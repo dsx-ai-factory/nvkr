@@ -890,11 +890,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-csi-node-driver-regis-b17474c2d7cb:
     name: 'Publish output-csi-node-driver-registrar-image-arm64'
@@ -906,11 +905,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-postgresql:
     name: 'Publish output-postgresql'
@@ -922,11 +920,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-postgresql-image:
     name: 'Publish output-postgresql-image'
@@ -938,11 +935,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-postgresql-image-arm64:
     name: 'Publish output-postgresql-image-arm64'
@@ -954,11 +950,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-csi-node-driver-registrar-image:
     name: 'Sign and attest release and deliverables: output-csi-node-driver-registrar-image'
@@ -971,10 +966,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-csi-node-driver-registra-1ee01f3e15c9:
     name: 'Sign and attest release and deliverables: output-csi-node-driver-registrar-image-arm64'
@@ -987,10 +981,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-postgresql:
     name: 'Sign and attest release and deliverables: output-postgresql'
@@ -1003,10 +996,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-postgresql-image:
     name: 'Sign and attest release and deliverables: output-postgresql-image'
@@ -1019,10 +1011,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-postgresql-image-arm64:
     name: 'Sign and attest release and deliverables: output-postgresql-image-arm64'
@@ -1035,10 +1026,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-package-publication-spiffe-csi-image-arm64:
     name: 'Package publication bundle: publication-spiffe-csi-image-arm64'
@@ -1072,11 +1062,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-spiffe-csi-image-arm64:
     name: 'Sign and attest release and deliverables: output-spiffe-csi-image-arm64'
@@ -1089,10 +1078,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-spiffe-csi-image-sbom:
     name: 'Generate SBOMs: spiffe-csi-image'
@@ -1136,11 +1124,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-spiffe-csi-image:
     name: 'Sign and attest release and deliverables: output-spiffe-csi-image'
@@ -1153,10 +1140,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-package-publication-spire-agent-image-arm64:
     name: 'Package publication bundle: publication-spire-agent-image-arm64'
@@ -1190,11 +1176,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-spire-agent-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-agent-image-arm64'
@@ -1207,10 +1192,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-spire-agent-image-sbom:
     name: 'Generate SBOMs: spire-agent-image'
@@ -1254,11 +1238,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-spire-agent-image:
     name: 'Sign and attest release and deliverables: output-spire-agent-image'
@@ -1271,10 +1254,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-package-publication-spire-bash-image-arm64:
     name: 'Package publication bundle: publication-spire-bash-image-arm64'
@@ -1308,11 +1290,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-spire-bash-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-bash-image-arm64'
@@ -1325,10 +1306,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-spire-bash-image-sbom:
     name: 'Generate SBOMs: spire-bash-image'
@@ -1372,11 +1352,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-spire-bash-image:
     name: 'Sign and attest release and deliverables: output-spire-bash-image'
@@ -1389,10 +1368,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-package-publication-spire-controller-14366a611047:
     name: 'Package publication bundle: publication-spire-controller-manager-image-arm64'
@@ -1426,11 +1404,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-spire-controller-manager-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-controller-manager-image-arm64'
@@ -1443,10 +1420,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-spire-controller-manager-image-sbom:
     name: 'Generate SBOMs: spire-controller-manager-image'
@@ -1490,11 +1466,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-spire-controller-manager-image:
     name: 'Sign and attest release and deliverables: output-spire-controller-manager-image'
@@ -1507,10 +1482,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-spire-crds-sbom:
     name: 'Generate SBOMs: spire-crds'
@@ -1554,11 +1528,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-spire-crds:
     name: 'Sign and attest release and deliverables: output-spire-crds'
@@ -1571,10 +1544,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-package-publication-spire-oidc-image-arm64:
     name: 'Package publication bundle: publication-spire-oidc-image-arm64'
@@ -1608,11 +1580,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-spire-oidc-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-oidc-image-arm64'
@@ -1625,10 +1596,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-spire-oidc-image-sbom:
     name: 'Generate SBOMs: spire-oidc-image'
@@ -1672,11 +1642,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-spire-oidc-image:
     name: 'Sign and attest release and deliverables: output-spire-oidc-image'
@@ -1689,10 +1658,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-package-publication-spire-server-image-arm64:
     name: 'Package publication bundle: publication-spire-server-image-arm64'
@@ -1726,11 +1694,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-spire-server-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-server-image-arm64'
@@ -1743,10 +1710,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-spire-server-image-sbom:
     name: 'Generate SBOMs: spire-server-image'
@@ -1790,11 +1756,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-spire-server-image:
     name: 'Sign and attest release and deliverables: output-spire-server-image'
@@ -1807,10 +1772,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-package-publication-spire-tpm-server-image-arm64:
     name: 'Package publication bundle: publication-spire-tpm-server-image-arm64'
@@ -1844,11 +1808,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-spire-tpm-server-image-arm64:
     name: 'Sign and attest release and deliverables: output-spire-tpm-server-image-arm64'
@@ -1861,10 +1824,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-spire-tpm-server-image-sbom:
     name: 'Generate SBOMs: spire-tpm-server-image'
@@ -1908,11 +1870,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-spire-tpm-server-image:
     name: 'Sign and attest release and deliverables: output-spire-tpm-server-image'
@@ -1925,10 +1886,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-spire-sbom:
     name: 'Generate SBOMs: spire'
@@ -1972,11 +1932,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-spire:
     name: 'Sign and attest release and deliverables: output-spire'
@@ -1989,10 +1948,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-package-publication-temporal-admin-t-619203c9c277:
     name: 'Package publication bundle: publication-temporal-admin-tools-image-arm64'
@@ -2026,11 +1984,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-temporal-admin-tools-image-arm64:
     name: 'Sign and attest release and deliverables: output-temporal-admin-tools-image-arm64'
@@ -2043,10 +2000,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-temporal-admin-tools-image-sbom:
     name: 'Generate SBOMs: temporal-admin-tools-image'
@@ -2090,11 +2046,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-temporal-admin-tools-image:
     name: 'Sign and attest release and deliverables: output-temporal-admin-tools-image'
@@ -2107,10 +2062,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-package-publication-temporal-server-image-arm64:
     name: 'Package publication bundle: publication-temporal-server-image-arm64'
@@ -2144,11 +2098,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-temporal-server-image-arm64:
     name: 'Sign and attest release and deliverables: output-temporal-server-image-arm64'
@@ -2161,10 +2114,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-temporal-server-image-sbom:
     name: 'Generate SBOMs: temporal-server-image'
@@ -2208,11 +2160,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-temporal-server-image:
     name: 'Sign and attest release and deliverables: output-temporal-server-image'
@@ -2225,10 +2176,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-package-publication-temporal-ui-image-arm64:
     name: 'Package publication bundle: publication-temporal-ui-image-arm64'
@@ -2262,11 +2212,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-temporal-ui-image-arm64:
     name: 'Sign and attest release and deliverables: output-temporal-ui-image-arm64'
@@ -2279,10 +2228,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-temporal-ui-image-sbom:
     name: 'Generate SBOMs: temporal-ui-image'
@@ -2326,11 +2274,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-temporal-ui-image:
     name: 'Sign and attest release and deliverables: output-temporal-ui-image'
@@ -2343,10 +2290,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-temporal-sbom:
     name: 'Generate SBOMs: temporal'
@@ -2390,11 +2336,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-temporal:
     name: 'Sign and attest release and deliverables: output-temporal'
@@ -2407,10 +2352,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-csi-node-d-914d7376ead0:
     name: 'Verify release and deliverable signatures: output-csi-node-driver-registrar-image'
@@ -2422,10 +2366,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-csi-node-d-ed501e7759bf:
     name: 'Verify release and deliverable signatures: output-csi-node-driver-registrar-image-arm64'
@@ -2437,10 +2380,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-postgresql:
     name: 'Verify release and deliverable signatures: output-postgresql'
@@ -2452,10 +2394,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-postgresql-image:
     name: 'Verify release and deliverable signatures: output-postgresql-image'
@@ -2467,10 +2408,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-postgresql-image-arm64:
     name: 'Verify release and deliverable signatures: output-postgresql-image-arm64'
@@ -2482,10 +2422,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-spiffe-csi-image:
     name: 'Verify release and deliverable signatures: output-spiffe-csi-image'
@@ -2497,10 +2436,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-spiffe-csi-image-arm64:
     name: 'Verify release and deliverable signatures: output-spiffe-csi-image-arm64'
@@ -2512,10 +2450,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-spire:
     name: 'Verify release and deliverable signatures: output-spire'
@@ -2527,10 +2464,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-spire-agent-image:
     name: 'Verify release and deliverable signatures: output-spire-agent-image'
@@ -2542,10 +2478,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-spire-agen-690d58615fef:
     name: 'Verify release and deliverable signatures: output-spire-agent-image-arm64'
@@ -2557,10 +2492,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-spire-bash-image:
     name: 'Verify release and deliverable signatures: output-spire-bash-image'
@@ -2572,10 +2506,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-spire-bash-image-arm64:
     name: 'Verify release and deliverable signatures: output-spire-bash-image-arm64'
@@ -2587,10 +2520,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-spire-cont-81ba1c1e8041:
     name: 'Verify release and deliverable signatures: output-spire-controller-manager-image'
@@ -2602,10 +2534,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91:
     name: 'Verify release and deliverable signatures: output-spire-controller-manager-image-arm64'
@@ -2617,10 +2548,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-spire-crds:
     name: 'Verify release and deliverable signatures: output-spire-crds'
@@ -2632,10 +2562,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-spire-oidc-image:
     name: 'Verify release and deliverable signatures: output-spire-oidc-image'
@@ -2647,10 +2576,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-spire-oidc-image-arm64:
     name: 'Verify release and deliverable signatures: output-spire-oidc-image-arm64'
@@ -2662,10 +2590,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-spire-server-image:
     name: 'Verify release and deliverable signatures: output-spire-server-image'
@@ -2677,10 +2604,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-spire-serv-2ffabff52266:
     name: 'Verify release and deliverable signatures: output-spire-server-image-arm64'
@@ -2692,10 +2618,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-spire-tpm-server-image:
     name: 'Verify release and deliverable signatures: output-spire-tpm-server-image'
@@ -2707,10 +2632,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-spire-tpm-fdd5a5adf925:
     name: 'Verify release and deliverable signatures: output-spire-tpm-server-image-arm64'
@@ -2722,10 +2646,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-temporal:
     name: 'Verify release and deliverable signatures: output-temporal'
@@ -2737,10 +2660,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-temporal-a-9109bef2fded:
     name: 'Verify release and deliverable signatures: output-temporal-admin-tools-image'
@@ -2752,10 +2674,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-temporal-a-325229721989:
     name: 'Verify release and deliverable signatures: output-temporal-admin-tools-image-arm64'
@@ -2767,10 +2688,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-temporal-server-image:
     name: 'Verify release and deliverable signatures: output-temporal-server-image'
@@ -2782,10 +2702,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-temporal-s-030929bd4981:
     name: 'Verify release and deliverable signatures: output-temporal-server-image-arm64'
@@ -2797,10 +2716,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-temporal-ui-image:
     name: 'Verify release and deliverable signatures: output-temporal-ui-image'
@@ -2812,10 +2730,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac:
     name: 'Verify release and deliverable signatures: output-temporal-ui-image-arm64'
@@ -2827,10 +2744,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-package-release:
     name: 'Assemble release from verified output references'
@@ -2842,10 +2758,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-release:
     name: 'Publish release'
@@ -2857,11 +2772,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-release:
     name: 'Sign and attest release and deliverables: release'
@@ -2874,10 +2788,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-release:
     name: 'Verify release and deliverable signatures: release'
@@ -2889,10 +2802,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-results-00:
     name: 'Collect provider results: nvkr-results-00'
@@ -3105,17 +3017,16 @@ jobs:
   nvkr-lifecycle-run:
     name: Finalize Run and check completeness
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 15
+    timeout-minutes: 120
     needs: [nvkr-results-00, nvkr-results-01, nvkr-results-02, nvkr-results-03, nvkr-results-04, nvkr-results-05, nvkr-results-06, nvkr-results-07, nvkr-results-08, nvkr-results-09, nvkr-results-0a, nvkr-results-0b, nvkr-results-0c, nvkr-results-0d, nvkr-results-0e, nvkr-results-0f]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     env:
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source

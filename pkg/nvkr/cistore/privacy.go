@@ -77,7 +77,7 @@ func (b *backend) source(ctx context.Context, repository string, opts Options) (
 }
 
 // Transfer packages must have no reported repository association even while the
-// source repository is private. Publication separately permits private linkage.
+// source repository is private. Publication enforces the same linkage boundary.
 // Neither check proves independent grants; operators retain that ACL obligation.
 func (b *backend) checkPrivacy(ctx context.Context, request Request, source repositoryRecord, opts Options) (bool, error) {
 	return b.checkPackagePrivacy(ctx, strings.ToLower(strings.Split(request.Repository, "/")[1])+"/ci-artifacts", source, opts, true)

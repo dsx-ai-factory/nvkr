@@ -7,7 +7,7 @@ unrecorded. The [input instructions](../inputs/definitions/nvke/README.md#four-f
 current selections; [reconciliation](adr/reconciliation.md#maintained-input-and-schema-boundaries) owns
 implementation and acceptance status.
 
-The pilot is based on upstream `b8010971`. Current local measurements and historical research are reported
+The pilot incorporates upstream `afdca952` (2026-10-19). Current local measurements and historical research are reported
 separately. Historical tables retain baseline `258ab29bdfa0a6f65de9b761272f186293c6aa0e`; they do not
 describe the current generated bundles.
 This document changes no ADR contract or organizational acceptance decision.
@@ -28,6 +28,12 @@ and `.github/nvkr-run-nvke-<family>/`. Explicit signer policy matches that workf
 publication uses `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/<family>`. The resulting
 `<prefix>/releases@sha256:…` identifies only that family's Release.
 
+The family Environments preserve the combined candidate's independent production registry writer.
+The exact disks publication prefix also retains preparation of the existing private M2 toolchain pins
+using the fixed registry reader, before source or producer execution. Namespace lookalikes, child prefixes,
+other families and foreign toolchain owners receive no exception. These are credential projection
+contracts, not evidence of provisioned package access or hosted disk execution.
+
 The combined [Definition](../inputs/definitions/nvke/definition.yaml), production and development bundles,
 and their qualification paths remain available. The families are a reversible pilot, not a recursive
 replacement for the combined Release. Existing consumer acceptance of the combined publication cannot be
@@ -39,7 +45,7 @@ and drift contracts, not artifact production.
 
 ### Current local validation
 
-The extended split contract passed on 2026-10-17: all 73 complete native build records and 69 named
+The extended split contract passed on 2026-10-19 after the upstream merge: all 73 complete native build records and 69 named
 output-binding records matched the combined Plan byte-for-byte, including catalogs, producer graphs,
 material selections, evidence and aggregate child bindings. Each generated family bundle matched exact
 regeneration and retained independent file ownership. This comparison uses the validated combined Plan's
@@ -48,34 +54,38 @@ catalog snapshots; it does not independently fetch upstream sources or prove rep
 
 | Family | Outputs | Native targets | Factory nodes | Jobs | Workflow bytes | Plan bytes | Expanded YAML events |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Core | 20 | 24 | 210 | 198 | 130,347 | 651,128 | 15,377 |
-| Services | 28 | 28 | 258 | 233 | 151,403 | 548,762 | 18,450 |
-| Telemetry | 17 | 17 | 160 | 153 | 102,000 | 486,528 | 11,821 |
-| Disks | 4 | 4 | 106 | 55 | 58,454 | 501,678 | 5,187 |
-| Total | 69 | 73 | 734 | 639 | 442,204 | 2,188,096 | 50,835 |
+| Core | 20 | 24 | 210 | 198 | 130,455 | 651,282 | 15,247 |
+| Services | 28 | 28 | 258 | 233 | 151,551 | 548,972 | 18,272 |
+| Telemetry | 17 | 17 | 160 | 153 | 102,093 | 486,661 | 11,709 |
+| Disks | 4 | 4 | 106 | 55 | 61,523 | 501,720 | 5,293 |
+| Total | 69 | 73 | 734 | 639 | 445,622 | 2,188,635 | 50,521 |
 
-With the same current generator, the retained combined Plan has 716 nodes and its workflow has 580 jobs,
-384,031 bytes and 47,431 expanded YAML events; the Plan is 2,152,957 bytes. The split reduces the largest
-workflow to 233 jobs, 151,403 bytes and 18,450 events, while total jobs rise by 59 (10.17%) and total
-workflow bytes rise to 442,204. These measurements show reduced per-workflow breadth and parser demand,
+Measured on 2026-10-19 with the same current generator, the retained combined Plan has 716 nodes and its
+workflow has 580 jobs, 394,695 bytes and 47,055 expanded YAML events; the Plan is 2,153,454 bytes. The split
+reduces the largest workflow to 233 jobs, 151,551 bytes and 18,272 events, while total jobs rise by 59
+(10.17%) and total workflow bytes rise to 445,622. These measurements show reduced per-workflow breadth and parser demand,
 with higher aggregate job and byte counts.
 
 Each workflow's limits apply separately; the total event count is not one parsed workflow. All four
 family workflows and catalog refresh passed actionlint; relaxed yamllint passed these workflows, the
 family actions and authored inputs with line-length warnings.
 
-`make workflows-check` also passed on 2026-10-17 for all four families, combined production and its
+`make workflows-check` also passed on 2026-10-19 for all four families, combined production and its
 qualification bundle, development and its qualification bundle, both nightly bundles and catalog
 refresh. These CLI checks reauthenticated source pins and confirmed exact generated-bundle drift.
 This local source validation establishes no hosted execution, publication, qualification or downstream
 acceptance.
 
-The uncached `make check GO_TEST_FLAGS=-count=1` did not pass on macOS: delivery, factory and lifecycle
+The initial uncached `make check GO_TEST_FLAGS=-count=1` at `c19fdead` did not pass on macOS: delivery, factory and lifecycle
 exceeded the 20-minute package timeout. Formatting, license headers, vet, lint, shell checks and Python
 tests passed; a separate `make vulncheck` completed with no vulnerabilities found. The three subtests
 active at timeout (`readback_corrupt`, `missing_output_predicate`, and `version_mismatch`) each passed
 in a bounded focused rerun. Other Go packages completed successfully. The full-suite timeouts remain
-unresolved; these focused passes do not establish a clean repository gate.
+unresolved in that local run; these focused passes do not establish a clean repository gate.
+The initial [PR CI run](https://github.com/dsx-ai-factory/nvkr/actions/runs/39191781677)
+passed its Go check but failed workflow drift on the synthetic merge with newer upstream generator code.
+The current regeneration and drift checks incorporate those generator changes; no passing aggregate
+hosted gate is inferred from the earlier Go check.
 
 Focused source-access contracts also passed: acquired-only root/output pin-set sources are admitted,
 ordinary unselected and unknown sources are rejected, local execution remains unsupported, snapshot

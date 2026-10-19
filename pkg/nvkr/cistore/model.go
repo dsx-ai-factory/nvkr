@@ -48,6 +48,10 @@ type Options struct {
 	// RepositoryToken authenticates source repository metadata independently of
 	// the package credential. When empty, Token supplies that explicit fallback.
 	RepositoryToken string
+	// AllowEarlierAttempts permits same-Run source attempts up to Request.Attempt
+	// in DownloadGitHub and DownloadGitHubNested only. Exact store APIs and
+	// locator validation remain strict; original source bindings are preserved.
+	AllowEarlierAttempts bool
 }
 
 // Locator is descriptive metadata suitable for a small Actions artifact.

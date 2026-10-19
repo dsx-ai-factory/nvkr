@@ -111,13 +111,13 @@ func githubStagePermissions(plan *Plan, stage githubStage) (map[string]string, e
 	if node.Kind == NodePublish {
 		permissions := map[string]string{"contents": "read"}
 		target := plan.Targets[node.Target]
-		if target.CredentialRef != "" && strings.HasPrefix(target.Ref, "ghcr.io/") && !plan.Environment.GitHubDevelopment {
+		if target.CredentialRef != "" && strings.HasPrefix(target.Ref, "ghcr.io/") && !githubScopedPublication(plan) {
 			permissions["packages"] = "write"
 		}
 		return permissions, nil
 	}
 	if len(githubStagePrivateImages(plan, stage)) > 0 {
-		return map[string]string{"contents": "read", "packages": "read"}, nil
+		return map[string]string{"contents": "read"}, nil
 	}
 	return nil, nil
 }
@@ -125,7 +125,7 @@ func githubStagePermissions(plan *Plan, stage githubStage) (map[string]string, e
 func githubFinalizerPermissions(plan *Plan) map[string]string {
 	if PerOutputPublication(plan) {
 		permissions := map[string]string{"contents": "read"}
-		if !plan.Environment.GitHubDevelopment {
+		if !githubScopedPublication(plan) {
 			permissions["packages"] = "read"
 		}
 		return permissions
@@ -418,10 +418,16 @@ func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string
 				"NVKR_CI_NAME", githubYAMLString("${{ inputs.name }}"), "NVKR_CI_PATTERN", githubYAMLString("${{ inputs.pattern }}"),
 				"NVKR_CI_MERGE", githubYAMLString("${{ inputs.merge-multiple || 'false' }}"),
 				"NVKR_CI_RUN", githubYAMLString("${{ inputs.run-id }}"), "NVKR_CI_ATTEMPT", githubYAMLString("${{ inputs.attempt }}"))
-			locatorCommand := "set -eu\nexec " + helper + " factory github ci-fetch-locators --index-dir \"$NVKR_CI_INDEX\" --name \"$NVKR_CI_NAME\" --pattern \"$NVKR_CI_PATTERN\" --merge-multiple=\"$NVKR_CI_MERGE\" --run-id \"$NVKR_CI_RUN\" --attempt \"$NVKR_CI_ATTEMPT\""
+			locatorCommand := "exec " + helper + " factory github ci-fetch-locators --index-dir \"$NVKR_CI_INDEX\" --name \"$NVKR_CI_NAME\" --pattern \"$NVKR_CI_PATTERN\" --merge-multiple=\"$NVKR_CI_MERGE\" --run-id \"$NVKR_CI_RUN\" --attempt \"$NVKR_CI_ATTEMPT\""
+			// The Environment enables reuse only for implicit current-Run reads.
+			// Development namespaces and explicit cross-Run consumers stay exact.
+			retrySetup := fmt.Sprintf("set -eu\nallow_earlier=%t\nif [ -n \"$NVKR_CI_RUN\" ]; then allow_earlier=false; fi\n", !plan.Environment.GitHubDevelopment)
+			retryPolicy := " --allow-earlier-attempts=\"$allow_earlier\""
+			locatorCommand = retrySetup + locatorCommand + retryPolicy
 			steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Download metadata and private locators"), "shell", githubYAMLString("bash"), "env", locatorEnv, "run", githubYAMLString(locatorCommand)))
 			download := helper + " factory github ci-download --index-dir \"$NVKR_CI_INDEX\" --destination \"${NVKR_CI_DESTINATION:-.}\" --run-id \"$NVKR_CI_RUN\" --attempt \"$NVKR_CI_ATTEMPT\""
-			command := "set -eu\n"
+			download += retryPolicy
+			command := retrySetup
 			if mode == "download" {
 				githubYAMLSet(env, "NVKR_CI_STAGE", githubYAMLString("${{ inputs."+githubCIRestoreStageInput+" }}"))
 				command += "if [ -n \"$NVKR_CI_STAGE\" ]; then\n  exec " + download + " --plan " + shellQuote(githubLayoutFor(plan).planPath) + " --stage \"$NVKR_CI_STAGE\"\nfi\n"

@@ -111,8 +111,8 @@ nvkr run diff --before /tmp/nvkr-plan-before.json --after .github/nvkr-run/plan.
 nvkr run diff --before /tmp/nvkr-plan-before.json --after .github/nvkr-run/plan.json --format json
 ```
 
-The root regeneration uses the committed M2 inputs and the generator identity described in the
-[M2 instructions](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md). Generate alternative Definitions into scratch roots
+The root regeneration uses the committed maintained NVKE inputs and the generator identity described in the
+[maintained NVKE Definition's instructions](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md). Generate alternative Definitions into scratch roots
 as shown in the [pipeline guide](generate-pipeline.md).
 
 The default text report identifies changed, added or removed per-output Build Digests, counts every changed
@@ -152,7 +152,7 @@ bundle format are unchanged.
 
 Contract tests cover exact-byte JSON, display-only pretty JSON, caller-mutation isolation, invalid complete
 Plans, bounded/no-follow file loading, complete graph vertices and edges including the maintained controller
-chart/CWE relationship, diagram escaping, stable named comparisons, ordered argv/patches, large integers,
+chart/management-plane image relationship, diagram escaping, stable named comparisons, ordered argv/patches, large integers,
 absent-versus-null values, and transport/execution changes that preserve Build Digests. CLI tests cover
 file views, graph formats, concise/full differences, exit status and failure before output. These
 contracts live in [the Plan-view tests](https://github.com/dsx-ai-factory/nvkr/tree/main/pkg/nvkr/planview) and the CLI inspection tests.

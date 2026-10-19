@@ -23,7 +23,7 @@ func TestMaintainedM2CandidatePublicationNamespace(t *testing.T) {
 	if candidate.Publication.RepositoryPrefix != prefix || candidate.Publication.RepositoryPrefix == production.Publication.RepositoryPrefix {
 		t.Fatal("candidate namespace overlaps production outputs")
 	}
-	if candidate.Publication.CredentialRef != production.Publication.CredentialRef || candidate.Signing.Mode != production.Signing.Mode || candidate.Signing.Issuer != production.Signing.Issuer {
+	if candidate.Publication.CredentialRef != ProductionRegistryWriteCredential || candidate.Signing.Mode != production.Signing.Mode || candidate.Signing.Issuer != production.Signing.Issuer {
 		t.Fatal("candidate changed registry credential or signing mode/issuer")
 	}
 	// The maintained Environment must not carry a candidate-test branch into main.

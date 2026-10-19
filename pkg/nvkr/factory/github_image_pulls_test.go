@@ -115,6 +115,14 @@ func TestPrivateToolchainPublicationBoundary(t *testing.T) {
 		want                     bool
 	}{
 		{"current", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
+		{"disk family current subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
+		{"disk family prefix lookalike", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-mirror", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
+		{"disk family child prefix", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks/other", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
+		{"other family prefix", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/core", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
+		{"foreign disk family owner", "ghcr.io/other/nvkr/m2-candidate/disks", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
+		{"disk family foreign toolchain owner", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks", "ghcr.io/other/nvkr/m2-candidate/toolchains/packer", false, false},
+		{"disk family unsupported repository", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false, false},
+		{"disk family non-toolchain subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/other/packer", false, false},
 		{"unsupported repository", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false, false},
 		{"nightly current subject", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
 		{"nightly unsupported repository", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false, false},
@@ -152,10 +160,17 @@ func TestPrivateToolchainPublicationBoundary(t *testing.T) {
 	}
 }
 
-func TestMaintainedNightlyPrivateImageCredentialBoundary(t *testing.T) {
-	for _, profile := range []string{"nvke-nightly-arm64", "nvke-nightly-upstream-ovn-arm64"} {
-		t.Run(profile, func(t *testing.T) {
-			plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-"+profile+"/plan.json")
+func TestMaintainedNamedPrivateImageCredentialBoundary(t *testing.T) {
+	for _, profile := range []struct {
+		name  string
+		disks int
+	}{
+		{"nvke-nightly-arm64", 1},
+		{"nvke-nightly-upstream-ovn-arm64", 1},
+		{"nvke-disks", 4},
+	} {
+		t.Run(profile.name, func(t *testing.T) {
+			plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-"+profile.name+"/plan.json")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -170,8 +185,8 @@ func TestMaintainedNightlyPrivateImageCredentialBoundary(t *testing.T) {
 				prepareIndex, executionIndex := -1, -1
 				for index, step := range job.Steps {
 					if step.Env[githubImageToken] != "" {
-						if prepared || job.Permissions["packages"] != "read" || job.Permissions["id-token"] != "" || job.Env[githubImageToken] != "" || step.Env[sourceTokenEnv] != "" ||
-							step.Env[githubImageToken] != "${{ github.token }}" || !strings.Contains(step.Run, "factory github prepare-images ") {
+						if prepared || job.Permissions["packages"] != "" || job.Permissions["id-token"] != "" || job.Env[githubImageToken] != "" || step.Env[sourceTokenEnv] != "" ||
+							step.Env[githubImageToken] != "${{ secrets.NVKR_REGISTRY_READ }}" || !strings.Contains(step.Run, "factory github prepare-images ") {
 							t.Fatal("toolchain credential escaped its separate read-only preparation step")
 						}
 						prepared = true
@@ -191,7 +206,7 @@ func TestMaintainedNightlyPrivateImageCredentialBoundary(t *testing.T) {
 					t.Fatal("toolchain preparation did not precede source or producer execution")
 				}
 			}
-			if disks != 1 || fetches == 0 {
+			if disks != profile.disks || fetches == 0 {
 				t.Fatalf("missing private preparation for native disk or its source vendors: %d/%d", disks, fetches)
 			}
 		})
@@ -214,7 +229,7 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 			if step.Env[githubImageToken] == "" {
 				continue
 			}
-			if job.Permissions["packages"] != "read" || job.Permissions["id-token"] != "" || step.Env[sourceTokenEnv] != "" ||
+			if job.Permissions["packages"] != "" || job.Permissions["id-token"] != "" || step.Env[sourceTokenEnv] != "" ||
 				!strings.Contains(step.Run, "factory github prepare-images ") {
 				t.Fatal("toolchain credential escaped its read-only preparation step")
 			}
@@ -242,7 +257,39 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 	if jobID == "" {
 		t.Fatal("fixture lacks a native private-image preparation job")
 	}
-	member, _ := githubTestSharedInvocation(t, bundle, jobID, "images", jobID)
+	member, part := githubTestSharedInvocation(t, bundle, jobID, "images", jobID)
+	for _, input := range []string{"nvkr-toolchain-read-token", "nvkr-toolchain-read-user"} {
+		for _, change := range []string{"missing", "empty", "substituted"} {
+			t.Run(input+"/"+change, func(t *testing.T) {
+				changed := mutateGitHubBundleYAML(t, bundle, bundle.WorkflowPath, func(root *yamlv3.Node) {
+					steps := githubTestYAMLField(t, root, "jobs", jobID, "steps")
+					found := false
+					for _, step := range steps.Content {
+						with := githubYAMLField(step, "with")
+						if githubYAMLValue(with, "parameters") == githubParametersExpression(part) {
+							found = true
+							if change == "missing" {
+								githubYAMLRemove(with, input)
+							} else {
+								value := ""
+								if change == "substituted" {
+									value = "${{ vars.OTHER_READER }}"
+									if input == "nvkr-toolchain-read-token" {
+										value = "${{ secrets.OTHER_TOKEN }}"
+									}
+								}
+								githubYAMLSet(with, input, githubYAMLString(value))
+							}
+						}
+					}
+					if !found {
+						t.Fatal("private image caller missing")
+					}
+				})
+				assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), e.CodeEngineCapability)
+			})
+		}
+	}
 	for _, test := range []struct {
 		name, member string
 		mutate       func(*testing.T, *yamlv3.Node)
@@ -253,7 +300,7 @@ func TestMaintainedM2PrivateImageCredentialBoundary(t *testing.T) {
 		{"wrong credential", member, func(t *testing.T, root *yamlv3.Node) {
 			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "id", "operation_images")
 			token := githubTestYAMLField(t, step, "env", githubImageToken)
-			if token.Value != "${{ github.token }}" {
+			if token.Value != "${{ inputs.nvkr-toolchain-read-token }}" {
 				t.Fatalf("fixture image token differs: %q", token.Value)
 			}
 			token.Value = "${{ secrets.NKE_SOURCE_TOKEN }}"

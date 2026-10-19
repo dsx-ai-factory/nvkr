@@ -26,6 +26,9 @@ func RestoreGitHubPrivateInputs(ctx context.Context, plan *Plan, stageID string,
 	if err != nil {
 		return err
 	}
+	if storage.AllowEarlierAttempts && plan.Environment.GitHubDevelopment {
+		return e.New(e.CodeEngineCapability, "development CI restoration requires exact source attempts")
+	}
 	var selected *githubStage
 	for i := range stages {
 		if stages[i].ID == stageID {

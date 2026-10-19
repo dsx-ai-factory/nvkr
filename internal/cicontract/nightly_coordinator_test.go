@@ -91,7 +91,7 @@ func TestNightlyCoordinatorMaintainsExplicitProducerAndRuntimeBoundary(t *testin
 		t.Fatal("runtime target allocated before completed candidate selection")
 	}
 	if !reflect.DeepEqual(build.Permissions, map[string]string{"contents": "read", "actions": "write"}) ||
-		!reflect.DeepEqual(runtime.Permissions, map[string]string{"contents": "read", "actions": "read", "packages": "read"}) ||
+		!reflect.DeepEqual(runtime.Permissions, map[string]string{"contents": "read", "actions": "read"}) ||
 		runtime.RunsOn != "arc-arm64-kvm" || runtime.Environment != "nvkr-arc" ||
 		runtime.Concurrency.CancelInProgress || runtime.Concurrency.Group != "nvkr-nightly-native-arm64-runtime" ||
 		runtime.TimeoutMinutes != 360 {

@@ -65,7 +65,6 @@ jobs:
     if: inputs.verify_published && startsWith(github.ref, 'refs/heads/')
     permissions:
       contents: read
-      packages: read
     strategy:
       fail-fast: false
       matrix:
@@ -123,14 +122,14 @@ jobs:
           esac
           printf 'packer=%s\ninspector=%s\n' "$packer" "$inspector" \
             >> "$GITHUB_OUTPUT"
-      - name: Pull exact images with the repository workflow token
+      - name: Pull exact images with the independent registry reader
         timeout-minutes: 10
         env:
           NATIVE_ARCH: ${{ matrix.arch }}
           PACKER_IMAGE: ${{ steps.pins.outputs.packer }}
           INSPECTOR_IMAGE: ${{ steps.pins.outputs.inspector }}
-          GHCR_USER: ${{ github.actor }}
-          GHCR_TOKEN: ${{ github.token }}
+          GHCR_USER: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          GHCR_TOKEN: ${{ secrets.NVKR_REGISTRY_READ }}
         run: |
           set -euo pipefail
           DOCKER_CONFIG=$(mktemp -d "$RUNNER_TEMP/nvkr-toolchain-pull.XXXXXX")

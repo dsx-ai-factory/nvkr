@@ -59,7 +59,7 @@ native-host preflight and owned-resource cleanup remain required.
 
 Both Definitions select the profile-owned site catalog at exact NVKE candidate commit
 `a8391755d12d99f859783c6cf390338debd1e085` for the CLI, controller image,
-controller chart and NKTP chart. The baseline suite selection uses that same revision,
+controller chart and NVKE telemetry pipelines chart. The baseline suite selection uses that same revision,
 including the runtime `^TestE2E$` selection and candidate-input fixes. Relative to
 the previous product source, only eight adapter, test and documentation files
 changed; CLI, controller and chart producer code is unchanged. The source and
@@ -107,7 +107,7 @@ also completed on `arc-arm64-kvm`. These results establish those capabilities.
 The new combined publication-to-runtime nightly cycle has not yet passed;
 historical NVKR records do not establish current-schema Release acceptance.
 
-Forge YTL, AZ61, DSX and Redstone profiles remain subsequent work. Each needs its
+Site-specific NICo deployment profiles remain subsequent work. Each needs its
 own component closure, runtime configuration, access, usable capacity and cleanup
 ownership. The special TestGrid integration remains deferred.
 

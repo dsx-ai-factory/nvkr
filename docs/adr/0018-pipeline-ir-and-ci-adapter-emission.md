@@ -151,9 +151,21 @@ The generated workflow admits at most 2,000 Actions uploads per attempt, countin
 finalization uploads even when conditional. The Go transport owner acquires selected records serially,
 looking up each fixed name through the authenticated same-Run API. Exact-name queries avoid listing cutoffs
 and page-position races. The Run-attempt response binds repository IDs and head; each lookup must return
-zero or one matching artifact. Each ZIP must match its provider SHA-256 and contain one canonical record
-bound to repository, Run, attempt and selected name. Private locators retain their 32 KiB decoded limit;
-public metadata uses the bounds above. ZIPs are bounded to 33 MiB and the complete decoded index to 128 MiB.
+zero or one matching artifact for exact-attempt consumers. Production retry selection admits at most
+100 same-name candidates in one complete response, with at most 2,000 candidates across the selection.
+Every candidate must authenticate before selecting the greatest source attempt; multiple records for
+one source attempt are ambiguous and fail closed, regardless of provider order or artifact ID.
+Truncated responses, invalid candidates and future attempts fail closed without index publication.
+Each ZIP must match its provider SHA-256 and contain one canonical record
+bound to repository, Run, source attempt and selected name. Production transfer templates explicitly admit
+retained records from earlier canonical positive attempts of that same Run, no later than the consuming
+attempt. Provider repository/head and ZIP authentication still precede index publication; restoration
+preserves each original source request and private image/config binding. Different repositories, Runs,
+names and future attempts fail closed. Development templates and explicitly selected cross-Run downloads
+remain exact-attempt; the exact store and qualification APIs do not inherit this transport opt-in.
+Consumer Plan, invocation, signature and completeness checks still own acceptance under ADR-20.
+Private locators retain their 32 KiB decoded limit;
+public metadata uses the bounds above. ZIPs are bounded to 33 MiB and the aggregate decoded candidate bytes to 128 MiB, including unselected candidates.
 Provider digests and all selected records are checked before publishing the fresh index. Actions acquisition
 uses the repository workflow token; metadata-only restoration needs no registry credential or package API
 request. Mixed stage batches admit their complete selection and private credentials before transfer. Private
@@ -196,8 +208,14 @@ An interrupted chunk body may restart extraction only for narrowly typed transie
 three attempts with one- and two-second cancellable waits under the original deadline. Each attempt opens
 fresh bodies from the authenticated immutable descriptors and repeats full archive verification. Failed
 responses must close and all failed extraction staging must be removed before retry. Integrity, archive,
-filesystem, cleanup and publication failures do not authorize this recovery. Diagnostics expose fixed
-categories and byte counts without retaining provider URLs, credentials or response bodies.
+filesystem, cleanup and publication failures do not authorize this recovery. Admitted HTTP/2 interruptions
+are typed, nonzero-stream peer resets with `PROTOCOL_ERROR`, `INTERNAL_ERROR` or `REFUSED_STREAM`;
+local protocol violations, connection errors, other reset codes and matching error text do not qualify.
+The pinned Go standard-library transport converts its stream errors to the pinned public HTTP/2 error
+type. Bounded single-cause extraction wrappers may preserve the exact stream-issued retry permission;
+joined independent failures cannot acquire it. Diagnostics distinguish the admitted reset categories and
+byte counts without retaining provider URLs, credentials or response bodies. Recovery restarts the entire
+archive rather than trusting a partially received prefix, and repeats neither publication nor signing.
 
 CI transfer admission requires an API-confirmed private/internal package with no linked repository,
 including while the source remains private. A missing package may receive an empty metadata-only seed;
@@ -318,18 +336,22 @@ publication operations remain on hosted runners. Those runners restore the prepa
 disk producer's full material closure.
 
 Internal native toolchains beneath the candidate publication prefix's `toolchains/`
-repositories use a separate preparation step with `contents: read` and `packages: read`.
-The maintained M2 and two NVKE nightly publication prefixes also reuse the already-published
-`ghcr.io/dsx-ai-factory/{nvkr,nke-recipes}/m2-candidate/toolchains/` pins. Reusing these
-toolchain subjects does not relocate them into the nightly output namespace or admit unrelated
-publication owners or toolchain repositories.
-Only that step receives the ephemeral workflow token. The helper admits the complete Plan,
+repositories use a separate preparation step with `contents: read` and no workflow package scope.
+The maintained M2, exact `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks` family and two NVKE
+nightly publication prefixes also reuse the already-published
+`ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/` pins. Reusing these toolchain subjects does
+not relocate them into family or nightly output namespaces. Other family prefixes, child or lookalike
+prefixes, unrelated publication owners and other toolchain repositories remain excluded from this exception.
+Only that step receives the independent `NVKR_REGISTRY_READ` credential and explicit account.
+The entry workflow binds both values as explicit composite inputs; composite metadata does not evaluate
+caller-only `vars` or `secrets` contexts. Calls without image preparation omit both inputs, whose empty
+defaults are admitted only with the absent image role. The helper admits the complete Plan,
 native platform and disk host requirements before pulling; it uses a private temporary Docker
 configuration and deletes it on success or failure before source or producer execution.
 Held runtime observation accepts an already-local exact repository digest, rejects a present
 but mismatched record, and pulls only after a failed local lookup. Image/platform/tool-byte
 admission remains required. No registry credential is forwarded into producer containers.
-The package owner must grant the workflow repository Actions read access separately.
+The package owner grants the reader account access without granting the source repository Actions access.
 
 Each generated native disk producer first prepares access to the fixed `/dev/kvm` path, before checkout,
 helper downloads or input restoration. The credential-free, one-minute step rejects a missing device,
@@ -923,7 +945,10 @@ Development and production have separate generated layouts and concurrency group
 development cancels superseded same-branch Runs and retains helpers/carriers for one day. Signed development,
 like production, is non-canceling and retains helpers/carriers for seven days to cover native disk budgets.
 Final Run records and production qualification handoffs retain seven days and disk diagnostics one day. Provider cancellation or runner loss can
-prevent finalization. Expired carriers require a complete new Run. Signed development uses per-attempt
+prevent finalization. Release finalizers have a dedicated two-hour job budget for bootstrap, bounded
+carrier acquisition/restoration, complete-release authentication and record uploads; the fifteen-minute
+utility-job budget does not apply. This bound is not evidence of successful hosted completion.
+Expired carriers require a complete new Run. Signed development uses per-attempt
 registry namespaces and full-attempt retries; production's authenticated earlier-attempt reuse is unchanged.
 These retention periods govern provider locator records. Private carrier blobs have no automatic expiry
 in this implementation; registry retention must be managed separately, without removing active Run inputs.

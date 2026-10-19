@@ -21,6 +21,7 @@ import (
 )
 
 const githubImageToken = "NVKR_TOOLCHAIN_READ_TOKEN"
+const githubImageUser = "NVKR_TOOLCHAIN_READ_USER"
 
 func githubPrivateToolchain(plan *Plan, image string) bool {
 	if plan.Environment.GitHubARC != "native-kvm-v1" || !strings.Contains(image, "@sha256:") {
@@ -40,14 +41,15 @@ func githubPrivateToolchain(plan *Plan, image string) bool {
 	}
 	// Development publication does not move already-pinned native toolchains.
 	// Only the maintained NVKR development namespace may prepare the
-	// toolchain roots, using the separate read-only workflow token.
+	// toolchain roots, using the separate read-only registry credential.
 	if plan.Environment.GitHubDevelopment && prefix == "ghcr.io/dsx-ai-factory/nvkr/development" {
 		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/")
 	}
-	// Maintained nightly outputs reuse the same published, pinned M2 tooling.
+	// Maintained disk-family and nightly outputs reuse the published M2 tooling.
 	// Output publication does not relocate those subjects or authorize other owners.
 	switch prefix {
 	case "ghcr.io/dsx-ai-factory/nvkr/m2-candidate",
+		"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks",
 		"ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64",
 		"ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-upstream-ovn-arm64":
 		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/")
@@ -73,7 +75,7 @@ func githubStagePrivateImages(plan *Plan, stage githubStage) []string {
 }
 
 func githubImageEnvironment() map[string]string {
-	return map[string]string{githubImageToken: "${{ github.token }}", "NVKR_TOOLCHAIN_READ_USER": "${{ github.actor }}"}
+	return map[string]string{githubImageToken: "${{ secrets.NVKR_REGISTRY_READ }}", githubImageUser: "${{ vars.NVKR_REGISTRY_READ_USER }}"}
 }
 
 // PrepareGitHubImages is a separate credential-bearing step. Its temporary Docker

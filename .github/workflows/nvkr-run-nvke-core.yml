@@ -1390,11 +1390,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-capi-controller-image-arm64:
     name: 'Publish output-capi-controller-image-arm64'
@@ -1406,11 +1405,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-capi-kubeadm-bootstrap-image:
     name: 'Publish output-capi-kubeadm-bootstrap-image'
@@ -1422,11 +1420,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-capi-kubeadm-bootstra-07670d07d213:
     name: 'Publish output-capi-kubeadm-bootstrap-image-arm64'
@@ -1438,11 +1435,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-capi-kubeadm-control-plane-image:
     name: 'Publish output-capi-kubeadm-control-plane-image'
@@ -1454,11 +1450,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-capi-kubeadm-control-189e7620a1e0:
     name: 'Publish output-capi-kubeadm-control-plane-image-arm64'
@@ -1470,11 +1465,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-capnico-controller:
     name: 'Publish output-capnico-controller'
@@ -1486,11 +1480,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-cert-manager-cainjector-image:
     name: 'Publish output-cert-manager-cainjector-image'
@@ -1502,11 +1495,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-cert-manager-cainject-37550fcc232b:
     name: 'Publish output-cert-manager-cainjector-image-arm64'
@@ -1518,11 +1510,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-cert-manager-controller-image:
     name: 'Publish output-cert-manager-controller-image'
@@ -1534,11 +1525,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-cert-manager-controll-1c8e088fb6a6:
     name: 'Publish output-cert-manager-controller-image-arm64'
@@ -1550,11 +1540,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-cert-manager-webhook-image:
     name: 'Publish output-cert-manager-webhook-image'
@@ -1566,11 +1555,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-cert-manager-webhook-image-arm64:
     name: 'Publish output-cert-manager-webhook-image-arm64'
@@ -1582,11 +1570,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-cluster-api-provider-provisioned:
     name: 'Publish output-cluster-api-provider-provisioned'
@@ -1598,11 +1585,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-controller-chart:
     name: 'Publish output-controller-chart'
@@ -1614,11 +1600,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-cwe:
     name: 'Publish output-cwe'
@@ -1630,11 +1615,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nico-reference-profiles-fixture:
     name: 'Publish output-nico-reference-profiles-fixture'
@@ -1646,11 +1630,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nvkectl:
     name: 'Publish output-nvkectl'
@@ -1662,11 +1645,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nvkectl-linux-arm64:
     name: 'Publish output-nvkectl-linux-arm64'
@@ -1678,11 +1660,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-operator-tools:
     name: 'Publish output-operator-tools'
@@ -1694,11 +1675,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-capi-controller-image:
     name: 'Sign and attest release and deliverables: output-capi-controller-image'
@@ -1711,10 +1691,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-capi-controller-image-arm64:
     name: 'Sign and attest release and deliverables: output-capi-controller-image-arm64'
@@ -1727,10 +1706,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-capi-kubeadm-bootstrap-image:
     name: 'Sign and attest release and deliverables: output-capi-kubeadm-bootstrap-image'
@@ -1743,10 +1721,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-capi-kubeadm-bootstrap-image-arm64:
     name: 'Sign and attest release and deliverables: output-capi-kubeadm-bootstrap-image-arm64'
@@ -1759,10 +1736,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-capi-kubeadm-control-plane-image:
     name: 'Sign and attest release and deliverables: output-capi-kubeadm-control-plane-image'
@@ -1775,10 +1751,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-capi-kubeadm-control-pla-d95378faf55b:
     name: 'Sign and attest release and deliverables: output-capi-kubeadm-control-plane-image-arm64'
@@ -1791,10 +1766,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-capnico-controller:
     name: 'Sign and attest release and deliverables: output-capnico-controller'
@@ -1807,10 +1781,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-cert-manager-cainjector-image:
     name: 'Sign and attest release and deliverables: output-cert-manager-cainjector-image'
@@ -1823,10 +1796,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-cert-manager-cainjector-image-arm64:
     name: 'Sign and attest release and deliverables: output-cert-manager-cainjector-image-arm64'
@@ -1839,10 +1811,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-cert-manager-controller-image:
     name: 'Sign and attest release and deliverables: output-cert-manager-controller-image'
@@ -1855,10 +1826,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-cert-manager-controller-image-arm64:
     name: 'Sign and attest release and deliverables: output-cert-manager-controller-image-arm64'
@@ -1871,10 +1841,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-cert-manager-webhook-image:
     name: 'Sign and attest release and deliverables: output-cert-manager-webhook-image'
@@ -1887,10 +1856,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-cert-manager-webhook-image-arm64:
     name: 'Sign and attest release and deliverables: output-cert-manager-webhook-image-arm64'
@@ -1903,10 +1871,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-cluster-api-provider-provisioned:
     name: 'Sign and attest release and deliverables: output-cluster-api-provider-provisioned'
@@ -1919,10 +1886,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-controller-chart:
     name: 'Sign and attest release and deliverables: output-controller-chart'
@@ -1935,10 +1901,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-cwe:
     name: 'Sign and attest release and deliverables: output-cwe'
@@ -1951,10 +1916,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nico-reference-profiles-fixture:
     name: 'Sign and attest release and deliverables: output-nico-reference-profiles-fixture'
@@ -1967,10 +1931,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nvkectl:
     name: 'Sign and attest release and deliverables: output-nvkectl'
@@ -1983,10 +1946,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nvkectl-linux-arm64:
     name: 'Sign and attest release and deliverables: output-nvkectl-linux-arm64'
@@ -1999,10 +1961,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-operator-tools:
     name: 'Sign and attest release and deliverables: output-operator-tools'
@@ -2015,10 +1976,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-capi-controller-image:
     name: 'Verify release and deliverable signatures: output-capi-controller-image'
@@ -2030,10 +1990,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-capi-contr-a309e0dde6c8:
     name: 'Verify release and deliverable signatures: output-capi-controller-image-arm64'
@@ -2045,10 +2004,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-capi-kubea-400c7177454b:
     name: 'Verify release and deliverable signatures: output-capi-kubeadm-bootstrap-image'
@@ -2060,10 +2018,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-capi-kubea-8c536327dae9:
     name: 'Verify release and deliverable signatures: output-capi-kubeadm-bootstrap-image-arm64'
@@ -2075,10 +2032,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-capi-kubea-a1d9f5feb0f6:
     name: 'Verify release and deliverable signatures: output-capi-kubeadm-control-plane-image'
@@ -2090,10 +2046,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-capi-kubea-459a501ddf86:
     name: 'Verify release and deliverable signatures: output-capi-kubeadm-control-plane-image-arm64'
@@ -2105,10 +2060,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-capnico-controller:
     name: 'Verify release and deliverable signatures: output-capnico-controller'
@@ -2120,10 +2074,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-cert-manag-f1997a85223a:
     name: 'Verify release and deliverable signatures: output-cert-manager-cainjector-image'
@@ -2135,10 +2088,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-cert-manag-d72fce3ac728:
     name: 'Verify release and deliverable signatures: output-cert-manager-cainjector-image-arm64'
@@ -2150,10 +2102,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-cert-manag-eecf216a547d:
     name: 'Verify release and deliverable signatures: output-cert-manager-controller-image'
@@ -2165,10 +2116,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-cert-manag-9a8734354915:
     name: 'Verify release and deliverable signatures: output-cert-manager-controller-image-arm64'
@@ -2180,10 +2130,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-cert-manag-02f76d39d687:
     name: 'Verify release and deliverable signatures: output-cert-manager-webhook-image'
@@ -2195,10 +2144,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-cert-manag-b56eb8b59b49:
     name: 'Verify release and deliverable signatures: output-cert-manager-webhook-image-arm64'
@@ -2210,10 +2158,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-cluster-ap-5fb4884131f8:
     name: 'Verify release and deliverable signatures: output-cluster-api-provider-provisioned'
@@ -2225,10 +2172,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-controller-chart:
     name: 'Verify release and deliverable signatures: output-controller-chart'
@@ -2240,10 +2186,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-cwe:
     name: 'Verify release and deliverable signatures: output-cwe'
@@ -2255,10 +2200,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nico-refer-768f0a1fbfbe:
     name: 'Verify release and deliverable signatures: output-nico-reference-profiles-fixture'
@@ -2270,10 +2214,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nvkectl:
     name: 'Verify release and deliverable signatures: output-nvkectl'
@@ -2285,10 +2228,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nvkectl-linux-arm64:
     name: 'Verify release and deliverable signatures: output-nvkectl-linux-arm64'
@@ -2300,10 +2242,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-operator-tools:
     name: 'Verify release and deliverable signatures: output-operator-tools'
@@ -2315,10 +2256,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-package-release:
     name: 'Assemble release from verified output references'
@@ -2330,10 +2270,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-release:
     name: 'Publish release'
@@ -2345,11 +2284,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-release:
     name: 'Sign and attest release and deliverables: release'
@@ -2362,10 +2300,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-release:
     name: 'Verify release and deliverable signatures: release'
@@ -2377,10 +2314,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-results-00:
     name: 'Collect provider results: nvkr-results-00'
@@ -2593,17 +2529,16 @@ jobs:
   nvkr-lifecycle-run:
     name: Finalize Run and check completeness
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 15
+    timeout-minutes: 120
     needs: [nvkr-results-00, nvkr-results-01, nvkr-results-02, nvkr-results-03, nvkr-results-04, nvkr-results-05, nvkr-results-06, nvkr-results-07, nvkr-results-08, nvkr-results-09, nvkr-results-0a, nvkr-results-0b, nvkr-results-0c, nvkr-results-0d, nvkr-results-0e, nvkr-results-0f]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     env:
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source

@@ -164,9 +164,14 @@ receive only the dedicated read credential. Only artifact signing and SBOM attes
 GHCR publication jobs use the automatic repository token separately for source-repository metadata checks;
 the development publishing token does not need repository scope for that lookup.
 
-Keep `NKE_SOURCE_TOKEN` available to the fixed source-fetch/catalog-validation steps. Verify the workflow
-can read its retained native Packer toolchain package. Internal package access can already come from the
-enterprise policy; do not add a public-repository Actions grant without reviewing its fork-access implications.
+Configure repository secret `NVKR_REGISTRY_READ` and variable `NVKR_REGISTRY_READ_USER` for the
+shared private toolchain and smoke images as well. These are additional prerequisites to the development
+output credentials above; see [registry reader setup](docs/generate-pipeline.md) for scopes and package
+access requirements.
+
+Keep `NKE_SOURCE_TOKEN` available to the fixed source-fetch/catalog-validation steps. Verify that the
+`NVKR_REGISTRY_READ_USER` account can read the retained native Packer toolchain package. Do not grant the
+source repository Actions access to that package; see [registry reader setup](docs/generate-pipeline.md).
 The temporary toolchain read credential
 is removed before producer execution. Branch code participates in these operations, so run reviewed branches;
 the workflow is not an untrusted-code sandbox. The generator does not provision or attest provider access policy.

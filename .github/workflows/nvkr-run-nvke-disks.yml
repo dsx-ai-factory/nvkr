@@ -88,6 +88,9 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
@@ -102,13 +105,12 @@ jobs:
         name: execute source part-1
         uses: ./.github/nvkr-run-nvke-disks/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-disk-nvke-node-fde-amd64:
     name: 'Build and package producer evidence for nvke-node-fde-amd64'
     runs-on: 'arc-amd64-kvm'
@@ -116,6 +118,9 @@ jobs:
     needs: [build-runner-arc-amd64-kvm, nvkr-nvke-node-fde-amd64-fetch-nvke-agent-dc6f3464c691, nvkr-nvke-node-fde-amd64-fetch-nvke-cni-calico, nvkr-nvke-node-fde-amd64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-fde-amd64-fetch-nvke-spire-agent, nvkr-nvke-node-fde-amd64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-fde-amd64-fetch-ovn-kubernetes-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-arc'
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-amd64
       - name: Prepare KVM access before transfer
@@ -154,6 +159,13 @@ jobs:
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - &operation-prepare-images-part-2
+        name: prepare images part-2
+        uses: ./.github/nvkr-run-nvke-disks/actions/shared/prepare-images
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
       - name: 'Build and package producer evidence for nvke-node-fde-amd64'
         id: run-disk
         run: ./nvkr-exec factory github run-disk --plan .github/nvkr-run-nvke-disks/plan.json --output nvke-node-fde-amd64
@@ -165,12 +177,6 @@ jobs:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
         if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
         timeout-minutes: 5
-      - &operation-collect-node-outputs-part-2
-        name: collect node outputs part-2
-        uses: ./.github/nvkr-run-nvke-disks/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       - &operation-collect-node-outputs-part-3
         name: collect node outputs part-3
         uses: ./.github/nvkr-run-nvke-disks/actions/shared/collect-node-outputs
@@ -249,51 +255,54 @@ jobs:
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-15'] }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
+      - &operation-collect-node-outputs-part-16
+        name: collect node outputs part-16
+        uses: ./.github/nvkr-run-nvke-disks/actions/shared/collect-node-outputs
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-16'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-fde-amd64-fetch-nvke-cni-calico:
     name: 'Fetch pinned source for nvke-cni-calico (nvke-node-fde-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
       - *operation-execute-source-part-1
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-amd64-fetch-nvke-kubeadm-distro:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-fde-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
       - *operation-execute-source-part-1
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-amd64-fetch-nvke-spire-agent:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-fde-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
       - *operation-execute-source-part-1
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-amd64-fetch-ovn-kube-ubuntu:
     name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-fde-amd64)'
     runs-on: 'ubuntu-24.04'
@@ -320,16 +329,30 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
     permissions:
       actions: read
       contents: read
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-disks/actions/shared/execute-node
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-fde-arm64-fetch-nvke-agent-e713dcd879bc:
     name: 'Fetch pinned source for nvke-agent, nvke-cni-ovn, nvke-image-inputs, nvke-node-fde-arm64, nvke-patched-installer-iso (nvke-node-fde-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
@@ -341,9 +364,6 @@ jobs:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       - *operation-execute-source-part-1
-    permissions:
-      actions: read
-      contents: read
   nvkr-disk-nvke-node-fde-arm64:
     name: 'Build and package producer evidence for nvke-node-fde-arm64'
     runs-on: 'arc-arm64-kvm'
@@ -351,6 +371,9 @@ jobs:
     needs: [build-runner-arc-arm64-kvm, nvkr-nvke-node-fde-arm64-fetch-nvke-agent-e713dcd879bc, nvkr-nvke-node-fde-arm64-fetch-nvke-cni-calico, nvkr-nvke-node-fde-arm64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-fde-arm64-fetch-nvke-spire-agent, nvkr-nvke-node-fde-arm64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-fde-arm64-fetch-ovn-kubernetes-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-arc'
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-arm64
       - name: Prepare KVM access before transfer
@@ -384,6 +407,7 @@ jobs:
           runner-artifact: 'nvkr-exec-arc-arm64-kvm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       - *operation-prepare-inputs-part-1
+      - *operation-prepare-images-part-2
       - name: 'Build and package producer evidence for nvke-node-fde-arm64'
         id: run-disk
         run: ./nvkr-exec factory github run-disk --plan .github/nvkr-run-nvke-disks/plan.json --output nvke-node-fde-arm64
@@ -395,7 +419,6 @@ jobs:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
         if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
         timeout-minutes: 5
-      - *operation-collect-node-outputs-part-2
       - *operation-collect-node-outputs-part-3
       - *operation-collect-node-outputs-part-4
       - *operation-collect-node-outputs-part-5
@@ -409,51 +432,49 @@ jobs:
       - *operation-collect-node-outputs-part-13
       - *operation-collect-node-outputs-part-14
       - *operation-collect-node-outputs-part-15
-    permissions:
-      actions: read
-      contents: read
+      - *operation-collect-node-outputs-part-16
   nvkr-nvke-node-fde-arm64-fetch-nvke-cni-calico:
     name: 'Fetch pinned source for nvke-cni-calico (nvke-node-fde-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-arm64-fetch-nvke-kubeadm-distro:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-fde-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-arm64-fetch-nvke-spire-agent:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-fde-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-arm64-fetch-ovn-kube-ubuntu:
     name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-fde-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -474,24 +495,35 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
     permissions:
       actions: read
       contents: read
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-disks/actions/shared/execute-node
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-image-amd64-fetch-nvke-age-0c826a20a7b4:
     name: 'Fetch pinned source for nvke-agent, nvke-cni-ovn, nvke-image-inputs, nvke-node-image-amd64, nvke-patched-installer-iso-amd64 (nvke-node-image-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
       - *operation-execute-source-part-1
-    permissions:
-      actions: read
-      contents: read
   nvkr-disk-nvke-node-image-amd64:
     name: 'Build and package producer evidence for nvke-node-image-amd64'
     runs-on: 'arc-amd64-kvm'
@@ -499,6 +531,9 @@ jobs:
     needs: [build-runner-arc-amd64-kvm, nvkr-nvke-node-image-amd64-fetch-nvke-age-0c826a20a7b4, nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico, nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent, nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-arc'
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-amd64
       - name: Prepare KVM access before transfer
@@ -526,6 +561,7 @@ jobs:
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-arc-amd64-kvm
       - *operation-prepare-inputs-part-1
+      - *operation-prepare-images-part-2
       - name: 'Build and package producer evidence for nvke-node-image-amd64'
         id: run-disk
         run: ./nvkr-exec factory github run-disk --plan .github/nvkr-run-nvke-disks/plan.json --output nvke-node-image-amd64
@@ -537,7 +573,6 @@ jobs:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
         if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
         timeout-minutes: 5
-      - *operation-collect-node-outputs-part-2
       - *operation-collect-node-outputs-part-3
       - *operation-collect-node-outputs-part-4
       - *operation-collect-node-outputs-part-5
@@ -551,51 +586,49 @@ jobs:
       - *operation-collect-node-outputs-part-13
       - *operation-collect-node-outputs-part-14
       - *operation-collect-node-outputs-part-15
-    permissions:
-      actions: read
-      contents: read
+      - *operation-collect-node-outputs-part-16
   nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico:
     name: 'Fetch pinned source for nvke-cni-calico (nvke-node-image-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
       - *operation-execute-source-part-1
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-image-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
       - *operation-execute-source-part-1
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-image-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
       - *operation-execute-source-part-1
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu:
     name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-image-amd64)'
     runs-on: 'ubuntu-24.04'
@@ -612,24 +645,35 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
     permissions:
       actions: read
       contents: read
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-disks/actions/shared/execute-node
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-nvke-node-image-arm64-fetch-nvke-age-aee9fbaecda2:
     name: 'Fetch pinned source for nvke-agent, nvke-cni-ovn, nvke-image-inputs, nvke-node-image, nvke-patched-installer-iso (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
-    permissions:
-      actions: read
-      contents: read
   nvkr-disk-nvke-node-image-arm64:
     name: 'Build and package producer evidence for nvke-node-image-arm64'
     runs-on: 'arc-arm64-kvm'
@@ -637,6 +681,9 @@ jobs:
     needs: [build-runner-arc-arm64-kvm, nvkr-nvke-node-image-arm64-fetch-nvke-age-aee9fbaecda2, nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico, nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent, nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-arc'
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-arm64
       - name: Prepare KVM access before transfer
@@ -664,6 +711,7 @@ jobs:
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-arc-arm64-kvm
       - *operation-prepare-inputs-part-1
+      - *operation-prepare-images-part-2
       - name: 'Build and package producer evidence for nvke-node-image-arm64'
         id: run-disk
         run: ./nvkr-exec factory github run-disk --plan .github/nvkr-run-nvke-disks/plan.json --output nvke-node-image-arm64
@@ -675,7 +723,6 @@ jobs:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
         if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
         timeout-minutes: 5
-      - *operation-collect-node-outputs-part-2
       - *operation-collect-node-outputs-part-3
       - *operation-collect-node-outputs-part-4
       - *operation-collect-node-outputs-part-5
@@ -689,51 +736,49 @@ jobs:
       - *operation-collect-node-outputs-part-13
       - *operation-collect-node-outputs-part-14
       - *operation-collect-node-outputs-part-15
-    permissions:
-      actions: read
-      contents: read
+      - *operation-collect-node-outputs-part-16
   nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico:
     name: 'Fetch pinned source for nvke-cni-calico (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-source-part-1
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu:
     name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -750,10 +795,21 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
     permissions:
       actions: read
       contents: read
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-disks/actions/shared/execute-node
+        with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-tool-cosign:
     name: 'Acquire pinned cosign'
     runs-on: 'ubuntu-24.04'
@@ -822,11 +878,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nvke-node-fde-arm64:
     name: 'Publish output-nvke-node-fde-arm64'
@@ -838,11 +893,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nvke-node-image-amd64:
     name: 'Publish output-nvke-node-image-amd64'
@@ -854,11 +908,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nvke-node-image-arm64:
     name: 'Publish output-nvke-node-image-arm64'
@@ -870,11 +923,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nvke-node-fde-amd64:
     name: 'Sign and attest release and deliverables: output-nvke-node-fde-amd64'
@@ -887,10 +939,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nvke-node-fde-arm64:
     name: 'Sign and attest release and deliverables: output-nvke-node-fde-arm64'
@@ -903,10 +954,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nvke-node-image-amd64:
     name: 'Sign and attest release and deliverables: output-nvke-node-image-amd64'
@@ -919,10 +969,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nvke-node-image-arm64:
     name: 'Sign and attest release and deliverables: output-nvke-node-image-arm64'
@@ -935,10 +984,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-tool-syft:
     name: 'Acquire pinned syft'
@@ -960,10 +1008,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nvke-node-fde-arm64:
     name: 'Verify release and deliverable signatures: output-nvke-node-fde-arm64'
@@ -975,10 +1022,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nvke-node-image-amd64:
     name: 'Verify release and deliverable signatures: output-nvke-node-image-amd64'
@@ -990,10 +1036,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nvke-node-image-arm64:
     name: 'Verify release and deliverable signatures: output-nvke-node-image-arm64'
@@ -1005,10 +1050,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-package-release:
     name: 'Assemble release from verified output references'
@@ -1020,10 +1064,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-release:
     name: 'Publish release'
@@ -1035,11 +1078,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-release:
     name: 'Sign and attest release and deliverables: release'
@@ -1052,10 +1094,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-release:
     name: 'Verify release and deliverable signatures: release'
@@ -1067,25 +1108,23 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-lifecycle-run:
     name: Finalize Run and check completeness
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 15
+    timeout-minutes: 120
     needs: [build-runner-arc-amd64-kvm, build-runner-arc-arm64-kvm, build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm, nvkr-attest-sboms-output-nvke-node-fde-amd64, nvkr-attest-sboms-output-nvke-node-fde-arm64, nvkr-attest-sboms-output-nvke-node-image-amd64, nvkr-attest-sboms-output-nvke-node-image-arm64, nvkr-disk-nvke-node-fde-amd64, nvkr-disk-nvke-node-fde-arm64, nvkr-disk-nvke-node-image-amd64, nvkr-disk-nvke-node-image-arm64, nvkr-nvke-node-fde-amd64-fetch-nvke-agent-dc6f3464c691, nvkr-nvke-node-fde-amd64-fetch-nvke-cni-calico, nvkr-nvke-node-fde-amd64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-fde-amd64-fetch-nvke-spire-agent, nvkr-nvke-node-fde-amd64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-fde-amd64-fetch-ovn-kubernetes-chart, nvkr-nvke-node-fde-arm64-fetch-nvke-agent-e713dcd879bc, nvkr-nvke-node-fde-arm64-fetch-nvke-cni-calico, nvkr-nvke-node-fde-arm64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-fde-arm64-fetch-nvke-spire-agent, nvkr-nvke-node-fde-arm64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-fde-arm64-fetch-ovn-kubernetes-chart, nvkr-nvke-node-image-amd64-fetch-nvke-age-0c826a20a7b4, nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico, nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent, nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart, nvkr-nvke-node-image-arm64-fetch-nvke-age-aee9fbaecda2, nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico, nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent, nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart, nvkr-package-release, nvkr-publish-output-nvke-node-fde-amd64, nvkr-publish-output-nvke-node-fde-arm64, nvkr-publish-output-nvke-node-image-amd64, nvkr-publish-output-nvke-node-image-arm64, nvkr-publish-release, nvkr-sign-output-nvke-node-fde-amd64, nvkr-sign-output-nvke-node-fde-arm64, nvkr-sign-output-nvke-node-image-amd64, nvkr-sign-output-nvke-node-image-arm64, nvkr-sign-release, nvkr-tool-cosign, nvkr-tool-syft, nvkr-verify-publication-output-nvke-node-fde-amd64, nvkr-verify-publication-output-nvke-node-fde-arm64, nvkr-verify-publication-output-nvke-node-image-amd64, nvkr-verify-publication-output-nvke-node-image-arm64, nvkr-verify-publication-release]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     env:
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source

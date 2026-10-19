@@ -13,6 +13,12 @@ import (
 
 const githubDiskBuildFinalizerTimeoutMinutes = 120
 
+// Finalization includes bootstrap, bounded carrier acquisition/restoration and
+// authentication of the complete release. It cannot share the 15-minute utility
+// budget: acquisition alone permits twenty minutes. Keep a bounded job lifetime
+// with room for release verification and the final Run/handoff uploads.
+const githubReleaseFinalizerTimeoutMinutes = 120
+
 // Build-only finalization restores the complete raw disk/material/source closure.
 // Keep its storage on the one disk output's explicitly selected ARC pool. A
 // mixed-output closure has no admitted aggregate scratch-capacity contract.
@@ -41,7 +47,7 @@ func githubFinalizerTimeoutMinutes(plan *Plan) int {
 	if GitHubDiskBuildOnly(plan) {
 		return githubDiskBuildFinalizerTimeoutMinutes
 	}
-	return githubSupportJobTimeoutMinutes
+	return githubReleaseFinalizerTimeoutMinutes
 }
 
 // writeGitHubFinalizerRestoreSteps emits the complete carrier download and restore

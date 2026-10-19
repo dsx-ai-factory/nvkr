@@ -12,7 +12,7 @@ githubRunners:
   linux/arm64: ubuntu-24.04-arm
 publication:
   mode: per-output-v1
-  credentialRef: github:GITHUB_TOKEN
+  credentialRef: github:NVKR_REGISTRY_WRITE
   repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/telemetry
 runtime:
   runtime: docker

@@ -134,7 +134,7 @@ func TestNestedIndexSupportsBothProviderLayouts(t *testing.T) {
 				directory = filepath.Join(index, request.Name)
 			}
 			writeNestedLocator(t, directory, request.Name, locator)
-			got, err := readNestedIndex(t.Context(), request, index, selections)
+			got, err := readNestedIndex(t.Context(), request, index, selections, false)
 			if err != nil || len(got) != 1 || got[request.Name].Reference != locator.Reference {
 				t.Fatalf("exact index rejected: %v", err)
 			}

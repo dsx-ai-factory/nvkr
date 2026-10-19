@@ -1,6 +1,4 @@
-# NVKR (NVIDIA Kubernetes Definition) — Software Architecture & Design Document
-
-## PLC-L1: Basic PLC: Software Architecture and Design Document
+# NVKR (NVIDIA Kubernetes Recipes) — Software Architecture & Design Document
 
 - **Revision:** 2026-10-07 — current lifecycle, native disk route and evidence boundaries
 - **Status:** Draft; ADR-01 through ADR-22 pending named-decider ratification
@@ -597,6 +595,15 @@ retain their JSON locators plus separately admitted metadata records. The factor
 and inventories before exporting metadata; control layouts exclude output payload blobs. Same-Run provider
 digests and downstream artifact authentication remain required. Metadata-only transfers use workflow
 identity without package API calls. Dedicated read/write credentials do not elevate repository-token permissions.
+Interrupted private reads have at most three extraction attempts under one deadline. Typed HTTP/2 peer
+resets admitted by ADR-18 restart from byte zero after response closure and checked staging cleanup;
+every attempt repeats complete chunk and archive verification. Independent failures cannot authorize a
+retry, and publication and signing remain outside this recovery boundary.
+Production partial retries admit earlier source attempts only within the same Run and preserve original
+transport bindings through restoration. Bounded same-name candidates all authenticate before selection
+of the newest source attempt; ties within an attempt fail closed. Development and explicit cross-Run transfers remain exact-attempt;
+release and qualification owners retain their separate invocation/evidence checks. Release finalizers use
+a bounded two-hour budget for setup, transport, authentication and final record uploads.
 Carrier and GHCR publication admission use the automatic repository token for source metadata, separately
 from the credential that accesses package metadata and registry bytes. Producers receive neither through
 these admission paths.
@@ -1121,7 +1128,7 @@ already obtained.
 
 | Decision or acceptance gap | Responsible role | Blocks |
 |---|---|---|
-| Named-decider ratification of the ADR set | Architecture owners — **[INPUT NEEDED]** | Organizational acceptance of the proposed engineering baseline |
+| Named-decider ratification of the ADR set | Architecture owners (unassigned) | Organizational acceptance of the proposed engineering baseline |
 | Default-branch production/PR trigger exercises, source access and protected-environment policy | CI/release engineering and NVKE source owners | Remaining M1 acceptance beyond recorded manual candidate runs |
 | Transparency disclosure approval, Fulcio/Rekor operations and deletion protection | Product security and service owners | Organizational approval and sustainable consumer verification |
 | Native route approval, measured capacity envelope and independent full-payload disk consumption | NVKE build owner and CI engineering | M2 acceptance beyond the scoped candidate delivery |
@@ -1140,29 +1147,10 @@ reproduction of helper bytes.
 
 | Item | Description |
 | :---- | :---- |
-| Title | NVKR (NVIDIA Kubernetes Definition) — Software Architecture and Design Document (PLC-L1) |
-| Author(s) | **[INPUT NEEDED]** |
-| Reviewers | **[INPUT NEEDED]** |
-| Approvers | **[INPUT NEEDED]** (per stakeholders) |
+| Title | NVKR (NVIDIA Kubernetes Recipes) — Software Architecture and Design Document |
 | Status | Draft |
 | Revision | 2026-10-07 |
 | Related ADRs | ADR-01…ADR-22 (`docs/adr/`) |
 | Related acceptance documents | `docs/milestones.md` summarizes the roadmap; `docs/epics-v1-spec.md` owns product acceptance; ADRs own engineering contracts |
 | Current support record | `docs/adr/reconciliation.md` |
 | Related surface | `docs/lifecycle.md` |
-
-## Approvers
-
-> **[INPUT NEEDED]** — modify according to stakeholders.
-
-| Name | Role | Approval |
-| :---- | :---- | :---- |
-|  |  |  |
-
-## Reviewers
-
-> **[INPUT NEEDED]**
-
-| Name | Role | Date |
-| :---- | :---- | :---- |
-|  |  |  |

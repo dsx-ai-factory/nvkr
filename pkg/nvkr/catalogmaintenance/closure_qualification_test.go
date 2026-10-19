@@ -69,7 +69,7 @@ func qualificationFixture(t *testing.T) (Config, func(string)) {
 	writeFixture(t, cfg.Definition, []byte(strings.Replace(string(readFixture(t, cfg.Definition)), "catalog: {base: catalog}\n", "catalog: {base: catalog}\nsbomTool: syft\ncosignTool: cosign\n", 1)))
 	digest := func(c string) string { return "sha256:" + strings.Repeat(c, 64) }
 	writeFixture(t, cfg.Environment, []byte(string(readFixture(t, cfg.Environment))+
-		"publication:\n  mode: per-output-v1\n  credentialRef: github:GITHUB_TOKEN\n  repositoryPrefix: ghcr.io/example/nvkr/fixture\n"+
+		"publication:\n  mode: per-output-v1\n  credentialRef: github:NVKR_REGISTRY_WRITE\n  repositoryPrefix: ghcr.io/example/nvkr/fixture\n"+
 		"signing:\n  identity: ^https://github\\.com/example/nvkr/\\.github/workflows/nvkr-run\\.yml@refs/heads/main$\n"+
 		"  issuer: https://token.actions.githubusercontent.com\n  mode: cosign\n"))
 	writeFixture(t, qualificationFixturePolicy, []byte("schemaVersion: nvkr.dev/qualification-policy/v1\n"+

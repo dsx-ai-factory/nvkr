@@ -27,7 +27,7 @@ func qualificationSourceAuthentication(plan *factory.Plan) (qualificationSourceA
 		return qualificationSourceAuth{}, err
 	}
 	result := qualificationSourceAuth{environment: env}
-	secrets := map[string]bool{}
+	secrets := map[string]bool{"NVKR_REGISTRY_READ": true}
 	for key, value := range env {
 		if !strings.HasPrefix(key, "NVKR_PIN_SOURCE_TOKEN_") {
 			continue

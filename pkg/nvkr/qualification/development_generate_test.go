@@ -39,8 +39,8 @@ func TestDevelopmentQualificationGenerationAndIndependentOwnership(t *testing.T)
 	if len(top.On) != 1 || top.On["workflow_dispatch"] == nil {
 		t.Fatal("development trigger is not explicit dispatch")
 	}
-	if top.Jobs["qualify"].Permissions["packages"] != "read" || top.Jobs["native-smoke"].Permissions["packages"] != "read" {
-		t.Fatal("development obtained production package write")
+	if top.Jobs["qualify"].Permissions["packages"] != "" || top.Jobs["native-smoke"].Permissions["packages"] != "" {
+		t.Fatal("development obtained repository package authority")
 	}
 	if top.Jobs["native-smoke"].Secrets[development.ReadSecret] == "" || top.Jobs["native-smoke"].Secrets[development.WriteSecret] != "" {
 		t.Fatal("native smoke lost read/write credential separation")

@@ -17,7 +17,7 @@ execution settings remain in their owning records. Two outputs can share a Build
 separate producer jobs, observations and evidence; one successful output cannot satisfy a missing sibling.
 
 The [NVKE Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-tutorial/definition.yaml) directly selects `nvkectl`, `cwe`, and `nvke-helm`
-for three outputs. The Helm output explicitly depends on the CWE image output. No reusable membership group,
+for three outputs. The Helm output explicitly depends on the NVKE management-plane image output (`cwe`). No reusable membership group,
 criteria query, inheritance chain, or mixin sits between an output and its producers.
 
 Deployment topology and placement are owned by the system that consumes the artifacts;
@@ -59,7 +59,7 @@ For saved generated Plans, `run plan --plan <path>` prints the required outputs 
 and `run diff` explains changes between canonical Plans. See [Plan and graph inspection](plan-and-graph-inspection.md).
 
 Generation writes provider files and their commit manifest from the same admitted inputs. This example
-uses a temporary root: the repository's committed bundle selects M2, not the three-output Definition.
+uses a temporary root: the repository's committed bundle selects the maintained NVKE Definition, not the three-output Definition.
 The matching `--check` invocation regenerates in memory and fails if generated files differ:
 
 ```sh
@@ -75,7 +75,7 @@ bin/nvkr run generate \
   --engine github --root "$NVKR_LIFECYCLE_ROOT" --check
 ```
 
-Use the [M2 instructions](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md) to regenerate the committed bundle.
+Use the [maintained NVKE Definition's instructions](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md) to regenerate the committed bundle.
 Generated CI defaults to generic hosted runners; ADR-18 separately admits the explicit native ARC disk
 route. Publication and signing belong to the GitHub v1 lane. Generation does not prove provider execution.
 
@@ -408,7 +408,7 @@ release acceptance still requires its deferred qualification, membership, and re
 result cannot substitute for them. The ADR-04 stock-cosign consumer contract remains independent of the
 convenience NVKR reader.
 
-## Authenticate an M3 candidate
+## Authenticate a qualification candidate
 
 On Linux, `nvkr run check-artifacts` checks the already-published bytes against one exact producing Run
 attempt and an independently selected trust policy:
@@ -455,7 +455,7 @@ delivered payload reference. The collector joins bounded aggregate metadata and 
 without reading payload packages. The handoff contains no consumer policy. Development, unsigned, dry-run and legacy aggregate workflows do not produce it;
 an older Run without a complete handoff fails instead of rebuilding or reconstructing missing evidence.
 Legacy aggregate builds/publication remain available, but they lack invocation-bound release metadata and
-the per-output route records needed for M3 qualification; direct qualification rejects that capability before publication work.
+the per-output route records needed for qualification; direct qualification rejects that capability before publication work.
 
 The lifecycle owner recompiles the captured authored bytes with their original logical paths and requires
 the exact original Plan identity. Authored reads have no checkout fallback. Catalog-owned authentication

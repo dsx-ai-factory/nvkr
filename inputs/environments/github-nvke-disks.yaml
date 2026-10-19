@@ -67,7 +67,7 @@ diskInspectionProfiles:
     scratchStorage: private-volume
 publication:
   mode: per-output-v1
-  credentialRef: github:GITHUB_TOKEN
+  credentialRef: github:NVKR_REGISTRY_WRITE
   repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks
 runtime:
   runtime: docker

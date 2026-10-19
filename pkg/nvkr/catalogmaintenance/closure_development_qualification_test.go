@@ -21,7 +21,7 @@ func TestRefreshMaintainsDevelopmentQualificationAlongsideProduction(t *testing.
 		t.Fatal(err)
 	}
 	env := string(readFixture(t, cfg.Environment))
-	env = strings.Replace(env, "credentialRef: github:GITHUB_TOKEN", "credentialRef: github:NVKR_DEV_REGISTRY_WRITE", 1)
+	env = strings.Replace(env, "credentialRef: github:NVKR_REGISTRY_WRITE", "credentialRef: github:NVKR_DEV_REGISTRY_WRITE", 1)
 	env = strings.Replace(env, "repositoryPrefix: ghcr.io/example/nvkr/fixture", "repositoryPrefix: ghcr.io/example/nvkr/development", 1)
 	start := strings.Index(env, "  identity: ")
 	end := strings.Index(env[start:], "\n") + start

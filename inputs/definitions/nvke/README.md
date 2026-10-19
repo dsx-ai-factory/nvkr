@@ -21,6 +21,10 @@ Each Environment selects `githubBundle: nvke-<family>`, the corresponding
 `.github/workflows/nvkr-run-nvke-<family>.yml`, an explicit main-only signer identity, and publication prefix
 `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/<family>`. Its Release publishes by digest beneath that prefix's
 `releases` repository. Source-access and disk settings are scoped to the family's selected producers.
+All four families retain the maintained production registry policy: `NVKR_REGISTRY_WRITE` handles
+publication, while private native toolchain preparation uses `NVKR_REGISTRY_READ` with
+`NVKR_REGISTRY_READ_USER`. These credentials require the same operator provisioning as the combined
+candidate; generation does not verify package access.
 
 From the repository root:
 
@@ -169,7 +173,7 @@ policy-digest-bound. The historical validation run below predates these consumer
 and does not validate this updated head, current main execution, strict inspection or independent full-payload
 consumer acceptance.
 
-The [customer choices guide](../../../docs/nvke-m2-customer-choices.md) explains supplier replacement through
+The [customer choices guide](../../../docs/nvke-customer-choices.md) explains supplier replacement through
 the existing catalog interfaces and the precise scope of its graph tests. The
 [release transport evidence](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-release-carrier-transport.md) records the
 failed candidate's storage exhaustion and why correcting carrier selection alone does not complete delivery.
@@ -178,8 +182,9 @@ The [toolchain preparation guide](../../../toolchains/nvkr-packer/README.md)
 lists repository-owned native preparation and measurement commands, their current
 toolchain license/security gates, and the missing production inputs. The inspector's source
 README gives separate AMD64 and ARM64 assembly commands. The generated workflow uses isolated
-read-only image preparation with the ephemeral GitHub token; grant this repository Read under
-each internal toolchain package's Manage Actions access settings. Maintained manual dispatch and
+read-only image preparation with `NVKR_REGISTRY_READ` and `NVKR_REGISTRY_READ_USER`; provision access
+independently of the repository token, as described in the
+[production credential setup](../../../docs/generate-pipeline.md). Maintained manual dispatch and
 signing admit only `main`. The October 7 branch attempt at `562a609` used a temporary exact
 `codex/m2-native-arc-foundation` authored exception; it was cancelled after GitHub environment
 protection rejected that branch before attestation, disk execution and finalization steps ran
@@ -300,7 +305,7 @@ private-source credentials. Pinning and graph tests establish their own contract
 
 ## Qualification readiness
 
-The simplified [artifact check](../../../docs/lifecycle.md#authenticate-an-m3-candidate) takes a Run URL and a
+The simplified [artifact check](../../../docs/lifecycle.md#authenticate-a-qualification-candidate) takes a Run URL and a
 reusable policy. Upstream embedded-component manifests are not a qualification prerequisite. The maintained
 catalogs omit the optional declarations, so their metadata checks are `not-applicable`. Any declaration added
 later must strictly match its referenced map at the pinned source revision, including exact membership,

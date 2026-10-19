@@ -998,11 +998,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nktp-collector-image:
     name: 'Publish output-nktp-collector-image'
@@ -1014,11 +1013,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nktp-collector-image-arm64:
     name: 'Publish output-nktp-collector-image-arm64'
@@ -1030,11 +1028,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nktp-kube-state-metrics-image:
     name: 'Publish output-nktp-kube-state-metrics-image'
@@ -1046,11 +1043,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nktp-kube-state-metri-cecf76dda028:
     name: 'Publish output-nktp-kube-state-metrics-image-arm64'
@@ -1062,11 +1058,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nktp-kubectl-image:
     name: 'Publish output-nktp-kubectl-image'
@@ -1078,11 +1073,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nktp-kubectl-image-arm64:
     name: 'Publish output-nktp-kubectl-image-arm64'
@@ -1094,11 +1088,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nktp-lgtm-image:
     name: 'Publish output-nktp-lgtm-image'
@@ -1110,11 +1103,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nktp-lgtm-image-arm64:
     name: 'Publish output-nktp-lgtm-image-arm64'
@@ -1126,11 +1118,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nktp-metrics-server-image:
     name: 'Publish output-nktp-metrics-server-image'
@@ -1142,11 +1133,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nktp-metrics-server-image-arm64:
     name: 'Publish output-nktp-metrics-server-image-arm64'
@@ -1158,11 +1148,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nktp-node-exporter-image:
     name: 'Publish output-nktp-node-exporter-image'
@@ -1174,11 +1163,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nktp-node-exporter-image-arm64:
     name: 'Publish output-nktp-node-exporter-image-arm64'
@@ -1190,11 +1178,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nktp-operator-image:
     name: 'Publish output-nktp-operator-image'
@@ -1206,11 +1193,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nktp-operator-image-arm64:
     name: 'Publish output-nktp-operator-image-arm64'
@@ -1222,11 +1208,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nktp-target-allocator-image:
     name: 'Publish output-nktp-target-allocator-image'
@@ -1238,11 +1223,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nktp-target-allocator-image-arm64:
     name: 'Publish output-nktp-target-allocator-image-arm64'
@@ -1254,11 +1238,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nktp:
     name: 'Sign and attest release and deliverables: output-nktp'
@@ -1271,10 +1254,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nktp-collector-image:
     name: 'Sign and attest release and deliverables: output-nktp-collector-image'
@@ -1287,10 +1269,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nktp-collector-image-arm64:
     name: 'Sign and attest release and deliverables: output-nktp-collector-image-arm64'
@@ -1303,10 +1284,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nktp-kube-state-metrics-image:
     name: 'Sign and attest release and deliverables: output-nktp-kube-state-metrics-image'
@@ -1319,10 +1299,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nktp-kube-state-metrics-image-arm64:
     name: 'Sign and attest release and deliverables: output-nktp-kube-state-metrics-image-arm64'
@@ -1335,10 +1314,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nktp-kubectl-image:
     name: 'Sign and attest release and deliverables: output-nktp-kubectl-image'
@@ -1351,10 +1329,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nktp-kubectl-image-arm64:
     name: 'Sign and attest release and deliverables: output-nktp-kubectl-image-arm64'
@@ -1367,10 +1344,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nktp-lgtm-image:
     name: 'Sign and attest release and deliverables: output-nktp-lgtm-image'
@@ -1383,10 +1359,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nktp-lgtm-image-arm64:
     name: 'Sign and attest release and deliverables: output-nktp-lgtm-image-arm64'
@@ -1399,10 +1374,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nktp-metrics-server-image:
     name: 'Sign and attest release and deliverables: output-nktp-metrics-server-image'
@@ -1415,10 +1389,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nktp-metrics-server-image-arm64:
     name: 'Sign and attest release and deliverables: output-nktp-metrics-server-image-arm64'
@@ -1431,10 +1404,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nktp-node-exporter-image:
     name: 'Sign and attest release and deliverables: output-nktp-node-exporter-image'
@@ -1447,10 +1419,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nktp-node-exporter-image-arm64:
     name: 'Sign and attest release and deliverables: output-nktp-node-exporter-image-arm64'
@@ -1463,10 +1434,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nktp-operator-image:
     name: 'Sign and attest release and deliverables: output-nktp-operator-image'
@@ -1479,10 +1449,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nktp-operator-image-arm64:
     name: 'Sign and attest release and deliverables: output-nktp-operator-image-arm64'
@@ -1495,10 +1464,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nktp-target-allocator-image:
     name: 'Sign and attest release and deliverables: output-nktp-target-allocator-image'
@@ -1511,10 +1479,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nktp-target-allocator-image-arm64:
     name: 'Sign and attest release and deliverables: output-nktp-target-allocator-image-arm64'
@@ -1527,10 +1494,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nktp:
     name: 'Verify release and deliverable signatures: output-nktp'
@@ -1542,10 +1508,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nktp-collector-image:
     name: 'Verify release and deliverable signatures: output-nktp-collector-image'
@@ -1557,10 +1522,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nktp-colle-3037712057c4:
     name: 'Verify release and deliverable signatures: output-nktp-collector-image-arm64'
@@ -1572,10 +1536,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nktp-kube-8edb2f9f5644:
     name: 'Verify release and deliverable signatures: output-nktp-kube-state-metrics-image'
@@ -1587,10 +1550,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nktp-kube-59673e96b3e2:
     name: 'Verify release and deliverable signatures: output-nktp-kube-state-metrics-image-arm64'
@@ -1602,10 +1564,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nktp-kubectl-image:
     name: 'Verify release and deliverable signatures: output-nktp-kubectl-image'
@@ -1617,10 +1578,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nktp-kubec-58bc88c11e26:
     name: 'Verify release and deliverable signatures: output-nktp-kubectl-image-arm64'
@@ -1632,10 +1592,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nktp-lgtm-image:
     name: 'Verify release and deliverable signatures: output-nktp-lgtm-image'
@@ -1647,10 +1606,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nktp-lgtm-image-arm64:
     name: 'Verify release and deliverable signatures: output-nktp-lgtm-image-arm64'
@@ -1662,10 +1620,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nktp-metri-4773ec2231a9:
     name: 'Verify release and deliverable signatures: output-nktp-metrics-server-image'
@@ -1677,10 +1634,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nktp-metri-72d2044749d1:
     name: 'Verify release and deliverable signatures: output-nktp-metrics-server-image-arm64'
@@ -1692,10 +1648,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nktp-node-308c6a04d0d9:
     name: 'Verify release and deliverable signatures: output-nktp-node-exporter-image'
@@ -1707,10 +1662,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nktp-node-89687b0a3b8b:
     name: 'Verify release and deliverable signatures: output-nktp-node-exporter-image-arm64'
@@ -1722,10 +1676,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nktp-operator-image:
     name: 'Verify release and deliverable signatures: output-nktp-operator-image'
@@ -1737,10 +1690,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nktp-opera-e8ca29886a10:
     name: 'Verify release and deliverable signatures: output-nktp-operator-image-arm64'
@@ -1752,10 +1704,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nktp-targe-83f6218e2759:
     name: 'Verify release and deliverable signatures: output-nktp-target-allocator-image'
@@ -1767,10 +1718,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nktp-targe-c21c44003a70:
     name: 'Verify release and deliverable signatures: output-nktp-target-allocator-image-arm64'
@@ -1782,10 +1732,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-package-release:
     name: 'Assemble release from verified output references'
@@ -1797,10 +1746,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-publish-release:
     name: 'Publish release'
@@ -1812,11 +1760,10 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: write
     env:
       NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-sign-release:
     name: 'Sign and attest release and deliverables: release'
@@ -1829,10 +1776,9 @@ jobs:
       actions: read
       contents: read
       id-token: write
-      packages: write
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-release:
     name: 'Verify release and deliverable signatures: release'
@@ -1844,10 +1790,9 @@ jobs:
     permissions:
       actions: read
       contents: read
-      packages: read
     env:
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
   nvkr-results-00:
     name: 'Collect provider results: nvkr-results-00'
@@ -2060,17 +2005,16 @@ jobs:
   nvkr-lifecycle-run:
     name: Finalize Run and check completeness
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 15
+    timeout-minutes: 120
     needs: [nvkr-results-00, nvkr-results-01, nvkr-results-02, nvkr-results-03, nvkr-results-04, nvkr-results-05, nvkr-results-06, nvkr-results-07, nvkr-results-08, nvkr-results-09, nvkr-results-0a, nvkr-results-0b, nvkr-results-0c, nvkr-results-0d, nvkr-results-0e, nvkr-results-0f]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     env:
-      NVKR_REGISTRY_USER: '${{ github.actor }}'
-      NVKR_CREDENTIAL: '${{ secrets.GITHUB_TOKEN }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
     permissions:
       actions: read
       contents: read
-      packages: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
