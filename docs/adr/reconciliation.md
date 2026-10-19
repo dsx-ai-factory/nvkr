@@ -2157,6 +2157,59 @@ execution remain external acceptance requirements.
 
 ## Maintained input and schema boundaries
 
+The NVKE four-family pilot adds independent core (20 outputs), services (28), telemetry (17) and disks (4)
+Definitions under `inputs/definitions/nvke/`, with corresponding `github-nvke-<family>` Environments and
+named production bundles. Their selected output union is the combined candidate's 69 outputs, retaining
+aggregate native children, bound chart/image relationships and complete disk material selections. They
+reuse shared catalog/pin owners and publish into separate family prefixes beneath the existing candidate
+namespace. `make nvke-split-generate` and `make nvke-split-check` own the family subset; the repository-wide
+workflow targets include it. These are authored-input and generation changes, not a new lifecycle or
+cross-Run assembly contract. No hosted family execution, publication or independent consumer acceptance
+is recorded. The combined production/development and qualification paths remain until consumer and
+qualification cutover. Named producer qualification and named development remain unsupported; the pilot
+emits no automatic association file or parent Release. Consumers independently verify exact family
+references and own any required association or compatibility decision. See the
+[pilot inputs](../../inputs/definitions/nvke/README.md#four-family-pilot) and
+[partitioning strategy](../definition-partitioning-strategy.md) for scope and historical measurements.
+
+Local validation on 2026-10-17 passed the extended split contract: all 73 complete native build records and
+69 output-binding records matched the combined Plan byte-for-byte, and all four generated bundles matched
+exact regeneration. The comparison uses that validated Plan's resolved catalog snapshots, not fresh upstream
+authentication or reproduced artifact bytes. Family workflows contain 198, 233, 153 and 55 jobs; the largest
+is 151,403 bytes with 18,450 expanded YAML events. The combined workflow with the same current generator
+has 580 jobs, 384,031 bytes and 47,431 events; the families total 639 jobs. All four family workflows and
+catalog refresh passed actionlint; relaxed yamllint passed these workflows, the family actions and
+authored inputs with line-length warnings. These results do not establish a complete repository gate,
+hosted execution or product acceptance. The
+[split contract](../../pkg/nvkr/factory/nvke_definition_split_test.go) and
+[current measurement table](../definition-partitioning-strategy.md#current-local-validation) own the exact scope.
+
+`make workflows-check` passed on 2026-10-17 for all four families, combined production and its
+qualification bundle, development and its qualification bundle, both nightly bundles and catalog
+refresh. The CLI reauthenticated source pins and confirmed exact generated-bundle drift. This local
+validation does not establish hosted execution, publication, qualification, consumer acceptance or a
+complete repository gate pass.
+
+The uncached macOS `make check GO_TEST_FLAGS=-count=1` did not pass: delivery, factory and lifecycle
+exceeded the 20-minute package timeout. Formatting, license headers, vet, lint, shell and Python checks
+passed, and the separately completed vulnerability scan found no vulnerabilities. The three subtests
+active at timeout passed in bounded focused reruns; other Go packages completed successfully. The suite
+timeouts remain unresolved and no clean full-gate result is claimed.
+
+The services family requires private chart pin-set revalidation even though its selected producers need no
+Git fetch node. Source-access admission now also recognizes the actual pin-set sources in revalidated
+catalog snapshots. It retains rejection of unrelated repository entries and the existing step-scoped
+credential projection: catalog recompilation may receive these credentials; artifact acquisition, build
+and publication do not. This closes a local admission gap for acquired-only selections, not a new source
+trust or credential scope. No hosted private-source read or services publication is established by this
+change; [ADR-20](0020-artifact-publication-and-target-configuration.md#2-target-configuration-surface) owns
+the contract.
+Focused local contracts passed for pin-set-only sources in root and output catalogs, ordinary-source and
+unknown-repository refusal, unchanged local-engine admission, rendered credential scope and snapshot
+substitution without a partial bundle. Existing fetch-only and repository-scoped credential tests also
+passed. These use fixtures and local Git credential checks, not a hosted source read.
+[Source-access contracts](../../pkg/nvkr/factory/source_access_test.go)
+
 The [M2 Definition instructions](../../inputs/definitions/nvke/README.md) own example-specific selection and input
 preparation. The candidate requires 69 named outputs. It retains the previous 37 and adds source-built
 CAPNICo and explicitly named reference-profile fixtures, the existing provisioned infrastructure provider, source-packaged NKTP,

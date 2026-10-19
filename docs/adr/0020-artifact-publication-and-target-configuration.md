@@ -80,6 +80,10 @@ Environment may also map a canonical source URL to an HTTPS fetch mirror and a G
 through `sourceAccess`. This changes transport and Environment identity, not the canonical source, pinned
 commit/tree, or build identity. The current adapter binds credentials to the matching GitHub fetch execution step and, for private
 pin-set sources, the bootstrap regeneration and Run finalization steps that re-read pinned Git trees.
+Admission permits an entry when its canonical repository is used by a compiled fetch or by a pin-set
+source in a catalog snapshot that compilation revalidates. An acquired-chart-only selection can therefore
+retain its pin-set source credential without inventing a producer fetch. Unused repository entries remain
+errors; revalidation credentials are not passed to artifact acquisition, build or publication steps.
 Production jobs require dispatch on the default branch or an exact `githubDispatchBranches` entry (ADR-18).
 The separate development mode admits manual branch dispatch with the same fixed source-read steps.
 Signed development uses the explicit isolated publication contract below; arbitrary job setup and variables

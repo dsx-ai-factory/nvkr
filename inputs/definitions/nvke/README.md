@@ -1,9 +1,50 @@
-# Combined NVKE M2 candidate
+# NVKE release candidate and family pilot
 
-This is the Definition used by the committed `nvkr-run.yml`. It joins independently pinned NVKE CLI,
+The combined [Definition](definition.yaml) is used by the committed `nvkr-run.yml`. It joins independently pinned NVKE CLI,
 controller and chart builds, operator executables, native node images and third-party deployment images
 into one release with **69 named outputs**. This remains a candidate; completed pipeline delivery and
 full product acceptance are separate facts.
+
+## Four-family pilot
+
+Four independent Definitions partition the combined candidate's exact named outputs. They reuse the
+shared catalogs and pins; they do not import each other or change the combined Definition into a parent.
+
+| Definition | Outputs | Membership | Environment |
+|---|---:|---|---|
+| [Core](core.yaml) | 20 | CLI/operator tools, controller and bound chart, providers/reference fixture, CAPI and cert-manager images | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) |
+| [Services](services.yaml) | 28 | SPIRE, PostgreSQL and Temporal charts and native images | [github-nvke-services.yaml](../../environments/github-nvke-services.yaml) |
+| [Telemetry](telemetry.yaml) | 17 | NKTP chart and native runtime images | [github-nvke-telemetry.yaml](../../environments/github-nvke-telemetry.yaml) |
+| [Disks](disks.yaml) | 4 | Native AMD64/ARM64 plain and public-bootstrap FDE disks, each with its complete material closure | [github-nvke-disks.yaml](../../environments/github-nvke-disks.yaml) |
+
+Each Environment selects `githubBundle: nvke-<family>`, the corresponding
+`.github/workflows/nvkr-run-nvke-<family>.yml`, an explicit main-only signer identity, and publication prefix
+`ghcr.io/dsx-ai-factory/nvkr/m2-candidate/<family>`. Its Release publishes by digest beneath that prefix's
+`releases` repository. Source-access and disk settings are scoped to the family's selected producers.
+
+From the repository root:
+
+```sh
+make nvke-split-generate
+make nvke-split-check
+```
+
+The repository-wide `make workflows-generate` and `make workflows-check` also include these bundles.
+Generated Plans, actions and manifests retain their normal ownership; edit the authored inputs and
+regenerate. Generation and drift checking do not build, publish or qualify any family.
+
+This is a reversible pilot alongside the combined production, development and qualification workflows.
+Named production bundles have no generated qualification pair, and named development bundles remain
+unsupported. The existing combined qualification policies do not cover four independent family Runs.
+Keep the combined path until the consumer and qualification cutover has its own accepted contract.
+
+Consumers select each exact digest-pinned family Release and verify it under independently chosen policy.
+Any record associating those references belongs to the downstream consumer; this pilot emits no automatic
+association file, native parent Release or cross-Release compatibility verdict. Family output publication
+still requires every output and its exact evidence within that Definition. No hosted family build,
+publication or independent consumer acceptance is established here. The
+[partitioning strategy](../../../docs/definition-partitioning-strategy.md) records the rationale,
+historical capacity measurements and remaining cutover work.
 
 ## Selected artifacts and their owners
 

@@ -74,6 +74,11 @@ The [ADRs](adr) own engineering contracts, and [reconciliation](adr/reconciliati
 implementation/evidence ledger. The [roadmap](milestones.md) links outcomes to the detailed
 [acceptance specification](epics-v1-spec.md).
 
+[Definition partitioning strategy](definition-partitioning-strategy.md) explains the four-family NVKE
+pilot, historical graph-capacity measurements, shared catalog ownership and related Release options.
+The [input instructions](../inputs/definitions/nvke/README.md#four-family-pilot) own generation and checking;
+the combined candidate remains available pending consumer and qualification cutover.
+
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
 Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) covers branch
 dispatch, separate generated development bundles, artifact downloads and short retention.

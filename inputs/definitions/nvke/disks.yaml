@@ -1,0 +1,85 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+kind: Definition
+metadata:
+  name: nvke-disks
+  description: Build the maintained native AMD64 and ARM64 plain and public-bootstrap FDE node disks, preserving each complete material closure.
+catalog:
+  base: ../../catalogs/nvke/module-tags
+sbomTool: syft
+cosignTool: cosign
+outputs:
+  - name: nvke-node-fde-amd64
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/node-images/release
+      overlays: [../../catalogs/node-images/variants/native-toolchains.yaml]
+    format: disk-image
+    components:
+      - nvke-agent
+      - nvke-cni-calico
+      - nvke-cni-ovn
+      - nvke-image-inputs
+      - nvke-kubeadm-distro
+      - nvke-node-fde-amd64
+      - nvke-patched-installer-iso-amd64
+      - nvke-spire-agent
+      - ovn-kube-ubuntu
+      - ovn-kubernetes-chart
+      - ubuntu-installer-iso-amd64
+  - name: nvke-node-fde-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/node-images/release
+      overlays: [../../catalogs/node-images/variants/native-toolchains.yaml]
+    format: disk-image
+    components:
+      - nvke-agent
+      - nvke-cni-calico
+      - nvke-cni-ovn
+      - nvke-image-inputs
+      - nvke-kubeadm-distro
+      - nvke-node-fde-arm64
+      - nvke-patched-installer-iso
+      - nvke-spire-agent
+      - ovn-kube-ubuntu
+      - ovn-kubernetes-chart
+      - ubuntu-installer-iso
+  - name: nvke-node-image-amd64
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/node-images/release
+      overlays: [../../catalogs/node-images/variants/native-toolchains.yaml]
+    format: disk-image
+    components:
+      - nvke-agent
+      - nvke-cni-calico
+      - nvke-cni-ovn
+      - nvke-image-inputs
+      - nvke-kubeadm-distro
+      - nvke-node-image-amd64
+      - nvke-patched-installer-iso-amd64
+      - nvke-spire-agent
+      - ovn-kube-ubuntu
+      - ovn-kubernetes-chart
+      - ubuntu-installer-iso-amd64
+  - name: nvke-node-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/node-images/release
+      overlays: [../../catalogs/node-images/variants/native-toolchains.yaml]
+    format: disk-image
+    components:
+      - nvke-agent
+      - nvke-cni-calico
+      - nvke-cni-ovn
+      - nvke-image-inputs
+      - nvke-kubeadm-distro
+      - nvke-node-image
+      - nvke-patched-installer-iso
+      - nvke-spire-agent
+      - ovn-kube-ubuntu
+      - ovn-kubernetes-chart
+      - ubuntu-installer-iso

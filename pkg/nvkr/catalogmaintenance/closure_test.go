@@ -8,6 +8,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -202,8 +203,8 @@ func TestClosureAllowlistIsExactInBothPlaces(t *testing.T) {
 	}
 }
 
-// The committed policy and Plans give the real qualification pair and named
-// nightly Runs; their files must be in the allowlist. This proves the listing
+// The committed policy and Plans give the real qualification pairs and named
+// family and nightly Runs; their files must be in the allowlist. This proves the listing
 // only; regenerating a pair after a pin change is exercised on a fixture in
 // closure_qualification_test.go.
 func TestClosureListsTheMaintainedBundles(t *testing.T) {
@@ -219,6 +220,22 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 	if cfg.DevelopmentEnvironment == "" || cfg.QualificationPolicy == "" || cfg.DevelopmentQualificationPolicy == "" {
 		t.Fatal("the maintained policy does not name its dependent bundles")
 	}
+	wantAdditional := []RunInput{
+		{Definition: "inputs/definitions/nvke/core.yaml", Environment: "inputs/environments/github-nvke-core.yaml"},
+		{Definition: "inputs/definitions/nvke/services.yaml", Environment: "inputs/environments/github-nvke-services.yaml"},
+		{Definition: "inputs/definitions/nvke/telemetry.yaml", Environment: "inputs/environments/github-nvke-telemetry.yaml"},
+		{Definition: "inputs/definitions/nvke/disks.yaml", Environment: "inputs/environments/github-nvke-disks.yaml"},
+		{Definition: "inputs/definitions/demo/arm64-nvidia-kvm.json", Environment: "inputs/environments/github-nightly-nvidia.json"},
+		{Definition: "inputs/definitions/demo/arm64-upstream-kvm.json", Environment: "inputs/environments/github-nightly-upstream.json"},
+	}
+	if len(cfg.AdditionalRuns) != len(wantAdditional) {
+		t.Fatalf("maintained policy selects %d additional Runs, want %d", len(cfg.AdditionalRuns), len(wantAdditional))
+	}
+	for _, want := range wantAdditional {
+		if !slices.Contains(cfg.AdditionalRuns, want) {
+			t.Fatalf("maintained policy omits additional Run %+v", want)
+		}
+	}
 	plan, err := lifecycle.CompileFiles(t.Context(), cfg.Definition, cfg.Environment, "dev (unknown)")
 	if err != nil {
 		t.Skipf("committed Plan does not compile offline: %v", err)
@@ -232,23 +249,36 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		t.Fatal(err)
 	}
 	directories, files := members.paths()
-	for _, want := range []string{".github/nvkr-dev", ".github/nvkr-dev-qualification", ".github/nvkr-qualification", ".github/nvkr-run", ".github/nvkr-run-nvke-nightly-arm64", ".github/nvkr-run-nvke-nightly-upstream-ovn-arm64"} {
-		if !contains(directories, want) {
-			t.Fatalf("directories %v lack %s", directories, want)
-		}
+	wantDirectories := []string{
+		".github/nvkr-dev",
+		".github/nvkr-dev-qualification",
+		".github/nvkr-qualification",
+		".github/nvkr-run",
+		".github/nvkr-run-nvke-core",
+		".github/nvkr-run-nvke-disks",
+		".github/nvkr-run-nvke-nightly-arm64",
+		".github/nvkr-run-nvke-nightly-upstream-ovn-arm64",
+		".github/nvkr-run-nvke-services",
+		".github/nvkr-run-nvke-telemetry",
 	}
-	for _, want := range []string{".github/workflows/nvkr-dev.yml", ".github/workflows/nvkr-dev-qualify.yml", ".github/workflows/nvkr-dev-smoke.yml", ".github/workflows/nvkr-qualify.yml", ".github/workflows/nvkr-run-nvke-nightly-arm64.yml", ".github/workflows/nvkr-run-nvke-nightly-upstream-ovn-arm64.yml", ".github/workflows/nvkr-run.yml", ".github/workflows/nvkr-smoke.yml"} {
-		if !contains(files, want) {
-			t.Fatalf("files %v lack %s", files, want)
-		}
+	if !slices.Equal(directories, wantDirectories) {
+		t.Fatalf("closure directories = %v, want %v", directories, wantDirectories)
 	}
-}
-
-func contains(values []string, want string) bool {
-	for _, value := range values {
-		if value == want {
-			return true
-		}
+	wantFiles := []string{
+		".github/workflows/nvkr-dev-qualify.yml",
+		".github/workflows/nvkr-dev-smoke.yml",
+		".github/workflows/nvkr-dev.yml",
+		".github/workflows/nvkr-qualify.yml",
+		".github/workflows/nvkr-run-nvke-core.yml",
+		".github/workflows/nvkr-run-nvke-disks.yml",
+		".github/workflows/nvkr-run-nvke-nightly-arm64.yml",
+		".github/workflows/nvkr-run-nvke-nightly-upstream-ovn-arm64.yml",
+		".github/workflows/nvkr-run-nvke-services.yml",
+		".github/workflows/nvkr-run-nvke-telemetry.yml",
+		".github/workflows/nvkr-run.yml",
+		".github/workflows/nvkr-smoke.yml",
 	}
-	return false
+	if !slices.Equal(files, wantFiles) {
+		t.Fatalf("closure workflow files = %v, want %v", files, wantFiles)
+	}
 }

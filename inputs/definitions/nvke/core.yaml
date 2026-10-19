@@ -1,0 +1,142 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+kind: Definition
+metadata:
+  name: nvke-core
+  description: Build the maintained AMD64 and ARM64 CLI, controller and provider images with their image-bound controller chart and reference-profile fixture, and acquire operator tools plus native CAPI and cert-manager images.
+catalog:
+  base: ../../catalogs/nvke/module-tags
+sbomTool: syft
+cosignTool: cosign
+outputs:
+  - name: capi-controller-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [capi-controller-image]
+  - name: capi-controller-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [capi-controller-image]
+  - name: capi-kubeadm-bootstrap-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [capi-kubeadm-bootstrap-image]
+  - name: capi-kubeadm-bootstrap-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [capi-kubeadm-bootstrap-image]
+  - name: capi-kubeadm-control-plane-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [capi-kubeadm-control-plane-image]
+  - name: capi-kubeadm-control-plane-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [capi-kubeadm-control-plane-image]
+  - name: capnico-controller
+    platforms: [linux/amd64, linux/arm64]
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components:
+      - capnico-controller
+  - name: cert-manager-cainjector-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [cert-manager-cainjector-image]
+  - name: cert-manager-cainjector-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [cert-manager-cainjector-image]
+  - name: cert-manager-controller-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [cert-manager-controller-image]
+  - name: cert-manager-controller-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [cert-manager-controller-image]
+  - name: cert-manager-webhook-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [cert-manager-webhook-image]
+  - name: cert-manager-webhook-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [cert-manager-webhook-image]
+  - name: cluster-api-provider-provisioned
+    platforms: [linux/amd64, linux/arm64]
+    catalog:
+      base: ../../catalogs/nvke/release
+    format: oci
+    components:
+      - cluster-api-provider-provisioned
+  - name: controller-chart
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release
+    format: helm-oci
+    components:
+      - nvke-controller-chart
+    helm:
+      images:
+        controller: cwe
+  - name: cwe
+    platforms: [linux/amd64, linux/arm64]
+    catalog:
+      base: ../../catalogs/nvke/release
+    format: oci
+    components:
+      - nvke-controller
+  # Reference test data, not the runnable demo's controller-profiles or fleet configuration.
+  - name: nico-reference-profiles-fixture
+    platforms: [linux/amd64, linux/arm64]
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components:
+      - nvke-nico-reference-profiles
+  - name: nvkectl
+    platform: linux/amd64
+    format: executable
+    components:
+      - nvkectl
+  - name: nvkectl-linux-arm64
+    platform: linux/arm64
+    format: executable
+    components:
+      - nvkectl
+  - name: operator-tools
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/tools/operator-amd64
+    format: executable
+    components:
+      - helm
+      - kubectl

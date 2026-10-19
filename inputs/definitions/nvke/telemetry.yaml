@@ -1,0 +1,116 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+kind: Definition
+metadata:
+  name: nvke-telemetry
+  description: Build the maintained NKTP chart and acquire its exact AMD64 and ARM64 runtime image outputs; chart image-reference binding remains consumer-owned.
+catalog:
+  base: ../../catalogs/nvke/module-tags
+sbomTool: syft
+cosignTool: cosign
+outputs:
+  - name: nktp
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: helm-oci
+    components:
+      - nktp-chart
+  - name: nktp-collector-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [nktp-collector-image]
+  - name: nktp-collector-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [nktp-collector-image]
+  - name: nktp-kube-state-metrics-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [nktp-kube-state-metrics-image]
+  - name: nktp-kube-state-metrics-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [nktp-kube-state-metrics-image]
+  - name: nktp-kubectl-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [nktp-kubectl-image]
+  - name: nktp-kubectl-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [nktp-kubectl-image]
+  - name: nktp-lgtm-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [nktp-lgtm-image]
+  - name: nktp-lgtm-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [nktp-lgtm-image]
+  - name: nktp-metrics-server-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [nktp-metrics-server-image]
+  - name: nktp-metrics-server-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [nktp-metrics-server-image]
+  - name: nktp-node-exporter-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [nktp-node-exporter-image]
+  - name: nktp-node-exporter-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [nktp-node-exporter-image]
+  - name: nktp-operator-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [nktp-operator-image]
+  - name: nktp-operator-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [nktp-operator-image]
+  - name: nktp-target-allocator-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [nktp-target-allocator-image]
+  - name: nktp-target-allocator-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/nvke/release-components
+    format: oci
+    components: [nktp-target-allocator-image]

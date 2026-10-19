@@ -3,6 +3,8 @@
 This directory owns the repository's NVKE build and release inputs. Definitions select named outputs
 from pinned catalog producers; Environments select execution and publication policy. The maintained
 release candidate starts at [the NVKE Definition](definitions/nvke/definition.yaml).
+The [four-family pilot](definitions/nvke/README.md#four-family-pilot) supplies independent core, services,
+telemetry and disk Definitions alongside that combined candidate.
 
 ```text
 inputs/
@@ -29,6 +31,10 @@ the move preserves each file's existing format.
 |---|---|---|
 | [`definitions/nvke/definition.yaml`](definitions/nvke/definition.yaml) | [`environments/github-release.yaml`](environments/github-release.yaml) | Maintained 69-output release candidate; existing main-only signed publication |
 | Same NVKE Definition | [`environments/github-development.yaml`](environments/github-development.yaml) | Separate signed development bundle and publication namespace |
+| [`definitions/nvke/core.yaml`](definitions/nvke/core.yaml) | [`environments/github-nvke-core.yaml`](environments/github-nvke-core.yaml) | 20-output core pilot with its own named production bundle and publication namespace |
+| [`definitions/nvke/services.yaml`](definitions/nvke/services.yaml) | [`environments/github-nvke-services.yaml`](environments/github-nvke-services.yaml) | 28-output supporting-services pilot |
+| [`definitions/nvke/telemetry.yaml`](definitions/nvke/telemetry.yaml) | [`environments/github-nvke-telemetry.yaml`](environments/github-nvke-telemetry.yaml) | 17-output telemetry pilot |
+| [`definitions/nvke/disks.yaml`](definitions/nvke/disks.yaml) | [`environments/github-nvke-disks.yaml`](environments/github-nvke-disks.yaml) | Four-output native plain/public-bootstrap FDE disk pilot |
 | [`definitions/demo/arm64-nvidia-tcg.json`](definitions/demo/arm64-nvidia-tcg.json) | [`environments/local-arm64-tcg.json`](environments/local-arm64-tcg.json) | Local 29-output NVIDIA OVN demo |
 | [`definitions/demo/arm64-upstream-tcg.json`](definitions/demo/arm64-upstream-tcg.json) | Same local TCG Environment | Local 29-output upstream OVN diagnostic demo |
 | [`definitions/demo/arm64-nvidia-kvm.json`](definitions/demo/arm64-nvidia-kvm.json) | [`environments/github-nightly-nvidia.json`](environments/github-nightly-nvidia.json) | Named NVIDIA nightly producer; current content differences remain explicit |
@@ -60,9 +66,14 @@ together. Maintain pins through `catalog pin`/`catalog bump`; use
 [catalog maintenance](../docs/catalog-maintenance.md) for the complete workflow. Definition reuse is
 explicit producer selection, without inheritance or execution-time output filtering.
 
-`make workflows-generate` regenerates the maintained release, development, nightly and qualification
-bundles. `make workflows-check` checks their exact recorded inputs. Generated bundles remain under
+`make workflows-generate` regenerates the maintained release, family-pilot, development, nightly and qualification
+bundles. `make workflows-check` checks their exact recorded inputs. The family-only targets are
+`make nvke-split-generate` and `make nvke-split-check`. Generated bundles remain under
 `.github/`; Run records and release artifacts remain with their execution/publication owners.
+
+The pilot retains the combined production/development/qualification paths pending consumer and
+qualification cutover. Its family Releases require separate digest-pinned verification and downstream-owned
+association; no parent Release, automatic association file or hosted acceptance is supplied by the split.
 
 The [qualification policy](policies/nvke-qualification.yaml) and
 [nightly coordinator configuration](testing/nightly-profiles.json) have independent owners and scopes.
