@@ -280,9 +280,12 @@ jobs:
             --connect-timeout 10 --max-time 60 --retry 2 --retry-max-time 90 \
             "https://github.com/golangci/golangci-lint/releases/download/v${lint_version}/${lint_archive}" \
             --output "$lint_install_root/$lint_archive"
-          printf '%s  %s\n' \
+          if ! printf '%s  %s\n' \
             'ab90aeb7b066f92a33415b638a50fe5344bbb75a0d32ad30cc248d88f81032ab' \
-            "$lint_install_root/$lint_archive" | sha256sum --check --status
+            "$lint_install_root/$lint_archive" | sha256sum --check --status; then
+            echo '::error::golangci-lint checksum verification failed'
+            exit 1
+          fi
           tar -xzf "$lint_install_root/$lint_archive" -C "$lint_install_root" \
             "golangci-lint-${lint_version}-linux-amd64/golangci-lint"
           echo "$lint_install_root/golangci-lint-${lint_version}-linux-amd64" >> "$GITHUB_PATH"

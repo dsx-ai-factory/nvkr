@@ -25,6 +25,7 @@ type mergeGateStep struct {
 }
 
 type mergeGateJob struct {
+	If       string            `json:"if"`
 	Needs    []string          `json:"needs"`
 	Outputs  map[string]string `json:"outputs"`
 	Steps    []mergeGateStep   `json:"steps"`
@@ -51,6 +52,9 @@ func readMergeGateJobs(t *testing.T) map[string]mergeGateJob {
 
 func TestMergeGateRequiresEveryCodeJob(t *testing.T) {
 	gate := readMergeGateJobs(t)["gate"]
+	if gate.If != "always()" {
+		t.Fatal("aggregate gate must always run, including after failed or skipped dependencies")
+	}
 	codeJobs := []string{"check", "lint", "vulnerabilities", "tests"}
 	for _, name := range append(slices.Clone(codeJobs), "check-skip", "check-paths") {
 		if !slices.Contains(gate.Needs, name) {
@@ -222,6 +226,103 @@ exit "$FAKE_EXIT"
 			raw, err := os.ReadFile(filepath.Join(root, "go-test.jsonl"))
 			if err != nil || string(raw) != diagnostic || output != diagnostic {
 				t.Fatalf("shard diagnostics lost: file=%q, output=%q, read error=%v", raw, output, err)
+			}
+		})
+	}
+}
+
+func TestMergeGateLintInstaller(t *testing.T) {
+	job := readMergeGateJobs(t)["lint"]
+	installer := slices.IndexFunc(job.Steps, func(step mergeGateStep) bool {
+		return step.Name == "Install checksum-pinned golangci-lint"
+	})
+	consumer := slices.IndexFunc(job.Steps, func(step mergeGateStep) bool {
+		return strings.HasPrefix(step.Uses, "golangci/golangci-lint-action@")
+	})
+	if installer < 0 || consumer <= installer || job.Steps[consumer].With["install-mode"] != "none" {
+		t.Fatal("lint action must consume the executable published by the verified installer")
+	}
+	// Replace network, checksum and archive commands; execute the declared
+	// workflow script without downloading or executing a release binary.
+	const stub = `#!/bin/sh
+set -eu
+tool=${0##*/}
+printf '%s\n' "$tool" >> "$RUNNER_TEMP/installer-trace"
+case "$tool" in
+  curl)
+    [ "$FAKE_FAILURE" != download ] || exit 23
+    for archive in "$@"; do :; done
+    printf 'archive fixture' > "$archive"
+    ;;
+  sha256sum)
+    [ "$*" = '--check --status' ] || exit 99
+    read -r checksum archive
+    [ "$checksum" = ab90aeb7b066f92a33415b638a50fe5344bbb75a0d32ad30cc248d88f81032ab ] || exit 99
+    [ -f "$archive" ] || exit 99
+    [ "$FAKE_FAILURE" != checksum ] || exit 1
+    printf '%s\n' "$archive" > "$RUNNER_TEMP/verified-archive"
+    ;;
+  tar)
+    [ "$#" -eq 5 ] && [ "$1" = -xzf ] && [ "$3" = -C ] || exit 99
+    IFS= read -r verified_archive < "$RUNNER_TEMP/verified-archive"
+    [ "$2" = "$verified_archive" ] || exit 99
+    [ "$5" = golangci-lint-2.14.0-linux-amd64/golangci-lint ] || exit 99
+    mkdir -p "$4/${5%/*}"
+    printf '#!/bin/sh\nexit 0\n' > "$4/$5"
+    chmod 700 "$4/$5"
+    ;;
+  *) exit 99 ;;
+esac
+`
+	for _, tc := range []struct {
+		name, failure, trace string
+		code                 int
+	}{
+		{"success", "", "curl\nsha256sum\ntar\n", 0},
+		{"download failure", "download", "curl\n", 23},
+		{"checksum mismatch", "checksum", "curl\nsha256sum\n", 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			for _, tool := range []string{"curl", "sha256sum", "tar"} {
+				if err := os.WriteFile(filepath.Join(root, tool), []byte(stub), 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			pathFile := filepath.Join(root, "github-path")
+			if err := os.WriteFile(pathFile, nil, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			output, code := runMergeGateStep(t, job.Steps[installer], root, []string{
+				"GITHUB_PATH=" + pathFile, "FAKE_FAILURE=" + tc.failure,
+			})
+			if code != tc.code {
+				t.Fatalf("installer exited %d, want %d: %s", code, tc.code, output)
+			}
+			trace, err := os.ReadFile(filepath.Join(root, "installer-trace"))
+			if err != nil || string(trace) != tc.trace {
+				t.Fatalf("unexpected installer operations: %q (read error: %v)", trace, err)
+			}
+			published, err := os.ReadFile(pathFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.code != 0 {
+				if len(published) != 0 {
+					t.Fatalf("failed installer published PATH: %q", published)
+				}
+				if tc.failure == "checksum" && !strings.Contains(output, "::error::golangci-lint checksum verification failed") {
+					t.Fatalf("missing checksum failure annotation: %s", output)
+				}
+				return
+			}
+			path := strings.TrimSuffix(string(published), "\n")
+			if !strings.HasPrefix(path, root+string(os.PathSeparator)) {
+				t.Fatalf("lint executable must remain in runner temporary storage: %q", path)
+			}
+			info, err := os.Stat(filepath.Join(path, "golangci-lint"))
+			if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
+				t.Fatalf("published PATH does not contain an executable golangci-lint: %v", err)
 			}
 		})
 	}
