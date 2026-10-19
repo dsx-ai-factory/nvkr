@@ -33,6 +33,8 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 		return executeAPTPackage(ctx, plan, node, output, inputs)
 	case PackageHelm:
 		return executeHelmPackage(ctx, plan, node, output, inputs, artifacts, stdout)
+	case PackageBundle:
+		return executeBundlePackage(ctx, plan, node, output, inputs, artifacts)
 	case PackageOCI:
 		return executePublicationPackage(ctx, plan, node, output, inputs, artifacts)
 	default:

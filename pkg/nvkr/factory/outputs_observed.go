@@ -225,6 +225,25 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "lifecycle Helm output %q differs from independently reproduced package (%s != %s)", expected.Name, descriptor.Digest, expectedDigest)
 		}
 		return LifecyclePayloadObservation{Digest: descriptor.Digest, SemanticDigest: descriptor.Digest, Components: components}, nil
+	case PackageBundle:
+		if err := verifyRawResults(); err != nil {
+			return LifecyclePayloadObservation{}, err
+		}
+		descriptor, payload, err := delivery.ReadArtifact(ctx, artifact.Path)
+		if err != nil {
+			return LifecyclePayloadObservation{}, err
+		}
+		if descriptor.ArtifactType != delivery.MediaBundle {
+			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "bundle output %q has the wrong artifact media type", expected.Name)
+		}
+		expectedDigest, err := reproduceLifecyclePackage(ctx, plan, artifact, artifacts)
+		if err != nil {
+			return LifecyclePayloadObservation{}, err
+		}
+		if expectedDigest != descriptor.Digest {
+			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "bundle output %q differs from independently reproduced package", expected.Name)
+		}
+		return LifecyclePayloadObservation{Digest: descriptor.Digest, SemanticDigest: pipeline.FileDigest(payload), Components: components}, nil
 	default:
 		return LifecyclePayloadObservation{}, e.New(e.CodeEngineCapability, "package kind %q cannot be observed for lifecycle output", artifact.Kind)
 	}
@@ -307,7 +326,7 @@ func reproduceLifecyclePackage(ctx context.Context, plan *Plan, artifact Artifac
 			return "", err
 		}
 		return result.Digest, nil
-	case PackageHelm:
+	case PackageHelm, PackageBundle:
 		result, err := delivery.PayloadDescriptor(ctx, reproduced.Path)
 		if err != nil {
 			return "", err

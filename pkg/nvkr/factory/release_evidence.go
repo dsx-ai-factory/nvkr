@@ -114,14 +114,14 @@ func releaseEvidenceObjects(ctx context.Context, plan *Plan, node Node, artifact
 					return nil, err
 				}
 				subject, kind = image.ManifestDigest, "oci-manifest"
-			case "helm-oci":
+			case "helm-oci", PackageBundle:
 				stage, kind = "source-build", "source-archive"
 			}
 			if err := add(bom, output.Name, "", component, stage, kind, subject, input); err != nil {
 				return nil, err
 			}
 		}
-		if output.Kind != "helm-oci" {
+		if output.Kind != "helm-oci" && output.Kind != PackageBundle {
 			continue
 		}
 		descriptor, payload, err := delivery.ReadArtifact(ctx, artifact.Path)
@@ -134,18 +134,22 @@ func releaseEvidenceObjects(ctx context.Context, plan *Plan, node Node, artifact
 		// the manifest-level subject.
 		subject := descriptor.Digest
 		input := pipeline.FileDigest(payload)
-		// Helm inspection is internal/offline and executes neither scripts nor a scanner.
-		temporary, err := os.MkdirTemp(filepath.Dir(artifact.Path), ".release-helm-sbom-*")
+		// Archive inspection is internal/offline and executes neither scripts nor a scanner.
+		temporary, err := os.MkdirTemp(filepath.Dir(artifact.Path), ".release-archive-sbom-*")
 		if err != nil {
 			return nil, e.Wrap(e.CodeInternal, err, "creating package SBOM workspace")
 		}
 		funcErr := func() error {
 			defer func() { _ = os.RemoveAll(temporary) }()
-			path := filepath.Join(temporary, "helm.tar")
+			path := filepath.Join(temporary, "archive.tar.gz")
 			if err := writeFactoryFile(ctx, path, payload, 0o600); err != nil {
 				return err
 			}
-			inventory, err := sbom.InspectDependencies(ctx, path, input, "tarball", sbom.Scanner{})
+			payloadKind, subjectKind := "tarball", "helm-bundle"
+			if output.Kind == PackageBundle {
+				payloadKind, subjectKind = "bundle-archive", "bundle"
+			}
+			inventory, err := sbom.InspectDependencies(ctx, path, input, payloadKind, sbom.Scanner{})
 			if err != nil {
 				return err
 			}
@@ -157,7 +161,7 @@ func releaseEvidenceObjects(ctx context.Context, plan *Plan, node Node, artifact
 			if err != nil {
 				return err
 			}
-			return add(bom, output.Name, "", output.Name, "packaging", "helm-bundle", subject, input)
+			return add(bom, output.Name, "", output.Name, "packaging", subjectKind, subject, input)
 		}()
 		if funcErr != nil {
 			return nil, funcErr

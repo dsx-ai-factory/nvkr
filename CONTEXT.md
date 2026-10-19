@@ -36,6 +36,12 @@ _Avoid_: Plan, release, proof of qualification
 Immutable bytes produced or acquired for delivery, such as an executable, image, chart, or packaged collection.
 _Avoid_: Producer, expected output, release
 
+**OCI bundle**:
+A generic archive artifact carrying a pinned producer's rendered files, including AICR deployment bundles.
+The OCI manifest identifies the output; the archive and its file inventory retain separate exact byte bindings.
+Rendering and file integrity do not establish deployed dependency closure or hardware compatibility.
+_Avoid_: Native Helm chart, container image, cluster topology, new lifecycle object
+
 **Release**:
 An immutable selection of artifacts and evidence accessible through one pinned reference, with an explicit evidence lane. Acceptance depends on the consumer's Verification Policy.
 Metadata inspection can expose checked artifact/evidence membership without establishing payload integrity,

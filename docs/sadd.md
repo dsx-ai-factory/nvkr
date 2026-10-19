@@ -122,7 +122,11 @@ The [domain vocabulary](../CONTEXT.md) defines six high-level public objects:
 | Release | Immutable selected artifacts and evidence accessible through one pinned reference |
 | Verification Policy | Consumer requirements for acceptable identities, evidence, and lifecycle state |
 
-A binary bundle is an Artifact format. Deployment topology and node placement are downstream concerns,
+A binary bundle or generic OCI bundle is an Artifact format. Generic bundles wrap one pinned producer's
+gzip tar archive and receive a bounded delivered-file inventory. AICR renderers use this path without new
+profile or lifecycle objects; native Helm charts retain their own media contract. See
+[ADR-24](adr/0024-generic-oci-bundles-and-aicr-producers.md) for integrity and evidence boundaries.
+Deployment topology and node placement are downstream concerns,
 without another NVKR authored object or generated realization.
 
 The internal records appear where needed to explain trust: plans describe admitted execution; Inventory and

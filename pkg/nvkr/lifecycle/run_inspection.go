@@ -203,7 +203,7 @@ func validateInspectedRun(run *Run) error {
 	}
 	for _, output := range run.Expected {
 		switch output.Kind {
-		case OutputExecutable, OutputOCI, OutputAPT, OutputHelm, OutputDiskImage:
+		case OutputExecutable, OutputOCI, OutputAPT, OutputHelm, OutputBundle, OutputDiskImage:
 		default:
 			return e.New(e.CodeVerifyFailed, "Run record has an unknown output format")
 		}

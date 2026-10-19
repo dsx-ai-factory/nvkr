@@ -1,10 +1,10 @@
 # NVKR
 
-NVKR turns pinned NVKE components into traceable, signed software releases. Its goal is to bring
-NVKE's CLI, container images, Helm charts, operator tools, and node images into one declarative build and
+NVKR turns pinned NVKE and AICR components into traceable, signed software releases. Its goal is to bring
+CLIs, container images, Helm charts, deployment bundles, operator tools, and node images into one declarative build and
 delivery workflow, connecting the delivered bytes to their inputs and evidence.
 
-The **`nvkr`** CLI exposes the build and release engine, alongside reusable NVKE catalogs and product
+The **`nvkr`** CLI exposes the build and release engine, alongside reusable NVKE and AICR catalogs and product
 Definitions. Release engineers declare what to ship; NVKR derives the
 dependency graphs and generates the pipelines that build or acquire, package, sign, and publish it.
 Consumers can navigate a release's artifacts and evidence, then verify a supported claim against their
@@ -66,6 +66,7 @@ The [documentation map](docs/README.md) connects the next steps:
 | Select components, pins, and overlays | [Catalogs and components](docs/catalogs-and-components.md) |
 | Visualize dependencies and generate GitHub Actions | [Pipeline generation](docs/generate-pipeline.md) |
 | Understand node-image materials and execution | [Node images](docs/node-images.md) |
+| Build AICR bundles for GB300 and preview VR200 recipes | [AICR inputs and hardware limits](definitions/aicr/README.md) |
 | Find outputs and verify a published claim | [Release quickstart](docs/release-quickstart.md) |
 | Look up terminology and features | [Concept reference](docs/user-concepts.md) |
 

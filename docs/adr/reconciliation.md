@@ -9,6 +9,10 @@ schema results do not transfer to a changed candidate.
 test interfaces outside that consolidated set until acceptance. Implementation and local CLI proof
 are tracked below; governance, CI and broader acceptance remain pending.
 
+[ADR-24](0024-generic-oci-bundles-and-aicr-producers.md) additionally admits generic OCI bundles and
+ordinary pinned AICR producers. Its contract and rendering evidence remain distinct from hosted delivery
+and hardware acceptance, as recorded below.
+
 ## Current boundary
 
 The maintained public workflow is **Definition → Run → Release**, with Environment, Artifact and
@@ -20,7 +24,8 @@ internal evidence records are generated or authenticated rather than separately 
 Planning, byte-exact GitHub generation, Plan/graph/diff views and metadata-only release navigation are
 implemented. Diagnostic pulling retrieves and checks one named output's complete payload closure from a
 registry release: executable files, a plain or declared LUKS2-encrypted QCOW2 disk, an unchanged Helm archive,
-an OCI image layout including all declared aggregate platforms, or an APT repository tree.
+an OCI image layout including all declared aggregate platforms, an APT repository tree, or a validated
+generic bundle archive.
 Local immutable attempts and Linux `pipeline-attested` consumers for `authenticity` and
 `artifact-publication` are implemented. Authenticity verifies signatures and evidence without artifact
 payload downloads; artifact-publication retains payload integrity checks. Browsing does not verify payload
@@ -74,6 +79,78 @@ The [native ARC record below](#native-arc-disk-route) binds the exact output and
 The [pinned-source audit](../../definitions/nvke-fde/fde-audit.md) records retained bootstrap
 files, SSH key distinctions, a GRUB cleanup defect and cloned-volume-key implications. The public value
 requires no GitHub secret; private passphrases remain unsupported.
+
+## AICR deployment bundles
+
+ADR-24's `bundle-oci` path is implemented through the existing Definition → Run → Release owners.
+Each named output selects one pinned source-built gzip tar archive. Delivery preserves its exact bytes
+in an OCI artifact; independent output observation reconstructs the wrapper from that output's producer.
+The bounded archive reader rejects traversal, links, sparse files, unsupported extended metadata,
+ambiguous paths and compressed/trailing-data substitutions. Always-on `bundle-files/v1` evidence records
+the included regular files at the source/archive and final packaging subjects. It does not inspect
+referenced charts, images or providers. Diagnostic pulling writes the exact archive without extraction
+or deployment; authenticated consumption retains the normal signed Release/evidence requirements.
+
+The [maintained AICR inputs](../../definitions/aicr/README.md) pin
+[upstream commit fa705ec263a54eeb0ca25cb24c9f20c5d8504dca](https://github.com/NVIDIA/aicr/tree/fa705ec263a54eeb0ca25cb24c9f20c5d8504dca),
+tree `10c8c6832fa5d6b37c431dc5aa5bb44c52b3d1a7`, and source epoch `1792385421`.
+The six independent renderers are Argo CD, Argo CD Helm, Flux, Helm, Helmfile and Terraform. The default
+selection is `generic / gb300 / ubuntu / training`; the separate `rke2 / vr200 / ubuntu / training`
+selection retains upstream Preview status. `eks / gb200 / ubuntu / training` is an explicitly cloud-only
+reference. The pinned upstream rejects the generic GB200 coordinate; no bare-metal GB200 result is claimed.
+An additional native Helm selection uses the genuine GB300 root chart and the existing chart packaging
+owner. Its source-derived chart version and repository basename require separate naming/namespace review
+before another hardware recipe can publish alongside it. These selections use a separate named GitHub
+namespace and do not change the maintained NVKE candidate's workflow.
+
+The pinned Go 1.27.2 image
+`sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c` separately exercised module
+download/verification/vendoring without changing the upstream module pin files. Its Linux ARM64 runtime
+executed the complete GB300 Definition recorded below. Linux ARM64 contracts in archive, Definition,
+buildgraph, SBOM, delivery, factory and lifecycle passed with networking disabled. They cover producer
+admission, byte substitution, inventory scope, evidence membership, registry retrieval and selected-output
+consumption; local registry and signer
+fixtures do not establish hosted registry or signing-service acceptance. All four production selections
+and the build-only development selection generated and passed byte-exact drift checking in scratch roots.
+
+On October 18, the complete six-output GB300 Definition finished local attempt
+`aicr-gb300-local-20261018-r2` with exit code 0 and complete cleanup. Its immutable
+`.nvkr/runs/aicr-gb300-local-20261018-r2/lifecycle.json` records status `complete`, lane
+`unqualified-local-execution`, Plan digest
+`sha256:34a006d3caa099af8ec284c77a4489cc6a22d61edb144650f6eaef9bbf2c6b33` and content subject
+`sha256:101165a75a35b41e85116a0c38b42ffd74617111db42c6e9847b096277396ff7`.
+All 30 source-fetch, offline build, terminal-observation, file-inventory and OCI-packaging nodes completed;
+independent lifecycle observation bound all six required output manifests. The host was macOS ARM64
+Go 1.27.2 and producers ran in the pinned Linux ARM64 Go 1.27.2 container. The earlier attempt stopped
+at its dependency-vendoring timeout with no observed outputs; the retained command now bounds vendoring
+at 900 seconds. These are local records, not hosted evidence or signed Releases.
+
+The Linux ARM64 generator retained by that Run, version `0.0.0-nvkr.fa705ec263a5`, was reused offline
+for two complete passes across all 18 recipe/renderer selections. All 36 renders passed upstream checksum
+verification; every pair retained identical resolved recipe bytes, rendered files and normalized gzip-tar
+bytes. All six GB300 archives also matched the completed Run's archives byte for byte. NVKR's local OCI
+builder admitted all 18 resulting archives. This is repeat-render evidence from one retained binary,
+not independently qualified reproduction.
+
+That same binary rendered the optional native Helm root chart. Helm 4.2.3 accepted it in lint, template
+and package checks. NVKR built a native Helm OCI layout and exported the identical chart archive, with
+manifest `sha256:2f597484d2ae24c8a5f2b25b3395977110778d913cba1f1181bcaa4575793999` and archive
+`sha256:f229addc1ff50804b24361c2327d4d5afc477539805454ffd51e364cff08b85e` (35,757 bytes).
+This separate renderer and delivery smoke is not a complete native Helm Run or registry publication.
+
+The uncached default Go suite passed on Linux ARM64 Go 1.27.2 across the full suite and reruns of the
+three packages whose fixtures required a non-root user or writable `.nvkr` scratch space. The corrected
+reruns retained read-only source, Git and module-cache mounts with private writable test volumes. Formatting,
+license headers, vet, lint, shellcheck, Python report tests, vulnerability scanning, documentation checks,
+maintained-workflow drift checks and the final CLI build also passed. The macOS full gate did not pass:
+delivery exceeded a deadline and its 20-minute package timeout under slow filesystem operations; its
+remaining run was stopped after the Linux package passed. The Linux results do not imply a macOS gate pass.
+
+Hosted AICR publication/signing and independent production consumption remain unexercised. Helm lint and
+template rendering do not prove Argo reconciliation: the pinned native chart's child OCI subpaths need
+separate downstream validation, as documented with the inputs. Cluster installation, hardware behavior,
+air-gap dependency closure and qualified bundle reproduction remain outside these results. No test or
+render upgrades VR200 Preview to operational acceptance.
 
 ## Preparatory external test output boundary
 
@@ -267,7 +344,7 @@ that remains outstanding after merge.
 | 07–08 Reproduction | Linux stage-two helper/runtime/image and terminal-byte receipts, deterministic comparisons and profile matching | Provider receipts, other-platform authority, qualified helper images, independent two-machine bake-off and profile graduation |
 | 09 Provenance | Separate deterministic reproduction and SLSA production predicates; exact Plan/dependency/subject finalization checks; acquired-image parent/native URI distinctions | Recorded hosted signatures/provenance do not establish qualified reproduction; parent-bound qualified acquisition provenance is unavailable |
 | 10 Builders | OCI source builds, digest-pinned acquisition, rootless BuildKit wrapped exports, direct-Packer disk schema/IR/Plan lowering and connected plain/public-bootstrap execution; exact component/material bindings and acquisition-carrier retention; M3-A pinned embedded-declaration checker and contract fixtures | Optional upstream metadata integration is not an MVP prerequisite. Command/Make material handoff and held-output execution, general hosted/qualified VM adapters, encrypted secret channel, qualified Nix observation and fused general wrapped-job phase isolation remain closed |
-| 11–12 Resolution | Exact output-selected producers and concrete platforms; complete explicit disk material closure; predecessor-bound whole-producer overlays | Finite-set embedded compatibility and accelerated-runtime rendering remain deferred; no matching, mixins, wildcards or deployment classification |
+| 11–12 Resolution | Exact output-selected producers and concrete platforms; complete explicit disk material closure; predecessor-bound whole-producer overlays; ADR-24 ordinary pinned AICR producers | Finite-set embedded compatibility and retired AICR profile fields remain unavailable; no matching, mixins, wildcards or deployment classification |
 | 13 Evidence | Exact offline binary/image dependency scanning, separate `InspectDebianArchiveMetadata` diagnostics and bounded Helm metadata inventories, including acquired raw charts; stage-bound signed CycloneDX bundles; M2 live disk producer/material evidence with explicit deferred inspection; guarded installed-inventory and full-content export receipt APIs | Factory callers retain ordinary hint-free dependency inspection; no maintained factory output invokes the separate Debian metadata diagnostic. Dependency SBOM attachment and serialized BOM validation reject its method. Native Debian delivery and payload dependency inspection remain deferred. Real native NVKE full-content inspection/reconciliation and original-live-Run joins remain unexercised. Vulnerability scanning, acquired upstream-signature verification and qualified signed evidence publication are outside v1 |
 | 14 Delivery | Executable/APT/Helm formats, byte-preserving acquired charts, image-bound source charts, RAW/ISO measurement, Linux held-qemu envelope verification, local held-QCOW2 retention and streamed plain/public-bootstrap FDE OCI disk wrappers | Independent full-payload signed M2 disk read-back, real strict receipt-to-package/finalization and unmodified Helm/ORAS binary interoperability remain unexercised; private-passphrase FDE, strict FDE and object-store delivery are unavailable |
 | 15 Air gap | No mirror implementation or CLI retained; supported offline signature primitives remain | Air-gap product lifecycle and zero-egress acceptance require a new admitted design |
@@ -279,6 +356,7 @@ that remains outstanding after merge.
 | 21 Generation | Exact recorded input selection, independent fixed production/development layouts, manifest-owned semantic action interfaces and Plan-derived invocation data with expanded-step validation, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows; separately owned qualification pair and runtime policy drift admission; optional named production namespaces independently own their manifest, lock, paths and retirement | Producer generation emits manual-dispatch workflows, not cron; optional qualification generation emits its fixed event/call pair. Authored downstream scheduling has separate ownership. Combining development with a nonempty named bundle is rejected before catalog resolution or generated-output work. Latest stable-workflow, semantic-interface and controlled-transfer regressions are unrun; semantic-action hosted execution, automatic PR publication and scheduled/private-source service acceptance are unexercised. Producer matrices and general callable workflows remain deferred. Qualification generation does not make both owner writes one atomic transaction; lock and generated files are separate transactions; complete crash matrix remains |
 | 22 Pins | Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets, same-release maintenance groups, whole-producer overlays, exact toolchain substitutions and authored embedded-version metadata authentication | Pin-set loading needs pinned Git access. Curated graph/SBOM edges remain deferred. Optional metadata consistency is not disk-content inspection, external acquisition or production acceptance |
 | 23 Artifact test interfaces | Proposed ADR merged in PR #139; upstream interface, Go Plan helper and diagnostic adapter implementation remain separate drafts | [Implementation guide and local CLI proof](https://github.com/dsx-ai-factory/nvkr/blob/65d13f4becb358015dead41fd1bc440d13118556/docs/artifact-testing.md) retain their stated limits. Maintained-pin adoption, kind, CI and CAPD/CAPNICo acceptance remain outstanding; no conformance or qualification authority |
+| 24 Generic bundles and AICR | `bundle-oci` selection, exact gzip-tar OCI wrapping, independent producer correspondence, bounded `bundle-files/v1` inventories, source/archive and packaging evidence, metadata/full inspection and diagnostic pulling | AICR hosted signing/publication, standard deployer acceptance, on-prem hardware operation, air-gap dependency closure and qualified reproduction remain unexercised or deferred; upstream preview status is retained |
 
 ## Feature-branch pipeline development
 

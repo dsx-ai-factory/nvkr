@@ -105,7 +105,7 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 			}
 			continue
 		}
-		if plan.Definition.SBOMTool != "" {
+		if plan.Definition.SBOMTool != "" || plan.hasBundleTarget(artifact.BuildTarget) {
 			if len(bom.Components) == 0 {
 				return nil, e.New(e.CodeProvenanceMissing, "hosted SBOM omits required dependency inventory")
 			}
@@ -129,7 +129,9 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 					}
 				}
 			}
-			if (kind == "tarball" && method != "helm-manifests/v1") || (kind != "tarball" && (method != "syft-cyclonedx/v1" || scanner != toolExecutableDigest(plan, plan.Definition.SBOMTool))) {
+			if (kind == "bundle-archive" && (method != "bundle-files/v1" || scanner != "")) ||
+				(kind == "tarball" && method != "helm-manifests/v1") ||
+				(kind != "tarball" && kind != "bundle-archive" && (method != "syft-cyclonedx/v1" || scanner != toolExecutableDigest(plan, plan.Definition.SBOMTool))) {
 				return nil, e.New(e.CodeVerifyFailed, "hosted SBOM inspection does not match the planned scanner")
 			}
 		}

@@ -8,8 +8,9 @@ payloads plus their producer records. The implementation is selected by artifact
 |---|---|---|
 | CLI executable | Syft reads compiled binary metadata | Embedded Go modules and other recognizable binary packages |
 | OCI image export | Syft reads the final image filesystem | Installed OS packages and recognizable application dependencies |
-| Helm source archive | NVKR reads Helm/AICR manifests | Source-build stage: bundled charts, chart dependencies/locks and declared external chart references |
+| Helm source archive | NVKR reads standard chart metadata | Source-build stage: bundled charts and declared chart dependencies/locks |
 | Bound Helm package | NVKR re-inspects the final archive after image binding | Packaging stage: chart declarations/references in the exact delivered bytes |
+| Generic OCI bundle | NVKR's bounded archive reader inventories every regular file | `bundle-files/v1`: delivered paths, exact hashes, sizes and modes; referenced images/charts/providers are not inspected |
 | Separate Debian archive metadata diagnostic | `InspectDebianArchiveMetadata` uses Syft v1.51.1 with the fixed private name `subject.deb`, independent of the caller's filename | Package identity only; `syft-debian-archive-metadata/v1` is rejected by dependency SBOM attachment and serialized BOM validation; no maintained factory output invokes this diagnostic |
 
 Ordinary `InspectDependencies` and held-only `InspectHeldDependencies` retain hint-free host-file scanning;
@@ -24,13 +25,17 @@ is normalized into CycloneDX 1.5: deterministic identities/order, package URLs, 
 edges. File-location records are excluded from dependency counts. Missing versions remain unknown. Missing
 inputs, substituted bytes/tools, scanner failures and empty inventories are errors, not successful empty SBOMs.
 
-Helm dependency inspection reads standard `Chart.yaml`/`Chart.lock` files and Helm references from AICR's
-`recipe.yaml` export. It reads version declarations directly and never executes shell scripts. External charts
+Helm dependency inspection reads standard `Chart.yaml`/`Chart.lock` files.
+It reads version declarations directly and never executes shell scripts. External charts
 are references, not vendored packages; their transitive dependencies are not claimed. The Helm subject is the
 built source archive, preceding the separate image-binding and packaging operation.
 
-A Definition without `sbomTool` still emits declaration-only source metadata and does not claim dependency
-inspection. This does not enable vulnerability scanning or qualified reproduction.
+A `bundle-oci` output always receives a file inventory, including without `sbomTool`. Its source-build
+document binds the producer archive; its packaging document binds the final OCI manifest and the exact
+archive inspected. AICR recipes, Argo CD applications, Helm values and Terraform files are inventoried as
+files. The inventory makes no claim about referenced packages, deployment success or hardware compatibility.
+Other outputs without `sbomTool` still emit declaration-only source metadata and do not claim dependency
+inspection. Neither path enables vulnerability scanning or qualified reproduction.
 
 One release index references each required CycloneDX attestation bundle once in its owning artifact repository.
 The document appears only inside that signed statement; raw SBOM files remain private job handoffs. Its metadata records exact subject,

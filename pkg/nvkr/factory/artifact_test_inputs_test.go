@@ -84,11 +84,6 @@ func cliTestPlan(t *testing.T, arch, mode string, outputs int) *Plan {
 		t.Fatal(err)
 	}
 	plan, err := Compile(t.Context(), definition, environment, stack, "test")
-	if strings.Contains(mode, "alias") {
-		// Renamed stamps are refused by canonical IR environment admission.
-		assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
-		return nil
-	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +183,22 @@ func TestCLIArtifactTestUnsupportedProducers(t *testing.T) {
 
 func TestCLIArtifactTestVersionAliasAdmission(t *testing.T) {
 	for _, mode := range []string{"alias", "equal-alias", "conflicting-alias"} {
-		t.Run(mode, func(t *testing.T) { cliTestPlan(t, "amd64", mode, 1) })
+		t.Run(mode, func(t *testing.T) {
+			// Both reviewed upstream spellings are valid build inputs. The
+			// artifact-test owner requires an unambiguous expected version.
+			plan := cliTestPlan(t, "amd64", mode, 1)
+			inputs, err := LoadCLIArtifactTestInputs(t.Context(), writeCLIPlan(t, plan), "")
+			if mode == "conflicting-alias" {
+				assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
+				if inputs != nil {
+					t.Fatal("conflicting versions emitted test inputs")
+				}
+				return
+			}
+			if err != nil || inputs.ExpectedVersion != "v1" {
+				t.Fatalf("reviewed version alias rejected: %+v, %v", inputs, err)
+			}
+		})
 	}
 }
 

@@ -65,6 +65,7 @@ The selected output's format determines what appears directly beneath `--out`:
 | `executable` | The bundle's named files with recorded permission modes, such as `nvkectl` |
 | `disk-image` | `<output-name>.qcow2`, preserving the exact plain or declared LUKS2-encrypted disk payload bytes without decryption |
 | `helm-oci` | `<output-name>.tgz`, preserving the unchanged chart archive |
+| `bundle-oci` | `<output-name>.tar.gz`, preserving the validated generic bundle archive without extraction or execution |
 | `oci` | A standard OCI layout with `oci-layout`, `index.json`, and `blobs/`; native OCI and Docker schema-2 images retain their exact manifests, configs, and layers; aggregate OCI indexes include every declared platform |
 | `apt-repository` | The checked APT repository tree of regular files and directories, directly beneath the destination directory |
 
@@ -225,7 +226,7 @@ downloads including disk images, failed admission before filesystem/network work
 in a read-only current directory, rejection of evidence without output membership, empty Helm build-subject
 arrays, filtered shared membership, Unicode-safe JSON round trips and CLI option admission. Those fixtures
 establish contracts, not GHCR, signing-service or production acceptance. Pulling contracts cover exact output
-selection, the five supported formats, complete aggregate-platform membership, exclusion of unrelated payloads,
+selection, supported formats, complete aggregate-platform membership, exclusion of unrelated payloads,
 integrity failures, existing-destination refusal, and cleanup. They do not establish registry-service,
 installation, image-runtime, or production acceptance. Current support and external evidence remain recorded in
 [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md).

@@ -117,6 +117,10 @@ func inspectMetadata(ctx context.Context, root string, allowPayloads bool) (Insp
 			if _, err := inspectDiskOutputMetadata(ctx, root, object, m); err != nil {
 				return Inspection{}, err
 			}
+		} else if object.Output != nil && object.Output.Format == outputFormatBundle {
+			if err := inspectBundleMetadata(ctx, root, m, &object); err != nil {
+				return Inspection{}, err
+			}
 		} else if _, err := readBlob(ctx, root, m.Config, 8<<20); err != nil {
 			return Inspection{}, err
 		}
@@ -322,6 +326,11 @@ func metadataManifest(ctx context.Context, root string, object PublishedObject) 
 	}
 	if err := canonical.ValidateJSONDocument(manifestBytes); err != nil {
 		return ociManifest{}, err
+	}
+	if object.ArtifactType == MediaBundle {
+		if err := validateBundleManifestDocument(manifestBytes); err != nil {
+			return ociManifest{}, err
+		}
 	}
 	if types.MediaType(object.ArtifactType).IsImage() {
 		if err := validateImageSchemaNames(manifestBytes, reflect.TypeFor[v1.Manifest]()); err != nil {

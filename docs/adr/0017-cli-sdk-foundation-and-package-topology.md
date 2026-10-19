@@ -26,6 +26,10 @@ belongs to the downstream deployment owner and is not part of the Definition or 
 sets, clearance, publication roots, and qualification records are generated/authenticated internals available
 through inspection. Normal callers neither construct nor connect their receipt graph.
 
+Generic `bundle-oci` outputs select one pinned source tarball producer and retain the same complete lifecycle,
+independent output observation and evidence obligations. [ADR-24](0024-generic-oci-bundles-and-aicr-producers.md)
+owns their archive/OCI contract and the AICR integration; a deployment bundle is distinct from a native Helm chart.
+
 Definition declares named outputs directly. Each native output selects exact catalog components and a concrete target
 platform, together with its artifact format. An OCI aggregate instead declares a sorted, unique `platforms`
 set; the compiler derives one native producer target per member and one required image-index output

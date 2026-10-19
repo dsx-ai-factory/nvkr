@@ -768,6 +768,22 @@ func testReleaseRequest(t *testing.T, artifacts []Artifact, objects []delivery.O
 		request.Objects = append(request.Objects, delivery.ObjectInput{Name: "sbom-" + strings.TrimPrefix(digest, "sha256:"), Kind: "sbom", ArtifactType: "application/vnd.cyclonedx+json", LayerMediaType: "application/vnd.cyclonedx+json", SemanticDigest: digest, Bytes: raw, Evidence: &delivery.EvidenceBinding{Outputs: []string{output}, Component: component, Stage: stage, SubjectKind: kind, SubjectDigest: subject, InspectionInputDigest: inspected}})
 	}
 	for i, artifact := range artifacts {
+		var bundleInventory *sbom.DependencyInventory
+		if artifact.Kind == OutputBundle {
+			_, raw, err := delivery.ReadArtifact(t.Context(), objects[i].Path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(t.TempDir(), "bundle.tar.gz")
+			if err := os.WriteFile(path, raw, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			inventory, err := sbom.InspectDependencies(t.Context(), path, pipeline.FileDigest(raw), "bundle-archive", sbom.Scanner{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			bundleInventory = &inventory
+		}
 		output := &delivery.OutputBinding{Repository: artifact.Name, Format: artifact.Kind, BuildDigest: artifact.BuildDigest, Components: artifact.Components}
 		request.Objects[i].Output = output
 		for _, component := range artifact.Components {
@@ -781,12 +797,18 @@ func testReleaseRequest(t *testing.T, artifacts []Artifact, objects []delivery.O
 			if artifact.Kind == OutputOCI {
 				subject, kind = artifact.Digest, "oci-manifest"
 			}
-			if artifact.Kind == OutputHelm {
+			if artifact.Kind == OutputHelm || artifact.Kind == OutputBundle {
 				stage, kind = "source-build", "source-archive"
+			}
+			if bundleInventory != nil {
+				bom, err = sbom.WithDependencies(bom, bundleInventory.Components, bundleInventory.Method, "")
+				if err != nil {
+					t.Fatal(err)
+				}
 			}
 			add(bom, artifact.Name, component, stage, kind, subject, input)
 		}
-		if artifact.Kind == OutputHelm {
+		if artifact.Kind == OutputHelm || artifact.Kind == OutputBundle {
 			descriptor, raw, err := delivery.ReadArtifact(context.Background(), objects[i].Path)
 			if err != nil {
 				t.Fatal(err)
@@ -799,7 +821,11 @@ func testReleaseRequest(t *testing.T, artifacts []Artifact, objects []delivery.O
 			if err := os.WriteFile(path, raw, 0600); err != nil {
 				t.Fatal(err)
 			}
-			inventory, err := sbom.InspectDependencies(context.Background(), path, input, "tarball", sbom.Scanner{})
+			payloadKind, subjectKind := "tarball", "helm-bundle"
+			if artifact.Kind == OutputBundle {
+				payloadKind, subjectKind = "bundle-archive", "bundle"
+			}
+			inventory, err := sbom.InspectDependencies(context.Background(), path, input, payloadKind, sbom.Scanner{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -811,7 +837,7 @@ func testReleaseRequest(t *testing.T, artifacts []Artifact, objects []delivery.O
 			if err != nil {
 				t.Fatal(err)
 			}
-			add(bom, artifact.Name, artifact.Name, "packaging", "helm-bundle", subject, input)
+			add(bom, artifact.Name, artifact.Name, "packaging", subjectKind, subject, input)
 		}
 	}
 	return request

@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/environment/v1
+kind: Environment
+metadata:
+  name: aicr-github
+  description: Candidate GitHub publication of AICR bundles; hardware compatibility is independently established downstream.
+githubBundle: aicr
+publication:
+  mode: per-output-v1
+  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/aicr-candidate
+  credentialRef: github:GITHUB_TOKEN
+githubRunners:
+  linux/amd64: ubuntu-24.04
+  linux/arm64: ubuntu-24.04-arm
+runtime:
+  runtime: docker
+signing:
+  identity: ^https://github\.com/dsx-ai-factory/nvkr/\.github/workflows/nvkr-run-aicr\.yml@refs/heads/main$
+  issuer: https://token.actions.githubusercontent.com
+  mode: cosign
+utilityContainer: busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1
+utilityPlatform: linux/amd64

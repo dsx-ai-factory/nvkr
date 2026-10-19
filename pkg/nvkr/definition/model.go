@@ -30,6 +30,7 @@ const (
 	OutputOCI                    = "oci"
 	OutputAPT                    = "apt-repository"
 	OutputHelm                   = "helm-oci"
+	OutputBundle                 = "bundle-oci"
 	OutputDiskImage              = "disk-image"
 	BuildNetworkOfflineOnly      = "offline-only"
 	BuildNetworkProducerDeclared = "producer-declared"
@@ -186,7 +187,7 @@ func (definition Definition) Validate() error {
 		if output.Catalog != nil && output.Catalog.Base == "" {
 			return e.New(e.CodeInvalidCatalog, "output %q has an empty catalog override", output.Name)
 		}
-		if output.Format != OutputExecutable && output.Format != OutputOCI && output.Format != OutputAPT && output.Format != OutputHelm && output.Format != OutputDiskImage {
+		if output.Format != OutputExecutable && output.Format != OutputOCI && output.Format != OutputAPT && output.Format != OutputHelm && output.Format != OutputBundle && output.Format != OutputDiskImage {
 			return e.New(e.CodeInvalidCatalog, "definition output %q has unsupported format %q", output.Name, output.Format)
 		}
 		if output.Format == OutputHelm {
@@ -198,6 +199,9 @@ func (definition Definition) Validate() error {
 		}
 		if output.Format == OutputOCI && len(output.Components) != 1 {
 			return e.New(e.CodeInvalidCatalog, "definition OCI output %q requires exactly one image component", output.Name)
+		}
+		if output.Format == OutputBundle && len(output.Components) != 1 {
+			return e.New(e.CodeInvalidCatalog, "definition bundle output %q requires exactly one source archive component", output.Name)
 		}
 		if output.Format == OutputAPT {
 			if output.APT == nil || !namePattern.MatchString(output.APT.Distribution) || !namePattern.MatchString(output.APT.Component) {

@@ -46,6 +46,8 @@ func githubNodeLabel(plan *Plan, node Node) string {
 			return "Package Helm bundle: " + name
 		case PackageBinaryBundle:
 			return "Package binaries: " + name
+		case PackageBundle:
+			return "Package OCI bundle: " + name
 		case PackageAPT:
 			return "Package APT repository: " + name
 		case PackageOCI:
@@ -134,7 +136,7 @@ func githubArtifactLabel(plan *Plan, artifact Artifact) string {
 	kind := map[string]string{
 		"host-package": "binary", "oci-image": "image export", "tarball": "source archive",
 		PackageImage: "container image", PackageHelm: "Helm bundle", PackageOCI: "publication bundle",
-		PackageBinaryBundle: "binary bundle", PackageAPT: "APT repository",
+		PackageBinaryBundle: "binary bundle", PackageBundle: "OCI bundle", PackageAPT: "APT repository",
 		"provenance-predicate": "provenance", "published-reference": "published reference",
 		"signing-record": "signature record", "verification-record": "signature checks", "pipeline-tool": "tool",
 	}[artifact.Kind]

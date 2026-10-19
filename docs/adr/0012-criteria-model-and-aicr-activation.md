@@ -37,7 +37,7 @@ capability policy are execution contracts, not target defaults. Source builds re
 model; a foreign host requires its admitted execution mechanism. The typed `{{.Arch}}` producer token is resolved
 from the explicit target. Other command values are never inferred from deployment context.
 
-### 2. AICR rendering — deferred
+### 2. Retired AICR profile model
 
 This ADR previously also owned an accelerated-runtime rendering path: a catalog-declared `aicrProfiles` map, an
 output-owned `aicr` producer selecting a pinned upstream profile and generator, output-owned `aicr.bundle`
@@ -47,8 +47,10 @@ removed: it had no concrete consumer, and the rendering/publication boundary (§
 closed end-to-end. `canonical.KindAICRBundle` remains a permanently reserved, retired digest domain (ADR-01 §3) so
 no future family can silently reuse its identity.
 
-Reintroducing accelerated-runtime rendering requires a new decision once a concrete use case exists; it is not
-implicitly re-admitted by this ADR.
+[ADR-24](0024-generic-oci-bundles-and-aicr-producers.md) admits current AICR rendering through ordinary
+pinned source producers and the generic `bundle-oci` artifact format. It does not restore these retired
+fields, the old qualified adapter or its digest domain. Upstream hardware recipe support and deployment
+acceptance remain explicit limitations of the selected inputs.
 
 ## Consequences
 

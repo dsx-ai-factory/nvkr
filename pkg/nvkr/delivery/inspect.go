@@ -205,6 +205,9 @@ func verifyPublishedObjectBinding(ctx context.Context, root string, object Publi
 	if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
 		return e.Wrap(e.CodeVerifyFailed, err, "decoding publication manifest")
 	}
+	if object.Kind == outputFormatBundle || object.ArtifactType == MediaBundle || manifest.ArtifactType == MediaBundle {
+		return inspectBundleMetadata(ctx, root, manifest, &object)
+	}
 	if types.MediaType(manifest.Config.MediaType).IsConfig() {
 		if len(manifest.Layers) == 1 && manifest.Layers[0].MediaType == MediaQCOW2 {
 			observed, ok := disks[descriptor.Digest]
@@ -336,6 +339,20 @@ func verifyDescriptorHoldingDisks(ctx context.Context, root string, descriptor D
 		}
 		if manifest.SchemaVersion != 2 || manifest.MediaType != MediaOCIManifest || manifest.ArtifactType == "" {
 			return e.New(e.CodeVerifyFailed, "OCI artifact manifest has an invalid schema")
+		}
+		if manifest.ArtifactType == MediaBundle {
+			if err := validateBundleManifestDocument(raw); err != nil {
+				return err
+			}
+			if descriptor.ArtifactType != "" && descriptor.ArtifactType != MediaBundle {
+				return e.New(e.CodeVerifyFailed, "bundle descriptor differs from its artifact type")
+			}
+			if err := inspectBundlePayload(ctx, root, manifest); err != nil {
+				return err
+			}
+			visited[manifest.Config.Digest] = true
+			visited[manifest.Layers[0].Digest] = true
+			return nil
 		}
 		if manifest.Config.MediaType == MediaImageConfig && len(manifest.Layers) == 1 && manifest.Layers[0].MediaType == MediaQCOW2 {
 			artifact, err := openDiskManifest(ctx, root, descriptor, "", maxDeliveryFileBytes)
