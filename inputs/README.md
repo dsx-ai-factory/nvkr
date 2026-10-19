@@ -41,6 +41,11 @@ The native local KVM Environments retain their existing diagnostic capacity and 
 table does not imply that they can run the complete nightly demo unchanged. TCG/KVM differences affect
 producer inputs as well as runtime admission, so the explicit demo Definitions remain separate.
 
+The opt-in [Ubuntu 24 node-image inputs](definitions/diagnostics/ubuntu24/README.md) select
+native AMD64 and ARM64 plain local builds, plus plain or public-bootstrap FDE GitHub builds.
+The hosted variants use the matching `environments/github-ubuntu24-<arch>.yaml` Environment
+and remain build-only; they do not change maintained release membership or Ubuntu 26 defaults.
+
 ## Focused inputs and examples
 
 `definitions/diagnostics/demo-arm64/` retains the existing components, OS, profiles, providers,

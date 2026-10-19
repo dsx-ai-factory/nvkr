@@ -8,6 +8,11 @@ This is an ownership relocation, preserving registry, lock and patch contents. I
 Each leaf catalog contains `registry.yaml` and `pins.lock.yaml`. `node-images/variants/` contains
 predecessor-bound producer replacements and toolchain substitutions, not additional catalogs.
 
+The [Ubuntu 24 overlay](node-images/variants/ubuntu24.json) applies after the release node-image
+catalog's native-toolchain overlay. It selects pinned installers and a compatible agent builder
+for the [Ubuntu 24 diagnostic inputs](../definitions/diagnostics/ubuntu24/README.md), retaining
+the release catalog's other materials, Packer pins and disk-root patches.
+
 ## Current-to-shared mapping
 
 Former paths below were relative to `definitions/` at upstream commit

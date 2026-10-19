@@ -324,9 +324,12 @@ func TestOSDockerBootstrapUsesPrivateSharedTemporaryDirectory(t *testing.T) {
 				t.Fatal(err)
 			}
 			files := map[string]string{
-				"scripts/nvke-os-local.sh":                              string(source),
-				"inputs/definitions/diagnostics/os-" + arch + ".yaml":   "fixture",
-				"inputs/environments/local-linux-" + arch + "-kvm.yaml": "fixture",
+				"scripts/nvke-os-local.sh":                                       string(source),
+				"inputs/definitions/diagnostics/os-" + arch + ".yaml":            "fixture",
+				"inputs/environments/local-linux-" + arch + "-kvm.yaml":          "fixture",
+				"inputs/catalogs/node-images/diagnostic/registry.yaml":           "fixture",
+				"inputs/catalogs/node-images/diagnostic/pins.lock.yaml":          "fixture",
+				"inputs/catalogs/node-images/variants/diagnostic-arm64-kvm.yaml": "fixture",
 				"bin/docker":                      "#!/bin/sh\nexit 99\n",
 				"bin/uname":                       "#!/bin/sh\ncase \"$1\" in -s) echo Linux;; -m) echo \"$TEST_MACHINE\";; *) exit 99;; esac\n",
 				"toolchains/nvkr-packer/build.sh": "#!/bin/sh\nprintf '%s' \"$TMPDIR\" >\"$TEST_TMP_RECORD\"\nexit 42\n",
@@ -349,7 +352,7 @@ func TestOSDockerBootstrapUsesPrivateSharedTemporaryDirectory(t *testing.T) {
 			defer cancel()
 			cmd := exec.CommandContext(ctx, "bash", filepath.Join(root, "scripts/nvke-os-local.sh"), "test-attempt")
 			cmd.Env = append(os.Environ(), "PATH="+filepath.Join(root, "bin")+":"+os.Getenv("PATH"),
-				"CONTAINER_RUNTIME=docker", "NVKE_OS_ARCH="+arch, "NVKE_LOCAL_CLONE=",
+				"CONTAINER_RUNTIME=docker", "NVKE_OS_ARCH="+arch, "NVKE_OS_UBUNTU_VERSION=26.04", "NVKE_LOCAL_CLONE=",
 				"TEST_MACHINE="+machine, "TEST_TMP_RECORD="+record)
 			output, err := cmd.CombinedOutput()
 			var exit *exec.ExitError
@@ -378,12 +381,14 @@ func TestOSBootstrapRejectsUnsupportedRoutesBeforeOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, test := range []struct {
-		name, runtime, os, machine, arch, message string
-		code                                      int
+		name, runtime, os, machine, arch, ubuntu, message string
+		code                                              int
 	}{
-		{"removed runtime", "podman", "Linux", "aarch64", "arm64", "CONTAINER_RUNTIME must be docker", 2},
-		{"macOS requires laptop launcher", "docker", "Darwin", "arm64", "arm64", "requires native Linux with Docker and KVM", 1},
-		{"crossed architecture", "docker", "Linux", "x86_64", "arm64", "requires a native arm64 host", 1},
+		{"removed runtime", "podman", "Linux", "aarch64", "arm64", "26.04", "CONTAINER_RUNTIME must be docker", 2},
+		{"macOS requires laptop launcher", "docker", "Darwin", "arm64", "arm64", "26.04", "requires native Linux with Docker and KVM", 1},
+		{"crossed architecture", "docker", "Linux", "x86_64", "arm64", "26.04", "requires a native arm64 host", 1},
+		{"unsupported Ubuntu", "docker", "Linux", "aarch64", "arm64", "22.04", "NVKE_OS_UBUNTU_VERSION must be 24.04 or 26.04", 2},
+		{"Ubuntu point release is not a selector", "docker", "Linux", "aarch64", "arm64", "24.04.5", "NVKE_OS_UBUNTU_VERSION must be 24.04 or 26.04", 2},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -405,6 +410,7 @@ func TestOSBootstrapRejectsUnsupportedRoutesBeforeOutput(t *testing.T) {
 			cmd := exec.CommandContext(t.Context(), "bash", filepath.Join(root, "scripts/nvke-os-local.sh"), "test-attempt")
 			cmd.Env = append(os.Environ(), "PATH="+filepath.Join(root, "bin")+":"+os.Getenv("PATH"),
 				"CONTAINER_RUNTIME="+test.runtime, "NVKE_OS_ARCH="+test.arch,
+				"NVKE_OS_UBUNTU_VERSION="+test.ubuntu,
 				"TEST_HOST_OS="+test.os, "TEST_MACHINE="+test.machine, "TEST_RUNTIME_MARKER="+marker)
 			output, err := cmd.CombinedOutput()
 			var exit *exec.ExitError
@@ -417,5 +423,135 @@ func TestOSBootstrapRejectsUnsupportedRoutesBeforeOutput(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// The real CLI compiles both maintained and frozen inputs. Only the native
+// toolchain build and final execution are substituted; no Docker or KVM runs.
+func TestOSBootstrapFreezesSelectedUbuntuRecipe(t *testing.T) {
+	if _, err := exec.LookPath("jq"); err != nil {
+		t.Skip("OS wrapper requires jq")
+	}
+	repository := filepath.Dir(filepath.Dir(demoScript(t, "nvke-os-local.sh")))
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, arch := range []string{"amd64", "arm64"} {
+		for _, ubuntu := range []string{"", "24.04"} {
+			t.Run(arch+"/"+ubuntu, func(t *testing.T) {
+				root, err := filepath.EvalSymlinks(t.TempDir())
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, directory := range []string{"inputs/definitions/diagnostics", "inputs/environments", "inputs/catalogs/node-images"} {
+					if err := os.CopyFS(filepath.Join(root, directory), os.DirFS(filepath.Join(repository, directory))); err != nil {
+						t.Fatal(err)
+					}
+				}
+				for _, file := range []string{"scripts/nvke-os-local.sh", "scripts/nvke-os-plan.jq"} {
+					raw, err := os.ReadFile(filepath.Join(repository, file))
+					if err != nil {
+						t.Fatal(err)
+					}
+					writeOSBootstrapFixture(t, root, file, string(raw))
+				}
+				image := "sha256:" + strings.Repeat("e", 64)
+				writeOSBootstrapFixture(t, root, "toolchains/nvkr-packer/build.sh", "#!/bin/sh\nprintf '%s\\n' '"+image+"'\n")
+				writeOSBootstrapFixture(t, root, "bin/uname", "#!/bin/sh\ncase \"$1\" in -s) echo Linux;; -m) echo \"$TEST_MACHINE\";; *) exit 99;; esac\n")
+				writeOSBootstrapFixture(t, root, "bin/docker", `#!/bin/sh
+cp "$TEST_RUNNER" .nvkr/bootstrap/test-attempt/nvkr
+chmod 700 .nvkr/bootstrap/test-attempt/nvkr
+`)
+				writeOSBootstrapFixture(t, root, "runner", `#!/bin/sh
+if [ "$1" = run ] && [ "$2" = local ]; then
+  printf '%s\n' "$@" >"$TEST_RUN_RECORD"
+  exit 0
+fi
+exec "$NVKR_AUTHORING_TEST_EXE" -test.run='^TestAuthoringLabCLIProcess$' -- "$@"
+`)
+				machine := "aarch64"
+				if arch == "amd64" {
+					machine = "x86_64"
+				}
+				ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
+				defer cancel()
+				cmd := exec.CommandContext(ctx, "bash", filepath.Join(root, "scripts/nvke-os-local.sh"), "test-attempt")
+				record := filepath.Join(root, "run-record")
+				cmd.Env = append(os.Environ(), "PATH="+filepath.Join(root, "bin")+":"+os.Getenv("PATH"),
+					"CONTAINER_RUNTIME=docker", "NVKE_OS_ARCH="+arch, "NVKE_OS_UBUNTU_VERSION="+ubuntu, "NVKE_LOCAL_CLONE=",
+					"TEST_MACHINE="+machine, "TEST_RUNNER="+filepath.Join(root, "runner"), "TEST_RUN_RECORD="+record,
+					"NVKR_AUTHORING_TEST_HELPER=1", "NVKR_AUTHORING_TEST_EXE="+executable)
+				if output, err := cmd.CombinedOutput(); err != nil {
+					t.Fatalf("freezing selected recipe: %v\n%s", err, output)
+				}
+				raw, err := os.ReadFile(record)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !strings.Contains(string(raw), ".nvkr/inputs/test-attempt/definition-attempt.json\n") {
+					t.Fatalf("run did not receive frozen Definition: %s", raw)
+				}
+				t.Chdir(root)
+				planRaw, err := runCLIWithCapturedStdout(t, newApp(), "nvkr", "run", "plan",
+					"--definition", ".nvkr/inputs/test-attempt/definition-attempt.json",
+					"--environment", ".nvkr/inputs/test-attempt/environment-local.yaml", "--json")
+				if err != nil {
+					t.Fatal(err)
+				}
+				var plan factory.Plan
+				if err := json.Unmarshal(planRaw, &plan); err != nil {
+					t.Fatal(err)
+				}
+				build := plan.Builds[0]
+				rootRaw, err := runOSPlanQuery(t, planRaw, "disk_root")
+				if err != nil {
+					t.Fatal(err)
+				}
+				var diskRoot string
+				if err := json.Unmarshal(rootRaw, &diskRoot); err != nil {
+					t.Fatal(err)
+				}
+				if build.CatalogSnapshot.Components[diskRoot].ToolchainImages[arch] != image {
+					t.Fatal("frozen disk did not bind the observed Packer image")
+				}
+				agent := build.CatalogSnapshot.Components["nvke-agent"].ToolchainImages[arch]
+				if ubuntu == "24.04" {
+					if !strings.Contains(build.Name, "ubuntu24") || agent == image || !strings.HasPrefix(agent, "docker.io/library/golang@sha256:") {
+						t.Fatalf("Ubuntu 24 selection lost its compatible agent toolchain: output=%s, agent=%s", build.Name, agent)
+					}
+					patch := "patches/capture-schema.patch"
+					sourcePatch, err := os.ReadFile(filepath.Join(repository, "inputs/catalogs/node-images/release", patch))
+					if err != nil {
+						t.Fatal(err)
+					}
+					frozenPatch, err := os.ReadFile(filepath.Join(root, ".nvkr/inputs/test-attempt/catalog", patch))
+					if err != nil {
+						t.Fatal(err)
+					}
+					if !bytes.Equal(sourcePatch, frozenPatch) {
+						t.Fatal("frozen catalog lost the exact source patch")
+					}
+					for _, name := range []string{"native-toolchains.yaml", "ubuntu24.json"} {
+						if _, err := os.Stat(filepath.Join(root, ".nvkr/inputs/test-attempt", name)); err != nil {
+							t.Fatal(err)
+						}
+					}
+				} else if strings.Contains(build.Name, "ubuntu24") || agent != image {
+					t.Fatalf("default recipe changed: output=%s, agent=%s", build.Name, agent)
+				}
+			})
+		}
+	}
+}
+
+func writeOSBootstrapFixture(t *testing.T, root, path, contents string) {
+	t.Helper()
+	path = filepath.Join(root, path)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(contents), 0o700); err != nil {
+		t.Fatal(err)
 	}
 }
