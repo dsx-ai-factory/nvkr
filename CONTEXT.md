@@ -121,6 +121,10 @@ removed while preserving the prerequisite closure.
 Large finalizers collect the exact original per-job results through fixed, bounded diagnostic buckets;
 collector success never substitutes for producer success. Neither scripts supplied as data nor separately
 authored lifecycle inputs are admitted.
+Production partial retries may transport retained same-Run artifacts from earlier attempts while preserving
+their original source bindings. Same-name candidates are bounded and authenticated before selecting the
+newest source attempt, with ties rejected. Transport admission does not replace consumer evidence or completeness checks;
+development and explicitly selected qualification sources remain exact-attempt.
 The workflow can remain byte-identical across routine pin updates when scheduling, labels/interfaces and
 visible policy and required inline action pins stay unchanged. Stable provider scheduling keys do not replace exact executable Plan IDs;
 the complete bundle still requires regeneration and checking.
@@ -247,6 +251,14 @@ consumer verification, negative cases and the scope of deployment-gate testing s
 External suites outside the MVP are reported as not evaluated, never passed; a required suite needs authenticated
 subject-bound evidence.
 _Avoid_: Qualified reproduction, disk-content inspection, cluster conformance, build success
+
+**Release manifest**:
+The pipeline-attested document naming one Run's complete qualified artifact set: the Definition and exact
+inputs, originating Run, each member's exact digest, source lane and verified build provenance, and the exact
+qualification evidence. It is issued only after that evidence is authenticated on every member under the
+independently selected qualification identity, and is attested to the publication root under that identity.
+A manifest attachment alone is not a published release; tags, channels and revocation are separate.
+_Avoid_: Release clearance, ReleaseSet, qualified release, tag
 
 **Inventory**:
 The internal qualified-lane declaration of required component membership, exact artifact identities, and compatibility requirements.

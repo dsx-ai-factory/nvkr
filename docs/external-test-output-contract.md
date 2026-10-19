@@ -67,7 +67,7 @@ ownership; selected tools execute on the host with cluster credentials, without 
 [ADR-18 §3](adr/0018-pipeline-ir-and-ci-adapter-emission.md#3-helper-owned-isolation-and-narrowly-admitted-native-arc-disks).
 Product and tools roots must be signed `per-output-v1` hosted publications carrying a qualification handoff;
 unsigned local/dry-run and legacy aggregate outputs cannot supply this capability. Both policy paths name
-independently selected qualification-policy documents in the [M3 policy format](lifecycle.md#authenticate-an-m3-candidate).
+independently selected qualification-policy documents in the [M3 policy format](lifecycle.md#authenticate-a-qualification-candidate).
 Set `NVKR_GITHUB_TOKEN` for producing-Run and handoff reads. Trust policy and verifier pins remain independent
 of downloaded records.
 

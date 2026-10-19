@@ -2,7 +2,7 @@
 
 Run **`nvkr`** for catalog, input, Plan, artifact and release operations. Run **`nvke-demo e2e`** for the
 complete Linux ARM64 build and tenant demonstration. These are the existing Go entry points; no new
-shell wrapper is required. The [presenter script](nvkr-presenter.md) is spoken narration, not a program.
+shell wrapper is required.
 
 ## Prepare the Go binaries
 

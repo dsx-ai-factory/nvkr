@@ -406,6 +406,15 @@ func TestGitHubPrivateTransfersExposeOnlyLocatorsToActions(t *testing.T) {
 					if node == nil {
 						return
 					}
+					if run := githubYAMLValue(node, "run"); strings.Contains(run, " factory github ci-fetch-locators ") || strings.Contains(run, " factory github ci-download ") {
+						want := "allow_earlier=true"
+						if plan.Environment.GitHubDevelopment {
+							want = "allow_earlier=false"
+						}
+						if !strings.Contains(run, want) || !strings.Contains(run, "if [ -n \"$NVKR_CI_RUN\" ]; then allow_earlier=false; fi") || !strings.Contains(run, "--allow-earlier-attempts=\"$allow_earlier\"") {
+							t.Fatalf("transport retry policy differs for %s", fixture.name)
+						}
+					}
 					if strings.Contains(githubYAMLValue(node, "run"), " factory github ci-fetch-locators ") {
 						downloads++
 						if name != githubCITransferPath(plan, "download")+"/action.yml" && name != githubCITransferPath(plan, "bootstrap-download")+"/action.yml" {
@@ -683,5 +692,63 @@ func TestGitHubPrivateTransferProjectionRemainsStableAcrossSourcePins(t *testing
 		if name != first.PlanPath && name != githubActionDataPathFor(before) && !bytes.Equal(raw, second.Files[name]) {
 			t.Fatalf("source pin update changed private transport implementation %s", name)
 		}
+	}
+}
+
+func TestPrivateTransferRetryPolicyAtInvocation(t *testing.T) {
+	for _, development := range []bool{false, true} {
+		t.Run("development="+strconv.FormatBool(development), func(t *testing.T) {
+			plan := githubTestPlan(t)
+			if development {
+				plan = githubDevelopmentTestPlan(t)
+			}
+			files, err := githubCITransferTemplates(plan, testActionRefs(t, plan))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, mode := range []string{"download", "bootstrap-download"} {
+				var document yamlv3.Node
+				if err := yamlv3.Unmarshal(files[githubCITransferPath(plan, mode)+"/action.yml"], &document); err != nil {
+					t.Fatal(err)
+				}
+				steps := githubYAMLField(githubYAMLField(document.Content[0], "runs"), "steps")
+				for _, step := range steps.Content {
+					command := githubYAMLValue(step, "run")
+					if !strings.Contains(command, "--allow-earlier-attempts=") {
+						continue
+					}
+					for _, run := range []string{"", "123"} {
+						for _, stage := range []string{"", "build-stage"} {
+							t.Run(mode+"/"+githubYAMLValue(step, "name")+"/run="+run+"/stage="+stage, func(t *testing.T) {
+								root := t.TempDir()
+								helper := filepath.Join(root, "nvkr-exec")
+								if mode == "bootstrap-download" {
+									helper = filepath.Join(root, ".nvkr", "ci-bootstrap", "nvkr-exec")
+									if err := os.MkdirAll(filepath.Dir(helper), 0o700); err != nil {
+										t.Fatal(err)
+									}
+								}
+								if err := os.WriteFile(helper, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\"\n"), 0o700); err != nil {
+									t.Fatal(err)
+								}
+								cmd := exec.CommandContext(t.Context(), "bash", "-c", command)
+								cmd.Dir = root
+								cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "NVKR_CI_RUN=" + run, "NVKR_CI_ATTEMPT=2",
+									"NVKR_CI_STAGE=" + stage, "NVKR_CI_INDEX=index", "NVKR_CI_DESTINATION=out",
+									"NVKR_CI_NAME=helper", "NVKR_CI_PATTERN=", "NVKR_CI_MERGE=false"}
+								output, err := cmd.CombinedOutput()
+								if err != nil {
+									t.Fatalf("generated command failed: %v: %s", err, output)
+								}
+								want := "--allow-earlier-attempts=" + strconv.FormatBool(!development && run == "")
+								if !strings.Contains(string(output), want+"\n") {
+									t.Fatalf("missing %s in arguments: %s", want, output)
+								}
+							})
+						}
+					}
+				}
+			}
+		})
 	}
 }

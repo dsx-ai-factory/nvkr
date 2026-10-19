@@ -577,7 +577,7 @@ func TestOCICosignEnvironmentHomeRequiresReplacement(t *testing.T) {
 		{"OCI private workspace", "/private/work/docker", "/private/work", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			base := []string{"HOME=/ambient/home", "USERPROFILE=/ambient/profile", "XDG_CONFIG_HOME=/ambient/cache", "XDG_RUNTIME_DIR=/ambient/runtime", "DOCKER_CONFIG=/ambient/docker", "REGISTRY_AUTH_FILE=/ambient/auth", "ACTIONS_ID_TOKEN_REQUEST_URL=https://oidc.example/token", "ACTIONS_ID_TOKEN_REQUEST_TOKEN=identity-token", "COSIGN_PASSWORD=ambient"}
+			base := []string{"HOME=/ambient/home", "USERPROFILE=/ambient/profile", "XDG_CONFIG_HOME=/ambient/cache", "XDG_RUNTIME_DIR=/ambient/runtime", "DOCKER_CONFIG=/ambient/docker", "REGISTRY_AUTH_FILE=/ambient/auth", "ACTIONS_ID_TOKEN_REQUEST_URL=https://oidc.example/token", "ACTIONS_ID_TOKEN_REQUEST_TOKEN=identity-token", "COSIGN_PASSWORD=placeholder"}
 			got := ociCosignEnvironment(base, tc.directory)
 			values := map[string]string{}
 			for _, entry := range got {

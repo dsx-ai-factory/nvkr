@@ -112,6 +112,7 @@ func TestValidateGitHubBundleRejectsIsolationAndTransportTampering(t *testing.T)
 		{"execution-event", bundle.WorkflowPath, set("true", "jobs", stage.ID, "if"), e.CodeEngineCapability, "admitted branch"},
 		{"job-timeout", bundle.WorkflowPath, set("0", "jobs", bootstrapJob, "timeout-minutes"), e.CodeEngineCapability, "timeout"},
 		{"stage-timeout", bundle.WorkflowPath, set("59", "jobs", stage.ID, "timeout-minutes"), e.CodeEngineCapability, "timeout"},
+		{"finalizer-timeout", bundle.WorkflowPath, set("15", "jobs", githubFinalizerJobID, "timeout-minutes"), e.CodeEngineCapability, "timeout"},
 		{"cancel-running-publication", bundle.WorkflowPath, set("true", "concurrency", "cancel-in-progress"), e.CodeEngineCapability, "concurrency"},
 		{"unplanned-launch-argument", executeMember, rewriteRun("id", "operation_execute", "factory github run-node --plan", "factory github run-node --network bridge --plan"), e.CodeEngineCapability, ""},
 		{"node-dispatch", executeMember, rewriteRun("id", "operation_execute", "factory github run-node --plan", "factory execute-node --plan"), e.CodeEngineCapability, ""},

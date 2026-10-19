@@ -491,17 +491,17 @@ func TestQualificationSourceCredentialContext(t *testing.T) {
 			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + t.TempDir(), "LC_ALL=C"}
 			for key, value := range auth.environment {
 				if strings.HasPrefix(key, "NVKR_PIN_SOURCE_TOKEN_") {
-					value = "synthetic-scoped-token"
+					value = "fake-scoped-token"
 				}
 				cmd.Env = append(cmd.Env, key+"="+value)
 			}
 			cmd.Stdin = strings.NewReader("url=" + tc.url + "\n\n")
 			raw, err := cmd.CombinedOutput()
 			if tc.allowed {
-				if err != nil || !bytes.Contains(raw, []byte("password=synthetic-scoped-token")) {
+				if err != nil || !bytes.Contains(raw, []byte("password=fake-scoped-token")) {
 					t.Fatalf("selected credential context failed: %v", err)
 				}
-			} else if err == nil || bytes.Contains(raw, []byte("synthetic-scoped-token")) {
+			} else if err == nil || bytes.Contains(raw, []byte("fake-scoped-token")) {
 				t.Fatal("credential escaped selected repository context")
 			}
 		})
