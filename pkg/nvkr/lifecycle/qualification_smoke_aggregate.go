@@ -179,7 +179,6 @@ func authenticateHostedToolSmoke(ctx context.Context, checks *ArtifactCheckRecei
 	if err != nil {
 		return nil, err
 	}
-	constraints := trust.GitHubInvocationConstraints{RunInvocationURI: current.InvocationID, BuildConfigURI: current.BuilderID, BuildConfigDigest: current.Commit}
 	workers := make([]NativeToolSmokeReport, 0, len(platforms))
 	seen := map[string]bool{}
 	for _, artifact := range artifacts {
@@ -187,11 +186,15 @@ func authenticateHostedToolSmoke(ctx context.Context, checks *ArtifactCheckRecei
 			return nil, e.New(e.CodeReleaseIncomplete, "native smoke platform is unexpected or duplicated")
 		}
 		seen[artifact.Platform] = true
+		if err := matchSmokeWorkerInvocation(artifact.Invocation, current); err != nil {
+			return nil, err
+		}
+		constraints := trust.GitHubInvocationConstraints{RunInvocationURI: artifact.Invocation.InvocationID, BuildConfigURI: artifact.Invocation.BuilderID, BuildConfigDigest: artifact.Invocation.Commit}
 		report, err := authenticateNativeSmokeArtifact(ctx, authenticator, role, constraints, artifact)
 		if err != nil {
 			return nil, err
 		}
-		if report.Platform != artifact.Platform || report.Invocation != current || report.PolicyDigest != policyDigest || report.Image != frozen.Smoke.Images[report.Platform] || !sameSmokeChecks(report.ArtifactChecks, description) {
+		if report.Platform != artifact.Platform || report.Invocation != artifact.Invocation || report.PolicyDigest != policyDigest || report.Image != frozen.Smoke.Images[report.Platform] || !sameSmokeChecks(report.ArtifactChecks, description) {
 			return nil, e.New(e.CodeGateUnmet, "signed smoke result differs from exact source, qualifier, policy or native platform")
 		}
 		if err := matchSmokeMembers(report, expected); err != nil {
