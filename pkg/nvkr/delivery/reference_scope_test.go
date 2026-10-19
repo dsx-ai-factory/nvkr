@@ -26,9 +26,9 @@ func TestPublicationReferencesRetainDevelopmentAttempts(t *testing.T) {
 		{"other repository", prefix + "3/releases", strings.Replace(prefix, "/nvkr/", "/other/", 1) + "1/releases-node", "", true},
 		{"other host", prefix + "3/releases", strings.Replace(prefix, "ghcr.io", "registry.example.test", 1) + "1/releases-node", "", true},
 		{"noncanonical attempt", prefix + "3/releases", prefix + "01/releases-node", "", true},
-		{"origin overlaps output", prefix + "3/releases", prefix + "1/node", "", true},
 		{"production sibling", "ghcr.io/example/nvkr/releases", "ghcr.io/example/nvkr/releases-node", "ghcr.io/example/nvkr/node", false},
-		{"production foreign namespace", "ghcr.io/example/nvkr/releases", "ghcr.io/example/other/releases-node", "", true},
+		{"production provenance cannot redirect namespace", "ghcr.io/example/nvkr/releases", "ghcr.io/example/other/releases-node", "ghcr.io/example/nvkr/node", false},
+		{"production provenance cannot redirect host", "ghcr.io/example/nvkr/releases", "registry.example.test/other/releases-node", "ghcr.io/example/nvkr/node", false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			binding := &OutputBinding{Repository: "node"}

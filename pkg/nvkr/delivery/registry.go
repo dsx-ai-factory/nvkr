@@ -446,9 +446,6 @@ func outputReferences(root name.Reference, publication PublicationRoot, insecure
 		if target == repository {
 			return nil, e.New(e.CodeVerifyFailed, "deliverable repository overlaps release repository")
 		}
-		if origin := object.Output.Publication; origin != nil && strings.HasPrefix(origin.Ref, target+"@") {
-			return nil, e.New(e.CodeVerifyFailed, "deliverable repository overlaps original publication repository")
-		}
 		ref, err := name.NewDigest(target+"@"+object.DescriptorDigest, options...)
 		if err != nil || ref.Context().Name() != target {
 			return nil, e.New(e.CodeVerifyFailed, "noncanonical deliverable repository")

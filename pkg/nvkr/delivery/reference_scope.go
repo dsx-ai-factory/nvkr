@@ -18,6 +18,17 @@ func publicationOutputParent(root name.Reference, origin *PublicationOrigin, par
 	if origin == nil {
 		return parent, nil
 	}
+	// Ordinary publication keeps its caller-selected sibling namespace. Its
+	// descriptive provenance is authenticated separately, never used to redirect
+	// transport. Only the canonical development namespace has attempt routing.
+	prefix, _, found := strings.Cut(root.Context().Name(), "/runs/")
+	if !found {
+		return parent, nil
+	}
+	namespace, err := development.ParseNamespace(prefix)
+	if err != nil {
+		return parent, nil
+	}
 	if err := ValidatePublicationReference(origin.Ref); err != nil {
 		return "", e.Wrap(e.CodeVerifyFailed, err, "invalid output publication origin")
 	}
@@ -27,17 +38,6 @@ func publicationOutputParent(root name.Reference, origin *PublicationOrigin, par
 	}
 	repository := ref.Context().Name()
 	originalParent := repository[:strings.LastIndexByte(repository, '/')+1]
-	if originalParent == parent {
-		return parent, nil
-	}
-	prefix, _, found := strings.Cut(root.Context().Name(), "/runs/")
-	if !found {
-		return "", e.New(e.CodeVerifyFailed, "output publication origin is outside the release namespace")
-	}
-	namespace, err := development.ParseNamespace(prefix)
-	if err != nil {
-		return "", e.Wrap(e.CodeVerifyFailed, err, "output publication origin requires the same development run")
-	}
 	current, err := namespace.ParseReference(root.Context().Name())
 	if err != nil {
 		return "", e.Wrap(e.CodeVerifyFailed, err, "invalid development release namespace")
