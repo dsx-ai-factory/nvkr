@@ -1,4 +1,4 @@
-apiVersion: nkd.dev/catalog/v3
+apiVersion: nvkr.dev/catalog/v3
 components:
   acme-kubectl:
     artifactPath: _output/local/bin/linux/amd64/kubectl
@@ -44,7 +44,7 @@ metadata:
   description: 'Example operator-authored catalog. Passed via `--data examples/operator-catalog`
     it FULLY replaces the embedded NVIDIA default — none of its sources, recipes,
     or components are shared with it. This is the release-train seam (docs/versioning.md):
-    an operator tracks their own catalog + lock without depending on nkdctl''s default.'
+    an operator tracks their own catalog + lock without depending on nvkr''s default.'
   name: acme-operator
 sources:
   k8s:

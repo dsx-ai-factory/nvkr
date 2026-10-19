@@ -11,7 +11,7 @@ if [ "${1:-}" = --help ]; then
 fi
 if [ "$#" -gt 1 ]; then printf 'site: expected at most one output directory\n' >&2; exit 2; fi
 OUT=${1:-"$ROOT/dist/demo-site"}
-FILES=(index.html nkd-team-tour.html demo-team-concepts.html demo-team-explorer.html demo-team-walkthrough.html)
+FILES=(index.html nvkr-team-tour.html demo-team-concepts.html demo-team-explorer.html demo-team-walkthrough.html)
 for file in "${FILES[@]}"; do
   if [ ! -f "$ROOT/demos/$file" ] || [ -L "$ROOT/demos/$file" ]; then
     printf 'site: expected regular source file: %s\n' "$file" >&2

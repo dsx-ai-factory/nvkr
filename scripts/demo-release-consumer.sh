@@ -21,13 +21,13 @@ PLAN=
 DEFINITION_SET=0
 ENVIRONMENT_SET=0
 PLAN_SET=0
-WORK=${WORK:-.nkd/demo-release-consumer}
+WORK=${WORK:-.nvkr/demo-release-consumer}
 PLAIN_HTTP=0
 ANONYMOUS=0
 EXECUTION_RUNTIME=auto
 REGISTRY_CONFIG=
-# The maintained NKE CLI toolchain provides Linux amd64, CA certificates and
-# no additional authority: NKD still snapshots and authenticates cosign bytes.
+# The maintained NVKE CLI toolchain provides Linux amd64, CA certificates and
+# no additional authority: NVKR still snapshots and authenticates cosign bytes.
 LINUX_IMAGE=golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
 
 usage() {
@@ -52,7 +52,7 @@ Options:
   --definition PATH      exact authored Definition to require with the next two options
   --environment PATH     exact selected Environment to require with the other two options
   --plan PATH            exact compiled Plan to require with the previous two options
-  --work DIR             verification workspace below .nkd
+  --work DIR             verification workspace below .nvkr
   --plain-http           use a development HTTP registry
   --anonymous            use anonymous registry access
   --runtime MODE         auto (default), native, or docker; auto uses Docker on macOS
@@ -62,7 +62,7 @@ Options:
 This command contacts the configured registry and cosign verification services.
 Relative exact-input paths are resolved from the caller's working directory.
 Use a static Linux amd64 cosign executable for Docker verification. On macOS,
-the script builds a Linux NKD helper and verifies inside the pinned container;
+the script builds a Linux NVKR helper and verifies inside the pinned container;
 native Linux uses the host CLI. Docker mode needs the repository's pinned Go
 toolchain and Docker. The executable pin, signer policy and release checks remain
 mandatory. Host credential helpers are not available inside the container; use
@@ -110,7 +110,7 @@ if [ "$EXACT_INPUTS" -eq 3 ]; then
   case "$ENVIRONMENT" in /*) ;; *) ENVIRONMENT="$CALLER_DIR/$ENVIRONMENT" ;; esac
   case "$PLAN" in /*) ;; *) PLAN="$CALLER_DIR/$PLAN" ;; esac
 fi
-demo_require_nkd_child_path "$WORK"
+demo_require_nvkr_child_path "$WORK"
 case "$EXECUTION_RUNTIME" in
   auto) if [ "$(uname -s)" = Darwin ]; then EXECUTION_RUNTIME=docker; else EXECUTION_RUNTIME=native; fi ;;
   native|docker) ;;
@@ -139,7 +139,7 @@ PY
   fi
 else
   [ -z "$REGISTRY_CONFIG" ] || demo_die "--registry-config requires Docker mode; native verification uses DOCKER_CONFIG"
-  demo_prepare_nkdctl
+  demo_prepare_nvkr
 fi
 demo_prepare_work "$WORK" "release-consumer"
 
@@ -149,11 +149,11 @@ args=(release verify --reference "$REFERENCE" --lane pipeline-attested --scope a
 [ "$ANONYMOUS" -eq 0 ] || args+=(--anonymous)
 [ "$EXACT_INPUTS" -eq 0 ] || args+=(--definition "$DEFINITION" --environment "$ENVIRONMENT" --plan "$PLAN")
 if [ "$EXECUTION_RUNTIME" = docker ]; then
-  printf 'Build Linux amd64 NKD; verify using Docker (%s)\n' "$LINUX_IMAGE"
-  CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=local go build -trimpath -o "$WORK/nkdctl-linux-amd64" ./cmd/nkdctl
+  printf 'Build Linux amd64 NVKR; verify using Docker (%s)\n' "$LINUX_IMAGE"
+  CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=local go build -trimpath -o "$WORK/nvkr-linux-amd64" ./cmd/nvkr
   docker_args=(run --rm --platform linux/amd64 --user "$(id -u):$(id -g)" -e HOME=/tmp
     -v "$PWD/$WORK:/workspace/$WORK" -w /workspace
-    -v "$PWD/$WORK/nkdctl-linux-amd64:/nkdctl:ro" -v "$COSIGN:/cosign:ro")
+    -v "$PWD/$WORK/nvkr-linux-amd64:/nvkr:ro" -v "$COSIGN:/cosign:ro")
   if [ -n "$REGISTRY_CONFIG" ]; then
     # Cosign scrubs DOCKER_CONFIG overrides; mount the explicitly selected auth
     # at the private container HOME's standard path, shared with the OCI reader.
@@ -171,9 +171,9 @@ if [ "$EXECUTION_RUNTIME" = docker ]; then
     docker_args+=(-v "$DEFINITION:/inputs/definition.yaml:ro" -v "$ENVIRONMENT:/inputs/environment.yaml:ro" -v "$PLAN:/inputs/plan.json:ro")
     args+=(--definition /inputs/definition.yaml --environment /inputs/environment.yaml --plan /inputs/plan.json)
   fi
-  docker "${docker_args[@]}" "$LINUX_IMAGE" /nkdctl "${args[@]}"
+  docker "${docker_args[@]}" "$LINUX_IMAGE" /nvkr "${args[@]}"
 else
-  "$NKD" "${args[@]}"
+  "$NVKR" "${args[@]}"
 fi
 
 printf '\nARTIFACT PUBLICATION VERIFIED\n  reference: %s\n  policy: pipeline-attested/artifact-publication\n' "$REFERENCE"

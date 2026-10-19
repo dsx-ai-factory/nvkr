@@ -4,7 +4,7 @@
 // Package client is the context-first embeddable SDK facade described by ADR-17.
 //
 // Use LoadDefinition, LoadEnvironment, PrepareLifecycleRun/ExecuteLifecycleRun or
-// GenerateLifecycleRun, and VerifyRelease for the public lifecycle. ResolveBuild
+// GenerateLifecycleRun, VerifyRelease, and AuthenticateRelease for the public lifecycle. ResolveBuild
 // and Run support exact component/platform diagnostics. Domain packages own
 // compilation, execution, publication, authentication and their authority checks;
 // the facade exposes no separate qualified-evidence or publication workflow.
@@ -16,10 +16,10 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/lifecycle"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
 
 // CatalogIO is the narrow context-aware read boundary used by catalog.LoadContext.
@@ -59,7 +59,7 @@ type Client struct {
 type Option func(*Client)
 
 // WithReleaseConsumer configures the transport and verifier used by the
-// simplified one-reference Release consumer for every later VerifyRelease call.
+// simplified one-reference Release consumer for VerifyRelease and AuthenticateRelease.
 func WithReleaseConsumer(options lifecycle.ConsumerOptions) Option {
 	return func(c *Client) {
 		consumer, err := lifecycle.NewConsumer(options)

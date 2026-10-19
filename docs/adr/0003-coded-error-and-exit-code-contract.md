@@ -6,14 +6,14 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-03 in the consolidated NKD ADR set.
+- **Index:** ADR-03 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-04 (trust-failure codes), ADR-17 (CLI/SDK), and every fail-closed path across the ADRs.
 
 ## Context
 
-NKD fails **closed** with machine-readable errors and **distinct exit codes** — an SRD invariant, because
+NVKR fails **closed** with machine-readable errors and **distinct exit codes** — an SRD invariant, because
 verification runs as the unconditional final stage and a promotion gate must stop on a coded, auditable failure.
-A downstream gate, whether a CI job or a consumer such as NKE, branches on the exit code. The code set is
+A downstream gate, whether a CI job or a consumer such as NVKE, branches on the exit code. The code set is
 therefore a **public contract**, not an internal detail.
 
 ## Decision
@@ -88,7 +88,7 @@ cancellation classifies as `timeout`. A gate retries the retryable class and fai
 
 ## Acceptance evidence
 
-Current evidence in `pkg/nkd/errors/errors_test.go` proves that declared codes map once, statuses are distinct,
+Current evidence in `pkg/nvkr/errors/errors_test.go` proves that declared codes map once, statuses are distinct,
 and bands are respected. The currently named codes are allocated. Acceptance remains partial until CLI
 integration tests prove cancellation/deadline, network unavailability, stale-status, capability failure, and
 write-conflict causes reach their documented process status without collapsing to internal error 1.

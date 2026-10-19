@@ -100,6 +100,7 @@ jobs:
       actions: ${{ github.event_name != 'pull_request' && 'true' || steps.changes.outputs.actions }}
       pipeline: ${{ github.event_name != 'pull_request' && 'true' || steps.changes.outputs.pipeline }}
       notices: ${{ github.event_name != 'pull_request' && 'true' || steps.changes.outputs.notices }}
+      docs: ${{ github.event_name != 'pull_request' && 'true' || steps.changes.outputs.docs }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -123,7 +124,8 @@ jobs:
               - 'cmd/**'
               - 'internal/**'
               - 'pkg/**'
-              - 'definitions/**'
+              - 'inputs/**'
+              - 'docs/examples/**'
               - 'scripts/**'
               - 'demos/**'
               - 'testdata/**'
@@ -134,12 +136,12 @@ jobs:
               - '.go-version'
               - '.golangci.yml'
               # Tests read the committed generated bundle:
-              # pkg/nkd/factory/{sbom_dependencies,github_labels}_test.go load
-              # .github/nkd-run/plan.json. A PR touching only that bundle must
+              # pkg/nvkr/factory/{sbom_dependencies,github_labels}_test.go load
+              # .github/nvkr-run/plan.json. A PR touching only that bundle must
               # therefore still run `check`, or the tests guarding bundle
               # integrity silently do not run.
-              - '.github/nkd-run/**'
-              - '.github/workflows/nkd-run.yml'
+              - '.github/nvkr-run/**'
+              - '.github/workflows/nvkr-run.yml'
               - '.github/workflows/merge-gate.yaml'
               # `make license-header-check` also covers the stamped files here
               # (dependabot, issue templates, the other workflows).
@@ -152,9 +154,20 @@ jobs:
               # Everything `run generate` consumes or emits, plus the files that
               # define the check itself, so a change to the gate cannot skip the
               # gate it changes.
-              - 'definitions/**'
-              - '.github/workflows/nkd-run.yml'
-              - '.github/nkd-run/**'
+              - 'inputs/**'
+              - '.github/workflows/nvkr-run.yml'
+              - '.github/nvkr-run/**'
+              - '.github/workflows/nvkr-run-*.yml'
+              - '.github/nvkr-run-*/**'
+              - '.github/workflows/nvkr-qualify.yml'
+              - '.github/workflows/nvkr-smoke.yml'
+              - '.github/nvkr-qualification/**'
+              - '.github/workflows/nvkr-dev.yml'
+              - '.github/nvkr-dev/**'
+              - '.github/workflows/nvkr-dev-qualify.yml'
+              - '.github/workflows/nvkr-dev-smoke.yml'
+              - '.github/nvkr-dev-qualification/**'
+              - '.github/workflows/catalog-refresh.yaml'
               - 'cmd/**'
               - 'client/**'
               - 'internal/**'
@@ -167,7 +180,7 @@ jobs:
               - '.github/workflows/merge-gate.yaml'
             notices:
               # The linked-module set derives from the full import graph of
-              # ./cmd/nkdctl, plus the generator itself and the committed
+              # ./cmd/nvkr, plus the generator itself and the committed
               # notices file. Watching the dependency surface catches a new
               # dependency added without rerunning `make notices`.
               - 'THIRD_PARTY_NOTICES.md'
@@ -179,6 +192,17 @@ jobs:
               - 'pkg/**'
               - 'internal/**'
               - 'client/**'
+              - 'Makefile'
+              - '.github/workflows/merge-gate.yaml'
+            docs:
+              # The published pages, their navigation and the Fern site
+              # configuration, plus the files that define the check itself: the
+              # MDX checker, the Makefile recipe, and this workflow. A page can
+              # break the site through any page it links to, so the whole docs
+              # tree is watched rather than only the pages listed in the nav.
+              - 'docs/**'
+              - 'fern/**'
+              - 'tools/check-docs-mdx'
               - 'Makefile'
               - '.github/workflows/merge-gate.yaml'
 
@@ -202,25 +226,6 @@ jobs:
           go-version-file: .go-version
           cache: false
 
-      # This job owns its instrumented build cache. Other jobs must not win a
-      # shared immutable key with a cache that never compiled the race tests.
-      - name: Locate Go caches
-        id: cache-paths
-        run: |
-          echo "modules=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
-          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-
-      - name: Restore check cache
-        id: go-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ${{ steps.cache-paths.outputs.modules }}
-            ${{ steps.cache-paths.outputs.build }}
-          key: nkd-check-v1-${{ runner.os }}-${{ runner.arch }}-go${{ steps.go.outputs.go-version }}-${{ hashFiles('go.sum', 'toolchains/govulncheck/go.sum') }}-${{ github.sha }}
-          restore-keys: |
-            nkd-check-v1-${{ runner.os }}-${{ runner.arch }}-go${{ steps.go.outputs.go-version }}-${{ hashFiles('go.sum', 'toolchains/govulncheck/go.sum') }}-
-
       - name: fmt-check
         run: make fmt-check
 
@@ -235,7 +240,11 @@ jobs:
       - name: lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          version: v2.13.1
+          version: v2.14.0
+          # Build the importer with setup-go's exact SDK. Older release
+          # binaries cannot read Go 1.27.2's version-5 export data.
+          install-mode: goinstall
+          skip-cache: true
 
       - name: shellcheck
         run: make shellcheck
@@ -246,6 +255,9 @@ jobs:
       - name: test (fast default)
         id: tests
         shell: bash
+        env:
+          # Rendered workflow-step tests fail instead of skipping when bash, git, jq or yq is missing.
+          NVKR_REQUIRE_SHELL_TOOLS: '1'
         run: make test GO_TEST_FLAGS=-json | tee "$RUNNER_TEMP/go-test.jsonl"
 
       - name: Summarize test timings
@@ -254,7 +266,7 @@ jobs:
 
       - name: Retain test results
         if: always() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure')
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: merge-gate-tests
           path: |
@@ -267,15 +279,6 @@ jobs:
 
       - name: Go vulnerability check
         run: make vulncheck
-
-      - name: Save check cache
-        if: success() && steps.go-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ${{ steps.cache-paths.outputs.modules }}
-            ${{ steps.cache-paths.outputs.build }}
-          key: ${{ steps.go-cache.outputs.cache-primary-key }}
 
   check-skip:
     needs: [check-paths]
@@ -360,8 +363,8 @@ jobs:
   # emits from the current Definition, Environment and catalog pins. ADR-21 §3
   # requires matching regeneration when a lock changes.
   #
-  # PR drift checks live here; the generated nkd-run workflow is manual-only.
-  # Fork PRs temporarily skip this check because NKE inputs are private.
+  # PR drift checks live here; the generated nvkr-run workflow is manual-only.
+  # Fork PRs temporarily skip this check because NVKE inputs are private.
   # Same-repository PRs and main retain the generation drift gate.
   #
   # Per ADR-21 §2 this job lives OUTSIDE the emitted pipeline and does not
@@ -384,27 +387,27 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: .go-version
-          cache: true
+          cache: false
 
-      # Catalog validation re-reads the pinned NKE tree. Acquire it with a
+      # Catalog validation re-reads the pinned NVKE tree. Acquire it with a
       # fixed action before running checkout code; never pass this token to
       # the generator or persist credentials. Forks skip this job; do not use
       # pull_request_target to bypass that boundary.
-      - name: Fetch private NKE validation inputs
+      - name: Fetch private NVKE validation inputs
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: dsx-ai-factory/nke
+          repository: dsx-ai-factory/nvke
           ref: 33fb71b2f4224b470ebc628a9165fc4b92870406 # v0.21.0
           fetch-depth: 0
-          path: .nkd-inputs/nke
+          path: .nvkr-inputs/nvke
           token: ${{ secrets.NKE_SOURCE_TOKEN }}
           persist-credentials: false
 
-      - name: Verify committed Run generation is current
+      - name: Verify committed producer, qualification and catalog refresh generation is current
         env:
           GIT_CONFIG_COUNT: '1'
-          GIT_CONFIG_KEY_0: url.${{ github.workspace }}/.nkd-inputs/nke/.insteadOf
-          GIT_CONFIG_VALUE_0: https://github.com/dsx-ai-factory/nke
+          GIT_CONFIG_KEY_0: url.${{ github.workspace }}/.nvkr-inputs/nvke/.insteadOf
+          GIT_CONFIG_VALUE_0: https://github.com/dsx-ai-factory/nvke
         run: make workflows-check
 
   workflows-regen-skip:
@@ -422,7 +425,7 @@ jobs:
           github.event.pull_request.head.repo.full_name != github.repository
         run: >-
           echo "Regeneration check skipped for fork PR —
-          private NKE inputs are unavailable"
+          private NVKE inputs are unavailable"
       - name: Explain unchanged inputs
         if: >-
           github.event_name != 'pull_request' ||
@@ -449,7 +452,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: .go-version
-          cache: true
+          cache: false
 
       - name: Verify THIRD_PARTY_NOTICES.md is current
         run: make notices-check
@@ -461,6 +464,45 @@ jobs:
     timeout-minutes: 1
     steps:
       - run: echo "No dependency or notices inputs changed — notices check not required"
+
+  # ---------------------------------------------------------------------------
+  # Fern docs — the operator-facing site published from docs/index.yml.
+  #
+  # `make docs-check` runs the MDX safety checker, `fern check`, `fern docs md
+  # check` and `fern docs broken-links`. No secrets are used, so it is safe on
+  # fork PRs. The Fern CLI is intentionally installed unpinned (`@latest`), so
+  # an upstream Fern release can fail this check without a change in this
+  # repository; Node itself is pinned by setup-node.
+  # ---------------------------------------------------------------------------
+
+  docs:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '20'
+          package-manager-cache: false
+
+      - name: Install Fern CLI
+        run: npm install -g fern-api@latest
+
+      - name: Check Fern docs
+        run: make docs-check
+
+  docs-skip:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.docs != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - run: echo "No docs or Fern inputs changed — docs check not required"
 
   # ---------------------------------------------------------------------------
   # Static analysis (CodeQL)
@@ -495,15 +537,32 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: .go-version
-          cache: true
+          cache: false
 
-      - uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+      # CodeQL automatically uploads complete/partial databases as Actions
+      # artifacts in runner debug mode, even when debug and upload-database are
+      # false. RUNNER_DEBUG is provider-owned and cannot be overridden by env.
+      - name: Admit CodeQL without database artifact uploads
+        run: |
+          if [ "${RUNNER_DEBUG:-0}" = '1' ]; then
+            echo '::error::[NVKR-E-ENGINE-CAPABILITY] CodeQL debug reruns upload compiled databases; rerun with debug logging disabled.'
+            exit 1
+          fi
+
+      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        env:
+          CODEQL_OVERLAY_DATABASE_MODE: none
         with:
           languages: go
+          debug: false
+          trap-caching: false
+          dependency-caching: false
 
       - run: go build ./...
 
-      - uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          upload-database: false
 
   analyze-skip:
     needs: [check-paths]
@@ -540,8 +599,12 @@ jobs:
       - workflows-regen-skip
       - notices-regen
       - notices-regen-skip
+      - docs
+      - docs-skip
     runs-on: ubuntu-latest
-    timeout-minutes: 1
+    # Allow runner finalization after the checks; a one-minute job budget can
+    # expire even after this script reports success.
+    timeout-minutes: 5
     steps:
       - name: Check gate
         run: |

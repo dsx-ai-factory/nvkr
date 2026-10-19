@@ -6,15 +6,15 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-14 in the consolidated NKD ADR set.
+- **Index:** ADR-14 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-02 (identity/purity), ADR-05 (evidence / disk manifest), ADR-12 (targets and rendering), ADR-19 (artifact membership), ADR-04 (verify).
 - **Satisfies:** FR-13 (canonical disk boundary), FR-14 (deterministic assembly).
 
 ## Context
 
-NKD turns verified inputs into digest-identified delivery artifacts: packages, images, and bootable node disks.
+NVKR turns verified inputs into digest-identified delivery artifacts: packages, images, and bootable node disks.
 The disk story has a load-bearing boundary — RAW is the only canonical disk artifact. Delivery is packages-first
-and BYO-OS as the target model, while the current NKE compatibility path ships a source-owned aggregate image.
+and BYO-OS as the target model, while the current NVKE compatibility path ships a source-owned aggregate image.
 Each named output selects its exact producers and delivery format. This ADR fixes the canonical disk model,
 the envelope-verification mechanism, the encryption boundary, and artifact delivery.
 
@@ -24,7 +24,7 @@ the envelope-verification mechanism, the encryption boundary, and artifact deliv
 
 The **RAW logical byte stream is the canonical disk artifact**. `qcow2`, `vmdk`, and `vhd` are **derived
 envelopes**. Qualified reproduction is verified by **decoding** them and hashing the **decoded logical stream**,
-never by substituting container-file bytes, which carry non-reproducible padding and UUIDs. A `DiskManifest` (`nkd.dev/disk-manifest/v2`) records `{ logicalDigest (over the
+never by substituting container-file bytes, which carry non-reproducible padding and UUIDs. A `DiskManifest` (`nvkr.dev/disk-manifest/v2`) records `{ logicalDigest (over the
 decoded RAW LBA stream), block manifest, optional per-file content manifest, envelope refs (container digest =
 exact delivery identity and provenance, not qualified reproduction identity), pre-encryption boundary }`.
 Qualified reproduction identity attaches to the decoded logical stream; a divergence names the first divergent
@@ -71,7 +71,7 @@ no-follow regular-file capture, pathname replacement, byte substitution, cancell
 close races. The local unencrypted direct-Packer callback is connected and passes the VM driver's package-issued
 held result through that seam after capability admission. A serialized local result or caller-composed path,
 digest, or result cannot replace the in-process capability. This path has contract coverage only; no real
-Docker/Packer/NKE bake is claimed.
+Docker/Packer/NVKE bake is claimed.
 
 A successful local lifecycle attempt streams the held QCOW2 once into an attempt-owned temporary file while the
 held Packer capability rechecks its collection digest and the observer checks size and QCOW2 framing. Lifecycle
@@ -83,11 +83,11 @@ success commit point; descriptor cleanup after that point cannot change success 
 transaction remains explicitly marked and cannot be mistaken for success. This local retained file is the
 observed delivery payload; it is not publication, qualified reproduction, or a caller-selected export path.
 
-At NKE commit `6df693a`, the [Make target](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/packer/Makefile#L148-L185)
-produces a QCOW2 and the [hosted workflow](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/.github/workflows/os-image-artifact.yml#L399-L410)
+At NVKE commit `6df693a`, the [Make target](https://github.com/dsx-ai-factory/nvke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/packer/Makefile#L148-L185)
+produces a QCOW2 and the [hosted workflow](https://github.com/dsx-ai-factory/nvke/blob/6df693a9748a78aafdf96e1f2d03772530783487/.github/workflows/os-image-artifact.yml#L399-L410)
 later creates the published QCOW2 with another `qemu-img convert -c`. Source inspection alone does not establish
-byte parity between the Make-path file and the published file, so NKD must not claim it. Parity requires a
-source-owned finalization entrypoint or an explicit pinned transform followed by exact output verification. NKD
+byte parity between the Make-path file and the published file, so NVKR must not claim it. Parity requires a
+source-owned finalization entrypoint or an explicit pinned transform followed by exact output verification. NVKR
 must not silently copy workflow shell into an adapter.
 
 ### 2. Envelope codec seam + determinism spikes
@@ -145,23 +145,35 @@ Reproduced or digest-verified plaintext inputs remain independently visible evid
 encrypted delivery bytes reproducible. Inspection of an authenticated unlocked view can establish composition;
 the ciphertext still has only its exact per-artifact delivery identity.
 
-The authoring schema can represent the current NKE `luks2` component without asserting that qualified boundary.
-The [current FDE design](https://github.com/NVIDIA/nke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/docs/full-disk-encryption.md#L14-L34)
-ships a shared unlock-capable passphrase in a LUKS slot and GRUB until first-boot TPM binding succeeds. ADR-20's
-no-secret rule therefore prohibits its publication unchanged. Schema validity is not publication acceptance.
+The authoring schema can represent the current NVKE `luks2` component without asserting that qualified boundary.
+The [current FDE design](https://github.com/dsx-ai-factory/nvke/blob/6df693a9748a78aafdf96e1f2d03772530783487/os-image/docs/full-disk-encryption.md#L14-L34)
+ships a shared unlock-capable passphrase in a LUKS slot and GRUB for first-boot TPM binding. ADR-10 admits
+the documented `changeit` value only as an explicitly public diagnostic input; it has no confidentiality
+requirement and is not a private credential smuggled through public variables. ADR-18/20 admit native ARC
+publication of this output only with `build-provenance-v1`, binding the actual `luks2` declaration and exact
+delivery bytes without inspected-content or reproduction claims. An actual private passphrase embedded in those files violates
+ADR-20's no-secret rule. Cloned disks also retain the original volume key after TPM keyslot enrollment,
+so the published candidate image supplies no deployed confidentiality claim. Schema validity and diagnostic byte
+retention are not publication or firstboot acceptance.
 
 ### 4. Delivery follows explicit artifact formats
 
 A Definition selects the exact components of each executable, package, image or chart output. Actual producer
 metadata and format requirements govern admission; there is no node-role/category taxonomy or role-scoped
-staging manifest. Different disk contents are separate selected producers. The NKE aggregate disk is an explicit
+staging manifest. Different disk contents are separate selected producers. The NVKE aggregate disk is an explicit
 output whose embedded inputs retain traced material identities and full-disk SBOM obligations.
+
+Mixed executable bundles retain loose tools and declared tarball assets as separate named members.
+Factory packages declared tarballs with mode `0644`; executable tools retain mode `0755`. The compiled
+producer type selects this mode, never the source file's permissions or filename extension. Bundle
+identity covers the mode as well as exact member bytes. Existing bundles retain their original identity;
+rebuilding a tarball previously packaged as executable changes the bundle identity.
 
 ISO is a separate canonical class because it is a flat logical stream, not a decode-to-RAW envelope.
 Deterministic production would require pinned tools, a frozen clock, sorted directory order and fixed volume
 identity. Current existing-byte measurement does not implement that production capability.
 
-NKD produces artifacts and verified references. Downstream consumers own boot serving, installation and Helm
+NVKR produces artifacts and verified references. Downstream consumers own boot serving, installation and Helm
 deployment. No provisioning bundle or node-SKU interface is retained without a supported artifact producer.
 
 ## Consequences
@@ -193,7 +205,7 @@ deployment. No provisioning bundle or node-SKU interface is retained without a s
 - **Treat matching package/file inventories as disk reproduction.** Rejected — semantic agreement is valuable
   content validation but permits different bytes and cannot satisfy an exact-byte qualified claim.
 - **Make aggregate baked images the primary delivery model.** Rejected — packages-first, thin-base, BYO-OS is
-  the target delivery. The current NKE aggregate disk remains an explicit compatibility output while its
+  the target delivery. The current NVKE aggregate disk remains an explicit compatibility output while its
   embedded components are separated into independent layers.
 
 ## De-risking spikes
@@ -211,7 +223,7 @@ deployment. No provisioning bundle or node-SKU interface is retained without a s
 
 ## Acceptance evidence
 
-Current contract evidence in `pkg/nkd/assemble/*_test.go` covers canonical RAW and ISO identities, per-block
+Current contract evidence in `pkg/nvkr/assemble/*_test.go` covers canonical RAW and ISO identities, per-block
 manifests, strict legacy-role rejection, pre-encryption rejection, qualified exact held `qemu` executable, input,
 and output capabilities, exact explicit probe argv including `vhd` to `vpc`, format/encryption/backing/data-file
 probes, QCOW2-only diagnostic admission, VMDK single-file sparse pre-probe and extent-binding negatives
@@ -222,9 +234,9 @@ and removed staging interfaces fail before catalog, graph, input, output, or sub
 existing-byte `DiskManifest` emission and ordinary unqualified development packaging remain available. Masked
 regions deliberately remain unsupported. Factory/lifecycle/delivery contracts additionally cover the
 process-local exact-QCOW2 observation described above. They use a controlled producer callback and do not
-establish production VM execution, NKE disk production, full-disk evidence, compatibility, or publication.
-The real-QEMU VMDK fixture replay is opt-in through `NKD_TEST_QEMU_IMG` and its exact executable pin;
-ordinary CI does not run it. Its [ARM64 replay evidence](https://github.com/dsx-ai-factory/nke-recipes/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/disk-inspection-observations.md#vmdk-codec-admission)
+establish production VM execution, NVKE disk production, full-disk evidence, compatibility, or publication.
+The real-QEMU VMDK fixture replay is opt-in through `NVKR_TEST_QEMU_IMG` and its exact executable pin;
+ordinary CI does not run it. Its [ARM64 replay evidence](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/disk-inspection-observations.md#vmdk-codec-admission)
 keeps the earlier and linked follow-up replay identities separate from the contract suite
 and does not establish qualified reproduction.
 

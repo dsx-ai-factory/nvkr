@@ -6,13 +6,13 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-17 in the consolidated NKD ADR set.
+- **Index:** ADR-17 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-03 (exit codes), ADR-18 (runner / ctx), ADR-20 (publish seams), ADR-01 (canonical codec).
 - **Satisfies:** FR-21 (standard, replaceable interfaces); supports FR-20 (coded errors — owned by ADR-03).
 
 ## Context
 
-NKD is a **thin CLI over a reusable SDK**. It needs an embeddable facade, context/cancellation discipline,
+NVKR is a **thin CLI over a reusable SDK**. It needs an embeddable facade, context/cancellation discipline,
 swappable external-transport seams, and a clean package topology, so later work does not re-accrete orchestration
 in `main` or double-author types.
 
@@ -26,8 +26,10 @@ belongs to the downstream deployment owner and is not part of the Definition or 
 sets, clearance, publication roots, and qualification records are generated/authenticated internals available
 through inspection. Normal callers neither construct nor connect their receipt graph.
 
-Definition declares named outputs directly. Each output selects exact catalog components and a concrete target
-platform, together with its artifact format. An output may explicitly
+Definition declares named outputs directly. Each native output selects exact catalog components and a concrete target
+platform, together with its artifact format. An OCI aggregate instead declares a sorted, unique `platforms`
+set; the compiler derives one native producer target per member and one required image-index output
+binding every member's exact manifest, Build identity and evidence. An output may explicitly
 select another catalog. The compiler derives its complete pinned build graph, routine package envelopes,
 required slots, and routes. Byte-changing transformations remain explicit. Missing or duplicate selections,
 unsupported platforms and unsupported formats fail with coded errors before work.
@@ -50,20 +52,25 @@ can inspect that Plan. The ordinary local scheduler rejects disk publication wit
 runtime, source, subprocess or workspace work until its grouped live inspector/package executor is connected.
 ADR-18 separately admits generated native ARC jobs for unencrypted direct-Packer outputs. The recorded
 M2 candidate exercised that pipeline-attested publication route with `build-provenance-v1`, explicitly
-deferring inspection, under a validation-branch exception. General hosted VM adapters, FDE and qualified
-execution remain capability-gated. The strict live full-disk evidence/publication path has guarded APIs
-without a successful real NKE join; main-only execution, independent full-payload disk consumption,
-M3 inventory/qualification and organizational acceptance remain separate gaps in
+deferring inspection, under a validation-branch exception. A separate native ARC build-only route omits
+publication and signing, retains exact raw QCOW2 bytes and producer records, and finalizes a static-unqualified
+Run. It admits ADR-10's explicitly public-bootstrap FDE producer as well as plain disks. Native ARC also admits
+public-bootstrap FDE publication with explicit `build-provenance-v1` evidence and exact encryption metadata
+binding. General hosted VM adapters, secret-valued FDE, encrypted inspection, strict FDE publication and
+qualified execution remain capability-gated.
+The strict live full-disk evidence/publication path has guarded APIs
+without a successful real NVKE join; main-only execution, independent full-payload disk consumption,
+strict inventory hardening, M3 qualification acceptance and organizational acceptance remain separate gaps in
 [reconciliation](reconciliation.md).
 
-Definition v4, Run/Release v3, and compiled Run Plan/artifact graph v4 records reject the
+Definition v5, Run/Release v4, and compiled Run Plan/artifact graph v5 records reject the
 retired cluster, role, category and composition fields. Signer policy roles remain a distinct security concept.
 
 Environment separately supplies runtime, runner, publication namespace, credential references and signing policy
 (ADR-20). Output-affecting tools stay in the build identity they affect.
 Changing transport or signing configuration cannot silently change logical Build identity.
 
-`pkg/nkd/definition` owns authored Definition/Environment loading, validation and identity. `factory.Compile`
+`pkg/nvkr/definition` owns authored Definition/Environment loading, validation and identity. `factory.Compile`
 accepts those exact inputs and owns the complete Plan, output joins and evidence requirements. It returns no
 partially completed plan and exposes no independently authored CompileSpec or ExecutionSettings handoff.
 `lifecycle` owns preparation, immutable attempt persistence and consumer workflow. Preparation retains an owned
@@ -89,6 +96,68 @@ canonical, trust, evidence, status and release invariants. `client/v1` is a cont
 with process configuration in functional options and per-call inputs in method arguments. CLI commands parse
 flags, call those use cases, format results and map ADR-03 errors. Neither layer mints authority from fields.
 
+For M3-A, `run check-artifacts --run <exact-attempt-URL> --policy <path>` delegates to
+`lifecycle.CheckQualificationRun`; the only optional command input is the private workspace. Lifecycle owns
+strict policy loading and the full handoff orchestration. `qualificationorigin` discovers the commit from
+the exact successful GitHub attempt, applies the independent repository/workflow/default-branch policy and
+issues a closeable source receipt. It downloads only that attempt's bounded, provider-digest-bound archive,
+whose sole member is the generated `handoff.json`. An artifact name or decoded description grants no authority.
+
+For the in-progress local rehearsal, `lifecycle.PrepareCapturedFiles` delegates to factory's existing
+bounded compiler-read capture and retains the snapshot privately with the prepared Run. Real local
+execution commits `compile-inputs.json` before starting producers; dry-run and failed capability
+admission create no snapshot or attempt storage. Later edits to authored files cannot change that
+snapshot. The snapshot remains descriptive: it grants no completed-Run, payload or signing authority.
+
+The distinct `lifecycle.CheckQualificationReference` entrypoint discovers that exact source attempt from
+an authenticated selected publication's signed `InvocationID`, retaining the same independent policy and
+Run/handoff authentication. The receipt must bind the selected root (ADR-16 §5). `Client.Validate` delegates
+to `validation.RunFiles` and its concrete `conformance` adapter; [ADR-16 §6](0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
+owns its descriptive execution boundary. This does not require a customer-supplied Run URL.
+
+Factory captures the complete compiler-read authored closure and replays it from memory through the existing
+compiler. Original logical paths, base and output catalog overrides, overlays, registries, locks, patches and
+directory facts are preserved. Capture uses no-follow source reads; each file is bounded to 4 MiB, the
+aggregate to 32 MiB and file/directory/listing facts to 1,024 entries, with the catalog traversal-depth limit.
+Replay cannot fall back to a checkout. Catalog retains its bounded pinned-upstream Git authentication and embedded
+declaration checks, so replay is not offline. Lifecycle compares the recompiled Plan with the saved original.
+The generated signed `per-output-v1` producer exports original predicates only after successful finalization.
+Unsigned/dry-run and legacy aggregate producers cannot emit a qualification handoff; aggregate publication
+remains available without M3 qualification. Consumer policy and verifier pins remain separately selected.
+
+`lifecycle.Consumer.CheckQualification` joins the authenticated source to the verified publication, exact
+Definition/Environment/Plan, every named output and authenticated build evidence. Factory owns
+production-predicate semantics; signing owns cryptographic verification. The immutable artifact-check receipt
+retains the verified publication and frozen Plan. Its idempotent closure is shared by shallow copies: it
+revokes admission, cancels and joins registered operations, then releases held payloads. The receipt grants
+no smoke-execution or signing authority. The direct consumer and `CheckQualificationHandoff` operations borrow
+the caller's source receipt; source closure also revokes the check receipt. The Run adapter and retained
+`CheckQualificationFiles` diagnostic adapter transfer their source owner to the returned receipt. All
+qualification adapters share independent canonical registry-host admission for explicit pull credentials;
+the candidate cannot select the credential destination. Anonymous and host-scoped keychain reads remain
+available. Defensive
+diagnostics cannot restore authority after closure. The independent `qualification` publisher contract
+consumes authenticated check and smoke receipts; its public descriptions are not receipt constructors.
+`run qualify --policy <path>` delegates to `qualification.PublishTriggeredRun`, which derives its source
+from the authenticated hosted event. The generated hidden native worker command also takes only that
+policy; it is not an independently authored lifecycle input. Pipeline owns isolated held-byte execution,
+lifecycle owns fixed version evaluation and authenticated complete worker aggregation, and qualification
+owns worker report signing and final subject-bound publication. Native and aggregate receipts borrow A and
+the qualifier invocation, preserve shared revocation, and expose only defensive descriptions. The old
+file-based publishing adapter is capability-gated before I/O; A's file diagnostics remain supported.
+`run generate --qualification-policy <path>` composes the producer generator with the qualification-owned
+workflow pair and manifest. `lifecycle.ValidateQualificationSmokePlan` owns the pure policy/Plan scope
+join shared by generation and runtime; adapters cannot choose a different applicability rule. Generation
+selects exactly the executable native platforms, retaining the final AMD64 signer requirement. The CLI
+only selects the use case and presents its result.
+`run qualify-local` delegates to `lifecycle.QualifyLocalRun`. It selects a completed captured attempt,
+independent local policy, three explicit private-key files, native runtime, pinned cosign, registry
+namespace, scratch and new evidence destination. Lifecycle owns the complete check/sign/smoke/publish/
+read-back sequence and cleanup; the command emits only its descriptive canonical result. This separate
+local lane accepts no hosted invocation and supplies no hosted qualification or release authority.
+ADR-16 owns verdict and publication rules, and reconciliation records the separate A/B/C implementation and
+acceptance boundaries.
+
 `status.AcceptDiagnosticCheckpoint` owns protected minimum reads, exact document authentication, checkpoint
 verification and receipt-derived byte-CAS persistence before interpreting withdrawal. Its caller-supplied epoch
 and returned decision remain diagnostic; this operation adds no trusted-time or release authority.
@@ -103,9 +172,51 @@ these maintenance descriptions cannot grant execution or release authority.
 Plans, joins producer and artifact graphs by exact instruction references, and compares every field while
 separating per-output Build Digest changes from execution and transport changes. It issues no authority.
 
-Normal commands are `definition validate|inspect`, `run plan|graph|diff|local|generate`, and `release verify|inspect|browse`, with
-`--definition` and `--environment`; catalog maintenance and exact component/platform diagnostics remain
-available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
+`progress` owns bounded descriptive snapshots of admitted operations and named
+outputs, supplied by factory scheduling and lifecycle output-observation boundaries.
+It also carries detached public command-result descriptions (titles, fields, items
+and navigation links). These values are presentation contracts, not additional
+Run membership or SDK inspection methods; CLI adapters project recorded metadata.
+It calls no renderer or caller-controlled writer from producer updates. Lossy
+wakeups and bounded public activity cannot change frozen membership or finalization.
+`internal/runpresenter` owns terminal admission, rendering, cancellation requests and
+joined screen/event/worker lifetimes. It has no receipt or deployment ownership.
+Live CLI result/error pairs independently select final reporting and exit status;
+complete retained output plus cleanup failure remains a complete Run and a failed
+command. These transient descriptions add no field to signed/canonical identities.
+The CLI captures a bounded tail of interactive producer stdout/stderr in memory,
+without producer-side filesystem or renderer callbacks. A failed command replays
+that tail to ordinary stderr after terminal restoration and owner joining, with
+truncation marked. Raw diagnostics never enter safe snapshots or panes. This
+does not create durable general-purpose logs or replay successful console output;
+existing Packer diagnostic retention remains separately owned.
+
+Lifecycle's `InspectRun` owns bounded, no-follow canonical record inspection and
+projects safe file-recorded metadata and attempt-marker descriptions through the
+SDK. A record must exist and name its containing attempt directory; absence
+fails with a coded verification error and never establishes interruption or
+excludes a live owner. Inspection admits only currently producible lanes, not
+qualified lifecycle records. It validates the existing output slot bindings, without opening payload
+locators, restoring execution authority or inferring current availability/health.
+The CLI may show these views as plain/JSON or an explicitly selected read-only
+terminal explorer. Of the 27 public command leaves, 23 admit an explicitly selected result browser;
+`validate`, `run check-artifacts`, `run qualify` and `run qualify-local` retain canonical machine-readable diagnostics. The hidden native
+worker is not a public command.
+Owning operations, including maintenance transactions
+and verification, finish and release receipts before this read-only view opens.
+Typed names, identity fields, counts and navigation links are descriptions; they
+exclude transport locations, private paths and raw error/value text. Closing a
+result view neither repeats nor reverses the operation, and owning status codes
+remain authoritative; Ctrl+C closes a read-only viewer and cancels only live work.
+Existing non-interactive and explicitly plain output bytes, including exact Plan
+JSON, are preserved. Interactive `run local` defaults to the dashboard and does
+not replay successful producer output. Nonempty `CI` keeps auto plain; explicit
+terminal mode remains available. Hidden CI/execution helpers retain their existing interface.
+
+Normal commands are `validate`, `definition validate|inspect`, `run plan|graph|diff|inspect|local|generate|check-artifacts|qualify|qualify-local`,
+and `release verify|inspect|browse|export|pull`. Producer operations select authored inputs with `--definition` and
+`--environment`; artifact checking and qualification use the Run/policy interfaces above. Catalog maintenance
+and exact component/platform diagnostics remain available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
 is not required. Remove superseded authoring APIs and wire fixtures; retain internal mechanics only when the
 current lifecycle uses them. SDK callers obtain an opaque prepared Run and execute/generate it; decoded
 JSON cannot restore executable authority. Consumer verification takes one pinned Release reference and explicit
@@ -118,6 +229,15 @@ to `build-provenance-v1`; explicitly selecting `strict` requires inspected evide
 to strict and rejects the producer-only minimum. Inspected evidence satisfies either minimum; producer metadata
 cannot weaken the selected consumer policy. The signed mode remains
 descriptive and does not grant authority.
+
+`Consumer.Authenticate` admits only pipeline-attested `authenticity` policy and issues a distinct opaque
+`AuthenticatedRelease` after checking the complete metadata/evidence closure and its required signatures,
+production provenance and SBOM bundles. It never opens the full-payload publication owner. Its description
+explicitly reports `payloadIntegrityVerified: false`; it supplies no payload export or exact-input receipt.
+`Consumer.Verify` retains the full-payload artifact-publication contract. These capabilities cannot substitute
+for one another, and their serialized descriptions cannot restore live authority. The CLI selects the narrow
+operation through `release verify --scope authenticity`; exact-input flags are rejected at admission.
+
 Transport locators are excluded from
 the content subject and bound by the release metadata. A second published lifecycle-binding object is not retained. An external SDK test proves embedding
 without `main`. Low-level command orchestration must serve a current diagnostic or execution use case, not preserve an obsolete workflow.
@@ -130,8 +250,37 @@ render text, JSON, or Mermaid; platform labels describe checked config metadata.
 admission precede filesystem/network work. Registry inspection owns and removes a system temporary directory
 by default; an explicit caller-owned workspace is retained while its private staging child is removed.
 Each format labels metadata inspection explicitly. These detached descriptions establish no payload,
-signature or policy verification, and cannot restore a verified Release capability. Explicit Release
-verification retains its full payload and policy checks. The existing compact local `release inspect` view remains.
+signature or policy verification, and cannot restore an authenticated or verified Release capability. Explicit
+`artifact-publication` verification retains its full payload and policy checks; `authenticity` adds policy-bound
+signature/evidence checks to metadata acquisition. The existing compact local `release inspect` view remains.
+
+`lifecycle.ExportRelease(ctx, reference, options)` owns complete release-description export (ADR-19/20).
+It uses the same bounded inspection and versioned JSON description as `release browse --format json`.
+The `nvkr.dev/release-description/v1` schema is a detached read model, not another public lifecycle object.
+Export takes one immutable OCI reference; an optional local layout caches that exact publication. It needs
+no Plan, mapping, requested platform, producer checkout or build workspace. Every named output and platform
+is retained, including aggregate image-index children and exact evidence/source bindings. Consumer-specific
+roles, source compatibility and installation requirements remain outside this interface. The CLI writes the
+complete description after admission and metadata validation. Export creates no identity, Run completion,
+payload or signature acceptance, or publication authority. Unpublished workspace export is not an interface.
+
+`lifecycle.PullReleaseOutput`, exposed as `release pull`, is a diagnostic use case for one exact named output
+under a pinned registry Release reference. Lifecycle owns the overall deadline and delegates to `delivery.PullOutput`.
+Delivery owns reference, selection, destination and transport admission, complete metadata/evidence validation,
+selected format and payload-closure checks, and private temporary storage and cleanup. Its optional workspace
+is the parent for owned temporary data. Executables retain their bundle names and modes; disks and Helm charts
+retain exact payload bytes in named files, including declared LUKS2 disk ciphertext without decryption. Images
+retain their native OCI/Docker manifests, configs and layers in a standard OCI layout; APT repositories retain
+their repository trees. An aggregate OCI output includes every declared platform. Only the selected output's
+payload closure is downloaded. The destination parent must already exist; existing destinations are rejected,
+and installation suggestions cannot redirect writes. Failure or cancellation before commit exposes no
+destination; a failed directory sync after commit can leave the complete destination while reporting failure.
+Malformed or unsupported format metadata fails with a coded error before payload or destination work. This
+operation runs on macOS and Linux and executes no downloaded file.
+The CLI retains plain output by default and admits its optional read-only result browser before acquisition;
+the successful snapshot describes files already written and cannot repeat or reverse the operation.
+Its result describes integrity-checked bytes and confers no signature, policy or Release acceptance;
+authenticated consumption remains the explicit verification use case.
 
 The SDK exposes document loading, Run preparation/execution/generation and scoped Release verification.
 `ResolveBuild` and `Run` remain for exact producer diagnostics; optional `AtomicOutput` commits a diagnostic
@@ -178,12 +327,20 @@ future qualified publication needs an authenticated commit protocol before expos
 ### 4. Package topology and single-owner rule
 
 - A documented **single-owner package map** — `definition`, `lifecycle`, `factory`, `delivery`, `canonical`, `catalog`, `buildgraph`, `target`,
-  `execution`, `ir`, `pipeline`, `attest`, `release`, `status`, `provenance`, `sbom`, `vuln`, and `trust`.
+  `execution`, `ir`, `pipeline`, `attest`, `release`, `status`, `provenance`, `sbom`, `vuln`, `trust`,
+  `qualificationorigin`, `testresults`, `validation`, `conformance`, and the separate M3-C `qualification` publisher.
   Catalog owns producer admission and snapshots; buildgraph owns exact selection and graph compilation;
   target owns concrete supported target platforms. Each owns its schema, returns typed coded
   errors, and marshals through the canonical codec (ADR-01). `client/v1` composes those owners; `main` must not
   own a competing schema, verifier, receipt constructor, or policy decision. Remaining multi-step command
   orchestration is migration debt tracked independently rather than declared absent.
+
+`testresults` owns output descriptions, wrapper validation and deterministic serialization in lane
+**none (descriptive)**. [ADR-16 §6](0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
+owns the external-producer boundary; the [output reference](../external-test-output-contract.md)
+owns descriptive fields, format pins and limits. This adds no public lifecycle object or receipt. `validation` owns diagnostic profile admission and
+check dispatch; `conformance` owns the supported suite/harness protocol, subject observations, capture
+and cleanup. Catalog, lifecycle, delivery and held-file owners retain their existing responsibilities.
 
 The standalone query/diff selector workflow is removed; inspect the current lifecycle views directly.
 
@@ -194,6 +351,21 @@ copies. If it also retains file descriptors, subprocesses, locks, or other resou
 Ownership transfers are stated on the returning method. Facade results either close on every failure or transfer
 one clear close obligation to their caller. Garbage-collector cleanup may be defense in depth, never the
 correctness or resource-reclamation mechanism.
+
+`ArtifactCheckReceipt.WithDiagnosticOperation` registers a bounded callback and defensive description
+under the live receipt; it grants no payload access on its own. `WriteExecutableMember` delegates held
+member streaming to delivery after exact output/member/platform, publication and build-subject checks.
+Export grants byte access, not execution or qualification authority. The diagnostic adapter separately
+admits the user's explicit execution profile and owns capture, child processes and cleanup (ADR-18 §3).
+Product and tools receipts remain live through that work; closure stays outside the registered callback
+and cancels/joins operations before releasing payloads. Serialization restores none of these capabilities.
+
+The public `client/v1.ValidationOptions` currently aliases `lifecycle.QualificationRuntimeOptions`.
+This deliberately reuses the existing GitHub token, private workspace and registry credential/transport
+options without another authentication contract; it grants no qualification relationship or authority.
+The CLI supplies the explicit anonymous-registry default; SDK callers must select anonymous access or
+complete host-scoped credentials themselves. The alias exposes future changes to that owner and remains
+an explicit SDK coupling, like `LocalRunOptions` below.
 
 The non-owning installed-inventory receipt in ADR-13 borrows the issuing Run's
 lifetime; it has no separate close obligation or resource ownership. The Run's
@@ -237,7 +409,7 @@ record; absence of a record proves neither success nor absence of remote effects
 - Downstream integrators embed the SDK to prepare and execute Runs or verify Releases, branching on coded failures.
 - ctx and cancellation are explicit on every public operation; the options-carried deep-runner context
   remains visible migration debt and fails closed when omitted.
-- Swappable transports keep NKD integrating only via standard interfaces, while missing authority adapters fail
+- Swappable transports keep NVKR integrating only via standard interfaces, while missing authority adapters fail
   honestly instead of falling back to declarations.
 - The package map prevents `main` re-accretion and double-authored types.
 
@@ -265,9 +437,9 @@ record; absence of a record proves neither success nor absence of remote effects
 
 ## Acceptance evidence
 
-Current contract evidence in `client/v1/*_test.go`, `cmd/nkdctl/*_test.go`, `pkg/nkd/pipeline/local*_test.go`,
-`pkg/nkd/pipeline/container_lifecycle_test.go`, and
-`pkg/nkd/internal/heldfile` covers context-first facade calls, authoritative-module equivalence, injected
+Current contract evidence in `client/v1/*_test.go`, `cmd/nvkr/*_test.go`, `pkg/nvkr/pipeline/local*_test.go`,
+`pkg/nvkr/pipeline/container_lifecycle_test.go`, and
+`pkg/nvkr/internal/heldfile` covers context-first facade calls, authoritative-module equivalence, injected
 catalog/runner/consumer seams, local cancellation propagation, an explicitly stopped and joined container-reaper
 waiter, bounded lock-free cleanup I/O, held-child SIGTERM→SIGKILL escalation, atomic output, exact-byte
 receipt checks in the owning modules, rejection of unauthenticated inputs, and absence of implicit publication I/O.

@@ -1,0 +1,168 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+---
+apiVersion: nvkr.dev/catalog/v3
+kind: SourceBuildRegistry
+metadata:
+  name: nvke-nightly-installer-tools-arm64
+  description: Source-built ARM64 clusterctl, kind, kubectl and oras with acquired
+    Helm4.2.4; complete executable bundle for signed nightly candidate, not qualification.
+sources:
+  clusterctl:
+    repo: https://github.com/kubernetes-sigs/cluster-api
+    constraint: 1.12.3
+    toolchainImagesByArch:
+      arm64: docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9
+    vendorCommand:
+    - bash
+    - "-euc"
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+      pins="$(sha256sum go.mod go.sum)"
+      timeout --kill-after=10s 540s go mod download
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+      GOPROXY=off timeout --kill-after=10s 60s go mod verify
+      GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+  helm:
+    repo: https://github.com/helm/helm
+    constraint: 4.2.4
+    tool:
+      format: tar-gzip
+      url: https://get.helm.sh/helm-{{.Tag}}-linux-arm64.tar.gz
+      platform: linux/arm64
+      executablePath: linux-arm64/helm
+  kind:
+    repo: https://github.com/kubernetes-sigs/kind
+    constraint: 0.32.0
+    toolchainImagesByArch:
+      arm64: docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9
+    vendorCommand:
+    - bash
+    - "-euc"
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+      pins="$(sha256sum go.mod go.sum)"
+      timeout --kill-after=10s 540s go mod download
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+      GOPROXY=off timeout --kill-after=10s 60s go mod verify
+      GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+  kubectl:
+    repo: https://github.com/kubernetes/kubernetes
+    constraint: 1.36.0
+    toolchainImagesByArch:
+      arm64: docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9
+  oras:
+    repo: https://github.com/oras-project/oras
+    constraint: 1.3.3
+    toolchainImagesByArch:
+      arm64: docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9
+    vendorCommand:
+    - bash
+    - "-euc"
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+      pins="$(sha256sum go.mod go.sum)"
+      timeout --kill-after=10s 540s go mod download
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+      GOPROXY=off timeout --kill-after=10s 60s go mod verify
+      GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+components:
+  clusterctl:
+    fromSource: true
+    source: clusterctl
+    cgo: false
+    platforms:
+    - linux/arm64
+    outputType: host-package
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/clusterctl
+    versionStamp:
+      BUILD_VERSION: "{{.Tag}}"
+      GIT_VERSION: "{{.Commit}}"
+      KUBE_GIT_MAJOR: "{{.Major}}"
+      KUBE_GIT_MINOR: "{{.Minor}}"
+    buildCommand:
+    - bash
+    - "-euc"
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off
+      build_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
+      go build -trimpath -mod=vendor \
+        -ldflags "-s -w -buildid= -X sigs.k8s.io/cluster-api/version.gitVersion=$BUILD_VERSION -X sigs.k8s.io/cluster-api/version.gitCommit=$GIT_VERSION -X sigs.k8s.io/cluster-api/version.gitReleaseCommit=$GIT_VERSION -X sigs.k8s.io/cluster-api/version.gitTreeState=clean -X sigs.k8s.io/cluster-api/version.gitMajor=$KUBE_GIT_MAJOR -X sigs.k8s.io/cluster-api/version.gitMinor=$KUBE_GIT_MINOR -X sigs.k8s.io/cluster-api/version.buildDate=$build_date" \
+        -o /src/nvkr-output/clusterctl ./cmd/clusterctl
+  helm:
+    source: helm
+    platforms:
+    - linux/arm64
+    outputType: host-package
+    prebuilt:
+      releaseExecutable: true
+      evidence:
+        none: true
+  kind:
+    fromSource: true
+    source: kind
+    cgo: false
+    platforms:
+    - linux/arm64
+    outputType: host-package
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/kind
+    versionStamp:
+      BUILD_VERSION: "{{.Version}}"
+      GIT_VERSION: "{{.Commit}}"
+    buildCommand:
+    - bash
+    - "-euc"
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off
+      go build -trimpath -mod=vendor \
+        -ldflags "-s -w -buildid= -X sigs.k8s.io/kind/pkg/cmd/kind/version.gitCommit=$GIT_VERSION" \
+        -o /src/nvkr-output/kind .
+      test "$(/src/nvkr-output/kind version -q)" = "$BUILD_VERSION"
+  kubectl:
+    fromSource: true
+    source: kubectl
+    cgo: false
+    platforms:
+    - linux/arm64
+    outputType: host-package
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/kubectl
+    versionStamp:
+      BUILD_VERSION: "{{.Tag}}"
+      GIT_VERSION: "{{.Commit}}"
+      KUBE_GIT_MAJOR: "{{.Major}}"
+      KUBE_GIT_MINOR: "{{.Minor}}"
+    buildCommand:
+    - bash
+    - "-euc"
+    - |
+      export GOENV=off GOWORK=/src/go.work GOTOOLCHAIN=local GOPROXY=off
+      build_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
+      go build -trimpath -mod=vendor -tags selinux,notest,grpcnotrace \
+        -ldflags "-s -w -buildid= -X k8s.io/component-base/version.gitVersion=$BUILD_VERSION -X k8s.io/component-base/version.gitCommit=$GIT_VERSION -X k8s.io/component-base/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/component-base/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/component-base/version.gitTreeState=clean -X k8s.io/component-base/version.buildDate=$build_date -X k8s.io/client-go/pkg/version.gitVersion=$BUILD_VERSION -X k8s.io/client-go/pkg/version.gitCommit=$GIT_VERSION -X k8s.io/client-go/pkg/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/client-go/pkg/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/client-go/pkg/version.gitTreeState=clean -X k8s.io/client-go/pkg/version.buildDate=$build_date" \
+        -o /src/nvkr-output/kubectl ./cmd/kubectl
+  oras:
+    fromSource: true
+    source: oras
+    cgo: false
+    platforms:
+    - linux/arm64
+    outputType: host-package
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/oras
+    versionStamp:
+      GIT_VERSION: "{{.Commit}}"
+    buildCommand:
+    - bash
+    - "-euc"
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off
+      go build -trimpath -mod=vendor \
+        -ldflags "-s -w -buildid= -X oras.land/oras/internal/version.BuildMetadata= -X oras.land/oras/internal/version.GitCommit=$GIT_VERSION -X oras.land/oras/internal/version.GitTreeState=clean" \
+        -o /src/nvkr-output/oras ./cmd/oras

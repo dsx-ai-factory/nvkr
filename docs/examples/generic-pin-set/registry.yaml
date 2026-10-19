@@ -1,4 +1,4 @@
-apiVersion: nkd.dev/catalog/v3
+apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 sources:
   platform:

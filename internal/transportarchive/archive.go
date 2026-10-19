@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NVIDIA/nke-recipes/internal/securepath"
-	e "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/dsx-ai-factory/nvkr/internal/securepath"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -481,7 +481,7 @@ func validateTransportEntryUnchanged(expected transportEntry, observed securepat
 // acceptance to the one caller that actually needs it (Helm chart carriers);
 // every other transport consumer keeps requiring plain tar, so this widened
 // decompression exposure and its budget do not silently apply to Packer,
-// APT, or the generic `nkdctl transport` carriers.
+// APT, or the generic `nvkr transport` carriers.
 //
 // maxHelmTransportDecompressedBytes bounds the decompressed size of the one
 // gzip-compressed transport lane (a real `helm package` .tgz, read via
@@ -499,11 +499,14 @@ const maxHelmTransportDecompressedBytes = 512 << 20
 // bounds 1:1. Without a smaller budget on the gzip lane, a small decompression
 // bomb could expand without bound; the budget is charged for every
 // decompressed byte, including data tar.Reader.Next skips between entries.
-func openTransportTarSource(source io.Reader, allowCompressed bool) (io.Reader, func(), error) {
-	buffered := bufio.NewReader(source)
+func openTransportTarSource(ctx context.Context, source io.Reader, allowCompressed bool) (io.Reader, func(), error) {
+	if err := requireTransportContext(ctx, "opening transport archive"); err != nil {
+		return nil, nil, err
+	}
+	buffered := bufio.NewReader(transportContextReader{ctx: ctx, reader: source})
 	magic, err := buffered.Peek(2)
 	if err != nil && err != io.EOF {
-		return nil, nil, e.Wrap(e.CodeVerifyFailed, err, "inspecting transport archive")
+		return nil, nil, transportError(ctx, e.CodeVerifyFailed, err, "inspecting transport archive")
 	}
 	if len(magic) == 2 && magic[0] == 0x1f && magic[1] == 0x8b {
 		if !allowCompressed {
@@ -511,12 +514,12 @@ func openTransportTarSource(source io.Reader, allowCompressed bool) (io.Reader, 
 		}
 		gz, err := gzip.NewReader(buffered)
 		if err != nil {
-			return nil, nil, e.Wrap(e.CodeVerifyFailed, err, "opening compressed transport archive")
+			return nil, nil, transportError(ctx, e.CodeVerifyFailed, err, "opening compressed transport archive")
 		}
-		return &transportLimitReader{reader: gz, remaining: maxHelmTransportDecompressedBytes, bound: maxHelmTransportDecompressedBytes},
+		return transportContextReader{ctx: ctx, reader: &transportLimitReader{reader: gz, remaining: maxHelmTransportDecompressedBytes, bound: maxHelmTransportDecompressedBytes}},
 			func() { _ = gz.Close() }, nil
 	}
-	return &transportLimitReader{reader: buffered, remaining: maxTransportBytes, bound: maxTransportBytes}, func() {}, nil
+	return transportContextReader{ctx: ctx, reader: &transportLimitReader{reader: buffered, remaining: maxTransportBytes, bound: maxTransportBytes}}, func() {}, nil
 }
 
 // transportLimitReader fails closed once an untrusted stream has yielded more
@@ -557,7 +560,7 @@ func (reader *transportLimitReader) Read(p []byte) (int, error) {
 // with no top-level directory, fail closed; extraction independently
 // re-validates every entry.
 func detectTransportChartRootFrom(ctx context.Context, source io.Reader, allowCompressed bool) (string, error) {
-	tarSource, closeTarSource, err := openTransportTarSource(source, allowCompressed)
+	tarSource, closeTarSource, err := openTransportTarSource(ctx, source, allowCompressed)
 	if err != nil {
 		return "", err
 	}
@@ -574,7 +577,7 @@ func detectTransportChartRootFrom(ctx context.Context, source io.Reader, allowCo
 			break
 		}
 		if err != nil {
-			return "", e.Wrap(e.CodeVerifyFailed, err, "reading transport archive")
+			return "", transportError(ctx, e.CodeVerifyFailed, err, "reading transport archive")
 		}
 		entries++
 		if entries > maxTransportEntries {
@@ -623,7 +626,7 @@ func DetectTransportChartRoot(ctx context.Context, archive string) (string, erro
 	}
 	root, err := detectTransportChartRootFrom(ctx, file, true)
 	if err != nil {
-		return "", e.Wrap(e.CodeVerifyFailed, err, "inspecting transport archive %s", archive)
+		return "", transportError(ctx, e.CodeVerifyFailed, err, "inspecting transport archive %s", archive)
 	}
 	return root, nil
 }
@@ -650,7 +653,7 @@ func DetectAndUnpackChartRoot(ctx context.Context, archive, root string) (string
 	}
 	chartRoot, err := detectTransportChartRootFrom(ctx, file, true)
 	if err != nil {
-		return "", e.Wrap(e.CodeVerifyFailed, err, "inspecting transport archive %s", archive)
+		return "", transportError(ctx, e.CodeVerifyFailed, err, "inspecting transport archive %s", archive)
 	}
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return "", e.Wrap(e.CodeVerifyFailed, err, "rewinding transport archive %s", archive)
@@ -663,7 +666,10 @@ func DetectAndUnpackChartRoot(ctx context.Context, archive, root string) (string
 
 // Unpack extracts an untrusted carrier into a private staging directory,
 // accepts only the producer's declared paths, and publishes them only after the full
-// archive has been validated. Traversal, hard links, devices, duplicate entries,
+// archive has been validated. The exact stream extracted is hashed, including
+// trailing carrier bytes, and matched against a stable rehash of the held source
+// before publication; extraction never needs a second full archive on disk.
+// Traversal, hard links, devices, duplicate entries,
 // escaping symlinks, missing roots, and destination overwrite all fail closed.
 // The carrier must be plain tar; a gzip-compressed carrier fails closed here
 // (see DetectAndUnpackChartRoot for the one caller that needs compression).
@@ -710,10 +716,40 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 			"held transport archive has invalid size %d; expected 0 through %d bytes",
 			archiveInfo.Size(), maxTransportBytes)
 	}
+	if _, err := archiveFile.Seek(0, io.SeekStart); err != nil {
+		return e.Wrap(e.CodeVerifyFailed, err, "rewinding held transport archive")
+	}
+	// Hash the exact raw bytes consumed by extraction. The bound is the size
+	// admitted above, not a fresh stat or a tar member's declared size, so a
+	// growing source cannot expand the extraction budget.
+	rawSource := &io.LimitedReader{R: archiveFile, N: archiveInfo.Size()}
+	extractedHash := sha256.New()
+	file := io.TeeReader(transportContextReader{ctx: ctx, reader: rawSource}, extractedHash)
+	verify := func() error {
+		if rawSource.N != 0 {
+			return e.New(e.CodeVerifyFailed, "transport archive changed while unpacking")
+		}
+		currentDigest, currentInfo, err := stableTransportDigest(ctx, archiveFile, archiveInfo)
+		if err != nil {
+			return transportError(ctx, e.CodeVerifyFailed, err, "rechecking transport archive")
+		}
+		extractedDigest := "sha256:" + hex.EncodeToString(extractedHash.Sum(nil))
+		if !os.SameFile(archiveInfo, currentInfo) || currentDigest != extractedDigest {
+			return e.New(e.CodeVerifyFailed, "transport archive changed while unpacking")
+		}
+		return nil
+	}
+	return unpackSource(ctx, file, rootAbs, cleanAllowed, allowCompressed, verify)
+}
+
+// unpackSource retains every extraction in its owned private tree until verify
+// authenticates all consumed bytes. Both callers admit the size and paths before
+// entering this shared filesystem boundary.
+func unpackSource(ctx context.Context, file io.Reader, rootAbs string, cleanAllowed []string, allowCompressed bool, verify func() error) error {
 	if err := os.MkdirAll(rootAbs, 0o755); err != nil {
 		return e.Wrap(e.CodeInternal, err, "creating transport root")
 	}
-	stage, err := os.MkdirTemp(rootAbs, ".nkd-unpack-")
+	stage, err := os.MkdirTemp(rootAbs, ".nvkr-unpack-")
 	if err != nil {
 		return e.Wrap(e.CodeInternal, err, "creating private transport staging directory")
 	}
@@ -721,12 +757,6 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 	if err := os.Chmod(stage, 0o700); err != nil {
 		return e.Wrap(e.CodeInternal, err, "securing transport staging directory")
 	}
-	snapshotDigest, file, err := snapshotTransport(ctx, archiveFile, archiveInfo,
-		filepath.Join(stage, "carrier.tar"))
-	if err != nil {
-		return err
-	}
-	defer file.Close()
 
 	// Bind extraction writes to the held staging directory, including resolution
 	// through symlinks. Lexical validation alone is not a filesystem boundary.
@@ -735,15 +765,30 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 		return e.Wrap(e.CodeInternal, err, "opening transport staging root")
 	}
 	defer func() { _ = stageRoot.Close() }()
-	tarSource, closeTarSource, err := openTransportTarSource(file, allowCompressed)
+	tarSource, closeTarSource, err := openTransportTarSource(ctx, file, allowCompressed)
 	if err != nil {
-		return e.Wrap(e.CodeVerifyFailed, err, "opening held transport archive")
+		return transportError(ctx, e.CodeVerifyFailed, err, "opening held transport archive")
 	}
 	defer closeTarSource()
 	tr := tar.NewReader(tarSource)
 	seen := map[string]bool{}
 	directoryModes := map[string]fs.FileMode{}
 	directories := map[string]bool{"": true}
+	defer func() {
+		// Archive modes may remove write/search permissions. Restore permissions
+		// only inside this owned stage, before its deferred removal; roots already
+		// published outside the stage are absent and are never changed here.
+		names := make([]string, 0, len(directories))
+		for name := range directories {
+			if name != "" {
+				names = append(names, name)
+			}
+		}
+		sort.Slice(names, func(i, j int) bool { return strings.Count(names[i], "/") < strings.Count(names[j], "/") })
+		for _, name := range names {
+			_ = stageRoot.Chmod(filepath.FromSlash(name), 0o700)
+		}
+	}()
 	entries := 0
 	for {
 		if err := ctx.Err(); err != nil {
@@ -754,7 +799,7 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 			break
 		}
 		if err != nil {
-			return e.Wrap(e.CodeVerifyFailed, err, "reading transport archive")
+			return transportError(ctx, e.CodeVerifyFailed, err, "reading transport archive")
 		}
 		entries++
 		if entries > maxTransportEntries {
@@ -774,6 +819,12 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 		destination := filepath.Join(stage, filepath.FromSlash(name))
 		for parent := filepath.ToSlash(filepath.Dir(filepath.FromSlash(name))); parent != "." && parent != ""; parent = filepath.ToSlash(filepath.Dir(filepath.FromSlash(parent))) {
 			directories[parent] = true
+			// File-only archives (including Helm charts) omit directory headers.
+			// Their implicit parents must not inherit the extractor's umask;
+			// an explicit header, before or after this entry, retains precedence.
+			if _, present := directoryModes[parent]; !present {
+				directoryModes[parent] = 0o755
+			}
 		}
 		if err := noSymlinkParents(stage, destination); err != nil {
 			return e.Wrap(e.CodeVerifyFailed, err, "transport path %s has a symlink parent", name)
@@ -797,17 +848,25 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 				return e.Wrap(e.CodeVerifyFailed, err, "creating transport file %s", name)
 			}
 			written, copyErr := copyTransportExact(ctx, out, tr, header.Size)
-			var syncErr error
+			var modeErr, syncErr error
 			if copyErr == nil {
 				if ctxErr := ctx.Err(); ctxErr != nil {
 					copyErr = ctxErr
 				} else {
-					syncErr = out.Sync()
+					// Creation permissions are filtered by the process umask.
+					// Restore the archive mode on this held inode before syncing.
+					modeErr = out.Chmod(fs.FileMode(header.Mode) & 0o777)
+					if modeErr == nil {
+						syncErr = out.Sync()
+					}
 				}
 			}
 			closeErr := out.Close()
 			if copyErr != nil {
 				return transportError(ctx, e.CodeVerifyFailed, copyErr, "copying transport file %s", name)
+			}
+			if modeErr != nil {
+				return transportError(ctx, e.CodeInternal, modeErr, "setting transport file mode %s", name)
 			}
 			if syncErr != nil {
 				return transportError(ctx, e.CodeInternal, syncErr, "syncing transport file %s", name)
@@ -829,6 +888,12 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 		default:
 			return e.New(e.CodeVerifyFailed, "transport path %s has forbidden tar type %d", name, header.Typeflag)
 		}
+	}
+	// tar.Reader stops at its end marker and may leave padding or other trailing
+	// carrier bytes unread. Drain the bounded decoding stream to authenticate all
+	// raw bytes and, for Helm, validate the gzip checksum and decompressed bound.
+	if _, err := copyTransport(ctx, io.Discard, tarSource); err != nil {
+		return transportError(ctx, e.CodeVerifyFailed, err, "finishing transport archive")
 	}
 	modeNames := make([]string, 0, len(directoryModes))
 	for name := range directoryModes {
@@ -858,12 +923,8 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 			return e.Wrap(e.CodeInternal, err, "persisting transport staging directory %s", name)
 		}
 	}
-	currentDigest, currentInfo, err := stableTransportDigest(ctx, archiveFile, archiveInfo)
-	if err != nil {
-		return transportError(ctx, e.CodeVerifyFailed, err, "rechecking transport archive")
-	}
-	if !os.SameFile(archiveInfo, currentInfo) || currentDigest != snapshotDigest {
-		return e.New(e.CodeVerifyFailed, "transport archive changed while unpacking")
+	if err := verify(); err != nil {
+		return err
 	}
 	return publishTransportRoots(ctx, stage, rootAbs, cleanAllowed, publishTransportNoReplace)
 }
@@ -986,49 +1047,6 @@ func publishTransportRoots(ctx context.Context, stage, root string, paths []stri
 		}
 	}
 	return nil
-}
-
-func snapshotTransport(ctx context.Context, source *os.File, expected fs.FileInfo,
-	destination string,
-) (string, *os.File, error) {
-	if source == nil || expected == nil {
-		return "", nil, e.New(e.CodeInternal, "transport snapshot has no held source")
-	}
-	if _, err := source.Seek(0, io.SeekStart); err != nil {
-		return "", nil, e.Wrap(e.CodeVerifyFailed, err, "rewinding held transport archive")
-	}
-	opened, err := source.Stat()
-	if err != nil || !securepath.SameMetadata(expected, opened) {
-		return "", nil, e.New(e.CodeVerifyFailed, "transport archive changed before snapshot")
-	}
-	out, err := os.OpenFile(destination, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o400)
-	if err != nil {
-		return "", nil, e.Wrap(e.CodeInternal, err, "creating private transport snapshot")
-	}
-	fail := func(err error) (string, *os.File, error) {
-		_ = out.Close()
-		_ = os.Remove(destination)
-		return "", nil, err
-	}
-	if err := os.Remove(destination); err != nil {
-		return fail(e.Wrap(e.CodeInternal, err, "unlinking private transport snapshot"))
-	}
-	hash := sha256.New()
-	written, copyErr := copyTransportExact(ctx, io.MultiWriter(out, hash), source, expected.Size())
-	after, statErr := source.Stat()
-	if copyErr != nil {
-		return fail(transportError(ctx, e.CodeVerifyFailed, copyErr, "snapshotting transport archive"))
-	}
-	if statErr != nil {
-		return fail(transportError(ctx, e.CodeVerifyFailed, statErr, "restating transport archive"))
-	}
-	if written != expected.Size() || !securepath.SameMetadata(expected, after) {
-		return fail(e.New(e.CodeVerifyFailed, "transport archive changed while snapshotting"))
-	}
-	if _, err := out.Seek(0, io.SeekStart); err != nil {
-		return fail(e.Wrap(e.CodeInternal, err, "rewinding private transport snapshot"))
-	}
-	return "sha256:" + hex.EncodeToString(hash.Sum(nil)), out, nil
 }
 
 func stableTransportDigest(ctx context.Context, file *os.File, expected fs.FileInfo) (string, fs.FileInfo, error) {

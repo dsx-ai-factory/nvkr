@@ -1,0 +1,9 @@
+# Machine-managed by `nvkr catalog pin` / `nvkr catalog bump`. Do not hand-edit.
+apiVersion: nvkr.dev/lock/v1
+kind: PinLock
+pins:
+  ovn-kubernetes:
+    commit: d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d
+    sourceDateEpoch: 1788540677
+    tag: v1.4.0
+    treeHash: ce0cb49cd14f2fc260457e61a5a222c027a07f79

@@ -1,0 +1,24 @@
+# Machine-managed by `nvkr catalog pin` / `nvkr catalog bump`. Do not hand-edit.
+apiVersion: nvkr.dev/lock/v1
+kind: PinLock
+pins:
+  nvke-cli:
+    commit: a8391755d12d99f859783c6cf390338debd1e085
+    sourceDateEpoch: 1792011564
+    tag: a8391755d12d99f859783c6cf390338debd1e085
+    treeHash: 3dea15e95f96f3d5133c50935d7a0818907bfd33
+  nvke-controller:
+    commit: a8391755d12d99f859783c6cf390338debd1e085
+    sourceDateEpoch: 1792011564
+    tag: a8391755d12d99f859783c6cf390338debd1e085
+    treeHash: 3dea15e95f96f3d5133c50935d7a0818907bfd33
+  nvke-controller-helm:
+    commit: a8391755d12d99f859783c6cf390338debd1e085
+    sourceDateEpoch: 1792011564
+    tag: a8391755d12d99f859783c6cf390338debd1e085
+    treeHash: 3dea15e95f96f3d5133c50935d7a0818907bfd33
+  nvke-nktp-helm:
+    commit: a8391755d12d99f859783c6cf390338debd1e085
+    sourceDateEpoch: 1792011564
+    tag: a8391755d12d99f859783c6cf390338debd1e085
+    treeHash: 3dea15e95f96f3d5133c50935d7a0818907bfd33

@@ -25,7 +25,7 @@ body:
       options:
         - label: I searched existing issues and found no duplicates
           required: true
-        - label: This is not a security vulnerability. I will report security vulnerabilities privately as described in the [security policy](https://github.com/dsx-ai-factory/nke-recipes/blob/main/SECURITY.md)
+        - label: This is not a security vulnerability. I will report security vulnerabilities privately as described in the [security policy](https://github.com/dsx-ai-factory/nvkr/blob/main/SECURITY.md)
           required: true
 
   - type: textarea
@@ -60,7 +60,7 @@ body:
         - Environment — execution or publication configuration
         - Run — planning, generation, or execution
         - Release — verification or consumption
-        - CLI (nkdctl)
+        - CLI (nvkr)
         - Generator / pipeline emission
         - Signing / provenance / evidence
         - Docs / examples
@@ -113,7 +113,7 @@ body:
     attributes:
       label: Environment
       placeholder: |
-        - NKE Recipes CLI version (`nkdctl --version`) or source commit SHA:
+        - NVKR CLI version (`nvkr --version`) or source commit SHA:
         - OS and architecture:
         - Go version:
         - Operation (definition, run, resolve, catalog, or release; include subcommand):
@@ -130,7 +130,7 @@ body:
       description: Paste the exact CLI command(s) that triggered the issue. Redact credentials, secrets, and private hostnames, including tokens in URLs.
       placeholder: |
         ```bash
-        nkdctl resolve --data path/to/catalog --component kubectl --platform linux/amd64
+        nvkr resolve --data path/to/catalog --component kubectl --platform linux/amd64
         ```
     validations:
       required: false
@@ -155,5 +155,5 @@ body:
     attributes:
       label: Code of Conduct
       options:
-        - label: I agree to follow the project's [Code of Conduct](https://github.com/dsx-ai-factory/nke-recipes/blob/main/CODE_OF_CONDUCT.md)
+        - label: I agree to follow the project's [Code of Conduct](https://github.com/dsx-ai-factory/nvkr/blob/main/CODE_OF_CONDUCT.md)
           required: true

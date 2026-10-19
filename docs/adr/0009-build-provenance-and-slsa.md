@@ -6,7 +6,7 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-09 in the consolidated NKD ADR set.
+- **Index:** ADR-09 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-02 (tier boundary), ADR-05 (evidence bundle / ValidationVector), ADR-07 (observed engine
   class), ADR-13 (external evidence for prebuilt), ADR-01 (canonical codec / serialization profile).
 
@@ -14,7 +14,7 @@
 
 ## Context
 
-NKD emits machine-readable SLSA provenance per artifact, and that provenance folds into the trust/evidence model.
+NVKR emits machine-readable SLSA provenance per artifact, and that provenance folds into the trust/evidence model.
 Determinism is in tension with it: a build attestation naturally records *when* and *where* a build ran, but a
 per-build value cannot belong to the **reproducible** evidence a verifier recomputes and compares. This ADR
 resolves that tension.
@@ -32,16 +32,16 @@ Emit one **in-toto v1 statement** carrying an `https://slsa.dev/provenance/v1` p
 - `subject` = the artifact digest;
 - `runDetails.builder.id` = the **builder-profile identity** (`profileDigest`) — the reproducible "who built it,"
   not a host;
-- `buildDefinition.buildType` = a stable NKD build-type URI;
+- `buildDefinition.buildType` = a stable NVKR build-type URI;
 - `buildDefinition.resolvedDependencies` = the pinned sources + toolchains (for `nix`, the flake-lock closure);
 - **build-time fields omitted** for determinism.
 
 Serialize through the canonical codec (ADR-01). The statement's digest is a **stable expected evidence digest** in
 the ValidationVector (ADR-05), so verify recomputes and compares it.
 
-The NKD reproduction build-type URIs use `/v2` (`oci-hermetic`, `nix`, `prebuilt-acquire`) and bind
+The NVKR reproduction build-type URIs use `/v2` (`oci-hermetic`, `nix`, `prebuilt-acquire`) and bind
 `externalParameters.buildDigest`. The surrounding standard in-toto Statement/v1 and SLSA provenance/v1 formats
-remain unchanged. The owning provenance index uses `nkd.dev/provenance-index/v2`; legacy Recipe fields and
+remain unchanged. The owning provenance index uses `nvkr.dev/provenance-index/v2`; legacy Recipe fields and
 build-type versions cannot be relabeled as this graph identity.
 
 ### 2. Reproducible provenance and deferred signed observations
@@ -69,7 +69,7 @@ consistent with builder-agnostic verify.
 
 ### 4. `prebuilt` provenance
 
-A no-compile component emits **no from-source build claim**. NKD may emit a profile-free `prebuilt-acquire/v2`
+A no-compile component emits **no from-source build claim**. NVKR may emit a profile-free `prebuilt-acquire/v2`
 statement binding the exact acquired bytes, build, and resolved transport inputs; that statement proves
 acquisition, not upstream construction. The artifact also records a **verified reference** to the upstream's
 external provenance where one exists, else an explicit `evidence: none` — never silently absent. The
@@ -82,7 +82,7 @@ reproducible identity and cannot replace §1's reproduction predicate.
 
 | Field | Production contract |
 |---|---|
-| `buildType` | NKD `/v2` URI identifying `hermetic-build`, `wrapped-build`, or `acquired`; any wrapped/network-enabled build makes the complete plan `wrapped-build`, regardless of build order |
+| `buildType` | NVKR `/v2` URI identifying `hermetic-build`, `wrapped-build`, or `acquired`; any wrapped/network-enabled build makes the complete plan `wrapped-build`, regardless of build order |
 | `builder.id` | Committed workflow path and ref; a local Run uses a distinct local builder URI |
 | Invocation metadata | Exact Run identity with start and finish times |
 | `externalParameters` | Exactly `definitionDigest`, `environmentDigest`, `catalogDigest`, `planDigest`, and the descriptive `runPlanReference` |
@@ -96,9 +96,9 @@ evidence for an exact component may remain independently inspectable, but it can
 production predicate. Likewise, a list of matching resolved dependencies records what the producer consumed;
 it does not assert exact-byte reproduction of the produced subject.
 
-The Definition and Environment parameters identify the admitted authored inputs directly. Run plan v4 carries
+The Definition and Environment parameters identify the admitted authored inputs directly. Run plan v5 carries
 those exact values and revalidates their identities before execution or attestation. The retired compile-spec
-and execution-settings objects are not provenance dependencies. Their replacement changes the NKD build-type
+and execution-settings objects are not provenance dependencies. Their replacement changes the NVKR build-type
 URI major; a `/v1` production predicate cannot be interpreted with `/v2` parameter meanings. Reproduction
 build types retain their separate semantics and validators.
 
@@ -117,7 +117,7 @@ Production and reproduction validators reject each other's shapes; coercion is f
 reconstructs expected production semantics from the admitted plan and checks dependencies, build metadata,
 workflow identity, and exact subject rather than accepting any well-formed predicate.
 
-Acquired provenance is NKD's acquisition record (upstream reference, lock pin, fetch time); it makes no upstream
+Acquired provenance is NVKR's acquisition record (upstream reference, lock pin, fetch time); it makes no upstream
 build or signature-verification claim. Without declared digest-pinned upstream evidence it remains
 `evidence: none` under ADR-13. Live producer signing and consumer acceptance remain separate operational tests.
 
@@ -130,7 +130,7 @@ from the native artifact subject. The qualified emitter retains only its existin
 dependency; parent-bound qualified acquisition provenance is unsupported.
 
 In the pipeline-attested lane, for a selected release executable the transport URL dependency binds the archive's exact digest, never
-the extracted executable digest. A separate `nkd:prebuilt/<component>` URI with `archive` and `member` query
+the extracted executable digest. A separate `nvkr:prebuilt/<component>` URI with `archive` and `member` query
 parameters records the selected member's exact executable digest. This logical dependency distinguishes
 members and architecture-specific archive URLs without claiming that fetching the archive URL returns the
 selected member bytes. Raw executable assets retain the ordinary URL/executable digest pair.
@@ -170,12 +170,12 @@ lane remains unsupported and must not be inferred from the pipeline-attested acq
 
 ## Acceptance evidence
 
-Current contract evidence in `pkg/nkd/provenance/provenance_test.go` covers the supported in-toto Statement/v1 +
+Current contract evidence in `pkg/nvkr/provenance/provenance_test.go` covers the supported in-toto Statement/v1 +
 SLSA provenance/v1 profile, exact single-artifact subjects, build/input/builder binding, pinned dependencies,
 stable ordering, and rejection of mutable or type-confused inputs. It does not prove producer signing or
 cross-process observation provenance.
 
-`pkg/nkd/provenance/production_test.go` pins exact `/v2` production predicate bytes, verifies the original
+`pkg/nvkr/provenance/production_test.go` pins exact `/v2` production predicate bytes, verifies the original
 Definition/Environment parameter set, and rejects retired build types and compiler-handoff parameters. The
 compiler/signing tests bind the same exact values from a completed Plan. These tests do not establish a new
 hosted signing or independent-consumer result.

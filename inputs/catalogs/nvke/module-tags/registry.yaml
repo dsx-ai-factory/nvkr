@@ -1,0 +1,115 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog/v3
+components:
+  cwe:
+    artifactPath: bin/cwe.oci.tar
+    buildCommand:
+    - sh
+    - -ec
+    - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src --local
+      dockerfile=/src/controller --opt platform=linux/amd64 --opt "build-arg:BUILD_VERSION=$BUILD_VERSION"
+      --opt "build-arg:GIT_VERSION=$GIT_VERSION" --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
+      --output type=oci,dest=/src/bin/cwe.oci.tar,oci-mediatypes=true
+    builderType: buildkit-rootless
+    fromSource: true
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    source: nvke-controller
+    toolchainImage: moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef
+    versionStamp:
+      BUILD_VERSION: '{{.ModuleTag}}'
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: bin
+  nvke-helm:
+    helm:
+      chart: .
+      images:
+        controller:
+          values:
+            digest: image.digest
+    artifactPath: bin/nvke-helm.tar
+    buildCommand:
+    - sh
+    - -ec
+    - tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owner
+      -C /src/controller/deploy/charts -cf /src/bin/nvke-helm.tar controller
+    fromSource: true
+    outputType: tarball
+    platforms:
+    - linux/amd64
+    source: nvke-controller
+    writeDir: bin
+  nvkectl:
+    artifactPath: bin/nvkectl
+    buildCommand:
+    - sh
+    - -c
+    - go build -mod=vendor -trimpath -ldflags "-s -w -buildid= -X main.version=$NKECTL_VERSION
+      -X main.gitCommit=$NKECTL_COMMIT -X main.gitTreeState=clean -X main.buildDate=$NKECTL_DATE
+      -X github.com/NVIDIA/nke/cli/internal/cwedeploy.capiVersion=$NKECTL_CAPI_VERSION"
+      -o /src/bin/nvkectl ./cli/cmd/nkectl
+    cgo: false
+    fromSource: true
+    outputType: host-package
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    source: nvke
+    versionStamp:
+      NKECTL_CAPI_VERSION: v1.12.3
+      NKECTL_COMMIT: '{{slice .Commit 0 8}}'
+      NKECTL_DATE: '{{.Date}}'
+      NKECTL_VERSION: '{{.ModuleTag}}'
+    writeDir: bin
+kind: SourceBuildRegistry
+metadata:
+  description: NVKE components from independently pinned CLI and controller module
+    tags. The CLI uses an offline Go build; CWE wraps the upstream Dockerfile in digest-pinned
+    rootless BuildKit.
+  name: nvke-v1
+sources:
+  checkout:
+    constraint: 7.x
+    kind: github-action
+    repo: https://github.com/actions/checkout
+  cosign:
+    constraint: 3.1.x
+    repo: https://github.com/sigstore/cosign
+    tool:
+      executablePath: cosign-linux-amd64
+      format: raw
+      platform: linux/amd64
+      url: https://github.com/sigstore/cosign/releases/download/{{.Tag}}/cosign-linux-amd64
+  download-artifact:
+    constraint: 8.x
+    kind: github-action
+    repo: https://github.com/actions/download-artifact
+  nvke:
+    constraint: 0.1.x
+    repo: https://github.com/dsx-ai-factory/nvke
+    tagPrefix: cli/
+    toolchainImage: golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
+  nvke-controller:
+    constraint: 0.1.x
+    repo: https://github.com/dsx-ai-factory/nvke
+    tagPrefix: controller/
+    toolchainImage: golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
+  setup-go:
+    constraint: 7.x
+    kind: github-action
+    repo: https://github.com/actions/setup-go
+  syft:
+    constraint: 1.51.x
+    repo: https://github.com/anchore/syft
+    tool:
+      executablePath: syft
+      format: tar-gzip
+      platform: linux/amd64
+      url: https://github.com/anchore/syft/releases/download/{{.Tag}}/syft_{{.Version}}_linux_amd64.tar.gz
+  upload-artifact:
+    constraint: 7.x
+    kind: github-action
+    repo: https://github.com/actions/upload-artifact

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "nvkr.dev/disk-inspect-toolchain/v1",
+  "baseImage": "ubuntu@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3",
+  "downloadImage": "curlimages/curl@sha256:935d9100e9ba842cdb060de42472c7ca90cfe9a7c96e4dacb55e79e560b3ff40",
+  "ubuntuSnapshot": "20260920T000000Z",
+  "helper": {
+    "source": "cmd/nvkr-disk-inspect",
+    "goToolchain": "go1.27.2",
+    "architectures": ["amd64", "arm64"]
+  },
+  "packages": {
+    "guestfs-tools": "1.52.0-2ubuntu5",
+    "guestfish": "1:1.52.0-5ubuntu3",
+    "libguestfs0t64": "1:1.52.0-5ubuntu3",
+    "linux-image-virtual": "6.8.0-139.139",
+    "qemu-system-x86": "1:8.2.2+ds-0ubuntu1.18",
+    "qemu-system-arm": "1:8.2.2+ds-0ubuntu1.18",
+    "qemu-utils": "1:8.2.2+ds-0ubuntu1.18"
+  },
+  "scanner": {
+    "version": "1.51.1",
+    "schemaVersion": "16.1.10",
+    "archives": {
+      "amd64": "sha256:8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3",
+      "arm64": "sha256:a7fd2b784e6664acd44719270574f6cd8c6864fc2b1700bf9099bd1cccda7d7f"
+    }
+  },
+  "images": {"amd64": null, "arm64": null},
+  "publicationGates": {"licenseApproval": "not-recorded", "vulnerabilityApproval": "not-recorded"}
+}

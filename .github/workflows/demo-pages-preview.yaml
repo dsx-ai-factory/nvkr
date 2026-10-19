@@ -41,7 +41,7 @@ jobs:
   deploy:
     needs: build
     if: >-
-      github.repository == 'dsx-ai-factory/nke-recipes' &&
+      github.repository == 'dsx-ai-factory/nvkr' &&
       github.ref == 'refs/heads/codex/nvke-recipes-pages' &&
       vars.DEMO_PAGES_PREVIEW == 'true'
     runs-on: ubuntu-latest

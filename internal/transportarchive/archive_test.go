@@ -8,17 +8,21 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/NVIDIA/nke-recipes/internal/securepath"
-	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
+	"github.com/dsx-ai-factory/nvkr/internal/securepath"
+	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -29,14 +33,14 @@ func TestCopyExact(t *testing.T) {
 		size     int64
 		cancel   bool
 		want     string
-		wantCode nkderr.Code
+		wantCode nvkrerr.Code
 	}{
 		{name: "exact", source: "payload", size: 7, want: "payload"},
 		{name: "leaves trailing bytes", source: "payload-next", size: 7, want: "payload"},
 		{name: "empty", size: 0},
-		{name: "short", source: "x", size: 2, want: "x", wantCode: nkderr.CodeVerifyFailed},
-		{name: "negative", size: -1, wantCode: nkderr.CodeVerifyFailed},
-		{name: "canceled", source: "payload", size: 7, cancel: true, wantCode: nkderr.CodeTimeout},
+		{name: "short", source: "x", size: 2, want: "x", wantCode: nvkrerr.CodeVerifyFailed},
+		{name: "negative", size: -1, wantCode: nvkrerr.CodeVerifyFailed},
+		{name: "canceled", source: "payload", size: 7, cancel: true, wantCode: nvkrerr.CodeTimeout},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
@@ -47,7 +51,7 @@ func TestCopyExact(t *testing.T) {
 			source := strings.NewReader(test.source)
 			var destination bytes.Buffer
 			written, err := CopyExact(ctx, &destination, source, test.size)
-			var coded *nkderr.Error
+			var coded *nvkrerr.Error
 			if test.wantCode == "" {
 				if err != nil || written != test.size || int64(source.Len()) != int64(len(test.source))-test.size {
 					t.Fatalf("written=%d remaining=%d error=%v", written, source.Len(), err)
@@ -64,24 +68,24 @@ func TestCopyExact(t *testing.T) {
 
 func TestTransportArchiveRoundTripIsDeterministicAndExact(t *testing.T) {
 	producer := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(producer, ".nkd/work/out/tool/bin"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(producer, ".nvkr/work/out/tool/bin"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	program := filepath.Join(producer, ".nkd/work/out/tool/bin/tool")
+	program := filepath.Join(producer, ".nvkr/work/out/tool/bin/tool")
 	if err := os.WriteFile(program, []byte("exact bytes\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink("bin/tool", filepath.Join(producer, ".nkd/work/out/tool/current")); err != nil {
+	if err := os.Symlink("bin/tool", filepath.Join(producer, ".nvkr/work/out/tool/current")); err != nil {
 		t.Fatal(err)
 	}
-	result := filepath.Join(producer, ".nkd/work/results/build-tool.json")
+	result := filepath.Join(producer, ".nvkr/work/results/build-tool.json")
 	if err := os.MkdirAll(filepath.Dir(result), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(result, []byte(`{"sha256":"sha256:abc"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	paths := []string{".nkd/work/out/tool", ".nkd/work/results/build-tool.json"}
+	paths := []string{".nvkr/work/out/tool", ".nvkr/work/results/build-tool.json"}
 	one := filepath.Join(producer, ".carrier", "one.tar")
 	two := filepath.Join(producer, ".carrier", "two.tar")
 	if err := Pack(context.Background(), one, producer, paths); err != nil {
@@ -100,15 +104,15 @@ func TestTransportArchiveRoundTripIsDeterministicAndExact(t *testing.T) {
 	if err := Unpack(context.Background(), one, consumer, paths); err != nil {
 		t.Fatal(err)
 	}
-	got, err := os.ReadFile(filepath.Join(consumer, ".nkd/work/out/tool/bin/tool"))
+	got, err := os.ReadFile(filepath.Join(consumer, ".nvkr/work/out/tool/bin/tool"))
 	if err != nil || string(got) != "exact bytes\n" {
 		t.Fatalf("transported bytes = %q, %v", got, err)
 	}
-	info, err := os.Stat(filepath.Join(consumer, ".nkd/work/out/tool/bin/tool"))
+	info, err := os.Stat(filepath.Join(consumer, ".nvkr/work/out/tool/bin/tool"))
 	if err != nil || info.Mode().Perm() != 0o755 {
 		t.Fatalf("executable mode was not preserved: %v %v", info, err)
 	}
-	link, err := os.Readlink(filepath.Join(consumer, ".nkd/work/out/tool/current"))
+	link, err := os.Readlink(filepath.Join(consumer, ".nvkr/work/out/tool/current"))
 	if err != nil || link != "bin/tool" {
 		t.Fatalf("safe relative symlink was not preserved: %q %v", link, err)
 	}
@@ -117,6 +121,110 @@ func TestTransportArchiveRoundTripIsDeterministicAndExact(t *testing.T) {
 	}
 	if err := Pack(context.Background(), one, producer, paths); err == nil {
 		t.Fatal("archive overwrite must fail closed")
+	}
+}
+
+func TestTransportArchiveModesIgnoreProcessUmask(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputs := t.TempDir()
+	for _, mask := range []string{"022", "077"} {
+		t.Run(mask, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+			defer cancel()
+			command := exec.CommandContext(ctx, executable, "-test.run=^TestTransportArchiveModesHelper$", "-test.timeout=20s")
+			command.Env = append(os.Environ(), "NVKR_TRANSPORT_UMASK="+mask,
+				"NVKR_TRANSPORT_OUTPUT="+filepath.Join(outputs, mask))
+			if output, err := command.CombinedOutput(); err != nil {
+				t.Fatalf("isolated umask %s extraction: %v\n%s", mask, err, output)
+			}
+		})
+	}
+	if t.Failed() {
+		return
+	}
+	one, err := os.ReadFile(filepath.Join(outputs, "022", "carrier.tar"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	two, err := os.ReadFile(filepath.Join(outputs, "077", "carrier.tar"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(one, two) {
+		t.Fatal("file-only Helm chart repacking changed with the extracting process's umask")
+	}
+}
+
+func TestTransportArchiveModesHelper(t *testing.T) {
+	maskText := os.Getenv("NVKR_TRANSPORT_UMASK")
+	if maskText == "" {
+		t.Skip("isolated subprocess helper")
+	}
+	mask, err := strconv.ParseUint(maskText, 8, 32)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// This helper is the sole test selected in its child process. Never change
+	// the parent's umask: other tests and goroutines share that process setting.
+	previous := unix.Umask(int(mask))
+	defer unix.Umask(previous)
+	root := os.Getenv("NVKR_TRANSPORT_OUTPUT")
+	if err := os.Mkdir(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	archive := filepath.Join(root, "chart.tgz")
+	writeTestTarGz(t, archive, []*tar.Header{
+		{Name: "chart/Chart.yaml", Typeflag: tar.TypeReg, Mode: 0o644, Size: 4},
+		{Name: "chart/templates/deployment.yaml", Typeflag: tar.TypeReg, Mode: 0o640, Size: 4},
+		{Name: "chart/bin/hook", Typeflag: tar.TypeReg, Mode: 0o755, Size: 4},
+	})
+	destination := filepath.Join(root, "extracted")
+	if _, err := DetectAndUnpackChartRoot(t.Context(), archive, destination); err != nil {
+		t.Fatal(err)
+	}
+	for name, mode := range map[string]fs.FileMode{
+		"chart": 0o755, "chart/templates": 0o755, "chart/bin": 0o755,
+		"chart/Chart.yaml": 0o644, "chart/templates/deployment.yaml": 0o640,
+		"chart/bin/hook": 0o755,
+	} {
+		info, err := os.Stat(filepath.Join(destination, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != mode {
+			t.Errorf("mode of %s = %04o, want %04o", name, info.Mode().Perm(), mode)
+		}
+	}
+	if err := Pack(t.Context(), filepath.Join(root, "carrier.tar"), root, []string{"extracted/chart"}); err != nil {
+		t.Fatal(err)
+	}
+	// A later explicit directory header overrides its earlier implicit default.
+	archive = filepath.Join(root, "restricted.tar")
+	writeTestTar(t, archive, []*tar.Header{
+		{Name: "private/first", Typeflag: tar.TypeDir, Mode: 0o700},
+		{Name: "private/first/file", Typeflag: tar.TypeReg, Mode: 0o644, Size: 4},
+		{Name: "private/closed/file", Typeflag: tar.TypeReg, Mode: 0o400, Size: 4},
+		{Name: "private/closed", Typeflag: tar.TypeDir, Mode: 0o700},
+		{Name: "private", Typeflag: tar.TypeDir, Mode: 0o750},
+	})
+	destination = filepath.Join(root, "restricted")
+	if err := Unpack(t.Context(), archive, destination, []string{"private"}); err != nil {
+		t.Fatal(err)
+	}
+	for name, mode := range map[string]fs.FileMode{
+		"private": 0o750, "private/closed": 0o700, "private/closed/file": 0o400,
+		"private/first": 0o700, "private/first/file": 0o644,
+	} {
+		info, err := os.Stat(filepath.Join(destination, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != mode {
+			t.Errorf("mode of %s = %04o, want %04o", name, info.Mode().Perm(), mode)
+		}
 	}
 }
 
@@ -194,7 +302,7 @@ func TestUnpackOpenRejectsInvalidHeldArchives(t *testing.T) {
 				defer archive.Close()
 			}
 			err := UnpackOpen(t.Context(), archive, t.TempDir(), []string{"artifact"})
-			if transportCode(err) != nkderr.CodeVerifyFailed {
+			if transportCode(err) != nvkrerr.CodeVerifyFailed {
 				t.Fatalf("invalid held archive returned %v, want verify-failed", err)
 			}
 			if !strings.Contains(err.Error(), test.wantMessage) {
@@ -240,7 +348,7 @@ func TestTransportArchiveRejectsUntrustedTarStructures(t *testing.T) {
 			archive := filepath.Join(t.TempDir(), "bad.tar")
 			writeTestTar(t, archive, tc.headers)
 			root := t.TempDir()
-			if err := Unpack(context.Background(), archive, root, []string{"allowed"}); transportCode(err) != nkderr.CodeVerifyFailed {
+			if err := Unpack(context.Background(), archive, root, []string{"allowed"}); transportCode(err) != nvkrerr.CodeVerifyFailed {
 				t.Fatalf("untrusted %s carrier error = %v, want verify-failed", tc.name, err)
 			}
 			if _, err := os.Lstat(filepath.Join(root, "allowed")); !os.IsNotExist(err) {
@@ -269,14 +377,14 @@ func TestPackRejectsEscapingSymlinkAndCancellation(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := Pack(ctx, filepath.Join(root, ".carrier", "canceled.tar"), root, []string{"allowed"}); transportCode(err) != nkderr.CodeTimeout || !nkderr.Retryable(err) {
+	if err := Pack(ctx, filepath.Join(root, ".carrier", "canceled.tar"), root, []string{"allowed"}); transportCode(err) != nvkrerr.CodeTimeout || !nvkrerr.Retryable(err) {
 		t.Fatalf("canceled pack error = %v, want retryable timeout", err)
 	}
 	archive := filepath.Join(root, ".carrier", "ok.tar")
 	if err := Pack(context.Background(), archive, root, []string{"allowed"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := Unpack(ctx, archive, t.TempDir(), []string{"allowed"}); transportCode(err) != nkderr.CodeTimeout || !nkderr.Retryable(err) {
+	if err := Unpack(ctx, archive, t.TempDir(), []string{"allowed"}); transportCode(err) != nvkrerr.CodeTimeout || !nvkrerr.Retryable(err) {
 		t.Fatalf("canceled unpack error = %v, want retryable timeout", err)
 	}
 }
@@ -286,20 +394,20 @@ func TestTransportRejectsNilAndCanceledContextBeforeIO(t *testing.T) {
 	missingArchive := filepath.Join(t.TempDir(), "missing.tar")
 
 	//nolint:staticcheck // Passing nil is the admission behavior under test.
-	if err := Pack(nil, missingArchive, missingRoot, []string{"allowed"}); transportCode(err) != nkderr.CodeUsage {
+	if err := Pack(nil, missingArchive, missingRoot, []string{"allowed"}); transportCode(err) != nvkrerr.CodeUsage {
 		t.Fatalf("nil pack context error = %v, want usage", err)
 	}
 	//nolint:staticcheck // Passing nil is the admission behavior under test.
-	if err := Unpack(nil, missingArchive, missingRoot, []string{"allowed"}); transportCode(err) != nkderr.CodeUsage {
+	if err := Unpack(nil, missingArchive, missingRoot, []string{"allowed"}); transportCode(err) != nvkrerr.CodeUsage {
 		t.Fatalf("nil unpack context error = %v, want usage", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := Pack(ctx, missingArchive, missingRoot, []string{"allowed"}); transportCode(err) != nkderr.CodeTimeout || !nkderr.Retryable(err) {
+	if err := Pack(ctx, missingArchive, missingRoot, []string{"allowed"}); transportCode(err) != nvkrerr.CodeTimeout || !nvkrerr.Retryable(err) {
 		t.Fatalf("pre-canceled pack error = %v, want retryable timeout before missing-root I/O", err)
 	}
-	if err := Unpack(ctx, missingArchive, missingRoot, []string{"allowed"}); transportCode(err) != nkderr.CodeTimeout || !nkderr.Retryable(err) {
+	if err := Unpack(ctx, missingArchive, missingRoot, []string{"allowed"}); transportCode(err) != nvkrerr.CodeTimeout || !nvkrerr.Retryable(err) {
 		t.Fatalf("pre-canceled unpack error = %v, want retryable timeout before missing-archive I/O", err)
 	}
 	if _, err := os.Lstat(missingArchive); !os.IsNotExist(err) {
@@ -325,7 +433,7 @@ func TestUnpackRejectsSymlinkAndFIFOArchiveBeforeRootIO(t *testing.T) {
 			root := filepath.Join(t.TempDir(), "must-not-be-created")
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
-			if err := Unpack(ctx, archive, root, []string{"allowed"}); transportCode(err) != nkderr.CodeVerifyFailed {
+			if err := Unpack(ctx, archive, root, []string{"allowed"}); transportCode(err) != nvkrerr.CodeVerifyFailed {
 				t.Fatalf("%s archive returned %v, want verify-failed", test.name, err)
 			}
 			if ctx.Err() != nil {
@@ -338,7 +446,7 @@ func TestUnpackRejectsSymlinkAndFIFOArchiveBeforeRootIO(t *testing.T) {
 	}
 }
 
-func TestTransportSnapshotKeepsHeldArchiveAcrossPathReplacement(t *testing.T) {
+func TestTransportDigestKeepsHeldArchiveAcrossPathReplacement(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "carrier.tar")
 	if err := os.WriteFile(path, []byte("held carrier bytes"), 0o600); err != nil {
 		t.Fatal(err)
@@ -354,18 +462,13 @@ func TestTransportSnapshotKeepsHeldArchiveAcrossPathReplacement(t *testing.T) {
 	if err := unix.Mkfifo(path, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	digest, snapshot, err := snapshotTransport(context.Background(), held, info,
-		filepath.Join(t.TempDir(), "snapshot"))
-	if err != nil {
-		t.Fatalf("held transport snapshot followed replacement path: %v", err)
-	}
-	defer snapshot.Close()
 	current, currentInfo, err := stableTransportDigest(context.Background(), held, info)
 	if err != nil {
 		t.Fatalf("held transport recheck followed replacement path: %v", err)
 	}
-	if current != digest || !os.SameFile(info, currentInfo) {
-		t.Fatalf("held transport identity changed: initial %s current %s", digest, current)
+	want := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte("held carrier bytes")))
+	if current != want || !os.SameFile(info, currentInfo) {
+		t.Fatalf("held transport identity changed: want %s current %s", want, current)
 	}
 }
 
@@ -389,7 +492,7 @@ func TestPackRejectsAggregateByteOverflowBeforePublication(t *testing.T) {
 	}
 	archive := filepath.Join(root, ".carrier", "oversized.tar")
 	if err := Pack(context.Background(), archive, root,
-		[]string{"allowed"}); transportCode(err) != nkderr.CodeReleaseIncomplete {
+		[]string{"allowed"}); transportCode(err) != nvkrerr.CodeReleaseIncomplete {
 		t.Fatalf("oversized transport returned %v, want release-incomplete", err)
 	}
 	if _, err := os.Lstat(filepath.Dir(archive)); !os.IsNotExist(err) {
@@ -402,7 +505,7 @@ func TestTransportRootListHasAnAdmissionBound(t *testing.T) {
 	for index := range paths {
 		paths[index] = fmt.Sprintf("root-%05d", index)
 	}
-	if _, _, err := transportRoots(t.TempDir(), paths); transportCode(err) != nkderr.CodeUsage {
+	if _, _, err := transportRoots(t.TempDir(), paths); transportCode(err) != nvkrerr.CodeUsage {
 		t.Fatalf("oversized transport root list returned %v, want usage", err)
 	}
 }
@@ -418,7 +521,7 @@ func TestPackRejectsSymlinkPublicationParent(t *testing.T) {
 	}
 	archive := filepath.Join(root, ".carrier", "escaped.tar")
 	if err := Pack(context.Background(), archive, root,
-		[]string{"allowed"}); transportCode(err) != nkderr.CodeImmutableViolation {
+		[]string{"allowed"}); transportCode(err) != nvkrerr.CodeImmutableViolation {
 		t.Fatalf("symlink publication parent returned %v, want immutable-violation", err)
 	}
 	if _, err := os.Lstat(filepath.Join(outside, "escaped.tar")); !os.IsNotExist(err) {
@@ -436,7 +539,7 @@ func TestUnpackRejectsSymlinkDestinationParent(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := Unpack(context.Background(), archive, root,
-		[]string{"link/out"}); transportCode(err) != nkderr.CodeImmutableViolation {
+		[]string{"link/out"}); transportCode(err) != nvkrerr.CodeImmutableViolation {
 		t.Fatalf("symlink destination parent returned %v, want immutable-violation", err)
 	}
 	if _, err := os.Lstat(filepath.Join(outside, "out")); !os.IsNotExist(err) {
@@ -461,7 +564,7 @@ func TestPublishTransportRootsRollsBackOrdinaryFailure(t *testing.T) {
 		return publishTransportNoReplace(source, destination)
 	}
 	err := publishTransportRoots(context.Background(), stage, root, []string{"a", "b"}, publish)
-	if transportCode(err) != nkderr.CodeImmutableViolation {
+	if transportCode(err) != nvkrerr.CodeImmutableViolation {
 		t.Fatalf("injected publication failure returned %v, want immutable-violation", err)
 	}
 	for _, name := range []string{"a", "b"} {
@@ -558,8 +661,8 @@ func TestTransportEnumerationPreservesGitExclusionBoundary(t *testing.T) {
 	}
 }
 
-func transportCode(err error) nkderr.Code {
-	var coded *nkderr.Error
+func transportCode(err error) nvkrerr.Code {
+	var coded *nvkrerr.Error
 	if errors.As(err, &coded) {
 		return coded.Code
 	}
@@ -572,7 +675,7 @@ func TestDetectTransportChartRootDiscoversTheSingleTopLevelDirectory(t *testing.
 		headers []*tar.Header
 		gzip    bool
 		root    string
-		code    nkderr.Code
+		code    nvkrerr.Code
 	}{
 		{name: "single root", headers: []*tar.Header{
 			{Name: "postgresql", Typeflag: tar.TypeDir, Mode: 0o755},
@@ -585,8 +688,8 @@ func TestDetectTransportChartRootDiscoversTheSingleTopLevelDirectory(t *testing.
 		{name: "multiple roots", headers: []*tar.Header{
 			{Name: "helm", Typeflag: tar.TypeDir, Mode: 0o755},
 			{Name: "other", Typeflag: tar.TypeDir, Mode: 0o755},
-		}, code: nkderr.CodeVerifyFailed},
-		{name: "empty archive", headers: nil, code: nkderr.CodeVerifyFailed},
+		}, code: nvkrerr.CodeVerifyFailed},
+		{name: "empty archive", headers: nil, code: nvkrerr.CodeVerifyFailed},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			archive := filepath.Join(t.TempDir(), "chart.archive")
@@ -643,7 +746,7 @@ func TestUnpackRejectsAGzipCompressedCarrier(t *testing.T) {
 	})
 	root := filepath.Join(t.TempDir(), "extracted")
 	err := Unpack(context.Background(), archive, root, []string{"postgresql"})
-	if transportCode(err) != nkderr.CodeVerifyFailed {
+	if transportCode(err) != nvkrerr.CodeVerifyFailed {
 		t.Fatalf("got %v, want a fail-closed rejection of the compressed carrier", err)
 	}
 }
@@ -703,11 +806,15 @@ func TestOpenTransportTarSourceBoundsBothCarrierShapes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		source, closeSource, err := openTransportTarSource(file, true)
+		source, closeSource, err := openTransportTarSource(t.Context(), file, true)
 		if err != nil {
 			t.Fatal(err)
 		}
-		limited, ok := source.(*transportLimitReader)
+		contextual, ok := source.(transportContextReader)
+		if !ok {
+			t.Fatalf("%s carrier is not context-bound: %T", name, source)
+		}
+		limited, ok := contextual.reader.(*transportLimitReader)
 		if !ok {
 			t.Fatalf("%s carrier is unbounded: %T", name, source)
 		}

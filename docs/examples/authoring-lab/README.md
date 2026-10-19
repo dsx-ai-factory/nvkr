@@ -1,12 +1,12 @@
 # Exercise catalog and output replacements
 
 This local lab demonstrates shared catalog authoring and the identity effects of four changes. It drives
-public `nkdctl` commands, creates deterministic Git commits and tags in a new workspace, and keeps every
-lock write inside `catalog pin` or `catalog bump`. No NKE repository or maintained Definition is modified.
+public `nvkr` commands, creates deterministic Git commits and tags in a new workspace, and keeps every
+lock write inside `catalog pin` or `catalog bump`. No NVKE repository or maintained Definition is modified.
 
 The lab is an **authoring and compilation fixture**. It does not build containers, execute its declared
 producers, download the supplier artifact, publish, sign, or install anything. Both CLI platform declarations
-use simple fixture scripts; they do not prove native NKE CLI support or runner availability. Container
+use simple fixture scripts; they do not prove native NVKE CLI support or runner availability. Container
 and utility image pins are taken from the maintained inputs but are not pulled or authenticated by this lab.
 
 ## Run it
@@ -16,7 +16,7 @@ Use Linux or macOS, Bash 3.2 or later, Git, `jq`, GNU `timeout` (or `gtimeout`),
 
 ```sh
 make build
-bash docs/examples/authoring-lab/run.sh --nkdctl bin/nkdctl --work .nkd/authoring-lab-01
+bash docs/examples/authoring-lab/run.sh --nvkr bin/nvkr --work .nvkr/authoring-lab-01
 ```
 
 Choose a new workspace for every run. The program refuses an existing directory and never deletes a
@@ -38,8 +38,8 @@ output-selection: changed Build Digests: diagnostics
 
 ## Read the inputs and results
 
-[registry.yaml](catalog/registry.yaml) defines seven producers. [definition.yaml](definition.yaml) selects
-seven required outputs. [environment.yaml](environment.yaml) supplies utility execution settings without
+[registry.yaml](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/authoring-lab/catalog/registry.yaml) defines seven producers. [definition.yaml](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/authoring-lab/definition.yaml) selects
+seven required outputs. [environment.yaml](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/authoring-lab/environment.yaml) supplies utility execution settings without
 publication or signing. The `upstream/` files are the fixture's source-owned build inputs.
 
 | Output | Selection and relationship |
@@ -82,7 +82,7 @@ unmodified `run plan --json` result streams.
    controller chart whose own files did not change, because its exact source tree changed. The `tools`
    graphs retain their Build Digests.
 2. **Whole producer:** `doctor` becomes a prebuilt supplier script, replacing the complete source-build
-   producer. Its digest comes from the retained [supplier script](supplier-doctor.sh); both architecture
+   producer. Its digest comes from the retained [supplier script](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/authoring-lab/supplier-doctor.sh); both architecture
    entries identify those same fixture bytes. The placeholder HTTPS URL is not downloaded. The graph
    switches from build to acquisition, and both outputs selecting `doctor` through that stack change.
 3. **Per-output catalog:** only `tools` selects the supplier overlay. `diagnostics` still selects the
@@ -91,8 +91,8 @@ unmodified `run plan --json` result streams.
    output name remains fixed while its selected component and Build Digest change.
 
 The final source upgrade makes the original supplier overlay stale. Reusing it fails with
-`NKD-E-UNVERIFIED-REF`; the lab checks that refusal. It also checks independent derived-member pin refusal
-(`NKD-E-UNSUPPORTED`), no-op lock preservation, and preview status (`NKD-E-DIFF`). Reissuing an overlay
+`NVKR-E-UNVERIFIED-REF`; the lab checks that refusal. It also checks independent derived-member pin refusal
+(`NVKR-E-UNSUPPORTED`), no-op lock preservation, and preview status (`NVKR-E-DIFF`). Reissuing an overlay
 against an upgraded base requires a new reviewed decision; the lab does not silently refresh it.
 
 ## Inspect a retained workspace manually
@@ -104,7 +104,7 @@ repeat it for commands that load its pin set:
 export GIT_CONFIG_COUNT=1
 export GIT_CONFIG_KEY_0="url.$WORK/upstream.insteadOf"
 export GIT_CONFIG_VALUE_0=https://authoring.example.invalid/platform
-bin/nkdctl run plan --definition "$WORK/definition.yaml" --environment "$WORK/environment.yaml"
+bin/nvkr run plan --definition "$WORK/definition.yaml" --environment "$WORK/environment.yaml"
 ```
 
 This describes the final upgraded source set. Old variant Definitions intentionally still reference the
@@ -113,9 +113,9 @@ original predecessor digest. Use the retained original plans and report to compa
 The regression test executes this same program through the real CLI adapters:
 
 ```sh
-go test ./cmd/nkdctl -run '^TestAuthoringLab' -count=1
+go test ./cmd/nvkr -run '^TestAuthoringLab' -count=1
 ```
 
 For shared sources, complete per-output catalog stacks, and replacement identity, read
 [catalogs and components](../../catalogs-and-components.md). The
-[deploy Definition](../../../definitions/nke-deploy/README.md) provides the real NKE composition example.
+[deploy Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-deploy/README.md) provides the real NVKE composition example.

@@ -1,4 +1,4 @@
-apiVersion: nkd.dev/environment/v1
+apiVersion: nvkr.dev/environment/v1
 kind: Environment
 metadata:
   name: authoring-lab

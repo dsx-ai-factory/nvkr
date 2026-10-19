@@ -25,8 +25,10 @@ func TestReceiverOnlyAcceptsAllowlistedRecords(t *testing.T) {
 		rejected    bool
 	}{
 		{"valid", valid, false},
+		{"pinned image literal", "NVKR_INSPECTION " + `{"phase":"root-scan","event":"start","elapsedMillis":123}` + "\n", false},
+		{"unsupported protocol", "UNSUPPORTED_INSPECTION " + `{"phase":"root-scan","event":"start","elapsedMillis":123}` + "\n", true},
 		{"warning", "scanner warning token=secret\n", true},
-		{"unknown phase", strings.Replace(valid, "root-scan", "password=secret", 1), true},
+		{"unknown phase", strings.Replace(valid, "root-scan", "password=fake-secret", 1), true},
 		{"unknown event", strings.Replace(valid, "start", "secret", 1), true},
 		{"unknown field", Prefix + `{"phase":"root-scan","event":"start","elapsedMillis":1,"secret":"token"}` + "\n", true},
 		{"duplicate field", Prefix + `{"phase":"root-scan","phase":"nested-scan","event":"start","elapsedMillis":1}` + "\n", true},
@@ -65,12 +67,12 @@ func TestReceiverOnlyAcceptsAllowlistedRecords(t *testing.T) {
 }
 
 func TestInspectionProgressChild(t *testing.T) {
-	if os.Getenv("NKD_INSPECTION_PROGRESS_TEST_CHILD") != "1" {
+	if os.Getenv("NVKR_INSPECTION_PROGRESS_TEST_CHILD") != "1" {
 		return
 	}
 	ctx := WithWriter(context.Background(), os.Stderr)
 	Emit(ctx, "nested-scan", "start", 1, 17)
-	if os.Getenv("NKD_INSPECTION_PROGRESS_TEST_VOLUME") == "1" {
+	if os.Getenv("NVKR_INSPECTION_PROGRESS_TEST_VOLUME") == "1" {
 		Emit(ctx, "report-completion", "complete", 0, 0)
 	}
 	time.Sleep(time.Hour)
@@ -87,7 +89,7 @@ func TestNativeChildCancellationKeepsProgressAndJoins(t *testing.T) {
 	defer cancel()
 	receiver := NewReceiver(nil)
 	command := exec.CommandContext(ctx, executable, "-test.run=^TestInspectionProgressChild$")
-	command.Env = append(os.Environ(), "NKD_INSPECTION_PROGRESS_TEST_CHILD=1")
+	command.Env = append(os.Environ(), "NVKR_INSPECTION_PROGRESS_TEST_CHILD=1")
 	command.Stderr = receiver
 	if err := command.Start(); err != nil {
 		t.Fatal(err)
@@ -318,7 +320,7 @@ func TestSubjectEnrichedCollectorEvictsWholeLinesAcrossReceivers(t *testing.T) {
 }
 
 func TestFailureBytesAreBoundedAndNeverRetained(t *testing.T) {
-	for _, failure := range []string{"[NKD-E-VERIFY-FAILED] exact helper cause\n", strings.Repeat("untrusted", 2000) + "\n", "unfinished runtime failure"} {
+	for _, failure := range []string{"[NVKR-E-VERIFY-FAILED] exact helper cause\n", strings.Repeat("untrusted", 2000) + "\n", "unfinished runtime failure"} {
 		t.Run(fmt.Sprintf("bytes=%d", len(failure)), func(t *testing.T) {
 			collector := NewCollector()
 			receiver := NewReceiver(collector)
@@ -443,7 +445,7 @@ func TestNativeChildParsingCeilingCancellationStillDrainsAndJoins(t *testing.T) 
 	receiver := NewReceiver(NewCollector())
 	receiver.parsedRecords = MaxParsedRecords - 1
 	command := exec.CommandContext(ctx, executable, "-test.run=^TestInspectionProgressChild$")
-	command.Env = append(os.Environ(), "NKD_INSPECTION_PROGRESS_TEST_CHILD=1", "NKD_INSPECTION_PROGRESS_TEST_VOLUME=1")
+	command.Env = append(os.Environ(), "NVKR_INSPECTION_PROGRESS_TEST_CHILD=1", "NVKR_INSPECTION_PROGRESS_TEST_VOLUME=1")
 	command.Stderr = receiver
 	if err := command.Start(); err != nil {
 		t.Fatal(err)

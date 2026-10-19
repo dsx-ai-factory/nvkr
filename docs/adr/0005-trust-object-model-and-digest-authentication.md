@@ -6,7 +6,7 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-05 in the consolidated NKD ADR set.
+- **Index:** ADR-05 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-01 (canonical codec), ADR-04 (signing), ADR-07 (builder-profile scope), ADR-09 (provenance),
   ADR-13 (SBOM), ADR-16 (release gates / Inventory).
 - **Satisfies:** SEC-01, SEC-02, FR-22 (verification schema as a versioned public contract), FR-23 (validation
@@ -14,12 +14,12 @@
 
 ## Context
 
-NKD publishes a small family of **digest-addressable, integrity-protected** trust objects that bind a build to
+NVKR publishes a small family of **digest-addressable, integrity-protected** trust objects that bind a build to
 its expected identities and evidence. The SRD requires each object to be independently digest-addressable
 (SEC-01), and requires an expected artifact digest to be trusted **only** when the signed ValidationVector
 authenticates it (SEC-02). The SRD marks the ValidationVector, ReleaseSet, and Inventory *illustrative /
-non-normative*, so NKD owns their canonical schemas and versions them to reconcile with the eventual downstream
-(NKE) contract. This ADR fixes those schemas, unifies the “expected-digests manifest” with the ValidationVector,
+non-normative*, so NVKR owns their canonical schemas and versions them to reconcile with the eventual downstream
+(NVKE) contract. This ADR fixes those schemas, unifies the “expected-digests manifest” with the ValidationVector,
 and defines the digest-authentication chain.
 
 ## Decision
@@ -73,7 +73,7 @@ Inventory {
                  externalSBOMRef, externalSBOMDigest,
                  externalProvenanceRef, externalProvenanceDigest,
                  evidenceGaps } ]
-  compatibility { kubernetes, nke, platform }
+  compatibility { kubernetes, nvke, platform }
 }
 ```
 
@@ -81,8 +81,8 @@ The **required set is derived from the Inventory**, not hand-listed in the Relea
 completeness (ADR-16) and compatibility. `inventoryRef` binds into the ReleaseSet digest, so rebinding a
 different Inventory yields a new set identity.
 
-The active schemas are `nkd.dev/validation-vector/v3`, `nkd.dev/inventory/v4`, and
-`nkd.dev/release-set/v4`. Their `buildDigest` fields bind the generated `nkd.build` identity. Removed
+The active schemas are `nvkr.dev/validation-vector/v3`, `nvkr.dev/inventory/v4`, and
+`nvkr.dev/release-set/v4`. Their `buildDigest` fields bind the generated `nvkr.build` identity. Removed
 `recipeDigest`, deployment-role fields, and older majors are rejected, never renamed inside authenticated bytes. Frozen digest
 family tags remain unchanged for these existing trust-object families (ADR-01).
 
@@ -112,6 +112,9 @@ evidence and is never included in, or hashed back into, the reference vector it 
 compatibility, and vulnerability results are likewise release-gate receipts under ADR-13/16, not mutable fields
 added to an already published vector. Every claim therefore has exactly one owner and no vector self-compares.
 
+External test output descriptions have lane **none (descriptive)**; [ADR-16 §6](0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
+owns their separation from publisher evidence and authenticated release-gate receipts.
+
 Every retained trust object — resolved build graph, ValidationVector, ReleaseSet, Inventory,
 publisher-evidence index, and ReproductionObservation — is independently digest-addressable via the ADR-01 codec,
 satisfying SEC-01.
@@ -135,7 +138,7 @@ independent of the later operator observations compared against them.
 A future versioned ValidationVector coverage profile enumerates scenario classes, the exhaustiveness rule over
 the promoted/provisioned set, and how conformance/qualification `vectorDigests` map to coverage. A pinned
 `suitePolicyDigest` governs which coverage a passing verdict may assert. An external consumer may demand, for
-example, GPU-runtime health and CNI conformance. Raw test results remain opaque; NKD checks the declared coverage
+example, GPU-runtime health and CNI conformance. Raw test results remain opaque; NVKR checks the declared coverage
 and suite policy. Coverage is schema, not additional authority. No coverage-profile implementation is claimed.
 Deployment qualification and cluster topology remain outside the active artifact model (ADR-19); no
 cluster-result field is retained in the ValidationVector. External observations remain outside the published
@@ -151,7 +154,7 @@ vector and require a separately specified subject and policy before any future a
 
 **Negative / costs**
 - These schemas are non-normative in the SRD; they must carry `schemaVersion` and stay operator-replaceable to
-  absorb the eventual NKE contract without a breaking rewrite.
+  absorb the eventual NVKE contract without a breaking rewrite.
 - Deriving the required set from the Inventory couples release completeness to the Inventory’s correctness.
 
 **Neutral**
@@ -176,8 +179,8 @@ vector and require a separately specified subject and policy before any future a
 
 ## Acceptance evidence
 
-Current contract evidence in `pkg/nkd/attest/*_test.go`, `pkg/nkd/trust/document_test.go`,
-`pkg/nkd/release/*_test.go`, and `client/v1/*_test.go` covers exact authenticated ValidationVector/ReleaseSet
+Current contract evidence in `pkg/nvkr/attest/*_test.go`, `pkg/nvkr/trust/document_test.go`,
+`pkg/nvkr/release/*_test.go`, and `client/v1/*_test.go` covers exact authenticated ValidationVector/ReleaseSet
 bytes, profile-free versus source-profile binding, publisher-evidence derivation, mutation/substitution
 rejection, required-set completeness, and the distinction between a reference vector and a later qualified
 observation.

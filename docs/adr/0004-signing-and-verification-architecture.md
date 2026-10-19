@@ -6,7 +6,7 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-04 in the consolidated NKD ADR set.
+- **Index:** ADR-04 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-03 (trust-failure codes), ADR-05 (trust objects), ADR-07 (builder-profile signing), ADR-06
   (publication signing), ADR-16 / air-gap (offline verify).
 
@@ -14,7 +14,7 @@
 
 ## Context
 
-NKD supports two explicit trust contracts. Qualified reproduction authenticates detached publisher expectations
+NVKR supports two explicit trust contracts. Qualified reproduction authenticates detached publisher expectations
 and independently produced bytes. The v1 pipeline-attested lane publishes artifact bytes with keyless signatures
 and production provenance from a named hosted workflow. Both require external consumer trust policy; neither
 allows a catalog or signed object to choose its own trusted identity. Offline equivalence belongs to the
@@ -50,7 +50,7 @@ qualified contract. The mechanisms below have separate claims and admission requ
   specific issuer or identity.
 - **Stock signing protocol.** Stock signing holds a defensive copy of the exact subject and streams it to cosign
   on stdin. cosign receives only anonymous inherited writable descriptors for signature, certificate, and
-  optional bundle output. After a successful child exit, NKD seals and captures those exact descriptor contents
+  optional bundle output. After a successful child exit, NVKR seals and captures those exact descriptor contents
   and returns an opaque receipt bound to the subject digest. The production signer requires an explicit expected
   OIDC identity and issuer, passes the issuer as a qualified argument, extracts the issued certificate claims,
   and refuses a mismatch before returning the receipt. Cosign/Sigstore/TUF and loader environment overrides are
@@ -62,6 +62,23 @@ qualified contract. The mechanisms below have separate claims and admission requ
 - **Injected runners.** Custom injected runners use a separate private-path diagnostic protocol and are
   explicitly part of the embedding caller's TCB.
 - **Keyed / KMS mode** is an optional operator fallback, not the default.
+
+The local M3 rehearsal uses a separate `LocalCosign` detached-document adapter with explicit
+passwordless demo keys. It holds the pinned static Linux executable, private/public key material and
+signature descriptors, bounds execution and output, removes ambient signing configuration, and verifies
+each newly signed document under the independently supplied public key before issuing its local receipt.
+Local signing explicitly disables public transparency submission; verification is offline under that key.
+The receipt binds exact document and public-key bytes and cannot be used as a keyless `SignedDocument`,
+hosted workflow identity or qualification verdict. The local qualification owner must independently
+enforce signer roles, complete artifact/input membership and all gates before invoking it. This is an
+explicit local rehearsal adapter, never a fallback when hosted signing fails. Reconciliation records
+real-key interoperability and the remaining end-to-end work separately.
+
+Local rehearsal key admission currently supports one P-256 PKIX `PUBLIC KEY` PEM block per role,
+matching the local cosign key-generation path. Parsing rejects other curves, malformed points,
+PEM headers, private-key labels, extra blocks and non-whitespace surrounding material. Canonical
+public-key encoding removes PEM presentation differences before checking that builder, smoke and
+qualifier keys are distinct. Role assignment remains part of the independently selected policy identity.
 
 ### 2. Trust store and resolution precedence
 
@@ -132,40 +149,83 @@ Independent cosign consumption authenticates that artifact; release membership a
 still require the signed release index (ADR-20). No extra payload publication is introduced.
 
 SBOMs use a distinct standard CycloneDX predicate. Before publication the pinned signer creates a Sigstore
-v0.3 attestation bundle using `attest-blob --hash` for the exact already-inspected subject, then verifies it
+v0.3 attestation bundle using `attest-blob --hash` for the exact preparation-bound subject, then verifies it
 with `verify-blob-attestation` under the expected identity, issuer and normal transparency checks. The bundle
 must contain the exact canonical SBOM and one matching statement subject. Registry discovery uses an OCI
 referrer manifest beside the associated deliverable; source evidence retains its original source subject.
 Hosted pull-back verification independently checks every bundle. Keyless creation/verification remains
 Linux-only and raw preparation layouts cannot satisfy authenticated release consumption.
 
-The signer re-derives the subject from held artifact bytes and requires equality with the Run's observed subject.
+In GitHub `per-output-v1`, the preparation producer inspects the complete payload. The separate SBOM job
+receives only its bounded metadata and canonical documents, with exact subject, membership, Plan and Run
+bindings; it does not independently inspect payload bytes. The publisher combines the resulting bundles
+with the original preparation only after verifying the bundles, unchanged subjects and metadata, and exact
+decoded document equality. It then checks the complete final payload before publication. Metadata alone
+grants no payload-integrity capability. The full-layout attestation path retains its existing complete-byte
+checks. This separation removes the unchanged payload's SBOM round trip while preserving OIDC isolation.
+
+SBOM bundle creation permits at most three fresh keyless invocations within one three-minute deadline,
+with cancellation-aware one- and two-second delays, only when Rekor v1 reports its explicit HTTP 409
+`createLogEntryConflict` failure. Each attempt retains the same frozen predicate and exact subject and uses
+a separate private bundle output. A conflict is never accepted as evidence: only a successful invocation
+followed by the unchanged predicate, identity, issuer and transparency checks can return a bundle. Other
+failures, output overflow and verification failures are not retried. This compensates for the conflict-recovery
+gap in the pinned Cosign dependency, addressed upstream in
+[sigstore-go PR 647](https://github.com/sigstore/sigstore-go/pull/647). Fresh signatures can leave unused
+transparency entries. This policy does not add retries to OCI release signing or qualification attestation.
+
+The signer re-derives each subject and requires equality with the Run's publication binding. In GitHub
+`per-output-v1`, the publisher exports bounded metadata bound to the exact root it pushed. The signer
+re-derives the root and sibling subjects from that metadata, checks the exact output/Plan/Run bindings and
+cryptographically verifies required SBOM bundles before signing. It does not download or independently
+check payload bytes; complete-byte checks remain in preparation, publication and independent remote
+verification. Legacy signing retains its full-layout inspection. No caller-supplied digest or successful
+job-status description substitutes for these checks.
 The subsequent verifier re-resolves the registry reference, recomputes the served manifest digest, and verifies
 both signature and subject-bound production provenance (ADR-09). A mismatch fails the Run and returns no
 successful signing or verification record. Registry credentials use a private restrictive-mode `DOCKER_CONFIG`,
 never argv. Dry-run executes no signer and contacts no registry for signing; it records intended argv and
 `dryRun: true`, retaining `static-unqualified` evidence.
 
-The build signer's identity is a fixed committed workflow path and default-branch ref under an explicit issuer.
-It authenticates who produced the artifact; Build Digest separately identifies the selected logical graph. The separate
+The production build signer's identity is a fixed committed workflow path and admitted branch ref under an explicit issuer.
+Signed development uses the separate `nvkr-dev.yml` branch identity and reserved disposable namespace
+specified by ADR-18/20. It performs the same signature, provenance and SBOM checks under that development
+trust policy. A production consumer pinned to `nvkr-run.yml` does not accept those certificates; selecting
+development signing grants no production or qualified acceptance. Registry cleanup does not erase public
+transparency records or relax the existing disclosure/identity-service prerequisites.
+Signer identity authenticates who produced the artifact; Build Digest separately identifies the selected logical graph. The separate
 build/evidence qualification workflow has its own identity; build provenance and qualification evidence cannot
 substitute for one another. Consumer instructions publish both identities and use stock
 `cosign verify-attestation` with the explicit signature or SLSA predicate type. Downloaded bundles are also
-independently verifiable with `verify-blob-attestation` and an independently selected digest. An NKD reader is
+independently verifiable with `verify-blob-attestation` and an independently selected digest. An NVKR reader is
 a convenience, never a mandatory trust service. Event and credential admission are owned by ADR-18.
 
 A Verification Policy explicitly selects lane and acceptance scope:
 
 | Lane / scope | Required acceptance |
 |---|---|
-| `pipeline-attested` / `artifact-publication` | Exact selected closure, accepted build signer identity and issuer, signature, and subject-bound production provenance |
+| `pipeline-attested` / `authenticity` | Exact metadata/evidence closure, root and every required named output's signature and subject-bound production provenance, and required SBOM bundles under the accepted build identity and issuer; artifact payload bytes unchecked |
+| `pipeline-attested` / `artifact-publication` | Exact selected payload/evidence closure, accepted build signer identity and issuer, signature, and subject-bound production provenance |
 | `pipeline-attested` / `release` | Artifact-publication checks plus ADR-16 qualification identity, verdicts, membership, and ADR-06 revocation checks |
 | `qualified` / `release` | Qualified authority, evidence, freshness, status, and publication contracts in ADR-05/06/16/20 |
 
+The `authenticity` scope fetches bounded manifests, configurations and evidence, including native child
+metadata for aggregate images, without retrieving artifact payload layers. Root authentication alone is
+insufficient: every required named output must satisfy the signature/provenance checks, and every required
+SBOM bundle must pass cryptographic verification and its exact subject/stage/membership checks. Missing or
+rejected evidence returns no successful result. Metadata navigation remains unauthenticated.
+
+Lifecycle issues a separate opaque `AuthenticatedRelease` capability for this scope. Its description states
+`payloadIntegrityVerified: false`; it cannot authorize payload export, satisfy full artifact-publication
+verification, or issue an exact-input receipt. The scope authenticates the producer's recorded evidence, not
+artifact availability, consumer-side disk inspection, qualification or revocation. Stock execution retains
+the Linux and pinned-verifier admission requirements.
+
 For disk outputs, `VerificationPolicy.minimumDiskEvidence` is part of the policy digest. Its omitted default is
-`strict`, which rejects the producer-only `build-provenance-v1` mode. A consumer may explicitly set the minimum
-to `build-provenance-v1` to accept that narrower evidence; a strictly inspected disk also satisfies that weaker
-minimum. Unknown values fail closed, and no producer-signed disk mode can weaken the consumer's policy.
+`build-provenance-v1` for pipeline-attested scopes; explicit `strict` requires inspected evidence. Qualified
+policy defaults to `strict` and rejects the producer-only minimum. A strictly inspected disk also satisfies
+the weaker minimum. Authenticity applies the same minimum to signed disk evidence without reading or
+reinspecting the disk. Unknown values fail closed, and no producer-signed disk mode can weaken consumer policy.
 
 Missing scope is an error. Unsupported scopes fail admission before dependent I/O, without falling back to a
 weaker scope. The returned opaque capability binds the exact reference and policy, including scope and the
@@ -173,7 +233,7 @@ minimum disk-evidence requirement; closing it
 invalidates shallow copies. Public descriptions and inspection never supply verification authority.
 
 Live keyless acceptance requires the protected hosted workflow, public-transparency disclosure approval before
-the first signed NKE bytes, bounded service retry/availability policy, and an independent cosign-only consumer
+the first signed NVKE bytes, bounded service retry/availability policy, and an independent cosign-only consumer
 exercise. Unit tests and local dry-run records establish none of those operational facts.
 
 ## Consequences
@@ -226,9 +286,9 @@ exercise. Unit tests and local dry-run records establish none of those operation
 
 ## Acceptance evidence
 
-Current contract evidence lives in `pkg/nkd/internal/heldfile`, `pkg/nkd/sign/signer_test.go`,
-`pkg/nkd/sign/signer_linux_test.go`, `pkg/nkd/sign/qualified_test.go`, `pkg/nkd/trust/document_test.go`,
-`cmd/nkdctl/qualified_lifecycle_test.go`, and `cmd/nkdctl/verify_test.go`. It covers exact-byte signing, private
+Current contract evidence lives in `pkg/nvkr/internal/heldfile`, `pkg/nvkr/sign/signer_test.go`,
+`pkg/nvkr/sign/signer_linux_test.go`, `pkg/nvkr/sign/qualified_test.go`, `pkg/nvkr/trust/document_test.go`,
+`cmd/nvkr/qualified_lifecycle_test.go`, and `cmd/nvkr/verify_test.go`. It covers exact-byte signing, private
 snapshots of diagnostic subject/output bytes, anonymous held production signing outputs, strict role/schema
 dispatch, offline inclusion-proof arguments, actual certificate identity/issuer extraction, mutation and
 insecure-option rejection, and a stock measure-only verifier that refuses to rebuild. It also covers rejection

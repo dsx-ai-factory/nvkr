@@ -6,19 +6,20 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-22 in the consolidated NKD ADR set (added to give the pin/lock model a decided home).
+- **Index:** ADR-22 in the consolidated NVKR ADR set (added to give the pin/lock model a decided home).
 - **Relates to:** ADR-02 (what enters `buildDigest`), ADR-10 (toolchain / builder pins), ADR-11 (the catalog
   the lock feeds resolution), ADR-12 (the output/composition shape a curated set takes), ADR-13 (the aggregate
   SBOM dependency graph a curated set induces), ADR-15 (mirrorable pinned inputs), ADR-16 (digest-first
   selection), ADR-07 (the profile boundary the lock must NOT cross), ADR-21 (bump → regen), ADR-10 (a wrapped
-  build's `embeds` are derived from a curated set), ADR-01 (canonical codec).
+  build's optional `embeds` authenticate pinned upstream metadata only; curated-set derivation is deferred),
+  ADR-01 (canonical codec).
 - **Satisfies:** FR-01/FR-02 (digest-pinned, fail-closed inputs). Supports the `buildDigest` determinism of
   ADR-02.
 
 ## Context
 
-NKD aggregates a dozen-plus upstream components that each move independently as releases and CVE patches land.
-If every pin lived in a file compiled into the `nkdctl` binary, keeping current would mean cutting a tool
+NVKR aggregates a dozen-plus upstream components that each move independently as releases and CVE patches land.
+If every pin lived in a file compiled into the `nvkr` binary, keeping current would mean cutting a tool
 release constantly and the repository would churn forever. Multiple ADRs already *assume* a lockfile exists
 (ADR-02 "source-date derived from a lock", ADR-10 flake locks, ADR-15 locked closures), but the pin/lock
 contract itself — the declare-vs-resolve split, what feeds `buildDigest`, what a bump is, and where the
@@ -39,6 +40,12 @@ both `resolve` and `catalog bump`.
 Both files carry explicit `apiVersion` and `kind`. Readers dispatch to an exact versioned schema, reject unknown
 versions/kinds/fields, and never interpret a future lock as the current version. A missing lock is an input error,
 not an implicit empty lock.
+
+The independent qualification policy selects its own verifier executable and native smoke-image pins; these
+are consumer trust inputs, not producer catalog pins or permissions inherited from the producing Run.
+Review and commit those concrete selections with their generated workflows. Hosted acceptance follows merge
+under ADR-16; a recorded pin or successful generation alone establishes neither production readiness nor
+organizational approval.
 
 Registry v3 contains producer components with explicit supported `platforms`.
 It contains no recipes, criteria, recipe layers, mixins, `versionFrom`, placement categories or node roles.
@@ -96,7 +103,7 @@ Completeness is checked from actual producer platform declarations even when no 
 
 A **derived member** (§7) whose lock pin disagrees with the version its umbrella declares **at the umbrella's
 pinned tree** is likewise an **under-resolved input**: resolution fails with `CodePinSetMismatch`
-(`NKD-E-PIN-SET-MISMATCH`, exit 54). Re-derivation, not the recorded `derivedFrom` string, checks this agreement.
+(`NVKR-E-PIN-SET-MISMATCH`, exit 54). Re-derivation, not the recorded `derivedFrom` string, checks this agreement.
 
 Authority-bearing catalog reads are context-aware and resource-bounded. The on-disk provider holds a real root
 and opens every component descriptor-relative with `O_NOFOLLOW`; it accepts regular files only, limits one file
@@ -206,7 +213,7 @@ differs only by withholding the commit.
 ### 5. The lock is DATA and ships on its own train, decoupled from the tool
 
 Because the lock is data, a newer lock ships as a **catalog release**, consumed via `--data` / a catalog
-reference, on its **own cadence independent of `nkdctl` releases**. `nkdctl` (the tool) is released only when
+reference, on its **own cadence independent of `nvkr` releases**. `nvkr` (the tool) is released only when
 its *logic* changes; the embedded default lock is a **periodically-refreshed known-good default**, not the
 mechanism operators rely on to stay current. An operator tracking security fixes pulls a **newer catalog, not a
 newer binary**.
@@ -215,7 +222,7 @@ newer binary**.
 |---|---|---|---|
 | A component version / CVE patch | `pins.lock.yaml` | often | catalog release (data) |
 | A producer build definition / new component | `registry.yaml` | occasional | catalog release (data) |
-| Resolver / IR / engine logic | Go code | rare | `nkdctl` release (tool) |
+| Resolver / IR / engine logic | Go code | rare | `nvkr` release (tool) |
 
 `derivedFrom` (§7) is **pin provenance carried in the lock as data**: it records which umbrella pin produced a
 member entry, so a reviewer reads the curation out of an ordinary lockfile diff. It is not a signature, not a
@@ -226,7 +233,7 @@ receipt, and not an authority on its own — the authority is the re-derivation 
 Catalog data pins **definition** inputs; the selected executable subset enters `buildDigest`: resolved sources and prebuilt
 artifacts live in `pins.lock.yaml`; the directly digest-pinned **component build toolchain** lives in
 `registry.yaml`. The signed builder profile does **not** override either. It owns environment identity instead:
-the `nkd-runner`, its bootstrap toolchain, host-environment facts, and builder capabilities (ADR-07), all excluded
+the `nvkr-runner`, its bootstrap toolchain, host-environment facts, and builder capabilities (ADR-07), all excluded
 from `buildDigest` by construction.
 
 This boundary is load-bearing: changing a component toolchain is a reviewed catalog producer change and moves
@@ -312,7 +319,7 @@ Source tags use the declared `tagPrefix` without guessing a `v`: `0.9.3` with `c
 `controller/v0.9.3`. Unsupported selectors, duplicate keys, extra documents, YAML anchors and aliases fail.
 Documents are limited to 4 MiB, 64 levels and 65,536 nodes; a set declares at most 1,024 members.
 
-**Pinned-tree validation.** NKD fetches the exact umbrella commit into a private bare Git repository and
+**Pinned-tree validation.** NVKR fetches the exact umbrella commit into a private bare Git repository and
 checks its tree hash and source date epoch against the lock. Linux/macOS acquisition applies a kernel
 file-size ceiling of at most 64 MiB to Git and its children before fetching. Fetch retains packed objects,
 disables auxiliary pack downloads and automatic maintenance, and admits exactly one pack with its index
@@ -330,13 +337,13 @@ failure leaves the original lock intact. Full catalog loads and lock writes re-d
 Catalogs with pin sets therefore require access to pinned Git objects when loaded; ordinary catalogs retain
 local loading. Offline pin-set transport remains deferred.
 
-**NKE deploy adapter.** `format: nke-deploy-v1` reads `nke-deploy.yaml` and each Helm item's
+**NVKE deploy adapter.** `format: nvke-deploy-v1` reads `nke-deploy.yaml` and each Helm item's
 `release.yaml` from the same pinned tree. Every deploy item must appear in `members` or `accounted`;
 unknown, missing, duplicate or reclassified items fail before chart acquisition. External members bind the
 reviewed chart name/repository through `prebuilt.chart` (acquired) or member `chart` (source). Accounted local
 charts bind their relative path and must match their `Chart.yaml` name/version. Order, values and installation
-remain NKE-owned. See the [example catalog](../examples/nke-pin-set/registry.yaml) and
-[usage guide](../nke-pin-set-usage.md). CycloneDX ingestion and qualified-set acceptance remain deferred.
+remain NVKE-owned. See the [example catalog](../examples/nvke-pin-set/registry.yaml) and
+[usage guide](../nvke-pin-set-usage.md). CycloneDX ingestion and qualified-set acceptance remain deferred.
 
 **Chart acquisition.** HTTPS Helm indexes and anonymous OCI repositories resolve one exact chart version.
 Source-owned acquired charts use the exact declared chart version, including any leading `v`, for
@@ -395,7 +402,7 @@ remain follow-ups owned by ADR-11/13; this pinning contract does not implement t
   instead (§1); the checkout node de-duplicates by commit anyway.
 - **A repository-level pin shared by every source naming that repository.** Rejected — it forces unrelated
   modules of a monorepo to move together and re-introduces the churn `tagPrefix` exists to avoid.
-- **Resolve upstream version ranges at pin time.** Rejected — NKD would re-decide what the upstream already
+- **Resolve upstream version ranges at pin time.** Rejected — NVKR would re-decide what the upstream already
   decided, and two pins of the same tree could differ. A pin set reads exact declared versions (§7).
 - **Hand-author each member pin and diff it against the upstream set by review.** Rejected — an unchecked
   convention. Re-derivation at validation time makes it a property the tooling enforces.
@@ -411,11 +418,12 @@ remain follow-ups owned by ADR-11/13; this pinning contract does not implement t
 - **ADR-12 §3:** a future curated set can inform explicit output membership; it must not introduce a selector
   axis, deployment topology or reusable recipe group.
 - **ADR-13 (deferred):** define aggregate SBOM curation edges from an umbrella to its members.
-- **ADR-10 (deferred):** bind a wrapped build's `embeds` to its pinned upstream declaration.
+- **ADR-10:** bind any explicitly authored `embeds` to its exact pinned upstream declaration;
+  automatic curated-set derivation remains deferred.
 
 ## Acceptance evidence
 
-Contract evidence in `pkg/nkd/catalog/load_test.go`, `provider_context_test.go`, `pin_context_test.go`,
+Contract evidence in `pkg/nvkr/catalog/load_test.go`, `provider_context_test.go`, `pin_context_test.go`,
 `prebuilt_test.go`, `lock_contract_test.go`, `pin_update_test.go`, `pin_artifact*_test.go` and
 `client/v1/catalog_io*_test.go` covers strict schemas, complete source/artifact keys and architectures,
 bounded no-follow I/O, cancellation, deterministic output and atomic CAS writes. `pin_extract_test.go`,

@@ -6,17 +6,17 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-01 in the consolidated NKD ADR set.
+- **Index:** ADR-01 in the consolidated NVKR ADR set.
 - **Relates to:** every digest-addressed object — the Build Digest (ADR-02), the trust objects (ADR-05),
   provenance and SBOM (ADR-09, ADR-13), publication and status (ADR-06). ADR-03 defines the error contract for
   serialization failures.
 
 ## Context
 
-Many NKD objects are identified and trusted by digest: the Build Digest, the ValidationVector, the ReleaseSet,
+Many NVKR objects are identified and trusted by digest: the Build Digest, the ValidationVector, the ReleaseSet,
 the evidence bundle, provenance, SBOMs, and status declarations. For each, the byte form is the identity, frozen
 the moment it is published or signed. An auditor must be able to recompute that digest independently, in any
-language, without access to NKD's implementation.
+language, without access to NVKR's implementation.
 
 Three requirements follow: one canonical serialization, so the same object always yields the same bytes; a
 disciplined way to evolve schemas without invalidating already-signed bytes; and a way to keep the digest of one
@@ -27,12 +27,12 @@ kind of object from being mistaken for another.
 ### 1. One canonical codec for every structured semantic identity
 
 Every structured semantic identity — **including the Build Digest** — serializes through **one** canonical
-codec: the **RFC-8785 (JSON Canonicalization Scheme) structural/string profile with NKD's integer-only numeric
+codec: the **RFC-8785 (JSON Canonicalization Scheme) structural/string profile with NVKR's integer-only numeric
 profile**. That is UTF-8, object keys sorted by UTF-16 code units, ECMAScript string escaping, no insignificant
 whitespace, and object-owned slices pre-sorted before marshaling. **No host, clock, random, or
 generated-identifier value** enters the output.
 
-NKD numeric values are JSON integer tokens only. Decimal fractions and exponent notation are rejected. Integer
+NVKR numeric values are JSON integer tokens only. Decimal fractions and exponent notation are rejected. Integer
 tokens are preserved and rendered exactly at arbitrary precision, never converted through binary floating point;
 independent implementations therefore MUST NOT route an integer through IEEE-754 before hashing. A schema that
 needs a fractional quantity encodes a scaled integer or a canonical string, or introduces a future explicitly
@@ -43,7 +43,7 @@ Human-authored **inputs** (the catalog) stay in a human-friendly format; only th
 JSON.
 
 Raw file/blob integrity is a distinct layer. `sha256(exact-bytes)` identifies the bytes carried by a transport
-descriptor and does not pretend to be a structured NKD object. A filesystem tree or source closure is identified
+descriptor and does not pretend to be a structured NVKR object. A filesystem tree or source closure is identified
 by a named, versioned canonical manifest whose sorted entries bind normalized path, entry type, mode, symlink
 target, and/or the raw content digest. A raw digest may be a field inside a typed semantic object, but it never
 substitutes for that object's domain-separated identity or its authenticated receipt.
@@ -69,6 +69,10 @@ substitutes for that object's domain-separated identity or its authenticated rec
   output.
 
 ### 3. Domain-separated digests
+
+The framework uses the `nvkr.*` digest families and `nvkr.dev` schemas.
+Namespace changes never rewrite historical signed bytes. Unsupported namespaces
+fail strict dispatch. Reserved names below belong to the NVKR namespace.
 
 Every structured semantic object's digest is computed with a frozen **family-kind tag** and an unambiguous
 separator: `Digest(kind, obj) = sha256(UTF8(kind) ∥ 0x00 ∥ canonical-bytes)`. `schemaVersion` stays inside the
@@ -101,12 +105,12 @@ within the same family from being interpreted.
 ### 5. Public lifecycle schemas
 
 The six public objects are Definition, Environment, Run, Artifact, Release, and Verification Policy. The
-compiler-derived logical build graph uses the new **`nkd.build`** family. **`nkd.recipe` remains a reserved
-historical allocation**; active graph compilation never mints new identities under it. Removing authored
+compiler-derived logical build graph uses the new **`nvkr.build`** family. **`nvkr.recipe` is reserved and
+never minted**; unsupported identity families remain rejected. Removing authored
 Recipes does not rename, convert, or reauthenticate historical signed bytes. Cluster-definition,
 cluster-composition, cluster-realization and staging-manifest families are likewise reserved and cannot mint
 new identities. The removed compiler-handoff and copied execution-settings families are also reserved and
-reject new minting, as do the removed redundant lifecycle-binding and qualified CI bundle (`nkd.bundle`)
+reject new minting, as do the removed redundant lifecycle-binding and qualified CI bundle (`nvkr.bundle`)
 families. The unused qualified clearance implementation is removed: reproduction-result,
 compatibility-result, conformance-result, evidence-waiver, clearance, status-trusted-time, publication,
 publication-manifest and vulnerability-report allocations likewise remain reserved and reject minting. Retained publication-root and
@@ -118,38 +122,98 @@ changed shapes are:
 
 | Object | Schema |
 |---|---|
-| Definition | `nkd.dev/definition/v4` |
-| Component catalog and snapshot | `nkd.dev/catalog/v3`, `nkd.dev/catalog-snapshot/v3` |
-| Component catalog overlay | `nkd.dev/catalog-overlay/v3` |
-| Executable and logical build graph | `nkd.dev/ir/v4` |
-| Run plan and artifact graph | `nkd.dev/run-plan/v4`, `nkd.dev/artifact-graph/v4` |
-| Run and Release views | `nkd.dev/run/v3`, `nkd.dev/release/v3` |
+| Definition | `nvkr.dev/definition/v5` |
+| Component catalog and snapshot | `nvkr.dev/catalog/v3`, `nvkr.dev/catalog-snapshot/v3` |
+| Component catalog overlay | `nvkr.dev/catalog-overlay/v3` |
+| Executable and logical build graph | `nvkr.dev/ir/v4` |
+| Run plan and artifact graph | `nvkr.dev/run-plan/v5`, `nvkr.dev/artifact-graph/v5` |
+| Run and Release views | `nvkr.dev/run/v4`, `nvkr.dev/release/v4` |
 
-Definition v4 removes cluster views. Catalog v3 removes delivery categories and node-role affinities. IR v4
+Definition v5 retains removal of cluster views and adds an explicit required platform set for an aggregate OCI image. Catalog v3 removes delivery categories and node-role affinities. IR v4
 binds typed VM disk, producer, selected toolchain-host platform,
 public-variable and material-edge inputs into Build Digest. Old
 major versions fail closed; the migration does not reinterpret or repair existing signed records.
 
-Run plan v4 embeds the admitted Definition and Environment directly. The compiler owns complete output,
+Run plan v5 embeds the admitted Definition and Environment directly. The compiler owns complete output,
 package, route and evidence binding; there is no separately versioned compile specification or execution-settings
 document. Producer scheduling records reference the authoritative embedded IR instruction and cannot carry a
 second copy of its runner, network, container, platform, execution requirements or class binding. Artifact graph
-v4 makes that reference contract explicit. Required output slots remain separate from observations.
+v5 retains that reference contract and freezes every native child build, producer result and evidence slot for an image index. Required output slots remain separate from observations.
+
+The logical image-index build projection uses `nvkr.dev/image-index-build/v1` inside the existing
+`nvkr.build` family: sorted `requiredPlatforms` plus sorted children containing only `platform`, `buildDigest`
+and `component`. It is distinct from native IR v4 and from OCI manifest observations. Native IR bytes and
+binary-bundle v1 remain unchanged. Publication-root metadata and media use v4 (ADR-20); Definition v4,
+Plan/artifact-graph v4 and Run/Release v3 are rejected rather than reinterpreted with aggregate membership.
 
 Production SLSA build-type URIs use `/v2` for the replacement of compiler-handoff parameters by the original
 `definitionDigest` and `environmentDigest`. SLSA provenance/v1 and in-toto Statement/v1 remain unchanged.
 Historical production predicates are rejected rather than relabeled or re-signed under the current contract.
 
-Environment stays `nkd.dev/environment/v1`; the generated Run's unchanged exact-file commit manifest stays
-`nkd.dev/generated-run/v1`. Unchanged wire shapes keep their existing major. Evidence,
+Environment stays `nvkr.dev/environment/v1`; the generated Run's unchanged exact-file commit manifest stays
+`nvkr.dev/generated-run/v1`. Unchanged wire shapes keep their existing major. Evidence,
 publication, and release owners version every field or meaning changed from Recipe identity to Build identity;
 they must not accept a former `recipeDigest` under a new `buildDigest` spelling. Existing family tags remain
 frozen even where their names contain a version; the schema inside the canonical bytes distinguishes changed
 major versions within a family. Run presentation and Release reference views do not acquire redundant identities
 without a canonical subject.
 
-The deferred v1 qualification-evidence and release-manifest documents (ADR-16) require strict schema dispatch
-and registered, domain-separated identities before implementation. Pretty-printed JSON hashes are insufficient.
+M3 qualification evidence (ADR-16) registers the following distinct schema and family. This is
+pipeline-attested build/evidence qualification; it does not reuse a reserved qualified-clearance family.
+
+| Object | Canonical schema | Frozen family kind | Attestation predicate type |
+|---|---|---|---|
+| Qualification evidence | `nvkr.dev/qualification-evidence/v2` | `nvkr.qualification-evidence` | `https://nvkr.dev/qualification-evidence/v2` |
+| Development qualification evidence | `nvkr.dev/development-qualification-evidence/v1` | `nvkr.qualification-evidence` | `https://nvkr.dev/development-qualification-evidence/v1` |
+| Qualification policy | `nvkr.dev/qualification-policy/v1` | `nvkr.qualification-policy` | Independently selected configuration; no evidence predicate |
+| Native smoke worker | `nvkr.dev/tool-smoke-worker/v1` | `nvkr.tool-smoke-worker` | Detached signed document; no qualification attachment |
+
+The document binds the authenticated originating repository, Run, attempt, commit, workflow/ref and build
+invocation; the separately authenticated qualification invocation; gate version; Definition, Environment,
+Plan and relevant input identities; and complete exact output/subject membership with per-check results.
+Object-owned output, subject and check collections have deterministic ordering. Overall output verdicts are
+pass/fail only. Applicable checks must pass before publication; non-applicable checks carry the explicit
+applicability result. External suites outside this MVP use `not-evaluated` with reason `outside MVP scope`;
+this is never interpreted as passed. Disk scope states producer-only evidence and no content inspection.
+Unknown fields, versions or verdicts, duplicate members, noncanonical bytes and inexact bindings fail closed.
+
+The complete qualification-policy identity includes source and qualifier workflow selection, the distinct
+same-repository native smoke workflow, every platform executable/image pin, fixed tool profiles, explicit
+non-tool output scope and external-suite requirements. Local executable paths are locators, excluded from
+this identity; exact executable byte pins remain included. Object-owned set collections are sorted before
+hashing. The existing release Verification Policy digest keeps its separate meaning.
+
+A native smoke-worker document binds the full artifact-check description, exact source and qualifier
+invocations, complete qualification-policy identity, measured native platform/runtime/image and exact
+per-member byte identities, expected and observed versions and fixed command profiles. It carries no
+qualification signing authority. The final owner authenticates the distinct worker certificate identity,
+issuer, exact qualifier Run-attempt URI and top-level workflow configuration URI/commit from the same
+verified certificate, then validates complete, disjoint member coverage. Generated transport names and
+unsigned report fields never restore a smoke receipt. These registrations state the wire contracts;
+reconciliation separately records runtime, worker authentication and hosted acceptance implementation.
+
+M4 release issuance (ADR-16 §5) registers the following distinct schema and family. It is
+pipeline-attested release membership; it does not reuse the reserved clearance, publication or
+publication-manifest families.
+
+| Object | Canonical schema | Frozen family kind | Attestation predicate type |
+|---|---|---|---|
+| Release manifest | `nvkr.dev/release-manifest/v1` | `nvkr.release-manifest` | `https://nvkr.dev/release-manifest/v1` |
+
+The manifest states the `pipeline-attested` lane and binds the immutable publication root it is attached to;
+the originating repository, Run, attempt, commit, workflow/ref and build invocation; the Definition,
+Environment, Plan, catalog, content-subject and release Verification Policy identities; and the separately
+authenticated qualification invocation, gate version, qualification-policy digest and the
+`nvkr.qualification-evidence` digest of the exact evidence attached to every member. Each member carries its
+name, kind, digest-pinned reference and digest, Build Digest, native platform, sorted producer subjects, source
+lane (`hermetic-build`, `wrapped-build` or `acquired`, read from its verified production provenance build type)
+and the SHA-256 of that verified production predicate's canonical JSON, excluding the optional trailing
+transport newline that signature verification also ignores. An aggregate image member names its index;
+the bound qualification evidence enumerates its native children. Disk members state producer-only scope.
+Members are sorted by name and unique. Unknown fields, versions, lanes or kinds, noncanonical bytes, missing
+identities and inexact bindings fail closed. The canonical document is bounded by the qualification signing
+transport limit. Pretty-printed JSON hashes are insufficient for either document. Reconciliation records
+implementation and external acceptance independently of schema registration.
 
 ## Consequences
 
@@ -188,10 +252,10 @@ and registered, domain-separated identities before implementation. Pretty-printe
 
 ## Acceptance evidence
 
-Current module-level evidence is `pkg/nkd/canonical/canonical_test.go` (golden JCS bytes, integer boundaries,
-invalid UTF-8 rejection, immutable kind registration, and domain separation), `pkg/nkd/ir/marshal_test.go`
-(structurally transport-free, field-classified build identity), `pkg/nkd/ir/identity_contract_test.go`
-(independently calculated acquisition/source graph vectors, retired-family separation and old-field rejection), `pkg/nkd/pipeline/source_snapshot_test.go`
+Current module-level evidence is `pkg/nvkr/canonical/canonical_test.go` (golden JCS bytes, integer boundaries,
+invalid UTF-8 rejection, immutable kind registration, and domain separation), `pkg/nvkr/ir/marshal_test.go`
+(structurally transport-free, field-classified build identity), `pkg/nvkr/ir/identity_contract_test.go`
+(independently calculated acquisition/source graph vectors, retired-family separation and old-field rejection), `pkg/nvkr/pipeline/source_snapshot_test.go`
 (versioned canonical tree identity including empty directories, modes, content, and symlink targets). This is **contract evidence**, not
 corpus-wide or independent-language acceptance.
 

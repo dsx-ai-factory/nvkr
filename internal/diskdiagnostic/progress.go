@@ -14,11 +14,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 )
 
 const (
-	Prefix              = "NKD_INSPECTION "
+	// Wire prefix emitted by the NVKR inspection helper.
+	Prefix              = "NVKR_INSPECTION "
 	MaxRecordBytes      = 512
 	MaxRetainedBytes    = 32 << 10
 	MaxForwardedRecords = 512

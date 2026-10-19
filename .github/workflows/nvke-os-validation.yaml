@@ -1,0 +1,800 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# Companion implementation: https://github.com/dsx-ai-factory/nvkr/pull/59
+# Full mode runs only from this trusted main workflow. A pre-merge candidate
+# requires an exact copy-pr-bot mirror. Candidate code receives the pinned
+# private NVKE source and a network-capable KVM runner, but never its credential.
+
+---
+name: NVKE OS validation
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Exact 40-character nvkr commit to validate
+        required: true
+        type: string
+      approved_nvke_commit:
+        description: Exact NVKE commit approved for a full secret-backed validation
+        required: false
+        type: string
+      arch:
+        description: Native architecture for toolchain or full image validation
+        required: true
+        default: arm64
+        type: choice
+        options: [both, amd64, arm64]
+      mode:
+        description: Check KVM access, build the toolchain, or run full image validation
+        required: true
+        default: toolchain
+        type: choice
+        options: [preflight, toolchain, full]
+      mirror_pr:
+        description: Optional PR number whose copy-pr-bot mirror and current PR head must equal commit_sha
+        required: false
+        type: string
+      retain_qcow2:
+        description: Retain the QCOW2 privately after full validation of the exact workflow commit
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  select:
+    name: Select exact commit and native runners
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      commit: ${{ steps.select.outputs.commit }}
+      legs: ${{ steps.select.outputs.legs }}
+      mode: ${{ steps.select.outputs.mode }}
+      mirror_pr: ${{ steps.select.outputs.mirror_pr }}
+      nvke_commit: ${{ steps.source.outputs.commit }}
+      nvke_tree: ${{ steps.source.outputs.tree }}
+      retain_qcow2: ${{ steps.select.outputs.retain_qcow2 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate selection
+        id: select
+        env:
+          DISPATCH_ARCH: ${{ inputs.arch }}
+          DISPATCH_COMMIT: ${{ inputs.commit_sha }}
+          DISPATCH_MODE: ${{ inputs.mode }}
+          DISPATCH_MIRROR_PR: ${{ inputs.mirror_pr }}
+          DISPATCH_RETAIN_QCOW2: ${{ inputs.retain_qcow2 }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_SHA: ${{ github.sha }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          case "${EVENT_NAME}" in
+            push)
+              commit="${EVENT_SHA}"
+              arch=both
+              mode=full
+              mirror_pr=''
+              retain_qcow2=true
+              ;;
+            workflow_dispatch)
+              commit="${DISPATCH_COMMIT}"
+              arch="${DISPATCH_ARCH}"
+              mode="${DISPATCH_MODE}"
+              mirror_pr="${DISPATCH_MIRROR_PR}"
+              retain_qcow2="${DISPATCH_RETAIN_QCOW2}"
+              ;;
+            *) echo "unsupported validation event: ${EVENT_NAME}" >&2; exit 1 ;;
+          esac
+          if [[ ! "${commit}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "commit_sha must be one exact lowercase 40-character SHA" >&2
+            exit 1
+          fi
+          case "${mode}" in
+            preflight|toolchain|full) ;;
+            *) echo "unsupported validation mode: ${mode}" >&2; exit 1 ;;
+          esac
+          if [[ "${mode}" == preflight ]]; then
+            # The approved, credential-free probe executes this workflow's own
+            # exact branch commit, not a separately selected candidate checkout.
+            if [[ "${EVENT_NAME}" != workflow_dispatch || "${EVENT_REF}" != refs/heads/* ||
+                  "${commit}" != "${EVENT_SHA}" || -n "${mirror_pr}" || "${retain_qcow2}" != false ]]; then
+              echo "preflight requires an exact dispatched branch commit, no mirror and no image upload" >&2
+              exit 1
+            fi
+          elif [[ "${EVENT_REF}" != refs/heads/main ]]; then
+            echo "toolchain and full validation must run from the trusted main workflow" >&2
+            exit 1
+          fi
+          case "${retain_qcow2}" in
+            true|false) ;;
+            *) echo "retain_qcow2 must be true or false" >&2; exit 1 ;;
+          esac
+          if [[ "${retain_qcow2}" == true && "${commit}" != "${WORKFLOW_SHA}" ]]; then
+            echo "[NVKR-E-ENGINE-CAPABILITY] private QCOW2 retention requires the exact trusted workflow commit" >&2
+            exit 1
+          fi
+          if [[ "${mode}" == preflight ]]; then
+            test "$(git rev-parse HEAD)" = "${commit}"
+          elif [[ -n "${mirror_pr}" ]]; then
+            if [[ ! "${mirror_pr}" =~ ^[1-9][0-9]*$ ]]; then
+              echo "mirror_pr must be a positive pull request number" >&2
+              exit 1
+            fi
+            mirror_commit="$(gh api "repos/${REPOSITORY}/git/ref/heads/pull-request/${mirror_pr}" --jq '.object.sha')" || {
+              echo "copy-pr-bot mirror pull-request/${mirror_pr} is unavailable" >&2
+              exit 1
+            }
+            pr_json="$(gh api "repos/${REPOSITORY}/pulls/${mirror_pr}")" || {
+              echo "unable to inspect PR ${mirror_pr}" >&2
+              exit 1
+            }
+            IFS=$'\t' read -r pr_commit pr_state pr_repo pr_base pr_draft <<<"$(
+              jq -r '[.head.sha, .state, .head.repo.full_name, .base.ref, .draft] | @tsv' <<<"${pr_json}"
+            )"
+            if [[ "${mirror_commit}" != "${commit}" || "${pr_commit}" != "${commit}" ||
+                  "${pr_state}" != open || "${pr_repo}" != "${REPOSITORY}" ||
+                  "${pr_base}" != main || "${pr_draft}" != false ]]; then
+              echo "commit_sha ${commit} is not the authenticated, ready in-repository PR ${mirror_pr} tip" >&2
+              echo "mirror=${mirror_commit} head=${pr_commit} state=${pr_state} repository=${pr_repo} base=${pr_base} draft=${pr_draft}" >&2
+              exit 1
+            fi
+          else
+            if ! git merge-base --is-ancestor "${commit}" origin/main; then
+              echo "commit_sha is not reachable from main; select its exact mirror_pr" >&2
+              exit 1
+            fi
+          fi
+          git cat-file -e "${commit}^{commit}"
+          if [[ "${mode}" == toolchain ]]; then
+            amd64='{"arch":"amd64","runner":"ubuntu-24.04"}'
+            arm64='{"arch":"arm64","runner":"ubuntu-24.04-arm"}'
+          else
+            # NVKE main uses arc-arm64-kvm; NVKE PR #1100 selects
+            # arc-amd64-kvm. Neither establishes access from nvkr;
+            # verify both scale sets are granted before a full dispatch.
+            amd64='{"arch":"amd64","runner":"arc-amd64-kvm"}'
+            arm64='{"arch":"arm64","runner":"arc-arm64-kvm"}'
+          fi
+          case "${arch}" in
+            amd64) legs="[${amd64}]" ;;
+            arm64) legs="[${arm64}]" ;;
+            both) legs="[${amd64},${arm64}]" ;;
+            *) echo "unsupported architecture selection: ${arch}" >&2; exit 1 ;;
+          esac
+          {
+            echo "commit=${commit}"
+            echo "legs=${legs}"
+            echo "mode=${mode}"
+            echo "mirror_pr=${mirror_pr}"
+            echo "retain_qcow2=${retain_qcow2}"
+          } >>"${GITHUB_OUTPUT}"
+
+      - name: Summarize selected validation
+        env:
+          CANDIDATE_COMMIT: ${{ steps.select.outputs.commit }}
+          VALIDATION_MODE: ${{ steps.select.outputs.mode }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          {
+            printf '### NVKE OS validation selection\n\n'
+            printf -- '- Candidate commit: %s\n' "${CANDIDATE_COMMIT}"
+            printf -- '- Workflow commit: %s\n' "${WORKFLOW_SHA}"
+            printf -- '- Mode: %s\n' "${VALIDATION_MODE}"
+            if [[ "${CANDIDATE_COMMIT}" != "${WORKFLOW_SHA}" ]]; then
+              printf '\nCandidate diagnostics remain in workflow logs; file retention is disabled.\n'
+            fi
+          } >>"${GITHUB_STEP_SUMMARY}"
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: steps.select.outputs.mode == 'full'
+        with:
+          go-version-file: .go-version
+          cache: false
+
+      - name: Build trusted catalog reader
+        if: steps.select.outputs.mode == 'full'
+        run: make build
+
+      - name: Check out selected authored inputs without persisted credentials
+        if: steps.select.outputs.mode == 'full'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.select.outputs.commit }}
+          path: .candidate-inputs
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Resolve the recipe-owned NVKE source pin
+        id: source
+        if: steps.select.outputs.mode == 'full'
+        env:
+          VALIDATED_LEGS: ${{ steps.select.outputs.legs }}
+        run: |
+          set -euo pipefail
+          mapfile -t required_arches < <(jq -r '.[].arch' <<<"${VALIDATED_LEGS}")
+          for target_arch in "${required_arches[@]}"; do
+            input_dir=.candidate-inputs/inputs
+            test -f \
+              "${input_dir}/definitions/diagnostics/os-${target_arch}.yaml" || {
+              echo "missing maintained ${target_arch} KVM Definition" >&2
+              exit 1
+            }
+            test -f \
+              "$input_dir/environments/local-linux-${target_arch}-kvm.yaml" || {
+              echo "missing maintained ${target_arch} Docker Environment" >&2
+              exit 1
+            }
+          done
+          # Reject drift in locked toolchain source pins. Candidate build scripts
+          # and the resulting image remain untrusted diagnostic inputs; this
+          # comparison does not establish a toolchain trust boundary.
+          candidate_lock=.candidate-inputs/toolchains/nvkr-packer/toolchain.lock.json
+          test -f "${candidate_lock}" || {
+            echo "candidate toolchain lock is missing" >&2
+            exit 1
+          }
+          jq -n -e --slurpfile candidate "${candidate_lock}" \
+            --slurpfile reviewed toolchains/nvkr-packer/toolchain.lock.json '
+            def valid_ids:
+              type == "object" and
+              (keys | sort) == ["amd64", "arm64"] and
+              all(.[]; . == null or
+                (type == "string" and test("^sha256:[0-9a-f]{64}$")));
+            ($candidate | length) == 1 and ($reviewed | length) == 1 and
+            ($candidate[0] as $input |
+              ($reviewed[0] |
+                del(.localImages, .localPodmanImages, .localDockerImages))
+                as $trusted |
+              ($input |
+                del(.localImages, .localPodmanImages, .localDockerImages))
+                == $trusted and
+              ($input | has("localImages") | not) and
+              ($input | has("localPodmanImages") | not) and
+              ($input | has("localDockerImages")) and
+              ($input.localDockerImages | valid_ids))
+          ' >/dev/null || {
+            jq -n -r --slurpfile candidate "${candidate_lock}" \
+              --slurpfile reviewed toolchains/nvkr-packer/toolchain.lock.json '
+              if ($candidate | length) != 1 then
+                "candidate lock must contain exactly one JSON document"
+              elif ($reviewed | length) != 1 then
+                "reviewed lock must contain exactly one JSON document"
+              else
+                $candidate[0] as $lock |
+                ($lock | del(.localImages, .localPodmanImages, .localDockerImages)) as $input |
+                ($reviewed[0] | del(.localImages, .localPodmanImages, .localDockerImages)) as $trusted |
+                (if ($lock | has("localImages")) then "legacy localImages is unsupported" else empty end),
+                (if ($lock | has("localPodmanImages")) then "legacy localPodmanImages is unsupported" else empty end),
+                (if ($lock | has("localDockerImages") | not) then
+                  "missing localDockerImages: expected amd64 and arm64 image IDs or null"
+                elif ($lock.localDockerImages | type) != "object" then
+                  "invalid localDockerImages: expected an object with amd64 and arm64"
+                elif ($lock.localDockerImages | keys | sort) != ["amd64", "arm64"] then
+                  "invalid localDockerImages: expected exactly amd64 and arm64"
+                elif ($lock.localDockerImages | any(.[]; . != null and
+                    (type != "string" or (test("^sha256:[0-9a-f]{64}$") | not)))) then
+                  "invalid localDockerImages: image IDs must be null or exact sha256 digests"
+                else empty end),
+                ([($input | keys[]), ($trusted | keys[])] | unique |
+                  map(select($input[.] != $trusted[.])) |
+                  if length > 0 then "mismatched locked fields: " + join(", ") else empty end)
+              end
+            ' >&2 || true
+            printf '%s\n' \
+              'invalid candidate toolchain pins or local Docker image IDs;' \
+              'legacy localImages and localPodmanImages are unsupported;' \
+              'use toolchain mode or land reviewed pins first' >&2
+            exit 1
+          }
+          pin="$(bin/nvkr catalog source-pin \
+            --data .candidate-inputs/inputs/catalogs/node-images/diagnostic \
+            nvke-os)"
+          # One lock entry cannot establish the full component/overlay closure.
+          # New input schemas must land in main before this trusted reader.
+          for target_arch in "${required_arches[@]}"; do
+            input_dir=.candidate-inputs/inputs
+            plan="$(bin/nvkr run plan \
+              --definition "${input_dir}/definitions/diagnostics/os-${target_arch}.yaml" \
+              --environment "${input_dir}/environments/local-linux-${target_arch}-kvm.yaml" --json)"
+            jq -L scripts -e --argjson pin "${pin}" \
+              'include "nvke-os-plan"; nvke_source_closure($pin)' <<<"${plan}" >/dev/null || {
+              echo "selected ${target_arch} NVKE source closure disagrees with the approved pin" >&2
+              exit 1
+            }
+          done
+          {
+            echo "commit=$(jq -er '.commit' <<<"${pin}")"
+            echo "tree=$(jq -er '.treeHash' <<<"${pin}")"
+          } >>"${GITHUB_OUTPUT}"
+
+      # Main pushes use the pin from the merged catalog and validated Plans.
+      # Manual full runs additionally require the dispatch value to match it;
+      # this consistency check is not independent approval of candidate code.
+      - name: Check the manually selected NVKE source pin
+        if: steps.select.outputs.mode == 'full' && github.event_name == 'workflow_dispatch'
+        env:
+          APPROVED_NVKE_COMMIT: ${{ inputs.approved_nvke_commit }}
+          PINNED_NVKE_COMMIT: ${{ steps.source.outputs.commit }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${APPROVED_NVKE_COMMIT}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "approved_nvke_commit must be one exact lowercase 40-character SHA" >&2
+            exit 1
+          fi
+          if [[ "${PINNED_NVKE_COMMIT}" != "${APPROVED_NVKE_COMMIT}" ]]; then
+            echo "recipe-selected NVKE commit ${PINNED_NVKE_COMMIT} does not match approved ${APPROVED_NVKE_COMMIT}" >&2
+            exit 1
+          fi
+
+  validate-kvm:
+    name: NVKE KVM preflight (${{ matrix.arch }})
+    needs: select
+    if: needs.select.outputs.mode == 'preflight'
+    permissions: {}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.select.outputs.legs) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - name: Record exact workflow and runner
+        env:
+          WORKFLOW_SHA: ${{ github.sha }}
+          RUNNER_NAME: ${{ runner.name }}
+          RUNNER_ARCH: ${{ runner.arch }}
+        run: |
+          printf 'Workflow commit: %s\nRunner: %s\nArchitecture: %s\n' \
+            "${WORKFLOW_SHA}" "${RUNNER_NAME}" "${RUNNER_ARCH}"
+
+      - name: Admit native KVM runner
+        run: &native_kvm_preflight |
+          set -euo pipefail
+          id
+          if [[ ! -c /dev/kvm ]]; then
+            echo "::error::Missing /dev/kvm for ${{ matrix.arch }}"
+            exit 1
+          fi
+          stat -c 'uid=%u gid=%g mode=%a owner=%U group=%G' /dev/kvm
+          # The scale set must provide access through its KVM group or device
+          # configuration. A build job must not change host device permissions.
+          if [[ ! -r /dev/kvm || ! -w /dev/kvm ]]; then
+            echo "::error::Runner identity needs read/write access to /dev/kvm; configure the runner's KVM group or device access"
+            exit 1
+          fi
+          # This preflight only checks access. NVKR independently admits KVM and
+          # guards Docker's device projection before invoking Packer.
+          exec 3<>/dev/kvm
+          exec 3>&-
+
+  validate-toolchain:
+    name: NVKE OS toolchain (${{ matrix.arch }})
+    needs: select
+    if: needs.select.outputs.mode == 'toolchain'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.select.outputs.legs) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.select.outputs.commit }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Build and validate pinned native toolchain
+        id: toolchain
+        env:
+          CONTAINER_RUNTIME: docker
+        run: |
+          set -euo pipefail
+          mkdir -p .nvkr/evidence
+          printf '%s\n' 'unqualified-diagnostic' >.nvkr/evidence/evidence-scope
+          toolchains/nvkr-packer/build.sh --arch '${{ matrix.arch }}' \
+            2>&1 | tee ".nvkr/evidence/toolchain-${{ matrix.arch }}.log"
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: always()
+        with:
+          go-version-file: .go-version
+          cache: false
+
+      - name: Build trusted private storage helper
+        id: ci-helper
+        if: always() && needs.select.outputs.commit == github.workflow_sha
+        env:
+          GOTOOLCHAIN: local
+        run: CGO_ENABLED=0 go build -trimpath -o nvkr-exec ./cmd/nvkr
+
+      - name: Prove Docker identity bind on native daemon
+        env:
+          NVKR_TEST_DOCKER_TOOLCHAIN_IMAGE: localhost/nvkr-packer-toolchain:dev-${{ matrix.arch }}
+        run: go test ./pkg/nvkr/pipeline -run '^TestDockerPackerIdentityBind$' -count=1
+
+      # This observation is candidate-influenced diagnostic output. It never
+      # authorizes a lock update or a release identity.
+      - name: Record exact native toolchain image ID
+        if: always() && steps.toolchain.outcome == 'success'
+        run: |
+          set -euo pipefail
+          docker image inspect --format '{{.Id}}' \
+            "localhost/nvkr-packer-toolchain:dev-${{ matrix.arch }}" \
+            | tee ".nvkr/evidence/toolchain-${{ matrix.arch }}.image-id"
+
+      - name: Upload toolchain evidence
+        if: always() && needs.select.outputs.commit == github.workflow_sha && steps.ci-helper.outcome == 'success'
+        uses: ./.github/nvkr-run/actions/ci-upload
+        env:
+          NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}
+        with:
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+          nvkr-ci-always: 'true'
+          name: nvke-os-${{ matrix.arch }}-toolchain-${{ needs.select.outputs.commit }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+          path: .nvkr/evidence
+
+  fetch-nvke-source:
+    name: Fetch exact NVKE source
+    needs: select
+    if: needs.select.outputs.mode == 'full'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      archive_digest: ${{ steps.package.outputs.archive_digest }}
+    steps:
+      # This job contains no checkout or executable code from the selected
+      # candidate. Its NVKE credential never enters either build runner job.
+      - name: Check out trusted storage helper source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+      - name: Build trusted private storage helper
+        env:
+          GOTOOLCHAIN: local
+        run: CGO_ENABLED=0 go build -trimpath -o nvkr-exec ./cmd/nvkr
+      - name: Check out exact pinned NVKE source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: dsx-ai-factory/nvke
+          ref: ${{ needs.select.outputs.nvke_commit }}
+          token: ${{ secrets.NKE_SOURCE_TOKEN }}
+          path: .trusted/nvke
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Authenticate and package credential-free source
+        id: package
+        env:
+          NVKE_COMMIT: ${{ needs.select.outputs.nvke_commit }}
+          NVKE_TREE: ${{ needs.select.outputs.nvke_tree }}
+        run: |
+          set -euo pipefail
+          test "$(git -C .trusted/nvke rev-parse HEAD)" = "${NVKE_COMMIT}"
+          test "$(git -C .trusted/nvke rev-parse 'HEAD^{tree}')" = "${NVKE_TREE}"
+          mkdir -p .handoff
+          git clone --quiet --no-local --no-hardlinks .trusted/nvke .handoff/nvke
+          git -C .handoff/nvke checkout --quiet --detach "${NVKE_COMMIT}"
+          git -C .handoff/nvke remote remove origin
+          test "$(git -C .handoff/nvke rev-parse HEAD)" = "${NVKE_COMMIT}"
+          test "$(git -C .handoff/nvke rev-parse 'HEAD^{tree}')" = "${NVKE_TREE}"
+          config_keys="$(git -C .handoff/nvke config --local --name-only --list)"
+          while IFS= read -r key; do
+            case "${key}" in
+              core.repositoryformatversion|core.filemode|core.bare|core.logallrefupdates|core.ignorecase|core.precomposeunicode) ;;
+              *) echo "source handoff contains unexpected Git configuration key" >&2; exit 1 ;;
+            esac
+          done <<<"${config_keys}"
+          tar -C .handoff -cf .handoff/nvke-source.tar nvke
+          digest="$(sha256sum .handoff/nvke-source.tar | cut -d' ' -f1)"
+          echo "archive_digest=${digest}" >>"${GITHUB_OUTPUT}"
+
+      - name: Upload one-day NVKE source handoff
+        uses: ./.github/nvkr-run/actions/ci-upload
+        env:
+          NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}
+        with:
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+          name: nvke-os-source-${{ github.run_id }}
+          path: .handoff/nvke-source.tar
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1
+
+  validate-full:
+    name: NVKE OS full validation (${{ matrix.arch }})
+    needs: [select, fetch-nvke-source]
+    if: needs.select.outputs.mode == 'full'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.select.outputs.legs) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 420
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Admit native KVM runner
+        run: *native_kvm_preflight
+
+      - name: Check out trusted storage helper source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+      - name: Build trusted private storage helper
+        env:
+          GOTOOLCHAIN: local
+        run: CGO_ENABLED=0 go build -trimpath -o nvkr-exec ./cmd/nvkr
+
+      - name: Download exact NVKE source handoff
+        uses: ./.github/nvkr-run/actions/ci-download
+        env:
+          NVKR_CI_STORAGE_READ_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
+        with:
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          name: nvke-os-source-${{ github.run_id }}
+          path: .trusted-transfer
+
+      - name: Authenticate and unpack pinned NVKE source
+        env:
+          NVKE_COMMIT: ${{ needs.select.outputs.nvke_commit }}
+          NVKE_TREE: ${{ needs.select.outputs.nvke_tree }}
+          SOURCE_ARCHIVE_DIGEST: ${{ needs.fetch-nvke-source.outputs.archive_digest }}
+        run: |
+          set -euo pipefail
+          [[ "${SOURCE_ARCHIVE_DIGEST}" =~ ^[0-9a-f]{64}$ ]]
+          printf '%s  %s\n' "${SOURCE_ARCHIVE_DIGEST}" .trusted-transfer/nvke-source.tar \
+            | sha256sum -c -
+          mkdir -p .trusted
+          tar -xf .trusted-transfer/nvke-source.tar -C .trusted
+          test "$(git -C .trusted/nvke rev-parse HEAD)" = "${NVKE_COMMIT}"
+          test "$(git -C .trusted/nvke rev-parse 'HEAD^{tree}')" = "${NVKE_TREE}"
+
+      - name: Check out the selected NVKR candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.select.outputs.commit }}
+          path: .candidate
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Initialize retained evidence
+        working-directory: .candidate
+        env:
+          CANDIDATE_COMMIT: ${{ needs.select.outputs.commit }}
+          MIRROR_PR: ${{ needs.select.outputs.mirror_pr }}
+          NVKE_COMMIT: ${{ needs.select.outputs.nvke_commit }}
+          NVKE_TREE: ${{ needs.select.outputs.nvke_tree }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          WORKFLOW_SHA: ${{ github.sha }}
+          RUNNER_ARCH: ${{ runner.arch }}
+          RUNNER_NAME: ${{ runner.name }}
+          RUNNER_OS: ${{ runner.os }}
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          mkdir -p .nvkr/evidence
+          candidate_tree="$(git rev-parse 'HEAD^{tree}')"
+          jq -n \
+            --arg scope unqualified-diagnostic \
+            --arg candidateCommit "${CANDIDATE_COMMIT}" \
+            --arg candidateTree "${candidate_tree}" \
+            --arg mirrorPR "${MIRROR_PR}" \
+            --arg nvkeCommit "${NVKE_COMMIT}" \
+            --arg nvkeTree "${NVKE_TREE}" \
+            --arg runID "${RUN_ID}" \
+            --arg runAttempt "${RUN_ATTEMPT}" \
+            --arg workflowSHA "${WORKFLOW_SHA}" \
+            --arg runnerName "${RUNNER_NAME}" \
+            --arg runnerOS "${RUNNER_OS}" \
+            --arg runnerArch "${RUNNER_ARCH}" \
+            --arg targetArch "${TARGET_ARCH}" \
+            '{schemaVersion:"nvkr.dev/nvke-os-validation/v1", scope:$scope,
+              candidateCommit:$candidateCommit, candidateTree:$candidateTree,
+              mirrorPR:$mirrorPR, workflowSHA:$workflowSHA,
+              nvkeCommit:$nvkeCommit, nvkeTree:$nvkeTree,
+              runID:$runID, runAttempt:$runAttempt, targetArch:$targetArch,
+              runner:{name:$runnerName, os:$runnerOS, arch:$runnerArch}}' \
+            >.nvkr/evidence/context.json
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .candidate/.go-version
+          cache: false
+
+      - name: Check guarded Packer dispatch on the admitted KVM runner
+        working-directory: .candidate
+        env:
+          GOTOOLCHAIN: local
+          CGO_ENABLED: '0'
+          NVKR_REQUIRE_KVM_TEST: '1'
+        run: |
+          set -euo pipefail
+          go test ./pkg/nvkr/pipeline -run '^TestRunPackerContainerClassifiesBuildExit$' -count=1 -v \
+            2>&1 | tee ".nvkr/evidence/packer-dispatch-${{ matrix.arch }}.log"
+
+      - name: Build one QCOW2 through the NVKR lifecycle
+        id: lifecycle
+        working-directory: .candidate
+        env:
+          CONTAINER_RUNTIME: docker
+          NVKE_LOCAL_CLONE: ${{ github.workspace }}/.trusted/nvke
+          NVKE_OS_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          attempt="gha-${{ matrix.arch }}-${{ needs.select.outputs.commit }}"
+          echo "${attempt}" >".nvkr/evidence/attempt-${{ matrix.arch }}"
+          scripts/nvke-os-local.sh "${attempt}" 4 \
+            2>&1 | tee ".nvkr/evidence/lifecycle-${{ matrix.arch }}.log"
+
+      - name: Record diagnostic QCOW2 identity
+        working-directory: .candidate
+        env:
+          ARCH: ${{ matrix.arch }}
+          NVKE_COMMIT: ${{ needs.select.outputs.nvke_commit }}
+          NVKE_TREE: ${{ needs.select.outputs.nvke_tree }}
+          RUNNER_ARCH: ${{ runner.arch }}
+          RUNNER_NAME: ${{ runner.name }}
+          RUNNER_OS: ${{ runner.os }}
+        run: |
+          set -euo pipefail
+          attempt="$(cat ".nvkr/evidence/attempt-${ARCH}")"
+          output_dir=".nvkr/runs/${attempt}/outputs"
+          qcow="${output_dir}/nvke-node-image-${ARCH}.qcow2"
+          test -f "${qcow}"
+          test "$(find "${output_dir}" -maxdepth 1 -type f -name '*.qcow2' | wc -l | tr -d ' ')" = 1
+          digest="$(sha256sum "${qcow}" | cut -d' ' -f1)"
+          size="$(stat -c %s "${qcow}")"
+          printf 'sha256:%s\n' "${digest}" >".nvkr/evidence/qcow2-${ARCH}.digest"
+          printf '%s\n' "${size}" >".nvkr/evidence/qcow2-${ARCH}.size"
+          jq --arg digest "sha256:${digest}" --argjson size "${size}" \
+            '. + {qcow2:{digest:$digest, size:$size}}' \
+            .nvkr/evidence/context.json >.nvkr/evidence/metadata.json
+          {
+            echo "### NVKE OS ${ARCH} diagnostic validation"
+            echo
+            echo "- Evidence scope: unqualified diagnostic"
+            echo "- NVKE commit: \`${NVKE_COMMIT}\`"
+            echo "- NVKE tree: \`${NVKE_TREE}\`"
+            echo "- Runner: \`${RUNNER_NAME}\` (\`${RUNNER_OS}/${RUNNER_ARCH}\`)"
+            echo "- QCOW2 digest: \`sha256:${digest}\`"
+            echo "- QCOW2 size: \`${size}\` bytes"
+          } >>"${GITHUB_STEP_SUMMARY}"
+
+      - name: Record exact native toolchain image ID
+        if: always() && (steps.lifecycle.outcome == 'success' || steps.lifecycle.outcome == 'failure')
+        working-directory: .candidate
+        env:
+          ARCH: ${{ matrix.arch }}
+          LIFECYCLE_OUTCOME: ${{ steps.lifecycle.outcome }}
+        run: |
+          set -euo pipefail
+          attempt="$(cat ".nvkr/evidence/attempt-${ARCH}")"
+          plan=".nvkr/runs/${attempt}/.runner/plan.json"
+          if [[ ! -f "${plan}" ]]; then
+            if [[ "${LIFECYCLE_OUTCOME}" == success ]]; then
+              echo "::error::Successful lifecycle did not retain its executable Plan"
+              exit 1
+            fi
+            echo "::notice::No executable Plan was recorded before lifecycle failure; no toolchain observation is available"
+            exit 0
+          fi
+          if ! image="$(jq -er '
+            [.builds[].executionGraph.nodes[] |
+              select(.kind == "build" and .builderType == "vm-image") | .toolchain] |
+            if length == 1 then .[0] else error("expected exactly one disk toolchain") end
+          ' "${plan}")"; then
+            echo "::error::Executable Plan must identify exactly one vm-image toolchain"
+            exit 1
+          fi
+          # Select the smoke image from the Plan, not a mutable development tag.
+          if ! observed="$(docker image inspect --format '{{.Id}}' "${image}")"; then
+            echo "::error::Executable Plan toolchain image is not available locally"
+            exit 1
+          fi
+          test "${observed}" = "${image}" || {
+            echo "::error::Observed toolchain image does not match the executable Plan"
+            exit 1
+          }
+          printf '%s\n' "${image}" | tee ".nvkr/evidence/toolchain-${ARCH}.image-id"
+
+      - name: Run source-owned boot smoke
+        working-directory: .candidate
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          attempt="$(cat ".nvkr/evidence/attempt-${ARCH}")"
+          qcow=".nvkr/runs/${attempt}/outputs/nvke-node-image-${ARCH}.qcow2"
+          # This image was built by candidate code; the smoke result remains
+          # diagnostic and does not authenticate the toolchain or disk.
+          image="$(cat ".nvkr/evidence/toolchain-${ARCH}.image-id")"
+          [[ "${image}" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+            echo "missing exact observed ${ARCH} Packer toolchain image ID" >&2
+            exit 1
+          }
+          mkdir -p ".nvkr/boot-smoke/${ARCH}"
+          identity_dir="${PWD}/.nvkr/boot-smoke-identity/${ARCH}"
+          install -d -m 0700 "${identity_dir}"
+          printf 'nvkr:x:%s:%s:NVKR Builder:/work:/bin/sh\n' "$(id -u)" "$(id -g)" \
+            >"${identity_dir}/passwd"
+          printf 'nvkr:x:%s:\n' "$(id -g)" >"${identity_dir}/group"
+          chmod 0400 "${identity_dir}/passwd" "${identity_dir}/group"
+          kvm_group="$(stat -c %g /dev/kvm)"
+          docker run --rm --pull=never --network=none --read-only --cap-drop=all \
+            --security-opt no-new-privileges --device /dev/kvm --group-add "${kvm_group}" \
+            --user "$(id -u):$(id -g)" --tmpfs /tmp:rw,nosuid,nodev \
+            --mount "type=bind,src=${identity_dir}/passwd,dst=/etc/passwd,readonly" \
+            --mount "type=bind,src=${identity_dir}/group,dst=/etc/group,readonly" \
+            --volume "${GITHUB_WORKSPACE}/.trusted/nvke:/nvke:ro" \
+            --volume "${PWD}/${qcow}:/nvke-node-image-${ARCH}.qcow2:ro" \
+            --volume "${PWD}/.nvkr/boot-smoke/${ARCH}:/work:rw" \
+            --env ARCH="${ARCH}" --entrypoint bash "${image}" -ec '
+              ssh-keygen -q -t ed25519 -N "" -f /work/id_ed25519
+              QCOW=/nvke-node-image-${ARCH}.qcow2 SSH_KEY=/work/id_ed25519 REQUIRE_ACCELERATION=1 \
+                /nvke/os-image/packer/scripts/boot-smoke.sh
+            ' 2>&1 | tee ".nvkr/evidence/boot-smoke-${ARCH}.log"
+
+      - name: Upload full validation evidence
+        if: always() && needs.select.outputs.commit == github.workflow_sha
+        uses: ./.github/nvkr-run/actions/ci-upload
+        env:
+          NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}
+        with:
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+          nvkr-ci-always: 'true'
+          name: nvke-os-${{ matrix.arch }}-evidence-${{ needs.select.outputs.commit }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+          path: |
+            .candidate/.nvkr/evidence
+            .candidate/.nvkr/runs/gha-${{ matrix.arch }}-${{ needs.select.outputs.commit }}/.runner/plan.json
+            .candidate/.nvkr/runs/gha-${{ matrix.arch }}-${{ needs.select.outputs.commit }}/diagnostics/packer
+            .candidate/.nvkr/runs/gha-${{ matrix.arch }}-${{ needs.select.outputs.commit }}/lifecycle.json
+
+      - name: Upload retained QCOW2
+        if: success() && needs.select.outputs.retain_qcow2 == 'true' && needs.select.outputs.commit == github.workflow_sha
+        uses: ./.github/nvkr-run/actions/ci-upload
+        env:
+          NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}
+        with:
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+          name: nvke-os-${{ matrix.arch }}-qcow2-${{ needs.select.outputs.commit }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 3
+          path: .candidate/.nvkr/runs/gha-${{ matrix.arch }}-${{ needs.select.outputs.commit }}/outputs/nvke-node-image-${{ matrix.arch }}.qcow2

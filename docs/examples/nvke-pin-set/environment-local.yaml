@@ -1,0 +1,10 @@
+apiVersion: nvkr.dev/environment/v1
+kind: Environment
+metadata:
+  name: local-chart-packaging
+  description: Local chart packaging without publication or signing.
+runtime:
+  runtime: docker
+utilityContainer: golang@sha256:69a7b9788769bec032d238959b61854e9ae87f57be9029ec04e9885fabf99195
+# Set linux/arm64 when the local container runtime runs on ARM64.
+utilityPlatform: linux/amd64

@@ -1,0 +1,125 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package main
+
+import (
+	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/urfave/cli/v2"
+)
+
+func TestGitHubFactoryCommandsKeepOperationDiagnosticsInLogs(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		err  error
+	}{
+		{name: "success"},
+		{name: "failure", err: e.New(e.CodeVerifyFailed, "controlled operation failure")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			summary := filepath.Join(t.TempDir(), "summary.md")
+			t.Setenv("GITHUB_STEP_SUMMARY", summary)
+			called := false
+			command := githubFactoryCommand("diagnostic-test", "", func(_ *cli.Context, plan *factory.Plan, options factory.GitHubStepOptions) error {
+				called = true
+				if plan == nil || options.Stdout != os.Stdout || options.Stderr != os.Stderr || options.SummaryPath != "" {
+					t.Fatalf("operation must receive its plan and logs without a per-step summary: %+v", options)
+				}
+				return test.err
+			})
+			app := &cli.App{Commands: []*cli.Command{command}}
+			err := app.RunContext(t.Context(), []string{"nvkr", "diagnostic-test", "--plan", filepath.Join("..", "..", factory.FactoryPlanPath)})
+			if !called || err != test.err {
+				t.Fatalf("operation result changed: called=%t, error=%v, want %v", called, err, test.err)
+			}
+			if _, err := os.Stat(summary); !os.IsNotExist(err) {
+				t.Fatalf("operation wrote a per-step summary: %v", err)
+			}
+		})
+	}
+}
+
+func TestGitHubFactoryCommandsRejectUnboundWorkBeforeOutputs(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", factory.FactoryPlanPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name string
+		args []string
+		code e.Code
+	}{
+		{"missing node", []string{"github", "run-node", "--plan", "plan.json"}, e.CodeUsage},
+		{"unknown node", []string{"github", "run-node", "--plan", "plan.json", "--node", "unknown"}, e.CodeInvalidCatalog},
+		{"unknown stage", []string{"github", "restore-inputs", "--plan", "plan.json", "--stage", "unknown"}, e.CodeInvalidCatalog},
+		{"unknown pack node", []string{"github", "pack-outputs", "--plan", "plan.json", "--node", "unknown"}, e.CodeInvalidCatalog},
+		{"missing recovery jobs", []string{"github", "recover", "--plan", "plan.json"}, e.CodeInvalidCatalog},
+		{"positional arguments", []string{"github", "recover", "--plan", "plan.json", "unexpected"}, e.CodeUsage},
+		{"extra authority flag", []string{"github", "run-node", "--plan", "plan.json", "--node", "unknown", "--workspace", "outside"}, e.CodeUsage},
+		{"substituted plan", []string{"execute-node", "--plan", "plan.json", "--node", "unknown", "--plan-digest", "sha256:" + strings.Repeat("a", 64)}, e.CodePipelineDrift},
+		{"source missing expectation", []string{"inspect-source", "--plan", "plan.json", "--node", "unknown"}, e.CodeUsage},
+		{"source substituted plan", []string{"inspect-source", "--plan", "plan.json", "--node", "unknown", "--plan-digest", "sha256:" + strings.Repeat("a", 64)}, e.CodePipelineDrift},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			t.Chdir(root)
+			t.Setenv("GITHUB_STEP_SUMMARY", filepath.Join(root, "summary.md"))
+			t.Setenv("NVKR_JOB_RESULTS", "{}")
+			if err := os.WriteFile("plan.json", raw, 0600); err != nil {
+				t.Fatal(err)
+			}
+			_, err := invokeLifecycleCLI(t, append([]string{"factory"}, test.args...)...)
+			assertLifecycleCommandCode(t, err, test.code)
+			for _, path := range []string{".nvkr", "summary.md"} {
+				if _, err := os.Stat(path); !os.IsNotExist(err) {
+					t.Fatalf("rejected operation touched %s: %v", path, err)
+				}
+			}
+		})
+	}
+}
+
+func TestFactoryDoesNotExposeUnusedSourceFetchCommand(t *testing.T) {
+	for _, command := range cmdFactory().Subcommands {
+		if command.Name == "fetch-source" {
+			t.Fatal("unused source-only command bypasses the GitHub Plan admission boundary")
+		}
+	}
+}
+
+// Exercise main in a fresh process: writing to a reader-closed fd 2 otherwise
+// exits with SIGPIPE before the selected coded status reaches os.Exit.
+func TestCLIFinalDiagnosticPreservesStatusWithClosedPipe(t *testing.T) {
+	if os.Getenv("NVKR_TEST_FINAL_DIAGNOSTIC") == "1" {
+		os.Args = []string{"nvkr", "unknown-command"}
+		main()
+		return
+	}
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := reader.Close(); err != nil {
+		t.Fatal(err)
+	}
+	defer writer.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	command := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestCLIFinalDiagnosticPreservesStatusWithClosedPipe$")
+	command.Env = append(os.Environ(), "NVKR_TEST_FINAL_DIAGNOSTIC=1")
+	command.Stderr = writer
+	err = command.Run()
+	want := e.ExitCode(e.New(e.CodeUsage, ""))
+	if command.ProcessState == nil || command.ProcessState.ExitCode() != want {
+		t.Fatalf("closed final diagnostic changed exit: %v, state=%v, want %d", err, command.ProcessState, want)
+	}
+}

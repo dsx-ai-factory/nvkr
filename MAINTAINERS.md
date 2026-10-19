@@ -1,10 +1,10 @@
 # Maintainers
 
-This document lists the maintainers of the NVIDIA NKE Recipes project.
+This document lists the maintainers of the NVIDIA NVKR project.
 
 ## Current Maintainers
 
-This list is the authoritative maintainer roster. The `@dsx-ai-factory/nke-write` GitHub
+This list is the authoritative maintainer roster. The `@dsx-ai-factory/nvke-write` GitHub
 team grants repository access and is referenced by
 [`.github/CODEOWNERS`](.github/CODEOWNERS), but it is an organization-wide team
 with a far broader membership than this roster; it does not define who the

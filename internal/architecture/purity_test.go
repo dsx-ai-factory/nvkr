@@ -5,9 +5,9 @@
 // the identity-producing code paths contain no nondeterministic source — wall-clock
 // reads, randomness, UUID generation, hostname, or host-environment reads — because a
 // leak there would make buildDigest host-dependent and collapse the trust model. It
-// is the static half; the empirical invariance test lives in pkg/nkd/ir
+// is the static half; the empirical invariance test lives in pkg/nvkr/ir
 // (TestDigestHostInvariance). A deliberate exception is allowlisted only with an
-// inline `//nkd:allow-nondeterminism` note on the offending line, forcing a
+// inline `//nvkr:allow-nondeterminism` note on the offending line, forcing a
 // justification into the diff.
 package architecture
 
@@ -37,11 +37,11 @@ var forbidden = []string{
 	"uuid.NewString",
 }
 
-const allowMarker = "//nkd:allow-nondeterminism"
+const allowMarker = "//nvkr:allow-nondeterminism"
 
 func TestIdentityPathsArePure(t *testing.T) {
 	for _, pkg := range identityPaths {
-		dir := filepath.Join("..", "..", "pkg", "nkd", pkg)
+		dir := filepath.Join("..", "..", "pkg", "nvkr", pkg)
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			t.Fatalf("reading %s: %v", dir, err)

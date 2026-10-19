@@ -1,0 +1,380 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package factory
+
+import (
+	"context"
+	"errors"
+	"maps"
+	"os"
+	"path/filepath"
+	"reflect"
+	"sort"
+	"strings"
+	"testing"
+
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
+)
+
+func diskPublicationPlanFixture(t *testing.T, platform string) *Plan {
+	return diskPublicationPlanFixtureForHost(t, platform, platform)
+}
+
+func diskPublicationPlanFixtureForHost(t *testing.T, platform, host string) *Plan {
+	t.Helper()
+	fixture := newVMPackerMaterialFixtureForPlatform(t, nil,
+		map[string]string{"agent": "agent", "runtime": "runtime"}, platform)
+	definition, environment := fixture.plan.Definition.Clone(), fixture.plan.Environment.Clone()
+	for _, class := range environment.ExecutionClasses {
+		if string(class.HostPlatform) == host {
+			environment.ExecutionClasses = []execution.Class{class}
+			break
+		}
+	}
+	environment.Runtime.Runtime = "podman"
+	environment.Publication = &authored.Publication{RepositoryPrefix: "example.test/nvkr", Anonymous: true}
+	environment.Signing = cosignSigningProfile()
+	definition.CosignTool = "cosign"
+	environment.DiskInspectionProfiles = map[string]authored.DiskInspectionProfile{host: {
+		Image:           "example.test/inspection@sha256:" + strings.Repeat("1", 64),
+		InspectorDigest: "sha256:" + strings.Repeat("2", 64), CodecDigest: "sha256:" + strings.Repeat("3", 64),
+		GuestfishDigest: "sha256:" + strings.Repeat("4", 64), ScannerDigest: "sha256:" + strings.Repeat("5", 64),
+		PackageReaderDigest: "sha256:" + strings.Repeat("6", 64),
+		Resources:           execution.ResourceRequest{CPUMillis: 1000, MemoryMiB: 2048, EphemeralStorageMiB: 2048},
+		TimeoutSeconds:      60, MaxFilesystemBytes: 1 << 20, ScratchStorage: "private-volume",
+	}}
+	base := fixture.plan.CatalogSnapshot
+	root := base.Components["image"]
+	packer := *root.Packer
+	packer.AcquisitionArchive = "test-acquisitions.tar"
+	root.Packer = &packer
+	base.Components["image"] = root
+	base.Tools = map[string]catalog.ToolPin{"cosign": {
+		Format: ToolFormatTarGzip, URL: "https://example.test/cosign.tar.gz", Platform: environment.UtilityPlatform,
+		ExecutablePath: "cosign", ArchiveDigest: testCosignArchiveDigest, ExecutableDigest: testCosignExecutableDigest,
+	}}
+	stack, err := catalog.ApplyStack(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := Compile(t.Context(), definition, environment, stack, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return plan
+}
+
+func TestDiskPublicationSelectsFrozenExecutionHostProfile(t *testing.T) {
+	for _, pair := range [][2]string{{"linux/arm64", "linux/amd64"}, {"linux/amd64", "linux/arm64"}} {
+		t.Run(pair[0]+" on "+pair[1], func(t *testing.T) {
+			plan := diskPublicationPlanFixtureForHost(t, pair[0], pair[1])
+			expected := plan.LifecycleOutputs[0]
+			nodes, artifacts := planIndex(plan)
+			root, err := plan.ExecutionFor(nodes[artifacts[expected.ArtifactID].Producer])
+			if err != nil || root.ExecutionBinding == nil || string(root.ExecutionBinding.Class.HostPlatform) != pair[1] {
+				t.Fatalf("root execution host = %+v, %v", root, err)
+			}
+			profile := plan.Environment.DiskInspectionProfiles[pair[1]]
+			if evidence := nodes[expected.Name+"/sbom"]; evidence.Platform != pair[1] || evidence.Container != profile.Image {
+				t.Fatalf("inspection used guest instead of frozen host: %+v", evidence)
+			}
+			guest, selected, err := reconciledDiskPackageBinding(plan, expected, artifacts["package/"+expected.Name])
+			if err != nil || guest != pair[0] || selected != profile {
+				t.Fatalf("wrapper guest/profile = %s, %+v, %v", guest, selected, err)
+			}
+			// Persisted evidence uses native host tooling but retains the guest
+			// platform in its catalog-derived source subject. No receipt is minted.
+			component := artifacts[expected.ArtifactID].Component
+			pin := pipeline.FileDigest(testQCOW2HeaderPayload())
+			var sources []catalog.NamedComponent
+			for _, source := range plan.Builds[0].ResolvedComponents {
+				if source.Name == component {
+					sources = append(sources, source)
+				}
+			}
+			documents, _, err := sbom.PerArtifact(&buildgraph.Resolved{Platform: guest,
+				Components: sources}, expected.BuildDigest, map[string]string{component: pin})
+			if err != nil {
+				t.Fatal(err)
+			}
+			bom, err := sbom.ForSubject(documents[component], pin, "build-output", pin)
+			if err != nil {
+				t.Fatal(err)
+			}
+			bom.Metadata.Component.Type = "operating-system"
+			bom, err = sbom.WithDependencies(bom, []sbom.Component{{Type: "library", Name: "controlled-package", Version: "1"}}, "disk-reconciled/v1", profile.ScannerDigest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for key, value := range map[string]string{
+				"nvkr:diskInspectionRuntimeDigest": pin, "nvkr:diskInspectorDigest": profile.InspectorDigest, "nvkr:diskCodecDigest": profile.CodecDigest,
+			} {
+				bom.Metadata.Props = append(bom.Metadata.Props, sbom.Property{Name: key, Value: value})
+			}
+			sort.Slice(bom.Metadata.Props, func(i, j int) bool { return bom.Metadata.Props[i].Name < bom.Metadata.Props[j].Name })
+			if err := validateReconciledDiskDocument(plan, expected.Name, component, pin, bom); err != nil {
+				t.Fatalf("native host evidence rejected: %v", err)
+			}
+			for _, kind := range []string{"application", "library", "container", "file"} {
+				changed := *bom
+				changed.Metadata.Component.Type = kind
+				assertFactoryErrorCode(t, validateReconciledDiskDocument(plan, expected.Name, component, pin, &changed), e.CodeVerifyFailed)
+			}
+			for _, field := range []string{"version", "purl"} {
+				changed := *bom
+				switch field {
+				case "version":
+					changed.Metadata.Component.Version = "substituted-version"
+				case "purl":
+					changed.Metadata.Component.PURL = "pkg:generic/substituted-source@1"
+				}
+				err := validateReconciledDiskDocument(plan, expected.Name, component, pin, &changed)
+				assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
+				if !strings.Contains(err.Error(), "frozen full component source subject") {
+					t.Fatalf("%s substitution missed source owner comparison: %v", field, err)
+				}
+			}
+			for index := range bom.Metadata.Props {
+				if bom.Metadata.Props[index].Name == "nvkr:dependencyScannerDigest" {
+					bom.Metadata.Props[index].Value = "sha256:" + strings.Repeat("9", 64)
+				}
+			}
+			assertFactoryErrorCode(t, validateReconciledDiskDocument(plan, expected.Name, component, pin, bom), e.CodeVerifyFailed)
+		})
+	}
+}
+
+func TestCompileProductionDiskPreservesRawRootAndAllEvidence(t *testing.T) {
+	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
+		t.Run(platform, func(t *testing.T) {
+			plan := diskPublicationPlanFixture(t, platform)
+			if plan.Definition.SBOMTool != "" {
+				t.Fatal("fixture unexpectedly selected an ordinary scanner")
+			}
+			expected := plan.LifecycleOutputs[0]
+			nodes, artifacts := planIndex(plan)
+			if expected.ArtifactID != "artifact/node-image/image" || artifacts[expected.ArtifactID].BuildTarget != expected.Name {
+				t.Fatal("production compilation substituted the raw lifecycle subject")
+			}
+			wrapper := artifacts["package/"+expected.Name]
+			if wrapper.Kind != PackageDiskImage || wrapper.MediaType != "application/vnd.nvkr.disk-image.v1" || wrapper.BuildTarget != "" {
+				t.Fatalf("wrapper = %+v", wrapper)
+			}
+			evidence := nodes[expected.Name+"/sbom"]
+			if evidence.Kind != NodeSBOM || evidence.Platform != platform || evidence.Container != plan.Environment.DiskInspectionProfiles[platform].Image {
+				t.Fatalf("evidence operation = %+v", evidence)
+			}
+			for _, component := range expected.Components {
+				for _, id := range []string{"artifact/" + expected.Name + "/" + component, "result/" + expected.Name + "/" + component} {
+					if !containsString(evidence.Inputs, id) || !containsString(nodes[wrapper.Producer].Inputs, id) {
+						t.Fatalf("disk evidence or wrapper omits %s", id)
+					}
+				}
+			}
+			if !containsString(nodes["package/release"].Inputs, wrapper.ID) || !containsString(nodes["package/release"].Inputs, "sbom/"+expected.Name) {
+				t.Fatal("publication omits disk wrapper or component evidence")
+			}
+			if err := plan.Validate(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestObserveProductionDiskKeepsManifestAndRawDigestsSeparate(t *testing.T) {
+	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
+		t.Run(platform, func(t *testing.T) {
+			plan := diskPublicationPlanFixture(t, platform)
+			_, baseArtifacts := planIndex(plan)
+			raw := testQCOW2HeaderPayload()
+			path := filepath.Join(t.TempDir(), "disk.qcow2")
+			if err := os.WriteFile(path, raw, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			// Observation is read-only. Each row gets its own descriptions and
+			// producer record while sharing these immutable wrapper bytes.
+			wrappers := make(map[string]Artifact)
+			for _, wrapperPlatform := range []string{"linux/amd64", "linux/arm64"} {
+				wrapper := baseArtifacts["package/"+plan.LifecycleOutputs[0].Name]
+				wrapper.Path = filepath.Join(t.TempDir(), "wrapper")
+				if _, err := delivery.BuildDiskArtifact(t.Context(), wrapper.Path, delivery.DiskArtifactRequest{
+					Path: path, Digest: pipeline.FileDigest(raw), Size: int64(len(raw)), Platform: wrapperPlatform,
+					Format: "qcow2", Encryption: "none", ArtifactType: wrapper.MediaType,
+				}); err != nil {
+					t.Fatal(err)
+				}
+				wrappers[wrapperPlatform] = wrapper
+			}
+			descriptor, err := delivery.PayloadDescriptor(t.Context(), wrappers[platform].Path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, condition := range []string{"valid", "manifest substituted for raw", "wrong size", "wrong wrapper platform", "canceled",
+				"missing raw", "wrong raw producer", "missing wrapper", "wrong wrapper producer", "missing record", "wrong record component", "wrong frozen output"} {
+				t.Run(condition, func(t *testing.T) {
+					expected := plan.LifecycleOutputs[0]
+					artifacts := maps.Clone(baseArtifacts)
+					wrapperPlatform := platform
+					if condition == "wrong wrapper platform" {
+						wrapperPlatform = "linux/amd64"
+						if platform == wrapperPlatform {
+							wrapperPlatform = "linux/arm64"
+						}
+					}
+					wrapper := wrappers[wrapperPlatform]
+					artifacts[wrapper.ID] = wrapper
+					record := artifacts["result/"+expected.Name+"/image"]
+					record.Path = filepath.Join(t.TempDir(), "result.json")
+					artifacts[record.ID] = record
+					observed := pipeline.ArtifactResult{Component: "image", OutputType: PackageDiskImage,
+						SHA256: pipeline.FileDigest(raw), Size: int64(len(raw))}
+					if condition == "manifest substituted for raw" {
+						observed.SHA256 = descriptor.Digest
+					}
+					if condition == "wrong size" {
+						observed.Size++
+					}
+					encoded, err := canonical.Marshal(observed)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(record.Path, encoded, 0o600); err != nil {
+						t.Fatal(err)
+					}
+					want := e.CodeVerifyFailed
+					switch condition {
+					case "missing raw":
+						delete(artifacts, expected.ArtifactID)
+						want = e.CodeReleaseIncomplete
+					case "wrong raw producer":
+						changed := artifacts[expected.ArtifactID]
+						changed.Producer = "sibling/build-image"
+						artifacts[expected.ArtifactID] = changed
+						want = e.CodeReleaseIncomplete
+					case "missing wrapper":
+						delete(artifacts, wrapper.ID)
+						want = e.CodeReleaseIncomplete
+					case "wrong wrapper producer":
+						wrapper.Producer = "sibling/package-image"
+						artifacts[wrapper.ID] = wrapper
+						want = e.CodeReleaseIncomplete
+					case "missing record":
+						delete(artifacts, record.ID)
+						want = e.CodeProvenanceMissing
+					case "wrong record component":
+						record.Component = "sibling"
+						artifacts[record.ID] = record
+						want = e.CodeProvenanceMissing
+					case "wrong frozen output":
+						expected.BuildDigest = "sha256:" + strings.Repeat("9", 64)
+						want = e.CodePipelineDrift
+					case "canceled":
+						want = e.CodeTimeout
+					}
+					ctx, cancel := context.WithCancel(t.Context())
+					defer cancel()
+					if condition == "canceled" {
+						cancel()
+					}
+					result, err := ObserveDiskPublicationPayload(ctx, plan, expected, artifacts)
+					if condition != "valid" {
+						if factoryErrorCode(err) != want || !reflect.DeepEqual(result, delivery.Output{}) {
+							t.Fatalf("invalid projection = %+v, %v", result, err)
+						}
+						if condition == "canceled" && (!errors.Is(err, context.Canceled) || factoryErrorCode(err) != e.CodeTimeout) {
+							t.Fatalf("cancellation = %v", err)
+						}
+						return
+					}
+					if err != nil || result.Digest != descriptor.Digest || result.Disk == nil || result.Disk.PayloadDigest != observed.SHA256 || result.Digest == result.Disk.PayloadDigest {
+						t.Fatalf("projection = %+v, %v", result, err)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestPackageReconciledDiskRequiresLiveEvidenceBeforeOutput(t *testing.T) {
+	for _, condition := range []string{"nil context", "canceled", "missing owner", "missing plan", "missing runtime", "missing receipt", "inert receipt"} {
+		t.Run(condition, func(t *testing.T) {
+			ctx := t.Context()
+			owner, inspection := &LocalRunResult{}, &sbom.DiskInspectionRuntime{}
+			plan := diskPublicationPlanFixture(t, "linux/amd64")
+			expected := plan.LifecycleOutputs[0]
+			_, artifacts := planIndex(plan)
+			output := artifacts["package/"+expected.Name]
+			// Non-nil but inert: this isolates each required argument without
+			// pretending that a live evidence owner issued a receipt.
+			receipt := &DiskEvidenceReceipt{}
+			want := e.CodeProvenanceMissing
+			switch condition {
+			case "nil context":
+				ctx, want = nil, e.CodeUsage
+			case "canceled":
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+				want = e.CodeTimeout
+			case "missing owner":
+				owner = nil
+			case "missing plan":
+				plan = nil
+			case "missing runtime":
+				inspection = nil
+			case "missing receipt":
+				receipt = nil
+			case "inert receipt":
+				want = e.CodeVerifyFailed
+			}
+			result, document, err := owner.PackageReconciledDisk(ctx, plan, expected, inspection, receipt, output)
+			if factoryErrorCode(err) != want || document != nil || !reflect.DeepEqual(result, delivery.Result{}) {
+				t.Fatalf("refusal = %+v, %v, %v", result, document, err)
+			}
+			if _, err := os.Stat(output.Path); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("missing live authority created output: %v", err)
+			}
+		})
+	}
+}
+
+func TestHostedDiskCompletionRequiresOriginalLiveOwners(t *testing.T) {
+	for _, condition := range []string{"nil context", "nil plan", "missing owner", "missing runtime", "canceled", "not pipeline-attested"} {
+		t.Run(condition, func(t *testing.T) {
+			ctx := t.Context()
+			plan, owner, inspection := &Plan{}, &LocalRunResult{}, &sbom.DiskInspectionRuntime{}
+			want := e.CodeProvenanceMissing
+			switch condition {
+			case "nil context":
+				ctx, want = nil, e.CodeUsage
+			case "nil plan":
+				plan = nil
+			case "missing owner":
+				owner = nil
+			case "missing runtime":
+				inspection = nil
+			case "canceled":
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+				want = e.CodeTimeout
+			case "not pipeline-attested":
+				want = e.CodeEngineCapability
+			}
+			err := CompleteHostedDiskPublication(ctx, plan, LifecycleOutputPlan{}, owner, inspection)
+			assertFactoryErrorCode(t, err, want)
+			if owner != nil && len(owner.Nodes) != 0 {
+				t.Fatal("failed completion recorded successful node outcomes")
+			}
+		})
+	}
+}

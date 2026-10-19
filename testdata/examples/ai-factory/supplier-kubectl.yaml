@@ -1,4 +1,4 @@
-apiVersion: nkd.dev/catalog-overlay/v3
+apiVersion: nvkr.dev/catalog-overlay/v3
 components:
   kubectl:
     outputType: host-package
@@ -13,4 +13,4 @@ components:
     version: v1.32.0
 kind: CatalogOverlay
 name: trusted-kubernetes-supplier
-requiresCatalogDigest: sha256:da06df2e2c3e74baaa9ee7b3a190ab58ba3ed02b4a244bee8cf0d8eec223eb00
+requiresCatalogDigest: sha256:7f89dcca125121399fce3a88147f98b9ac1aefc366ff5275e91ee2ff6f60da4d

@@ -1,6 +1,6 @@
-# Contributing to NKE Recipes
+# Contributing to NVKR
 
-Thanks for your interest. NKE Recipes is an Apache-2.0 implementation of a pinned, verifiable
+Thanks for your interest. NVKR is an Apache-2.0 implementation of a pinned, verifiable
 Definition → Run → Release architecture. Exact-byte reproduction is a separate qualified claim for an exact
 subject; it is not inherited by every pipeline or aggregate artifact. This guide covers the dev loop, the
 contribution mechanics, and the invariants a change must respect. See **[DEVELOPMENT.md](DEVELOPMENT.md)**
@@ -10,9 +10,9 @@ for a deeper environment walkthrough and **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.
 ## Getting started
 
 ```sh
-git clone https://github.com/NVIDIA/nke-recipes && cd nke-recipes
+git clone https://github.com/dsx-ai-factory/nvkr && cd nvkr
 make help          # list all targets
-make build         # compile bin/nkdctl; catalogs are supplied explicitly
+make build         # compile bin/nvkr; catalogs are supplied explicitly
 make check         # the full local gate, including the Go vulnerability check
 ```
 
@@ -38,7 +38,7 @@ vulnerability check needs access to the Go vulnerability database; see the
 [maintainer procedure](docs/cve-management.md) for triage and scope.
 
 Expensive capacity and full-product integration fixtures require
-`NKD_TEST_EXTENDED=1`; `make test-full` sets it for the race-and-coverage run.
+`NVKR_TEST_EXTENDED=1`; `make test-full` sets it for the race-and-coverage run.
 Enable them selectively when changing large-document limits, attestation or
 publication readback, catalog serialization limits, maintained workflow
 generation, or the authoring lab. Go's `-short` flag keeps them skipped even when
@@ -59,7 +59,7 @@ baseline pending ratification, and [`docs/adr/reconciliation.md`](docs/adr/recon
 current implementation boundary:
 
 - **Fail closed.** An unpinned source ref, a tag-pinned toolchain, an unknown component or unsupported target platform must error with a coded, distinct exit status — never a silent default.
-- **Deterministic IR.** `buildDigest` identifies the validated graph's logical projection under `nkd.build`.
+- **Deterministic IR.** `buildDigest` identifies the validated graph's logical projection under `nvkr.build`.
   Transport and execution metadata remain in the full graph and Plan. No host paths,
   clocks, UUIDs, random values, invalid UTF-8 normalization, or Go map-iteration order may feed a semantic
   identity, manifest, or signature.
@@ -78,18 +78,24 @@ current implementation boundary:
 
 ## Contributing a catalog / component
 
-Adding a component is a **declarative** change in the selected Definition’s catalog under `definitions/`.
+Adding a component is a **declarative** change in the selected Definition’s catalog under `inputs/catalogs/`.
 Select it directly in an output with a concrete platform, with every source, toolchain, vendor closure, or acquired artifact pinned by exact
 content identity. A qualified prebuilt entry must also declare digest-pinned typed evidence or an exact authenticated
-waiver; v1 acquisition uses the separate production-evidence contract. Run `make build` and validate the changed Definition with `bin/nkdctl definition validate --definition <path>`. A source bake-off is useful contract evidence, but
+waiver; v1 acquisition uses the separate production-evidence contract. Run `make build` and validate the changed Definition with `bin/nvkr definition validate --definition <path>`. A source bake-off is useful contract evidence, but
 release qualification also requires the authenticated producer, terminal, evidence, policy, and status chain
 described in the ADR reconciliation. Operators may ship an entirely separate catalog via `--data` (see
 `testdata/examples/operator-catalog/`).
 
 Catalog diagnostics require an explicit `--data` path. There is no embedded worker catalog or backward-compatibility
-requirement. Worker binaries belong to the NKE OS-image build; add product outputs through a Definition.
+requirement. Worker binaries belong to the NVKE OS-image build; add product outputs through a Definition.
 
 ## Pull request process
+
+For a substantial feature, behavior change, or architectural change, open or find a GitHub issue and discuss
+the approach with maintainers before starting implementation. Link that issue in the PR so reviewers can
+follow the problem and agreed scope. Small bug fixes, typo corrections, and documentation clarifications
+may go directly to a focused PR. Report security vulnerabilities privately through
+[SECURITY.md](SECURITY.md), rather than opening a public issue or PR.
 
 1. **Branch** off `main`; keep the change focused.
 2. **`make check` is green** and new behavior has a test (pure-logic where possible).
@@ -105,6 +111,23 @@ requirement. Worker binaries belong to the NKE OS-image build; add product outpu
    changes. Current product requirements belong in the milestone specification; engineering contracts belong
    in the owning ADR. Superseded plans and requirement exports are available in Git history.
 5. Open the PR with a clear description of *what* and *why*; link any issue.
+
+### Review
+
+- **Who reviews.** GitHub requests review from the code owners of the paths you touch.
+  [`.github/CODEOWNERS`](.github/CODEOWNERS) routes every path to the `@dsx-ai-factory/nvke-write` team. The
+  [maintainers](MAINTAINERS.md) handle the review, requests for changes and the merge decision under
+  [GOVERNANCE.md](GOVERNANCE.md). The branch rules on `main` require one approving review from a code owner and a
+  green `gate` check before a merge.
+- **What to expect.** A non-trivial change stays open for at least five business days so that any maintainer can
+  raise a blocking objection (lazy consensus, [GOVERNANCE.md](GOVERNANCE.md#decision-making)). A draft pull request
+  is not reviewed until you mark it ready. The repository does not publish a response-time target for pull requests;
+  maintainers review issues and discussions at least weekly under the
+  [issue and PR management procedure](docs/github-issue-pr-management.md).
+- **How to follow up.** If a pull request has had no response after a week, comment on it and mention
+  `@dsx-ai-factory/nvke-write` or a maintainer from [MAINTAINERS.md](MAINTAINERS.md). If you are not sure who owns the
+  change, ask in [GitHub Discussions Q&A](https://github.com/dsx-ai-factory/nvkr/discussions/categories/q-a). Pull
+  requests are not closed automatically for inactivity; issues are (see the procedure).
 
 ## Signing your commits
 

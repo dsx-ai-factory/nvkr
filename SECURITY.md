@@ -17,7 +17,7 @@ NVIDIA follows a coordinated vulnerability disclosure process. See the [NVIDIA P
 
 ## Maintainer response
 
-NKE Recipes maintainers use the [vulnerability management procedure](docs/cve-management.md)
+NVKR maintainers use the [vulnerability management procedure](docs/cve-management.md)
 to detect, triage, track, and remediate findings in this repository. PSIRT
 coordinates external reports, disclosure, and incident-specific timelines;
 the repository procedure does not supersede those decisions.
@@ -28,7 +28,7 @@ For security bulletins, policies, acknowledgements, and reporting resources, vis
 
 ## Scope
 
-nkdctl's target trust model is **reproducibility as provenance**. The currently implemented authority-bearing
+nvkr's target trust model is **reproducibility as provenance**. The currently implemented authority-bearing
 surface is narrower: contract-tested Linux local qualification and exact-byte verification require authenticated
 profiles, descriptor-held pinned tools, terminal artifact receipts, and signed typed evidence; unavailable
 adapters fail closed. This is not a claim that a production deployment or its external services have been
@@ -41,7 +41,7 @@ qualified. Reports of particular interest:
 - signature/offline-verify bypasses involving authenticated documents, pinned roots, bundles, issuer, or
   identity policy.
 
-Out of scope: vulnerabilities in the **upstream components** nkdctl builds (report those upstream) and in
+Out of scope: vulnerabilities in the **upstream components** nvkr builds (report those upstream) and in
 an **operator-authored catalog** (`--data`) that ships outside this repository.
 
 ## Trust boundaries and deployment assumptions
@@ -53,10 +53,10 @@ authority subprocesses whose protocols accept descriptor paths use held or anony
 executable and security-sensitive inputs. A platform that cannot execute the held capability must fail that
 qualified operation rather than fall back to an ambient or private pathname. Container execution is a distinct
 engine boundary: the configured daemon and its mount implementation are trusted to consume the materialized,
-receipt-bound source tree presented by the runner; NKD does not claim a pathname bind mount is an FD transfer.
+receipt-bound source tree presented by the runner; NVKR does not claim a pathname bind mount is an FD transfer.
 
-That hardening is not a sandbox for the account running nkdctl. The trusted computing base still includes the
-host kernel, the integrity of the running nkdctl process, root-owned loader and library state, the configured
+That hardening is not a sandbox for the account running nvkr. The trusted computing base still includes the
+host kernel, the integrity of the running nvkr process, root-owned loader and library state, the configured
 container-daemon endpoint, trusted time and trust-store configuration, and every explicitly injected in-process
 adapter. Arbitrary code that can ptrace the process, replace its memory, control its container daemon, or obtain
 its inherited descriptors can act with the same authority. Run qualified producer and verifier roles under
@@ -72,4 +72,4 @@ broader platform surface, but their outputs cannot authorize attestation, releas
 
 ## Supported versions
 
-nkdctl is pre-1.0 (POC); security fixes target `main`. Pin by commit and rebuild from source to verify.
+nvkr is pre-1.0 (POC); security fixes target `main`. Pin by commit and rebuild from source to verify.

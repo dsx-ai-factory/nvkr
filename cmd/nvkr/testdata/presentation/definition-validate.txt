@@ -1,0 +1,3 @@
+definition: nvke-v1
+digest: sha256:9e75b6ddc0ee9d7cb3bf7a55e654cef39d5399eb021a2459332555946a3cb794
+outputs: 3

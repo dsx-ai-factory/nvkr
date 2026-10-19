@@ -4,7 +4,7 @@
 - **Implementation maturity:** Removed. The former mirror package and CLI were disconnected from the maintained lifecycle.
 - **Acceptance-test maturity:** No current air-gap acceptance claim.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
-- **Index:** ADR-15 in the consolidated NKD ADR set.
+- **Index:** ADR-15 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-04 (offline signature verification), ADR-06 (status), ADR-20 (publication).
 
 ## Context
@@ -25,5 +25,5 @@ implementation is available in Git history, not as a second dormant workflow in 
 
 ## Consequences
 
-There is no `inputs` or `mirror` command and no `pkg/nkd/airgap` package. ADR-15 remains as the scope decision so
+There is no `inputs` or `mirror` command and no `pkg/nvkr/airgap` package. ADR-15 remains as the scope decision so
 historical references do not imply a current capability. No package is retained solely to preserve its old API.

@@ -12,16 +12,16 @@ import (
 	"strings"
 	"testing"
 
-	client "github.com/NVIDIA/nke-recipes/client/v1"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/buildgraph"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/catalog"
-	nkderr "github.com/NVIDIA/nke-recipes/pkg/nkd/errors"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/ir"
-	"github.com/NVIDIA/nke-recipes/pkg/nkd/pipeline"
+	client "github.com/dsx-ai-factory/nvkr/client/v1"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
 
-func errorCode(err error) nkderr.Code {
-	var coded *nkderr.Error
+func errorCode(err error) nvkrerr.Code {
+	var coded *nvkrerr.Error
 	if errors.As(err, &coded) {
 		return coded.Code
 	}
@@ -69,7 +69,7 @@ func TestResolveBuildCarriesOutputFormatToResolution(t *testing.T) {
 	resolution, err := client.New(client.WithData(data)).ResolveBuild(context.Background(), client.ResolveRequest{
 		Components: sdkFixtureComponents(), Platform: "linux/amd64", OutputFormat: "disk-image",
 	})
-	if resolution != nil || errorCode(err) != nkderr.CodeInvalidCatalog ||
+	if resolution != nil || errorCode(err) != nvkrerr.CodeInvalidCatalog ||
 		!strings.Contains(err.Error(), "selects no QCOW2 root") {
 		t.Fatalf("disk output format was not enforced during SDK resolution: resolution=%+v err=%v", resolution, err)
 	}
@@ -77,7 +77,7 @@ func TestResolveBuildCarriesOutputFormatToResolution(t *testing.T) {
 
 func TestResolveBuildRequiresExplicitCatalog(t *testing.T) {
 	_, err := client.New().ResolveBuild(context.Background(), client.ResolveRequest{})
-	if errorCode(err) != nkderr.CodeUsage || !strings.Contains(err.Error(), "requires catalog I/O") {
+	if errorCode(err) != nvkrerr.CodeUsage || !strings.Contains(err.Error(), "requires catalog I/O") {
 		t.Fatalf("missing catalog returned %v", err)
 	}
 }
@@ -102,7 +102,7 @@ func TestResolveBuildCancellationPreventsCatalogIO(t *testing.T) {
 	_, err := client.New(client.WithCatalogIO(catalogIO)).ResolveBuild(ctx, client.ResolveRequest{
 		Components: []string{"kubectl"}, Platform: "linux/amd64",
 	})
-	if errorCode(err) != nkderr.CodeTimeout {
+	if errorCode(err) != nvkrerr.CodeTimeout {
 		t.Fatalf("cancellation must use the stable timeout code, got %v", err)
 	}
 	if catalogIO.calls != 0 {
@@ -152,7 +152,7 @@ func TestRunPropagatesCancellationToRunner(t *testing.T) {
 		t.Fatal("Run did not pass its exact context to pipeline.RunOptions")
 	}
 	cancel()
-	if err := <-result; errorCode(err) != nkderr.CodeTimeout {
+	if err := <-result; errorCode(err) != nvkrerr.CodeTimeout {
 		t.Fatalf("runner cancellation must be normalized to CodeTimeout, got %v", err)
 	}
 	if runner.calls != 1 {
@@ -226,8 +226,8 @@ func TestRequestedAtomicOutputIsAdmittedBeforeCatalogIO(t *testing.T) {
 	_, err := client.New(client.WithCatalogIO(catalogIO)).ResolveBuild(context.Background(), client.ResolveRequest{
 		Components: []string{"kubectl"}, Platform: "linux/amd64", OutputName: "graph.json",
 	})
-	if errorCode(err) != nkderr.CodeUsage {
-		t.Fatalf("error = %v, want %s", err, nkderr.CodeUsage)
+	if errorCode(err) != nvkrerr.CodeUsage {
+		t.Fatalf("error = %v, want %s", err, nvkrerr.CodeUsage)
 	}
 	if catalogIO.calls != 0 {
 		t.Fatalf("missing AtomicOutput performed %d catalog reads", catalogIO.calls)
@@ -251,11 +251,11 @@ func TestResolveBuildAtomicOutputContract(t *testing.T) {
 		name   string
 		cancel bool
 		fail   bool
-		code   nkderr.Code
+		code   nvkrerr.Code
 	}{
 		{name: "success"},
-		{name: "adapter failure", fail: true, code: nkderr.CodeImmutableViolation},
-		{name: "cancellation before commit", cancel: true, fail: true, code: nkderr.CodeTimeout},
+		{name: "adapter failure", fail: true, code: nvkrerr.CodeImmutableViolation},
+		{name: "cancellation before commit", cancel: true, fail: true, code: nvkrerr.CodeTimeout},
 		{name: "successful commit followed by cancellation", cancel: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -275,7 +275,7 @@ func TestResolveBuildAtomicOutputContract(t *testing.T) {
 					if ctx.Err() != nil {
 						return ctx.Err()
 					}
-					return nkderr.New(nkderr.CodeImmutableViolation, "test adapter refused commit")
+					return nvkrerr.New(nvkrerr.CodeImmutableViolation, "test adapter refused commit")
 				}
 				output.committed[name] = append([]byte(nil), canonicalBytes...)
 				return nil

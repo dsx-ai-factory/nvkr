@@ -1,0 +1,13 @@
+apiVersion: nvkr.dev/catalog-maintenance/v1
+name: nvke-deploy
+catalog: inputs/catalogs/nvke/release
+sources: [nvke, nvke-helm]
+sameRelease:
+  - [nvke, nvke-helm]
+definition: docs/examples/nvke-deploy/definition.yaml
+environment: docs/examples/nvke-deploy/environment-github.yaml
+# Illustrative policy shape. The committed root bundle is generated from inputs/definitions/nvke, so refreshing
+# this policy in this repository reports NVKR-E-PIPELINE-DRIFT; use inputs/policies/nvke-catalog-maintenance.yaml.
+# The hosted Environment declares sourceAccess; local execution rejects it.
+# This example produces a review patch without a producer-execution claim.
+validation: static

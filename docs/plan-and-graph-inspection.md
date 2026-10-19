@@ -4,8 +4,8 @@ Use the validated Plan views to review required outputs, producer instructions, 
 publication routes before executing a Run. These read-only views explain the complete generated Plan and
 its changes. They do not observe output bytes, verify a release, or authorize execution.
 
-The Plan in `.github/nkd-run/plan.json` remains canonical, compact JSON. Its exact bytes still participate
-in Plan identity and generated-file drift checks. Keep human views outside `.github/nkd-run/`: that directory
+The Plan in `.github/nvkr-run/plan.json` remains canonical, compact JSON. Its exact bytes still participate
+in Plan identity and generated-file drift checks. Keep human views outside `.github/nvkr-run/`: that directory
 admits only manifest-owned generated files. Inspection never updates the Plan or its ownership manifest.
 
 ## Read the Plan
@@ -13,8 +13,8 @@ admits only manifest-owned generated files. Inspection never updates the Plan or
 Inspect the current generated Plan without resolving catalogs or contacting an external service:
 
 ```sh
-nkdctl run plan --plan .github/nkd-run/plan.json
-nkdctl run plan --plan .github/nkd-run/plan.json --pretty
+nvkr run plan --plan .github/nvkr-run/plan.json
+nvkr run plan --plan .github/nvkr-run/plan.json --pretty
 ```
 
 The text view lists required output slots and Build Digests, every producer instruction and dependency,
@@ -26,9 +26,9 @@ canonical Plan input. `--json` emits the exact canonical Plan bytes, with no app
 The same views can compile authored inputs directly:
 
 ```sh
-nkdctl run plan \
-  --definition definitions/nke-deploy/definition.yaml \
-  --environment definitions/nke-deploy/environment-github.yaml --pretty
+nvkr run plan \
+  --definition docs/examples/nvke-deploy/definition.yaml \
+  --environment docs/examples/nvke-deploy/environment-github.yaml --pretty
 ```
 
 Use either `--plan` or the pair `--definition` and `--environment`. Compilation can need access to pinned
@@ -36,12 +36,36 @@ Git objects for catalog pin-set revalidation. Reading an existing generated Plan
 Readers require the current schema, canonical bytes, safe bounded regular files, and complete graph and
 binding validation. Invalid input produces a coded error before any result bytes are emitted.
 
+## Browse in the terminal
+
+```sh
+nvkr run plan --plan .github/nvkr-run/plan.json --ui=tui
+```
+
+The explicit terminal explorer uses validated typed output/operation membership
+and dependencies. It leaves the Plan and generated ownership manifest unchanged.
+Use arrows to select, Enter for details/dependencies, Tab or 1/2 for panes, Esc to go back,
+`/` for output search, `f` for filters and `?` for help. Tabs identify Outputs
+and Details, with frames separating the panes. Activity appears only when supplied
+(for example, during live Runs); static Plans have no Activity tab. `a` selects
+the Activity pane only when available. q asks before closing
+this read-only view: y or Ctrl+C closes it; n, Esc or Enter keeps it open. Closure does not
+execute a Plan or clean up a Run. Small terminals use a single pane.
+`--no-color` and nonempty `NO_COLOR` preserve textual state and focus.
+
+The default Plan output remains plain; `--json` retains byte-exact canonical
+output and `--pretty` retains its display-only JSON format. Explicit terminal mode
+requires usable interactive stdin/stdout and cannot be combined with JSON/pretty
+output. Planned operations and declared evidence lanes are descriptions, not
+observed artifacts or authenticated runtime/release claims. For recorded attempts
+and live Run presentation, see [Lifecycle](lifecycle.md#choose-local-run-presentation).
+
 ## Follow linked graphs
 
 ```sh
-nkdctl run graph --plan .github/nkd-run/plan.json --format mermaid
-nkdctl run graph --plan .github/nkd-run/plan.json --format dot
-nkdctl run graph --plan .github/nkd-run/plan.json --format json
+nvkr run graph --plan .github/nvkr-run/plan.json --format mermaid
+nvkr run graph --plan .github/nvkr-run/plan.json --format dot
+nvkr run graph --plan .github/nvkr-run/plan.json --format json
 ```
 
 The default `--view complete` includes every embedded producer IR node, factory operation, intermediate
@@ -65,7 +89,7 @@ Mermaid labels use [numeric entity escaping](https://mermaid.js.org/syntax/flowc
 DOT labels use DOT quoting for quotes, backslashes and line breaks; other nonprinting characters are shown
 as literal Unicode escape text. Renderer node IDs are generated independently of input strings.
 JSON preserves complete vertex keys, source references and labeled edges under
-`nkd.dev/plan-graph-view/v1`. Its `planDigest` names the validated source Plan; `authority: description-only`
+`nvkr.dev/plan-graph-view/v1`. Its `planDigest` names the validated source Plan; `authority: description-only`
 does not grant a new identity or execution receipt. DOT can be rendered with Graphviz; Mermaid can be
 embedded in documentation viewers that support it. Large Plans can produce large diagrams; use a focused
 view to reduce visual load without dropping nodes from that chosen graph.
@@ -78,17 +102,17 @@ from a publication root or infer producer edges from matching artifact names.
 Save the previous exact Plan before regeneration, then compare it to the regenerated file:
 
 ```sh
-git show HEAD:.github/nkd-run/plan.json > /tmp/nkd-plan-before.json
-GOTOOLCHAIN=local go run ./cmd/nkdctl run generate \
-  --definition definitions/nke-m2/definition.yaml \
-  --environment definitions/nke-m2/environment-github.yaml --engine github --root .
-nkdctl run diff --before /tmp/nkd-plan-before.json --after .github/nkd-run/plan.json
-nkdctl run diff --before /tmp/nkd-plan-before.json --after .github/nkd-run/plan.json --details
-nkdctl run diff --before /tmp/nkd-plan-before.json --after .github/nkd-run/plan.json --format json
+git show HEAD:.github/nvkr-run/plan.json > /tmp/nvkr-plan-before.json
+GOTOOLCHAIN=local go run ./cmd/nvkr run generate \
+  --definition inputs/definitions/nvke/definition.yaml \
+  --environment inputs/environments/github-release.yaml --engine github --root .
+nvkr run diff --before /tmp/nvkr-plan-before.json --after .github/nvkr-run/plan.json
+nvkr run diff --before /tmp/nvkr-plan-before.json --after .github/nvkr-run/plan.json --details
+nvkr run diff --before /tmp/nvkr-plan-before.json --after .github/nvkr-run/plan.json --format json
 ```
 
-The root regeneration uses the committed M2 inputs and the generator identity described in the
-[M2 instructions](../definitions/nke-m2/README.md). Generate alternative Definitions into scratch roots
+The root regeneration uses the committed maintained NVKE inputs and the generator identity described in the
+[maintained NVKE Definition's instructions](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md). Generate alternative Definitions into scratch roots
 as shown in the [pipeline guide](generate-pipeline.md).
 
 The default text report identifies changed, added or removed per-output Build Digests, counts every changed
@@ -114,22 +138,22 @@ pins appear as removed and added references; no heuristic guesses that two diffe
 are interchangeable. JSON numbers retain integer precision.
 
 A difference is a successful descriptive result by default. Add `--exit-code` for exit status 3
-(`NKD-E-DIFF`) when the two Plans differ. Malformed Plans and unsupported view options remain ordinary
+(`NVKR-E-DIFF`) when the two Plans differ. Malformed Plans and unsupported view options remain ordinary
 coded errors. A text summary is not a substitute for `run generate --check`: semantic comparison explains
 two already generated Plans, while the drift gate regenerates all owned files from authored inputs and
 checks their exact bytes. Workflow-only changes still require reviewing the generated workflow diff.
 
 ## Implementation and evidence
 
-`pkg/nkd/planview` owns validated snapshots, display projections and comparisons. The CLI only selects inputs
+`pkg/nvkr/planview` owns validated snapshots, display projections and comparisons. The CLI only selects inputs
 and formats. The module reuses factory-owned canonical loading and full Plan validation; it grants no
 artifact or execution authority. The Plan schema, canonical codec, typed digest families and generated
 bundle format are unchanged.
 
 Contract tests cover exact-byte JSON, display-only pretty JSON, caller-mutation isolation, invalid complete
 Plans, bounded/no-follow file loading, complete graph vertices and edges including the maintained controller
-chart/CWE relationship, diagram escaping, stable named comparisons, ordered argv/patches, large integers,
+chart/management-plane image relationship, diagram escaping, stable named comparisons, ordered argv/patches, large integers,
 absent-versus-null values, and transport/execution changes that preserve Build Digests. CLI tests cover
 file views, graph formats, concise/full differences, exit status and failure before output. These
-contracts live in [the Plan-view tests](../pkg/nkd/planview/) and the CLI inspection tests.
+contracts live in [the Plan-view tests](https://github.com/dsx-ai-factory/nvkr/tree/main/pkg/nvkr/planview) and the CLI inspection tests.
 This is local inspection/contract evidence; it adds no registry, runner, signing or OS execution acceptance.
