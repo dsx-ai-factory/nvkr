@@ -422,7 +422,10 @@ policy. Publishers and signers receive that secret and its explicit account; ver
 finalization receive `NVKR_REGISTRY_READ` and its explicit account. These jobs request no workflow-token
 package permissions. Maintained production and nightly inputs use this policy. Legacy anonymous and
 job-scoped `github:GITHUB_TOKEN` configurations remain supported but are unsuitable for private binaries
-in a future-public source repository; arbitrary static credentials remain rejected. The explicit signed-development contract below instead requires separately scoped read/write
+in a future-public source repository; arbitrary static credentials remain rejected. Generated production
+qualification requires the fixed production writer policy on both the publication and every target, matching
+its emitted credentials and permissions; legacy workflow-token producer profiles cannot generate that pair.
+The explicit signed-development contract below instead requires separately scoped read/write
 credentials. Legacy publication without this mode retains its full-closure assembly/finalization path. Local
 execution and dry-run signing do not admit the new mode. Interrupted production runs can leave independently
 published outputs; no production cross-run reuse, rollback, retention protocol or atomic multi-repository

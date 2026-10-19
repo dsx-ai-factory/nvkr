@@ -345,11 +345,11 @@ func admitQualificationRegistry(plan *factory.Plan, policy lifecycle.Qualificati
 	}
 	namespace := "ghcr.io/" + strings.ToLower(strings.Split(policy.Source.Repository, "/")[0]) + "/"
 	publication := plan.Environment.Publication
-	if publication == nil || !strings.HasPrefix(publication.RepositoryPrefix, namespace) || publication.Anonymous || (publication.CredentialRef != "github:GITHUB_TOKEN" && publication.CredentialRef != factory.ProductionRegistryWriteCredential) {
+	if publication == nil || !strings.HasPrefix(publication.RepositoryPrefix, namespace) || publication.Anonymous || publication.CredentialRef != factory.ProductionRegistryWriteCredential {
 		return e.New(e.CodeEngineCapability, "qualification generation requires GHCR publication in the trusted source owner namespace using an admitted production credential policy")
 	}
 	for _, target := range plan.Targets {
-		if !strings.HasPrefix(target.Ref, namespace) || target.PlainHTTP || target.Anonymous || (target.CredentialRef != "github:GITHUB_TOKEN" && target.CredentialRef != factory.ProductionRegistryWriteCredential) {
+		if !strings.HasPrefix(target.Ref, namespace) || target.PlainHTTP || target.Anonymous || target.CredentialRef != factory.ProductionRegistryWriteCredential {
 			return e.New(e.CodeEngineCapability, "qualification generation requires every publication target in the admitted GHCR namespace")
 		}
 	}

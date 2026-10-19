@@ -284,6 +284,41 @@ func TestQualificationGenerationFinalReportsWorkerFailure(t *testing.T) {
 	}
 }
 
+func TestQualificationProductionRegistryCredentialAdmission(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		publication bool
+		target      bool
+	}{
+		{"dedicated writer", false, false},
+		{"legacy publication", true, false},
+		{"legacy target", false, true},
+		{"legacy publication and target", true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan, policy := generationFixture(t)
+			if tc.publication {
+				plan.Environment.Publication.CredentialRef = "github:GITHUB_TOKEN"
+			}
+			if tc.target {
+				if len(plan.Targets) == 0 {
+					t.Fatal("fixture has no publication targets")
+				}
+				for name, target := range plan.Targets {
+					target.CredentialRef = "github:GITHUB_TOKEN"
+					plan.Targets[name] = target
+				}
+			}
+			err := admitQualificationRegistry(plan, policy)
+			if tc.publication || tc.target {
+				requireCode(t, err, e.CodeEngineCapability)
+			} else if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestQualificationGenerationAdmission(t *testing.T) {
 	for _, tc := range []struct {
 		name string

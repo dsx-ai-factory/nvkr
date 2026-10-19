@@ -1488,7 +1488,10 @@ and dry-run signing reject this mode.
 Maintained production/nightly generation selects fixed independent
 registry reader/writer credentials, including native toolchain preparation, qualification/smoke and nightly
 runtime consumers. Hosted publication now rejects repository-linked packages even while their repository is
-private. Image-reader account and token bindings use explicit caller inputs, with empty defaults only
+private. Production qualification generation rejects workflow-token publication and target credentials
+before emitting a bundle, matching its fixed independent writer. Regression cases cover legacy publication,
+legacy targets and their combination; local execution of these cases remains deferred to CI.
+Image-reader account and token bindings use explicit caller inputs, with empty defaults only
 for absent image preparation; composite metadata contains no caller-only variable/secret references.
 Code and regression coverage are prepared; local unit execution is intentionally deferred.
 [PR CI at 6f8afe62](https://github.com/dsx-ai-factory/nvkr/actions/runs/38983931671) passed before
