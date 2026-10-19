@@ -27,6 +27,9 @@ native disk and pipeline-attested stages with separate signer policy, credential
 registry namespaces. Cleanup admits only internal-visibility packages in those namespaces.
 Unsigned development remains static-unqualified. Neither setting grants production
 acceptance, provider access or qualified evidence.
+The specified, disabled S3 extension adds typed file destinations under Environment publication settings.
+Destinations and clean boot URLs remain transport configuration; they do not change producer Build identity.
+Its future schema reservation does not change the implemented Environment version or enable delivery.
 _Avoid_: Delivery profile, component catalog, build identity
 
 **Run**:
@@ -197,6 +200,24 @@ An Artifact format (`debian-package`) containing one raw Debian archive from an 
 producer. The same package bytes can be supplied as an OS build material. Local retention does not establish
 installation or runtime acceptance.
 _Avoid_: APT repository, installed package, builder type
+
+**Native file output**:
+The specified, disabled Artifact representation for unchanged producer-created Debian packages, EFI/iPXE
+files and installer assets. Complete regular archive members retain parent identity, canonical member name,
+digest, size, mode and declared kind. File integrity is distinct from package dependencies and boot readiness.
+_Avoid_: Reconstructed package, executable tool, installed inventory
+
+**File-delivery root**:
+A generated, detached signed record binding selected authenticated source publications and exact named
+payload/evidence objects to their S3 routes and read-back observations. It preserves original provenance and
+adds no build, boot or qualification verdict. The contract is specified and disabled.
+_Avoid_: Authored lifecycle object, replacement source release, successful upload flag
+
+**File-delivery locator**:
+Caller-pinned transport coordinates and raw hashes/sizes for the delivery document and detached bundle.
+It locates proof; independent consumer policy and complete-byte checks establish acceptance. A final commit
+may exist after lost acknowledgement, so an indeterminate producer result requires independent reconciliation.
+_Avoid_: Trusted policy, mutable release name, atomic bucket transaction
 
 ## Evidence and authority
 

@@ -1548,6 +1548,28 @@ Finalizers are scheduled unconditionally and fail on failed/missing producers, f
 artifacts, malformed or substituted observations/SBOMs, and wrong production predicates. The platform may prevent
 the finalizer itself from starting; inspect provider status when no Run record exists (ADR-17).
 
+The S3 extension specified in ADR-20 is disabled. Its generated execution must retain GitHub-only authority,
+the admitted source/signing branches and protected Environments, and the existing producer isolation.
+Derive required delivery nodes from typed targets and named outputs in the complete Plan. The graph orders
+source aggregate authentication, selected complete output checks, proof capture, upload/read-back, detached
+delivery signing, completion publication and independent completion verification. Every required target result
+is a finalizer dependency; job success or an unverified locator cannot replace the authenticated result.
+
+Source/build/ARC jobs receive no S3 credentials. Narrow writer federation/reference access belongs only to
+the admitted transfer/completion operations; verifier access is read-only and independent. A new S3 OIDC
+consumer requires explicit renderer and bundle-validator admission, not removal of existing signing-only
+token checks. No OIDC or storage credentials are available to arbitrary jobs, PRs or forks. The consumer
+selects its own read identity and policies. Secret references may be recorded; secret values cannot be
+transported in plans, command arguments, boot scripts, artifacts or logs. Referenced authentication and
+provider capabilities must be admitted before producer, storage or publication work.
+
+The finalizer reports no successful required delivery for failed or indeterminate completion. A valid remote
+commit can survive lost acknowledgement, cancellation or finalizer failure; preserve its exact locator for
+independent reconciliation rather than claiming rollback. Existing OCI publication may remain successful
+while its required S3 delivery fails. Native EFI production needs its own admitted Linux/mkosi/material
+capability; existing ARC disk admission does not implicitly authorize it. Boot/install acceptance is a
+downstream exercise of delivered artifacts, not a new generated provisioning engine or qualification verdict.
+
 ## Consequences
 
 **Positive**

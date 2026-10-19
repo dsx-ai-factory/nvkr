@@ -467,6 +467,12 @@ milestone specification.
 
 ## Current support boundary
 
+ADR-20 specifies, but does not enable, complete S3 delivery for selected VM/iPXE/EFI/QCOW2 and Debian package
+artifacts. The contract keeps OCI source publications immutable, adds native file/member representations,
+and authenticates a derived delivery root with portable original proofs. Typed configuration, executable
+adapters, provider acceptance and actual boot/package-install acceptance remain required. Existing schema
+constants, whole-Plan verification and disabled-path behavior are unchanged by this documentation freeze.
+
 [Reconciliation](adr/reconciliation.md) owns the current support matrix. Local immutable attempts,
 Plan/graph inspection, GitHub generation, metadata-only release navigation and the scoped
 `pipeline-attested` consumers for `authenticity` and `artifact-publication` are implemented. Authenticity
@@ -528,6 +534,16 @@ output-affecting build inputs remain bound to the identity they affect (ADR-17 ย
 The current publication input owner admits omitted or explicit OCI selection and rejects APT-only or
 combined APT/OCI selection before catalog, generation or execution work. Required selections never fall back
 to another transport; a direct APT publisher and its service/signing contract remain deferred (ADR-20 ยง2).
+
+The disabled file-delivery extension reserves Definition v6 `file` outputs, Environment v2
+`publication.fileTargets` and Run Plan v6. Its new native-file and delivery-root families are distinct from
+Build, payload and OCI wrapper identity. A lifecycle selection receipt retains selected complete output-local
+publications and actual source proof bytes; it does not relax whole-Plan completeness. Separate caller policies
+authenticate source and delivery roles. Transfer uses conditional writes and full read-back; detached completion
+is published last. An ambiguous final write may leave a valid completion, so producer success requires
+reconciliation and consumers always authenticate the complete required closure. Boot HTTP(S) access is
+separate from S3 API access. Downstream owners render machine-specific boot configuration and prove actual
+EFI imaging/reboot, direct VM boot and package installation; NVKR supplies no new provisioning service.
 
 The qualified lane additionally consumes signed builder profiles, immutable promotion and evidence policies,
 and an operator trust store. It generates the exact Inventory compatibility form only after authenticated
