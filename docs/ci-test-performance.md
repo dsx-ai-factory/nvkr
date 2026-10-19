@@ -75,6 +75,14 @@ The workflow derives its matrix from the same shard definition used by the runne
 partition completeness, compiled examples/fuzz discovery, missing/extra results, child failures,
 process-group timeout cleanup, and aggregate rejection of skipped, failed or canceled code jobs.
 
+The later [review-fix run](https://github.com/dsx-ai-factory/nvkr/actions/runs/39332732975) at
+`903b3ec3b1fe04d7799f73198f72224ec1eb3913` passed all 21 required jobs in 314 seconds, exceeding the
+target. Three CLI action-descriptor tests accounted for 99.24 seconds in its slowest shard by repeatedly
+rendering the complete product Plan. Their fixture now compiles one executable producer from the small
+test catalog and renders real shared action data. All existing command, coded-error and output-sink
+cases remain. Uncached targeted local runs fell from 20.03 to 0.82 seconds; that local comparison does
+not establish the hosted savings.
+
 Two shards for the remaining packages were rejected: one accumulated 538 seconds of package execution
 in the linked CI record. Scheduling those package durations alphabetically across two execution slots
 estimated 311 seconds before compilation or job setup. Five package shards reduce that same scheduling
