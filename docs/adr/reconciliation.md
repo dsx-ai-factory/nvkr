@@ -880,6 +880,16 @@ M4-D.
 
 ## Feature-branch pipeline development
 
+Beta development [Run 39274459086](https://github.com/dsx-ai-factory/nvkr/actions/runs/39274459086)
+reached admitted native disk builds and successful SBOM signing after the operator approved its exact branch
+in both development environments. Publication jobs
+[118139197664](https://github.com/dsx-ai-factory/nvkr/actions/runs/39274459086/job/118139197664) and
+[118139250021](https://github.com/dsx-ai-factory/nvkr/actions/runs/39274459086/job/118139250021)
+then failed during helper locator acquisition with HTTP 503. The locator API owner now admits ADR-18's
+bounded transient-server retries. Recovery, exhaustion, cancellation and server-delay cases are added to
+the contract suite; local execution is skipped at the operator's request and CI validation is pending.
+This is not a successful complete development Run or qualification claim.
+
 The explicit `githubDevelopment` Environment setting selects separate fixed workflow/Plan/manifest paths
 with the same compiler, complete graph and helper. The committed development bundle now uses the full
 69-output M2 Definition, including all four native plain/public-bootstrap FDE disk outputs, output-local publication, SBOM attestation,

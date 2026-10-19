@@ -171,9 +171,10 @@ uses the repository workflow token; metadata-only restoration needs no registry 
 request. Mixed stage batches admit their complete selection and private credentials before transfer. Private
 payload privacy admission is unchanged and remains mandatory for every private carrier.
 API request starts are separated by at least 100 milliseconds. Each API request permits at most four
-attempts, only for HTTP 429 or an HTTP 403 JSON response identifying a secondary rate limit. Cancellable
-waits honor `Retry-After` up to 120 seconds, with a 60-second exponentially increasing fallback and an
-increasing minimum delay for repeated rate limits. A delay beyond the bound or an exhausted primary
+attempts, only for HTTP 429, an HTTP 403 JSON response identifying a secondary rate limit, or transient
+HTTP 500/502/503/504 responses. Cancellable waits honor `Retry-After` up to 120 seconds, with a 60-second
+exponentially increasing fallback for rate limits and a two-second exponentially increasing fallback for
+transient server failures. Repeated retries have an increasing minimum delay. A delay beyond the bound or an exhausted primary
 quota fails without an early retry. Acquisition has a twenty-minute bound and each HTTP request a thirty-second bound;
 earlier caller cancellation/deadlines still win. ZIP reads use one credential-free request after an admitted
 redirect and have no generic retry. Ambiguous selections, malformed metadata and integrity or binding

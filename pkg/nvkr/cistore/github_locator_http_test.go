@@ -25,6 +25,11 @@ func TestGitHubLocatorRateLimitAdmission(t *testing.T) {
 		delay            time.Duration
 		limited, failure bool
 	}{
+		{name: "service unavailable", status: 503, delay: 2 * time.Second, limited: true},
+		{name: "server backoff", status: 502, attempt: 2, delay: 8 * time.Second, limited: true},
+		{name: "service retry after", status: 503, header: http.Header{"Retry-After": {"30"}}, delay: 30 * time.Second, limited: true},
+		{name: "service excessive delay", status: 503, header: http.Header{"Retry-After": {"121"}}, limited: true, failure: true},
+		{name: "not implemented", status: 501},
 		{name: "secondary", status: 403, body: `{"message":"You have exceeded a secondary rate limit."}`, header: http.Header{"Retry-After": {"1"}}, delay: time.Second, limited: true},
 		{name: "ordinary forbidden", status: 403, body: `{"message":"Resource not accessible by integration"}`, header: http.Header{"Retry-After": {"1"}}},
 		{name: "duplicate message", status: 403, body: `{"message":"denied","message":"secondary rate limit"}`, header: http.Header{"Retry-After": {"1"}}},
@@ -54,6 +59,50 @@ func TestGitHubLocatorRateLimitAdmission(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGitHubLocatorTransientServerRetries(t *testing.T) {
+	for _, status := range []int{500, 502, 503, 504} {
+		for _, scenario := range []string{"recovers", "exhausted", "canceled"} {
+			t.Run(http.StatusText(status)+"/"+scenario, func(t *testing.T) {
+				ctx, cancel := context.WithCancel(t.Context())
+				defer cancel()
+				g := newGitHubLocatorClient("test-token")
+				calls := 0
+				g.wait = func(context.Context, time.Duration) error {
+					if scenario == "canceled" {
+						cancel()
+						return ctx.Err()
+					}
+					return nil
+				}
+				g.client.Transport = chunkRoundTripper(func(*http.Request) (*http.Response, error) {
+					calls++
+					if scenario == "recovers" && calls == 2 {
+						return githubLocatorHTTPFixture(200, []byte(`{"value":7}`), nil), nil
+					}
+					return githubLocatorHTTPFixture(status, []byte("provider error"), nil), nil
+				})
+				var result struct{ Value int }
+				err := g.getJSON(ctx, "/repos/org/repo/actions/runs/1", &result)
+				switch scenario {
+				case "recovers":
+					if err != nil || calls != 2 || result.Value != 7 {
+						t.Fatalf("calls=%d result=%v err=%v", calls, result, err)
+					}
+				case "exhausted":
+					assertCode(t, err, e.CodeUnavailable)
+					if calls != githubLocatorAPIAttempts {
+						t.Fatal("server retries exceeded request budget")
+					}
+				case "canceled":
+					assertCode(t, err, e.CodeTimeout)
+					if calls != 1 {
+						t.Fatal("server request repeated after cancellation")
+					}
+				}
+			})
+		}
 }
 
 func TestGitHubLocatorAPIRetryIsBoundedAndCancellationAware(t *testing.T) {
