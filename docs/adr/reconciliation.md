@@ -1003,6 +1003,8 @@ M4-D.
 
 ## Feature-branch pipeline development
 
+The main-source upgrade selects `55612dce98cf0183790fbe5f4776225d63369fc2` through `catalog pin --commit`, retaining all three SPIRE package roles and the separate nightly test-harness exception. Canonical generation and [Merge Gate 39306909978](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306909978) passed on NVKR `5953a0ac`. [Development Run 39306902739](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306902739) remains incomplete: [provisioned-provider signing](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306902739/job/118254801119) failed while fetching ambient GitHub OIDC credentials because the response was not JSON; disk builds are still pending. A fresh complete attempt and independent development qualification are required. The preceding [beta Run 39276513915](https://github.com/dsx-ai-factory/nvkr/actions/runs/39276513915) failed disk production and completeness. Both plain disk logs reached an absent-file error during provisioning; the selected main source adds the two missing network configuration files to image-input composition. This source correction requires fresh external execution.
+
 Beta development [Run 39274459086](https://github.com/dsx-ai-factory/nvkr/actions/runs/39274459086)
 reached admitted native disk builds and successful SBOM signing after the operator approved its exact branch
 in both development environments. Publication jobs
@@ -1010,7 +1012,7 @@ in both development environments. Publication jobs
 [118139250021](https://github.com/dsx-ai-factory/nvkr/actions/runs/39274459086/job/118139250021)
 then failed during helper locator acquisition with HTTP 503. The locator API owner now admits ADR-18's
 bounded transient-server retries. Recovery, exhaustion, cancellation and server-delay cases are added to
-the contract suite; local execution is skipped at the operator's request and CI validation is pending.
+the contract suite; [Merge Gate 39276232245](https://github.com/dsx-ai-factory/nvkr/actions/runs/39276232245) passed on `8dc975de`. Local execution remains skipped at the operator's request.
 This is not a successful complete development Run or qualification claim.
 
 The explicit `githubDevelopment` Environment setting selects separate fixed workflow/Plan/manifest paths
@@ -1342,18 +1344,18 @@ cancellation and continued rejection of delegated configuration. Command admissi
 errors retain the failing phase without exposing arguments or source paths. These
 tests do not establish a completed Ubuntu site replay.
 
-The local demo now selects NVKE `v0.22.0-beta.1` at
-`6991e36bef8f15b42b6f6519ccff089c587a6e49`, retaining the shared pre-DSX SPIRE
+The local demo now selects NVKE main at
+`55612dce98cf0183790fbe5f4776225d63369fc2`, retaining the shared pre-DSX SPIRE
 packaging exception. Its adapter uses the source-owned site-spec renderer and
 deployment entrypoint with verified local chart archives and exact image references.
 The already admitted Kind configuration owns cluster networking; site-spec bootstrap
 fields are not executed. Before tenant creation, the adapter binds source-owned
 profile bytes to the live observed controller pod and creates MachineImage,
 ClusterRelease and NodePoolRelease resources for the selected plain ARM64 disk.
-Focused resource, pod-binding, cancellation and profile tests pass, including
+On the preceding beta selection, focused resource, pod-binding, cancellation and profile tests passed, including
 targeted race checks. The actual beta CLI validated a diagnostic site spec and the
 source installer completed its dry-run with prepared chart paths. Those checks
-do not establish chart builds, cluster readiness or a completed beta tenant replay.
+do not establish chart builds, cluster readiness, a completed tenant replay, or acceptance of the current main selection.
 
 Maintained OS Definitions, catalog execution and Packer toolchain assembly select Docker.
 The older authored Podman Environment and its TCG Definition are removed; generic
@@ -2590,8 +2592,8 @@ scanner acceptance or complete production input approval. The
 [acquisition observations](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#temporary-spire-source-selection) retain the historical mixed-source candidate and HTTP-403 limits.
 Current inputs temporarily retain the prior SPIRE packaging source `726f76944404e1106626b8333d3576bdf67b575b`
 and its source-owned acquisition/packaging commands. OS assembly, agent, Calico, kubeadm and native
-Packer capture now select NVKE `v0.22.0-beta.1` (`6991e36bef8f15b42b6f6519ccff089c587a6e49`),
-including its renamed Packer targets, disk filenames and material schema. Beta execution remains
+Packer capture now select NVKE main (`55612dce98cf0183790fbe5f4776225d63369fc2`),
+including its renamed Packer targets, disk filenames, material schema and required Ubuntu-series input. Current-source execution remains
 unverified until a complete recorded development attempt succeeds. The older SPIRE package omits DSX IMDS,
 which current NVKE requires; this is an explicitly incomplete compatibility selection, not full product parity.
 The blocked DSX producer, its material-only selections and unused source credentials are removed.
@@ -2755,14 +2757,14 @@ M2 toolchains through the existing read-only image-preparation owner. Temporary 
 credentials are removed before source or producer execution; the nightly output
 namespace does not require republishing the existing pinned toolchains.
 The four CLI, controller and chart candidate sources now select NVKE
-`v0.22.0-beta.1` at `6991e36bef8f15b42b6f6519ccff089c587a6e49`.
+main at `55612dce98cf0183790fbe5f4776225d63369fc2`.
 The nightly consumer projects authenticated profile bytes into the current resource
 API and supplies the current site-spec shape. Both the normal and upstream-OVN
 disk URLs, where required by the selected profile, read the same held disk and are
 checked against the exact selected Artifact. Focused contract and HTTP race tests
-pass, and the actual beta CLI validates and renders the diagnostic site spec.
+passed for the preceding beta selection, and that CLI validated and rendered the diagnostic site spec. Those checks do not validate the new main source.
 The user-approved test-only suite pin is `a32067108ab89d1e2b2b6720766ffe97270a166a`,
-which retains the candidate entrypoint omitted from beta. Product sources remain beta
+which retains the candidate entrypoint omitted from the selected product source. Product sources select main
 with the explicit SPIRE exception. This diagnostic selection is an exception to
 ADR-23's proposed matching-revision rule, not adoption of that proposal. Missing
 candidate hooks still fail admission; the generic rebuilding suite is no fallback.
