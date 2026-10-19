@@ -1741,7 +1741,26 @@ copy and does not retry publication. Package build/vet, Linux vet, global lint, 
 four-bundle drift checks passed, with independent source review. Regression contracts are authored but
 unexecuted at the operator's request. Recovery of an actual interrupted hosted response remains unproved.
 
-The same Run externally exercised the locator pagination fix: its successful
+Attempt 1 of [Run 39191524720](https://github.com/dsx-ai-factory/nvkr/actions/runs/39191524720/attempts/1),
+at commit `4487a965d25e24dfd745124487d6bb3915fb6780`, failed in the
+[AMD64 plain disk publication job](https://github.com/dsx-ai-factory/nvkr/actions/runs/39191524720/job/117875170854)
+while restoring private input payloads. The diagnostic was `http2-protocol`, chunk 3 of 4, after
+411,041,792 of 1,073,741,824 chunk bytes. The build and SBOM attestation had succeeded, locator acquisition
+succeeded, and the actual publication operation was skipped. The
+[finalizer](https://github.com/dsx-ai-factory/nvkr/actions/runs/39191524720/job/117882182746) then rejected
+the incomplete provider closure. The retained category does not identify the underlying HTTP/2 reset code
+or establish a registry, intermediary or network cause; it provides no evidence of an authentication failure.
+That revision classified HTTP/2 errors as nonretryable, so this was not exhausted recovery.
+
+Private chunk recovery now admits typed peer `PROTOCOL_ERROR`, `INTERNAL_ERROR` and `REFUSED_STREAM`
+resets under the existing three-attempt extraction budget. It rejects local/unknown protocol errors,
+lookalike strings, filesystem wrappers and joined independent failures. Safe categories distinguish the
+admitted resets without retaining provider error text. Controlled TLS/HTTP2 fixtures exercise the actual
+Go standard-library body error, replay from byte zero, checked response/staging cleanup, retry exhaustion,
+cancellation and complete archive verification. These local contracts do not replay the original hosted
+failure or establish successful GHCR recovery or release acceptance.
+
+Run 38859949586 externally exercised the locator pagination fix: its successful
 [ARM64 plain disk signer](https://github.com/dsx-ai-factory/nvkr/actions/runs/38859949586/job/116850300612)
 listed 1,046 artifacts with the 2,000 bound, selected the older Cosign locator (`12028567478`) and both
 route locators, restored the private bytes and completed actual signing (`dryRun=false`) at
