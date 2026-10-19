@@ -659,6 +659,9 @@ consume earlier immutable references after exact Plan, named-output and evidence
 join outputs from different attempts of that run and records each original origin. Other runs, future
 attempts, changed inputs and incomplete evidence fail closed. Qualification reauthenticates the full
 closure against the successful completion attempt; it never treats a prior success flag as authority.
+Payload and evidence locators are derived from each recorded publication origin's namespace, even when
+the aggregate root is published in a later attempt. Delivery admits that change of namespace only for
+canonical non-future attempts of the same development run; ordinary production references remain siblings.
 Each attempt's packages remain independently discoverable for cleanup. Expired or deleted inputs require
 rebuilding the affected dependency closure; a fresh dispatch does not implicitly reuse another run.
 

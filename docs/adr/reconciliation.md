@@ -1049,6 +1049,12 @@ preserving source URLs in the chart archive and Helm config. Regression coverage
 hosted validation of this packaging correction remains pending. Existing published bytes are not rewritten.
 The operator disconnected the existing Nktp package; API read-back confirmed internal visibility with no
 repository association. Failed jobs were rerun as attempt 2 of the same Run, retaining successful producers.
+Attempt 2 restored the original metadata, but aggregate publication incorrectly projected payload references
+into attempt 2 and failed with `MANIFEST_UNKNOWN` for the attempt-1 CAPI controller output. Delivery now
+derives output and evidence locations from their recorded original publication namespace, rejecting
+foreign registries/repositories/runs and future attempts. Regression coverage includes mixed-origin assembly
+and production sibling isolation. The corrected implementation still requires fresh hosted validation;
+the immutable failed Run cannot acquire new executable code through a rerun.
 
 The main-source upgrade selects `55612dce98cf0183790fbe5f4776225d63369fc2` through `catalog pin --commit`, retaining all three SPIRE package roles and the separate nightly test-harness exception. Canonical generation and [Merge Gate 39306909978](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306909978) passed on NVKR `5953a0ac`. [Development Run 39306902739](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306902739) remains incomplete: [provisioned-provider signing](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306902739/job/118254801119) failed while fetching ambient GitHub OIDC credentials because the response was not JSON. All four disk outputs nevertheless passed build, publication, signing and verification in that Run. Complete same-run retry validation and independent development qualification remain required. The preceding [beta Run 39276513915](https://github.com/dsx-ai-factory/nvkr/actions/runs/39276513915) failed disk production and completeness. Both plain disk logs reached an absent-file error during provisioning; the selected main source adds the two missing network configuration files to image-input composition. The four successful disk outputs in the main-source Run exercise this source correction; they do not establish complete Run acceptance.
 

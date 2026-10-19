@@ -338,6 +338,14 @@ func TestDevelopmentRetrySignsOriginalPublicationAndAssemblesMixedOrigins(t *tes
 	if result.Root.Release.InvocationID != invocation+"3" {
 		t.Fatal("assembly lost current invocation")
 	}
+	target, err := runtimeTarget(plan, "release")
+	if err != nil {
+		t.Fatal(err)
+	}
+	refs, err := delivery.OutputReferences(target.Ref+"@"+result.RootDigest, result)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, object := range result.Root.Objects {
 		if object.Output == nil {
 			continue
@@ -345,6 +353,10 @@ func TestDevelopmentRetrySignsOriginalPublicationAndAssemblesMixedOrigins(t *tes
 		origin := object.Output.Publication
 		if origin == nil {
 			t.Fatal("assembly lost original publication")
+		}
+		parent := origin.Ref[:strings.LastIndexByte(origin.Ref, '/')+1]
+		if refs[object.Name] != parent+object.Output.Repository+"@"+object.DescriptorDigest {
+			t.Fatalf("assembled output reference changed original namespace: %s", refs[object.Name])
 		}
 		if object.Name == plan.LifecycleOutputs[0].Name {
 			if origin.Ref != original.Ref || origin.PreparedInvocationID != invocation+"1" || origin.SignedInvocationID != invocation+"3" {
