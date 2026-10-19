@@ -481,9 +481,11 @@ or signature-verification I/O.
 Every selected output is checked for schema/membership, exact Run and inputs, signed evidence, build
 signature/provenance, applicable payload pins and any authored embedded declarations. Failed checks return coded
 diagnostics; only a complete passing set produces an opaque `ArtifactCheckReceipt`. Its description is
-defensive data and grants no authority. A successful receipt retains the verified publication and a frozen
-Plan until closed. Closure revokes all shallow copies, cancels and joins registered operations, then releases
-held payload bytes. This lifetime does not itself authorize smoke execution. The direct consumer and handoff
+defensive data and grants no authority. Hosted checks verify every output's complete payload in sequence,
+releasing non-executable scratch after each output. A successful receipt retains verified controls, evidence,
+exact executable bundle bytes and a frozen Plan until closed; it cannot export discarded payloads. Closure revokes
+all shallow copies, cancels and joins registered operations, then releases held bytes. This lifetime does not
+itself authorize smoke execution. The direct consumer and handoff
 methods borrow the caller's source Run receipt, whose closure also revokes the check receipt. The Run and
 file adapters transfer their internally created source owner to the returned receipt and close it with that
 receipt.

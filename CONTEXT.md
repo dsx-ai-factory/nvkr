@@ -232,8 +232,10 @@ attempts of that same workflow run when their exact inputs and original evidence
 not relabel production. Development publications remain bound to one exact source attempt and its namespace.
 The generated handoff carries original inputs and evidence for
 recompilation and verification; it is descriptive transport, not a new authored lifecycle object or trust policy.
-The check receipt retains the verified publication and frozen Plan until closure revokes copies, cancels and
-joins registered operations, then releases the held bytes. This lifetime grants no smoke-execution authority.
+Hosted checks verify all payloads sequentially and release non-executable scratch after each output. The check
+receipt retains verified controls, evidence, exact executable bundle bytes and the frozen Plan until closure revokes
+copies, cancels and joins registered operations, then releases held bytes. It cannot export discarded payloads.
+This lifetime grants no smoke-execution authority.
 Native workers exercise every selected delivered tool with fixed version checks in isolated containers and
 sign exact member observations. The final qualifier authenticates complete native coverage under the same
 independent policy before signing. A successful worker from an earlier attempt of that same qualification

@@ -242,6 +242,17 @@ Linux and checks byte integrity only: signatures and consumer policy remain unve
 is issued, and no accepted Release or stronger evidence lane is implied. Explicit `artifact-publication`
 verification retains its complete payload and policy checks; `authenticity` retains its signature/evidence-only scope.
 
+ADR-16's hosted artifact-check path uses a narrower delivery owner: it verifies the complete publication one
+output at a time and releases non-executable payload scratch after each output's format, descriptor and
+content checks. All named outputs and every declared native image child remain mandatory. The owner retains
+checked control documents, evidence and exact executable bundle bytes for subsequent qualification and smoke work;
+it exposes no layout or disk export for discarded payloads. Late failure or cancellation prevents issuance
+and closes retained bytes. This is a retention distinction, not metadata-only verification or a new evidence
+lane. The ordinary held `Publication` and verified Release export paths keep their complete payload owners.
+Registry image-index import copies the already verified held closure directly into the caller's private stage,
+without an intermediate layout or second complete snapshot. The import borrows the owner through completion,
+preserves exact index and child bytes, and retains complete publication binding and payload checks.
+
 The public CLI constructor emits only a visibly `diagnostic` root and requires `--allow-diagnostic` before push.
 It cannot set publication identity, publication-manifest digest, or clearance digest. Qualified publishing is
 not implemented. The unused qualified constructor, legacy filesystem publication adapters, clearance authentication and
@@ -455,8 +466,8 @@ platform-scoped evidence. It retrieves no artifact payload layers and issues onl
 authentication capability, which cannot authorize export or exact-input matching. A signed disk inventory
 authenticates the producer's inspection claim; this scope performs no consumer-side disk inspection.
 
-Consumer integrity checking opens an opaque delivery publication with an explicit lifetime. It snapshots the
-index and blobs into bounded anonymous retained files, verifies every reachable descriptor and evidence slot,
+Ordinary full-publication consumer integrity checking opens an opaque delivery publication with an explicit
+lifetime. It snapshots the index and blobs into bounded anonymous retained files, verifies every reachable descriptor and evidence slot,
 and checks format-specific payload membership against that exact closure. Private extraction workspaces are
 removed before the capability is returned. Later source-path replacement cannot change the checked output
 projection, and defensive copies cannot mutate the held view; closing releases the file capabilities and rejects
@@ -464,7 +475,8 @@ further projections. Signature and policy verification remain in the lifecycle c
 integrity and membership only, never signer authority by itself. Path-based diagnostic operations retain their
 independent revalidation at each call.
 
-Large QCOW2 payloads use streamed anonymous filesystem snapshots rather than payload-sized RAM files.
+This full-publication owner's large QCOW2 payloads use streamed anonymous filesystem snapshots rather than
+payload-sized RAM files.
 The consumer snapshot root uses the process `TMPDIR` (the platform temporary directory when unset),
 including when registry acquisition has a separate workspace. Before payload copies, the consumer admits
 aggregate unique QCOW2 bytes against writable free space and rejects detected tmpfs/ramfs storage with

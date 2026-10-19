@@ -173,7 +173,10 @@ export or consumption from implying otherwise. The file diagnostic adapter now s
 independent credential-host admission before transport; missing/mismatched hosts refuse explicit pull
 credentials, while anonymous and host-scoped keychain operation remain available.
 
-The check receipt retains the verified publication and a frozen Plan; closing it revokes copies, cancels and
+Hosted artifact checks verify every output's complete payload sequentially, then release non-executable
+payload scratch before the next output. Their narrower delivery owner retains checked controls, evidence and
+exact executable bundle bytes; it cannot export discarded payloads. Ordinary full-publication export retains its
+complete payload owner. The check receipt retains this verified owner and a frozen Plan; closing it revokes copies, cancels and
 joins registered operations and then releases held bytes and any owned source receipt. It grants no execution
 or signing authority. The command writes diagnostic JSON, not a serialized capability. Contract fixtures in
 `pkg/nvkr/factory/compile_snapshot_test.go`, `pkg/nvkr/factory/github_handoff_test.go`,
@@ -310,6 +313,31 @@ of changed inputs/policies/subjects, other runs/workflows/commits, missing origi
 The targeted qualification/native-smoke suite also passes with race detection on Linux using Go 1.27.2
 across `factory`, `lifecycle`, `qualificationorigin` and `qualification`; Linux lint and full Fern validation pass.
 These provider/signature fixtures establish contract behavior; successful hosted retry qualification remains unproved.
+
+The [attempt-3 finalizer](https://github.com/dsx-ai-factory/nvkr/actions/runs/39191524720/job/117957092152)
+completed successfully on October 19 at 08:42 UTC, reusing the original producer publications and emitting a
+fresh handoff. It triggered [qualification Run 39224632381](https://github.com/dsx-ai-factory/nvkr/actions/runs/39224632381)
+at `22831fb16867b7ce28a99ca846279b2cb622ee71`, which includes the retry correction.
+Its [AMD64 worker](https://github.com/dsx-ai-factory/nvkr/actions/runs/39224632381/job/117967824568)
+failed while materializing `nvke-node-fde-arm64` with `no space left on device`, before native smoke or
+qualification signing. Its [ARM64 worker](https://github.com/dsx-ai-factory/nvkr/actions/runs/39224632381/job/117967824107)
+finished downloading the release but rejected the additional disk snapshots: 20,136,460,288 bytes required
+with 12,484,796,416 bytes available. The [final qualifier](https://github.com/dsx-ai-factory/nvkr/actions/runs/39224632381/job/117975647169)
+also exhausted storage while downloading `nvke-node-fde-arm64`. The former delivery path downloaded the complete
+release into one scratch layout before constructing another retained snapshot. This records successful finalizer reuse and a hosted storage
+failure, not complete artifact verification or successful retry qualification. Sequential verification and
+reduced payload retention require a fresh hosted run after their local contract checks.
+
+Registry-backed delivery and lifecycle contracts cover sequential complete payload verification, retained
+executable bundle reads, full-format parity, exact evidence bindings, missing sibling rejection, cancellation
+and cleanup. The storage fixture first failed against the cumulative pull path and passes with sequential
+checking. Interrupted disk reads are retried without retaining failed payloads or repeating prior output
+observations; integrity, close and filesystem failures remain terminal. Image-index import reuses the verified
+held closure directly; a regression rejects the former intermediate-layout path when system temporary storage
+is unavailable and verifies exact child bytes, shared-blob membership and unchanged publication index bytes.
+Binding mismatch, closed-owner and canceled-operation contracts prevent output before admission. The uncached full gate and build pass
+on Linux with Go 1.27.2, as do targeted delivery/lifecycle race checks and full Fern validation. These local
+fixtures do not establish successful hosted qualification.
 
 No successful hosted worker/qualifier OIDC signing transcript, subject-bound qualification attachment/read-back
 or independent complete-set consumer verification is recorded here. M3-D
