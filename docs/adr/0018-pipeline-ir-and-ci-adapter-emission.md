@@ -208,8 +208,14 @@ An interrupted chunk body may restart extraction only for narrowly typed transie
 three attempts with one- and two-second cancellable waits under the original deadline. Each attempt opens
 fresh bodies from the authenticated immutable descriptors and repeats full archive verification. Failed
 responses must close and all failed extraction staging must be removed before retry. Integrity, archive,
-filesystem, cleanup and publication failures do not authorize this recovery. Diagnostics expose fixed
-categories and byte counts without retaining provider URLs, credentials or response bodies.
+filesystem, cleanup and publication failures do not authorize this recovery. Admitted HTTP/2 interruptions
+are typed, nonzero-stream peer resets with `PROTOCOL_ERROR`, `INTERNAL_ERROR` or `REFUSED_STREAM`;
+local protocol violations, connection errors, other reset codes and matching error text do not qualify.
+The pinned Go standard-library transport converts its stream errors to the pinned public HTTP/2 error
+type. Bounded single-cause extraction wrappers may preserve the exact stream-issued retry permission;
+joined independent failures cannot acquire it. Diagnostics distinguish the admitted reset categories and
+byte counts without retaining provider URLs, credentials or response bodies. Recovery restarts the entire
+archive rather than trusting a partially received prefix, and repeats neither publication nor signing.
 
 CI transfer admission requires an API-confirmed private/internal package with no linked repository,
 including while the source remains private. A missing package may receive an empty metadata-only seed;

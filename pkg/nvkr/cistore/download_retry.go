@@ -5,7 +5,9 @@ package cistore
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
+	"os"
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
@@ -47,7 +49,7 @@ func unpackChunkAttempts(ctx context.Context, layers []v1.Layer, manifest *v1.Ma
 		// A reader may yield bytes and an error together. Those bytes can also
 		// cause an independent TAR, path or filesystem rejection; only the
 		// extraction error's exact stream cause may authorize another attempt.
-		if stream.err != nil && errors.Is(err, stream.err) {
+		if exactChunkStreamCause(err, stream.err) {
 			err = stream.err
 		}
 		if closeErr != nil {
@@ -77,6 +79,38 @@ func unpackChunkAttempts(ctx context.Context, layers []v1.Layer, manifest *v1.Ma
 		}
 	}
 	return e.New(e.CodeInternal, "private CI archive read exceeded its attempt bound")
+}
+
+// Extraction adds verification context around read failures. Only that bounded
+// single-cause chain may expose the exact source-issued failure: errors.Is would
+// also match a joined independent failure or caller-defined equality. Other coded
+// boundaries and filesystem/TLS wrappers retain their own nonretryable failure.
+func exactChunkStreamCause(err, sourceErr error) bool {
+	if sourceErr == nil {
+		return false
+	}
+	for depth := 0; depth < maxChunkDiagnosticNodes && err != nil; depth++ {
+		if err == sourceErr {
+			return true
+		}
+		switch typed := err.(type) {
+		case *e.Error:
+			if typed.Code != e.CodeVerifyFailed {
+				return false
+			}
+		case *tls.CertificateVerificationError, *os.PathError, *os.LinkError:
+			return false
+		}
+		if _, joined := err.(interface{ Unwrap() []error }); joined {
+			return false
+		}
+		wrapped, ok := err.(interface{ Unwrap() error })
+		if !ok {
+			return false
+		}
+		err = wrapped.Unwrap()
+	}
+	return false
 }
 
 func waitChunkRetry(ctx context.Context, delay time.Duration) error {
