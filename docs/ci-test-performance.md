@@ -80,8 +80,20 @@ The later [review-fix run](https://github.com/dsx-ai-factory/nvkr/actions/runs/3
 target. Three CLI action-descriptor tests accounted for 99.24 seconds in its slowest shard by repeatedly
 rendering the complete product Plan. Their fixture now compiles one executable producer from the small
 test catalog and renders real shared action data. All existing command, coded-error and output-sink
-cases remain. Uncached targeted local runs fell from 20.03 to 0.82 seconds; that local comparison does
-not establish the hosted savings.
+cases remain. The sum of the three top-level test durations fell from 20.03 to 0.82 seconds locally;
+that comparison does not establish the hosted savings. These were single runs on macOS ARM64 with
+Go 1.27.2, before at `903b3ec3b1fe04d7799f73198f72224ec1eb3913` and after the fixture change committed
+as `42325df37b743b3d71a1db43d7638570f8b708c6`. The existing build cache was retained; `-count=1`
+bypassed the test-result cache. Default concurrency was unchanged, with no race or coverage
+instrumentation. Package durations, including startup, were 20.474 and 4.148 seconds respectively.
+Repeat the focused comparison at those revisions with the pinned Go toolchain:
+
+```sh
+GOTOOLCHAIN=local go test ./cmd/nvkr -run '^TestDescribeActionCommand' -count=1 -json
+```
+
+Sum the `Elapsed` fields of the three top-level `pass` events to compare test execution; exclude
+subtest and package events, and do not treat that sum as command wall time.
 
 Two shards for the remaining packages were rejected: one accumulated 538 seconds of package execution
 in the linked CI record. Scheduling those package durations alphabetically across two execution slots

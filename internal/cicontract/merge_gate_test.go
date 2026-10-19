@@ -5,11 +5,14 @@ package cicontract
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -242,8 +245,34 @@ func TestMergeGateLintInstaller(t *testing.T) {
 	if installer < 0 || consumer <= installer || job.Steps[consumer].With["install-mode"] != "none" {
 		t.Fatal("lint action must consume the executable published by the verified installer")
 	}
-	// Replace network, checksum and archive commands; execute the declared
-	// workflow script without downloading or executing a release binary.
+	const releaseChecksum = "ab90aeb7b066f92a33415b638a50fe5344bbb75a0d32ad30cc248d88f81032ab"
+	const archiveFixture = "archive fixture"
+	step := job.Steps[installer]
+	if strings.Count(step.Run, releaseChecksum) != 1 {
+		t.Fatal("installer must retain the reviewed release archive checksum")
+	}
+	fixtureChecksum := fmt.Sprintf("%x", sha256.Sum256([]byte(archiveFixture)))
+	step.Run = strings.Replace(step.Run, releaseChecksum, fixtureChecksum, 1)
+	var checksumTool string
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	for _, name := range []string{"sha256sum", "gsha256sum"} {
+		path, err := exec.LookPath(name)
+		if err != nil {
+			continue
+		}
+		version, err := exec.CommandContext(ctx, path, "--version").Output()
+		if err == nil && strings.Contains(string(version), "GNU coreutils") {
+			checksumTool = path
+			break
+		}
+	}
+	if checksumTool == "" && runtime.GOOS == "linux" {
+		t.Fatal("Linux installer contract requires GNU sha256sum")
+	}
+	// Preserve the workflow's serialized input for GNU verification when
+	// available, with the portable stub fallback for macOS without coreutils.
+	// Only the test copy substitutes a synthetic hash; no release is downloaded.
 	const stub = `#!/bin/sh
 set -eu
 tool=${0##*/}
@@ -252,14 +281,20 @@ case "$tool" in
   curl)
     [ "$FAKE_FAILURE" != download ] || exit 23
     for archive in "$@"; do :; done
-    printf 'archive fixture' > "$archive"
+    printf '%s' "$ARCHIVE_FIXTURE" > "$archive"
+    if [ "$FAKE_FAILURE" = checksum ]; then printf 'corrupt' >> "$archive"; fi
     ;;
   sha256sum)
     [ "$*" = '--check --status' ] || exit 99
-    read -r checksum archive
-    [ "$checksum" = ab90aeb7b066f92a33415b638a50fe5344bbb75a0d32ad30cc248d88f81032ab ] || exit 99
+    cat > "$RUNNER_TEMP/checksum-input"
+    if [ -n "$REAL_SHA256SUM" ]; then
+      "$REAL_SHA256SUM" "$@" < "$RUNNER_TEMP/checksum-input"
+    else
+      [ "$FAKE_FAILURE" != checksum ] || exit 1
+    fi
+    read -r checksum archive < "$RUNNER_TEMP/checksum-input"
+    [ "$checksum" = "$FIXTURE_CHECKSUM" ] || exit 99
     [ -f "$archive" ] || exit 99
-    [ "$FAKE_FAILURE" != checksum ] || exit 1
     printf '%s\n' "$archive" > "$RUNNER_TEMP/verified-archive"
     ;;
   tar)
@@ -293,8 +328,10 @@ esac
 			if err := os.WriteFile(pathFile, nil, 0o600); err != nil {
 				t.Fatal(err)
 			}
-			output, code := runMergeGateStep(t, job.Steps[installer], root, []string{
+			output, code := runMergeGateStep(t, step, root, []string{
 				"GITHUB_PATH=" + pathFile, "FAKE_FAILURE=" + tc.failure,
+				"REAL_SHA256SUM=" + checksumTool, "FIXTURE_CHECKSUM=" + fixtureChecksum,
+				"ARCHIVE_FIXTURE=" + archiveFixture,
 			})
 			if code != tc.code {
 				t.Fatalf("installer exited %d, want %d: %s", code, tc.code, output)
