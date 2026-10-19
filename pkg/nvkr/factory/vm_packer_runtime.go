@@ -5,7 +5,9 @@ package factory
 
 import (
 	"context"
+	"errors"
 	"io"
+	"runtime"
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/internal/buildactivity"
@@ -21,6 +23,8 @@ type localVMPackerResolver struct{}
 
 type localVMPackerExecutor struct {
 	inner       *pipeline.VMImagePackerExecutor
+	native      map[string]*pipeline.PackerToolchain
+	workspace   string
 	subjects    map[string]struct{}
 	sourceRoots map[string]string
 	stdout      io.Writer
@@ -34,7 +38,7 @@ func (localVMPackerResolver) Admit(
 	plan *Plan,
 	session *pipeline.NodeSession,
 	config vmDriverRunConfig,
-) (vmDriverExecutor, error) {
+) (result vmDriverExecutor, returnedErr error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "local Packer resolver requires a context")
 	}
@@ -45,10 +49,24 @@ func (localVMPackerResolver) Admit(
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
+	if config.Diagnostics == nil {
+		return nil, e.New(e.CodeEngineCapability, "local Packer resolver requires an attempt-owned diagnostic capability")
+	}
 	_, artifacts := planIndex(plan)
 	selections := make([]pipeline.VMImagePackerSelection, 0)
 	subjects := make(map[string]struct{})
 	sourceRoots := make(map[string]string)
+	native := make(map[string]*pipeline.PackerToolchain)
+	success := false
+	defer func() {
+		if !success {
+			for _, toolchain := range native {
+				if err := toolchain.Close(); err != nil {
+					returnedErr = joinFactoryCleanupError(returnedErr, err, "closing rejected native Packer toolchain")
+				}
+			}
+		}
+	}()
 	for _, selected := range topologicalFactoryNodes(plan.Graph) {
 		if config.NodeID != "" && selected.ID != config.NodeID {
 			continue
@@ -90,6 +108,10 @@ func (localVMPackerResolver) Admit(
 		}
 		sourceRoots[request.Subject] = sourceRoot
 		selection := pipeline.VMImagePackerSelection{Subject: request.Subject, Node: instruction}
+		_, hasNative := plan.Environment.Runtime.NativeToolchains[instruction.Toolchain]
+		if err := validateLocalPackerHost(instruction, hasNative); err != nil {
+			return nil, err
+		}
 		selection.ActivityOperation = packerActivityOperation(selected.ID, config.Activity != nil)
 		selections = append(selections, selection)
 	}
@@ -107,11 +129,46 @@ func (localVMPackerResolver) Admit(
 	if err != nil {
 		return nil, err
 	}
+	// Pure Plan, host and network admission precede local toolchain I/O.
+	nativeCount := 0
+	for _, selection := range selections {
+		if _, ok := plan.Environment.Runtime.NativeToolchains[selection.Node.Toolchain]; ok {
+			nativeCount++
+		}
+	}
+	if nativeCount != 0 && nativeCount != len(selections) {
+		return nil, e.New(e.CodeEngineCapability, "one Packer admission cannot mix native and container toolchains")
+	}
+	for index := range selections {
+		selection := &selections[index]
+		locator, ok := plan.Environment.Runtime.NativeToolchains[selection.Node.Toolchain]
+		if !ok {
+			continue
+		}
+		toolchain := native[selection.Node.Toolchain]
+		if toolchain == nil {
+			toolchain, err = openNativePackerBundle(ctx, locator.Layout, locator.Bundle, selection.Node.Toolchain, selection.Node.ToolchainPlatform)
+			if err != nil {
+				return nil, err
+			}
+			native[selection.Node.Toolchain] = toolchain
+		}
+		variables := make([]pipeline.PackerVariable, 0, len(selection.Node.Packer.Variables))
+		for _, variable := range selection.Node.Packer.Variables {
+			variables = append(variables, pipeline.PackerVariable(variable))
+		}
+		if _, err := toolchain.NativeVariables(ctx, variables); err != nil {
+			return nil, err
+		}
+		selection.Toolchain = toolchain
+	}
 	admitted, err := session.AdmitVMImagePacker(ctx, selections, networkAdmission, config.Runtime)
 	if err != nil {
 		return nil, err
 	}
+	success = true
 	return &localVMPackerExecutor{
+		native: native, workspace: config.Workspace,
 		inner: admitted, subjects: subjects, sourceRoots: sourceRoots,
 		stdout: config.Stdout, stderr: config.Stderr, diagnostics: config.Diagnostics,
 		activity: config.Activity,
@@ -190,8 +247,8 @@ func (executor *localVMPackerExecutor) RunPacker(
 			"local Packer subject %q has no admitted source route", subject)
 	}
 	return executor.inner.Run(ctx, subject, node, pipeline.VMImagePackerRun{
-		Activity:    executor.activity,
-		SourceRoot:  sourceRoot,
+		Activity:   executor.activity,
+		SourceRoot: sourceRoot, Workspace: executor.workspace,
 		Manifest:    materials.manifest,
 		Materials:   materials.inputs,
 		Runtime:     runtime.inner,
@@ -205,5 +262,21 @@ func (executor *localVMPackerExecutor) Close() error {
 	if executor == nil || executor.inner == nil {
 		return nil
 	}
-	return executor.inner.Close()
+	closeErr := executor.inner.Close()
+	for _, toolchain := range executor.native {
+		closeErr = errors.Join(closeErr, toolchain.Close())
+	}
+	return closeErr
+}
+
+// validateLocalPackerHost is the shared pure platform/network gate used by local
+// preflight and the resolver before opening native bundle bytes.
+func validateLocalPackerHost(node ir.Node, native bool) error {
+	if runtime.GOOS != "linux" && !native {
+		return e.New(e.CodeEngineCapability, "local VM execution requires Linux container tools or a verified native toolchain bundle; host is %s/%s", runtime.GOOS, runtime.GOARCH)
+	}
+	if native && (node.ToolchainPlatform != runtime.GOOS+"/"+runtime.GOARCH || node.Network != ir.NetworkDefault) {
+		return e.New(e.CodeEngineCapability, "native VM execution requires the selected actual host and explicit producer-declared networking")
+	}
+	return nil
 }

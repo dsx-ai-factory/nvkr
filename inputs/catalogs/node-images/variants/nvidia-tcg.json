@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-os-arm64-tcg-local",
-  "requiresCatalogDigest": "sha256:6e7da2d5790e92063340e03f49843133d66d588f5773c2939fd5be667e061d42",
+  "requiresCatalogDigest": "sha256:221cb95ed35e8549168ba2ed04e67422fe15b9199f43fbbf9dabe86a4a79d068",
   "components": {
     "nvke-node-image": {
       "component": {
@@ -26,7 +26,7 @@
           "timeoutSeconds": 21600
         },
         "builderType": "vm-image",
-        "commit": "6991e36bef8f15b42b6f6519ccff089c587a6e49",
+        "commit": "55612dce98cf0183790fbe5f4776225d63369fc2",
         "patches": [
           {
             "name": "patches/capture-schema.patch",
@@ -70,20 +70,21 @@
             "guest_memory_mib": "4096",
             "ssh_timeout": "180m",
             "cpu_model": "cortex-a57",
-            "boot_wait": "30s"
+            "boot_wait": "30s",
+            "ubuntu_series": "26.04"
           }
         },
         "platforms": [
           "linux/arm64"
         ],
         "repo": "https://github.com/dsx-ai-factory/nvke.git",
-        "sourceDateEpoch": 1792081788,
-        "tag": "v0.22.0-beta.1",
+        "sourceDateEpoch": 1792435542,
+        "tag": "55612dce98cf0183790fbe5f4776225d63369fc2",
         "toolchainImages": {
           "amd64": "sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0",
           "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2"
         },
-        "treeHash": "64d3259508bb91745a0fbaa71b5d72a61b787142",
+        "treeHash": "8df7ab7e8254a3826d588be8437957df1854c658",
         "vendorCommand": [
           "bash",
           "-ec",

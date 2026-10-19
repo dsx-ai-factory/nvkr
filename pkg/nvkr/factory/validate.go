@@ -171,6 +171,12 @@ func (plan Plan) validatePlanNodes(builds map[string]ir.Node) error {
 					"rootless BuildKit node %q requires Docker or Podman in its Environment", node.ID)
 			}
 		}
+		if build.BuilderType == ir.BuilderNativeGo {
+			location, ok := plan.Environment.Runtime.NativeToolchains[build.Toolchain]
+			if !ok || location.GoManifest == "" || plan.Environment.Publication != nil || plan.Environment.Signing != nil {
+				return e.New(e.CodeEngineCapability, "native Go requires a local installed toolchain binding without publication or signing")
+			}
+		}
 	}
 	return nil
 }

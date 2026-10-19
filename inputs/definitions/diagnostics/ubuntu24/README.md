@@ -2,9 +2,9 @@
 
 These opt-in inputs select Ubuntu **24.04.5** installers for native AMD64 and ARM64 NVKE
 QCOW2 builds. Ubuntu 26.04 remains the existing default. The release catalog pins NVKE
-`v0.22.0-beta.1` (`6991e36bef8f15b42b6f6519ccff089c587a6e49`), which contains upstream's
+`main` at `55612dce98cf` (`55612dce98cf0183790fbe5f4776225d63369fc2`), which contains upstream's
 [Ubuntu 24 support](https://github.com/dsx-ai-factory/nvke/commit/96ccc50cb7f8ed8bb08f7cf8655906982774f809).
-The installer material selects the guest OS; this source has no Ubuntu-version Packer variable.
+The installer material and required `ubuntu_series=24.04` Packer variable select the guest OS together.
 
 | Selection | Definition | Output |
 |---|---|---|
@@ -19,7 +19,7 @@ Each selects the complete eleven-producer closure. The ordered stack is the shar
 [release node-image catalog](../../../catalogs/node-images/release/registry.yaml), its
 [native-toolchain overlay](../../../catalogs/node-images/variants/native-toolchains.yaml), then
 [Ubuntu 24 overlay](../../../catalogs/node-images/variants/ubuntu24.json). The last overlay
-replaces the two installer suppliers and the agent producer as complete declarations, bound
+replaces the two installer suppliers, the agent and four disk producers as complete declarations, bound
 to the predecessor catalog digest. The Ubuntu 24 selection does not change existing locks, release outputs, or
 committed workflows.
 
@@ -114,7 +114,7 @@ Contract tests compile all four hosted selections and both local selections, che
 KVM admission and exact material membership, compare Build identities, and generate/check
 each hosted bundle. These tests do not build or boot an Ubuntu 24 disk. A full native bake,
 guest boot and agent-start smoke test remain external acceptance work for each selected
-architecture and encryption mode. The prior-source native ARM64 container exercise does not establish beta agent compatibility.
-The beta overlay awaits CI and external execution; local test execution was stopped at the user’s request.
+architecture and encryption mode. The prior-source native ARM64 container exercise does not establish main-revision agent compatibility.
+The current overlay awaits CI and external execution; local test execution was stopped at the user’s request.
 Current evidence belongs in
 [reconciliation](../../../../docs/adr/reconciliation.md#ubuntu-24-node-image-inputs).

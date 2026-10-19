@@ -1,0 +1,142 @@
+{
+  "apiVersion": "nvkr.dev/definition/v5",
+  "catalog": {
+    "base": "../../../catalogs/runtime-dependencies"
+  },
+  "kind": "Definition",
+  "metadata": {
+    "description": "Acquire the pinned runtime, workload and source CAPI authentication images for local guest import; no publication or signing.",
+    "name": "nvke-local-runtime-images"
+  },
+  "outputs": [
+    {
+      "catalog": {
+        "base": "../../../catalogs/tools/native"
+      },
+      "components": [
+        "native-capi-exec-init-image"
+      ],
+      "format": "oci",
+      "name": "capi-exec-init-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/tools/native"
+      },
+      "components": [
+        "native-capi-exec-plugin-image"
+      ],
+      "format": "oci",
+      "name": "capi-exec-plugin-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "components": [
+        "csi-node-driver-registrar-image"
+      ],
+      "format": "oci",
+      "name": "csi-node-driver-registrar-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "components": [
+        "postgresql-image"
+      ],
+      "format": "oci",
+      "name": "postgresql-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "components": [
+        "spiffe-csi-image"
+      ],
+      "format": "oci",
+      "name": "spiffe-csi-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "components": [
+        "spire-agent-image"
+      ],
+      "format": "oci",
+      "name": "spire-agent-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "components": [
+        "spire-bash-image"
+      ],
+      "format": "oci",
+      "name": "spire-bash-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "components": [
+        "spire-controller-manager-image"
+      ],
+      "format": "oci",
+      "name": "spire-controller-manager-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "components": [
+        "spire-oidc-image"
+      ],
+      "format": "oci",
+      "name": "spire-oidc-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "components": [
+        "spire-server-image"
+      ],
+      "format": "oci",
+      "name": "spire-server-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "components": [
+        "spire-tpm-server-image"
+      ],
+      "format": "oci",
+      "name": "spire-tpm-server-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "components": [
+        "temporal-admin-tools-image"
+      ],
+      "format": "oci",
+      "name": "temporal-admin-tools-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "components": [
+        "temporal-server-image"
+      ],
+      "format": "oci",
+      "name": "temporal-server-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "components": [
+        "temporal-ui-image"
+      ],
+      "format": "oci",
+      "name": "temporal-ui-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/tools/native"
+      },
+      "components": [
+        "native-workload-image"
+      ],
+      "format": "oci",
+      "name": "workload-image-arm64",
+      "platform": "linux/arm64"
+    }
+  ]
+}

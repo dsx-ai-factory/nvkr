@@ -50,17 +50,17 @@ workflow does not execute that suite or establish operational acceptance.
 The coordinator checks supported native ARM64 runtime and OVN selections, authenticates the complete
 publication, and requires both test and cleanup verdicts. Checksum-pinned tool acquisition adds no
 vulnerability-clearance claim. All four site-product sources select
-NVKE `v0.22.0-beta.1` at `6991e36bef8f15b42b6f6519ccff089c587a6e49`. The OS closure
+NVKE `main` at `55612dce98cf` at `55612dce98cf0183790fbe5f4776225d63369fc2`. The OS closure
 retains the explicit pre-DSX SPIRE exception at `726f76944404e1106626b8333d3576bdf67b575b`.
 The test-only suite selects `a32067108ab89d1e2b2b6720766ffe97270a166a`, an explicit
-user-approved exception to ADR-23's proposed matching-revision rule. Product sources remain beta.
+user-approved exception to ADR-23's proposed matching-revision rule. Product sources select the exact main commit.
 
-The adapter now projects authenticated profile bytes into beta `MachineImage`, `ClusterRelease`
+The adapter now projects authenticated profile bytes into current `MachineImage`, `ClusterRelease`
 and `NodePoolRelease` resources, preserving the exact disk binding and the candidate suite's
 fixed profile name. It renders the current site-specification shape with private tenant credentials.
 These paths are contract-tested, without a recorded runtime cycle.
 
-The selected test source retains the candidate entrypoint omitted from beta. It accepts the
+The selected test source retains the candidate entrypoint omitted from the selected product source. It accepts the
 verified publication without rebuilding products. This separate test pin does not establish
 runtime compatibility or operational acceptance.
 The first combined nightly cycle remains unrecorded.

@@ -67,12 +67,18 @@ func (plan Plan) executionForProducer(node Node) (Node, error) {
 	case ir.KindFetch:
 		node.Network = ir.NetworkDefault
 		node.Container = instruction.VendorImage
+		if build.Graph.Platform == "darwin/arm64" && node.Container != "" {
+			node.Platform = "linux/arm64"
+		}
 	case ir.KindPull:
 		node.Network = ir.NetworkDefault
 	case ir.KindBuild:
 		node.Network = instruction.Network
 		node.Container = instruction.Toolchain
 		node.Platform = instruction.Platform
+		if instruction.Platform == "darwin/arm64" {
+			node.Platform = instruction.ToolchainPlatform
+		}
 		node.Requirements = execution.Clone(instruction.Requirements)
 		node.ExecutionBinding = execution.CloneBinding(instruction.ExecutionBinding)
 		if instruction.ExecutionBinding != nil {

@@ -1,0 +1,61 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package nvkedemo
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestTenantWorkloadRequiresExecutionDNSAndExactImage(t *testing.T) {
+	for _, tc := range []struct {
+		name, marker, image, fail string
+		copies                    int
+		wantError                 bool
+	}{
+		{name: "accepted", marker: "NVKE_LOCAL_WORKLOAD_PASS\n", image: WorkloadImage, copies: 1},
+		{name: "missing execution marker", image: WorkloadImage, copies: 1, wantError: true},
+		{name: "partial marker", marker: "prefixNVKE_LOCAL_WORKLOAD_PASS\n", image: WorkloadImage, copies: 1, wantError: true},
+		{name: "wrong image", marker: "NVKE_LOCAL_WORKLOAD_PASS\n", image: "sha256:wrong", copies: 1, wantError: true},
+		{name: "no observed container", marker: "NVKE_LOCAL_WORKLOAD_PASS\n", wantError: true},
+		{name: "extra observed container", marker: "NVKE_LOCAL_WORKLOAD_PASS\n", image: WorkloadImage, copies: 2, wantError: true},
+		{name: "wait failed", fail: "workload-complete", wantError: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			failed := errors.New("owned command failed")
+			var phases []string
+			capture := func(_ context.Context, args []string, phase string, budget time.Duration) ([]byte, error) {
+				phases = append(phases, phase)
+				if len(args) < 4 || args[0] != "kubectl" || args[1] != "--kubeconfig" || args[2] != "tenant.config" || budget <= 0 {
+					t.Fatalf("invalid command admission: %v %v", args, budget)
+				}
+				if phase == tc.fail {
+					return nil, failed
+				}
+				if phase == "workload-log" {
+					return []byte(tc.marker), nil
+				}
+				if phase == "workload-pod" {
+					containers := make([]map[string]string, tc.copies)
+					for i := range containers {
+						containers[i] = map[string]string{"imageID": tc.image}
+					}
+					return json.Marshal(map[string]any{"items": []any{map[string]any{"status": map[string]any{"containerStatuses": containers}}}})
+				}
+				return nil, nil
+			}
+			_, err := runTenantWorkload(t.Context(), t.TempDir(), "tenant.config", "kubectl", capture)
+			if (err != nil) != tc.wantError {
+				t.Fatalf("acceptance error=%v; wantError=%v", err, tc.wantError)
+			}
+			if tc.fail != "" && (!errors.Is(err, failed) || strings.Join(phases, ",") != "workload-apply,workload-complete") {
+				t.Fatalf("failed wait was bypassed: %v, phases=%v", err, phases)
+			}
+		})
+	}
+}

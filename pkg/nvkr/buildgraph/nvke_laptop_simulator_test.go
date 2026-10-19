@@ -15,7 +15,16 @@ import (
 )
 
 func TestLaptopNICoSimSourceBuild(t *testing.T) {
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "inputs/catalogs/nicosim")))
+	testNICoSimSourceBuild(t, "nicosim", true)
+}
+
+func TestNativeNICoSimSourceBuild(t *testing.T) {
+	testNICoSimSourceBuild(t, "tools/native", false)
+}
+
+func testNICoSimSourceBuild(t *testing.T, directory string, patched bool) {
+	t.Helper()
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "inputs/catalogs", directory)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,14 +38,20 @@ func TestLaptopNICoSimSourceBuild(t *testing.T) {
 		{"runtime assets", "linux/arm64", []string{"nico-sim-runtime-assets"}, ""},
 		{"both share one prepared source", "linux/arm64", []string{"nico-sim", "nico-simctl"}, ""},
 		{"self-contained simulator selection", "linux/arm64", []string{"nico-sim", "nico-sim-runtime-assets", "nico-simctl"}, ""},
+		{"Mac simulator requires an admitted CGO toolchain", "darwin/arm64", []string{"nico-sim"}, e.CodeEngineCapability},
+		{"Mac API CLI remains cross-buildable", "darwin/arm64", []string{"nico-simctl"}, ""},
 		{"foreign platform fails closed", "linux/amd64", []string{"nico-sim"}, e.CodeEngineCapability},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			wantCode := tc.wantCode
+			if patched && tc.platform == "darwin/arm64" {
+				wantCode = e.CodeEngineCapability
+			}
 			resolved, err := Resolve(cat, Selection{Components: tc.components, Platform: tc.platform, OutputFormat: "executable"})
-			if tc.wantCode != "" {
+			if wantCode != "" {
 				var coded *e.Error
-				if !errors.As(err, &coded) || coded.Code != tc.wantCode {
-					t.Fatalf("wanted %s, got %v", tc.wantCode, err)
+				if !errors.As(err, &coded) || coded.Code != wantCode {
+					t.Fatalf("wanted %s, got %v", wantCode, err)
 				}
 				return
 			}
@@ -57,7 +72,7 @@ func TestLaptopNICoSimSourceBuild(t *testing.T) {
 					}
 				case ir.KindBuild:
 					builds++
-					if node.SourceCommit != "6991e36bef8f15b42b6f6519ccff089c587a6e49" || node.Network != ir.NetworkNone || node.BuilderType != ir.BuilderOCIHermetic || !node.SourceReadOnly {
+					if node.SourceCommit != cat.Components[node.Component].Commit || node.Network != ir.NetworkNone || node.BuilderType != ir.BuilderOCIHermetic || !node.SourceReadOnly {
 						t.Fatalf("pinned offline source producer changed: %+v", node)
 					}
 					cgo := false
@@ -66,10 +81,11 @@ func TestLaptopNICoSimSourceBuild(t *testing.T) {
 							cgo = true
 						}
 					}
-					if node.Component != "nico-sim-runtime-assets" && !cgo {
-						t.Fatal("SQLite simulator requires a CGO-capable build")
+					wantCGO := node.Component == "nico-sim" || (patched && node.Component == "nico-simctl")
+					if cgo != wantCGO {
+						t.Fatalf("unexpected CGO selection for %s: got %t, want %t", node.Component, cgo, wantCGO)
 					}
-					if node.Component != "nico-sim-runtime-assets" {
+					if patched && node.Component != "nico-sim-runtime-assets" {
 						if len(node.Patches) != 1 || node.Patches[0].Content == "" || node.Patches[0].SHA256 != "sha256:b45c745b03f1661572f00ce658499a6b260940c36293e03dfff4300ba940e167" {
 							t.Fatal("NICoSim version interface must be a byte-bound source patch")
 						}
@@ -81,12 +97,19 @@ func TestLaptopNICoSimSourceBuild(t *testing.T) {
 							t.Fatal("NICoSim must report its exact base revision and declared patched state")
 						}
 					}
+					if !patched && len(node.Patches) != 0 {
+						t.Fatal("native simulator must use the selected upstream source without patches")
+					}
 					command := strings.Join(node.Command, " ")
-					if node.Component == "nico-sim" && !strings.Contains(command, "make -C controller/nico-sim build-static") {
+					makeCommand := "make build-static"
+					if patched {
+						makeCommand = "make -C controller/nico-sim build-static"
+					}
+					if node.Component == "nico-sim" && !strings.Contains(command, makeCommand) {
 						t.Fatal("server must invoke the source-owned static Make target")
 					}
-					if node.Component == "nico-simctl" && !strings.Contains(command, "-extldflags -static") {
-						t.Fatal("CLI must be portable to the Linux demo runtime")
+					if patched && node.Component == "nico-simctl" && !strings.Contains(command, "-extldflags -static") {
+						t.Fatal("qualified-lane CLI must retain the declared static Linux link")
 					}
 					if node.Component == "nico-sim-runtime-assets" {
 						if cgo || node.OutputType != "tarball" {

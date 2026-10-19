@@ -1,7 +1,7 @@
 # NVKE deploy example
 
 This nine-output Definition builds CWE, a runnable fixture profiles image, and its controller chart and acquires the four external charts
-selected by NVKE `v0.22.0-beta.1`. It remains available for local execution. The committed GitHub workflow uses
+selected by NVKE `main at 55612dce98cf`. It remains available for local execution. The committed GitHub workflow uses
 [the combined M2 Definition](../../../inputs/definitions/nvke/README.md), which has its own output selection and additional artifacts.
 
 | Output | Selected input |
@@ -19,13 +19,13 @@ selected by NVKE `v0.22.0-beta.1`. It remains available for local execution. The
 ## Source and package membership
 
 The [shared controller catalog](../../../inputs/catalogs/nvke/release/registry.yaml) pins the umbrella NVKE tag
-`v0.22.0-beta.1`. Its machine-managed lock authenticates the source commit/tree and acquired chart bytes.
+`main at 55612dce98cf`. Its machine-managed lock authenticates the source commit/tree and acquired chart bytes.
 The source-owned `deploy/nico/nvke-deploy.yaml` supplies the four external chart versions;
 every other deploy member is explicitly accounted for. Re-pinning fails on unreviewed membership,
 type, path or chart-identity changes. See the [pin-set adapter guide](../../nvke-pin-set-usage.md).
 
 The CLI, controller, profiles and chart producers share source commit
-`6991e36bef8f15b42b6f6519ccff089c587a6e49`, the umbrella `v0.22.0-beta.1` source.
+`55612dce98cf0183790fbe5f4776225d63369fc2`, the umbrella `main at 55612dce98cf` source.
 The CLI has a separate preparation source alias at that exact commit so its
 Go dependency closure does not change the controller or profiles fetches. It
 uses the source-owned Make target for linker symbols and version assertions.

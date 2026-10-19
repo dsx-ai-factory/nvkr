@@ -124,14 +124,14 @@ func TestNightlyWorkflowSuiteSelectionMatchesGoCohortOwner(t *testing.T) {
 		legacy bool
 	}{
 		{"current frozen source", func(*factory.Plan) {}, false},
-		{"approved beta harness", func(p *factory.Plan) {
+		{"approved main harness", func(p *factory.Plan) {
 			for i := range p.Builds {
-				p.Builds[i].ResolvedComponents[0].Commit = "6991e36bef8f15b42b6f6519ccff089c587a6e49"
+				p.Builds[i].ResolvedComponents[0].Commit = "55612dce98cf0183790fbe5f4776225d63369fc2"
 			}
 		}, false},
-		{"beta with unapproved harness", func(p *factory.Plan) {
+		{"main with unapproved harness", func(p *factory.Plan) {
 			for i := range p.Builds {
-				p.Builds[i].ResolvedComponents[0].Commit = "6991e36bef8f15b42b6f6519ccff089c587a6e49"
+				p.Builds[i].ResolvedComponents[0].Commit = "55612dce98cf0183790fbe5f4776225d63369fc2"
 			}
 		}, false},
 		{"legacy configured source", func(*factory.Plan) {}, true},
@@ -150,7 +150,7 @@ func TestNightlyWorkflowSuiteSelectionMatchesGoCohortOwner(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			profile := profile
-			if test.name == "approved beta harness" {
+			if test.name == "approved main harness" {
 				profile.HarnessCommit = "a32067108ab89d1e2b2b6720766ffe97270a166a"
 			}
 			plan, _ := nightlyRuntimeCompiledFixture(t, profile, build, strings.Repeat("d", 40))

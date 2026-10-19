@@ -25,15 +25,15 @@ pins:
     tag: v8.0.1
     treeHash: f008da01d74dc8156ff9b1d22b2bccec8ff2ee72
   nvke:
-    commit: 6991e36bef8f15b42b6f6519ccff089c587a6e49
-    sourceDateEpoch: 1792081788
-    tag: v0.22.0-beta.1
-    treeHash: 64d3259508bb91745a0fbaa71b5d72a61b787142
+    commit: 55612dce98cf0183790fbe5f4776225d63369fc2
+    sourceDateEpoch: 1792435542
+    tag: 55612dce98cf0183790fbe5f4776225d63369fc2
+    treeHash: 8df7ab7e8254a3826d588be8437957df1854c658
   nvke-controller:
-    commit: 6991e36bef8f15b42b6f6519ccff089c587a6e49
-    sourceDateEpoch: 1792081788
-    tag: v0.22.0-beta.1
-    treeHash: 64d3259508bb91745a0fbaa71b5d72a61b787142
+    commit: 55612dce98cf0183790fbe5f4776225d63369fc2
+    sourceDateEpoch: 1792435542
+    tag: 55612dce98cf0183790fbe5f4776225d63369fc2
+    treeHash: 8df7ab7e8254a3826d588be8437957df1854c658
   setup-go:
     commit: b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
     sourceDateEpoch: 1784170069

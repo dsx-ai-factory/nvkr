@@ -374,7 +374,7 @@ func TestDashboardHandoverKeepsLateFailures(t *testing.T) {
 			if mode == "same message distinct error" {
 				ownerErr = first
 			}
-			writer := &checkedWriter{out: &out, cancel: cancel, started: time.Now(), results: [6]string{4: "Warning: result replay"}}
+			writer := &checkedWriter{out: &out, cancel: cancel, started: time.Now(), results: [8]string{6: "Warning: result replay"}}
 			calls := 0
 			terminalFailure := func() error {
 				calls++

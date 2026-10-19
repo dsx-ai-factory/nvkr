@@ -93,7 +93,7 @@ case "$1 $2" in
       */userData.tmpl) cat "$FIXTURE/profile-userdata" ;;
       *) exit 22 ;;
     esac ;;
-  'get secret') step kubeconfig; printf '{}\n' ;;
+  'get secret') step kubeconfig; printf '{"data":{"value":"YQ=="}}\n' ;;
   'config view') cat "$FIXTURE/config.json" ;;
   'get nodes') step nodes; cat "$FIXTURE/nodes.json" ;;
   'get machines.cluster.x-k8s.io,nicomachines.infrastructure.cluster.x-k8s.io') step guest-bindings; printf '{"items":[]}\n' ;;

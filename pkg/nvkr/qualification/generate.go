@@ -271,7 +271,7 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 	fmt.Fprintln(&top, "          NVKR_CI_STORAGE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}")
 	fmt.Fprintln(&top, "          NVKR_CI_STORAGE_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}")
 	sourceAuth.writeEnvironment(&top)
-	fmt.Fprintf(&top, "        run: |\n          set -euo pipefail\n%s          ./nvkr-exec run qualify --policy %s\n", sourceAuth.requireTokens(), qualificationShell(policyPath))
+	fmt.Fprintf(&top, "        run: |\n          set -euo pipefail\n%s          exec ./nvkr-exec run qualify --policy %s\n", sourceAuth.requireTokens(), qualificationShell(policyPath))
 	fmt.Fprintf(&worker, "name: %s\n'on':\n  workflow_call:\n", qualificationYAML("nvkr-smoke-"+plan.Name))
 	sourceAuth.writeCallContract(&worker)
 	fmt.Fprint(&worker, "permissions:\n  contents: read\nconcurrency:\n  group: nvkr-native-smoke-${{ github.run_id }}-${{ github.run_attempt }}\n  cancel-in-progress: false\njobs:\n  native:\n    name: native-${{ matrix.arch }}\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 30\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n")
@@ -306,7 +306,7 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 	fmt.Fprintln(&worker, "          NVKR_CI_STORAGE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}")
 	fmt.Fprintln(&worker, "          NVKR_CI_STORAGE_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}")
 	sourceAuth.writeEnvironment(&worker)
-	fmt.Fprintf(&worker, "        run: |\n          set -euo pipefail\n%s          ./nvkr-exec run smoke-worker --policy %s\n", sourceAuth.requireTokens(), qualificationShell(policyPath))
+	fmt.Fprintf(&worker, "        run: |\n          set -euo pipefail\n%s          exec ./nvkr-exec run smoke-worker --policy %s\n", sourceAuth.requireTokens(), qualificationShell(policyPath))
 	fmt.Fprintf(&worker, "      - name: Upload signed native smoke evidence\n        uses: %s # %s\n        timeout-minutes: 5\n        with:\n          name: nvkr-smoke-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.arch }}\n          path: |\n            .nvkr/smoke-worker/evidence/worker.json\n            .nvkr/smoke-worker/evidence/worker.sig\n            .nvkr/smoke-worker/evidence/worker.pem\n            .nvkr/smoke-worker/evidence/worker.bundle.json\n          include-hidden-files: true\n          if-no-files-found: error\n", actions.Upload, plan.Actions["upload-artifact"].Version)
 	files := map[string][]byte{policy.QualificationWorkflow: top.Bytes(), policy.Smoke.Workflow: worker.Bytes()}
 	members := make([]factory.GeneratedMember, 0, 2)

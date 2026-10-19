@@ -57,13 +57,13 @@ profile, exact suite revision, native runtime target and network. There is no
 self-declared security approval field. Artifact authentication, source matching,
 native-host preflight and owned-resource cleanup remain required.
 
-Both Definitions select the profile-owned site catalog at NVKE `v0.22.0-beta.1`,
-commit `6991e36bef8f15b42b6f6519ccff089c587a6e49`, for the CLI, controller image,
+Both Definitions select the profile-owned site catalog at NVKE `main at 55612dce98cf`,
+commit `55612dce98cf0183790fbe5f4776225d63369fc2`, for the CLI, controller image,
 controller chart and NKTP chart. The test-only suite checkout selects
 `a32067108ab89d1e2b2b6720766ffe97270a166a`.
 The OS closure retains SPIRE at the explicit pre-DSX exception commit
 `726f76944404e1106626b8333d3576bdf67b575b`. Clusterctl selects 1.13.6 to match the
-beta installer. The separate test pin is a user-approved exception to ADR-23's proposed
+selected installer. The separate test pin is a user-approved exception to ADR-23's proposed
 matching-revision rule; it establishes no runtime compatibility or broader acceptance.
 ADR-23 remains proposed and excludes CI trigger, runner and credential policy.
 
@@ -72,10 +72,10 @@ same profile projection as the local tenant flow, then emits `MachineImage`, `Cl
 and `NodePoolRelease` resources under `internal.nvke.nvidia.com/v1`. It preserves the full
 disk digest, boot script and user-data template, retaining the candidate suite's fixed profile
 name in its fresh management cluster. No source profile-converter executable is required.
-The site specification uses the beta `cluster` and `controllerStack` shape with private
+The site specification uses the current `cluster` and `controllerStack` shape with private
 credentials. These adapter paths have contract tests; they have no recorded runtime cycle.
 
-The selected test source retains `controller/hack/ci/nico-vms-candidate.sh`, which beta
+The selected test source retains `controller/hack/ci/nico-vms-candidate.sh`, which the selected product source
 omits. This entrypoint accepts the authenticated candidate artifacts and reports cleanup.
 The generic suite's product rebuild and OS-tag download remain forbidden fallbacks.
 The beta CLI validates and renders the selected test source's deployment templates in a

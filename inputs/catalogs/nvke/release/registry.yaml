@@ -51,9 +51,9 @@ components:
     fromSource: true
     source: nvke-helm
     # Package the source chart with the selected NVKE release version.
-    artifactPath: charts/nke-controller-0.22.0-beta.1.tgz
+    artifactPath: charts/nke-controller-0.0.0-git.55612dce98cf.tgz
     writeDir: charts
-    buildCommand: ['package', 'controller/deploy/charts/controller', '--version=0.22.0-beta.1', '--app-version=v0.22.0-beta.1', '--destination=charts/']
+    buildCommand: ['package', 'controller/deploy/charts/controller', '--version=0.0.0-git.55612dce98cf', '--app-version=55612dce98cf0183790fbe5f4776225d63369fc2', '--destination=charts/']
     outputType: tarball
     platforms:
     - linux/amd64

@@ -70,9 +70,19 @@ func SelectTarGzip(ctx context.Context, source io.Reader, member string, limits 
 		if err != nil {
 			return nil, archiveError(ctx, err, "reading release archive header")
 		}
-		name := header.Name
+		// Upstream tar archives commonly spell relative members with one ./
+		// prefix. Normalize only that spelling before duplicate/path admission;
+		// traversal, absolute paths and multiple dot prefixes stay invalid.
+		name := strings.TrimPrefix(header.Name, "./")
 		if header.Typeflag == tar.TypeDir {
 			name = strings.TrimSuffix(name, "/")
+		}
+		if name == "." || name == "" {
+			if count >= limits.Entries || header.Typeflag != tar.TypeDir || header.Size != 0 || seen["."] || (header.Name != "." && header.Name != "./") {
+				return nil, e.New(e.CodeVerifyFailed, "release archive contains an invalid root directory")
+			}
+			seen["."] = true
+			continue
 		}
 		if count >= limits.Entries || !validMember(name) || seen[name] || header.Size < 0 ||
 			(header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeDir) ||

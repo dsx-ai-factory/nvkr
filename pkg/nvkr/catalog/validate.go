@@ -6,6 +6,7 @@ package catalog
 import (
 	"crypto/sha256"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -43,7 +44,7 @@ func validateRegistryDeclarations(reg *registryDoc) error {
 		if strings.TrimSpace(name) == "" || name != strings.TrimSpace(name) {
 			return e.New(e.CodeInvalidCatalog, "component name %q is empty or non-canonical", name)
 		}
-		if err := validateComponentTargets(name, c.Platforms); err != nil {
+		if err := validateComponentTargets(name, c.Platforms, sourceExecutableTarget(c.FromSource, c.BuilderType, c.OutputType) || !c.FromSource && c.OutputType == "host-package" && c.Prebuilt != nil && c.Prebuilt.ReleaseExecutable); err != nil {
 			return err
 		}
 	}
@@ -149,13 +150,17 @@ func (cat *Catalog) Validate() error {
 	return validateMaterialGraph(cat.Components)
 }
 
-func validateComponentTargets(name string, platforms []string) error {
+func validateComponentTargets(name string, platforms []string, executable bool) error {
 	if len(platforms) == 0 {
 		return e.New(e.CodeInvalidCatalog, "component %q requires explicit supported platforms", name)
 	}
 	previous := ""
 	for _, platform := range platforms {
-		if err := target.ValidatePlatform(platform); err != nil {
+		validate := target.ValidatePlatform
+		if executable {
+			validate = target.ValidateExecutablePlatform
+		}
+		if err := validate(platform); err != nil {
 			return e.Wrap(e.CodeInvalidCatalog, err, "component %q", name)
 		}
 		if platform <= previous {
@@ -166,14 +171,36 @@ func validateComponentTargets(name string, platforms []string) error {
 	return nil
 }
 
+func sourceExecutableTarget(fromSource bool, builder string, output string) bool {
+	// Target declaration is separate from executor admission. Darwin CGO must
+	// select an installed native toolchain before lowering executable IR.
+	return fromSource && (builder == "" || builder == BuilderOCIHermetic || builder == BuilderNativeGo) && (output == "host-package" || output == "tarball")
+}
+
 func validateComponent(name string, c Component) error {
+	if len(c.BuildCommandByPlatform) != 0 && (!c.FromSource || c.Packer != nil || c.Flake != nil) {
+		return e.New(e.CodeInvalidCatalog, "component %q: platform commands require a plain from-source command producer", name)
+	}
+	for platform, command := range c.BuildCommandByPlatform {
+		if !slices.Contains(c.Platforms, platform) || len(command) == 0 {
+			return e.New(e.CodeInvalidCatalog, "component %q: command override requires a declared platform and nonempty argv", name)
+		}
+		for _, argument := range command {
+			if strings.TrimSpace(argument) == "" || strings.ContainsRune(argument, '\x00') {
+				return e.New(e.CodeInvalidCatalog, "component %q: invalid platform command argument", name)
+			}
+			if err := checkArchTokens("component", name, "buildCommandByPlatform", argument); err != nil {
+				return err
+			}
+		}
+	}
 	if err := validateEmbeddedDeclaration(c.Embeds, c.FromSource); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "component %q embeds", name)
 	}
 	if err := validateHelmProducer(c.Helm, c.FromSource, c.Prebuilt, c.OutputType); err != nil {
 		return err
 	}
-	if err := validateComponentTargets(name, c.Platforms); err != nil {
+	if err := validateComponentTargets(name, c.Platforms, sourceExecutableTarget(c.FromSource, c.BuilderType, c.OutputType) || !c.FromSource && c.OutputType == "host-package" && c.Prebuilt != nil && c.Prebuilt.Executable != nil); err != nil {
 		return err
 	}
 	for _, argument := range c.VendorCommand {
@@ -196,11 +223,11 @@ func validateComponent(name string, c Component) error {
 		return e.New(e.CodeInvalidCatalog,
 			"component %q: buildNetwork %q is unsupported (none|default)", name, c.BuildNetwork)
 	}
-	if c.BuildNetwork != "" && (!c.FromSource || c.BuilderType != BuilderVMImage) {
+	if c.BuildNetwork != "" && (!c.FromSource || c.BuilderType != BuilderVMImage && c.BuilderType != BuilderNativeGo) {
 		return e.New(e.CodeInvalidCatalog,
 			"component %q: buildNetwork requires a from-source vm-image component", name)
 	}
-	if c.BuildNetwork == "default" && c.Packer == nil {
+	if c.BuildNetwork == "default" && c.Packer == nil && c.BuilderType != BuilderNativeGo {
 		return e.New(e.CodeInvalidCatalog,
 			"component %q: default buildNetwork requires a direct Packer producer", name)
 	}
@@ -257,6 +284,10 @@ func validateComponent(name string, c Component) error {
 		return nil
 	}
 	switch c.BuilderType {
+	case BuilderNativeGo:
+		if !c.FromSource || c.OutputType != "host-package" || c.Flake != nil || c.BuildRequirements != nil || len(c.Materials) != 0 || len(c.Patches) != 0 || c.BuildNetwork != "default" || c.WriteDir == "" || len(c.BuildCommand) == 0 || c.BuildCommand[0] != "go" || !canonical.IsDigest(c.ToolchainImage) {
+			return e.New(e.CodeEngineCapability, "component %q: native Go requires an unpatched host package, installed SDK identity, Go argv and declared host network", name)
+		}
 	case BuilderBuildKit:
 		if c.Flake != nil || c.OutputType != "oci-image" {
 			return e.New(e.CodeInvalidCatalog, "component %q: rootless BuildKit requires an OCI image output and no flake", name)
@@ -355,7 +386,7 @@ func validateComponent(name string, c Component) error {
 	// per-host toolchain pin. The scalar source toolchain is never used as a VM route.
 	if c.BuilderType == BuilderVMImage {
 		for _, platform := range c.BuildRequirements.AllowedHostPlatforms {
-			hostArch := strings.TrimPrefix(string(platform), "linux/")
+			hostArch := target.ExecutableArch(string(platform))
 			if c.ToolchainImages[hostArch] == "" {
 				return e.New(e.CodeUnpinnedSource,
 					"component %q: allowed host platform %q has no digest-pinned toolchain route",
@@ -441,7 +472,7 @@ func validatePrebuilt(name string, c Component) error {
 		if err := validateToolPin(*p.Executable); err != nil {
 			return err
 		}
-		arch := strings.TrimPrefix(p.Executable.Platform, "linux/")
+		arch := target.ExecutableArch(p.Executable.Platform)
 		if c.OutputType != "host-package" || len(c.Platforms) != 1 || c.Platforms[0] != p.Executable.Platform ||
 			p.URL != p.Executable.URL || len(p.Digests) != 1 || p.Digests[arch] != p.Executable.ExecutableDigest {
 			return e.New(e.CodeInvalidCatalog, "release executable %q disagrees with its exact source tool pin", name)

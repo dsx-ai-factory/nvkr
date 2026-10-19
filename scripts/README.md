@@ -30,10 +30,17 @@ execution, separate development signing/publication credentials, and attempt-sco
 Controlled dispatch-adapter tests run with `make test-ci-tools`; registry cleanup is owned by the Go
 development module and the separate default-branch cleanup workflow.
 
-Follow the [Ubuntu ARM64 build-and-demo guide](../docs/local-nvke-demo.md) for
-`nvke-demo e2e`: build selected artifacts through `nvkr`, then deploy those
-completed Run to a local site and QCOW2-backed tenant. macOS supplies the Linux
-host through Colima; this is not a native Darwin build.
+The Go CLI is the entry point for the
+[shared native Linux/Mac path](../docs/local-nvke-demo.md#native-linux-and-mac-path):
+`nvke-demo build`, `run` and `e2e`; `tools` and `native` expose focused operations. The native site runs in QEMU; Kind is
+temporary bootstrap infrastructure. NVKR owns artifact builds, including QCOW2
+outputs; native NVKE commands own bootstrap and deployment. Native runtime
+acceptance against the selected source remains pending.
+
+Follow the [native build-and-deploy guide](../docs/local-nvke-demo.md#native-linux-and-mac-path).
+The standard `e2e` command builds through NVKR, then invokes the same three-VM
+deployment owner as `run`. The default Mac BUILD prepares native inputs from the
+documented installed prerequisites before invoking NVKR. No Colima execution host is substituted.
 
 `nvke-full-arm64-local.sh ATTEMPT JOBS LANE` also supports
 [focused selections](../inputs/definitions/demo/README.md);

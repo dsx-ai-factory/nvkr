@@ -10,7 +10,7 @@ the external test symlinks in that source before the local diagnostic vendor com
 them. This catalog uses the existing release-executable contract rather than weakening source capture.
 `nvkr catalog pin --dir inputs/catalogs/tools/installer-hosted-arm64 --tag v4.2.4 helm`
 generated its lock entry on October 13, 2026. Cluster API is pinned to v1.13.6 with
-`catalog pin`, matching the v0.22.0-beta.1 installer; kind, kubectl and ORAS retain their source pins.
+`catalog pin`, matching the main at 55612dce98cf installer; kind, kubectl and ORAS retain their source pins.
 
 | Binding | Verified value |
 | --- | --- |

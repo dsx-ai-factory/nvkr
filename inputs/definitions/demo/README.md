@@ -2,15 +2,16 @@
 
 For setup and the complete journey, use the
 [Ubuntu ARM64 build-and-demo guide](../../../docs/local-nvke-demo.md). These inputs
-target Linux ARM64; macOS supplies a Colima Linux VM, not Darwin artifacts.
+target Linux ARM64 artifact builds. Native host tools have separate OS selections
+in the shared tool catalog; Mac deployment does not use a Colima execution host.
 They do not publish, sign or build a complete source-only NVKE distribution.
 The separate KVM variants have their own hosted publication policies; see the
 [NVIDIA nightly](nightly-nvidia.md) and [upstream nightly](nightly-upstream.md) instructions.
 
 | Selection | Definition | Outputs |
 | --- | --- | --- |
-| Complete demo artifact set | `arm64-nvidia-tcg.json` | 29: disk, images, installer-aligned charts/CLI, tools, profiles and simulator in one Run |
-| Explicit upstream OVN diagnostic | `arm64-upstream-tcg.json` | 29: replaces the disk, OVN image/chart and profiles outputs together; not NVIDIA-fork validation |
+| Complete demo artifact set | `arm64-nvidia-tcg.json` | 32: disk, images, installer-aligned charts/CLI, tools, profiles and simulator in one Run |
+| Explicit upstream OVN diagnostic | `arm64-upstream-tcg.json` | 32: replaces the disk, OVN image/chart and profiles outputs together; not NVIDIA-fork validation |
 | Faster component loop | `../diagnostics/demo-arm64/components.json` | 22: historical components without the disk; not the complete demo selection |
 | OS-only loop | `../diagnostics/demo-arm64/os.json` | One disk with its complete material closure |
 | Source-built provider loop | `../diagnostics/demo-arm64/providers.json` | Two native provider images, no disk |
@@ -20,8 +21,9 @@ The separate KVM variants have their own hosted publication policies; see the
 | Diagnostic controller profiles | `../diagnostics/demo-arm64/profiles.json` | One native Linux ARM64 OCI image containing plain ARM64/Ubuntu 26.04 profile data at `/profiles`; not fleet profiles |
 
 Use `../../environments/local-arm64-tcg.json` with native Linux ARM64 Docker, the
-launcher's default runtime. The OS uses TCG. On macOS, follow the guide's
-Colima setup and run OS/demo commands inside Linux on native ext4 storage.
+launcher's default runtime. The OS image build uses TCG. Standard deployment
+uses the same three-VM owner on both hosts: KVM on Linux, HVF on Mac. Fresh Mac
+QCOW builds remain unsupported by the current NVKR disk execution path.
 The full demo uses one NVKR/demo bootstrap and a measured
 Packer/Go/GCC toolchain across its selected output scopes; that image also includes
 digest-checked Helm 4.2.4 and ORAS 1.3.3. There is no separate Helm-wrapper image.
@@ -33,7 +35,7 @@ its `requiresCatalogDigest` binds that exact predecessor, not the base catalog
 alone. Regenerate and review both bindings after changing either predecessor.
 
 `arm64-upstream-tcg.json` substitutes these four outputs as one matched
-diagnostic selection; the other 25 output names remain unchanged:
+diagnostic selection; the other 28 output names remain unchanged:
 
 | Output | Format | Role |
 | --- | --- | --- |
@@ -70,8 +72,8 @@ require authenticated Git access because NVKE chart pin sets are checked against
 the pinned tree. Dry-run/preflight are not runtime acceptance.
 
 The site catalog pins CLI, controller and charts to one exact NVKE candidate;
-the installer and every NVKE source except SPIRE select `v0.22.0-beta.1` at
-`6991e36bef8f15b42b6f6519ccff089c587a6e49`. The demo uses its site-spec renderer
+the installer and every NVKE source except SPIRE select `main` at `55612dce98cf` at
+`55612dce98cf0183790fbe5f4776225d63369fc2`. The demo uses its site-spec renderer
 and deployment entrypoint with verified local charts and image digests. Tenant
 setup creates MachineImage, ClusterRelease and NodePoolRelease resources from
 the observed profiles container and selected disk before requesting the tenant.

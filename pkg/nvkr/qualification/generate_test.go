@@ -80,6 +80,7 @@ type qualificationWorkflowStep struct {
 	Name            string            `yaml:"name"`
 	Uses            string            `yaml:"uses"`
 	Run             string            `yaml:"run"`
+	Timeout         int               `yaml:"timeout-minutes"`
 	Env             map[string]string `yaml:"env"`
 	With            map[string]string `yaml:"with"`
 }
@@ -91,6 +92,50 @@ func decodeQualificationWorkflow(t *testing.T, raw []byte) qualificationWorkflow
 		t.Fatal(err)
 	}
 	return result
+}
+
+func TestQualificationGeneratedCommandsOwnStepProcess(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		fixture func(*testing.T) (*factory.Plan, lifecycle.QualificationPolicy)
+	}{
+		{"production", generationFixture},
+		{"development", developmentGenerationFixture},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan, policy := tc.fixture(t)
+			bundle, err := RenderWorkflows(t.Context(), plan, policy, "qualification.yaml")
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, command := range []struct{ workflow, job, name string }{
+				{policy.QualificationWorkflow, "qualify", "qualify"},
+				{policy.Smoke.Workflow, "native", "smoke-worker"},
+			} {
+				workflow := decodeQualificationWorkflow(t, bundle.files[command.workflow])
+				found := 0
+				for _, step := range workflow.Jobs[command.job].Steps {
+					if !strings.Contains(step.Run, "./nvkr-exec run "+command.name+" --policy ") {
+						continue
+					}
+					found++
+					lines := strings.Split(strings.TrimSpace(step.Run), "\n")
+					if lines[len(lines)-1] != "exec ./nvkr-exec run "+command.name+" --policy 'qualification.yaml'" {
+						t.Fatalf("%s does not replace its shell with the final owner command", command.workflow)
+					}
+					if lines[0] != "set -euo pipefail" || !strings.Contains(step.Run, "[ -n \"${NVKR_PIN_SOURCE_TOKEN_0:-}\" ]") || step.Timeout != 20 {
+						t.Fatalf("%s changed source admission or its bounded step", command.workflow)
+					}
+					if time.Duration(step.Timeout)*time.Minute-hostedRuntimeTimeout < time.Minute {
+						t.Fatalf("%s leaves less than one minute for owner cleanup before the step deadline", command.workflow)
+					}
+				}
+				if found != 1 {
+					t.Fatalf("%s has %d owner commands", command.workflow, found)
+				}
+			}
+		})
+	}
 }
 
 func TestQualificationGenerationWorkflowContract(t *testing.T) {

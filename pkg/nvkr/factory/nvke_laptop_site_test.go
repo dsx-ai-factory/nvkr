@@ -190,7 +190,7 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 						t.Fatal("site applications/charts must not fall back to acquired releases")
 					case ir.KindFetch:
 						fetches++
-						if node.Commit != "6991e36bef8f15b42b6f6519ccff089c587a6e49" || node.TreeHash != "64d3259508bb91745a0fbaa71b5d72a61b787142" {
+						if node.Commit != "55612dce98cf0183790fbe5f4776225d63369fc2" || node.TreeHash != "8df7ab7e8254a3826d588be8437957df1854c658" {
 							t.Fatal("CLI, controller and charts must share the selected installer source")
 						}
 						if build.Name == "nktp" {

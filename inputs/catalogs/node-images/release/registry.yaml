@@ -313,6 +313,7 @@ components:
       buildLogDirectoryVariable: build_log_directory
       acquisitionArchive: fde/apt-acquisitions.tar
       variables:
+        ubuntu_series: "26.04"
         capture_apt_acquisitions: "true"
         efi_firmware_code: /usr/share/OVMF/OVMF_CODE_4M.fd
         efi_firmware_vars: /usr/share/OVMF/OVMF_VARS_4M.fd
@@ -365,6 +366,7 @@ components:
       buildLogDirectoryVariable: build_log_directory
       acquisitionArchive: fde/apt-acquisitions.tar
       variables:
+        ubuntu_series: "26.04"
         capture_apt_acquisitions: "true"
         efi_firmware_code: /usr/share/AAVMF/AAVMF_CODE.no-secboot.fd
         efi_firmware_vars: /usr/share/AAVMF/AAVMF_VARS.fd
@@ -418,6 +420,7 @@ components:
       buildLogDirectoryVariable: build_log_directory
       acquisitionArchive: non-fde/apt-acquisitions.tar
       variables:
+        ubuntu_series: "26.04"
         capture_apt_acquisitions: "true"
         efi_firmware_code: /usr/share/AAVMF/AAVMF_CODE.no-secboot.fd
         efi_firmware_vars: /usr/share/AAVMF/AAVMF_VARS.fd
@@ -468,6 +471,7 @@ components:
       buildLogDirectoryVariable: build_log_directory
       acquisitionArchive: non-fde/apt-acquisitions.tar
       variables:
+        ubuntu_series: "26.04"
         capture_apt_acquisitions: "true"
         efi_firmware_code: /usr/share/OVMF/OVMF_CODE_4M.fd
         efi_firmware_vars: /usr/share/OVMF/OVMF_VARS_4M.fd

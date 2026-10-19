@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -25,15 +26,18 @@ import (
 
 func TestQualificationSetupScopeMatchesMaintainedDefinitions(t *testing.T) {
 	for _, network := range []string{"ovn", "upstream-ovn", "kind-calico"} {
-		for _, change := range []string{"exact", "missing", "extra", "duplicate", "member", "kind", "unknown network"} {
+		for _, change := range []string{"exact", "missing", "extra", "unexpected output", "duplicate", "member", "kind", "unknown network", "other network"} {
 			t.Run(network+"/"+change, func(t *testing.T) {
-				name := "arm64-nvidia-tcg.json"
-				if network == "upstream-ovn" {
-					name = "arm64-upstream-tcg.json"
-				}
-				d, err := definition.LoadDefinition(t.Context(), filepath.Join("../../inputs/definitions/demo", name))
+				selected, _, err := LocalArtifactInputs(network)
 				if err != nil {
 					t.Fatal(err)
+				}
+				d, err := definition.LoadDefinition(t.Context(), filepath.Join("../..", selected))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(d.Outputs) != 32 {
+					t.Fatal("maintained local selection changed; review the authored qualification scope")
 				}
 				plan := &factory.Plan{}
 				for _, output := range d.Outputs {
@@ -45,6 +49,8 @@ func TestQualificationSetupScopeMatchesMaintainedDefinitions(t *testing.T) {
 					plan.LifecycleOutputs = plan.LifecycleOutputs[1:]
 				case "extra":
 					plan.LifecycleOutputs = append(plan.LifecycleOutputs, factory.LifecycleOutputPlan{Name: "foreign"})
+				case "unexpected output":
+					plan.LifecycleOutputs[0].Name = "foreign"
 				case "duplicate":
 					plan.LifecycleOutputs[0] = plan.LifecycleOutputs[1]
 				case "member":
@@ -53,6 +59,11 @@ func TestQualificationSetupScopeMatchesMaintainedDefinitions(t *testing.T) {
 					plan.LifecycleOutputs[0].Kind = "executable"
 				case "unknown network":
 					mode = "unknown"
+				case "other network":
+					mode = "upstream-ovn"
+					if network == "upstream-ovn" {
+						mode = "ovn"
+					}
 				}
 				var policy lifecycle.LocalQualificationPolicy
 				err = bindDemoQualificationScope(&policy, plan, mode)
@@ -63,8 +74,21 @@ func TestQualificationSetupScopeMatchesMaintainedDefinitions(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if len(policy.Smoke.NonToolOutputs) != 17 {
+				if len(policy.Smoke.NonToolOutputs) != 20 {
 					t.Fatal("deployment-image scope changed")
+				}
+				for _, output := range d.Outputs {
+					if output.Format != lifecycle.OutputOCI {
+						continue
+					}
+					index := slices.IndexFunc(policy.Smoke.NonToolOutputs, func(rule lifecycle.QualificationNonToolOutput) bool { return rule.Output == output.Name })
+					if index < 0 {
+						t.Fatalf("selected image %q has no explicit policy role", output.Name)
+					}
+					rule := policy.Smoke.NonToolOutputs[index]
+					if rule.Kind != lifecycle.OutputOCI || rule.Reason != "deployment-image" || !slices.Equal(rule.Components, output.Components) {
+						t.Fatalf("policy does not bind exact selected image %q: %+v", output.Name, rule)
+					}
 				}
 				for i := 1; i < len(policy.Smoke.NonToolOutputs); i++ {
 					if policy.Smoke.NonToolOutputs[i-1].Output >= policy.Smoke.NonToolOutputs[i].Output {
@@ -73,6 +97,30 @@ func TestQualificationSetupScopeMatchesMaintainedDefinitions(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestQualificationSetupScopeRejectsConformanceDefinitions(t *testing.T) {
+	for _, network := range []string{"ovn", "upstream-ovn"} {
+		t.Run(network, func(t *testing.T) {
+			selected, _, err := LocalArtifactInputsFor(network, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			d, err := definition.LoadDefinition(t.Context(), filepath.Join("../..", selected))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(d.Outputs) != 38 {
+				t.Fatal("explicit conformance selection changed; qualification scope must be reviewed")
+			}
+			plan := &factory.Plan{}
+			for _, output := range d.Outputs {
+				plan.LifecycleOutputs = append(plan.LifecycleOutputs, factory.LifecycleOutputPlan{Name: output.Name, Kind: output.Format, Components: output.Components})
+			}
+			var policy lifecycle.LocalQualificationPolicy
+			assertNightlyCode(t, bindDemoQualificationScope(&policy, plan, network), e.CodeUsage)
+		})
 	}
 }
 

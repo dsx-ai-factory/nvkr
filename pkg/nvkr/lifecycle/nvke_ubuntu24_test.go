@@ -5,6 +5,7 @@ package lifecycle
 
 import (
 	"context"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -68,6 +69,15 @@ func TestNVKEUbuntu24NativeDiskSelections(t *testing.T) {
 					t.Fatalf("Ubuntu 24 installer is not bound to the exact native ISO: %+v", iso)
 				}
 				for component, producer := range build.CatalogSnapshot.Components {
+					if producer.Packer != nil {
+						if producer.Packer.Variables["ubuntu_series"] != "24.04" || original.CatalogSnapshot.Components[component].Packer.Variables["ubuntu_series"] != "26.04" {
+							t.Fatal("disk Ubuntu series must match the selected installer")
+						}
+						packer := *producer.Packer
+						packer.Variables = maps.Clone(packer.Variables)
+						packer.Variables["ubuntu_series"] = "26.04"
+						producer.Packer = &packer
+					}
 					if component != "nvke-agent" && component != "ubuntu-installer-iso" && component != "ubuntu-installer-iso-amd64" &&
 						!reflect.DeepEqual(producer, original.CatalogSnapshot.Components[component]) {
 						t.Fatalf("Ubuntu selection unexpectedly changed unrelated producer %s", component)
@@ -82,7 +92,7 @@ func TestNVKEUbuntu24NativeDiskSelections(t *testing.T) {
 						continue
 					}
 					roots++
-					if node.Component != root || node.SourceCommit != "6991e36bef8f15b42b6f6519ccff089c587a6e49" || node.Packer == nil ||
+					if node.Component != root || node.SourceCommit != "55612dce98cf0183790fbe5f4776225d63369fc2" || node.Packer == nil ||
 						node.Disk == nil || node.ExecutionBinding == nil || node.Requirements == nil {
 						t.Fatal("Ubuntu 24 disk lost its source-owned native Packer contract")
 					}

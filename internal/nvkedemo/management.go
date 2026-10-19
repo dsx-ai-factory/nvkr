@@ -28,7 +28,7 @@ import (
 const managementBundle = "installer-tools-arm64"
 const kindConfigPath = "controller/hack/controller-capi-kind.yaml"
 const kindConfigHash = "835a53f6c852ddd71d2f26614131985383a5aa4deb7acf62e68435c328fa71f0"
-const toolVersionsHash = "ae8980d7b31d9f2f9c355dd7d873854eaba8cfe94f5075ec61dfa9bdbdb5a0f9"
+const toolVersionsHash = "553e8155955aaca7e00094ec93d838fee4d518510bf3718f70a03059174363d6"
 const kindNodeImage = "kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
 const kindNodeID = "sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
 const socketMount = "  extraMounts:\n    - hostPath: /var/run/docker.sock\n      containerPath: /var/run/docker.sock\n"
@@ -570,8 +570,15 @@ func verifyToolMembers(tools string, members []string) error {
 		if statErr != nil {
 			return statErr
 		}
-		if !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
-			return errors.New("require regular executable tool members")
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("require regular tool member: %s", row.Name())
+		}
+		if row.Name() == "nvke-installer-sources" {
+			if info.Mode().Perm() != nativeToolMemberMode(row.Name()) {
+				return errors.New("require regular nonexecutable installer source archive")
+			}
+		} else if info.Mode().Perm()&0o111 == 0 {
+			return fmt.Errorf("require executable tool member: %s", row.Name())
 		}
 		names = append(names, row.Name())
 	}

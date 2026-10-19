@@ -41,7 +41,9 @@ func TestExactSeedProjection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := bytes.Replace(bytes.Replace(raw, []byte("mem6gb"), []byte("mem8gb"), 1), []byte("memory_gib: 6"), []byte("memory_gib: 8"), 1)
+	expected := bytes.Replace(raw, []byte("cpu4-mem6gb"), []byte("cpu6-mem12gb"), 1)
+	expected = bytes.Replace(expected, []byte("cpu_count: 4"), []byte("cpu_count: 6"), 1)
+	expected = bytes.Replace(expected, []byte("memory_gib: 6"), []byte("memory_gib: 12"), 1)
 	if !bytes.Equal(projected, expected) || !bytes.Equal(raw, before) {
 		t.Fatal("projection changed nonselected bytes or source")
 	}

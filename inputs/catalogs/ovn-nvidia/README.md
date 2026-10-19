@@ -95,8 +95,8 @@ suffix before checking package presence and never runs APT. Install the exact
 package names with `=1+git.8af51273d52d` separately, for example through
 InstallPackages, then validate chart deployment. These packages are not a
 drop-in for an empty-version request using the default stream. See the
-[pinned InstallCNI contract](https://github.com/dsx-ai-factory/nvke/blob/6991e36bef8f15b42b6f6519ccff089c587a6e49/agent/pkg/agent/proto/node_agent.proto)
-and its [package-presence implementation](https://github.com/dsx-ai-factory/nvke/blob/6991e36bef8f15b42b6f6519ccff089c587a6e49/agent/internal/agent/cni.go).
+[pinned InstallCNI contract](https://github.com/dsx-ai-factory/nvke/blob/55612dce98cf0183790fbe5f4776225d63369fc2/agent/pkg/agent/proto/node_agent.proto)
+and its [package-presence implementation](https://github.com/dsx-ai-factory/nvke/blob/55612dce98cf0183790fbe5f4776225d63369fc2/agent/internal/agent/cni.go).
 The current agent accepts both `nvke-cni-*` and the candidate's retained `nke-cni-*`
 installed package names when checking chart presence.
 

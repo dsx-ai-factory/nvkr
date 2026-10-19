@@ -5,7 +5,7 @@
     "name": "nvke-local-nicosim-arm64",
     "description": "Build NICoSim server, CLI and runtime assets from pinned NVKE source for Linux ARM64; separate from local deployment and OS acceptance."
   },
-  "catalog": {"base": "../../../catalogs/nicosim"},
+  "catalog": {"base": "../../../catalogs/tools/native"},
   "outputs": [
     {
       "name": "nicosim-tools-arm64",

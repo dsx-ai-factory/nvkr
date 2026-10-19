@@ -309,6 +309,7 @@ components:
       sshPublicKeyVariable: ssh_public_key_file
       buildLogDirectoryVariable: build_log_directory
       variables:
+        ubuntu_series: "26.04"
         boot_wait: 30s
         # The pinned QEMU 10.1.2/AAVMF TCG closure stalls in UEFI with
         # max,pauth-impdef=on. cortex-a57 reaches the patched ARM64 GRUB menu
@@ -359,6 +360,7 @@ components:
       sshPublicKeyVariable: ssh_public_key_file
       buildLogDirectoryVariable: build_log_directory
       variables:
+        ubuntu_series: "26.04"
         efi_firmware_code: /usr/share/OVMF/OVMF_CODE_4M.fd
         efi_firmware_vars: /usr/share/OVMF/OVMF_VARS_4M.fd
         ssh_timeout: 180m

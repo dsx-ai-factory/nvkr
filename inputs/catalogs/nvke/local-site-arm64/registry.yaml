@@ -113,7 +113,7 @@ components:
     source: nvke-controller-helm
     platforms: [linux/arm64]
     outputType: tarball
-    artifactPath: charts/nke-controller-0.22.0-beta.1.tgz
+    artifactPath: charts/nke-controller-0.0.0-git.55612dce98cf.tgz
     writeDir: charts
     helm:
       chart: .
@@ -123,12 +123,12 @@ components:
             digest: image.digest
     # The upstream Chart.yaml version is a placeholder; package the selected release.
     # The final package is bound to the produced controller digest.
-    buildCommand: [sh, -euc, 'helm package controller/deploy/charts/controller --version=0.22.0-beta.1 --app-version=v0.22.0-beta.1 --destination=charts/']
+    buildCommand: [sh, -euc, 'helm package controller/deploy/charts/controller --version=0.0.0-git.55612dce98cf --app-version=55612dce98cf0183790fbe5f4776225d63369fc2 --destination=charts/']
   nktp-chart:
     fromSource: true
     source: nvke-nktp-helm
     platforms: [linux/arm64]
     outputType: tarball
-    artifactPath: charts/nktp-0.22.0-beta.1.tgz
+    artifactPath: charts/nktp-0.0.0-git.55612dce98cf.tgz
     writeDir: charts
-    buildCommand: [sh, -euc, 'helm package nktp/deploy/charts/nktp --version=0.22.0-beta.1 --app-version=v0.22.0-beta.1 --destination=charts/']
+    buildCommand: [sh, -euc, 'helm package nktp/deploy/charts/nktp --version=0.0.0-git.55612dce98cf --app-version=55612dce98cf0183790fbe5f4776225d63369fc2 --destination=charts/']

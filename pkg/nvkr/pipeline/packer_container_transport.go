@@ -136,12 +136,16 @@ func validatePackerContainerRequest(request packerContainerRunRequest, kvmEnable
 }
 
 type packerContainerWorkspace struct {
-	parent *os.File
-	root   *os.File
-	name   string
+	parent   *os.File
+	root     *os.File
+	name     string
+	hostPath string // Optional checked native projection; containers retain the descriptor path.
 }
 
 func (workspace *packerContainerWorkspace) path() string {
+	if workspace.hostPath != "" {
+		return workspace.hostPath
+	}
 	return fmt.Sprintf("/proc/%d/fd/%d", os.Getpid(), workspace.root.Fd())
 }
 
@@ -233,6 +237,13 @@ func (workspace *packerContainerWorkspace) cleanup() error {
 		return nil
 	}
 	rootPath := workspace.path()
+	if workspace.hostPath != "" {
+		held, heldErr := workspace.root.Stat()
+		named, namedErr := os.Lstat(rootPath)
+		if heldErr != nil || namedErr != nil || !os.SameFile(held, named) {
+			return errors.Join(e.New(e.CodeEngineCapability, "native Packer cleanup projection changed"), workspace.root.Close(), workspace.parent.Close())
+		}
+	}
 	names, readErr := workspace.root.Readdirnames(-1)
 	var cleanupErrors []error
 	if readErr != nil {

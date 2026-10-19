@@ -289,7 +289,8 @@ func TestDemoFileConversionRefusals(t *testing.T) {
 		{"build jobs zero", func(f *DemoFile) { f.Build.Jobs = 0 }, "build"},
 		{"build invalid optional clone", func(f *DemoFile) { f.Build.NVKEClone = "\n" }, "build"},
 		{"build version", func(f *DemoFile) { f.Version = 2 }, "build"},
-		{"run checkout", func(f *DemoFile) { f.Run.NVKECheckout = "" }, "run"},
+		{"run invalid accelerator", func(f *DemoFile) { f.Run.Accelerator = "unavailable" }, "run"},
+		{"run invalid optional checkout", func(f *DemoFile) { f.Run.NVKECheckout = "\n" }, "run"},
 		{"run out", func(f *DemoFile) { f.Run.Out = "" }, "run"},
 		{"run executable", func(f *DemoFile) { f.Run.NVKR = "" }, "run"},
 		{"run version", func(f *DemoFile) { f.Version = 0 }, "run"},
@@ -318,7 +319,7 @@ func TestDemoFileConversionRefusals(t *testing.T) {
 			assertConfigUsage(t, err)
 		})
 	}
-	for _, name := range []string{"os", "components", "providers", "site", "tools", "profiles", "simulator"} {
+	for _, name := range []string{"os", "components", "providers", "site", "tools", "profiles"} {
 		t.Run("missing "+name, func(t *testing.T) {
 			file := base
 			fields := map[string]*string{"os": &file.Run.Runs.OS, "components": &file.Run.Runs.Components, "providers": &file.Run.Runs.Providers, "site": &file.Run.Runs.Site, "tools": &file.Run.Runs.Tools, "profiles": &file.Run.Runs.Profiles, "simulator": &file.Run.Runs.Simulator}
@@ -368,7 +369,7 @@ func TestDemoFileTenantBudgetBoundaries(t *testing.T) {
 	}
 }
 
-func TestInstallerCheckoutOptionalOnlyForE2E(t *testing.T) {
+func TestInstallerCheckoutOptionalForBuildAndDeploy(t *testing.T) {
 	for _, checkout := range []string{"", "/native/installer", "\n"} {
 		t.Run("checkout="+checkout, func(t *testing.T) {
 			file := DemoFile{Version: 1, Build: BuildFile{Repo: "/native/repo", Attempt: "fresh", Jobs: 2}, Run: RunFile{NVKECheckout: checkout, Out: "/native/output", TimeoutSeconds: 3600}}
@@ -383,9 +384,7 @@ func TestInstallerCheckoutOptionalOnlyForE2E(t *testing.T) {
 			file.Run.NVKR = "/native/nvkr"
 			file.Run.Runs = RunFileInputs{OS: "run", Components: "run", Providers: "run", Site: "run", Tools: "run", Profiles: "run", Simulator: "run"}
 			_, err = file.RunConfig(nil)
-			if checkout == "" {
-				assertConfigUsage(t, err)
-			} else if err != nil {
+			if err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -401,4 +400,25 @@ func TestDemoFileMaintainedExample(t *testing.T) {
 	if err != nil || build.Jobs != 2 || build.AttemptPrefix != "demo-e2e-01" || run.Timeout != time.Hour || run.Runs != (RunInputs{}) || run.NVKR != "" {
 		t.Fatalf("maintained example does not describe a fresh e2e: build=%+v run=%+v error=%v", build, run, err)
 	}
+}
+
+func TestCombinedArtifactRunNeedsOnlyNativeTools(t *testing.T) {
+	file := DemoFile{Version: 1, Run: RunFile{NVKR: "nvkr", Out: "out", TimeoutSeconds: 3600, Runs: RunFileInputs{Artifacts: "built-artifacts", Tools: "built-native-tools"}}}
+	cfg, err := file.RunConfig(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.NVKECheckout != "" || cfg.Runs.Simulator != "" {
+		t.Fatal("native deployment added an old installer or simulator dependency")
+	}
+	for _, root := range []string{cfg.Runs.OS, cfg.Runs.Components, cfg.Runs.Providers, cfg.Runs.Site, cfg.Runs.Profiles} {
+		if root != "built-artifacts" {
+			t.Fatalf("combined Run binding changed: %+v", cfg.Runs)
+		}
+	}
+	if cfg.Runs.Tools != "built-native-tools" {
+		t.Fatal("native tools Run changed")
+	}
+	_, _, err = file.E2EConfig(nil)
+	assertConfigUsage(t, err)
 }

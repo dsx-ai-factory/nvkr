@@ -108,14 +108,14 @@ components:
   nktp-chart:
     fromSource: true
     source: nvke-nktp
-    artifactPath: charts/nktp-0.22.0-beta.1.tgz
+    artifactPath: charts/nktp-0.0.0-git.55612dce98cf.tgz
     writeDir: charts
     platforms: [linux/amd64, linux/arm64]
     outputType: tarball
     buildCommand:
       - sh
       - -euc
-      - .nvkr-tools/helm package nktp/deploy/charts/nktp --version=0.22.0-beta.1 --app-version=v0.22.0-beta.1 --destination=charts/
+      - .nvkr-tools/helm package nktp/deploy/charts/nktp --version=0.0.0-git.55612dce98cf --app-version=55612dce98cf0183790fbe5f4776225d63369fc2 --destination=charts/
   capnico-controller:
     fromSource: true
     source: capnico

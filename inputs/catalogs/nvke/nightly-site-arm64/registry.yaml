@@ -151,7 +151,7 @@ components:
     source: nvke-controller-helm
     platforms: [linux/arm64]
     outputType: tarball
-    artifactPath: charts/nke-controller-0.22.0-beta.1.tgz
+    artifactPath: charts/nke-controller-0.0.0-git.55612dce98cf.tgz
     writeDir: charts
     helm:
       chart: .
@@ -168,13 +168,13 @@ components:
         printf '%s\n' \
           '4d6e3a69e6203094d564d5d4e94325b1f7209421dc7e832a96d2510295e03f1d  /src/nvkr-chart-tools/helm' \
           | sha256sum --quiet -c -
-        exec timeout --kill-after=10s 60s /src/nvkr-chart-tools/helm package controller/deploy/charts/controller --version=0.22.0-beta.1 --app-version=v0.22.0-beta.1 --destination=charts/
+        exec timeout --kill-after=10s 60s /src/nvkr-chart-tools/helm package controller/deploy/charts/controller --version=0.0.0-git.55612dce98cf --app-version=55612dce98cf0183790fbe5f4776225d63369fc2 --destination=charts/
   nktp-chart:
     fromSource: true
     source: nvke-nktp-helm
     platforms: [linux/arm64]
     outputType: tarball
-    artifactPath: charts/nktp-0.22.0-beta.1.tgz
+    artifactPath: charts/nktp-0.0.0-git.55612dce98cf.tgz
     writeDir: charts
     buildCommand:
       - sh
@@ -183,4 +183,4 @@ components:
         printf '%s\n' \
           '4d6e3a69e6203094d564d5d4e94325b1f7209421dc7e832a96d2510295e03f1d  /src/nvkr-chart-tools/helm' \
           | sha256sum --quiet -c -
-        exec timeout --kill-after=10s 60s /src/nvkr-chart-tools/helm package nktp/deploy/charts/nktp --version=0.22.0-beta.1 --app-version=v0.22.0-beta.1 --destination=charts/
+        exec timeout --kill-after=10s 60s /src/nvkr-chart-tools/helm package nktp/deploy/charts/nktp --version=0.0.0-git.55612dce98cf --app-version=55612dce98cf0183790fbe5f4776225d63369fc2 --destination=charts/

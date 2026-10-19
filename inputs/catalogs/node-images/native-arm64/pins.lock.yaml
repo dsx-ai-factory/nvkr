@@ -1,0 +1,34 @@
+# Machine-managed by `nvkr catalog pin` / `nvkr catalog bump`. Do not hand-edit.
+apiVersion: nvkr.dev/lock/v1
+artifacts:
+  ubuntu-installer-iso:
+    digests:
+      arm64: sha256:af78753c94b924c85c4964c670692a853f7c80299a4064e317edad95462e3168
+    tag: 26.04.1
+kind: PinLock
+pins:
+  nvke-cni-calico-source:
+    commit: 55612dce98cf0183790fbe5f4776225d63369fc2
+    sourceDateEpoch: 1792435542
+    tag: 55612dce98cf0183790fbe5f4776225d63369fc2
+    treeHash: 8df7ab7e8254a3826d588be8437957df1854c658
+  nvke-kubeadm-distro-source:
+    commit: 55612dce98cf0183790fbe5f4776225d63369fc2
+    sourceDateEpoch: 1792435542
+    tag: 55612dce98cf0183790fbe5f4776225d63369fc2
+    treeHash: 8df7ab7e8254a3826d588be8437957df1854c658
+  nvke-os:
+    commit: 55612dce98cf0183790fbe5f4776225d63369fc2
+    sourceDateEpoch: 1792435542
+    tag: 55612dce98cf0183790fbe5f4776225d63369fc2
+    treeHash: 8df7ab7e8254a3826d588be8437957df1854c658
+  nvke-spire-agent-source:
+    commit: 726f76944404e1106626b8333d3576bdf67b575b
+    sourceDateEpoch: 1790192178
+    tag: 726f76944404e1106626b8333d3576bdf67b575b
+    treeHash: 3d6ea77f85d5da2648038425f805a598e23464ba
+  ovn-kubernetes:
+    commit: d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d
+    sourceDateEpoch: 1788540677
+    tag: v1.4.0
+    treeHash: ce0cb49cd14f2fc260457e61a5a222c027a07f79

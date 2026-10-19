@@ -1,0 +1,26 @@
+{
+  "apiVersion": "nvkr.dev/environment/v1",
+  "kind": "Environment",
+  "metadata": {
+    "name": "nvke-native-mac-source-local"
+  },
+  "utilityContainer": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c",
+  "utilityPlatform": "linux/arm64",
+  "executionClasses": [
+    {
+      "name": "native-mac-hvf",
+      "runsOn": "local-mac-hvf",
+      "hostPlatform": "darwin/arm64",
+      "capabilities": ["hvf"],
+      "resources": {
+        "cpuMillis": 8000,
+        "memoryMiB": 10240,
+        "ephemeralStorageMiB": 65536
+      },
+      "maxTimeoutSeconds": 21600
+    }
+  ],
+  "runtime": {
+    "runtime": "docker"
+  }
+}
