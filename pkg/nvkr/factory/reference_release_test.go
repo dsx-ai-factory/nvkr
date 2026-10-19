@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -107,9 +108,15 @@ func referenceMetadataFixtureForPlan(t *testing.T, plan *Plan, attempts ...strin
 		if err := executeAttestEvidence(t.Context(), plan, nodes[NodeAttestEvidence+"/"+route], artifacts, referenceSignerFactory(signer), io.Discard); err != nil {
 			t.Fatal(err)
 		}
-		source := artifacts["package/"+outputPublicationPackage(output.Name)].Path
+		source, err := completePublicationInput(t.Context(), plan, nodes[NodePublish+"/"+route], artifacts, referenceSignerFactory(signer), "")
+		if err != nil {
+			t.Fatal(err)
+		}
 		result, err := delivery.ExportMetadata(t.Context(), source, artifacts["metadata/"+route].Path)
 		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := delivery.ExportMetadataWithExpectedRoot(t.Context(), source, artifacts["signing-metadata/"+route].Path, result.RootDigest); err != nil {
 			t.Fatal(err)
 		}
 		writeReferenceSigningFixture(t, plan, artifacts, route, result.RootDigest)
@@ -118,6 +125,7 @@ func referenceMetadataFixtureForPlan(t *testing.T, plan *Plan, attempts ...strin
 }
 
 func TestReferenceReleaseAuthenticatesEveryOutputBeforeAssembly(t *testing.T) {
+	plan, original, _ := referenceMetadataFixture(t)
 	for _, tc := range []struct {
 		name   string
 		change func(*testing.T, *Plan, map[string]Artifact, *referenceSigner)
@@ -139,17 +147,19 @@ func TestReferenceReleaseAuthenticatesEveryOutputBeforeAssembly(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			path := artifacts["predicate/"+route].Path
-			raw, err := os.ReadFile(path)
+			predicate := artifacts["predicate/"+route]
+			raw, err := os.ReadFile(predicate.Path)
 			if err != nil {
 				t.Fatal(err)
 			}
 			raw = []byte(strings.ReplaceAll(string(raw), strings.TrimPrefix(digest, "sha256:"), strings.Repeat("f", 64)))
-			if err := writeFactoryFile(t.Context(), path, raw, 0644); err != nil {
+			predicate.Path = filepath.Join(t.TempDir(), "predicate.json")
+			artifacts[predicate.ID] = predicate
+			if err := os.WriteFile(predicate.Path, raw, 0644); err != nil {
 				t.Fatal(err)
 			}
-			recordPath := artifacts["signature/"+route].Path
-			record, err := readSigningRecord(t.Context(), recordPath)
+			signature := artifacts["signature/"+route]
+			record, err := readSigningRecord(t.Context(), signature.Path)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -158,7 +168,9 @@ func TestReferenceReleaseAuthenticatesEveryOutputBeforeAssembly(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := writeFactoryFile(t.Context(), recordPath, encoded, 0644); err != nil {
+			signature.Path = filepath.Join(t.TempDir(), "signature.json")
+			artifacts[signature.ID] = signature
+			if err := os.WriteFile(signature.Path, encoded, 0644); err != nil {
 				t.Fatal(err)
 			}
 		}, code: e.CodeVerifyFailed},
@@ -171,11 +183,17 @@ func TestReferenceReleaseAuthenticatesEveryOutputBeforeAssembly(t *testing.T) {
 		{name: "dry run", change: func(_ *testing.T, _ *Plan, _ map[string]Artifact, s *referenceSigner) { s.dry = true }, code: e.CodeSignatureInvalid},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			plan, artifacts, signer := referenceMetadataFixture(t)
+			// Authentication reads the same immutable output roots. Isolate the
+			// signer, handoff descriptions and assembly destination for each row.
+			artifacts := maps.Clone(original)
+			signer := &referenceSigner{}
+			node := planNode(plan, "package/release")
+			output := artifacts[node.Outputs[0]]
+			output.Path = filepath.Join(t.TempDir(), "release")
+			artifacts[output.ID] = output
 			if tc.change != nil {
 				tc.change(t, plan, artifacts, signer)
 			}
-			node := planNode(plan, "package/release")
 			err := executeReferenceRelease(t.Context(), plan, node, artifacts, referenceSignerFactory(signer))
 			if tc.code != "" {
 				assertFactoryErrorCode(t, err, tc.code)

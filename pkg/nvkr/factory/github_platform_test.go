@@ -201,7 +201,7 @@ func TestDeployCLIOutputsUseIndependentNativeBuilds(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(root)
-	definition, err := authored.LoadDefinition(t.Context(), "definitions/nvke-deploy/definition.yaml")
+	definition, err := authored.LoadDefinition(t.Context(), "docs/examples/nvke-deploy/definition.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +210,7 @@ func TestDeployCLIOutputsUseIndependentNativeBuilds(t *testing.T) {
 	if len(definition.Outputs) != 9 {
 		t.Fatalf("required outputs = %d, want nine", len(definition.Outputs))
 	}
-	base, sourceCommit := controllerCatalogFixture(t, "definitions/nvke-controller/catalog")
+	base, sourceCommit := controllerCatalogFixture(t, "inputs/catalogs/nvke/release")
 	for _, output := range definition.Outputs {
 		if output.Catalog != nil {
 			t.Fatalf("deploy output %s uses a different source catalog", output.Name)
@@ -226,7 +226,7 @@ func TestDeployCLIOutputsUseIndependentNativeBuilds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	environment, err := authored.LoadEnvironment(t.Context(), "definitions/nvke-deploy/environment-github.yaml")
+	environment, err := authored.LoadEnvironment(t.Context(), "docs/examples/nvke-deploy/environment-github.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -371,7 +371,7 @@ func TestM2CLINativeRoutesPreserveDiskGroups(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	definition, err := authored.LoadDefinition(t.Context(), "../../../definitions/nvke-m2/definition.yaml")
+	definition, err := authored.LoadDefinition(t.Context(), "../../../inputs/definitions/nvke/definition.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}

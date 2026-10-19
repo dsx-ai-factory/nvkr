@@ -26,8 +26,8 @@ func TestNVKEOVNForkReleaseOutputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(repo)
-	const definitionPath = "definitions/nvke-ovn-source/definition.yaml"
-	const environmentPath = "definitions/nvke-ovn-source/environment-github.yaml"
+	const definitionPath = "inputs/definitions/diagnostics/ovn.yaml"
+	const environmentPath = "inputs/environments/github-ovn-diagnostics.yaml"
 	authored, err := definition.LoadDefinition(t.Context(), definitionPath)
 	if err != nil {
 		t.Fatal(err)
@@ -157,12 +157,12 @@ func TestNVKEOVNForkReleaseOutputs(t *testing.T) {
 	if !bytes.Equal(workflow, regenerated.Files[regenerated.WorkflowPath]) {
 		t.Fatal("nondeterministic workflow")
 	}
-	for _, want := range []string{"ubuntu-latest", "ubuntu-24.04-arm", "packages: write", "id-token: write", "NKE_SOURCE_TOKEN", "nkd-release"} {
+	for _, want := range []string{"ubuntu-latest", "ubuntu-24.04-arm", "secrets.NVKR_REGISTRY_WRITE", "id-token: write", "NKE_SOURCE_TOKEN", "nvkr-release"} {
 		if !strings.Contains(string(workflow), want) {
 			t.Fatalf("missing generated contract %q", want)
 		}
 	}
-	if strings.Contains(string(workflow), "pull_request_target") || strings.Contains(string(workflow), "self-hosted") {
+	if strings.Contains(string(workflow), "packages: write") || strings.Contains(string(workflow), "packages: read") || strings.Contains(string(workflow), "pull_request_target") || strings.Contains(string(workflow), "self-hosted") {
 		t.Fatal("candidate must retain the ordinary hosted route")
 	}
 }

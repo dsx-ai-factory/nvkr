@@ -237,6 +237,88 @@ func TestGitHubWorkflowSizeAdmission(t *testing.T) {
 	}
 }
 
+func TestGitHubWorkflowYAMLNodeAdmission(t *testing.T) {
+	// Stream, document and sequence start/end events account for six nodes.
+	for _, tc := range []struct {
+		name  string
+		items int
+		valid bool
+	}{
+		{"under", maxGitHubWorkflowYAMLNodes - 7, true},
+		{"exact", maxGitHubWorkflowYAMLNodes - 6, true},
+		{"over", maxGitHubWorkflowYAMLNodes - 5, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := []byte(strings.Repeat("- x\n", tc.items))
+			err := validateGitHubWorkflowSize(raw)
+			if !tc.valid {
+				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			nodes, err := countGitHubWorkflowYAMLNodes(raw)
+			if err != nil || nodes != tc.items+6 {
+				t.Fatalf("nodes=%d error=%v, want %d parsing events", nodes, err, tc.items+6)
+			}
+		})
+	}
+}
+
+func TestGitHubWorkflowYAMLNodeAccounting(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		raw  string
+		want int
+	}{
+		{"scalar", "value\n", 5},
+		{"mapping keys and values", "key: [one, two]\n", 11},
+		{"replayed sequence", "- &pair [one, two]\n- *pair\n", 14},
+		{"nested aliases", "- &value x\n- &pair [*value, *value]\n- *pair\n", 15},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			nodes, err := countGitHubWorkflowYAMLNodes([]byte(tc.raw))
+			if err != nil || nodes != tc.want {
+				t.Fatalf("nodes=%d error=%v, want %d parsing events", nodes, err, tc.want)
+			}
+		})
+	}
+}
+
+func TestGitHubWorkflowYAMLAdmissionRejectsMalformedGraphs(t *testing.T) {
+	assertFactoryErrorCode(t, validateGitHubWorkflowSize(nil), e.CodeInvalidCatalog)
+	assertFactoryErrorCode(t, validateGitHubWorkflowSize([]byte("# no workflow\n")), e.CodeInvalidCatalog)
+	for _, tc := range []struct {
+		name string
+		raw  string
+	}{
+		{"malformed", "key: [\n"},
+		{"missing alias", "key: *absent\n"},
+		{"recursive alias", "key: &cycle [*cycle]\n"},
+		{"multiple documents", "first\n---\nsecond\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assertFactoryErrorCode(t, validateGitHubWorkflowSize([]byte(tc.raw)), e.CodePipelineDrift)
+		})
+	}
+	deep := strings.Repeat("[", maxGitHubWorkflowYAMLDepth) + "x" + strings.Repeat("]", maxGitHubWorkflowYAMLDepth)
+	assertFactoryErrorCode(t, validateGitHubWorkflowSize([]byte(deep)), e.CodeEngineCapability)
+}
+
+func TestGitHubWorkflowYAMLAliasExpansionStopsAtBudget(t *testing.T) {
+	var raw strings.Builder
+	raw.WriteString("a0: &a0 [x]\n")
+	for i := 1; i <= 20; i++ {
+		fmt.Fprintf(&raw, "a%d: &a%d [*a%d, *a%d]\n", i, i, i-1, i-1)
+	}
+	nodes, err := countGitHubWorkflowYAMLNodes([]byte(raw.String()))
+	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+	if nodes > maxGitHubWorkflowYAMLNodes {
+		t.Fatalf("alias traversal exceeded its budget: %d", nodes)
+	}
+}
+
 func TestOversizedWorkflowCannotWriteGeneratedBundle(t *testing.T) {
 	plan := githubTestPlan(t)
 	bundle, err := RenderGitHub(t.Context(), plan)
@@ -253,12 +335,28 @@ func TestOversizedWorkflowCannotWriteGeneratedBundle(t *testing.T) {
 	}
 }
 
+func TestOvercomplexWorkflowCannotWriteGeneratedBundle(t *testing.T) {
+	plan := githubTestPlan(t)
+	bundle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := []byte(strings.Repeat("- x\n", maxGitHubWorkflowYAMLNodes))
+	bundle.Files[GitHubWorkflowPath] = raw
+	bundle.WorkflowDigest = pipeline.FileDigest(raw)
+	out := filepath.Join(t.TempDir(), "must-not-exist")
+	assertFactoryErrorCode(t, WriteGeneratedBundle(t.Context(), out, bundle), e.CodeEngineCapability)
+	if _, err := os.Stat(out); !os.IsNotExist(err) {
+		t.Fatalf("overcomplex workflow wrote output: %v", err)
+	}
+}
+
 func TestMaintainedWorkflowFitsGitHubFileLimit(t *testing.T) {
 	plan, err := LoadPlanContext(t.Context(), "../../../"+FactoryPlanPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if plan.DefinitionPath != "definitions/nvke-m2/definition.yaml" || plan.EnvironmentPath != "definitions/nvke-m2/environment-github.yaml" {
+	if plan.DefinitionPath != "inputs/definitions/nvke/definition.yaml" || plan.EnvironmentPath != "inputs/environments/github-release.yaml" {
 		t.Fatal("committed workflow must select the maintained combined M2 inputs")
 	}
 	raw, err := os.ReadFile("../../../" + GitHubWorkflowPath)
@@ -275,8 +373,7 @@ func TestMaintainedWorkflowFitsGitHubFileLimit(t *testing.T) {
 	if !bytes.Equal(raw, bundle.Files[GitHubWorkflowPath]) {
 		t.Fatal("committed workflow differs from its complete regenerated Plan")
 	}
-	document := decodeGitHubWorkflow(t, raw)
-	t.Logf("maintained workflow: %d bytes, %d explicit jobs", len(raw), len(document.Jobs))
+	t.Logf("maintained workflow: %d bytes, %d explicit jobs", len(raw), len(githubSerializedJobOrder(t, raw)))
 }
 
 // Render the maintained complete Plan as well as checking its committed bytes:
@@ -298,5 +395,54 @@ func TestMaintainedM2RenderingFitsGitHubFileLimit(t *testing.T) {
 	if len(raw) > maxGitHubWorkflowBytes*95/100 {
 		t.Fatalf("maintained workflow has less than 5%% headroom (%d of %d bytes); compact semantic calls before expanding membership", len(raw), maxGitHubWorkflowBytes)
 	}
-	t.Logf("maintained M2 rendering: %d bytes (%d bytes below GitHub limit)", len(raw), maxGitHubWorkflowBytes-len(raw))
+	nodes, err := countGitHubWorkflowYAMLNodes(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if nodes > maxGitHubWorkflowYAMLNodes*95/100 {
+		t.Fatalf("maintained workflow has less than 5%% YAML parsing headroom (%d of %d events); compact semantic calls before expanding membership", nodes, maxGitHubWorkflowYAMLNodes)
+	}
+	t.Logf("maintained M2 rendering: %d bytes (%d below GitHub limit), %d YAML events (%d below parser limit)", len(raw), maxGitHubWorkflowBytes-len(raw), nodes, maxGitHubWorkflowYAMLNodes-nodes)
+}
+
+func TestMaintainedGitHubBundlesKeepJobsInEntryWorkflow(t *testing.T) {
+	for _, planPath := range []string{
+		FactoryPlanPath,
+		GitHubDevelopmentPlanPath,
+		".github/nvkr-run-nvke-nightly-arm64/plan.json",
+		".github/nvkr-run-nvke-nightly-upstream-ovn-arm64/plan.json",
+	} {
+		t.Run(planPath, func(t *testing.T) {
+			plan, err := LoadPlanContext(t.Context(), "../../../"+planPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for name := range bundle.Files {
+				if strings.HasPrefix(name, ".github/workflows/") && name != bundle.WorkflowPath {
+					t.Fatalf("producer bundle emitted an additional workflow %s", name)
+				}
+			}
+			workflow := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath])
+			if _, dispatch := workflow.On["workflow_dispatch"]; !dispatch || len(workflow.On) != 1 {
+				t.Fatal("producer entry must expose only its manual dispatch trigger")
+			}
+			projection, err := githubNeedsForPlan(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(workflow.Jobs) != len(projection.Reduced) || len(projection.Collectors) == 0 {
+				t.Fatal("maintained entry lost execution jobs or result collection")
+			}
+			for id, job := range workflow.Jobs {
+				if job.RunsOn == "" || len(job.Steps) == 0 {
+					t.Fatalf("job %s delegates execution outside the entry workflow", id)
+				}
+			}
+			t.Logf("one entry: %d bytes, %d execution/result jobs", len(bundle.Files[bundle.WorkflowPath]), len(workflow.Jobs))
+		})
+	}
 }

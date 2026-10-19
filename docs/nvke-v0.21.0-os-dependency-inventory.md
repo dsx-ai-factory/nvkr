@@ -2,7 +2,7 @@
 
 Reviewed 2026-10-07 against the exact published release asset, not NVKE main.
 This document inventories the release and the remaining source-build migration.
-The experimental [public-source catalog](../definitions/nvke-os-source/README.md) adds 14 binary producers from 13 pinned Git sources, separate from the maintained M2 inputs.
+The experimental [public-source catalog](../inputs/experiments/public-os-sources/README.md) adds 14 binary producers from 13 pinned Git sources, separate from the maintained M2 inputs.
 The experimental catalog does not establish a complete OS-image migration or release qualification.
 
 ## Authoritative inputs

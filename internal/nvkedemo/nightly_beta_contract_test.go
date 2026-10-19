@@ -278,7 +278,7 @@ func TestNightlyBetaSiteSourceContract(t *testing.T) {
 	work := privateTestDir(t)
 	runner := Runner{Work: work, Env: []string{"PATH=" + os.Getenv("PATH"), "HOME=" + work, "KIND_CLUSTER_NAME=nvkr-nightly-contract", "NVKECTL_RENDER_ALLOW_TEMP_OUT=1"}}
 	if suite := os.Getenv("NVKR_NVKE_NIGHTLY_SOURCE_CONTRACT"); suite != "" {
-		profile, err := loadNightlyProfile(t.Context(), "../../definitions/nightly-profiles.json", "nvke-nightly-arm64")
+		profile, err := loadNightlyProfile(t.Context(), "../../inputs/testing/nightly-profiles.json", "nvke-nightly-arm64")
 		if err != nil {
 			t.Fatal(err)
 		}

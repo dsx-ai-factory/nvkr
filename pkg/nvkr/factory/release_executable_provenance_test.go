@@ -18,7 +18,7 @@ import (
 )
 
 func TestReleaseExecutableResolvedDependencies(t *testing.T) {
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("../../../definitions/nvke-m2", "catalog")))
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "inputs", "catalogs", "tools", "operator-amd64")))
 	if err != nil {
 		t.Fatal(err)
 	}

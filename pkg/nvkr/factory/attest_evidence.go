@@ -42,6 +42,12 @@ func bindEvidenceAttestation(plan *Plan) error {
 			return e.New(e.CodePipelineDrift, "release route has no package")
 		}
 		final := plan.Graph.Artifacts[index]
+		if PerOutputPublication(plan) {
+			if err := bindMetadataEvidenceAttestation(plan, route, index); err != nil {
+				return err
+			}
+			continue
+		}
 		prepared := final
 		prepared.ID = "prepared/" + route.Name
 		prepared.Path = filepath.ToSlash(filepath.Join(".nvkr", "factory", "prepared", route.Name))
@@ -73,6 +79,9 @@ func bindEvidenceAttestation(plan *Plan) error {
 }
 
 func executeAttestEvidence(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, newSigner signerFor, stdout io.Writer) error {
+	if route, metadataOnly := preparedEvidenceRoute(plan, node); metadataOnly {
+		return executeAttestEvidenceMetadata(ctx, plan, node, route, artifacts, newSigner, stdout)
+	}
 	if plan.Environment.GitHubDevelopment {
 		if _, err := runtimeTarget(plan, node.Target); err != nil {
 			return err
@@ -123,6 +132,12 @@ func (plan Plan) validateEvidenceAttestationGraph() error {
 	nodes, artifacts := planIndex(&plan)
 	for _, route := range plan.Routes {
 		if PerOutputPublication(&plan) && route.Name == "release" {
+			continue
+		}
+		if PerOutputPublication(&plan) {
+			if err := validateMetadataEvidenceGraph(&plan, route, nodes, artifacts); err != nil {
+				return err
+			}
 			continue
 		}
 		output, ok := artifacts[route.Input]

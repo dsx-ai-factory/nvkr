@@ -193,4 +193,6 @@ func TestInspectRestoredSourceChecksExactPlanPaths(t *testing.T) {
 	if got != want {
 		t.Fatalf("source description = %+v, want %+v", got, want)
 	}
+	plan.DefinitionPath, plan.EnvironmentPath = "definition.yaml", "environment.yaml"
+	roundtripProducedGitHubMetadata(t, plan, receipt)
 }

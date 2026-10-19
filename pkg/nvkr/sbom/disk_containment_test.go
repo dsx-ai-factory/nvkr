@@ -34,7 +34,7 @@ func TestContainedArchiveKeepsActualRootPathsAndImmediateCarrier(t *testing.T) {
 				if index == 1 {
 					carrier = "var/cache/second.deb"
 				}
-				if len(component.Properties) != 2 || component.Properties[0] != (Property{Name: "nkd:containedIn", Value: carrier + "@" + pin}) {
+				if len(component.Properties) != 2 || component.Properties[0] != (Property{Name: "nvkr:containedIn", Value: carrier + "@" + pin}) {
 					t.Fatalf("immediate exact carrier absent: %+v", component)
 				}
 				if class, err := diskComponentClass(component); err != nil || class != kind {
@@ -58,7 +58,7 @@ func TestContainedArchiveKeepsActualRootPathsAndImmediateCarrier(t *testing.T) {
 				if component.Type == "file" {
 					continue
 				}
-				if len(component.Properties) != 1 || component.Properties[0] != (Property{Name: "nkd:containedIn", Value: string(wanted)}) {
+				if len(component.Properties) != 1 || component.Properties[0] != (Property{Name: "nvkr:containedIn", Value: string(wanted)}) {
 					t.Fatalf("public inventory lost immediate carriers: %+v", component)
 				}
 			}
@@ -99,7 +99,7 @@ func TestInstallerMemberMergeRetainsImmediateSquashFSCarrier(t *testing.T) {
 	}
 	want := map[string]string{"controlled base": "casper/base.squashfs@" + rawDigest([]byte("controlled base")), "controlled additional": "casper/additional.squashfs@" + rawDigest([]byte("controlled additional"))}
 	for _, component := range inspection.components {
-		if !slices.Contains(component.Properties, Property{Name: "nkd:containedIn", Value: want[component.Name]}) {
+		if !slices.Contains(component.Properties, Property{Name: "nvkr:containedIn", Value: want[component.Name]}) {
 			t.Fatalf("installer member lost exact carrier: %+v", component)
 		}
 	}
@@ -123,7 +123,7 @@ func TestReconcileContainedPackagesRetainsCarriersBeforePublicDeduplication(t *t
 				for _, carrier := range carriers {
 					contained := cloneComponent(installed)
 					contained.Properties[0].Value = diskClassDebianArchive
-					contained.Properties = append(contained.Properties, Property{Name: "nkd:containedIn", Value: carrier})
+					contained.Properties = append(contained.Properties, Property{Name: "nvkr:containedIn", Value: carrier})
 					root.report.Components = append(root.report.Components, contained)
 				}
 				if conflict {
@@ -150,7 +150,7 @@ func TestReconcileContainedPackagesRetainsCarriersBeforePublicDeduplication(t *t
 				found, rootObserved := false, false
 				for _, component := range bom.Components {
 					for _, property := range component.Properties {
-						if property.Name == "nkd:containedIn" {
+						if property.Name == "nvkr:containedIn" {
 							found = property.Value == string(wanted)
 						}
 						if property.Name == "nvkr:observedAtSubjectRoot" {
@@ -173,7 +173,7 @@ func TestRootAndContainedImagePackageWithSamePURLRemainDescriptivelyDistinct(t *
 			inputs := []*DiskContentInspection{contentFixture("installer-iso", arch, "c"), contentFixture("apt-acquisition", arch, "d"), contentFixture("oci-image", arch, "e")}
 			contained := cloneComponent(root.report.Components[0])
 			contained.Properties[0].Value = diskClassContainer
-			contained.Properties = append(contained.Properties, Property{Name: "nkd:containedIn", Value: "images/save.tar@" + inputs[2].report.Subject})
+			contained.Properties = append(contained.Properties, Property{Name: "nvkr:containedIn", Value: "images/save.tar@" + inputs[2].report.Subject})
 			slices.SortFunc(contained.Properties, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
 			root.report.Components = append(root.report.Components, contained)
 			inputs[2].report.Components[0].Properties[0].Value = diskClassContainer
@@ -181,7 +181,7 @@ func TestRootAndContainedImagePackageWithSamePURLRemainDescriptivelyDistinct(t *
 			if err != nil {
 				t.Fatal(err)
 			}
-			if slices.ContainsFunc(projected[0].Properties, func(p Property) bool { return p.Name == "nkd:containedIn" }) ||
+			if slices.ContainsFunc(projected[0].Properties, func(p Property) bool { return p.Name == "nvkr:containedIn" }) ||
 				!slices.Contains(projected[0].Properties, Property{Name: "nvkr:observedAtSubjectRoot", Value: "true"}) ||
 				slices.ContainsFunc(projected[1].Properties, func(p Property) bool { return p.Name == "nvkr:observedAtSubjectRoot" }) {
 				t.Fatal("containment was copied to a root observation or root observation to a contained package")
@@ -192,7 +192,7 @@ func TestRootAndContainedImagePackageWithSamePURLRemainDescriptivelyDistinct(t *
 			}
 			for _, component := range bom.Components {
 				if component.Type != "file" && (!slices.Contains(component.Properties, Property{Name: "nvkr:observedAtSubjectRoot", Value: "true"}) ||
-					!slices.ContainsFunc(component.Properties, func(p Property) bool { return p.Name == "nkd:containedIn" })) {
+					!slices.ContainsFunc(component.Properties, func(p Property) bool { return p.Name == "nvkr:containedIn" })) {
 					t.Fatal("public deduplication erased the host/image overlap")
 				}
 			}

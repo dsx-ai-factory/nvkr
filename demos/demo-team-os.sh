@@ -72,8 +72,8 @@ if [ "$NON_INTERACTIVE" -eq 0 ] && [ ! -t 0 ]; then die 'use --non-interactive w
 if [ -n "$OUT" ]; then mkdir -- "$OUT"; OUT=$(cd "$OUT" && pwd); else OUT=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-team-os.XXXXXX"); fi
 cd "$ROOT"
 printf 'cd %q\n' "$ROOT" >"$OUT/commands.txt"
-DEFINITION="definitions/nvke-os/definition-$ARCH-kvm.yaml"
-ENVIRONMENT="definitions/nvke-os/environment-local-linux-$ARCH-docker.yaml"
+DEFINITION="inputs/definitions/diagnostics/os-$ARCH.yaml"
+ENVIRONMENT="inputs/environments/local-linux-$ARCH-kvm.yaml"
 
 heading 'NVKR / Understand an OS image'
 printf 'Follow components into a disk image, then preview the work.\n'
@@ -125,5 +125,5 @@ show_command run local --definition "$DEFINITION" --environment "$ENVIRONMENT" -
 export_command "$OUT/os-dry-run-$ARCH.txt" "$NVKR" run local --definition "$DEFINITION" --environment "$ENVIRONMENT" --attempt team-os-preview --dry-run
 awk '/^(lane|status|observed outputs):/ { print "  " $0 }' "$OUT/os-dry-run-$ARCH.txt"
 printf 'The preview creates no Run workspace or disk. Full operation output is saved.\n'
-printf 'For a real KVM build, start with definitions/nvke-os/README.md.\n'
+printf 'For a real KVM build, start with inputs/definitions/diagnostics/README.md.\n'
 printf '\nNext: browse the hosted release to see an image that was actually published.\n'

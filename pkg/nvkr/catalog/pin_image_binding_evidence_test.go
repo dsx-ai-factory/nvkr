@@ -85,7 +85,7 @@ func TestMaintainedM2ImageParentReadback(t *testing.T) {
 	if os.Getenv("NVKR_TEST_M2_IMAGE_PARENT_READBACK") != "1" {
 		t.Skip("explicit external metadata read-back was not requested")
 	}
-	provider := Dir(filepath.Join("..", "..", "..", "definitions", "nvke-m2", "image-catalog")).(ContextDataProvider)
+	provider := Dir(filepath.Join("..", "..", "..", "inputs/catalogs/runtime-dependencies")).(ContextDataProvider)
 	raw, err := provider.ReadFileContext(t.Context(), RegistryFile)
 	if err != nil {
 		t.Fatal(err)

@@ -22,6 +22,8 @@ func workerCLIEnvironment(t *testing.T) {
 		t.Setenv(name, "")
 	}
 	t.Setenv("NVKR_GITHUB_TOKEN", "provider-secret")
+	t.Setenv("NVKR_CI_STORAGE_TOKEN", "private-read-secret")
+	t.Setenv("NVKR_CI_STORAGE_USER", "storage-reader")
 	t.Setenv("NVKR_PULL_REGISTRY", "registry.example")
 	t.Setenv("NVKR_PULL_REGISTRY_USER", "reader")
 	t.Setenv("NVKR_PULL_REGISTRY_PASSWORD", "pull-secret")
@@ -33,6 +35,9 @@ func TestSmokeWorkerCLIUsesOnlyPolicyAndPullRuntime(t *testing.T) {
 			workerCLIEnvironment(t)
 			var output bytes.Buffer
 			app := &cli.App{Writer: &output, Commands: []*cli.Command{cmdRunSmokeWorkerWithRunner(func(ctx context.Context, path string, options lifecycle.QualificationRuntimeOptions) (*qualification.SmokeWorkerResult, error) {
+				if options.CIStorageUsername != "storage-reader" || options.CIStorageToken != "private-read-secret" {
+					t.Fatal("private registry account was not passed independently of publication pull credentials")
+				}
 				if ctx == nil || path != "qualification.yaml" || options.WorkspaceRoot != ".nvkr/smoke-worker" || options.GitHubToken != "provider-secret" || options.Credential.Registry != "registry.example" || options.Credential.Username != "reader" || options.Registry.Password != "pull-secret" {
 					t.Fatal("wrong worker inputs")
 				}

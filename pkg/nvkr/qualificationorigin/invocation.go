@@ -16,7 +16,8 @@ import (
 )
 
 // Invocation is the current qualification workflow, authenticated independently
-// of its successful source build. Only workflow_run events are admitted in MVP.
+// of its successful source build. Production uses workflow_run; explicit
+// development policy admits its separate manual-dispatch workflow.
 type Invocation struct {
 	description Description
 	source      *SourceRun
@@ -66,6 +67,9 @@ func (g *GitHub) AuthenticateInvocation(ctx context.Context, source *SourceRun, 
 	description, err := source.Description()
 	if err != nil {
 		return nil, err
+	}
+	if description.Branch != "" {
+		return g.authenticateDevelopmentInvocation(ctx, source, workflow)
 	}
 	request := SourceRequest{Repository: os.Getenv("GITHUB_REPOSITORY"), RunID: os.Getenv("GITHUB_RUN_ID"), Attempt: os.Getenv("GITHUB_RUN_ATTEMPT"), Commit: os.Getenv("GITHUB_SHA"), Workflow: workflow, DefaultBranch: description.DefaultBranch}
 	if err := request.Validate(); err != nil {

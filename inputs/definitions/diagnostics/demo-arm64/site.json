@@ -1,0 +1,61 @@
+{
+  "apiVersion": "nvkr.dev/definition/v5",
+  "kind": "Definition",
+  "metadata": {
+    "name": "nvke-local-site-artifacts-arm64",
+    "description": "Five source-aligned staged-installer artifacts including the native diagnostic profiles image. Build-only candidate; no OS, complete dependency mirror, deployment or signing claim."
+  },
+  "catalog": {
+    "base": "../../../catalogs/nvke/local-site-arm64"
+  },
+  "outputs": [
+    {
+      "name": "controller-chart",
+      "components": [
+        "nvke-controller-chart"
+      ],
+      "format": "helm-oci",
+      "platform": "linux/arm64",
+      "helm": {
+        "images": {
+          "controller": "cwe"
+        }
+      }
+    },
+    {
+      "name": "controller-profiles",
+      "components": [
+        "nvke-local-profiles"
+      ],
+      "format": "oci",
+      "platform": "linux/arm64",
+      "catalog": {
+        "base": "../../../catalogs/controller-profiles/nvidia-arm64"
+      }
+    },
+    {
+      "name": "cwe",
+      "components": [
+        "nvke-controller"
+      ],
+      "format": "oci",
+      "platform": "linux/arm64"
+    },
+    {
+      "name": "nktp",
+      "components": [
+        "nktp-chart"
+      ],
+      "format": "helm-oci",
+      "platform": "linux/arm64"
+    },
+    {
+      "name": "nvkectl",
+      "components": [
+        "nvkectl"
+      ],
+      "format": "executable",
+      "platform": "linux/arm64"
+    }
+  ]
+}

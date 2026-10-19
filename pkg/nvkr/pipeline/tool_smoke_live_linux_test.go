@@ -78,6 +78,12 @@ func init() {
 		fmt.Print("v0.0.0-fixture")
 	case slices.Equal(os.Args[1:], []string{"version", "--client", "--output", "json"}):
 		fmt.Printf("{\"clientVersion\":{\"gitVersion\":\"v0.0.0-fixture\",\"gitCommit\":\"fixture\",\"platform\":%q}}\n", "linux/"+runtime.GOARCH)
+	case slices.Equal(os.Args[1:], []string{"version", "--output=json"}):
+		fmt.Printf("{\"clusterctl\":{\"gitVersion\":\"v0.0.0-fixture\",\"platform\":%q}}\n", "linux/"+runtime.GOARCH)
+	case slices.Equal(os.Args[1:], []string{"version", "-q"}):
+		fmt.Println("0.0.0-fixture")
+	case slices.Equal(os.Args[1:], []string{"version"}):
+		fmt.Printf("Version: 0.0.0-fixture\nOS/Arch: %s\n", "linux/"+runtime.GOARCH)
 	default:
 		fail("subject received an unknown command")
 	}
@@ -109,14 +115,14 @@ func TestToolSmokeRealDocker(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer subject.Close()
-	for _, profile := range []ToolSmokeProfile{ToolSmokeNVKECTL, ToolSmokeHelm, ToolSmokeKubectl} {
+	for _, profile := range []ToolSmokeProfile{ToolSmokeNVKECTL, ToolSmokeHelm, ToolSmokeKubectl, ToolSmokeKind, ToolSmokeClusterctl, ToolSmokeORAS, ToolSmokeNICoSim} {
 		t.Run(string(profile), func(t *testing.T) {
 			observation, err := owner.RunHeld(ctx, subject, profile)
 			if err != nil {
 				t.Logf("container observation: %s", observedRuntime.inspection.Bytes())
 				t.Fatal(err)
 			}
-			if !strings.Contains(string(observation.Stdout()), "v0.0.0-fixture") {
+			if !strings.Contains(string(observation.Stdout()), "0.0.0-fixture") {
 				t.Fatalf("unexpected fixture version: %q", observation.Stdout())
 			}
 			var facts struct {

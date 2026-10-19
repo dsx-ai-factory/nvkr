@@ -25,7 +25,7 @@ import (
 func TestCombinedBuildKitRuntimeAdmission(t *testing.T) {
 	ctx := context.Background()
 	t.Chdir(filepath.Join("..", "..", ".."))
-	root := filepath.Join("definitions", "nvke-v1")
+	root := filepath.Join("docs", "examples", "nvke-tutorial")
 	definitionPath := filepath.Join(root, "definition.yaml")
 	definition, err := LoadDefinition(ctx, definitionPath)
 	if err != nil {
@@ -308,7 +308,7 @@ func relocatedImageFixture(t *testing.T, hosted bool) (*factory.Plan, requiredOu
 
 func TestCompileDerivesImageEnvelope(t *testing.T) {
 	t.Chdir(filepath.Join("..", "..", ".."))
-	definitionPath := filepath.Join("definitions", "nvke-v1", "definition.yaml")
+	definitionPath := filepath.Join("docs", "examples", "nvke-tutorial", "definition.yaml")
 	definition, err := LoadDefinition(t.Context(), definitionPath)
 	if err != nil {
 		t.Fatal(err)

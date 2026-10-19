@@ -4,6 +4,7 @@
 package sign
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -11,6 +12,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/testutil"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -200,5 +203,146 @@ func TestSBOMVerificationBundlePolicyBeforeCosign(t *testing.T) {
 	requireSignCode(t, err, e.CodeVerifyFailed)
 	if calls != 0 {
 		t.Fatal("oversized bundle reached cosign")
+	}
+}
+
+func TestSBOMAttestationRekorConflictRecovery(t *testing.T) {
+	const conflict = `Error: creating bundle: signing bundle: error signing bundle: [POST /api/v1/log/entries][409] createLogEntryConflict {"code":409,"message":"an equivalent entry already exists in the transparency log with UUID 108e9186e8c5677a0b166fafffd96f895b290621a11c737c3c628334d37ef48feb7f3de8a13932b4"}`
+	for _, tc := range []struct {
+		name     string
+		mode     string
+		failures int
+		attempts int
+		verifies int
+		elapsed  time.Duration
+		code     e.Code
+	}{
+		{name: "fresh invocation succeeds", failures: 1, attempts: 2, verifies: 1, elapsed: time.Second},
+		{name: "third invocation succeeds", failures: 2, attempts: 3, verifies: 1, elapsed: 3 * time.Second},
+		{name: "conflict bound", failures: 3, attempts: 3, elapsed: 3 * time.Second, code: e.CodeSignatureInvalid},
+		{name: "unrelated failure", mode: "unrelated", failures: 1, attempts: 1, code: e.CodeSignatureInvalid},
+		{name: "registry conflict", mode: "registry", failures: 1, attempts: 1, code: e.CodeSignatureInvalid},
+		{name: "oversized stderr", mode: "oversized", failures: 1, attempts: 1, code: e.CodeSignatureInvalid},
+		{name: "mutation on failed invocation", mode: "mutate input", failures: 1, attempts: 1, code: e.CodeSignatureInvalid},
+		{name: "caller mutation cannot replace snapshot", mode: "mutate caller", failures: 1, attempts: 2, verifies: 1, elapsed: time.Second},
+		{name: "failed output cannot satisfy later attempt", mode: "stale output", failures: 1, attempts: 2, elapsed: time.Second, code: e.CodeSignatureInvalid},
+		{name: "verification conflict is terminal", mode: "verify conflict", attempts: 1, verifies: 1, code: e.CodeSignatureInvalid},
+		{name: "backoff cancellation", mode: "cancel", failures: 1, attempts: 1, elapsed: 100 * time.Millisecond, code: e.CodeTimeout},
+		{name: "overall deadline", mode: "deadline", attempts: 1, elapsed: 3 * time.Minute, code: e.CodeTimeout},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				bom, err := sbom.NewSubject(ociTestDigest, "component", ociTestDigest)
+				if err != nil {
+					t.Fatal(err)
+				}
+				predicate, err := bom.Marshal()
+				if err != nil {
+					t.Fatal(err)
+				}
+				expected := bytes.Clone(predicate)
+				ctx, cancel := context.WithCancel(t.Context())
+				defer cancel()
+				started := time.Now()
+				attempts, verifies := 0, 0
+				outputs := make(map[string]bool)
+				runner := EnvRunnerFunc(func(ctx context.Context, _ string, args, _ []string, _, stderr io.Writer) error {
+					flag := func(name string) string {
+						for i, arg := range args {
+							if arg == name && i+1 < len(args) {
+								return args[i+1]
+							}
+						}
+						return ""
+					}
+					deadline, ok := ctx.Deadline()
+					if !ok || !deadline.Equal(started.Add(3*time.Minute)) {
+						t.Fatalf("invocation does not share the overall deadline: %v", deadline)
+					}
+					if args[0] == "verify-blob-attestation" {
+						verifies++
+						if flag("--certificate-identity-regexp") != ociTestIdentity || flag("--certificate-oidc-issuer") != ociTestIssuer || flag("--digest") != strings.TrimPrefix(ociTestDigest, "sha256:") {
+							t.Fatal("recovery weakened verification policy", args)
+						}
+						if tc.mode == "verify conflict" {
+							_, _ = io.WriteString(stderr, conflict)
+							return io.ErrUnexpectedEOF
+						}
+						return nil
+					}
+					if args[0] != "attest-blob" {
+						t.Fatalf("unexpected operation: %s", args[0])
+					}
+					attempts++
+					output := flag("--bundle")
+					if outputs[output] {
+						t.Fatal("retry reused a prior bundle output")
+					}
+					outputs[output] = true
+					raw, err := os.ReadFile(flag("--predicate"))
+					if err != nil {
+						return err
+					}
+					if !bytes.Equal(raw, expected) {
+						t.Fatal("retry changed the predicate")
+					}
+					if tc.mode == "deadline" {
+						<-ctx.Done()
+						return ctx.Err()
+					}
+					if attempts <= tc.failures {
+						diagnostic := conflict
+						switch tc.mode {
+						case "unrelated":
+							diagnostic = "Error: certificate verification failed"
+						case "registry":
+							diagnostic = strings.Replace(conflict, "/api/v1/log/entries", "/v2/example/manifests/latest", 1)
+						case "oversized":
+							diagnostic += strings.Repeat("x", int(maxCosignOutputBytes))
+						case "mutate input":
+							if err := os.WriteFile(flag("--predicate"), []byte(`{}`), 0600); err != nil {
+								return err
+							}
+						case "mutate caller":
+							predicate[0] = '!'
+						case "stale output":
+							if err := os.WriteFile(output, testSBOMBundle(t, ociTestDigest, raw), 0600); err != nil {
+								return err
+							}
+						case "cancel":
+							time.AfterFunc(100*time.Millisecond, cancel)
+						}
+						_, _ = io.WriteString(stderr, diagnostic)
+						return io.ErrUnexpectedEOF
+					}
+					if tc.mode == "stale output" {
+						return nil
+					}
+					return os.WriteFile(output, testSBOMBundle(t, ociTestDigest, raw), 0600)
+				})
+				signer, err := NewCosignOCISigner(CosignOCIOptions{Identity: ociTestIdentity, Issuer: ociTestIssuer, Runner: runner})
+				if err != nil {
+					t.Fatal(err)
+				}
+				bundle, err := signer.AttestSBOM(ctx, ociTestDigest, predicate)
+				if tc.code != "" {
+					requireSignCode(t, err, tc.code)
+					if bundle != nil {
+						t.Fatal("failed recovery returned a bundle")
+					}
+				} else {
+					if err != nil {
+						t.Fatal(err)
+					}
+					document, err := sbom.AttestedDocument(bundle, ociTestDigest)
+					if err != nil || !bytes.Equal(document, expected) {
+						t.Fatalf("recovery did not preserve the admitted predicate: %v", err)
+					}
+				}
+				if attempts != tc.attempts || verifies != tc.verifies || time.Since(started) != tc.elapsed {
+					t.Fatalf("attempts=%d verification=%d elapsed=%v; want %d, %d, %v", attempts, verifies, time.Since(started), tc.attempts, tc.verifies, tc.elapsed)
+				}
+			})
+		})
 	}
 }

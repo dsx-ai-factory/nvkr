@@ -68,3 +68,24 @@ func TestQualificationProductionPredicateBindsOriginAndInputs(t *testing.T) {
 		})
 	}
 }
+
+func TestDevelopmentQualificationPredicateUsesSourceNotQualifierInvocation(t *testing.T) {
+	plan := githubDevelopmentPublicationTestPlan(t)
+	setDevelopmentRun(t)
+	source := hostedPredicateRun{builderID: "https://github.com/example/nvkr/.github/workflows/nvkr-dev.yml@refs/heads/feature/pipeline", invocationID: "https://github.com/example/nvkr/actions/runs/12345/attempts/1", startedOn: time.Unix(100, 0).UTC(), finishedOn: time.Unix(101, 0).UTC()}
+	raw, err := ProductionPredicate(plan, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GITHUB_WORKFLOW_REF", "example/nvkr/.github/workflows/nvkr-dev-qualify.yml@refs/heads/feature/qualify")
+	t.Setenv("GITHUB_REF", "refs/heads/feature/qualify")
+	t.Setenv("GITHUB_RUN_ID", "99999")
+	if err := ValidateProductionPredicate(raw, plan, source.builderID, source.invocationID); err != nil {
+		t.Fatal(err)
+	}
+	// The publication owner still refuses to execute producer work in a qualifier.
+	assertFactoryErrorCode(t, validateHostedProductionPredicate(raw, plan, plan.Environment.Signing), e.CodeEngineCapability)
+	for _, invocation := range []string{"https://github.com/example/nvkr/actions/runs/99999/attempts/1", "https://github.com/example/nvkr/actions/runs/12345/attempts/2"} {
+		assertFactoryErrorCode(t, ValidateProductionPredicate(raw, plan, source.builderID, invocation), e.CodeVerifyFailed)
+	}
+}

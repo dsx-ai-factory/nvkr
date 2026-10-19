@@ -8,7 +8,6 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/urfave/cli/v2"
 )
 
@@ -27,36 +26,25 @@ func providerFor(c *cli.Context) catalog.DataProvider {
 	return nil
 }
 
-// resolveBuild selects exact catalog producers and compiles their pinned graph.
-func resolveBuild(c *cli.Context) (*buildgraph.Resolved, string, error) {
+// resolveBuildResult retains the SDK's resolved producers, compiled graph and
+// digest together so command adapters do not compile the same inputs again.
+func resolveBuildResult(c *cli.Context) (*client.Resolution, error) {
 	if c.String("data") == "" {
-		return nil, "", e.New(e.CodeUsage, "build resolution requires --data <catalog-directory>")
+		return nil, e.New(e.CodeUsage, "build resolution requires --data <catalog-directory>")
 	}
-	resolution, err := client.New(client.WithProvider(providerFor(c))).ResolveBuild(c.Context, client.ResolveRequest{
+	return client.New(client.WithProvider(providerFor(c))).ResolveBuild(c.Context, client.ResolveRequest{
 		Components: c.StringSlice("component"), Platform: c.String("platform"),
 	})
+}
+
+// resolveBuild projects the producer description and identity for callers that
+// do not consume the compiled graph, including the qualified verifier seam.
+func resolveBuild(c *cli.Context) (*buildgraph.Resolved, string, error) {
+	resolution, err := resolveBuildResult(c)
 	if err != nil {
 		return nil, "", err
 	}
 	return resolution.Resolved, resolution.BuildDigest, nil
-}
-
-// resolveGraph is the shared front half of every command: load + validate the
-// catalog, select producers, compile the IR, and compute buildDigest.
-func resolveGraph(c *cli.Context) (*ir.Graph, string, error) {
-	res, _, err := resolveBuild(c)
-	if err != nil {
-		return nil, "", err
-	}
-	g, err := buildgraph.Compile(res)
-	if err != nil {
-		return nil, "", err
-	}
-	digest, err := g.Digest()
-	if err != nil {
-		return nil, "", err
-	}
-	return g, digest, nil
 }
 
 func orNone(s string) string {

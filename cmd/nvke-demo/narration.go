@@ -25,22 +25,22 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 	if ctx == nil || out == nil {
 		return nvkrerr.New(nvkrerr.CodeUsage, "walkthrough introduction requires a context and writer")
 	}
-	selected := "definition.json"
+	selected := "arm64-nvidia-tcg.json"
 	network := "NVIDIA OVN (default)"
 	switch cfg.Network {
 	case "", "ovn":
 	case "upstream-ovn":
-		selected = "definition-upstream-ovn.json"
+		selected = "arm64-upstream-tcg.json"
 		network = "upstream OVN diagnostic; does not validate the NVIDIA fork"
 	case "kind-calico":
 		network = "Kind/Calico diagnostic; does not validate NVIDIA OVN"
 	default:
 		return nvkrerr.New(nvkrerr.CodeUsage, "unsupported walkthrough network")
 	}
-	root := filepath.Join(cfg.Repository, "definitions", "nvke-local-dev-arm64")
-	visibleRoot := filepath.Join("definitions", "nvke-local-dev-arm64")
+	visibleRoot := filepath.Join("inputs", "definitions", "demo")
+	root := filepath.Join(cfg.Repository, visibleRoot)
 	definitionPath := filepath.Join(root, selected)
-	environmentPath := filepath.Join(root, "environment-local-docker.json")
+	environmentPath := filepath.Join(cfg.Repository, "inputs/environments/local-arm64-tcg.json")
 	authored, err := definition.LoadDefinition(ctx, definitionPath)
 	if err != nil {
 		return err
@@ -79,7 +79,7 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 	for _, path := range paths {
 		fmt.Fprintf(&text, "   %q\n", path)
 	}
-	fmt.Fprintf(&text, "3. Environment selects execution settings: %q\n", filepath.Join(visibleRoot, "environment-local-docker.json"))
+	fmt.Fprintf(&text, "3. Environment selects execution settings: %q\n", "inputs/environments/local-arm64-tcg.json")
 	fmt.Fprintln(&text, "4. NVKR compiles the selection into a generated Plan, then records each required output's result.")
 	fmt.Fprintf(&text, "   Attempt Plan, created during preparation: %q\n", filepath.Join(".nvkr", "laptop-bootstrap", cfg.AttemptPrefix, "selected-plan.json"))
 	fmt.Fprintf(&text, "   Run record, written by execution: %q\n", filepath.Join(".nvkr", "runs", cfg.AttemptPrefix, "lifecycle.json"))

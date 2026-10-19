@@ -15,19 +15,19 @@ import (
 )
 
 func TestMaintainedM2OSFetchCredentialProjection(t *testing.T) {
-	const root = "../../../definitions/nvke-m2"
+	const root = "../../../inputs/definitions/nvke"
 	const repository = "https://github.com/dsx-ai-factory/nvke.git"
 	const mirror = "https://github.com/dsx-ai-factory/nvke"
 	const dsxRepository = "https://github.com/dsx-ai-factory/project-dsx-identity"
 	privateRepositories := map[string]string{repository: mirror}
-	environment, err := definition.LoadEnvironment(t.Context(), filepath.Join(root, "environment-github.yaml"))
+	environment, err := definition.LoadEnvironment(t.Context(), filepath.Join(root, "../../environments/github-release.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if access, ok := environment.SourceAccess[mirror]; !ok || access.Mirror != mirror || access.CredentialRef != "github:NKE_SOURCE_TOKEN" {
 		t.Fatal("existing CLI/controller source access was changed")
 	}
-	for _, path := range []string{filepath.Join(root, "environment-github.yaml"), filepath.Join(root, "environment-github-dev.yaml"), "../../../definitions/nvke-fde/environment-github.yaml"} {
+	for _, path := range []string{filepath.Join(root, "../../environments/github-release.yaml"), filepath.Join(root, "../../environments/github-development.yaml"), "../../../inputs/environments/github-diagnostics.yaml"} {
 		selected, err := definition.LoadEnvironment(t.Context(), path)
 		if err != nil {
 			t.Fatal(err)

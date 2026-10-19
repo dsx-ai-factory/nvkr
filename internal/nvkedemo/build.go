@@ -22,6 +22,8 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/sourcegit"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"golang.org/x/sys/unix"
 )
 
@@ -43,8 +45,17 @@ func BuildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	return result, nil
 }
 func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
+	if err := validateAutomaticQualification(cfg.QualifyLocal, cfg.Prepared, cfg.QualificationPolicy, cfg.Qualification); err != nil {
+		return BuiltInputs{}, err
+	}
 	if err := requireContext(ctx); err != nil {
 		return BuiltInputs{}, err
+	}
+	if err := cfg.Qualification.validate(cfg.QualificationPolicy); err != nil {
+		return BuiltInputs{}, err
+	}
+	if cfg.Prepared && !configString(cfg.QualificationPolicy) {
+		return BuiltInputs{}, configUsage("prepared builds require an explicit qualification policy")
 	}
 	launcherFlags, err := buildNetworkFlags(cfg.Network)
 	if err != nil {
@@ -83,6 +94,13 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	// script remains authoritative for exact runtime/toolchain admission.
 	for _, root := range []string{"runs", "laptop-bootstrap"} {
 		owned := filepath.Join(repo, ".nvkr", root, cfg.AttemptPrefix)
+		if cfg.Prepared && root == "laptop-bootstrap" {
+			info, readErr := os.Lstat(owned)
+			if readErr != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+				return BuiltInputs{}, fmt.Errorf("prepared bootstrap %q must be an existing directory", owned)
+			}
+			continue
+		}
 		if _, readErr := os.Lstat(owned); readErr == nil {
 			return BuiltInputs{}, fmt.Errorf("attempt destination %q already exists; choose a fresh --attempt", owned)
 		} else if !errors.Is(readErr, os.ErrNotExist) {
@@ -94,10 +112,58 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 		return BuiltInputs{}, err
 	}
 	cfg.Repository = repo
-	if err = buildLocalArtifacts(ctx, runner, script, cfg); err != nil {
+	return executeBuildQualification(ctx, runner, script, cfg, buildQualificationSteps{
+		prepare: prepareLocalArtifacts, setup: SetupQualification,
+		build: buildLocalArtifacts, qualify: qualifyBuiltArtifacts, stop: StopQualificationRegistry,
+	})
+}
+
+// The private seam joins admitted operations without replacing their authority
+// checks. Production always supplies the concrete owners above.
+type buildQualificationSteps struct {
+	prepare func(context.Context, Runner, string, BuildConfig) error
+	setup   func(context.Context, DemoFile, string, io.Writer) (string, error)
+	build   func(context.Context, Runner, string, BuildConfig) error
+	qualify func(context.Context, BuildConfig) error
+	stop    func(context.Context, string) error
+}
+
+func executeBuildQualification(ctx context.Context, runner Runner, script string, cfg BuildConfig, steps buildQualificationSteps) (result BuiltInputs, resultErr error) {
+	if cfg.QualifyLocal {
+		if err := steps.prepare(ctx, runner, script, cfg); err != nil {
+			return BuiltInputs{}, err
+		}
+		out := filepath.Join(cfg.Repository, ".nvkr/laptop-bootstrap", cfg.AttemptPrefix, "qualification")
+		file := DemoFile{Version: 1, Build: BuildFile{Repo: cfg.Repository, NVKEClone: cfg.NVKEClone, Attempt: cfg.AttemptPrefix, Jobs: cfg.Jobs}, Run: RunFile{Network: cfg.Network}}
+		path, err := steps.setup(ctx, file, out, cfg.Progress)
+		if err != nil {
+			return BuiltInputs{}, err
+		}
+		defer func() {
+			resultErr = errors.Join(resultErr, finishAutomaticQualification(ctx, out, steps.stop))
+			if resultErr != nil {
+				result = BuiltInputs{}
+			}
+		}()
+		selected, err := LoadDemoFile(ctx, path)
+		if err != nil {
+			return BuiltInputs{}, err
+		}
+		cfg, err = selected.BuildConfig(cfg.Progress)
+		if err != nil {
+			return BuiltInputs{}, err
+		}
+		if cfg.Progress != nil {
+			fmt.Fprintf(cfg.Progress, "Local qualification files and evidence: %s\n", out)
+		}
+	}
+	if err := steps.build(ctx, runner, script, cfg); err != nil {
 		return BuiltInputs{}, err
 	}
-	return builtInputs(repo, cfg.AttemptPrefix), nil
+	if err := steps.qualify(ctx, cfg); err != nil {
+		return BuiltInputs{}, err
+	}
+	return builtInputs(cfg.Repository, cfg.AttemptPrefix), nil
 }
 
 func builtInputs(repo, attempt string) BuiltInputs {
@@ -126,10 +192,6 @@ func localBuildEnvironment() ([]string, error) {
 }
 
 func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg BuildConfig) (result error) {
-	launcherFlags, err := buildNetworkFlags(cfg.Network)
-	if err != nil {
-		return err
-	}
 	ctx, cancel := context.WithTimeout(ctx, 6*time.Hour)
 	defer cancel()
 	boundary := beginProgress(runner.Progress, "artifacts", LaneStarted, LaneFinished, LaneFailed)
@@ -139,9 +201,34 @@ func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg 
 	}
 	// Bootstrap gets no activity pipe. Its selected Plan, previews and source
 	// preparation remain at the existing owner before the final direct child.
-	prepare := append([]string{"bash", script, "--prepare-only"}, launcherFlags...)
-	if err := runner.Run(ctx, append(prepare, cfg.AttemptPrefix, strconv.Itoa(cfg.Jobs), "all"), "build-prepare", 6*time.Hour); err != nil {
-		return err
+	if !cfg.Prepared {
+		if err := prepareLocalArtifacts(ctx, runner, script, cfg); err != nil {
+			return err
+		}
+	}
+	if cfg.QualificationPolicy != "" {
+		policy, err := lifecycle.LoadLocalQualificationPolicy(ctx, cfg.QualificationPolicy)
+		if err != nil {
+			return err
+		}
+		if policy.Platform != "linux/arm64" {
+			return nvkrerr.New(nvkrerr.CodeEngineCapability, "demo qualification policy requires linux/arm64")
+		}
+		plan, err := factory.LoadPlanContext(ctx, filepath.Join(cfg.Repository, ".nvkr/laptop-bootstrap", cfg.AttemptPrefix, "selected-plan.json"))
+		if err != nil {
+			return err
+		}
+		if err := policy.RequirePlan(plan); err != nil {
+			return err
+		}
+		if cfg.Prepared {
+			if err := recheckPreparedQualificationPlan(ctx, runner, cfg, policy); err != nil {
+				return err
+			}
+		}
+		if err := preflightDemoQualification(ctx, cfg, plan); err != nil {
+			return err
+		}
 	}
 	args, err := preparedBuildInvocation(cfg)
 	if err != nil {
@@ -190,20 +277,20 @@ func preparedBuildInvocation(cfg BuildConfig) ([]string, error) {
 	}
 	var args []string
 	decoder := json.NewDecoder(bytes.NewReader(raw))
-	if err := decoder.Decode(&args); err != nil || len(args) != 18 {
+	if err := decoder.Decode(&args); err != nil || len(args) != 19 {
 		return nil, errors.New("invalid private build invocation")
 	}
 	definition := args[4]
-	authored := "definitions/nvke-local-dev-arm64/definition.json"
+	authored := "inputs/definitions/demo/arm64-nvidia-tcg.json"
 	if cfg.Network == "upstream-ovn" {
-		authored = "definitions/nvke-local-dev-arm64/definition-upstream-ovn.json"
+		authored = "inputs/definitions/demo/arm64-upstream-tcg.json"
 	}
 	if definition != authored && definition != bootstrap+"/definition.json" {
 		return nil, errors.New("private build invocation selected an unsupported definition path")
 	}
 	want := []string{bootstrap + "/nvkr", "run", "local", "--definition", definition,
-		"--environment", "definitions/nvke-local-dev-arm64/environment-local-docker.json", "--attempt", cfg.AttemptPrefix,
-		"--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", strconv.Itoa(cfg.Jobs), "--runtime", "docker", "--ui=plain"}
+		"--environment", "inputs/environments/local-arm64-tcg.json", "--attempt", cfg.AttemptPrefix,
+		"--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", strconv.Itoa(cfg.Jobs), "--runtime", "docker", "--capture-inputs-root=.", "--ui=plain"}
 	if !slices.Equal(args, want) {
 		return nil, errors.New("private build invocation differs from the supported local command")
 	}
@@ -235,4 +322,13 @@ func preparedBuildEnvironment(environment []string, cfg BuildConfig) ([]string, 
 		return nil, err
 	}
 	return SetEnv(env, map[string]string{"TMPDIR": filepath.Join(cfg.Repository, ".nvkr/laptop-bootstrap", cfg.AttemptPrefix, "tmp")}), nil
+}
+
+func prepareLocalArtifacts(ctx context.Context, runner Runner, script string, cfg BuildConfig) error {
+	flags, err := buildNetworkFlags(cfg.Network)
+	if err != nil {
+		return err
+	}
+	args := append([]string{"bash", script, "--prepare-only"}, flags...)
+	return runner.Run(ctx, append(args, cfg.AttemptPrefix, strconv.Itoa(cfg.Jobs), "all"), "build-prepare", 6*time.Hour)
 }

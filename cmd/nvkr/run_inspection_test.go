@@ -21,7 +21,7 @@ import (
 // directory. Rejection and substitution tests build their invalid records explicitly.
 func runInspectionFixture(t *testing.T, attempt string) (root, record string, raw []byte) {
 	t.Helper()
-	prepared, err := lifecycle.PrepareFiles(t.Context(), "definitions/nvke-v1/definition.yaml", "definitions/nvke-v1/environment-local.yaml", "test", attempt)
+	prepared, err := lifecycle.PrepareFiles(t.Context(), "docs/examples/nvke-tutorial/definition.yaml", "docs/examples/nvke-tutorial/environment-local.yaml", "test", attempt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +133,7 @@ func TestReadOnlyModesRejectBeforeInputOrOutput(t *testing.T) {
 
 func TestRunInspectionFailureIsDescriptiveAndDoesNotExposeCause(t *testing.T) {
 	lifecycleCommandRepo(t)
-	prepared, err := lifecycle.PrepareFiles(t.Context(), "definitions/nvke-v1/definition.yaml", "definitions/nvke-v1/environment-local.yaml", "test", "failed-inspection")
+	prepared, err := lifecycle.PrepareFiles(t.Context(), "docs/examples/nvke-tutorial/definition.yaml", "docs/examples/nvke-tutorial/environment-local.yaml", "test", "failed-inspection")
 	if err != nil {
 		t.Fatal(err)
 	}

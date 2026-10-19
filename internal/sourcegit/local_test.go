@@ -413,7 +413,7 @@ func TestLocalGitMaintainedOVNForkPin(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
-	overlay, err := catalog.LoadOverlayContext(ctx, "../../definitions/nvke-local-dev-arm64/os-tcg.json")
+	overlay, err := catalog.LoadOverlayContext(ctx, "../../inputs/catalogs/node-images/variants/nvidia-tcg.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -820,7 +820,7 @@ func TestLocalCloneChecksLocalObjects(t *testing.T) {
 			if malformed {
 				tree := localFixtureGit(t, source, "rev-parse", "HEAD^{tree}")
 				cmd := exec.CommandContext(t.Context(), "git", "-C", source, "hash-object", "--literally", "-t", "commit", "-w", "--stdin")
-				cmd.Stdin = strings.NewReader("tree " + tree + "\nauthor Fixture <nkd@example.test> invalid +0000\ncommitter Fixture <nkd@example.test> 0 +0000\n\nfixture\n")
+				cmd.Stdin = strings.NewReader("tree " + tree + "\nauthor Fixture <nvkr@example.test> invalid +0000\ncommitter Fixture <nvkr@example.test> 0 +0000\n\nfixture\n")
 				cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull}
 				out, err := cmd.CombinedOutput()
 				if err != nil {
@@ -1019,6 +1019,37 @@ func TestLocalGitRejectsCleartextBeforeNetworkAcquisition(t *testing.T) {
 				t.Fatal("Git did not refuse the selected cleartext transport before connecting", err)
 			}
 		})
+	}
+}
+
+func TestLocalGitRejectsExternalHelperBeforeExecution(t *testing.T) {
+	root := t.TempDir()
+	helper, marker := filepath.Join(root, "helper"), filepath.Join(root, "helper-ran")
+	script := "#!/bin/sh\n: > '" + strings.ReplaceAll(marker, "'", "'\"'\"'") + "'\n"
+	if err := os.WriteFile(helper, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Prove the harmless fixture can create its marker before checking refusal.
+	if err := exec.CommandContext(t.Context(), helper).Run(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(marker); err != nil {
+		t.Fatal("helper did not create its marker", err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	cmd, err := LocalCommand(ctx, []string{"PATH=" + os.Getenv("PATH")}, "", "ls-remote", "ext::"+helper)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &output, &output
+	err = ownedcmd.Run(ctx, cmd)
+	if err == nil || ctx.Err() != nil || cmd.ProcessState == nil || cmd.ProcessState.ExitCode() != 128 || !strings.Contains(output.String(), "transport 'ext' not allowed") {
+		t.Fatalf("external helper transport was not refused: %v %s", err, &output)
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatal("external helper was executed", err)
 	}
 }
 

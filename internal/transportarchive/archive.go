@@ -716,6 +716,36 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 			"held transport archive has invalid size %d; expected 0 through %d bytes",
 			archiveInfo.Size(), maxTransportBytes)
 	}
+	if _, err := archiveFile.Seek(0, io.SeekStart); err != nil {
+		return e.Wrap(e.CodeVerifyFailed, err, "rewinding held transport archive")
+	}
+	// Hash the exact raw bytes consumed by extraction. The bound is the size
+	// admitted above, not a fresh stat or a tar member's declared size, so a
+	// growing source cannot expand the extraction budget.
+	rawSource := &io.LimitedReader{R: archiveFile, N: archiveInfo.Size()}
+	extractedHash := sha256.New()
+	file := io.TeeReader(transportContextReader{ctx: ctx, reader: rawSource}, extractedHash)
+	verify := func() error {
+		if rawSource.N != 0 {
+			return e.New(e.CodeVerifyFailed, "transport archive changed while unpacking")
+		}
+		currentDigest, currentInfo, err := stableTransportDigest(ctx, archiveFile, archiveInfo)
+		if err != nil {
+			return transportError(ctx, e.CodeVerifyFailed, err, "rechecking transport archive")
+		}
+		extractedDigest := "sha256:" + hex.EncodeToString(extractedHash.Sum(nil))
+		if !os.SameFile(archiveInfo, currentInfo) || currentDigest != extractedDigest {
+			return e.New(e.CodeVerifyFailed, "transport archive changed while unpacking")
+		}
+		return nil
+	}
+	return unpackSource(ctx, file, rootAbs, cleanAllowed, allowCompressed, verify)
+}
+
+// unpackSource retains every extraction in its owned private tree until verify
+// authenticates all consumed bytes. Both callers admit the size and paths before
+// entering this shared filesystem boundary.
+func unpackSource(ctx context.Context, file io.Reader, rootAbs string, cleanAllowed []string, allowCompressed bool, verify func() error) error {
 	if err := os.MkdirAll(rootAbs, 0o755); err != nil {
 		return e.Wrap(e.CodeInternal, err, "creating transport root")
 	}
@@ -727,15 +757,6 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 	if err := os.Chmod(stage, 0o700); err != nil {
 		return e.Wrap(e.CodeInternal, err, "securing transport staging directory")
 	}
-	if _, err := archiveFile.Seek(0, io.SeekStart); err != nil {
-		return e.Wrap(e.CodeVerifyFailed, err, "rewinding held transport archive")
-	}
-	// Hash the exact raw bytes consumed by extraction. The bound is the size
-	// admitted above, not a fresh stat or a tar member's declared size, so a
-	// growing source cannot expand the extraction budget.
-	rawSource := &io.LimitedReader{R: archiveFile, N: archiveInfo.Size()}
-	extractedHash := sha256.New()
-	file := io.TeeReader(transportContextReader{ctx: ctx, reader: rawSource}, extractedHash)
 
 	// Bind extraction writes to the held staging directory, including resolution
 	// through symlinks. Lexical validation alone is not a filesystem boundary.
@@ -874,10 +895,6 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 	if _, err := copyTransport(ctx, io.Discard, tarSource); err != nil {
 		return transportError(ctx, e.CodeVerifyFailed, err, "finishing transport archive")
 	}
-	if rawSource.N != 0 {
-		return e.New(e.CodeVerifyFailed, "transport archive changed while unpacking")
-	}
-	extractedDigest := "sha256:" + hex.EncodeToString(extractedHash.Sum(nil))
 	modeNames := make([]string, 0, len(directoryModes))
 	for name := range directoryModes {
 		modeNames = append(modeNames, name)
@@ -906,12 +923,8 @@ func unpackOpen(ctx context.Context, archiveFile *os.File, root string, allowed 
 			return e.Wrap(e.CodeInternal, err, "persisting transport staging directory %s", name)
 		}
 	}
-	currentDigest, currentInfo, err := stableTransportDigest(ctx, archiveFile, archiveInfo)
-	if err != nil {
-		return transportError(ctx, e.CodeVerifyFailed, err, "rechecking transport archive")
-	}
-	if !os.SameFile(archiveInfo, currentInfo) || currentDigest != extractedDigest {
-		return e.New(e.CodeVerifyFailed, "transport archive changed while unpacking")
+	if err := verify(); err != nil {
+		return err
 	}
 	return publishTransportRoots(ctx, stage, rootAbs, cleanAllowed, publishTransportNoReplace)
 }

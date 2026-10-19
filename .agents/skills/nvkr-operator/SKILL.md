@@ -64,6 +64,13 @@ perform unrelated cleanup.
 Linux-only authority paths must remain Linux-only. Explain capability errors and supported alternatives
 without silently substituting a platform, provider, builder or evidence lane.
 
+For an explicitly requested local M3 rehearsal, follow
+[local qualification](../../../docs/local-development.md#rehearse-local-m3-qualification) and inspect
+`run qualify-local --help`. Require the complete captured attempt, independent policy, three distinct
+local signing keys and explicit registry destination. Report its `unqualified-local-execution` lane and
+actual result; preserve unsupported-tool refusals and publication references from failed read-back.
+The command's availability does not prove a full NVKE demo exercise.
+
 For NVKE, NVIDIA OVN remains the default but has a [documented startup
 blocker](../../../docs/local-nvke-demo.md). The [quickstart](../../../docs/quickstart.md) explicitly selects a
 matched upstream OVN alternative with diagnostic-only scope; it does not fix or validate NVIDIA OVN. Do not

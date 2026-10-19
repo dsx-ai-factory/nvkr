@@ -62,7 +62,7 @@ func kubernetesBinaryMembers() []string {
 
 func loadPublicOSSourceCatalog(t *testing.T) *catalog.Catalog {
 	t.Helper()
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../definitions/nvke-os-source/catalog"))
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/experiments/public-os-sources/catalog"))
 	if err != nil {
 		t.Fatal(err)
 	}

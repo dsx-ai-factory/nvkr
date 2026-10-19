@@ -15,6 +15,7 @@ usage() {
   printf '%s\n' \
     'Usage: bash scripts/nvke-full-arm64-local.sh ATTEMPT [JOBS] [all|components|os|providers|simulator|site|tools|profiles]' \
     '       bash scripts/nvke-full-arm64-local.sh --check [all|components|os|providers|simulator|site|tools|profiles]' \
+    '       bash scripts/nvke-full-arm64-local.sh --prepare-only ATTEMPT [JOBS] [all|components|os|providers|simulator|site|tools|profiles]' \
     'Explicit upstream alternative: add --network upstream-ovn before ATTEMPT (all selection only).' \
     'NVIDIA OVN remains the default. This alternative does not validate the NVIDIA fork.' \
     'all: one Run with 29 outputs; components: 22; os: one disk; providers: two source-built images.' \
@@ -30,6 +31,8 @@ usage() {
     'Colima os/all: export committed source to native ext4 and run inside Linux; Mac forwarding is rejected.' \
     'No VM is created, started, reset or resized automatically; Docker Desktop is not admitted.' \
     '--check performs prerequisite diagnostics only: no pull, build or attempt creation.' \
+    '--prepare-only freezes the bootstrap and selected Plan without running producers (native Linux only).' \
+    'For local qualification, author the exact policy after preparation, then use nvke-demo build/e2e --prepared.' \
     'NVKE_LOCAL_CLONE supplies pinned Git objects, not uncommitted changes.' \
     'The Go demo builds all selections in one Run; subset selectors remain available for diagnostics.' \
     'See docs/local-development.md for clean setup and acceptance limits.'
@@ -38,7 +41,7 @@ if [[ $# == 1 && ( "$1" == --help || "$1" == -h ) ]]; then usage; exit 0; fi
 check_only=0
 prepare_only=0
 network=ovn
-# Private Go-demo handoff: no activity descriptor is inherited by this shell.
+# Go-demo preparation handoff: no activity descriptor is inherited by this shell.
 # It prepares the same selected inputs, but the Go process launches the final
 # unchanged run-local vector directly so only that child receives telemetry.
 if [[ "${1:-}" == --prepare-only ]]; then
@@ -90,7 +93,7 @@ if [[ "${host_system}" != Darwin ]] && ! command -v docker >/dev/null; then
   exit 1
 fi
 if [[ "${host_system}" == Darwin ]]; then
-  [[ "${prepare_only}" == 0 ]] || { echo 'Private preparation requires native Linux execution.' >&2; exit 1; }
+  [[ "${prepare_only}" == 0 ]] || { echo 'Preparation requires native Linux execution.' >&2; exit 1; }
   [[ "$(uname -m)" == arm64 ]] || { echo 'The macOS ARM64 launcher requires Apple Silicon.' >&2; exit 1; }
   profile="${COLIMA_PROFILE:-}"
   if [[ -z "${profile}" ]]; then
@@ -169,7 +172,7 @@ if [[ -n "${NVKE_LOCAL_CLONE:-}" ]]; then
   # source identity. The bare NVKE form also prefix-matches sibling repository
   # names, so use this override only for this maintained NVKE selection.
 fi
-environment="definitions/nvke-local-dev-arm64/environment-local-docker.json"
+environment="inputs/environments/local-arm64-tcg.json"
 # This is one narrow developer bootstrap, not an Environment validator. Admit
 # its exact reviewed bootstrap image/platform before creating storage or running
 # caller-edited inputs. The compiled runner owns complete document validation.
@@ -231,9 +234,9 @@ if [[ -z "${shared_bootstrap}" ]]; then
 fi
 runner="${tools}/nvkr"
 [[ -f "${runner}" && -x "${runner}" && ! -L "${runner}" ]] || { echo 'Bootstrap did not produce a regular executable.' >&2; exit 1; }
-definition="definitions/nvke-local-dev-arm64/definition.json"
-if [[ "${network}" == upstream-ovn ]]; then definition="definitions/nvke-local-dev-arm64/definition-upstream-ovn.json"; fi
-if [[ "${lane}" != all ]]; then definition="definitions/nvke-local-dev-arm64/definition-${lane}.json"; fi
+definition="inputs/definitions/demo/arm64-nvidia-tcg.json"
+if [[ "${network}" == upstream-ovn ]]; then definition="inputs/definitions/demo/arm64-upstream-tcg.json"; fi
+if [[ "${lane}" != all ]]; then definition="inputs/definitions/diagnostics/demo-arm64/${lane}.json"; fi
 if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}" == site ]]; then
   # Admit the compiled selection before building/loading/probing a replacement
   # toolchain. The narrow utility bootstrap above supplies this Plan owner.
@@ -280,17 +283,22 @@ if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}"
       toolchain_overlay("arm64"; .pin; $to; .catalogDigest; .components)' \
       "${bootstrap}/substitutions.json" >"${bootstrap}/${file}"
   done < <(jq -r 'keys[]' "${bootstrap}/substitutions.json")
-  jq -e --arg root "${repo_root}" --arg out "${repo_root}/${bootstrap}" \
+  # The generated Definition lives three directories below the repository.
+  # Keep its references relocatable so compilation can capture and replay the
+  # original input closure without the producer checkout's absolute paths.
+  definition_dir="${definition%/*}"
+  jq -e --arg definition_dir "${definition_dir}" \
     --slurpfile scopes "${bootstrap}/substitutions.json" '
-    def absolute: if startswith("/") then . else $root + "/definitions/nvke-local-dev-arm64/" + . end;
-    def locate: .base |= absolute | if .overlays then .overlays |= map(absolute) else . end;
+    def relocate: if startswith("/") then error("local demo catalog references must be repository-relative")
+      else "../../../" + $definition_dir + "/" + . end;
+    def locate: .base |= relocate | if .overlays then .overlays |= map(relocate) else . end;
     .catalog |= locate |
     .catalog as $default |
     .outputs |= map(.name as $name |
       if .catalog then .catalog |= locate else .catalog = $default end |
       .catalog.overlays = ((.catalog.overlays // []) +
         [$scopes[0] | to_entries[] | select(.value.outputs | index($name)) |
-          $out + "/toolchain-attempt" + (if .key == 0 then "" else "-" + (.key | tostring) end) + ".json"]))
+          "./toolchain-attempt" + (if .key == 0 then "" else "-" + (.key | tostring) end) + ".json"]))
   ' "${definition}" >"${bootstrap}/definition.json"
   definition="${bootstrap}/definition.json"
   fi
@@ -318,11 +326,11 @@ jq -r '
     truncated: (($operations | length) + ($artifacts | length) > ($vertices | length) or
       ($displayEdges | length) > ($edges | length) or ($edges | length) > 4096)} | tojson)
 ' "${bootstrap}/graph.json" >&2
-preview_command=("${runner}" run local --definition "${definition}" --environment "${environment}" --attempt "${attempt}-preview" --dry-run)
+preview_command=("${runner}" run local --definition "${definition}" --environment "${environment}" --attempt "${attempt}-preview" --capture-inputs-root=. --dry-run)
 print_nvkr_command "${preview_command[@]}"
 "${preview_command[@]}"
 build_command=("${runner}" run local --definition "${definition}" --environment "${environment}" \
-  --attempt "${attempt}" --attempts-root .nvkr/runs --runner-source . --jobs "${jobs}" --runtime "${runtime}" --ui=plain)
+  --attempt "${attempt}" --attempts-root .nvkr/runs --runner-source . --jobs "${jobs}" --runtime "${runtime}" --capture-inputs-root=. --ui=plain)
 if [[ "${prepare_only}" == 1 ]]; then
   # This is a private description, not executable authority or source evidence.
   # Preserve the exact final argv selected above; never pass it through eval.

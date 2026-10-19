@@ -12,7 +12,7 @@ import (
 // nvkeV1CatalogDir is the shipped production catalog for the NVKE CLI. It is loaded here,
 // rather than restated as a fixture, because the property under test is exactly that the
 // document we ship stamps what upstream stamps.
-const nvkeV1CatalogDir = "../../../definitions/nvke-v1/catalog"
+const nvkeV1CatalogDir = "../../../inputs/catalogs/nvke/module-tags"
 
 // The nvkectl binary this catalog builds must report the SAME version string as a binary
 // built by NVKE's own cli/Makefile, including the leading v. The retained v1

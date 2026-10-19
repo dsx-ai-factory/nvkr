@@ -195,21 +195,13 @@ func TestPinSetIntegrationMembershipFailurePreservesLock(t *testing.T) {
 	fixture := newPinSetIntegrationFixture(t, "")
 	fixture.pin(t, "1.0.0")
 	before := readPinFixtureLock(t, fixture.dir)
-	for index, tc := range []struct{ name, manifest string }{
-		{"unknown", "dependencies: [{name: cwe, version: 1.2.3}, {name: extra, version: 1.0.0}]\n"},
-		{"duplicate", "dependencies: [{name: cwe, version: 1.2.3}, {name: cwe, version: 1.2.3}]\n"},
-		{"missing", "dependencies: []\n"},
-		{"range", "dependencies: [{name: cwe, version: '^1.2.3'}]\n"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			tag := fmt.Sprintf("umbrella/v1.%d.0", index+1)
-			fixture.commitManifest(t, tc.manifest, tag)
-			_, err := UpdateSourcePins(t.Context(), SourcePinRequest{Directory: fixture.dir, Sources: []string{"umbrella"}, Tag: tag})
-			assertCatalogContractCode(t, err, e.CodePinSetMismatch)
-			if !bytes.Equal(before, readPinFixtureLock(t, fixture.dir)) {
-				t.Fatal("failed membership validation changed committed lock")
-			}
-		})
+	// Extraction's malformed-content cases live in TestExtractPinSetVersions;
+	// one failed derivation proves the transaction preserves its original lock.
+	fixture.commitManifest(t, "dependencies: [{name: cwe, version: 1.2.3}, {name: extra, version: 1.0.0}]\n", "umbrella/v1.1.0")
+	_, err := UpdateSourcePins(t.Context(), SourcePinRequest{Directory: fixture.dir, Sources: []string{"umbrella"}, Tag: "1.1.0"})
+	assertCatalogContractCode(t, err, e.CodePinSetMismatch)
+	if !bytes.Equal(before, readPinFixtureLock(t, fixture.dir)) {
+		t.Fatal("failed membership validation changed committed lock")
 	}
 	// The checkout and latest upstream tag now disagree with the locked tree.
 	// A valid old lock still loads from that exact original commit.
@@ -348,80 +340,84 @@ components:
 	}
 	for _, tc := range []struct {
 		name, old, replacement, diagnostic string
+		implicitFormat                     bool
 	}{
-		{"unknown format", "format: values", "format: unknown", "unsupported format"},
-		{"accounted items", "      members:", "      accounted: {config: {type: manifest}}\n      members:", "accounted items require nvke-deploy-v1"},
-		{"member chart", "artifact: tool,", "chart: {name: tool, repository: https://example.invalid/charts}, artifact: tool,", "chart identity requires nvke-deploy-v1"},
-		{"prebuilt chart", "    prebuilt:", "    prebuilt:\n      chart: {name: tool, repository: https://example.invalid/charts}", "requires outputType raw and no url/image"},
-		{"resolved OCI archive", "    prebuilt:", "    prebuilt:\n      ociArchive: https://example.invalid/archive", "authors resolved ociArchive"},
+		{"unknown format", "format: values", "format: unknown", "unsupported format", false},
+		{"accounted items", "      members:", "      accounted: {config: {type: manifest}}\n      members:", "accounted items require nvke-deploy-v1", false},
+		{"member chart", "artifact: tool,", "chart: {name: tool, repository: https://example.invalid/charts}, artifact: tool,", "chart identity requires nvke-deploy-v1", false},
+		{"implicit format accounted items", "      members:", "      accounted: {config: {type: manifest}}\n      members:", "accounted items require nvke-deploy-v1", true},
+		{"implicit format member chart", "artifact: tool,", "chart: {name: tool, repository: https://example.invalid/charts}, artifact: tool,", "chart identity requires nvke-deploy-v1", true},
+		{"prebuilt chart", "    prebuilt:", "    prebuilt:\n      chart: {name: tool, repository: https://example.invalid/charts}", "requires outputType raw and no url/image", false},
+		{"resolved OCI archive", "    prebuilt:", "    prebuilt:\n      ociArchive: https://example.invalid/archive", "authors resolved ociArchive", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			// Pure declaration admission has no upstream or lock I/O to perform.
 			raw := strings.Replace(registry, tc.old, tc.replacement, 1)
-			reg, err := decodeRegistry([]byte(raw), "unsupported adapter fixture")
+			if tc.implicitFormat {
+				raw = strings.Replace(raw, "      format: values\n", "", 1)
+			}
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, RegistryFile), []byte(raw), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			// A malformed lock proves declaration admission happens first,
+			// without resolving a valid upstream merely to test rejected input.
+			before := []byte("unread lock sentinel\n")
+			if err := os.WriteFile(filepath.Join(dir, LockFile), before, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			update, err := UpdateSourcePins(t.Context(), SourcePinRequest{Directory: dir, Sources: []string{"umbrella"}, Tag: "1.0.0"})
 			assertCatalogContractCode(t, err, e.CodeInvalidCatalog)
-			if reg != nil || !strings.Contains(err.Error(), tc.diagnostic) {
-				t.Fatalf("adapter schema did not fail at admission: %+v, %v", reg, err)
+			if update.Changed != 0 || len(update.Pins) != 0 || len(update.Artifacts) != 0 || !strings.Contains(err.Error(), tc.diagnostic) {
+				t.Fatalf("adapter schema did not fail at admission: %+v, %v", update, err)
+			}
+			if !bytes.Equal(before, readPinFixtureLock(t, dir)) {
+				t.Fatal("invalid declaration changed lock bytes")
 			}
 		})
 	}
 }
 
 func TestPinSetImageRuntimeSelection(t *testing.T) {
+	// Invalid runtime admission is covered without Git fixtures by
+	// TestPinRuntimeRejectsNondefaultBeforeInputWork.
 	for _, sourceOwned := range []bool{false, true} {
-		for _, custom := range []bool{false, true} {
-			t.Run(fmt.Sprintf("source=%t/custom=%t", sourceOwned, custom), func(t *testing.T) {
-				fixture := newPinSetIntegrationFixture(t, "")
-				image := rawComponent{Platforms: []string{"linux/amd64"}, OutputType: "oci-image",
-					Prebuilt: &Prebuilt{Image: "example.invalid/tool:{{.Version}}", Evidence: &ExternalEvidence{None: true}}}
-				version := "1.2.3"
-				if sourceOwned {
-					image.Source = "cwe"
-				} else {
-					delete(fixture.registry.Sources, "cwe")
-					delete(fixture.registry.Components, "controller")
-					fixture.registry.Sources["umbrella"].PinSet.Members["a-cwe"] = PinSetMember{Artifact: "image", Path: "dependencies[name=cwe].version"}
-					image.PinnedBy = "umbrella"
+		t.Run(fmt.Sprintf("source=%t", sourceOwned), func(t *testing.T) {
+			fixture := newPinSetIntegrationFixture(t, "")
+			image := rawComponent{Platforms: []string{"linux/amd64"}, OutputType: "oci-image",
+				Prebuilt: &Prebuilt{Image: "example.invalid/tool:{{.Version}}", Evidence: &ExternalEvidence{None: true}}}
+			version := "1.2.3"
+			if sourceOwned {
+				image.Source = "cwe"
+			} else {
+				delete(fixture.registry.Sources, "cwe")
+				delete(fixture.registry.Components, "controller")
+				fixture.registry.Sources["umbrella"].PinSet.Members["a-cwe"] = PinSetMember{Artifact: "image", Path: "dependencies[name=cwe].version"}
+				image.PinnedBy = "umbrella"
+			}
+			fixture.registry.Components["image"] = image
+			fixture.writeRegistry(t)
+			digest := "sha256:" + strings.Repeat("a", 64)
+			request := SourcePinRequest{Directory: fixture.dir, Sources: []string{"umbrella"}, Tag: "1.0.0"}
+			resolveArtifact := func(ctx context.Context, selected PrebuiltTarget, runtime string) (ArtifactPin, error) {
+				if runtime != "docker" || selected.Image != "example.invalid/tool:"+version {
+					t.Fatalf("maintenance projection = %q, %q", runtime, selected.Image)
 				}
-				fixture.registry.Components["image"] = image
-				fixture.writeRegistry(t)
-				digest := "sha256:" + strings.Repeat("a", 64)
-				request := SourcePinRequest{Directory: fixture.dir, Sources: []string{"umbrella"}, Tag: "1.0.0"}
-				if custom {
-					request.Runtime = "unused-legacy-runtime"
-				}
-				resolveArtifact := func(ctx context.Context, selected PrebuiltTarget, runtime string) (ArtifactPin, error) {
-					if custom {
-						t.Fatal("non-default legacy runtime reached acquisition")
-					}
-					if runtime != "docker" || selected.Image != "example.invalid/tool:"+version {
-						t.Fatalf("maintenance projection = %q, %q", runtime, selected.Image)
-					}
-					return ArtifactPin{Tag: selected.Tag, Digests: map[string]string{"amd64": digest}}, nil
-				}
-				update, err := updateSourcePinsWithArtifacts(t.Context(), request, ListTags, ResolvePin, resolveArtifact)
-				if custom {
-					assertCatalogContractCode(t, err, e.CodeUsage)
-					_, lockErr := os.Stat(filepath.Join(fixture.dir, LockFile))
-					if !os.IsNotExist(lockErr) || update.Changed != 0 || len(update.Pins) != 0 || len(update.Artifacts) != 0 {
-						t.Fatalf("non-default runtime produced a partial update: %+v, %v", update, lockErr)
-					}
-					return
-				}
-				if err != nil {
-					t.Fatal(err)
-				}
-				if got := fixture.lock(t).Artifacts["image"].Digests["amd64"]; got != digest {
-					t.Fatalf("image digest = %s; want %s", got, digest)
-				}
-				loaded, err := LoadContext(t.Context(), Dir(fixture.dir))
-				if err != nil {
-					t.Fatal(err)
-				}
-				if got := loaded.Components["image"].Prebuilt; got.Image != "example.invalid/tool:"+version || got.Digests["amd64"] != digest {
-					t.Fatalf("loaded member version/native subject changed: %+v", got)
-				}
-			})
-		}
+				return ArtifactPin{Tag: selected.Tag, Digests: map[string]string{"amd64": digest}}, nil
+			}
+			_, err := updateSourcePinsWithArtifacts(t.Context(), request, ListTags, ResolvePin, resolveArtifact)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := fixture.lock(t).Artifacts["image"].Digests["amd64"]; got != digest {
+				t.Fatalf("image digest = %s; want %s", got, digest)
+			}
+			loaded, err := LoadContext(t.Context(), Dir(fixture.dir))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := loaded.Components["image"].Prebuilt; got.Image != "example.invalid/tool:"+version || got.Digests["amd64"] != digest {
+				t.Fatalf("loaded member version/native subject changed: %+v", got)
+			}
+		})
 	}
 }

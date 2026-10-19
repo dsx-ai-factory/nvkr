@@ -136,12 +136,11 @@ func ReconcileDiskContents(ctx context.Context, buildDigest, name string, root *
 type diskPackageKey struct{ name, version, format, architecture string }
 
 const (
-	// These four names are the pinned inspector's report ABI, not framework
-	// metadata. Keep writer and reader exact until that closure is repinned.
-	diskContentClassProperty        = "nkd:diskContentClass"
-	diskPackageFormatProperty       = "nkd:packageFormat"
-	diskPackageArchitectureProperty = "nkd:packageArchitecture"
-	diskContainedInProperty         = "nkd:containedIn"
+	// Property names emitted and consumed by the NVKR inspection report.
+	diskContentClassProperty        = "nvkr:diskContentClass"
+	diskPackageFormatProperty       = "nvkr:packageFormat"
+	diskPackageArchitectureProperty = "nvkr:packageArchitecture"
+	diskContainedInProperty         = "nvkr:containedIn"
 	diskClassFilesystem             = "filesystem"
 	diskClassContainer              = "container"
 	diskClassDebianArchive          = "debian-archive"

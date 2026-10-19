@@ -88,6 +88,7 @@ type artifactCheckLifetime struct {
 	closeDone        chan struct{}
 	verified         *VerifiedRelease
 	plan             *factory.Plan
+	members          []QualificationReleaseMember
 	operationContext context.Context
 	stopOperations   context.CancelFunc
 	operations       sync.WaitGroup
@@ -236,7 +237,19 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 	if err := canonical.UnmarshalExact(raw, &plan); err != nil {
 		return nil, nil, e.Wrap(e.CodeVerifyFailed, err, "freezing qualification Plan")
 	}
-	if err := factory.AdmitQualificationHandoff(&plan); err != nil {
+	if origin.Branch != "" {
+		if err := factory.AdmitDevelopmentQualification(&plan); err != nil {
+			return nil, nil, err
+		}
+		if err := admitDevelopmentQualificationReference(request.Reference, origin); err != nil {
+			return nil, nil, err
+		}
+		for _, predicate := range request.Predicates {
+			if err := admitDevelopmentQualificationReference(predicate.Reference, origin); err != nil {
+				return nil, nil, err
+			}
+		}
+	} else if err := factory.AdmitQualificationHandoff(&plan); err != nil {
 		return nil, nil, err
 	}
 	expectation, err := PrepareExactInputs(request.Definition, request.Environment, &plan)
@@ -385,6 +398,10 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 		}
 		return nil, report, err
 	}
+	members, err := qualificationReleaseMembers(report.Outputs, predicates)
+	if err != nil {
+		return nil, report, err
+	}
 	raw, err = canonical.Marshal(report)
 	if err != nil {
 		return nil, report, err
@@ -402,7 +419,7 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 		return nil, report, err
 	}
 	transferred = true
-	return &ArtifactCheckReceipt{origin: source, raw: string(raw), lifetime: &artifactCheckLifetime{verified: verified, plan: &plan}}, report, nil
+	return &ArtifactCheckReceipt{origin: source, raw: string(raw), lifetime: &artifactCheckLifetime{verified: verified, plan: &plan, members: members}}, report, nil
 }
 
 func qualificationPredicates(values []QualificationPredicate, plan *factory.Plan, origin qualificationorigin.Description) (map[string][]byte, error) {

@@ -73,8 +73,11 @@ func materializeGitHubSharedActions(plan *Plan, raw []byte, files map[string][]b
 			}
 			with := githubYAMLField(call, "with")
 			if uses == "./"+sharedDirectory+"prepare-stage" || uses == "./"+sharedDirectory+"prepare-stage-container" {
-				if prepared || githubYAMLValue(call, "id") != githubContextStepID || githubYAMLValue(with, "action") != "${{ github.job }}" ||
-					len(inner.Content) != 2 || githubYAMLValue(inner.Content[1], "run") != githubRunnerCommand(plan, "describe-action", "", "")+` --action "$NVKR_ACTION"` {
+				if prepared || githubYAMLValue(call, "id") != githubContextStepID || !githubYAMLOnlyFields(with, "runner-artifact") ||
+					!githubYAMLOnlyFields(githubYAMLField(body, "inputs"), "runner-artifact") || len(inner.Content) != 2 ||
+					!githubYAMLOnlyFields(githubYAMLField(inner.Content[1], "env"), "NVKR_ACTION") ||
+					githubYAMLValue(githubYAMLField(inner.Content[1], "env"), "NVKR_ACTION") != "${{ github.job }}" ||
+					githubYAMLValue(inner.Content[1], "run") != githubRunnerCommand(plan, "describe-action", "", "")+` --action "$NVKR_ACTION"` {
 					return nil, nil, e.New(e.CodeEngineCapability, "job %q changes shared action preparation", jobID)
 				}
 				artifact := githubYAMLField(with, "runner-artifact")
@@ -149,6 +152,15 @@ func materializeGitHubInterfaceSteps(steps *yamlv3.Node, values map[string]strin
 		if present == "false" {
 			if condition != guard {
 				return e.New(e.CodeEngineCapability, "shared action disables required operation %q", role)
+			}
+			if role == "images" {
+				for _, name := range []string{"nvkr-toolchain-read-token", "nvkr-toolchain-read-user"} {
+					input := githubYAMLField(inputs, name)
+					if githubYAMLValue(input, "required") != "false" || githubYAMLField(input, "default") == nil || githubYAMLValue(input, "default") != "" || githubYAMLField(arguments, name) != nil {
+						return e.New(e.CodeEngineCapability, "absent image preparation changes its empty reader default")
+					}
+					githubYAMLRemove(inputs, name)
+				}
 			}
 			continue
 		}

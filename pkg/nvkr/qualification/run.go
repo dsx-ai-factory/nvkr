@@ -13,8 +13,8 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationorigin"
 )
 
-// PublishTriggeredRun selects its source only from the authenticated workflow_run
-// event and exact provider attempt. The policy is independently selected by the
+// PublishTriggeredRun selects its source from the admitted production event or
+// explicit development dispatch and authenticates the exact provider attempt. The policy is independently selected by the
 // qualification workflow; candidate inputs cannot override either trust role.
 func PublishTriggeredRun(ctx context.Context, policyPath string, options lifecycle.QualificationRuntimeOptions) (*Publication, error) {
 	if ctx == nil {
@@ -40,11 +40,16 @@ func PublishTriggeredRun(ctx context.Context, policyPath string, options lifecyc
 	if err != nil {
 		return nil, err
 	}
-	publisher, err := NewPublisher(Options{CosignBinary: policy.Cosign.Path, CosignDigest: digest, Credential: options.Credential})
+	newPublisher := NewPublisher
+	if policy.Source.Development {
+		newPublisher = NewDevelopmentPublisher
+	}
+	publisher, err := newPublisher(Options{CosignBinary: policy.Cosign.Path, CosignDigest: digest, Credential: options.Credential})
 	if err != nil {
 		return nil, err
 	}
-	provider := qualificationorigin.NewGitHub(options.GitHubToken)
+	storage := qualificationorigin.CIStorageCredential{Username: options.CIStorageUsername, Token: options.CIStorageToken}
+	provider := qualificationorigin.NewGitHubWithCIStorageCredential(options.GitHubToken, storage)
 	source, err := provider.AuthenticateTriggeredSource(ctx, policy.Source)
 	if err != nil {
 		return nil, err
@@ -55,11 +60,7 @@ func PublishTriggeredRun(ctx context.Context, policyPath string, options lifecyc
 		return nil, err
 	}
 	defer func() { _ = invocation.Close() }()
-	raw, err := provider.DownloadQualificationHandoff(ctx, source)
-	if err != nil {
-		return nil, err
-	}
-	checks, report, err := lifecycle.CheckQualificationHandoff(ctx, raw, source, policy, options)
+	checks, report, err := checkTriggeredArtifacts(ctx, provider, source, policy, options)
 	if err != nil {
 		if report == nil {
 			return nil, err
@@ -67,7 +68,7 @@ func PublishTriggeredRun(ctx context.Context, policyPath string, options lifecyc
 		return &Publication{ArtifactChecks: report, Verdicts: []Verdict{}, PublishedSubjects: []string{}}, err
 	}
 	defer func() { _ = checks.Close() }()
-	smoke, err := lifecycle.AuthenticateHostedToolSmoke(ctx, checks, invocation, policy, options.GitHubToken)
+	smoke, err := lifecycle.AuthenticateHostedToolSmokeWithCIStorageCredential(ctx, checks, invocation, policy, options.GitHubToken, storage)
 	if err != nil {
 		return smokeFailurePublication(report, err)
 	}
@@ -115,4 +116,15 @@ func admitRunPolicy(policy lifecycle.QualificationPolicy) error {
 	}
 	_, err := outsideSuites(policy.OutsideMVPSuites)
 	return err
+}
+
+func checkTriggeredArtifacts(ctx context.Context, provider *qualificationorigin.GitHub, source *qualificationorigin.SourceRun, policy lifecycle.QualificationPolicy, options lifecycle.QualificationRuntimeOptions) (*lifecycle.ArtifactCheckReceipt, *lifecycle.ArtifactCheckDescription, error) {
+	if policy.Source.Development {
+		return lifecycle.CheckDevelopmentQualificationSource(ctx, provider, source, policy, options)
+	}
+	raw, err := provider.DownloadQualificationHandoff(ctx, source)
+	if err != nil {
+		return nil, nil, err
+	}
+	return lifecycle.CheckQualificationHandoff(ctx, raw, source, policy, options)
 }

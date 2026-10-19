@@ -842,8 +842,7 @@ func restoreBGP(ctx context.Context, guard *NetworkGuard) error {
 }
 
 // Restore removes only recorded network controls after all producers are idle.
-// It does not delete tenants, VMs or management resources and cannot import a
-// legacy Python journal. Restore old controls before upgrading the helper.
+// It does not delete tenants, VMs or management resources.
 func Restore(ctx context.Context, work string, progress io.Writer) error {
 	runner := Runner{Work: work, Env: NativeEnvironment(), Progress: progress}
 	binding, err := admitLibvirtEnvironment(ctx, runner)

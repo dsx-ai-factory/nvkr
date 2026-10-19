@@ -70,7 +70,7 @@ func TestCIRestrictsAutomaticSelectionOnly(t *testing.T) {
 
 // These fixed bytes were captured with the pre-dashboard base executable at
 // 3558650e986cd7600558e4e38b77da5b89d780f0, not regenerated from this implementation.
-// Only the input-dependent Plan identity is adapted below.
+// Only input-dependent identities and relocated catalog paths are adapted below.
 func TestDefaultLeafBytesMatchPreDashboardFixtures(t *testing.T) {
 	lifecycleCommandRepo(t)
 	const maintainedPlan = ".github/nvkr-run/plan.json"
@@ -78,14 +78,37 @@ func TestDefaultLeafBytesMatchPreDashboardFixtures(t *testing.T) {
 		name, fixture string
 		args          []string
 	}{
-		{"Definition validation", "definition-validate.txt", []string{"definition", "validate", "--definition", "definitions/nvke-v1/definition.yaml"}},
-		{"Definition inspection", "definition-inspect.json", []string{"definition", "inspect", "--definition", "definitions/nvke-v1/definition.yaml"}},
+		{"Definition validation", "definition-validate.txt", []string{"definition", "validate", "--definition", "docs/examples/nvke-tutorial/definition.yaml"}},
+		{"Definition inspection", "definition-inspect.json", []string{"definition", "inspect", "--definition", "docs/examples/nvke-tutorial/definition.yaml"}},
 		{"identical Plans", "identical-plans.txt", []string{"run", "diff", "--before", maintainedPlan, "--after", maintainedPlan}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			want, err := os.ReadFile("cmd/nvkr/testdata/presentation/" + test.fixture)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if test.fixture == "definition-validate.txt" || test.fixture == "definition-inspect.json" {
+				definition, err := lifecycle.LoadDefinition(t.Context(), "docs/examples/nvke-tutorial/definition.yaml")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if test.fixture == "definition-validate.txt" {
+					const capturedDigest = "sha256:9e75b6ddc0ee9d7cb3bf7a55e654cef39d5399eb021a2459332555946a3cb794"
+					if bytes.Count(want, []byte(capturedDigest)) != 1 {
+						t.Fatal("Definition fixture lost its captured identity")
+					}
+					digest, err := definition.Digest()
+					if err != nil {
+						t.Fatal(err)
+					}
+					want = bytes.ReplaceAll(want, []byte(capturedDigest), []byte(digest))
+				} else {
+					const capturedCatalog = `"base":"./catalog"`
+					if bytes.Count(want, []byte(capturedCatalog)) != 1 {
+						t.Fatal("Definition fixture lost its captured catalog path")
+					}
+					want = bytes.ReplaceAll(want, []byte(capturedCatalog), []byte(fmt.Sprintf(`"base":%q`, definition.Catalog.Base)))
+				}
 			}
 			if test.fixture == "identical-plans.txt" {
 				// The maintained output selection changes its Plan identity. Keep

@@ -87,6 +87,13 @@ func shareGitHubBootstrap(plan *Plan, files map[string][]byte, oldPath string, c
 		return err
 	}
 	path := githubActionsDirectoryFor(plan) + "bootstrap-" + variant
+	if plan.Environment.GitHubRuntimePlan {
+		for _, step := range steps.Content {
+			if githubYAMLValue(step, "name") == "Upload NVKR runtime inputs" {
+				path += "-runtime-plan"
+			}
+		}
+	}
 	newPath := path + "/action.yml"
 	if previous, exists := files[newPath]; exists && !bytes.Equal(previous, raw) {
 		return e.New(e.CodeEngineCapability, "generated bootstrap actions for %q have conflicting implementations", variant)

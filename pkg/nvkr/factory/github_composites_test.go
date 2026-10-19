@@ -18,6 +18,25 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+func TestGitHubActionsRejectMalformedOrCallableJobs(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		raw  string
+	}{
+		{name: "empty"},
+		{name: "comment only", raw: "# missing workflow\n"},
+		{name: "invalid YAML", raw: "jobs: [\n"},
+		{name: "no jobs", raw: "name: Missing jobs\n"},
+		{name: "local workflow call", raw: "jobs:\n  operation:\n    uses: ./.github/workflows/nvkr-worker.yml\n"},
+		{name: "remote workflow call", raw: "jobs:\n  operation:\n    uses: example/repo/.github/workflows/worker.yml@main\n"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := expandGitHubActions(&Plan{}, []byte(test.raw), nil)
+			assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
+		})
+	}
+}
+
 // The fixture deliberately combines caller-only contexts, an output-referenced
 // execution step and all provider controls that cannot move across action scope.
 func githubCompositeContractFixture(actions githubActionRefs, container bool) []byte {
@@ -315,11 +334,11 @@ func assertGitHubCompositeReadableYAML(t *testing.T, name string, raw []byte, pl
 				} else if uses != sharedPrefix+"prepare-stage" {
 					t.Fatal("preparation alias names a different action")
 				}
-				if anchor != wantAnchor || len(target.Content) != 8 || githubYAMLLength(with) != 4 ||
+				if anchor != wantAnchor || len(target.Content) != 8 || githubYAMLLength(with) != 2 ||
 					githubYAMLValue(target, "name") != "Prepare NVKR runner and job parameters" ||
-					githubYAMLValue(target, "id") != githubContextStepID || githubYAMLValue(with, "action") != "${{ github.job }}" ||
+					githubYAMLValue(target, "id") != githubContextStepID ||
 					!strings.HasPrefix(artifact, "nvkr-exec-") {
-					t.Fatal("preparation alias changes its fixed helper delivery or current-job binding")
+					t.Fatal("preparation alias changes its fixed helper delivery")
 				}
 			}
 		}
@@ -354,7 +373,7 @@ func TestGitHubCompositesKeepCallerInputsOnExactInnerSteps(t *testing.T) {
 		}
 		for name, value := range step.With {
 			switch name {
-			case "parameters", "action", "runner-artifact":
+			case "parameters", "runner-artifact":
 				continue
 			case "with-path":
 				if value == "" {
@@ -690,5 +709,60 @@ func TestGitHubCompositesManifestOwnershipAndRetirement(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+func TestGitHubCompositeLiftsNonImageVariableOnExactStep(t *testing.T) {
+	const expression = "${{ vars.CATALOG_PROFILE }}"
+	original := []*yamlv3.Node{
+		githubYAMLMap("name", githubYAMLString("Consume profile"), "run", githubYAMLString("echo profile"), "env", githubYAMLMap("PROFILE", githubYAMLString(expression))),
+		githubYAMLMap("name", githubYAMLString("Reuse profile"), "run", githubYAMLString("echo same profile"), "env", githubYAMLMap("PROFILE", githubYAMLString(expression))),
+		githubYAMLMap("name", githubYAMLString("Unrelated operation"), "run", githubYAMLString("echo unrelated")),
+	}
+	steps := make([]*yamlv3.Node, len(original))
+	for i, step := range original {
+		steps[i] = githubInterfaceClone(step)
+	}
+	files := map[string][]byte{}
+	path := githubActionsDirectory + "jobs/non-image/part-1"
+	call, err := githubComposite(files, path, "Non-image variable", steps, "bash -e {0}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	arguments := githubYAMLField(call, "with")
+	if githubYAMLLength(arguments) != 2 || githubYAMLValue(arguments, "profile") != expression || githubYAMLField(call, "env") != nil {
+		t.Fatal("caller variable gained unrelated inputs or ambient scope")
+	}
+	var action yamlv3.Node
+	if err := yamlv3.Unmarshal(files[path+"/action.yml"], &action); err != nil {
+		t.Fatal(err)
+	}
+	body := action.Content[0]
+	if githubYAMLLength(githubYAMLField(body, "inputs")) != 2 {
+		t.Fatal("unexpected composite input set")
+	}
+	inner := githubYAMLField(githubYAMLField(body, "runs"), "steps")
+	if githubYAMLValue(githubYAMLField(inner.Content[0], "env"), "PROFILE") != "${{ inputs.profile }}" || githubYAMLValue(githubYAMLField(inner.Content[1], "env"), "PROFILE") != "${{ inputs.profile }}" || githubYAMLField(inner.Content[2], "env") != nil {
+		t.Fatal("variable escaped its original step")
+	}
+	expanded, err := expandGitHubSteps(&Plan{}, []*yamlv3.Node{call}, files, "bash -e {0}", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(expanded) != len(original) {
+		t.Fatal("expansion changed step count")
+	}
+	for i := range original {
+		want, err := encodeGitHubYAML(original[i])
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := encodeGitHubYAML(expanded[i])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("step %d variable roundtrip changed: %s", i, got)
+		}
 	}
 }

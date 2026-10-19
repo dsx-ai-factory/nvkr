@@ -238,6 +238,9 @@ func TestNativeSmokeExpectedStampBindings(t *testing.T) {
 			n.Env[1].Value = "bbbbbbbb"
 		}, e.CodeVerifyFailed},
 		{"exact full commit", func(n *ir.Node) { n.Env[1].Value = n.SourceCommit }, ""},
+		{"commit version", func(n *ir.Node) { n.Version = n.SourceCommit; n.Env[0].Value = n.SourceCommit }, ""},
+		{"wrong commit version", func(n *ir.Node) { n.Version = strings.Repeat("b", 40); n.Env[0].Value = n.Version }, e.CodeVerifyFailed},
+		{"prefixed commit version", func(n *ir.Node) { n.Version = n.SourceCommit; n.Env[0].Value = "v" + n.SourceCommit }, e.CodeVerifyFailed},
 		{"wrong version", func(n *ir.Node) { n.Env[0].Value = "v1.2.4" }, e.CodeVerifyFailed},
 		{"wrong commit", func(n *ir.Node) { n.Env[1].Value = "bbbbbbbb" }, e.CodeVerifyFailed},
 		{"weak prefix", func(n *ir.Node) { n.Env[1].Value = "aaaa" }, e.CodeVerifyFailed},
@@ -247,11 +250,13 @@ func TestNativeSmokeExpectedStampBindings(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			node := ir.Node{Kind: ir.KindBuild, Version: "1.2.3", SourceCommit: strings.Repeat("a", 40), Env: []ir.EnvVar{{Name: "NKECTL_VERSION", Value: "v1.2.3"}, {Name: "NKECTL_COMMIT", Value: "aaaaaaaa"}}}
 			tc.edit(&node)
-			_, _, err := expectedSmokeVersion(node, "nvkectl-version-json")
+			version, _, err := expectedSmokeVersion(node, "nvkectl-version-json")
 			if tc.code != "" {
 				assertCode(t, err, tc.code)
 			} else if err != nil {
 				t.Fatal(err)
+			} else if version != node.Env[0].Value {
+				t.Fatalf("expected version %q differs from frozen stamp %q", version, node.Env[0].Value)
 			}
 		})
 	}
@@ -503,6 +508,28 @@ func TestNativeSmokeReportRejectsIncompleteOrSubstitutedFields(t *testing.T) {
 	raw, err := report.Canonical()
 	if err != nil {
 		t.Fatal(err)
+	}
+	for _, profile := range []string{"kind-version", "clusterctl-version-json", "oras-version"} {
+		t.Run(profile+" commit shape", func(t *testing.T) {
+			var changed NativeToolSmokeReport
+			if err := canonical.UnmarshalExact(raw, &changed); err != nil {
+				t.Fatal(err)
+			}
+			member := &changed.Members[0]
+			member.Profile = profile
+			for _, commit := range []string{"", "abcdef12", strings.Repeat("a", 40)} {
+				member.ExpectedCommit, member.ObservedCommit = commit, commit
+				err := changed.Validate()
+				valid := (profile == "kind-version" && commit == "") || (profile != "kind-version" && len(commit) == 40)
+				if valid {
+					if err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					assertCode(t, err, e.CodeVerifyFailed)
+				}
+			}
+		})
 	}
 	for _, tc := range []struct {
 		name string

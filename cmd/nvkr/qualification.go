@@ -12,6 +12,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationorigin"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
 	"github.com/urfave/cli/v2"
 )
@@ -19,8 +20,10 @@ import (
 func qualificationRuntimeOptions(c *cli.Context) lifecycle.QualificationRuntimeOptions {
 	return lifecycle.QualificationRuntimeOptions{
 		GitHubToken: os.Getenv("NVKR_GITHUB_TOKEN"), WorkspaceRoot: c.String("workspace"),
-		Credential: sign.Credential{Registry: os.Getenv("NVKR_REGISTRY"), Username: os.Getenv("NVKR_REGISTRY_USER"), Password: os.Getenv("NVKR_REGISTRY_PASSWORD")},
-		Registry:   delivery.RegistryOptions{Username: os.Getenv("NVKR_REGISTRY_USER"), Password: os.Getenv("NVKR_REGISTRY_PASSWORD")},
+		CIStorageToken:    os.Getenv("NVKR_CI_STORAGE_TOKEN"),
+		CIStorageUsername: os.Getenv("NVKR_CI_STORAGE_USER"),
+		Credential:        sign.Credential{Registry: os.Getenv("NVKR_REGISTRY"), Username: os.Getenv("NVKR_REGISTRY_USER"), Password: os.Getenv("NVKR_REGISTRY_PASSWORD")},
+		Registry:          delivery.RegistryOptions{Username: os.Getenv("NVKR_REGISTRY_USER"), Password: os.Getenv("NVKR_REGISTRY_PASSWORD")},
 	}
 }
 
@@ -56,4 +59,36 @@ func cmdRunCheckArtifactsWithChecker(check qualificationRunChecker) *cli.Command
 			}
 			return checkErr
 		}}
+}
+
+// The generated adapter emits a descriptive commit locator; later stages still
+// reauthenticate the source and verify the original signed Plan and artifacts.
+func cmdQualificationSource() *cli.Command {
+	return &cli.Command{Name: "qualification-source", Hidden: true, Flags: []cli.Flag{&cli.StringFlag{Name: "policy"}}, Action: func(c *cli.Context) error {
+		if c.Args().Present() || c.String("policy") == "" {
+			return e.New(e.CodeUsage, "qualification-source requires --policy")
+		}
+		policy, err := lifecycle.LoadQualificationPolicy(c.Context, c.String("policy"))
+		if err != nil {
+			return err
+		}
+		provider := qualificationorigin.NewGitHub(os.Getenv("NVKR_GITHUB_TOKEN"))
+		source, err := provider.AuthenticateTriggeredSource(c.Context, policy.Source)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = source.Close() }()
+		description, err := source.Description()
+		if err != nil {
+			return err
+		}
+		raw, err := canonical.Marshal(description)
+		if err != nil {
+			return err
+		}
+		if _, err := c.App.Writer.Write(append(raw, '\n')); err != nil {
+			return e.Wrap(e.CodeInternal, err, "writing source description")
+		}
+		return nil
+	}}
 }

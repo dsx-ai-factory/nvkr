@@ -16,7 +16,10 @@ import (
 
 // executePackage admits every declared input before dispatching format-specific I/O.
 func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer) error {
-	output := artifacts[node.Outputs[0]]
+	output, err := signNodeOutput(node, artifacts, node.PackageKind)
+	if err != nil {
+		return err
+	}
 	inputs, err := packageInputs(plan, node, artifacts)
 	if err != nil {
 		return err
@@ -69,8 +72,14 @@ func packageInputs(plan *Plan, node Node, artifacts map[string]Artifact) ([]Arti
 func executeBinaryPackage(ctx context.Context, plan *Plan, output Artifact, inputs []Artifact) error {
 	files := make([]delivery.BinaryFileInput, 0, len(inputs))
 	for _, input := range inputs {
+		mode := uint32(0o755)
+		if input.Kind == "tarball" {
+			// The compiled producer type owns applicability; filesystem mode and
+			// filename suffixes must not promote runtime assets to executable tools.
+			mode = 0o644
+		}
 		files = append(files, delivery.BinaryFileInput{Name: input.Name, Path: input.Path,
-			InstallPath: "/usr/local/bin/" + input.Name, Mode: 0o755})
+			InstallPath: "/usr/local/bin/" + input.Name, Mode: mode})
 	}
 	_, err := delivery.BuildBinaryBundle(ctx, output.Path, delivery.BinaryBundleRequest{
 		OS: "linux", Arch: packageArch(plan, inputs), Purpose: output.Name, Files: files,

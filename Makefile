@@ -10,6 +10,9 @@ DEMO_TEST_BIN ?= bin/nvke-demo.test
 PKG         := ./...
 # Optional diagnostic flags, e.g. GO_TEST_FLAGS=-json for CI timing capture.
 GO_TEST_FLAGS ?=
+# Bound each package explicitly; the hosted factory suite can exceed Go's
+# implicit 10-minute default while still executing its ordinary contracts.
+GO_TEST_TIMEOUT ?= 20m
 # Dispatch is explicit about the repository: a checkout may have a fork and upstream.
 PIPELINE_DEV_REPO ?=
 export PIPELINE_DEV_REPO
@@ -101,7 +104,7 @@ vulncheck: go-version-check ## Check reachable Go vulnerabilities using the pinn
 
 .PHONY: test
 test: ## Fast default tests for CI and agents (no extended fixtures or instrumentation).
-	go test $(GO_TEST_FLAGS) $(PKG)
+	go test -timeout $(GO_TEST_TIMEOUT) $(GO_TEST_FLAGS) $(PKG)
 
 .PHONY: test-race
 test-race: ## Opt-in race detection and coverage for the default suite.
@@ -174,10 +177,11 @@ LICENSE_HOLDER     := NVIDIA CORPORATION & AFFILIATES
 LICENSE_IGNORES := -ignore '**/testdata/**' -ignore '**/pins.lock.yaml' \
 	-ignore '.github/workflows/nvkr-run.yml' -ignore '.github/workflows/nvkr-qualify.yml' \
 	-ignore '.github/workflows/nvkr-run-*.yml' \
+	-ignore '.github/workflows/nvkr-dev-qualify.yml' -ignore '.github/workflows/nvkr-dev-smoke.yml' \
 	-ignore '.github/workflows/nvkr-smoke.yml' -ignore '.github/workflows/nvkr-dev.yml' -ignore '**/*.tmpl' \
 	-ignore 'docs/evidence/**' -ignore 'docs/**/*.yaml' -ignore 'docs/**/*.yml' \
 	-ignore '.nvkr/**' -ignore '.nvkr-inputs/**' -ignore '.claude/**' -ignore 'bin/**'
-LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-(run(-[a-z0-9-]+)?|qualify|smoke|dev)\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
+LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-(run(-[a-z0-9-]+)?|qualify|smoke|dev(-qualify|-smoke)?)\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
 ADDLICENSE := go run github.com/google/addlicense@$(ADDLICENSE_VERSION)
 # addlicense walks every directory under its argument, including untracked ones
 # such as other worktrees, so hand it Git's file list instead of ".".
@@ -212,22 +216,43 @@ workflow-generator: go-version-check
 		-o bin/nvkr-exec ./cmd/nvkr
 
 .PHONY: workflows-check
-workflows-check: workflow-generator pipeline-dev-check ## Check committed producer, qualification and development bundles for drift.
+workflows-check: workflow-generator pipeline-dev-check catalog-refresh-check ## Check committed producer, qualification, development bundles and the catalog refresh workflow for drift.
 	@# Repeat the committed Plan's authored selection, including focused feature-branch
 	@# Definitions. The generator still authenticates the complete bundle and inputs.
 	@definition="$$(jq -er '.definitionPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
 	 environment="$$(jq -er '.environmentPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
 	 bin/nvkr-exec run generate --engine github \
 		--definition "$$definition" --environment "$$environment" \
-		--qualification-policy definitions/nvke-m2/qualification.yaml --root . --check
+		--qualification-policy inputs/policies/nvke-qualification.yaml --root . --check
 	bin/nvkr-exec run generate --engine github \
-		--definition definitions/nvke-nightly-arm64/definition.json \
-		--environment definitions/nvke-nightly-arm64/environment-github.json \
-		--root . --check
+		--definition inputs/definitions/demo/arm64-nvidia-kvm.json \
+		--environment inputs/environments/github-nightly-nvidia.json \
+		--root . --runtime --check
 	bin/nvkr-exec run generate --engine github \
-		--definition definitions/nvke-nightly-upstream-ovn-arm64/definition.json \
-		--environment definitions/nvke-nightly-upstream-ovn-arm64/environment-github.json \
-		--root . --check
+		--definition inputs/definitions/demo/arm64-upstream-kvm.json \
+		--environment inputs/environments/github-nightly-upstream.json \
+		--root . --runtime --check
+
+# The private NVKE source the installed catalog refresh workflow was rendered with.
+CATALOG_REFRESH_SOURCE ?= dsx-ai-factory/nvke:NKE_SOURCE_TOKEN
+
+.PHONY: catalog-refresh-check
+catalog-refresh-check: workflow-generator ## Check the installed catalog refresh workflow against `catalog update-ci`.
+	@# The installed file is generated, so it must equal the renderer's output for the
+	@# same source option and the canonical generator stamp. Regenerate it with
+	@# `make catalog-refresh-generate`; never edit the file by hand.
+	@rendered="$$(mktemp)" && trap 'rm -f "$$rendered"' EXIT && \
+	 bin/nvkr-exec catalog update-ci --source-checkout "$(CATALOG_REFRESH_SOURCE)" > "$$rendered" && \
+	 { diff -u .github/workflows/catalog-refresh.yaml "$$rendered" || { \
+	   echo "catalog-refresh.yaml differs from catalog update-ci output; regenerate it from the generator" >&2; exit 1; }; }
+
+.PHONY: catalog-refresh-generate
+catalog-refresh-generate: workflow-generator ## Regenerate the installed catalog refresh workflow with the canonical generator stamp.
+	@# Render to a temporary file and replace the installed workflow only after the renderer
+	@# succeeds: a refused render (source, stamp or closure admission) leaves it untouched.
+	@rendered="$$(mktemp .github/workflows/.catalog-refresh.XXXXXX)" && trap 'rm -f "$$rendered"' EXIT && \
+	 bin/nvkr-exec catalog update-ci --source-checkout "$(CATALOG_REFRESH_SOURCE)" > "$$rendered" && \
+	 chmod 0644 "$$rendered" && mv "$$rendered" .github/workflows/catalog-refresh.yaml
 
 .PHONY: workflows-generate
 workflows-generate: workflow-generator pipeline-dev-generate ## Regenerate producer, qualification and development bundles with their canonical generator stamp.
@@ -235,26 +260,28 @@ workflows-generate: workflow-generator pipeline-dev-generate ## Regenerate produ
 	 environment="$$(jq -er '.environmentPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
 	 bin/nvkr-exec run generate --engine github \
 		--definition "$$definition" --environment "$$environment" \
-		--qualification-policy definitions/nvke-m2/qualification.yaml \
+		--qualification-policy inputs/policies/nvke-qualification.yaml \
 		--root .
 	bin/nvkr-exec run generate --engine github \
-		--definition definitions/nvke-nightly-arm64/definition.json \
-		--environment definitions/nvke-nightly-arm64/environment-github.json --root .
+		--definition inputs/definitions/demo/arm64-nvidia-kvm.json \
+		--environment inputs/environments/github-nightly-nvidia.json --root .
 	bin/nvkr-exec run generate --engine github \
-		--definition definitions/nvke-nightly-upstream-ovn-arm64/definition.json \
-		--environment definitions/nvke-nightly-upstream-ovn-arm64/environment-github.json --root .
+		--definition inputs/definitions/demo/arm64-upstream-kvm.json \
+		--environment inputs/environments/github-nightly-upstream.json --root .
 
 .PHONY: pipeline-dev-generate
 pipeline-dev-generate: workflow-generator ## Regenerate the full feature-branch development pipeline.
 	bin/nvkr-exec run generate --engine github \
-		--definition definitions/nvke-m2/definition.yaml \
-		--environment definitions/nvke-m2/environment-github-dev.yaml --root .
+		--definition inputs/definitions/nvke/definition.yaml \
+		--environment inputs/environments/github-development.yaml \
+		--qualification-policy inputs/policies/nvke-development-qualification.yaml --root .
 
 .PHONY: pipeline-dev-check
 pipeline-dev-check: workflow-generator ## Check development workflow generation without changing files.
 	bin/nvkr-exec run generate --engine github \
-		--definition definitions/nvke-m2/definition.yaml \
-		--environment definitions/nvke-m2/environment-github-dev.yaml --root . --check
+		--definition inputs/definitions/nvke/definition.yaml \
+		--environment inputs/environments/github-development.yaml \
+		--qualification-policy inputs/policies/nvke-development-qualification.yaml --root . --check
 
 .PHONY: pipeline-dev-run
 pipeline-dev-run: pipeline-dev-check ## Dispatch the clean, pushed current branch (PIPELINE_DEV_REPO=owner/repo).

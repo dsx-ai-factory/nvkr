@@ -55,7 +55,7 @@ by hand. [Catalog refreshes](catalog-maintenance.md) covers coordinated updates 
 Use https://github.com/dsx-ai-factory/nvkr to follow only the quickstart's first
 hello-artifact build in a fresh workspace. Check prerequisites first, build and run
 that example, and report its local artifact and evidence limits. Do not continue
-into the NVKE tenant demo or publish anything.
+into the NVKE demo or publish anything.
 ```
 
 The [quickstart](quickstart.md#build-and-use-your-first-artifact) owns the prerequisites and commands.
@@ -86,5 +86,5 @@ Ask for the exact source revision, CLI version, input diff, checks, output ident
 blockers in the final report. A Plan or dry-run is `static-unqualified` (see [Concepts](user-concepts.md));
 release browsing is metadata inspection. Built bytes, signatures, supported `pipeline-attested`
 verification and qualification checks establish different facts. The [lifecycle guide](lifecycle.md)
-owns current checks, policies and supported verification scopes, including the limits of M3 qualification
+owns current checks, policies and supported verification scopes, including the limits of qualification
 and full-release acceptance.
