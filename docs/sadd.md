@@ -599,9 +599,9 @@ Interrupted private reads have at most three extraction attempts under one deadl
 resets admitted by ADR-18 restart from byte zero after response closure and checked staging cleanup;
 every attempt repeats complete chunk and archive verification. Independent failures cannot authorize a
 retry, and publication and signing remain outside this recovery boundary.
-Production partial retries admit earlier source attempts only within the same Run and preserve original
+Production and development partial retries admit earlier source attempts only within the same Run and preserve original
 transport bindings through restoration. Bounded same-name candidates all authenticate before selection
-of the newest source attempt; ties within an attempt fail closed. Development and explicit cross-Run transfers remain exact-attempt;
+of the newest source attempt; ties within an attempt fail closed. Explicit cross-Run transfers remain exact-attempt;
 release and qualification owners retain their separate invocation/evidence checks. Release finalizers use
 a bounded two-hour budget for setup, transport, authentication and final record uploads.
 Carrier and GHCR publication admission use the automatic repository token for source metadata, separately

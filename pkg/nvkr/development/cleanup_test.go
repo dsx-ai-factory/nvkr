@@ -30,6 +30,7 @@ type cleanupFixture struct {
 	recheckPackage func(*cleanupPackage)
 	recheckJSON    json.RawMessage
 	recheckRun     func(*cleanupRun)
+	latestRun      func(*cleanupRun)
 	deletes        []string
 	requests       int
 	runReads       int
@@ -100,6 +101,12 @@ func (fixture *cleanupFixture) serve(t *testing.T, writer http.ResponseWriter, r
 			_, _ = fmt.Sscan(request.URL.Query().Get("page"), &page)
 			payload = fixture.versionPage(page)
 		}
+	case request.URL.Path == "/repos/example/project/actions/runs/100":
+		run := fixture.run
+		if fixture.latestRun != nil {
+			fixture.latestRun(&run)
+		}
+		payload = run
 	case strings.HasPrefix(request.URL.Path, "/repos/example/project/actions/runs/"):
 		fixture.runReads++
 		if request.URL.Path != "/repos/example/project/actions/runs/100/attempts/1" {
@@ -155,6 +162,15 @@ func TestCleanupAdmitsOnlyExpiredCompleteDevelopmentAttempts(t *testing.T) {
 		code   e.Code
 	}{
 		{"success", nil, 1, ""},
+		{"active retry retains original packages", func(f *cleanupFixture) {
+			f.latestRun = func(r *cleanupRun) { r.Attempt = 2; r.Status = "in_progress"; r.Conclusion = "" }
+		}, 0, ""},
+		{"recent retry retains original packages", func(f *cleanupFixture) {
+			f.latestRun = func(r *cleanupRun) { r.Attempt = 2; r.UpdatedAt = f.now.Add(-time.Hour) }
+		}, 0, ""},
+		{"expired retry", func(f *cleanupFixture) {
+			f.latestRun = func(r *cleanupRun) { r.Attempt = 2 }
+		}, 1, ""},
 		{"failed partial publication", func(f *cleanupFixture) { f.run.Conclusion = "failure" }, 1, ""},
 		{"canceled partial publication", func(f *cleanupFixture) { f.run.Conclusion = cleanupCanceledConclusion }, 1, ""},
 		{"user account", func(f *cleanupFixture) { f.repo.Owner.Type = "User"; f.packages[0].Owner.Type = "User" }, 1, ""},

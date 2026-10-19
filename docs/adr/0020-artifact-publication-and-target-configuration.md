@@ -644,15 +644,19 @@ as `<prefix>/runs/<run-id>/attempts/<attempt>/<repository-leaf>` from the admitt
 revalidating source repository, dev workflow identity and canonical positive run/attempt IDs. No GitHub
 expression is interpolated into the committed Plan. The Plan binds the policy and route leaves; the runtime
 projection changes only transport location. Every publication, signing and verification boundary checks the
-same projection, and metadata authentication rejects another run or attempt's root. Existing subject,
+same namespace grammar; metadata authentication admits only current or earlier attempts of the same run. Existing subject,
 Plan, invocation, SBOM and signature checks remain mandatory. Native output digests and logical Build identity
 are unchanged. Helm aliases remain scoped inside that attempt's output repository.
 
-Full development retries rerun all jobs or start a fresh dispatch. They intentionally cannot reuse an
-older attempt's disposable roots, unlike the existing production same-run recovery rule. Each attempt owns
-its output roots, aggregate root, output bytes, signatures and referrers in separate packages. Partial or
-cancelled attempts therefore leave bounded, independently discoverable cleanup scope without requiring a
-successful final Run record.
+Development and production support failed-job and full-workflow retries within the same immutable GitHub
+run. Retained work keeps its original source request, publication location, preparation and signing
+invocations. New publication work uses the current attempt's namespace; signing and verification can
+consume earlier immutable references after exact Plan, named-output and evidence checks. Assembly may
+join outputs from different attempts of that run and records each original origin. Other runs, future
+attempts, changed inputs and incomplete evidence fail closed. Qualification reauthenticates the full
+closure against the successful completion attempt; it never treats a prior success flag as authority.
+Each attempt's packages remain independently discoverable for cleanup. Expired or deleted inputs require
+rebuilding the affected dependency closure; a fresh dispatch does not implicitly reuse another run.
 
 The fixed `github:NVKR_DEV_REGISTRY_WRITE` reference selects only the dedicated development publisher.
 Generated publishing/signing jobs use that secret and `NVKR_DEV_REGISTRY_WRITE_USER`; verification,
@@ -665,7 +669,7 @@ Only artifact signing and SBOM attestation receive OIDC. The distinct default-br
 holds the cleanup token; branch execution receives no deletion credential.
 
 Development qualification may attach its distinct predicate to existing immutable output subjects in the
-selected successful source attempt's namespace. It never rebuilds or republishes their payloads, changes
+selected successful source run's original publication namespaces. It never rebuilds or republishes their payloads, changes
 aliases, or writes production qualification predicates. The final qualifier uses the dedicated development
 writer; native smoke uses the reader. Original producer signatures and complete artifact verification are
 required before qualification signing. Attachments are disposable with their subject packages. Qualification
@@ -675,11 +679,11 @@ available. Concurrent cleanup or expired inputs cause failure, not a bypass or a
 The development cleanup owner supports read-only preview by default and explicit apply. It inventories
 private GHCR container packages under only the exact reserved namespace, authenticates account/package identity
 and the matching `nvkr-dev.yml` manual-dispatch attempt, and requires completion plus at least 24 hours
-of age for that attempt, its package and every version. Source-repository linkage on package metadata is
+of age for that attempt, the latest attempt of the same run, its package and every version. Source-repository linkage on package metadata is
 not proof of ownership and is not required: preserved native images can carry upstream annotations.
 The reserved namespace policy plus authenticated provider account, package and attempt checks determine
 cleanup scope. Ambiguous names, malformed/unknown run records, incomplete inventories or API errors fail
-closed. Active or young attempts are retained. All candidate admission precedes deletion; each candidate's
+closed. An active or young latest attempt retains all original packages of that run. All candidate admission precedes deletion; each candidate's
 package/version metadata and run eligibility are rechecked immediately before deleting that whole package.
 
 The handwritten repository cleanup workflow uses only default-branch code, a separate protected
@@ -692,8 +696,9 @@ after an ambiguous outcome. Calls, response sizes and pagination are bounded and
 The 24-hour age is eligibility, not an exact expiry SLA. GitHub's deletion/restoration and physical garbage
 collection remain provider behavior; Sigstore transparency records remain external and are not erased.
 Production packages, old shared prefixes and arbitrary registries are outside this protocol. The protocol
-assumes deleted attempt namespaces are never repopulated by an external writer; development retries
-always obtain a new attempt namespace. Provider ACL enforcement and successful real deletion require
+assumes deleted attempt namespaces are never repopulated by an external writer. Retry publication writes
+new namespaces while signatures may attach to retained earlier subjects. Cleanup cannot reserve packages
+against a retry starting after its final provider check; a missing subject fails closed. Provider ACL enforcement and successful real deletion require
 separate external evidence.
 
 ### 7. Operator release registration — deferred

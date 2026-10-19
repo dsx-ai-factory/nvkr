@@ -12,7 +12,7 @@ import (
 	yamlv3 "go.yaml.in/yaml/v3"
 )
 
-func TestPrivateStageRestoreRejectsDevelopmentRetryBeforeIO(t *testing.T) {
+func TestPrivateStageRestoreAdmitsDevelopmentRetryButRejectsUnknownStage(t *testing.T) {
 	for _, fixture := range []struct {
 		name string
 		plan func(*testing.T) *Plan
@@ -21,7 +21,7 @@ func TestPrivateStageRestoreRejectsDevelopmentRetryBeforeIO(t *testing.T) {
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
 			err := RestoreGitHubPrivateInputs(t.Context(), fixture.plan(t), "unused", cistore.Request{}, "/missing", cistore.Options{AllowEarlierAttempts: true}, GitHubStepOptions{})
-			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
 		})
 	}
 }

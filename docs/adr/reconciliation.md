@@ -298,7 +298,7 @@ with its overall verdict failed and no check receipt. Previously completed artif
 actual results; successful reports keep their existing six-check shape. First/final evidence-callback
 revocation fixtures cover this diagnostic boundary, not external provider acceptance.
 
-For production, the successful authenticated source attempt anchors producer completion. Root/output predicates and
+For production and development, the successful authenticated source attempt anchors producer completion. Root/output predicates and
 publication origins may retain earlier attempts of that same workflow run under ADR-20's retry contract.
 The same builder and exact Plan/input bindings remain mandatory. Output preparation precedes or equals
 output signing, which precedes or equals aggregate assembly; aggregate assembly precedes or equals root
@@ -1056,21 +1056,24 @@ Source and pinned-toolchain read credentials retain their separate fixed prepara
 Provider pool/credential/ACL configuration is an external prerequisite, not established by rendering.
 
 The factory owner derives registry targets beneath the current run and attempt without mutating committed
-Plan bytes or Build identity. Subject/reference, metadata and predicate checks reject another attempt's
-publication. Production authenticated earlier-attempt reuse is unchanged; development retries rerun all
-jobs or dispatch a complete new Run. Signed-development helpers/carriers and all final Run records retain
+Plan bytes or Build identity. Development now uses production's same-run retry contract: retained
+subjects, controls and predicates keep their original attempt bindings; new publication work uses the
+current attempt. Other runs, future attempts and changed Plans remain rejected. Development qualification
+selects bounded provider-authenticated metadata candidates and rechecks the full original closure.
+These retry changes have regression coverage authored; local test execution is skipped at the user's
+request and hosted validation remains pending. Signed-development helpers/carriers and all final Run records retain
 seven days; disk diagnostics retain one day. Full signed development is non-canceling.
 
 The development cleanup module inventories only private packages in that reserved attempt namespace.
 It authenticates account, package and exact completed workflow-attempt metadata; package, version and
-attempt timestamps must all be at least 24 hours old. It rechecks before whole-package deletion, fails
+original and latest attempt timestamps must all be at least 24 hours old. It rechecks before whole-package deletion, fails
 closed on unknown/ambiguous/API state, and records confirmed partial progress without retrying ambiguous
 mutation. Preview is the default. The separate daily cleanup workflow executes only default-branch code
 with a cleanup-only credential; it never loads branch executables or downloaded artifacts. Production and
 older unscoped packages remain outside this protocol.
 
 Definition/factory contracts cover admission, identity, complete M2 graph retention, exact rendering,
-credential/environment scope, retention, runtime namespace projection and cross-attempt rejection.
+credential/environment scope, retention, runtime namespace projection and same-run retry admission.
 Cleanup API fixtures cover eligibility, authentication errors, pagination, races and mutation failures;
 workflow contracts enforce default-branch scheduling and secret scope. The dispatch helper retains its
 clean/current pushed-commit preflight. These tests do not establish live GitHub execution, actual credential
@@ -1859,7 +1862,7 @@ same-Run source attempts no later than the consumer, preserving original locator
 ordinary and nested restoration. Same-name retry candidates are bounded and all authenticate before
 selecting the newest source attempt; tied source attempts and incomplete listings fail closed.
 Generated fetch and restore commands disable reuse whenever an explicit Run is supplied.
-Development, explicit cross-Run and direct store APIs stay exact-attempt.
+Development transfers now use the same retry selection. Explicit cross-Run and direct store APIs stay exact-attempt.
 The review follow-up adds regression cases for candidate ordering, ties, future/corrupt candidates and
 truncated listings; local execution of these new tests is intentionally skipped pending hosted CI.
 Focused contracts reproduce the old rejection and cover private payloads, public metadata, mixed source

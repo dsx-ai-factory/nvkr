@@ -42,7 +42,10 @@ func authenticateReferenceMetadata(ctx context.Context, plan *Plan, route Route,
 	if err != nil {
 		return fail(err)
 	}
-	if subject.Ref != target.Ref+"@"+subject.Digest {
+	if err := admitDevelopmentSubject(plan, route.Target, subject); err != nil {
+		return fail(err)
+	}
+	if !plan.Environment.GitHubDevelopment && subject.Ref != target.Ref+"@"+subject.Digest {
 		return fail(e.New(e.CodeVerifyFailed, "publication differs from planned repository"))
 	}
 	signed, err := readSigningRecord(ctx, artifacts["signature/"+route.Name].Path)
@@ -97,9 +100,13 @@ func authenticateReferenceMetadata(ctx context.Context, plan *Plan, route Route,
 			continue
 		}
 		origin := object.Output.Publication
-		target, err := runtimeTarget(plan, outputPublicationRoute(object.Name))
-		if err != nil || !strings.HasPrefix(origin.Ref, target.Ref+"@") {
+		target, found := plan.Targets[outputPublicationRoute(object.Name)]
+		repository, _, pinned := strings.Cut(origin.Ref, "@")
+		if !found || !pinned || delivery.ValidatePublicationReference(origin.Ref) != nil {
 			return fail(e.New(e.CodeVerifyFailed, "output origin differs from planned publication repository"))
+		}
+		if err := validateQualificationOutputRepository(plan, target, repository, metadata.InvocationID); err != nil {
+			return fail(err)
 		}
 		if err := admitPlanReferenceInvocation(plan, origin.PreparedInvocationID, origin.SignedInvocationID); err != nil {
 			return fail(err)

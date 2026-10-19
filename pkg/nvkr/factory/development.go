@@ -122,16 +122,32 @@ func admitDevelopmentSubject(plan *Plan, targetName string, subject sign.Subject
 	if err != nil {
 		return err
 	}
-	if subject.Ref != target.Ref+"@"+subject.Digest {
-		return e.New(e.CodeVerifyFailed, "development publication subject differs from this run attempt's target")
+	repository, digest, ok := strings.Cut(subject.Ref, "@")
+	if !ok || digest != subject.Digest {
+		return e.New(e.CodeVerifyFailed, "development publication subject differs from its digest")
+	}
+	namespace, err := development.ParseNamespace(plan.Environment.Publication.RepositoryPrefix)
+	if err != nil {
+		return err
+	}
+	current, err := namespace.ParseReference(target.Ref)
+	if err != nil {
+		return err
+	}
+	invocation := "https://github.com/" + namespace.Repository() + "/actions/runs/" + current.RunID() + "/attempts/" + current.Attempt()
+	if err := validateQualificationOutputRepository(plan, plan.Targets[targetName], repository, invocation); err != nil {
+		return e.Wrap(e.CodeVerifyFailed, err, "development subject differs from its same-run publication scope")
 	}
 	return nil
 }
 
-func admitPlanReferenceInvocation(plan *Plan, candidate, current string) error {
-	if plan.Environment.GitHubDevelopment && candidate != current {
-		return e.New(e.CodeVerifyFailed, "development publication cannot reuse another run attempt; dispatch the complete workflow again")
-	}
+func admitPlanReferenceInvocation(_ *Plan, candidate, current string) error {
+	return admitReferenceInvocation(candidate, current)
+}
+
+// ValidatePublicationInvocation checks same-run, non-future attempt scope.
+// It grants no authority without exact Plan, subject and signature verification.
+func ValidatePublicationInvocation(candidate, current string) error {
 	return admitReferenceInvocation(candidate, current)
 }
 
@@ -148,8 +164,8 @@ func admitDevelopmentMetadata(plan *Plan, inspection delivery.Inspection) error 
 		return err
 	}
 	metadata := inspection.Root.Release
-	if metadata == nil || metadata.PlanDigest != digest || metadata.EnvironmentDigest != plan.EnvironmentDigest || metadata.DefinitionDigest != plan.DefinitionDigest || metadata.InvocationID != run.InvocationID() {
-		return e.New(e.CodeVerifyFailed, "development publication metadata differs from this exact Plan and run attempt")
+	if metadata == nil || metadata.PlanDigest != digest || metadata.EnvironmentDigest != plan.EnvironmentDigest || metadata.DefinitionDigest != plan.DefinitionDigest {
+		return e.New(e.CodeVerifyFailed, "development publication metadata differs from this exact Plan")
 	}
-	return nil
+	return admitReferenceInvocation(metadata.InvocationID, run.InvocationID())
 }

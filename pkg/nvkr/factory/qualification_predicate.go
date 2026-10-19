@@ -13,8 +13,7 @@ import (
 
 // ValidateProductionPredicate compares a descriptive predicate with the exact
 // admitted Plan and externally authenticated producing workflow run. Production
-// retries retain earlier same-run predicates; development requires the exact
-// source attempt. Publication-origin checks must additionally bind the predicate
+// and development retries retain earlier same-run predicates. Publication-origin checks must additionally bind the predicate
 // to the exact selected metadata.
 // Only a subsequent signature verification authenticates these predicate bytes.
 func ValidateProductionPredicate(raw []byte, plan *Plan, builder, invocation string) error {
@@ -37,7 +36,7 @@ func ValidateProductionPredicate(raw []byte, plan *Plan, builder, invocation str
 // ValidateQualificationRootInvocation checks the original aggregate preparation
 // and signing against the selected successful source attempt. These descriptive
 // bindings grant no authority without exact Plan and signature verification.
-// Development requires preparation, signing and consumption in the same attempt.
+// Both lanes preserve preparation <= signing <= consumption within one run.
 func ValidateQualificationRootInvocation(raw []byte, plan *Plan, prepared, consuming string) error {
 	if plan == nil {
 		return e.New(e.CodeProvenanceMissing, "qualification root requires an exact Plan")

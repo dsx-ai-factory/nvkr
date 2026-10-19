@@ -297,7 +297,7 @@ Production hosted qualification takes one independently selected policy; its sou
 `workflow_run` event and provider API. Native cosign byte pins are independent of producer tool selection.
 The pinned release version is a bootstrap download locator, never authority in place of those byte pins.
 
-For production, the authenticated successful source attempt is the completion boundary for the producer workflow run.
+For production and development, the authenticated successful source attempt is the completion boundary for the producer workflow run.
 Root and output production predicates may name current or earlier attempts of that same run under ADR-20's
 publication retry contract. The repository, server, workflow builder and exact Plan/input bindings must
 match. Output preparation must precede or equal its signing, which must precede or equal aggregate assembly;
@@ -392,13 +392,13 @@ inputs and recovers its original public metadata controls. A production handoff 
 separate path. Recovery supplies descriptions only: the same artifact verification, native tool smoke,
 complete-set receipts, signing and attachment read-back remain mandatory. Source and qualifier branches
 may differ; both exact commits and invocations are retained without relabeling the original build.
-The development publication remains bound to one exact source attempt. Within a qualification run,
+Development publications retain their original namespaces and attempt bindings within the same source run. Within a qualification run,
 successful native workers may be retained from earlier attempts under the same worker-retry checks above;
 original branch, source, policy, artifact and certificate bindings remain mandatory.
 
 Development evidence uses `nvkr.dev/development-qualification-evidence/v1`, gate
 `nvkr.dev/development-qualification-gate/v1` and the separate predicate registered in ADR-01. Every subject
-must remain inside the original source Run/attempt namespace. The production decoder and publisher reject
+must remain inside its original publication namespace of the selected source Run, no later than completion. The production decoder and publisher reject
 development evidence and receipts. Development success grants no production acceptance, reproduction,
 full disk inspection or external-suite acceptance. Hosted execution remains separately evidenced.
 

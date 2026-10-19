@@ -126,8 +126,11 @@ func developmentQualificationCandidate(ctx context.Context, plan *factory.Plan, 
 		return QualificationCandidate{}, err
 	}
 	metadata := inspection.Root.Release
-	if metadata == nil || metadata.PlanDigest != digest || metadata.DefinitionDigest != plan.DefinitionDigest || metadata.EnvironmentDigest != plan.EnvironmentDigest || metadata.InvocationID != origin.InvocationID {
+	if metadata == nil || metadata.PlanDigest != digest || metadata.DefinitionDigest != plan.DefinitionDigest || metadata.EnvironmentDigest != plan.EnvironmentDigest {
 		return QualificationCandidate{}, e.New(e.CodeVerifyFailed, "development metadata differs from exact source Plan and invocation")
+	}
+	if err := factory.ValidatePublicationInvocation(metadata.InvocationID, origin.InvocationID); err != nil {
+		return QualificationCandidate{}, err
 	}
 	outputs, err := delivery.MetadataOutputs(inspection.Root)
 	if err != nil {
@@ -181,8 +184,7 @@ func admitDevelopmentQualificationReference(reference string, origin qualificati
 	if err != nil {
 		return err
 	}
-	if parsed.RunID() != origin.RunID || parsed.Attempt() != origin.Attempt {
-		return e.New(e.CodeVerifyFailed, "development qualification reference belongs to a different source attempt")
-	}
-	return nil
+	candidate := "https://github.com/" + namespace.Repository() + "/actions/runs/" + parsed.RunID() + "/attempts/" + parsed.Attempt()
+	current := "https://github.com/" + namespace.Repository() + "/actions/runs/" + origin.RunID + "/attempts/" + origin.Attempt
+	return factory.ValidatePublicationInvocation(candidate, current)
 }
