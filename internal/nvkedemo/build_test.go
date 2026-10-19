@@ -260,11 +260,11 @@ func TestPreparedInvocationUsesSelectedAuthoredDefinition(t *testing.T) {
 		mode, definition string
 		valid            bool
 	}{
-		{"ovn", "arm64-nvidia-tcg.json", true},
-		{"kind-calico", "arm64-nvidia-tcg.json", true},
-		{"upstream-ovn", "arm64-upstream-tcg.json", true},
-		{"upstream-ovn", "arm64-nvidia-tcg.json", false},
-		{"ovn", "arm64-upstream-tcg.json", false},
+		{"ovn", "arm64-nvidia-local-kvm.json", true},
+		{"kind-calico", "arm64-nvidia-local-kvm.json", true},
+		{"upstream-ovn", "arm64-upstream-local-kvm.json", true},
+		{"upstream-ovn", "arm64-nvidia-local-kvm.json", false},
+		{"ovn", "arm64-upstream-local-kvm.json", false},
 	} {
 		t.Run(test.mode+"/"+test.definition, func(t *testing.T) {
 			cfg := BuildConfig{Repository: privateTestDir(t), AttemptPrefix: "fresh", Jobs: 4, Network: test.mode}
@@ -287,7 +287,7 @@ func TestUpstreamBuildPreparationKeepsExplicitMode(t *testing.T) {
 	dir := privateTestDir(t)
 	cfg := BuildConfig{Repository: dir, AttemptPrefix: "fresh", Jobs: 4, Network: "upstream-ovn"}
 	args := preparedInvocationFixture(cfg)
-	args[4] = "inputs/definitions/demo/arm64-upstream-tcg.json"
+	args[4] = "inputs/definitions/demo/arm64-upstream-local-kvm.json"
 	writeInvocationFixture(t, cfg, args)
 	log, script := filepath.Join(dir, "calls"), filepath.Join(dir, "launcher.sh")
 	if err := os.WriteFile(script, []byte("#!/bin/sh\nprintf 'prepare:%s\\n' \"$*\" >>\"$CALLS\"\n"), 0700); err != nil {
@@ -309,7 +309,7 @@ func TestUpstreamBuildPreparationKeepsExplicitMode(t *testing.T) {
 
 func preparedInvocationFixture(cfg BuildConfig) []string {
 	root := ".nvkr/laptop-bootstrap/" + cfg.AttemptPrefix
-	return []string{root + "/nvkr", "run", "local", "--definition", root + "/definition.json", "--environment", "inputs/environments/local-arm64-tcg.json", "--attempt", cfg.AttemptPrefix, "--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", "4", "--runtime", "docker", "--capture-inputs-root=.", "--ui=plain"}
+	return []string{root + "/nvkr", "run", "local", "--definition", root + "/definition.json", "--environment", "inputs/environments/local-arm64-kvm.json", "--attempt", cfg.AttemptPrefix, "--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", "4", "--runtime", "docker", "--capture-inputs-root=.", "--ui=plain"}
 }
 
 func writeInvocationFixture(t *testing.T, cfg BuildConfig, args []string) {
@@ -472,7 +472,7 @@ func TestBuildAttemptDiagnostics(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
 		t.Skip("artifact build admission requires native Linux ARM64")
 	}
-	for _, root := range []string{"runs", "laptop-bootstrap"} {
+	for _, root := range []string{"runs", "laptop-bootstrap", "native-tools/runs"} {
 		for _, blockedParent := range []bool{false, true} {
 			t.Run(root+map[bool]string{false: "/existing", true: "/not-directory"}[blockedParent], func(t *testing.T) {
 				repo := privateTestDir(t)

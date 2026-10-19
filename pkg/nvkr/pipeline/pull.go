@@ -211,7 +211,7 @@ func downloadReleaseExecutableWithClient(ctx context.Context, node ir.Node, root
 	if held.Digest() != node.ExecutableArchive.Digest {
 		return "", 0, e.New(e.CodeVerifyFailed, "release carrier digest %s does not match pinned %s", held.Digest(), node.ExecutableArchive.Digest)
 	}
-	member, err := releaseasset.SelectTarGzip(ctx, io.NewSectionReader(held, 0, held.Size()), node.ExecutableArchive.Member, releaseasset.ToolLimits())
+	member, err := releaseasset.Select(ctx, held, held.Size(), node.ExecutableArchive.Format, node.ExecutableArchive.Member, releaseasset.ToolLimits())
 	if err != nil {
 		return "", 0, err
 	}

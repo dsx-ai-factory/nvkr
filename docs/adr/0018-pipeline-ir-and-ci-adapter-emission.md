@@ -255,8 +255,11 @@ file artifacts; trusted selection summaries and runner logs remain diagnostic. T
 attaches only its constructed cycle summary, never unvalidated raw suite report files. These limits are not SLSA
 Build L3 or qualified execution claims.
 
-The explicit diagnostic `validate` route is separate from generated producer execution. It is Linux-only
-and executes authenticated, held tool bytes on the host with the selected embedded kubeconfig. Private
+The explicit diagnostic `validate` route is separate from generated producer execution. Published-source
+validation remains Linux-only with sealed executable descriptors. Captured-local-Run validation also
+admits Darwin ARM64 tools using private executable snapshots checked before/after commands; this
+local pathname execution does not provide Linux sealing against a hostile same-user writer. Both
+execute authenticated tool bytes on the host with the selected embedded kubeconfig. Private
 workspaces, pinned descriptors, bounded output, restricted environment and process cancellation/join
 protect capture and lifecycle; they provide no filesystem, network, privilege or container sandbox.
 The cluster endpoint can be remote: local/disposable acknowledgement is an operator declaration, not
@@ -556,8 +559,19 @@ Isolation and the fixed environment/mount contract are identical across all engi
   happens to match UID 1000. A fixed, offline preparation stage preserves source modes and changes ownership
   only inside those volumes. It runs no producer command, mounts no host source or runtime socket, and grants
   the build no root privilege. The producer mounts source read-only; declared output is returned through bounded
-  archive transport before ordinary host collection. Preparation, transfer and failure paths own bounded cleanup. Run
-  scheduler records reference the exact embedded producer instruction; network, container and platform are
+  archive transport before ordinary host collection. Preparation, transfer and failure paths own bounded cleanup.
+  Each preparation staging operation (capacity admission, packing, holding/hashing, each volume creation,
+  helper creation and authenticated copying) has its own five-minute allowance. Helper start,
+  explicit exit observation, diagnostics and removal each receive a separate two-minute RPC budget derived
+  from the original caller context. Earlier caller deadlines and cancellation bound every phase; one RPC
+  cannot consume the next operation's allowance. The nine staging and four completion allowances total
+  fifty-three minutes before existing bounded failure diagnostics, child-process joining and owned cleanup;
+  this is not a hard kernel-I/O
+  return deadline. Descriptive transport logs retain the operation count, allowance and measured held-archive
+  byte sizes, without private paths. No RPC retries producer or runtime work. The local scheduler records
+  the first worker error before canceling its batch and joins all workers before returning it; original caller
+  cancellation still takes precedence. Run scheduler records reference the exact embedded producer instruction;
+  network, container and platform are
   resolved from that instruction at execution or rendering, never serialized a second time. A future qualified
   pipeline emitter must reject this mode rather than silently render it as a network-denied build.
 - `prebuilt` nodes lower to acquire-and-digest-verify.
@@ -624,12 +638,67 @@ already-open workspace-directory capability. The helper duplicates that descript
 protected by the runtime, checks effective write and traversal access, observes host platform, process CPU
 affinity capped by the complete cgroup-v2 quota ancestry, host-available memory capped by complete cgroup-v2
 headroom, available workspace capacity and KVM API exposure, then closes every retained
-workspace and KVM handle before returning. It never resolves a replaceable workspace pathname. Non-Linux hosts
-reject the observation.
+workspace and KVM handle before returning. It never resolves a replaceable workspace pathname.
+
+The diagnostic host-platform domain additionally admits Darwin ARM64 with an explicit `hvf` capability.
+Darwin classes cannot advertise KVM, and Linux classes cannot advertise HVF. The Darwin observer retains the
+workspace descriptor and reads effective access and available filesystem space through that handle. It reads
+logical CPU count and kernel hypervisor availability through native sysctls. Bounded, locale-fixed `vm_stat`
+output supplies free, inactive and speculative page counts; their sum is a reclaimable-memory estimate,
+checked against physical RAM, not a reservation or pressure policy. Purgeable pages are not added because
+those pages overlap other queues. Native command cancellation and join use the existing process owner.
+HVF observation establishes kernel availability; it does not establish a selected QEMU executable's
+Hypervisor entitlement or a successful VM launch. Other host platforms reject observation. This diagnostic
+extension does not by itself admit source compilation, hosted execution or signing.
 
 This helper accepts neither an execution request nor a selected binding. It does not authenticate Environment
 membership or deterministic selection, own or enforce an execution deadline, reserve observed resources, prove a
 provider allocation, or authorize execution.
+
+The explicit captured-local-Run conformance diagnostic also admits native Darwin ARM64 tools.
+It retains authenticated executable bytes, copies each selected tool once to a private executable
+snapshot, and checks the snapshot inode, mode, size and digest before and after commands.
+A separate owner-only kubeconfig snapshot belongs to each command. Owned process-group
+cancellation and join precede snapshot cleanup. The same upstream suite and original-report
+capture run on both hosts; conformance images remain Linux OCI subjects. This local diagnostic
+has the pathname-execution limitation described below and issues no qualification receipt.
+Published-source validation and global held-executable/signing admission stay Linux-only.
+
+The existing direct-Packer driver separates host mechanics through one private execution-class interface.
+Validation/build arguments, authenticated material staging, plugin closure, exact output collection and
+toolchain lifetime stay shared. Linux retains its sealed executable descriptors and held-directory procfs
+paths. The Mac implementation uses digest-pinned, read-only private Mach-O executable snapshots, a private
+PATH/plugin closure and the existing owned-process cancellation/join helper. Noninteractive Mac Packer
+commands run in a private session without the caller's controlling terminal, retaining their private group
+for cancellation and join. It validates the native executable
+architecture and rejects KVM or cross-architecture HVF. TCG remains explicit. Snapshot verification before and
+after commands detects substitution between operations; pathname execution on Mac does not provide Linux's
+sealed-descriptor guarantee against a hostile same-UID process. Dynamic-loader/library realization remains an
+outer toolchain responsibility. This implementation is restricted to local unqualified execution; qualified
+subprocess and signing boundaries are unchanged. Shared driver contracts and a pinned native Packer version
+probe exercise this primitive. The local factory resolver can instead authenticate an existing local binary
+bundle by its exact semantic digest, host platform and `packer-toolchain` purpose. The independently selected
+Environment supplies only the local layout and bundle name in `runtime.nativeToolchains`; the map key must
+be the exact toolchain digest frozen in the Plan. Bundle roles identify Packer, declared host tools and the
+private plugin closure. Source/material admission, runtime deadline, output observation and cleanup use the
+existing Run/session path. The native driver retains a declared acquisition carrier from the same build's
+private output tree before cleanup, using the shared resource limit and material archive validator. Missing,
+malformed, symlinked or over-budget carriers reject the disk output; closing that output revokes its carrier.
+Native execution requires explicit producer-declared host networking; it does not
+claim network isolation. A session cannot mix native and container toolchains. Hosted rendering rejects this
+local configuration before output. A controlled native session test covers exact-node binding, host admission,
+source/material handoff and output collection, but is not evidence of a fresh Mac QCOW Run, deployment or
+conformance. Local `native-go` source compilation is separately admitted under ADR-10 with an independently
+measured installed SDK/compiler, private source/caches, and explicit host-network semantics. It cannot
+render hosted jobs, sign, publish, or claim qualified execution. Full demo dependency and runtime acceptance
+remain unverified.
+
+Apple's platform-signed `/usr/bin/ssh-keygen` cannot be relocated into a private executable snapshot. The Mac
+adapter admits only this exact root-owned system path with root-owned, non-writable parent directories and
+bytes matching the selected bundle pin. It rechecks that condition before and after commands. Other tools
+retain private snapshots. This explicitly trusts the installed system owner and changes no SIP, signing or
+global security setting. The pinned tool generates and validates private attempt-local SSH keys when the
+producer declares those bindings; keys are removed with the owned execution tree.
 
 The local VM admission primitive builds on the same observer without promoting diagnostic values into durable
 evidence. The factory owner validates the complete Plan and identifies one exact `vm-image` build. An opaque,
@@ -798,6 +867,12 @@ through `pipeline.NodeSession`, and cancels and joins pending operations on fail
 `factory.ExecuteNode`; hosted source fetch delegates through a private factory source owner to the same producer primitive. Neither path converts a whole producer
 report into a second scheduling result model.
 Source receipts remain reusable; result slots and completeness still belong to each exact named output.
+
+Authenticated source patches are checked, applied and reverse-checked by Git in the private build snapshot.
+Each Git child uses a fixed creation mask of `022`, without changing the parent process's mask, so newly
+created executable files, ordinary files and parent directories do not depend on the operator's mask.
+Unchanged admitted source modes remain intact. Exact patch bytes and the resulting filesystem closure,
+including its actual modes, remain part of source authentication; this is not a new patch parser or receipt lane.
 The generated Plan is the single executable input document; separate per-build graph files are retired.
 
 An unqualified local Plan may select both direct-Packer disks and ordinary outputs.

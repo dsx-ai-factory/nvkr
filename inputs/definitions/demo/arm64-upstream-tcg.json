@@ -11,6 +11,28 @@
   "outputs": [
     {
       "catalog": {
+        "base": "../../catalogs/tools/native"
+      },
+      "components": [
+        "native-capi-exec-init-image"
+      ],
+      "format": "oci",
+      "name": "capi-exec-init-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../catalogs/tools/native"
+      },
+      "components": [
+        "native-capi-exec-plugin-image"
+      ],
+      "format": "oci",
+      "name": "capi-exec-plugin-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
         "base": "../../catalogs/capnico/local-arm64"
       },
       "components": [
@@ -97,7 +119,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nicosim"
+        "base": "../../catalogs/tools/native"
       },
       "components": [
         "nico-sim",
@@ -357,6 +379,17 @@
       ],
       "format": "oci",
       "name": "upstream-ovn-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../catalogs/tools/native"
+      },
+      "components": [
+        "native-workload-image"
+      ],
+      "format": "oci",
+      "name": "workload-image-arm64",
       "platform": "linux/arm64"
     }
   ]

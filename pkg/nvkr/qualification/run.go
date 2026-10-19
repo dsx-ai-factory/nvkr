@@ -26,6 +26,8 @@ func PublishTriggeredRun(ctx context.Context, policyPath string, options lifecyc
 	if runtime.GOOS != "linux" {
 		return nil, e.New(e.CodeEngineCapability, "qualification signing requires Linux pinned cosign execution")
 	}
+	ctx, cancel := hostedRuntimeContext(ctx)
+	defer cancel()
 	policy, err := lifecycle.LoadQualificationPolicy(ctx, policyPath)
 	if err != nil {
 		return nil, err

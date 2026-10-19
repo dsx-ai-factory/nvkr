@@ -210,7 +210,13 @@ complete recursive closure before the destination becomes visible.
 The config uses `nvkr.dev/publication-root/v4` and `application/vnd.nvkr.publication-root.config.v4+json`.
 Its release metadata binds the exact Definition, Environment, compiled Plan and release-content identities.
 Its output bindings carry Build Digest and exact named output membership; deployment cluster metadata is
-removed. Readers reject earlier metadata and removed fields. ValidationVector v3 and ReleaseSet/Inventory v4
+removed. Distinct named single-platform native image outputs may reference the same exact manifest in
+separate sibling repositories. Each keeps its own output, Build Subject and evidence bindings. Shared
+physical descriptors require identical native media type, size, blob and semantic digests, and platform;
+conflicting aliases, repeated logical names and duplicate direct index descriptors remain errors. Inspection
+checks every logical output and evidence binding while accounting for the distinct physical descriptor
+closure. This does not merge producer identities or grant publication or qualification authority.
+Readers reject earlier metadata and removed fields. ValidationVector v3 and ReleaseSet/Inventory v4
 remain implemented. The retired clearance and publication-manifest families remain reserved and nonminting;
 retained transport media identifiers do not imply a current clearance issuer or verifier.
 

@@ -22,7 +22,7 @@ type validationRunner func(context.Context, string, string, lifecycle.Qualificat
 
 func cmdValidate() *cli.Command { return cmdValidateWithRunner(client.New().Validate) }
 func cmdValidateWithRunner(run validationRunner) *cli.Command {
-	return &cli.Command{Name: "validate", ArgsUsage: "[check-name]", Usage: "run configured diagnostic checks against a published source; retain original reports without qualification signing", Flags: []cli.Flag{
+	return &cli.Command{Name: "validate", ArgsUsage: "[check-name]", Usage: "run configured diagnostic checks against a published source or complete local Run; retain original reports without qualification signing", Flags: []cli.Flag{
 		&cli.StringFlag{Name: "config", Usage: "independently selected validation profile JSON"},
 		&cli.StringFlag{Name: "workspace", Value: ".nvkr/validation", Usage: "private validation workspace"},
 	}, Action: func(c *cli.Context) error {

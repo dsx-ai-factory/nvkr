@@ -171,7 +171,7 @@ func TestDiskImageSchemaValidation(t *testing.T) {
 			c.BuildRequirements.Resources.EphemeralStorageMiB = 0
 		}, "positive ephemeral storage"},
 		{"vm builder without host platform", func(c *Component) { c.BuilderType = BuilderVMImage; c.BuildRequirements.AllowedHostPlatforms = nil }, "allowed host platform"},
-		{"vm builder without KVM policy", func(c *Component) { c.BuilderType = BuilderVMImage; c.BuildRequirements.Capabilities = nil }, "KVM capability policy"},
+		{"vm builder without virtualization policy", func(c *Component) { c.BuilderType = BuilderVMImage; c.BuildRequirements.Capabilities = nil }, "KVM or HVF capability policy"},
 		{"vm builder without timeout", func(c *Component) { c.BuilderType = BuilderVMImage; c.BuildRequirements.TimeoutSeconds = 0 }, "positive executor timeout"},
 		{"vm builder with CGO", func(c *Component) { c.BuilderType = BuilderVMImage; c.CGO = true }, ""},
 		{"vm builder with container write directory", func(c *Component) { c.BuilderType = BuilderVMImage; c.WriteDir = "out" }, ""},

@@ -58,6 +58,7 @@ func (input Environment) Clone() Environment {
 		value := *input.Signing
 		input.Signing = &value
 	}
+	input.Runtime.NativeToolchains = maps.Clone(input.Runtime.NativeToolchains)
 	input.Runtime.Services = append([]string(nil), input.Runtime.Services...)
 	input.Runtime.Setup = append([]string(nil), input.Runtime.Setup...)
 	if input.Runtime.Variables != nil {

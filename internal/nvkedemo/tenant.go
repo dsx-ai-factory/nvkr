@@ -4,6 +4,7 @@
 package nvkedemo
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -35,6 +36,25 @@ const (
 	tenantCleanupTimeout      = time.Hour
 )
 
+// tenantKubeconfigPublished observes publication only. NVKE owns kubeconfig
+// extraction and validation; the Secret may exist with only its breakglass key
+// while certificate issuance is still pending.
+func tenantKubeconfigPublished(raw []byte) (bool, error) {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return false, nil
+	}
+	var secret struct {
+		Data struct {
+			Value []byte `json:"value"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &secret); err != nil {
+		// Keep private Secret contents out of diagnostics.
+		return false, errors.New("invalid tenant admin kubeconfig Secret JSON")
+	}
+	return len(secret.Data.Value) > 0, nil
+}
+
 func tenantCleanupContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.WithoutCancel(ctx), tenantCleanupTimeout)
 }
@@ -47,12 +67,18 @@ type TenantRequest struct {
 	CNI           string             `json:"cniPlugin"`
 	CNIVersion    string             `json:"cniVersion"`
 	EtcdEncrypted bool               `json:"etcdEncrypted"`
-	VIP           string             `json:"controlPlaneVIP"`
+	VIP           string             `json:"controlPlaneVIP,omitempty"`
 	Teleport      bool               `json:"teleportEnabled"`
 	NICo          TenantProvider     `json:"nico"`
 	ControlPlane  ControlPlaneIntent `json:"controlPlaneConfig"`
 	NodePools     []NodePoolIntent   `json:"nodePools"`
+	Network       *TenantNetwork     `json:"network,omitempty"`
 }
+type TenantNetwork struct {
+	PodCIDR     string `json:"podCIDR"`
+	ServiceCIDR string `json:"serviceCIDR"`
+}
+
 type TenantProvider struct {
 	Org  string `json:"orgID"`
 	Site string `json:"siteID"`
@@ -65,7 +91,8 @@ type ControlPlaneIntent struct {
 	DisableMonitor bool   `json:"provisioningMonitorDisabled"`
 	NICo           struct {
 		Profile  string   `json:"configProfile"`
-		OS       string   `json:"osProfile"`
+		OS       string   `json:"osProfile,omitempty"`
+		Release  string   `json:"release,omitempty"`
 		Types    []string `json:"instanceTypePreference"`
 		Prefixes []string `json:"vpcPrefixIDs"`
 	} `json:"nico"`
@@ -84,7 +111,8 @@ type NodePoolIntent struct {
 	Recycle          int    `json:"recycleBudget"`
 	NICo             struct {
 		Profile  string   `json:"configProfile"`
-		OS       string   `json:"osProfile"`
+		OS       string   `json:"osProfile,omitempty"`
+		Release  string   `json:"release,omitempty"`
 		Type     string   `json:"instanceTypeID"`
 		Prefixes []string `json:"vpcPrefixIDs"`
 	} `json:"nico"`
@@ -171,6 +199,13 @@ type tenantNode struct {
 		Name   string            `json:"name"`
 		Labels map[string]string `json:"labels"`
 	} `json:"metadata"`
+	Spec struct {
+		Unschedulable bool `json:"unschedulable"`
+		Taints        []struct {
+			Key    string `json:"key"`
+			Effect string `json:"effect"`
+		} `json:"taints"`
+	} `json:"spec"`
 	Status struct {
 		Conditions []struct{ Type, Status string }
 		NodeInfo   struct{ Architecture, KubeletVersion string }
@@ -185,14 +220,28 @@ func readyNodes(nodes []tenantNode) (bool, error) {
 		return false, nil
 	}
 	control := 0
+	available := true
 	names := map[string]bool{}
 	for _, node := range nodes {
 		if node.Metadata.Name == "" || names[node.Metadata.Name] {
 			return false, errors.New("require two distinct named tenant nodes")
 		}
 		names[node.Metadata.Name] = true
-		if _, ok := node.Metadata.Labels["node-role.kubernetes.io/control-plane"]; ok {
+		_, isControlPlane := node.Metadata.Labels["node-role.kubernetes.io/control-plane"]
+		if isControlPlane {
 			control++
+		} else {
+			// The workload targets the sole worker. Node Ready may precede
+			// source-owned post-join completion and removal of its provisioning
+			// marker; wait without changing taints or adding Job tolerations.
+			if node.Spec.Unschedulable {
+				available = false
+			}
+			for _, taint := range node.Spec.Taints {
+				if taint.Key == "nke.nvidia.com/provisioning" || taint.Effect == "NoSchedule" || taint.Effect == "NoExecute" {
+					available = false
+				}
+			}
 		}
 		ready := false
 		for _, condition := range node.Status.Conditions {
@@ -210,7 +259,7 @@ func readyNodes(nodes []tenantNode) (bool, error) {
 	if control != 1 {
 		return false, errors.New("require exactly one tenant control plane")
 	}
-	return true, nil
+	return available, nil
 }
 func pause(ctx context.Context, duration time.Duration) error {
 	timer := time.NewTimer(duration)
@@ -225,6 +274,7 @@ func pause(ctx context.Context, duration time.Duration) error {
 
 type tenant struct {
 	name, id      string
+	cliPath       string
 	network       string
 	session       ManagementSession
 	simulator     *OwnedProcess
@@ -248,7 +298,12 @@ func (t *tenant) capture(ctx context.Context, args []string, phase string, budge
 	}
 	return runner.Capture(ctx, args, fmt.Sprintf("tenant-%03d-%s", t.sequence, phase), budget)
 }
-func (t *tenant) cli() string { return filepath.Join(t.session.Work, "cli", installerCLIName) }
+func (t *tenant) cli() string {
+	if t.cliPath != "" {
+		return t.cliPath
+	}
+	return filepath.Join(t.session.Work, "cli", installerCLIName)
+}
 func (t *tenant) inventory(ctx context.Context) ([]tenantRow, error) {
 	raw, err := t.capture(ctx, []string{t.cli(), "get", "clusters", "-o", "json"}, "inventory", 30*time.Second)
 	if err != nil {
@@ -347,13 +402,11 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 		if readErr != nil {
 			return readErr
 		}
-		var secret json.RawMessage
-		if len(raw) > 0 {
-			if err = json.Unmarshal(raw, &secret); err != nil {
-				return err
-			}
+		published, err := tenantKubeconfigPublished(raw)
+		if err != nil {
+			return err
 		}
-		if len(secret) > 0 && string(secret) != "null" {
+		if published {
 			if _, err = t.capture(provision, []string{t.cli(), "get", "kubeconfig", t.name, "--output-file", kubeconfig}, "kubeconfig", 30*time.Second); err != nil {
 				return err
 			}
@@ -395,6 +448,9 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 			}
 			progress.update(time.Now(), "tenant-api", nil)
 		} else {
+			// Kubernetes omits cleared optional fields. Decode each poll into
+			// fresh entries so removed taints and cordons do not remain cached.
+			nodes.Items = nil
 			if err = json.Unmarshal(raw, &nodes); err != nil {
 				return err
 			}
@@ -422,46 +478,10 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 	if err = t.waitDNS(provision, kubeconfig); err != nil {
 		return err
 	}
-	job := filepath.Join(t.session.Work, "workload.json")
 	progress.update(time.Now(), "tenant-workload", nodes.Items)
-	if err = privateJSON(job, workloadJob()); err != nil {
-		return err
-	}
-	if _, err = t.capture(ctx, t.kubectl(kubeconfig, "apply", "-f", job), "workload-apply", 30*time.Second); err != nil {
-		return err
-	}
-	if _, err = t.capture(ctx, t.kubectl(kubeconfig, "wait", "job/nvkr-smoke", "--for=condition=Complete", "--timeout=210s"), "workload-complete", 240*time.Second); err != nil {
-		return err
-	}
-	raw, err = t.capture(ctx, t.kubectl(kubeconfig, "logs", "job/nvkr-smoke"), "workload-log", 30*time.Second)
+	raw, err = runTenantWorkload(ctx, t.session.Work, kubeconfig, filepath.Join(t.session.Tools, "kubectl"), t.capture)
 	if err != nil {
 		return err
-	}
-	if !slices.Contains(strings.Split(strings.TrimSpace(string(raw)), "\n"), "NVKE_LOCAL_WORKLOAD_PASS") {
-		return errors.New("workload did not report ARM64 execution and cluster DNS success")
-	}
-	raw, err = t.capture(ctx, t.kubectl(kubeconfig, "get", "pods", "-l", "job-name=nvkr-smoke", "-o", "json"), "workload-pod", 30*time.Second)
-	if err != nil {
-		return err
-	}
-	var pods struct {
-		Items []struct {
-			Status struct {
-				Containers []struct{ ImageID string } `json:"containerStatuses"`
-			}
-		}
-	}
-	if err = json.Unmarshal(raw, &pods); err != nil {
-		return err
-	}
-	var ids []string
-	for _, pod := range pods.Items {
-		for _, container := range pod.Status.Containers {
-			ids = append(ids, container.ImageID)
-		}
-	}
-	if len(ids) != 1 || strings.Split(ids[0], "@")[len(strings.Split(ids[0], "@"))-1] != strings.Split(WorkloadImage, "@")[1] {
-		return errors.New("workload image ID differs from pinned diagnostic acquisition")
 	}
 	return privateJSON(filepath.Join(t.session.Work, "tenant-result.json"), tenantResult{
 		Scope: "unqualified-local-demo", Network: t.network, Name: t.name, TenantID: t.id,
@@ -520,28 +540,8 @@ func (t *tenant) waitCNI(ctx context.Context, kubeconfig string) (result error) 
 // Node Ready does not mean the pinned NVKE DNS workloads have finished rolling
 // out. Wait for their owning controllers before running the unchanged DNS
 // smoke test; rollout completion alone is not functional DNS acceptance.
-func (t *tenant) waitDNS(ctx context.Context, kubeconfig string) (result error) {
-	if err := requireContext(ctx); err != nil {
-		return t.waitError(err, "waiting for tenant DNS readiness")
-	}
-	boundary := beginProgress(t.session.Runner.Progress, "tenant-dns-readiness", PhaseStarted, PhaseFinished, PhaseFailed)
-	stage := "waiting for tenant DNS readiness"
-	defer func() {
-		result = t.waitError(result, stage)
-		boundary.finish(result)
-	}()
-	ready, cancel := context.WithTimeout(ctx, 4*time.Minute)
-	defer cancel()
-	for _, resource := range []struct{ name, phase string }{
-		{"deployment/coredns", "dns-coredns-rollout"},
-		{"daemonset/node-local-dns", "dns-node-local-rollout"},
-	} {
-		stage = "waiting for tenant DNS " + resource.name + " rollout"
-		if _, err := t.capture(ready, t.kubectl(kubeconfig, "-n", "kube-system", "rollout", "status", resource.name, "--timeout=240s"), resource.phase, 4*time.Minute); err != nil {
-			return err
-		}
-	}
-	return nil
+func (t *tenant) waitDNS(ctx context.Context, kubeconfig string) error {
+	return t.waitError(waitTenantDNS(ctx, kubeconfig, filepath.Join(t.session.Tools, "kubectl"), t.session.Runner.Progress, t.capture), "waiting for tenant DNS readiness")
 }
 
 type workload struct {

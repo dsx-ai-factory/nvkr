@@ -44,6 +44,7 @@ func TestReleaseExecutableRejectsMalformedPullClosure(t *testing.T) {
 		change func(*Node)
 		code   e.Code
 	}{
+		{name: "unknown format", change: func(n *Node) { n.ExecutableArchive.Format = "7z" }},
 		{name: "unpinned archive", change: func(n *Node) { n.ExecutableArchive.Digest = "" }},
 		{name: "malformed archive digest", change: func(n *Node) { n.ExecutableArchive.Digest = "sha256:abc" }},
 		{name: "absolute member", change: func(n *Node) { n.ExecutableArchive.Member = "/bin/tool" }},
@@ -76,6 +77,7 @@ func TestReleaseExecutableIdentityAndDescriptionIsolation(t *testing.T) {
 		change func(*Node)
 		moves  bool
 	}{
+		{name: "archive format", change: func(n *Node) { n.ExecutableArchive.Format = "zip" }, moves: true},
 		{name: "archive pin", change: func(n *Node) { n.ExecutableArchive.Digest = "sha256:" + strings.Repeat("c", 64) }, moves: true},
 		{name: "member", change: func(n *Node) { n.ExecutableArchive.Member = "other/tool" }, moves: true},
 		{name: "executable pin", change: func(n *Node) { n.Digest = "sha256:" + strings.Repeat("c", 64) }, moves: true},

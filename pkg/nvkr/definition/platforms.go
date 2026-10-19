@@ -12,6 +12,9 @@ import (
 
 func (output DefinitionOutput) validatePlatforms() error {
 	if output.Platforms == nil {
+		if output.Format == OutputExecutable {
+			return target.ValidateExecutablePlatform(output.Platform)
+		}
 		return target.ValidatePlatform(output.Platform)
 	}
 	if output.Platform != "" || output.Format != OutputOCI {

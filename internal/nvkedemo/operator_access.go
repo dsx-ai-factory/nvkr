@@ -26,6 +26,7 @@ import (
 // before any presenter describes the environment as left running.
 type OperatorAccess struct {
 	kubectl, site, tenant string
+	siteQCOW              bool
 	uiService             string
 	uiPort                int
 	uiHTTPObserved        bool

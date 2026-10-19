@@ -118,8 +118,8 @@ func (a *admitted) observe(ctx context.Context, workspace, phase string) ([]test
 	}
 	// The caller declares which pods implement CNI; that classification is not
 	// inferred from arbitrary installed workloads or promoted to API evidence.
-	add("cni.selection", "operator-selected kube-system pods", "declared")
-	raw, _, err = a.kube(ctx, workspace, nil, "get", "pods", "--namespace=kube-system", "--selector="+a.options.CNISelector, "-o", "json")
+	add("cni.selection", "operator-selected "+a.options.CNINamespace+" pods", "declared")
+	raw, _, err = a.kube(ctx, workspace, nil, "get", "pods", "--namespace="+a.options.CNINamespace, "--selector="+a.options.CNISelector, "-o", "json")
 	if err != nil {
 		return env, err
 	}

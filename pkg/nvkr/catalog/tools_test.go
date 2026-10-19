@@ -5,6 +5,7 @@ package catalog
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
@@ -23,7 +24,9 @@ func TestToolReleasePinResolutionAndVersionBinding(t *testing.T) {
 		status               int
 		want                 e.Code
 	}{
-		{"raw", "raw", "tool", 200, ""}, {"archive", "tar-gzip", "tool", 200, ""},
+		{"raw", "raw", "tool", 200, ""}, {"archive", "tar-gzip", "tool", 200, ""}, {"ZIP", "zip", "tool", 200, ""},
+		{"ZIP missing executable", "zip", "other", 200, e.CodeVerifyFailed},
+		{"ZIP unsafe member", "zip", "../tool", 200, e.CodeVerifyFailed},
 		{"missing executable", "tar-gzip", "other", 200, e.CodeVerifyFailed},
 		{"unsafe member", "tar-gzip", "../tool", 200, e.CodeVerifyFailed},
 		{"not found", "raw", "tool", 404, e.CodeFetchFailed},
@@ -45,6 +48,21 @@ func TestToolReleasePinResolutionAndVersionBinding(t *testing.T) {
 					t.Fatal(err)
 				}
 				if err := gz.Close(); err != nil {
+					t.Fatal(err)
+				}
+				raw = b.Bytes()
+			}
+			if tc.format == "zip" {
+				var b bytes.Buffer
+				zw := zip.NewWriter(&b)
+				f, err := zw.Create(tc.member)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := f.Write(executable); err != nil {
+					t.Fatal(err)
+				}
+				if err := zw.Close(); err != nil {
 					t.Fatal(err)
 				}
 				raw = b.Bytes()
@@ -88,7 +106,7 @@ func TestToolDeclarationAndPinRejectAmbiguity(t *testing.T) {
 		name string
 		edit func(*ToolSource)
 	}{
-		{"format", func(s *ToolSource) { s.Format = "zip" }}, {"platform", func(s *ToolSource) { s.Platform = "linux/any" }},
+		{"format", func(s *ToolSource) { s.Format = "7z" }}, {"platform", func(s *ToolSource) { s.Platform = "linux/any" }},
 		{"http", func(s *ToolSource) { s.URL = "http://example.test/tool" }}, {"credentials", func(s *ToolSource) { s.URL = "https://token@example.test/tool" }},
 		{"template", func(s *ToolSource) { s.URL = "https://example.test/{{.NoSuchField}}" }}, {"path", func(s *ToolSource) { s.ExecutablePath = "bin/../tool" }},
 	} {

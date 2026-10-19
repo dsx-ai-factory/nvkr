@@ -185,9 +185,9 @@ func TestConfiguredProducerPreservesOriginalBytesAndFailureCauses(t *testing.T) 
 	} {
 		t.Run(tc.mode, func(t *testing.T) {
 			o := buildFixture(t, tc.mode)
-			if tc.mode == "slow-after" {
-				o.CommandTimeout = 150 * time.Millisecond
-			}
+			// Use the normal per-command budget for real process startup. The
+			// slow-after fixture derives each observation delay from that budget;
+			// its complete phase exceeds one command budget, without delaying cleanup.
 			if tc.mode == "delayed-cleanup" {
 				o.CleanupTimeout = 12 * time.Second
 			}
@@ -353,12 +353,14 @@ func TestCNIImageIdentifierForms(t *testing.T) {
 
 func TestReportRecoveryTimeoutDoesNotConsumeCleanupBudget(t *testing.T) {
 	o := buildFixture(t, "slow-recovery")
-	o.CommandTimeout = 150 * time.Millisecond
 	o.CleanupTimeout = 2 * time.Second
 	out, err := produce(t, o)
 	requireCode(t, err, e.CodeTimeout)
 	if !errors.Is(err, context.DeadlineExceeded) || len(out.Reports) != 0 {
 		t.Fatalf("recovery refusal lost: %+v %v", out, err)
+	}
+	if !strings.Contains(err.Error(), "original suite results unavailable") {
+		t.Fatalf("timeout occurred before report recovery: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(filepath.Dir(o.Kubeconfig.Path), "state.json.delete")); err != nil {
 		t.Fatal("report timeout abandoned UID cleanup")
@@ -447,13 +449,25 @@ func TestProducerUsesAuthenticatedImagesAndRetainsToolOrigins(t *testing.T) {
 }
 
 func TestAfterObservationTimeoutBudget(t *testing.T) {
-	for _, count := range []int{1, 64} {
-		o := optionsFixture()
-		o.Targets = make([]DeploymentTarget, count)
-		o.CommandTimeout = 5 * time.Minute
-		if got, want := afterObservationTimeout(o), time.Duration(count+5)*o.CommandTimeout; got != want {
-			t.Fatalf("%d targets: %s want %s", count, got, want)
-		}
+	for _, tc := range []struct {
+		name           string
+		targets        int
+		commandTimeout time.Duration
+	}{
+		{"one target at former timing threshold", 1, 150 * time.Millisecond},
+		{"two targets at former timing threshold", 2, 150 * time.Millisecond},
+		{"maximum targets at former timing threshold", 64, 150 * time.Millisecond},
+		{"one target at maximum command budget", 1, 5 * time.Minute},
+		{"maximum targets at maximum command budget", 64, 5 * time.Minute},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			o := optionsFixture()
+			o.Targets = make([]DeploymentTarget, tc.targets)
+			o.CommandTimeout = tc.commandTimeout
+			if got, want := afterObservationTimeout(o), time.Duration(tc.targets+5)*tc.commandTimeout; got != want {
+				t.Fatalf("%d targets: %s want %s", tc.targets, got, want)
+			}
+		})
 	}
 }
 

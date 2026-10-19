@@ -35,8 +35,8 @@ the move preserves each file's existing format.
 | [`definitions/nvke/services.yaml`](definitions/nvke/services.yaml) | [`environments/github-nvke-services.yaml`](environments/github-nvke-services.yaml) | 28-output supporting-services pilot |
 | [`definitions/nvke/telemetry.yaml`](definitions/nvke/telemetry.yaml) | [`environments/github-nvke-telemetry.yaml`](environments/github-nvke-telemetry.yaml) | 17-output telemetry pilot |
 | [`definitions/nvke/disks.yaml`](definitions/nvke/disks.yaml) | [`environments/github-nvke-disks.yaml`](environments/github-nvke-disks.yaml) | Four-output native plain/public-bootstrap FDE disk pilot |
-| [`definitions/demo/arm64-nvidia-tcg.json`](definitions/demo/arm64-nvidia-tcg.json) | [`environments/local-arm64-tcg.json`](environments/local-arm64-tcg.json) | Local 29-output NVIDIA OVN demo |
-| [`definitions/demo/arm64-upstream-tcg.json`](definitions/demo/arm64-upstream-tcg.json) | Same local TCG Environment | Local 29-output upstream OVN diagnostic demo |
+| [`definitions/demo/arm64-nvidia-tcg.json`](definitions/demo/arm64-nvidia-tcg.json) | [`environments/local-arm64-tcg.json`](environments/local-arm64-tcg.json) | Local 32-output NVIDIA OVN demo |
+| [`definitions/demo/arm64-upstream-tcg.json`](definitions/demo/arm64-upstream-tcg.json) | Same local TCG Environment | Local 32-output upstream OVN diagnostic demo |
 | [`definitions/demo/arm64-nvidia-kvm.json`](definitions/demo/arm64-nvidia-kvm.json) | [`environments/github-nightly-nvidia.json`](environments/github-nightly-nvidia.json) | Named NVIDIA nightly producer; current content differences remain explicit |
 | [`definitions/demo/arm64-upstream-kvm.json`](definitions/demo/arm64-upstream-kvm.json) | [`environments/github-nightly-upstream.json`](environments/github-nightly-upstream.json) | Separately signed upstream nightly producer |
 | [`definitions/diagnostics/os-amd64.yaml`](definitions/diagnostics/os-amd64.yaml) | [`environments/local-linux-amd64-kvm.yaml`](environments/local-linux-amd64-kvm.yaml) | Native AMD64 plain-disk diagnostic |
@@ -46,6 +46,16 @@ the move preserves each file's existing format.
 The native local KVM Environments retain their existing diagnostic capacity and utility pins. The
 table does not imply that they can run the complete nightly demo unchanged. TCG/KVM differences affect
 producer inputs as well as runtime admission, so the explicit demo Definitions remain separate.
+
+## Native host demo inputs
+
+The additional [Mac](definitions/demo/native-mac/README.md) and
+[Linux](definitions/demo/native-linux/README.md) selections use one
+[shared native tool catalog](catalogs/tools/native/README.md). Their local policies
+are `environments/local-native-mac.json` and `environments/local-native-linux.json`.
+QCOW builds use NVKR's existing disk-image Definitions listed above.
+The recorded Mac runtime uses an existing QCOW, upstream OVN and TCG. These inputs
+do not imply fresh-machine or full native Linux runtime acceptance.
 
 The opt-in [Ubuntu 24 node-image inputs](definitions/diagnostics/ubuntu24/README.md) select
 native AMD64 and ARM64 plain local builds, plus plain or public-bootstrap FDE GitHub builds.

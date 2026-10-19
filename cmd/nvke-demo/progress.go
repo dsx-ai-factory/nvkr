@@ -84,7 +84,7 @@ type checkedWriter struct {
 	sudoAuth    func(context.Context) error
 	// One bounded latest line per public result category, independent of the
 	// dashboard's activity ring. Success statements replay only after success.
-	results           [6]string
+	results           [8]string
 	operatorStatus    string
 	walkthroughStatus string
 	guests            [2]nvkedemo.TenantGuestObservation
@@ -109,7 +109,7 @@ func (w *checkedWriter) displayText(value string) string {
 func (w *checkedWriter) retainResult(line string) {
 	index := -1
 	switch {
-	case strings.HasPrefix(line, "Artifact builds complete;"):
+	case strings.HasPrefix(line, "Artifact builds complete;"), strings.HasPrefix(line, "Native catalog tools verified and prepared:"):
 		index = 0
 	case strings.HasPrefix(line, "Deployment is separate:"):
 		index = 1
@@ -119,10 +119,14 @@ func (w *checkedWriter) retainResult(line string) {
 		index = 2
 	case strings.HasPrefix(line, "Unqualified local diagnostic"):
 		index = 3
-	case strings.HasPrefix(line, "Warning:"):
+	case strings.HasPrefix(line, "Artifacts Run:"):
 		index = 4
-	case strings.HasPrefix(line, "OS advisory"):
+	case strings.HasPrefix(line, "Native tools Run:"):
 		index = 5
+	case strings.HasPrefix(line, "Warning:"):
+		index = 6
+	case strings.HasPrefix(line, "OS advisory"):
+		index = 7
 	}
 	if index >= 0 {
 		text := []rune(terminalText(line))
@@ -142,7 +146,7 @@ func (w *checkedWriter) replayResults(success bool) {
 		w.emit("\nCluster snapshot observed during this invocation; historical, not a claim that services remain running.\n" + w.operatorStatus)
 	}
 	for index, line := range w.results {
-		if line != "" && (success || index >= 4) {
+		if line != "" && (success || index >= 6) {
 			w.emit(line + "\n")
 		}
 	}
@@ -288,7 +292,7 @@ func (w *checkedWriter) lineOutput() {
 		return
 	}
 	// Human subprocess markers are labeled logs, not authenticated Run events.
-	for _, prefix := range []string{"[dry-run] ", "[start] ", "[done] ", "[cached] ", "nvkr command:", "Build graph:", "  output:", "OS advisory", "Prerequisite diagnostics", "Warning:", "Build all artifacts", "Artifact builds complete;", "Deployment is separate:", "Tenant created;", "PASS:", "PASS (NVIDIA OVN):", "PASS (upstream OVN diagnostic; NVIDIA OVN not validated):", "PASS (Kind/Calico diagnostic; NVIDIA OVN not deployed):", "Unqualified local diagnostic"} {
+	for _, prefix := range []string{"[dry-run] ", "[start] ", "[done] ", "[cached] ", "nvkr command:", "Build graph:", "  output:", "OS advisory", "Prerequisite diagnostics", "Warning:", "Build all artifacts", "Artifact builds complete;", "Artifacts Run:", "Native tools Run:", "Native catalog tools verified and prepared:", "Deployment is separate:", "Tenant created;", "PASS:", "PASS (NVIDIA OVN):", "PASS (upstream OVN diagnostic; NVIDIA OVN not validated):", "PASS (Kind/Calico diagnostic; NVIDIA OVN not deployed):", "Unqualified local diagnostic"} {
 		if strings.HasPrefix(line, prefix) {
 			w.retainResult(line)
 			w.emit(fmt.Sprintf("[log +%s] %s\n", time.Since(w.started).Truncate(time.Second), w.displayText(line)))

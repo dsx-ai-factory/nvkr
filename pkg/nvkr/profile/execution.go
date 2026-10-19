@@ -347,6 +347,9 @@ func deriveExpectedExecution(p BuilderProfile, buildNodes []ir.Node, origin Runn
 		if node.Kind != ir.KindBuild {
 			return expectedExecution{}, e.New(e.CodeInvalidCatalog, "execution preflight selection contains non-build node %q of kind %q", node.ID, node.Kind)
 		}
+		if node.Platform == "darwin/arm64" {
+			return expectedExecution{}, e.New(e.CodeEngineCapability, "qualified execution does not admit diagnostic payload %q for node %q", node.Platform, node.ID)
+		}
 		if strings.TrimSpace(node.ID) == "" || strings.TrimSpace(node.Component) == "" {
 			return expectedExecution{}, e.New(e.CodeInvalidCatalog, "selected build node has no ID or component")
 		}

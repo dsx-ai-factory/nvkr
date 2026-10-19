@@ -1,0 +1,16 @@
+# Machine-managed by `nvkr catalog pin` / `nvkr catalog bump`. Do not hand-edit.
+apiVersion: nvkr.dev/lock/v1
+artifacts:
+  conformance-image:
+    digests:
+      arm64: sha256:6ea19a03ca4da93c406066e56c263a6a8cd0b2a8336170fd531af691712926c1
+    imageParentDigest: sha256:1fd2b8043fab3e2858ec181649161a9acc592eff033f3c9be78856d7b408fc66
+    tag: v1.34.2
+kind: PinLock
+pins:
+  kubernetes-conformance:
+    commit: 8cc511e399b929453cd98ae65b419c3cc227ec79
+    goVersion: 1.24.9
+    sourceDateEpoch: 1762887637
+    tag: v1.34.2
+    treeHash: 3044d97295d24abc46b5c3f8fce9017295e2719f

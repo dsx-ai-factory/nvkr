@@ -16,6 +16,8 @@ import (
 // extract the selected bytes before installation. Every view may reference the
 // same combined Run; separate completed Runs remain usable for diagnostics.
 type RunInputs struct {
+	HostTools  string
+	Runtime    string
 	OS         string
 	Components string
 	Providers  string
@@ -29,8 +31,11 @@ type RunInputs struct {
 // Out must be a new private directory outside sources and accepted attempts.
 // Timeout bounds tenant provisioning; cleanup has separate bounded contexts.
 type Config struct {
+	Accelerator  string
 	Cleanup      bool
 	Walkthrough  bool
+	Conformance  bool
+	Repository   string
 	Network      string
 	NVKECheckout string
 	NVKR         string
@@ -55,9 +60,13 @@ type BuildConfig struct {
 	Prepared            bool
 	// Network selects a closed authored artifact set for E2E. It does not
 	// substitute source pins or confer deployment/readiness authority.
+	Conformance   bool
 	Network       string
 	Repository    string
 	NVKEClone     string
+	Definition    string
+	Environment   string
+	NVKR          string
 	AttemptPrefix string
 	Jobs          int
 	Progress      io.Writer

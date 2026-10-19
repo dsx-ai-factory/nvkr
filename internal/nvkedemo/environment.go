@@ -128,6 +128,14 @@ type seedProjection struct {
 	DiskGiB       int    `json:"diskGiB"`
 }
 
+// Both native hosts use the same tenant type. NVIDIA OVN's node pod requests
+// three CPUs and 4352 MiB; Kubernetes reservations and other pods need headroom.
+// Keep those source-owned requests and reservations intact.
+const (
+	tenantDemoVCPUs     = 6
+	tenantDemoMemoryGiB = 12
+)
+
 func projectSeed(ctx context.Context, work string) (seedProjection, error) {
 	var result seedProjection
 	if err := requireContext(ctx); err != nil {
@@ -152,7 +160,7 @@ func projectSeed(ctx context.Context, work string) (seedProjection, error) {
 	if err = privateWrite(filepath.Join(work, "laptop-seed.yaml"), projected); err != nil {
 		return result, err
 	}
-	return seedProjection{"sha256:" + SeedDigest, "sha256:" + plainSHA(projected), TenantInstanceType, 4, 8, 60}, nil
+	return seedProjection{"sha256:" + SeedDigest, "sha256:" + plainSHA(projected), TenantInstanceType, tenantDemoVCPUs, tenantDemoMemoryGiB, 60}, nil
 }
 func projectSeedBytes(raw []byte) ([]byte, error) { return projectSeedFixture(raw, SeedDigest) }
 func projectSeedFixture(raw []byte, digest string) ([]byte, error) {
@@ -162,7 +170,10 @@ func projectSeedFixture(raw []byte, digest string) ([]byte, error) {
 	if len(raw) > 65536 || plainSHA(raw) != digest || bytes.Count(raw, block) != 1 {
 		return nil, errors.New("source simulator seed differs from inspected laptop interface")
 	}
-	replacement := bytes.ReplaceAll(bytes.ReplaceAll(block, []byte("mem6gb"), []byte("mem8gb")), []byte("memory_gib: 6"), []byte("memory_gib: 8"))
+	replacement := bytes.ReplaceAll(block, []byte("cpu4"), fmt.Appendf(nil, "cpu%d", tenantDemoVCPUs))
+	replacement = bytes.ReplaceAll(replacement, []byte("cpu_count: 4"), fmt.Appendf(nil, "cpu_count: %d", tenantDemoVCPUs))
+	replacement = bytes.ReplaceAll(replacement, []byte("mem6gb"), fmt.Appendf(nil, "mem%dgb", tenantDemoMemoryGiB))
+	replacement = bytes.ReplaceAll(replacement, []byte("memory_gib: 6"), fmt.Appendf(nil, "memory_gib: %d", tenantDemoMemoryGiB))
 	return bytes.Replace(raw, block, replacement, 1), nil
 }
 func simulatorEnvironment(ctx context.Context, work, disk, guardWork, gateway string, binding map[string]string) ([]string, error) {

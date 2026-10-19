@@ -4,7 +4,6 @@
 package nvkedemo
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -13,14 +12,16 @@ import (
 )
 
 // TestEndToEnd is deliberately opt-in: ordinary go test does not download,
-// build, create tenants, grant host controls or touch a Colima installation.
-// It builds one combined Run before deploying its exact newly completed outputs.
+// build, create tenants or grant host controls. It invokes the customer CLI,
+// which builds fresh Runs and deploys their exact outputs through the native path.
+// This noninteractive test requires the documented unattended host controls;
+// it never receives a password or opens a terminal for authentication.
 func TestEndToEnd(t *testing.T) {
 	if os.Getenv("NVKR_NVKE_E2E") != "1" {
-		t.Skip("set NVKR_NVKE_E2E=1 on dedicated Ubuntu ARM64 to build and deploy real NVKE")
+		t.Skip("set NVKR_NVKE_E2E=1 on a dedicated native ARM64 host to build and deploy real NVKE")
 	}
-	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
-		t.Fatal("E2E requires dedicated native Ubuntu ARM64, not macOS")
+	if runtime.GOARCH != "arm64" || runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Fatal("E2E requires dedicated native Ubuntu or macOS ARM64")
 	}
 	required := func(key string) string {
 		value := os.Getenv(key)
@@ -30,23 +31,22 @@ func TestEndToEnd(t *testing.T) {
 		return value
 	}
 	repo := required("NVKR_NVKE_E2E_REPO")
-	installer := os.Getenv("NVKR_NVKE_E2E_INSTALLER")
 	out := required("NVKR_NVKE_E2E_OUT")
 	attempt := required("NVKR_NVKE_E2E_ATTEMPT")
-	ctx, cancel := context.WithTimeout(t.Context(), 8*time.Hour)
-	defer cancel()
-	build := BuildConfig{Repository: repo, NVKEClone: os.Getenv("NVKE_LOCAL_CLONE"), AttemptPrefix: attempt, Jobs: 1, Progress: os.Stdout}
-	run, err := PrepareInstaller(ctx, build, Config{NVKECheckout: installer, Out: out, Timeout: time.Hour, Progress: os.Stdout})
-	if err != nil {
-		t.Fatal(err)
+	binary := os.Getenv("NVKR_NVKE_E2E_BINARY")
+	if binary == "" {
+		binary = filepath.Join(repo, "bin", "nvke-demo")
 	}
-	built, err := BuildArtifacts(ctx, build)
-	if err != nil {
-		t.Fatal(err)
+	// The conformance CLI owns its 12-hour workflow deadline. Leave two more hours for
+	// independent guest cleanup (65m), restoration (8m), bridge stop (1m)
+	// and bounded diagnostics instead of killing it before those owners join.
+	budget := 14 * time.Hour
+	args := []string{binary, "e2e", "--repo", repo, "--attempt", attempt,
+		"--out", out, "--jobs", "1", "--network", "ovn", "--conformance", "--cleanup", "--plain"}
+	if clone := os.Getenv("NVKE_LOCAL_CLONE"); clone != "" {
+		args = append(args, "--nvke-clone", clone)
 	}
-	run.NVKR, run.Runs = built.NVKR, built.Runs
-	run.DemoExecutable = filepath.Join(filepath.Dir(built.NVKR), "nvke-demo")
-	if err = Run(ctx, run); err != nil {
+	if err := (Runner{Env: os.Environ(), Progress: os.Stdout}).Run(t.Context(), args, "full-native-e2e", budget); err != nil {
 		t.Fatal(err)
 	}
 }

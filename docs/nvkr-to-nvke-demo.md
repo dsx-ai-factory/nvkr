@@ -1,8 +1,9 @@
-# NVKR-to-NVKE artifact handoff reference
+# Legacy NVKR-to-NVKE artifact handoff and recovery
 
-Start with the [Ubuntu ARM64 quickstart](local-nvke-demo.md). This reference
-explains what the downstream adapter consumes and its safety/recovery limits;
-it is not another setup guide.
+For the current Mac/Linux workflow, use the [native demo guide](local-nvke-demo.md).
+This page describes the older staged-installer path with a Kind-hosted site and
+its retained-session recovery controls. It is a reference for those existing
+sessions, not the architecture or setup procedure for current `run` and `e2e`.
 
 NVKR builds/acquires and observes artifacts. NVKE owns installation, site
 configuration, provisioning and tenant lifecycle. The demo calls `nvkr`
@@ -11,11 +12,11 @@ pinned NVKE staged installer at
 `8fb2d53368823bd386b4fbd55b4ab6d3c0931345`.
 See its [deployment instructions](https://github.com/dsx-ai-factory/nvke/blob/8fb2d53368823bd386b4fbd55b4ab6d3c0931345/deploy/README.md).
 
-`nvke-demo e2e` prepares this pinned installer automatically in a private
-attempt-local directory; `run.nvkeCheckout` is an optional read-only override.
-Replaying retained outputs with `nvke-demo run` still requires an explicit matching
-checkout. See [pin origins and upgrades](local-nvke-demo.md#where-the-nvke-versions-come-from)
-before moving to another NVKE release.
+That older implementation prepared this installer in a private attempt-local
+directory and accepted a matching read-only `run.nvkeCheckout` override. Current
+native commands consume source-built installer bundles from their selected Runs.
+See [pin origins and upgrades](local-nvke-demo.md#where-the-nvke-versions-come-from)
+before changing the NVKE source selection.
 
 ## Inputs consumed by the demo
 

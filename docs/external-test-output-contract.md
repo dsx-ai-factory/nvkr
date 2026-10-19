@@ -65,7 +65,7 @@ This route requires Linux execution support, a complete embedded HTTPS kubeconfi
 acknowledged existing disposable local cluster. That acknowledgement proves neither locality nor exclusive
 ownership; selected tools execute on the host with cluster credentials, without a sandbox. See
 [ADR-18 §3](adr/0018-pipeline-ir-and-ci-adapter-emission.md#3-helper-owned-isolation-and-narrowly-admitted-native-arc-disks).
-Product and tools roots must be signed `per-output-v1` hosted publications carrying a qualification handoff;
+For `source.kind: published`, product and tools roots must be signed `per-output-v1` hosted publications carrying a qualification handoff;
 unsigned local/dry-run and legacy aggregate outputs cannot supply this capability. Both policy paths name
 independently selected qualification-policy documents in the [M3 policy format](lifecycle.md#authenticate-a-qualification-candidate).
 Set `NVKR_GITHUB_TOKEN` for producing-Run and handoff reads. Trust policy and verifier pins remain independent
@@ -97,8 +97,12 @@ independently explicit; registry/provider secrets are not forwarded in the clust
 
 Relative policy and check-configuration paths resolve beside the profile. Lifecycle owns publication,
 source-Run lookup and artifact authentication; customers need no GitHub Run URL. An unsigned local
-Run or record cannot restore that receipt. Source kind `local` returns `CodeEngineCapability` until
-an owning local diagnostic capability exists; no local behavior is approximated by hosted authentication.
+Run or record cannot restore that hosted receipt. The separate explicit local diagnostic route below
+captures local bytes through its own concrete lifecycle owner. This route supports native
+Linux tools and Darwin ARM64 tools. Darwin uses owner-private executable snapshots with byte
+checks before/after commands and joined cleanup; it does not provide Linux sealed execution
+against a hostile same-user writer. Published-source validation remains Linux-only.
+Linux OCI suite images and exact Run/output bindings are unchanged.
 Check `name` is a configurable unique instance name; `suite` and `harness` select separate supported
 protocols. The initial suite/harness pair is `kube-conformance` / `hydrophone`. Unsupported pairs,
 including user/AI adapters, return `CodeUnsupported` before provider or harness work. New producers
@@ -125,7 +129,7 @@ The producer configuration independently selects its tools publication and polic
 ```
 
 This fragment shows source/member selection; the remaining runner fields are required: `context`,
-`cniSelector`, declared `imageVersion`, `suiteName`, `role: local`, `disposableCluster: true` and explicit `targets`. Each target specifies
+`cniSelector`, optional `cniNamespace` (defaults to `kube-system`), declared `imageVersion`, `suiteName`, `role: local`, `disposableCluster: true` and explicit `targets`. Each target specifies
 `output`, `namespace`, `labelSelector`, `container`, and positive `requiredReplicas`.
 The complete profile's source and suite/harness selections are admitted before execution; each
 referenced producer configuration is admitted when its check starts. Invalid settings for a later
@@ -201,3 +205,25 @@ artifact verification, qualification signing, promotion or release, nor establis
 The configured diagnostic route supplies capture and selected-subject observations. Format adapters,
 coverage policy and independently authenticated external qualification handoff remain unimplemented;
 contract tests establish no external runtime acceptance.
+
+## Complete local diagnostic Runs
+
+Use `source: {"kind":"local","workspace":".nvkr/runs/<attempt>"}` to test an
+explicit disposable local cluster against a complete `unqualified-local-execution` Run.
+Run paths are canonical repository-relative paths; invoke `nvkr validate` from that repository.
+The original Plan, compiler inputs, complete output membership and exact held payloads are checked.
+A local record cannot substitute for a signed publication, and this route signs no qualification.
+
+The check configuration uses `toolsWorkspace` instead of `toolsSource` and the same `runner`
+and `timeouts` descriptions. `bindings.productImages` maps an exact output to its deployed canonical
+OCI alias; `bindings.toolImages` maps each tool-image output to a canonical digest reference.
+Both arrays contain objects with `output` and `reference`. Tool image digests must match held output
+bytes. A product alias alone proves nothing: selected live PodSpec aliases and native runtime
+manifest identities must match the held outputs before and after execution. Repository-relative
+Run paths are independent of configuration-relative kubeconfig paths. Product and tools may name
+the same Run; it is captured once and kept alive through execution and joined cleanup.
+
+Use the shared [native demo](local-nvke-demo.md#conformance-on-the-fresh-ubuntu-tenant) for a
+version-matched configuration generated from its fresh tenant. Retained JSON and original JUnit
+are diagnostics. Inspect the original suite results; complete capture and zero process exit do not
+establish suite completeness, a passing test verdict, qualification or promotion.

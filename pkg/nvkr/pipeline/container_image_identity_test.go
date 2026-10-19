@@ -69,6 +69,8 @@ func TestPreparedImageRequiresSelectedToolchainPlatform(t *testing.T) {
 	}{
 		{"OCI amd64", ir.BuilderOCIHermetic, "linux/amd64", "", "linux/amd64", "linux", "amd64", ""},
 		{"OCI arm64", ir.BuilderOCIHermetic, "linux/arm64", "", "linux/arm64", "linux", "arm64", ""},
+		{"Mac payload Linux toolchain", ir.BuilderOCIHermetic, "darwin/arm64", "linux/arm64", "linux/arm64", "linux", "arm64", ""},
+		{"Mac rejects Darwin container", ir.BuilderOCIHermetic, "darwin/arm64", "linux/arm64", "linux/arm64", "darwin", "arm64", e.CodePreflightFailed},
 		{"OCI wrong OS", ir.BuilderOCIHermetic, "linux/amd64", "", "linux/amd64", "windows", "amd64", e.CodePreflightFailed},
 		{"OCI wrong arch", ir.BuilderOCIHermetic, "linux/amd64", "", "linux/amd64", "linux", "arm64", e.CodePreflightFailed},
 		{"OCI ignores VM host field", ir.BuilderOCIHermetic, "linux/amd64", "linux/arm64", "linux/amd64", "linux", "amd64", ""},

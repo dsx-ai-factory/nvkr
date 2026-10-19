@@ -41,6 +41,8 @@ func RunTriggeredSmokeWorker(ctx context.Context, policyPath string, options lif
 	if runtime.GOOS != "linux" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64") {
 		return nil, e.New(e.CodeEngineCapability, "native smoke worker requires Linux AMD64 or ARM64")
 	}
+	ctx, cancel := hostedRuntimeContext(ctx)
+	defer cancel()
 	policy, err := lifecycle.LoadQualificationPolicy(ctx, policyPath)
 	if err != nil {
 		return nil, err

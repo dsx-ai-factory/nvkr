@@ -21,8 +21,9 @@ const maxTimeoutSeconds uint64 = (1<<63 - 1) / 1_000_000_000
 type HostPlatform string
 
 const (
-	HostPlatformLinuxAMD64 HostPlatform = "linux/amd64"
-	HostPlatformLinuxARM64 HostPlatform = "linux/arm64"
+	HostPlatformDarwinARM64 HostPlatform = "darwin/arm64"
+	HostPlatformLinuxAMD64  HostPlatform = "linux/amd64"
+	HostPlatformLinuxARM64  HostPlatform = "linux/arm64"
 )
 
 // CapabilityName identifies a typed facility that an executor can expose to or
@@ -31,6 +32,7 @@ const (
 type CapabilityName string
 
 const (
+	CapabilityHVF CapabilityName = "hvf"
 	CapabilityKVM CapabilityName = "kvm"
 )
 
@@ -100,7 +102,7 @@ func (requirements *Requirements) Validate() error {
 		previous := HostPlatform("")
 		for _, platform := range requirements.AllowedHostPlatforms {
 			switch platform {
-			case HostPlatformLinuxAMD64, HostPlatformLinuxARM64:
+			case HostPlatformDarwinARM64, HostPlatformLinuxAMD64, HostPlatformLinuxARM64:
 			default:
 				return e.New(e.CodeInvalidCatalog,
 					"execution host platform %q is unsupported", platform)
@@ -121,7 +123,7 @@ func (requirements *Requirements) Validate() error {
 		hasConstraint = true
 		previous := CapabilityName("")
 		for _, capability := range requirements.Capabilities {
-			if capability.Name != CapabilityKVM {
+			if !supportedCapability(capability.Name) {
 				return e.New(e.CodeInvalidCatalog,
 					"execution capability %q is unsupported", capability.Name)
 			}
