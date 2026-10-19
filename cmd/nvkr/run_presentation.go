@@ -119,7 +119,12 @@ func runLocalCommandWithServices(c *cli.Context, execute localLifecycleExecutor,
 		}
 		defer func() { _ = activity.Close() }()
 	}
-	prepared, err := lifecycle.PrepareFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("attempt"))
+	var prepared *lifecycle.PreparedRun
+	if c.IsSet("capture-inputs-root") {
+		prepared, err = lifecycle.PrepareCapturedFiles(c.Context, c.String("capture-inputs-root"), c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("attempt"))
+	} else {
+		prepared, err = lifecycle.PrepareFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("attempt"))
+	}
 	if err != nil {
 		if view.json {
 			return preserveRunError(err, writeLocalRunJSON(commandOutput(c), nil, nil, err, c.Bool("dry-run"), false))

@@ -7,19 +7,47 @@ KVM guests as tenant nodes on a dedicated Linux runner. Local describes the test
 environment; GitHub Actions schedules and executes the entire cycle.
 
 The coordinator is `.github/workflows/nvkr-nightly.yml`, with a daily 03:17 UTC
-schedule and manual dispatch. `definitions/nightly-profiles.json` selects the
+schedule and manual dispatch. `inputs/testing/nightly-profiles.json` selects the
 project Definitions, named generated producer workflows, exact suite revisions
 and runtime profiles. Each project selects its own complete output set. The
 ordinary generated M2 workflow retains its default paths; named bundles use the
 existing generator and manifest owner. The coordinator is authored separately.
 The daily trigger is retained as explicitly requested by the user.
 
+Binary carriers, source handoffs, OCI images, charts and disks use private CI storage under
+`ghcr.io/dsx-ai-factory/nvkr/ci-artifacts`; Actions retain only their small location-and-digest records.
+The existing NVKR helper owns this transport. Uploads and downloads check package visibility and its
+repository association; any link or public/unknown access policy stops the transfer. A failed private transfer never
+falls back to uploading the payload to Actions. Final release artifacts retain the profile-owned nightly
+publication prefixes below the Environment's configured registry path.
+Their GHCR destination packages receive private/internal visibility checks and reject public or unknown repository links
+using the publication credential before product uploads; the checked metadata root binds the actual push.
+
+Configure dedicated `NVKR_CI_STORAGE_READ_TOKEN` and `NVKR_CI_STORAGE_WRITE_TOKEN` secrets with access
+only to the unlinked private/internal CI package. Set repository variables `NVKR_CI_STORAGE_READ_USER`
+and `NVKR_CI_STORAGE_WRITE_USER` to the corresponding token owners. Transfer never falls back to the workflow token. The
+nightly consumer and qualification reader receive only the read credential. Before making NVKR public,
+verify independent package grants and actual anonymous, unrelated-user and fork access behavior.
+Previously retained binary Actions artifacts, caches, active runs and old workflow refs require separate
+handling; none is migrated or deleted by generation. Private transport contracts do not establish a
+successful hosted transfer or public-repository readiness. Provider locator retention does not expire
+private carrier blobs; registry retention is separate. The public runtime attachment contains the constructed
+`cycle.json` summary only; raw suite reports are not attached.
+
+Both nightly Environments opt into runtime Plan preparation. Each producer's first bootstrap reads the
+current catalog pins from that dispatch's exact repository commit and freezes fresh Plan data. Other
+helper bootstraps restore the same data and verify it against those inputs; every producer job and the
+finalizer then receives it with its native helper. Source-version updates within the reviewed execution
+contract need no regeneration commit. Changes to workflow/action bytes, member paths or Environment
+policy still fail admission and require reviewed regeneration. This retains pinned inputs throughout
+the cycle and does not follow newer versions after the build starts.
+
 This is downstream repository CI test infrastructure outside NVKR's public
 product lifecycle and v1 acceptance. It leaves M3 build/evidence qualification
 and ADR-16's passive conformance boundary unchanged. Its schedule is authored
 configuration, not evidence of a successful cycle or organizational approval.
-Merging the configured daily trigger enables unattended execution; the first combined
-manual cycle and its cleanup verdict have not yet been recorded.
+The daily trigger is enabled. The first scheduled attempt is recorded below;
+a successful combined cycle and its runtime cleanup verdict remain unrecorded.
 
 ## Runtime and tool bindings
 
@@ -31,14 +59,16 @@ native-host preflight and owned-resource cleanup remain required.
 
 Both Definitions select the profile-owned site catalog at exact NVKE candidate commit
 `a8391755d12d99f859783c6cf390338debd1e085` for the CLI, controller image,
-controller chart and NKTP chart. The suite checkout selects that same revision,
+controller chart and NVKE telemetry pipelines chart. The baseline suite selection uses that same revision,
 including the runtime `^TestE2E$` selection and candidate-input fixes. Relative to
 the previous product source, only eight adapter, test and documentation files
 changed; CLI, controller and chart producer code is unchanged. The source and
 suite selections now share one exact commit, consistent with ADR-23's proposed
 matching-revision rule. This alignment does not establish overall interface adoption
 or broader acceptance; ADR-23 remains proposed and excludes CI trigger, runner
-and credential policy.
+and credential policy. At runtime the suite checkout follows the single exact NVKE revision shared by
+the frozen Plan's CLI, controller and two chart producers. Ambiguous or mixed source revisions fail.
+The Go consumer independently checks this join before executing the suite.
 This is a candidate revision from open NVKE PR #1580, not a claim of merged-main
 membership or human approval. Its exact source bytes remain required; a pin
 does not guarantee future provider reachability or authorize the privileged suite.
@@ -74,12 +104,43 @@ disk jobs completed on their ARC KVM pools, and that historical Run completed
 NVKE's existing
 [kind plus ARM64 VM job](https://github.com/dsx-ai-factory/nvke/actions/runs/38459969744/job/115512893269)
 also completed on `arc-arm64-kvm`. These results establish those capabilities.
-The new combined publication-to-runtime nightly cycle has not yet been recorded;
+The new combined publication-to-runtime nightly cycle has not yet passed;
 historical NVKR records do not establish current-schema Release acceptance.
 
-Forge YTL, AZ61, DSX and Redstone profiles remain subsequent work. Each needs its
+Site-specific NICo deployment profiles remain subsequent work. Each needs its
 own component closure, runtime configuration, access, usable capacity and cleanup
 ownership. The special TestGrid integration remains deferred.
+
+## First scheduled attempt
+
+The [2026-10-15 coordinator](https://github.com/dsx-ai-factory/nvkr/actions/runs/38676875690)
+started at 03:33:24 UTC on commit
+`b77229c2cc7bedfc422af506c1cdfbbb655aba48`. Both producer workflows failed,
+so runtime tests were skipped. This attempt provides no VM E2E or runtime
+cleanup result.
+
+The [NVIDIA-fork producer](https://github.com/dsx-ai-factory/nvkr/actions/runs/38676906834)
+failed fetching the private OVN fork. The Environment omitted that repository's
+source-access binding; the existing organization token was not passed to those
+fetch steps. The binding now selects the same `NKE_SOURCE_TOKEN` for that exact
+repository, with regression coverage for private and public OVN fetches. This
+fix changes credential delivery, not the token's permissions.
+
+The [upstream producer](https://github.com/dsx-ai-factory/nvkr/actions/runs/38677610324)
+independently failed because the generic NICoSim seed/UI archive was sent to
+the Helm metadata reader. Its disk job also failed its KVM admission check on
+that attempt. A later runner repair was reported by the operator; no rerun of
+this combined cycle is recorded here to verify that repair.
+
+Selected source tarball assets in executable bundles use a bounded archive-content
+inventory only when their component and producer/output bindings match the Plan.
+The inventory records member paths and hashes. NICoSim's seed/UI archive uses that path;
+Helm archives retain their strict metadata reader. The archive method records
+file composition without claiming package discovery. The pinned Syft 1.51.1
+scanner returned no packages for the source-selected simulator seed/UI archive
+in a separate diagnostic, so treating it as a generic Syft scan would not supply
+the required nonempty inventory. Neither that diagnostic nor local contracts
+establish a completed hosted producer or E2E cycle.
 
 ## One cycle
 
@@ -88,13 +149,15 @@ ownership. The special TestGrid integration remains deferred.
    returned by dispatch; never use a latest-run search or retry an ambiguous
    POST. Join that run while checking repository, commit, workflow and attempt.
 3. Download only that completed run's named lifecycle and publication locator
-   artifacts. Run records and locators remain descriptive until verification.
+   artifacts and, for runtime Plan profiles, its frozen `nvkr-runtime-inputs`.
+   Run records, locators and the frozen Plan remain descriptive until verification.
 4. Authenticate the complete publication, signing identity, production
    provenance, outputs and exact Definition, Environment and Plan. Export held
    bytes only for the originating invocation. Extract native tools, images,
    charts and disk through existing lifecycle and delivery owners.
-5. Use a private checkout at the exact pinned NVKE suite revision. Generate profile
-   resources through NVKE's existing Go owner. Produce the suite's
+5. Use a private checkout at the frozen Plan's shared NVKE producer commit, or
+   the profile's pinned suite revision when runtime Plans are not selected.
+   Generate profile resources through NVKE's existing Go owner. Produce the suite's
    `release-description/v1` input through NVKR's existing export renderer over
    the held publication; the description adds no verification authority.
    Execute its existing

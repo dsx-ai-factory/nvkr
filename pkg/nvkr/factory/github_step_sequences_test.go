@@ -26,8 +26,7 @@ func githubStepSequenceFixture(t *testing.T, plan *Plan, actions githubActionRef
 		githubYAMLMap("name", githubYAMLString("Check out workflow source"), "uses", githubYAMLString(actions.Checkout),
 			"with", githubYAMLMap("persist-credentials", githubYAMLString("false"))),
 		githubYAMLMap("name", githubYAMLString("Prepare NVKR runner and job parameters"), "id", githubYAMLString(githubContextStepID),
-			"uses", githubYAMLString(shared+"prepare-stage"), "with", githubYAMLMap("runner-artifact", githubYAMLString("nvkr-exec-"+shortStableName(runner)),
-				"action", githubYAMLString("${{ github.job }}"))),
+			"uses", githubYAMLString(shared+"prepare-stage"), "with", githubYAMLMap("runner-artifact", githubYAMLString("nvkr-exec-"+shortStableName(runner)))),
 		githubYAMLMap("name", githubYAMLString("execute node part-1"), "uses", githubYAMLString(shared+"execute-node"),
 			"with", githubYAMLMap("parameters", githubYAMLString(githubParametersExpression("part-1")))),
 	}})
@@ -119,8 +118,11 @@ func TestGitHubStepSequencesRequireApprovedIdenticalSteps(t *testing.T) {
 		{name: "different helper", change: func(s *yamlv3.Node) {
 			githubYAMLSet(githubYAMLField(s.Content[2], "with"), "runner-artifact", githubYAMLString("other-helper"))
 		}},
-		{name: "different job selector", change: func(s *yamlv3.Node) {
+		{name: "injected job selector", change: func(s *yamlv3.Node) {
 			githubYAMLSet(githubYAMLField(s.Content[2], "with"), "action", githubYAMLString("another-job"))
+		}},
+		{name: "redundant job selector", both: true, change: func(s *yamlv3.Node) {
+			githubYAMLSet(githubYAMLField(s.Content[2], "with"), "action", githubYAMLString("${{ github.job }}"))
 		}},
 		{name: "different operation selector", change: func(s *yamlv3.Node) {
 			githubYAMLSet(githubYAMLField(s.Content[3], "with"), "parameters", githubYAMLString(githubParametersExpression("part-2")))

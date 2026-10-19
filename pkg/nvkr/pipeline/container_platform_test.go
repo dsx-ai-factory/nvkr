@@ -149,3 +149,107 @@ func TestContainerPlatformAdmissionCanceled(t *testing.T) {
 		t.Fatalf("canceled admission: %v", err)
 	}
 }
+
+func TestContainerPullFailureKeepsOnlyDiagnosticCategory(t *testing.T) {
+	for _, tc := range []struct {
+		name, diagnostic, want string
+	}{
+		{"Docker pull limit", "Error response from daemon: toomanyrequests: You have reached your pull rate limit", "registry-rate-limit"},
+		{"HTTP rate limit", "unexpected status: 429 Too Many Requests", "registry-rate-limit"},
+		{"Docker auth", "unauthorized: authentication required", "registry-auth"},
+		{"Podman auth", "requested access to the resource is denied", "registry-auth"},
+		{"registry unavailable", "received unexpected HTTP status: 503 Service Unavailable", "registry-unavailable"},
+		{"network timeout", "failed to do request: i/o timeout", "network-timeout"},
+		{"DNS failure", "dial tcp: lookup registry.invalid: no such host", "network-unavailable"},
+		{"local storage", "failed to register layer: no space left on device", "local-storage"},
+		{"runtime unavailable", "Cannot connect to the Docker daemon", "runtime-unavailable"},
+		{"unknown", "an unrecognized runtime failure", "unknown"},
+		{"bare status is not evidence", "opaque request identifier 503", "unknown"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			const privateDiagnostic = " https://user:secret-value@registry.invalid/token?credential=secret-value Authorization: Bearer secret-value"
+			var diagnostic containerPlatformBuffer
+			_, _ = diagnostic.Write([]byte(tc.diagnostic + privateDiagnostic))
+			err := containerPullFailure(t.Context(), "linux/amd64", errors.New("exit status 1"), &diagnostic)
+			if code(err) != e.CodeEngineCapability {
+				t.Fatalf("pull failure lost its capability code: %v", err)
+			}
+			if !strings.Contains(err.Error(), "diagnostic: "+tc.want+")") {
+				t.Fatalf("missing fixed diagnostic category %q: %v", tc.want, err)
+			}
+			for _, forbidden := range []string{tc.diagnostic, "secret-value", "registry.invalid", "Authorization", "https://"} {
+				if strings.Contains(err.Error(), forbidden) {
+					t.Fatalf("raw child diagnostic escaped the error boundary: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestContainerPullDiagnosticBoundsAndCancellation(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		cancel bool
+		code   e.Code
+	}{
+		{"oversized", false, e.CodeEngineCapability},
+		{"cancellation takes precedence", true, e.CodeTimeout},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var diagnostic containerPlatformBuffer
+			raw := "toomanyrequests: " + strings.Repeat("s", 1<<20)
+			if n, err := diagnostic.Write([]byte(raw)); n != len(raw) || err != nil {
+				t.Fatalf("diagnostic was not completely drained: %d, %v", n, err)
+			}
+			if diagnostic.buffer.Len() != 1<<20 || !diagnostic.overflow {
+				t.Fatal("diagnostic capture exceeded its bound or lost overflow")
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if tc.cancel {
+				cancel()
+			}
+			err := containerPullFailure(ctx, "linux/amd64", errors.New("exit status 1"), &diagnostic)
+			if code(err) != tc.code {
+				t.Fatalf("want %s, got %v", tc.code, err)
+			}
+			if tc.cancel {
+				if !errors.Is(err, context.Canceled) || strings.Contains(err.Error(), "diagnostic:") {
+					t.Fatalf("cancellation did not take precedence: %v", err)
+				}
+			} else if !strings.Contains(err.Error(), "diagnostic: oversized)") || strings.Contains(err.Error(), "registry-rate-limit") {
+				t.Fatalf("oversized prefix was interpreted: %v", err)
+			}
+		})
+	}
+}
+
+func TestContainerPlatformPullCapturesDiagnosticsBeforeInspection(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell protocol fixture requires Unix")
+	}
+	dir := t.TempDir()
+	log := filepath.Join(dir, "calls")
+	t.Setenv("NVKR_TEST_CALLS", log)
+	runtimePath := filepath.Join(dir, "docker")
+	script := `#!/bin/sh
+printf '%s\n' "$1" >> "$NVKR_TEST_CALLS"
+case "$1" in
+info) printf '%s\n' '{"OSType":"linux","Architecture":"amd64"}';;
+pull) printf '%s\n' 'toomanyrequests: secret-value https://registry.invalid/private' >&2; exit 1;;
+image) exit 0;;
+esac
+`
+	if err := os.WriteFile(runtimePath, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	image := "example.test/tool@sha256:" + strings.Repeat("a", 64)
+	err := CheckContainerPlatform(t.Context(), runtimePath, image, "linux/amd64")
+	if code(err) != e.CodeEngineCapability || !strings.Contains(err.Error(), "diagnostic: registry-rate-limit)") || strings.Contains(err.Error(), "secret-value") || strings.Contains(err.Error(), "registry.invalid") {
+		t.Fatalf("pull diagnostic was not safely classified: %v", err)
+	}
+	calls, readErr := os.ReadFile(log)
+	if readErr != nil || string(calls) != "info\npull\n" {
+		t.Fatalf("failed pull was retried or inspected: %q, %v", calls, readErr)
+	}
+}

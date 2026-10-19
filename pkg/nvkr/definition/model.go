@@ -92,6 +92,9 @@ type Environment struct {
 	// GitHubBundle selects an independent generated workflow namespace; empty
 	// preserves the original generated Run paths. Paths are never authored.
 	GitHubBundle string `json:"githubBundle,omitempty"`
+	// GitHubRuntimePlan compiles current catalog pins at dispatch while retaining
+	// the reviewed named production workflow and its complete execution policy.
+	GitHubRuntimePlan bool `json:"githubRuntimePlan,omitempty"`
 	// GitHubDevelopment admits branch-dispatched hosted builds and, when explicitly
 	// configured, isolated signed publications under a disposable attempt namespace.
 	GitHubDevelopment bool `json:"githubDevelopment,omitempty"`
@@ -250,6 +253,9 @@ func (environment Environment) Validate() error {
 	}
 	if environment.GitHubDevelopment && environment.GitHubBundle != "" {
 		return e.New(e.CodeEngineCapability, "githubDevelopment does not support a named githubBundle")
+	}
+	if environment.GitHubRuntimePlan && (environment.GitHubDevelopment || environment.GitHubBundle == "") {
+		return e.New(e.CodeEngineCapability, "githubRuntimePlan requires a named production githubBundle")
 	}
 	if err := ValidateGitHubBundleName(environment.GitHubBundle); err != nil {
 		return err

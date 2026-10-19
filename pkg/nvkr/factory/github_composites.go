@@ -111,7 +111,7 @@ func lowerGitHubActions(plan *Plan, raw []byte, actions githubActionRefs) ([]byt
 			}
 			// Consolidate the repeated, ordered helper delivery in one action.
 			if githubYAMLValue(step, "uses") == actions.Download && githubYAMLValue(step, "name") == "Download NVKR runner" && position+1 < len(steps.Content) &&
-				githubYAMLValue(steps.Content[position+1], "name") == prepareHelperStepName && githubYAMLValue(steps.Content[position+1], "run") == prepareHelperRun {
+				githubYAMLValue(steps.Content[position+1], "name") == prepareHelperStepName && strings.TrimSpace(githubYAMLValue(steps.Content[position+1], "run")) == prepareHelperRunFor(plan) {
 				artifact := githubYAMLField(githubYAMLField(step, "with"), "name")
 				value := *artifact
 				artifact.Value = "${{ inputs.runner-artifact }}"
@@ -305,7 +305,7 @@ func githubComposite(files map[string][]byte, path, name string, steps []*yamlv3
 		if env := githubYAMLField(step, "env"); env != nil {
 			for index := 0; index < len(env.Content); index += 2 {
 				key, value := env.Content[index].Value, env.Content[index+1]
-				if !strings.Contains(value.Value, "secrets.") && value.Value != "${{ toJSON(needs) }}" {
+				if !strings.Contains(value.Value, "secrets.") && !strings.Contains(value.Value, "vars.") && value.Value != "${{ toJSON(needs) }}" {
 					continue
 				}
 				input := strings.ToLower(strings.ReplaceAll(key, "_", "-"))
@@ -359,6 +359,10 @@ func githubActionInput(description string) *yamlv3.Node {
 // Exact regeneration additionally authenticates every action and its call sites.
 func expandGitHubActions(plan *Plan, raw []byte, files map[string][]byte) ([]byte, error) {
 	var err error
+	raw, files, err = materializeGitHubPrivateTransfers(plan, raw, files)
+	if err != nil {
+		return nil, err
+	}
 	raw, files, err = materializeGitHubSharedActions(plan, raw, files)
 	if err != nil {
 		return nil, err
@@ -491,6 +495,28 @@ func githubYAMLField(node *yamlv3.Node, name string) *yamlv3.Node {
 		}
 	}
 	return nil
+}
+
+func githubYAMLOnlyFields(node *yamlv3.Node, allowed ...string) bool {
+	if node == nil || node.Kind != yamlv3.MappingNode || len(node.Content)%2 != 0 {
+		return false
+	}
+	seen := map[string]bool{}
+	for index := 0; index < len(node.Content); index += 2 {
+		key := node.Content[index]
+		if key.Kind != yamlv3.ScalarNode || key.Tag != "!!str" || seen[key.Value] {
+			return false
+		}
+		seen[key.Value] = true
+		found := false
+		for _, name := range allowed {
+			found = found || key.Value == name
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 func githubYAMLValue(node *yamlv3.Node, name string) string {

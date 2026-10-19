@@ -97,7 +97,7 @@ func TestCleanupAndRestoreWithdrawControlsDespiteENOSPC(t *testing.T) {
 					if !bridgePresent {
 						return []byte("[]"), nil
 					}
-					return []byte(fmt.Sprintf(`[{"ifname":"nkdvm0","ifindex":42,"address":%q,"linkinfo":{"info_kind":"bridge"}}]`, g.BridgeMAC)), nil
+					return []byte(fmt.Sprintf(`[{"ifname":"nvkevm0","ifindex":42,"address":%q,"linkinfo":{"info_kind":"bridge"}}]`, g.BridgeMAC)), nil
 				case "getcap":
 					if capPresent {
 						return []byte("opaque-libcap-presence"), nil
@@ -185,24 +185,24 @@ func TestBGPRoutesRequireExactOwnedShape(t *testing.T) {
 		selected      int
 	}{
 		{"blackhole", `[{"dst":"172.31.0.0/24","type":"blackhole","flags":[]}]`, false, true, 1},
-		{"vip", `[{"dst":"172.31.0.10","gateway":"172.30.0.10","dev":"nkdvm0","flags":[]}]`, true, true, 1},
-		{"linkdown", `[{"dst":"172.31.0.10/32","gateway":"172.30.0.10","dev":"nkdvm0","flags":["linkdown"]}]`, true, true, 1},
-		{"multipath", `[{"dst":"172.31.0.10","nexthops":[{"gateway":"172.30.0.10","dev":"nkdvm0","weight":1},{"gateway":"172.30.0.11","dev":"nkdvm0","flags":[]}]}]`, true, true, 1},
+		{"vip", `[{"dst":"172.31.0.10","gateway":"172.30.0.10","dev":"nvkevm0","flags":[]}]`, true, true, 1},
+		{"linkdown", `[{"dst":"172.31.0.10/32","gateway":"172.30.0.10","dev":"nvkevm0","flags":["linkdown"]}]`, true, true, 1},
+		{"multipath", `[{"dst":"172.31.0.10","nexthops":[{"gateway":"172.30.0.10","dev":"nvkevm0","weight":1},{"gateway":"172.30.0.11","dev":"nvkevm0","flags":[]}]}]`, true, true, 1},
 		{"unrelated", `[{"dst":"default","gateway":"192.168.1.1"},{"dst":"10.2.0.0/16","dev":"other"}]`, false, true, 0},
-		{"no-bridge", `[{"dst":"172.31.0.10","gateway":"172.30.0.10","dev":"nkdvm0"}]`, false, false, 0},
-		{"foreign-gateway", `[{"dst":"172.31.0.10","gateway":"192.168.1.10","dev":"nkdvm0"}]`, true, false, 0},
+		{"no-bridge", `[{"dst":"172.31.0.10","gateway":"172.30.0.10","dev":"nvkevm0"}]`, false, false, 0},
+		{"foreign-gateway", `[{"dst":"172.31.0.10","gateway":"192.168.1.10","dev":"nvkevm0"}]`, true, false, 0},
 		{"foreign-device", `[{"dst":"172.31.0.10","gateway":"172.30.0.10","dev":"other"}]`, true, false, 0},
-		{"unknown-flags", `[{"dst":"172.31.0.10","gateway":"172.30.0.10","dev":"nkdvm0","flags":["onlink"]}]`, true, false, 0},
-		{"null-flags", `[{"dst":"172.31.0.10","gateway":"172.30.0.10","dev":"nkdvm0","flags":null}]`, true, false, 0},
-		{"extra-field", `[{"dst":"172.31.0.10","gateway":"172.30.0.10","dev":"nkdvm0","metric":3}]`, true, false, 0},
-		{"weighted-hop", `[{"dst":"172.31.0.10","nexthops":[{"gateway":"172.30.0.10","dev":"nkdvm0","weight":2}]}]`, true, false, 0},
+		{"unknown-flags", `[{"dst":"172.31.0.10","gateway":"172.30.0.10","dev":"nvkevm0","flags":["onlink"]}]`, true, false, 0},
+		{"null-flags", `[{"dst":"172.31.0.10","gateway":"172.30.0.10","dev":"nvkevm0","flags":null}]`, true, false, 0},
+		{"extra-field", `[{"dst":"172.31.0.10","gateway":"172.30.0.10","dev":"nvkevm0","metric":3}]`, true, false, 0},
+		{"weighted-hop", `[{"dst":"172.31.0.10","nexthops":[{"gateway":"172.30.0.10","dev":"nvkevm0","weight":2}]}]`, true, false, 0},
 		{"empty-hops", `[{"dst":"172.31.0.10","nexthops":[]}]`, true, false, 0},
 		{"malformed-hop", `[{"dst":"172.31.0.10","nexthops":true}]`, true, false, 0},
 		{"blackhole-extra", `[{"dst":"172.31.0.0/24","type":"blackhole","metric":3}]`, true, false, 0},
 		{"blackhole-flags", `[{"dst":"172.31.0.0/24","type":"blackhole","flags":["linkdown"]}]`, true, false, 0},
 		{"blackhole-null-flags", `[{"dst":"172.31.0.0/24","type":"blackhole","flags":null}]`, true, false, 0},
-		{"other-vip", `[{"dst":"172.31.0.11","gateway":"172.30.0.10","dev":"nkdvm0"}]`, true, false, 0},
-		{"unknown-overlap", `[{"dst":"172.31.0.0/16","dev":"nkdvm0"}]`, true, false, 0},
+		{"other-vip", `[{"dst":"172.31.0.11","gateway":"172.30.0.10","dev":"nvkevm0"}]`, true, false, 0},
+		{"unknown-overlap", `[{"dst":"172.31.0.0/16","dev":"nvkevm0"}]`, true, false, 0},
 		{"malformed-prefix", `[{"dst":"not-a-route"}]`, true, false, 0},
 		{"non-string-prefix", `[{"dst":true}]`, true, false, 0},
 		{"empty-prefix", `[{"dst":""}]`, true, false, 0},
@@ -262,7 +262,7 @@ func TestBGPWithdrawalRechecksExactRouteAndFinalAbsence(t *testing.T) {
 				if name == "foreign-bridge" {
 					mac = "02:00:00:00:00:00"
 				}
-				return []byte(fmt.Sprintf(`[{"ifname":"nkdvm0","ifindex":42,"address":%q,"linkinfo":{"info_kind":"bridge"}}]`, mac)), nil
+				return []byte(fmt.Sprintf(`[{"ifname":"nvkevm0","ifindex":42,"address":%q,"linkinfo":{"info_kind":"bridge"}}]`, mac)), nil
 			}
 			err := restoreBGP(t.Context(), g)
 			if (err == nil) != (name == "success") {

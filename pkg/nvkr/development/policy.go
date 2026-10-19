@@ -14,13 +14,16 @@ import (
 )
 
 const (
-	Issuer             = "https://token.actions.githubusercontent.com"
-	WriteSecret        = "NVKR_DEV_REGISTRY_WRITE"
-	ReadSecret         = "NVKR_DEV_REGISTRY_READ"
-	WriteCredentialRef = "github:" + WriteSecret
-	ReadCredentialRef  = "github:" + ReadSecret
-	WriteUserVariable  = "NVKR_DEV_REGISTRY_WRITE_USER"
-	ReadUserVariable   = "NVKR_DEV_REGISTRY_READ_USER"
+	ProducerWorkflow      = ".github/workflows/nvkr-dev.yml"
+	QualificationWorkflow = ".github/workflows/nvkr-dev-qualify.yml"
+	SmokeWorkflow         = ".github/workflows/nvkr-dev-smoke.yml"
+	Issuer                = "https://token.actions.githubusercontent.com"
+	WriteSecret           = "NVKR_DEV_REGISTRY_WRITE"
+	ReadSecret            = "NVKR_DEV_REGISTRY_READ"
+	WriteCredentialRef    = "github:" + WriteSecret
+	ReadCredentialRef     = "github:" + ReadSecret
+	WriteUserVariable     = "NVKR_DEV_REGISTRY_WRITE_USER"
+	ReadUserVariable      = "NVKR_DEV_REGISTRY_READ_USER"
 )
 
 var namespacePattern = regexp.MustCompile(`^ghcr\.io/([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)/([a-z0-9](?:[a-z0-9._-]*[a-z0-9])?)/development$`)

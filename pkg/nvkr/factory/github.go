@@ -24,9 +24,9 @@ const (
 	GitHubDevelopmentWorkflowPath = ".github/workflows/nvkr-dev.yml"
 	GitHubDevelopmentPlanPath     = ".github/nvkr-dev/plan.json"
 	GitHubDevelopmentManifestPath = ".github/nvkr-dev/manifest.json"
-	// Existing protected provider objects are not renamed by a repository change.
-	githubReleaseEnvironment            = "nkd-release"
-	githubARCEnvironment                = "nkd-arc"
+	// Protected provider objects must be provisioned under these exact names.
+	githubReleaseEnvironment            = "nvkr-release"
+	githubARCEnvironment                = "nvkr-arc"
 	githubDevelopmentReleaseEnvironment = "nvkr-dev-release"
 	githubDevelopmentARCEnvironment     = "nvkr-dev-arc"
 	githubExecutionCondition            = "github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)"
@@ -111,6 +111,10 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		return nil, err
 	}
 	layout := githubLayoutFor(plan)
+	needsProjection, err := githubNeedsForPlan(ctx, plan)
+	if err != nil {
+		return nil, err
+	}
 	files, planDigest, err := renderStaticInputs(ctx, plan, layout)
 	if err != nil {
 		return nil, err
@@ -148,6 +152,9 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		fmt.Fprintf(&body, "    name: %s\n", yamlSingle("Prepare NVKR runner ("+runner+")"))
 		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(githubBootstrapRunner(runner)))
 		fmt.Fprintf(&body, "    timeout-minutes: %d\n", githubSupportJobTimeoutMinutes)
+		if plan.Environment.GitHubRuntimePlan && runner != sortedKeys(bootstrapJobs)[0] {
+			fmt.Fprintf(&body, "    needs: [%s]\n", bootstrapJobs[sortedKeys(bootstrapJobs)[0]])
+		}
 		if plan.Environment.GitHubDevelopment || len(githubCatalogSourceEnvironment(plan)) > 0 {
 			fmt.Fprintf(&body, "    if: ${{ %s }}\n", githubDispatchCondition(plan))
 		}
@@ -169,7 +176,19 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			helperEnvironment += " GOOS=linux GOARCH=" + strings.TrimPrefix(platform, "linux/")
 		}
 		fmt.Fprintf(&body, "      - name: Build runner from this checkout\n        run: %s go build -trimpath -ldflags %s -o nvkr-exec ./cmd/nvkr\n", helperEnvironment, shellQuote(linkerFlags))
-		writeCatalogValidationStep(&body, plan, "Verify committed Run generation is current", "validate-catalog", generationCommand(plan, EngineGitHub))
+		command := generationCommand(plan, EngineGitHub)
+		if plan.Environment.GitHubRuntimePlan {
+			if runner == sortedKeys(bootstrapJobs)[0] {
+				command = githubRuntimeGenerationCommand(plan)
+			} else {
+				actions.writeDownloadStep(&body, "NVKR runtime inputs", githubRuntimeInputsArtifact, githubRuntimeInputDirectory)
+				writeGitHubShellStep(&body, "Install NVKR runtime inputs", []string{githubRuntimeInstallCommand(plan)})
+			}
+		}
+		writeCatalogValidationStep(&body, plan, "Verify committed Run generation is current", "validate-catalog", command)
+		if plan.Environment.GitHubRuntimePlan && runner == sortedKeys(bootstrapJobs)[0] {
+			writeGitHubRuntimeInputsUpload(&body, plan, actions)
+		}
 		actions.writeUploadStep(&body, plan, "NVKR runner", "nvkr-exec-"+shortStableName(runner), "nvkr-exec")
 	}
 	for _, stage := range stages {
@@ -209,32 +228,13 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		}
 		env := map[string]string{}
 		privateImages := len(githubStagePrivateImages(plan, stage)) > 0
-		if privateImages {
-			fmt.Fprintln(&body, "    permissions:\n      contents: read\n      packages: read")
+		permissions, err := githubStagePermissions(plan, stage)
+		if err != nil {
+			return nil, err
 		}
+		writeGitHubPermissions(&body, permissions)
 		for k, v := range plan.Environment.Runtime.Variables {
 			env[k] = v
-		}
-		if node.Kind == NodePublish {
-			target := plan.Targets[node.Target]
-			fmt.Fprintf(&body, "    permissions:\n      contents: read\n")
-			if target.CredentialRef != "" && strings.HasPrefix(target.Ref, "ghcr.io/") && !plan.Environment.GitHubDevelopment {
-				fmt.Fprintf(&body, "      packages: write\n")
-			}
-		}
-		if signFamilyNode(node.Kind) {
-			signing := plan.Environment.Signing
-			if signing == nil {
-				return nil, e.New(e.CodeTrustPolicyMissing,
-					"GitHub node %q signs without a delivery signing profile", node.ID)
-			}
-			// Signing scopes are per-mode and per-kind, and `id-token: write` (the OIDC
-			// token keyless cosign exchanges for a certificate) is emitted only for artifact signing and SBOM attestation.
-			permissions := githubSigningPermissionsFor(plan, node.Kind)
-			fmt.Fprintf(&body, "    permissions:\n")
-			for _, name := range sortedKeys(permissions) {
-				fmt.Fprintf(&body, "      %s: %s\n", name, permissions[name])
-			}
 		}
 		if node.Kind == NodePublish || signFamilyNode(node.Kind) {
 			registryEnv, err := githubRegistryEnvironment(plan, node.Kind, node.Target)
@@ -244,6 +244,9 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			for key, value := range registryEnv {
 				env[key] = value
 			}
+		}
+		if token := githubPublicationRepositoryToken(plan, node); token != "" {
+			env[githubRepositoryTokenEnv] = token
 		}
 		if len(env) > 0 {
 			fmt.Fprintln(&body, "    env:")
@@ -255,14 +258,21 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		if err := writeGitHubPlatformCheck(&body, plan, node.RunsOn); err != nil {
 			return nil, err
 		}
+		if stage.DiskOutput != "" {
+			check := githubKVMAccessCheck()
+			fmt.Fprintf(&body, "      - name: %s\n        timeout-minutes: %d\n        run: |-\n", check.Name, check.TimeoutMinutes)
+			for _, line := range strings.Split(check.Run, "\n") {
+				fmt.Fprintf(&body, "          %s\n", line)
+			}
+		}
 		actions.writeCheckoutStep(&body)
-		actions.writeDownloadStep(&body, "NVKR runner", "nvkr-exec-"+shortStableName(node.RunsOn), ".")
+		actions.writeDownloadStep(&body, "NVKR runner", "nvkr-exec-"+shortStableName(node.RunsOn), githubHelperDownloadPath(plan))
 		// upload-artifact/download-artifact do not preserve the execute bit, so the helper
 		// arrives non-executable. Restore it in a dedicated step IMMEDIATELY after the helper
 		// download, before ANY ./nvkr-exec invocation: the input Restore steps below are
 		// themselves helper invocations, so a chmod folded into the later Execute step leaves
 		// every input-bearing job failing at its first Restore.
-		writePrepareHelperStep(&body)
+		writeGitHubPrepareHelperStep(&body, plan)
 		if err := writeGitHubStageInputSteps(&body, plan, stage, artifacts, nodeJobs, actions); err != nil {
 			return nil, err
 		}
@@ -297,7 +307,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 					yamlSingle(diagnostic.With["name"]), yamlSingle(diagnostic.With["path"]), diagnostic.With["include-hidden-files"], diagnostic.With["if-no-files-found"], diagnostic.With["retention-days"])
 			}
 			for _, member := range stage.Nodes {
-				writeGitHubOutputSteps(&body, plan, member, artifacts, actions)
+				writeGitHubOutputSteps(&body, plan, member, artifacts, nodeJobs, actions)
 			}
 			continue
 		}
@@ -315,7 +325,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			for _, line := range githubNodeCommands(node, plan) {
 				fmt.Fprintf(&body, "          %s\n", line)
 			}
-			writeGitHubOutputSteps(&body, plan, node, artifacts, actions)
+			writeGitHubOutputSteps(&body, plan, node, artifacts, nodeJobs, actions)
 		}
 	}
 	if plan.DefinitionDigest != "" && plan.EnvironmentDigest != "" {
@@ -350,14 +360,9 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		fmt.Fprintf(&body, "    if: ${{ always() && %s }}\n", githubDispatchCondition(plan))
 		if GitHubDiskBuildOnly(plan) {
 			fmt.Fprintf(&body, "    environment: %s\n", yamlSingle(githubARCEnvironment))
-			fmt.Fprintln(&body, "    permissions:\n      contents: read")
 		}
 		if PerOutputPublication(plan) {
 			fmt.Fprintf(&body, "    environment: %s\n", yamlSingle(githubReleaseEnvironmentFor(plan)))
-			fmt.Fprintln(&body, "    permissions:\n      contents: read")
-			if !plan.Environment.GitHubDevelopment {
-				fmt.Fprintln(&body, "      packages: read")
-			}
 			registryEnv, err := githubRegistryEnvironment(plan, NodeVerifyPublication, "release")
 			if err != nil {
 				return nil, err
@@ -366,13 +371,14 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 				fmt.Fprintf(&body, "    env:\n      NVKR_REGISTRY_USER: %s\n      NVKR_CREDENTIAL: %s\n", yamlSingle(registryEnv["NVKR_REGISTRY_USER"]), yamlSingle(registryEnv["NVKR_CREDENTIAL"]))
 			}
 		}
+		writeGitHubPermissions(&body, githubFinalizerPermissions(plan))
 		fmt.Fprintln(&body, "    steps:")
 		if err := writeGitHubPlatformCheck(&body, plan, runner); err != nil {
 			return nil, err
 		}
 		actions.writeCheckoutStep(&body)
-		actions.writeDownloadStep(&body, "NVKR runner", "nvkr-exec-"+shortStableName(runner), ".")
-		writePrepareHelperStep(&body)
+		actions.writeDownloadStep(&body, "NVKR runner", "nvkr-exec-"+shortStableName(runner), githubHelperDownloadPath(plan))
+		writeGitHubPrepareHelperStep(&body, plan)
 		if err := writeGitHubFinalizerRestoreSteps(&body, plan, nodeJobs); err != nil {
 			return nil, err
 		}
@@ -387,13 +393,25 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		if githubQualificationHandoffEnabled(plan) {
 			writeGitHubQualificationHandoffStep(&body, actions)
 		}
-		writeGitHubRunSummary(&body, githubRunEndSummary(len(allNeeds)))
+		summary := githubRunEndSummary(len(allNeeds))
+		if len(needsProjection.Collectors) != 0 {
+			summary = githubCollectedRunEndSummary(len(allNeeds))
+		}
+		writeGitHubRunSummary(&body, summary)
 	}
 	workflow, actionFiles, err := lowerGitHubActions(plan, body.Bytes(), actions)
 	if err != nil {
 		return nil, err
 	}
 	workflow, err = shareGitHubActions(plan, workflow, actionFiles, actions)
+	if err != nil {
+		return nil, err
+	}
+	workflow, err = lowerGitHubNeeds(ctx, plan, workflow)
+	if err != nil {
+		return nil, err
+	}
+	workflow, actionFiles, err = privatizeGitHubTransfers(plan, workflow, actionFiles, actions)
 	if err != nil {
 		return nil, err
 	}
@@ -449,12 +467,20 @@ func githubSigningPermissions(kind, mode string) map[string]string {
 
 func githubSigningPermissionsFor(plan *Plan, kind string) map[string]string {
 	permissions := githubSigningPermissions(kind, plan.Environment.Signing.Mode)
-	if plan.Environment.GitHubDevelopment {
-		// Development publication uses separately scoped principals. The workflow
+	if githubScopedPublication(plan) {
+		// Scoped publication uses separately scoped principals. The workflow
 		// token cannot acquire production-package write access as a side effect.
 		delete(permissions, "packages")
 	}
 	return permissions
+}
+
+// ProductionRegistryWriteCredential selects independently scoped production accounts.
+const ProductionRegistryWriteCredential = "github:NVKR_REGISTRY_WRITE"
+
+func githubScopedPublication(plan *Plan) bool {
+	return plan.Environment.GitHubDevelopment ||
+		(plan.Environment.Publication != nil && plan.Environment.Publication.CredentialRef == ProductionRegistryWriteCredential)
 }
 
 // githubRegistryEnvironment selects the fixed credential for one graph operation.
@@ -483,7 +509,28 @@ func githubRegistryEnvironment(plan *Plan, kind, targetName string) (map[string]
 			return nil, e.New(e.CodeEngineCapability, "development operation %q has no registry credential scope", kind)
 		}
 	}
+	if !plan.Environment.GitHubDevelopment && target.CredentialRef == ProductionRegistryWriteCredential {
+		switch kind {
+		case NodePublish, NodeSign:
+			secret, user = "NVKR_REGISTRY_WRITE", "${{ vars.NVKR_REGISTRY_WRITE_USER }}"
+		case NodeVerifyPublication, NodeAssembleRelease:
+			secret, user = "NVKR_REGISTRY_READ", "${{ vars.NVKR_REGISTRY_READ_USER }}"
+		default:
+			return nil, e.New(e.CodeEngineCapability, "production operation %q has no registry credential scope", kind)
+		}
+	}
 	return map[string]string{"NVKR_CREDENTIAL": "${{ secrets." + secret + " }}", "NVKR_REGISTRY_USER": user}, nil
+}
+
+// GHCR privacy admission authenticates the source repository with the automatic
+// workflow token. Package inspection and writes keep the publisher's credential.
+// Only publication performs this admission; producers and other release stages
+// receive no repository metadata credential through their job environment.
+func githubPublicationRepositoryToken(plan *Plan, node Node) string {
+	if node.Kind == NodePublish && strings.HasPrefix(plan.Targets[node.Target].Ref, "ghcr.io/") {
+		return "${{ github.token }}"
+	}
+	return ""
 }
 
 func githubCancelInProgress(plan *Plan) bool {
@@ -514,7 +561,38 @@ func (actions githubActionRefs) writeUploadStep(out *bytes.Buffer, plan *Plan, l
 	if githubCancelInProgress(plan) {
 		days = 1
 	}
+	if plan.Environment.GitHubRuntimePlan && label == "NVKR runner" {
+		fmt.Fprintf(out, "      - name: %s\n        uses: %s\n        with:\n          name: %s\n          path: |\n            nvkr-exec\n", yamlSingle("Upload "+label), actions.Upload, yamlSingle(name))
+		for _, member := range githubRuntimeInputPaths(plan) {
+			fmt.Fprintf(out, "            %s\n", member)
+		}
+		fmt.Fprintf(out, "          include-hidden-files: 'true'\n          if-no-files-found: error\n          retention-days: %d\n", days)
+		return
+	}
 	fmt.Fprintf(out, "      - name: %s\n        uses: %s\n        with:\n          name: %s\n          path: %s\n          if-no-files-found: error\n          retention-days: %d\n", yamlSingle("Upload "+label), actions.Upload, yamlSingle(name), yamlSingle(path), days)
+}
+
+const githubRuntimeInputsArtifact = "nvkr-runtime-inputs"
+
+func githubRuntimeInstallCommand(plan *Plan) string {
+	return "./nvkr-exec factory github install-runtime-inputs --plan " + shellQuote(githubLayoutFor(plan).planPath)
+}
+
+func githubRuntimeInputPaths(plan *Plan) []string {
+	layout := githubLayoutFor(plan)
+	return []string{layout.planPath, filepath.ToSlash(filepath.Join(filepath.Dir(layout.planPath), "action-data.json")), layout.manifestPath}
+}
+
+func githubRuntimeGenerationCommand(plan *Plan) string {
+	return strings.TrimSuffix(generationCommand(plan, EngineGitHub), " --check") + " --runtime"
+}
+
+func writeGitHubRuntimeInputsUpload(out *bytes.Buffer, plan *Plan, actions githubActionRefs) {
+	fmt.Fprintf(out, "      - name: Upload NVKR runtime inputs\n        uses: %s\n        with:\n          name: %s\n          path: |\n", actions.Upload, githubRuntimeInputsArtifact)
+	for _, member := range githubRuntimeInputPaths(plan) {
+		fmt.Fprintf(out, "            %s\n", member)
+	}
+	fmt.Fprint(out, "          include-hidden-files: 'true'\n          if-no-files-found: error\n          retention-days: 7\n")
 }
 
 func (actions githubActionRefs) writeCheckoutStep(out *bytes.Buffer) {
@@ -541,6 +619,43 @@ const (
 
 func writePrepareHelperStep(out *bytes.Buffer) {
 	fmt.Fprintf(out, "      - name: %s\n        run: %s\n", prepareHelperStepName, prepareHelperRun)
+}
+
+func githubHelperDownloadPath(plan *Plan) string {
+	if plan.Environment.GitHubRuntimePlan {
+		return ".nvkr/runtime-runner"
+	}
+	return "."
+}
+
+func prepareHelperRunFor(plan *Plan) string {
+	if plan == nil || !plan.Environment.GitHubRuntimePlan {
+		return prepareHelperRun
+	}
+	var command strings.Builder
+	fmt.Fprintln(&command, "set -eu")
+	members := append([]string{"nvkr-exec"}, githubRuntimeInputPaths(plan)...)
+	for _, member := range members {
+		source := shellQuote(githubHelperDownloadPath(plan) + "/" + member)
+		fmt.Fprintf(&command, "[ -f %s ] && [ ! -L %s ] || { printf 'nvkr: [NVKR-E-PIPELINE-DRIFT] incomplete runtime input carrier\\n' >&2; exit %d; }\n", source, source, e.ExitCode(e.New(e.CodePipelineDrift, "")))
+	}
+	for _, member := range members {
+		fmt.Fprintf(&command, "mv -- %s %s\n", shellQuote(githubHelperDownloadPath(plan)+"/"+member), shellQuote(member))
+	}
+	fmt.Fprintln(&command, prepareHelperRun)
+	fmt.Fprintf(&command, "./nvkr-exec factory github check-runtime-inputs --plan %s\n", shellQuote(githubLayoutFor(plan).planPath))
+	return strings.TrimSuffix(command.String(), "\n")
+}
+
+func writeGitHubPrepareHelperStep(out *bytes.Buffer, plan *Plan) {
+	if !plan.Environment.GitHubRuntimePlan {
+		writePrepareHelperStep(out)
+		return
+	}
+	fmt.Fprintf(out, "      - name: %s\n        run: |\n", prepareHelperStepName)
+	for _, line := range strings.Split(prepareHelperRunFor(plan), "\n") {
+		fmt.Fprintf(out, "          %s\n", line)
+	}
 }
 
 func (actions githubActionRefs) writeDownloadStep(out *bytes.Buffer, label, name, path string) {

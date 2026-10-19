@@ -20,6 +20,7 @@ type githubWorkflowDocument struct {
 	Name        string                     `json:"name"`
 	On          map[string]json.RawMessage `json:"on"`
 	Permissions map[string]string          `json:"permissions"`
+	Env         map[string]string          `json:"env,omitempty"`
 	Jobs        map[string]githubJob       `json:"jobs"`
 	Concurrency struct {
 		Group            string `json:"group"`
@@ -38,6 +39,7 @@ type githubJob struct {
 	If             string                     `json:"if,omitempty"`
 	Permissions    map[string]string          `json:"permissions,omitempty"`
 	Env            map[string]string          `json:"env,omitempty"`
+	Outputs        map[string]string          `json:"outputs,omitempty"`
 	Steps          []githubStep               `json:"steps"`
 }
 
@@ -84,6 +86,12 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	if err := yaml.UnmarshalStrict(expanded, &document); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "GitHub workflow schema is invalid")
 	}
+	if err := validateGitHubLocatorBudget(document, actions); err != nil {
+		return err
+	}
+	if err := admitGitHubNeeds(ctx, plan, &document); err != nil {
+		return err
+	}
 	if err := validateGitHubScriptLimits(document); err != nil {
 		return err
 	}
@@ -122,6 +130,17 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	stages, nodeJobs, err := githubStages(plan)
 	if err != nil {
 		return err
+	}
+	for _, stage := range stages {
+		if stage.DiskOutput == "" {
+			continue
+		}
+		job := document.Jobs[stage.ID]
+		if len(job.Steps) == 0 || !reflect.DeepEqual(job.Steps[0], githubKVMAccessCheck()) {
+			return e.New(e.CodeEngineCapability, "GitHub disk job %q must prepare KVM access before checkout or input transport", stage.ID)
+		}
+		job.Steps = job.Steps[1:]
+		document.Jobs[stage.ID] = job
 	}
 	if err := validateGitHubCarrierUploads(plan, document, stages, artifacts, nodeJobs, actions); err != nil {
 		return err
@@ -297,11 +316,24 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	}
 	for runner, jobID := range bootstrap {
 		job, ok := document.Jobs[jobID]
+		wantSteps := 5
+		command := generationCommand(plan, EngineGitHub)
+		if plan.Environment.GitHubRuntimePlan {
+			wantSteps = 6
+			if runner == sortedKeys(bootstrap)[0] {
+				command = githubRuntimeGenerationCommand(plan)
+			} else {
+				wantSteps = 7
+				if !strings.Contains(joinRuns(job.Steps), githubRuntimeInstallCommand(plan)) {
+					return e.New(e.CodeInvalidCatalog, "secondary GitHub bootstrap omits runtime input installation")
+				}
+			}
+		}
 		wantCondition := ""
 		if plan.Environment.GitHubDevelopment || len(catalogEnv) > 0 {
 			wantCondition = "${{ " + githubDispatchCondition(plan) + " }}"
 		}
-		if !ok || job.RunsOn != githubBootstrapRunner(runner) || job.If != wantCondition || len(job.Steps) != 5 || job.Steps[0].Uses != actions.Checkout {
+		if !ok || job.RunsOn != githubBootstrapRunner(runner) || job.If != wantCondition || len(job.Steps) != wantSteps || job.Steps[0].Uses != actions.Checkout {
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q is incomplete", jobID)
 		}
 		// The bootstrap must provision the Go toolchain via the pinned setup-go action rather
@@ -318,7 +350,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		}
 		if !stepUses(job.Steps, actions.Upload) || !strings.Contains(bootstrapRuns, "go build -trimpath") ||
 			!strings.Contains(bootstrapRuns, "-ldflags "+shellQuote(linkerFlags)) ||
-			!strings.Contains(bootstrapRuns, generationCommand(plan, EngineGitHub)) {
+			!strings.Contains(bootstrapRuns, command) {
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q does not build and transport the runner", jobID)
 		}
 	}
@@ -352,7 +384,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if len(job.Steps) == 0 || job.Steps[0].Uses != actions.Checkout || !stepUses(job.Steps, actions.Download) {
 			return e.New(e.CodeInvalidCatalog, "GitHub job %q omits pinned checkout or input transport", jobID)
 		}
-		if err := actions.validateHelperPreparedFirst(jobID, job.Steps); err != nil {
+		if err := actions.validateHelperPreparedFirst(jobID, job.Steps, plan); err != nil {
 			return err
 		}
 		for _, step := range job.Steps {
@@ -363,21 +395,25 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if err := validateGitHubStageExecution(plan, stage, job.Steps); err != nil {
 			return err
 		}
-		if len(githubStagePrivateImages(plan, stage)) > 0 && !reflect.DeepEqual(job.Permissions, map[string]string{"contents": "read", "packages": "read"}) {
-			return e.New(e.CodeEngineCapability, "private toolchain jobs require exactly contents:read and packages:read")
+		if len(githubStagePrivateImages(plan, stage)) > 0 && !reflect.DeepEqual(job.Permissions, map[string]string{"contents": "read"}) {
+			return e.New(e.CodeEngineCapability, "private toolchain jobs require exactly contents:read")
 		}
 		wantCondition := stage.condition(plan)
 		if job.If != wantCondition {
 			return e.New(e.CodeEngineCapability, "GitHub execution job %q must require dispatch on an admitted branch", jobID)
 		}
-		if plan.Environment.GitHubDevelopment {
+		repositoryToken, repositoryTokenPresent := job.Env[githubRepositoryTokenEnv]
+		if want := githubPublicationRepositoryToken(plan, node); repositoryToken != want || repositoryTokenPresent != (want != "") {
+			return e.New(e.CodeEngineCapability, "GitHub job %q repository metadata credential differs from its publication scope", jobID)
+		}
+		if githubScopedPublication(plan) {
 			if err := validateGitHubRegistryEnvironment(plan, node.Kind, node.Target, jobID, job); err != nil {
 				return err
 			}
 		}
 		if node.Kind == NodePublish {
 			target := plan.Targets[node.Target]
-			if !plan.Environment.GitHubDevelopment && strings.HasPrefix(target.Ref, "ghcr.io/") && job.Permissions["packages"] != "write" {
+			if !githubScopedPublication(plan) && strings.HasPrefix(target.Ref, "ghcr.io/") && job.Permissions["packages"] != "write" {
 				return e.New(e.CodeEngineCapability, "GitHub publish job %q lacks explicit packages:write", jobID)
 			}
 			if !strings.HasPrefix(target.Ref, "ghcr.io/") && job.Permissions["packages"] != "" {
@@ -412,7 +448,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				return e.New(e.CodeEngineCapability, "GitHub signing job %q omits its credential reference", jobID)
 			}
 		}
-		for _, output := range node.Outputs {
+		for _, output := range githubCarrierOutputs(plan, node, artifacts, nodeJobs) {
 			if !hasExactGitHubRun(job.Steps, githubRunnerCommand(plan, "pack-outputs", "node", node.ID)) ||
 				!actions.stepUploads(job.Steps, githubArtifactName(output), carrierPath(output)) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q does not transport output %q", jobID, output)
@@ -432,7 +468,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		job := document.Jobs["nvkr-lifecycle-run"]
 		if PerOutputPublication(plan) {
 			permissions := map[string]string{"contents": "read"}
-			if !plan.Environment.GitHubDevelopment {
+			if !githubScopedPublication(plan) {
 				permissions["packages"] = "read"
 			}
 			if job.Environment != githubReleaseEnvironmentFor(plan) || !reflect.DeepEqual(job.Permissions, permissions) {
@@ -462,7 +498,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if githubQualificationHandoffEnabled(plan) && !reflect.DeepEqual(job.Steps[len(job.Steps)-1], githubQualificationHandoffStep(actions)) {
 			return e.New(e.CodeEngineCapability, "GitHub finalizer must upload only the complete handoff for this successful exact attempt")
 		}
-		if err := actions.validateHelperPreparedFirst("nvkr-lifecycle-run", job.Steps); err != nil {
+		if err := actions.validateHelperPreparedFirst("nvkr-lifecycle-run", job.Steps, plan); err != nil {
 			return err
 		}
 		var needs []string
@@ -515,10 +551,14 @@ func validateGitHubRegistryEnvironment(plan *Plan, kind, target, jobID string, j
 // not runnable until the dedicated preparation step runs; because the input Restore steps
 // are themselves helper invocations, the preparation must come immediately after the
 // helper download and strictly before the FIRST ./nvkr-exec in the job.
-func (actions githubActionRefs) validateHelperPreparedFirst(jobID string, steps []githubStep) error {
+func (actions githubActionRefs) validateHelperPreparedFirst(jobID string, steps []githubStep, plans ...*Plan) error {
+	wantRun := prepareHelperRun
+	if len(plans) != 0 {
+		wantRun = prepareHelperRunFor(plans[0])
+	}
 	prepared := -1
 	for index, step := range steps {
-		if step.Name == prepareHelperStepName && strings.TrimSpace(step.Run) == prepareHelperRun {
+		if step.Name == prepareHelperStepName && strings.TrimSpace(step.Run) == wantRun {
 			prepared = index
 			break
 		}
@@ -602,6 +642,9 @@ func validateGitHubCarrierUploads(plan *Plan, document githubWorkflowDocument, s
 				carriers = append(carriers, artifact)
 			}
 			if _, raw := diskPublicationRequirement(plan, artifact); raw {
+				continue
+			}
+			if !githubArtifactNeedsCarrier(plan, artifact, nodeJobs) {
 				continue
 			}
 			if err := require(artifact.ID); err != nil {

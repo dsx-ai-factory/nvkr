@@ -21,8 +21,8 @@ import (
 // They are not framework requirements for customer catalogs or component names.
 func TestNVKEControllerPinnedChartFilename(t *testing.T) {
 	for _, tc := range []struct{ catalog, component, artifact string }{
-		{"../../../definitions/nvke-controller/catalog", "nvke-controller-chart", "charts/nke-controller-0.1.1.tgz"},
-		{"../../../definitions/nvke-local-dev-arm64/site-catalog", "nvke-controller-chart", "charts/nke-controller-0.0.0.tgz"},
+		{"../../../inputs/catalogs/nvke/release", "nvke-controller-chart", "charts/nke-controller-0.1.1.tgz"},
+		{"../../../inputs/catalogs/nvke/local-site-arm64", "nvke-controller-chart", "charts/nke-controller-0.0.0.tgz"},
 	} {
 		t.Run(tc.catalog, func(t *testing.T) {
 			raw, err := os.ReadFile(filepath.Join(tc.catalog, "registry.yaml"))
@@ -46,7 +46,7 @@ func TestNVKEControllerPinnedChartFilename(t *testing.T) {
 }
 
 func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
-	const inputRoot = "../../../definitions/nvke-m2"
+	const inputRoot = "../../../inputs/definitions/nvke"
 	const approvedSource = "ff21ba8c07cafff74b68e238a8876af11e5beded"
 	authored, err := definition.LoadDefinition(t.Context(), filepath.Join(inputRoot, "definition.yaml"))
 	if err != nil {
@@ -144,6 +144,10 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 				}
 				if node.Packer == nil || node.Packer.AcquisitionArchive != want.variant+"/apt-acquisitions.tar" {
 					t.Fatal("capture carrier did not reach compiled graph")
+				}
+				if len(node.Patches) != 1 || node.Patches[0].Name != "patches/capture-schema.patch" ||
+					!strings.Contains(node.Patches[0].Content, `+SCHEMA = "nvkr.dev/package-acquisitions/v1"`) {
+					t.Fatal("capture producer must use the same schema as its consumer through an authenticated source patch")
 				}
 				if node.ArtifactPath != want.variant+"/nke-node.qcow2" || node.Disk == nil || node.Disk.Encryption != want.encryption ||
 					node.Packer.BuildName != "nke-node-"+want.variant+".qemu.nke-"+want.variant {

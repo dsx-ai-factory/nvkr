@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/cistore"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
@@ -252,6 +253,7 @@ func assertDevelopmentRejectsStaleMetadataBeforePublication(t *testing.T, plan *
 	t.Setenv("GITHUB_RUN_ATTEMPT", "2")
 	t.Setenv("NVKR_REGISTRY_USER", "dev-user")
 	t.Setenv("NVKR_CREDENTIAL", "dev-credential")
+	t.Setenv(githubRepositoryTokenEnv, "repository-credential")
 	route := outputPublicationRoute(plan.LifecycleOutputs[0].Name)
 	node := planNode(plan, NodePublish+"/"+route)
 	calls := 0
@@ -261,7 +263,8 @@ func assertDevelopmentRejectsStaleMetadataBeforePublication(t *testing.T, plan *
 		return nil, context.Canceled
 	})
 	t.Cleanup(func() { remote.DefaultTransport = original })
-	err := executePublish(t.Context(), plan, node, artifacts, io.Discard)
+	err := executePublishWithAdmission(t.Context(), plan, node, artifacts, io.Discard,
+		func(context.Context, string, []string, cistore.Options) error { return nil })
 	assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
 	if calls != 0 {
 		t.Fatal("stale development metadata reached registry")

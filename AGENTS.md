@@ -87,6 +87,10 @@ retains its original scope; superseded requirements and plans are available only
 7. **Prefer file tools and `git mv` over destructive shell commands.** Do not use `rm`-style commands when a
    file tool or Git operation does the job.
 8. **3-strike rule.** After three failed fix attempts, stop, reassess, and explain the blocker.
+9. **Never commit secrets or credentials.** Keep real tokens, passwords, private keys, credential files,
+   and sensitive logs out of source, examples, fixtures, generated files, commits, and PR content. Use clearly
+   synthetic placeholders in tests and credential references in configuration. If you find an exposed secret,
+   stop reproducing it and follow [SECURITY.md](SECURITY.md) privately; do not copy it into a public report.
 
 ## Commands
 
@@ -192,6 +196,9 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
   template already supplies `{#slug}` anchors (the SADD). Promote a bold label to a
   heading only when it names a topic with substantial content beneath it.
 - Keep `docs/sadd.md` and `CONTEXT.md` (domain vocabulary) consistent with any ADR change.
+- Keep the GitHub App setup instructions current with the permissions the catalog maintenance workflow requests.
+  When `catalogmaintenance.AppPermissions` or the App secrets change, update the "Create the publishing GitHub
+  App" section of `docs/catalog-maintenance.md` in the same change.
 - Put example-specific commands beside their Definition or toolchain. Before adding a user guide, consult
   `docs/README.md` and update the existing task or reference owner. Cite immutable external Run/artifact
   references and their limits in reconciliation; historical investigations belong in Git history.
@@ -199,9 +206,9 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
 ## Key files
 
 Use `docs/README.md` for documentation, `demos/README.md` for presentations and guided demos, and
-`scripts/README.md` for operational scripts. Generate alternate examples into scratch roots. `definitions/nvke-v1/`
-contains the retained three-output NVKE inputs; `definitions/nvke-m2/` supplies the maintained release candidate,
-and `definitions/nvke-fde/` supplies the build-only FDE selection. `make workflows-check` repeats the exact input
+`scripts/README.md` for operational scripts and `inputs/README.md` for authored input ownership. Generate alternate examples into scratch roots. `docs/examples/nvke-tutorial/`
+contains the retained three-output NVKE inputs; `inputs/definitions/nvke/` supplies the maintained release candidate,
+and `inputs/definitions/diagnostics/fde-amd64.yaml` supplies the build-only FDE selection. `make workflows-check` repeats the exact input
 paths in the committed Plan. A branch's selection is not a ratified canonical-product decision.
 `.github/workflows/nvkr-run.yml` and `.github/nvkr-run/manifest.json` are generated. `toolchains/` owns toolchain
 sources and helper pins. `CONTRIBUTING.md` owns contribution rules.

@@ -15,11 +15,11 @@ import (
 // Git insteadOf matches prefixes, not repository identities. Admit every source
 // the pin transaction or catalog validation can resolve before compiling (which
 // revalidates pin sets); prepare also admits the compiled execution fetches.
-func admitSourceCheckoutCatalogs(ctx context.Context, config Config, sources map[string]catalog.Source, catalogs map[string]bool) error {
-	if config.SourceCheckout == nil {
+func admitSourceCheckoutCatalogs(ctx context.Context, config Config, repository string, sources map[string]catalog.Source, catalogs map[string]bool) error {
+	if repository == "" {
 		return nil
 	}
-	if err := admitSourceCheckoutSources(config.SourceCheckout, sources, config.Sources); err != nil {
+	if err := admitSourceCheckoutSources(repository, sources, config.Sources); err != nil {
 		return err
 	}
 	paths := make([]string, 0, len(catalogs))
@@ -34,14 +34,14 @@ func admitSourceCheckoutCatalogs(ctx context.Context, config Config, sources map
 		if err != nil {
 			return err
 		}
-		if err := admitSourceCheckoutSources(config.SourceCheckout, sources, nil); err != nil {
+		if err := admitSourceCheckoutSources(repository, sources, nil); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func admitSourceCheckoutSources(checkout *SourceCheckout, sources map[string]catalog.Source, selected []string) error {
+func admitSourceCheckoutSources(repository string, sources map[string]catalog.Source, selected []string) error {
 	pending := append([]string(nil), selected...)
 	// Catalog loading validates every declared pin set, including those that do
 	// not supply a selected output. Nested member sources are resolved as well.
@@ -60,7 +60,7 @@ func admitSourceCheckoutSources(checkout *SourceCheckout, sources map[string]cat
 		}
 		seen[name] = true
 		source := sources[name]
-		if err := admitSourceCheckoutRepo(checkout, source.Repo); err != nil {
+		if err := admitSourceCheckoutRepo(repository, source.Repo); err != nil {
 			return err
 		}
 		if source.PinSet != nil {
@@ -74,23 +74,23 @@ func admitSourceCheckoutSources(checkout *SourceCheckout, sources map[string]cat
 	return nil
 }
 
-func admitSourceCheckoutRepo(checkout *SourceCheckout, repo string) error {
-	if checkout == nil {
+func admitSourceCheckoutRepo(repository, repo string) error {
+	if repository == "" {
 		return nil
 	}
-	prefix := "https://github.com/" + checkout.Repository
-	if strings.HasPrefix(repo, prefix) && !matchesSourceCheckout(checkout, repo) {
+	prefix := "https://github.com/" + repository
+	if strings.HasPrefix(repo, prefix) && !matchesSourceCheckout(repository, repo) {
 		return e.New(e.CodeEngineCapability, "source checkout URL prefix %q would redirect distinct repository %q", prefix, repo)
 	}
 	return nil
 }
 
 // Use the same repository spelling rules for root selection and prefix admission.
-func matchesSourceCheckout(checkout *SourceCheckout, repo string) bool {
-	if checkout == nil {
+func matchesSourceCheckout(repository, repo string) bool {
+	if repository == "" {
 		return false
 	}
 	// Git accepts the same repository with an optional .git and trailing slash.
 	identity := strings.TrimSuffix(strings.TrimSuffix(repo, "/"), ".git")
-	return identity == "https://github.com/"+checkout.Repository
+	return identity == "https://github.com/"+repository
 }

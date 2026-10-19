@@ -181,7 +181,7 @@ After publication, read back the exact repository reference's native descriptor,
 `crane digest --platform linux/arm64 '<repository>@sha256:<digest>'`, with the matching platform.
 
 The source lock's historical `validatedNVKE` commit is not validation of the capture-enabled M2 source.
-The [M2 README](../../definitions/nvke-m2/README.md) owns current source selections, candidate exceptions
+The [M2 README](../../inputs/definitions/nvke/README.md) owns current source selections, candidate exceptions
 and generated execution requirements; the machine-managed locks and overlay own their exact values.
 Native preparation and registry read-back do not establish source-owner release acceptance, runtime
 isolation, a full image bake, organizational approval or independent consumer acceptance.

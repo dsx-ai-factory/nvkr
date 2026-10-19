@@ -29,7 +29,7 @@ func TestOSAgentAcquisitionUsesGoTransportFallback(t *testing.T) {
 		t.Skipf("authored module-pin checks require sha256sum: %v", err)
 	}
 	root := filepath.Dir(filepath.Dir(demoScript(t, "nvke-os-local.sh")))
-	raw, err := os.ReadFile(filepath.Join(root, "definitions/nvke-os/catalog/registry.yaml"))
+	raw, err := os.ReadFile(filepath.Join(root, "inputs/catalogs/node-images/diagnostic/registry.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestOSAgentAcquisitionUsesGoTransportFallback(t *testing.T) {
 	if len(command) != 3 || command[0] != "bash" || command[1] != "-ec" {
 		t.Fatalf("unexpected agent preparation command: %v", command)
 	}
-	overlay, err := catalog.LoadOverlayContext(t.Context(), filepath.Join(root, "definitions/nvke-os/arm64-kvm.yaml"))
+	overlay, err := catalog.LoadOverlayContext(t.Context(), filepath.Join(root, "inputs/catalogs/node-images/variants/diagnostic-arm64-kvm.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}

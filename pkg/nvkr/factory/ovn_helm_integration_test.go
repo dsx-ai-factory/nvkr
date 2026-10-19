@@ -45,7 +45,7 @@ func TestOVNForkHelmDigestRendering(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
-	cat, err := catalog.LoadContext(ctx, catalog.Dir("../../../definitions/nvke-ovn-source/catalog"))
+	cat, err := catalog.LoadContext(ctx, catalog.Dir("../../../inputs/catalogs/ovn-nvidia"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestOVNForkHelmDigestRendering(t *testing.T) {
 	server := httptest.NewServer(registry.New(registry.Logger(log.New(io.Discard, "", 0))))
 	defer server.Close()
 	repository := strings.TrimPrefix(server.URL, "http://") + "/ovn-chart-arm64"
-	ref, err := name.NewTag(repository+":2.4.0", name.StrictValidation, name.Insecure)
+	ref, err := name.NewTag(repository+":2.4.2", name.StrictValidation, name.Insecure)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,13 +180,13 @@ func TestOVNForkHelmDigestRendering(t *testing.T) {
 		t.Fatal(err)
 	}
 	pulled := t.TempDir()
-	cmd := exec.CommandContext(ctx, helm, "pull", "oci://"+repository, "--version", "2.4.0", "--plain-http", "--destination", pulled, "--registry-config", filepath.Join(pulled, "registry.json"))
+	cmd := exec.CommandContext(ctx, helm, "pull", "oci://"+repository, "--version", "2.4.2", "--plain-http", "--destination", pulled, "--registry-config", filepath.Join(pulled, "registry.json"))
 	cmd.WaitDelay = 5 * time.Second
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("real Helm OCI pull: %v\n%s", err, out)
 	}
-	raw, err := os.ReadFile(filepath.Join(pulled, "ovn-chart-arm64-2.4.0.tgz"))
+	raw, err := os.ReadFile(filepath.Join(pulled, "ovn-chart-arm64-2.4.2.tgz"))
 	if err != nil {
 		t.Fatal(err)
 	}

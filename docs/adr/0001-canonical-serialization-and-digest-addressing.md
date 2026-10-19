@@ -70,12 +70,9 @@ substitutes for that object's domain-separated identity or its authenticated rec
 
 ### 3. Domain-separated digests
 
-The NVKR rebrand allocates the `nvkr.*` family namespace and `nvkr.dev` schemas
-as a breaking framework-namespace cutover. It does not mutate historical `nkd.*`
-identities or signed bytes. Unsupported old namespaces fail strict dispatch;
-there is no implicit alias or conversion. Reserved names below are reserved
-within the NVKR namespace. Historical allocations remain historical. See the
-[cutover contract](../nvkr-rebranding.md) for producer and runtime boundaries.
+The framework uses the `nvkr.*` digest families and `nvkr.dev` schemas.
+Namespace changes never rewrite historical signed bytes. Unsupported namespaces
+fail strict dispatch. Reserved names below belong to the NVKR namespace.
 
 Every structured semantic object's digest is computed with a frozen **family-kind tag** and an unambiguous
 separator: `Digest(kind, obj) = sha256(UTF8(kind) ∥ 0x00 ∥ canonical-bytes)`. `schemaVersion` stays inside the
@@ -109,7 +106,7 @@ within the same family from being interpreted.
 
 The six public objects are Definition, Environment, Run, Artifact, Release, and Verification Policy. The
 compiler-derived logical build graph uses the new **`nvkr.build`** family. **`nvkr.recipe` is reserved and
-never minted**; historical `nkd.recipe` identities remain unsupported. Removing authored
+never minted**; unsupported identity families remain rejected. Removing authored
 Recipes does not rename, convert, or reauthenticate historical signed bytes. Cluster-definition,
 cluster-composition, cluster-realization and staging-manifest families are likewise reserved and cannot mint
 new identities. The removed compiler-handoff and copied execution-settings families are also reserved and
@@ -167,6 +164,7 @@ pipeline-attested build/evidence qualification; it does not reuse a reserved qua
 | Object | Canonical schema | Frozen family kind | Attestation predicate type |
 |---|---|---|---|
 | Qualification evidence | `nvkr.dev/qualification-evidence/v2` | `nvkr.qualification-evidence` | `https://nvkr.dev/qualification-evidence/v2` |
+| Development qualification evidence | `nvkr.dev/development-qualification-evidence/v1` | `nvkr.qualification-evidence` | `https://nvkr.dev/development-qualification-evidence/v1` |
 | Qualification policy | `nvkr.dev/qualification-policy/v1` | `nvkr.qualification-policy` | Independently selected configuration; no evidence predicate |
 | Native smoke worker | `nvkr.dev/tool-smoke-worker/v1` | `nvkr.tool-smoke-worker` | Detached signed document; no qualification attachment |
 
@@ -194,9 +192,28 @@ verified certificate, then validates complete, disjoint member coverage. Generat
 unsigned report fields never restore a smoke receipt. These registrations state the wire contracts;
 reconciliation separately records runtime, worker authentication and hosted acceptance implementation.
 
-The M4 release-manifest document remains deferred and requires its own registered canonical schema and
-domain-separated identity before implementation. Pretty-printed JSON hashes are insufficient for either
-document. Reconciliation records implementation and external acceptance independently of schema registration.
+M4 release issuance (ADR-16 §5) registers the following distinct schema and family. It is
+pipeline-attested release membership; it does not reuse the reserved clearance, publication or
+publication-manifest families.
+
+| Object | Canonical schema | Frozen family kind | Attestation predicate type |
+|---|---|---|---|
+| Release manifest | `nvkr.dev/release-manifest/v1` | `nvkr.release-manifest` | `https://nvkr.dev/release-manifest/v1` |
+
+The manifest states the `pipeline-attested` lane and binds the immutable publication root it is attached to;
+the originating repository, Run, attempt, commit, workflow/ref and build invocation; the Definition,
+Environment, Plan, catalog, content-subject and release Verification Policy identities; and the separately
+authenticated qualification invocation, gate version, qualification-policy digest and the
+`nvkr.qualification-evidence` digest of the exact evidence attached to every member. Each member carries its
+name, kind, digest-pinned reference and digest, Build Digest, native platform, sorted producer subjects, source
+lane (`hermetic-build`, `wrapped-build` or `acquired`, read from its verified production provenance build type)
+and the SHA-256 of that verified production predicate's canonical JSON, excluding the optional trailing
+transport newline that signature verification also ignores. An aggregate image member names its index;
+the bound qualification evidence enumerates its native children. Disk members state producer-only scope.
+Members are sorted by name and unique. Unknown fields, versions, lanes or kinds, noncanonical bytes, missing
+identities and inexact bindings fail closed. The canonical document is bounded by the qualification signing
+transport limit. Pretty-printed JSON hashes are insufficient for either document. Reconciliation records
+implementation and external acceptance independently of schema registration.
 
 ## Consequences
 

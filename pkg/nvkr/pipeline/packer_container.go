@@ -30,7 +30,7 @@ const (
 	packerContainerBuildLogPath = packerContainerWorkRoot + "/build-logs"
 	packerContainerHTTPPath     = packerContainerWorkRoot + "/http-data"
 	// In-image ABI of the digest-pinned closure, not a caller namespace alias.
-	packerContainerPluginPath = "/nkd/toolchain/packer/plugins"
+	packerContainerPluginPath = "/nvkr/toolchain/packer/plugins"
 	packerContainerPATH       = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 	// Open the transported tar once, authenticate that held inode, then extract
 	// the same inode. The fixed script is part of NVKR's runtime contract; only

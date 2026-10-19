@@ -103,6 +103,18 @@ the exact successful GitHub attempt, applies the independent repository/workflow
 issues a closeable source receipt. It downloads only that attempt's bounded, provider-digest-bound archive,
 whose sole member is the generated `handoff.json`. An artifact name or decoded description grants no authority.
 
+For the in-progress local rehearsal, `lifecycle.PrepareCapturedFiles` delegates to factory's existing
+bounded compiler-read capture and retains the snapshot privately with the prepared Run. Real local
+execution commits `compile-inputs.json` before starting producers; dry-run and failed capability
+admission create no snapshot or attempt storage. Later edits to authored files cannot change that
+snapshot. The snapshot remains descriptive: it grants no completed-Run, payload or signing authority.
+
+The distinct `lifecycle.CheckQualificationReference` entrypoint discovers that exact source attempt from
+an authenticated selected publication's signed `InvocationID`, retaining the same independent policy and
+Run/handoff authentication. The receipt must bind the selected root (ADR-16 §5). `Client.Validate` delegates
+to `validation.RunFiles` and its concrete `conformance` adapter; [ADR-16 §6](0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
+owns its descriptive execution boundary. This does not require a customer-supplied Run URL.
+
 Factory captures the complete compiler-read authored closure and replays it from memory through the existing
 compiler. Original logical paths, base and output catalog overrides, overlays, registries, locks, patches and
 directory facts are preserved. Capture uses no-follow source reads; each file is bounded to 4 MiB, the
@@ -138,6 +150,11 @@ workflow pair and manifest. `lifecycle.ValidateQualificationSmokePlan` owns the 
 join shared by generation and runtime; adapters cannot choose a different applicability rule. Generation
 selects exactly the executable native platforms, retaining the final AMD64 signer requirement. The CLI
 only selects the use case and presents its result.
+`run qualify-local` delegates to `lifecycle.QualifyLocalRun`. It selects a completed captured attempt,
+independent local policy, three explicit private-key files, native runtime, pinned cosign, registry
+namespace, scratch and new evidence destination. Lifecycle owns the complete check/sign/smoke/publish/
+read-back sequence and cleanup; the command emits only its descriptive canonical result. This separate
+local lane accepts no hosted invocation and supplies no hosted qualification or release authority.
 ADR-16 owns verdict and publication rules, and reconciliation records the separate A/B/C implementation and
 acceptance boundaries.
 
@@ -182,8 +199,8 @@ excludes a live owner. Inspection admits only currently producible lanes, not
 qualified lifecycle records. It validates the existing output slot bindings, without opening payload
 locators, restoring execution authority or inferring current availability/health.
 The CLI may show these views as plain/JSON or an explicitly selected read-only
-terminal explorer. Of the 25 public command leaves, 23 admit an explicitly selected result browser;
-`run check-artifacts` and `run qualify` retain canonical machine-readable diagnostics. The hidden native
+terminal explorer. Of the 27 public command leaves, 23 admit an explicitly selected result browser;
+`validate`, `run check-artifacts`, `run qualify` and `run qualify-local` retain canonical machine-readable diagnostics. The hidden native
 worker is not a public command.
 Owning operations, including maintenance transactions
 and verification, finish and release receipts before this read-only view opens.
@@ -196,7 +213,7 @@ JSON, are preserved. Interactive `run local` defaults to the dashboard and does
 not replay successful producer output. Nonempty `CI` keeps auto plain; explicit
 terminal mode remains available. Hidden CI/execution helpers retain their existing interface.
 
-Normal commands are `definition validate|inspect`, `run plan|graph|diff|inspect|local|generate|check-artifacts|qualify`,
+Normal commands are `validate`, `definition validate|inspect`, `run plan|graph|diff|inspect|local|generate|check-artifacts|qualify|qualify-local`,
 and `release verify|inspect|browse|export|pull`. Producer operations select authored inputs with `--definition` and
 `--environment`; artifact checking and qualification use the Run/policy interfaces above. Catalog maintenance
 and exact component/platform diagnostics remain available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
@@ -311,7 +328,7 @@ future qualified publication needs an authenticated commit protocol before expos
 
 - A documented **single-owner package map** — `definition`, `lifecycle`, `factory`, `delivery`, `canonical`, `catalog`, `buildgraph`, `target`,
   `execution`, `ir`, `pipeline`, `attest`, `release`, `status`, `provenance`, `sbom`, `vuln`, `trust`,
-  `qualificationorigin`, `testresults`, and the separate M3-C `qualification` publisher.
+  `qualificationorigin`, `testresults`, `validation`, `conformance`, and the separate M3-C `qualification` publisher.
   Catalog owns producer admission and snapshots; buildgraph owns exact selection and graph compilation;
   target owns concrete supported target platforms. Each owns its schema, returns typed coded
   errors, and marshals through the canonical codec (ADR-01). `client/v1` composes those owners; `main` must not
@@ -321,7 +338,9 @@ future qualified publication needs an authenticated commit protocol before expos
 `testresults` owns output descriptions, wrapper validation and deterministic serialization in lane
 **none (descriptive)**. [ADR-16 §6](0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
 owns the external-producer boundary; the [output reference](../external-test-output-contract.md)
-owns descriptive fields, format pins and limits. This adds no public lifecycle object or receipt.
+owns descriptive fields, format pins and limits. This adds no public lifecycle object or receipt. `validation` owns diagnostic profile admission and
+check dispatch; `conformance` owns the supported suite/harness protocol, subject observations, capture
+and cleanup. Catalog, lifecycle, delivery and held-file owners retain their existing responsibilities.
 
 The standalone query/diff selector workflow is removed; inspect the current lifecycle views directly.
 
@@ -332,6 +351,21 @@ copies. If it also retains file descriptors, subprocesses, locks, or other resou
 Ownership transfers are stated on the returning method. Facade results either close on every failure or transfer
 one clear close obligation to their caller. Garbage-collector cleanup may be defense in depth, never the
 correctness or resource-reclamation mechanism.
+
+`ArtifactCheckReceipt.WithDiagnosticOperation` registers a bounded callback and defensive description
+under the live receipt; it grants no payload access on its own. `WriteExecutableMember` delegates held
+member streaming to delivery after exact output/member/platform, publication and build-subject checks.
+Export grants byte access, not execution or qualification authority. The diagnostic adapter separately
+admits the user's explicit execution profile and owns capture, child processes and cleanup (ADR-18 §3).
+Product and tools receipts remain live through that work; closure stays outside the registered callback
+and cancels/joins operations before releasing payloads. Serialization restores none of these capabilities.
+
+The public `client/v1.ValidationOptions` currently aliases `lifecycle.QualificationRuntimeOptions`.
+This deliberately reuses the existing GitHub token, private workspace and registry credential/transport
+options without another authentication contract; it grants no qualification relationship or authority.
+The CLI supplies the explicit anonymous-registry default; SDK callers must select anonymous access or
+complete host-scoped credentials themselves. The alias exposes future changes to that owner and remains
+an explicit SDK coupling, like `LocalRunOptions` below.
 
 The non-owning installed-inventory receipt in ADR-13 borrows the issuing Run's
 lifetime; it has no separate close obligation or resource ownership. The Run's

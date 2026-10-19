@@ -26,19 +26,19 @@ func TestControllerProfilesImageProducerContracts(t *testing.T) {
 		name, catalogPath, definitionPath, component, dockerfile string
 		platforms                                                []string
 	}{
-		{"source fixtures", "nvke-controller/catalog", "nvke-controller/definition-profiles.yaml", "nvke-controller-profiles-image", "nvkr-controller-profiles/Dockerfile", []string{"linux/amd64", "linux/arm64"}},
+		{"source fixtures", "inputs/catalogs/nvke/release", "inputs/definitions/diagnostics/controller-profiles.yaml", "nvke-controller-profiles-image", "nvkr-controller-profiles/Dockerfile", []string{"linux/amd64", "linux/arm64"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			cat, _ := controllerCatalogFixture(t, filepath.Join("../../../definitions", tc.catalogPath))
+			cat, _ := controllerCatalogFixture(t, filepath.Join("../../..", tc.catalogPath))
 			stack, err := catalog.ApplyStack(cat)
 			if err != nil {
 				t.Fatal(err)
 			}
-			doc, err := definition.LoadDefinition(t.Context(), filepath.Join("../../../definitions", tc.definitionPath))
+			doc, err := definition.LoadDefinition(t.Context(), filepath.Join("../../..", tc.definitionPath))
 			if err != nil {
 				t.Fatal(err)
 			}
-			env, err := definition.LoadEnvironment(t.Context(), "../../../definitions/nvke-deploy/environment-github.yaml")
+			env, err := definition.LoadEnvironment(t.Context(), "../../../docs/examples/nvke-deploy/environment-github.yaml")
 			if err != nil {
 				t.Fatal(err)
 			}

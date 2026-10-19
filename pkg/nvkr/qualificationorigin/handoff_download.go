@@ -111,10 +111,20 @@ func (g *GitHub) DownloadQualificationHandoff(ctx context.Context, source *Sourc
 	// This digest is exact blob integrity of a provider-pinned archive, not a
 	// structured Run, policy, publication or qualification identity.
 	hash := sha256.Sum256(archive)
-	if "sha256:"+hex.EncodeToString(hash[:]) != artifact.Digest {
-		return nil, e.New(e.CodeVerifyFailed, "qualification artifact archive differs from its provider digest")
+	size, err := strconv.ParseInt(string(artifact.Size), 10, 64)
+	if err != nil || "sha256:"+hex.EncodeToString(hash[:]) != artifact.Digest || int64(len(archive)) != size {
+		return nil, e.New(e.CodeVerifyFailed, "qualification artifact archive differs from its provider digest or size")
 	}
-	raw, err := unpackQualificationHandoff(ctx, archive)
+	members, private, err := g.resolvePrivateArtifact(ctx, source.Require, origin, name, archive, maxQualificationArchiveBytes, map[string]int64{"handoff.json": MaxQualificationHandoffBytes})
+	if err != nil {
+		return nil, err
+	}
+	var raw []byte
+	if private {
+		raw = members["handoff.json"]
+	} else {
+		raw, err = unpackQualificationHandoff(ctx, archive)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +140,7 @@ func (g *GitHub) DownloadQualificationHandoff(ctx context.Context, source *Sourc
 func (artifact qualificationArtifact) validate(name string, origin Description) error {
 	run := artifact.WorkflowRun
 	if !numberPattern.MatchString(string(artifact.ID)) || artifact.Name != name || artifact.Expired == nil || *artifact.Expired ||
-		string(run.ID) != origin.RunID || run.HeadSHA != origin.Commit || run.HeadBranch != origin.DefaultBranch ||
+		string(run.ID) != origin.RunID || run.HeadSHA != origin.Commit || run.HeadBranch != origin.SourceBranch() ||
 		!numberPattern.MatchString(string(run.RepositoryID)) || run.RepositoryID != run.HeadRepositoryID {
 		return e.New(e.CodeVerifyFailed, "qualification artifact does not belong to the exact non-expired source handoff")
 	}

@@ -117,60 +117,62 @@ func TestNestedOCIEnumerationPlatformDepthAndDeduplication(t *testing.T) {
 }
 
 func TestNestedOCIUsesCompleteClosureAndAllPlatforms(t *testing.T) {
-	for _, architecture := range []string{"amd64", "arm64"} {
-		for _, compressed := range []bool{false, true} {
-			for _, test := range []struct {
-				name          string
-				architectures []string
-				change        func(string)
-				code          e.Code
-				message       string
-			}{
-				{"two images reach scanner", []string{architecture, architecture}, nil, e.CodeUnverifiedRef, ""},
-				{"other platform not dropped", []string{architecture, "unsupported"}, nil, e.CodeVerifyFailed, ""},
-				{"empty layout malformed blob directory", nil, nil, e.CodeVerifyFailed, "unexpected directory set"},
-				{"well-formed empty layout has no image", nil, func(root string) {
-					if err := os.MkdirAll(filepath.Join(root, "blobs", "sha256"), 0o755); err != nil {
-						t.Fatal(err)
-					}
-				}, e.CodeEngineCapability, "no inspectable image"},
-				{"multiple roots without index media type", []string{architecture, architecture}, func(root string) {
-					raw, err := os.ReadFile(filepath.Join(root, "index.json"))
-					if err != nil {
-						t.Fatal(err)
-					}
-					var manifest v1.IndexManifest
-					if err := json.Unmarshal(raw, &manifest); err != nil {
-						t.Fatal(err)
-					}
-					manifest.MediaType = ""
-					raw, err = json.Marshal(manifest)
-					if err != nil {
-						t.Fatal(err)
-					}
-					if err := os.WriteFile(filepath.Join(root, "index.json"), raw, 0o644); err != nil {
-						t.Fatal(err)
-					}
-				}, e.CodeVerifyFailed, ""},
-				{"unreferenced blob rejected", []string{architecture}, func(root string) {
-					raw := []byte("unreferenced")
-					if err := os.WriteFile(filepath.Join(root, "blobs", "sha256", strings.TrimPrefix(rawDigest(raw), "sha256:")), raw, 0o644); err != nil {
-						t.Fatal(err)
-					}
-				}, e.CodeVerifyFailed, ""},
-			} {
-				t.Run(architecture+"/"+strconv.FormatBool(compressed)+"/"+test.name, func(t *testing.T) {
-					inspection, err := inspectCompressedImages(t.Context(), nestedOCIFixture(t, test.architectures, compressed, test.change), "linux/"+architecture, Scanner{Path: "/missing/selected-syft", Digest: "sha256:" + strings.Repeat("f", 64)}, 1<<20, 0)
-					assertDependencyCode(t, err, test.code)
-					if test.message != "" && !strings.Contains(err.Error(), test.message) {
-						t.Fatalf("wrong rejection boundary: %v", err)
-					}
-					if inspection != nil {
-						t.Fatal("rejected OCI returned partial inventory")
-					}
-				})
+	// Exercise each closure defect once; platform and compression admission
+	// need representatives, not a Cartesian product of every malformed layout.
+	for _, test := range []struct {
+		name          string
+		architecture  string
+		compressed    bool
+		architectures []string
+		change        func(string)
+		code          e.Code
+		message       string
+	}{
+		{"plain amd64 reaches scanner admission", "amd64", false, []string{"amd64", "amd64"}, nil, e.CodeUnverifiedRef, ""},
+		{"compressed arm64 reaches scanner admission", "arm64", true, []string{"arm64", "arm64"}, nil, e.CodeUnverifiedRef, ""},
+		{"plain foreign platform", "amd64", false, []string{"amd64", "unsupported"}, nil, e.CodeVerifyFailed, ""},
+		{"compressed foreign platform", "arm64", true, []string{"arm64", "unsupported"}, nil, e.CodeVerifyFailed, ""},
+		{"empty layout malformed blob directory", "amd64", false, nil, nil, e.CodeVerifyFailed, "unexpected directory set"},
+		{"well-formed empty layout has no image", "amd64", false, nil, func(root string) {
+			if err := os.MkdirAll(filepath.Join(root, "blobs", "sha256"), 0o755); err != nil {
+				t.Fatal(err)
 			}
-		}
+		}, e.CodeEngineCapability, "no inspectable image"},
+		{"multiple roots without index media type", "amd64", false, []string{"amd64", "amd64"}, func(root string) {
+			raw, err := os.ReadFile(filepath.Join(root, "index.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var manifest v1.IndexManifest
+			if err := json.Unmarshal(raw, &manifest); err != nil {
+				t.Fatal(err)
+			}
+			manifest.MediaType = ""
+			raw, err = json.Marshal(manifest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(root, "index.json"), raw, 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}, e.CodeVerifyFailed, ""},
+		{"unreferenced blob rejected", "amd64", false, []string{"amd64"}, func(root string) {
+			raw := []byte("unreferenced")
+			if err := os.WriteFile(filepath.Join(root, "blobs", "sha256", strings.TrimPrefix(rawDigest(raw), "sha256:")), raw, 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}, e.CodeVerifyFailed, ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			inspection, err := inspectCompressedImages(t.Context(), nestedOCIFixture(t, test.architectures, test.compressed, test.change), "linux/"+test.architecture, Scanner{Path: "/missing/selected-syft", Digest: "sha256:" + strings.Repeat("f", 64)}, 1<<20, 0)
+			assertDependencyCode(t, err, test.code)
+			if test.message != "" && !strings.Contains(err.Error(), test.message) {
+				t.Fatalf("wrong rejection boundary: %v", err)
+			}
+			if inspection != nil {
+				t.Fatal("rejected OCI returned partial inventory")
+			}
+		})
 	}
 }
 

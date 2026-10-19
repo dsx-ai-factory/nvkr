@@ -6,6 +6,7 @@ package factory
 import (
 	"context"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -159,6 +160,23 @@ func TestImageIndexPackagingObservesEveryExactChild(t *testing.T) {
 	if len(evidence) != 2 {
 		t.Fatalf("got %d child inventories", len(evidence))
 	}
+	retained, retainedDigest, err := captureRetainedOrdinaryPublication(t.Context(), p, artifacts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = retained.Close() })
+	retainedPath := filepath.Join(t.TempDir(), "retained-index")
+	if err := retained.WriteLayout(t.Context(), retainedPath); err != nil {
+		t.Fatal(err)
+	}
+	retainedInspection, err := delivery.Inspect(t.Context(), retainedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retainedOutputs, _, err := retained.Artifacts("example.test/local/release@" + retainedDigest)
+	if err != nil || retainedInspection.RootDigest != retainedDigest || len(retainedOutputs) != 1 || !reflect.DeepEqual(retainedOutputs[0].ImageIndex, observed.ImageIndex) {
+		t.Fatalf("retained native child bindings differ: %+v, %v", retainedOutputs, err)
+	}
 	for _, object := range evidence {
 		binding := object.Evidence
 		found := false
@@ -204,6 +222,7 @@ func TestImageIndexPackagingObservesEveryExactChild(t *testing.T) {
 }
 
 func TestImageIndexPackagingFailsBeforeOutputOnMissingChildEvidence(t *testing.T) {
+	p, n, artifacts := indexObservationFixture(t)
 	for _, tc := range []struct {
 		name   string
 		mutate func(*Plan, Node, map[string]Artifact)
@@ -234,7 +253,7 @@ func TestImageIndexPackagingFailsBeforeOutputOnMissingChildEvidence(t *testing.T
 		}, e.CodeVerifyFailed},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			p, n, a := indexObservationFixture(t)
+			a := maps.Clone(artifacts)
 			tc.mutate(p, n, a)
 			err := executePackage(t.Context(), p, n, a, io.Discard)
 			assertFactoryErrorCode(t, err, tc.code)
@@ -257,6 +276,12 @@ func TestImageIndexPackagingCancellationHasNoOutput(t *testing.T) {
 
 // Exercise the consumer joins independently of generic packageInputs admission.
 func TestImageIndexConsumerRejectsMissingOrSubstitutedEvidence(t *testing.T) {
+	p, n, artifacts := indexObservationFixture(t)
+	// All mutations affect only the consumer's artifact descriptions. Retain one
+	// valid aggregate and give every row its own handoff map.
+	if err := executePackage(t.Context(), p, n, artifacts, io.Discard); err != nil {
+		t.Fatal(err)
+	}
 	for _, route := range []string{"prepare", "observe"} {
 		for _, tc := range []struct {
 			name    string
@@ -270,11 +295,7 @@ func TestImageIndexConsumerRejectsMissingOrSubstitutedEvidence(t *testing.T) {
 			{"later result unrelated target", 1, false, e.CodeReleaseIncomplete},
 		} {
 			t.Run(route+"/"+tc.name, func(t *testing.T) {
-				p, n, a := indexObservationFixture(t)
-				// Materialize a valid aggregate before corrupting only the consumer handoff.
-				if err := executePackage(t.Context(), p, n, a, io.Discard); err != nil {
-					t.Fatal(err)
-				}
+				a := maps.Clone(artifacts)
 				child := n.ImageIndex.Children[tc.child]
 				if tc.missing {
 					delete(a, child.SBOMArtifactID)

@@ -172,10 +172,6 @@ func runNightlyPublishedCandidate(ctx context.Context, timing nightlyTiming) (re
 	if err != nil {
 		return err
 	}
-	expectation, err := lifecycle.PrepareExactInputs(definition, environment, plan)
-	if err != nil {
-		return err
-	}
 	workspace, err := freshDestination(os.Getenv("NVKR_NIGHTLY_WORKSPACE"))
 	if err != nil {
 		return e.Wrap(e.CodeUsage, err, "nightly requires a fresh private workspace")
@@ -193,8 +189,10 @@ func runNightlyPublishedCandidate(ctx context.Context, timing nightlyTiming) (re
 		return err
 	}
 	source := os.Getenv("NVKR_NIGHTLY_SOURCE")
-	if err = nightlySource(ctx, runner, source, profile.HarnessCommit); err != nil {
-		return err
+	if !environment.GitHubRuntimePlan {
+		if err = nightlySource(ctx, runner, source, profile.HarnessCommit); err != nil {
+			return err
+		}
 	}
 	// Refuse missing runtime capabilities before fetching large publication data.
 	for _, tool := range []string{"bash", "docker", "virsh", "qemu-img", "qemu-system-aarch64", "cloud-localds", "swtpm", "dnsmasq", "ip", "iptables", "sudo", "setcap", "getcap", "jq", "curl", "timeout", "flock", "setsid", "openssl", "go", "ss", "make", "awk", "df", "sort", "seq"} {
@@ -207,15 +205,25 @@ func runNightlyPublishedCandidate(ctx context.Context, timing nightlyTiming) (re
 		return e.Wrap(e.CodeEngineCapability, openErr, "native KVM is unavailable")
 	}
 	_ = device.Close()
-	inputs, err := newNightlyInputs(ctx, profile, build, plan, workspace)
+	inputs, err := newNightlyInputs(ctx, profile, build, plan, definition, environment, workspace)
 	if err != nil {
 		return err
+	}
+	plan = inputs.Plan
+	expectation, err := lifecycle.PrepareExactInputs(definition, environment, plan)
+	if err != nil {
+		return err
+	}
+	if environment.GitHubRuntimePlan {
+		if err = nightlySource(ctx, runner, source, inputs.HarnessCommit); err != nil {
+			return err
+		}
 	}
 	consumer, err := lifecycle.NewConsumer(lifecycle.ConsumerOptions{
 		CosignBinary: os.Getenv("NVKR_NIGHTLY_COSIGN"), CosignDigest: os.Getenv("NVKR_NIGHTLY_COSIGN_DIGEST"),
 		WorkspaceRoot: filepath.Join(workspace, "verified"),
-		Registry:      delivery.RegistryOptions{Username: os.Getenv("GITHUB_ACTOR"), Password: os.Getenv("GH_TOKEN")},
-		Credential:    sign.Credential{Registry: "ghcr.io", Username: os.Getenv("GITHUB_ACTOR"), Password: os.Getenv("GH_TOKEN")},
+		Registry:      delivery.RegistryOptions{Username: os.Getenv("NVKR_REGISTRY_READ_USER"), Password: os.Getenv("NVKR_REGISTRY_READ")},
+		Credential:    sign.Credential{Registry: "ghcr.io", Username: os.Getenv("NVKR_REGISTRY_READ_USER"), Password: os.Getenv("NVKR_REGISTRY_READ")},
 	})
 	if err != nil {
 		return err
@@ -254,7 +262,9 @@ func runNightlyPublishedCandidate(ctx context.Context, timing nightlyTiming) (re
 	// Verification credentials never reach a runtime command or simulator.
 	runner.Env = SetEnv(runner.Env, bindings)
 	phase, suite = "runtime", filepath.Join(workspace, "suite")
-	return nightlyRuntime(ctx, timing, runner, source, profile, description)
+	runtimeProfile := profile
+	runtimeProfile.HarnessCommit = inputs.HarnessCommit
+	return nightlyRuntime(ctx, timing, runner, source, runtimeProfile, description)
 }
 
 func nightlySource(ctx context.Context, runner Runner, source, commit string) error {

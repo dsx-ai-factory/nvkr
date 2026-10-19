@@ -80,11 +80,11 @@ func TestLifecycleOutputsCompileOnlySelectedProducers(t *testing.T) {
 }
 
 func TestDefinitionAndEnvironmentHaveIndependentIdentity(t *testing.T) {
-	definitionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "definitions", "nvke-v1", "definition.yaml"))
+	definitionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "docs/examples/nvke-tutorial/definition.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	environmentPath, err := filepath.Abs(filepath.Join("..", "..", "..", "definitions", "nvke-v1", "environment-local.yaml"))
+	environmentPath, err := filepath.Abs(filepath.Join("..", "..", "..", "docs/examples/nvke-tutorial/environment-local.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +133,7 @@ func TestDefinitionAndEnvironmentHaveIndependentIdentity(t *testing.T) {
 	if err != nil || definitionDigestAgain != definitionDigest {
 		t.Fatal("changing an environment perturbed definition identity")
 	}
-	base, err := catalog.LoadContext(context.Background(), catalog.Dir(filepath.Join(filepath.Dir(definitionPath), "catalog")))
+	base, err := catalog.LoadContext(context.Background(), catalog.Dir(filepath.Join(filepath.Dir(definitionPath), definition.Catalog.Base)))
 	if err != nil {
 		t.Fatal(err)
 	}

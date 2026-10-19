@@ -188,10 +188,10 @@ func nvkeOSScriptPlan(t *testing.T, arch string) ([]byte, *factory.Plan) {
 	t.Helper()
 	root := filepath.Dir(filepath.Dir(demoScript(t, "nvke-os-local.sh")))
 	t.Chdir(root)
-	input := filepath.Join("definitions", "nvke-os")
+	input := "inputs"
 	raw, err := runCLIWithCapturedStdout(t, newApp(), "nvkr", "run", "plan",
-		"--definition", filepath.Join(input, "definition-"+arch+"-kvm.yaml"),
-		"--environment", filepath.Join(input, "environment-local-linux-"+arch+"-docker.yaml"), "--json")
+		"--definition", filepath.Join(input, "definitions/diagnostics/os-"+arch+".yaml"),
+		"--environment", filepath.Join(input, "environments/local-linux-"+arch+"-kvm.yaml"), "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,11 +252,12 @@ func TestOSDockerBootstrapUsesPrivateSharedTemporaryDirectory(t *testing.T) {
 				t.Fatal(err)
 			}
 			files := map[string]string{
-				"scripts/nvke-os-local.sh":                                             string(source),
-				"definitions/nvke-os/definition-" + arch + "-kvm.yaml":                 "fixture",
-				"definitions/nvke-os/environment-local-linux-" + arch + "-docker.yaml": "fixture",
-				"definitions/nvke-os/catalog/registry.yaml":                            "fixture",
-				"definitions/nvke-os/catalog/pins.lock.yaml":                           "fixture",
+				"scripts/nvke-os-local.sh":                                       string(source),
+				"inputs/definitions/diagnostics/os-" + arch + ".yaml":            "fixture",
+				"inputs/environments/local-linux-" + arch + "-kvm.yaml":          "fixture",
+				"inputs/catalogs/node-images/diagnostic/registry.yaml":           "fixture",
+				"inputs/catalogs/node-images/diagnostic/pins.lock.yaml":          "fixture",
+				"inputs/catalogs/node-images/variants/diagnostic-arm64-kvm.yaml": "fixture",
 				"bin/docker":                      "#!/bin/sh\nexit 99\n",
 				"bin/uname":                       "#!/bin/sh\ncase \"$1\" in -s) echo Linux;; -m) echo \"$TEST_MACHINE\";; *) exit 99;; esac\n",
 				"toolchains/nvkr-packer/build.sh": "#!/bin/sh\nprintf '%s' \"$TMPDIR\" >\"$TEST_TMP_RECORD\"\nexit 42\n",
@@ -371,12 +372,12 @@ func TestOSBootstrapFreezesSelectedUbuntuRecipe(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				for _, directory := range []string{"definitions/nvke-os", "definitions/nvke-os-ubuntu24", "definitions/nvke-m2/os-catalog"} {
+				for _, directory := range []string{"inputs/definitions/diagnostics", "inputs/environments", "inputs/catalogs/node-images"} {
 					if err := os.CopyFS(filepath.Join(root, directory), os.DirFS(filepath.Join(repository, directory))); err != nil {
 						t.Fatal(err)
 					}
 				}
-				for _, file := range []string{"scripts/nvke-os-local.sh", "scripts/nvke-os-plan.jq", "definitions/nvke-m2/native-toolchains.yaml"} {
+				for _, file := range []string{"scripts/nvke-os-local.sh", "scripts/nvke-os-plan.jq"} {
 					raw, err := os.ReadFile(filepath.Join(repository, file))
 					if err != nil {
 						t.Fatal(err)
@@ -446,6 +447,18 @@ exec "$NVKR_AUTHORING_TEST_EXE" -test.run='^TestAuthoringLabCLIProcess$' -- "$@"
 				if ubuntu == "24.04" {
 					if !strings.Contains(build.Name, "ubuntu24") || agent == image || !strings.HasPrefix(agent, "docker.io/library/golang@sha256:") {
 						t.Fatalf("Ubuntu 24 selection lost its compatible agent toolchain: output=%s, agent=%s", build.Name, agent)
+					}
+					patch := "patches/capture-schema.patch"
+					sourcePatch, err := os.ReadFile(filepath.Join(repository, "inputs/catalogs/node-images/release", patch))
+					if err != nil {
+						t.Fatal(err)
+					}
+					frozenPatch, err := os.ReadFile(filepath.Join(root, ".nvkr/inputs/test-attempt/catalog", patch))
+					if err != nil {
+						t.Fatal(err)
+					}
+					if !bytes.Equal(sourcePatch, frozenPatch) {
+						t.Fatal("frozen catalog lost the exact source patch")
 					}
 					for _, name := range []string{"native-toolchains.yaml", "ubuntu24.json"} {
 						if _, err := os.Stat(filepath.Join(root, ".nvkr/inputs/test-attempt", name)); err != nil {

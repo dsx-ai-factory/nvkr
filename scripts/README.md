@@ -4,6 +4,21 @@ The maintained scripts use the public lifecycle or demonstrate one focused
 supporting contract. They never turn local diagnostics into release authority.
 The [demo index](../demos/README.md) collects the presentation and guided journeys.
 
+## CLI artifact test baseline
+
+```sh
+GOTOOLCHAIN=local go build -o bin/nvkr ./cmd/nvkr
+bin/nvkr run artifact-test --artifact /path/to/nvkectl --plan /path/to/matching/plan.json
+```
+
+Imports the matching pinned NVKE tests and invokes their `test-artifact` target
+against a supplied NVKR-built binary, without rebuilding it. See
+[artifact testing](../docs/artifact-testing.md) for prerequisites, results, and scope.
+This trusted-input diagnostic is implemented in Go. The guide separates prior
+Python-adapter runtime results from validation of the Go replacement.
+The current production pin lacks the upstream entrypoint; upstream adoption and
+explicit maintained-input refresh remain follow-ups. The guide distinguishes prior results from committed regressions.
+
 ## Definition → Run
 
 For repository pipeline changes, `make pipeline-dev-run PIPELINE_DEV_REPO=owner/repo` checks the generated
@@ -21,20 +36,25 @@ completed Run to a local site and QCOW2-backed tenant. macOS supplies the Linux
 host through Colima; this is not a native Darwin build.
 
 `nvke-full-arm64-local.sh ATTEMPT JOBS LANE` also supports
-[focused selections](../definitions/nvke-local-dev-arm64/README.md);
+[focused selections](../inputs/definitions/demo/README.md);
 `--check LANE` performs diagnostics only. The full demo compiles binaries once and shares
 one measured Packer toolchain, including Helm 4.2.4 and ORAS 1.3.3. Profiles are
 data bundles, not a separate container image. No publication/signing is enabled.
 The launcher prints its exact shell-escaped `nvkr` invocations to stderr before execution, without printing environment values.
 
 Contract tests: `go test ./internal/nvkedemo ./cmd/nvke-demo -count=1`.
+For qualification, add `--qualify-local` to `nvke-demo build` or `nvke-demo e2e`.
+It prepares fresh local keys, a Plan-bound demo policy, pinned cosign, scratch and an owned disk-backed
+loopback registry, then stops that registry after qualification while retaining data and evidence.
+See [local qualification setup](../docs/local-development.md#rehearse-local-m3-qualification)
+for prerequisites and the advanced explicit setup/stop commands.
 See [reconciliation](../docs/adr/reconciliation.md) for recorded runtime results;
 the reduced flow has not passed a new clean-machine end-to-end run. This is not
 a [full source-built distribution](../docs/full-nvke-source-build.md).
 
 ```sh
 # Plan only: validates and creates no attempt storage.
-nvkr run plan --definition definitions/nvke-v1/definition.yaml --environment definitions/nvke-v1/environment-local.yaml
+nvkr run plan --definition docs/examples/nvke-tutorial/definition.yaml --environment docs/examples/nvke-tutorial/environment-local.yaml
 
 # Local execution; Docker, Go and acquisition/build network access are required.
 # Despite its historical name, the M1 script executes CLI + CWE + Helm.
@@ -65,7 +85,7 @@ CONTAINER_RUNTIME=docker NVKE_OS_ARCH=amd64 scripts/nvke-os-local.sh local-amd64
 ```
 
 The default guest is Ubuntu 26.04. Set `NVKE_OS_UBUNTU_VERSION=24.04` to select the
-[Ubuntu 24.04.5 inputs](../definitions/nvke-os-ubuntu24/README.md), including their
+[Ubuntu 24.04.5 inputs](../inputs/definitions/diagnostics/ubuntu24/README.md), including their
 separate compatible agent compiler. The architecture and native KVM requirements stay the same.
 
 Use a different immutable attempt name for each run. The historical Podman
@@ -73,7 +93,7 @@ Use a different immutable attempt name for each run. The historical Podman
 does not validate a current maintained route.
 The [ARC evidence](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) records successful ARM64 and AMD64
 Docker/KVM builds and boot smoke at an earlier exact commit, not validation of the latest changes.
-See the [Definition guide](../definitions/nvke-os/README.md) for route requirements and limitations.
+See the [Definition guide](../inputs/definitions/diagnostics/README.md) for route requirements and limitations.
 Set `NVKE_LOCAL_CLONE` to reuse an exact local NVKE checkout, accessible at the
 same absolute path to the native Linux runner and Docker daemon.
 

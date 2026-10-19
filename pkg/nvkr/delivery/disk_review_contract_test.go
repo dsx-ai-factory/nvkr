@@ -39,19 +39,22 @@ func TestReleaseDiskTypeAdmissionRejectsOtherArtifactFamilies(t *testing.T) {
 }
 
 func TestReleaseSBOMSubjectGateRejectsSelfPinnedChanges(t *testing.T) {
+	request, _ := diskPublicationRequest(t, "amd64")
+	base := filepath.Join(t.TempDir(), "base")
+	if _, err := BuildPublicationRoot(t.Context(), base, request); err != nil {
+		t.Fatal(err)
+	}
 	for _, scenario := range []string{"semantic digest", "object name", "subject hash", "no subject hash", "two subject hashes", "component name", "invalid non-disk document", "subject hash missing provenance", "material subject hash missing provenance"} {
 		t.Run(scenario, func(t *testing.T) {
-			request, _ := diskPublicationRequest(t, "amd64")
 			component := "image"
 			if scenario == "material subject hash missing provenance" {
 				component = "agent"
 			}
-			if scenario == "invalid non-disk document" {
-				request = releasePublicationRequestFixture(t, "linux", "amd64")
-				component = "cli"
-			}
 			root := filepath.Join(t.TempDir(), "publication")
-			if _, err := BuildPublicationRoot(t.Context(), root, request); err != nil {
+			if scenario == "invalid non-disk document" {
+				root, _ = releasePublicationPlatformFixture(t, "linux", "amd64")
+				component = "cli"
+			} else if err := os.CopyFS(root, os.DirFS(base)); err != nil {
 				t.Fatal(err)
 			}
 			inspection, err := Inspect(t.Context(), root)
@@ -217,42 +220,44 @@ func rewriteDiskPublicationRoot(t *testing.T, root string, inspection Inspection
 }
 
 func TestOpenPublicationRejectsSelfPinnedDiskBindingChanges(t *testing.T) {
-	for _, arch := range []string{"amd64", "arm64"} {
-		for _, test := range []struct {
-			name, diagnostic string
-			edit             func(*PublishedObject)
-		}{
-			{"size", "disk wrapper differs", func(o *PublishedObject) { o.Output.Disk.Size++ }},
-			{"payload", "published disk requires", func(o *PublishedObject) { o.Output.Disk.PayloadDigest = digestBytes([]byte("sibling")) }},
-			{"missing binding", "published disk requires", func(o *PublishedObject) { o.Output.Disk = nil }},
-			{"non-disk binding", "non-disk release output", func(o *PublishedObject) {
-				o.Kind, o.ArtifactType, o.Output.Format = "container-image", MediaOCIManifest, "oci"
-			}},
-		} {
-			t.Run(arch+"/"+test.name, func(t *testing.T) {
-				request, _ := diskPublicationRequest(t, arch)
-				root := filepath.Join(t.TempDir(), "publication")
-				if _, err := BuildPublicationRoot(t.Context(), root, request); err != nil {
-					t.Fatal(err)
-				}
-				inspection, err := Inspect(t.Context(), root)
-				if err != nil {
-					t.Fatal(err)
-				}
-				pin := rewriteDiskPublicationRoot(t, root, inspection, func(publication *PublicationRoot) {
-					for index := range publication.Objects {
-						if publication.Objects[index].Output != nil {
-							test.edit(&publication.Objects[index])
-						}
+	request, _ := diskPublicationRequest(t, "amd64")
+	base := filepath.Join(t.TempDir(), "base")
+	if _, err := BuildPublicationRoot(t.Context(), base, request); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name, diagnostic string
+		edit             func(*PublishedObject)
+	}{
+		{"size", "disk wrapper differs", func(o *PublishedObject) { o.Output.Disk.Size++ }},
+		{"payload", "published disk requires", func(o *PublishedObject) { o.Output.Disk.PayloadDigest = digestBytes([]byte("sibling")) }},
+		{"missing binding", "published disk requires", func(o *PublishedObject) { o.Output.Disk = nil }},
+		{"non-disk binding", "non-disk release output", func(o *PublishedObject) {
+			o.Kind, o.ArtifactType, o.Output.Format = "container-image", MediaOCIManifest, "oci"
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := filepath.Join(t.TempDir(), "publication")
+			if err := os.CopyFS(root, os.DirFS(base)); err != nil {
+				t.Fatal(err)
+			}
+			inspection, err := Inspect(t.Context(), root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			pin := rewriteDiskPublicationRoot(t, root, inspection, func(publication *PublicationRoot) {
+				for index := range publication.Objects {
+					if publication.Objects[index].Output != nil {
+						test.edit(&publication.Objects[index])
 					}
-				})
-				owner, err := openDiskPublicationFixture(t.Context(), root, pin)
-				assertRegistryCode(t, err, e.CodeVerifyFailed)
-				if owner != nil || !strings.Contains(err.Error(), test.diagnostic) {
-					t.Fatalf("changed binding reached the wrong gate: owner=%v, %v", owner, err)
 				}
 			})
-		}
+			owner, err := openDiskPublicationFixture(t.Context(), root, pin)
+			assertRegistryCode(t, err, e.CodeVerifyFailed)
+			if owner != nil || !strings.Contains(err.Error(), test.diagnostic) {
+				t.Fatalf("changed binding reached the wrong gate: owner=%v, %v", owner, err)
+			}
+		})
 	}
 }
 

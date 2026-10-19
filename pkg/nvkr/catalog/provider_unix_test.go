@@ -96,17 +96,37 @@ func TestDirProviderBoundsAndSortsRecursiveListing(t *testing.T) {
 
 	t.Run("entry-count", func(t *testing.T) {
 		root := t.TempDir()
-		directory := filepath.Join(root, "overlays")
-		if err := os.MkdirAll(directory, 0o700); err != nil {
-			t.Fatal(err)
-		}
-		for index := 0; index <= MaxCatalogDirectoryEntries; index++ {
-			if err := os.WriteFile(filepath.Join(directory, fmt.Sprintf("%04d.yaml", index)), nil, 0o600); err != nil {
+		for _, name := range []string{"a.yaml", "b.yaml"} {
+			if err := os.WriteFile(filepath.Join(root, name), nil, 0o600); err != nil {
 				t.Fatal(err)
 			}
 		}
-		if _, err := contextDirProvider(t, root).ReadDirContext(context.Background(), "overlays"); err == nil || !strings.Contains(err.Error(), "entry bound") {
-			t.Fatalf("oversized directory returned %v", err)
+		for _, tc := range []struct {
+			name    string
+			entries int
+			wantErr bool
+		}{
+			{"last admitted entries", MaxCatalogDirectoryEntries - 2, false},
+			{"first extra entry", MaxCatalogDirectoryEntries - 1, true},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				directory, err := os.Open(root)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer directory.Close()
+				// Exercise the aggregate boundary through the real walker without
+				// creating the already-accounted-for thousand directory entries.
+				state := &catalogWalkState{entries: tc.entries}
+				err = walkCatalogDirectory(t.Context(), directory, "", 0, state)
+				if tc.wantErr {
+					if err == nil || !strings.Contains(err.Error(), "entry bound") || len(state.files) != 0 {
+						t.Fatalf("oversized directory returned files=%v, err=%v", state.files, err)
+					}
+				} else if err != nil || state.entries != MaxCatalogDirectoryEntries || len(state.files) != 2 {
+					t.Fatalf("last admitted entries returned state=%+v, err=%v", state, err)
+				}
+			})
 		}
 	})
 

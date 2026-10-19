@@ -64,7 +64,7 @@ func nightlyCoordinatorFixture(t *testing.T) (nightlyCoordinatorDocument, []map[
 	if err := yaml.UnmarshalStrict(raw, &workflow); err != nil {
 		t.Fatal(err)
 	}
-	raw, err = os.ReadFile("../../definitions/nightly-profiles.json")
+	raw, err = os.ReadFile("../../inputs/testing/nightly-profiles.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,8 +91,8 @@ func TestNightlyCoordinatorMaintainsExplicitProducerAndRuntimeBoundary(t *testin
 		t.Fatal("runtime target allocated before completed candidate selection")
 	}
 	if !reflect.DeepEqual(build.Permissions, map[string]string{"contents": "read", "actions": "write"}) ||
-		!reflect.DeepEqual(runtime.Permissions, map[string]string{"contents": "read", "actions": "read", "packages": "read"}) ||
-		runtime.RunsOn != "arc-arm64-kvm" || runtime.Environment != "nkd-arc" ||
+		!reflect.DeepEqual(runtime.Permissions, map[string]string{"contents": "read", "actions": "read"}) ||
+		runtime.RunsOn != "arc-arm64-kvm" || runtime.Environment != "nvkr-arc" ||
 		runtime.Concurrency.CancelInProgress || runtime.Concurrency.Group != "nvkr-nightly-native-arm64-runtime" ||
 		runtime.TimeoutMinutes != 360 {
 		t.Fatal("dispatch credentials escaped into native runtime or shared target admission changed")
@@ -100,7 +100,7 @@ func TestNightlyCoordinatorMaintainsExplicitProducerAndRuntimeBoundary(t *testin
 	executed, checkedSource, publicUpload := false, false, false
 	for _, step := range runtime.Steps {
 		if step.With["repository"] == "dsx-ai-factory/nvke" {
-			checkedSource = step.With["ref"] == "${{ matrix.harness_commit }}" &&
+			checkedSource = step.With["ref"] == "${{ steps.suite.outputs.commit }}" &&
 				step.With["persist-credentials"] == false && step.With["path"] == ".nightly-private/nvke"
 		}
 		if strings.Contains(step.Run, "go test ./internal/nvkedemo -run '^TestNightlyPublishedCandidate$'") {
@@ -114,7 +114,7 @@ func TestNightlyCoordinatorMaintainsExplicitProducerAndRuntimeBoundary(t *testin
 		}
 		if strings.HasPrefix(step.Uses, "actions/upload-artifact@") {
 			publicUpload = step.If == "always()" &&
-				step.With["path"] == "${{ runner.temp }}/nightly-reports-${{ matrix.name }}/*"
+				step.With["path"] == "${{ runner.temp }}/nightly-reports-${{ matrix.name }}/cycle.json"
 		}
 	}
 	if !executed || !checkedSource || !publicUpload || len(profiles) != 2 {
@@ -207,10 +207,10 @@ func TestNightlyCoordinatorSelectionFailsClosedBeforeDispatch(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := os.Mkdir(filepath.Join(root, "definitions"), 0o700); err != nil {
+			if err := os.MkdirAll(filepath.Join(root, "inputs/testing"), 0o700); err != nil {
 				t.Fatal(err)
 			}
-			if err := os.WriteFile(filepath.Join(root, "definitions/nightly-profiles.json"), raw, 0o600); err != nil {
+			if err := os.WriteFile(filepath.Join(root, "inputs/testing/nightly-profiles.json"), raw, 0o600); err != nil {
 				t.Fatal(err)
 			}
 			output := filepath.Join(root, "outputs")

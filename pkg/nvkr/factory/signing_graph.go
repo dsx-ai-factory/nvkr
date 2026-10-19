@@ -17,13 +17,14 @@ const (
 	ArtifactSigningRecord       = "signing-record"
 	ArtifactProvenancePredicate = "provenance-predicate"
 	ArtifactVerificationRecord  = "verification-record"
+	ArtifactSigningMetadata     = "publication-signing-metadata"
 )
 
 // addSigningDataflow appends the two post-publication nodes of one OCI route when
 // the delivery configures signing. The edges are pure dataflow, not ordering
 // hints: sign consumes the PUBLISHED reference (so it cannot run before publish)
-// together with the routed layout (so it can re-derive the digest it is about to
-// bind instead of trusting the reference file), and verify-publication consumes
+// together with the routed layout or bounded output-local metadata (so it can
+// re-derive the digest it is about to bind), and verify-publication consumes
 // the reference and the signing record (so it cannot run before signing).
 func addSigningDataflow(plan *Plan, runsOn string, route Route,
 	packageInput, referenceID string, nodes map[string]Node, artifacts map[string]Artifact) error {
@@ -36,6 +37,19 @@ func addSigningDataflow(plan *Plan, runsOn string, route Route,
 			"delivery route %q cannot be signed: only OCI registry targets have a signing adapter", route.Name)
 	}
 	signInputs := []string{packageInput, referenceID}
+	if PerOutputPublication(plan) && route.Name != "release" {
+		id := "signing-metadata/" + route.Name
+		publish := nodes[NodePublish+"/"+route.Name]
+		if publish.ID == "" {
+			return e.New(e.CodePipelineDrift, "signing metadata requires its publication producer")
+		}
+		publish.Outputs = uniqueSorted(append(publish.Outputs, id))
+		nodes[publish.ID] = publish
+		artifacts[id] = Artifact{ID: id, Name: route.Name, Kind: ArtifactSigningMetadata,
+			Producer: publish.ID, Target: route.Target,
+			Path: filepath.ToSlash(filepath.Join(".nvkr", "factory", "signing-metadata", route.Name))}
+		signInputs = []string{id, referenceID}
+	}
 	verifyInputs := []string{referenceID, "signature/" + route.Name}
 	if PerOutputPublication(plan) {
 		verifyInputs = append(verifyInputs, "predicate/"+route.Name)

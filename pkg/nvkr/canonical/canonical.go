@@ -42,9 +42,7 @@ import (
 // objects share a tag, so the anti-collision guarantee is by construction, not by
 // luck.
 const (
-	// KindLegacyRecipe reserves the new namespace's counterpart of historical
-	// nkd.recipe. It was never minted in NVKR; Digest rejects both families.
-	// Active builds use KindBuild.
+	// KindLegacyRecipe is reserved; active builds use KindBuild.
 	KindLegacyRecipe            = "nvkr.recipe"
 	KindBuild                   = "nvkr.build"                    // the compiled IR / buildDigest (ADR-02)
 	KindBuilderProfile          = "nvkr.builder-profile"          // the signed builder profile (ADR-07)
@@ -97,6 +95,7 @@ const (
 	KindQualificationPolicy     = "nvkr.qualification-policy"     // independent complete M3 trust and smoke policy
 	KindToolSmokeWorker         = "nvkr.tool-smoke-worker"        // authenticated native worker observations
 	KindQualificationEvidence   = "nvkr.qualification-evidence"   // independent pipeline artifact checks (ADR-16)
+	KindReleaseManifest         = "nvkr.release-manifest"         // qualification-backed release membership (ADR-16 §5)
 	KindClusterRealization      = "nvkr.cluster-realization/v1"   // retired cluster-realization family, reserved
 	KindLifecycleBinding        = "nvkr.lifecycle-binding/v1"     // retired redundant publication binding, reserved
 	// Internal capability bindings are registered too. They are not wire schemas,
@@ -128,7 +127,7 @@ var registeredKinds = [...]string{
 	KindDiskManifest, KindStagingManifest, KindBuildMaterialManifest,
 	KindSourceClosure, KindVendorSpec, KindSourceInput, KindResolvedInput, KindAICRBundle,
 	KindCatalogSnapshot, KindCatalogOverlay, KindArtifactGraph, KindExecutionSettings, KindCompileSpec, KindRunPlan, KindFactoryObservation,
-	KindDefinition, KindEnvironment, KindVerificationPolicy, KindReleaseContent, KindQualificationEvidence, KindQualificationPolicy, KindToolSmokeWorker, KindClusterRealization, KindLifecycleBinding,
+	KindDefinition, KindEnvironment, KindVerificationPolicy, KindReleaseContent, KindQualificationEvidence, KindReleaseManifest, KindQualificationPolicy, KindToolSmokeWorker, KindClusterRealization, KindLifecycleBinding,
 	KindQualifiedReport, KindTerminalVerification, KindTerminalTree,
 	KindStatusCheckpointPolicy, KindQualifiedObservation, KindQualifiedPublication,
 	KindHostObservation, KindExecutionSelection, KindExecutionObservation, KindRuntimeIdentity,

@@ -47,7 +47,7 @@ func TestNVKEUbuntu24NativeDiskSelections(t *testing.T) {
 		for _, variant := range []struct{ output, source, encryption string }{{"image", "non-fde", "none"}, {"fde", "fde", "luks2"}} {
 			name := "nvke-node-" + variant.output + "-ubuntu24-" + tc.arch
 			t.Run(name, func(t *testing.T) {
-				plan, baseline := nvkeUbuntu24Plans(t, "definitions/nvke-os-ubuntu24/definition-github-"+variant.output+"-"+tc.arch+".yaml", tc.arch)
+				plan, baseline := nvkeUbuntu24Plans(t, "inputs/definitions/diagnostics/ubuntu24/definition-github-"+variant.output+"-"+tc.arch+".yaml", tc.arch)
 				build := nvkeUbuntu24Build(t, plan, name)
 				original := nvkeUbuntu24Build(t, baseline, name)
 				root := tc.plain
@@ -179,7 +179,7 @@ func nvkeUbuntu24GeneratedBundle(t *testing.T, plan *factory.Plan, arch string) 
 
 func nvkeUbuntu24Plans(t *testing.T, definitionPath, arch string) (*factory.Plan, *factory.Plan) {
 	t.Helper()
-	environmentPath := "definitions/nvke-os-ubuntu24/environment-github-" + arch + ".yaml"
+	environmentPath := "inputs/environments/github-ubuntu24-" + arch + ".yaml"
 	authored, err := LoadDefinition(t.Context(), definitionPath)
 	if err != nil {
 		t.Fatal(err)
@@ -200,8 +200,8 @@ func nvkeUbuntu24Plans(t *testing.T, definitionPath, arch string) (*factory.Plan
 	// toolchains against the retained Ubuntu 26 source/material selection.
 	prior := authored.Clone()
 	stack := prior.Outputs[0].Catalog
-	if stack == nil || stack.Base != "../nvke-m2/os-catalog" ||
-		!slices.Equal(stack.Overlays, []string{"../nvke-m2/native-toolchains.yaml", "ubuntu24.json"}) {
+	if stack == nil || stack.Base != "../../../catalogs/node-images/release" ||
+		!slices.Equal(stack.Overlays, []string{"../../../catalogs/node-images/variants/native-toolchains.yaml", "../../../catalogs/node-images/variants/ubuntu24.json"}) {
 		t.Fatalf("output %s lost its exact ordered catalog stack: %+v", prior.Outputs[0].Name, stack)
 	}
 	stack.Overlays = stack.Overlays[:1]
@@ -220,13 +220,13 @@ func TestNVKEUbuntu24LocalDiskSelections(t *testing.T) {
 	t.Chdir(repo)
 	for _, arch := range []string{"amd64", "arm64"} {
 		t.Run(arch, func(t *testing.T) {
-			hosted, err := CompileFiles(t.Context(), "definitions/nvke-os-ubuntu24/definition-github-image-"+arch+".yaml",
-				"definitions/nvke-os-ubuntu24/environment-github-"+arch+".yaml", "test (deadbeef)")
+			hosted, err := CompileFiles(t.Context(), "inputs/definitions/diagnostics/ubuntu24/definition-github-image-"+arch+".yaml",
+				"inputs/environments/github-ubuntu24-"+arch+".yaml", "test (deadbeef)")
 			if err != nil {
 				t.Fatal(err)
 			}
-			definitionPath := "definitions/nvke-os-ubuntu24/definition-" + arch + ".yaml"
-			environmentPath := "definitions/nvke-os/environment-local-linux-" + arch + "-docker.yaml"
+			definitionPath := "inputs/definitions/diagnostics/ubuntu24/definition-" + arch + ".yaml"
+			environmentPath := "inputs/environments/local-linux-" + arch + "-kvm.yaml"
 			plan, err := CompileFiles(t.Context(), definitionPath, environmentPath, "test (deadbeef)")
 			if err != nil {
 				t.Fatal(err)
@@ -252,7 +252,7 @@ func TestNVKEUbuntu24LocalDiskSelections(t *testing.T) {
 				otherArch = "arm64"
 			}
 			crossed, err := CompileFiles(t.Context(), definitionPath,
-				"definitions/nvke-os/environment-local-linux-"+otherArch+"-docker.yaml", "test (deadbeef)")
+				"inputs/environments/local-linux-"+otherArch+"-kvm.yaml", "test (deadbeef)")
 			assertCode(t, err, e.CodeEngineCapability)
 			if crossed != nil {
 				t.Fatal("crossed native environment returned a Plan")
@@ -271,7 +271,7 @@ func nvkeUbuntu24Build(t *testing.T, plan *factory.Plan, name string) factory.Bu
 }
 
 func TestNVKEUbuntu24AgentRejectsUnsupportedLibcBeforeWork(t *testing.T) {
-	overlay, err := catalog.LoadOverlayContext(t.Context(), "../../../definitions/nvke-os-ubuntu24/ubuntu24.json")
+	overlay, err := catalog.LoadOverlayContext(t.Context(), "../../../inputs/catalogs/node-images/variants/ubuntu24.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,7 +337,7 @@ func TestNVKEUbuntu24AgentRejectsUnsupportedLibcBeforeWork(t *testing.T) {
 }
 
 func TestNVKEUbuntu24AgentPreservesDynamicAgentAndStaticUpdater(t *testing.T) {
-	overlay, err := catalog.LoadOverlayContext(t.Context(), "../../../definitions/nvke-os-ubuntu24/ubuntu24.json")
+	overlay, err := catalog.LoadOverlayContext(t.Context(), "../../../inputs/catalogs/node-images/variants/ubuntu24.json")
 	if err != nil {
 		t.Fatal(err)
 	}

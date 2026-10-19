@@ -57,12 +57,12 @@ func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *te
 	_ = os.RemoveAll(caseRoot)
 	defer func() { _ = os.RemoveAll(caseRoot) }()
 	ctx := context.Background()
-	definitionPath := "definitions/nvke-v1/definition.yaml"
+	definitionPath := "docs/examples/nvke-tutorial/definition.yaml"
 	definition, err := LoadDefinition(ctx, definitionPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	environment, err := LoadEnvironment(ctx, "definitions/nvke-v1/environment-github.yaml")
+	environment, err := LoadEnvironment(ctx, "docs/examples/nvke-tutorial/environment-github.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *te
 		}
 	}
 	definition.Outputs = cliOutputs
-	definition.Catalog.Base = filepath.Join(repo, "definitions", "nvke-v1", "catalog")
+	definition.Catalog.Base = filepath.Join(repo, "inputs/catalogs/nvke/module-tags")
 	definitionPath = filepath.ToSlash(filepath.Join(caseRoot, "definition.json"))
 	writeCanonicalTestFile(t, definitionPath, definition)
 	environment.Signing.Mode = factory.SigningModeCosign

@@ -186,8 +186,8 @@ func TestNightlyProfilesUsePinnedNestedRunbooksLayout(t *testing.T) {
 		!strings.Contains(string(dockerfile), "\nCOPY profiles/ /profiles/\nCOPY runbooks/ /profiles/runbooks/\n") {
 		t.Fatal("profiles fixture differs from the source-owned pinned Dockerfile layout")
 	}
-	for _, catalog := range []string{"profiles-catalog", "upstream-ovn-profiles-catalog"} {
-		raw, err := os.ReadFile(filepath.Join("../../definitions/nvke-local-dev-arm64", catalog, "registry.yaml"))
+	for _, catalog := range []string{"nvidia-arm64", "upstream-arm64"} {
+		raw, err := os.ReadFile(filepath.Join("../../inputs/catalogs/controller-profiles", catalog, "registry.yaml"))
 		if err != nil || !strings.Contains(string(raw), pin+"  controller/profiles/example/Dockerfile") {
 			t.Fatal("producer Dockerfile pin differs from the layout fixture", catalog, err)
 		}

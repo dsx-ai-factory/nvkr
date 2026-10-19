@@ -16,8 +16,8 @@ producer, packaging, source-access and runtime work.
 
 The catalogs introduced by
 [PR #113](https://github.com/dsx-ai-factory/nvkr/pull/113) provide
-[public-source producers](../definitions/nvke-os-source/README.md) and
-[OVN outputs](../definitions/nvke-ovn-source/README.md). The local demo selects
+[public-source producers](../inputs/experiments/public-os-sources/README.md) and
+[OVN outputs](../inputs/catalogs/ovn-nvidia/README.md). The local demo selects
 the OVN fork producers for the disk's chart/image packages. The other direct-source
 OS producers are not yet integrated into that selection. M2 still uses the source-owned package-folder
 producers and temporarily retains the older plugin-free SPIRE package; the remaining direct-source catalog is not integrated.
@@ -28,7 +28,7 @@ candidate catalogs.
 | --- | --- | --- |
 | CLI/controller/chart | Local source producers and controller image binding | Exercise the complete final source-built selection; migrating to a different NVKE baseline also requires its matching build interface/toolchain |
 | CAPNICo | This example selects a source-owned BuildKit producer at public v0.0.45, commit `30882520888ab7bb75d125cb7bb9aa89e48acd6a` | Include it in the complete Run and validate provider reconciliation; a producer declaration is not runtime acceptance |
-| Provisioned provider | Existing `nvke-controller/catalog` source producer, selected locally | Include it in the complete Run and validate provider reconciliation; the NICo demo does not use this provider |
+| Provisioned provider | Existing `inputs/catalogs/nvke/release` source producer, selected locally | Include it in the complete Run and validate provider reconciliation; the NICo demo does not use this provider |
 | Fleet profiles | NVKE `image.yml` identifies `nvke-site-deploy` as the production source; M2's `nico-reference-profiles-fixture` is explicitly test data, not production profiles | Accessible Git URL and approved revision, producer and image output. A signed reference fixture does not satisfy production fleet-profile delivery |
 | Kubernetes/containerd/crictl/CNI/Helm/TPM | PR #113 has fourteen direct-source producers across supported versions | Integrate the candidate catalog and package the authenticated outputs for actual consumers. Its static containerd subset is not feature-equivalent to NVKE's upstream release archive; held Helm preparation remains a separate hosted-route limitation, not a blocker to the local developer-fetch route |
 | Remaining OS application dependencies | PR #113's inventory maps released inputs and missing source producers | SPIRE, runc with seccomp, CoreDNS, etcd, pause, Calico/Tigera and embedded OCI images; preserve package dependencies, paths, units, hooks and import behavior |
@@ -48,19 +48,19 @@ See the [staged-installer handoff](nvkr-to-nvke-demo.md) for installer alignment
 ## Offline deployment inventory
 
 Source-build completeness and offline-install completeness are separate requirements. The following
-inventory was inspected on 2026-10-10 against NKE commit
+inventory was inspected on 2026-10-10 against NVKE commit
 [`b506565e698a3f0f1a64b2072476ba928c2e799e`](https://github.com/dsx-ai-factory/nvke/tree/b506565e698a3f0f1a64b2072476ba928c2e799e).
 It describes that consumer's dependencies, not an NVKR export schema or a completed installation.
-The pinned source links require access to the private NVKE repository, renamed from NKE.
+The pinned NVKE source links require repository access.
 
-The [M2 image catalog](../definitions/nvke-m2/image-catalog/registry.yaml) selects twelve non-test runtime
+The [M2 image catalog](../inputs/catalogs/runtime-dependencies/registry.yaml) selects twelve non-test runtime
 images per architecture: PostgreSQL, eight SPIRE images and three Temporal images. Their pins reflect the
-selected NKE deployment values and do not cover every installation mode. The bootstrap CLI's embedded
+selected NVKE deployment values and do not cover every installation mode. The bootstrap CLI's embedded
 PostgreSQL selection differs from the NICo deployment's Bitnami chart image.
 
-The [local site catalog](../definitions/nvke-local-dev-arm64/site-catalog/registry.yaml) bundles the NKTP
+The [local site catalog](../inputs/catalogs/nvke/local-site-arm64/registry.yaml) bundles the NVKE telemetry pipelines
 dependency charts `opentelemetry-kube-stack` 0.22.0, `prometheus-node-exporter` 4.56.1 and
-`metrics-server` 3.13.1. Rendering the inspected NKE source with NICo values and those exact archives
+`metrics-server` 3.13.1. Rendering the inspected NVKE source with NICo values and those exact archives
 selected these additional runtime images; the archive hashes matched the catalog pins during inspection:
 
 | Runtime role | Rendered image reference |
@@ -74,11 +74,11 @@ selected these additional runtime images; the archive hashes matched the catalog
 | Development telemetry backend | `grafana/otel-lgtm:0.32.0` |
 
 The charts also use `rancher/kubectl:v1.34.1` for a pre-delete hook and `busybox:latest` for Helm test hooks.
-The Operator declares a fallback collector at 0.159.0 while NKE's rendered collector resources specify
+The Operator declares a fallback collector at 0.159.0 while NVKE's rendered collector resources specify
 0.162.0. The downstream inventory must state whether tests, uninstall, fallback resources and an
 operator-selected production telemetry backend are in scope. These tags are findings, not admitted digest pins.
 
-NKE's [bootstrap code](https://github.com/dsx-ai-factory/nvke/blob/b506565e698a3f0f1a64b2072476ba928c2e799e/cli/internal/bootstrap/controllerdeploy/capi.go)
+NVKE's [bootstrap code](https://github.com/dsx-ai-factory/nvke/blob/b506565e698a3f0f1a64b2072476ba928c2e799e/cli/internal/bootstrap/controllerdeploy/capi.go)
 requests CAPI core, kubeadm bootstrap and kubeadm control-plane v1.12.3 through `clusterctl init`.
 The [clusterctl default](https://github.com/kubernetes-sigs/cluster-api/blob/v1.12.3/cmd/clusterctl/client/config/cert_manager_client.go)
 is cert-manager v1.19.3 unless configuration overrides it. Their release manifests identify these images:

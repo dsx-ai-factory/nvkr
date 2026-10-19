@@ -6,8 +6,8 @@ acquisition-origin authority, installed inventory, a live-Run receipt or a full 
 [ADR-10](adr/0010-pluggable-builder-types.md) owns the producer/carrier handoff;
 [ADR-13](adr/0013-supply-chain-evidence.md) owns evidence authority.
 
-The standalone [OS development inputs](../definitions/nvke-os/README.md) and the newer
-[M2 candidate](../definitions/nvke-m2/README.md) have different source selections. M2 pins the
+The standalone [OS development inputs](../inputs/definitions/diagnostics/README.md) and the newer
+[M2 candidate](../inputs/definitions/nvke/README.md) have different source selections. M2 pins the
 merged capture-capable NVKE source and explicitly enables capture. Its generic disk collector can retain
 the declared carrier under the original Run/QCOW2 owner; that integration does not strengthen this
 standalone verifier's claim.
@@ -23,7 +23,7 @@ standalone verifier's claim.
 | Member path | Digest-derived `packages/<sha256>.deb` | A tar member name, never a filesystem grant |
 | Capture archive identity | NVKR's held-file capability and exact archive hashing | Not a live-Run or final-QCOW2 binding |
 
-The minimal `nkd.dev/package-acquisitions/v1` capture document is separate from
+The minimal `nvkr.dev/package-acquisitions/v1` capture document is separate from
 the build-material manifest. Build inputs have component bindings; guest APT
 events have package archive sizes and repository metadata locations. Neither
 description authenticates an acquisition simply by being well-formed.

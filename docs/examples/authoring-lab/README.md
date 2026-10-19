@@ -118,4 +118,4 @@ go test ./cmd/nvkr -run '^TestAuthoringLab' -count=1
 
 For shared sources, complete per-output catalog stacks, and replacement identity, read
 [catalogs and components](../../catalogs-and-components.md). The
-[deploy Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-deploy/README.md) provides the real NVKE composition example.
+[deploy Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-deploy/README.md) provides the real NVKE composition example.

@@ -16,7 +16,8 @@ import (
 )
 
 // publicationOutputSubjects derives the independent signing subjects only from
-// metadata whose complete local or downloaded closure has passed Inspect.
+// control documents admitted by Inspect or InspectMetadata. The caller owns the
+// route, Run and evidence policy; metadata alone issues no payload receipt.
 func publicationOutputSubjects(reference string, inspection delivery.Inspection) ([]sign.Subject, error) {
 	refs, err := delivery.OutputReferences(reference, inspection)
 	if err != nil {

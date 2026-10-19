@@ -182,26 +182,29 @@ func TestCLIArtifactTestUnsupportedProducers(t *testing.T) {
 }
 
 func TestCLIArtifactTestVersionAliasAdmission(t *testing.T) {
-	for _, tc := range []struct {
-		mode string
-		code e.Code
+	for _, test := range []struct {
+		mode     string
+		conflict bool
 	}{
 		{mode: "alias"},
 		{mode: "equal-alias"},
-		{mode: "conflicting-alias", code: e.CodeInvalidCatalog},
+		{mode: "conflicting-alias", conflict: true},
 	} {
-		t.Run(tc.mode, func(t *testing.T) {
-			plan := cliTestPlan(t, "amd64", tc.mode, 1)
+		t.Run(test.mode, func(t *testing.T) {
+			plan := cliTestPlan(t, "amd64", test.mode, 1)
 			inputs, err := LoadCLIArtifactTestInputs(t.Context(), writeCLIPlan(t, plan), "")
-			if tc.code != "" {
-				assertFactoryErrorCode(t, err, tc.code)
+			if test.conflict {
+				assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
 				if inputs != nil {
-					t.Fatal("conflicting version aliases emitted diagnostic inputs")
+					t.Fatal("conflicting version stamps emitted inputs")
 				}
 				return
 			}
-			if err != nil || inputs == nil || inputs.ExpectedVersion != "v1" {
-				t.Fatalf("admitted version alias: inputs=%+v, error=%v", inputs, err)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if inputs == nil || inputs.ExpectedVersion != "v1" {
+				t.Fatalf("unexpected version inputs: %+v", inputs)
 			}
 		})
 	}

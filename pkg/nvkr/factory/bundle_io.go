@@ -15,7 +15,6 @@ import (
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
@@ -62,16 +61,19 @@ func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 		return GeneratedManifest{}, nil, e.New(e.CodePipelineDrift,
 			"generated %s workflow bytes do not match workflowDigest", bundle.Engine)
 	}
-	if bundle.Engine == EngineGitHub {
-		if err := validateGitHubWorkflowSize(workflow); err != nil {
-			return GeneratedManifest{}, nil, err
-		}
-	}
 	names := sortedFileNames(bundle.Files)
+	if len(names) > maxGeneratedDirEntries {
+		return GeneratedManifest{}, nil, e.New(e.CodeInvalidCatalog, "generated Run has too many members")
+	}
 	members := make([]GeneratedMember, 0, len(names))
 	for _, name := range names {
 		if !safeGeneratedPath(name) || int64(len(bundle.Files[name])) > maxGeneratedFileBytes {
 			return GeneratedManifest{}, nil, e.New(e.CodeInvalidCatalog, "generated Run member %q is unsafe or oversized", name)
+		}
+		if name == bundle.WorkflowPath {
+			if err := validateGitHubWorkflowSize(bundle.Files[name]); err != nil {
+				return GeneratedManifest{}, nil, err
+			}
 		}
 		members = append(members, GeneratedMember{Path: name, SHA256: pipeline.FileDigest(bundle.Files[name]), Mode: 0o644})
 	}
@@ -85,30 +87,18 @@ func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 	return manifest, append(raw, '\n'), nil
 }
 
-// Ownership descriptions may include retired records in this namespace, but
-// cannot grant write or retirement ownership over another generated bundle.
+// New bundles contain one entry workflow and records in its private directory.
+// Legacy sibling workflows are admitted only when retiring a prior manifest.
 func validateBundleNamespace(bundle *GeneratedBundle) error {
-	name := ""
-	if bundle.WorkflowPath != GitHubWorkflowPath && bundle.WorkflowPath != GitHubDevelopmentWorkflowPath {
-		name = strings.TrimSuffix(strings.TrimPrefix(bundle.WorkflowPath, ".github/workflows/nvkr-run-"), ".yml")
-		if name == "" {
-			return e.New(e.CodeInvalidCatalog, "generated Run has an invalid namespace")
-		}
-	}
-	if err := definition.ValidateGitHubBundleName(name); err != nil {
-		return err
-	}
-	layout := githubBundleLayout(name)
-	if bundle.WorkflowPath == GitHubDevelopmentWorkflowPath {
-		layout = githubDevelopmentLayout
+	layout, ok := githubWorkflowNamespace(bundle.WorkflowPath)
+	if !ok {
+		return e.New(e.CodeInvalidCatalog, "generated Run has an invalid namespace")
 	}
 	if bundle.WorkflowPath != layout.workflowPath || bundle.ManifestPath != layout.manifestPath || bundle.PlanPath != layout.planPath {
 		return e.New(e.CodeInvalidCatalog, "generated Run paths do not share one admitted namespace")
 	}
-	prefix := filepath.ToSlash(filepath.Dir(layout.manifestPath)) + "/"
 	for path := range bundle.Files {
-		if path == bundle.ManifestPath || path == bundle.ManifestPath+".lease" ||
-			(path != layout.workflowPath && !strings.HasPrefix(path, prefix)) {
+		if !generatedMemberInNamespace(bundle, path) {
 			return e.New(e.CodeInvalidCatalog, "generated Run member %q is outside its namespace", path)
 		}
 	}
@@ -253,6 +243,13 @@ func CheckGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 		if err != nil {
 			return err
 		}
+		info, statErr := os.Lstat(destination)
+		if statErr != nil || !info.Mode().IsRegular() || info.Mode().Perm() != os.FileMode(member.Mode) {
+			return e.New(e.CodePipelineDrift, "generated Run member %s is missing, unsafe or has changed mode", member.Path)
+		}
+		if err := validateGeneratedDirectoryChain(root, filepath.ToSlash(filepath.Dir(member.Path))); err != nil {
+			return e.Wrap(e.CodePipelineDrift, err, "generated Run member %s has unsafe parents", member.Path)
+		}
 		raw, err := readGeneratedContext(ctx, destination)
 		if err != nil {
 			return e.Wrap(e.CodePipelineDrift, err, "generated Run member %s is missing or unsafe", member.Path)
@@ -384,7 +381,10 @@ func checkGeneratedDirectoryContents(ctx context.Context, root string, bundle *G
 		}
 		return nil
 	}
-	return inspect(directory, ".")
+	if err := inspect(directory, "."); err != nil {
+		return err
+	}
+	return checkGeneratedWorkflowContents(ctx, root, bundle)
 }
 
 func validateGeneratedDirectoryChain(root, relative string) error {
@@ -483,7 +483,7 @@ func copyContext(ctx context.Context, destination io.Writer, source io.Reader) (
 	var total int64
 	for {
 		if err := ctx.Err(); err != nil {
-			return total, e.Wrap(e.CodeTimeout, err, "generated Run write canceled")
+			return total, e.Wrap(e.CodeTimeout, err, "copy canceled")
 		}
 		n, readErr := source.Read(buffer)
 		if n > 0 {

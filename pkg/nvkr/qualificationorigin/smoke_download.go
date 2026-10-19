@@ -94,7 +94,7 @@ func (g *GitHub) DownloadNativeSmoke(ctx context.Context, invocation *Invocation
 		_, err := invocation.Description()
 		return err
 	}
-	request := SourceRequest{Repository: origin.Repository, RunID: origin.RunID, Attempt: origin.Attempt,
+	request := SourceRequest{Branch: origin.Branch, Repository: origin.Repository, RunID: origin.RunID, Attempt: origin.Attempt,
 		Commit: origin.Commit, Workflow: origin.Workflow, DefaultBranch: origin.DefaultBranch}
 	repository, run, err := g.lookup(ctx, request)
 	if admission := require(); admission != nil {
@@ -106,7 +106,11 @@ func (g *GitHub) DownloadNativeSmoke(ctx context.Context, invocation *Invocation
 	if err := matchRun(request, repository, run); err != nil {
 		return nil, err
 	}
-	if run.Event != "workflow_run" || run.Status != "in_progress" || run.Conclusion != "" {
+	event := "workflow_run"
+	if origin.Branch != "" {
+		event = "workflow_dispatch"
+	}
+	if run.Event != event || run.Status != "in_progress" || run.Conclusion != "" {
 		return nil, e.New(e.CodeVerifyFailed, "native smoke transport requires the active qualification workflow attempt")
 	}
 	if err := g.requireNativeSmokeJobs(ctx, require, origin, selected); err != nil {
@@ -146,7 +150,24 @@ func (g *GitHub) DownloadNativeSmoke(ctx context.Context, invocation *Invocation
 		if "sha256:"+hex.EncodeToString(hash[:]) != artifact.Digest || int64(len(archive)) != size {
 			return nil, e.New(e.CodeVerifyFailed, "native smoke archive differs from its provider digest or size")
 		}
-		result, err := unpackNativeSmoke(ctx, archive)
+		members, private, err := g.resolvePrivateArtifact(ctx, require, origin, name, archive, maxNativeSmokeArchiveBytes, map[string]int64{
+			"worker.json": maxNativeSmokeDocumentBytes, "worker.sig": maxNativeSmokeSignatureBytes,
+			"worker.pem": maxNativeSmokeCertificateBytes, "worker.bundle.json": maxNativeSmokeBundleBytes,
+		})
+		if err != nil {
+			return nil, err
+		}
+		var result NativeSmokeArtifact
+		if private {
+			for _, raw := range members {
+				if len(raw) == 0 {
+					return nil, e.New(e.CodeVerifyFailed, "private native smoke artifact contains an empty evidence member")
+				}
+			}
+			result = NativeSmokeArtifact{Document: members["worker.json"], Signature: members["worker.sig"], Certificate: members["worker.pem"], Bundle: members["worker.bundle.json"]}
+		} else {
+			result, err = unpackNativeSmoke(ctx, archive)
+		}
 		if err != nil {
 			return nil, err
 		}

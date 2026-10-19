@@ -294,11 +294,11 @@ func TestDashboardGraphDisplayBounds(t *testing.T) {
 // source-selector rename must update the display deliberately, rather than
 // silently losing the fixed, privacy-safe Packer reports.
 func TestDashboardGuestReportsFollowMaintainedPackerSelectors(t *testing.T) {
-	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../definitions/nvke-m2/os-catalog"))
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../inputs/catalogs/node-images/release"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	overlay, err := catalog.LoadOverlayContext(t.Context(), "../../definitions/nvke-local-dev-arm64/os-tcg.json")
+	overlay, err := catalog.LoadOverlayContext(t.Context(), "../../inputs/catalogs/node-images/variants/nvidia-tcg.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,8 +337,8 @@ func TestDashboardMaintainedPlanThroughLauncherProjection(t *testing.T) {
 			var plan *factory.Plan
 			var err error
 			if small {
-				const definitionPath = "definitions/nvke-v1/definition.yaml"
-				const environmentPath = "definitions/nvke-v1/environment-github.yaml"
+				const definitionPath = "docs/examples/nvke-tutorial/definition.yaml"
+				const environmentPath = "docs/examples/nvke-tutorial/environment-github.yaml"
 				authored, loadErr := definition.LoadDefinition(t.Context(), definitionPath)
 				if loadErr != nil {
 					t.Fatal(loadErr)

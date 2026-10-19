@@ -68,6 +68,9 @@ func TestQualificationEvidenceStrictContract(t *testing.T) {
 		edit func(*Evidence)
 		code e.Code
 	}{
+		{"development source", func(v *Evidence) { v.ArtifactChecks.Origin.Branch = "feature/qualification" }, e.CodeVerifyFailed},
+		{"development qualifier", func(v *Evidence) { v.Invocation.Branch = "feature/qualification" }, e.CodeVerifyFailed},
+		{"development policy", func(v *Evidence) { v.ToolSmoke.Policy.Source.Development = true }, e.CodeVerifyFailed},
 		{"unknown schema", func(v *Evidence) { v.SchemaVersion = "nvkr.dev/qualification-evidence/v1" }, e.CodeVerifyFailed},
 		{"unknown gate", func(v *Evidence) { v.GateVersion = "other" }, e.CodeVerifyFailed},
 		{"builder signs qualification", func(v *Evidence) { v.Invocation = v.ArtifactChecks.Origin }, e.CodeVerifyFailed},
