@@ -162,59 +162,57 @@ larger NVKE demo with a real workload cluster.
 
 ## Extend the workflow into the NVKE demo
 
-The NVKE demo adds a downstream step: **NVKR builds the artifacts → NVKE's installer consumes them →
-you use the running cluster**. It builds a larger selection including tools, images, charts, and an OS
-disk. Kind hosts the management services; the workload cluster's control-plane and worker are real QCOW2 virtual machines.
+The NVKE demo adds a downstream step: **NVKR builds the artifacts → NVKE consumes them →
+you use the running cluster**. The native CLI runs on Ubuntu ARM64 with KVM or Apple Silicon
+macOS with HVF. NICoSim runs on that host and starts three real QEMU guests from the selected
+QCOW2: one Kubernetes site, one tenant control plane, and one tenant worker. Kind is temporary
+bootstrap infrastructure; the NVKE management stack runs in the site guest.
 
-This needs a dedicated **Ubuntu ARM64 host**, with eight CPUs, 24 GiB RAM, and about 90 GiB free on
-native ext4 storage. An Apple Silicon Mac can host that Linux environment through Colima; Docker
-Desktop alone does not provide the workload cluster's virtual-machine runtime. Allow substantially more time and downloads than
-the greeting demo.
+Follow the [native demo setup guide](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/local-nvke-demo.md)
+for your platform's prerequisites, source access, and full guest and build capacity requirements.
+Mac commands run directly in macOS. Both platforms use Docker for artifact builds and a private
+Lima containerd backend for temporary Kind bootstrap. Allow substantially more time, storage,
+and downloads than the greeting demo.
 
-First follow the
-[Ubuntu ARM64 setup guide](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/local-nvke-demo.md#1-choose-your-linux-execution-host).
-Complete steps 1–3 **and the preparation in step 4**, stopping before its first `e2e` command.
-That includes the Kind network setup and required runtime-image pulls. Bootstrap builds the CLI inside
-its pinned Go container, so this host does not need its own Go installation. Stay in that Linux terminal,
-at the NVKR repository root, with the guide's `NVKE_DEMO` variable set.
-
-For this walkthrough, explicitly select **upstream OVN**. The default NVIDIA OVN selection has a
-documented startup blocker. The upstream alternative has a recorded successful E2E at a specific
-revision on October 11, 2026; it does not validate the NVIDIA fork or later revisions. The setup guide
-links that evidence and owns the current prerequisites and limitations.
+After installing those prerequisites, build both CLIs from this checkout with the Go version in
+`.go-version` on `PATH`:
 
 ```sh
-"$NVKE_DEMO" e2e \
-  --config demos/local-nvke.yaml \
-  --repo "$PWD" \
-  --attempt quickstart-upstream-01 \
-  --out "$PWD/.nvkr/quickstart-upstream-01-demo" \
-  --jobs 2 \
-  --network upstream-ovn
+GOTOOLCHAIN=local make build demo
+bin/nvke-demo e2e --help
 ```
 
-The command supplies the example's paths; no YAML edits are needed. For a rerun, choose unused values
-for both `--attempt` and `--out`.
-
-Success returns `retained-ready` and prints live cluster checks plus commands for accessing the
-management cluster and the workload cluster, which the demo labels "Site" and "Tenant". Copy the exact
-`DEMO`, `SESSION`, `KUBECTL`, and kubeconfig assignments it prints. Use the printed workload cluster
-commands to inspect nodes and pods, and check the retained session with:
+From the repository root, start a fresh build and deployment with NVIDIA OVN, then clean up:
 
 ```sh
-"$DEMO" status --session "$SESSION"
+bin/nvke-demo e2e --repo "$PWD" \
+  --attempt quickstart-native-01 \
+  --out "$PWD/.nvkr/quickstart-native-01-demo" \
+  --jobs 2 --network ovn --walkthrough --cleanup
 ```
 
-When finished exploring, clean up that session:
+Source authorization must work on the execution host. If supplying local NVKE source objects,
+add `--nvke-clone /absolute/path/to/nvke` as described in the setup guide; the pinned commits
+must exist in that Git repository. For a rerun, choose unused values for both `--attempt` and
+`--out`. NVIDIA OVN is the default. The guide also describes the explicit matched upstream OVN
+alternative; the CLI does not silently switch suppliers.
 
-```sh
-"$DEMO" cleanup --session "$SESSION"
-```
+The command stays in the foreground while it builds, bootstraps the site, creates the tenant,
+and checks two Ready tenant nodes plus workload/DNS. `--walkthrough` adds bounded site and tenant
+API, node, and all-namespace pod observations. Add `--conformance` to test the same fresh tenant
+and retain its original reports before cleanup. With `--cleanup`, natural tenant deletion and
+joined owned cleanup must finish before success; require the command's exit zero.
 
-Cleanup removes the owned demo resources and retains Run records and logs. For an automated run that
-cleans up immediately, add `--cleanup` to `e2e` and require exit zero with the upstream-specific `PASS`
-message. Readiness alone does not establish cleanup. This remains an unqualified local diagnostic;
-it does not produce a signed Release.
+For interactive inspection, omit `--cleanup` and leave the foreground terminal running. Use a
+second terminal with that invocation's private tool and kubeconfig paths, as described in
+[cluster access](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/local-nvke-demo.md#5-recognize-success).
+Ctrl-C requests cleanup. New native invocations do not detach a session; the guide's
+[session controls](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/local-nvke-demo.md#retained-deployment-and-actual-cluster-access)
+apply only to existing legacy Kind-site sessions.
+
+Cleanup retains Run records and logs. This remains a local diagnostic and does not produce a
+signed Release. See the setup guide's current evidence and limitations before treating a run
+as accepted.
 
 ## Take the same inputs to CI and Releases
 
