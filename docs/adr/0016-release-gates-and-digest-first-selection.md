@@ -276,7 +276,11 @@ failed work; they do not establish that a complete candidate fits the hosted bud
 deadline and the individual operation bounds.
 
 Pipeline owns native ELF and image admission, bounded execution in a nonroot network-disabled container,
-clean payload environment, no host mounts or credentials, bounded output and stop/join cleanup. Lifecycle
+clean payload environment, no host mounts or credentials, bounded output and stop/join cleanup. Local image
+inspection uses the exact pin with portable Docker inspection arguments, then checks the returned platform,
+image identity and inherited configuration. It does not require the newer inspection-only platform option;
+an unexpected local variant still fails admission. Pull and container creation retain explicit platform selection,
+and the smoke owner checks the created container's image identity before streaming the executable. Lifecycle
 streams exact held members and evaluates fixed version responses; it issues a native receipt only after
 cleanup. The worker signs only that live receipt's canonical report under its separate worker identity.
 No worker has final qualification publication credentials. Failed native reports retain actual observations
