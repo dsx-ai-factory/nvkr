@@ -216,26 +216,43 @@ Traceability to the draft imported-validation specification:
 - **IV-R09/R10; IV1-A1/A4 (partial):** before/after byte observations on exercised
   fixture exit paths, preparation and supplied-process failures, bounded version
   timeout, preparation process-group cancellation, and Linux bootstrap-group
-  stop/join contracts. Failure cleanup is still best effort; full phase budgets,
+  stop/join contracts. Cleanup after failure remains best effort; full phase budgets,
   cleanup-failure reporting, retention and real runtime cancellation are unproved.
 - **IV-R04/R11/R13–R15; IV1-A1/A5 (open):** no fresh matching-revision NVKR build
   has completed bootstrap. No machine-readable upstream completion protocol or
   NVKR bootstrap result parser exists; process success must not become an IV1
   acceptance result. Required bootstrap completeness remains unestablished.
 
-Validation on 2026-10-19: NVKE `gmake preflight MODULES=cli
-PREFLIGHT_BASE=HEAD` passed CLI lint, the full CLI Go suite with race detection,
-license checks and shell checks. The final helper correction was then covered by
-all bootstrap-interface contracts with race detection in an offline, unprivileged
-Linux ARM64 container in Docker's macOS VM (35.6 seconds), including the real
-30-second preflight timeout and TERM-ignoring process-group escalation. Final
-macOS ARM64 targeted race contracts passed with `-short` (the real timeout and
-Linux setsid cases are excluded there). Final Bash syntax, warning-level shellcheck
-and both worktrees' whitespace checks passed. The initial sandboxed full suite
-could not open listeners; the successful preflight ran outside that restriction.
-These are source/interface contracts, not a real bootstrap run or native-host
-AMD64 evidence. The documentation-only NVKR branch ran whitespace checks, not
-the repository-wide Go gate.
+Validation record (source/interface contracts only; no real bootstrap Run):
+
+- The interface reviewed in [NVKE source commit
+  `f33b7afb55d421958540589ca03d206531bfa16b`](https://github.com/dsx-ai-factory/nvke/commit/f33b7afb55d421958540589ca03d206531bfa16b)
+  includes the corrected process helper. The [hosted CLI job for that exact
+  head](https://github.com/dsx-ai-factory/nvke/actions/runs/39347477494/job/118383877388)
+  passed the bootstrap contract package on Linux. The overall job and workflow
+  failed: the CLI telemetry contract encountered `CloseIdleConnections`, and
+  other jobs reported tracing and API compatibility failures. A package pass
+  does not establish a clean repository gate or real bootstrap acceptance.
+- On 2026-10-20, the review follow-up source was checked at [NVKE commit
+  `e8562635ef329f3ce335c668f5bb0a533d511a6a`](https://github.com/dsx-ai-factory/nvke/commit/e8562635ef329f3ce335c668f5bb0a533d511a6a),
+  tree `204643ad1ad0575400ad583e3373b59f3490163d`.
+  `gmake preflight MODULES=cli PREFLIGHT_BASE=HEAD` passed on the identical
+  pre-commit tree on macOS ARM64, including CLI lint, the full CLI Go suite with
+  race detection, license checks and shell checks. A restricted-PATH probe also
+  passed all three input-admission cases while skipping only shell-dependent
+  cases. These local logs are not retained immutable CI artifacts; the source
+  commit identifies the tested implementation, not an authenticated Run.
+- Earlier local preflight and Linux ARM64 container checks were recorded before
+  their source identities were pinned in this guide. Their original logs are
+  local diagnostics, not immutable acceptance evidence. The source and hosted
+  job above replace mutable PR references as the inspectable record.
+
+No fresh NVKR-built CLI has completed real bootstrap on a native Linux AMD64
+host. There is no immutable real-bootstrap Run or artifact to cite. The
+source/interface contracts use controlled supporting tools and cannot establish
+live cluster assertions or exhaustive teardown. The NVKR documentation branch's
+aggregate local gate also failed two timing-sensitive contracts; separate passing
+reruns do not make that aggregate gate successful.
 
 The execution follow-up must retain upstream bootstrap preparation, runtime,
 networking and assertions in development and verification. It must use an
