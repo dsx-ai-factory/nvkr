@@ -2979,8 +2979,11 @@ passed for the preceding beta selection, and that CLI validated and rendered the
 The user-approved test-only suite pin is `b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8`,
 a signed compatibility revision of the earlier `a3206710` suite, with beta.6 deployment
 templates and an explicit stack-config/credential/telemetry handoff. It retains the
-candidate entrypoint omitted from the selected product source. Hosted source-contract
-and full runtime validation of this revision remain pending. Product sources select beta.6
+candidate entrypoint omitted from the selected product source. The [hosted source-contract Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/39487106857/attempts/1)
+on NVKR `8df540b83aeaec5e27b865dcd65887882699755b` passed the actual
+candidate render function with the beta.6 CLI and the hook argv/environment
+regression. This verifies configuration composition, not published-artifact or VM
+runtime acceptance; full runtime validation of this revision remains unverified. Product sources select beta.6
 with the explicit SPIRE exception. This diagnostic selection is an exception to
 ADR-23's proposed matching-revision rule, not adoption of that proposal. Missing
 candidate hooks still fail admission; the generic rebuilding suite is no fallback.
