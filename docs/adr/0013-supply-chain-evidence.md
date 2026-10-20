@@ -416,7 +416,7 @@ a delivery route. The authoritative Debian material reader remains digest-pinned
 Independent standalone package payload inspection and dependency evidence remain deferred. This diagnostic does not validate target architecture, preserve a source package,
 enable direct APT publication, or prove installation.
 
-ADR-20's specified, disabled native `file` format must preserve source-created Debian packages unchanged.
+ADR-20's native `file` format must preserve source-created Debian packages unchanged.
 Its `deb` kind requires the pinned authoritative Debian tooling to validate package name, version,
 architecture and declared dependencies against the actual held package, then inspect bounded payload
 contents for the required subject-bound evidence. Archive acquisition, member hashes, control metadata
@@ -424,8 +424,8 @@ and actual payload dependencies are distinct claims. No source pathname, filenam
 `archive-content/v1` inventory or `deb-archive-metadata/v1` diagnostic may satisfy the payload-evidence gate.
 Every selected package/member and architecture needs its own exact subject and output membership; variants
 that intentionally conflict use separate installation cases. Merely exposing current disk materials as
-files does not complete this evidence path. It remains disabled until its native package and independent
-consumer contracts and operational acceptance are recorded.
+files does not complete this evidence path. Implementation must satisfy its native package and independent
+consumer contracts and record operational acceptance before use.
 
 For `efi`, `ipxe`, `kernel`, `initrd` and `iso` files, preserve the actual source/material and exact-byte
 subjects. An inventory of archive members establishes those bytes, not boot compatibility, installed

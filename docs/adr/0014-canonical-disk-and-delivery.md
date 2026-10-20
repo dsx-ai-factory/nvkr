@@ -176,7 +176,7 @@ identity. Current existing-byte measurement does not implement that production c
 NVKR produces artifacts and verified references. Downstream consumers own boot serving, installation and Helm
 deployment. No provisioning bundle or node-SKU interface is retained without a supported artifact producer.
 
-ADR-20 specifies a disabled S3 contract for the complete selected QCOW2, EFI, iPXE and Debian package set.
+ADR-20 specifies the S3 delivery contract for the complete selected QCOW2, EFI, iPXE and Debian package set.
 Raw QCOW2 payload identity remains separate from its OCI wrapper and canonical decoded-disk identity;
 relocation cannot upgrade production evidence into reproduction. Native packages preserve their original
 bytes rather than being rebuilt by the legacy development packager. Plain and public-bootstrap FDE keep

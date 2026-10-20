@@ -1548,8 +1548,9 @@ Finalizers are scheduled unconditionally and fail on failed/missing producers, f
 artifacts, malformed or substituted observations/SBOMs, and wrong production predicates. The platform may prevent
 the finalizer itself from starting; inspect provider status when no Run record exists (ADR-17).
 
-The S3 extension specified in ADR-20 is disabled. Its generated execution must retain GitHub-only authority,
-the admitted source/signing branches and protected Environments, and the existing producer isolation.
+ADR-20 specifies the S3 extension; its generated execution remains implementation work. That execution must
+retain GitHub-only authority, the admitted source/signing branches and protected Environments, and the
+existing producer isolation.
 Derive required delivery nodes from typed targets and named outputs in the complete Plan. The graph orders
 source aggregate authentication, selected complete output checks, proof capture, upload/read-back, detached
 delivery signing, completion publication and independent completion verification. Every required target result

@@ -215,8 +215,8 @@ identities and inexact bindings fail closed. The canonical document is bounded b
 transport limit. Pretty-printed JSON hashes are insufficient for either document. Reconciliation records
 implementation and external acceptance independently of schema registration.
 
-The disabled S3/native-file contract in ADR-20 reserves the following new families. These are design
-allocations only; no executable codec registration or decoder is added by the contract freeze.
+The S3/native-file contract in ADR-20 defines the following new families. Their names and semantics form
+the implementation contract; executable codec registration and decoders remain implementation work.
 
 | Object | Canonical schema | Frozen family kind |
 | --- | --- | --- |

@@ -257,7 +257,7 @@ Live keyless acceptance requires the protected hosted workflow, public-transpare
 the first signed NVKE bytes, bounded service retry/availability policy, and an independent cosign-only consumer
 exercise. Unit tests and local dry-run records establish none of those operational facts.
 
-The specified, disabled file-delivery extension in ADR-20 preserves the original build signature,
+The file-delivery contract in ADR-20 requires preserving the original build signature,
 subject-bound SLSA provenance and SBOM bundles byte-for-byte. Signing must retain the exact authenticated
 bundle bytes through an opaque closeable proof owner and provide supplied-bundle verification without
 registry discovery. The current verification/signing JSON records are descriptive and cannot serve as

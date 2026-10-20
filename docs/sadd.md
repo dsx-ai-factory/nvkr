@@ -471,7 +471,7 @@ ADR-20 specifies, but does not enable, complete S3 delivery for selected VM/iPXE
 artifacts. The contract keeps OCI source publications immutable, adds native file/member representations,
 and authenticates a derived delivery root with portable original proofs. Typed configuration, executable
 adapters, provider acceptance and actual boot/package-install acceptance remain required. Existing schema
-constants, whole-Plan verification and disabled-path behavior are unchanged by this documentation freeze.
+constants, whole-Plan verification and current capability admission are unchanged by this documentation freeze.
 
 [Reconciliation](adr/reconciliation.md) owns the current support matrix. Local immutable attempts,
 Plan/graph inspection, GitHub generation, metadata-only release navigation and the scoped
@@ -535,7 +535,7 @@ The current publication input owner admits omitted or explicit OCI selection and
 combined APT/OCI selection before catalog, generation or execution work. Required selections never fall back
 to another transport; a direct APT publisher and its service/signing contract remain deferred (ADR-20 §2).
 
-The disabled file-delivery extension reserves Definition v6 `file` outputs, Environment v2
+The file-delivery contract reserves Definition v6 `file` outputs, Environment v2
 `publication.fileTargets` and Run Plan v6. Its new native-file and delivery-root families are distinct from
 Build, payload and OCI wrapper identity. A lifecycle selection receipt retains selected complete output-local
 publications and actual source proof bytes; it does not relax whole-Plan completeness. Separate caller policies
