@@ -41,6 +41,19 @@ func readBootstrapDiagnosticReport(path, checksum string) (*bootstrapDiagnosticR
 	if err := canonical.ValidateJSONDocument(raw); err != nil {
 		return nil, e.Wrap(e.CodeBuildFailed, err, "invalid bootstrap report JSON")
 	}
+	// encoding/json accepts case-insensitive struct field aliases, including
+	// aliases that overwrite an earlier canonical completion marker.
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return nil, e.Wrap(e.CodeBuildFailed, err, "decoding bootstrap report fields")
+	}
+	for key := range fields {
+		switch key {
+		case "apiVersion", "suite", "completed", "phase", "exitCode", "artifactSha256Before", "artifactSha256After", "cleanup", "nodes", "controlPlaneVip":
+		default:
+			return nil, e.New(e.CodeBuildFailed, "unknown bootstrap report field %q", key)
+		}
+	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	var report bootstrapDiagnosticReport
