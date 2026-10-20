@@ -215,8 +215,19 @@ func TestHostedDevelopmentPredicateInvocationScope(t *testing.T) {
 			setDevelopmentRun(t)
 			t.Setenv("GITHUB_RUN_ATTEMPT", "2")
 			plan := githubDevelopmentPublicationTestPlan(t)
-			run := hostedPredicateRun{builderID: "https://github.com/example/nvkr/.github/workflows/nvkr-dev.yml@refs/heads/feature/pipeline", invocationID: test.invocation, startedOn: time.Unix(100, 0).UTC(), finishedOn: time.Unix(101, 0).UTC()}
+			run := hostedPredicateRun{builderID: "https://github.com/example/nvkr/.github/workflows/nvkr-dev.yml@refs/heads/feature/pipeline", invocationID: "https://github.com/example/nvkr/actions/runs/12345/attempts/2", startedOn: time.Unix(100, 0).UTC(), finishedOn: time.Unix(101, 0).UTC()}
 			raw, err := productionPredicateForRun(plan, plan.Environment.Signing, run)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Produce an admitted predicate, then exercise the consumer boundary
+			// with the candidate invocation rather than failing in the producer.
+			var predicate provenance.Predicate
+			if err := canonical.UnmarshalExact(raw, &predicate); err != nil {
+				t.Fatal(err)
+			}
+			predicate.RunDetails.Metadata["invocationId"] = test.invocation
+			raw, err = canonical.Marshal(predicate)
 			if err != nil {
 				t.Fatal(err)
 			}

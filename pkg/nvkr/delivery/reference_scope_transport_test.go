@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -57,6 +58,20 @@ func TestMixedAttemptMetadataAndPayloadRegistryRoundTrip(t *testing.T) {
 	for i, item := range []string{"a", "b"} {
 		attempt := []string{"1", "2"}[i]
 		request := releasePublicationRequestFixture(t, "", "")
+		// Distinct bundles may share payload evidence, but non-image outputs
+		// must not alias a single bundle descriptor.
+		source := filepath.Join(t.TempDir(), "cli")
+		if err := os.WriteFile(source, []byte("exact executable"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		bundlePath := filepath.Join(t.TempDir(), "bundle")
+		bundle, err := BuildBinaryBundle(t.Context(), bundlePath, BinaryBundleRequest{OS: "linux", Arch: "amd64", Purpose: item, Files: []BinaryFileInput{{Name: "cli", Path: source, InstallPath: "/usr/local/bin/cli", Mode: 0o755}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		request.Objects[0].Path = bundlePath
+		request.Objects[0].SemanticDigest = bundle.SemanticDigest
+		request.Objects[0].BlobDigest = bundle.RootDigest
 		request.Objects[0].Name = item
 		request.Objects[0].Output.Repository = item
 		request.Objects[1].Evidence.Outputs = []string{item}
