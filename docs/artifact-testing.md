@@ -158,6 +158,113 @@ passing result may still be retained. Output failures do not replace a failed
 suite's primary status. Executable staging and rehashing observe cancellation at
 copy chunk boundaries; cancellation cannot interrupt an already-blocked kernel I/O.
 
+## Bootstrap E2E interface candidate (IV1 first slice)
+
+The NVKE bootstrap interface candidate [#1801](https://github.com/dsx-ai-factory/nvke/pull/1801),
+stacked on process-contract interface [#1578](https://github.com/dsx-ai-factory/nvke/pull/1578),
+adds a producer-neutral entrypoint:
+
+```sh
+# From the matching NVKE checkout, on an already prepared Linux host:
+sudo -E env "PATH=$PATH" make -C cli test-e2e-bootstrap-artifact \
+  NVKECTL=/absolute/path/to/staged/nvkectl \
+  NVKECTL_EXPECTED_VERSION=<version-selected-from-the-Plan>
+```
+
+This is a candidate upstream interface, **not an implemented NVKR bootstrap
+adapter**. `nvkr run artifact-test` still admits only `contract` and `cli`;
+its default, selection, source import, offline containers and error semantics are
+unchanged. Do not point its offline runner at bootstrap or patch an imported
+checkout to add this target. Once adopted, the target must exist at the exact
+artifact source commit selected by `LoadCLIArtifactTestInputs` and imported by
+`sourcegit`; a convenient local checkout is not an alternative test revision.
+
+The new target has no CLI build prerequisite, requires an explicit executable
+and expected version, makes a relative path absolute, and calls the existing
+bootstrap script. Before fixture preparation that script hashes the executable
+and runs its `version -o short`, bounded by GNU timeout to 30 seconds plus five
+seconds of kill grace. Both `generate sitespec` and `bootstrap site` use the same
+read-only shell variable. Once fixture cleanup is installed, exit paths also
+rehash the executable; a mismatch fails an otherwise successful invocation and
+cannot replace an earlier preparation or suite failure. No staging, Plan
+interpretation or source-selection implementation is added upstream.
+
+The default `test-e2e-bootstrap: build` and direct upstream CI invocation remain
+available. All assertions and supporting preparation stay upstream. The candidate
+also stops and joins the background bootstrap process group before tearing down
+its resources, with a five-second termination grace and escalation to SIGKILL.
+This is process cleanup, not a guarantee that all external resources disappeared.
+
+| Resource or phase | Existing owner and requirements |
+|---|---|
+| Subject and source | NVKR factory selects one output from the complete Plan; sourcegit imports its exact commit/tree; the eventual adapter must reuse private staging and pipeline execution ownership |
+| Host and capacity | Caller/upstream CI supplies a disposable, native Linux host with root, sufficient capacity, `/dev/vtpmx`, Go, Make, GNU timeout/coreutils, Kind, kubectl, Helm, clusterctl and jq for VIP checks |
+| Runtime daemons | Host owner supplies standalone containerd, nerdctl and BuildKit; upstream `cli/hack/bootstrap-e2e-host.sh` installs them in CI; daemon installation and Docker removal are not suite teardown duties |
+| Controller image | Caller/CI builds it into the same containerd image store and names it with `NVKECTL_CONTROLLER_IMAGE`; this is a supporting dependency, not the CLI subject |
+| Other support | Upstream prepares OVN/Helm packages, agent/fake-node and provisioned-provider images; caches may reuse existing support images under upstream semantics |
+| Live fixture | Upstream creates fake nodes/network, bootstrap Kind cluster, SPIRE/TPM, Postgres, Temporal, provider/controller, tenant control planes, FRR/BGP, and the Traefik/whoami workload |
+| Networking | Upstream installs cross-bridge/VIP forwarding and addresses/routes; downloads modules, images and charts using its existing mirror controls. This requires connected execution, unlike IV0 |
+| Teardown | Upstream registers fixture removal in reverse order and collects failure diagnostics; caller owns host services, preloaded images and caches. Several removals suppress errors and diagnostics may remain |
+
+Traceability to the draft imported-validation specification:
+
+- **IV-R01, IV-R03, IV-R05; IV1-A2/A3:** no-build interface, explicit input,
+  shared upstream preparation/assertions, and documented dependency ownership.
+  Contract tests consume a supplied executable at version preflight and the real
+  site-spec invocation, with a working default present; broken/version-mismatched
+  subjects fail. This is not real cluster execution.
+- **IV-R09/R10; IV1-A1/A4 (partial):** before/after byte observations on exercised
+  fixture exit paths, preparation and supplied-process failures, bounded version
+  timeout, preparation process-group cancellation, and Linux bootstrap-group
+  stop/join contracts. Cleanup after failure remains best effort; full phase budgets,
+  cleanup-failure reporting, retention and real runtime cancellation are unproved.
+- **IV-R04/R11/R13–R15; IV1-A1/A5 (open):** no fresh matching-revision NVKR build
+  has completed bootstrap. No machine-readable upstream completion protocol or
+  NVKR bootstrap result parser exists; process success must not become an IV1
+  acceptance result. Required bootstrap completeness remains unestablished.
+
+Validation record (source/interface contracts only; no real bootstrap Run):
+
+- The interface reviewed in [NVKE source commit
+  `f33b7afb55d421958540589ca03d206531bfa16b`](https://github.com/dsx-ai-factory/nvke/commit/f33b7afb55d421958540589ca03d206531bfa16b)
+  includes the corrected process helper. The [hosted CLI job for that exact
+  head](https://github.com/dsx-ai-factory/nvke/actions/runs/39347477494/job/118383877388)
+  passed the bootstrap contract package on Linux. The overall job and workflow
+  failed: the CLI telemetry contract encountered `CloseIdleConnections`, and
+  other jobs reported tracing and API compatibility failures. A package pass
+  does not establish a clean repository gate or real bootstrap acceptance.
+- On 2026-10-20, the review follow-up source was checked at [NVKE commit
+  `e8562635ef329f3ce335c668f5bb0a533d511a6a`](https://github.com/dsx-ai-factory/nvke/commit/e8562635ef329f3ce335c668f5bb0a533d511a6a),
+  tree `204643ad1ad0575400ad583e3373b59f3490163d`.
+  `gmake preflight MODULES=cli PREFLIGHT_BASE=HEAD` passed on the identical
+  pre-commit tree on macOS ARM64, including CLI lint, the full CLI Go suite with
+  race detection, license checks and shell checks. A restricted-PATH probe also
+  passed all three input-admission cases while skipping only shell-dependent
+  cases. These local logs are not retained immutable CI artifacts; the source
+  commit identifies the tested implementation, not an authenticated Run.
+- Earlier local preflight and Linux ARM64 container checks were recorded before
+  their source identities were pinned in this guide. Their original logs are
+  local diagnostics, not immutable acceptance evidence. The source and hosted
+  job above replace mutable PR references as the inspectable record.
+
+No fresh NVKR-built CLI has completed real bootstrap on a native Linux AMD64
+host. There is no immutable real-bootstrap Run or artifact to cite. The
+source/interface contracts use controlled supporting tools and cannot establish
+live cluster assertions or exhaustive teardown. The NVKR documentation branch's
+aggregate local gate also failed two timing-sensitive contracts; separate passing
+reruns do not make that aggregate gate successful.
+
+The execution follow-up must retain upstream bootstrap preparation, runtime,
+networking and assertions in development and verification. It must use an
+importable matching source commit and identify upstream/integration/execution
+owners. Native Linux AMD64 execution remains to be demonstrated. This work does not grant host privileges, add runner
+policy, change maintained pins, introduce catalog infrastructure, or weaken IV0.
+The next smallest slice is an upstream-owned terminal completion/cleanup report
+(with missing-result and teardown-failure negatives), then pipeline-owned bounded
+execution on the agreed route using existing factory/source selection. A real
+fresh-build positive and broken-executable negative on that route must precede
+IV1 acceptance. Local contract logs are validation, not operational evidence.
+
 ## Validation and remaining work
 
 The Go replacement was exercised on 2026-10-15 from the main-based migration
