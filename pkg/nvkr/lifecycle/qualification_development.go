@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
@@ -27,6 +26,8 @@ const DevelopmentQualificationSourceRoot = ".nvkr/development-source"
 
 // CheckDevelopmentQualificationSource recovers original controls from an exact
 // authenticated successful development Run, including runs predating a handoff.
+// The caller owns the complete-operation deadline, as for production handoffs;
+// source, metadata and payload operations retain their individual bounds.
 func CheckDevelopmentQualificationSource(ctx context.Context, provider *qualificationorigin.GitHub, source *qualificationorigin.SourceRun, policy QualificationPolicy, options QualificationRuntimeOptions) (*ArtifactCheckReceipt, *ArtifactCheckDescription, error) {
 	if err := admitQualificationRun(ctx); err != nil {
 		return nil, nil, err
@@ -41,8 +42,6 @@ func CheckDevelopmentQualificationSource(ctx context.Context, provider *qualific
 	if !policy.Source.Development || origin.Branch == "" || origin.Repository != policy.Source.Repository || origin.Workflow != policy.Source.Workflow || origin.DefaultBranch != policy.Source.DefaultBranch {
 		return nil, nil, e.New(e.CodeUntrustedSigner, "development source differs from independent policy")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
-	defer cancel()
 	plan, err := factory.LoadPlanContext(ctx, filepath.Join(DevelopmentQualificationSourceRoot, ".github/nvkr-dev/plan.json"))
 	if err != nil {
 		return nil, nil, err

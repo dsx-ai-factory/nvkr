@@ -262,6 +262,8 @@ sixty-minute Actions step and ninety-minute job. The complete-operation budget c
 metadata and payload acquisition, evidence authentication, native smoke or qualification publication, and
 production release-manifest issuance. Manifest issuance shares the final qualifier's original deadline;
 it does not start a fresh budget after qualification publication. A shorter caller deadline still wins.
+Development source recovery and complete artifact checking inherit that same caller budget; they do not
+impose a separate shorter whole-candidate deadline.
 The remaining minute allows cooperative
 joined cleanup and failure diagnostics; it is not a guaranteed return bound. Expiration cannot establish
 successful completion; attachments already published are not rolled back.
