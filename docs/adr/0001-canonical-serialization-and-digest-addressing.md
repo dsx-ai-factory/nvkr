@@ -228,8 +228,9 @@ root binds authenticated source publications to exact stored bytes and destinati
 `nvkr.publication`/`nvkr.publication-manifest` families or changes Build identity. Implementations must register
 the distinct tags and add strict canonical/unknown-schema/family-separation contracts before minting them.
 The `nvkr.dev/file-delivery-locator/v1` locator pins raw document/bundle hashes and sizes; it is transport
-selection, not another semantic identity or trust object. Root JSON SHA-256, detached bundle SHA-256,
-native-file SHA-256 and their typed structured identities remain distinct.
+selection, not another semantic identity or trust object. The raw SHA-256 digests of the root JSON,
+detached bundle and native payload remain distinct from the typed identities of the delivery root and
+native-file manifest.
 
 ## Consequences
 

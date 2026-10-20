@@ -192,8 +192,9 @@ the QCOW2 directly cannot prove EFI execution. A transport signature, build succ
 cannot establish imager parameter compatibility or Secure Boot. Delivery, boot readiness and qualification
 are reported separately; the contract freeze enables none of these paths.
 The downstream serving/client trust boundary must bind the script and EFI bytes actually executed to the
-authenticated assets; preflight URL verification alone cannot prevent later substitution. Acceptance includes
-substitution after verification as well as a wrong authenticated QCOW2 digest.
+authenticated assets; preflight URL verification alone cannot prevent later substitution. Acceptance must
+demonstrate rejection of script or EFI substitution after verification and rejection of a QCOW2 whose digest
+differs from authenticated metadata.
 
 ## Consequences
 

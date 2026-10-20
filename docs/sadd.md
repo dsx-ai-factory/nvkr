@@ -541,7 +541,7 @@ Build, payload and OCI wrapper identity. A lifecycle selection receipt retains s
 publications and actual source proof bytes; it does not relax whole-Plan completeness. Separate caller policies
 authenticate source and delivery roles. Transfer uses conditional writes and full read-back; detached completion
 is published last. An ambiguous final write may leave a valid completion, so producer success requires
-reconciliation and consumers always authenticate the complete required closure. Boot HTTP(S) access is
+reconciliation and consumers always authenticate the complete required closure. Boot HTTPS access is
 separate from S3 API access. Downstream owners render machine-specific boot configuration and prove actual
 EFI imaging/reboot, direct VM boot and package installation; NVKR supplies no new provisioning service.
 

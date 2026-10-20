@@ -203,14 +203,16 @@ _Avoid_: APT repository, installed package, builder type
 
 **Native file output**:
 The Artifact representation specified in ADR-20 for unchanged producer-created Debian packages, EFI/iPXE
-files and installer assets. Complete regular archive members retain parent identity, canonical member name,
-digest, size, mode and declared kind. File integrity is distinct from package dependencies and boot readiness.
+files and installer assets. All regular files in an archive retain the parent archive identity, canonical
+member name, digest, size, mode and declared kind. File integrity is distinct from package dependencies and
+boot readiness.
 _Avoid_: Reconstructed package, executable tool, installed inventory
 
 **File-delivery root**:
-A generated, detached signed record binding selected authenticated source publications and exact named
-payload/evidence objects to their S3 routes and read-back observations. It preserves original provenance and
-adds no build, boot or qualification verdict. Implementation remains outstanding under the specified contract.
+A generated record with a detached signature, binding selected authenticated source publications and exact
+named payload and evidence objects to their S3 routes and read-back observations. It preserves original
+provenance and adds no build, boot or qualification verdict. Implementation remains outstanding under the
+specified contract.
 _Avoid_: Authored lifecycle object, replacement source release, successful upload flag
 
 **File-delivery locator**:

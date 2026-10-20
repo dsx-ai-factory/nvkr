@@ -264,8 +264,8 @@ registry discovery. The current verification/signing JSON records are descriptiv
 portable proofs. Capture must occur during the same verification that issues the source capability;
 re-downloading an unbound candidate or serializing a verified boolean is insufficient.
 
-The derived canonical delivery root uses detached keyless document signing with the admitted pinned signer,
-normal transparency checks and a portable Sigstore bundle. Reusing detached-signing primitives does not
+The derived canonical delivery root must use detached keyless document signing with the admitted pinned signer,
+required transparency checks and a portable Sigstore bundle. Reusing detached-signing primitives does not
 grant a new authority: the pipeline-attested delivery role must be explicitly admitted and cannot borrow
 qualified-document or build-provenance authority. The signature binds relocation/completion, never a new
 build or runtime verdict. Exact root bytes, proof bytes, subject and invocation are bound before publication.
