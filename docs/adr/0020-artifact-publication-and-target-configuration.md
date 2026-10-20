@@ -168,30 +168,34 @@ policy is implied by accepting a disk. The separate raw diagnostic route remains
 #### S3 file delivery contract
 
 This section freezes the proposed engineering contract for customer-controlled S3 delivery of the complete
-selected VM/iPXE/EFI/QCOW2 and Debian package set. Delivery of that complete selected set is required
-implementation scope. This documentation change specifies the contract; the S3 adapter, native-file codecs
-and decoders remain implementation work. Named-decider ratification and provider/boot acceptance remain
-outstanding. Existing OCI behavior and existing schema readers are unchanged.
+selected artifact set: QCOW2 disk images for VM boot and imaging, compatible EFI and iPXE assets, and Debian
+packages. Implementations must support that complete selected set. This documentation change specifies
+the contract; the S3 adapter, native-file codecs and decoders remain implementation work. Ratification by
+the named deciders, provider acceptance and boot acceptance remain outstanding. Existing OCI behavior and
+existing schema readers are unchanged.
+
 The initial source is GitHub `per-output-v1` publication in the `pipeline-attested` lane. GCS, direct APT
 repository serving, other repository managers, arbitrary upload scripts and legacy monolithic-root projection
 are not admitted by this contract. A new adapter must satisfy the same ownership and acceptance boundary.
 
 **Authored inputs and versions.** Reserve `nvkr.dev/definition/v6` for the native `file` output below,
 `nvkr.dev/environment/v2` for `publication.fileTargets`, and `nvkr.dev/run-plan/v6` for their derived graph.
-These are documentary reservations, not implemented decoders. Existing v5 Definitions and v1 Environments
-remain valid under their current contracts; new fields or formats must never be silently interpreted under an
-older schema. New admission must preserve omitted-target OCI behavior and reject unknown or mixed fields.
-No current schema constant, catalog pin, generated workflow or executable capability changes in this freeze.
+This contract reserves those versions; runtime decoders do not yet accept them. Existing v5 Definitions
+and v1 Environments remain valid under their current contracts; new fields or formats must never be silently
+interpreted under an older schema. Omitting file targets must preserve existing OCI behavior; admission
+must reject unknown or mixed fields. No current schema constant, catalog pin, generated workflow or
+executable capability changes in this freeze.
 
-Each `publication.fileTargets` entry has the following closed shape. The list is sorted by unique `name`;
-every configured target is required for Run success. There is no best-effort target or implicit all-output selection.
+Each `publication.fileTargets` entry has the closed shape below. The list is sorted by `name`, and names
+must be unique. Every configured target is required for Run success. There is no best-effort target or
+implicit selection of all outputs.
 
 | Field | Contract |
 | --- | --- |
 | `name` | Unique canonical target name, using the existing authored-name rules. |
 | `kind` | Exactly `s3`; its matching `s3` object is required. |
-| `outputs` | Sorted, unique, nonempty exact Definition output names. Initially only `file`, `executable` and `disk-image` outputs are admitted. Missing, duplicate, unknown or unsupported selections fail before work. |
-| `s3.endpoint`, `s3.region` | Explicit HTTPS S3 API origin and signing region. No user information, query, fragment or embedded credentials; provider endpoint/addressing behavior must be exercised. |
+| `outputs` | A nonempty, sorted list of unique, exact Definition output names. Initially only `file`, `executable` and `disk-image` outputs are admitted. Missing, duplicate, unknown or unsupported selections fail before work. |
+| `s3.endpoint`, `s3.region` | Explicit S3 API origin using HTTPS, plus the signing region. The endpoint has no user information, query, fragment or embedded credentials; provider endpoint and addressing behavior must be exercised. |
 | `s3.bucket`, `s3.prefix` | Explicit bucket and nonempty canonical relative key prefix; no traversal, empty segments or leading/trailing slash. Provider naming validation belongs to the admitted SDK/service boundary. |
 | `s3.addressing` | Exactly `path` or `virtual-host`; no silent addressing fallback. |
 | `s3.writeCredentialRef`, `s3.readCredentialRef` | Separate references to writer and verifier credentials. They resolve only in admitted operations; secret values never enter authored/generated records, URLs or logs. |
@@ -200,26 +204,29 @@ every configured target is required for Run success. There is no best-effort tar
 
 `maxRequestAttempts` counts the initial request and all SDK retries for each API call. `maxUploadAttempts`
 counts the initial single PUT or multipart upload and each fresh whole-object restart; it does not reset the
-operation deadline. `maxObjectBytes`, `maxTotalBytes` and `maxObjects` bound the final unique stored objects
-for one target, including parent archives, original proof/control objects, the delivery root and its detached
-bundle. Duplicate source bindings do not count another copy of an identical key. Reserve bounded root/bundle
-capacity before upload and reject any resulting size that exceeds it before committing. Retransfers and
-read-backs do not increase that stored-byte inventory, but are bounded independently by both attempt limits,
-the global concurrency/memory/scratch admission and the operation/cleanup deadlines.
+operation deadline. `maxObjectBytes`, `maxTotalBytes` and `maxObjects` bound the final set of unique stored
+objects for one target, including parent archives, original proof/control objects, the delivery root and
+its detached bundle. Multiple source bindings for the same object key count as one stored object. Reserve
+bounded capacity for the root and bundle before upload and reject any resulting size that exceeds it before
+committing. Repeated transfers and read-backs do not increase that stored-byte inventory, but are bounded
+independently by both attempt limits, the global concurrency/memory/scratch admission and the
+operation/cleanup deadlines.
 
 Targets affect Environment, Plan and delivery identity, never producer Build identity or unchanged file digests.
 The target must have a corresponding OCI publication source and signing configuration; the first extension does
 not replace OCI production. Local credentials may support diagnostics, but authority-bearing delivery/signing
-remains GitHub-only. Federation and referenced compatible-service credentials are admitted implementations of
-the references above, not ambient credentials inherited by build jobs. Dependency, license, provenance and
-security review must admit pinned AWS SDK modules and transitive dependencies before implementation uses them.
+remains GitHub-only. Implementations may resolve those references through federation or credentials for an
+admitted S3-compatible service. Build jobs must not inherit ambient storage credentials. Dependency,
+license, provenance and security review must admit pinned AWS SDK modules and transitive dependencies
+before implementation uses them.
 
 **Native file outputs.** A `format: file` output selects one exposed producer and its required material closure.
 Its `file` object contains exactly `kind` and `representation`. `kind` is one of `deb`, `efi`, `ipxe`, `kernel`,
-`initrd` or `iso`; `representation` is `file`, `tar` or `tar-gzip`. Archive representation means its complete
-regular-file membership, not an authored wildcard/subset. Kind comes from the declaration and owning validator,
-not the filename. The existing archive owner admits safe directory structure but rejects duplicate normalized
-names, traversal, links, special files, ambiguous or empty membership and unsupported content before publication.
+`initrd` or `iso`; `representation` is `file`, `tar` or `tar-gzip`. An archive representation includes every
+regular file in the archive; authored wildcards or subsets are not allowed. Kind comes from the declaration
+and owning validator, not the filename. The existing archive owner admits safe directory structure but
+rejects duplicate normalized names, traversal, links, special files, ambiguous or empty membership and
+unsupported content before publication.
 
 Reserve `nvkr.dev/native-file/v1` with the new `nvkr.native-file` digest family. Its closed canonical object
 contains `schemaVersion`, `platform`, `producer` and sorted `files`. `producer` binds exact `artifactID`,
@@ -240,11 +247,11 @@ platforms, Plan and original preparation/signing invocations. Unrelated image/ch
 downloaded, but their absence cannot be described as full aggregate payload verification. Preserve existing
 whole-Plan `ExactInputReceipt` and `ExportForInvocation` guarantees; neither accepts a subset.
 
-Lifecycle must issue a separate opaque selection receipt retaining the selected complete held publications
+`lifecycle` must issue a separate opaque selection receipt retaining the selected complete held publications
 and actual authenticated source signature, provenance and SBOM bundle bytes. Verification records, booleans,
-restored paths or equal Build Digests cannot replace that owner or authorize another output/Run. Signing owns
-proof retention and supplied-bundle authentication; delivery owns held bytes and storage receipts; lifecycle
-joins them. Close cancels and joins active work before releasing payload/proof owners. No new authored
+restored paths or equal Build Digests cannot replace that owner or authorize another output or Run. `sign` owns
+proof retention and supplied-bundle authentication; `delivery` owns held bytes and storage receipts; `lifecycle`
+joins them. `Close` cancels and joins active work before releasing payload and proof owners. No new authored
 lifecycle object, second scheduler or plugin authority is introduced.
 
 **Signed root and consumer locator.** Reserve `nvkr.dev/file-delivery/v1` and the new `nvkr.file-delivery`
@@ -277,11 +284,11 @@ not basename, array position or caller-asserted checksum; every selected output'
 `readback` records the full-byte observation (`sha256`, `size`, and the exact `versionId` or conditional-read
 `etag` used); its digest, size and version must match the corresponding object binding. The owner must
 derive it from completed reads, never deserialize it as authority. Objects are sorted by unique exact key;
-outputs and native files are sorted by unique name. An object's
-optional `readURL` is the exact clean boot/file URL, itself fully read and rehashed before signing. Source
-control/evidence objects needed to independently authenticate aggregate membership and every selected output
-are mandatory objects even when they are not payloads. Unknown fields, zero/missing required objects,
-duplicate bindings and subject/format confusion fail strict canonical validation.
+outputs and native files are sorted by unique name. An object's optional `readURL` is the exact clean boot
+or file URL, whose contents must be fully read and rehashed before signing. Source control and evidence
+objects needed to independently authenticate aggregate membership and every selected output are mandatory
+even when they are not payloads. Unknown fields, empty object sets, missing required objects, duplicate
+bindings and subject/format confusion fail strict canonical validation.
 
 Payload/proof keys are `<prefix>/blobs/sha256/<hex>/<basename>`. A projected native/executable member uses the
 last segment of its canonical relative source name; the full member path remains in its source binding.
@@ -301,7 +308,7 @@ objects and requires that the detached bundle authenticates the exact canonical 
 the locator alone supplies no trust. Source and delivery Verification Policies are independent caller inputs;
 publisher-policy digests in the root are descriptive. Consumer receipts bind the policies actually enforced.
 The root cannot nominate its trusted signer, weaken disk evidence, or upgrade the lane or acceptance scope.
-Full Release qualification/revocation and offline acceptance remain outside this artifact-publication contract.
+Full Release qualification, revocation and offline acceptance remain outside this artifact-publication contract.
 
 **Transfer, commit and interruption.** Use conditional creation for PUT and multipart completion. A `412`
 requires full GET/digest/size reconciliation before reuse. A multipart `409` requires key reconciliation and,
@@ -311,9 +318,9 @@ and provider checksum metadata are not payload identity. Use exact version reads
 admit explicit ETag-conditional reads with full rehash. A provider unable to meet a selected requirement fails
 admission, not a silent safety downgrade.
 
-The state order is source authentication → upload payload/proofs → verify every required storage object and
-boot URL → generate canonical root → detached sign → root upload/read-back → bundle conditional upload last
-→ independent root/bundle authentication → producer success. Freeze the exact root, bundle and locator bytes
+The state order is source authentication → upload payloads and proofs → verify every required storage object
+and boot URL → generate canonical root → detached signing → root upload and read-back → conditional bundle
+upload last → independent root and bundle authentication → producer success. Freeze the exact root, bundle and locator bytes
 before the final commit request; retries never silently re-sign under the same key. Before that request,
 failure cannot publish a completion. Its result can be indeterminate: a lost response or failed final read-back
 may leave a valid completion remotely. Return no producer success until reconciliation; preserve objects and
@@ -324,13 +331,14 @@ after an error, or an atomic transaction across objects or targets. Every consum
 Cancellation stops and joins transfer workers, then aborts only owned incomplete upload IDs under a separate
 bounded cleanup context and verifies cleanup. Cleanup errors remain visible. Process death requires an
 operator-owned incomplete-upload expiration policy; immediate cleanup or durable multipart resume is not
-promised. Never prune unrelated bucket objects. A required target failure/indeterminate result prevents Run
-success without invalidating completed OCI publication or claiming that another target was rolled back.
+promised. Never prune unrelated bucket objects. Failure or an indeterminate result for a required target
+prevents Run success without invalidating completed OCI publication or claiming that another target was
+rolled back.
 
-**Boot and package acceptance.** All selected AMD64/ARM64 QCOW2, EFI, iPXE and DEB outputs are required;
-none is a later optional substitute for the complete customer path. Source templates retain their own
-identities; destination- or machine-specific rendering has a new identity and belongs to the downstream
-deployment owner. That owner authenticates the delivered asset set before selecting/rendering it. iPXE and
+**Boot and package acceptance.** All selected AMD64/ARM64 QCOW2, EFI, iPXE and DEB outputs are required
+parts of the complete customer path. Source templates retain their own identities; destination- or
+machine-specific rendering has a new identity and belongs to the downstream deployment owner. That owner
+authenticates the delivered asset set before selecting or rendering it. iPXE and
 firmware do not implicitly verify NVKR JSON or Sigstore bundles. Boot endpoints must be exercised from the
 actual provisioning network using the actual clients' read-access method, separately from SDK API read-back.
 The downstream owner must bind bytes actually executed at each boot hop to the authenticated assets through
@@ -351,12 +359,12 @@ iPXE chainload → EFI image verification/disk write → installed-disk reboot �
 for every supported architecture/profile. A simulator that skips EFI execution cannot establish that path.
 Install each delivered DEB on a matching clean target and check declared dependencies and runtime behavior;
 mutually exclusive package versions use separate test cases, not one impossible combined installation.
-Required negatives cover corrupt/missing proof or boot files, EFI/script substitution after verification,
-wrong architecture/digest/imager parameters,
-existing equal/conflicting objects, concurrent writes, lost commit acknowledgement, denied access,
-interrupted multipart transfer and failed boot/install. Delivery success, boot readiness and qualification
-remain separate results. Record provider capabilities, exact artifact/client identities and acceptance limits
-in reconciliation; no provider or format is enabled by this contract freeze alone.
+Required tests cover corrupt or missing proof or boot files, EFI or script substitution after verification,
+wrong architectures or digests, incompatible imager parameters, equal or conflicting existing objects,
+concurrent writes, lost commit acknowledgements, denied access, interrupted multipart transfers and failed
+boot or installation. Delivery success, boot readiness and qualification remain separate results. Record
+provider capabilities, exact artifact/client identities and acceptance limits in reconciliation; no provider
+or format is enabled by this contract freeze alone.
 
 ### 3. The emitted publish phase
 
