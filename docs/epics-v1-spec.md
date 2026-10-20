@@ -443,9 +443,9 @@ verification, vulnerability scanning, deployment topology, cluster E2E qualifica
 builder-profile reproduction and byte-identity guarantees. GitHub is the sole hosted workflow,
 publication and signing provider. Per-built-artifact SBOM composition remains in scope.
 
-The proposed S3 boot and package delivery extension has a specified engineering contract but remains disabled
-and outside completed v1 acceptance. It requires the complete selected artifact set for both supported native
-architectures: disk images, compatible EFI imagers, iPXE assets and original Debian packages, together with
+The proposed S3 boot and package delivery extension has a specified engineering contract; implementation
+and operational acceptance remain outstanding. It requires the complete selected artifact set for both
+supported native architectures: disk images, compatible EFI imagers, iPXE assets and original Debian packages, together with
 their authenticated provenance and required inventories. Installer kernels, initial filesystems and media
 belong to the set when the selected boot method needs them. Deployment owns machine-specific configuration,
 network services, firmware and instance metadata; those prerequisites must be exercised with the delivery.

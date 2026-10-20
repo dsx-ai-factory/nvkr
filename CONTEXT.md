@@ -23,7 +23,7 @@ An explicit GitHub development setting selects branch dispatch. Signed developme
 native disk and pipeline-attested stages with separate signer policy, credentials and disposable run-attempt
 registry namespaces. Unsigned development remains static-unqualified. Neither setting grants production
 acceptance, provider access or qualified evidence.
-The specified, disabled S3 extension adds typed file destinations under Environment publication settings.
+ADR-20 specifies an S3 extension with typed file destinations under Environment publication settings.
 Destinations and clean boot URLs remain transport configuration; they do not change producer Build identity.
 Its future schema reservation does not change the implemented Environment version or enable delivery.
 _Avoid_: Delivery profile, component catalog, build identity
@@ -168,7 +168,7 @@ An Artifact format containing exact executable files and their installation meta
 _Avoid_: Release, arbitrary archive
 
 **Native file output**:
-The specified, disabled Artifact representation for unchanged producer-created Debian packages, EFI/iPXE
+The Artifact representation specified in ADR-20 for unchanged producer-created Debian packages, EFI/iPXE
 files and installer assets. Complete regular archive members retain parent identity, canonical member name,
 digest, size, mode and declared kind. File integrity is distinct from package dependencies and boot readiness.
 _Avoid_: Reconstructed package, executable tool, installed inventory
@@ -176,7 +176,7 @@ _Avoid_: Reconstructed package, executable tool, installed inventory
 **File-delivery root**:
 A generated, detached signed record binding selected authenticated source publications and exact named
 payload/evidence objects to their S3 routes and read-back observations. It preserves original provenance and
-adds no build, boot or qualification verdict. The contract is specified and disabled.
+adds no build, boot or qualification verdict. Implementation remains outstanding under the specified contract.
 _Avoid_: Authored lifecycle object, replacement source release, successful upload flag
 
 **File-delivery locator**:

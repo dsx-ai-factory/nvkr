@@ -76,8 +76,8 @@ unchanged. Source-created DEBs, EFI and iPXE files are not executable-tool bundl
 packages. The six public lifecycle objects remain unchanged; native manifests, selection receipts, delivery
 roots and locators are generated/authenticated internals rather than independently authored lifecycle inputs.
 
-The disabled delivery use case belongs to `lifecycle`. It authenticates aggregate membership under source
-policy and retains each selected complete output-local publication plus its actual verified proof bytes.
+The S3 delivery use case specified in ADR-20 belongs to `lifecycle`. It authenticates aggregate membership
+under source policy and retains each selected complete output-local publication plus its actual verified proof bytes.
 Its separate opaque receipt binds named selection, source roots/Plan/invocations, delivery target and effective
 consumer policies. The complete-set `ExactInputReceipt` and `ExportForInvocation` are not relaxed for this
 subset operation. A descriptive pull result, copied path or decoded delivery document cannot reconstruct

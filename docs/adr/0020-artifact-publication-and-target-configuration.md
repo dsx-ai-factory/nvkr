@@ -43,7 +43,7 @@ When publication is configured, the release index and metadata publish under
 release metadata binds canonical sibling repository names and manifest digests; no complete closure is copied
 into the product repositories.
 Omitting publication produces a build-only Run. In the implemented schema, destinations and a separate
-output-to-destination map are not authored. The disabled S3 extension below specifies the bounded exception.
+output-to-destination map are not authored. The S3 extension contract below specifies the bounded exception.
 The generated internal routes still bind exact package inputs and targets.
 Each derived route owns exactly one publisher and its publication reference. When signing is configured,
 its sign and verification operations bind that same route's package, reference and signature artifacts.
@@ -154,7 +154,7 @@ This export grants no runtime verdict or stronger release/evidence lane. Contrac
 tests exercise origin mismatch, closure substitution, closed capabilities and
 pre-start cancellation; externally exercised end-to-end consumption remains unrecorded.
 
-An S3 object and boot URL must project those same payload bytes, not alternate Build identities. The disabled
+An S3 object and boot URL must project those same payload bytes, not alternate Build identities. The
 contract below binds the payload, route and authenticated read-back in a derived signed delivery root referencing
 the unchanged source publication; it does not rewrite a previously signed OCI root. Object-store execution and
 consumption remain unavailable. Qualified disk reproduction and strict FDE publication remain capability-gated. An FDE payload
@@ -168,8 +168,10 @@ policy is implied by accepting a disk. The separate raw diagnostic route remains
 #### S3 file delivery contract
 
 This section freezes the proposed engineering contract for customer-controlled S3 delivery of the complete
-selected VM/iPXE/EFI/QCOW2 and Debian package set. It is not an enabled capability, a ratified scope change,
-or evidence of provider or boot acceptance. Existing OCI behavior and existing schema readers are unchanged.
+selected VM/iPXE/EFI/QCOW2 and Debian package set. Delivery of that complete selected set is required
+implementation scope. This documentation change specifies the contract; the S3 adapter, native-file codecs
+and decoders remain implementation work. Named-decider ratification and provider/boot acceptance remain
+outstanding. Existing OCI behavior and existing schema readers are unchanged.
 The initial source is GitHub `per-output-v1` publication in the `pipeline-attested` lane. GCS, direct APT
 repository serving, other repository managers, arbitrary upload scripts and legacy monolithic-root projection
 are not admitted by this contract. A new adapter must satisfy the same ownership and acceptance boundary.
