@@ -39,7 +39,7 @@ KEEP_REGISTRY=1
 # introducing another execution image. The loopback registry service uses registry:3.
 RUN_IMAGE=golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
 # The version string the catalog passes to upstream's cli/Makefile for the shared release.
-EXPECT_VERSION=${EXPECT_VERSION:-v0.22.0-beta.1}
+EXPECT_VERSION=${EXPECT_VERSION:-v0.22.0-beta.6}
 
 usage() {
   cat <<'EOF'

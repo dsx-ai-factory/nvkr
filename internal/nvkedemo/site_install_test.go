@@ -162,15 +162,30 @@ func TestManagementStackSeparatesCredentialsFromSiteAndStackInputs(t *testing.T)
 }
 
 func TestStackStateAdmissionAfterParentSymlinkResolution(t *testing.T) {
-	link := filepath.Join(t.TempDir(), "shared")
-	if err := os.Symlink(os.TempDir(), link); err != nil {
-		t.Fatal(err)
-	}
-	destination, err := freshDestination(filepath.Join(link, "new-private-state"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := admitStackStateRoot(destination); err == nil {
-		t.Fatal("normalized shared temporary parent admitted")
+	for _, scenario := range []string{"system temp", "aliased temp outside standard roots"} {
+		t.Run(scenario, func(t *testing.T) {
+			link := filepath.Join(t.TempDir(), "shared")
+			target := os.TempDir()
+			if scenario == "aliased temp outside standard roots" {
+				var err error
+				target, err = filepath.Abs(".")
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.Symlink(target, link); err != nil {
+				t.Fatal(err)
+			}
+			if scenario == "aliased temp outside standard roots" {
+				t.Setenv("TMPDIR", link)
+			}
+			destination, err := freshDestination(filepath.Join(link, "new-private-state"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := admitStackStateRoot(destination); err == nil {
+				t.Fatal("normalized shared temporary parent admitted")
+			}
+		})
 	}
 }

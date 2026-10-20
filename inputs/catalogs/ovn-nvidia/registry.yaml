@@ -28,7 +28,7 @@ components:
         exec buildctl-daemonless.sh build --frontend dockerfile.v0 \
           --local context=/src --local dockerfile=/src/dist/images \
           --opt filename=Dockerfile.ubuntu.nv --opt platform=linux/{{.Arch}} \
-          --opt build-arg:OVN_KUBERNETES_DIR=. \
+          --opt build-arg:OVN_K8S_SRC_ROOT=. \
           --opt build-arg:BASE_IMAGE=docker.io/library/ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55 \
           --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
           --opt build-arg:OVS_SOURCE=doca \

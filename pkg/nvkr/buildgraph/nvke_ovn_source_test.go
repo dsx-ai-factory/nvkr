@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -224,6 +225,7 @@ func TestNVKEOVNForkPinBindings(t *testing.T) {
 		{component: "ovn-kube-ubuntu", fragments: []string{
 			"name=localhost/nvke/ovn-kubernetes:git-" + pin.Commit,
 			"filename=Dockerfile.ubuntu.nv",
+			"build-arg:OVN_K8S_SRC_ROOT=.",
 			`--opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"`,
 			// The Dockerfile defaults to the fork's private FIPS/STIG base and
 			// Artifactory; these overrides keep the producer credential-free.
@@ -742,5 +744,66 @@ func TestNVKEOVNPostinstImportDiagnostics(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+// The diagnostic KVM route binds the TCG predecessor, not the release base.
+func TestNVKEOVNForkDiagnosticKVMStack(t *testing.T) {
+	const path = "../../../inputs/definitions/diagnostics/demo-arm64/os-kvm.json"
+	d, err := definition.LoadDefinition(t.Context(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selection := d.Outputs[0].Catalog
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(filepath.Dir(path), selection.Base)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(selection.Overlays) != 2 {
+		t.Fatal("diagnostic KVM must retain its two ordered overlays")
+	}
+	overlays := make([]catalog.Overlay, 2)
+	for i, name := range selection.Overlays {
+		overlays[i], err = catalog.LoadOverlayContext(t.Context(), filepath.Join(filepath.Dir(path), name))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	prior, err := catalog.ApplyStack(base, overlays[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := catalog.ApplyStack(base, overlays...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = catalog.ApplyStack(base, overlays[1]); err == nil {
+		t.Fatal("diagnostic KVM accepted without its predecessor")
+	} else {
+		var coded *nvkrerr.Error
+		if !errors.As(err, &coded) || coded.Code != nvkrerr.CodeUnverifiedRef {
+			t.Fatalf("wrong predecessor error: %v", err)
+		}
+	}
+	if len(got.Catalog.Components) != len(prior.Catalog.Components) {
+		t.Fatal("KVM changed component membership")
+	}
+	for name, before := range prior.Catalog.Components {
+		want := before
+		if name == "nvke-node-image" {
+			raw, err := canonical.Marshal(before)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := canonical.UnmarshalExact(raw, &want); err != nil {
+				t.Fatal(err)
+			}
+			want.BuildRequirements.Capabilities = []execution.CapabilityRequirement{{Name: "kvm", Policy: "required"}}
+			want.Packer.Variables["cpu_model"] = "host"
+			want.Packer.Variables["ssh_timeout"] = "60m"
+		}
+		if !reflect.DeepEqual(got.Catalog.Components[name], want) {
+			t.Fatalf("KVM changed unintended fields of %s", name)
+		}
 	}
 }

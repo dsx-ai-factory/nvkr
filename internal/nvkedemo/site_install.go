@@ -27,6 +27,16 @@ func admitStackStateRoot(path string) error {
 		if insidePath(path, root) {
 			return errors.New("beta installer state must be outside shared temporary directories")
 		}
+		resolved, err := filepath.EvalSymlinks(root)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return fmt.Errorf("resolve prohibited temporary root: %w", err)
+		}
+		if insidePath(path, resolved) {
+			return errors.New("beta installer state must be outside shared temporary directories")
+		}
 	}
 	return nil
 }

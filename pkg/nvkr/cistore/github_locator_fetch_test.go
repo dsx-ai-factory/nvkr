@@ -148,12 +148,14 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 			}
 			calls, archives := 0, 0
 			zipAPICalls := 0
+			archiveReads := map[string]int{}
 			g := newGitHubLocatorClient("test-repository-token")
 			g.wait = func(context.Context, time.Duration) error { return nil }
 			g.client.Transport = chunkRoundTripper(func(r *http.Request) (*http.Response, error) {
 				calls++
 				if r.URL.Host == "account.blob.core.windows.net" {
 					archives++
+					archiveReads[r.URL.Path]++
 					if r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" {
 						t.Fatal("repository credential escaped to ZIP storage")
 					}
@@ -256,6 +258,16 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 			case "transient ZIP API", "success flat", "success subdirectories", "singleton subdirectory", "missing pattern", "earlier attempt", "retry newest first", "retry oldest first":
 				if err != nil {
 					t.Fatal(err)
+				}
+				if scenario == "transient ZIP API" {
+					if zipAPICalls != 3 || archives != 2 || len(archiveReads) != 2 {
+						t.Fatalf("retry calls: ZIP API=%d storage=%d paths=%v", zipAPICalls, archives, archiveReads)
+					}
+					for path, count := range archiveReads {
+						if count != 1 {
+							t.Fatalf("storage archive %s read %d times", path, count)
+						}
+					}
 				}
 				for _, name := range []string{"nvkr-a", "nvkr-b"} {
 					if (scenario == "missing pattern" || scenario == "singleton subdirectory") && name == "nvkr-b" {

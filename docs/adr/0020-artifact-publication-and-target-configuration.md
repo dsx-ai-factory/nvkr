@@ -580,7 +580,9 @@ same root. Signature/attestation attachments stay outside the signed index to av
 own repository for independent consumption. Signing processes deliverables before the root; hosted verification
 requires every child signature and attestation before recording success. The Release consumer still authenticates
 membership and SBOM coverage through the root. Standalone verification does not establish that release-wide claim. Run completion is a separate descriptive
-record, not signed merely because its referenced bytes are signed. Consumers resolve only sibling repositories within the chosen release namespace and fetch every pinned manifest.
+record, not signed merely because its referenced bytes are signed. Production consumers resolve only sibling repositories within the chosen release namespace and fetch every pinned manifest.
+Development consumers additionally admit the same-run earlier-attempt origins defined in the development
+publication section below, preserving each output's original namespace.
 Artifact-publication acceptance additionally verifies the full payload closure; authenticity explicitly leaves
 payload integrity unchecked. Metadata cannot redirect credentials
 to another host or namespace. The publisher validates local bytes first, uploads and checks deliverables in their
