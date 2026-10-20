@@ -387,8 +387,9 @@ The maintained Definition's deployment images are selected outside the maintenan
 catalog pins, declares each image reference, and locks each image's native digests; the Definition lists one OCI
 output per image and platform, and the qualification policy names those outputs as deployment images. A refresh
 moves only the `nvke` and `nvke-helm` pins and regenerates the bundles, so it changes none of these inputs.
-Today the exact `v0.21.0` constraints keep refreshes a no-op. Before a constraint allows the NVKE release to
-move, review and update together, in one authored change: the selection source pin, the image references and
+The enrolled constraints now select `v0.22.0-beta.6`; stable-only refresh returns `NVKR-E-NO-MATCH`,
+and the daily schedule is suspended. Before changing the NVKE release selection or restoring scheduled
+refresh, review and update together, in one authored change: the selection source pin, the image references and
 their native digest locks, the Definition's image outputs, the qualification policy's `nonToolOutputs`, and the
 expected images in `pkg/nvkr/buildgraph/nvke_m2_images_test.go`. That test fails, naming this section, when the
 selection commit and the controller's NVKE commit diverge. Maintenance does not perform or check this

@@ -8,9 +8,9 @@ sessions, not the architecture or setup procedure for current `run` and `e2e`.
 NVKR builds/acquires and observes artifacts. NVKE owns installation, site
 configuration, provisioning and tenant lifecycle. The demo calls `nvkr`
 subprocesses, not an execution SDK, and delegates installation to the exact
-pinned NVKE `v0.22.0-beta.1` installer at
-`6991e36bef8f15b42b6f6519ccff089c587a6e49`.
-See its [deployment instructions](https://github.com/dsx-ai-factory/nvke/blob/6991e36bef8f15b42b6f6519ccff089c587a6e49/deploy/README.md).
+pinned NVKE `v0.22.0-beta.6` installer at
+`8db5721ae3031bdcd945e559153a740d46ea209e`.
+See its [deployment instructions](https://github.com/dsx-ai-factory/nvke/blob/8db5721ae3031bdcd945e559153a740d46ea209e/deploy/README.md).
 
 That older implementation prepared this installer in a private attempt-local
 directory and accepted a matching read-only `run.nvkeCheckout` override. Current

@@ -1549,8 +1549,8 @@ cancellation and continued rejection of delegated configuration. Command admissi
 errors retain the failing phase without exposing arguments or source paths. These
 tests do not establish a completed Ubuntu site replay.
 
-The local demo now selects NVKE main at
-`55612dce98cf0183790fbe5f4776225d63369fc2`, retaining the shared pre-DSX SPIRE
+The local demo now selects NVKE `v0.22.0-beta.6` at
+`8db5721ae3031bdcd945e559153a740d46ea209e`, retaining the shared pre-DSX SPIRE
 packaging exception. Its adapter uses the source-owned site-spec renderer and
 deployment entrypoint with verified local chart archives and exact image references.
 The already admitted Kind configuration owns cluster networking; site-spec bootstrap
@@ -1560,7 +1560,7 @@ ClusterRelease and NodePoolRelease resources for the selected plain ARM64 disk.
 On the preceding beta selection, focused resource, pod-binding, cancellation and profile tests passed, including
 targeted race checks. The actual beta CLI validated a diagnostic site spec and the
 source installer completed its dry-run with prepared chart paths. Those checks
-do not establish chart builds, cluster readiness, a completed tenant replay, or acceptance of the current main selection.
+do not establish chart builds, cluster readiness, a completed tenant replay, or acceptance of the current beta.6 selection.
 
 Maintained OS Definitions, catalog execution and Packer toolchain assembly select Docker.
 The older authored Podman Environment and its TCG Definition are removed; generic
@@ -2762,7 +2762,7 @@ Both candidate disk jobs succeeded in run `37486058412`, but the aggregate relea
 before publication. The [dated carrier evidence](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-release-carrier-transport.md) records
 that failed attempt. The subsequent validation-branch run `37533806963` at commit `625980e` passed
 all candidate outputs and aggregate publication, signing, verification and finalization. That historical run
-predates the consumer-policy and timeout changes here; it is not evidence for this updated head, current main
+predates the consumer-policy and timeout changes here; it is not evidence for this updated head, current candidate
 execution, strict inspection or independent full-payload consumer acceptance. Per-output storage peaks remain unmeasured.
 The [October 6 preparation record](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md) retains final-source
 ARM64 and AMD64 Packer/inspector assembly, executable measurements, native tool validation
@@ -2798,7 +2798,7 @@ scanner acceptance or complete production input approval. The
 [acquisition observations](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#temporary-spire-source-selection) retain the historical mixed-source candidate and HTTP-403 limits.
 Current inputs temporarily retain the prior SPIRE packaging source `726f76944404e1106626b8333d3576bdf67b575b`
 and its source-owned acquisition/packaging commands. OS assembly, agent, Calico, kubeadm and native
-Packer capture now select NVKE main (`55612dce98cf0183790fbe5f4776225d63369fc2`),
+Packer capture now select NVKE `v0.22.0-beta.6` (`8db5721ae3031bdcd945e559153a740d46ea209e`),
 including its renamed Packer targets, disk filenames, material schema and required Ubuntu-series input. Current-source execution remains
 unverified until a complete recorded development attempt succeeds. The older SPIRE package omits DSX IMDS,
 which current NVKE requires; this is an explicitly incomplete compatibility selection, not full product parity.
@@ -2963,14 +2963,14 @@ M2 toolchains through the existing read-only image-preparation owner. Temporary 
 credentials are removed before source or producer execution; the nightly output
 namespace does not require republishing the existing pinned toolchains.
 The four CLI, controller and chart candidate sources now select NVKE
-main at `55612dce98cf0183790fbe5f4776225d63369fc2`.
+`v0.22.0-beta.6` at `8db5721ae3031bdcd945e559153a740d46ea209e`.
 The nightly consumer projects authenticated profile bytes into the current resource
 API and supplies the current site-spec shape. Both the normal and upstream-OVN
 disk URLs, where required by the selected profile, read the same held disk and are
 checked against the exact selected Artifact. Focused contract and HTTP race tests
-passed for the preceding beta selection, and that CLI validated and rendered the diagnostic site spec. Those checks do not validate the new main source.
+passed for the preceding beta selection, and that CLI validated and rendered the diagnostic site spec. Those checks do not validate the current beta.6 source.
 The user-approved test-only suite pin is `a32067108ab89d1e2b2b6720766ffe97270a166a`,
-which retains the candidate entrypoint omitted from the selected product source. Product sources select main
+which retains the candidate entrypoint omitted from the selected product source. Product sources select beta.6
 with the explicit SPIRE exception. This diagnostic selection is an exception to
 ADR-23's proposed matching-revision rule, not adoption of that proposal. Missing
 candidate hooks still fail admission; the generic rebuilding suite is no fallback.
