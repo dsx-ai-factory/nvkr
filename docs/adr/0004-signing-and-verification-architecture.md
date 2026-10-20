@@ -54,7 +54,10 @@ qualified contract. The mechanisms below have separate claims and admission requ
   and returns an opaque receipt bound to the subject digest. The production signer requires an explicit expected
   OIDC identity and issuer, passes the issuer as a qualified argument, extracts the issued certificate claims,
   and refuses a mismatch before returning the receipt. Cosign/Sigstore/TUF and loader environment overrides are
-  scrubbed for signing as well as verifying.
+  scrubbed for signing as well as verifying. The pinned Cosign 3 invocation explicitly selects detached
+  output compatibility (`--use-signing-config=false`, `--new-bundle-format=false`, `--b64=false`), producing
+  a raw signature, PEM certificate and optional legacy bundle. Public transparency submission remains
+  explicitly enabled; certificate issuer and identity checks still gate the receipt.
 - **Publication binding.** Publication rebinds that receipt immediately before writing any public document or
   sidecar; cosign never receives a named subject or a public output pathname. The complete signed set is staged
   and synced under a cross-process lock, then published with a durable journal plus no-replace links, so

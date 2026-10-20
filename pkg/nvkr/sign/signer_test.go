@@ -16,6 +16,13 @@ import (
 
 func writeSigningOutputs(t *testing.T, args []string, certificate []byte) {
 	t.Helper()
+	// Cosign 3 defaults to signing-config service selection and bundle-only
+	// output. The detached protocol must explicitly select compatible options.
+	for _, flag := range []string{"--use-signing-config=false", "--new-bundle-format=false", "--b64=false", "--tlog-upload=true"} {
+		if !containsArg(args, flag) {
+			t.Fatalf("detached signing protocol missing %s: %v", flag, args)
+		}
+	}
 	if err := os.WriteFile(argAfter(t, args, "--output-signature"), []byte("detached-signature"), 0o600); err != nil {
 		t.Fatal(err)
 	}

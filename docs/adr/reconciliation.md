@@ -1147,7 +1147,12 @@ ARM64 completed payload/SBOM checks and reached output provenance checks; AMD64 
 materializing `nvke-node-image-arm64`. The development adapter now inherits the hosted owner's existing
 fifty-nine-minute deadline, matching production handoffs, while retaining individual operation bounds.
 Existing hosted-budget contracts cover earlier caller deadlines and cancellation; corrected development
-execution remains pending. These development observations do not establish production qualification,
+execution in [Run 39358337890](https://github.com/dsx-ai-factory/nvkr/actions/runs/39358337890)
+passed the ARM64 artifact checks for all 69 outputs and native tool smoke, then both native workers
+failed report signing because Cosign 3 rejected the explicit issuer with its default signing configuration.
+The exact-byte signer now explicitly selects detached output compatibility, raw signature/PEM encoding
+and public transparency submission. Injected and held-process protocol tests check those options;
+corrected hosted signing and qualification remain pending. These development observations do not establish production qualification,
 full-release consumer acceptance or a live local-demo deployment.
 
 At NVKR `92ce9fc65182a965f94ffa8a527828a971e9fc45`, [development Run 39327360895](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327360895)
