@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-os-arm64-tcg-local",
-  "requiresCatalogDigest": "sha256:3adb7b8dc8d4372a23f2ee0996d5702d833c2c37ed94aabe769b7dd65c0bb3e6",
+  "requiresCatalogDigest": "sha256:ddfa54c80554bac42be140e3f445e60cb5837a90afdec9c70bbf93be57e8f494",
   "components": {
     "nvke-node-image": {
       "component": {
@@ -140,7 +140,7 @@
         "buildCommand": [
           "sh",
           "-ec",
-          "echo 'OVN IMAGE BUILD: source-owned Dockerfile acquires OVS/OVN and kubectl through APT; not hermetic or NV FIPS/STIG.' >&2\nexec buildctl-daemonless.sh build --frontend dockerfile.v0 \\\n  --local context=/src --local dockerfile=/src/dist/images \\\n  --opt filename=Dockerfile.ubuntu.nv --opt platform=linux/{{.Arch}} \\\n  --opt build-arg:OVN_KUBERNETES_DIR=. \\\n  --opt build-arg:BUILDER_IMAGE=quay.io/projectquay/golang@sha256:506a668eb4c763a964ffc4d4ad0125d45d75aac899392be7e5d39380f8452564 \\\n  --opt build-arg:BASE_IMAGE=docker.io/library/ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55 \\\n  --opt \"build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH\" \\\n  --opt build-arg:OVS_SOURCE=doca \\\n  --opt build-arg:OVN_SOURCE=uca \\\n  --opt build-arg:CLOUD_ARCHIVE=gazpacho \\\n  --opt build-arg:UCA_OVN_VER=26.03.0-2~cloud0 \\\n  --opt build-arg:DOCA_RELEASE=3.5.0 \\\n  --opt build-arg:K8S_VER=v1.36 \\\n  --output type=oci,dest=/src/nvkr-output/ovn-kube-ubuntu.oci.tar,oci-mediatypes=true,rewrite-timestamp=true,name=localhost/nvke/ovn-kubernetes:git-8af51273d52dfa07454435d18d37230e582d797a\n"
+          "echo 'OVN IMAGE BUILD: source-owned Dockerfile acquires OVS/OVN and kubectl through APT; not hermetic or NV FIPS/STIG.' >&2\nexec buildctl-daemonless.sh build --frontend dockerfile.v0 \\\n  --local context=/src --local dockerfile=/src/dist/images \\\n  --opt filename=Dockerfile.ubuntu.nv --opt platform=linux/{{.Arch}} \\\n  --opt build-arg:OVN_KUBERNETES_DIR=. \\\n  --opt build-arg:BUILDER_IMAGE=quay.io/projectquay/golang@sha256:d5acf07940fb5e6e2d07542abd853cece623d95ffd364769ec825aab5471d3b8 \\\n  --opt build-arg:BASE_IMAGE=docker.io/library/ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55 \\\n  --opt \"build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH\" \\\n  --opt build-arg:OVS_SOURCE=doca \\\n  --opt build-arg:OVN_SOURCE=uca \\\n  --opt build-arg:CLOUD_ARCHIVE=gazpacho \\\n  --opt build-arg:UCA_OVN_VER=26.03.0-2~cloud0 \\\n  --opt build-arg:DOCA_RELEASE=3.5.0 \\\n  --opt build-arg:K8S_VER=v1.36 \\\n  --output type=oci,dest=/src/nvkr-output/ovn-kube-ubuntu.oci.tar,oci-mediatypes=true,rewrite-timestamp=true,name=localhost/nvke/ovn-kubernetes:git-8af51273d52dfa07454435d18d37230e582d797a\n"
         ],
         "artifactPath": "nvkr-output/ovn-kube-ubuntu.oci.tar",
         "writeDir": "nvkr-output",

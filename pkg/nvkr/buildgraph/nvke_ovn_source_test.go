@@ -39,7 +39,8 @@ const ovnForkCommit = "8af51273d52dfa07454435d18d37230e582d797a"
 const ovnForkStream = "2.4.2"
 
 // Both source trees use a vendored JSON adapter incompatible with Go 1.27.
-const ovnGoBuilder = "quay.io/projectquay/golang@sha256:506a668eb4c763a964ffc4d4ad0125d45d75aac899392be7e5d39380f8452564"
+// Quay Go 1.26.10 index, verified for linux/amd64 and linux/arm64 on 2026-10-20.
+const ovnGoBuilder = "quay.io/projectquay/golang@sha256:d5acf07940fb5e6e2d07542abd853cece623d95ffd364769ec825aab5471d3b8"
 
 func TestNVKEOVNBuilderPinBindings(t *testing.T) {
 	for _, path := range []string{

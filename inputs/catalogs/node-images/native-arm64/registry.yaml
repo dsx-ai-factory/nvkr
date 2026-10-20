@@ -205,7 +205,7 @@ components:
     - --opt
     - build-arg:OVN_KUBERNETES_DIR=.
     - --opt
-    - build-arg:BUILDER_IMAGE=quay.io/projectquay/golang@sha256:506a668eb4c763a964ffc4d4ad0125d45d75aac899392be7e5d39380f8452564
+    - build-arg:BUILDER_IMAGE=quay.io/projectquay/golang@sha256:d5acf07940fb5e6e2d07542abd853cece623d95ffd364769ec825aab5471d3b8
     - --opt
     - build-arg:KUBECTL_MINOR=1.36
     - --opt

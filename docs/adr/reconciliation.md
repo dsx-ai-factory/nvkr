@@ -1125,6 +1125,17 @@ interruption demonstrations remain M4-D.
 
 ## Feature-branch pipeline development
 
+On October 20, the beta.6 [development Run 39467682189](https://github.com/dsx-ai-factory/nvkr/actions/runs/39467682189)
+failed all four OS-image producers during OVN builder preparation, before Packer. The unchanged
+`quay.io/projectquay/golang@sha256:506a668eb4c763a964ffc4d4ad0125d45d75aac899392be7e5d39380f8452564`
+returned `MANIFEST_UNKNOWN` both on the runners and in a direct registry read. Authored OVN builder
+arguments now select the Go 1.26.10 multi-platform index
+`sha256:d5acf07940fb5e6e2d07542abd853cece623d95ffd364769ec825aab5471d3b8`; registry reads verified
+its AMD64 and ARM64 manifests and recorded Go version. The selected source Dockerfile requires the
+existing DNF-based builder family, and its vendored JSON adapter remains incompatible with Go 1.27.
+This updates a builder input, not the NVKE beta.6, SPIRE or harness source selections. A complete
+hosted build with the replacement remains pending.
+
 The current candidate selects NVKE `v0.22.0-beta.6` at
 `8db5721ae3031bdcd945e559153a740d46ea209e` through `catalog pin --tag` for all 37
 updated NVKE source roles. The three SPIRE package roles retain pre-DSX commit
