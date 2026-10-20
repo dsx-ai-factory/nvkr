@@ -32,9 +32,9 @@ must provide Go and Make; Plan validation does not prove those tools are present
 
 ## Provisional validator catalog
 
-IV1-C1–IV1-C3 add discovery and explicit local selection of these same two suites.
-The ADR-24 schemas and SDK methods remain provisional; this slice does not declare
-IV4 stabilization or maintained upstream adoption. Discovery reads only the catalog
+The provisional CLI catalog adds discovery and explicit local selection of these same two suites.
+The ADR-24 schemas and SDK methods remain provisional; schema stabilization and
+maintained upstream adoption remain deferred. Discovery reads only the catalog
 index and its entry files. It neither imports source nor probes Docker or prepares an
 environment. `available` describes installed adapter support; runtime readiness stays
 `unverified`. Adapter-owned limitations remain visible independently of authored display text.

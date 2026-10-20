@@ -8,6 +8,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -93,6 +95,40 @@ func TestCatalogDiscoveryDeterministicAndDetached(t *testing.T) {
 	}
 	// There is no Plan, artifact or Docker fixture: discovery reads metadata only.
 }
+func TestCatalogHeldRootSurvivesDirectoryReplacement(t *testing.T) {
+	path, _ := catalogFixture(t)
+	before, err := LoadCatalog(t.Context(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := openCatalogRoot(t.Context(), filepath.Dir(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = root.Close() })
+	// Replace the pathname after opening it. Neither the index nor its entries
+	// may be resolved through this replacement directory.
+	moved := filepath.Join(t.TempDir(), "original")
+	if err := os.Rename(filepath.Dir(path), moved); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"catalog.yaml", "nvke/nvkectl/cli.yaml", "nvke/nvkectl/contract.yaml"} {
+		writeCatalogFile(t, filepath.Join(filepath.Dir(path), name), []byte("replacement: invalid\n"))
+	}
+	after, err := loadCatalogRoot(t.Context(), path, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !maps.Equal(before.documents, after.documents) {
+		t.Fatalf("document integrity changed: before %v, after %v", before.documents, after.documents)
+	}
+	want, _ := canonical.Marshal(before.List())
+	got, _ := canonical.Marshal(after.List())
+	if !bytes.Equal(want, got) {
+		t.Fatal("discovery changed after directory replacement")
+	}
+}
+
 func TestCatalogUnavailableIsDescribable(t *testing.T) {
 	path, profile := catalogFixture(t)
 	entry := filepath.Join(filepath.Dir(path), "nvke/nvkectl/contract.yaml")
@@ -240,7 +276,18 @@ func TestCatalogCompleteAdmissionBeforeDispatch(t *testing.T) {
 		{"missing-output", func(p *profile) { p.Checks[1].Inputs["executable"] = binding{Artifact: "x"} }, e.CodeUsage},
 		{"mixed-trust", func(p *profile) { p.Source.Reference = "published" }, e.CodeUsage},
 		{"published-new-format", func(p *profile) { p.Source.Kind = "published" }, e.CodeUnsupported},
-		{"no-checks", func(p *profile) { p.Checks = nil }, e.CodeUsage},
+		{"no-checks", func(p *profile) { p.Checks = []profileCheck{} }, e.CodeUsage},
+		{"profile-version", func(p *profile) { p.APIVersion = "nvkr.dev/validation-profile/v2" }, e.CodeUsage},
+		{"profile-kind", func(p *profile) { p.Kind = "ValidatorCatalog" }, e.CodeUsage},
+		{"missing-catalog", func(p *profile) { p.Catalog = "missing.yaml" }, e.CodeUsage},
+		{"too-many-checks", func(p *profile) {
+			check := p.Checks[0]
+			p.Checks = make([]profileCheck, 65)
+			for i := range p.Checks {
+				p.Checks[i] = check
+				p.Checks[i].Name = fmt.Sprintf("check-%d", i)
+			}
+		}, e.CodeUsage},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, path := catalogFixture(t)
@@ -286,6 +333,9 @@ func TestCatalogSnapshotOrderAndStopOnFailure(t *testing.T) {
 			err = invocation.Run(t.Context())
 			if fail != "" {
 				catalogCode(t, err, e.CodeUsage)
+				if !strings.Contains(err.Error(), `check "one"`) {
+					t.Fatal("failure lost the check name", err)
+				}
 			} else if err != nil {
 				t.Fatal(err)
 			}
@@ -353,6 +403,182 @@ func TestCatalogProductionCLIAdmissionParityAndRefusal(t *testing.T) {
 			}
 			if _, err := os.Stat(workspace); !os.IsNotExist(err) {
 				t.Fatal("admission created workspace")
+			}
+		})
+	}
+}
+
+func TestCatalogRefusesMalformedEntryDocuments(t *testing.T) {
+	for _, tc := range []struct{ name, old, replacement string }{
+		{"id", "id: nvke/nvkectl/contract", "id: Nvke/nvkectl/contract"},
+		{"coverage", "coverage: artifact-contract", "coverage: bogus"},
+		{"role", "  executable:", "  Executable:"},
+		{"unknown-field", "description:", "unexpected: true\ndescription:"},
+		{"version", "nvkr.dev/validator/v1", "nvkr.dev/validator/v2"},
+		{"malformed", "inputs:", "inputs: ["},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path, _ := catalogFixture(t)
+			entry := filepath.Join(filepath.Dir(path), "nvke/nvkectl/contract.yaml")
+			raw, err := os.ReadFile(entry)
+			if err != nil {
+				t.Fatal(err)
+			}
+			writeCatalogFile(t, entry, bytes.Replace(raw, []byte(tc.old), []byte(tc.replacement), 1))
+			_, err = LoadCatalog(t.Context(), path)
+			catalogCode(t, err, e.CodeUsage)
+		})
+	}
+}
+
+func TestCatalogRefusesAggregateByteBudget(t *testing.T) {
+	path, _ := catalogFixture(t)
+	c, err := LoadCatalog(t.Context(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := c.entries["nvke/nvkectl/contract"]
+	index := catalogIndex{envelope: envelope{APIVersion: "nvkr.dev/validator-catalog/v1", Kind: "ValidatorCatalog"}}
+	for i := range 17 {
+		v.ID = fmt.Sprintf("nvke/nvkectl/check-%d", i)
+		raw, err := json.Marshal(v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Each document is within 1 MiB, but their combined bytes exceed 16 MiB.
+		raw = append(raw, bytes.Repeat([]byte(" "), (1<<20)-len(raw))...)
+		name := fmt.Sprintf("check-%d.json", i)
+		writeCatalogFile(t, filepath.Join(filepath.Dir(path), name), raw)
+		index.Entries = append(index.Entries, name)
+	}
+	raw, err := json.Marshal(index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeCatalogFile(t, path, raw)
+	_, err = LoadCatalog(t.Context(), path)
+	catalogCode(t, err, e.CodeUsage)
+	if !strings.Contains(err.Error(), "catalog exceeds 16 MiB") {
+		t.Fatal(err)
+	}
+}
+
+func TestCatalogAdapterDisagreementRefusedBeforePreparation(t *testing.T) {
+	for _, tc := range []struct{ name, old, replacement string }{
+		{"timeout", "timeout: 30m", "timeout: 31m"},
+		{"requirement", "requires: [docker, git]", "requires: [docker, git, privileged]"},
+		{"platform", "platforms: [linux/amd64, linux/arm64]", "platforms: [darwin/arm64]"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			catalog, path := catalogFixture(t)
+			entry := filepath.Join(filepath.Dir(catalog), "nvke/nvkectl/contract.yaml")
+			raw, err := os.ReadFile(entry)
+			if err != nil {
+				t.Fatal(err)
+			}
+			writeCatalogFile(t, entry, bytes.Replace(raw, []byte(tc.old), []byte(tc.replacement), 1))
+			c, err := LoadCatalog(t.Context(), catalog)
+			if err != nil {
+				t.Fatal(err)
+			}
+			d, err := c.Describe("nvke/nvkectl/contract")
+			if err != nil || d.Available || d.UnavailableReason == "" {
+				t.Fatalf("%+v %v", d, err)
+			}
+			admitted, executed := []string{}, []string{}
+			_, err = admitProfile(t.Context(), path, Runtime{}, map[string]adapter{"nvke-cli/v1": recordingCatalogAdapter{admitted: &admitted, executed: &executed}})
+			catalogCode(t, err, e.CodeEngineCapability)
+			if len(admitted) != 0 || len(executed) != 0 {
+				t.Fatal("adapter disagreement reached preparation", admitted, executed)
+			}
+			_, err = AdmitProfile(t.Context(), path, Runtime{})
+			catalogCode(t, err, e.CodeEngineCapability)
+		})
+	}
+}
+
+func TestCatalogInvocationCancellationAndZeroValues(t *testing.T) {
+	_, path := catalogFixture(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	admitted, executed := []string{}, []string{}
+	invocation, err := admitProfile(ctx, path, Runtime{}, map[string]adapter{"nvke-cli/v1": recordingCatalogAdapter{admitted: &admitted, executed: &executed, onRun: cancel}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalogCode(t, invocation.Run(ctx), e.CodeTimeout)
+	if len(executed) != 1 {
+		t.Fatal("cancellation started the next check", executed)
+	}
+	for _, tc := range []struct {
+		name       string
+		invocation *Invocation
+		ctx        context.Context
+	}{
+		{"nil invocation", nil, t.Context()},
+		{"zero invocation", &Invocation{}, t.Context()},
+		{"nil context", invocation, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) { catalogCode(t, tc.invocation.Run(tc.ctx), e.CodeUsage) })
+	}
+}
+
+func TestCatalogPreservesConfigurationErrorCodes(t *testing.T) {
+	for _, code := range []e.Code{e.CodeUsage, e.CodeEngineCapability, e.CodeInternal} {
+		t.Run(string(code), func(t *testing.T) {
+			err := e.New(code, "configuration refusal")
+			if got := configurationError(t.Context(), err, "reading configuration"); got != err {
+				t.Fatalf("recoded %v as %v", err, got)
+			}
+		})
+	}
+}
+
+func TestCatalogCLIAdmissionRefusesArtifactAndPlatformBeforeWorkspace(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		mode        os.FileMode
+		platforms   string
+		missingPlan bool
+		code        e.Code
+	}{
+		{"non-executable", 0o644, "", false, e.CodeUsage},
+		{"excluded-platform", 0o755, "platforms: [linux/arm64]", false, e.CodeEngineCapability},
+		{"missing-plan", 0o755, "", true, e.CodePipelineDrift},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, path := catalogFixture(t)
+			root := filepath.Dir(path)
+			artifact := filepath.Join(root, "binary")
+			if err := os.WriteFile(artifact, []byte("supplied"), tc.mode); err != nil {
+				t.Fatal(err)
+			}
+			plan, err := filepath.Abs("../../../.github/nvkr-run/plan.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.missingPlan {
+				plan = filepath.Join(root, "missing-plan.json")
+			}
+			mutateProfile(t, path, func(p *profile) {
+				p.Source.Plan = plan
+				for i := range p.Checks {
+					p.Checks[i].Inputs["executable"] = binding{Output: "nvkectl", Artifact: artifact}
+				}
+			})
+			if tc.platforms != "" {
+				entry := filepath.Join(root, "nvke/nvkectl/contract.yaml")
+				raw, err := os.ReadFile(entry)
+				if err != nil {
+					t.Fatal(err)
+				}
+				writeCatalogFile(t, entry, bytes.Replace(raw, []byte("platforms: [linux/amd64, linux/arm64]"), []byte(tc.platforms), 1))
+			}
+			workspace := filepath.Join(root, "no-workspace")
+			_, err = AdmitProfile(t.Context(), path, Runtime{WorkspaceRoot: workspace})
+			catalogCode(t, err, tc.code)
+			if _, err := os.Stat(workspace); !os.IsNotExist(err) {
+				t.Fatal("admission created a workspace", err)
 			}
 		})
 	}

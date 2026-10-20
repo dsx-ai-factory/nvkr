@@ -7,6 +7,7 @@ package validation
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 
@@ -25,7 +26,7 @@ func openCatalogRoot(ctx context.Context, path string) (*catalogRoot, error) {
 	}
 	fd, err := unix.Open(path, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("configuration root must be an existing directory, not a symlink: %w", err)
 	}
 	return &catalogRoot{os.NewFile(uintptr(fd), path)}, nil
 }

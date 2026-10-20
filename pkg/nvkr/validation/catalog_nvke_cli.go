@@ -5,7 +5,6 @@ package validation
 
 import (
 	"context"
-	"os"
 	"slices"
 	"time"
 
@@ -58,10 +57,6 @@ func (a *nvkeCLIAdapter) prepare(ctx context.Context, v Validator, source profil
 			return nil, nil, err
 		}
 		a.plans[source.Plan] = plan
-	}
-	info, err := os.Stat(b.Artifact)
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
-		return nil, nil, usage("artifact must be an executable regular file")
 	}
 	invocation, err := plan.Admit(ctx, factory.ArtifactTestOptions{Plan: source.Plan, Output: b.Output, Artifact: b.Artifact, Suite: v.Suite,
 		Timeout: timeout, DependencyTimeout: 30 * time.Minute, WorkspaceRoot: runtime.WorkspaceRoot, Keep: runtime.Keep, Stdout: runtime.Stdout, Stderr: runtime.Stderr, DiagnosticConfiguration: configuration})

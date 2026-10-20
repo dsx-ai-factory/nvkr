@@ -109,6 +109,10 @@ func (p *CLIArtifactPlan) Admit(ctx context.Context, options ArtifactTestOptions
 	if err != nil {
 		return nil, err
 	}
+	info, err := os.Stat(options.Artifact)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
+		return nil, e.New(e.CodeUsage, "artifact must be an executable regular file")
+	}
 	if len(options.DiagnosticConfiguration) != 0 {
 		raw, err := canonical.Marshal(struct {
 			Selection  json.RawMessage       `json:"selection"`

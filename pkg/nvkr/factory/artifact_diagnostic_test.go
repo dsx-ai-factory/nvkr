@@ -423,3 +423,43 @@ func TestAdmittedCLIArtifactFreezesPlanAndSelection(t *testing.T) {
 		}
 	}
 }
+
+func TestAdmittedCLIArtifactRunRequiresAdmission(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		invocation *CLIArtifactInvocation
+	}{
+		{"nil", nil}, {"zero", &CLIArtifactInvocation{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) { assertFactoryErrorCode(t, tc.invocation.Run(t.Context()), e.CodeUsage) })
+	}
+}
+
+func TestAdmittedCLIArtifactChecksExecutableBeforeWorkspace(t *testing.T) {
+	for _, kind := range []string{"missing", "non-executable", "directory"} {
+		t.Run(kind, func(t *testing.T) {
+			plan, err := LoadCLIArtifactPlan(t.Context(), writeCLIPlan(t, cliTestPlan(t, "amd64", "scalar", 1)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			root := t.TempDir()
+			artifact := filepath.Join(root, "binary")
+			switch kind {
+			case "directory":
+				if err := os.Mkdir(artifact, 0o700); err != nil {
+					t.Fatal(err)
+				}
+			case "non-executable":
+				if err := os.WriteFile(artifact, []byte("supplied"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			workspace := filepath.Join(root, "no-workspace")
+			_, err = plan.Admit(t.Context(), ArtifactTestOptions{Artifact: artifact, WorkspaceRoot: workspace})
+			assertFactoryErrorCode(t, err, e.CodeUsage)
+			if _, err := os.Stat(workspace); !os.IsNotExist(err) {
+				t.Fatal("admission created a workspace", err)
+			}
+		})
+	}
+}

@@ -18,7 +18,11 @@ func cmdValidators() *cli.Command {
 		if describe {
 			name = "describe"
 		}
-		return &cli.Command{Name: name, Usage: "inspect provisional imported-validator metadata without execution", Flags: []cli.Flag{&cli.StringFlag{Name: "catalog", Required: true}}, Action: func(c *cli.Context) error {
+		usage, argsUsage := "list provisional validators without execution", " "
+		if describe {
+			usage, argsUsage = "describe one exact validator ID without execution", "VALIDATOR-ID"
+		}
+		return &cli.Command{Name: name, Usage: usage, ArgsUsage: argsUsage, Flags: []cli.Flag{&cli.StringFlag{Name: "catalog", Required: true, Usage: "path to the versioned validator catalog index"}}, Action: func(c *cli.Context) error {
 			if (!describe && c.Args().Present()) || (describe && c.Args().Len() != 1) {
 				return e.New(e.CodeUsage, "invalid validator discovery arguments")
 			}
@@ -42,7 +46,7 @@ func cmdValidators() *cli.Command {
 	}
 	return &cli.Command{Name: "validators", Hidden: true, Usage: "discover and run provisional imported CLI diagnostics", Subcommands: []*cli.Command{
 		discovery(false), discovery(true),
-		{Name: "run", Usage: "execute an explicit versioned local-plan profile (unqualified)", Flags: []cli.Flag{&cli.StringFlag{Name: "profile", Required: true}, &cli.BoolFlag{Name: "keep"}, &cli.StringFlag{Name: "workspace-root"}}, Action: func(c *cli.Context) error {
+		{Name: "run", Usage: "execute an explicit versioned local-plan profile (unqualified)", Flags: []cli.Flag{&cli.StringFlag{Name: "profile", Required: true, Usage: "path to the versioned local-plan validation profile"}, &cli.BoolFlag{Name: "keep", Usage: "retain diagnostic workspaces after execution"}, &cli.StringFlag{Name: "workspace-root", Usage: "parent directory for private diagnostic workspaces"}}, Action: func(c *cli.Context) error {
 			if c.Args().Present() {
 				return e.New(e.CodeUsage, "validators run accepts flags only")
 			}
@@ -60,7 +64,7 @@ func writeValidatorJSON(c *cli.Context, value any) error {
 		return e.Wrap(e.CodeInternal, err, "encoding validator metadata")
 	}
 	if _, err := fmt.Fprintln(c.App.Writer, string(raw)); err != nil {
-		return e.Wrap(e.CodeBuildFailed, err, "writing validator metadata")
+		return e.Wrap(e.CodeInternal, err, "writing validator metadata")
 	}
 	return nil
 }

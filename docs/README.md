@@ -80,7 +80,8 @@ implementation/evidence ledger. The [roadmap](milestones.md) links outcomes to t
 
 Proposed [ADR-24: imported validator catalog](adr/0024-imported-validator-catalog.md) defines discovery,
 adapter selection and artifact bindings across repositories, including its diagnostic and evidence limits.
-The catalog and versioned profiles are not implemented.
+The provisional local-plan CLI slice implements catalog discovery and versioned-profile execution;
+broader adapter and profile support remains deferred.
 
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
 Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) covers branch

@@ -144,7 +144,11 @@ entries:
 ```
 
 Index paths are relative to its directory, remain beneath that root and identify regular files. Absolute
-paths, parent traversal and symlink traversal are rejected. The loader uses context-aware bounded reads:
+paths, parent traversal and symlink traversal are rejected. The operator-supplied index/profile parent directory
+must itself be a real directory; use its resolved path when that final parent is a symlink. Ancestor
+symlinks may resolve before that directory is held. Hard links are permitted: this descriptive loader
+confines path traversal, but does not claim exclusive file ownership or an atomic multi-file snapshot.
+The loader uses context-aware bounded reads:
 at most 1 MiB per document, 16 MiB across one catalog, 1,024 entry files and 16 directory levels. A profile has
 at most 64 uniquely named check instances and each entry declares at most 64 input roles. Unknown adapters can
 be described as unavailable during discovery, but any selected unavailable adapter fails execution admission.
@@ -154,7 +158,9 @@ An entry declares its ID, description, adapter protocol/version, suite selector,
 suite-source relationship, platform constraints, execution requirements, timeout, coverage category and known
 limitations. Limitations are bounded display text; they disclose constraints without changing admission rules.
 Adapters own typed configuration and supported values; free-form fields cannot bypass their validation.
-Descriptions are display text and cannot select behavior.
+Descriptions are display text and cannot select behavior. Adapter minimum limitations are emitted separately
+from authored display text. An entry/adapter disagreement remains describable as unavailable and cannot be
+selected for execution.
 
 For example, the CLI contract entry would have this proposed shape:
 
@@ -213,9 +219,10 @@ checks:
         artifact: ../../../.nvkr/example/nvkectl
 ```
 
-Published mode instead selects the existing immutable publication reference and independent policy; local
-artifact paths are forbidden in that mode. Mode-specific fields are strictly disjoint. Optional adapter
-configuration is typed and cannot override the selected suite, source relationship or input requirements.
+The separate legacy published route selects an immutable publication reference and independent policy;
+local artifact paths are forbidden there. New profiles admit local-plan only and reject adapter configuration
+extensions until a reviewed versioned interface owns them. Check instance and role names use the same
+segment grammar as ID segments; output names retain existing Plan naming rules.
 Checks execute sequentially in authored profile order and stop at the first failure, retaining completed and
 partial diagnostics accurately. Index/discovery order is sorted by ID and does not alter profile order.
 There is no dependency graph, parallel scheduler or automatic provisioning in the initial profile protocol.
@@ -226,12 +233,12 @@ producer graph. Multiple matching outputs require an explicit choice. Every requ
 once; unknown or extra roles fail. An output may fill more than one role only when the adapter explicitly
 permits it. Every check invocation retains its own named-output bindings even if outputs share a Build Digest.
 
-The initial new-profile source modes are explicit `local-plan` diagnostics and the existing admitted
-`published` route. A profile selects one mode; mixing trust modes within one profile is deferred. In local
-mode, a complete canonical Plan and supplied artifact locations are mandatory. Factory validates the complete
-Plan before selecting named outputs; paths and hashes remain caller-supplied descriptions until owning checks
-run. Published mode retains existing publication authentication, policy and held-output consumption; local
-mode cannot inherit those capabilities merely by using the same catalog entry.
+The initial new-profile source mode is explicit `local-plan` diagnostics. New-format published mode and
+mixing trust modes within one profile are deferred. In local mode, a complete canonical Plan and supplied
+artifact locations are mandatory. Factory validates the complete Plan before selecting named outputs;
+paths and hashes remain caller-supplied descriptions until owning checks run. The separate legacy published
+route retains existing publication authentication, policy and held-output consumption; local mode cannot
+inherit those capabilities merely by using the same catalog entry.
 
 Before workspace creation, source acquisition, artifact staging or subprocess execution, validate the complete
 profile, catalog references, selected adapters, role key sets, Plan shape and statically knowable capabilities.
@@ -279,9 +286,11 @@ platforms and configuration. They do not implement new producers or bypass capab
 placement must preserve the existing dependency direction; a shared dispatcher is not permission to move
 factory or lifecycle invariants into command code or create an import cycle.
 
-Entry requirements must satisfy the adapter's minimum capabilities; an entry may narrow platform support or
-add requirements, but cannot weaken isolation, omit required capabilities or extend adapter-owned maximum
-budgets. Disagreement is an admission error, not an instruction to trust the entry over executable contracts.
+Entry requirements must satisfy the adapter's minimum capabilities. An entry may narrow platform support,
+but cannot weaken isolation, omit required capabilities or extend adapter-owned maximum budgets. The installed
+CLI adapter admits only Docker and Git requirements and refuses additions with no installed admission owner.
+Its selected toolchain must provide Go and Make. Disagreement is an admission error, not an instruction to
+trust the entry over executable contracts.
 
 Local and CI execution resolve the same entry and use the same adapter contracts. Runtime locations and
 admitted infrastructure may differ. For the first CLI migration, retain Docker execution, private artifact
@@ -338,7 +347,10 @@ running a cataloged suite does not satisfy that separate handoff.
 Resolve the complete selected configuration once before execution. Execute that admitted snapshot rather than
 reopening mutable entry files between phases. Retained diagnostics include canonical resolved configuration
 and exact source-document byte digests, so a reviewer can distinguish an entry edit from an artifact change.
-Credential values are excluded; runtime secret handles remain with execution owners.
+Credential values are excluded; runtime secret handles remain with execution owners. Factory's opaque
+diagnostic invocation is shared by both CLI paths and freezes complete Plan interpretation before execution
+without issuing an authenticated receipt. Artifact paths are frozen; bytes retain the staging-time integrity
+contract. Exact admitted Plan document integrity is retained with catalog selection metadata.
 
 Use the canonical codec for generated structured descriptions and raw SHA-256 only for exact file/report
 integrity. This ADR allocates no new authenticated receipt or semantic digest family. A future evidence-bound
@@ -352,10 +364,13 @@ File paths and display-only descriptions cannot determine artifact identity.
 ### 9. Migrate through explicit compatibility boundaries
 
 First add catalog discovery and strict loading, then catalog the existing `contract` and `cli` suites through
-their current Go owners. Preserve the hidden `run artifact-test` diagnostic as a compatibility interface;
-its default suite and flags map explicitly to those entries when the new path is admitted. Preserve its
-documented error/exit behavior, cleanup and diagnostic limitations. There is no automatic switch from a
-failed catalog lookup back to hard-coded execution.
+their current Go owners. Preserve the hidden `run artifact-test` diagnostic as a compatibility interface
+with direct factory dispatch. Preserve its documented error/exit behavior, cleanup and diagnostic limitations.
+There is no automatic switch from a failed catalog lookup back to hard-coded execution.
+
+The legacy `run artifact-test --timeout` admits arbitrary positive per-container bounds, while `nvke-cli/v1`
+caps catalog suite execution at 30 minutes and retains a separate 30-minute dependency budget. The legacy
+command therefore retains direct factory dispatch; mapping its flags to catalog entries remains deferred.
 
 The existing unversioned JSON `validate --config` profile keeps its current published-source semantics and
 its independently admitted complete-local-Run conformance route.
@@ -363,8 +378,9 @@ The new versioned profile is an explicit format and capability transition; legac
 reinterpreted, and local support is not enabled by relaxing the legacy source check. Discovery reports
 availability and requirements; it does not execute checks or interpret a descriptor as proof of support.
 
-The first catalog exposes exact-ID list and describe operations through the shared owner. CLI spelling and
-SDK method signatures must be reconciled with ADR-17 when implemented. New selection remains explicit and
+The provisional hidden `validators list|describe|run` commands delegate to the shared owner. The corresponding
+`client/v1` methods are `ListValidators`, `DescribeValidator` and `PrepareValidatorProfile`; ADR-17 records
+their provisional coupling to deep-owner types. New selection remains explicit and
 errors preserve ADR-03's existing distinctions among invalid configuration, unsupported capability, fetch
 failure, suite failure and timeout. This ADR allocates no new exit codes.
 
@@ -441,29 +457,6 @@ item 6. Artifact expansion and hosted integration have separate acceptance; neit
 6. **Migration and CI:** explicit legacy/new-profile behavior, unchanged existing published-source admission,
    shared local/CI adapter semantics and generator-owned workflow changes. Hosted credentials, runner allocation,
    triggers and transport require their own acceptance; no workflow capability follows from merging this ADR.
-
-The IV1-C1–IV1-C3 implementation exposes provisional `validators list|describe|run` diagnostics
-(hidden from normal lifecycle help) and matching thin `client/v1` methods. The first versioned profile
-admits local-plan only. It deliberately refuses new-format published mode; the existing legacy published
-route retains authentication and capture-only semantics; its separately admitted local conformance route
-also remains unchanged. Profiles have no adapter configuration extension in this slice: such fields are
-unknown until a reviewed versioned interface owns them. Check instance and
-role names use the same segment grammar as ID segments; output names retain existing Plan naming rules.
-
-Adapter minimum limitations are emitted separately from authored display text. An unavailable adapter or
-entry/adapter disagreement remains describable but cannot be selected for execution. Host Git and Docker
-are minimum CLI prerequisites; the selected toolchain must provide Go and Make. The CLI adapter
-currently refuses extra requirements with no installed admission owner. Catalog selection does not enable
-those capabilities by naming them.
-
-The legacy timeout contract needs an explicit migration decision: `run artifact-test --timeout` admits
-arbitrary positive per-container bounds, while `nvke-cli/v1` caps catalog suite execution at 30 minutes and
-retains a separate 30-minute dependency budget. Therefore this slice preserves the legacy command directly
-through factory rather than mapping all its flags to a narrower catalog entry. No failed catalog admission
-falls back to that route. Factory's opaque diagnostic invocation is shared by both paths; it freezes complete
-Plan interpretation before execution without issuing an authenticated receipt. Artifact paths are frozen;
-bytes retain the existing staging-time integrity contract. No claim of admission-time artifact authentication
-is added. Exact admitted Plan document integrity is retained with catalog selection metadata.
 
 Named owners must ratify the schemas, adapter protocols and migration before maintained adoption. Reconciliation
 records implementation, contract tests and external execution separately. Any future authenticated evidence

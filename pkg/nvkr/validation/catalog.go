@@ -6,6 +6,7 @@ package validation
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"maps"
 	"path/filepath"
@@ -164,20 +165,25 @@ func LoadCatalog(ctx context.Context, path string) (*Catalog, error) {
 	if ctx == nil {
 		return nil, usage("catalog requires context")
 	}
-	documents := map[string]string{}
-	var index catalogIndex
-	budget := 16 << 20
-	if err := readDocument(ctx, path, &index, documents, &budget); err != nil {
-		return nil, err
-	}
-	if index.APIVersion != "nvkr.dev/validator-catalog/v1" || index.Kind != "ValidatorCatalog" || len(index.Entries) == 0 || len(index.Entries) > 1024 || !unique(index.Entries) {
-		return nil, usage("invalid validator catalog index")
-	}
 	root, err := openCatalogRoot(ctx, filepath.Dir(path))
 	if err != nil {
 		return nil, configurationError(ctx, err, "opening catalog root")
 	}
 	defer func() { _ = root.Close() }()
+	return loadCatalogRoot(ctx, path, root)
+}
+
+// loadCatalogRoot reads the index and entries through the same held directory.
+func loadCatalogRoot(ctx context.Context, path string, root *catalogRoot) (*Catalog, error) {
+	documents := map[string]string{}
+	var index catalogIndex
+	budget := 16 << 20
+	if err := readDocumentAt(ctx, root, path, &index, documents, &budget); err != nil {
+		return nil, err
+	}
+	if index.APIVersion != "nvkr.dev/validator-catalog/v1" || index.Kind != "ValidatorCatalog" || len(index.Entries) == 0 || len(index.Entries) > 1024 || !unique(index.Entries) {
+		return nil, usage("invalid validator catalog index")
+	}
 	result := &Catalog{entries: map[string]Validator{}, documents: documents}
 	for _, path := range index.Entries {
 		if !safeEntryPath(path) {
@@ -256,8 +262,13 @@ func (c *Catalog) Describe(id string) (Description, error) {
 
 // Invocation owns a fully admitted, immutable selection. Configuration is descriptive only.
 type Invocation struct {
-	run           []func(context.Context) error
+	run           []admittedCheck
 	configuration []byte
+}
+
+type admittedCheck struct {
+	name string
+	run  func(context.Context) error
 }
 
 // Configuration returns canonical resolved selection and document digests as a copy.
@@ -268,12 +279,17 @@ func (i *Invocation) Run(ctx context.Context) error {
 	if i == nil || len(i.run) == 0 || ctx == nil {
 		return usage("missing admitted validation invocation")
 	}
-	for _, run := range i.run {
+	for _, check := range i.run {
 		if ctx.Err() != nil {
 			return e.Wrap(e.CodeTimeout, ctx.Err(), "validation canceled")
 		}
-		if err := run(ctx); err != nil {
-			return err
+		if err := check.run(ctx); err != nil {
+			code := e.CodeInternal
+			var coded *e.Error
+			if errors.As(err, &coded) {
+				code = coded.Code
+			}
+			return e.Wrap(code, err, "check %q", check.name)
 		}
 	}
 	return nil
@@ -372,7 +388,7 @@ func admitProfile(ctx context.Context, path string, runtime Runtime, registry ma
 		if err != nil {
 			return nil, err
 		}
-		invocation.run = append(invocation.run, run)
+		invocation.run = append(invocation.run, admittedCheck{name: check.Name, run: run})
 		descriptions = append(descriptions, description)
 	}
 	invocation.configuration, err = canonical.Marshal(struct {

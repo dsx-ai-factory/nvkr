@@ -26,6 +26,11 @@ func readDocument(ctx context.Context, path string, target any, documents map[st
 		return configurationError(ctx, err, "opening configuration root")
 	}
 	defer func() { _ = root.Close() }()
+	return readDocumentAt(ctx, root, path, target, documents, budget)
+}
+
+// readDocumentAt retains decoding, byte accounting and exact document integrity for a held root.
+func readDocumentAt(ctx context.Context, root *catalogRoot, path string, target any, documents map[string]string, budget *int) error {
 	raw, err := root.read(ctx, filepath.Base(path), 1<<20)
 	if err != nil {
 		return configurationError(ctx, err, "reading configuration")
