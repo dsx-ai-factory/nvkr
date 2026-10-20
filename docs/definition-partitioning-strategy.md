@@ -7,8 +7,9 @@ unrecorded. The [input instructions](../inputs/definitions/nvke/README.md#four-f
 current selections; [reconciliation](adr/reconciliation.md#maintained-input-and-schema-boundaries) owns
 implementation and acceptance status.
 
-The pilot incorporates upstream `9857feed` (2026-10-20), including current catalog pins, qualification
-metadata sessions and budgets, development retry support, and the provisional CLI validator catalog.
+The pilot incorporates upstream `07181055` (2026-10-20), including `9857feed`'s current catalog pins,
+qualification metadata sessions and budgets, development retry support, and provisional CLI validator
+catalog, plus subsequent bootstrap-interface documentation and bounded formatting commands.
 [ADR-24](adr/0024-imported-validator-catalog.md) now records strict discovery/loading and local-plan profile
 dispatch as implemented; broader migration, published adapters and actual upstream/native-platform catalog
 acceptance remain deferred. Historical tables retain their stated source revisions; they do not describe
@@ -77,7 +78,11 @@ It ran `make check GO_TEST_FLAGS='-count=1 -json -p=1'`, `make build` and both s
 the vulnerability scan found none. Delivery took 544.323 seconds, factory 462.554 seconds and lifecycle
 363.894 seconds. Extended fixtures were disabled for this gate, with the original 20-minute package
 timeout and assertions unchanged; the separate focused run above covered the relevant extended contracts.
-Only validation prose changed afterward. All-owner `make workflows-check`, actionlint, relaxed yamllint,
+After this gate, upstream documentation and formatting-only commit `07181055` were integrated. Go sources,
+tests, authored inputs and generated bundles are unchanged from the tested tree. The final formatting
+commands passed the large-inventory, spaced-filename, read-only and failure fixtures plus `make fmt-check`;
+the full suite was not repeated for those formatting/documentation changes.
+All-owner `make workflows-check`, actionlint, relaxed yamllint,
 targeted metadata/retry lifetime race checks and formatting failure/read-only fixtures also passed.
 New-head hosted CI remains pending. Native Linux signing/pipeline race and pinned-cosign interoperability
 were not rerun locally; the raw local logs remain unpublished.
@@ -93,9 +98,10 @@ constant. These changes add regression coverage without expanding admission or c
 
 The integrated upstream [formatting check](https://github.com/dsx-ai-factory/nvkr/actions/runs/39494503833/job/118876005825)
 failed before starting `gofmt`: the repeated filename list made its shell command 131,872 bytes, exceeding
-Linux's per-argument limit. Formatting targets now use `find -exec … {} +` batches, and `fmt-check` preserves
-formatter errors while reporting captured unformatted paths once. The format, check and tidy targets share
-this bounded invocation pattern; generated inputs and outputs are unaffected.
+Linux's per-argument limit. Formatting targets adopt upstream `07181055`'s recursive `gofmt` invocation on
+the four module source directories, and `fmt-check` preserves formatter errors while reporting captured
+unformatted paths once. The format, check and tidy targets share this bounded invocation pattern;
+generated inputs and outputs are unaffected.
 
 Combined qualification retains same-Run authentication with the upstream 59-minute operation,
 60-minute step and 90-minute job budgets. Development retry reuse retains the original Run and publication

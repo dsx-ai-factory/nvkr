@@ -2823,8 +2823,11 @@ The full local gate passed at 21:54:35 UTC on 2026-10-20 on staged tree
 `2ff2a400055ae9cfe429b5c0bcfeb55bfaaedb41`, with Go 1.27.2 on Darwin ARM64 and golangci-lint 2.14.0:
 `make check GO_TEST_FLAGS='-count=1 -json -p=1'`, `make build` and both diff checks. All 58 default Go
 package suites, static/shell checks and 19 Python tests passed; the vulnerability scan found none.
-Delivery took 544.323 seconds, factory 462.554 seconds and lifecycle 363.894 seconds. Only validation prose
-changed afterward. All-owner workflow regeneration, workflow lint, targeted metadata/retry lifetime race
+Delivery took 544.323 seconds, factory 462.554 seconds and lifecycle 363.894 seconds. Subsequent integration
+through upstream `07181055` changed only documentation and formatting commands; Go sources, tests, authored
+inputs and generated bundles remain identical to the tested tree. The final formatting commands passed
+large-inventory, spaced-filename, read-only and failure fixtures plus `make fmt-check`; the full suite was
+not repeated for those formatting/documentation changes. All-owner workflow regeneration, workflow lint, targeted metadata/retry lifetime race
 checks and formatting failure/read-only fixtures also passed. New-head hosted CI remains pending.
 Native Linux signing/pipeline race and pinned-cosign interoperability were not rerun locally; raw local
 logs remain unpublished. These local contracts establish no hosted family acceptance.
@@ -2840,8 +2843,9 @@ These are coverage and generation changes, not new authority or evidence of regi
 
 Upstream's [formatting job](https://github.com/dsx-ai-factory/nvkr/actions/runs/39494503833/job/118876005825)
 failed before `gofmt` because the expanded shell command exceeded Linux's per-argument limit. Format,
-check and tidy targets now batch paths with `find -exec … {} +`; formatter failures remain errors and the
-check remains read-only. This fixes repository CI invocation, not artifact execution.
+check and tidy targets adopt upstream `07181055`'s recursive `gofmt` invocation on the module source
+directories; formatter failures remain errors and the check remains read-only. This fixes repository CI
+invocation, not artifact execution.
 
 Combined qualification retains same-Run live authenticated receipts and the existing publication root,
 with upstream's 59-minute operation, 60-minute step and 90-minute job budgets. Development retry reuse stays

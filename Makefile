@@ -78,12 +78,12 @@ go-version-check: ## Require the exact Go patch pinned in .go-version.
 
 .PHONY: fmt
 fmt: ## Format code (gofmt -s -w).
-	find $(GOSRC) -type f -name '*.go' -exec gofmt -s -w {} +
+	gofmt -s -w $(GOSRC)
 
 .PHONY: fmt-check
 fmt-check: ## Check formatting (CI-friendly, no writes).
-	@unformatted="$$(find $(GOSRC) -type f -name '*.go' -exec gofmt -l {} +)" || exit $$?; \
-	 test -z "$$unformatted" || { echo "unformatted files — run 'make fmt':"; printf '%s\n' "$$unformatted"; exit 1; }
+	@unformatted="$$(gofmt -l $(GOSRC))" || exit $$?; \
+	  test -z "$$unformatted" || { echo "unformatted files — run 'make fmt':"; printf '%s\n' "$$unformatted"; exit 1; }
 	@echo "formatting ok"
 
 .PHONY: vet
@@ -133,7 +133,7 @@ cover: test-race ## Open the HTML coverage report in a browser.
 
 .PHONY: tidy
 tidy: ## Format + go mod tidy.
-	find $(GOSRC) -type f -name '*.go' -exec gofmt -s -w {} +
+	gofmt -s -w $(GOSRC)
 	go mod tidy
 
 .PHONY: notices
