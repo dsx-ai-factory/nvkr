@@ -51,9 +51,9 @@ components:
     fromSource: true
     source: nvke-helm
     # Package the source chart with the selected NVKE release version.
-    artifactPath: charts/nke-controller-0.0.0-git.55612dce98cf.tgz
+    artifactPath: charts/nke-controller-0.22.0-beta.6.tgz
     writeDir: charts
-    buildCommand: ['package', 'controller/deploy/charts/controller', '--version=0.0.0-git.55612dce98cf', '--app-version=55612dce98cf0183790fbe5f4776225d63369fc2', '--destination=charts/']
+    buildCommand: ['package', 'controller/deploy/charts/controller', '--version=0.22.0-beta.6', '--app-version=v0.22.0-beta.6', '--destination=charts/']
     outputType: tarball
     platforms:
     - linux/amd64
@@ -144,7 +144,7 @@ components:
 sources:
   nvke-cli:
     repo: https://github.com/dsx-ai-factory/nvke
-    constraint: v0.22.0-beta.1
+    constraint: v0.22.0-beta.6
     toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
     vendorCommand:
       - bash
@@ -191,11 +191,11 @@ sources:
         temporal:
           artifact: temporal-chart
     repo: https://github.com/dsx-ai-factory/nvke
-    constraint: v0.22.0-beta.1
+    constraint: v0.22.0-beta.6
     toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
   nvke-helm:
     repo: https://github.com/dsx-ai-factory/nvke
-    constraint: v0.22.0-beta.1
+    constraint: v0.22.0-beta.6
     toolchainImage: alpine/helm@sha256:a6cf54599ccb99d90cf0712b30f03fdb3cab062e6b94e0418cc4db7e8a1464b2
     vendorCommand: ['dependency', 'build', 'controller/deploy/charts/controller']
   checkout:

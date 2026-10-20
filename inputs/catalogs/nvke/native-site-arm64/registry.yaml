@@ -9,7 +9,7 @@ metadata:
 sources:
   nvke-cli:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.21.x
+    constraint: v0.22.0-beta.6
     toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
     vendorCommand:
     - bash
@@ -28,11 +28,11 @@ sources:
       test ! -e controller/deploy/charts/go.sum
   nvke-controller:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.21.x
+    constraint: v0.22.0-beta.6
     toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
   nvke-controller-helm:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.21.x
+    constraint: v0.22.0-beta.6
     toolchainImagesByArch:
       arm64: sha256:8fae65b2d2366fe8370d8e10f34ef5c11c43a8341bb727bb48b2fa2b1035dbf0
     vendorCommand:
@@ -42,7 +42,7 @@ sources:
     - controller/deploy/charts/controller
   nvke-nktp-helm:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.21.x
+    constraint: v0.22.0-beta.6
     toolchainImagesByArch:
       arm64: sha256:8fae65b2d2366fe8370d8e10f34ef5c11c43a8341bb727bb48b2fa2b1035dbf0
     vendorCommand:

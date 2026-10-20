@@ -50,7 +50,7 @@ workflow does not execute that suite or establish operational acceptance.
 The coordinator checks supported native ARM64 runtime and OVN selections, authenticates the complete
 publication, and requires both test and cleanup verdicts. Checksum-pinned tool acquisition adds no
 vulnerability-clearance claim. All four site-product sources select
-NVKE `main` at `55612dce98cf` at `55612dce98cf0183790fbe5f4776225d63369fc2`. The OS closure
+NVKE v0.22.0-beta.6 at `8db5721ae3031bdcd945e559153a740d46ea209e`. The OS closure
 retains the explicit pre-DSX SPIRE exception at `726f76944404e1106626b8333d3576bdf67b575b`.
 The test-only suite selects `a32067108ab89d1e2b2b6720766ffe97270a166a`, an explicit
 user-approved exception to ADR-23's proposed matching-revision rule. Product sources select the exact main commit.

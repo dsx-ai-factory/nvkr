@@ -15,9 +15,9 @@ Copy the example to a writable directory, then pin the NVKE release tag. Flags p
 mkdir -p /tmp/nvke-chart-catalog
 cp docs/examples/nvke-pin-set/registry.yaml /tmp/nvke-chart-catalog/registry.yaml
 go run ./cmd/nvkr catalog pin --dir /tmp/nvke-chart-catalog \
-  --tag v0.22.0-beta.1 --check nvke-controller
+  --tag v0.22.0-beta.6 --check nvke-controller
 go run ./cmd/nvkr catalog pin --dir /tmp/nvke-chart-catalog \
-  --tag v0.22.0-beta.1 nvke-controller
+  --tag v0.22.0-beta.6 nvke-controller
 go run ./cmd/nvkr catalog validate --data /tmp/nvke-chart-catalog
 ```
 
@@ -48,7 +48,7 @@ mkdir -p .nvkr/acquired-charts
 cp docs/examples/nvke-pin-set/*.yaml .nvkr/acquired-charts/
 # On ARM64, set utilityPlatform to linux/arm64 in environment-local.yaml.
 go run ./cmd/nvkr catalog pin --dir .nvkr/acquired-charts \
-  --tag v0.22.0-beta.1 nvke-controller
+  --tag v0.22.0-beta.6 nvke-controller
 go run ./cmd/nvkr run local \
   --definition .nvkr/acquired-charts/definition.yaml \
   --environment .nvkr/acquired-charts/environment-local.yaml \

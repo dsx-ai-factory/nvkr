@@ -44,7 +44,7 @@ func TestNVKEFDEOnlyGeneratedSelection(t *testing.T) {
 		}
 		roots++
 		if node.Component != "nvke-node-fde-amd64" || node.Disk.Encryption != "luks2" || node.ArtifactPath != "fde/nvke-node.qcow2" ||
-			node.Packer.BuildName != "nvke-node-fde.qemu.nvke-fde" || node.SourceCommit != "55612dce98cf0183790fbe5f4776225d63369fc2" {
+			node.Packer.BuildName != "nvke-node-fde.qemu.nvke-fde" || node.SourceCommit != "8db5721ae3031bdcd945e559153a740d46ea209e" {
 			t.Fatal("FDE producer no longer selects the audited source contract")
 		}
 		if err := pipeline.ValidateVMImagePackerDiskExecution(node); err != nil {
@@ -167,7 +167,7 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 				if node.Component != name || node.Disk == nil || node.Packer == nil || node.ExecutionBinding == nil || node.Requirements == nil {
 					t.Fatal("incomplete native FDE producer")
 				}
-				if node.SourceCommit != "55612dce98cf0183790fbe5f4776225d63369fc2" || node.Toolchain != tc.toolchain ||
+				if node.SourceCommit != "8db5721ae3031bdcd945e559153a740d46ea209e" || node.Toolchain != tc.toolchain ||
 					node.ToolchainPlatform != build.Platform || node.Disk.Format != "qcow2" || node.Disk.Encryption != "luks2" ||
 					node.ArtifactPath != "fde/nvke-node.qcow2" || node.Packer.BuildName != "nvke-node-fde.qemu.nvke-fde" ||
 					node.Packer.AcquisitionArchive != "fde/apt-acquisitions.tar" {

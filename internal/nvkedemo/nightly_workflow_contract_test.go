@@ -126,12 +126,12 @@ func TestNightlyWorkflowSuiteSelectionMatchesGoCohortOwner(t *testing.T) {
 		{"current frozen source", func(*factory.Plan) {}, false},
 		{"approved main harness", func(p *factory.Plan) {
 			for i := range p.Builds {
-				p.Builds[i].ResolvedComponents[0].Commit = "55612dce98cf0183790fbe5f4776225d63369fc2"
+				p.Builds[i].ResolvedComponents[0].Commit = "8db5721ae3031bdcd945e559153a740d46ea209e"
 			}
 		}, false},
 		{"main with unapproved harness", func(p *factory.Plan) {
 			for i := range p.Builds {
-				p.Builds[i].ResolvedComponents[0].Commit = "55612dce98cf0183790fbe5f4776225d63369fc2"
+				p.Builds[i].ResolvedComponents[0].Commit = "8db5721ae3031bdcd945e559153a740d46ea209e"
 			}
 		}, false},
 		{"legacy configured source", func(*factory.Plan) {}, true},

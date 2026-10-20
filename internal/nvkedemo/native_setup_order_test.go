@@ -155,10 +155,10 @@ func TestNativeSiteContractRequiresReviewedSource(t *testing.T) {
 		name, commit string
 		valid        bool
 	}{
-		{"current", "55612dce98cf0183790fbe5f4776225d63369fc2\n", true},
+		{"current", "8db5721ae3031bdcd945e559153a740d46ea209e\n", true},
 		{"historical", "b6154b292a934dbdff7aa17596cbf2d7ef5f0f85\n", false},
 		{"unknown", strings.Repeat("a", 40) + "\n", false},
-		{"noncanonical", "55612dce98cf0183790fbe5f4776225d63369fc2", false},
+		{"noncanonical", "8db5721ae3031bdcd945e559153a740d46ea209e", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			installer := privateTestDir(t)

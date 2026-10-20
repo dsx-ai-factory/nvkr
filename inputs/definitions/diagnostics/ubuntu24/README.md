@@ -2,7 +2,7 @@
 
 These opt-in inputs select Ubuntu **24.04.5** installers for native AMD64 and ARM64 NVKE
 QCOW2 builds. Ubuntu 26.04 remains the existing default. The release catalog pins NVKE
-`main` at `55612dce98cf` (`55612dce98cf0183790fbe5f4776225d63369fc2`), which contains upstream's
+v0.22.0-beta.6 (`8db5721ae3031bdcd945e559153a740d46ea209e`), which contains upstream's
 [Ubuntu 24 support](https://github.com/dsx-ai-factory/nvke/commit/96ccc50cb7f8ed8bb08f7cf8655906982774f809).
 The installer material and required `ubuntu_series=24.04` Packer variable select the guest OS together.
 

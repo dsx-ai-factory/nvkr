@@ -57,8 +57,8 @@ profile, exact suite revision, native runtime target and network. There is no
 self-declared security approval field. Artifact authentication, source matching,
 native-host preflight and owned-resource cleanup remain required.
 
-Both Definitions select the profile-owned site catalog at NVKE `main at 55612dce98cf`,
-commit `55612dce98cf0183790fbe5f4776225d63369fc2`, for the CLI, controller image,
+Both Definitions select the profile-owned site catalog at NVKE `v0.22.0-beta.6`,
+commit `8db5721ae3031bdcd945e559153a740d46ea209e`, for the CLI, controller image,
 controller chart and NKTP chart. The test-only suite checkout selects
 `a32067108ab89d1e2b2b6720766ffe97270a166a`.
 The OS closure retains SPIRE at the explicit pre-DSX exception commit

@@ -273,7 +273,7 @@ func TestLaptopProfilesImageContext(t *testing.T) {
 	}
 }
 
-// Exact bytes from NVKE 55612dce98cf0183790fbe5f4776225d63369fc2, not a
+// Exact bytes from NVKE 8db5721ae3031bdcd945e559153a740d46ea209e, not a
 // Dockerfile grammar or semantic validator. BuildKit owns that interpretation.
 const laptopProfilesDockerfile = `# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
@@ -520,7 +520,7 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 					t.Fatal("profiles must not fall back to an acquired fleet image")
 				case ir.KindFetch:
 					fetches++
-					if node.Commit != "55612dce98cf0183790fbe5f4776225d63369fc2" || node.TreeHash != "8df7ab7e8254a3826d588be8437957df1854c658" {
+					if node.Commit != "8db5721ae3031bdcd945e559153a740d46ea209e" || node.TreeHash != "e928ae13298118b61581d9a406ba4a02f872e959" {
 						t.Fatal("profiles must use the staged-installer source")
 					}
 				case ir.KindBuild:

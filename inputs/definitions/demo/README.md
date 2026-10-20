@@ -72,8 +72,8 @@ require authenticated Git access because NVKE chart pin sets are checked against
 the pinned tree. Dry-run/preflight are not runtime acceptance.
 
 The site catalog pins CLI, controller and charts to one exact NVKE candidate;
-the installer and every NVKE source except SPIRE select `main` at `55612dce98cf` at
-`55612dce98cf0183790fbe5f4776225d63369fc2`. The demo uses its site-spec renderer
+the installer and every NVKE source except SPIRE select v0.22.0-beta.6 at
+`8db5721ae3031bdcd945e559153a740d46ea209e`. The demo uses its site-spec renderer
 and deployment entrypoint with verified local charts and image digests. Tenant
 setup creates MachineImage, ClusterRelease and NodePoolRelease resources from
 the observed profiles container and selected disk before requesting the tenant.

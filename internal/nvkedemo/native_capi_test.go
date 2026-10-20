@@ -15,8 +15,8 @@ import (
 )
 
 func TestNativeCAPIAdmitsOnlyReviewedSourcePolicy(t *testing.T) {
-	const source = "55612dce98cf0183790fbe5f4776225d63369fc2\n"
-	const digest = "553e8155955aaca7e00094ec93d838fee4d518510bf3718f70a03059174363d6"
+	const source = "8db5721ae3031bdcd945e559153a740d46ea209e\n"
+	const digest = "a47d8c38e6812bc3da6f8cf45953c25b365e5b2712669678b53c46798f441420"
 	for _, tc := range []struct {
 		name, commit, digest string
 		accepted             bool
@@ -49,7 +49,7 @@ func TestNativeCAPISourceFailurePrecedesCommandsAndOutput(t *testing.T) {
 	for _, name := range []string{"missing commit", "oversize commit", "missing versions", "changed versions", "oversize versions", "symlink versions", "directory versions", "canceled"} {
 		t.Run(name, func(t *testing.T) {
 			installer, out := t.TempDir(), t.TempDir()
-			commit := []byte("55612dce98cf0183790fbe5f4776225d63369fc2\n")
+			commit := []byte("8db5721ae3031bdcd945e559153a740d46ea209e\n")
 			if name == "oversize commit" {
 				commit = append(commit, '\n')
 			}
@@ -100,7 +100,7 @@ func TestNativeCAPISourceFailurePrecedesCommandsAndOutput(t *testing.T) {
 }
 
 func TestNativeCAPIInitSelectsAllThreeProvidersAndWaits(t *testing.T) {
-	version, err := reviewedNativeCAPIProvider("55612dce98cf0183790fbe5f4776225d63369fc2\n", "553e8155955aaca7e00094ec93d838fee4d518510bf3718f70a03059174363d6")
+	version, err := reviewedNativeCAPIProvider("8db5721ae3031bdcd945e559153a740d46ea209e\n", "a47d8c38e6812bc3da6f8cf45953c25b365e5b2712669678b53c46798f441420")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestNativeHostClusterctlMatchesAuthenticatedCAPIRelease(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	version, err := reviewedNativeCAPIProvider("55612dce98cf0183790fbe5f4776225d63369fc2\n", plainSHA(versions))
+	version, err := reviewedNativeCAPIProvider("8db5721ae3031bdcd945e559153a740d46ea209e\n", plainSHA(versions))
 	if err != nil {
 		t.Fatal(err)
 	}

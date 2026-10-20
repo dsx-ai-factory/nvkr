@@ -1125,6 +1125,14 @@ interruption demonstrations remain M4-D.
 
 ## Feature-branch pipeline development
 
+The current candidate selects NVKE `v0.22.0-beta.6` at
+`8db5721ae3031bdcd945e559153a740d46ea209e` through `catalog pin --tag` for all 37
+updated NVKE source roles. The three SPIRE package roles retain pre-DSX commit
+`726f76944404e1106626b8333d3576bdf67b575b`; the nightly harness retains
+`a32067108ab89d1e2b2b6720766ffe97270a166a`. Chart versions, native demo source
+admission and catalog overlay bindings follow beta.6. Hosted validation of this
+new selection is pending; the successful records below cover the preceding main pin.
+
 At NVKR `36dd99fe3aa0c7dc6cce72b272da93d6ab8ba355`,
 [development Run 39343181108, attempt 1](https://github.com/dsx-ai-factory/nvkr/actions/runs/39343181108/attempts/1)
 completed all 580 jobs successfully, including all four OS disk builds, output publication/signing/verification,

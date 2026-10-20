@@ -23,7 +23,7 @@ func TestNativeNVIDIADefinitionsAlignRenamedSourceContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const nvke = "55612dce98cf0183790fbe5f4776225d63369fc2"
+	const nvke = "8db5721ae3031bdcd945e559153a740d46ea209e"
 	const ovn = "8af51273d52dfa07454435d18d37230e582d797a"
 	for _, conformance := range []bool{false, true} {
 		name := "demo"
@@ -99,7 +99,7 @@ func TestNativeNVIDIADefinitionsAlignRenamedSourceContracts(t *testing.T) {
 // Read only authored selections and lock records. Full compilation also
 // authenticates private derived-chart pins and belongs to the extended suite.
 func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
-	const nvke = "55612dce98cf0183790fbe5f4776225d63369fc2"
+	const nvke = "8db5721ae3031bdcd945e559153a740d46ea209e"
 	repo, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)

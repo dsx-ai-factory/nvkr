@@ -678,7 +678,7 @@ func nightlyPlanHarnessCommit(plan *factory.Plan, profile NightlyProfile) (strin
 	}
 	// The selected products retain a separate candidate entrypoint. This exact diagnostic pair is the
 	// reviewed test-only exception; it does not authorize another product pin.
-	if commit == "55612dce98cf0183790fbe5f4776225d63369fc2" {
+	if commit == "8db5721ae3031bdcd945e559153a740d46ea209e" {
 		if profile.HarnessCommit != "a32067108ab89d1e2b2b6720766ffe97270a166a" {
 			return "", e.New(e.CodeUnpinnedInput, "selected products require the reviewed candidate harness pin")
 		}

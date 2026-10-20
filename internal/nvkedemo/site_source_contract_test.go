@@ -54,7 +54,7 @@ func TestPinnedSiteSourceContract(t *testing.T) {
 		}
 		versions[item] = fields[2]
 		if versions[item] == "" {
-			versions[item] = "0.0.0-git.55612dce98cf"
+			versions[item] = "0.22.0-beta.6"
 		}
 	}
 	deploy, err := prepareChartInputs(t.Context(), ChartInputsConfig{NVKECheckout: source, NVKR: cli, Out: filepath.Join(work, "prepared"), Charts: charts, Manifests: pins, Versions: versions}, fixtureCapture)

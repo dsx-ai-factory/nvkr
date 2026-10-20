@@ -4,7 +4,7 @@ Catalog maintenance combines existing atomic pin updates with matching generated
 choose a new release policy: each selected independent source still uses the exact constraint in its
 registry. The maintained policy,
 [`inputs/policies/nvke-catalog-maintenance.yaml`](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/nvke-catalog-maintenance.yaml),
-selects `nvke` and `nvke-helm`, whose constraints select `v0.22.0-beta.1`. This prerelease requires explicit
+selects `nvke` and `nvke-helm`, whose constraints select `v0.22.0-beta.6`. This prerelease requires explicit
 `catalog pin --tag` selection; the stable-only maintenance resolver does not choose prereleases. Broader constraints or a different exact release require an authored, reviewed registry change.
 The explicit controller chart package/app-version remains an authored producer input; maintenance does
 not infer or rewrite it.

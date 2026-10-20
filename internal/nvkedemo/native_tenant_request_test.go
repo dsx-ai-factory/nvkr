@@ -20,13 +20,13 @@ func TestNativeTenantRequestSelectsReviewedAPI(t *testing.T) {
 		name, commit, subnet string
 		modern, rejected     bool
 	}{
-		{"modern Mac", "55612dce98cf0183790fbe5f4776225d63369fc2\n", "192.168.64.0/24", true, false},
-		{"modern Linux", "55612dce98cf0183790fbe5f4776225d63369fc2\n", "172.30.0.0/24", true, false},
+		{"modern Mac", "8db5721ae3031bdcd945e559153a740d46ea209e\n", "192.168.64.0/24", true, false},
+		{"modern Linux", "8db5721ae3031bdcd945e559153a740d46ea209e\n", "172.30.0.0/24", true, false},
 		{"historical", "b6154b292a934dbdff7aa17596cbf2d7ef5f0f85\n", "172.30.0.0/24", false, true},
 		{"unreviewed", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", "192.168.64.0/24", false, true},
-		{"pod overlap", "55612dce98cf0183790fbe5f4776225d63369fc2\n", "10.245.0.0/24", true, true},
-		{"service overlap", "55612dce98cf0183790fbe5f4776225d63369fc2\n", "10.97.0.0/24", true, true},
-		{"missing underlay", "55612dce98cf0183790fbe5f4776225d63369fc2\n", "", true, true},
+		{"pod overlap", "8db5721ae3031bdcd945e559153a740d46ea209e\n", "10.245.0.0/24", true, true},
+		{"service overlap", "8db5721ae3031bdcd945e559153a740d46ea209e\n", "10.97.0.0/24", true, true},
+		{"missing underlay", "8db5721ae3031bdcd945e559153a740d46ea209e\n", "", true, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			installer := privateTestDir(t)

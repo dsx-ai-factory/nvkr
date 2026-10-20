@@ -9,7 +9,7 @@ metadata:
 sources:
   nvke-os:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: v0.22.0-beta.1
+    constraint: v0.22.0-beta.6
     toolchainImagesByArch:
       # AMD64 is a substitution-only local baseline. ARM64 retains the historical
       # M2 Docker candidate publication, not reproduction of the current Dockerfile.
@@ -46,7 +46,7 @@ sources:
         }
   nvke-cni-calico-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: v0.22.0-beta.1
+    constraint: v0.22.0-beta.6
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
@@ -64,7 +64,7 @@ sources:
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
   nvke-kubeadm-distro-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: v0.22.0-beta.1
+    constraint: v0.22.0-beta.6
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2

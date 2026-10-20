@@ -6,7 +6,7 @@ metadata:
 sources:
   nvke-controller:
     repo: https://github.com/dsx-ai-factory/nvke
-    constraint: v0.22.0-beta.1
+    constraint: v0.22.0-beta.6
     pinSet:
       format: nvke-deploy-v1
       file: deploy/nico/nvke-deploy.yaml

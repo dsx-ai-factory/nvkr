@@ -92,7 +92,7 @@ func TestNVKEUbuntu24NativeDiskSelections(t *testing.T) {
 						continue
 					}
 					roots++
-					if node.Component != root || node.SourceCommit != "55612dce98cf0183790fbe5f4776225d63369fc2" || node.Packer == nil ||
+					if node.Component != root || node.SourceCommit != "8db5721ae3031bdcd945e559153a740d46ea209e" || node.Packer == nil ||
 						node.Disk == nil || node.ExecutionBinding == nil || node.Requirements == nil {
 						t.Fatal("Ubuntu 24 disk lost its source-owned native Packer contract")
 					}

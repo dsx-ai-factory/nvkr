@@ -21,8 +21,8 @@ import (
 // They are not framework requirements for customer catalogs or component names.
 func TestNVKEControllerPinnedChartFilename(t *testing.T) {
 	for _, tc := range []struct{ catalog, component, artifact string }{
-		{"../../../inputs/catalogs/nvke/release", "nvke-controller-chart", "charts/nke-controller-0.0.0-git.55612dce98cf.tgz"},
-		{"../../../inputs/catalogs/nvke/local-site-arm64", "nvke-controller-chart", "charts/nke-controller-0.0.0-git.55612dce98cf.tgz"},
+		{"../../../inputs/catalogs/nvke/release", "nvke-controller-chart", "charts/nke-controller-0.22.0-beta.6.tgz"},
+		{"../../../inputs/catalogs/nvke/local-site-arm64", "nvke-controller-chart", "charts/nke-controller-0.22.0-beta.6.tgz"},
 	} {
 		t.Run(tc.catalog, func(t *testing.T) {
 			raw, err := os.ReadFile(filepath.Join(tc.catalog, "registry.yaml"))
@@ -47,7 +47,7 @@ func TestNVKEControllerPinnedChartFilename(t *testing.T) {
 
 func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 	const inputRoot = "../../../inputs/definitions/nvke"
-	const selectedSource = "55612dce98cf0183790fbe5f4776225d63369fc2"
+	const selectedSource = "8db5721ae3031bdcd945e559153a740d46ea209e"
 	authored, err := definition.LoadDefinition(t.Context(), filepath.Join(inputRoot, "definition.yaml"))
 	if err != nil {
 		t.Fatal(err)
@@ -79,7 +79,7 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 			agent := cat.Components["nvke-agent"]
 			for _, name := range []string{"nvke-agent", "nvke-cni-calico", "nvke-kubeadm-distro"} {
 				component := cat.Components[name]
-				if component.Tag != "55612dce98cf0183790fbe5f4776225d63369fc2" || component.Commit != selectedSource || component.TreeHash != "8df7ab7e8254a3826d588be8437957df1854c658" || component.SourceDate != 1792435542 {
+				if component.Tag != "v0.22.0-beta.6" || component.Commit != selectedSource || component.TreeHash != "e928ae13298118b61581d9a406ba4a02f872e959" || component.SourceDate != 1792450875 {
 					t.Fatalf("%s does not retain the selected source commit/commit/tree/epoch", name)
 				}
 			}
@@ -95,8 +95,8 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 			if _, exists := cat.Components["dsx-imds-node-attestor-agent"]; exists || slices.Contains(output.Components, "dsx-imds-node-attestor-agent") {
 				t.Fatal("temporary SPIRE selection unexpectedly reintroduced DSX")
 			}
-			if agent.VersionStamp["BUILD_VERSION"] != "55612dce98cf0183790fbe5f4776225d63369fc2" || !strings.Contains(strings.Join(agent.BuildCommand, "\n"), `VERSION="$BUILD_VERSION"`) {
-				t.Fatal("agent version must derive from the selected source commit")
+			if agent.VersionStamp["BUILD_VERSION"] != "v0.22.0-beta.6" || !strings.Contains(strings.Join(agent.BuildCommand, "\n"), `VERSION="$BUILD_VERSION"`) {
+				t.Fatal("agent version must derive from the selected source tag")
 			}
 			selected, err := Resolve(cat, Selection{Components: output.Components, Platform: output.Platform, OutputFormat: output.Format})
 			if err != nil {

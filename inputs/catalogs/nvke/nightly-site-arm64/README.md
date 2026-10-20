@@ -3,9 +3,9 @@
 This profile-owned catalog selects the CLI, controller image, controller chart and NKTP chart for both
 ARM64 nightly Definitions. It uses the same beta product revision as
 `../local-site-arm64`, while each source role keeps its distinct vendor closure.
-The four source roles are pinned through `catalog pin --commit 55612dce98cf0183790fbe5f4776225d63369fc2` to
-`55612dce98cf0183790fbe5f4776225d63369fc2`, with owner-issued tree
-`8df7ab7e8254a3826d588be8437957df1854c658` and committer epoch `1792435542`.
+The four source roles are pinned through `catalog pin --tag v0.22.0-beta.6` to
+`8db5721ae3031bdcd945e559153a740d46ea209e`, with owner-issued tree
+`e928ae13298118b61581d9a406ba4a02f872e959` and committer epoch `1792450875`.
 Both nightly suite selections use the separate test-only commit
 `a32067108ab89d1e2b2b6720766ffe97270a166a`, retaining the candidate entrypoint omitted
 from beta. This user-approved exception changes no product source and establishes no runtime success.
@@ -16,8 +16,8 @@ The producer mappings follow the source-owned contracts at that beta revision:
 | --- | --- |
 | `nvkectl` | `cli/Makefile` builds `cli/bin/nvkectl` and owns `NVKECTL_VERSION`, `NVKECTL_COMMIT`, `NVKECTL_DATE` and `NVKECTL_TREE`; its build target executes the binary's version assertion |
 | `cwe` | `controller/Dockerfile` uses the existing Go 1.27.2 and Alpine digest pins and its source-owned controller Make target |
-| `controller-chart` | Source `Chart.yaml` placeholder `0.0.0`, packaged as `0.0.0-git.55612dce98cf`; no dependencies or `Chart.lock`; the final chart remains bound to the produced controller digest |
-| `nktp` | Source `Chart.yaml` placeholder `0.0.0`, packaged as `0.0.0-git.55612dce98cf`; its existing `Chart.lock` selects the three captured dependency-chart archives |
+| `controller-chart` | Source `Chart.yaml` placeholder `0.0.0`, packaged as `0.22.0-beta.6`; no dependencies or `Chart.lock`; the final chart remains bound to the produced controller digest |
+| `nktp` | Source `Chart.yaml` placeholder `0.0.0`, packaged as `0.22.0-beta.6`; its existing `Chart.lock` selects the three captured dependency-chart archives |
 
 CLI vendoring verifies that CLI, controller API, chart-module and management-engine module metadata
 are unchanged after the standard Go download, verify and vendor commands. The chart module has no

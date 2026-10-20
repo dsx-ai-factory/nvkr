@@ -108,14 +108,14 @@ components:
   nktp-chart:
     fromSource: true
     source: nvke-nktp
-    artifactPath: charts/nktp-0.0.0-git.55612dce98cf.tgz
+    artifactPath: charts/nktp-0.22.0-beta.6.tgz
     writeDir: charts
     platforms: [linux/amd64, linux/arm64]
     outputType: tarball
     buildCommand:
       - sh
       - -euc
-      - .nvkr-tools/helm package nktp/deploy/charts/nktp --version=0.0.0-git.55612dce98cf --app-version=55612dce98cf0183790fbe5f4776225d63369fc2 --destination=charts/
+      - .nvkr-tools/helm package nktp/deploy/charts/nktp --version=0.22.0-beta.6 --app-version=v0.22.0-beta.6 --destination=charts/
   capnico-controller:
     fromSource: true
     source: capnico
@@ -171,11 +171,11 @@ sources:
     toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
   nvke-content:
     repo: https://github.com/dsx-ai-factory/nvke
-    constraint: v0.22.0-beta.1
+    constraint: v0.22.0-beta.6
     toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
   nvke-nktp:
     repo: https://github.com/dsx-ai-factory/nvke
-    constraint: v0.22.0-beta.1
+    constraint: v0.22.0-beta.6
     # Empty entrypoint, curl and tar are supplied by this existing pinned image.
     # The selected NVKE tool-versions.mk owns Helm v4.2.4. Its native executable
     # is acquired and verified in fetch, retained with the source, then used offline.

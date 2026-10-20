@@ -28,7 +28,7 @@ import (
 const managementBundle = "installer-tools-arm64"
 const kindConfigPath = "controller/hack/controller-capi-kind.yaml"
 const kindConfigHash = "835a53f6c852ddd71d2f26614131985383a5aa4deb7acf62e68435c328fa71f0"
-const toolVersionsHash = "553e8155955aaca7e00094ec93d838fee4d518510bf3718f70a03059174363d6"
+const toolVersionsHash = "a47d8c38e6812bc3da6f8cf45953c25b365e5b2712669678b53c46798f441420"
 const kindNodeImage = "kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
 const kindNodeID = "sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
 const socketMount = "  extraMounts:\n    - hostPath: /var/run/docker.sock\n      containerPath: /var/run/docker.sock\n"
