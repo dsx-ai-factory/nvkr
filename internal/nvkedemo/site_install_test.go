@@ -172,6 +172,7 @@ func TestStackStateAdmissionAfterParentSymlinkResolution(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+				requireOutsideStandardTempRoots(t, target)
 			}
 			if err := os.Symlink(target, link); err != nil {
 				t.Fatal(err)
@@ -187,5 +188,49 @@ func TestStackStateAdmissionAfterParentSymlinkResolution(t *testing.T) {
 				t.Fatal("normalized shared temporary parent admitted")
 			}
 		})
+	}
+}
+
+func TestStackStateAdmissionWithRelativeTempRoot(t *testing.T) {
+	cwd, err := filepath.Abs(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireOutsideStandardTempRoots(t, cwd)
+	for _, root := range []string{".", "./nonexistent-shared-temp"} {
+		t.Run(root, func(t *testing.T) {
+			t.Setenv("TMPDIR", root)
+			destination, err := filepath.Abs(filepath.Join(root, "new-private-state"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := admitStackStateRoot(destination); err == nil {
+				t.Fatal("relative shared temporary parent admitted")
+			}
+			if err := admitStackStateRoot(cwd + "-permitted-sibling"); err != nil {
+				t.Fatalf("permitted sibling refused: %v", err)
+			}
+		})
+	}
+}
+
+func requireOutsideStandardTempRoots(t *testing.T, path string) {
+	t.Helper()
+	for _, root := range []string{"/tmp", "/var/tmp", "/private/tmp", "/private/var/tmp"} {
+		if insidePath(path, root) {
+			t.Skip("checkout under a standard temporary root masks the TMPDIR predicate")
+		}
+	}
+}
+
+func TestStackStateAdmissionRefusesTemporaryRootLookupFailure(t *testing.T) {
+	link := filepath.Join(t.TempDir(), "loop")
+	if err := os.Symlink("loop", link); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TMPDIR", link)
+	err := admitStackStateRoot("/srv/nvkr/private-state")
+	if err == nil || !strings.Contains(err.Error(), "resolve prohibited temporary root:") {
+		t.Fatalf("expected wrapped temporary root lookup refusal, got %v", err)
 	}
 }

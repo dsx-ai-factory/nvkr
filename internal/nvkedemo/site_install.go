@@ -24,10 +24,14 @@ const installerProviderRepository = "ghcr.io/dsx-ai-factory/cluster-api-provider
 // Admit that requirement before creating the management cluster or registry.
 func admitStackStateRoot(path string) error {
 	for _, root := range []string{"/tmp", "/var/tmp", "/private/tmp", "/private/var/tmp", os.TempDir()} {
-		if insidePath(path, root) {
+		absolute, err := filepath.Abs(root)
+		if err != nil {
+			return fmt.Errorf("make prohibited temporary root absolute: %w", err)
+		}
+		if insidePath(path, absolute) {
 			return errors.New("beta installer state must be outside shared temporary directories")
 		}
-		resolved, err := filepath.EvalSymlinks(root)
+		resolved, err := filepath.EvalSymlinks(absolute)
 		if err != nil {
 			if os.IsNotExist(err) {
 				continue
