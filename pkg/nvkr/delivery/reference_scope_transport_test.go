@@ -5,6 +5,7 @@ package delivery
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -36,15 +37,18 @@ func TestMixedAttemptMetadataAndPayloadRegistryRoundTrip(t *testing.T) {
 	defer server.Close()
 	// Keep the admitted logical GHCR namespace while routing every byte to the
 	// local registry. No real credentials or external registry are used.
+	serverHost := strings.TrimPrefix(server.URL, "http://")
 	original := remote.DefaultTransport
 	remote.DefaultTransport = imageErrorTransport(func(r *http.Request) (*http.Response, error) {
-		if r.URL.Host != "ghcr.io" {
-			t.Errorf("unexpected registry host %s", r.URL.Host)
+		// Registry upload Location responses point at this exact test server.
+		// Admit those follow-ups without allowing any other network destination.
+		if r.URL.Host != "ghcr.io" && r.URL.Host != serverHost {
+			return nil, fmt.Errorf("unexpected registry host %s", r.URL.Host)
 		}
 		clone := r.Clone(r.Context())
 		address := *r.URL
 		address.Scheme = "http"
-		address.Host = strings.TrimPrefix(server.URL, "http://")
+		address.Host = serverHost
 		clone.URL = &address
 		return http.DefaultTransport.RoundTrip(clone)
 	})
