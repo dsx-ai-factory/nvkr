@@ -7,7 +7,7 @@ The four source roles are pinned through `catalog pin --tag v0.22.0-beta.6` to
 `8db5721ae3031bdcd945e559153a740d46ea209e`, with owner-issued tree
 `e928ae13298118b61581d9a406ba4a02f872e959` and committer epoch `1792450875`.
 Both nightly suite selections use the separate test-only commit
-`a32067108ab89d1e2b2b6720766ffe97270a166a`, retaining the candidate entrypoint omitted
+`b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8`, retaining the candidate entrypoint omitted
 from beta. This user-approved exception changes no product source and establishes no runtime success.
 
 The producer mappings follow the source-owned contracts at that beta revision:

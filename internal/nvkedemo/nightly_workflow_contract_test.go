@@ -151,7 +151,7 @@ func TestNightlyWorkflowSuiteSelectionMatchesGoCohortOwner(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			profile := profile
 			if test.name == "approved main harness" {
-				profile.HarnessCommit = "a32067108ab89d1e2b2b6720766ffe97270a166a"
+				profile.HarnessCommit = "b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8"
 			}
 			plan, _ := nightlyRuntimeCompiledFixture(t, profile, build, strings.Repeat("d", 40))
 			test.change(plan)

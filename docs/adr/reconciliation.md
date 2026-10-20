@@ -1146,7 +1146,7 @@ The current candidate selects NVKE `v0.22.0-beta.6` at
 `8db5721ae3031bdcd945e559153a740d46ea209e` through `catalog pin --tag` for all 37
 updated NVKE source roles. The three SPIRE package roles retain pre-DSX commit
 `726f76944404e1106626b8333d3576bdf67b575b`; the nightly harness retains
-`a32067108ab89d1e2b2b6720766ffe97270a166a`. Chart versions, native demo source
+`b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8`. Chart versions, native demo source
 admission and catalog overlay bindings follow beta.6. Hosted validation of this
 new selection is pending; the successful records below cover the preceding main pin.
 
@@ -2971,12 +2971,16 @@ namespace does not require republishing the existing pinned toolchains.
 The four CLI, controller and chart candidate sources now select NVKE
 `v0.22.0-beta.6` at `8db5721ae3031bdcd945e559153a740d46ea209e`.
 The nightly consumer projects authenticated profile bytes into the current resource
-API and supplies the current site-spec shape. Both the normal and upstream-OVN
+API and supplies separate site and stack configuration, credentials through the child
+environment, and telemetry through the installer values handoff. Both the normal and upstream-OVN
 disk URLs, where required by the selected profile, read the same held disk and are
 checked against the exact selected Artifact. Focused contract and HTTP race tests
 passed for the preceding beta selection, and that CLI validated and rendered the diagnostic site spec. Those checks do not validate the current beta.6 source.
-The user-approved test-only suite pin is `a32067108ab89d1e2b2b6720766ffe97270a166a`,
-which retains the candidate entrypoint omitted from the selected product source. Product sources select beta.6
+The user-approved test-only suite pin is `b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8`,
+a signed compatibility revision of the earlier `a3206710` suite, with beta.6 deployment
+templates and an explicit stack-config/credential/telemetry handoff. It retains the
+candidate entrypoint omitted from the selected product source. Hosted source-contract
+and full runtime validation of this revision remain pending. Product sources select beta.6
 with the explicit SPIRE exception. This diagnostic selection is an exception to
 ADR-23's proposed matching-revision rule, not adoption of that proposal. Missing
 candidate hooks still fail admission; the generic rebuilding suite is no fallback.

@@ -113,17 +113,8 @@ func nightlySiteSpec(ctx context.Context, runner Runner, source, gateway, contro
 	if err != nil {
 		return "", e.Wrap(e.CodeVerifyFailed, err, "reading pinned nightly Kind telemetry values")
 	}
-	password, err := randomScalar()
-	if err != nil {
-		return "", e.Wrap(e.CodePreflightFailed, err, "creating nightly tenant password")
-	}
-	for _, file := range []struct {
-		name string
-		raw  []byte
-	}{{"nightly-nico-token", []byte("nico-vmsctl-token")}, {"nightly-tenant-password", []byte(password)}, {"nightly-nktp-values.yaml", telemetry}} {
-		if err := privateWrite(filepath.Join(runner.Work, file.name), file.raw); err != nil {
-			return "", e.Wrap(e.CodeImmutableViolation, err, "writing private nightly site input")
-		}
+	if err := privateWrite(filepath.Join(runner.Work, "nightly-nktp-values.yaml"), telemetry); err != nil {
+		return "", e.Wrap(e.CodeImmutableViolation, err, "writing private nightly telemetry input")
 	}
 	spec := map[string]any{
 		"clusterName": cluster,
@@ -132,22 +123,39 @@ func nightlySiteSpec(ctx context.Context, runner Runner, source, gateway, contro
 			"k8sVersion": "1.37.0", "cniName": "ovn-kubernetes", "controlPlaneVIP": GuestGateway,
 			"podCidr": managementPodCIDR, "serviceCidr": managementServiceCIDR,
 		},
-		"registry": map[string]string{"bootstrapRepo": strings.Split(controller, "@")[0], "bootstrapChart": "nke-controller"},
-		"spire": map[string]string{
-			"trustDomain": cluster + ".nke.local", "caCertFile": filepath.Join(runner.Work, "ca.crt"), "caKeyFile": filepath.Join(runner.Work, "ca.key"),
-		},
-		"controllerStack": map[string]any{
-			"arch":           "arm64",
-			"nico":           map[string]string{"endpoint": "http://" + gateway + ":18089", "orgID": "novxwn552ssc", "apiName": "forge", "tokenFile": filepath.Join(runner.Work, "nightly-nico-token")},
-			"tenant":         map[string]string{"user": "nvkr-nightly", "passwordFile": filepath.Join(runner.Work, "nightly-tenant-password")},
-			"database":       map[string]string{"passwordFile": filepath.Join(runner.Work, "nightly-database-password")},
-			"images":         map[string]string{"controller": controller, "profiles": profiles},
-			"nktpValuesFile": filepath.Join(runner.Work, "nightly-nktp-values.yaml"),
-		},
+		"spire": map[string]any{"trustDomain": cluster + ".nke.local", "upstreamCA": true},
+	}
+	stack := map[string]any{
+		"nico":   map[string]string{"endpoint": "http://" + gateway + ":18089", "orgID": "novxwn552ssc", "apiName": "forge"},
+		"images": map[string]string{"controller": controller, "profiles": profiles},
+	}
+	if err := privateJSON(filepath.Join(runner.Work, "stack-config.json"), stack); err != nil {
+		return "", e.Wrap(e.CodeImmutableViolation, err, "writing private nightly stack config")
 	}
 	path := filepath.Join(runner.Work, "sitespec.json")
 	if err := privateJSON(path, spec); err != nil {
 		return "", e.Wrap(e.CodeImmutableViolation, err, "writing private nightly site spec")
 	}
 	return path, nil
+}
+
+// nightlyStackEnvironment binds credentials to the child environment, never the public input files.
+func nightlyStackEnvironment(runner Runner, site string) (Runner, error) {
+	password, err := randomScalar()
+	if err != nil {
+		return runner, e.Wrap(e.CodePreflightFailed, err, "creating nightly node password")
+	}
+	database, err := randomScalar()
+	if err != nil {
+		return runner, e.Wrap(e.CodePreflightFailed, err, "creating nightly database password")
+	}
+	runner = bindNativeSpireCA(runner, runner.Work)
+	runner.Env = SetEnv(runner.Env, map[string]string{
+		"NKE_E2E_CANDIDATE_SITESPEC":     site,
+		"NKE_E2E_CANDIDATE_STACK_CONFIG": filepath.Join(runner.Work, "stack-config.json"),
+		"NKE_E2E_CANDIDATE_NKTP_VALUES":  filepath.Join(runner.Work, "nightly-nktp-values.yaml"),
+		"NVKECTL_NICO_TOKEN":             "nico-vmsctl-token", "NVKECTL_NODE_USER": "nvkr-nightly",
+		"NVKECTL_NODE_PASSWORD": password, "NVKECTL_DATABASE_PASSWORD": database,
+	})
+	return runner, nil
 }

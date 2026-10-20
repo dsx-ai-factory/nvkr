@@ -248,7 +248,28 @@ func TestNightlyBetaSiteSpecRejectsUnboundInputs(t *testing.T) {
 			if err := json.Unmarshal(raw, &spec); err != nil {
 				t.Fatal(err)
 			}
-			stack := spec["controllerStack"].(map[string]any)
+			stackRaw, err := os.ReadFile(filepath.Join(work, "stack-config.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var stack map[string]any
+			if err := json.Unmarshal(stackRaw, &stack); err != nil {
+				t.Fatal(err)
+			}
+			for _, obsolete := range []string{"controllerStack", "registry", "caCertFile", "caKeyFile"} {
+				if strings.Contains(string(raw), obsolete) {
+					t.Fatalf("obsolete site field %s", obsolete)
+				}
+			}
+			bound, err := nightlyStackEnvironment(Runner{Work: work}, path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, key := range []string{"NVKECTL_NICO_TOKEN", "NVKECTL_NODE_USER", "NVKECTL_NODE_PASSWORD", "NVKECTL_DATABASE_PASSWORD", "NVKECTL_SPIRE_CA_CERT_FILE", "NVKECTL_SPIRE_CA_KEY_FILE", "NKE_E2E_CANDIDATE_STACK_CONFIG", "NKE_E2E_CANDIDATE_NKTP_VALUES"} {
+				if environmentValue(bound.Env, key) == "" {
+					t.Fatalf("missing handoff %s", key)
+				}
+			}
 			images := stack["images"].(map[string]any)
 			if spec["clusterName"] != cluster || images["controller"] != controller || images["profiles"] != profiles || spec["spire"].(map[string]any)["trustDomain"] != cluster+".nke.local" || stack["nico"].(map[string]any)["endpoint"] != "http://"+gateway+":18089" {
 				t.Fatal("site lost suite identity or selected image references")
@@ -256,7 +277,7 @@ func TestNightlyBetaSiteSpecRejectsUnboundInputs(t *testing.T) {
 			if strings.Contains(string(raw), "nico-vmsctl-token") {
 				t.Fatal("site embeds credentials instead of private credential files")
 			}
-			copied, err := os.ReadFile(stack["nktpValuesFile"].(string))
+			copied, err := os.ReadFile(filepath.Join(work, "nightly-nktp-values.yaml"))
 			if err != nil || string(copied) != string(telemetry) {
 				t.Fatal("site changed source-owned telemetry bytes", err)
 			}
@@ -297,11 +318,20 @@ func TestNightlyBetaSiteSourceContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	runner, err = nightlyStackEnvironment(runner, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := runner.Run(t.Context(), []string{cli, "validate", "sitespec", "-f", spec}, "nightly-sitespec-contract", time.Minute); err != nil {
 		t.Fatal(err)
 	}
 	rendered := filepath.Join(work, "rendered")
-	if err := runner.Run(t.Context(), []string{cli, "render", "deploy-path", "--deploy-path", filepath.Join(source, "deploy/nico"), "--sitespec", spec, "--out", rendered}, "nightly-render-contract", time.Minute); err != nil {
+	command := []string{cli, "render", "deploy-path", "--deploy-path", filepath.Join(source, "deploy/nico"), "--sitespec", spec, "--stack-config", filepath.Join(work, "stack-config.json"), "--arch", "linux/arm64", "--out", rendered}
+	if os.Getenv("NVKR_NVKE_NIGHTLY_SOURCE_CONTRACT") != "" {
+		runner.Env = SetEnv(runner.Env, map[string]string{"NVKECTL_BIN": cli, "WORKSPACE_ROOT": source, "STATE_DIR": work, "NKE_E2E_CANDIDATE_RELEASE": "", "NKE_E2E_CANDIDATE_LAYOUT": ""})
+		command = []string{"bash", "-eu", "-c", `source "$1"; candidate_render_stack`, "contract", filepath.Join(source, "controller/hack/ci/nico-vms-candidate.sh")}
+	}
+	if err := runner.Run(t.Context(), command, "nightly-render-contract", time.Minute); err != nil {
 		t.Fatal(err)
 	}
 	raw, err := os.ReadFile(filepath.Join(rendered, "controller/site-values.yaml"))

@@ -640,7 +640,10 @@ func nightlyRuntime(ctx context.Context, timing nightlyTiming, runner Runner, so
 	if err != nil {
 		return err
 	}
-	runner.Env = SetEnv(runner.Env, map[string]string{"NKE_E2E_CANDIDATE_SITESPEC": siteFile})
+	runner, err = nightlyStackEnvironment(runner, siteFile)
+	if err != nil {
+		return err
+	}
 	command, err := nightlySuiteCommand(ctx, runner, source)
 	if err != nil {
 		return err

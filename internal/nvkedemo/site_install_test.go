@@ -234,3 +234,26 @@ func TestStackStateAdmissionRefusesTemporaryRootLookupFailure(t *testing.T) {
 		t.Fatalf("expected wrapped temporary root lookup refusal, got %v", err)
 	}
 }
+
+func TestStackStateAdmissionWithUnresolvableWorkingDirectory(t *testing.T) {
+	for _, missing := range []bool{false, true} {
+		t.Run(map[bool]string{false: "resolvable", true: "removed"}[missing], func(t *testing.T) {
+			work := t.TempDir()
+			t.Chdir(work)
+			t.Setenv("TMPDIR", ".")
+			if missing {
+				if err := os.Remove(work); err != nil {
+					t.Fatal(err)
+				}
+			}
+			err := admitStackStateRoot("/srv/nvkr/private-state")
+			if missing {
+				if err == nil || !strings.Contains(err.Error(), "make prohibited temporary root absolute:") {
+					t.Fatalf("expected wrapped absolute-root failure, got %v", err)
+				}
+			} else if err != nil {
+				t.Fatalf("resolvable relative root refused permitted destination: %v", err)
+			}
+		})
+	}
+}

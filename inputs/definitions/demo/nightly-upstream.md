@@ -52,7 +52,7 @@ publication, and requires both test and cleanup verdicts. Checksum-pinned tool a
 vulnerability-clearance claim. All four site-product sources select
 NVKE v0.22.0-beta.6 at `8db5721ae3031bdcd945e559153a740d46ea209e`. The OS closure
 retains the explicit pre-DSX SPIRE exception at `726f76944404e1106626b8333d3576bdf67b575b`.
-The test-only suite selects `a32067108ab89d1e2b2b6720766ffe97270a166a`, an explicit
+The test-only suite selects `b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8`, an explicit
 user-approved exception to ADR-23's proposed matching-revision rule. Product sources select the exact main commit.
 
 The adapter now projects authenticated profile bytes into current `MachineImage`, `ClusterRelease`
