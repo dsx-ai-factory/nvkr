@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"go.yaml.in/yaml/v3"
 )
@@ -124,6 +125,21 @@ func TestNightlyWorkflowSuiteSelectionMatchesGoCohortOwner(t *testing.T) {
 		legacy bool
 	}{
 		{"current frozen source", func(*factory.Plan) {}, false},
+		{"approved main harness", func(p *factory.Plan) {
+			for i := range p.Builds {
+				p.Builds[i].ResolvedComponents[0].Commit = "8db5721ae3031bdcd945e559153a740d46ea209e"
+			}
+		}, false},
+		{"main with unapproved harness", func(p *factory.Plan) {
+			for i := range p.Builds {
+				p.Builds[i].ResolvedComponents[0].Commit = "8db5721ae3031bdcd945e559153a740d46ea209e"
+			}
+		}, false},
+		{"main with retired harness", func(p *factory.Plan) {
+			for i := range p.Builds {
+				p.Builds[i].ResolvedComponents[0].Commit = "8db5721ae3031bdcd945e559153a740d46ea209e"
+			}
+		}, false},
 		{"legacy configured source", func(*factory.Plan) {}, true},
 		{"missing role", func(p *factory.Plan) { p.Builds = p.Builds[1:] }, false},
 		{"mixed revisions", func(p *factory.Plan) { p.Builds[0].ResolvedComponents[0].Commit = strings.Repeat("e", 40) }, false},
@@ -139,12 +155,22 @@ func TestNightlyWorkflowSuiteSelectionMatchesGoCohortOwner(t *testing.T) {
 		{"invalid revision", func(p *factory.Plan) { p.Builds[0].ResolvedComponents[0].Commit = "main" }, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			profile := profile
+			if test.name == "approved main harness" {
+				profile.HarnessCommit = "b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8"
+			}
+			if test.name == "main with retired harness" {
+				profile.HarnessCommit = "a32067108ab89d1e2b2b6720766ffe97270a166a"
+			}
 			plan, _ := nightlyRuntimeCompiledFixture(t, profile, build, strings.Repeat("d", 40))
 			test.change(plan)
 			root := t.TempDir()
 			nightlyWorkflowWrite(t, root, "inputs/testing/nightly-profiles.json", []NightlyProfile{profile})
 			values := map[string]string{"PROFILE": profile.Name, "PINNED_SUITE": profile.HarnessCommit, "RUNTIME_PLAN": "true"}
 			expected, expectedErr := nightlyPlanHarnessCommit(plan, profile)
+			if test.name == "main with retired harness" {
+				assertNightlyCode(t, expectedErr, e.CodeUnpinnedInput)
+			}
 			if test.legacy {
 				values["RUNTIME_PLAN"] = "false"
 				expected, expectedErr = profile.HarnessCommit, nil

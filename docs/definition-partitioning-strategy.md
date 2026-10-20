@@ -7,12 +7,12 @@ unrecorded. The [input instructions](../inputs/definitions/nvke/README.md#four-f
 current selections; [reconciliation](adr/reconciliation.md#maintained-input-and-schema-boundaries) owns
 implementation and acceptance status.
 
-The pilot incorporates upstream `c01c9132` (2026-10-19), including default-test consolidation and the
-eleven-shard merge gate. It retains lazy OCI verification bundles and manifest issuance after combined
-production qualification from the preceding integration. The imported-validator catalog in ADR-24
-remains a proposed, unimplemented design. Current local measurements and historical research are reported
-separately. Historical tables retain baseline `258ab29bdfa0a6f65de9b761272f186293c6aa0e`; they do not
-describe the current generated bundles.
+The pilot incorporates upstream `9857feed` (2026-10-20), including current catalog pins, qualification
+metadata sessions and budgets, development retry support, and the provisional CLI validator catalog.
+[ADR-24](adr/0024-imported-validator-catalog.md) now records strict discovery/loading and local-plan profile
+dispatch as implemented; broader migration, published adapters and actual upstream/native-platform catalog
+acceptance remain deferred. Historical tables retain their stated source revisions; they do not describe
+current generated bundles.
 This document changes no ADR contract or organizational acceptance decision.
 
 ## Implemented pilot and retained path
@@ -48,6 +48,69 @@ and drift contracts, not artifact production.
 
 ### Current local validation
 
+The integration of `9857feeda03d2e7f529e1baef2b4a331a011e54c` reproduced drift in all four family bundles
+before regeneration. `make nvke-split-generate` refreshed eleven generated JSON files through the existing
+owner. Family Environments, entry workflows and action templates are unchanged; the four Plans now contain
+the updated catalog and generator snapshots. Independent inspection confirms the exact disjoint union of
+73 native build records and 69 output records still matches the combined Plan. The extended exact regeneration
+contract passed on 2026-10-20 in 4.05 seconds; the complete focused family/credential matrix passed in
+32.747 seconds, including the actual disks-family check in 0.81 seconds. This run records Go 1.27.2 on
+Darwin ARM64 and staged tree `e9187e1e6ce5e5fda6d26e04b912d10622f559c0`. It uses validated catalog
+snapshots; it does not independently authenticate upstream sources or reproduce artifact bytes.
+
+| Family | Outputs | Native targets | Factory nodes | Jobs | Workflow bytes | Plan bytes | Expanded YAML events |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Core | 20 | 24 | 210 | 198 | 130,455 | 659,186 | 15,247 |
+| Services | 28 | 28 | 258 | 233 | 151,551 | 542,725 | 18,272 |
+| Telemetry | 17 | 17 | 160 | 153 | 102,369 | 490,343 | 11,713 |
+| Disks | 4 | 4 | 106 | 55 | 62,075 | 500,953 | 5,301 |
+| Total | 69 | 73 | 734 | 639 | 446,450 | 2,193,207 | 50,533 |
+
+The updated combined Plan has 716 nodes and 2,155,133 bytes. Its unchanged workflow has 580 jobs,
+394,695 bytes and 47,055 expanded YAML events. Each workflow's limits apply separately. These are local
+size and generation contracts, not hosted artifact acceptance.
+
+The full local gate completed successfully at 21:54:35 UTC on 2026-10-20 on staged tree
+`2ff2a400055ae9cfe429b5c0bcfeb55bfaaedb41`, with Go 1.27.2 on Darwin ARM64 and golangci-lint 2.14.0.
+It ran `make check GO_TEST_FLAGS='-count=1 -json -p=1'`, `make build` and both staged/unstaged
+`git diff --check` checks. All 58 default Go package suites, static/shell checks and 19 Python tests passed;
+the vulnerability scan found none. Delivery took 544.323 seconds, factory 462.554 seconds and lifecycle
+363.894 seconds. Extended fixtures were disabled for this gate, with the original 20-minute package
+timeout and assertions unchanged; the separate focused run above covered the relevant extended contracts.
+Only validation prose changed afterward. All-owner `make workflows-check`, actionlint, relaxed yamllint,
+targeted metadata/retry lifetime race checks and formatting failure/read-only fixtures also passed.
+New-head hosted CI remains pending. Native Linux signing/pipeline race and pinned-cosign interoperability
+were not rerun locally; the raw local logs remain unpublished.
+
+The maintained closure inventory now checks all committed producer bundles and both qualification pairs
+offline, including exact policy selections, member bytes/modes and namespace ownership. Private source
+availability cannot skip that inventory; authenticated recompilation remains the separate workflow check.
+The existing combined/development/nightly credential matrix declares each row's expected disk count, with
+the development exemption explicit. The separate disks-family regression remains in place.
+PinSet parity contracts cover registry, resolved-catalog and snapshot admission for declaration edge cases,
+including the exact 1,024-member limit and NVKE accounted-member bound. The diagnostic uses the shared limit
+constant. These changes add regression coverage without expanding admission or credential authority.
+
+The integrated upstream [formatting check](https://github.com/dsx-ai-factory/nvkr/actions/runs/39494503833/job/118876005825)
+failed before starting `gofmt`: the repeated filename list made its shell command 131,872 bytes, exceeding
+Linux's per-argument limit. Formatting targets now use `find -exec … {} +` batches, and `fmt-check` preserves
+formatter errors while reporting captured unformatted paths once. The format, check and tidy targets share
+this bounded invocation pattern; generated inputs and outputs are unaffected.
+
+Combined qualification retains same-Run authentication with the upstream 59-minute operation,
+60-minute step and 90-minute job budgets. Development retry reuse retains the original Run and publication
+namespace. Named-family qualification, hosted family execution, independent consumer acceptance and Plan
+snapshot deduplication remain deferred.
+
+### Historical validation at 250f842c
+
+The following measurements and local results apply to the `c01c9132` integration committed as
+`250f842cb448347e2f6b1e9f2f373eb98e41e6e5`, not the current integration. Its exact-head
+[hosted Merge Gate](https://github.com/dsx-ai-factory/nvkr/actions/runs/39342927832) passed on 2026-10-19
+at 23:43:57 UTC. Local raw logs remain unpublished and are not independently retrievable evidence.
+They record commands and results but no complete tested working-tree hash or direct toolchain dump;
+they cannot independently bind the measured executions to the final commit.
+
 After incorporating upstream `c01c9132` and retaining the review hardening, the extended split contracts passed
 on 2026-10-19 in 4.25 seconds: all 73 complete native build records and 69 named output-binding records
 matched the combined Plan byte-for-byte, including catalogs, producer graphs,
@@ -64,7 +127,7 @@ catalog snapshots; it does not independently fetch upstream sources or prove rep
 | Disks | 4 | 4 | 106 | 55 | 62,075 | 501,720 | 5,301 |
 | Total | 69 | 73 | 734 | 639 | 446,450 | 2,188,635 | 50,533 |
 
-Measured on 2026-10-19 with the same current generator, the retained combined Plan has 716 nodes and its
+Measured on 2026-10-19 with that revision’s generator, the retained combined Plan has 716 nodes and its
 workflow has 580 jobs, 394,695 bytes and 47,055 expanded YAML events; the Plan is 2,153,454 bytes. The split
 reduces the largest workflow to 233 jobs, 151,551 bytes and 18,272 events, while total jobs rise by 59
 (10.17%) and total workflow bytes rise to 446,450. These measurements show reduced per-workflow breadth and parser demand,
@@ -77,7 +140,7 @@ guards. Negative contracts cover unadmitted feature branches, tags and push even
 publication and named-runtime helpers. These generation contracts establish no hosted execution.
 [Bootstrap dispatch contracts](../pkg/nvkr/factory/github_bootstrap_dispatch_test.go)
 
-Actionlint and relaxed yamllint passed for the changed merge-gate workflow. This integration changes no
+Actionlint and relaxed yamllint passed for the changed merge-gate workflow. The `c01c9132` integration changed no
 product Go source, authored family input, selected catalog or generated bundle. Upstream consolidates
 redundant default-test fixtures and discovers all Go packages and factory/lifecycle tests for eleven CI
 shards, retaining exact terminal-result accounting and the aggregate gate. The merge preserves the actual
@@ -93,7 +156,21 @@ Local native-tool support grants no hosted family capability, and named family q
 `make workflows-check` passed for all family, combined, development, qualification, nightly and catalog
 refresh owners after the preceding `7f67ce63` integration, reauthenticating source pins and confirming exact
 generated bytes. Its generator, authored inputs and generated files are unchanged by `c01c9132`; that
-all-owner result remains applicable, and the focused split regeneration passed again.
+all-owner result remained applicable to `250f842c`, and the focused split regeneration passed again.
+
+The immutable [02155409-to-250f842c comparison](https://github.com/dsx-ai-factory/nvkr/compare/02155409352955b3ce69d381fcb0da399700f3b7..250f842cb448347e2f6b1e9f2f373eb98e41e6e5)
+changes test/CI orchestration and prose. The following two checks return no path/mode/blob changes for
+production source/resources, authored inputs and generated owners; tests and the authored merge gate are
+explicitly outside those equality claims. The Makefile generation section is unchanged, although its test
+configuration changed. This commit comparison does not recover the missing local execution provenance.
+
+```sh
+git diff --exit-code 02155409352955b3ce69d381fcb0da399700f3b7 250f842cb448347e2f6b1e9f2f373eb98e41e6e5 -- \
+  client cmd internal pkg toolchains .go-version go.mod go.sum inputs docs/examples ':(exclude)**/*_test.go'
+git diff --exit-code 02155409352955b3ce69d381fcb0da399700f3b7 250f842cb448347e2f6b1e9f2f373eb98e41e6e5 -- \
+  '.github/nvkr-*' '.github/workflows/nvkr-*.yml' .github/workflows/catalog-refresh.yaml
+```
+
 The full uncached `make check GO_TEST_FLAGS='-count=1 -json -p=1'`, `make build` and diff checks passed
 on 2026-10-19 at 23:32 UTC. All 58 Go package suites passed, including the new CI-contract package, along
 with formatting, license, vet, lint, shell and all 19 Python CI-tool tests; the vulnerability scan found no

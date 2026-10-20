@@ -32,6 +32,26 @@ func LoadCLIArtifactTestInputs(ctx context.Context, path, output string) (*CLIAr
 	if err != nil {
 		return nil, err
 	}
+	return selectCLIArtifactTestInputs(plan, output)
+}
+
+// CLIArtifactPlan retains one complete validated Plan for multi-check admission.
+// Its producer graph is private and cannot be changed by the caller.
+type CLIArtifactPlan struct {
+	plan           *Plan
+	documentSHA256 string
+}
+
+// LoadCLIArtifactPlan reads and validates the Plan once, before executable work.
+func LoadCLIArtifactPlan(ctx context.Context, path string) (*CLIArtifactPlan, error) {
+	plan, digest, err := loadPlanDocument(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	return &CLIArtifactPlan{plan: plan, documentSHA256: digest}, nil
+}
+
+func selectCLIArtifactTestInputs(plan *Plan, output string) (*CLIArtifactTestInputs, error) {
 	var selected *BuildPlan
 	for i := range plan.Builds {
 		build := &plan.Builds[i]

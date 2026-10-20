@@ -26,9 +26,9 @@ import (
 )
 
 const managementBundle = "installer-tools-arm64"
-const kindConfigPath = "controller/hack/cwe-capi-kind.yaml"
-const kindConfigHash = "ffef66a877102f4d6c69012b30ed3a3869bf530e654ba07144e39595979cbf3c"
-const toolVersionsHash = "0a4a74197a07a862faf2d536d8565bf8cce3cbc50b72d50bc7c0a67514af2f64"
+const kindConfigPath = "controller/hack/controller-capi-kind.yaml"
+const kindConfigHash = "835a53f6c852ddd71d2f26614131985383a5aa4deb7acf62e68435c328fa71f0"
+const toolVersionsHash = "a47d8c38e6812bc3da6f8cf45953c25b365e5b2712669678b53c46798f441420"
 const kindNodeImage = "kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
 const kindNodeID = "sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
 const socketMount = "  extraMounts:\n    - hostPath: /var/run/docker.sock\n      containerPath: /var/run/docker.sock\n"
@@ -311,6 +311,9 @@ func admitManagement(ctx context.Context, cfg Config) (managementAdmission, erro
 	if err != nil {
 		return admitted, err
 	}
+	if err = admitStackStateRoot(out); err != nil {
+		return admitted, err
+	}
 	if insidePath(out, checkout) || insidePath(out, root) {
 		return admitted, errors.New("diagnostic output must be outside source and accepted Run")
 	}
@@ -361,7 +364,7 @@ func admitManagement(ctx context.Context, cfg Config) (managementAdmission, erro
 		return admitted, err
 	}
 	source := make(map[string][]byte)
-	for i, path := range []string{"deploy/stages/04-install-cluster-api.sh", "deploy/lib.sh", "make/tool-versions.mk"} {
+	for i, path := range []string{"deploy/check-site.sh", "deploy/lib/common.sh", "make/tool-versions.mk"} {
 		raw, readErr := sourceBytes(ctx, runner, checkout, path, fmt.Sprintf("admit-management-source-%d", i))
 		if readErr != nil {
 			return admitted, readErr
@@ -538,6 +541,7 @@ func cleanupManagement(ctx context.Context, session ManagementSession, existing 
 type ManagementSession struct {
 	Name, Tools, Work string
 	Runner            Runner
+	tenantProfiles    *tenantProfilesBinding
 }
 
 func cleanupAfterJoinedWork(ctx context.Context, primary error, timeout time.Duration, cleanup func(context.Context) error) error {
@@ -588,7 +592,7 @@ func verifyToolVersions(ctx context.Context, session ManagementSession) error {
 	for _, pin := range []struct {
 		name, expected string
 		args           []string
-	}{{"kind", "0.32.0", []string{"version", "-q"}}, {"clusterctl", "v1.12.3", []string{"version", "-o", "short"}}, {"helm", "v4.2.4", []string{"version", "--template", "{{.Version}}"}}} {
+	}{{"kind", "0.32.0", []string{"version", "-q"}}, {"clusterctl", "v1.13.6", []string{"version", "-o", "short"}}, {"helm", "v4.2.4", []string{"version", "--template", "{{.Version}}"}}} {
 		raw, err := session.Runner.Capture(ctx, append([]string{filepath.Join(session.Tools, pin.name)}, pin.args...), "version-"+pin.name, 30*time.Second)
 		if err != nil {
 			return err
@@ -674,7 +678,7 @@ func WithManagement(ctx context.Context, cfg Config, consumer func(context.Conte
 	if err = verifyToolVersions(ctx, session); err != nil {
 		return err
 	}
-	session.Runner.Env = SetEnv(runner.Env, map[string]string{"SITE_KUBECONFIG": filepath.Join(admitted.out, "kubeconfig"), "OUT_DIR": filepath.Join(admitted.out, "site-install"), "STAGE_NEEDS_RELEASE": "0", "PHASE_TIMEOUT": "10m", "REQUIRE_TIMEOUT": "600s"})
+	session.Runner.Env = SetEnv(runner.Env, map[string]string{"SITE_KUBECONFIG": filepath.Join(admitted.out, "kubeconfig"), "PHASE_TIMEOUT": "10m", "REQUIRE_TIMEOUT": "600s"})
 	if err = privateWrite(filepath.Join(admitted.out, "kind.yaml"), admitted.config); err != nil {
 		return err
 	}

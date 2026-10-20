@@ -16,6 +16,7 @@ import (
 )
 
 const nvkeFixtureDeploy = "controller/deploy/nke-sbom/nke-deploy.yaml"
+const nvkeBetaFixtureDeploy = "deploy/nico/nvke-deploy.yaml"
 
 type nvkeFixtureTree struct {
 	files map[string][]byte
@@ -100,6 +101,87 @@ func TestNVKEPinSetReadsActualUpstreamDeployMetadata(t *testing.T) {
 	}
 	if _, included := versions["controller"]; included {
 		t.Fatal("local controller placeholder version became an external pin")
+	}
+}
+
+func nvkeBetaPinFixture(t *testing.T) (*registryDoc, *nvkeFixtureTree) {
+	t.Helper()
+	reg, _ := nvkePinFixture(t)
+	set := reg.Sources["nvke"].PinSet
+	set.File = nvkeBetaFixtureDeploy
+	delete(set.Accounted, "nke-base-config")
+	set.Accounted["nvke-base-config"] = PinSetItem{Type: "template"}
+	set.Accounted["controller"] = PinSetItem{Type: "helm", Path: "../../controller/deploy/charts/controller"}
+	set.Accounted["nktp"] = PinSetItem{Type: "helm", Path: "../../nktp/deploy/charts/nktp"}
+	tree := &nvkeFixtureTree{files: map[string][]byte{}}
+	files := []string{set.File, "controller/deploy/charts/controller/Chart.yaml", "nktp/deploy/charts/nktp/Chart.yaml"}
+	for _, item := range []string{"controller", "nktp", "postgresql", "spire", "spire-crds", "temporal"} {
+		files = append(files, "deploy/nico/"+item+"/release.yaml")
+	}
+	for _, name := range files {
+		raw, err := os.ReadFile(filepath.Join("testdata/nvke-beta-pin-set", filepath.FromSlash(name)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		tree.files[name] = raw
+	}
+	return reg, tree
+}
+
+func TestNVKEPinSetReadsBetaLocalChartMetadata(t *testing.T) {
+	for _, explicitVersion := range []bool{false, true} {
+		t.Run(map[bool]string{false: "source chart version", true: "matching declared version"}[explicitVersion], func(t *testing.T) {
+			reg, tree := nvkeBetaPinFixture(t)
+			if explicitVersion {
+				for _, item := range []string{"controller", "nktp"} {
+					replaceNVKEFixture(t, tree, "deploy/nico/"+item+"/release.yaml", "chart:\n", "chart:\n  version: \"0.0.0\"\n")
+				}
+			}
+			versions, err := deriveNVKEPinSet(t.Context(), tree, reg, "nvke")
+			want := map[string]string{"spire": "0.30.1", "spire-crds": "0.6.1", "temporal": "0.74.0", "postgresql": "18.5.15"}
+			if err != nil || !reflect.DeepEqual(versions, want) {
+				t.Fatalf("derived beta versions = %v, %v; want %v", versions, err, want)
+			}
+			if len(tree.reads) != len(tree.files) {
+				t.Fatalf("read %d metadata files, want complete %d-file closure", len(tree.reads), len(tree.files))
+			}
+		})
+	}
+}
+
+func TestNVKEPinSetRejectsInvalidBetaLocalChartMetadata(t *testing.T) {
+	const controller = "deploy/nico/controller/release.yaml"
+	const chart = "controller/deploy/charts/controller/Chart.yaml"
+	for _, tc := range []struct{ name, file, old, replacement string }{
+		{"missing external version", "deploy/nico/spire/release.yaml", "  version: \"0.30.1\"\n", ""},
+		{"local null version", controller, "chart:\n", "chart:\n  version: null\n"},
+		{"local empty version", controller, "chart:\n", "chart:\n  version: \"\"\n"},
+		{"local numeric version", controller, "chart:\n", "chart:\n  version: 1\n"},
+		{"local version range", controller, "chart:\n", "chart:\n  version: \"~0.0.0\"\n"},
+		{"local mismatched version", controller, "chart:\n", "chart:\n  version: \"0.0.1\"\n"},
+		{"local chart name", chart, "name: nke-controller", "name: other"},
+		{"local chart version absent", chart, "version: \"0.0.0\"\n", ""},
+		{"local chart version range", chart, "version: \"0.0.0\"", "version: \"~0.0.0\""},
+		{"local chart version numeric", chart, "version: \"0.0.0\"", "version: 1"},
+		{"local chart path", controller, "path: ../../controller/deploy/charts/controller", "path: ../../other"},
+		{"unknown local metadata", controller, "chart:\n", "chart:\n  command: execute\n"},
+		{"artifact mapping escape", controller, "artifact: controller-chart", "artifact: ../controller-chart"},
+		{"artifact mapping empty", controller, "artifact: controller-chart", "artifact: \"\""},
+		{"artifact mapping null", controller, "artifact: controller-chart", "artifact: null"},
+		{"artifact mapping numeric", controller, "artifact: controller-chart", "artifact: 1"},
+		{"image mapping whitespace", controller, "imageArtifact: cwe", "imageArtifact: \"cwe image\""},
+		{"profiles mapping reference", controller, "profilesArtifact: controller-profiles", "profilesArtifact: registry.example/profiles"},
+		{"external artifact mapping", "deploy/nico/spire/release.yaml", "chart:\n", "chart:\n  artifact: spire\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			reg, tree := nvkeBetaPinFixture(t)
+			replaceNVKEFixture(t, tree, tc.file, tc.old, tc.replacement)
+			versions, err := deriveNVKEPinSet(t.Context(), tree, reg, "nvke")
+			assertCatalogContractCode(t, err, e.CodeInvalidCatalog)
+			if versions != nil {
+				t.Fatal("failed beta derivation returned partial versions")
+			}
+		})
 	}
 }
 

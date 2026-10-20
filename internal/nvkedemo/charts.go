@@ -19,9 +19,9 @@ import (
 
 // ChartInputsConfig describes a downstream chart handoff, not a Release.
 type ChartInputsConfig struct {
-	NVKECheckout, NVKR, Out string
-	Charts, Manifests       map[string]string
-	Progress                io.Writer
+	NVKECheckout, NVKR, Out     string
+	Charts, Manifests, Versions map[string]string
+	Progress                    io.Writer
 }
 type chartCapture func(context.Context, []string, string, time.Duration) ([]byte, error)
 
@@ -51,7 +51,7 @@ func releaseFields(ctx context.Context, capture chartCapture, reader, path strin
 		return nil, err
 	}
 	fields := strings.Split(strings.TrimRight(string(raw), "\n"), "\x1f")
-	if len(fields) != 9 || fields[0] != "single" {
+	if len(fields) != 13 || fields[0] != "single" {
 		return nil, errors.New("NVKE reader returned unsupported deploy-item interface")
 	}
 	return fields, nil
@@ -192,7 +192,7 @@ func prepareChartInputs(ctx context.Context, cfg ChartInputsConfig, capture char
 			return "", err
 		}
 	}
-	listed, err := capture(ctx, []string{"python3", reader, "items", filepath.Join(stage, "nke-deploy.yaml")}, "chart-items", 30*time.Second)
+	listed, err := capture(ctx, []string{"python3", reader, "items", filepath.Join(stage, "nvke-deploy.yaml")}, "chart-items", 30*time.Second)
 	if err != nil {
 		return "", err
 	}
@@ -237,7 +237,17 @@ func prepareChartInputs(ctx context.Context, cfg ChartInputsConfig, capture char
 	for _, item := range names {
 		fields := originals[item]
 		archive := "charts/" + item + ".tgz"
-		observation, readErr := capture(ctx, []string{tool, "publish", "chart", "--layout", layouts[item], "--manifest", cfg.Manifests[item], "--name", fields[1], "--version", fields[2], "--out", filepath.Join(stage, archive)}, "chart-extract", 120*time.Second)
+		version := fields[2]
+		if selected := cfg.Versions[item]; selected != "" {
+			if version != "" && selected != version {
+				return "", errors.New("selected chart version differs from pinned deploy item")
+			}
+			version = selected
+		}
+		if version == "" {
+			return "", errors.New("selected local chart requires its observed version")
+		}
+		observation, readErr := capture(ctx, []string{tool, "publish", "chart", "--layout", layouts[item], "--manifest", cfg.Manifests[item], "--name", fields[1], "--version", version, "--out", filepath.Join(stage, archive)}, "chart-extract", 120*time.Second)
 		if readErr != nil {
 			return "", readErr
 		}

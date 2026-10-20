@@ -9,8 +9,7 @@ metadata:
 sources:
   nvke-os:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0-beta.6
     toolchainImagesByArch:
       # AMD64 is a substitution-only local baseline. ARM64 retains the historical
       # M2 Docker candidate publication, not reproduction of the current Dockerfile.
@@ -47,8 +46,7 @@ sources:
         }
   nvke-cni-calico-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0-beta.6
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
@@ -57,7 +55,7 @@ sources:
       - -ec
       - |
         make -C os-image/packages/cni-calico bundle nfpm \
-          ARCH={{.Arch}} BIN_DIR=/usr/local/bin
+          ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
   ovn-kubernetes:
     repo: https://github.com/ovn-kubernetes/ovn-kubernetes
     constraint: 1.4.x
@@ -66,8 +64,7 @@ sources:
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
   nvke-kubeadm-distro-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0-beta.6
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
@@ -76,7 +73,7 @@ sources:
       - -ec
       - |
         make -C os-image/packages/kubeadm-distro bundle nfpm \
-          ARCH={{.Arch}} BIN_DIR=/usr/local/bin
+          ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
   nvke-spire-agent-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
     constraint: 0.1.x
@@ -89,7 +86,7 @@ sources:
       - -ec
       - |
         make -C os-image/packages/spire-agent bundle nfpm \
-          ARCH={{.Arch}} BIN_DIR=/usr/local/bin
+          ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
 components:
   nvke-agent:
     platforms: [linux/amd64, linux/arm64]
@@ -102,11 +99,13 @@ components:
       - -ec
       - |
         GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \
-          VERSION=v0.2.1-rc.6-109-g726f7694 \
+          VERSION="$BUILD_VERSION" \
           NFPM_BIN=/usr/local/bin/nfpm \
           DEB_OUTPUT=/src/agent/bin/nvke-agent.deb
     writeDir: agent/bin
     artifactPath: agent/bin/nvke-agent.deb
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
   nvke-cni-calico:
     platforms: [linux/amd64, linux/arm64]
     fromSource: true
@@ -186,7 +185,7 @@ components:
       - --opt
       - build-arg:OVN_KUBERNETES_DIR=.
       - --opt
-      - build-arg:BUILDER_IMAGE=quay.io/projectquay/golang@sha256:506a668eb4c763a964ffc4d4ad0125d45d75aac899392be7e5d39380f8452564
+      - build-arg:BUILDER_IMAGE=quay.io/projectquay/golang@sha256:d5acf07940fb5e6e2d07542abd853cece623d95ffd364769ec825aab5471d3b8
       - --opt
       - build-arg:KUBECTL_MINOR=1.36
       - --opt
@@ -243,6 +242,7 @@ components:
       - -ec
       - |
         exec python3 /src/os-image/packer/scripts/compose-image-inputs.py \
+          --architecture {{.Arch}} \
           --materials-dir /nvkr/inputs/materials \
           --source-files-dir /src/os-image/files \
           --output /src/nvkr-output/image-inputs.tar \
@@ -295,12 +295,12 @@ components:
     packer:
       projectPath: os-image/packer
       packerVersion: 1.15.4
-      buildName: nke-node-non-fde.qemu.nke-non-fde
+      buildName: nvke-node-non-fde.qemu.nvke-non-fde
       architectureVariable: architecture
       acceleratorVariable: accelerator
       materialManifestVariable: material_manifest
       materialManifest:
-        schemaVersion: nke.dev/os-image-materials/v1
+        schemaVersion: nvke.nvidia.com/os-image-materials/v1
         kinds:
           image-inputs: archive
           installer-iso: disk-image
@@ -309,6 +309,7 @@ components:
       sshPublicKeyVariable: ssh_public_key_file
       buildLogDirectoryVariable: build_log_directory
       variables:
+        ubuntu_series: "26.04"
         boot_wait: 30s
         # The pinned QEMU 10.1.2/AAVMF TCG closure stalls in UEFI with
         # max,pauth-impdef=on. cortex-a57 reaches the patched ARM64 GRUB menu
@@ -321,7 +322,7 @@ components:
     materials:
       image-inputs: nvke-image-inputs
       installer-iso: nvke-patched-installer-iso
-    artifactPath: non-fde/nke-node.qcow2
+    artifactPath: non-fde/nvke-node.qcow2
   nvke-node-image-amd64:
     platforms: [linux/amd64]
     fromSource: true
@@ -345,12 +346,12 @@ components:
     packer:
       projectPath: os-image/packer
       packerVersion: 1.15.4
-      buildName: nke-node-non-fde.qemu.nke-non-fde
+      buildName: nvke-node-non-fde.qemu.nvke-non-fde
       architectureVariable: architecture
       acceleratorVariable: accelerator
       materialManifestVariable: material_manifest
       materialManifest:
-        schemaVersion: nke.dev/os-image-materials/v1
+        schemaVersion: nvke.nvidia.com/os-image-materials/v1
         kinds:
           image-inputs: archive
           installer-iso: disk-image
@@ -359,13 +360,14 @@ components:
       sshPublicKeyVariable: ssh_public_key_file
       buildLogDirectoryVariable: build_log_directory
       variables:
+        ubuntu_series: "26.04"
         efi_firmware_code: /usr/share/OVMF/OVMF_CODE_4M.fd
         efi_firmware_vars: /usr/share/OVMF/OVMF_VARS_4M.fd
         ssh_timeout: 180m
     materials:
       image-inputs: nvke-image-inputs
       installer-iso: nvke-patched-installer-iso-amd64
-    artifactPath: non-fde/nke-node.qcow2
+    artifactPath: non-fde/nvke-node.qcow2
   nvke-patched-installer-iso:
     platforms: [linux/arm64]
     fromSource: true

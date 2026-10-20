@@ -5,6 +5,7 @@ package lifecycle
 
 import (
 	"context"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -68,6 +69,15 @@ func TestNVKEUbuntu24NativeDiskSelections(t *testing.T) {
 					t.Fatalf("Ubuntu 24 installer is not bound to the exact native ISO: %+v", iso)
 				}
 				for component, producer := range build.CatalogSnapshot.Components {
+					if producer.Packer != nil {
+						if producer.Packer.Variables["ubuntu_series"] != "24.04" || original.CatalogSnapshot.Components[component].Packer.Variables["ubuntu_series"] != "26.04" {
+							t.Fatal("disk Ubuntu series must match the selected installer")
+						}
+						packer := *producer.Packer
+						packer.Variables = maps.Clone(packer.Variables)
+						packer.Variables["ubuntu_series"] = "26.04"
+						producer.Packer = &packer
+					}
 					if component != "nvke-agent" && component != "ubuntu-installer-iso" && component != "ubuntu-installer-iso-amd64" &&
 						!reflect.DeepEqual(producer, original.CatalogSnapshot.Components[component]) {
 						t.Fatalf("Ubuntu selection unexpectedly changed unrelated producer %s", component)
@@ -82,12 +92,12 @@ func TestNVKEUbuntu24NativeDiskSelections(t *testing.T) {
 						continue
 					}
 					roots++
-					if node.Component != root || node.SourceCommit != "ff21ba8c07cafff74b68e238a8876af11e5beded" || node.Packer == nil ||
+					if node.Component != root || node.SourceCommit != "8db5721ae3031bdcd945e559153a740d46ea209e" || node.Packer == nil ||
 						node.Disk == nil || node.ExecutionBinding == nil || node.Requirements == nil {
 						t.Fatal("Ubuntu 24 disk lost its source-owned native Packer contract")
 					}
-					if node.Packer.BuildName != "nke-node-"+variant.source+".qemu.nke-"+variant.source ||
-						node.ArtifactPath != variant.source+"/nke-node.qcow2" || node.Packer.AcquisitionArchive != variant.source+"/apt-acquisitions.tar" ||
+					if node.Packer.BuildName != "nvke-node-"+variant.source+".qemu.nvke-"+variant.source ||
+						node.ArtifactPath != variant.source+"/nvke-node.qcow2" || node.Packer.AcquisitionArchive != variant.source+"/apt-acquisitions.tar" ||
 						node.Disk.Encryption != variant.encryption || node.ToolchainPlatform != build.Platform {
 						t.Fatal("Ubuntu 24 changed the pinned source's disk output contract")
 					}
@@ -367,7 +377,7 @@ func TestNVKEUbuntu24AgentPreservesDynamicAgentAndStaticUpdater(t *testing.T) {
 					}
 				}
 				if !tc.missingUpdater {
-					if err := os.WriteFile(filepath.Join(binaryDirectory, "nke-agent-updater"), []byte("updater fixture"), 0600); err != nil {
+					if err := os.WriteFile(filepath.Join(binaryDirectory, "nvke-agent-updater"), []byte("updater fixture"), 0600); err != nil {
 						t.Fatal(err)
 					}
 				}
@@ -380,7 +390,7 @@ test "$#" = 4
 test "$1" = /src/os-image/nix/check-ubuntu-elf.sh
 test "$2" = --arch
 test "$3" = "$NVKR_TEST_ARCH"
-test "$4" = "$NVKR_TEST_SOURCE/agent/bin/linux_${NVKR_TEST_ARCH}/nke-agent"
+test "$4" = "$NVKR_TEST_SOURCE/agent/bin/linux_${NVKR_TEST_ARCH}/nvke-agent"
 printf 'checked agent\n' > "$NVKR_TEST_SOURCE/agent-check"
 exit "$NVKR_TEST_CHECK_EXIT"
 `,
@@ -388,7 +398,7 @@ exit "$NVKR_TEST_CHECK_EXIT"
 set -eu
 test "$#" = 2
 test "$1" = -lW
-test "$2" = "$NVKR_TEST_SOURCE/agent/bin/linux_${NVKR_TEST_ARCH}/nke-agent-updater"
+test "$2" = "$NVKR_TEST_SOURCE/agent/bin/linux_${NVKR_TEST_ARCH}/nvke-agent-updater"
 printf 'checked updater\n' > "$NVKR_TEST_SOURCE/updater-check"
 printf '%s\n' "$NVKR_TEST_HEADERS"
 exit "$NVKR_TEST_READELF_EXIT"

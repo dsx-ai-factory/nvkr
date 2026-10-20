@@ -495,10 +495,10 @@ pinned commit and tree; they are not represented as one tagged NVKE release.
 
 | Part | Selected source | Owning input |
 | --- | --- | --- |
-| Native host CLI, installer and NICoSim | [`69ef9924`](https://github.com/dsx-ai-factory/nvke/commit/69ef9924c4bf0487beba8c3613ae6e0a0260d8f3) | [Shared tools lock](../inputs/catalogs/tools/native/pins.lock.yaml) |
-| Site CLI/controller/charts and provisioned provider | `69ef9924` | [Native site lock](../inputs/catalogs/nvke/native-site-arm64/pins.lock.yaml) |
-| OS, agent and kubeadm | `69ef9924` | [Native OS lock](../inputs/catalogs/node-images/native-arm64/pins.lock.yaml) |
-| Profiles and runbooks | `69ef9924` | [Native profiles lock](../inputs/catalogs/controller-profiles/native-nvidia-arm64/pins.lock.yaml) |
+| Native host CLI, installer and NICoSim | [`8db5721a`](https://github.com/dsx-ai-factory/nvke/commit/8db5721ae3031bdcd945e559153a740d46ea209e) | [Shared tools lock](../inputs/catalogs/tools/native/pins.lock.yaml) |
+| Site CLI/controller/charts and provisioned provider | `8db5721a` | [Native site lock](../inputs/catalogs/nvke/native-site-arm64/pins.lock.yaml) |
+| OS, agent and kubeadm | `8db5721a` | [Native OS lock](../inputs/catalogs/node-images/native-arm64/pins.lock.yaml) |
+| Profiles and runbooks | `8db5721a` | [Native profiles lock](../inputs/catalogs/controller-profiles/native-nvidia-arm64/pins.lock.yaml) |
 | Explicit SPIRE packaging exception | [`726f7694`](https://github.com/dsx-ai-factory/nvke/commit/726f76944404e1106626b8333d3576bdf67b575b) | Native OS lock; missing DSX input tracked in [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641) |
 | NVIDIA OVN image/chart | [`8af51273`](https://github.com/dsx-ai-factory/ovn-kubernetes/commit/8af51273d52dfa07454435d18d37230e582d797a), 2.4.2 | [Native NVIDIA overlay](../inputs/catalogs/node-images/variants/native-nvidia.json) |
 

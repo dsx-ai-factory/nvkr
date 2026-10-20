@@ -37,7 +37,7 @@ func TestNativeTenantAdmitsDNSBeforeSingleSmoke(t *testing.T) {
 				t.Fatal(err)
 			}
 			installer := privateTestDir(t)
-			writeTenantFixture(t, filepath.Join(installer, "SOURCE_COMMIT"), []byte("69ef9924c4bf0487beba8c3613ae6e0a0260d8f3\n"), 0600)
+			writeTenantFixture(t, filepath.Join(installer, "SOURCE_COMMIT"), []byte("8db5721ae3031bdcd945e559153a740d46ea209e\n"), 0600)
 			attempt := nativeSiteAttempt{
 				assets: NativeAssets{Installer: installer}, network: "ovn", tenantTimeout: 5 * time.Second,
 				bridge: nativeBridgeConfig{prefix: netip.MustParsePrefix(GuestCIDR)},

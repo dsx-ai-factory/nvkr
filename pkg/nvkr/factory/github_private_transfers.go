@@ -420,8 +420,8 @@ func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string
 				"NVKR_CI_RUN", githubYAMLString("${{ inputs.run-id }}"), "NVKR_CI_ATTEMPT", githubYAMLString("${{ inputs.attempt }}"))
 			locatorCommand := "exec " + helper + " factory github ci-fetch-locators --index-dir \"$NVKR_CI_INDEX\" --name \"$NVKR_CI_NAME\" --pattern \"$NVKR_CI_PATTERN\" --merge-multiple=\"$NVKR_CI_MERGE\" --run-id \"$NVKR_CI_RUN\" --attempt \"$NVKR_CI_ATTEMPT\""
 			// The Environment enables reuse only for implicit current-Run reads.
-			// Development namespaces and explicit cross-Run consumers stay exact.
-			retrySetup := fmt.Sprintf("set -eu\nallow_earlier=%t\nif [ -n \"$NVKR_CI_RUN\" ]; then allow_earlier=false; fi\n", !plan.Environment.GitHubDevelopment)
+			// Explicit cross-Run consumers stay exact; both hosted lanes allow retries.
+			retrySetup := "set -eu\nallow_earlier=true\nif [ -n \"$NVKR_CI_RUN\" ]; then allow_earlier=false; fi\n"
 			retryPolicy := " --allow-earlier-attempts=\"$allow_earlier\""
 			locatorCommand = retrySetup + locatorCommand + retryPolicy
 			steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Download metadata and private locators"), "shell", githubYAMLString("bash"), "env", locatorEnv, "run", githubYAMLString(locatorCommand)))

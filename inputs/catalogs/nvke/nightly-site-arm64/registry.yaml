@@ -9,7 +9,7 @@ metadata:
 sources:
   nvke-cli:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.21.x
+    constraint: v0.22.0-beta.6
     # Go 1.27.2 on the existing Trixie base; the controller uses the same parent
     # through its source-owned GOLANG_IMAGE build argument below.
     toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
@@ -30,11 +30,11 @@ sources:
         test ! -e controller/deploy/charts/go.sum
   nvke-controller:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.21.x
+    constraint: v0.22.0-beta.6
     toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
   nvke-controller-helm:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.21.x
+    constraint: v0.22.0-beta.6
     # Reuse the hosted Go image and operator-catalog's exact Helm acquisition.
     # The fetch owner seals the tool alongside its distinct source closure.
     toolchainImagesByArch:
@@ -64,7 +64,7 @@ sources:
         printf '%s\n' "$pins" | sha256sum --quiet -c -
   nvke-nktp-helm:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.21.x
+    constraint: v0.22.0-beta.6
     toolchainImagesByArch:
       arm64: docker.io/library/golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
     # The source-owned Chart.lock selects the dependency versions. Fetch checks
@@ -120,7 +120,7 @@ components:
     artifactPath: cli/bin/nvkectl
     writeDir: cli/bin
     versionStamp:
-      NVKECTL_VERSION: '{{.Commit}}'
+      NVKECTL_VERSION: '{{.Tag}}'
       NVKECTL_COMMIT: '{{.Commit}}'
       NVKECTL_DATE: '{{.Date}}'
     buildCommand:
@@ -140,7 +140,7 @@ components:
     outputType: oci-image
     platforms: [linux/arm64]
     versionStamp:
-      BUILD_VERSION: '{{.Commit}}'
+      BUILD_VERSION: '{{.Tag}}'
       GIT_VERSION: '{{.Commit}}'
     buildCommand:
       - sh
@@ -151,7 +151,7 @@ components:
     source: nvke-controller-helm
     platforms: [linux/arm64]
     outputType: tarball
-    artifactPath: charts/nke-controller-0.0.0.tgz
+    artifactPath: charts/nke-controller-0.22.0-beta.6.tgz
     writeDir: charts
     helm:
       chart: .
@@ -159,8 +159,8 @@ components:
         controller:
           values:
             digest: image.digest
-    # Keep the installer's source-tree chart version, not the older release's
-    # 0.1.1 override. The final package is bound to the produced controller digest.
+    # The upstream Chart.yaml version is a placeholder; package the selected release.
+    # The final package is bound to the produced controller digest.
     buildCommand:
       - sh
       - -euc
@@ -168,13 +168,13 @@ components:
         printf '%s\n' \
           '4d6e3a69e6203094d564d5d4e94325b1f7209421dc7e832a96d2510295e03f1d  /src/nvkr-chart-tools/helm' \
           | sha256sum --quiet -c -
-        exec timeout --kill-after=10s 60s /src/nvkr-chart-tools/helm package controller/deploy/charts/controller --destination=charts/
+        exec timeout --kill-after=10s 60s /src/nvkr-chart-tools/helm package controller/deploy/charts/controller --version=0.22.0-beta.6 --app-version=v0.22.0-beta.6 --destination=charts/
   nktp-chart:
     fromSource: true
     source: nvke-nktp-helm
     platforms: [linux/arm64]
     outputType: tarball
-    artifactPath: charts/nktp-0.0.0.tgz
+    artifactPath: charts/nktp-0.22.0-beta.6.tgz
     writeDir: charts
     buildCommand:
       - sh
@@ -183,4 +183,4 @@ components:
         printf '%s\n' \
           '4d6e3a69e6203094d564d5d4e94325b1f7209421dc7e832a96d2510295e03f1d  /src/nvkr-chart-tools/helm' \
           | sha256sum --quiet -c -
-        exec timeout --kill-after=10s 60s /src/nvkr-chart-tools/helm package nktp/deploy/charts/nktp --destination=charts/
+        exec timeout --kill-after=10s 60s /src/nvkr-chart-tools/helm package nktp/deploy/charts/nktp --version=0.22.0-beta.6 --app-version=v0.22.0-beta.6 --destination=charts/

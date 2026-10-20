@@ -30,6 +30,91 @@ must provide Go and Make; Plan validation does not prove those tools are present
 - `--suite cli` runs the full upstream CLI Go suite. Its contracts use the binary;
   other unit tests exercise upstream source. Bootstrap E2E is separate.
 
+## Provisional validator catalog
+
+The provisional CLI catalog adds discovery and explicit local selection of these same two suites.
+The ADR-24 schemas and SDK methods remain provisional; schema stabilization and
+maintained upstream adoption remain deferred. Discovery reads only the catalog
+index and its entry files. It neither imports source nor probes Docker or prepares an
+environment. `available` describes installed adapter support; runtime readiness stays
+`unverified`. Adapter-owned limitations remain visible independently of authored display text.
+
+```sh
+bin/nvkr validators list --catalog inputs/testing/validators/catalog.yaml
+bin/nvkr validators describe --catalog inputs/testing/validators/catalog.yaml nvke/nvkectl/contract
+bin/nvkr validators run --profile /path/to/validation.yaml --keep
+```
+
+The diagnostic command group is hidden from normal lifecycle help while its contracts
+are provisional. The SDK exposes `ListValidators`, `DescribeValidator`, and
+`PrepareValidatorProfile`; execute the returned invocation with `Run(ctx)`.
+No implicit catalog or suite fallback is installed.
+
+A profile uses ADR-24's explicit catalog, source and role bindings. Paths below are
+relative to the profile file:
+
+```yaml
+apiVersion: nvkr.dev/validation-profile/v1
+kind: ValidationProfile
+catalog: /path/to/nvkr/inputs/testing/validators/catalog.yaml
+source:
+  kind: local-plan
+  plan: ./plan.json
+checks:
+  - name: cli-contract
+    validator: nvke/nvkectl/contract
+    inputs:
+      executable:
+        output: nvkectl
+        artifact: ./nvkectl
+```
+
+Use `nvke/nvkectl/cli` for the full CLI suite. Every selected instance must explicitly
+bind `executable` to one named output and one artifact path; no inference, glob or
+run-all behavior exists. Multiple instances execute in profile order and stop at the
+first failure. Complete structural, adapter and Plan admission finishes before any
+workspace creation, source acquisition, artifact staging or execution. Executable
+paths are checked for regular executable files during admission; supplied bytes are
+copied and hashed by the existing private staging owner when each check starts.
+Artifact locations remain descriptions, not authenticated membership.
+
+One admitted invocation holds the selected entries, resolved absolute artifact paths,
+validated Plan, producer/source descriptions and suite selectors. `Run` does not reopen
+profiles, entries or Plans. With `--keep`, each existing CLI workspace also retains
+`selection.json`: canonical resolved configuration, exact profile/index/entry document
+SHA-256 values, the admitted Plan document SHA-256 and that check's factory inputs.
+The SDK's `Configuration()` returns a detached canonical description of the full
+selection and resolved inputs. These are diagnostic records, not new semantic identities.
+Original `tests.jsonl` and success-only `result.json` retain their existing meanings.
+Default cleanup still removes the workspace, including selection metadata.
+
+The new format currently admits **local-plan only**, through `nvke-cli/v1` with no
+adapter-configuration extension. Unknown fields, versions, duplicate keys/IDs/instances,
+missing or extra roles, unknown outputs, unsupported adapters or requirements fail
+without executable work or fallback. YAML aliases, merge keys, multi-document streams,
+symlink traversal and escaping index paths are forbidden. YAML and JSON use the same
+strict typed model. See ADR-24 for document, catalog and instance limits.
+
+`timeout` in an entry bounds its test container and cannot exceed the adapter's
+30-minute maximum. Dependency acquisition has its own fixed 30-minute bound; source
+Git commands and cleanup retain their existing independent bounds. A shorter caller
+context wins. This differs explicitly from legacy `--timeout`, which still sets both
+container bounds. Existing `run artifact-test` flags, default suite, error mapping and
+custom timeout remain supported directly through factory; migration of that interface
+to catalog entries is deferred rather than silently narrowing its accepted budgets.
+Legacy `validate --config` retains its separate published-source authentication and
+capture-only semantics, together with its independently admitted complete-local-Run
+conformance route. New profiles are not reinterpreted as legacy documents, and neither
+legacy route is relaxed. A new-format published adapter remains unsupported in this slice.
+
+Contract tests cover deterministic discovery, strict refusal, complete admission before
+execution, edits during dispatch, both suite/architecture selections and retained
+configuration. Factory import/container dispatch is mocked in the new parity tests;
+these tests do not constitute a fresh actual upstream execution or native-host evidence.
+The prior actual CLI execution records below remain the baseline. New catalog execution
+on native Linux AMD64/ARM64, upstream adoption, bootstrap, controller/chart adapters,
+CI migration and shared schema stabilization remain separate work.
+
 ## How it works
 
 1. Factory validates the complete canonical Plan and selects one CLI producer

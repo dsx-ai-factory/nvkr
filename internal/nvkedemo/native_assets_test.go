@@ -172,7 +172,7 @@ func TestNativeInstallerArchiveIncludesSourceOwnedCAPISelection(t *testing.T) {
 		t.Fatal(err)
 	}
 	producer, exists := loaded.Components["nvke-installer-sources"]
-	if !exists || producer.Commit != "69ef9924c4bf0487beba8c3613ae6e0a0260d8f3" {
+	if !exists || producer.Commit != "8db5721ae3031bdcd945e559153a740d46ea209e" {
 		t.Fatal("installer archive lost the selected NVKE source")
 	}
 	command := strings.Join(producer.BuildCommand, " ")
@@ -182,7 +182,7 @@ func TestNativeInstallerArchiveIncludesSourceOwnedCAPISelection(t *testing.T) {
 }
 
 func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *testing.T) {
-	versions, err := os.ReadFile("testdata/native-b615-tool-versions.mk")
+	versions, err := os.ReadFile("testdata/native-main-tool-versions.mk")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +203,7 @@ func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *test
 				{"controller/nico-sim/ui/index.html", tar.TypeReg, "index", 0},
 			}
 			if scenario != "missing source marker" {
-				commit := "69ef9924c4bf0487beba8c3613ae6e0a0260d8f3\n"
+				commit := "8db5721ae3031bdcd945e559153a740d46ea209e\n"
 				if scenario == "changed source marker" {
 					commit = strings.Repeat("a", 40) + "\n"
 				}

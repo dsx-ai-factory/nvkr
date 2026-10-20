@@ -367,6 +367,12 @@ The CLI supplies the explicit anonymous-registry default; SDK callers must selec
 complete host-scoped credentials themselves. The alias exposes future changes to that owner and remains
 an explicit SDK coupling, like `LocalRunOptions` below.
 
+The provisional diagnostic methods `ListValidators`, `DescribeValidator` and `PrepareValidatorProfile`
+delegate to `validation` for catalog discovery and frozen local-plan admission (ADR-24).
+`ValidatorDescription`, `ValidatorInvocation` and `ValidatorRuntime` alias that package's types, so changes
+to the provisional catalog/profile surfaces also affect `client/v1`. They provide no authenticated receipt,
+artifact membership or qualification authority. The corresponding hidden CLI group is `validators`.
+
 The non-owning installed-inventory receipt in ADR-13 borrows the issuing Run's
 lifetime; it has no separate close obligation or resource ownership. The Run's
 idempotent `Close` revokes every borrowed receipt and shallow copy. Live receipt

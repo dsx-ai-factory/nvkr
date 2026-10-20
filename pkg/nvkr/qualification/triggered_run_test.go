@@ -178,7 +178,7 @@ func TestTriggeredRunRetainsHostedBudgetUntilClose(t *testing.T) {
 		parentTimeout time.Duration
 		wantTimeout   time.Duration
 	}{
-		{"hosted deadline", 0, 19 * time.Minute},
+		{"hosted deadline", 0, 59 * time.Minute},
 		{"shorter caller", 5 * time.Minute, 5 * time.Minute},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

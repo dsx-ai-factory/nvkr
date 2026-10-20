@@ -13,18 +13,18 @@ components:
     cgo: false
     platforms: [linux/amd64, linux/arm64]
     outputType: host-package
-    artifactPath: cli/bin/nkectl
+    artifactPath: cli/bin/nvkectl
     writeDir: cli/bin
     versionStamp:
-      NKECTL_VERSION: '{{.Commit}}'
-      NKECTL_COMMIT: '{{.Commit}}'
-      NKECTL_DATE: '{{.Date}}'
+      NVKECTL_VERSION: '{{.ModuleTag}}'
+      NVKECTL_COMMIT: '{{.Commit}}'
+      NVKECTL_DATE: '{{.Date}}'
     buildCommand:
       - bash
       - -euc
       - |
         export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
-        make -C cli build NKECTL_TREE=clean
+        make -C cli build NVKECTL_TREE=clean
   nvke-controller-profiles-image:
     fromSource: true
     source: nvke
@@ -50,10 +50,10 @@ components:
             digest: image.digest
     fromSource: true
     source: nvke-helm
-    # Helm derives the filename from the pinned source's unchanged Chart.yaml.
-    artifactPath: charts/nke-controller-0.1.1.tgz
+    # Package the source chart with the selected NVKE release version.
+    artifactPath: charts/nke-controller-0.22.0-beta.6.tgz
     writeDir: charts
-    buildCommand: ['package', 'controller/deploy/charts/controller', '--version=0.1.1', '--app-version=0.1.1', '--destination=charts/']
+    buildCommand: ['package', 'controller/deploy/charts/controller', '--version=0.22.0-beta.6', '--app-version=v0.22.0-beta.6', '--destination=charts/']
     outputType: tarball
     platforms:
     - linux/amd64
@@ -144,7 +144,7 @@ components:
 sources:
   nvke-cli:
     repo: https://github.com/dsx-ai-factory/nvke
-    constraint: v0.21.0
+    constraint: v0.22.0-beta.6
     toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
     vendorCommand:
       - bash
@@ -152,7 +152,7 @@ sources:
       - |
         export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
         test ! -e controller/deploy/charts/go.sum
-        pins="$(sha256sum cli/go.mod cli/go.sum controller/api/go.mod controller/api/go.sum controller/deploy/charts/go.mod)"
+        pins="$(sha256sum cli/go.mod cli/go.sum controller/api/go.mod controller/api/go.sum controller/deploy/charts/go.mod management-engine/go.mod management-engine/go.sum)"
         cd cli
         timeout --kill-after=10s 540s go mod download
         GOPROXY=off timeout --kill-after=10s 60s go mod verify
@@ -166,9 +166,9 @@ sources:
         capnico:
           type: manifest
         controller:
-          path: ../charts/controller
+          path: ../../controller/deploy/charts/controller
           type: helm
-        nke-base-config:
+        nvke-base-config:
           type: template
         spire-oidc-provider-nodeport:
           type: manifest
@@ -176,7 +176,10 @@ sources:
           type: manifest
         spire-tpm-pubhashes:
           type: manifest
-      file: controller/deploy/nke-sbom/nke-deploy.yaml
+        nktp:
+          path: ../../nktp/deploy/charts/nktp
+          type: helm
+      file: deploy/nico/nvke-deploy.yaml
       format: nvke-deploy-v1
       members:
         postgresql:
@@ -188,11 +191,11 @@ sources:
         temporal:
           artifact: temporal-chart
     repo: https://github.com/dsx-ai-factory/nvke
-    constraint: v0.21.0
+    constraint: v0.22.0-beta.6
     toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
   nvke-helm:
     repo: https://github.com/dsx-ai-factory/nvke
-    constraint: v0.21.0
+    constraint: v0.22.0-beta.6
     toolchainImage: alpine/helm@sha256:a6cf54599ccb99d90cf0712b30f03fdb3cab062e6b94e0418cc4db7e8a1464b2
     vendorCommand: ['dependency', 'build', 'controller/deploy/charts/controller']
   checkout:

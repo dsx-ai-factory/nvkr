@@ -308,7 +308,9 @@ func BuildHelmChartArtifact(ctx context.Context, out, artifactType string, chart
 // helmChartAnnotations mirrors the subset of Helm's own
 // generateChartOCIAnnotations that is a pure function of Chart.yaml bytes: the
 // standard org.opencontainers.image.* keys derived from name, version,
-// description, homepage and primary source. Helm also sets
+// description and homepage. Source URLs remain in the chart and config blob;
+// promoting them to org.opencontainers.image.source would let GHCR auto-link
+// the package to a repository after private-publication admission. Helm also sets
 // org.opencontainers.image.created from the packaged .tgz's mtime and copies any
 // Chart.yaml annotations verbatim; the former is a wall-clock value excluded
 // here so the manifest stays a pure function of the chart's own bytes, and the
@@ -325,9 +327,6 @@ func helmChartAnnotations(config helmChartConfig) map[string]string {
 	add(ocispec.AnnotationVersion, config.Version)
 	add(ocispec.AnnotationDescription, config.Description)
 	add(ocispec.AnnotationURL, config.Home)
-	if len(config.Sources) > 0 {
-		add(ocispec.AnnotationSource, config.Sources[0])
-	}
 	if len(annotations) == 0 {
 		return nil
 	}

@@ -17,7 +17,10 @@ func admitSigningMetadata(plan *Plan, node Node, subject sign.Subject, inspectio
 	if err != nil {
 		return err
 	}
-	if subject.Ref != target.Ref+"@"+subject.Digest || inspection.RootDigest != subject.Digest {
+	if err := admitDevelopmentSubject(plan, node.Target, subject); err != nil {
+		return err
+	}
+	if (!plan.Environment.GitHubDevelopment && subject.Ref != target.Ref+"@"+subject.Digest) || inspection.RootDigest != subject.Digest {
 		return e.New(e.CodeVerifyFailed, "signing metadata differs from the planned publication")
 	}
 	for _, route := range plan.Routes {

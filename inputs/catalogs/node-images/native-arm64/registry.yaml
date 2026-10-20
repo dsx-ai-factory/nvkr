@@ -14,8 +14,7 @@ metadata:
 sources:
   nvke-os:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0-beta.6
     toolchainImagesByArch:
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
     vendorCommand:
@@ -48,8 +47,7 @@ sources:
       }
   nvke-cni-calico-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0-beta.6
     toolchainImagesByArch:
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
     vendorCommand:
@@ -65,8 +63,7 @@ sources:
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
   nvke-kubeadm-distro-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0-beta.6
     toolchainImagesByArch:
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
     vendorCommand:
@@ -208,7 +205,7 @@ components:
     - --opt
     - build-arg:OVN_KUBERNETES_DIR=.
     - --opt
-    - build-arg:BUILDER_IMAGE=quay.io/projectquay/golang@sha256:506a668eb4c763a964ffc4d4ad0125d45d75aac899392be7e5d39380f8452564
+    - build-arg:BUILDER_IMAGE=quay.io/projectquay/golang@sha256:d5acf07940fb5e6e2d07542abd853cece623d95ffd364769ec825aab5471d3b8
     - --opt
     - build-arg:KUBECTL_MINOR=1.36
     - --opt

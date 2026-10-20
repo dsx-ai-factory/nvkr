@@ -68,7 +68,7 @@ func validatePinSetDeclaration(name string, src Source) error {
 		return e.New(e.CodeInvalidCatalog, "pin set %q: unsupported format %q", name, set.Format)
 	}
 	if len(set.Members) == 0 || len(set.Members) > maxPinSetMembers {
-		return e.New(e.CodeInvalidCatalog, "pin set %q requires 1..1024 explicit members", name)
+		return e.New(e.CodeInvalidCatalog, "pin set %q requires 1..%d explicit members", name, maxPinSetMembers)
 	}
 	for _, key := range pinSetMemberNames(set) {
 		m := set.Members[key]

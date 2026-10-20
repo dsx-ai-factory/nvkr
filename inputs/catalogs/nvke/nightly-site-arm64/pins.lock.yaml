@@ -3,22 +3,22 @@ apiVersion: nvkr.dev/lock/v1
 kind: PinLock
 pins:
   nvke-cli:
-    commit: a8391755d12d99f859783c6cf390338debd1e085
-    sourceDateEpoch: 1792011564
-    tag: a8391755d12d99f859783c6cf390338debd1e085
-    treeHash: 3dea15e95f96f3d5133c50935d7a0818907bfd33
+    commit: 8db5721ae3031bdcd945e559153a740d46ea209e
+    sourceDateEpoch: 1792450875
+    tag: v0.22.0-beta.6
+    treeHash: e928ae13298118b61581d9a406ba4a02f872e959
   nvke-controller:
-    commit: a8391755d12d99f859783c6cf390338debd1e085
-    sourceDateEpoch: 1792011564
-    tag: a8391755d12d99f859783c6cf390338debd1e085
-    treeHash: 3dea15e95f96f3d5133c50935d7a0818907bfd33
+    commit: 8db5721ae3031bdcd945e559153a740d46ea209e
+    sourceDateEpoch: 1792450875
+    tag: v0.22.0-beta.6
+    treeHash: e928ae13298118b61581d9a406ba4a02f872e959
   nvke-controller-helm:
-    commit: a8391755d12d99f859783c6cf390338debd1e085
-    sourceDateEpoch: 1792011564
-    tag: a8391755d12d99f859783c6cf390338debd1e085
-    treeHash: 3dea15e95f96f3d5133c50935d7a0818907bfd33
+    commit: 8db5721ae3031bdcd945e559153a740d46ea209e
+    sourceDateEpoch: 1792450875
+    tag: v0.22.0-beta.6
+    treeHash: e928ae13298118b61581d9a406ba4a02f872e959
   nvke-nktp-helm:
-    commit: a8391755d12d99f859783c6cf390338debd1e085
-    sourceDateEpoch: 1792011564
-    tag: a8391755d12d99f859783c6cf390338debd1e085
-    treeHash: 3dea15e95f96f3d5133c50935d7a0818907bfd33
+    commit: 8db5721ae3031bdcd945e559153a740d46ea209e
+    sourceDateEpoch: 1792450875
+    tag: v0.22.0-beta.6
+    treeHash: e928ae13298118b61581d9a406ba4a02f872e959

@@ -12,10 +12,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualification"
 )
 
 const developmentFixtureEnvironment = "environment-dev.yaml"
@@ -204,9 +206,10 @@ func TestClosureAllowlistIsExactInBothPlaces(t *testing.T) {
 }
 
 // The committed policy and Plans give the real qualification pairs and named
-// family and nightly Runs; their files must be in the allowlist. This proves the listing
-// only; regenerating a pair after a pin change is exercised on a fixture in
-// closure_qualification_test.go.
+// family and nightly Runs; their complete committed file inventories must be in
+// the allowlist even without private source access. This checks local snapshots,
+// not source authentication or regeneration; the real compile/refresh owner is
+// exercised on fixtures in closure_qualification_test.go and by workflows-check.
 func TestClosureListsTheMaintainedBundles(t *testing.T) {
 	root, err := filepath.Abs("../../..")
 	if err != nil {
@@ -236,17 +239,54 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 			t.Fatalf("maintained policy omits additional Run %+v", want)
 		}
 	}
-	plan, err := lifecycle.CompileFiles(t.Context(), cfg.Definition, cfg.Environment, "dev (unknown)")
-	if err != nil {
-		t.Skipf("committed Plan does not compile offline: %v", err)
-	}
-	production, err := factory.Render(t.Context(), plan, factory.EngineGitHub)
+	planPaths, err := filepath.Glob(committedPlanGlob)
 	if err != nil {
 		t.Fatal(err)
 	}
-	members, err := buildClosure(t.Context(), cfg, "dev (unknown)", plan, production, "")
-	if err != nil {
-		t.Fatal(err)
+	wantRuns := append([]RunInput{{Definition: cfg.Definition, Environment: cfg.Environment}}, otherRuns(cfg)...)
+	if len(planPaths) != len(wantRuns) {
+		t.Fatalf("maintained closure has %d committed Plans, want %d", len(planPaths), len(wantRuns))
+	}
+	members := &closure{}
+	plans := make(map[RunInput]*factory.Plan, len(wantRuns))
+	for _, planPath := range planPaths {
+		plan, bundle := committedClosureRun(t, filepath.ToSlash(planPath))
+		input := RunInput{Definition: plan.DefinitionPath, Environment: plan.EnvironmentPath}
+		if !slices.Contains(wantRuns, input) || plans[input] != nil {
+			t.Fatalf("committed Plan %s has an unexpected or duplicate policy selection %+v", planPath, input)
+		}
+		plans[input] = plan
+		if input == wantRuns[0] {
+			members.production = bundle
+		} else {
+			members.runs = append(members.runs, closureRun{bundle: bundle, plan: plan})
+		}
+	}
+	for _, input := range wantRuns {
+		if plans[input] == nil {
+			t.Fatalf("maintenance policy selection %+v has no committed Plan", input)
+		}
+	}
+	for _, selected := range []struct {
+		policyPath string
+		input      RunInput
+		target     **qualification.GeneratedWorkflows
+	}{
+		{cfg.QualificationPolicy, wantRuns[0], &members.qualification},
+		{cfg.DevelopmentQualificationPolicy, RunInput{Definition: cfg.Definition, Environment: cfg.DevelopmentEnvironment}, &members.developmentQualification},
+	} {
+		policy, err := lifecycle.LoadQualificationPolicy(t.Context(), selected.policyPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pair, err := qualification.RenderWorkflows(t.Context(), plans[selected.input], policy, selected.policyPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := qualification.CheckWorkflows(t.Context(), ".", pair); err != nil {
+			t.Fatalf("committed qualification owner %s: %v", selected.policyPath, err)
+		}
+		*selected.target = pair
 	}
 	directories, files := members.paths()
 	wantDirectories := []string{
@@ -281,4 +321,46 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 	if !slices.Equal(files, wantFiles) {
 		t.Fatalf("closure workflow files = %v, want %v", files, wantFiles)
 	}
+	allowed := make(map[string]bool, len(directories))
+	for _, directory := range directories {
+		allowed[directory] = true
+	}
+	if err := refuseUnnamedBundles(allowed); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Reconstitute only the committed description; the factory owner checks every
+// member's bytes/mode, exact manifest and complete namespace inventory. Rendering
+// every family here would repeat the separate extended regeneration matrix.
+func committedClosureRun(t *testing.T, planPath string) (*factory.Plan, *factory.GeneratedBundle) {
+	t.Helper()
+	plan, err := factory.LoadPlanContext(t.Context(), planPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestPath := filepath.ToSlash(filepath.Join(filepath.Dir(planPath), "manifest.json"))
+	var manifest factory.GeneratedManifest
+	if err := canonical.UnmarshalExact(bytes.TrimSuffix(readFixture(t, manifestPath), []byte("\n")), &manifest); err != nil {
+		t.Fatalf("committed manifest %s: %v", manifestPath, err)
+	}
+	digest, err := plan.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.PlanDigest != digest {
+		t.Fatalf("committed manifest %s does not bind its Plan", manifestPath)
+	}
+	bundle := &factory.GeneratedBundle{
+		Engine: manifest.Engine, WorkflowPath: manifest.WorkflowPath, PlanPath: planPath,
+		ManifestPath: manifestPath, PlanDigest: digest, WorkflowDigest: manifest.WorkflowDigest,
+		Files: make(map[string][]byte, len(manifest.Members)),
+	}
+	for _, member := range manifest.Members {
+		bundle.Files[member.Path] = readFixture(t, member.Path)
+	}
+	if err := factory.CheckGeneratedBundle(t.Context(), ".", bundle); err != nil {
+		t.Fatalf("committed producer owner %s: %v", manifestPath, err)
+	}
+	return plan, bundle
 }

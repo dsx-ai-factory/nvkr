@@ -352,12 +352,16 @@ func TestOvercomplexWorkflowCannotWriteGeneratedBundle(t *testing.T) {
 }
 
 func TestMaintainedGitHubBundles(t *testing.T) {
-	for _, planPath := range []string{
-		FactoryPlanPath,
-		GitHubDevelopmentPlanPath,
-		".github/nvkr-run-nvke-nightly-arm64/plan.json",
-		".github/nvkr-run-nvke-nightly-upstream-ovn-arm64/plan.json",
+	for _, selected := range []struct {
+		planPath             string
+		privateDiskProducers int // -1 explicitly exempts the separate development credential policy.
+	}{
+		{FactoryPlanPath, 4},
+		{GitHubDevelopmentPlanPath, -1},
+		{".github/nvkr-run-nvke-nightly-arm64/plan.json", 1},
+		{".github/nvkr-run-nvke-nightly-upstream-ovn-arm64/plan.json", 1},
 	} {
+		planPath := selected.planPath
 		t.Run(planPath, func(t *testing.T) {
 			plan, err := LoadPlanContext(t.Context(), "../../../"+planPath)
 			if err != nil {
@@ -388,9 +392,9 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 				if nodes > maxGitHubWorkflowYAMLNodes*95/100 {
 					t.Fatalf("maintained workflow has less than 5%% YAML parsing headroom (%d of %d events); compact semantic calls before expanding membership", nodes, maxGitHubWorkflowYAMLNodes)
 				}
-				assertGitHubPrivateImageCredentialBoundary(t, plan, bundle, 4)
-			} else if planPath != GitHubDevelopmentPlanPath {
-				assertGitHubPrivateImageCredentialBoundary(t, plan, bundle, 1)
+			}
+			if selected.privateDiskProducers >= 0 {
+				assertGitHubPrivateImageCredentialBoundary(t, plan, bundle, selected.privateDiskProducers)
 			}
 			for name := range bundle.Files {
 				if strings.HasPrefix(name, ".github/workflows/") && name != bundle.WorkflowPath {

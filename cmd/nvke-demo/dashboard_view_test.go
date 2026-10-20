@@ -307,19 +307,19 @@ func TestDashboardSiteStageObservations(t *testing.T) {
 		done   int
 	}{
 		{"pending", nil, "pending", 0},
-		{"running", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseStarted, Name: "site-05-install-site-controller"}}, "running", 0},
-		{"run does not complete check", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseFinished, Name: "site-05-install-site-controller"}}, "pending", 1},
-		{"check running", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseFinished, Name: "site-05-install-site-controller"}, {Kind: nvkedemo.PhaseStarted, Name: "check-05-install-site-controller"}}, "running", 1},
-		{"check without run", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseFinished, Name: "check-05-install-site-controller"}}, "pending", 1},
-		{"observed", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseFinished, Name: "site-05-install-site-controller"}, {Kind: nvkedemo.PhaseFinished, Name: "check-05-install-site-controller"}}, "observed", 2},
-		{"failed check", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseFinished, Name: "site-05-install-site-controller"}, {Kind: nvkedemo.PhaseFailed, Name: "check-05-install-site-controller"}, {Kind: nvkedemo.PhaseFinished, Name: "check-05-install-site-controller"}}, "failed", 1},
+		{"running", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseStarted, Name: "site-client-policy"}}, "running", 0},
+		{"run does not complete check", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseFinished, Name: "site-client-policy"}}, "pending", 1},
+		{"check running", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseFinished, Name: "site-client-policy"}, {Kind: nvkedemo.PhaseStarted, Name: "site-register"}}, "running", 1},
+		{"check without run", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseFinished, Name: "site-register"}}, "pending", 1},
+		{"observed", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseFinished, Name: "site-client-policy"}, {Kind: nvkedemo.PhaseFinished, Name: "site-register"}}, "observed", 2},
+		{"failed check", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseFinished, Name: "site-client-policy"}, {Kind: nvkedemo.PhaseFailed, Name: "site-register"}, {Kind: nvkedemo.PhaseFinished, Name: "site-register"}}, "failed", 1},
 		{"unknown", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseFinished, Name: "private-stage-success"}}, "pending", 0},
-		{"wrong family", []nvkedemo.ProgressEvent{{Kind: nvkedemo.DeploymentFinished, Name: "site-05-install-site-controller"}}, "pending", 0},
+		{"wrong family", []nvkedemo.ProgressEvent{{Kind: nvkedemo.DeploymentFinished, Name: "site-client-policy"}}, "pending", 0},
 		{"owning demo cannot invent substeps", []nvkedemo.ProgressEvent{{Kind: nvkedemo.DeploymentFinished, Name: "local-demo"}}, "pending", 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			d := newDashboard()
-			_, _ = io.WriteString(d, "[done] site-05-install-site-controller\n[done] check-05-install-site-controller\n")
+			_, _ = io.WriteString(d, "[done] site-client-policy\n[done] site-register\n")
 			for _, event := range tc.events {
 				d.Report(event)
 			}
@@ -345,7 +345,7 @@ func TestDashboardFillingSiteChecklist(t *testing.T) {
 					}
 				}
 			}
-			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: "site-05-install-site-controller"})
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: "site-client-policy"})
 			s := d.snapshot()
 			now := s.siteStages[10].started[0].Add(75 * time.Second)
 			if checklist, _ := dashboardChecklist(s, now); !strings.Contains(checklist, "0/2 · 1m15s") {
@@ -355,7 +355,7 @@ func TestDashboardFillingSiteChecklist(t *testing.T) {
 			screen.SetSize(width, 42)
 			d.draw(screen, now, false)
 			text := dashboardText(screen)
-			for _, want := range []string{"Site stages · 6/11 checked", "Install Cluster API", "Check Cluster API", "Readiness", "Deliver images", "Install NVKE controller", "1m15s", "Secure and register", "Tenant stages · 0/4 checked", "Tenant kubeconfig", "Tenant API query", "Both nodes Ready", "Workload and DNS", "pending", "observed", "ETA unknown", "Activity"} {
+			for _, want := range []string{"Site stages · 6/11 checked", "Install Cluster API", "Check Cluster API", "Readiness", "Configure cluster identity", "Install NVKE stack", "1m15s", "Secure and register", "Tenant stages · 0/4 checked", "Tenant kubeconfig", "Tenant API query", "Both nodes Ready", "Workload and DNS", "pending", "observed", "ETA unknown", "Activity"} {
 				if !strings.Contains(text, want) {
 					t.Fatalf("missing %q in %d-column checklist:\n%s", want, width, text)
 				}
@@ -410,7 +410,7 @@ func TestDashboardObservationBoundaries(t *testing.T) {
 		{"OVS readiness is not whole site completion", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "site-ovs-ready"}, 2, "observed"},
 		{"OVN install is not whole site completion", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "site-ovn-install"}, 2, "observed"},
 		{"OVN readiness failure stays visible", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFailed, Name: "site-ovn-node-ready"}, 2, "failed"},
-		{"CAPI waits for site networking", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: "install-capi"}, 2, "running"},
+		{"CAPI waits for site networking", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: "site-cluster-api"}, 2, "running"},
 		{"wrong event family", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "artifacts"}, 1, "pending"},
 		{"unknown event", nvkedemo.ProgressEvent{Kind: "caller-success", Name: "artifacts"}, 1, "pending"},
 		{"private name", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFailed, Name: "private-node-name"}, 3, "pending"},

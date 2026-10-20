@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog-overlay/v3
 kind: CatalogOverlay
 name: nvke-os-arm64-native-kvm
-requiresCatalogDigest: sha256:9a64d19e23c0fb9f8157e16fd57bb713853ab8e93492352c9c941afe300f2865
+requiresCatalogDigest: sha256:175916a574b086a1f2c4bf496746c7553f39424c5febaff2c5628256b3e5ebb3
 components:
   nvke-node-image:
     component:
@@ -13,9 +13,9 @@ components:
       builderType: vm-image
       buildNetwork: default
       repo: https://github.com/dsx-ai-factory/nvke.git
-      tag: os-image/v0.1.0-rc.4-51-g726f7694
-      commit: 726f76944404e1106626b8333d3576bdf67b575b
-      treeHash: 3d6ea77f85d5da2648038425f805a598e23464ba
+      tag: v0.22.0-beta.6
+      commit: 8db5721ae3031bdcd945e559153a740d46ea209e
+      treeHash: e928ae13298118b61581d9a406ba4a02f872e959
       toolchainImages:
         arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
       vendorCommand:
@@ -46,7 +46,7 @@ components:
           printf '%s\n' "$pins" | sha256sum --quiet -c - || {
             echo 'agent module pins changed during vendoring' >&2; exit 1;
           }
-      sourceDateEpoch: 1790192178
+      sourceDateEpoch: 1792450875
       outputType: disk-image
       disk:
         format: qcow2
@@ -64,12 +64,12 @@ components:
       packer:
         projectPath: os-image/packer
         packerVersion: 1.15.4
-        buildName: nke-node-non-fde.qemu.nke-non-fde
+        buildName: nvke-node-non-fde.qemu.nvke-non-fde
         architectureVariable: architecture
         acceleratorVariable: accelerator
         materialManifestVariable: material_manifest
         materialManifest:
-          schemaVersion: nke.dev/os-image-materials/v1
+          schemaVersion: nvke.nvidia.com/os-image-materials/v1
           kinds:
             image-inputs: archive
             installer-iso: disk-image
@@ -78,10 +78,11 @@ components:
         sshPublicKeyVariable: ssh_public_key_file
         buildLogDirectoryVariable: build_log_directory
         variables:
+          ubuntu_series: "26.04"
           efi_firmware_code: /usr/share/AAVMF/AAVMF_CODE.no-secboot.fd
           efi_firmware_vars: /usr/share/AAVMF/AAVMF_VARS.fd
           ssh_timeout: 180m
       materials:
         image-inputs: nvke-image-inputs
         installer-iso: nvke-patched-installer-iso
-      artifactPath: non-fde/nke-node.qcow2
+      artifactPath: non-fde/nvke-node.qcow2

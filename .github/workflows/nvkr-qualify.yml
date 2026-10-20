@@ -29,7 +29,7 @@ jobs:
     needs: [native-smoke]
     if: ${{ !cancelled() && (needs.native-smoke.result == 'success' || needs.native-smoke.result == 'failure') && github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.repository == 'dsx-ai-factory/nvkr' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.repository.full_name == github.repository && github.event.workflow_run.head_repository.full_name == github.repository }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 90
     permissions:
       contents: read
       actions: read
@@ -73,7 +73,7 @@ jobs:
           chmod 0500 "$tools/cosign"
           printf '%s\n' "$tools" >> "$GITHUB_PATH"
       - name: Authenticate qualification and issue the release manifest
-        timeout-minutes: 20
+        timeout-minutes: 60
         env:
           NVKR_GITHUB_TOKEN: ${{ github.token }}
           NVKR_REGISTRY: ghcr.io

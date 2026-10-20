@@ -4,8 +4,11 @@ Catalog maintenance combines existing atomic pin updates with matching generated
 choose a new release policy: each selected independent source still uses the exact constraint in its
 registry. The maintained policy,
 [`inputs/policies/nvke-catalog-maintenance.yaml`](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/nvke-catalog-maintenance.yaml),
-selects `nvke` and `nvke-helm`, whose constraints remain `v0.21.0`. A normal upstream check therefore preserves
-the current pins. Broader constraints or a different exact release require an authored, reviewed registry change.
+selects `nvke` and `nvke-helm`, whose constraints select `v0.22.0-beta.6`. This prerelease requires explicit
+`catalog pin --tag` selection; the stable-only maintenance resolver does not choose prereleases. The daily schedule is suspended while this prerelease is selected; manual refresh also returns
+`NVKR-E-NO-MATCH` for these constraints. Use explicit pinning and regenerate the maintained bundles.
+Restore the default schedule in both Make targets when reviewed stable constraints are adopted.
+Broader constraints or a different exact release require an authored, reviewed registry change.
 The explicit controller chart package/app-version remains an authored producer input; maintenance does
 not infer or rewrite it.
 
@@ -251,9 +254,10 @@ claims remain with the production Run and consumer policy. Even a green candidat
 ## Scheduled catalog refresh
 
 `.github/workflows/catalog-refresh.yaml` is installed in this repository. It is the output of `catalog update-ci
---source-checkout dsx-ai-factory/nvke:NKE_SOURCE_TOKEN`, and it is regenerated rather than edited. It runs
-nightly at 02:00 UTC and on manual dispatch from the default branch. The nightly default keeps the pins
-current without an operator remembering to run the command; an empty `--schedule` restores manual dispatch only.
+--schedule "" --source-checkout dsx-ai-factory/nvke:NKE_SOURCE_TOKEN`, and it is regenerated rather than edited.
+It currently permits manual dispatch only from the default branch. The daily schedule is suspended for
+the exact beta constraints; manual dispatch does not bypass the stable-only resolver. The renderer's
+default schedule is 02:00 UTC when stable maintenance is restored.
 A newer run for the same ref cancels one still in progress. The next run moves the review branch to the current
 candidate (leaving it alone when it already holds that candidate) and opens or edits the pull request, so an
 interruption between the two converges on the next run. The one file matching
@@ -383,8 +387,9 @@ The maintained Definition's deployment images are selected outside the maintenan
 catalog pins, declares each image reference, and locks each image's native digests; the Definition lists one OCI
 output per image and platform, and the qualification policy names those outputs as deployment images. A refresh
 moves only the `nvke` and `nvke-helm` pins and regenerates the bundles, so it changes none of these inputs.
-Today the exact `v0.21.0` constraints keep refreshes a no-op. Before a constraint allows the NVKE release to
-move, review and update together, in one authored change: the selection source pin, the image references and
+The enrolled constraints now select `v0.22.0-beta.6`; stable-only refresh returns `NVKR-E-NO-MATCH`,
+and the daily schedule is suspended. Before changing the NVKE release selection or restoring scheduled
+refresh, review and update together, in one authored change: the selection source pin, the image references and
 their native digest locks, the Definition's image outputs, the qualification policy's `nonToolOutputs`, and the
 expected images in `pkg/nvkr/buildgraph/nvke_m2_images_test.go`. That test fails, naming this section, when the
 selection commit and the controller's NVKE commit diverge. Maintenance does not perform or check this

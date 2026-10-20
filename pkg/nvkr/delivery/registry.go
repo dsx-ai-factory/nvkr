@@ -421,8 +421,8 @@ func (options RegistryOptions) Validate() error {
 
 func validateRegistryOptions(options RegistryOptions) error { return options.Validate() }
 
-// Only sibling repositories in the caller-selected namespace are admitted.
-// Metadata cannot redirect registry credentials to another host or namespace.
+// Only sibling repositories in the caller-selected namespace, or retained
+// earlier attempts of that same development run, are admitted.
 func outputReferences(root name.Reference, publication PublicationRoot, insecure bool) (map[string]name.Digest, error) {
 	result := map[string]name.Digest{}
 	repository := root.Context().Name()
@@ -438,7 +438,11 @@ func outputReferences(root name.Reference, publication PublicationRoot, insecure
 		if !siblingRepositoryPattern.MatchString(object.Output.Repository) {
 			return nil, e.New(e.CodeVerifyFailed, "invalid output repository")
 		}
-		target := parent + object.Output.Repository
+		outputParent, err := publicationOutputParent(root, object.Output.Publication, parent)
+		if err != nil {
+			return nil, err
+		}
+		target := outputParent + object.Output.Repository
 		if target == repository {
 			return nil, e.New(e.CodeVerifyFailed, "deliverable repository overlaps release repository")
 		}

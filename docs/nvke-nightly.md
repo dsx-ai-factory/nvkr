@@ -57,21 +57,30 @@ profile, exact suite revision, native runtime target and network. There is no
 self-declared security approval field. Artifact authentication, source matching,
 native-host preflight and owned-resource cleanup remain required.
 
-Both Definitions select the profile-owned site catalog at exact NVKE candidate commit
-`a8391755d12d99f859783c6cf390338debd1e085` for the CLI, controller image,
-controller chart and NVKE telemetry pipelines chart. The baseline suite selection uses that same revision,
-including the runtime `^TestE2E$` selection and candidate-input fixes. Relative to
-the previous product source, only eight adapter, test and documentation files
-changed; CLI, controller and chart producer code is unchanged. The source and
-suite selections now share one exact commit, consistent with ADR-23's proposed
-matching-revision rule. This alignment does not establish overall interface adoption
-or broader acceptance; ADR-23 remains proposed and excludes CI trigger, runner
-and credential policy. At runtime the suite checkout follows the single exact NVKE revision shared by
-the frozen Plan's CLI, controller and two chart producers. Ambiguous or mixed source revisions fail.
-The Go consumer independently checks this join before executing the suite.
-This is a candidate revision from open NVKE PR #1580, not a claim of merged-main
-membership or human approval. Its exact source bytes remain required; a pin
-does not guarantee future provider reachability or authorize the privileged suite.
+Both Definitions select the profile-owned site catalog at NVKE `v0.22.0-beta.6`,
+commit `8db5721ae3031bdcd945e559153a740d46ea209e`, for the CLI, controller image,
+controller chart and NKTP chart. The test-only suite checkout selects
+`a32067108ab89d1e2b2b6720766ffe97270a166a`.
+The OS closure retains SPIRE at the explicit pre-DSX exception commit
+`726f76944404e1106626b8333d3576bdf67b575b`. Clusterctl selects 1.13.6 to match the
+selected installer. The separate test pin is a user-approved exception to ADR-23's proposed
+matching-revision rule; it establishes no runtime compatibility or broader acceptance.
+ADR-23 remains proposed and excludes CI trigger, runner and credential policy.
+
+The adapter validates authenticated profile bytes and the exact selected disk through the
+same profile projection as the local tenant flow, then emits `MachineImage`, `ClusterRelease`
+and `NodePoolRelease` resources under `internal.nvke.nvidia.com/v1`. It preserves the full
+disk digest, boot script and user-data template, retaining the candidate suite's fixed profile
+name in its fresh management cluster. No source profile-converter executable is required.
+The site specification uses the current `cluster` and `controllerStack` shape with private
+credentials. These adapter paths have contract tests; they have no recorded runtime cycle.
+
+The selected test source retains `controller/hack/ci/nico-vms-candidate.sh`, which the selected product source
+omits. This entrypoint accepts the authenticated candidate artifacts and reports cleanup.
+The generic suite's product rebuild and OS-tag download remain forbidden fallbacks.
+The beta CLI validates and renders the selected test source's deployment templates in a
+local contract check; a combined runtime cycle remains unverified.
+
 The chart producers use the existing registry-addressable Go image and acquire
 Helm 4.1.4 by its existing operator-catalog archive and executable digests.
 Vendoring captures that executable and the pinned chart dependencies in the
@@ -144,6 +153,10 @@ establish a completed hosted producer or E2E cycle.
 
 ## One cycle
 
+The following is the required candidate cycle. The separately pinned test harness supplies
+the candidate hook. A successful combined producer and runtime cycle remains unverified;
+the earlier producer failures and reported runner repair above do not establish that result.
+
 1. Select a maintained profile on the default branch.
 2. Dispatch its maintained generated producer once. Retain the exact run ID
    returned by dispatch; never use a latest-run search or retry an ambiguous
@@ -155,12 +168,12 @@ establish a completed hosted producer or E2E cycle.
    provenance, outputs and exact Definition, Environment and Plan. Export held
    bytes only for the originating invocation. Extract native tools, images,
    charts and disk through existing lifecycle and delivery owners.
-5. Use a private checkout at the frozen Plan's shared NVKE producer commit, or
-   the profile's pinned suite revision when runtime Plans are not selected.
-   Generate profile resources through NVKE's existing Go owner. Produce the suite's
+5. Use a private checkout at the exact pinned NVKE suite revision. Require its candidate
+   adapter before executing runtime work. Project authenticated profiles into current release
+   resources bound to the selected disk. Produce the suite's
    `release-description/v1` input through NVKR's existing export renderer over
    the held publication; the description adds no verification authority.
-   Execute its existing
+   Execute the source-owned
    `nico-vms-e2e.sh` candidate path, without rebuilding product components or
    selecting newer tags. Initial coverage is `(nico-vms && ovn) || health`:
    controller health/readiness/version and two-node OVN tenant tests. This does

@@ -67,7 +67,7 @@ func TestLaptopInstallerToolsContract(t *testing.T) {
 				len(plan.LifecycleOutputs) != 1 || plan.LifecycleOutputs[0].Name != "installer-tools-arm64" {
 				t.Fatal("tools must be one complete five-component executable bundle")
 			}
-			versions := map[string]string{"clusterctl": "v1.12.3", "helm": "v4.2.4", "kind": "v0.32.0", "kubectl": "v1.36.0", "oras": "v1.3.3"}
+			versions := map[string]string{"clusterctl": "v1.13.6", "helm": "v4.2.4", "kind": "v0.32.0", "kubectl": "v1.36.0", "oras": "v1.3.3"}
 			for _, component := range plan.Builds[0].ResolvedComponents {
 				if component.Tag != versions[component.Name] || !component.FromSource || component.Prebuilt != nil ||
 					component.OutputType != "raw" || component.ArtifactPath != "nvkr-output/"+component.Name {

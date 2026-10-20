@@ -208,12 +208,24 @@ func expectedSmokeVersion(node ir.Node, profile string) (string, string, error) 
 			return version, node.SourceCommit, nil
 		}
 	}
-	commit := stamps["NKECTL_COMMIT"]
+	prefix := "NKECTL_"
+	_, currentVersion := stamps["NVKECTL_VERSION"]
+	_, currentCommit := stamps["NVKECTL_COMMIT"]
+	if currentVersion || currentCommit {
+		if _, legacy := stamps["NKECTL_VERSION"]; legacy {
+			return "", "", e.New(e.CodeVerifyFailed, "ambiguous nvkectl version stamp family")
+		}
+		if _, legacy := stamps["NKECTL_COMMIT"]; legacy {
+			return "", "", e.New(e.CodeVerifyFailed, "ambiguous nvkectl commit stamp family")
+		}
+		prefix = "NVKECTL_"
+	}
+	commit := stamps[prefix+"COMMIT"]
 	if len(node.Version) == 40 && node.Version == node.SourceCommit && smokeHexCommit(node.Version) {
 		// Commit-selected CLI producers stamp the exact commit without a v prefix.
 		version = node.Version
 	}
-	if node.Kind != ir.KindBuild || stamps["NKECTL_VERSION"] != version || len(node.SourceCommit) != 40 || !smokeHexCommit(node.SourceCommit) || !smokeHexCommit(commit) || !strings.HasPrefix(node.SourceCommit, commit) {
+	if node.Kind != ir.KindBuild || stamps[prefix+"VERSION"] != version || len(node.SourceCommit) != 40 || !smokeHexCommit(node.SourceCommit) || !smokeHexCommit(commit) || !strings.HasPrefix(node.SourceCommit, commit) {
 		return "", "", e.New(e.CodeVerifyFailed, "nvkectl stamps differ from frozen producer version or commit")
 	}
 	return version, commit, nil

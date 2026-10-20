@@ -205,5 +205,9 @@ func configurationError(ctx context.Context, err error, message string) error {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return e.Wrap(e.CodeTimeout, err, "%s", message)
 	}
+	var coded *e.Error
+	if errors.As(err, &coded) {
+		return err
+	}
 	return e.Wrap(e.CodeUsage, err, "%s", message)
 }

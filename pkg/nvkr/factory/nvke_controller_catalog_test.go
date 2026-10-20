@@ -51,7 +51,7 @@ func controllerCatalogFixture(t *testing.T, directory string) (*catalog.Catalog,
 		t.Fatal("locate controller pin-set fixture")
 	}
 	repo := t.TempDir()
-	if err := os.CopyFS(repo, os.DirFS(filepath.Join(filepath.Dir(filename), "../catalog/testdata/nvke-pin-set"))); err != nil {
+	if err := os.CopyFS(repo, os.DirFS(filepath.Join(filepath.Dir(filename), "../catalog/testdata/nvke-beta-pin-set"))); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)

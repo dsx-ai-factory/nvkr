@@ -565,8 +565,15 @@ func TestNightlySuiteUsesAdmittedInterpreterAndActualEntrypoint(t *testing.T) {
 }
 
 func TestNightlySourceAdmitsBothReviewedEntrypoints(t *testing.T) {
-	for _, present := range []bool{false, true} {
-		t.Run(fmt.Sprint(present), func(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		candidate, e2e bool
+	}{
+		{"both reviewed entrypoints", true, true},
+		{"missing suite", true, false},
+		{"generic suite without candidate adapter", false, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
 			source, work := privateTestDir(t), privateTestDir(t)
 			git := func(args ...string) string {
 				t.Helper()
@@ -585,10 +592,12 @@ func TestNightlySourceAdmitsBothReviewedEntrypoints(t *testing.T) {
 			if err := os.MkdirAll(directory, 0700); err != nil {
 				t.Fatal(err)
 			}
-			if err := os.WriteFile(filepath.Join(directory, "nico-vms-candidate.sh"), []byte("candidate"), 0600); err != nil {
-				t.Fatal(err)
+			if test.candidate {
+				if err := os.WriteFile(filepath.Join(directory, "nico-vms-candidate.sh"), []byte("candidate"), 0600); err != nil {
+					t.Fatal(err)
+				}
 			}
-			if present {
+			if test.e2e {
 				if err := os.WriteFile(filepath.Join(directory, "nico-vms-e2e.sh"), []byte("e2e"), 0600); err != nil {
 					t.Fatal(err)
 				}
@@ -596,7 +605,7 @@ func TestNightlySourceAdmitsBothReviewedEntrypoints(t *testing.T) {
 			git("add", ".")
 			git("-c", "commit.gpgsign=false", "commit", "-qm", "fixture")
 			err := nightlySource(t.Context(), Runner{Work: work, Env: NativeEnvironment()}, source, git("rev-parse", "HEAD"))
-			if present {
+			if test.candidate && test.e2e {
 				if err != nil {
 					t.Fatal(err)
 				}

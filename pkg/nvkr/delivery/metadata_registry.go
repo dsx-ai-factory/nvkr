@@ -44,7 +44,13 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 		return Inspection{}, e.Wrap(e.CodeUnpinnedSource, err, "parse metadata reference")
 	}
 	remoteOptions := registryOptions(ctx, options)
-	fetched, err := remote.Get(ref, remoteOptions...)
+	// Reuse repository authentication only within this complete metadata pull.
+	// Independent calls retain independent credentials, contexts and admission.
+	puller, err := remote.NewPuller(remoteOptions...)
+	if err != nil {
+		return Inspection{}, metadataFetchError(ctx, err, "create metadata puller")
+	}
+	fetched, err := puller.Get(ctx, ref)
 	if err != nil {
 		return Inspection{}, metadataFetchError(ctx, err, "fetch metadata index")
 	}
@@ -71,7 +77,7 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 		return err
 	}
 	manifest := func(repo name.Repository, d Descriptor) (ociManifest, error) {
-		got, err := remote.Get(repo.Digest(d.Digest), remoteOptions...)
+		got, err := puller.Get(ctx, repo.Digest(d.Digest))
 		if err != nil {
 			return ociManifest{}, metadataFetchError(ctx, err, "fetch metadata manifest")
 		}
@@ -88,7 +94,7 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 		if d.Size < 0 || d.Size > max {
 			return e.New(e.CodeVerifyFailed, "oversized metadata blob")
 		}
-		layer, err := remote.Layer(repo.Digest(d.Digest), remoteOptions...)
+		layer, err := puller.Layer(ctx, repo.Digest(d.Digest))
 		if err != nil {
 			return metadataFetchError(ctx, err, "fetch metadata blob")
 		}

@@ -15,8 +15,8 @@ import (
 )
 
 func TestNativeCAPIAdmitsOnlyReviewedSourcePolicy(t *testing.T) {
-	const source = "69ef9924c4bf0487beba8c3613ae6e0a0260d8f3\n"
-	const digest = "ae8980d7b31d9f2f9c355dd7d873854eaba8cfe94f5075ec61dfa9bdbdb5a0f9"
+	const source = "8db5721ae3031bdcd945e559153a740d46ea209e\n"
+	const digest = "a47d8c38e6812bc3da6f8cf45953c25b365e5b2712669678b53c46798f441420"
 	for _, tc := range []struct {
 		name, commit, digest string
 		accepted             bool
@@ -49,7 +49,7 @@ func TestNativeCAPISourceFailurePrecedesCommandsAndOutput(t *testing.T) {
 	for _, name := range []string{"missing commit", "oversize commit", "missing versions", "changed versions", "oversize versions", "symlink versions", "directory versions", "canceled"} {
 		t.Run(name, func(t *testing.T) {
 			installer, out := t.TempDir(), t.TempDir()
-			commit := []byte("69ef9924c4bf0487beba8c3613ae6e0a0260d8f3\n")
+			commit := []byte("8db5721ae3031bdcd945e559153a740d46ea209e\n")
 			if name == "oversize commit" {
 				commit = append(commit, '\n')
 			}
@@ -100,7 +100,7 @@ func TestNativeCAPISourceFailurePrecedesCommandsAndOutput(t *testing.T) {
 }
 
 func TestNativeCAPIInitSelectsAllThreeProvidersAndWaits(t *testing.T) {
-	version, err := reviewedNativeCAPIProvider("69ef9924c4bf0487beba8c3613ae6e0a0260d8f3\n", "ae8980d7b31d9f2f9c355dd7d873854eaba8cfe94f5075ec61dfa9bdbdb5a0f9")
+	version, err := reviewedNativeCAPIProvider("8db5721ae3031bdcd945e559153a740d46ea209e\n", "a47d8c38e6812bc3da6f8cf45953c25b365e5b2712669678b53c46798f441420")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,11 +113,11 @@ func TestNativeCAPIInitSelectsAllThreeProvidersAndWaits(t *testing.T) {
 }
 
 func TestNativeHostClusterctlMatchesAuthenticatedCAPIRelease(t *testing.T) {
-	versions, err := os.ReadFile("testdata/native-b615-tool-versions.mk")
+	versions, err := os.ReadFile("testdata/native-main-tool-versions.mk")
 	if err != nil {
 		t.Fatal(err)
 	}
-	version, err := reviewedNativeCAPIProvider("69ef9924c4bf0487beba8c3613ae6e0a0260d8f3\n", plainSHA(versions))
+	version, err := reviewedNativeCAPIProvider("8db5721ae3031bdcd945e559153a740d46ea209e\n", plainSHA(versions))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -42,7 +42,10 @@ func authenticateReferenceMetadata(ctx context.Context, plan *Plan, route Route,
 	if err != nil {
 		return fail(err)
 	}
-	if subject.Ref != target.Ref+"@"+subject.Digest {
+	if err := admitDevelopmentSubject(plan, route.Target, subject); err != nil {
+		return fail(err)
+	}
+	if !plan.Environment.GitHubDevelopment && subject.Ref != target.Ref+"@"+subject.Digest {
 		return fail(e.New(e.CodeVerifyFailed, "publication differs from planned repository"))
 	}
 	signed, err := readSigningRecord(ctx, artifacts["signature/"+route.Name].Path)
@@ -81,7 +84,7 @@ func authenticateReferenceMetadata(ctx context.Context, plan *Plan, route Route,
 		return fail(e.New(e.CodeVerifyFailed, "production predicate belongs to another workflow Run"))
 	}
 	invocation := claimed.RunDetails.Metadata["invocationId"]
-	if err := admitPlanReferenceInvocation(plan, invocation, run.InvocationID()); err != nil {
+	if err := admitReferenceInvocation(invocation, run.InvocationID()); err != nil {
 		return fail(err)
 	}
 	metadata := inspection.Root.Release
@@ -89,7 +92,7 @@ func authenticateReferenceMetadata(ctx context.Context, plan *Plan, route Route,
 		metadata.DefinitionDigest != plan.DefinitionDigest || metadata.EnvironmentDigest != plan.EnvironmentDigest {
 		return fail(e.New(e.CodeVerifyFailed, "publication metadata belongs to another Plan or Run"))
 	}
-	if err := admitPlanReferenceInvocation(plan, metadata.InvocationID, invocation); err != nil {
+	if err := admitReferenceInvocation(metadata.InvocationID, invocation); err != nil {
 		return fail(err)
 	}
 	for _, object := range inspection.Root.Objects {
@@ -97,14 +100,18 @@ func authenticateReferenceMetadata(ctx context.Context, plan *Plan, route Route,
 			continue
 		}
 		origin := object.Output.Publication
-		target, err := runtimeTarget(plan, outputPublicationRoute(object.Name))
-		if err != nil || !strings.HasPrefix(origin.Ref, target.Ref+"@") {
+		target, found := plan.Targets[outputPublicationRoute(object.Name)]
+		repository, _, pinned := strings.Cut(origin.Ref, "@")
+		if !found || !pinned || delivery.ValidatePublicationReference(origin.Ref) != nil {
 			return fail(e.New(e.CodeVerifyFailed, "output origin differs from planned publication repository"))
 		}
-		if err := admitPlanReferenceInvocation(plan, origin.PreparedInvocationID, origin.SignedInvocationID); err != nil {
+		if err := validateQualificationOutputRepository(plan, target, repository, metadata.InvocationID); err != nil {
 			return fail(err)
 		}
-		if err := admitPlanReferenceInvocation(plan, origin.SignedInvocationID, metadata.InvocationID); err != nil {
+		if err := admitReferenceInvocation(origin.PreparedInvocationID, origin.SignedInvocationID); err != nil {
+			return fail(err)
+		}
+		if err := admitReferenceInvocation(origin.SignedInvocationID, metadata.InvocationID); err != nil {
 			return fail(err)
 		}
 	}
@@ -195,7 +202,7 @@ func assembleReferenceRelease(ctx context.Context, plan *Plan, out string, recei
 			root.Release.DefinitionDigest != receipt.inspection.Root.Release.DefinitionDigest || root.Release.EnvironmentDigest != receipt.inspection.Root.Release.EnvironmentDigest {
 			return e.New(e.CodeVerifyFailed, "output metadata belongs to different release plans")
 		}
-		if err := admitPlanReferenceInvocation(plan, receipt.origin.SignedInvocationID, run.InvocationID()); err != nil {
+		if err := admitReferenceInvocation(receipt.origin.SignedInvocationID, run.InvocationID()); err != nil {
 			return err
 		}
 		for _, object := range receipt.inspection.Root.Objects {

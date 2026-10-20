@@ -7,6 +7,7 @@
 | [GitHub Issues](https://github.com/dsx-ai-factory/nvkr/issues) | Reproducible bugs, concrete feature requests, and documentation gaps |
 | [GitHub Discussions Q&A](https://github.com/dsx-ai-factory/nvkr/discussions/categories/q-a) | Usage questions and answers |
 | [GitHub Discussions Ideas](https://github.com/dsx-ai-factory/nvkr/discussions/categories/ideas) | Open-ended design proposals and feature ideas needing discussion before an issue |
+| [`#nvke` on the DSX AI Factory Slack](https://inviter.co/dsx-ai-factory) | Chat and quick questions; the link is an invite |
 
 NVKR is a pre-1.0 proof of concept. Community support is best effort, and fixes target `main`.
 See [SECURITY.md](SECURITY.md) for the security-supported version scope.

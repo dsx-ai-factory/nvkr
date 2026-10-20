@@ -21,7 +21,6 @@ PIPELINE_DEV_REPO ?=
 export PIPELINE_DEV_REPO
 # Module source dirs only (never the vendored trees checked out under .nvkr/).
 GOSRC       := client cmd internal pkg
-GOFILES     := $(shell find $(GOSRC) -type f -name '*.go' -print)
 GO_VERSION  := $(shell cat .go-version 2>/dev/null)
 VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT      := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -79,11 +78,12 @@ go-version-check: ## Require the exact Go patch pinned in .go-version.
 
 .PHONY: fmt
 fmt: ## Format code (gofmt -s -w).
-	gofmt -s -w $(GOFILES)
+	find $(GOSRC) -type f -name '*.go' -exec gofmt -s -w {} +
 
 .PHONY: fmt-check
 fmt-check: ## Check formatting (CI-friendly, no writes).
-	@test -z "$$(gofmt -l $(GOFILES))" || { echo "unformatted files — run 'make fmt':"; gofmt -l $(GOFILES); exit 1; }
+	@unformatted="$$(find $(GOSRC) -type f -name '*.go' -exec gofmt -l {} +)" || exit $$?; \
+	 test -z "$$unformatted" || { echo "unformatted files — run 'make fmt':"; printf '%s\n' "$$unformatted"; exit 1; }
 	@echo "formatting ok"
 
 .PHONY: vet
@@ -133,7 +133,7 @@ cover: test-race ## Open the HTML coverage report in a browser.
 
 .PHONY: tidy
 tidy: ## Format + go mod tidy.
-	gofmt -s -w $(GOFILES)
+	find $(GOSRC) -type f -name '*.go' -exec gofmt -s -w {} +
 	go mod tidy
 
 .PHONY: notices
@@ -243,13 +243,15 @@ workflows-check: workflow-generator pipeline-dev-check nvke-split-check catalog-
 # The private NVKE source the installed catalog refresh workflow was rendered with.
 CATALOG_REFRESH_SOURCE ?= dsx-ai-factory/nvke:NKE_SOURCE_TOKEN
 
+# Daily refresh is suspended while maintained roots require an explicit prerelease.
+# Restore the default schedule in both targets when stable constraints are adopted.
 .PHONY: catalog-refresh-check
 catalog-refresh-check: workflow-generator ## Check the installed catalog refresh workflow against `catalog update-ci`.
 	@# The installed file is generated, so it must equal the renderer's output for the
 	@# same source option and the canonical generator stamp. Regenerate it with
 	@# `make catalog-refresh-generate`; never edit the file by hand.
 	@rendered="$$(mktemp)" && trap 'rm -f "$$rendered"' EXIT && \
-	 bin/nvkr-exec catalog update-ci --source-checkout "$(CATALOG_REFRESH_SOURCE)" > "$$rendered" && \
+	 bin/nvkr-exec catalog update-ci --schedule "" --source-checkout "$(CATALOG_REFRESH_SOURCE)" > "$$rendered" && \
 	 { diff -u .github/workflows/catalog-refresh.yaml "$$rendered" || { \
 	   echo "catalog-refresh.yaml differs from catalog update-ci output; regenerate it from the generator" >&2; exit 1; }; }
 
@@ -258,7 +260,7 @@ catalog-refresh-generate: workflow-generator ## Regenerate the installed catalog
 	@# Render to a temporary file and replace the installed workflow only after the renderer
 	@# succeeds: a refused render (source, stamp or closure admission) leaves it untouched.
 	@rendered="$$(mktemp .github/workflows/.catalog-refresh.XXXXXX)" && trap 'rm -f "$$rendered"' EXIT && \
-	 bin/nvkr-exec catalog update-ci --source-checkout "$(CATALOG_REFRESH_SOURCE)" > "$$rendered" && \
+	 bin/nvkr-exec catalog update-ci --schedule "" --source-checkout "$(CATALOG_REFRESH_SOURCE)" > "$$rendered" && \
 	 chmod 0644 "$$rendered" && mv "$$rendered" .github/workflows/catalog-refresh.yaml
 
 .PHONY: workflows-generate

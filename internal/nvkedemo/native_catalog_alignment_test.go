@@ -6,6 +6,7 @@ package nvkedemo
 import (
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/internal/testutil"
@@ -23,7 +24,7 @@ func TestNativeNVIDIADefinitionsAlignRenamedSourceContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const nvke = "69ef9924c4bf0487beba8c3613ae6e0a0260d8f3"
+	const nvke = "8db5721ae3031bdcd945e559153a740d46ea209e"
 	const ovn = "8af51273d52dfa07454435d18d37230e582d797a"
 	for _, conformance := range []bool{false, true} {
 		name := "demo"
@@ -99,7 +100,7 @@ func TestNativeNVIDIADefinitionsAlignRenamedSourceContracts(t *testing.T) {
 // Read only authored selections and lock records. Full compilation also
 // authenticates private derived-chart pins and belongs to the extended suite.
 func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
-	const nvke = "69ef9924c4bf0487beba8c3613ae6e0a0260d8f3"
+	const nvke = "8db5721ae3031bdcd945e559153a740d46ea209e"
 	repo, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
@@ -183,6 +184,9 @@ func TestNativeNVIDIAProducerRequirementsOffline(t *testing.T) {
 	stack, err := catalog.ApplyStack(base, overlay)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if strings.Contains(strings.Join(stack.Catalog.Components["ovn-kube-ubuntu"].BuildCommand, "\n"), "build-arg:BUILDER_IMAGE=") {
+		t.Fatal("native fork compiler must not carry an unused builder override")
 	}
 	disk := stack.Catalog.Components["nvke-node-image"]
 	if disk.BuilderType != catalog.BuilderVMImage || disk.Packer == nil || disk.BuildRequirements == nil {

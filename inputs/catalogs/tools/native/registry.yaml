@@ -424,7 +424,7 @@ sources:
               GOPROXY=off timeout --kill-after=10s 180s go mod vendor
               printf '%s\n' "$pins" | sha256sum --quiet -c -
     nvke-cli:
-        constraint: 0.21.x
+        constraint: v0.22.0-beta.6
         repo: https://github.com/dsx-ai-factory/nvke.git
         toolchainImagesByArch:
             arm64: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
@@ -441,12 +441,12 @@ sources:
               GOPROXY=off timeout --kill-after=10s 180s go mod vendor
               printf '%s\n' "$pins" | sha256sum --quiet -c -
     nvke-deploy:
-        constraint: 0.21.x
+        constraint: v0.22.0-beta.6
         repo: https://github.com/dsx-ai-factory/nvke.git
         toolchainImagesByArch:
             arm64: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
     nvke-nicosim:
-        constraint: 0.21.x
+        constraint: v0.22.0-beta.6
         repo: https://github.com/dsx-ai-factory/nvke.git
         toolchainImagesByArch:
             arm64: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c

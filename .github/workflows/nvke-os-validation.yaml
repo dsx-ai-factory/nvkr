@@ -59,6 +59,8 @@ jobs:
       mirror_pr: ${{ steps.select.outputs.mirror_pr }}
       nvke_commit: ${{ steps.source.outputs.commit }}
       nvke_tree: ${{ steps.source.outputs.tree }}
+      spire_commit: ${{ steps.source.outputs.spire_commit }}
+      spire_tree: ${{ steps.source.outputs.spire_tree }}
       retain_qcow2: ${{ steps.select.outputs.retain_qcow2 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -301,8 +303,15 @@ jobs:
             exit 1
           }
           pin="$(bin/nvkr catalog source-pin \
-            --data .candidate-inputs/inputs/catalogs/node-images/diagnostic \
-            nvke-os)"
+            --data .candidate-inputs/inputs/catalogs/node-images/diagnostic nvke-os)"
+          spire_pin="$(bin/nvkr catalog source-pin \
+            --data .candidate-inputs/inputs/catalogs/node-images/diagnostic nvke-spire-agent-source)"
+          jq -L scripts -n -e --argjson pin "${spire_pin}" \
+            'include "nvke-os-plan"; nvke_spire_source_exception == ($pin | {commit, treeHash})' \
+            </dev/null >/dev/null || {
+              echo "SPIRE source differs from the exact retained pre-DSX exception" >&2
+              exit 1
+            }
           # One lock entry cannot establish the full component/overlay closure.
           # New input schemas must land in main before this trusted reader.
           for target_arch in "${required_arches[@]}"; do
@@ -319,6 +328,8 @@ jobs:
           {
             echo "commit=$(jq -er '.commit' <<<"${pin}")"
             echo "tree=$(jq -er '.treeHash' <<<"${pin}")"
+            echo "spire_commit=$(jq -er '.commit' <<<"${spire_pin}")"
+            echo "spire_tree=$(jq -er '.treeHash' <<<"${spire_pin}")"
           } >>"${GITHUB_OUTPUT}"
 
       # Main pushes use the pin from the merged catalog and validated Plans.
@@ -489,18 +500,38 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Check out the retained SPIRE packaging source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: dsx-ai-factory/nvke
+          ref: ${{ needs.select.outputs.spire_commit }}
+          token: ${{ secrets.NKE_SOURCE_TOKEN }}
+          path: .trusted/spire
+          fetch-depth: 1
+          persist-credentials: false
+
       - name: Authenticate and package credential-free source
         id: package
         env:
           NVKE_COMMIT: ${{ needs.select.outputs.nvke_commit }}
           NVKE_TREE: ${{ needs.select.outputs.nvke_tree }}
+          SPIRE_COMMIT: ${{ needs.select.outputs.spire_commit }}
+          SPIRE_TREE: ${{ needs.select.outputs.spire_tree }}
         run: |
           set -euo pipefail
           test "$(git -C .trusted/nvke rev-parse HEAD)" = "${NVKE_COMMIT}"
           test "$(git -C .trusted/nvke rev-parse 'HEAD^{tree}')" = "${NVKE_TREE}"
+          test "$(git -C .trusted/spire rev-parse HEAD)" = "${SPIRE_COMMIT}"
+          test "$(git -C .trusted/spire rev-parse 'HEAD^{tree}')" = "${SPIRE_TREE}"
           mkdir -p .handoff
           git clone --quiet --no-local --no-hardlinks .trusted/nvke .handoff/nvke
           git -C .handoff/nvke checkout --quiet --detach "${NVKE_COMMIT}"
+          # A second exact local source ref supports both selected commits
+          # through the same canonical-repository transport override.
+          git -C .handoff/nvke fetch --quiet --no-tags --update-shallow "${PWD}/.trusted/spire" \
+            "${SPIRE_COMMIT}:refs/nvkr/spire"
+          test "$(git -C .handoff/nvke rev-parse refs/nvkr/spire)" = "${SPIRE_COMMIT}"
+          test "$(git -C .handoff/nvke rev-parse 'refs/nvkr/spire^{tree}')" = "${SPIRE_TREE}"
           git -C .handoff/nvke remote remove origin
           test "$(git -C .handoff/nvke rev-parse HEAD)" = "${NVKE_COMMIT}"
           test "$(git -C .handoff/nvke rev-parse 'HEAD^{tree}')" = "${NVKE_TREE}"
@@ -571,6 +602,8 @@ jobs:
         env:
           NVKE_COMMIT: ${{ needs.select.outputs.nvke_commit }}
           NVKE_TREE: ${{ needs.select.outputs.nvke_tree }}
+          SPIRE_COMMIT: ${{ needs.select.outputs.spire_commit }}
+          SPIRE_TREE: ${{ needs.select.outputs.spire_tree }}
           SOURCE_ARCHIVE_DIGEST: ${{ needs.fetch-nvke-source.outputs.archive_digest }}
         run: |
           set -euo pipefail
@@ -581,6 +614,8 @@ jobs:
           tar -xf .trusted-transfer/nvke-source.tar -C .trusted
           test "$(git -C .trusted/nvke rev-parse HEAD)" = "${NVKE_COMMIT}"
           test "$(git -C .trusted/nvke rev-parse 'HEAD^{tree}')" = "${NVKE_TREE}"
+          test "$(git -C .trusted/nvke rev-parse refs/nvkr/spire)" = "${SPIRE_COMMIT}"
+          test "$(git -C .trusted/nvke rev-parse 'refs/nvkr/spire^{tree}')" = "${SPIRE_TREE}"
 
       - name: Check out the selected NVKR candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -597,6 +632,8 @@ jobs:
           MIRROR_PR: ${{ needs.select.outputs.mirror_pr }}
           NVKE_COMMIT: ${{ needs.select.outputs.nvke_commit }}
           NVKE_TREE: ${{ needs.select.outputs.nvke_tree }}
+          SPIRE_COMMIT: ${{ needs.select.outputs.spire_commit }}
+          SPIRE_TREE: ${{ needs.select.outputs.spire_tree }}
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
           WORKFLOW_SHA: ${{ github.sha }}
@@ -615,6 +652,8 @@ jobs:
             --arg mirrorPR "${MIRROR_PR}" \
             --arg nvkeCommit "${NVKE_COMMIT}" \
             --arg nvkeTree "${NVKE_TREE}" \
+            --arg spireCommit "${SPIRE_COMMIT}" \
+            --arg spireTree "${SPIRE_TREE}" \
             --arg runID "${RUN_ID}" \
             --arg runAttempt "${RUN_ATTEMPT}" \
             --arg workflowSHA "${WORKFLOW_SHA}" \
@@ -626,6 +665,7 @@ jobs:
               candidateCommit:$candidateCommit, candidateTree:$candidateTree,
               mirrorPR:$mirrorPR, workflowSHA:$workflowSHA,
               nvkeCommit:$nvkeCommit, nvkeTree:$nvkeTree,
+              spireSourceException:{commit:$spireCommit, tree:$spireTree},
               runID:$runID, runAttempt:$runAttempt, targetArch:$targetArch,
               runner:{name:$runnerName, os:$runnerOS, arch:$runnerArch}}' \
             >.nvkr/evidence/context.json
@@ -666,6 +706,8 @@ jobs:
           ARCH: ${{ matrix.arch }}
           NVKE_COMMIT: ${{ needs.select.outputs.nvke_commit }}
           NVKE_TREE: ${{ needs.select.outputs.nvke_tree }}
+          SPIRE_COMMIT: ${{ needs.select.outputs.spire_commit }}
+          SPIRE_TREE: ${{ needs.select.outputs.spire_tree }}
           RUNNER_ARCH: ${{ runner.arch }}
           RUNNER_NAME: ${{ runner.name }}
           RUNNER_OS: ${{ runner.os }}
@@ -689,6 +731,7 @@ jobs:
             echo "- Evidence scope: unqualified diagnostic"
             echo "- NVKE commit: \`${NVKE_COMMIT}\`"
             echo "- NVKE tree: \`${NVKE_TREE}\`"
+            echo "- SPIRE source exception: \`${SPIRE_COMMIT}\` (tree \`${SPIRE_TREE}\`)"
             echo "- Runner: \`${RUNNER_NAME}\` (\`${RUNNER_OS}/${RUNNER_ARCH}\`)"
             echo "- QCOW2 digest: \`sha256:${digest}\`"
             echo "- QCOW2 size: \`${size}\` bytes"

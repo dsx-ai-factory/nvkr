@@ -9,8 +9,7 @@ metadata:
 sources:
   nvke-os:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0-beta.6
     toolchainImagesByArch:
       # AMD64 is a substitution-only local baseline. ARM64 retains the historical
       # M2 Docker candidate publication, not reproduction of the current Dockerfile.
@@ -47,8 +46,7 @@ sources:
         }
   nvke-cni-calico-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0-beta.6
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
@@ -66,8 +64,7 @@ sources:
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
   nvke-kubeadm-distro-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0-beta.6
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
@@ -102,11 +99,13 @@ components:
       - -ec
       - |
         GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \
-          VERSION=v0.2.1-81-gff21ba8 \
+          VERSION="$BUILD_VERSION" \
           NFPM_BIN=/usr/local/bin/nfpm \
           DEB_OUTPUT=/src/agent/bin/nvke-agent.deb
     writeDir: agent/bin
     artifactPath: agent/bin/nvke-agent.deb
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
   nvke-cni-calico:
     platforms: [linux/amd64, linux/arm64]
     fromSource: true
@@ -186,7 +185,7 @@ components:
       - --opt
       - build-arg:OVN_KUBERNETES_DIR=.
       - --opt
-      - build-arg:BUILDER_IMAGE=quay.io/projectquay/golang@sha256:506a668eb4c763a964ffc4d4ad0125d45d75aac899392be7e5d39380f8452564
+      - build-arg:BUILDER_IMAGE=quay.io/projectquay/golang@sha256:d5acf07940fb5e6e2d07542abd853cece623d95ffd364769ec825aab5471d3b8
       - --opt
       - build-arg:KUBECTL_MINOR=1.36
       - --opt
@@ -299,12 +298,12 @@ components:
     packer:
       projectPath: os-image/packer
       packerVersion: 1.15.4
-      buildName: nke-node-fde.qemu.nke-fde
+      buildName: nvke-node-fde.qemu.nvke-fde
       architectureVariable: architecture
       acceleratorVariable: accelerator
       materialManifestVariable: material_manifest
       materialManifest:
-        schemaVersion: nke.dev/os-image-materials/v1
+        schemaVersion: nvke.nvidia.com/os-image-materials/v1
         kinds:
           image-inputs: archive
           installer-iso: disk-image
@@ -314,6 +313,7 @@ components:
       buildLogDirectoryVariable: build_log_directory
       acquisitionArchive: fde/apt-acquisitions.tar
       variables:
+        ubuntu_series: "26.04"
         capture_apt_acquisitions: "true"
         efi_firmware_code: /usr/share/OVMF/OVMF_CODE_4M.fd
         efi_firmware_vars: /usr/share/OVMF/OVMF_VARS_4M.fd
@@ -324,7 +324,7 @@ components:
     materials:
       image-inputs: nvke-image-inputs
       installer-iso: nvke-patched-installer-iso-amd64
-    artifactPath: fde/nke-node.qcow2
+    artifactPath: fde/nvke-node.qcow2
   nvke-node-fde-arm64:
     platforms: [linux/arm64]
     fromSource: true
@@ -351,12 +351,12 @@ components:
     packer:
       projectPath: os-image/packer
       packerVersion: 1.15.4
-      buildName: nke-node-fde.qemu.nke-fde
+      buildName: nvke-node-fde.qemu.nvke-fde
       architectureVariable: architecture
       acceleratorVariable: accelerator
       materialManifestVariable: material_manifest
       materialManifest:
-        schemaVersion: nke.dev/os-image-materials/v1
+        schemaVersion: nvke.nvidia.com/os-image-materials/v1
         kinds:
           image-inputs: archive
           installer-iso: disk-image
@@ -366,6 +366,7 @@ components:
       buildLogDirectoryVariable: build_log_directory
       acquisitionArchive: fde/apt-acquisitions.tar
       variables:
+        ubuntu_series: "26.04"
         capture_apt_acquisitions: "true"
         efi_firmware_code: /usr/share/AAVMF/AAVMF_CODE.no-secboot.fd
         efi_firmware_vars: /usr/share/AAVMF/AAVMF_VARS.fd
@@ -377,7 +378,7 @@ components:
     materials:
       image-inputs: nvke-image-inputs
       installer-iso: nvke-patched-installer-iso
-    artifactPath: fde/nke-node.qcow2
+    artifactPath: fde/nvke-node.qcow2
   nvke-node-image:
     platforms: [linux/arm64]
     fromSource: true
@@ -404,12 +405,12 @@ components:
     packer:
       projectPath: os-image/packer
       packerVersion: 1.15.4
-      buildName: nke-node-non-fde.qemu.nke-non-fde
+      buildName: nvke-node-non-fde.qemu.nvke-non-fde
       architectureVariable: architecture
       acceleratorVariable: accelerator
       materialManifestVariable: material_manifest
       materialManifest:
-        schemaVersion: nke.dev/os-image-materials/v1
+        schemaVersion: nvke.nvidia.com/os-image-materials/v1
         kinds:
           image-inputs: archive
           installer-iso: disk-image
@@ -419,6 +420,7 @@ components:
       buildLogDirectoryVariable: build_log_directory
       acquisitionArchive: non-fde/apt-acquisitions.tar
       variables:
+        ubuntu_series: "26.04"
         capture_apt_acquisitions: "true"
         efi_firmware_code: /usr/share/AAVMF/AAVMF_CODE.no-secboot.fd
         efi_firmware_vars: /usr/share/AAVMF/AAVMF_VARS.fd
@@ -427,7 +429,7 @@ components:
     materials:
       image-inputs: nvke-image-inputs
       installer-iso: nvke-patched-installer-iso
-    artifactPath: non-fde/nke-node.qcow2
+    artifactPath: non-fde/nvke-node.qcow2
   nvke-node-image-amd64:
     platforms: [linux/amd64]
     fromSource: true
@@ -454,12 +456,12 @@ components:
     packer:
       projectPath: os-image/packer
       packerVersion: 1.15.4
-      buildName: nke-node-non-fde.qemu.nke-non-fde
+      buildName: nvke-node-non-fde.qemu.nvke-non-fde
       architectureVariable: architecture
       acceleratorVariable: accelerator
       materialManifestVariable: material_manifest
       materialManifest:
-        schemaVersion: nke.dev/os-image-materials/v1
+        schemaVersion: nvke.nvidia.com/os-image-materials/v1
         kinds:
           image-inputs: archive
           installer-iso: disk-image
@@ -469,6 +471,7 @@ components:
       buildLogDirectoryVariable: build_log_directory
       acquisitionArchive: non-fde/apt-acquisitions.tar
       variables:
+        ubuntu_series: "26.04"
         capture_apt_acquisitions: "true"
         efi_firmware_code: /usr/share/OVMF/OVMF_CODE_4M.fd
         efi_firmware_vars: /usr/share/OVMF/OVMF_VARS_4M.fd
@@ -476,7 +479,7 @@ components:
     materials:
       image-inputs: nvke-image-inputs
       installer-iso: nvke-patched-installer-iso-amd64
-    artifactPath: non-fde/nke-node.qcow2
+    artifactPath: non-fde/nvke-node.qcow2
   nvke-patched-installer-iso:
     platforms: [linux/arm64]
     fromSource: true

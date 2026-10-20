@@ -30,7 +30,7 @@ func TestNativeSharedSetupPrecedesOrdinaryTenantAndStopsDiagnostic(t *testing.T)
 					t.Fatal(err)
 				}
 			}
-			versions, err := os.ReadFile("testdata/native-b615-tool-versions.mk")
+			versions, err := os.ReadFile("testdata/native-main-tool-versions.mk")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -155,10 +155,10 @@ func TestNativeSiteContractRequiresReviewedSource(t *testing.T) {
 		name, commit string
 		valid        bool
 	}{
-		{"current", "69ef9924c4bf0487beba8c3613ae6e0a0260d8f3\n", true},
+		{"current", "8db5721ae3031bdcd945e559153a740d46ea209e\n", true},
 		{"historical", "b6154b292a934dbdff7aa17596cbf2d7ef5f0f85\n", false},
 		{"unknown", strings.Repeat("a", 40) + "\n", false},
-		{"noncanonical", "69ef9924c4bf0487beba8c3613ae6e0a0260d8f3", false},
+		{"noncanonical", "8db5721ae3031bdcd945e559153a740d46ea209e", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			installer := privateTestDir(t)

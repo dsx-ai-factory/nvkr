@@ -17,9 +17,9 @@ func TestHostedRuntimeBudgetBoundsCompleteOperation(t *testing.T) {
 		parentTimeout time.Duration
 		wantTimeout   time.Duration
 	}{
-		{"no caller deadline", 0, 19 * time.Minute},
+		{"no caller deadline", 0, 59 * time.Minute},
 		{"shorter caller deadline", 5 * time.Minute, 5 * time.Minute},
-		{"longer caller deadline", 30 * time.Minute, 19 * time.Minute},
+		{"longer caller deadline", 90 * time.Minute, 59 * time.Minute},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {

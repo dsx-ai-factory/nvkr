@@ -21,8 +21,8 @@ import (
 // They are not framework requirements for customer catalogs or component names.
 func TestNVKEControllerPinnedChartFilename(t *testing.T) {
 	for _, tc := range []struct{ catalog, component, artifact string }{
-		{"../../../inputs/catalogs/nvke/release", "nvke-controller-chart", "charts/nke-controller-0.1.1.tgz"},
-		{"../../../inputs/catalogs/nvke/local-site-arm64", "nvke-controller-chart", "charts/nke-controller-0.0.0.tgz"},
+		{"../../../inputs/catalogs/nvke/release", "nvke-controller-chart", "charts/nke-controller-0.22.0-beta.6.tgz"},
+		{"../../../inputs/catalogs/nvke/local-site-arm64", "nvke-controller-chart", "charts/nke-controller-0.22.0-beta.6.tgz"},
 	} {
 		t.Run(tc.catalog, func(t *testing.T) {
 			raw, err := os.ReadFile(filepath.Join(tc.catalog, "registry.yaml"))
@@ -47,7 +47,7 @@ func TestNVKEControllerPinnedChartFilename(t *testing.T) {
 
 func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 	const inputRoot = "../../../inputs/definitions/nvke"
-	const approvedSource = "ff21ba8c07cafff74b68e238a8876af11e5beded"
+	const selectedSource = "8db5721ae3031bdcd945e559153a740d46ea209e"
 	authored, err := definition.LoadDefinition(t.Context(), filepath.Join(inputRoot, "definition.yaml"))
 	if err != nil {
 		t.Fatal(err)
@@ -79,8 +79,8 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 			agent := cat.Components["nvke-agent"]
 			for _, name := range []string{"nvke-agent", "nvke-cni-calico", "nvke-kubeadm-distro"} {
 				component := cat.Components[name]
-				if component.Commit != approvedSource || component.TreeHash != "b915345debd33ccd63dfbf8146415bf20e94c4ea" || component.SourceDate != 1791257393 {
-					t.Fatalf("%s does not retain the approved source commit/tree/epoch", name)
+				if component.Tag != "v0.22.0-beta.6" || component.Commit != selectedSource || component.TreeHash != "e928ae13298118b61581d9a406ba4a02f872e959" || component.SourceDate != 1792450875 {
+					t.Fatalf("%s does not retain the selected source commit/commit/tree/epoch", name)
 				}
 			}
 			// Temporary SPIRE-only rollback is tracked in NVKE issue #1641.
@@ -88,14 +88,15 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 			if spire.Commit != "726f76944404e1106626b8333d3576bdf67b575b" || spire.TreeHash != "3d6ea77f85d5da2648038425f805a598e23464ba" || spire.SourceDate != 1790192178 {
 				t.Fatal("temporary SPIRE source pin changed")
 			}
-			if len(spire.Materials) != 0 || len(spire.VendorCommand) == 0 {
-				t.Fatal("temporary SPIRE producer must retain its source-owned acquisition contract without DSX materials")
+			if len(spire.Materials) != 0 || !strings.Contains(strings.Join(spire.VendorCommand, "\n"), "make -C os-image/packages/spire-agent bundle nfpm") ||
+				!strings.Contains(strings.Join(spire.BuildCommand, "\n"), "SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=1") {
+				t.Fatal("temporary SPIRE producer must retain its source-owned acquisition and packaging revision 1 without DSX materials")
 			}
 			if _, exists := cat.Components["dsx-imds-node-attestor-agent"]; exists || slices.Contains(output.Components, "dsx-imds-node-attestor-agent") {
 				t.Fatal("temporary SPIRE selection unexpectedly reintroduced DSX")
 			}
-			if agent.Commit != approvedSource || !strings.Contains(strings.Join(agent.BuildCommand, "\n"), "VERSION=v0.2.1-81-gff21ba8") {
-				t.Fatal("handwritten agent version no longer matches its exact source pin; revalidate owning source version before repinning")
+			if agent.VersionStamp["BUILD_VERSION"] != "v0.22.0-beta.6" || !strings.Contains(strings.Join(agent.BuildCommand, "\n"), `VERSION="$BUILD_VERSION"`) {
+				t.Fatal("agent version must derive from the selected source tag")
 			}
 			selected, err := Resolve(cat, Selection{Components: output.Components, Platform: output.Platform, OutputFormat: output.Format})
 			if err != nil {
@@ -122,8 +123,8 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 				if node.Kind == ir.KindBuild && node.Component == "nvke-image-inputs" {
 					compositionFound = true
 					arch := strings.TrimPrefix(output.Platform, "linux/")
-					if node.SourceCommit != approvedSource || !strings.Contains(strings.Join(node.Command, "\n"), "--architecture "+arch) {
-						t.Fatal("image composition must use the approved source's required native architecture argument")
+					if node.SourceCommit != selectedSource || !strings.Contains(strings.Join(node.Command, "\n"), "--architecture "+arch) {
+						t.Fatal("image composition must use the selected source's required native architecture argument")
 					}
 					spireMaterial := false
 					for _, binding := range node.Materials {
@@ -139,7 +140,7 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 					continue
 				}
 				found = true
-				if node.Platform != output.Platform || node.ToolchainPlatform != output.Platform || node.SourceCommit != approvedSource {
+				if node.Platform != output.Platform || node.ToolchainPlatform != output.Platform || node.SourceCommit != selectedSource {
 					t.Fatalf("native source/toolchain binding changed: %+v", node)
 				}
 				if node.Packer == nil || node.Packer.AcquisitionArchive != want.variant+"/apt-acquisitions.tar" {
@@ -149,8 +150,8 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 					!strings.Contains(node.Patches[0].Content, `+SCHEMA = "nvkr.dev/package-acquisitions/v1"`) {
 					t.Fatal("capture producer must use the same schema as its consumer through an authenticated source patch")
 				}
-				if node.ArtifactPath != want.variant+"/nke-node.qcow2" || node.Disk == nil || node.Disk.Encryption != want.encryption ||
-					node.Packer.BuildName != "nke-node-"+want.variant+".qemu.nke-"+want.variant {
+				if node.ArtifactPath != want.variant+"/nvke-node.qcow2" || node.Disk == nil || node.Disk.Encryption != want.encryption ||
+					node.Packer.BuildName != "nvke-node-"+want.variant+".qemu.nvke-"+want.variant {
 					t.Fatal("selected disk variant did not reach the source target and output paths")
 				}
 				capture := false
@@ -162,7 +163,7 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 				if !capture {
 					t.Fatal("source capture opt-in did not reach Packer")
 				}
-				if node.Packer.MaterialManifest == nil || node.Packer.MaterialManifest.SchemaVersion != "nke.dev/os-image-materials/v1" {
+				if node.Packer.MaterialManifest == nil || node.Packer.MaterialManifest.SchemaVersion != "nvke.nvidia.com/os-image-materials/v1" {
 					t.Fatal("source material projection is absent")
 				}
 				kinds := node.Packer.MaterialManifest.Kinds

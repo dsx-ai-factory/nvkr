@@ -6,77 +6,77 @@ artifacts:
       amd64: sha256:1ca23bdbb1504e41233d527e826d02dac98571c45a6cd74c5fb28be485d680fa
       arm64: sha256:0898bf569379e23a39b9dbd640934c4b9e2563b2c023cbad3e8f686167fd8b99
     imageParentDigest: sha256:11f199f6bec47403b03cb49c79a41f445884b213b382582a60710b8c6fdc316a
-    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+    tag: v0.22.0-beta.6
   postgresql-image:
     digests:
       amd64: sha256:9ca5fe8db49a439acdfda55fcbd6ff1c44bc84facf5e775b7e170434d61ce18c
       arm64: sha256:b3dec5235745879ca095c08c230e5a53825f7cd795bcee6e6ac88eed91267d28
     imageParentDigest: sha256:b74b23f091dcc87041bcae557d840c36458af46b955279cb13aedec4c32d7f71
-    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+    tag: v0.22.0-beta.6
   spiffe-csi-image:
     digests:
       amd64: sha256:b98766c90387033702ef64a3a4dce1aae252cb741b3ac2ef13f271dd7660bb1e
       arm64: sha256:6bfd786d4ffd3f7435659a7b923d819a7a0bcc55cd05673908915d433e86c0a2
     imageParentDigest: sha256:9dfe4f0caff096164fd921aa7f15319804df2fc0325f1d90bc793ef3256ab1cd
-    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+    tag: v0.22.0-beta.6
   spire-agent-image:
     digests:
       amd64: sha256:0d9c792d7f409b748d3a1fc93fe70b6d1450474c177d2a731ddc36e97a17e9fe
       arm64: sha256:0c94e29f29a13c885294ae73755033040438117ca6c1e257318c5df0868290ac
     imageParentDigest: sha256:41b0dcd8b258a69db9e2768292a060766fb76fd866e4bc925849981ea1b825ff
-    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+    tag: v0.22.0-beta.6
   spire-bash-image:
     digests:
       amd64: sha256:d49c2b6585ac8e6341adfe8cb214a656914ab5390fb7804a7ed9e90a5b785fba
       arm64: sha256:8d29611142077489b9863426dfccf935c5ee9a27a3548d726c16de32692e71e3
     imageParentDigest: sha256:90041f375e30f41aa7e0390075d8a69dc61900771d52fa98d63ee5d03d866a58
-    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+    tag: v0.22.0-beta.6
   spire-controller-manager-image:
     digests:
       amd64: sha256:fb3bfc8f98f24c769004543d6b760142380c8f2d3a0354391ee2bfdd48039e59
       arm64: sha256:99dae65b7e207a7d34f9bef2aff901d6cbba40bd5ed31093ebf51e6a063783bc
     imageParentDigest: sha256:d7b9e710f5428ea25daa35a07083fe517ed70c23df902d21c54a0f444455a84b
-    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+    tag: v0.22.0-beta.6
   spire-oidc-image:
     digests:
       amd64: sha256:32f5e7d7b6329ed9dff97ad374e11d9156c43611ecfcb0693b7ca085b5328cdf
       arm64: sha256:6adc68d480f285e586edb67f4053bfb8923816a02486bf22d117e29bdee54a78
     imageParentDigest: sha256:bb95f13c2b4e8392d6631ff1a45a03554ba050534cd3c1045505cc80d3fb77e2
-    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+    tag: v0.22.0-beta.6
   spire-server-image:
     digests:
       amd64: sha256:3aa2dce70fc1098d6718a87c629aa8cadb83e4672c71dd63c5575ea5d0603789
       arm64: sha256:b2fb59ac8ec292b2d0e3685008b4a72726fc2298923a569ada9b2700f8b86380
     imageParentDigest: sha256:4082f30d3e0ddc4000a171392c4ea174345ee44d161ee917c70b97b2ecfba141
-    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+    tag: v0.22.0-beta.6
   spire-tpm-server-image:
     digests:
       amd64: sha256:0ba43be0bd5cee7afc54fb351989692ddd07c106111ecda3cf6e9cbe23da137c
       arm64: sha256:d5a0bd84d06ce4a7cd8d0cc5f7f05ca041ed3e1cdd0f8fd129831d871669f2bf
     imageParentDigest: sha256:9d3c69f9a9a59b274e7d6d9f8e75d89691d7d9204f2063d7917685a17b8828dc
-    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+    tag: v0.22.0-beta.6
   temporal-admin-tools-image:
     digests:
       amd64: sha256:f24c619953ba5724f36446cca514ba7dd865c2367873cbad70977caf58a02448
       arm64: sha256:2f90b7c95151bb7a3ddf41749681918f70528fd6c90b160a89e05970b678144a
     imageParentDigest: sha256:2c2272b008f1af295b3719963e6feeef64f838d1105d895cf6acfcf96dd31741
-    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+    tag: v0.22.0-beta.6
   temporal-server-image:
     digests:
       amd64: sha256:1a71947754cd244b3e6f1beb61e2eb2408e9180f7f092fd30182849625db0ac7
       arm64: sha256:77c887f311db18f086ce2b8ac3144e7f0ad59d73765d01c3e412dea9b8fb6e2c
     imageParentDigest: sha256:a3d0f727caad0ecca5dc6e94766135aab448551f2c6c0d33d3c67576458e6a0d
-    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+    tag: v0.22.0-beta.6
   temporal-ui-image:
     digests:
       amd64: sha256:6734b3988aa3615286ac8edc83f4d40f10fba587b7109570702efe09478807f9
       arm64: sha256:0e7478fad0eebac6d135a9c1efcc21f50f5026e017064b32f034585b13674788
     imageParentDigest: sha256:edb5dd1b3e0ddb35611939dde9b573533afd6fbafbbf077b73c7131a30ca91ff
-    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
+    tag: v0.22.0-beta.6
 kind: PinLock
 pins:
   nvke-deployment-selection:
-    commit: 33fb71b2f4224b470ebc628a9165fc4b92870406
-    sourceDateEpoch: 1790728711
-    tag: 33fb71b2f4224b470ebc628a9165fc4b92870406
-    treeHash: 3e974db934ea90aba2f4d36e437872a31b39bdf6
+    commit: 8db5721ae3031bdcd945e559153a740d46ea209e
+    sourceDateEpoch: 1792450875
+    tag: v0.22.0-beta.6
+    treeHash: e928ae13298118b61581d9a406ba4a02f872e959

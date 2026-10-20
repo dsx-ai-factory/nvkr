@@ -11,10 +11,10 @@ There is no generic Definition `overrides` field or arbitrary Packer/HCL rewriti
 
 | Field or choice | Owning source | Required check |
 |---|---|---|
-| Each disk's exact root and complete material set | Maintained NVKE Definition and `inputs/catalogs/node-images/release/registry.yaml` | Resolve the explicitly selected closure for its native platform. |
-| OS, Calico and kubeadm source | `inputs/catalogs/node-images/release/pins.lock.yaml`, NVKE `ff21ba8c07cafff74b68e238a8876af11e5beded` | Exact commit/tree/epoch; retain this separately from controller/CLI release selection. |
-| Temporary SPIRE packaging selection | Same lock selects `nvke-spire-agent-source` at `726f76944404e1106626b8333d3576bdf67b575b` | The older package omits DSX IMDS. Do not claim full current-NVKE parity; [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641) tracks restoration. OS assembly, agent and other sources are unchanged. |
-| Runtime image selection | `inputs/catalogs/runtime-dependencies` plus NVKE deploy values at `33fb71b2f4224b470ebc628a9165fc4b92870406` and their pinned charts | Exact native manifest pins for the twelve selected non-test images on both architectures. |
+| Each disk's exact root and complete material set | M2 Definition and `inputs/catalogs/node-images/release/registry.yaml` | Resolve the explicitly selected closure for its native platform. |
+| OS, Calico and kubeadm source | `inputs/catalogs/node-images/release/pins.lock.yaml`, NVKE `v0.22.0-beta.6` at `8db5721ae3031bdcd945e559153a740d46ea209e` | Exact commit/tree/epoch; each producer retains its own source binding. |
+| Temporary SPIRE packaging selection | Same lock selects `nvke-spire-agent-source` at `726f76944404e1106626b8333d3576bdf67b575b` | The older package omits DSX IMDS. Do not claim full current-NVKE parity; [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641) tracks restoration. |
+| Runtime image selection | `inputs/catalogs/runtime-dependencies` plus NVKE deploy values at `8db5721ae3031bdcd945e559153a740d46ea209e` and their pinned charts | Exact native manifest pins for the twelve selected non-test images on both architectures. |
 | Release-component pins | CLI/controller/operator catalogs and their own locks | Validate each source independently; one shared repository URL does not imply one release. |
 | Reference-profile fixture | `inputs/catalogs/nvke/release-components`, output `nico-reference-profiles-fixture` | Test configuration and runbooks only; not the demo's runnable `controller-profiles` or approved fleet configuration. |
 | Customer replacement | Ordered catalog overlay, bound to its exact predecessor snapshot | Preserve the logical component's output type and supported platforms; validate its new material closure. |

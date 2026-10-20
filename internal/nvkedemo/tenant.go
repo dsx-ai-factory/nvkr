@@ -362,6 +362,13 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 	if len(rows) != 0 {
 		return errors.New("require an empty freshly installed site before tenant creation")
 	}
+	release, err := t.prepareTenantReleases(ctx)
+	if err != nil {
+		return err
+	}
+	// The strict beta API selects immutable releases through release.
+	intent.ControlPlane.NICo.Release, intent.ControlPlane.NICo.OS = release, ""
+	intent.NodePools[0].NICo.Release, intent.NodePools[0].NICo.OS = release, ""
 	request := filepath.Join(t.session.Work, "tenant-request.json")
 	if err = privateJSON(request, intent); err != nil {
 		return err

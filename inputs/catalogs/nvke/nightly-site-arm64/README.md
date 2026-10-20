@@ -1,23 +1,23 @@
 # Nightly site producer catalog
 
 This profile-owned catalog selects the CLI, controller image, controller chart and NKTP chart for both
-ARM64 nightly Definitions. It starts from `../local-site-arm64`; that retained local
-catalog is unchanged. Each source role keeps its distinct vendor closure. The four source roles are pinned through `catalog pin --commit` to the NVKE candidate commit
-`a8391755d12d99f859783c6cf390338debd1e085`, with owner-issued tree
-`3dea15e95f96f3d5133c50935d7a0818907bfd33` and committer epoch `1792011564`. Both nightly
-suite selections use that same source revision. It comes from open NVKE PR #1580,
-without a release-tag, merged-main membership or human-approval claim.
+ARM64 nightly Definitions. It uses the same beta product revision as
+`../local-site-arm64`, while each source role keeps its distinct vendor closure.
+The four source roles are pinned through `catalog pin --tag v0.22.0-beta.6` to
+`8db5721ae3031bdcd945e559153a740d46ea209e`, with owner-issued tree
+`e928ae13298118b61581d9a406ba4a02f872e959` and committer epoch `1792450875`.
+Both nightly suite selections use the separate test-only commit
+`b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8`, retaining the candidate entrypoint omitted
+from beta. This user-approved exception changes no product source and establishes no runtime success.
 
-The producer mappings follow the source-owned contracts at NVKE candidate revision
-`a8391755d12d99f859783c6cf390338debd1e085`. Its delta from the previous product source
-contains only eight adapter, test and documentation files; producer code is unchanged:
+The producer mappings follow the source-owned contracts at that beta revision:
 
 | Output | Source contract |
 | --- | --- |
 | `nvkectl` | `cli/Makefile` builds `cli/bin/nvkectl` and owns `NVKECTL_VERSION`, `NVKECTL_COMMIT`, `NVKECTL_DATE` and `NVKECTL_TREE`; its build target executes the binary's version assertion |
 | `cwe` | `controller/Dockerfile` uses the existing Go 1.27.2 and Alpine digest pins and its source-owned controller Make target |
-| `controller-chart` | Source `Chart.yaml` version `0.0.0`, no dependencies or `Chart.lock`; the final chart remains bound to the produced controller digest |
-| `nktp` | Source `Chart.yaml` version `0.0.0`; its existing `Chart.lock` selects the three captured dependency-chart archives |
+| `controller-chart` | Source `Chart.yaml` placeholder `0.0.0`, packaged as `0.22.0-beta.6`; no dependencies or `Chart.lock`; the final chart remains bound to the produced controller digest |
+| `nktp` | Source `Chart.yaml` placeholder `0.0.0`, packaged as `0.22.0-beta.6`; its existing `Chart.lock` selects the three captured dependency-chart archives |
 
 CLI vendoring verifies that CLI, controller API, chart-module and management-engine module metadata
 are unchanged after the standard Go download, verify and vendor commands. The chart module has no
@@ -51,4 +51,4 @@ NKTP dependency charts remain acquired materials with their existing byte hashes
 not authenticate upstream signatures. Native profiles and rootless BuildKit retain their separate
 explicit pins. No toolchain image was built or published, no nightly producer was dispatched and no
 qualified release is established. The candidate source commit and owner-issued tree/epoch values remain
-in `pins.lock.yaml`; no branch name or guessed release tag substitutes for that pin.
+in `pins.lock.yaml`; the resolved beta tag names those exact source bytes.

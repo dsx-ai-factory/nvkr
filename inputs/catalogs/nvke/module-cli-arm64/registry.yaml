@@ -10,11 +10,11 @@
   },
   "components": {
     "nvkectl-arm64": {
-      "artifactPath": "bin/nvkectl",
+      "artifactPath": "cli/bin/nvkectl",
       "buildCommand": [
-        "sh",
-        "-c",
-        "go build -mod=vendor -trimpath -ldflags \"-s -w -buildid= -X main.version=$NKECTL_VERSION -X main.gitCommit=$NKECTL_COMMIT -X main.gitTreeState=clean -X main.buildDate=$NKECTL_DATE -X github.com/NVIDIA/nke/cli/internal/cwedeploy.capiVersion=$NKECTL_CAPI_VERSION\" -o /src/bin/nvkectl ./cli/cmd/nkectl"
+        "bash",
+        "-euc",
+        "export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor\nmake -C cli build NVKECTL_TREE=clean\n"
       ],
       "cgo": false,
       "fromSource": true,
@@ -24,20 +24,23 @@
       ],
       "source": "nvke",
       "versionStamp": {
-        "NKECTL_CAPI_VERSION": "v1.12.3",
-        "NKECTL_COMMIT": "{{slice .Commit 0 8}}",
-        "NKECTL_DATE": "{{.Date}}",
-        "NKECTL_VERSION": "{{.ModuleTag}}"
+        "NVKECTL_VERSION": "{{.Tag}}",
+        "NVKECTL_COMMIT": "{{.Commit}}",
+        "NVKECTL_DATE": "{{.Date}}"
       },
-      "writeDir": "bin"
+      "writeDir": "cli/bin"
     }
   },
   "sources": {
     "nvke": {
-      "constraint": "0.1.x",
+      "constraint": "v0.22.0-beta.6",
       "repo": "https://github.com/dsx-ai-factory/nvke",
-      "tagPrefix": "cli/",
-      "toolchainImage": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c"
+      "toolchainImage": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c",
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        "export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\ntest ! -e controller/deploy/charts/go.sum\npins=\"$(sha256sum cli/go.mod cli/go.sum controller/api/go.mod controller/api/go.sum controller/deploy/charts/go.mod management-engine/go.mod management-engine/go.sum)\"\ncd cli\ntimeout --kill-after=10s 540s go mod download\nGOPROXY=off timeout --kill-after=10s 60s go mod verify\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor\ncd ..\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c -\ntest ! -e controller/deploy/charts/go.sum\n"
+      ]
     }
   }
 }
