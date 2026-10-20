@@ -160,9 +160,9 @@ copy chunk boundaries; cancellation cannot interrupt an already-blocked kernel I
 
 ## Bootstrap E2E interface candidate (IV1 first slice)
 
-The NVKE bootstrap interface candidate (based on upstream process-contract
-interface [#1578](https://github.com/dsx-ai-factory/nvke/pull/1578)) adds a
-producer-neutral entrypoint:
+The NVKE bootstrap interface candidate [#1801](https://github.com/dsx-ai-factory/nvke/pull/1801),
+stacked on process-contract interface [#1578](https://github.com/dsx-ai-factory/nvke/pull/1578),
+adds a producer-neutral entrypoint:
 
 ```sh
 # From the matching NVKE checkout, on an already prepared Linux host:
