@@ -545,6 +545,35 @@ failure diagnostics and the enclosing budget; they also cover independent creden
 retention of the original deadline through manifest issuance. Independent final review found no
 actionable issues. These checks establish the implementation contract, not hosted recovery.
 
+[Qualification Run 39344373891](https://github.com/dsx-ai-factory/nvkr/actions/runs/39344373891)
+used `fa1a73fc4bafd1661cdd9ba40ba53fcf518cc782`, including metadata negotiation reuse and the longer
+operation budget, with the original producer's successful attempt-7 handoff. Its
+[AMD64 worker](https://github.com/dsx-ai-factory/nvkr/actions/runs/39344373891/job/118373320509) and
+[ARM64 worker](https://github.com/dsx-ai-factory/nvkr/actions/runs/39344373891/job/118373320831)
+both completed all 69 artifact checks: payload integrity, membership, exact Run/inputs, signed evidence,
+and signatures/provenance. Both then failed native smoke runtime admission because the hosted Docker CLI
+rejected `image inspect --platform`. The commands returned `NVKR-E-ENGINE-CAPABILITY` and exit 29 after
+22 minutes 29 seconds and 22 minutes 4 seconds respectively, within the operation budget. All three AMD64
+tool results and the one ARM64 tool result were not evaluated, and neither worker uploaded signed smoke
+evidence. Complete logs confirm the trusted checkout and terminal `exec`. Full disk filesystem/content
+inspection remains outside this gate; passing artifact checks do not establish native smoke or qualification.
+
+The shared local-image observer now uses portable exact-reference inspection and still rejects unexpected
+OS/architecture, digest or local image ID, missing configuration, inherited writable volumes and unexpected
+environment. Pull/create platform selection and the smoke owner's pre-stream container-identity checks remain.
+The regression reproduces the hosted unsupported-option error on the prior source and passes with the
+correction; existing image substitution, isolation, cancellation and cleanup cases also pass. This establishes
+the command/admission contract, not hosted native smoke success or release-manifest issuance.
+
+The official Docker 28.0.4 client reproduced the unsupported option locally. Portable inspection of both
+exact hosted image pins returned the expected platform, manifest digest/local ID and unchanged configuration.
+The Linux ARM64 live smoke test then passed all seven fixed profiles in 2.696 seconds with that client and
+a local Docker 29.4.2 daemon. The fixture checked nonroot identity, disabled network, absent credentials and
+socket, read-only root, no capabilities and private temporary storage. This exercises local runtime mechanics
+with controlled ELF bytes, not the delivered NVKE tools or the hosted daemon. The Linux Go 1.27.2 full
+uncached repository gate, build and targeted pipeline race checks also pass; independent review found no
+actionable issue.
+
 No successful hosted worker/qualifier OIDC signing transcript, subject-bound qualification attachment/read-back
 or independent complete-set consumer verification is recorded here. M3-D
 retains positive/negative external acceptance and independent review; the earlier M2 candidate cannot satisfy
