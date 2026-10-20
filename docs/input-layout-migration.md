@@ -128,10 +128,10 @@ patches moved together; lock bytes remain unchanged. Use [catalog maintenance](c
 for pin changes. Do not introduce public Definition inheritance, catalog mixins or an unimplemented
 Run subset flag to reduce file count.
 
-`inputs/testing/nightly-profiles.json` moved to `inputs/testing/nightly-profiles.json`: it is downstream
+`definitions/nightly-profiles.json` moved to `inputs/testing/nightly-profiles.json`: it is downstream
 coordinator configuration, not a Definition or Environment. Its Definition/Environment references move
 without changing suite revisions, output names, bundle names or workflow identities.
-`inputs/policies/nvke-qualification.yaml` moved to `inputs/policies/nvke-qualification.yaml`; its
+`definitions/nvke-m2/qualification.yaml` moved to `inputs/policies/nvke-qualification.yaml`; its
 independently authored trust selections and exact output scope are preserved. Neither counts toward
 the eight/eight target. Teaching-only inputs now reside in `docs/examples/nvke-tutorial/` and
 `docs/examples/nvke-deploy/`; their current distinct payloads and Environments remain explicit.

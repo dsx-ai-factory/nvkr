@@ -130,3 +130,47 @@ func TestStackNodeOnlyRemovesOwnedSchedulingTaint(t *testing.T) {
 		})
 	}
 }
+
+func TestManagementStackSeparatesCredentialsFromSiteAndStackInputs(t *testing.T) {
+	work := privateTestDir(t)
+	session := ManagementSession{Name: "owned", Work: work, Runner: Runner{Work: work}}
+	refs := map[string]string{"cwe": "example.invalid/controller@sha256:" + strings.Repeat("a", 64), "profiles": "example.invalid/profiles@sha256:" + strings.Repeat("b", 64)}
+	spec, err := prepareStackSiteSpec(t.Context(), session, "172.18.0.2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner, stack, err := prepareManagementStack(t.Context(), session, refs, SiteConnection{Endpoint: "http://172.18.0.1:18081", Org: "synthetic-org", Token: "synthetic-token"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{spec, stack} {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, forbidden := range []string{"controllerStack", "passwordFile", "tokenFile", "synthetic-token", "caCertFile", "caKeyFile"} {
+			if strings.Contains(string(raw), forbidden) {
+				t.Fatalf("obsolete or secret field %s in public inputs", forbidden)
+			}
+		}
+	}
+	for _, key := range []string{"NVKECTL_NICO_TOKEN", "NVKECTL_NODE_USER", "NVKECTL_NODE_PASSWORD", "NVKECTL_DATABASE_PASSWORD", "NVKECTL_SPIRE_CA_CERT_FILE", "NVKECTL_SPIRE_CA_KEY_FILE"} {
+		if environmentValue(runner.Env, key) == "" {
+			t.Fatalf("missing credential handoff %s", key)
+		}
+	}
+}
+
+func TestStackStateAdmissionAfterParentSymlinkResolution(t *testing.T) {
+	link := filepath.Join(t.TempDir(), "shared")
+	if err := os.Symlink(os.TempDir(), link); err != nil {
+		t.Fatal(err)
+	}
+	destination, err := freshDestination(filepath.Join(link, "new-private-state"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := admitStackStateRoot(destination); err == nil {
+		t.Fatal("normalized shared temporary parent admitted")
+	}
+}

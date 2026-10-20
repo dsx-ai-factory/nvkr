@@ -198,3 +198,36 @@ func TestProductionBuildTypeUsesStrongestNetworkRequirement(t *testing.T) {
 		})
 	}
 }
+
+func TestHostedDevelopmentPredicateInvocationScope(t *testing.T) {
+	for _, test := range []struct {
+		name, invocation string
+		valid            bool
+	}{
+		{"earlier", "https://github.com/example/nvkr/actions/runs/12345/attempts/1", true},
+		{"current", "https://github.com/example/nvkr/actions/runs/12345/attempts/2", true},
+		{"future", "https://github.com/example/nvkr/actions/runs/12345/attempts/3", false},
+		{"other run", "https://github.com/example/nvkr/actions/runs/12346/attempts/1", false},
+		{"other repository", "https://github.com/other/nvkr/actions/runs/12345/attempts/1", false},
+		{"noncanonical", "https://github.com/example/nvkr/actions/runs/12345/attempts/01", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			setDevelopmentRun(t)
+			t.Setenv("GITHUB_RUN_ATTEMPT", "2")
+			plan := githubDevelopmentPublicationTestPlan(t)
+			run := hostedPredicateRun{builderID: "https://github.com/example/nvkr/.github/workflows/nvkr-dev.yml@refs/heads/feature/pipeline", invocationID: test.invocation, startedOn: time.Unix(100, 0).UTC(), finishedOn: time.Unix(101, 0).UTC()}
+			raw, err := productionPredicateForRun(plan, plan.Environment.Signing, run)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = validateHostedProductionPredicate(raw, plan, plan.Environment.Signing)
+			if test.valid {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
+			}
+		})
+	}
+}

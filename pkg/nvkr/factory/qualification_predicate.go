@@ -30,7 +30,7 @@ func ValidateProductionPredicate(raw []byte, plan *Plan, builder, invocation str
 	if err := validateProductionPredicateOrigin(raw, plan, plan.Environment.Signing, builder, signed); err != nil {
 		return err
 	}
-	return admitPlanReferenceInvocation(plan, signed, invocation)
+	return admitReferenceInvocation(signed, invocation)
 }
 
 // ValidateQualificationRootInvocation checks the original aggregate preparation
@@ -45,10 +45,10 @@ func ValidateQualificationRootInvocation(raw []byte, plan *Plan, prepared, consu
 	if err != nil {
 		return err
 	}
-	if err := admitPlanReferenceInvocation(plan, prepared, signed); err != nil {
+	if err := admitReferenceInvocation(prepared, signed); err != nil {
 		return err
 	}
-	return admitPlanReferenceInvocation(plan, signed, consuming)
+	return admitReferenceInvocation(signed, consuming)
 }
 
 // ValidateQualificationOutputOrigin binds an output predicate to the original
@@ -74,10 +74,10 @@ func ValidateQualificationOutputOrigin(raw []byte, plan *Plan, output delivery.P
 	if signed != origin.SignedInvocationID {
 		return e.New(e.CodeVerifyFailed, "qualification output %q differs from its original signing invocation", output.Name)
 	}
-	if err := admitPlanReferenceInvocation(plan, origin.PreparedInvocationID, signed); err != nil {
+	if err := admitReferenceInvocation(origin.PreparedInvocationID, signed); err != nil {
 		return err
 	}
-	return admitPlanReferenceInvocation(plan, signed, assembled)
+	return admitReferenceInvocation(signed, assembled)
 }
 
 // Development targets are projected from the authenticated source attempt, never
@@ -104,5 +104,5 @@ func validateQualificationOutputRepository(plan *Plan, target Target, repository
 		return e.New(e.CodeVerifyFailed, "development qualification output differs from its planned publication repository")
 	}
 	invocation := "https://github.com/" + namespace.Repository() + "/actions/runs/" + reference.RunID() + "/attempts/" + reference.Attempt()
-	return admitPlanReferenceInvocation(plan, invocation, assembled)
+	return admitReferenceInvocation(invocation, assembled)
 }

@@ -167,7 +167,7 @@ func TestTenantRunAdmitsCNIAndDNSBeforeSmoke(t *testing.T) {
 					t.Fatal(err)
 				}
 				releaseName := "nvkr-local-" + strings.TrimPrefix(selected.image.Digest, "sha256:")[:40]
-				if request.ControlPlane.NICo.OS != releaseName || len(request.NodePools) != 1 || request.NodePools[0].NICo.OS != releaseName {
+				if request.ControlPlane.NICo.Release != releaseName || len(request.NodePools) != 1 || request.NodePools[0].NICo.Release != releaseName || strings.Contains(string(raw), `"osProfile"`) {
 					t.Fatal("tenant request did not select the exact disk-bound releases")
 				}
 			}

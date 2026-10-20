@@ -1154,6 +1154,8 @@ reached the artifact checks against that exact successful attempt, but both nati
 ARM64 completed payload/SBOM checks and reached output provenance checks; AMD64 expired while
 materializing `nvke-node-image-arm64`. The development adapter now inherits the hosted owner's existing
 fifty-nine-minute deadline, matching production handoffs, while retaining individual operation bounds.
+[ADR-16](0016-release-gates-and-digest-first-selection.md) records earlier caller deadlines, joined cleanup
+and why this allowance is not a guaranteed return bound.
 Existing hosted-budget contracts cover earlier caller deadlines and cancellation; corrected development
 execution in [Run 39358337890](https://github.com/dsx-ai-factory/nvkr/actions/runs/39358337890)
 passed the ARM64 artifact checks for all 69 outputs and native tool smoke, then both native workers
@@ -1164,7 +1166,8 @@ and public transparency submission. Injected and held-process protocol tests che
 `8422f128e6b776ae5f353165893cd4085414bb4d` passed both native workers: each authenticated all 69
 outputs, passed native smoke and signed/uploaded its report. Final qualification also passed all 69
 artifact checks and signed/read back qualification attachments for exactly those 69 unique subjects.
-The result reported `successful: true` with development evidence digest
+The [final result job](https://github.com/dsx-ai-factory/nvkr/actions/runs/39360715596/job/118430919815)
+reported `successful: true` with development evidence digest
 `sha256:b89ca5cfb49f78ac2fc687f000890ad043813f0c5ba584a351598e6d20eea062`.
 Delivered-tool smoke passed for `nvkectl`, `nvkectl-linux-arm64` and `operator-tools`; the other
 66 outputs correctly report that tool smoke is not applicable. The same head passed
@@ -1190,7 +1193,7 @@ and production sibling isolation. The successful attempt-2 publication above exe
 namespace resolution, and its complete retry passed. The immutable failed Run cannot acquire
 new executable code through a rerun.
 
-The main-source upgrade selects `55612dce98cf0183790fbe5f4776225d63369fc2` through `catalog pin --commit`, retaining all three SPIRE package roles and the separate nightly test-harness exception. Canonical generation and [Merge Gate 39306909978](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306909978) passed on NVKR `5953a0ac`. [Development Run 39306902739](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306902739) remains incomplete: [provisioned-provider signing](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306902739/job/118254801119) failed while fetching ambient GitHub OIDC credentials because the response was not JSON. All four disk outputs nevertheless passed build, publication, signing and verification in that Run. The later successful complete Run and same-run retry are recorded above; this earlier incomplete Run does not supply that evidence. The preceding [beta Run 39276513915](https://github.com/dsx-ai-factory/nvkr/actions/runs/39276513915) failed disk production and completeness. Both plain disk logs reached an absent-file error during provisioning; the selected main source adds the two missing network configuration files to image-input composition. The four successful disk outputs in the main-source Run exercise this source correction; they do not establish complete Run acceptance.
+The historical October 19 main-source upgrade selected `55612dce98cf0183790fbe5f4776225d63369fc2` through `catalog pin --commit`, retaining all three SPIRE package roles and the separate nightly test-harness exception. Canonical generation and [Merge Gate 39306909978](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306909978) passed on NVKR `5953a0ac`. [Development Run 39306902739](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306902739) remains incomplete: [provisioned-provider signing](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306902739/job/118254801119) failed while fetching ambient GitHub OIDC credentials because the response was not JSON. All four disk outputs nevertheless passed build, publication, signing and verification in that Run. The later successful complete Run and same-run retry are recorded above; this earlier incomplete Run does not supply that evidence. The preceding [beta Run 39276513915](https://github.com/dsx-ai-factory/nvkr/actions/runs/39276513915) failed disk production and completeness. Both plain disk logs reached an absent-file error during provisioning; the [selected source composition](https://github.com/dsx-ai-factory/nvke/blob/55612dce98cf0183790fbe5f4776225d63369fc2/os-image/packer/scripts/compose-image-inputs.py) adds the two missing network configuration files, with [source regression coverage](https://github.com/dsx-ai-factory/nvke/blob/55612dce98cf0183790fbe5f4776225d63369fc2/os-image/packer/scripts/test_build_entrypoint.py). The four successful disk outputs in the main-source Run exercise this source correction; they do not establish complete Run acceptance.
 
 Beta development [Run 39274459086](https://github.com/dsx-ai-factory/nvkr/actions/runs/39274459086)
 reached admitted native disk builds and successful SBOM signing after the operator approved its exact branch
@@ -1221,7 +1224,8 @@ namespace binding and generated credential/owner separation. Catalog maintenance
 development pair with its producer, so pin updates cannot leave its manifest stale.
 Development qualifier retries may retain earlier successful workers within the same qualification run,
 preserving their original branch, source/policy bindings, certificate invocation and private-carrier attempt.
-The development producer's publication remains bound to one exact source attempt and its namespace.
+Each output publication retains its original source attempt and namespace. A later aggregate attempt
+may reuse earlier same-run outputs after exact invocation and evidence checks.
 For [development Run 38951964907, attempt 1](https://github.com/dsx-ai-factory/nvkr/actions/runs/38951964907/attempts/1),
 current code reproduced the original Plan digest
 `sha256:c6373e0b96f182b596ca89eeb6d7f66ee17b9126e4da236a0c5d583a0d1d12b6`.
@@ -1231,8 +1235,9 @@ using the exact `nvkr-dev.yml@refs/heads/codex/private-ghcr-combined` identity a
 The immutable release subject was
 `ghcr.io/dsx-ai-factory/nvkr/development/runs/38951964907/attempts/1/releases@sha256:d49148699674c485d24ef0de89c2450a2632d42681b031d421bf5c3102e92d0f`.
 This read-only laptop/Colima exercise did not execute those hosted outputs or publish new evidence.
-No hosted development qualification success, qualifier OIDC identity, hosted native smoke,
-qualification attachment/read-back or independent-consumer acceptance is claimed.
+That October 16 snapshot did not establish hosted development qualification, qualifier OIDC identity,
+hosted native smoke, qualification attachment/read-back or independent-consumer acceptance.
+The later hosted success above has its own exact Run and scope.
 
 Unsigned development remains hosted build-only, static-unqualified, automatically cancelling older
 same-branch Runs and retaining transfers for one day. Signed development requires the prescribed

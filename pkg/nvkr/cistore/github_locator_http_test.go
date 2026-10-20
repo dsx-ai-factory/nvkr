@@ -16,6 +16,7 @@ import (
 )
 
 func TestGitHubLocatorRateLimitAdmission(t *testing.T) {
+	now := time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)
 	for _, tc := range []struct {
 		name             string
 		status           int
@@ -30,6 +31,9 @@ func TestGitHubLocatorRateLimitAdmission(t *testing.T) {
 		{name: "service retry after", status: 503, header: http.Header{"Retry-After": {"30"}}, delay: 30 * time.Second, limited: true},
 		{name: "service excessive delay", status: 503, header: http.Header{"Retry-After": {"121"}}, limited: true, failure: true},
 		{name: "not implemented", status: 501},
+		{name: "transient duplicate delay", status: 503, header: http.Header{"Retry-After": {"1", "2"}}, limited: true, failure: true},
+		{name: "transient primary exhaustion", status: 502, header: http.Header{"X-Ratelimit-Remaining": {"0"}}, limited: true, failure: true},
+		{name: "transient HTTP date", status: 503, header: http.Header{"Retry-After": {now.Add(30 * time.Second).Format(http.TimeFormat)}}, limited: true, delay: 30 * time.Second},
 		{name: "secondary", status: 403, body: `{"message":"You have exceeded a secondary rate limit."}`, header: http.Header{"Retry-After": {"1"}}, delay: time.Second, limited: true},
 		{name: "ordinary forbidden", status: 403, body: `{"message":"Resource not accessible by integration"}`, header: http.Header{"Retry-After": {"1"}}},
 		{name: "duplicate message", status: 403, body: `{"message":"denied","message":"secondary rate limit"}`, header: http.Header{"Retry-After": {"1"}}},
@@ -43,7 +47,7 @@ func TestGitHubLocatorRateLimitAdmission(t *testing.T) {
 		{name: "primary exhaustion", status: 429, header: http.Header{"Retry-After": {"1"}, "X-Ratelimit-Remaining": {"0"}}, limited: true, failure: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			delay, limited, err := githubLocatorRetryDelay(githubLocatorResponse{status: tc.status, header: tc.header, body: []byte(tc.body)}, tc.attempt, time.Now())
+			delay, limited, err := githubLocatorRetryDelay(githubLocatorResponse{status: tc.status, header: tc.header, body: []byte(tc.body)}, tc.attempt, now)
 			if limited != tc.limited {
 				t.Fatal("incorrect retry admission")
 			}
@@ -69,7 +73,11 @@ func TestGitHubLocatorTransientServerRetries(t *testing.T) {
 				defer cancel()
 				g := newGitHubLocatorClient("test-token")
 				calls := 0
-				g.wait = func(context.Context, time.Duration) error {
+				backoffs := 0
+				g.wait = func(_ context.Context, delay time.Duration) error {
+					if delay >= time.Second {
+						backoffs++
+					}
 					if scenario == "canceled" {
 						cancel()
 						return ctx.Err()
@@ -92,8 +100,8 @@ func TestGitHubLocatorTransientServerRetries(t *testing.T) {
 					}
 				case "exhausted":
 					assertCode(t, err, e.CodeUnavailable)
-					if calls != githubLocatorAPIAttempts {
-						t.Fatal("server retries exceeded request budget")
+					if calls != githubLocatorAPIAttempts || backoffs != githubLocatorAPIAttempts-1 {
+						t.Fatal("server retries exceeded request budget or waited after terminal response")
 					}
 				case "canceled":
 					assertCode(t, err, e.CodeTimeout)

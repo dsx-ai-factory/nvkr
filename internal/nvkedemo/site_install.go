@@ -17,6 +17,8 @@ import (
 )
 
 const installerCAPIVersion = "v1.13.6"
+const installerProviderVersion = "v0.0.45"
+const installerProviderRepository = "ghcr.io/dsx-ai-factory/cluster-api-provider-nico/controller"
 
 // The beta renderer refuses credentials under shared temporary directories.
 // Admit that requirement before creating the management cluster or registry.
@@ -48,7 +50,7 @@ func projectProviderImage(ctx context.Context, deploy, reference string) error {
 	}
 	repository, digest, ok := strings.Cut(reference, "@")
 	hash, hashErr := v1.NewHash(digest)
-	if !ok || repository == "" || hashErr != nil || hash.Algorithm != "sha256" || binding.Artifact != "capnico-controller" || binding.Image != "ghcr.io/dsx-ai-factory/cluster-api-provider-nico/controller:v0.0.45" {
+	if !ok || repository == "" || hashErr != nil || hash.Algorithm != "sha256" || binding.Artifact != "capnico-controller" || binding.Image != installerProviderRepository+":"+installerProviderVersion {
 		return errors.New("provider image differs from selected deploy binding")
 	}
 	if _, err = boundedRegularRead(filepath.Join(deploy, "capnico/capnico.yaml"), diagnosticLimit); err != nil {
@@ -56,36 +58,15 @@ func projectProviderImage(ctx context.Context, deploy, reference string) error {
 	}
 	return privateJSON(filepath.Join(deploy, "capnico/kustomization.yaml"), map[string]any{
 		"resources": []string{"capnico.yaml"},
-		"images":    []any{map[string]string{"name": strings.TrimSuffix(binding.Image, ":v0.0.45"), "newName": repository, "digest": digest}},
+		"images":    []any{map[string]string{"name": installerProviderRepository, "newName": repository, "digest": digest}},
 	})
 }
 
 // prepareStackSiteSpec supplies the current source-owned renderer with the
 // site's stack inputs. Its bootstrap fields are never executed: the separately
 // admitted Kind configuration owns the management cluster and its CNI.
-func prepareStackSiteSpec(ctx context.Context, session ManagementSession, checkout, deploy, vip string, refs map[string]string, connection SiteConnection) (string, error) {
+func prepareStackSiteSpec(ctx context.Context, session ManagementSession, vip string) (string, error) {
 	if err := requireContext(ctx); err != nil {
-		return "", err
-	}
-	password, err := randomScalar()
-	if err != nil {
-		return "", err
-	}
-	secretFiles := map[string]string{"nico-token": connection.Token, "tenant-password": password}
-	for _, name := range []string{"nico-token", "tenant-password"} {
-		if err = privateWrite(filepath.Join(session.Work, name), []byte(secretFiles[name])); err != nil {
-			return "", err
-		}
-	}
-	telemetry, err := sourceBytes(ctx, session.Runner, checkout, "nktp/hack/e2e-values.yaml", "kind-nktp-values")
-	if err != nil {
-		return "", err
-	}
-	if !strings.Contains(string(telemetry), "  args: [\"--kubelet-insecure-tls\"]") {
-		return "", errors.New("selected NVKE Kind telemetry fixture differs")
-	}
-	telemetryPath := filepath.Join(session.Work, "nktp-kind-values.yaml")
-	if err = privateWrite(telemetryPath, telemetry); err != nil {
 		return "", err
 	}
 	path := filepath.Join(session.Work, "stack-sitespec.json")
@@ -96,18 +77,35 @@ func prepareStackSiteSpec(ctx context.Context, session ManagementSession, checko
 			"k8sVersion": "1.37.0", "cniName": "ovn-kubernetes", "podCidr": managementPodCIDR,
 			"serviceCidr": managementServiceCIDR, "controlPlaneVIP": vip,
 		},
-		"registry": map[string]string{"bootstrapRepo": strings.Split(refs["cwe"], "@")[0], "bootstrapChart": filepath.Join(deploy, "charts/controller.tgz")},
-		"spire":    map[string]string{"trustDomain": "nvkr.local", "caCertFile": filepath.Join(session.Work, "ca.crt"), "caKeyFile": filepath.Join(session.Work, "ca.key")},
-		"controllerStack": map[string]any{
-			"arch":           "arm64",
-			"nico":           map[string]string{"endpoint": connection.Endpoint, "orgID": connection.Org, "apiName": "forge", "tokenFile": filepath.Join(session.Work, "nico-token")},
-			"tenant":         map[string]string{"user": "nvkr-demo", "passwordFile": filepath.Join(session.Work, "tenant-password")},
-			"database":       map[string]string{"passwordFile": filepath.Join(session.Work, "database-password")},
-			"images":         map[string]string{"controller": refs["cwe"], "profiles": refs["profiles"]},
-			"nktpValuesFile": telemetryPath,
-		},
+		"spire": map[string]any{"trustDomain": "nvkr.local", "upstreamCA": true},
 	}
 	return path, privateJSON(path, config)
+}
+
+// prepareManagementStack binds credentials only to the private process environment.
+func prepareManagementStack(ctx context.Context, session ManagementSession, refs map[string]string, connection SiteConnection) (Runner, string, error) {
+	if err := requireContext(ctx); err != nil {
+		return session.Runner, "", err
+	}
+	password, err := randomScalar()
+	if err != nil {
+		return session.Runner, "", err
+	}
+	databasePassword, err := randomScalar()
+	if err != nil {
+		return session.Runner, "", err
+	}
+	runner := bindNativeSpireCA(session.Runner, session.Work)
+	runner.Env = SetEnv(runner.Env, map[string]string{
+		"NVKECTL_NICO_TOKEN": connection.Token, "NVKECTL_NODE_USER": "nvkr-demo",
+		"NVKECTL_NODE_PASSWORD": password, "NVKECTL_DATABASE_PASSWORD": databasePassword,
+	})
+	path := filepath.Join(session.Work, "stack-config.json")
+	config := map[string]any{
+		"nico":   map[string]string{"endpoint": connection.Endpoint, "orgID": connection.Org, "apiName": "forge"},
+		"images": map[string]string{"controller": refs["cwe"], "profiles": refs["profiles"]},
+	}
+	return runner, path, privateJSON(path, config)
 }
 
 // prepareStackNode removes only the source-documented control-plane scheduling
@@ -147,10 +145,26 @@ func installSelectedStack(ctx context.Context, session ManagementSession, checko
 	if err := appendChartValues(ctx, capture, filepath.Join(checkout, installerDeployReader), deploy, "controller", "nvkr-profiles-image.json", profilesImageValues(refs["profiles"])); err != nil {
 		return err
 	}
-	spec, err := prepareStackSiteSpec(ctx, session, checkout, deploy, vip, refs, connection)
+	spec, err := prepareStackSiteSpec(ctx, session, vip)
 	if err != nil {
 		return err
 	}
+	runner, stack, err := prepareManagementStack(ctx, session, refs, connection)
+	if err != nil {
+		return err
+	}
+	telemetry, err := sourceBytes(ctx, session.Runner, checkout, "nktp/hack/e2e-values.yaml", "kind-nktp-values")
+	if err != nil {
+		return err
+	}
+	var telemetryValues map[string]any
+	if err = yaml.Unmarshal(telemetry, &telemetryValues); err != nil {
+		return err
+	}
+	if err = appendChartValues(ctx, capture, filepath.Join(checkout, installerDeployReader), deploy, "nktp", "nvkr-kind-values.json", telemetryValues); err != nil {
+		return err
+	}
+	session.Runner = runner
 	state := filepath.Join(session.Work, "nvke-state")
 	if err = os.Mkdir(state, 0o700); err != nil {
 		return err
@@ -166,9 +180,9 @@ func installSelectedStack(ctx context.Context, session ManagementSession, checko
 		args  []string
 		limit time.Duration
 	}{
-		{"site-readiness", []string{"bash", filepath.Join(checkout, "deploy/check-site.sh"), "--sitespec", spec, "--kubeconfig", kube}, 5 * time.Minute},
+		{"site-readiness", []string{"bash", filepath.Join(checkout, "deploy/check-site.sh"), "--sitespec", spec, "--stack-config", stack, "--kubeconfig", kube}, 5 * time.Minute},
 		{"site-cluster-api", []string{filepath.Join(session.Tools, "clusterctl"), "init", "--kubeconfig", kube, "--core", "cluster-api:" + installerCAPIVersion, "--bootstrap", "kubeadm:" + installerCAPIVersion, "--control-plane", "kubeadm:" + installerCAPIVersion, "--wait-providers"}, 10 * time.Minute},
-		{"site-install", []string{"bash", filepath.Join(checkout, "deploy/nvke-deploy.sh"), "install", "--deploy-path", deploy, "--sitespec", spec, "--kubeconfig", kube, "--timeout", "15m"}, 30 * time.Minute},
+		{"site-install", []string{"bash", filepath.Join(checkout, "deploy/nvke-deploy.sh"), "install", "--deploy-path", deploy, "--sitespec", spec, "--stack-config", stack, "--kubeconfig", kube, "--timeout", "15m"}, 30 * time.Minute},
 		{"site-capi-identity", []string{"bash", filepath.Join(checkout, "controller/hack/apply-capi-spiffe-exec-auth.sh"), "--kubeconfig", kube}, 10 * time.Minute},
 	}
 	for _, command := range commands {

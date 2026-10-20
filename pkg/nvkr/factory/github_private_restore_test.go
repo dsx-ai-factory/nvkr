@@ -5,6 +5,7 @@ package factory
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/cistore"
@@ -23,6 +24,9 @@ func TestPrivateStageRestoreAdmitsDevelopmentRetryButRejectsUnknownStage(t *test
 			setDevelopmentRun(t)
 			err := RestoreGitHubPrivateInputs(t.Context(), fixture.plan(t), "unused", cistore.Request{}, "/missing", cistore.Options{AllowEarlierAttempts: true}, GitHubStepOptions{})
 			assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
+			if !strings.Contains(err.Error(), "unused") {
+				t.Fatalf("did not reach unknown-stage refusal: %v", err)
+			}
 		})
 	}
 }

@@ -141,10 +141,6 @@ func admitDevelopmentSubject(plan *Plan, targetName string, subject sign.Subject
 	return nil
 }
 
-func admitPlanReferenceInvocation(_ *Plan, candidate, current string) error {
-	return admitReferenceInvocation(candidate, current)
-}
-
 // ValidatePublicationInvocation checks same-run, non-future attempt scope.
 // It grants no authority without exact Plan, subject and signature verification.
 func ValidatePublicationInvocation(candidate, current string) error {

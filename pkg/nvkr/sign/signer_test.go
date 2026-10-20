@@ -231,3 +231,39 @@ func TestZeroSignedDocumentFailsClosed(t *testing.T) {
 		t.Fatalf("zero signed document must fail closed: %v", err)
 	}
 }
+
+func TestQualifiedSigningArgumentContract(t *testing.T) {
+	for _, issuer := range []string{"", "https://issuer.example.test"} {
+		for _, bundle := range []string{"", "/private/bundle.json"} {
+			t.Run(issuer+bundle, func(t *testing.T) {
+				args := qualifiedSignBlobArgs("/private/document", "/private/signature", "/private/certificate", bundle, issuer)
+				if args[0] != "sign-blob" || args[len(args)-1] != "/private/document" {
+					t.Fatal("wrong command or subject")
+				}
+				expected := map[string]string{"--yes": "", "--use-signing-config=false": "", "--new-bundle-format=false": "", "--b64=false": "", "--tlog-upload=true": "", "--output-signature": "/private/signature", "--output-certificate": "/private/certificate"}
+				if issuer != "" {
+					expected["--oidc-issuer"] = issuer
+				}
+				if bundle != "" {
+					expected["--bundle"] = bundle
+				}
+				for i := 1; i < len(args)-1; i++ {
+					value, ok := expected[args[i]]
+					if !ok {
+						t.Fatalf("unexpected or duplicate argument %s", args[i])
+					}
+					delete(expected, args[i])
+					if value != "" {
+						i++
+						if i >= len(args)-1 || args[i] != value {
+							t.Fatal("wrong option value")
+						}
+					}
+				}
+				if len(expected) != 0 {
+					t.Fatalf("missing options: %v", expected)
+				}
+			})
+		}
+	}
+}

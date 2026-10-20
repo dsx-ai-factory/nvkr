@@ -230,6 +230,18 @@ func TestCleanupDryRunAndRecheck(t *testing.T) {
 		{"attempt reactivated", true, func(f *cleanupFixture) {
 			f.recheckRun = func(r *cleanupRun) { r.Status = "in_progress"; r.Conclusion = "" }
 		}, e.CodeVerifyFailed},
+		{"latest retry starts on recheck", true, func(f *cleanupFixture) {
+			reads := 0
+			f.latestRun = func(r *cleanupRun) {
+				reads++
+				if reads > 1 {
+					r.Attempt = 2
+					r.Status = "in_progress"
+					r.Conclusion = ""
+					r.UpdatedAt = f.now
+				}
+			}
+		}, e.CodeVerifyFailed},
 		{"attempt updated", true, func(f *cleanupFixture) { f.recheckRun = func(r *cleanupRun) { r.UpdatedAt = f.now } }, e.CodeVerifyFailed},
 		{"new signature on recheck", true, func(f *cleanupFixture) {
 			reads := 0

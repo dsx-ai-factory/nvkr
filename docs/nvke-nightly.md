@@ -153,8 +153,9 @@ establish a completed hosted producer or E2E cycle.
 
 ## One cycle
 
-The following is the required candidate cycle. The beta source interface prerequisite
-above currently prevents the runtime step from completing.
+The following is the required candidate cycle. The separately pinned test harness supplies
+the candidate hook. A successful combined producer and runtime cycle remains unverified;
+the earlier producer failures and reported runner repair above do not establish that result.
 
 1. Select a maintained profile on the default branch.
 2. Dispatch its maintained generated producer once. Retain the exact run ID

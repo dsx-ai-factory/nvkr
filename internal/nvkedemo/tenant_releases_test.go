@@ -196,3 +196,37 @@ func TestTenantReleasesMustCompleteBeforeClusterCreation(t *testing.T) {
 		})
 	}
 }
+
+// Opt-in selected-source composition: actual privateJSON output enters the
+// selected CLI's strict decoder without contacting a site or creating resources.
+func TestPinnedTenantReleaseDecoderContract(t *testing.T) {
+	source := os.Getenv("NVKR_NVKE_SOURCE_CONTRACT")
+	if source == "" {
+		t.Skip("set NVKR_NVKE_SOURCE_CONTRACT and NVKR_NVKE_SOURCE_CLI")
+	}
+	cli, err := resolveExisting(os.Getenv("NVKR_NVKE_SOURCE_CLI"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	work := privateTestDir(t)
+	runner := Runner{Work: work, Env: []string{"PATH=" + os.Getenv("PATH"), "HOME=" + work}}
+	if err := verifyInstaller(t.Context(), runner, source); err != nil {
+		t.Fatal(err)
+	}
+	digest := "sha256:" + strings.Repeat("1", 64)
+	image := lifecycle.Artifact{Name: DiskOutputName, Kind: "disk-image", OS: "linux", Arch: "arm64", Digest: digest, Disk: &delivery.DiskOutput{PayloadDigest: digest, Size: 12345, Format: "qcow2", Encryption: "none"}}
+	metadata, ipxe, userData := tenantReleaseFixtureBytes()
+	_, documents, err := tenantReleaseDocuments("kind-calico", image, metadata, ipxe, userData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, kind := range []string{"machineimage", "clusterrelease", "nodepoolrelease"} {
+		path := filepath.Join(work, kind+".json")
+		if err := privateJSON(path, documents[i]); err != nil {
+			t.Fatal(err)
+		}
+		if err := runner.Run(t.Context(), []string{cli, "create", kind, "-f", path, "--dry-run=client", "-o", "yaml"}, "decode-"+kind, time.Minute); err != nil {
+			t.Fatal(err)
+		}
+	}
+}

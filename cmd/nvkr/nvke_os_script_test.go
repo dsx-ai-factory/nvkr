@@ -189,7 +189,7 @@ func TestOSPlanSPIREExceptionCannotAuthorizeOtherConsumers(t *testing.T) {
 		t.Skip("OS validation requires jq")
 	}
 	raw, _ := nvkeOSScriptPlan(t, "amd64")
-	for _, scenario := range []string{"retained SPIRE", "changed commit", "changed tree", "another consumer", "another name", "missing source edge", "snapshot drift"} {
+	for _, scenario := range []string{"retained SPIRE", "changed commit", "changed tree", "another consumer", "another name", "missing source edge", "snapshot drift", "distinct retained fetch"} {
 		t.Run(scenario, func(t *testing.T) {
 			var plan factory.Plan
 			if err := json.Unmarshal(raw, &plan); err != nil {
@@ -216,6 +216,11 @@ func TestOSPlanSPIREExceptionCannotAuthorizeOtherConsumers(t *testing.T) {
 				t.Fatal("fixture omits the mixed-source producer closure")
 			}
 			switch scenario {
+			case "distinct retained fetch":
+				duplicate := *source
+				duplicate.ID += "-other"
+				duplicate.Dest += "-other"
+				graph.Nodes = append(graph.Nodes, duplicate)
 			case "changed commit":
 				source.Commit = strings.Repeat("a", 40)
 			case "changed tree":

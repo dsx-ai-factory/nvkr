@@ -5,7 +5,10 @@ choose a new release policy: each selected independent source still uses the exa
 registry. The maintained policy,
 [`inputs/policies/nvke-catalog-maintenance.yaml`](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/nvke-catalog-maintenance.yaml),
 selects `nvke` and `nvke-helm`, whose constraints select `v0.22.0-beta.6`. This prerelease requires explicit
-`catalog pin --tag` selection; the stable-only maintenance resolver does not choose prereleases. Broader constraints or a different exact release require an authored, reviewed registry change.
+`catalog pin --tag` selection; the stable-only maintenance resolver does not choose prereleases. The daily schedule is suspended while this prerelease is selected; manual refresh also returns
+`NVKR-E-NO-MATCH` for these constraints. Use explicit pinning and regenerate the maintained bundles.
+Restore the default schedule in both Make targets when reviewed stable constraints are adopted.
+Broader constraints or a different exact release require an authored, reviewed registry change.
 The explicit controller chart package/app-version remains an authored producer input; maintenance does
 not infer or rewrite it.
 
@@ -251,9 +254,10 @@ claims remain with the production Run and consumer policy. Even a green candidat
 ## Scheduled catalog refresh
 
 `.github/workflows/catalog-refresh.yaml` is installed in this repository. It is the output of `catalog update-ci
---source-checkout dsx-ai-factory/nvke:NKE_SOURCE_TOKEN`, and it is regenerated rather than edited. It runs
-nightly at 02:00 UTC and on manual dispatch from the default branch. The nightly default keeps the pins
-current without an operator remembering to run the command; an empty `--schedule` restores manual dispatch only.
+--schedule "" --source-checkout dsx-ai-factory/nvke:NKE_SOURCE_TOKEN`, and it is regenerated rather than edited.
+It currently permits manual dispatch only from the default branch. The daily schedule is suspended for
+the exact beta constraints; manual dispatch does not bypass the stable-only resolver. The renderer's
+default schedule is 02:00 UTC when stable maintenance is restored.
 A newer run for the same ref cancels one still in progress. The next run moves the review branch to the current
 candidate (leaving it alone when it already holds that candidate) and opens or edits the pull request, so an
 interruption between the two converges on the next run. The one file matching

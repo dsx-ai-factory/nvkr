@@ -93,6 +93,8 @@ func TestDevelopmentMetadataRetrySelection(t *testing.T) {
 		{"tied source attempts", []string{"1", "1"}, e.CodeVerifyFailed},
 		{"future candidate", []string{"2", "3"}, e.CodeVerifyFailed},
 		{"invalid older candidate", []string{"2", "0"}, e.CodeVerifyFailed},
+		{"repeated artifact ID", []string{"1", "2"}, e.CodeVerifyFailed},
+		{"compressed aggregate bound", []string{"1", "2", "3", "4"}, e.CodeVerifyFailed},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			fixture := newHandoffDownloadFixture(t)
@@ -120,6 +122,14 @@ func TestDevelopmentMetadataRetrySelection(t *testing.T) {
 				artifact.ID, artifact.Size, artifact.Digest = json.Number(id), json.Number(strconv.Itoa(len(archive))), handoffArchiveDigest(archive)
 				fixture.list.Artifacts = append(fixture.list.Artifacts, artifact)
 			}
+			if tc.name == "repeated artifact ID" {
+				fixture.list.Artifacts[1].ID = fixture.list.Artifacts[0].ID
+			}
+			if tc.name == "compressed aggregate bound" {
+				for i := range fixture.list.Artifacts {
+					fixture.list.Artifacts[i].Size = "41943040"
+				}
+			}
 			g := NewGitHub("read-secret")
 			g.client.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				if _, ok := r.Context().Deadline(); !ok || r.Method != http.MethodGet {
@@ -139,6 +149,9 @@ func TestDevelopmentMetadataRetrySelection(t *testing.T) {
 							t.Fatal(err)
 						}
 					} else {
+						if tc.name == "repeated artifact ID" || tc.name == "compressed aggregate bound" {
+							t.Fatal("invalid candidate list reached archive download")
+						}
 						parts := strings.Split(r.URL.Path, "/")
 						id := parts[len(parts)-2]
 						if archives[id] == nil {
@@ -170,6 +183,31 @@ func TestDevelopmentMetadataRetrySelection(t *testing.T) {
 			raw, err := os.ReadFile(filepath.Join(destination, root))
 			if err != nil || string(raw) != "2" {
 				t.Fatalf("lost newest original metadata: %s, %v", raw, err)
+			}
+		})
+	}
+}
+
+func TestDevelopmentMetadataDecodedAggregateIncludesUnselectedCandidates(t *testing.T) {
+	for _, remaining := range []uint64{0, 1} {
+		t.Run(strconv.FormatUint(remaining, 10), func(t *testing.T) {
+			fixture := newHandoffDownloadFixture(t)
+			defer func() { _ = fixture.source.Close() }()
+			origin, err := fixture.source.Description()
+			if err != nil {
+				t.Fatal(err)
+			}
+			const name = "nvkr-qualification-1234-2"
+			fixture.archive = handoffZIP(t, []zip.FileHeader{{Name: name + ".ci-locator.json", Method: zip.Deflate}}, []byte("{}"))
+			artifact := fixture.list.Artifacts[0]
+			artifact.Digest = handoffArchiveDigest(fixture.archive)
+			artifact.Size = json.Number(strconv.Itoa(len(fixture.archive)))
+			fixture.list.Artifacts[0] = artifact
+			used := uint64(128<<20) - remaining
+			_, err = fixture.github(t).downloadDevelopmentLocator(t.Context(), fixture.source, origin, name, artifact, &used)
+			assertCode(t, err, e.CodeVerifyFailed)
+			if !strings.Contains(err.Error(), "decoded aggregate") {
+				t.Fatalf("wrong refusal: %v", err)
 			}
 		})
 	}

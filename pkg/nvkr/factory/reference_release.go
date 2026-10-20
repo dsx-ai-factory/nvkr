@@ -84,7 +84,7 @@ func authenticateReferenceMetadata(ctx context.Context, plan *Plan, route Route,
 		return fail(e.New(e.CodeVerifyFailed, "production predicate belongs to another workflow Run"))
 	}
 	invocation := claimed.RunDetails.Metadata["invocationId"]
-	if err := admitPlanReferenceInvocation(plan, invocation, run.InvocationID()); err != nil {
+	if err := admitReferenceInvocation(invocation, run.InvocationID()); err != nil {
 		return fail(err)
 	}
 	metadata := inspection.Root.Release
@@ -92,7 +92,7 @@ func authenticateReferenceMetadata(ctx context.Context, plan *Plan, route Route,
 		metadata.DefinitionDigest != plan.DefinitionDigest || metadata.EnvironmentDigest != plan.EnvironmentDigest {
 		return fail(e.New(e.CodeVerifyFailed, "publication metadata belongs to another Plan or Run"))
 	}
-	if err := admitPlanReferenceInvocation(plan, metadata.InvocationID, invocation); err != nil {
+	if err := admitReferenceInvocation(metadata.InvocationID, invocation); err != nil {
 		return fail(err)
 	}
 	for _, object := range inspection.Root.Objects {
@@ -108,10 +108,10 @@ func authenticateReferenceMetadata(ctx context.Context, plan *Plan, route Route,
 		if err := validateQualificationOutputRepository(plan, target, repository, metadata.InvocationID); err != nil {
 			return fail(err)
 		}
-		if err := admitPlanReferenceInvocation(plan, origin.PreparedInvocationID, origin.SignedInvocationID); err != nil {
+		if err := admitReferenceInvocation(origin.PreparedInvocationID, origin.SignedInvocationID); err != nil {
 			return fail(err)
 		}
-		if err := admitPlanReferenceInvocation(plan, origin.SignedInvocationID, metadata.InvocationID); err != nil {
+		if err := admitReferenceInvocation(origin.SignedInvocationID, metadata.InvocationID); err != nil {
 			return fail(err)
 		}
 	}
@@ -202,7 +202,7 @@ func assembleReferenceRelease(ctx context.Context, plan *Plan, out string, recei
 			root.Release.DefinitionDigest != receipt.inspection.Root.Release.DefinitionDigest || root.Release.EnvironmentDigest != receipt.inspection.Root.Release.EnvironmentDigest {
 			return e.New(e.CodeVerifyFailed, "output metadata belongs to different release plans")
 		}
-		if err := admitPlanReferenceInvocation(plan, receipt.origin.SignedInvocationID, run.InvocationID()); err != nil {
+		if err := admitReferenceInvocation(receipt.origin.SignedInvocationID, run.InvocationID()); err != nil {
 			return err
 		}
 		for _, object := range receipt.inspection.Root.Objects {

@@ -79,12 +79,16 @@ func TestPinnedSiteSourceContract(t *testing.T) {
 	if err = bootstrapCA(t.Context(), session); err != nil {
 		t.Fatal(err)
 	}
-	spec, err := prepareStackSiteSpec(t.Context(), session, source, deploy, "172.18.0.2", refs, SiteConnection{Endpoint: "http://172.30.0.1:18081", Org: "contract-org", Token: "contract-token"})
+	spec, err := prepareStackSiteSpec(t.Context(), session, "172.18.0.2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner, stack, err := prepareManagementStack(t.Context(), session, refs, SiteConnection{Endpoint: "http://172.30.0.1:18081", Org: "contract-org", Token: "contract-token"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	rendered := filepath.Join(work, "rendered")
-	if err = runner.Run(t.Context(), []string{cli, "render", "deploy-path", "--deploy-path", deploy, "--sitespec", spec, "--out", rendered}, "source-render-contract", time.Minute); err != nil {
+	if err = runner.Run(t.Context(), []string{cli, "render", "deploy-path", "--deploy-path", deploy, "--sitespec", spec, "--stack-config", stack, "--out", rendered}, "source-render-contract", time.Minute); err != nil {
 		t.Fatal(err)
 	}
 	for _, item := range []string{"controller", "nktp", "postgresql", "spire", "spire-crds", "temporal"} {
@@ -105,6 +109,25 @@ func TestPinnedSiteSourceContract(t *testing.T) {
 		t.Fatal("renderer lost selected controller/profiles images", err)
 	}
 	if err = runner.Run(t.Context(), []string{"bash", filepath.Join(source, "deploy/nvke-deploy.sh"), "install", "--deploy-path", rendered, "--kubeconfig", filepath.Join(work, "kubeconfig"), "--dry-run"}, "source-install-dry-run", time.Minute); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPinnedNICoSimPatchAppliesToSelectedSource(t *testing.T) {
+	source := os.Getenv("NVKR_NVKE_SOURCE_CONTRACT")
+	if source == "" {
+		t.Skip("set NVKR_NVKE_SOURCE_CONTRACT")
+	}
+	work := privateTestDir(t)
+	runner := Runner{Work: work, Env: []string{"PATH=" + os.Getenv("PATH"), "HOME=" + work}}
+	if err := verifyInstaller(t.Context(), runner, source); err != nil {
+		t.Fatal(err)
+	}
+	patch, err := filepath.Abs("../../inputs/catalogs/nicosim/patches/version-interface.patch")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := runner.Run(t.Context(), []string{"git", "-C", source, "apply", "--check", patch}, "nicosim-patch-contract", time.Minute); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -366,10 +366,9 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 	if err != nil {
 		return err
 	}
-	// The beta API retains osProfile as its request field. Its value now
-	// selects the immutable ClusterRelease or NodePoolRelease for this disk.
-	intent.ControlPlane.NICo.OS = release
-	intent.NodePools[0].NICo.OS = release
+	// The strict beta API selects immutable releases through release.
+	intent.ControlPlane.NICo.Release, intent.ControlPlane.NICo.OS = release, ""
+	intent.NodePools[0].NICo.Release, intent.NodePools[0].NICo.OS = release, ""
 	request := filepath.Join(t.session.Work, "tenant-request.json")
 	if err = privateJSON(request, intent); err != nil {
 		return err

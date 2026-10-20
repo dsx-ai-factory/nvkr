@@ -276,7 +276,7 @@ jobs:
               else error("site products require one exact NVKE suite revision") end
             ' .nightly-private/runtime-inputs/plan.json)
             if [[ "$suite" == 8db5721ae3031bdcd945e559153a740d46ea209e ]]; then
-              [[ "$PINNED_SUITE" == a32067108ab89d1e2b2b6720766ffe97270a166a ]]
+              [[ "$PINNED_SUITE" == a32067108ab89d1e2b2b6720766ffe97270a166a ]] || { echo "unrecognized retained suite pin" >&2; exit 1; }
               suite="$PINNED_SUITE"
             fi
           fi

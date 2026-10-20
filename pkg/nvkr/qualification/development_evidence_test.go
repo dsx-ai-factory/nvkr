@@ -4,6 +4,8 @@
 package qualification
 
 import (
+	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -95,9 +97,17 @@ func TestDevelopmentEvidenceRetainsMixedPublicationAttempts(t *testing.T) {
 				requireCode(t, err, tc.code)
 				return
 			}
-			if err != nil || !strings.Contains(string(raw), "/attempts/1/") {
+			if err != nil {
 				t.Fatalf("lost retained publication: %v", err)
 			}
+			var decoded Evidence
+			if err := json.Unmarshal(raw, &decoded); err != nil {
+				t.Fatal(err)
+			}
+			if decoded.ArtifactChecks.Origin.Attempt != "2" || decoded.ArtifactChecks.Inputs.ReleaseSubject != v.ArtifactChecks.Inputs.ReleaseSubject || !reflect.DeepEqual(decoded.ArtifactChecks.Outputs, v.ArtifactChecks.Outputs) {
+				t.Fatal("canonical evidence changed the consuming attempt or exact named retained references")
+			}
+
 		})
 	}
 }

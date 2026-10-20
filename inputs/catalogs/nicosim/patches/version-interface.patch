@@ -9,7 +9,7 @@
 +BUILD_VERSION ?= dev
 +GIT_COMMIT ?= unknown
 +GIT_TREE_STATE ?= unknown
-+VERSION_PACKAGE := github.com/dsx-ai-factory/nke/controller/nico-sim/internal/version
++VERSION_PACKAGE := github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/version
 +VERSION_LDFLAGS := -X $(VERSION_PACKAGE).BuildVersion=$(BUILD_VERSION) -X $(VERSION_PACKAGE).GitCommit=$(GIT_COMMIT) -X $(VERSION_PACKAGE).GitTreeState=$(GIT_TREE_STATE)
  
  REPO_ROOT := $(shell pwd)
@@ -33,10 +33,10 @@
 --- a/controller/nico-sim/cmd/nico-sim/main.go
 +++ b/controller/nico-sim/cmd/nico-sim/main.go
 @@ -18,9 +18,13 @@
- 	"github.com/dsx-ai-factory/nke/controller/nico-sim/internal/app"
- 	nvmconfig "github.com/dsx-ai-factory/nke/controller/nico-sim/internal/config"
- 	"github.com/dsx-ai-factory/nke/controller/nico-sim/internal/seed"
-+	"github.com/dsx-ai-factory/nke/controller/nico-sim/internal/version"
+ 	"github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/app"
+ 	nvmconfig "github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/config"
+ 	"github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/seed"
++	"github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/version"
  )
  
  func main() {
@@ -52,7 +52,7 @@
  	"bytes"
  	"encoding/json"
  	"fmt"
-+	"github.com/dsx-ai-factory/nke/controller/nico-sim/internal/version"
++	"github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/version"
  	"io"
  	"net/http"
  	"net/url"

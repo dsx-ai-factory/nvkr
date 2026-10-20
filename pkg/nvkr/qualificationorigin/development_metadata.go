@@ -68,10 +68,11 @@ func (g *GitHub) DownloadDevelopmentMetadata(ctx context.Context, source *Source
 	}
 	var selected cistore.Locator
 	var latest uint64
+	var decodedBytes uint64
 	seen := make(map[uint64]bool, count)
 	current, _ := strconv.ParseUint(request.Attempt, 10, 64)
 	for _, artifact := range listing.Artifacts {
-		locator, err := g.downloadDevelopmentLocator(ctx, source, origin, name, artifact)
+		locator, err := g.downloadDevelopmentLocator(ctx, source, origin, name, artifact, &decodedBytes)
 		if err != nil {
 			return err
 		}
@@ -99,7 +100,7 @@ func (g *GitHub) DownloadDevelopmentMetadata(ctx context.Context, source *Source
 }
 
 // Every candidate is provider-authenticated before selecting its original attempt.
-func (g *GitHub) downloadDevelopmentLocator(ctx context.Context, source *SourceRun, origin Description, name string, artifact qualificationArtifact) (cistore.Locator, error) {
+func (g *GitHub) downloadDevelopmentLocator(ctx context.Context, source *SourceRun, origin Description, name string, artifact qualificationArtifact, decodedBytes *uint64) (cistore.Locator, error) {
 	archive, err := g.downloadArtifactArchive(ctx, source.Require, origin.Repository, artifact.ID, 40<<20)
 	if err != nil {
 		return cistore.Locator{}, err
@@ -117,6 +118,11 @@ func (g *GitHub) downloadDevelopmentLocator(ctx context.Context, source *SourceR
 	if len(reader.File) != 1 || reader.File[0].Name != name+".ci-locator.json" || !reader.File[0].Mode().IsRegular() || reader.File[0].UncompressedSize64 > cistore.MaxMetadataRecordBytes {
 		return cistore.Locator{}, e.New(e.CodeVerifyFailed, "development control archive requires one exact bounded metadata record")
 	}
+	// Count every candidate's decoded bytes, including candidates not selected.
+	if reader.File[0].UncompressedSize64 > (128<<20)-*decodedBytes {
+		return cistore.Locator{}, e.New(e.CodeVerifyFailed, "development carrier selection exceeds its decoded aggregate bound")
+	}
+	*decodedBytes += reader.File[0].UncompressedSize64
 	bounded.metadata = false
 	input, err := reader.File[0].Open()
 	if err != nil {
