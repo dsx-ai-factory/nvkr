@@ -21,7 +21,6 @@ PIPELINE_DEV_REPO ?=
 export PIPELINE_DEV_REPO
 # Module source dirs only (never the vendored trees checked out under .nvkr/).
 GOSRC       := client cmd internal pkg
-GOFILES     := $(shell find $(GOSRC) -type f -name '*.go' -print)
 GO_VERSION  := $(shell cat .go-version 2>/dev/null)
 VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT      := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -79,11 +78,12 @@ go-version-check: ## Require the exact Go patch pinned in .go-version.
 
 .PHONY: fmt
 fmt: ## Format code (gofmt -s -w).
-	gofmt -s -w $(GOFILES)
+	gofmt -s -w $(GOSRC)
 
 .PHONY: fmt-check
 fmt-check: ## Check formatting (CI-friendly, no writes).
-	@test -z "$$(gofmt -l $(GOFILES))" || { echo "unformatted files — run 'make fmt':"; gofmt -l $(GOFILES); exit 1; }
+	@unformatted="$$(gofmt -l $(GOSRC))" || exit $$?; \
+	  test -z "$$unformatted" || { echo "unformatted files — run 'make fmt':"; printf '%s\n' "$$unformatted"; exit 1; }
 	@echo "formatting ok"
 
 .PHONY: vet
@@ -133,7 +133,7 @@ cover: test-race ## Open the HTML coverage report in a browser.
 
 .PHONY: tidy
 tidy: ## Format + go mod tidy.
-	gofmt -s -w $(GOFILES)
+	gofmt -s -w $(GOSRC)
 	go mod tidy
 
 .PHONY: notices
