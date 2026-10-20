@@ -1131,9 +1131,15 @@ failed all four OS-image producers during OVN builder preparation, before Packer
 returned `MANIFEST_UNKNOWN` both on the runners and in a direct registry read. Authored OVN builder
 arguments now select the Go 1.26.10 multi-platform index
 `sha256:d5acf07940fb5e6e2d07542abd853cece623d95ffd364769ec825aab5471d3b8`; registry reads verified
-its AMD64 and ARM64 manifests and recorded Go version. The selected source Dockerfile requires the
+its AMD64 and ARM64 manifests and recorded Go version in a point-in-time manual check.
+The default pin-binding contract checks catalog literals without contacting the registry; it does not
+continuously establish availability. The selected standard source Dockerfile requires the
 existing DNF-based builder family, and its vendored JSON adapter remains incompatible with Go 1.27.
-This updates a builder input, not the NVKE beta.6, SPIRE or harness source selections. A complete
+The separate fork at `8af51273d52dfa07454435d18d37230e582d797a` uses
+[Dockerfile.ubuntu.nv](https://github.com/dsx-ai-factory/ovn-kubernetes/blob/8af51273d52dfa07454435d18d37230e582d797a/dist/images/Dockerfile.ubuntu.nv),
+which hardcodes Go 1.26.9 at `sha256:37cfcca63222ec499bec5e8ad7aad52dbf7529db36d5812b8eae2f0621aa92d6`
+and ignores `BUILDER_IMAGE`; its unused argument is removed, not credited with a compiler repair.
+This updates a standard builder input, not the NVKE beta.6, SPIRE or harness source selections. A complete
 hosted build with the replacement remains pending.
 
 The current candidate selects NVKE `v0.22.0-beta.6` at

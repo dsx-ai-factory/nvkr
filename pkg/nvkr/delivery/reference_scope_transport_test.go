@@ -26,6 +26,7 @@ func TestMixedAttemptMetadataAndPayloadRegistryRoundTrip(t *testing.T) {
 	handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
 	var mu sync.Mutex
 	reads := map[string]bool{}
+	var rejectedHosts []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			mu.Lock()
@@ -43,6 +44,9 @@ func TestMixedAttemptMetadataAndPayloadRegistryRoundTrip(t *testing.T) {
 		// Registry upload Location responses point at this exact test server.
 		// Admit those follow-ups without allowing any other network destination.
 		if r.URL.Host != "ghcr.io" && r.URL.Host != serverHost {
+			mu.Lock()
+			rejectedHosts = append(rejectedHosts, r.URL.Host)
+			mu.Unlock()
 			return nil, fmt.Errorf("unexpected registry host %s", r.URL.Host)
 		}
 		clone := r.Clone(r.Context())
@@ -146,6 +150,9 @@ func TestMixedAttemptMetadataAndPayloadRegistryRoundTrip(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
+	if len(rejectedHosts) != 0 {
+		t.Fatalf("attempted rejected registry destinations: %v", rejectedHosts)
+	}
 	for _, path := range []string{"/v2/example/nvkr/development/runs/123/attempts/1/a/manifests/", "/v2/example/nvkr/development/runs/123/attempts/2/b/manifests/"} {
 		found := false
 		for read := range reads {

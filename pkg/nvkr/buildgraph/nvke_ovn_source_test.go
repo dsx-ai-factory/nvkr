@@ -38,13 +38,14 @@ const ovnForkCommit = "8af51273d52dfa07454435d18d37230e582d797a"
 // ovnForkStream matches Chart.yaml at ovnForkCommit; it is not the Debian revision.
 const ovnForkStream = "2.4.2"
 
-// Both source trees use a vendored JSON adapter incompatible with Go 1.27.
+// Dockerfile.ubuntu consumes this override; the .nv fork owns its compiler FROM.
+// This literal-binding contract does not check live registry availability.
 // Quay Go 1.26.10 index, verified for linux/amd64 and linux/arm64 on 2026-10-20.
 const ovnGoBuilder = "quay.io/projectquay/golang@sha256:d5acf07940fb5e6e2d07542abd853cece623d95ffd364769ec825aab5471d3b8"
 
 func TestNVKEOVNBuilderPinBindings(t *testing.T) {
 	for _, path := range []string{
-		"../../../inputs/catalogs/ovn-nvidia",
+		"../../../inputs/catalogs/ovn-upstream",
 		"../../../inputs/catalogs/node-images/release",
 		"../../../inputs/catalogs/node-images/diagnostic",
 	} {
@@ -212,6 +213,10 @@ func TestNVKEOVNForkPinBindings(t *testing.T) {
 		t.Fatal("fork lock changed without reviewing the catalog's stream and packaging bindings")
 	}
 	cat := loadOVNForkCatalog(t)
+	// The exact source-owned Dockerfile hardcodes Go 1.26.9 and ignores this argument.
+	if strings.Contains(strings.Join(cat.Components["ovn-kube-ubuntu"].BuildCommand, "\n"), "build-arg:BUILDER_IMAGE=") {
+		t.Fatal("fork compiler must not be represented by an unused build argument")
+	}
 	for _, tc := range []struct {
 		component string
 		fragments []string
@@ -219,9 +224,6 @@ func TestNVKEOVNForkPinBindings(t *testing.T) {
 		{component: "ovn-kube-ubuntu", fragments: []string{
 			"name=localhost/nvke/ovn-kubernetes:git-" + pin.Commit,
 			"filename=Dockerfile.ubuntu.nv",
-			// The fork's vendored JSON adapter needs Go 1.26, not Go 1.27's
-			// changed JSON v2 API. This is the measured patched 1.26.9 builder.
-			"build-arg:BUILDER_IMAGE=" + ovnGoBuilder,
 			`--opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"`,
 			// The Dockerfile defaults to the fork's private FIPS/STIG base and
 			// Artifactory; these overrides keep the producer credential-free.
