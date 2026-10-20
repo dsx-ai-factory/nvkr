@@ -361,3 +361,65 @@ func TestArtifactDiagnosticCopyCancellation(t *testing.T) {
 		})
 	}
 }
+
+// This is factory dispatch with mocked import/container execution, not an upstream run.
+func TestAdmittedCLIArtifactFreezesPlanAndSelection(t *testing.T) {
+	for _, arch := range []string{"amd64", "arm64"} {
+		for _, suite := range []string{"contract", "cli"} {
+			t.Run(arch+"/"+suite, func(t *testing.T) {
+				plan := writeCLIPlan(t, cliTestPlan(t, arch, "scalar", 1))
+				root := t.TempDir()
+				artifact := filepath.Join(root, "binary")
+				if err := os.WriteFile(artifact, []byte("selected"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				configuration := []byte(`{"check":"frozen"}`)
+				options := ArtifactTestOptions{Plan: plan, Artifact: artifact, Suite: suite, WorkspaceRoot: filepath.Join(root, "workspace"), Keep: true, DiagnosticConfiguration: configuration}
+				admitted, err := AdmitCLIArtifact(t.Context(), options)
+				if err != nil {
+					t.Fatal(err)
+				}
+				expected := admitted.Inputs()
+				if _, err := os.Stat(options.WorkspaceRoot); !os.IsNotExist(err) {
+					t.Fatal("workspace created during admission")
+				}
+				if err := os.WriteFile(plan, []byte("changed after admission"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				configuration[0] = 'x'
+				options.Suite = "bootstrap"
+				options.Artifact = "other"
+				importer := func(_ context.Context, _ []string, directory, repo, commit, tree string, _ io.Writer) error {
+					if repo != expected.Repo || commit != expected.Commit || tree != expected.TreeHash {
+						t.Fatal("source changed")
+					}
+					if err := os.MkdirAll(filepath.Join(directory, "cli"), 0o700); err != nil {
+						return err
+					}
+					return os.WriteFile(filepath.Join(directory, "cli/Makefile"), []byte("test-artifact:\n"), 0o600)
+				}
+				runner := func(_ context.Context, input pipeline.ArtifactDiagnostic, _ io.Writer, _ io.Writer) error {
+					if input.Suite != suite || input.Platform != "linux/"+arch || input.Image != expected.ToolchainImage || input.Version != expected.ExpectedVersion {
+						t.Fatal(input)
+					}
+					raw, err := os.ReadFile(input.Artifact)
+					if err != nil || string(raw) != "selected" {
+						t.Fatalf("%s %v", raw, err)
+					}
+					metadata, err := os.ReadFile(filepath.Join(input.Workspace, "selection.json"))
+					if err != nil || !strings.Contains(string(metadata), `"check":"frozen"`) || !strings.Contains(string(metadata), expected.Commit) {
+						t.Fatalf("%s %v", metadata, err)
+					}
+					pkg := "command-line-arguments"
+					if suite == "cli" {
+						pkg = "github.com/dsx-ai-factory/nvke/cli/cmd/nvkectl"
+					}
+					return os.WriteFile(filepath.Join(input.Workspace, "tests.jsonl"), []byte(diagnosticEvents(pkg, "TestContract")), 0o600)
+				}
+				if err := runCLIArtifact(t.Context(), admitted.options, &admitted.inputs, importer, runner); err != nil {
+					t.Fatal(err)
+				}
+			})
+		}
+	}
+}

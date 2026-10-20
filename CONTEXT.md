@@ -184,8 +184,10 @@ _Avoid_: Recipe, test dispatcher framework, verification policy
 **Validator catalog (proposed)**:
 An explicit index of reusable diagnostic validator entries, organized by project, artifact and suite.
 Proposed [ADR-24](docs/adr/0024-imported-validator-catalog.md) separates entries from profiles selecting named
-instances and artifact-role bindings. This catalog and the versioned profiles are not implemented; the
-current published-source Validation profile above retains its existing admission rules.
+instances and artifact-role bindings. The provisional CLI slice implements strict discovery, local-plan
+admission and frozen dispatch for the existing process-contract and mixed CLI suites. Shared schemas remain
+provisional; published adapters, controller/chart checks and broader migration are deferred. Existing legacy
+validation routes retain their separate admission and capture contracts.
 _Avoid_: Producer catalog, upstream test implementation, executable plugin, qualification policy
 
 **Release authenticity**:

@@ -59,8 +59,10 @@ disk service and journaled network-control restoration. These trusted-code CI
 diagnostics do not add runtime authority to the artifact-verification core.
 
 Proposed [ADR-24](adr/0024-imported-validator-catalog.md) separates imported-validator discovery from upstream
-test ownership and binds named artifact roles through explicit diagnostic profiles. The catalog, versioned
-profiles and controller/chart adapters are not implemented. Existing CLI and published-source diagnostics
+test ownership and binds named artifact roles through explicit diagnostic profiles. The provisional CLI
+slice implements strict loading/discovery and frozen local-plan dispatch through the existing execution
+owners; native upstream catalog execution remains unexercised. Shared schema stabilization, published
+adapters and controller/chart integration are deferred. Existing CLI and legacy validation diagnostics
 retain their separate admission and result contracts; catalog registration grants no qualification authority.
 
 ## Assumptions {#assumptions}

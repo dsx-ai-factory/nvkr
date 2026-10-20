@@ -1,10 +1,10 @@
 # ADR-24 — Imported validator catalog and artifact bindings
 
 - **Decision status:** Proposed (pending named-decider ratification)
-- **Implementation maturity:** Design only; the catalog, versioned profiles and discovery interface are not implemented.
-  Existing CLI diagnostics and published-source validation are tracked separately in `reconciliation.md`.
-- **Acceptance-test maturity:** Acceptance criteria are defined below; no catalog implementation or external
-  catalog execution has been demonstrated.
+- **Implementation maturity:** Initial provisional CLI catalog, strict loading/discovery and local-plan profile dispatch
+  are implemented. Broader migration, published adapters and stabilization remain deferred; see `reconciliation.md`.
+- **Acceptance-test maturity:** Initial discovery/admission/snapshot and mocked CLI dispatch contracts are tested.
+  No new actual upstream catalog execution or native-platform catalog acceptance is claimed.
 - **Deciders:** Pending; validation, artifact-production and upstream interface owners must be named before ratification.
 - **Index:** Proposed ADR-24 supplements ADR-01–22 and proposed ADR-23; it remains outside the consolidated
   contract set until accepted.
@@ -41,9 +41,10 @@ It must also preserve exact source relationships and support validators consumin
 
 There are already two relevant execution surfaces. `run artifact-test` is a trusted-input local CLI diagnostic;
 `validate` dispatches explicitly configured published-source `kube-conformance` checks through Hydrophone.
-The latter rejects local sources. `testresults` describes external report capture without parsing reports or
-granting a passing verdict. The [CLI diagnostic](../artifact-testing.md) and
-[external test output contract](../external-test-output-contract.md) document those implemented boundaries.
+The latter retains publication authentication and separately admits complete local diagnostic Runs through
+its existing conformance owner. Its local Run route is distinct from the new CLI local-plan binding.
+`testresults` describes external report capture without parsing reports or granting a passing verdict.
+The [CLI diagnostic](../artifact-testing.md) and [external test output contract](../external-test-output-contract.md) document those implemented boundaries.
 A common catalog must preserve these different input and result contracts.
 
 ## Decision
@@ -172,16 +173,17 @@ suiteSource:
   mode: build-source
   fromInput: executable
 platforms: [linux/amd64, linux/arm64]
-requires: [docker]
+requires: [docker, git]
 timeout: 30m
 coverage: artifact-contract
 limitations:
   - Package-level result checks do not establish exhaustive artifact-contract coverage
 ```
 
-This schema example does not introduce a currently accepted input format. `coverage` describes the intended
-test surface, not measured completeness: `artifact-contract`, `source`, or `mixed`. The full CLI suite is
-`mixed` because ordinary unit tests compile imported source while its process contracts execute supplied bytes.
+The initial CLI slice accepts this provisional entry shape; it does not establish stable compatibility.
+`coverage` describes the intended test surface, not measured completeness: `artifact-contract`, `source`,
+or `mixed`. The full CLI suite is `mixed` because ordinary unit tests compile imported source while its
+process contracts execute supplied bytes.
 Package/test counts cannot be presented as a count of artifact contracts.
 
 ### 4. Bind named artifact roles explicitly and validate the complete selection
@@ -355,7 +357,8 @@ its default suite and flags map explicitly to those entries when the new path is
 documented error/exit behavior, cleanup and diagnostic limitations. There is no automatic switch from a
 failed catalog lookup back to hard-coded execution.
 
-The existing unversioned JSON `validate --config` profile keeps its current published-source semantics.
+The existing unversioned JSON `validate --config` profile keeps its current published-source semantics and
+its independently admitted complete-local-Run conformance route.
 The new versioned profile is an explicit format and capability transition; legacy documents are not silently
 reinterpreted, and local support is not enabled by relaxing the legacy source check. Discovery reports
 availability and requirements; it does not execute checks or interpret a descriptor as proof of support.
@@ -438,6 +441,29 @@ item 6. Artifact expansion and hosted integration have separate acceptance; neit
 6. **Migration and CI:** explicit legacy/new-profile behavior, unchanged existing published-source admission,
    shared local/CI adapter semantics and generator-owned workflow changes. Hosted credentials, runner allocation,
    triggers and transport require their own acceptance; no workflow capability follows from merging this ADR.
+
+The IV1-C1–IV1-C3 implementation exposes provisional `validators list|describe|run` diagnostics
+(hidden from normal lifecycle help) and matching thin `client/v1` methods. The first versioned profile
+admits local-plan only. It deliberately refuses new-format published mode; the existing legacy published
+route retains authentication and capture-only semantics; its separately admitted local conformance route
+also remains unchanged. Profiles have no adapter configuration extension in this slice: such fields are
+unknown until a reviewed versioned interface owns them. Check instance and
+role names use the same segment grammar as ID segments; output names retain existing Plan naming rules.
+
+Adapter minimum limitations are emitted separately from authored display text. An unavailable adapter or
+entry/adapter disagreement remains describable but cannot be selected for execution. Host Git and Docker
+are minimum CLI prerequisites; the selected toolchain must provide Go and Make. The CLI adapter
+currently refuses extra requirements with no installed admission owner. Catalog selection does not enable
+those capabilities by naming them.
+
+The legacy timeout contract needs an explicit migration decision: `run artifact-test --timeout` admits
+arbitrary positive per-container bounds, while `nvke-cli/v1` caps catalog suite execution at 30 minutes and
+retains a separate 30-minute dependency budget. Therefore this slice preserves the legacy command directly
+through factory rather than mapping all its flags to a narrower catalog entry. No failed catalog admission
+falls back to that route. Factory's opaque diagnostic invocation is shared by both paths; it freezes complete
+Plan interpretation before execution without issuing an authenticated receipt. Artifact paths are frozen;
+bytes retain the existing staging-time integrity contract. No claim of admission-time artifact authentication
+is added. Exact admitted Plan document integrity is retained with catalog selection metadata.
 
 Named owners must ratify the schemas, adapter protocols and migration before maintained adoption. Reconciliation
 records implementation, contract tests and external execution separately. Any future authenticated evidence

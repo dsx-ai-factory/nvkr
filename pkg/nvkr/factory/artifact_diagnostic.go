@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/sourcegit"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
@@ -31,6 +32,10 @@ type ArtifactTestOptions struct {
 	Keep                                         bool
 	Timeout                                      time.Duration
 	Stdout, Stderr                               io.Writer
+	// DiagnosticConfiguration is descriptive canonical selection metadata only.
+	DiagnosticConfiguration []byte
+	// DependencyTimeout is a separate acquisition budget; zero preserves legacy per-container behavior.
+	DependencyTimeout time.Duration
 }
 
 type artifactTestCounts struct {
@@ -58,18 +63,88 @@ func TestCLIArtifact(ctx context.Context, options ArtifactTestOptions) error {
 func testCLIArtifact(ctx context.Context, options ArtifactTestOptions,
 	importSource func(context.Context, []string, string, string, string, string, io.Writer) error,
 	run func(context.Context, pipeline.ArtifactDiagnostic, io.Writer, io.Writer) error) (returnErr error) {
-	if ctx == nil {
-		return e.New(e.CodeUsage, "artifact testing requires a context")
+	invocation, err := AdmitCLIArtifact(ctx, options)
+	if err != nil {
+		return err
+	}
+	return runCLIArtifact(ctx, invocation.options, &invocation.inputs, importSource, run)
+}
+
+// CLIArtifactInvocation freezes the validated producer and suite for one diagnostic.
+// It grants no artifact membership or qualification authority.
+type CLIArtifactInvocation struct {
+	options    ArtifactTestOptions
+	inputs     CLIArtifactTestInputs
+	planSHA256 string
+}
+
+// AdmitCLIArtifact validates a complete Plan without workspace or executable work.
+// Run never reopens the Plan. Artifact bytes remain caller supplied until staging.
+func AdmitCLIArtifact(ctx context.Context, options ArtifactTestOptions) (*CLIArtifactInvocation, error) {
+	if options.Suite != "" && options.Suite != "contract" && options.Suite != "cli" {
+		return nil, e.New(e.CodeUsage, "suite must be contract or cli")
+	}
+	plan, err := LoadCLIArtifactPlan(ctx, options.Plan)
+	if err != nil {
+		return nil, err
+	}
+	return plan.Admit(ctx, options)
+}
+
+// Admit selects one producer from this frozen Plan without reopening its path.
+func (p *CLIArtifactPlan) Admit(ctx context.Context, options ArtifactTestOptions) (*CLIArtifactInvocation, error) {
+	if p == nil || p.plan == nil || ctx == nil {
+		return nil, e.New(e.CodeUsage, "missing CLI Plan or context")
+	}
+	if ctx.Err() != nil {
+		return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "CLI admission canceled")
 	}
 	if options.Suite == "" {
 		options.Suite = "contract"
 	}
 	if options.Suite != "contract" && options.Suite != "cli" {
-		return e.New(e.CodeUsage, "suite must be contract or cli")
+		return nil, e.New(e.CodeUsage, "suite must be contract or cli")
 	}
-	inputs, err := LoadCLIArtifactTestInputs(ctx, options.Plan, options.Output)
+	inputs, err := selectCLIArtifactTestInputs(p.plan, options.Output)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	if len(options.DiagnosticConfiguration) != 0 {
+		raw, err := canonical.Marshal(struct {
+			Selection  json.RawMessage       `json:"selection"`
+			Inputs     CLIArtifactTestInputs `json:"inputs"`
+			PlanSHA256 string                `json:"planSha256"`
+		}{options.DiagnosticConfiguration, *inputs, p.documentSHA256})
+		if err != nil {
+			return nil, e.Wrap(e.CodeUsage, err, "invalid diagnostic configuration")
+		}
+		options.DiagnosticConfiguration = raw
+	}
+	return &CLIArtifactInvocation{options: options, inputs: *inputs, planSHA256: p.documentSHA256}, nil
+}
+
+// Inputs returns a copy of the diagnostic producer description.
+func (i *CLIArtifactInvocation) Inputs() CLIArtifactTestInputs { return i.inputs }
+
+// PlanSHA256 returns the exact admitted Plan document integrity, not authority.
+func (i *CLIArtifactInvocation) PlanSHA256() string { return i.planSHA256 }
+
+// Run uses the admitted source/subject selection and existing execution owners.
+func (i *CLIArtifactInvocation) Run(ctx context.Context) error {
+	if i == nil || i.inputs.Output == "" {
+		return e.New(e.CodeUsage, "missing admitted CLI invocation")
+	}
+	return runCLIArtifact(ctx, i.options, &i.inputs, sourcegit.ImportLocal, pipeline.RunArtifactDiagnostic)
+}
+
+func runCLIArtifact(ctx context.Context, options ArtifactTestOptions, inputs *CLIArtifactTestInputs,
+	importSource func(context.Context, []string, string, string, string, string, io.Writer) error,
+	run func(context.Context, pipeline.ArtifactDiagnostic, io.Writer, io.Writer) error) (returnErr error) {
+	if ctx == nil {
+		return e.New(e.CodeUsage, "artifact testing requires a context")
+	}
+	if ctx.Err() != nil {
+		return e.Wrap(e.CodeTimeout, ctx.Err(), "artifact diagnostic canceled")
 	}
 	if options.Stdout == nil {
 		options.Stdout = io.Discard
@@ -119,6 +194,11 @@ func testCLIArtifact(ctx context.Context, options ArtifactTestOptions,
 			returnErr = e.Wrap(e.CodeBuildFailed, deliveryErr, "writing artifact diagnostic output")
 		}
 	}()
+	if len(options.DiagnosticConfiguration) != 0 {
+		if err := os.WriteFile(filepath.Join(workspace, "selection.json"), options.DiagnosticConfiguration, 0o600); err != nil {
+			return e.Wrap(e.CodeBuildFailed, err, "recording diagnostic selection")
+		}
+	}
 	staged := filepath.Join(workspace, "nvkectl")
 	copy, err := os.OpenFile(staged, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o555)
 	if err != nil {
@@ -145,7 +225,7 @@ func testCLIArtifact(ctx context.Context, options ArtifactTestOptions,
 		return e.New(e.CodeEngineCapability, "pinned NVKE revision has no test-artifact target; refresh explicit inputs and regenerate the Plan")
 	}
 	invocation := pipeline.ArtifactDiagnostic{Workspace: workspace, Artifact: staged, Image: inputs.ToolchainImage,
-		Platform: inputs.Platform, Version: inputs.ExpectedVersion, Suite: options.Suite, Timeout: options.Timeout}
+		Platform: inputs.Platform, Version: inputs.ExpectedVersion, Suite: options.Suite, Timeout: options.Timeout, DependencyTimeout: options.DependencyTimeout}
 	if err := run(ctx, invocation, options.Stdout, options.Stderr); err != nil {
 		return diagnosticError(ctx, err)
 	}

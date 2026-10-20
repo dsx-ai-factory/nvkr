@@ -52,6 +52,7 @@ records source availability and remaining gaps.
 | Reviewable updates and matching regeneration (the installed `catalog-refresh.yaml` is generated, never hand-edited) | [Catalog maintenance](catalog-maintenance.md) |
 | Chart slots, image outputs, and registry-independent bytes | [Declarative Helm bindings](declarative-helm-bindings.md) |
 | Software inventories and their exact subjects/stages | [Dependency SBOMs](dependency-sboms.md) |
+| Discover and explicitly select provisional CLI validators | [CLI artifact testing](artifact-testing.md#provisional-validator-catalog) |
 | External test output descriptions and configured diagnostic checks | [External test output contract](external-test-output-contract.md) |
 | Bounded guest capture format and acquisition ownership | [OS acquisition contract](nvke-os-acquisition-contract.md) |
 | Optional live-owner disk inspection and material observations | [OS live inspection](nvke-os-live-inspection.md) |

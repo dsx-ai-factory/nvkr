@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/validator/v1
+kind: Validator
+id: nvke/nvkectl/contract
+description: Run upstream process contracts against a supplied nvkectl executable
+adapter: nvke-cli/v1
+suite: contract
+inputs:
+  executable:
+    component: nvkectl
+    format: executable
+suiteSource:
+  mode: build-source
+  fromInput: executable
+platforms: [linux/amd64, linux/arm64]
+requires: [docker, git]
+timeout: 30m
+coverage: artifact-contract
+limitations:
+  - Package-level result checks do not establish exhaustive artifact-contract coverage
+  - Supplied bytes are not authenticated as Run members and grant no qualification
+  - The selected upstream revision must expose the supplied-executable interface; maintained adoption is pending
+  - Docker capacity and upstream Go and Make availability are unverified until execution
