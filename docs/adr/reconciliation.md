@@ -1152,7 +1152,16 @@ passed the ARM64 artifact checks for all 69 outputs and native tool smoke, then 
 failed report signing because Cosign 3 rejected the explicit issuer with its default signing configuration.
 The exact-byte signer now explicitly selects detached output compatibility, raw signature/PEM encoding
 and public transparency submission. Injected and held-process protocol tests check those options;
-corrected hosted signing and qualification remain pending. These development observations do not establish production qualification,
+[Run 39360715596](https://github.com/dsx-ai-factory/nvkr/actions/runs/39360715596) on
+`8422f128e6b776ae5f353165893cd4085414bb4d` passed both native workers: each authenticated all 69
+outputs, passed native smoke and signed/uploaded its report. Final qualification also passed all 69
+artifact checks and signed/read back qualification attachments for exactly those 69 unique subjects.
+The result reported `successful: true` with development evidence digest
+`sha256:b89ca5cfb49f78ac2fc687f000890ad043813f0c5ba584a351598e6d20eea062`.
+Delivered-tool smoke passed for `nvkectl`, `nvkectl-linux-arm64` and `operator-tools`; the other
+66 outputs correctly report that tool smoke is not applicable. The same head passed
+[Merge Gate 39360705380](https://github.com/dsx-ai-factory/nvkr/actions/runs/39360705380).
+These development observations do not establish production qualification,
 full-release consumer acceptance or a live local-demo deployment.
 
 At NVKR `92ce9fc65182a965f94ffa8a527828a971e9fc45`, [development Run 39327360895](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327360895)
@@ -1173,7 +1182,7 @@ and production sibling isolation. The successful attempt-2 publication above exe
 namespace resolution, and its complete retry passed. The immutable failed Run cannot acquire
 new executable code through a rerun.
 
-The main-source upgrade selects `55612dce98cf0183790fbe5f4776225d63369fc2` through `catalog pin --commit`, retaining all three SPIRE package roles and the separate nightly test-harness exception. Canonical generation and [Merge Gate 39306909978](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306909978) passed on NVKR `5953a0ac`. [Development Run 39306902739](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306902739) remains incomplete: [provisioned-provider signing](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306902739/job/118254801119) failed while fetching ambient GitHub OIDC credentials because the response was not JSON. All four disk outputs nevertheless passed build, publication, signing and verification in that Run. Complete same-run retry validation and independent development qualification remain required. The preceding [beta Run 39276513915](https://github.com/dsx-ai-factory/nvkr/actions/runs/39276513915) failed disk production and completeness. Both plain disk logs reached an absent-file error during provisioning; the selected main source adds the two missing network configuration files to image-input composition. The four successful disk outputs in the main-source Run exercise this source correction; they do not establish complete Run acceptance.
+The main-source upgrade selects `55612dce98cf0183790fbe5f4776225d63369fc2` through `catalog pin --commit`, retaining all three SPIRE package roles and the separate nightly test-harness exception. Canonical generation and [Merge Gate 39306909978](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306909978) passed on NVKR `5953a0ac`. [Development Run 39306902739](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306902739) remains incomplete: [provisioned-provider signing](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306902739/job/118254801119) failed while fetching ambient GitHub OIDC credentials because the response was not JSON. All four disk outputs nevertheless passed build, publication, signing and verification in that Run. The later successful complete Run and same-run retry are recorded above; this earlier incomplete Run does not supply that evidence. The preceding [beta Run 39276513915](https://github.com/dsx-ai-factory/nvkr/actions/runs/39276513915) failed disk production and completeness. Both plain disk logs reached an absent-file error during provisioning; the selected main source adds the two missing network configuration files to image-input composition. The four successful disk outputs in the main-source Run exercise this source correction; they do not establish complete Run acceptance.
 
 Beta development [Run 39274459086](https://github.com/dsx-ai-factory/nvkr/actions/runs/39274459086)
 reached admitted native disk builds and successful SBOM signing after the operator approved its exact branch
