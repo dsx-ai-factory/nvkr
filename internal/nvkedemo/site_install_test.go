@@ -245,6 +245,11 @@ func TestStackStateAdmissionWithUnresolvableWorkingDirectory(t *testing.T) {
 				if err := os.Remove(work); err != nil {
 					t.Fatal(err)
 				}
+				// Darwin can still resolve a removed cwd. Only assert the
+				// guard's error handling when this fixture triggers Abs failure.
+				if _, err := filepath.Abs("."); err == nil {
+					t.Skip("removed working directory remains resolvable on this platform")
+				}
 			}
 			err := admitStackStateRoot("/srv/nvkr/private-state")
 			if missing {

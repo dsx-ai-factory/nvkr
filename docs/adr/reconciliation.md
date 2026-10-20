@@ -2982,7 +2982,11 @@ templates and an explicit stack-config/credential/telemetry handoff. It retains 
 candidate entrypoint omitted from the selected product source. The [hosted source-contract Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/39487106857/attempts/1)
 on NVKR `8df540b83aeaec5e27b865dcd65887882699755b` passed the actual
 candidate render function with the beta.6 CLI and the hook argv/environment
-regression. This verifies configuration composition, not published-artifact or VM
+regression. This source-contract-only dispatch skipped the ordinary selection,
+build, runtime selection and runtime-test jobs. The later workflow selector correction
+is covered separately by the shell-versus-Go parity test in the successful
+[Merge Gate on `caf85b27`](https://github.com/dsx-ai-factory/nvkr/actions/runs/39487820535).
+This verifies configuration composition, not published-artifact or VM
 runtime acceptance; full runtime validation of this revision remains unverified. Product sources select beta.6
 with the explicit SPIRE exception. This diagnostic selection is an exception to
 ADR-23's proposed matching-revision rule, not adoption of that proposal. Missing

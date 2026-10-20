@@ -150,6 +150,9 @@ func nightlyStackEnvironment(runner Runner, site string) (Runner, error) {
 		return runner, e.Wrap(e.CodePreflightFailed, err, "creating nightly database password")
 	}
 	runner = bindNativeSpireCA(runner, runner.Work)
+	// This adapter intentionally replaces inherited credentials with the fixed
+	// local simulator protocol token and fresh diagnostic node/database values.
+	// The token matches the pinned harness; it is not a real site credential.
 	runner.Env = SetEnv(runner.Env, map[string]string{
 		"NKE_E2E_CANDIDATE_SITESPEC":     site,
 		"NKE_E2E_CANDIDATE_STACK_CONFIG": filepath.Join(runner.Work, "stack-config.json"),
