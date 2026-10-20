@@ -134,7 +134,7 @@ func TestArtifactDiagnosticStagingResultsAndCleanup(t *testing.T) {
 					}
 					return os.WriteFile(filepath.Join(input.Workspace, "tests.jsonl"), []byte(log), 0o600)
 				}
-				err := testCLIArtifact(ctx, options, importSource, run)
+				err := testCLIArtifact(ctx, options, importSource, run, pipeline.AdmitArtifactDiagnostic)
 				if phase == "import" && ran {
 					t.Fatal("source import refusal reached container execution")
 				}
@@ -283,7 +283,7 @@ func TestArtifactDiagnosticOutputFailurePreservesPrimary(t *testing.T) {
 								return childErr
 							}
 							return os.WriteFile(filepath.Join(input.Workspace, "tests.jsonl"), []byte(diagnosticEvents("command-line-arguments", "TestContract")), 0o600)
-						})
+						}, pipeline.AdmitArtifactDiagnostic)
 					switch phase {
 					case "source-failed":
 						assertFactoryErrorCode(t, err, e.CodeFetchFailed)
@@ -416,7 +416,7 @@ func TestAdmittedCLIArtifactFreezesPlanAndSelection(t *testing.T) {
 					}
 					return os.WriteFile(filepath.Join(input.Workspace, "tests.jsonl"), []byte(diagnosticEvents(pkg, "TestContract")), 0o600)
 				}
-				if err := runCLIArtifact(t.Context(), admitted.options, &admitted.inputs, importer, runner); err != nil {
+				if err := runCLIArtifact(t.Context(), admitted.options, &admitted.inputs, importer, runner, pipeline.AdmitArtifactDiagnostic); err != nil {
 					t.Fatal(err)
 				}
 			})

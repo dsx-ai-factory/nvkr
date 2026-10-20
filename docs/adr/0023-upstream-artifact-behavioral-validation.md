@@ -54,6 +54,27 @@ by any producer.
 The proposed execution flow is: build and retain the artifact and its Plan; validate and select test
 inputs; import the matching upstream suite; then execute it against the supplied bytes.
 
+### Incremental bootstrap diagnostic execution candidate
+
+The stacked IV1 candidate reuses the existing upstream rootful native Linux AMD64
+bootstrap environment for development and verification. Factory retains complete
+Plan admission, named-output selection and private executable staging; sourcegit
+retains matching commit/tree import; pipeline retains owned subprocess execution
+and cancellation. Existing CLI suites retain their offline Docker execution.
+Upstream continues preparing its fixtures and controlling networking/assertions;
+the surrounding existing workflow/environment supplies host services and its
+supporting controller image. This does not define new infrastructure, runner
+allocation, production or qualification policy.
+
+The candidate external-artifact target and optional `nvke.dev/bootstrap-e2e/v1`
+terminal report are producer-neutral. The consumer requires the terminal marker,
+unchanged executable observations and matching source interface. Missing or
+unexecuted required results cannot pass. The report's `cleanup=unknown` preserves
+the existing suppressed-inner-teardown limitation; suite success cannot imply
+complete cleanup or close IV1-A4. Real native AMD64 fresh-build execution and its
+negative/cleanup matrix remain prerequisites for acceptance, recorded separately
+from contract tests in reconciliation.
+
 ## Consequences
 
 NVKR depends on NVKE adopting and maintaining the required interface at the artifact's source revision.

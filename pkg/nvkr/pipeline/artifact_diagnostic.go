@@ -24,12 +24,16 @@ type ArtifactDiagnostic struct {
 	// DependencyTimeout overrides only acquisition; zero retains the legacy bound.
 	DependencyTimeout                                    time.Duration
 	Workspace, Artifact, Image, Platform, Version, Suite string
+	ControllerImage                                      string
 	Timeout                                              time.Duration
 }
 
 // RunArtifactDiagnostic acquires dependencies without the artifact and runs the
 // selected upstream suite offline against read-only source and staged bytes.
 func RunArtifactDiagnostic(ctx context.Context, input ArtifactDiagnostic, stdout, stderr io.Writer) error {
+	if input.Suite == "bootstrap" {
+		return runBootstrapArtifactDiagnostic(ctx, input, stdout, stderr)
+	}
 	err := runArtifactDiagnostic(ctx, input, stdout, stderr, runContainerRuntime, runReaperCleanupCommand)
 	var coded *e.Error
 	if err == nil || errors.As(err, &coded) {

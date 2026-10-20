@@ -29,6 +29,7 @@ import (
 // It authenticates neither executable membership in a Run nor suite completeness.
 type ArtifactTestOptions struct {
 	Plan, Output, Artifact, Suite, WorkspaceRoot string
+	ControllerImage                              string
 	Keep                                         bool
 	Timeout                                      time.Duration
 	Stdout, Stderr                               io.Writer
@@ -45,11 +46,13 @@ type artifactTestCounts struct {
 
 type artifactTestResult struct {
 	CLIArtifactTestInputs
-	ArtifactSHA256 string `json:"artifactSha256"`
-	TestRevision   string `json:"testRevision"`
-	Suite          string `json:"suite"`
-	Authority      string `json:"authority"`
-	Result         string `json:"result"`
+	ArtifactSHA256           string                     `json:"artifactSha256"`
+	TestRevision             string                     `json:"testRevision"`
+	Suite                    string                     `json:"suite"`
+	Authority                string                     `json:"authority"`
+	Result                   string                     `json:"result"`
+	Bootstrap                *bootstrapDiagnosticReport `json:"bootstrap,omitempty"`
+	BootstrapControllerImage string                     `json:"bootstrapControllerImage,omitempty"`
 	artifactTestCounts
 }
 
@@ -57,17 +60,18 @@ type artifactTestResult struct {
 // source, workspace or subprocess work. The source and pipeline owners import and
 // execute the matching upstream tests against a private copy of supplied bytes.
 func TestCLIArtifact(ctx context.Context, options ArtifactTestOptions) error {
-	return testCLIArtifact(ctx, options, sourcegit.ImportLocal, pipeline.RunArtifactDiagnostic)
+	return testCLIArtifact(ctx, options, sourcegit.ImportLocal, pipeline.RunArtifactDiagnostic, pipeline.AdmitArtifactDiagnostic)
 }
 
 func testCLIArtifact(ctx context.Context, options ArtifactTestOptions,
 	importSource func(context.Context, []string, string, string, string, string, io.Writer) error,
-	run func(context.Context, pipeline.ArtifactDiagnostic, io.Writer, io.Writer) error) (returnErr error) {
+	run func(context.Context, pipeline.ArtifactDiagnostic, io.Writer, io.Writer) error,
+	admit func(context.Context, pipeline.ArtifactDiagnostic) error) (returnErr error) {
 	invocation, err := AdmitCLIArtifact(ctx, options)
 	if err != nil {
 		return err
 	}
-	return runCLIArtifact(ctx, invocation.options, &invocation.inputs, importSource, run)
+	return runCLIArtifact(ctx, invocation.options, &invocation.inputs, importSource, run, admit)
 }
 
 // CLIArtifactInvocation freezes the validated producer and suite for one diagnostic.
@@ -81,8 +85,8 @@ type CLIArtifactInvocation struct {
 // AdmitCLIArtifact validates a complete Plan without workspace or executable work.
 // Run never reopens the Plan. Artifact bytes remain caller supplied until staging.
 func AdmitCLIArtifact(ctx context.Context, options ArtifactTestOptions) (*CLIArtifactInvocation, error) {
-	if options.Suite != "" && options.Suite != "contract" && options.Suite != "cli" {
-		return nil, e.New(e.CodeUsage, "suite must be contract or cli")
+	if options.Suite != "" && options.Suite != "contract" && options.Suite != "cli" && options.Suite != "bootstrap" {
+		return nil, e.New(e.CodeUsage, "suite must be contract, cli or bootstrap")
 	}
 	plan, err := LoadCLIArtifactPlan(ctx, options.Plan)
 	if err != nil {
@@ -102,8 +106,8 @@ func (p *CLIArtifactPlan) Admit(ctx context.Context, options ArtifactTestOptions
 	if options.Suite == "" {
 		options.Suite = "contract"
 	}
-	if options.Suite != "contract" && options.Suite != "cli" {
-		return nil, e.New(e.CodeUsage, "suite must be contract or cli")
+	if options.Suite != "contract" && options.Suite != "cli" && options.Suite != "bootstrap" {
+		return nil, e.New(e.CodeUsage, "suite must be contract, cli or bootstrap")
 	}
 	inputs, err := selectCLIArtifactTestInputs(p.plan, options.Output)
 	if err != nil {
@@ -138,17 +142,25 @@ func (i *CLIArtifactInvocation) Run(ctx context.Context) error {
 	if i == nil || i.inputs.Output == "" {
 		return e.New(e.CodeUsage, "missing admitted CLI invocation")
 	}
-	return runCLIArtifact(ctx, i.options, &i.inputs, sourcegit.ImportLocal, pipeline.RunArtifactDiagnostic)
+	return runCLIArtifact(ctx, i.options, &i.inputs, sourcegit.ImportLocal, pipeline.RunArtifactDiagnostic, pipeline.AdmitArtifactDiagnostic)
 }
 
 func runCLIArtifact(ctx context.Context, options ArtifactTestOptions, inputs *CLIArtifactTestInputs,
 	importSource func(context.Context, []string, string, string, string, string, io.Writer) error,
-	run func(context.Context, pipeline.ArtifactDiagnostic, io.Writer, io.Writer) error) (returnErr error) {
+	run func(context.Context, pipeline.ArtifactDiagnostic, io.Writer, io.Writer) error,
+	admit func(context.Context, pipeline.ArtifactDiagnostic) error) (returnErr error) {
 	if ctx == nil {
 		return e.New(e.CodeUsage, "artifact testing requires a context")
 	}
 	if ctx.Err() != nil {
 		return e.Wrap(e.CodeTimeout, ctx.Err(), "artifact diagnostic canceled")
+	}
+	invocation := pipeline.ArtifactDiagnostic{Image: inputs.ToolchainImage, Platform: inputs.Platform, Version: inputs.ExpectedVersion, Suite: options.Suite, Timeout: options.Timeout, DependencyTimeout: options.DependencyTimeout, ControllerImage: options.ControllerImage}
+	if err := admit(ctx, invocation); err != nil {
+		return err
+	}
+	if options.Suite != "bootstrap" && options.ControllerImage != "" {
+		return e.New(e.CodeUsage, "controller image is only supported for bootstrap")
 	}
 	if options.Stdout == nil {
 		options.Stdout = io.Discard
@@ -225,22 +237,42 @@ func runCLIArtifact(ctx context.Context, options ArtifactTestOptions, inputs *CL
 	if err != nil {
 		return e.Wrap(e.CodeFetchFailed, err, "reading upstream CLI entrypoint")
 	}
-	if !regexp.MustCompile(`(?m)^test-artifact:`).Match(makefile) {
-		return e.New(e.CodeEngineCapability, "pinned NVKE revision has no test-artifact target; refresh explicit inputs and regenerate the Plan")
+	target := "test-artifact"
+	if options.Suite == "bootstrap" {
+		target = "test-e2e-bootstrap-artifact"
 	}
-	invocation := pipeline.ArtifactDiagnostic{Workspace: workspace, Artifact: staged, Image: inputs.ToolchainImage,
-		Platform: inputs.Platform, Version: inputs.ExpectedVersion, Suite: options.Suite, Timeout: options.Timeout, DependencyTimeout: options.DependencyTimeout}
+	if !regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(target) + `:`).Match(makefile) {
+		return e.New(e.CodeEngineCapability, "pinned NVKE revision has no %s target; refresh explicit inputs and regenerate the Plan", target)
+	}
+	if options.Suite == "bootstrap" {
+		protocol, err := os.ReadFile(filepath.Join(workspace, "nvke", "cli", "e2e", "bootstrap", "report.sh"))
+		if err != nil || !strings.Contains(string(protocol), "nvke.dev/bootstrap-e2e/v1") {
+			return e.New(e.CodeEngineCapability, "matching NVKE source lacks the bootstrap terminal-report interface")
+		}
+	}
+	invocation.Workspace = workspace
+	invocation.Artifact = staged
 	if err := run(ctx, invocation, options.Stdout, options.Stderr); err != nil {
 		return diagnosticError(ctx, err)
 	}
-	log, err := os.Open(filepath.Join(workspace, "tests.jsonl"))
-	if err != nil {
-		return e.Wrap(e.CodeBuildFailed, err, "opening diagnostic results")
-	}
-	counts, summaryErr := summarizeArtifactTests(log, options.Suite)
-	_ = log.Close()
-	if summaryErr != nil {
-		return summaryErr
+	var counts artifactTestCounts
+	var bootstrap *bootstrapDiagnosticReport
+	if options.Suite == "bootstrap" {
+		bootstrap, err = readBootstrapDiagnosticReport(filepath.Join(workspace, "bootstrap.json"), checksum)
+		if err != nil {
+			return err
+		}
+	} else {
+		log, err := os.Open(filepath.Join(workspace, "tests.jsonl"))
+		if err != nil {
+			return e.Wrap(e.CodeBuildFailed, err, "opening diagnostic results")
+		}
+		var summaryErr error
+		counts, summaryErr = summarizeArtifactTests(log, options.Suite)
+		_ = log.Close()
+		if summaryErr != nil {
+			return summaryErr
+		}
 	}
 	file, err := os.Open(staged)
 	if err != nil {
@@ -259,7 +291,7 @@ func runCLIArtifact(ctx context.Context, options ArtifactTestOptions, inputs *CL
 		return e.Wrap(e.CodeTimeout, ctx.Err(), "artifact diagnostic canceled")
 	}
 	result := artifactTestResult{CLIArtifactTestInputs: *inputs, ArtifactSHA256: checksum, TestRevision: inputs.Commit, Suite: options.Suite,
-		Authority: "unqualified-diagnostic", Result: "pass", artifactTestCounts: counts}
+		Authority: "unqualified-diagnostic", Result: "pass", Bootstrap: bootstrap, BootstrapControllerImage: options.ControllerImage, artifactTestCounts: counts}
 	raw, err := json.Marshal(result)
 	if err != nil {
 		return e.Wrap(e.CodeInternal, err, "encoding diagnostic result")
@@ -269,6 +301,10 @@ func runCLIArtifact(ctx context.Context, options ArtifactTestOptions, inputs *CL
 	}
 	_, jsonErr := fmt.Fprintln(options.Stdout, string(raw))
 	_, passErr := fmt.Fprintf(options.Stdout, "PASS: upstream %s suite; staged artifact checksum unchanged\n", options.Suite)
+	if bootstrap != nil {
+		_, cleanupErr := fmt.Fprintln(options.Stdout, "Bootstrap cleanup: unknown; terminal completion covers upstream assertions, not exhaustive resource teardown")
+		passErr = errors.Join(passErr, cleanupErr)
+	}
 	deliveryErr = errors.Join(deliveryErr, jsonErr, passErr)
 	return nil
 }
@@ -295,7 +331,7 @@ func diagnosticSourceError(ctx context.Context, err error) error {
 	return e.Wrap(e.CodeFetchFailed, err, "importing artifact diagnostic source")
 }
 
-// Only container execution preserves a positive child process exit status.
+// Diagnostic process execution preserves a positive child process exit status.
 func diagnosticError(ctx context.Context, err error) error {
 	var coded *e.Error
 	classified := errors.As(err, &coded)

@@ -265,6 +265,64 @@ execution on the agreed route using existing factory/source selection. A real
 fresh-build positive and broken-executable negative on that route must precede
 IV1 acceptance. Local contract logs are validation, not operational evidence.
 
+## Bootstrap execution candidate (stacked follow-up)
+
+The draft execution follow-up consumes the terminal interface in
+[NVKE #1803](https://github.com/dsx-ai-factory/nvke/pull/1803) and is tracked by
+[NVKR #228](https://github.com/dsx-ai-factory/nvkr/issues/228). It adds
+`--suite bootstrap` while keeping `contract`
+and `cli` on their existing offline Docker path. It uses the same complete Plan
+loader, named CLI selection, exact source importer and private executable staging.
+The matching upstream commit must expose both `test-e2e-bootstrap-artifact` and
+`nvke.dev/bootstrap-e2e/v1`; missing interfaces fail before suite execution.
+Maintained pins are not refreshed and imported suites are never patched.
+
+On the existing upstream rootful native Linux AMD64 development/verification
+host, after the upstream workflow's normal host and controller-image preparation:
+
+```sh
+nvkr run artifact-test --plan /path/to/plan.json --artifact /path/to/nvkectl \
+  --suite bootstrap --bootstrap-controller-image <image-in-upstream-containerd> \
+  --timeout 45m --keep
+```
+
+This executes the original upstream bootstrap script and fixture preparation directly
+on that host through pipeline's existing owned-process implementation. It does
+not provision a different host, install runtime daemons, choose runner labels,
+copy assertions or change upstream networking. The surrounding upstream workflow
+or equivalent local environment remains responsible for host tools, services,
+capacity and the controller image. Source fixtures continue preparing the other
+supporting dependencies. The diagnostic does not escalate privileges itself.
+Unsupported hosts are rejected before workspace/source work; this candidate does
+not admit native ARM64, Docker-VM or emulated bootstrap execution.
+
+`--timeout` bounds preparation and execution of this native invocation. Source
+Git operations retain their existing bounds; process cancellation allows a
+separate two-minute termination grace for upstream diagnostics/cleanup before
+escalation. Raw `bootstrap.log` and upstream `bootstrap.json` are retained with
+`--keep`. The suite's original failure remains primary; missing reports after a
+successful process, malformed/duplicate/unknown report fields, unexecuted checks,
+wrong protocol, changed subjects and a reported cleanup failure cannot pass.
+The upstream node count and VIP-check configuration remain in the result so a
+supported single-node configuration is distinguishable from the default VIP flow.
+
+A passing terminal marker covers the assertions owned by that upstream entrypoint,
+not every possible bootstrap behavior. Current inner teardown helpers suppress
+some failures: `cleanup=unknown` is retained in the diagnostic result and printed
+explicitly. It is not successful or exhaustive resource cleanup. This useful
+unqualified suite diagnostic therefore does not finish IV1-A4 or grant qualification,
+authenticated Run membership, deployment acceptance or a new production route.
+
+Contract tests establish adapter selection, staging, report admission and owned
+process execution with controlled tools. Focused macOS race contracts, vet, lint
+and build passed; Linux ARM64 Docker-VM contracts exercised the native process
+owner and report refusal. Those containers are contract environments, not admitted
+bootstrap hosts or evidence for native AMD64 acceptance. Real fresh NVKR-build consumption and
+broken-executable refusal on the same existing native AMD64 bootstrap environment
+remain required before this draft is ready for acceptance. The follow-up preserves
+ADR-23's one-way dependency; NVKE consumes no NVKR inputs or tooling. ADR-24 catalog
+dispatch remains outside this increment.
+
 ## Validation and remaining work
 
 The Go replacement was exercised on 2026-10-15 from the main-based migration
