@@ -5,7 +5,7 @@ apiVersion: nvkr.dev/definition/v5
 kind: Definition
 metadata:
   name: nvke-m2
-  description: Build the maintained CLI, controller, configurable deployment charts and native non-FDE and public-bootstrap FDE node images for AMD64 and ARM64, and acquire operator tooling plus AMD64 and ARM64 non-test runtime images selected for NVKE v0.22.0-beta.6 in one Run.
+  description: Build the maintained CLI, controller, configurable deployment charts and native non-FDE and public-bootstrap FDE node images for AMD64 and ARM64, and acquire operator tooling plus AMD64 and ARM64 non-test runtime images selected for NVKE v0.22.0 in one Run.
 catalog:
   base: ../../catalogs/nvke/module-tags
 sbomTool: syft

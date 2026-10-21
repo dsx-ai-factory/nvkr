@@ -8,25 +8,25 @@ artifacts:
 kind: PinLock
 pins:
   nvke-cni-calico-source:
-    commit: 9ac6832ac965e5222876ef910c3a28be1a392665
-    sourceDateEpoch: 1792509664
-    tag: 9ac6832ac965e5222876ef910c3a28be1a392665
-    treeHash: 41a35697cf25320c58cc87e1ae5569f66869b8c1
+    commit: 400c24fb6465b042be883d6b62472528520d6291
+    sourceDateEpoch: 1792548398
+    tag: v0.22.0
+    treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
   nvke-kubeadm-distro-source:
-    commit: 9ac6832ac965e5222876ef910c3a28be1a392665
-    sourceDateEpoch: 1792509664
-    tag: 9ac6832ac965e5222876ef910c3a28be1a392665
-    treeHash: 41a35697cf25320c58cc87e1ae5569f66869b8c1
+    commit: 400c24fb6465b042be883d6b62472528520d6291
+    sourceDateEpoch: 1792548398
+    tag: v0.22.0
+    treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
   nvke-os:
-    commit: 9ac6832ac965e5222876ef910c3a28be1a392665
-    sourceDateEpoch: 1792509664
-    tag: 9ac6832ac965e5222876ef910c3a28be1a392665
-    treeHash: 41a35697cf25320c58cc87e1ae5569f66869b8c1
+    commit: 400c24fb6465b042be883d6b62472528520d6291
+    sourceDateEpoch: 1792548398
+    tag: v0.22.0
+    treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
   nvke-spire-agent-source:
-    commit: e7d5e32f5ec36eb57255e9d5de86853d92fa2087
-    sourceDateEpoch: 1792534790
-    tag: e7d5e32f5ec36eb57255e9d5de86853d92fa2087
-    treeHash: 772e6e99285ea7f6471eb62322d6c4893809ebf2
+    commit: 400c24fb6465b042be883d6b62472528520d6291
+    sourceDateEpoch: 1792548398
+    tag: v0.22.0
+    treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
   ovn-kubernetes:
     commit: d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d
     sourceDateEpoch: 1788540677

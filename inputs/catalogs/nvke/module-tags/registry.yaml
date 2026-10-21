@@ -62,7 +62,7 @@ components:
         make -C cli build NVKECTL_TREE=clean
 kind: SourceBuildRegistry
 metadata:
-  description: NVKE components from the release v0.22.0-beta.6 at 8db5721ae3031bdcd945e559153a740d46ea209e. The CLI uses an offline Go build; CWE wraps the upstream Dockerfile in digest-pinned
+  description: NVKE components from the release v0.22.0. The CLI uses an offline Go build; CWE wraps the upstream Dockerfile in digest-pinned
     rootless BuildKit.
   name: nvke-v1
 sources:
@@ -84,8 +84,8 @@ sources:
     repo: https://github.com/actions/download-artifact
   nvke:
     repo: https://github.com/dsx-ai-factory/nvke
-    constraint: v0.22.0-beta.6
-    toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
+    constraint: v0.22.0
+    toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
     vendorCommand:
       - bash
       - -euc
@@ -101,9 +101,9 @@ sources:
         printf '%s\n' "$pins" | sha256sum --quiet -c -
         test ! -e controller/deploy/charts/go.sum
   nvke-controller:
-    constraint: v0.22.0-beta.6
+    constraint: v0.22.0
     repo: https://github.com/dsx-ai-factory/nvke
-    toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
+    toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
   setup-go:
     constraint: 7.x
     kind: github-action

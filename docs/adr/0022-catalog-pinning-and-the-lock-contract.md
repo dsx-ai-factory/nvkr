@@ -342,7 +342,9 @@ local loading. Offline pin-set transport remains deferred.
 unknown, missing, duplicate or reclassified items fail before chart acquisition. External members bind the
 reviewed chart name/repository through `prebuilt.chart` (acquired) or member `chart` (source), and always
 require an exact version in `release.yaml`. Accounted local charts bind their relative path and authenticate
-their name and exact version against the same pinned tree's `Chart.yaml`. A local release may omit its version;
+a valid chart name and exact version from the same pinned tree's `Chart.yaml`. Their `release.yaml` chart name
+is a validated display alias; the declared local path selects the chart, so the two names need not match.
+A local release may omit its version;
 when supplied it must be an exact string matching `Chart.yaml`. Empty, null, numeric and ranged versions fail.
 The local chart's optional `artifact`, `imageArtifact` and `profilesArtifact` fields accept plain names only.
 They describe downstream consumer mappings; they neither select catalog producers nor authorize Release

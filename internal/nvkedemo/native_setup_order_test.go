@@ -50,6 +50,9 @@ case "$1:$2" in
   case "$*" in *spire.caCertFile=*|*spire.caKeyFile=*) exit 51;; esac
   printf 'generate\n' >> "$EVENTS"; printf '{}\n';;
  bootstrap:site)
+  case " $* " in *" --controller-image "*|*" --cwe-image "*) exit 55;; esac
+  case " $* " in *" --nvke-controller-image $EXPECTED_CONTROLLER_IMAGE "*) ;; *) exit 56;; esac
+  case " $* " in *" --provisioned-provider-image docker.io/library/provider:fixture "*) ;; *) exit 57;; esac
   printf 'bootstrap\n' >> "$EVENTS"
   while test "$#" -gt 0; do
    if test "$1" = --kubeconfig-out; then shift; printf 'private-fixture-config\n' > "$1"; break; fi
@@ -98,7 +101,7 @@ esac
 				attempt.assets.Images[role] = tenantFixture.assets.Images[role]
 			}
 			installNativeIdentityFixture(t, &attempt, tools, root)
-			runner := Runner{Work: root, Env: []string{"PATH=" + tools + ":/usr/bin:/bin", "FIXTURE=" + root, "EVENTS=" + events}}
+			runner := Runner{Work: root, Env: []string{"PATH=" + tools + ":/usr/bin:/bin", "FIXTURE=" + root, "EVENTS=" + events, "EXPECTED_CONTROLLER_IMAGE=" + attempt.assets.Images["controller"].Reference}}
 			var row nativeInstance
 			if err = json.Unmarshal([]byte("{\"id\":\"site-fixture\",\"interfaces\":[{\"ipAddresses\":[\"172.30.0.2\",\"172.30.0.3\"]}]}"), &row); err != nil {
 				t.Fatal(err)

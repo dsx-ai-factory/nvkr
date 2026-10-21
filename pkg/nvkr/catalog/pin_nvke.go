@@ -257,10 +257,11 @@ func validateNVKELocalChart(ctx context.Context, tree pinnedTree, deployFile, it
 	}
 	chartName := pinSetObjectField(root, "name")
 	chartVersion := pinSetObjectField(root, "version")
-	if chartName == nil || chartName.Tag != "!!str" || chartName.Value != release.Chart.Name ||
+	// NVKE selects local charts by path; release.Chart.Name is a display alias.
+	if chartName == nil || chartName.Tag != "!!str" || !helmChartName.MatchString(chartName.Value) || len(chartName.Value) > 253 ||
 		chartVersion == nil || chartVersion.Tag != "!!str" || !exactPinSetVersion(chartVersion.Value) ||
 		(release.Chart.Version != "" && chartVersion.Value != string(release.Chart.Version)) {
-		return e.New(e.CodeInvalidCatalog, "NVKE local chart %q name/version differs from release.yaml", item)
+		return e.New(e.CodeInvalidCatalog, "NVKE local chart %q requires a valid Chart.yaml name and exact version matching any declared release version", item)
 	}
 	return nil
 }

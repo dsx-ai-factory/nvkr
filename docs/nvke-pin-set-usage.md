@@ -67,12 +67,13 @@ is not supported. Acquired charts cannot use image binding, because that would c
 ## Explicit membership
 
 Every deploy item must be listed in `members` or `accounted`. External Helm items become members. The local
-controller and NKTP charts are accounted for by their exact paths. Their names must agree with
-`release.yaml`; their pinned `Chart.yaml` versions must be exact, and any explicit release version must match.
+controller and NKTP charts are accounted for by their exact paths. Their pinned `Chart.yaml` names must be
+valid chart names; a local `release.yaml` chart name is a display alias and need not match. The pinned chart
+versions must be exact, and any explicit release version must match.
 Local chart paths resolve relative to the deploy root, matching NVKE's deploy format.
 
 Re-pinning fails if an item appears, disappears, changes type, switches between local and external, or changes
-its reviewed chart name/repository. The existing lock remains intact. Review the upstream change and update
+an external member's reviewed chart name/repository. The existing lock remains intact. Review the upstream change and update
 the catalog mapping before trying again. NVKR does not automatically create producers or omit unknown items.
 
 An acquired member uses `artifact: <producer>` and takes its chart identity from `prebuilt.chart`. A source

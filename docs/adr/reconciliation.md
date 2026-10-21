@@ -1849,7 +1849,11 @@ outputs. The disk uses the renamed Packer build, artifact path and material sche
 The 32-output demo and 38-output local conformance selections share the same deployment
 closure. The native site catalog derives its four acquired chart pins from that
 source's `deploy/nico/nvke-deploy.yaml`; source-local controller and NKTP chart
-versions come from their exact `Chart.yaml` bytes. The native runtime-image variant
+names and versions come from their exact path-bound `Chart.yaml` bytes. Local deploy chart names are
+validated display aliases, while external member names and repositories must still match their reviewed
+acquisition identities. Contract tests cover differing local aliases, unsafe metadata, exact path/version
+checks and unchanged external selections; they do not establish installation or fresh runtime acceptance.
+The native runtime-image variant
 keeps its separately authenticated images and binds their selection to the same NVKE
 source. Mac and Linux tools share the same source pins. These are native diagnostic input changes, with no release/nightly pin change
 or new Release authority. A fresh package/QCOW build, site/tenant runtime, conformance

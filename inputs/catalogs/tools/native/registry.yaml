@@ -350,7 +350,7 @@ metadata:
     name: nvke-native-tools
 sources:
     nvke-spire-agent-source:
-        constraint: 0.21.x
+        constraint: v0.22.0
         repo: https://github.com/dsx-ai-factory/nvke.git
         toolchainImagesByArch:
             arm64: golang@sha256:288557fbc328e4ef9a78bae2eb44f24447029ff08667be883d79eeaa9029cf0c
@@ -483,10 +483,10 @@ sources:
               GOPROXY=off timeout --kill-after=10s 180s go mod vendor
               printf '%s\n' "$pins" | sha256sum --quiet -c -
     nvke-cli:
-        constraint: 0.21.x
+        constraint: v0.22.0
         repo: https://github.com/dsx-ai-factory/nvke.git
         toolchainImagesByArch:
-            arm64: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
+            arm64: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
         vendorCommand:
             - bash
             - -euc
@@ -500,15 +500,15 @@ sources:
               GOPROXY=off timeout --kill-after=10s 180s go mod vendor
               printf '%s\n' "$pins" | sha256sum --quiet -c -
     nvke-deploy:
-        constraint: 0.21.x
+        constraint: v0.22.0
         repo: https://github.com/dsx-ai-factory/nvke.git
         toolchainImagesByArch:
-            arm64: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
+            arm64: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
     nvke-nicosim:
-        constraint: 0.21.x
+        constraint: v0.22.0
         repo: https://github.com/dsx-ai-factory/nvke.git
         toolchainImagesByArch:
-            arm64: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
+            arm64: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
         vendorCommand:
             - bash
             - -euc

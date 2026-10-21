@@ -1,30 +1,30 @@
 # Nightly site producer catalog
 
 This profile-owned catalog selects the CLI, controller image, controller chart and NKTP chart for both
-ARM64 nightly Definitions. It uses the same beta product revision as
+ARM64 nightly Definitions. It uses the same released product revision as
 `../local-site-arm64`, while each source role keeps its distinct vendor closure.
-The four source roles are pinned through `catalog pin --tag v0.22.0-beta.6` to
-`8db5721ae3031bdcd945e559153a740d46ea209e`, with owner-issued tree
-`e928ae13298118b61581d9a406ba4a02f872e959` and committer epoch `1792450875`.
+The four source roles are pinned through `catalog pin --tag v0.22.0` to
+`400c24fb6465b042be883d6b62472528520d6291`, with owner-issued tree
+`f3afc02f5c92f4aacda3a1655836a91bef093bfe` and committer epoch `1792548398`.
 Both nightly suite selections use the separate test-only commit
 `b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8`, retaining the candidate entrypoint omitted
-from beta. This user-approved exception changes no product source and establishes no runtime success.
+from the release. This user-approved exception changes no product source and establishes no runtime success.
 
-The producer mappings follow the source-owned contracts at that beta revision:
+The producer mappings follow the source-owned contracts at that release revision:
 
 | Output | Source contract |
 | --- | --- |
 | `nvkectl` | `cli/Makefile` builds `cli/bin/nvkectl` and owns `NVKECTL_VERSION`, `NVKECTL_COMMIT`, `NVKECTL_DATE` and `NVKECTL_TREE`; its build target executes the binary's version assertion |
-| `cwe` | `controller/Dockerfile` uses the existing Go 1.27.2 and Alpine digest pins and its source-owned controller Make target |
-| `controller-chart` | Source `Chart.yaml` placeholder `0.0.0`, packaged as `0.22.0-beta.6`; no dependencies or `Chart.lock`; the final chart remains bound to the produced controller digest |
-| `nktp` | Source `Chart.yaml` placeholder `0.0.0`, packaged as `0.22.0-beta.6`; its existing `Chart.lock` selects the three captured dependency-chart archives |
+| `cwe` | `controller/Dockerfile` uses the existing Go 1.27.3 and Alpine digest pins and its source-owned controller Make target |
+| `controller-chart` | Source `Chart.yaml` placeholder `0.0.0`, packaged as `0.22.0`; no dependencies or `Chart.lock`; the final chart remains bound to the produced controller digest |
+| `nktp` | Source `Chart.yaml` placeholder `0.0.0`, packaged as `0.22.0`; its existing `Chart.lock` selects the three captured dependency-chart archives |
 
 CLI vendoring verifies that CLI, controller API, chart-module and management-engine module metadata
 are unchanged after the standard Go download, verify and vendor commands. The chart module has no
 `go.sum`; absence remains an explicit guard. No module files are rewritten to make the build pass.
 
-Both chart sources use the existing hosted Go 1.27.2 image
-`docker.io/library/golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c`.
+Both chart sources use the existing hosted Go 1.27.3 image
+`docker.io/library/golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b`.
 Its registry image has a native Linux ARM64 variant, no custom entrypoint and no implicit volumes.
 Fetch acquires the existing operator catalog's official Helm 4.1.4 ARM64 archive, verifying archive
 SHA-256 `13d03672be289045d2ff00e4e345d61de1c6f21c1257a45955a30e8ae036d8f1` and executable
@@ -38,8 +38,8 @@ variable selects the chart tool. Final Helm OCI packaging uses NVKR's existing o
 image-binding owners. The installer output's separate Helm 4.2.4 selection remains unchanged.
 
 The compiled vendor and package commands were executed against the previous NVKE source
-`04a6ed26c1e51d70167669a6882a04080eefadc7` in native Linux ARM64 Docker with that pulled
-Go image. Fetch used a read-only root, private HOME and temporary
+`04a6ed26c1e51d70167669a6882a04080eefadc7` in native Linux ARM64 Docker with the then-selected
+Go 1.27.2 image. Fetch used a read-only root, private HOME and temporary
 storage, dropped capabilities and no new privileges. NKTP's `Chart.yaml`, `Chart.lock` and three
 dependency-archive checks passed. Offline packaging used network denial and read-only source, producing
 `nke-controller-0.0.0.tgz` and `nktp-0.0.0.tgz`; Helm reported `v4.1.4+g05fa379`. A changed executable
@@ -51,4 +51,4 @@ NKTP dependency charts remain acquired materials with their existing byte hashes
 not authenticate upstream signatures. Native profiles and rootless BuildKit retain their separate
 explicit pins. No toolchain image was built or published, no nightly producer was dispatched and no
 qualified release is established. The candidate source commit and owner-issued tree/epoch values remain
-in `pins.lock.yaml`; the resolved beta tag names those exact source bytes.
+in `pins.lock.yaml`; the resolved release tag names those exact source bytes.

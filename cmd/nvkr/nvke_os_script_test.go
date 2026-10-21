@@ -188,7 +188,36 @@ func TestOSPlanSPIREExceptionCannotAuthorizeOtherConsumers(t *testing.T) {
 	if _, err := exec.LookPath("jq"); err != nil {
 		t.Skip("OS validation requires jq")
 	}
-	raw, _ := nvkeOSScriptPlan(t, "amd64")
+	t.Chdir(filepath.Dir(filepath.Dir(demoScript(t, "nvke-os-local.sh"))))
+	exceptionRaw, err := runOSPlanQuery(t, nil, "nvke_spire_source_exception", "-n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var exception struct {
+		Commit   string `json:"commit"`
+		TreeHash string `json:"treeHash"`
+	}
+	if err := json.Unmarshal(exceptionRaw, &exception); err != nil {
+		t.Fatal(err)
+	}
+	// Model the mixed-source diagnostic explicitly. Maintained catalog pins may
+	// all agree; this projection fixture is not an executable or admitted Plan.
+	primarySource := ir.Node{ID: "fetch-primary", Kind: ir.KindFetch, Repo: "https://github.com/dsx-ai-factory/nvke.git", Commit: strings.Repeat("b", 40), TreeHash: strings.Repeat("c", 40), Dest: "source-primary"}
+	retainedSource := primarySource
+	retainedSource.ID, retainedSource.Dest = "fetch-retained-spire", "source-retained-spire"
+	retainedSource.Commit, retainedSource.TreeHash = exception.Commit, exception.TreeHash
+	spire := catalog.Component{FromSource: true, Repo: retainedSource.Repo, Commit: exception.Commit, TreeHash: exception.TreeHash}
+	fixture := factory.Plan{Builds: []factory.BuildPlan{{
+		CatalogSnapshot: &catalog.Catalog{Components: map[string]catalog.Component{"nvke-spire-agent": spire}},
+		Graph: &ir.Graph{Nodes: []ir.Node{primarySource, retainedSource, {
+			ID: "build-spire", Kind: ir.KindBuild, Component: "nvke-spire-agent", Needs: []string{retainedSource.ID},
+			SourceDest: retainedSource.Dest, SourceCommit: exception.Commit, SourceTreeHash: exception.TreeHash,
+		}}},
+	}}}
+	raw, err := json.Marshal(fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, scenario := range []string{"retained SPIRE", "changed commit", "changed tree", "another consumer", "another name", "missing source edge", "snapshot drift", "distinct retained fetch"} {
 		t.Run(scenario, func(t *testing.T) {
 			var plan factory.Plan
@@ -202,7 +231,7 @@ func TestOSPlanSPIREExceptionCannotAuthorizeOtherConsumers(t *testing.T) {
 			for i := range graph.Nodes {
 				node := &graph.Nodes[i]
 				if node.Kind == ir.KindFetch && node.Repo == "https://github.com/dsx-ai-factory/nvke.git" {
-					if node.Commit == "726f76944404e1106626b8333d3576bdf67b575b" {
+					if node.Commit == exception.Commit {
 						source = node
 					} else {
 						primary = *node

@@ -9,7 +9,7 @@ metadata:
 sources:
   nvke-profiles:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: v0.22.0-beta.6
+    constraint: v0.22.0
     toolchainImage: docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9
 components:
   nvke-local-profiles:

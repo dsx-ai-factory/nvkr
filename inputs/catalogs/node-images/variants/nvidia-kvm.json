@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-os-arm64-kvm-nightly",
-  "requiresCatalogDigest": "sha256:47c9ec4e8a4fe2a3f45a7e4b32fefd70c30d7ec2136edc144da6910776bfbf76",
+  "requiresCatalogDigest": "sha256:fa06f5ff13ebe116ee1fb91b2e0175a76311d235a0dee9e461274b9e48752067",
   "components": {
     "nvke-cni-ovn": {
       "component": {

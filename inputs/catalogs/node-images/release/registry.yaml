@@ -9,7 +9,7 @@ metadata:
 sources:
   nvke-os:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: v0.22.0-beta.6
+    constraint: v0.22.0
     toolchainImagesByArch:
       # AMD64 is a substitution-only local baseline. ARM64 selects the native
       # Go 1.27.3 rebuild from workflow run 39522193703.
@@ -46,7 +46,7 @@ sources:
         }
   nvke-cni-calico-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: v0.22.0-beta.6
+    constraint: v0.22.0
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
@@ -64,7 +64,7 @@ sources:
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
   nvke-kubeadm-distro-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: v0.22.0-beta.6
+    constraint: v0.22.0
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
@@ -76,8 +76,7 @@ sources:
           ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
   nvke-spire-agent-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
@@ -507,7 +506,7 @@ components:
         mkdir -p /src/nvkr-output/work/os-image/packages /src/nvkr-output/spire-agent
         cp -a os-image/packages/spire-agent /src/nvkr-output/work/os-image/packages/
         cp -a os-image/files /src/nvkr-output/work/os-image/
-        SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=1 \
+        SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=4 \
           NFPM_BIN=/usr/local/bin/nfpm \
           /src/nvkr-output/work/os-image/packages/spire-agent/packaging/build-deb.sh \
           {{.Arch}} /src/os-image/packages/spire-agent/dist/1.14.1+tpm1.9.0/{{.Arch}} \

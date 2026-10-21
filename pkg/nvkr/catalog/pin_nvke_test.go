@@ -159,7 +159,13 @@ func TestNVKEPinSetRejectsInvalidBetaLocalChartMetadata(t *testing.T) {
 		{"local numeric version", controller, "chart:\n", "chart:\n  version: 1\n"},
 		{"local version range", controller, "chart:\n", "chart:\n  version: \"~0.0.0\"\n"},
 		{"local mismatched version", controller, "chart:\n", "chart:\n  version: \"0.0.1\"\n"},
-		{"local chart name", chart, "name: nke-controller", "name: other"},
+		{"local chart unsafe name", chart, "name: nke-controller", "name: ../controller"},
+		{"local chart name absent", chart, "name: nke-controller\n", ""},
+		{"local chart empty name", chart, "name: nke-controller", "name: \"\""},
+		{"local chart numeric name", chart, "name: nke-controller", "name: 42"},
+		{"local chart null name", chart, "name: nke-controller", "name: null"},
+		{"local chart oversized name", chart, "name: nke-controller", "name: " + strings.Repeat("a", 254)},
+		{"local display alias unsafe", controller, "name: nke-controller", "name: ../controller"},
 		{"local chart version absent", chart, "version: \"0.0.0\"\n", ""},
 		{"local chart version range", chart, "version: \"0.0.0\"", "version: \"~0.0.0\""},
 		{"local chart version numeric", chart, "version: \"0.0.0\"", "version: 1"},
@@ -180,6 +186,25 @@ func TestNVKEPinSetRejectsInvalidBetaLocalChartMetadata(t *testing.T) {
 			assertCatalogContractCode(t, err, e.CodeInvalidCatalog)
 			if versions != nil {
 				t.Fatal("failed beta derivation returned partial versions")
+			}
+		})
+	}
+}
+
+func TestNVKEPinSetLocalChartAllowsDisplayAlias(t *testing.T) {
+	for _, tc := range []struct {
+		name, chart, oldName, actualName string
+	}{
+		{"controller rename", "controller/deploy/charts/controller/Chart.yaml", "nke-controller", "nvke-controller"},
+		{"independent local chart", "nktp/deploy/charts/nktp/Chart.yaml", "nktp", "telemetry-chart"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			reg, tree := nvkeBetaPinFixture(t)
+			replaceNVKEFixture(t, tree, tc.chart, "name: "+tc.oldName, "name: "+tc.actualName)
+			versions, err := deriveNVKEPinSet(t.Context(), tree, reg, "nvke")
+			want := map[string]string{"spire": "0.30.1", "spire-crds": "0.6.1", "temporal": "0.74.0", "postgresql": "18.5.15"}
+			if err != nil || !reflect.DeepEqual(versions, want) || len(tree.reads) != len(tree.files) {
+				t.Fatalf("local display alias changed external pins or source closure: versions=%v reads=%d error=%v", versions, len(tree.reads), err)
 			}
 		})
 	}
@@ -285,8 +310,8 @@ func TestNVKEPinSetRejectsChartIdentityAndShapeChanges(t *testing.T) {
 		{"missing local chart", func(_ *testing.T, _ *registryDoc, tree *nvkeFixtureTree) {
 			delete(tree.files, "controller/deploy/charts/controller/Chart.yaml")
 		}},
-		{"local chart mismatches release", func(t *testing.T, _ *registryDoc, tree *nvkeFixtureTree) {
-			replaceNVKEFixture(t, tree, "controller/deploy/charts/controller/Chart.yaml", "name: nke-controller", "name: wrong-controller")
+		{"local chart invalid name", func(t *testing.T, _ *registryDoc, tree *nvkeFixtureTree) {
+			replaceNVKEFixture(t, tree, "controller/deploy/charts/controller/Chart.yaml", "name: nke-controller", "name: wrong/controller")
 		}},
 		{"extra release field", func(t *testing.T, _ *registryDoc, tree *nvkeFixtureTree) {
 			replaceNVKEFixture(t, tree, spire, "chart:\n", "chart:\n  command: run\n")

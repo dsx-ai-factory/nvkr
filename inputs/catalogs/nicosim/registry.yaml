@@ -9,7 +9,7 @@ metadata:
 sources:
   nvke-nicosim:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: v0.22.0-beta.6
+    constraint: v0.22.0
     # Native Go 1.27.3 rebuild from workflow run 39522193703. Local launchers
     # substitute freshly validated bytes; general license/security approval
     # remains unresolved.

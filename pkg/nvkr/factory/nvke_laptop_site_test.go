@@ -124,7 +124,6 @@ func TestLaptopNKTPDependencyArchiveChecks(t *testing.T) {
 
 // These are compiler contracts, not a five-output build or installation test.
 func TestLaptopSiteArtifactContract(t *testing.T) {
-	const compiler = "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c"
 	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
 		t.Fatal(err)
@@ -172,6 +171,12 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 			if err := plan.Validate(); err != nil {
 				t.Fatal(err)
 			}
+			installerPin, err := plan.CatalogSnapshot.SourcePin("nvke-cli")
+			if err != nil {
+				t.Fatal(err)
+			}
+			installerSource := plan.CatalogSnapshot.Sources["nvke-cli"]
+			compiler := installerSource.ToolchainImage
 			var names []string
 			for _, output := range plan.LifecycleOutputs {
 				names = append(names, output.Name)
@@ -190,7 +195,7 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 						t.Fatal("site applications/charts must not fall back to acquired releases")
 					case ir.KindFetch:
 						fetches++
-						if node.Commit != "8db5721ae3031bdcd945e559153a740d46ea209e" || node.TreeHash != "e928ae13298118b61581d9a406ba4a02f872e959" {
+						if node.Repo != installerSource.Repo || node.Commit != installerPin.Commit || node.TreeHash != installerPin.TreeHash {
 							t.Fatal("CLI, controller and charts must share the selected installer source")
 						}
 						if build.Name == "nktp" {

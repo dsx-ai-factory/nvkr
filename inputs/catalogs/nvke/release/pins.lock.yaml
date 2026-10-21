@@ -5,7 +5,7 @@ artifacts:
     chart:
       name: postgresql
       repository: oci://registry-1.docker.io/bitnamicharts
-    derivedFrom: nvke@8db5721ae3031bdcd945e559153a740d46ea209e
+    derivedFrom: nvke@400c24fb6465b042be883d6b62472528520d6291
     digests:
       amd64: sha256:c350143d2e21c1e1a3670dd32ab64fd11d49198a66fae87c63a3112531c0cd17
       arm64: sha256:c350143d2e21c1e1a3670dd32ab64fd11d49198a66fae87c63a3112531c0cd17
@@ -15,7 +15,7 @@ artifacts:
     chart:
       name: spire
       repository: https://spiffe.github.io/helm-charts-hardened/
-    derivedFrom: nvke@8db5721ae3031bdcd945e559153a740d46ea209e
+    derivedFrom: nvke@400c24fb6465b042be883d6b62472528520d6291
     digests:
       amd64: sha256:7c32126bb1909076cdf9fd0419dbf9e5b012f152bb09a96a4259917d70581fac
       arm64: sha256:7c32126bb1909076cdf9fd0419dbf9e5b012f152bb09a96a4259917d70581fac
@@ -25,7 +25,7 @@ artifacts:
     chart:
       name: spire-crds
       repository: https://spiffe.github.io/helm-charts-hardened/
-    derivedFrom: nvke@8db5721ae3031bdcd945e559153a740d46ea209e
+    derivedFrom: nvke@400c24fb6465b042be883d6b62472528520d6291
     digests:
       amd64: sha256:ce982e63fc375e392b014fc99e621a55442ab886052413e9bb052f72d66580a8
       arm64: sha256:ce982e63fc375e392b014fc99e621a55442ab886052413e9bb052f72d66580a8
@@ -35,7 +35,7 @@ artifacts:
     chart:
       name: temporal
       repository: https://go.temporal.io/helm-charts
-    derivedFrom: nvke@8db5721ae3031bdcd945e559153a740d46ea209e
+    derivedFrom: nvke@400c24fb6465b042be883d6b62472528520d6291
     digests:
       amd64: sha256:14a8efe1cc92c91befac151db91f20f9a13962788e9d710c86655add6d966d37
       arm64: sha256:14a8efe1cc92c91befac151db91f20f9a13962788e9d710c86655add6d966d37
@@ -66,20 +66,20 @@ pins:
     tag: v8.0.1
     treeHash: f008da01d74dc8156ff9b1d22b2bccec8ff2ee72
   nvke:
-    commit: 8db5721ae3031bdcd945e559153a740d46ea209e
-    sourceDateEpoch: 1792450875
-    tag: v0.22.0-beta.6
-    treeHash: e928ae13298118b61581d9a406ba4a02f872e959
+    commit: 400c24fb6465b042be883d6b62472528520d6291
+    sourceDateEpoch: 1792548398
+    tag: v0.22.0
+    treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
   nvke-cli:
-    commit: 8db5721ae3031bdcd945e559153a740d46ea209e
-    sourceDateEpoch: 1792450875
-    tag: v0.22.0-beta.6
-    treeHash: e928ae13298118b61581d9a406ba4a02f872e959
+    commit: 400c24fb6465b042be883d6b62472528520d6291
+    sourceDateEpoch: 1792548398
+    tag: v0.22.0
+    treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
   nvke-helm:
-    commit: 8db5721ae3031bdcd945e559153a740d46ea209e
-    sourceDateEpoch: 1792450875
-    tag: v0.22.0-beta.6
-    treeHash: e928ae13298118b61581d9a406ba4a02f872e959
+    commit: 400c24fb6465b042be883d6b62472528520d6291
+    sourceDateEpoch: 1792548398
+    tag: v0.22.0
+    treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
   setup-go:
     commit: b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
     sourceDateEpoch: 1784170069

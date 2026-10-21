@@ -27,7 +27,7 @@ committed workflows.
 
 Changing only the installer is insufficient: an agent compiled against Ubuntu 26's libc can
 install successfully on Ubuntu 24 and then fail to start. The Ubuntu 24 agent uses native,
-digest-pinned **Go 1.27.2 Bookworm** images with glibc 2.36. Both preparation and compilation
+digest-pinned **Go 1.27.3 Bookworm** images with glibc 2.36. Both preparation and compilation
 reject a different libc. Preparation downloads nFPM 2.47.0 with the archive and executable
 digests retained in the Packer toolchain lock, then captures it with the vendored source.
 Offline compilation uses NVKE's existing Debian packaging target and that exact executable.

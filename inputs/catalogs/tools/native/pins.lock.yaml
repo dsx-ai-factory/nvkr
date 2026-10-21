@@ -5,17 +5,17 @@ artifacts:
     digests:
       arm64: sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d
     imageParentDigest: sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
-    tag: 9ac6832ac965e5222876ef910c3a28be1a392665
+    tag: v0.22.0
   native-capi-exec-plugin-image:
     digests:
       arm64: sha256:a8904bb463d669541a195ee013937e9a5a457dc999b3245da222858b526660fa
     imageParentDigest: sha256:e30e90774e5951f84eb6dfb36f972fead08b64c3bfdc0912c5b15f988e79de3a
-    tag: 9ac6832ac965e5222876ef910c3a28be1a392665
+    tag: v0.22.0
   native-workload-image:
     digests:
       arm64: sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d
     imageParentDigest: sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d
-    tag: 9ac6832ac965e5222876ef910c3a28be1a392665
+    tag: v0.22.0
 kind: PinLock
 pins:
   clusterctl:
@@ -124,25 +124,25 @@ pins:
     tag: v2.4.1
     treeHash: 6475ba71d8f7f2a2d6c2d09cbfbd40b4a1a1f029
   nvke-cli:
-    commit: 9ac6832ac965e5222876ef910c3a28be1a392665
-    sourceDateEpoch: 1792509664
-    tag: 9ac6832ac965e5222876ef910c3a28be1a392665
-    treeHash: 41a35697cf25320c58cc87e1ae5569f66869b8c1
+    commit: 400c24fb6465b042be883d6b62472528520d6291
+    sourceDateEpoch: 1792548398
+    tag: v0.22.0
+    treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
   nvke-deploy:
-    commit: 9ac6832ac965e5222876ef910c3a28be1a392665
-    sourceDateEpoch: 1792509664
-    tag: 9ac6832ac965e5222876ef910c3a28be1a392665
-    treeHash: 41a35697cf25320c58cc87e1ae5569f66869b8c1
+    commit: 400c24fb6465b042be883d6b62472528520d6291
+    sourceDateEpoch: 1792548398
+    tag: v0.22.0
+    treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
   nvke-nicosim:
-    commit: 9ac6832ac965e5222876ef910c3a28be1a392665
-    sourceDateEpoch: 1792509664
-    tag: 9ac6832ac965e5222876ef910c3a28be1a392665
-    treeHash: 41a35697cf25320c58cc87e1ae5569f66869b8c1
+    commit: 400c24fb6465b042be883d6b62472528520d6291
+    sourceDateEpoch: 1792548398
+    tag: v0.22.0
+    treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
   nvke-spire-agent-source:
-    commit: e7d5e32f5ec36eb57255e9d5de86853d92fa2087
-    sourceDateEpoch: 1792534790
-    tag: e7d5e32f5ec36eb57255e9d5de86853d92fa2087
-    treeHash: 772e6e99285ea7f6471eb62322d6c4893809ebf2
+    commit: 400c24fb6465b042be883d6b62472528520d6291
+    sourceDateEpoch: 1792548398
+    tag: v0.22.0
+    treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
   nvkr-site-identity:
     commit: de567d94f0efc1532ae229ea656b69cb75fe92c4
     goVersion: 1.27.3

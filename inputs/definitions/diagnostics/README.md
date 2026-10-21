@@ -6,10 +6,10 @@ source-owned Packer project. Architecture-dependent build and vendor argv use th
 substitution. The AMD64 disk root and ARM64 execution overlay are explicit producer declarations, not one
 architecture-neutral root.
 
-The catalog pins NVKE source to v0.22.0-beta.6 at commit
-`8db5721ae3031bdcd945e559153a740d46ea209e`. The SPIRE package is an explicit
-exception, retained at the pre-DSX commit `726f76944404e1106626b8333d3576bdf67b575b`.
-The selected pins describe build inputs; they do not establish coordinated release acceptance.
+The catalog pins every NVKE material and OS producer to release v0.22.0 at commit
+`400c24fb6465b042be883d6b62472528520d6291`. SPIRE packaging uses that release's
+source-owned revision 4 and public SPIRE/TPM payloads; no separate packaging-source
+rollback is selected. The pins describe build inputs, not coordinated release acceptance.
 
 Local development and CI are parallel supported paths sharing material producers, not substitutes for one another.
 Their Definitions select explicit execution behavior:

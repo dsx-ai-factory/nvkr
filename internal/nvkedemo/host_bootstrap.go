@@ -175,7 +175,7 @@ func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, 
 	s.bootstrapName = cluster
 	runner.Env = SetEnv(runner.Env, map[string]string{"NVKECTL_BOOTSTRAP_CLUSTER_NAME": cluster, "NVKECTL_BOOTSTRAP_NODE_IMAGE": "kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5", "NVKECTL_BOOTSTRAP_WAIT_READY": "10m"})
 	s.bootstrapRunner = &runner
-	if err := runner.Run(ctx, []string{cli, "bootstrap", "site", "--sitespec", specPath, "--controller-image", s.assets.Images["controller"].Reference, "--provisioned-provider-image", s.assets.Images["provisioned-provider"].Reference,
+	if err := runner.Run(ctx, []string{cli, "bootstrap", "site", "--sitespec", specPath, "--nvke-controller-image", s.assets.Images["controller"].Reference, "--provisioned-provider-image", s.assets.Images["provisioned-provider"].Reference,
 		"--kubeconfig-out", filepath.Join(out, "site.kubeconfig"), "--encryption-key-out", filepath.Join(out, "site-etcd-encryption-key.json"), "--diagnostics-dir", filepath.Join(out, "bootstrap-diagnostics"), "--keep-bootstrap-cluster", "--timeout", "45m"}, "host-nvke-bootstrap", 60*time.Minute); err != nil {
 		return err
 	}
