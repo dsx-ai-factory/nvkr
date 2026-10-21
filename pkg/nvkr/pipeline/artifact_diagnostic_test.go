@@ -228,3 +228,30 @@ func TestArtifactDiagnosticIndependentWorkspaceNames(t *testing.T) {
 		names[name] = true
 	}
 }
+
+func TestArtifactDiagnosticSeparateAcquisitionBudget(t *testing.T) {
+	input := ArtifactDiagnostic{Workspace: t.TempDir(), Artifact: "/supplied", Image: "go@sha256:" + strings.Repeat("a", 64), Platform: "linux/amd64", Version: "v1", Suite: "contract", Timeout: time.Minute, DependencyTimeout: 30 * time.Minute}
+	phase := 0
+	run := func(options RunOptions, _ ...string) error {
+		deadline, ok := options.Ctx.Deadline()
+		if !ok {
+			t.Fatal("unbounded phase")
+		}
+		remaining := time.Until(deadline)
+		expected := 30 * time.Minute
+		if phase == 1 {
+			expected = time.Minute
+		}
+		if remaining > expected || remaining < expected-time.Second {
+			t.Fatalf("phase %d budget %s, want %s", phase, remaining, expected)
+		}
+		phase++
+		return nil
+	}
+	if err := runArtifactDiagnostic(t.Context(), input, io.Discard, io.Discard, run, unexpectedArtifactCleanup(t)); err != nil {
+		t.Fatal(err)
+	}
+	if phase != 2 {
+		t.Fatal(phase)
+	}
+}

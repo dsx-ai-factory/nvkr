@@ -53,6 +53,17 @@ const retainedManagementCleanupTimeout = 3 * time.Minute
 const RetainedCleanupTimeout = tenantCleanupTimeout + retainedRegistryCleanupTimeout + retainedManagementCleanupTimeout + retainedRuntimeCleanupTimeout + retainedRestoreTimeout + time.Minute
 
 func startDiskService(ctx context.Context, path, address string) (*diskService, error) {
+	return startDiskServiceWithNightlyAlias(ctx, path, address, "")
+}
+
+// The nightly suite verifies its fixed URL while the upstream-OVN profile uses
+// its named output URL. Both routes read the same held file. No other alias or
+// filesystem route is admitted, and the ordinary service exposes no alias.
+func startDiskServiceWithNightlyAlias(ctx context.Context, path, address, alias string) (*diskService, error) {
+	name := filepath.Base(path)
+	if alias != "" && (name != DiskOutputName+".qcow2" || alias != "nvke-node-image-upstream-ovn-arm64.qcow2") {
+		return nil, nvkrerr.New(nvkrerr.CodeEngineCapability, "disk service does not support this candidate URL alias")
+	}
 	file, info, err := securepath.OpenRegular(path)
 	if err != nil {
 		return nil, err
@@ -67,7 +78,6 @@ func startDiskService(ctx context.Context, path, address string) (*diskService, 
 		_ = file.Close()
 		return nil, err
 	}
-	name := filepath.Base(path)
 	service := &diskService{done: make(chan error, 1), file: file, url: "http://" + listener.Addr().String() + "/" + name}
 	serviceLifetime := ctx
 	if owner := runtimeRetention(ctx); owner != nil {
@@ -85,7 +95,8 @@ func startDiskService(ctx context.Context, path, address string) (*diskService, 
 		service.handlers.Add(1)
 		service.mu.Unlock()
 		defer service.handlers.Done()
-		if request.URL.Path != "/"+name || request.URL.RawQuery != "" || (request.Method != http.MethodGet && request.Method != http.MethodHead) {
+		selectedPath := request.URL.Path == "/"+name || alias != "" && request.URL.Path == "/"+alias
+		if !selectedPath || request.URL.RawQuery != "" || (request.Method != http.MethodGet && request.Method != http.MethodHead) {
 			http.NotFound(writer, request)
 			return
 		}

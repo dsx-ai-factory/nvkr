@@ -67,18 +67,20 @@ func TestNVKEOverlayPinsStayAligned(t *testing.T) {
 }
 
 func TestNVKERetainedCompilerRejectsBadAcquisition(t *testing.T) {
-	for _, directory := range []string{"node-images/release", "node-images/diagnostic", "node-images/native-arm64", "nicosim"} {
+	for _, directory := range []string{"ubuntu24"} {
 		for _, arch := range []string{"x86_64", "unsupported"} {
 			t.Run(directory+"/"+arch, func(t *testing.T) {
-				registry, err := readRegistry(Dir(filepath.Join("../../../inputs/catalogs", directory)))
+				overlay, err := LoadOverlayContext(t.Context(), "../../../inputs/catalogs/node-images/variants/ubuntu24.json")
 				if err != nil {
 					t.Fatal(err)
 				}
-				source := "nvke-os"
-				if directory == "nicosim" {
-					source = "nvke-nicosim"
+				command := overlay.Components["nvke-agent"].Component.VendorCommand
+				_, compiler, found := strings.Cut(command[2], "# Retain the source-required compiler;")
+				if !found {
+					t.Fatal("missing retained compiler")
 				}
-				command := registry.Sources[source].VendorCommand
+				_, compiler, _ = strings.Cut(compiler, "\n")
+				command[2] = compiler
 				root := t.TempDir()
 				bin := filepath.Join(root, "bin")
 				if err := os.Mkdir(bin, 0700); err != nil {

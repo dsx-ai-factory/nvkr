@@ -1,0 +1,31 @@
+---
+apiVersion: v2
+name: nke-controller
+
+# The chart name is the last path segment of the OCI repository it is pushed
+# to, so this is what puts the chart at <registry>/nke/charts/nke-controller.
+# The service it deploys is still the cloud-workflow-engine binary; nameOverride
+# in values.yaml pins the rendered resource names and labels to that older name
+# so the rename is an artifact-location change only.
+description: A Helm chart to deploy the NVKE controller service
+
+# A chart can be either an 'application' or a 'library' chart.
+#
+# Application charts are a collection of templates that can be packaged into versioned archives
+# to be deployed.
+#
+# Library charts provide useful utilities or functions for the chart developer. They're included as
+# a dependency of application charts to inject those utilities and functions into the rendering
+# pipeline. Library charts do not define any templates and therefore cannot be deployed.
+type: application
+
+# version and appVersion below are placeholders used only for local
+# `helm lint` / `helm template`. CI overrides both at package time from
+# BUILD_VERSION (git describe), so the chart is versioned in lockstep with the
+# image the same pipeline builds:
+#   --version <BUILD_VERSION without leading v>   (OCI-safe SemVer tag)
+#   --app-version <BUILD_VERSION>                 (drives image.tag)
+# See .github/workflows/chart-publish-nvcr.yml.
+version: "0.0.0"
+
+appVersion: "0.0.0"

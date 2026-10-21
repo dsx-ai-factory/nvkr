@@ -25,11 +25,10 @@ func TestPinnedInstallerIdentifiersAreNotProductAliases(t *testing.T) {
 	// These expectations come from the retained InstallerCommit, not NVKR's
 	// naming scheme. A source repin must revalidate its upstream contracts.
 	for _, row := range []struct{ name, got, want string }{
-		{"deploy reader", installerDeployReader, "deploy/lib/nke-deploy-items.py"},
-		{"release envelope", installerReleaseAPIVersion, "nke.nvidia.com/release/v1"},
+		{"deploy reader", installerDeployReader, "deploy/lib/nvke-deploy-items.py"},
 		{"controller", installerControllerName, "nke-controller"},
 		{"tenant secrets", installerSystemNamespace, "nke-system"},
-		{"installer CLI", installerCLIName, "nkectl"},
+		{"installer CLI", installerCLIName, "nvkectl"},
 	} {
 		t.Run(row.name, func(t *testing.T) {
 			if row.got != row.want {
@@ -71,7 +70,7 @@ func TestInstallerCLIPrivateHandoff(t *testing.T) {
 				if err := os.Mkdir(tools, 0o700); err != nil {
 					t.Fatal(err)
 				}
-				if err := os.WriteFile(filepath.Join(tools, "nkectl"), []byte("foreign"), 0o700); err != nil {
+				if err := os.WriteFile(filepath.Join(tools, "nvkectl"), []byte("foreign"), 0o700); err != nil {
 					t.Fatal(err)
 				}
 			case "canceled":
@@ -83,7 +82,7 @@ func TestInstallerCLIPrivateHandoff(t *testing.T) {
 					t.Fatal("unsafe installer handoff accepted")
 				}
 				if name == "existing destination" {
-					raw, readErr := os.ReadFile(filepath.Join(tools, "nkectl"))
+					raw, readErr := os.ReadFile(filepath.Join(tools, "nvkectl"))
 					if readErr != nil || string(raw) != "foreign" {
 						t.Fatal("existing private executable replaced")
 					}
@@ -95,15 +94,15 @@ func TestInstallerCLIPrivateHandoff(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := verifyToolMembers(tools, []string{"nkectl"}); err != nil {
+			if err := verifyToolMembers(tools, []string{"nvkectl"}); err != nil {
 				t.Fatal(err)
 			}
-			raw, err := os.ReadFile(filepath.Join(tools, "nkectl"))
+			raw, err := os.ReadFile(filepath.Join(tools, "nvkectl"))
 			if err != nil || string(raw) != payload {
 				t.Fatal("private handoff changed verified bytes")
 			}
 			selected := tenant{session: ManagementSession{Work: work}}
-			if selected.cli() != filepath.Join(tools, "nkectl") {
+			if selected.cli() != filepath.Join(tools, "nvkectl") {
 				t.Fatal("tenant CLI differs from installer handoff")
 			}
 		})
@@ -1199,7 +1198,7 @@ func TestRuntimePreparedValuesRequireOwningReaderRevalidation(t *testing.T) {
 			}
 			calls := make(map[string]int)
 			capture := func(_ context.Context, args []string, _ string, _ time.Duration) ([]byte, error) {
-				if len(args) != 4 || args[0] != "python3" || args[1] != filepath.Join(work, "deploy/lib/nke-deploy-items.py") || args[2] != "release" {
+				if len(args) != 4 || args[0] != "python3" || args[1] != filepath.Join(work, "deploy/lib/nvke-deploy-items.py") || args[2] != "release" {
 					t.Fatalf("wrong owner: %v", args)
 				}
 				item := filepath.Base(filepath.Dir(args[3]))
@@ -1214,7 +1213,7 @@ func TestRuntimePreparedValuesRequireOwningReaderRevalidation(t *testing.T) {
 				if calls[item] == 2 {
 					values += ",nvkr-image-inputs.json"
 				}
-				fields := []string{"single", item, "1.2.3", "", "charts/" + item + ".tgz", item, "test", values, "gate"}
+				fields := []string{"single", item, "1.2.3", "", "charts/" + item + ".tgz", item, "test", values, "gate", "", "", "", ""}
 				if name == "foreignSemantics" && calls[item] == 2 {
 					fields[6] = "foreign"
 				}

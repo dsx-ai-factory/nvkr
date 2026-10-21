@@ -42,49 +42,49 @@ artifacts:
       amd64: sha256:87adfbde7aff1288d7da30cb0cfbe00d0785b40f3919b1b16b745f0e859f0125
       arm64: sha256:69fe8d3cc67230b95b3c506ff6af0a05a413f3fd4109b5624e7beb44723eb0fb
     imageParentDigest: sha256:ed6862e1506e11c08a0ec4cc7e1395eb5cf10e3acf2c2ba3846edc1b6b3916d6
-    tag: v0.22.0
+    tag: v0.22.0-beta.6
   nktp-kube-state-metrics-image:
     digests:
       amd64: sha256:01171220c7c059afc85034ffe687bfe7249e41c0cc46fbe9a5128503ceee3016
       arm64: sha256:92b46557c71ecac53825772e4827dbcd9fca876b1950060f8fb2f2ef0d7a27af
     imageParentDigest: sha256:42cfe3723a5f058171c627537fb57a3ea0f26e4380fa18555a95cb1a1b4cfc5b
-    tag: v0.22.0
+    tag: v0.22.0-beta.6
   nktp-kubectl-image:
     digests:
       amd64: sha256:fac49dca08bb8a598bfc4062b74a120cd9e3b74677723e7845f25ea585b2a005
       arm64: sha256:eb68ffe84017c8354620ddcb3853caabf3ab8bd43d463a4333d81cc8204d8486
     imageParentDigest: sha256:090bef429ed1bdb10ebd4e82ac6b1b4695276e3a15cfeef6fa2772daed6deb89
-    tag: v0.22.0
+    tag: v0.22.0-beta.6
   nktp-lgtm-image:
     digests:
       amd64: sha256:aa8118b2d0fd37798c9612fa4429eae4cf7fdc59d834a6904b0db518b802dd04
       arm64: sha256:5e30372e9d59d1843d67d4109fd4c574a546d52b0b249e3282eec24db48900c5
     imageParentDigest: sha256:d6b20e35890ef2f91d13944805939acdaf1e5d3ffbf9f9aed08586312826c815
-    tag: v0.22.0
+    tag: v0.22.0-beta.6
   nktp-metrics-server-image:
     digests:
       amd64: sha256:6231fb0a1ffab76c92ab880f51a0d11b290f688373647bcedff85af025dfd8a9
       arm64: sha256:9ece07f21cfaf3c2398bd4e0de1f127cfad23ec40d29ceffd8323b4f34744eb8
     imageParentDigest: sha256:b2d2efaf5ac3b366ed0f839d2412a2c4279d4fc2a2a733f12c52133faed36c41
-    tag: v0.22.0
+    tag: v0.22.0-beta.6
   nktp-node-exporter-image:
     digests:
       amd64: sha256:da83fae85603c4e47e6c68369a7d746e2dda683dc35ea2e234b4f171e0d92798
       arm64: sha256:c9ef89f9464f09e7234decaae68a80ab856ff0014435677a99fd48b03dd410ea
     imageParentDigest: sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
-    tag: v0.22.0
+    tag: v0.22.0-beta.6
   nktp-operator-image:
     digests:
       amd64: sha256:dee6ece62624c268379a2803b4775ab20495e5ecfb9455331f85f5c50847f10e
       arm64: sha256:7f9ab2da723be0779e17396954e883e9b238d242e80521375b5080e4b5ec15e2
     imageParentDigest: sha256:2ceb3b541295e399d5449890edc5f4c352a7c45483caf1940b243794fe3ed99a
-    tag: v0.22.0
+    tag: v0.22.0-beta.6
   nktp-target-allocator-image:
     digests:
       amd64: sha256:ec23db7e61b9d705f4aecd267d8aa51b9ff92d2c6f50ff69cbf10370538cb4dc
       arm64: sha256:37553cfe83625530821bd6b5bd7b56ea9cda7584657a3d45914d994a1ca8c638
     imageParentDigest: sha256:03b70585d71e862edbf311f4592a5e876b056b5f5009ada5345c5625e9ac0382
-    tag: v0.22.0
+    tag: v0.22.0-beta.6
 kind: PinLock
 pins:
   capi:

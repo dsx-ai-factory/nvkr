@@ -162,7 +162,7 @@ sources:
     toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
   cert-manager:
     repo: https://github.com/cert-manager/cert-manager
-    # Matches the pinned NVKE tool-versions.mk and clusterctl default.
+    # The selected NVKE release's make/tool-versions.mk owns this CAPI pair.
     constraint: 1.21.1
     toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
   capnico:

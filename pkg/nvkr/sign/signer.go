@@ -502,8 +502,14 @@ func (s SignedDocument) requireExpectedClaims(identity, issuer string) error {
 }
 
 func qualifiedSignBlobArgs(documentPath, signaturePath, certificatePath, bundlePath, oidcIssuer string) []string {
+	// Cosign 3 defaults to a signing config and bundle-only output. This
+	// protocol uses an explicit issuer and captures detached outputs, including
+	// a PEM certificate rather than base64-wrapped PEM. Keep public transparency
+	// submission enabled for hosted keyless signing.
 	args := []string{
 		"sign-blob", "--yes",
+		"--use-signing-config=false", "--new-bundle-format=false",
+		"--b64=false", "--tlog-upload=true",
 		"--output-signature", signaturePath,
 		"--output-certificate", certificatePath,
 	}

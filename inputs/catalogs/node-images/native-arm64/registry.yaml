@@ -3,7 +3,7 @@
 
 # Source 69ef variables.pkr.hcl and locals.pkr.hcl: empty kernel_package
 # preserves the ARM64 source default linux-nvidia-64k; no kernel substitution.
-# SPIRE packaging uses the same v0.22.0 source as the other NVKE producers.
+# SPIRE packaging intentionally retains the separately reviewed 726f769 source.
 # Agent VERSION is its source commit, not a released module-version claim.
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
@@ -16,24 +16,11 @@ sources:
     repo: https://github.com/dsx-ai-factory/nvke.git
     constraint: v0.22.0
     toolchainImagesByArch:
-      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
     vendorCommand:
     - bash
     - -ec
     - |
-      # Retain the source-required compiler; the Packer image owns VM tools.
-      case "$(uname -m)" in
-        x86_64) go_arch=amd64; go_sha=65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40 ;;
-        aarch64) go_arch=arm64; go_sha=a06e99309dbcbdca1a8ccd2282c3ee146e55930886e26b4f1193269587165f49 ;;
-        *) echo 'Unsupported Go execution architecture' >&2; exit 1 ;;
-      esac
-      mkdir -p .nvkr-tools
-      curl --fail --location --max-time 120 --output .nvkr-tools/go.tar.gz \
-        "https://go.dev/dl/go1.27.3.linux-${go_arch}.tar.gz"
-      printf '%s  .nvkr-tools/go.tar.gz\n' "$go_sha" | sha256sum --quiet -c -
-      tar -xzf .nvkr-tools/go.tar.gz -C .nvkr-tools
-      export PATH="${PWD}/.nvkr-tools/go/bin:$PATH"
-      test "$(GOTOOLCHAIN=local go version)" = "go version go1.27.3 linux/${go_arch}"
       cd agent
       export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
       pins="$(sha256sum go.mod go.sum)"
@@ -62,7 +49,7 @@ sources:
     repo: https://github.com/dsx-ai-factory/nvke.git
     constraint: v0.22.0
     toolchainImagesByArch:
-      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
     vendorCommand:
     - bash
     - -ec
@@ -73,12 +60,12 @@ sources:
     repo: https://github.com/ovn-kubernetes/ovn-kubernetes
     constraint: 1.4.x
     toolchainImagesByArch:
-      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
   nvke-kubeadm-distro-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
     constraint: v0.22.0
     toolchainImagesByArch:
-      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
     vendorCommand:
     - bash
     - -ec
@@ -89,7 +76,7 @@ sources:
     repo: https://github.com/dsx-ai-factory/nvke.git
     constraint: v0.22.0
     toolchainImagesByArch:
-      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
     vendorCommand:
     - bash
     - -ec
@@ -108,7 +95,7 @@ components:
     - bash
     - -ec
     - |
-      PATH="/src/.nvkr-tools/go/bin:$PATH" GOTOOLCHAIN=local GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \
+      GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \
         VERSION="${BUILD_VERSION:?}" \
         NFPM_BIN=/usr/local/bin/nfpm \
         DEB_OUTPUT=/src/agent/bin/nvke-agent.deb
@@ -217,7 +204,7 @@ components:
     - --opt
     - build-arg:OVN_KUBERNETES_DIR=.
     - --opt
-    - build-arg:BUILDER_IMAGE=quay.io/projectquay/golang@sha256:506a668eb4c763a964ffc4d4ad0125d45d75aac899392be7e5d39380f8452564
+    - build-arg:BUILDER_IMAGE=quay.io/projectquay/golang@sha256:d5acf07940fb5e6e2d07542abd853cece623d95ffd364769ec825aab5471d3b8
     - --opt
     - build-arg:KUBECTL_MINOR=1.36
     - --opt

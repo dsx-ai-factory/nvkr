@@ -92,10 +92,10 @@ func (g *githubLocatorClient) apiGET(ctx context.Context, endpoint string) (gith
 			return response, nil
 		}
 		if attempt+1 == githubLocatorAPIAttempts {
-			return githubLocatorResponse{}, e.New(e.CodeUnavailable, "CI locator API rate-limit retry budget exhausted")
+			return githubLocatorResponse{}, e.New(e.CodeUnavailable, "CI locator API retry budget exhausted")
 		}
 		if err := g.wait(ctx, delay); err != nil {
-			return githubLocatorResponse{}, safeIOError(ctx, e.CodeTimeout, "CI locator API rate-limit wait canceled")
+			return githubLocatorResponse{}, safeIOError(ctx, e.CodeTimeout, "CI locator API retry wait canceled")
 		}
 	}
 	return githubLocatorResponse{}, e.New(e.CodeInternal, "CI locator API retry state invalid")
@@ -144,6 +144,8 @@ func githubLocatorHTTPError(ctx context.Context, cause error, message string) er
 }
 
 func githubLocatorRetryDelay(response githubLocatorResponse, attempt int, now time.Time) (time.Duration, bool, error) {
+	transient := response.status == http.StatusInternalServerError || response.status == http.StatusBadGateway ||
+		response.status == http.StatusServiceUnavailable || response.status == http.StatusGatewayTimeout
 	limited := response.status == http.StatusTooManyRequests
 	if response.status == http.StatusForbidden {
 		var body struct {
@@ -151,7 +153,7 @@ func githubLocatorRetryDelay(response githubLocatorResponse, attempt int, now ti
 		}
 		limited = canonical.ValidateJSONDocument(response.body) == nil && json.Unmarshal(response.body, &body) == nil && strings.Contains(strings.ToLower(body.Message), "secondary rate limit")
 	}
-	if !limited {
+	if !limited && !transient {
 		return 0, false, nil
 	}
 	remaining := response.header.Values("X-RateLimit-Remaining")
@@ -159,6 +161,9 @@ func githubLocatorRetryDelay(response githubLocatorResponse, attempt int, now ti
 		return 0, true, e.New(e.CodeUnavailable, "CI locator API primary rate limit is exhausted or ambiguous")
 	}
 	delay := (60 * time.Second) << attempt
+	if transient {
+		delay = (2 * time.Second) << attempt
+	}
 	values := response.header.Values("Retry-After")
 	if len(values) > 1 {
 		return 0, true, e.New(e.CodeUnavailable, "CI locator API returned ambiguous rate-limit delay")

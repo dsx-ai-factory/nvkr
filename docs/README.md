@@ -52,6 +52,7 @@ records source availability and remaining gaps.
 | Reviewable updates and matching regeneration (the installed `catalog-refresh.yaml` is generated, never hand-edited) | [Catalog maintenance](catalog-maintenance.md) |
 | Chart slots, image outputs, and registry-independent bytes | [Declarative Helm bindings](declarative-helm-bindings.md) |
 | Software inventories and their exact subjects/stages | [Dependency SBOMs](dependency-sboms.md) |
+| Discover and explicitly select provisional CLI validators | [CLI artifact testing](artifact-testing.md#provisional-validator-catalog) |
 | External test output descriptions and configured diagnostic checks | [External test output contract](external-test-output-contract.md) |
 | Bounded guest capture format and acquisition ownership | [OS acquisition contract](nvke-os-acquisition-contract.md) |
 | Optional live-owner disk inspection and material observations | [OS live inspection](nvke-os-live-inspection.md) |
@@ -79,7 +80,8 @@ implementation/evidence ledger. The [roadmap](milestones.md) links outcomes to t
 
 Proposed [ADR-24: imported validator catalog](adr/0024-imported-validator-catalog.md) defines discovery,
 adapter selection and artifact bindings across repositories, including its diagnostic and evidence limits.
-The catalog and versioned profiles are not implemented.
+The provisional local-plan CLI slice implements catalog discovery and versioned-profile execution;
+broader adapter and profile support remains deferred.
 
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
 Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) covers branch

@@ -51,45 +51,17 @@ func controllerCatalogFixture(t *testing.T, directory string) (*catalog.Catalog,
 		t.Fatal("locate controller pin-set fixture")
 	}
 	repo := t.TempDir()
-	if err := os.CopyFS(repo, os.DirFS(filepath.Join(filepath.Dir(filename), "../catalog/testdata/nvke-pin-set"))); err != nil {
+	if err := os.CopyFS(repo, os.DirFS(filepath.Join(filepath.Dir(filename), "../catalog/testdata/nvke-beta-pin-set"))); err != nil {
 		t.Fatal(err)
 	}
-	// Project the historical fixture into the selected release's renamed layout.
-	deploy := filepath.Join(repo, "deploy/nico")
-	if err := os.MkdirAll(filepath.Dir(deploy), 0o700); err != nil {
+	// The release changes the chart name; the beta fixture already owns its layout.
+	chart := filepath.Join(repo, "controller/deploy/charts/controller/Chart.yaml")
+	raw, err := os.ReadFile(chart)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Rename(filepath.Join(repo, "controller/deploy/nke-sbom"), deploy); err != nil {
+	if err := os.WriteFile(chart, []byte(strings.ReplaceAll(string(raw), "name: nke-controller", "name: nvke-controller")), 0600); err != nil {
 		t.Fatal(err)
-	}
-	if err := os.Rename(filepath.Join(deploy, "nke-deploy.yaml"), filepath.Join(deploy, "nvke-deploy.yaml")); err != nil {
-		t.Fatal(err)
-	}
-	for path, replacements := range map[string][]string{
-		"deploy/nico/nvke-deploy.yaml":                   {"nke-base-config", "nvke-base-config", "items:\n", "items:\n  - {name: nktp, type: helm}\n"},
-		"deploy/nico/controller/release.yaml":            {"../charts/controller", "../../controller/deploy/charts/controller", "  version: \"0.0.0\"\n", ""},
-		"controller/deploy/charts/controller/Chart.yaml": {"nke-controller", "nvke-controller"},
-	} {
-		file := filepath.Join(repo, path)
-		raw, err := os.ReadFile(file)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(file, []byte(strings.NewReplacer(replacements...).Replace(string(raw))), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for path, content := range map[string]string{
-		"deploy/nico/nktp/release.yaml":      "chart:\n  name: nktp\n  path: ../../nktp/deploy/charts/nktp\nrelease:\n  name: nktp\n  namespace: nktp\n",
-		"nktp/deploy/charts/nktp/Chart.yaml": "name: nktp\nversion: 0.0.0\n",
-	} {
-		file := filepath.Join(repo, path)
-		if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(file, []byte(content), 0o600); err != nil {
-			t.Fatal(err)
-		}
 	}
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")

@@ -227,8 +227,8 @@ func (api *cleanupAPI) eligible(ctx context.Context, token string, repo cleanupR
 	if err != nil || !versionsOld {
 		return false, err
 	}
-	// Read the exact attempt last, immediately before any DELETE. A newer active
-	// attempt has a different namespace and cannot keep this attempt alive.
+	// Authenticate ownership through the original attempt, then check the latest
+	// attempt before DELETE: a retry may still consume these original packages.
 	var run cleanupRun
 	path := "/repos/" + repo.FullName + "/actions/runs/" + candidate.reference.RunID() + "/attempts/" + candidate.reference.Attempt()
 	if err := api.request(ctx, token, http.MethodGet, path, &run); err != nil {
@@ -239,7 +239,23 @@ func (api *cleanupAPI) eligible(ctx context.Context, token string, repo cleanupR
 		run.Path != ".github/workflows/nvkr-dev.yml" || run.Event != "workflow_dispatch" {
 		return false, e.New(e.CodeVerifyFailed, "development package does not bind the expected repository, workflow and exact attempt")
 	}
-	old, err = api.oldEnough(run.CreatedAt, run.UpdatedAt)
+	old, err = api.runOldEnough(run)
+	if err != nil || !old {
+		return false, err
+	}
+	var latest cleanupRun
+	if err := api.request(ctx, token, http.MethodGet, "/repos/"+repo.FullName+"/actions/runs/"+candidate.reference.RunID(), &latest); err != nil {
+		return false, err
+	}
+	if latest.ID != run.ID || latest.Attempt < run.Attempt || latest.Repository.ID != repo.ID ||
+		!strings.EqualFold(latest.Repository.FullName, repo.FullName) || latest.Path != run.Path || latest.Event != run.Event {
+		return false, e.New(e.CodeVerifyFailed, "development cleanup latest run differs from the original owner")
+	}
+	return api.runOldEnough(latest)
+}
+
+func (api *cleanupAPI) runOldEnough(run cleanupRun) (bool, error) {
+	old, err := api.oldEnough(run.CreatedAt, run.UpdatedAt)
 	if err != nil {
 		return false, err
 	}

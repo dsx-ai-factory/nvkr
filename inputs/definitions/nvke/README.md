@@ -65,7 +65,7 @@ The pinned commit's source-owned direct-Packer contract receives `capture_apt_ac
 `non-fde/apt-acquisitions.tar` or `fde/apt-acquisitions.tar`, which each producer declares through `packer.acquisitionArchive`.
 The source's composition command receives the required explicit native `--architecture` argument.
 The selected material projection binds `image-inputs` as `archive` and `installer-iso` as `disk-image`
-under `nke.dev/os-image-materials/v1`; every selected material and disk target retains its own architecture.
+under `nvke.nvidia.com/os-image-materials/v1`; every selected material and disk target retains its own architecture.
 
 This is a candidate Definition, not completed M2 acceptance. The production target Environment reuses
 the existing registry credential, source access and workflow signing policy, but publishes only under
@@ -154,12 +154,13 @@ cannot substitute for those gates or establish qualified reproduction.
 ## Native execution and publication
 
 `nvke-node-fde-amd64` and `nvke-node-fde-arm64` select the pinned source's
-`nke-node-fde.qemu.nke-fde` target and `fde/nke-node.qcow2` output. They reuse each architecture's existing
+`nvke-node-fde.qemu.nvke-fde` target and `fde/nvke-node.qcow2` output. They reuse each architecture's existing
 material producers and native toolchain. Each explicitly declares the public bootstrap `luks_passphrase: changeit`;
 no private passphrase or new secret channel is admitted. Build-provenance publication binds `luks2` through
 the wrapper and signed release metadata. Strict FDE inspection/publication and qualified reproduction remain
-unsupported. The [source audit](../diagnostics/fde-audit.md) explains why these shared-key candidate images make
-no deployed confidentiality claim, even after TPM enrollment. `swtpm` is not required for the bake.
+unsupported. The [historical source audit](../diagnostics/fde-audit.md) records the prior pin's shared-key
+limitations; it is not an audit of the beta update. These diagnostic images make no deployed confidentiality
+claim, even after TPM enrollment. `swtpm` is not required for the bake.
 
 The [recorded AMD64 diagnostic Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035)
 completed a standalone FDE bake and raw artifact retention. It did not exercise FDE publication, an ARM64

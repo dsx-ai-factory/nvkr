@@ -13,8 +13,7 @@ import (
 
 // ValidateProductionPredicate compares a descriptive predicate with the exact
 // admitted Plan and externally authenticated producing workflow run. Production
-// retries retain earlier same-run predicates; development requires the exact
-// source attempt. Publication-origin checks must additionally bind the predicate
+// and development retries retain earlier same-run predicates. Publication-origin checks must additionally bind the predicate
 // to the exact selected metadata.
 // Only a subsequent signature verification authenticates these predicate bytes.
 func ValidateProductionPredicate(raw []byte, plan *Plan, builder, invocation string) error {
@@ -31,13 +30,13 @@ func ValidateProductionPredicate(raw []byte, plan *Plan, builder, invocation str
 	if err := validateProductionPredicateOrigin(raw, plan, plan.Environment.Signing, builder, signed); err != nil {
 		return err
 	}
-	return admitPlanReferenceInvocation(plan, signed, invocation)
+	return admitReferenceInvocation(signed, invocation)
 }
 
 // ValidateQualificationRootInvocation checks the original aggregate preparation
 // and signing against the selected successful source attempt. These descriptive
 // bindings grant no authority without exact Plan and signature verification.
-// Development requires preparation, signing and consumption in the same attempt.
+// Both lanes preserve preparation <= signing <= consumption within one run.
 func ValidateQualificationRootInvocation(raw []byte, plan *Plan, prepared, consuming string) error {
 	if plan == nil {
 		return e.New(e.CodeProvenanceMissing, "qualification root requires an exact Plan")
@@ -46,10 +45,10 @@ func ValidateQualificationRootInvocation(raw []byte, plan *Plan, prepared, consu
 	if err != nil {
 		return err
 	}
-	if err := admitPlanReferenceInvocation(plan, prepared, signed); err != nil {
+	if err := admitReferenceInvocation(prepared, signed); err != nil {
 		return err
 	}
-	return admitPlanReferenceInvocation(plan, signed, consuming)
+	return admitReferenceInvocation(signed, consuming)
 }
 
 // ValidateQualificationOutputOrigin binds an output predicate to the original
@@ -75,10 +74,10 @@ func ValidateQualificationOutputOrigin(raw []byte, plan *Plan, output delivery.P
 	if signed != origin.SignedInvocationID {
 		return e.New(e.CodeVerifyFailed, "qualification output %q differs from its original signing invocation", output.Name)
 	}
-	if err := admitPlanReferenceInvocation(plan, origin.PreparedInvocationID, signed); err != nil {
+	if err := admitReferenceInvocation(origin.PreparedInvocationID, signed); err != nil {
 		return err
 	}
-	return admitPlanReferenceInvocation(plan, signed, assembled)
+	return admitReferenceInvocation(signed, assembled)
 }
 
 // Development targets are projected from the authenticated source attempt, never
@@ -105,5 +104,5 @@ func validateQualificationOutputRepository(plan *Plan, target Target, repository
 		return e.New(e.CodeVerifyFailed, "development qualification output differs from its planned publication repository")
 	}
 	invocation := "https://github.com/" + namespace.Repository() + "/actions/runs/" + reference.RunID() + "/attempts/" + reference.Attempt()
-	return admitPlanReferenceInvocation(plan, invocation, assembled)
+	return admitReferenceInvocation(invocation, assembled)
 }

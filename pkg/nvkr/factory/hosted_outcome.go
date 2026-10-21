@@ -298,7 +298,14 @@ func validateHostedProductionPredicate(raw []byte, plan *Plan, signing *definiti
 		if err != nil {
 			return err
 		}
-		builder, invocation = run.BuilderID(), run.InvocationID()
+		builder = run.BuilderID()
+		invocation, err = qualificationPredicateInvocation(raw)
+		if err != nil {
+			return err
+		}
+		if err := admitReferenceInvocation(invocation, run.InvocationID()); err != nil {
+			return err
+		}
 	}
 	return validateProductionPredicateOrigin(raw, plan, signing, builder, invocation)
 }

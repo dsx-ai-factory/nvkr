@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/validator-catalog/v1
+kind: ValidatorCatalog
+entries:
+  - nvke/nvkectl/contract.yaml
+  - nvke/nvkectl/cli.yaml

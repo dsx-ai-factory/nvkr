@@ -8,9 +8,9 @@ sessions, not the architecture or setup procedure for current `run` and `e2e`.
 NVKR builds/acquires and observes artifacts. NVKE owns installation, site
 configuration, provisioning and tenant lifecycle. The demo calls `nvkr`
 subprocesses, not an execution SDK, and delegates installation to the exact
-pinned NVKE staged installer at
-`8fb2d53368823bd386b4fbd55b4ab6d3c0931345`.
-See its [deployment instructions](https://github.com/dsx-ai-factory/nvke/blob/8fb2d53368823bd386b4fbd55b4ab6d3c0931345/deploy/README.md).
+pinned NVKE `v0.22.0` installer at
+`400c24fb6465b042be883d6b62472528520d6291`.
+See its [deployment instructions](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/deploy/README.md).
 
 That older implementation prepared this installer in a private attempt-local
 directory and accepted a matching read-only `run.nvkeCheckout` override. Current
@@ -63,7 +63,12 @@ The adapter asks `nvkr publish chart` to verify each selected Helm layout,
 manifest/config and bounded archive, then exports unchanged chart bytes. It
 copies only tracked deploy files from the clean pinned installer into a private
 directory and supplies the same archives to inventory rendering and execution
-through `DEPLOY_PATH`.
+through the installer's `--deploy-path` option. The source-owned site-spec renderer
+receives the selected images and local chart archives; the adapter runs readiness,
+Cluster API installation, stack installation and the source-owned identity overlay.
+The generated site spec supplies stack rendering inputs for the already owned Kind
+cluster. Its bootstrap fields are not reusable instructions for creating that
+cluster; the separately admitted Kind configuration owns its networking.
 
 It does not rebuild dependencies during deployment, edit the NVKE checkout or
 mint a Release. NVKE's existing deploy-item reader remains authoritative;
@@ -97,11 +102,17 @@ a fresh profiles selection and supply it with `--profiles-run`, or build a new
 combined Run. A compatibility replay with the older demo binary retains its
 original data-volume behavior; it is not validation of the new image handoff.
 
-The controller's CAPNICo override is currently tag-shaped. The adapter checks
-the exact destination subject; a tag alone is not an authenticated release
-contract. Runtime image checks cover the selected dependency roles.
+The adapter rewrites the private CAPNICo manifest's image reference to the verified
+destination digest. Runtime image checks cover the selected dependency roles.
 Kube-vip and the test workload are additional runtime acquisitions; this is
 not a completely offline deployment.
+
+The beta tenant API uses MachineImage, ClusterRelease and NodePoolRelease
+resources. Before tenant creation, the adapter reads the diagnostic profile from
+the observed controller pod, rechecks that pod and its images, and creates those
+resources with the admitted disk's digest and size recorded in annotations. The
+source-owned initialization template still references the owned disk service.
+These are diagnostic provisioning resources, not signed NVKR Releases.
 
 Diagnostic registry copies do not equal NVKR publication/signing. Hosted
 Release consumption additionally requires consumer-policy verification and

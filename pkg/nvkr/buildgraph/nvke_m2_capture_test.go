@@ -47,7 +47,7 @@ func TestNVKEControllerPinnedChartFilename(t *testing.T) {
 
 func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 	const inputRoot = "../../../inputs/definitions/nvke"
-	const approvedSource = "400c24fb6465b042be883d6b62472528520d6291"
+	const selectedSource = "400c24fb6465b042be883d6b62472528520d6291"
 	authored, err := definition.LoadDefinition(t.Context(), filepath.Join(inputRoot, "definition.yaml"))
 	if err != nil {
 		t.Fatal(err)
@@ -79,23 +79,24 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 			agent := cat.Components["nvke-agent"]
 			for _, name := range []string{"nvke-agent", "nvke-cni-calico", "nvke-kubeadm-distro"} {
 				component := cat.Components[name]
-				if component.Commit != approvedSource || component.TreeHash != "f3afc02f5c92f4aacda3a1655836a91bef093bfe" || component.SourceDate != 1792548398 {
-					t.Fatalf("%s does not retain the approved source commit/tree/epoch", name)
+				if component.Tag != "v0.22.0" || component.Commit != selectedSource || component.TreeHash != "f3afc02f5c92f4aacda3a1655836a91bef093bfe" || component.SourceDate != 1792548398 {
+					t.Fatalf("%s does not retain the selected source commit/commit/tree/epoch", name)
 				}
 			}
-			// SPIRE shares the release pin; revision 4 removes the former DSX plugin.
+			// SPIRE packaging is part of the same release source identity.
 			spire := cat.Components["nvke-spire-agent"]
-			if spire.Commit != "400c24fb6465b042be883d6b62472528520d6291" || spire.TreeHash != "f3afc02f5c92f4aacda3a1655836a91bef093bfe" || spire.SourceDate != 1792548398 {
-				t.Fatal("release SPIRE source pin changed")
+			if spire.Tag != "v0.22.0" || spire.Commit != selectedSource || spire.TreeHash != "f3afc02f5c92f4aacda3a1655836a91bef093bfe" || spire.SourceDate != 1792548398 {
+				t.Fatal("SPIRE source must match the release")
 			}
-			if len(spire.Materials) != 0 || len(spire.VendorCommand) == 0 {
-				t.Fatal("release SPIRE producer must retain its source-owned acquisition contract without DSX materials")
+			if len(spire.Materials) != 0 || !strings.Contains(strings.Join(spire.VendorCommand, "\n"), "make -C os-image/packages/spire-agent bundle nfpm") ||
+				!strings.Contains(strings.Join(spire.BuildCommand, "\n"), "SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=4") {
+				t.Fatal("release SPIRE producer must retain its source-owned acquisition and packaging revision 4 without DSX materials")
 			}
 			if _, exists := cat.Components["dsx-imds-node-attestor-agent"]; exists || slices.Contains(output.Components, "dsx-imds-node-attestor-agent") {
 				t.Fatal("release SPIRE selection unexpectedly reintroduced DSX")
 			}
-			if agent.Commit != approvedSource || !strings.Contains(strings.Join(agent.BuildCommand, "\n"), "VERSION=v0.22.0") {
-				t.Fatal("handwritten agent version no longer matches its exact source pin; revalidate owning source version before repinning")
+			if agent.VersionStamp["BUILD_VERSION"] != "v0.22.0" || !strings.Contains(strings.Join(agent.BuildCommand, "\n"), `VERSION="$BUILD_VERSION"`) {
+				t.Fatal("agent version must derive from the selected source tag")
 			}
 			selected, err := Resolve(cat, Selection{Components: output.Components, Platform: output.Platform, OutputFormat: output.Format})
 			if err != nil {
@@ -116,14 +117,14 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 				if node.Kind == ir.KindBuild && node.Component == "nvke-spire-agent" {
 					spireFound = true
 					if node.SourceCommit != spire.Commit || node.Network != ir.NetworkNone || len(node.Materials) != 0 {
-						t.Fatal("SPIRE packaging must use the exact release source and its acquired closure offline")
+						t.Fatal("SPIRE packaging must use the exact temporary source and its acquired closure offline")
 					}
 				}
 				if node.Kind == ir.KindBuild && node.Component == "nvke-image-inputs" {
 					compositionFound = true
 					arch := strings.TrimPrefix(output.Platform, "linux/")
-					if node.SourceCommit != approvedSource || !strings.Contains(strings.Join(node.Command, "\n"), "--architecture "+arch) {
-						t.Fatal("image composition must use the approved source's required native architecture argument")
+					if node.SourceCommit != selectedSource || !strings.Contains(strings.Join(node.Command, "\n"), "--architecture "+arch) {
+						t.Fatal("image composition must use the selected source's required native architecture argument")
 					}
 					spireMaterial := false
 					for _, binding := range node.Materials {
@@ -139,7 +140,7 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 					continue
 				}
 				found = true
-				if node.Platform != output.Platform || node.ToolchainPlatform != output.Platform || node.SourceCommit != approvedSource {
+				if node.Platform != output.Platform || node.ToolchainPlatform != output.Platform || node.SourceCommit != selectedSource {
 					t.Fatalf("native source/toolchain binding changed: %+v", node)
 				}
 				if node.Packer == nil || node.Packer.AcquisitionArchive != want.variant+"/apt-acquisitions.tar" {

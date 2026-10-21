@@ -12,7 +12,8 @@ The CLI, controller image, controller chart and NKTP chart share the profile-own
 [nightly site catalog](../../catalogs/nvke/nightly-site-arm64/README.md). `installer-tools-arm64` shares the
 separate [nightly installer-tools catalog](../../catalogs/tools/installer-hosted-arm64/README.md);
 other output catalog selections remain explicit. Four tools
-remain source-built at their original pins and commands, with executable `host-package` output types.
+remain source-built with executable `host-package` output types; clusterctl selects 1.13.6 to
+match the beta installer, while kind, kubectl and ORAS retain their existing pins.
 Helm 4.2.4 is acquired by exact archive/executable digest because its diagnostic source preparation
 is unsupported by hosted fetching. Its recorded binary security scan has findings; this is an
 exception disclosure, not a security-pass or complete-source-build claim.
@@ -48,9 +49,17 @@ workflow does not execute that suite or establish operational acceptance.
 `../../testing/nightly-profiles.json` selects this project's generated producer and exact NVKE suite revision.
 The coordinator checks supported native ARM64 runtime and OVN selections, authenticates the complete
 publication, and requires both test and cleanup verdicts. Checksum-pinned tool acquisition adds no
-vulnerability-clearance claim. The suite and all four site-product sources select
-`a8391755d12d99f859783c6cf390338debd1e085`, including its `^TestE2E$` runtime entrypoint
-selection and candidate-input fixes. This candidate comes from open NVKE PR #1580;
-it is not a merged-main or human-approval claim. The shared revision follows ADR-23's
-proposed matching-revision rule without establishing overall interface adoption.
+vulnerability-clearance claim. All four site-product sources select
+NVKE v0.22.0 at `400c24fb6465b042be883d6b62472528520d6291`. The SPIRE OS package uses the same release source and Debian revision 4.
+The test-only suite selects `b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8`, an explicit
+user-approved exception to ADR-23's proposed matching-revision rule. Product sources select the exact main commit.
+
+The adapter now projects authenticated profile bytes into current `MachineImage`, `ClusterRelease`
+and `NodePoolRelease` resources, preserving the exact disk binding and the candidate suite's
+fixed profile name. It renders the current site-specification shape with private tenant credentials.
+These paths are contract-tested, without a recorded runtime cycle.
+
+The selected test source retains the candidate entrypoint omitted from the selected product source. It accepts the
+verified publication without rebuilding products. This separate test pin does not establish
+runtime compatibility or operational acceptance.
 The first combined nightly cycle remains unrecorded.

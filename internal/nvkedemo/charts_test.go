@@ -31,11 +31,11 @@ func TestChartProjectionIsNarrow(t *testing.T) {
 }
 
 func TestChartPreparationPreservesSourceAndAdmission(t *testing.T) {
-	for _, test := range []string{"exact", "wrongPin", "dirty", "readerChanged", "missingChart", "extraChart", "missingPin", "duplicateItems", "badReader", "symlinkSource", "extractFailure", "unjoined", "existingOutput", "outputSymlink", "sourceOutput", "layoutOutput", "changedSemantics"} {
+	for _, test := range []string{"exact", "localVersion", "missingLocalVersion", "versionMismatch", "wrongPin", "dirty", "readerChanged", "missingChart", "extraChart", "missingPin", "duplicateItems", "badReader", "symlinkSource", "extractFailure", "unjoined", "existingOutput", "outputSymlink", "sourceOutput", "layoutOutput", "changedSemantics"} {
 		t.Run(test, func(t *testing.T) {
 			base := t.TempDir()
 			checkout := filepath.Join(base, "nvke")
-			reader := filepath.Join(checkout, "deploy/lib/nke-deploy-items.py")
+			reader := filepath.Join(checkout, "deploy/lib/nvke-deploy-items.py")
 			if err := os.MkdirAll(filepath.Dir(reader), 0o700); err != nil {
 				t.Fatal(err)
 			}
@@ -53,7 +53,8 @@ func TestChartPreparationPreservesSourceAndAdmission(t *testing.T) {
 			tool, _ = resolveExisting(tool)
 			charts := make(map[string]string)
 			pins := make(map[string]string)
-			sources := map[string]string{"nke-deploy.yaml": "items: pinned\n"}
+			versions := make(map[string]string)
+			sources := map[string]string{"nvke-deploy.yaml": "items: pinned\n"}
 			for _, name := range []string{"controller", "spire"} {
 				layout := filepath.Join(base, name)
 				if err := os.Mkdir(layout, 0o700); err != nil {
@@ -63,6 +64,15 @@ func TestChartPreparationPreservesSourceAndAdmission(t *testing.T) {
 				pins[name] = "sha256:" + strings.Repeat("a", 64)
 				sources[name+"/release.yaml"] = "chart:\n  name: " + name + "\n  version: 1.2.3\n  repository: upstream\nvalues:\n  - values.yaml\n"
 				sources[name+"/values.yaml"] = "preserve: exact\n"
+			}
+			if test == "localVersion" || test == "missingLocalVersion" {
+				sources["controller/release.yaml"] = "chart:\n  name: controller\n  path: ../../controller\nvalues:\n  - values.yaml\n"
+				if test == "localVersion" {
+					versions["controller"] = "0.22.0-beta.1"
+				}
+			}
+			if test == "versionMismatch" {
+				versions["controller"] = "9.9.9"
 			}
 			out := filepath.Join(base, "prepared")
 			switch test {
@@ -99,7 +109,7 @@ func TestChartPreparationPreservesSourceAndAdmission(t *testing.T) {
 						}
 						return nil, nil
 					case "show":
-						if strings.HasSuffix(args[4], ":deploy/lib/nke-deploy-items.py") {
+						if strings.HasSuffix(args[4], ":deploy/lib/nvke-deploy-items.py") {
 							if test == "readerChanged" {
 								return []byte("different"), nil
 							}
@@ -120,6 +130,9 @@ func TestChartPreparationPreservesSourceAndAdmission(t *testing.T) {
 					}
 				}
 				if args[0] == tool {
+					if test == "localVersion" && strings.Contains(args[len(args)-1], "controller.tgz") && args[len(args)-3] != "0.22.0-beta.1" {
+						t.Fatal("local chart did not use its selected observed version")
+					}
 					if test == "extractFailure" {
 						return nil, errors.New("extract failed")
 					}
@@ -151,7 +164,10 @@ func TestChartPreparationPreservesSourceAndAdmission(t *testing.T) {
 						if err != nil {
 							return nil, err
 						}
-						repository, path := "upstream", ""
+						repository, path, version := "upstream", "", "1.2.3"
+						if name == "controller" && (test == "localVersion" || test == "missingLocalVersion") {
+							repository, path, version = "", "../../controller", ""
+						}
 						if strings.Contains(string(raw), "  path: charts/") {
 							repository = ""
 							path = "charts/" + name + ".tgz"
@@ -160,14 +176,14 @@ func TestChartPreparationPreservesSourceAndAdmission(t *testing.T) {
 						if test == "changedSemantics" && path != "" {
 							namespace = "foreign"
 						}
-						return []byte(strings.Join([]string{"single", name, "1.2.3", repository, path, name, namespace, "values.yaml", ""}, "\x1f")), nil
+						return []byte(strings.Join([]string{"single", name, version, repository, path, name, namespace, "values.yaml", "gate", "chart-artifact", "controller-image", "profiles-image", "ca=/owned/ca.pem"}, "\x1f")), nil
 					}
 				}
 				t.Fatalf("unexpected external call:%v", args)
 				return nil, nil
 			}
-			deploy, err := prepareChartInputs(context.Background(), ChartInputsConfig{NVKECheckout: checkout, NVKR: tool, Out: out, Charts: charts, Manifests: pins}, capture)
-			if test == "exact" {
+			deploy, err := prepareChartInputs(context.Background(), ChartInputsConfig{NVKECheckout: checkout, NVKR: tool, Out: out, Charts: charts, Manifests: pins, Versions: versions}, capture)
+			if test == "exact" || test == "localVersion" {
 				if err != nil {
 					t.Fatal(err)
 				}

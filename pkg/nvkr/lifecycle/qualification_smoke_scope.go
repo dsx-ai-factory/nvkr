@@ -209,14 +209,14 @@ func expectedSmokeVersion(node ir.Node, profile string) (string, string, error) 
 		}
 	}
 	prefix := "NKECTL_"
-	_, versionPresent := stamps["NVKECTL_VERSION"]
-	_, commitPresent := stamps["NVKECTL_COMMIT"]
-	if versionPresent || commitPresent {
-		if _, present := stamps["NKECTL_VERSION"]; present {
-			return "", "", e.New(e.CodeVerifyFailed, "ambiguous nvkectl version stamp families")
+	_, currentVersion := stamps["NVKECTL_VERSION"]
+	_, currentCommit := stamps["NVKECTL_COMMIT"]
+	if currentVersion || currentCommit {
+		if _, legacy := stamps["NKECTL_VERSION"]; legacy {
+			return "", "", e.New(e.CodeVerifyFailed, "ambiguous nvkectl version stamp family")
 		}
-		if _, present := stamps["NKECTL_COMMIT"]; present {
-			return "", "", e.New(e.CodeVerifyFailed, "ambiguous nvkectl commit stamp families")
+		if _, legacy := stamps["NKECTL_COMMIT"]; legacy {
+			return "", "", e.New(e.CodeVerifyFailed, "ambiguous nvkectl commit stamp family")
 		}
 		prefix = "NVKECTL_"
 	}

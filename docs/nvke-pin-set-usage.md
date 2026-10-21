@@ -1,23 +1,23 @@
 # Pin and package NVKE deploy charts
 
-NVKR can derive external chart pins from NVKE's `controller/deploy/nke-sbom/nke-deploy.yaml` and the
+NVKR can derive external chart pins from NVKE's `deploy/nico/nvke-deploy.yaml` and the
 `release.yaml` of each Helm item. The `nvke-deploy-v1` adapter reads those files from the exact pinned Git tree.
 It validates chart identity and acquires package digests. NVKE retains installation order, values and execution.
 
 The [example catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-pin-set/registry.yaml) declares four acquired chart producers and explicitly
-accounts for the other six deploy items. It does not modify the maintained NVKE product Definition.
+accounts for the other seven deploy items. It does not modify the maintained NVKE product Definition.
 
 ## Try the example
 
-Copy the example to a writable directory, then pin the controller tag. Flags precede the source name.
+Copy the example to a writable directory, then pin the NVKE release tag. Flags precede the source name.
 
 ```sh
 mkdir -p /tmp/nvke-chart-catalog
 cp docs/examples/nvke-pin-set/registry.yaml /tmp/nvke-chart-catalog/registry.yaml
 go run ./cmd/nvkr catalog pin --dir /tmp/nvke-chart-catalog \
-  --tag controller/v0.1.1-rc.9 --check nvke-controller
+  --tag v0.22.0 --check nvke-controller
 go run ./cmd/nvkr catalog pin --dir /tmp/nvke-chart-catalog \
-  --tag controller/v0.1.1-rc.9 nvke-controller
+  --tag v0.22.0 nvke-controller
 go run ./cmd/nvkr catalog validate --data /tmp/nvke-chart-catalog
 ```
 
@@ -48,7 +48,7 @@ mkdir -p .nvkr/acquired-charts
 cp docs/examples/nvke-pin-set/*.yaml .nvkr/acquired-charts/
 # On ARM64, set utilityPlatform to linux/arm64 in environment-local.yaml.
 go run ./cmd/nvkr catalog pin --dir .nvkr/acquired-charts \
-  --tag controller/v0.1.1-rc.9 nvke-controller
+  --tag v0.22.0 nvke-controller
 go run ./cmd/nvkr run local \
   --definition .nvkr/acquired-charts/definition.yaml \
   --environment .nvkr/acquired-charts/environment-local.yaml \

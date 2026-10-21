@@ -18,7 +18,7 @@ sources:
       export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
       # The source-owned charts module has no dependencies or go.sum.
       test ! -e controller/deploy/charts/go.sum
-      pins="$(sha256sum cli/go.mod cli/go.sum controller/api/go.mod controller/api/go.sum controller/deploy/charts/go.mod management-engine/go.mod management-engine/go.sum)"
+      pins="$(sha256sum cli/go.mod cli/go.sum controller/api/go.mod controller/api/go.sum controller/deploy/charts/go.mod)"
       cd cli
       timeout --kill-after=10s 540s go mod download
       GOPROXY=off timeout --kill-after=10s 60s go mod verify
@@ -80,7 +80,7 @@ components:
     artifactPath: cli/bin/nvkectl
     writeDir: cli/bin
     versionStamp:
-      NVKECTL_VERSION: '{{.ModuleTag}}'
+      NVKECTL_VERSION: git-{{.Commit}}
       NVKECTL_COMMIT: '{{.Commit}}'
       NVKECTL_DATE: '{{.Date}}'
     buildCommand:
@@ -112,7 +112,7 @@ components:
     platforms:
     - linux/arm64
     outputType: tarball
-    artifactPath: charts/nvke-controller-0.22.0.tgz
+    artifactPath: charts/nke-controller-0.0.0.tgz
     writeDir: charts
     helm:
       chart: .
@@ -124,8 +124,6 @@ components:
     - helm
     - package
     - controller/deploy/charts/controller
-    - --version=0.22.0
-    - --app-version=v0.22.0
     - --destination=charts/
   nktp-chart:
     fromSource: true
@@ -133,14 +131,12 @@ components:
     platforms:
     - linux/arm64
     outputType: tarball
-    artifactPath: charts/nktp-0.22.0.tgz
+    artifactPath: charts/nktp-0.0.0.tgz
     writeDir: charts
     buildCommand:
     - helm
     - package
     - nktp/deploy/charts/nktp
-    - --version=0.22.0
-    - --app-version=v0.22.0
     - --destination=charts/
   cluster-api-provider-provisioned:
     fromSource: true

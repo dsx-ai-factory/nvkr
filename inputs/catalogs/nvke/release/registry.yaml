@@ -50,7 +50,7 @@ components:
             digest: image.digest
     fromSource: true
     source: nvke-helm
-    # Helm derives the filename from the pinned source's unchanged Chart.yaml.
+    # Package the source chart with the selected NVKE release version.
     artifactPath: charts/nvke-controller-0.22.0.tgz
     writeDir: charts
     buildCommand: ['package', 'controller/deploy/charts/controller', '--version=0.22.0', '--app-version=v0.22.0', '--destination=charts/']
@@ -163,9 +163,6 @@ sources:
   nvke:
     pinSet:
       accounted:
-        nktp:
-          type: helm
-          path: ../../nktp/deploy/charts/nktp
         capnico:
           type: manifest
         controller:
@@ -180,6 +177,9 @@ sources:
           type: manifest
         spire-tpm-pubhashes:
           type: manifest
+        nktp:
+          path: ../../nktp/deploy/charts/nktp
+          type: helm
       file: deploy/nico/nvke-deploy.yaml
       format: nvke-deploy-v1
       members:

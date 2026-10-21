@@ -6,6 +6,7 @@ package nvkedemo
 import (
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/internal/testutil"
@@ -183,6 +184,9 @@ func TestNativeNVIDIAProducerRequirementsOffline(t *testing.T) {
 	stack, err := catalog.ApplyStack(base, overlay)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if strings.Contains(strings.Join(stack.Catalog.Components["ovn-kube-ubuntu"].BuildCommand, "\n"), "build-arg:BUILDER_IMAGE=") {
+		t.Fatal("native fork compiler must not carry an unused builder override")
 	}
 	disk := stack.Catalog.Components["nvke-node-image"]
 	if disk.BuilderType != catalog.BuilderVMImage || disk.Packer == nil || disk.BuildRequirements == nil {

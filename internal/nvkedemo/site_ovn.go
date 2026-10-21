@@ -429,7 +429,7 @@ func installSelectedSiteNetwork(ctx context.Context, selected string, session Ma
 	if _, err = capture(ctx, session.Runner, []string{filepath.Join(session.Tools, "kubectl"), "--kubeconfig", kube, "wait", "nodes", "--all", "--for=condition=Ready", "--timeout=180s"}, "management-ready", 210*time.Second); err != nil {
 		return err
 	}
-	return installManagementAPI(ctx, session, capture)
+	return nil
 }
 
 func installSiteNetworkForNetwork(ctx context.Context, network string, session ManagementSession, tool, node string, outputs map[string]SelectedOutput, reference, api string, capture siteNetworkCapture) error {
@@ -507,7 +507,7 @@ func installSiteNetworkForNetwork(ctx context.Context, network string, session M
 	if err = observeSelectedSiteNetwork(ctx, network, session, reference, exported, capture); err != nil {
 		return err
 	}
-	return installManagementAPI(ctx, session, capture)
+	return nil
 }
 
 // A successful kubectl exit is not admission of its body or live image IDs.
@@ -534,24 +534,6 @@ func observeSelectedSiteNetwork(ctx context.Context, network string, session Man
 		Deployed observedRuntime          `json:"deployed"`
 	}{"unqualified-local-site-network-diagnostic", exported, observed}); err != nil {
 		return err
-	}
-	return nil
-}
-
-func installManagementAPI(ctx context.Context, session ManagementSession, capture siteNetworkCapture) error {
-	stage := filepath.Join(session.Work, "source/deploy/stages/04-install-cluster-api.sh")
-	// This source stage predates site release materialization. Keep its original
-	// release-free contract in a child-only environment; subsequent site stages
-	// still require the selected release and cannot inherit this override.
-	capiRunner := session.Runner
-	capiRunner.Env = SetEnv(session.Runner.Env, map[string]string{"STAGE_NEEDS_RELEASE": "0"})
-	for _, step := range []struct {
-		action, phase string
-		timeout       time.Duration
-	}{{"run", "install-capi", 1200 * time.Second}, {"check", "check-capi", 180 * time.Second}} {
-		if _, err := capture(ctx, capiRunner, []string{"bash", stage, step.action}, step.phase, step.timeout); err != nil {
-			return err
-		}
 	}
 	return nil
 }

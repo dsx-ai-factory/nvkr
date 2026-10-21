@@ -43,7 +43,7 @@ type dashboardOSLogs struct {
 }
 
 // This bounded checklist names source-owned operations, not inferred deployment
-// milestones. Paired NVKE stages need both the run and check observations.
+// milestones. Paired operations require both completed observations.
 var dashboardSiteStages = [...]struct {
 	label      string
 	operations [2]string
@@ -52,14 +52,14 @@ var dashboardSiteStages = [...]struct {
 	{"Registry reachable", [2]string{"start-registry", "registry-admission"}},
 	{"Site networking (OVN)", [2]string{"site-ovs-ready", "site-ovn-admission"}},
 	{"Site nodes Ready", [2]string{"management-ready"}},
-	{"Install Cluster API", [2]string{"install-capi"}},
-	{"Check Cluster API", [2]string{"check-capi"}},
-	{"Readiness", [2]string{"site-00-check-readiness", "check-00-check-readiness"}},
-	{"Prepare cluster", [2]string{"site-01-prepare-cluster", "check-01-prepare-cluster"}},
-	{"Deliver images", [2]string{"site-02-stage-images", "check-02-stage-images"}},
-	{"Describe site", [2]string{"site-03-describe-site", "check-03-describe-site"}},
-	{"Install NVKE controller", [2]string{"site-05-install-site-controller", "check-05-install-site-controller"}},
-	{"Secure and register", [2]string{"site-06-secure-and-register", "check-06-secure-and-register"}},
+	{"Readiness", [2]string{"site-readiness"}},
+	{"Install Cluster API", [2]string{"site-cluster-api"}},
+	{"Install NVKE stack", [2]string{"site-install"}},
+	{"Configure cluster identity", [2]string{"site-capi-identity"}},
+	{"Check Cluster API", [2]string{"site-ready-capi-system", "site-ready-capi-kubeadm-bootstrap-system"}},
+	{"Check CAPI control plane", [2]string{"site-ready-capi-kubeadm-control-plane-system"}},
+	{"Secure and register", [2]string{"site-client-policy", "site-register"}},
+	{"Verify deployed images", [2]string{"site-images-admission"}},
 }
 
 var dashboardTenantStages = [...]string{"Tenant kubeconfig", "Tenant API query", "Both nodes Ready", "Workload and DNS"}
@@ -302,9 +302,6 @@ func dashboardGuestReport(line string) string {
 	}
 	message, ok := strings.CutPrefix(line, "==> nvke-node-non-fde.qemu.nvke-non-fde: ")
 	if !ok {
-		message, ok = strings.CutPrefix(line, "==> nke-node-non-fde.qemu.nke-non-fde: ")
-	}
-	if !ok {
 		return ""
 	}
 	for _, report := range dashboardPackerReports {
@@ -369,10 +366,13 @@ func dashboardOperation(name string) (index int, label string) {
 		return 2, "Install selected OVN and wait for its site controllers"
 	case "site-ovn-observation", "site-ovn-admission":
 		return 2, "Check live site OVN images against the selected output"
-	case "install-capi", "check-capi":
-		return 2, "Install and check Cluster API after site networking"
-	case "site-00-check-readiness", "check-00-check-readiness", "site-01-prepare-cluster", "check-01-prepare-cluster", "site-02-stage-images", "check-02-stage-images", "site-03-describe-site", "check-03-describe-site", "site-05-install-site-controller", "check-05-install-site-controller", "site-06-secure-and-register", "check-06-secure-and-register":
-		return 2, "Install and check the NVKE site stack"
+	case "site-readiness", "site-cluster-api", "site-install", "site-capi-identity", "site-ready-capi-system", "site-ready-capi-kubeadm-bootstrap-system", "site-ready-capi-kubeadm-control-plane-system", "site-client-policy", "site-register", "site-images-admission":
+		for _, stage := range dashboardSiteStages {
+			if slices.Contains(stage.operations[:], name) {
+				return 2, stage.label
+			}
+		}
+		return -1, ""
 	case "tenant-provisioning":
 		return 3, "Provision QCOW2 control plane and worker"
 	case "tenant-cni-readiness":

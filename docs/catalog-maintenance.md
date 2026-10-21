@@ -251,9 +251,9 @@ claims remain with the production Run and consumer policy. Even a green candidat
 ## Scheduled catalog refresh
 
 `.github/workflows/catalog-refresh.yaml` is installed in this repository. It is the output of `catalog update-ci
---source-checkout dsx-ai-factory/nvke:NKE_SOURCE_TOKEN`, and it is regenerated rather than edited. It runs
-nightly at 02:00 UTC and on manual dispatch from the default branch. The nightly default keeps the pins
-current without an operator remembering to run the command; an empty `--schedule` restores manual dispatch only.
+--source-checkout dsx-ai-factory/nvke:NKE_SOURCE_TOKEN`, and it is regenerated rather than edited.
+It permits manual dispatch from the default branch and runs daily at 02:00 UTC. The exact stable
+`v0.22.0` constraints keep refreshes at that release until an authored change widens them.
 A newer run for the same ref cancels one still in progress. The next run moves the review branch to the current
 candidate (leaving it alone when it already holds that candidate) and opens or edits the pull request, so an
 interruption between the two converges on the next run. The one file matching

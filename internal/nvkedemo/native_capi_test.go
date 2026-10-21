@@ -113,9 +113,12 @@ func TestNativeCAPIInitSelectsAllThreeProvidersAndWaits(t *testing.T) {
 }
 
 func TestNativeHostClusterctlMatchesAuthenticatedCAPIRelease(t *testing.T) {
-	versions, err := os.ReadFile("testdata/native-v022-tool-versions.mk")
+	versions, err := os.ReadFile("testdata/native-main-tool-versions.mk")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if plainSHA(versions) != toolVersionsHash {
+		t.Fatal("management and native installers must admit the same tool versions")
 	}
 	version, err := reviewedNativeCAPIProvider("400c24fb6465b042be883d6b62472528520d6291\n", plainSHA(versions))
 	if err != nil {

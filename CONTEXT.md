@@ -121,10 +121,10 @@ removed while preserving the prerequisite closure.
 Large finalizers collect the exact original per-job results through fixed, bounded diagnostic buckets;
 collector success never substitutes for producer success. Neither scripts supplied as data nor separately
 authored lifecycle inputs are admitted.
-Production partial retries may transport retained same-Run artifacts from earlier attempts while preserving
+Production and development partial retries may transport retained same-Run artifacts from earlier attempts while preserving
 their original source bindings. Same-name candidates are bounded and authenticated before selecting the
 newest source attempt, with ties rejected. Transport admission does not replace consumer evidence or completeness checks;
-development and explicitly selected qualification sources remain exact-attempt.
+explicit cross-Run transfers remain exact-attempt. Qualification independently checks original source attempts.
 The workflow can remain byte-identical across routine pin updates when scheduling, labels/interfaces and
 visible policy and required inline action pins stay unchanged. Stable provider scheduling keys do not replace exact executable Plan IDs;
 the complete bundle still requires regeneration and checking.
@@ -184,8 +184,10 @@ _Avoid_: Recipe, test dispatcher framework, verification policy
 **Validator catalog (proposed)**:
 An explicit index of reusable diagnostic validator entries, organized by project, artifact and suite.
 Proposed [ADR-24](docs/adr/0024-imported-validator-catalog.md) separates entries from profiles selecting named
-instances and artifact-role bindings. This catalog and the versioned profiles are not implemented; the
-current published-source Validation profile above retains its existing admission rules.
+instances and artifact-role bindings. The provisional CLI slice implements strict discovery, local-plan
+admission and frozen dispatch for the existing process-contract and mixed CLI suites. Shared schemas remain
+provisional; published adapters, controller/chart checks and broader migration are deferred. Existing legacy
+validation routes retain their separate admission and capture contracts.
 _Avoid_: Producer catalog, upstream test implementation, executable plugin, qualification policy
 
 **Release authenticity**:
@@ -234,9 +236,9 @@ Checks for the complete selected artifact set against its producing Run, origina
 including schema, pin, source, signature/provenance and applicable delivered-tool smoke results. Every output
 has a pass or fail verdict. Independent qualification evidence is issued only after all required results pass;
 the authenticated check receipt itself grants no signing authority. Artifact checking selects one exact
-successful completion attempt of a Run and an independent consumer policy. Production outputs may retain authenticated earlier
+successful completion attempt of a Run and an independent consumer policy. Production and development outputs may retain authenticated earlier
 attempts of that same workflow run when their exact inputs and original evidence remain bound; retrying does
-not relabel production. Development publications remain bound to one exact source attempt and its namespace.
+not relabel production. Development publications retain each original attempt namespace within the same source run.
 The generated handoff carries original inputs and evidence for
 recompilation and verification; it is descriptive transport, not a new authored lifecycle object or trust policy.
 Hosted checks verify all payloads sequentially and release non-executable scratch after each output. The check

@@ -43,30 +43,26 @@ components:
     source: nvke-controller
     writeDir: bin
   nvkectl:
-    artifactPath: bin/nvkectl
+    fromSource: true
+    source: nvke
+    cgo: false
+    platforms: [linux/amd64, linux/arm64]
+    outputType: host-package
+    artifactPath: cli/bin/nvkectl
+    writeDir: cli/bin
+    versionStamp:
+      NVKECTL_VERSION: '{{.ModuleTag}}'
+      NVKECTL_COMMIT: '{{.Commit}}'
+      NVKECTL_DATE: '{{.Date}}'
     buildCommand:
       - bash
       - -euc
       - |
         export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
         make -C cli build NVKECTL_TREE=clean
-        cp cli/bin/nvkectl bin/nvkectl
-    cgo: false
-    fromSource: true
-    outputType: host-package
-    platforms:
-    - linux/amd64
-    - linux/arm64
-    source: nvke
-    versionStamp:
-      NVKECTL_COMMIT: '{{slice .Commit 0 8}}'
-      NVKECTL_DATE: '{{.Date}}'
-      NVKECTL_VERSION: '{{.ModuleTag}}'
-    writeDir: bin
 kind: SourceBuildRegistry
 metadata:
-  description: NVKE components from independently pinned CLI and controller module
-    tags. The CLI uses an offline Go build; CWE wraps the upstream Dockerfile in digest-pinned
+  description: NVKE components from the release v0.22.0 at 400c24fb6465b042be883d6b62472528520d6291. The CLI uses an offline Go build; CWE wraps the upstream Dockerfile in digest-pinned
     rootless BuildKit.
   name: nvke-v1
 sources:
@@ -87,6 +83,9 @@ sources:
     kind: github-action
     repo: https://github.com/actions/download-artifact
   nvke:
+    repo: https://github.com/dsx-ai-factory/nvke
+    constraint: v0.22.0
+    toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
     vendorCommand:
       - bash
       - -euc
@@ -101,9 +100,6 @@ sources:
         cd ..
         printf '%s\n' "$pins" | sha256sum --quiet -c -
         test ! -e controller/deploy/charts/go.sum
-    constraint: v0.22.0
-    repo: https://github.com/dsx-ai-factory/nvke
-    toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
   nvke-controller:
     constraint: v0.22.0
     repo: https://github.com/dsx-ai-factory/nvke

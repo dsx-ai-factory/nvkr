@@ -5,7 +5,8 @@ ARM64 nightly Definitions. It follows `../local-site-arm64`; each source role ke
 vendor closure. All four roles select NVKE tag `v0.22.0`, commit
 `400c24fb6465b042be883d6b62472528520d6291`, tree
 `f3afc02f5c92f4aacda3a1655836a91bef093bfe` and committer epoch `1792548398`.
-Both nightly suite selections use that same source revision.
+The test-only nightly suites retain the separate `b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8`
+entrypoint selected by the beta migration; v0.22.0 omits that entrypoint. This does not establish runtime compatibility.
 
 The producer mappings follow the source-owned contracts at that revision:
 

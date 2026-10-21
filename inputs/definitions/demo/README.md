@@ -16,7 +16,7 @@ The separate KVM variants have their own hosted publication policies; see the
 | OS-only loop | `../diagnostics/demo-arm64/os.json` | One disk with its complete material closure |
 | Source-built provider loop | `../diagnostics/demo-arm64/providers.json` | Two native provider images, no disk |
 | NICoSim build loop | `../diagnostics/demo-arm64/simulator.json` | One executable bundle: source-built Linux ARM64 server, CLI and pinned seed/UI archive |
-| Staged-installer site loop | `../diagnostics/demo-arm64/site.json` | Five source-aligned candidates: CLI, controller image, native diagnostic profiles image, image-bound controller chart and NKTP chart |
+| Installer site loop | `../diagnostics/demo-arm64/site.json` | Five source-aligned candidates: CLI, controller image, native diagnostic profiles image, image-bound controller chart and NKTP chart |
 | Source-built installer tools | `../diagnostics/demo-arm64/tools.json` | One five-component Linux ARM64 executable bundle; distinct from the acquired `operator-tools` |
 | Diagnostic controller profiles | `../diagnostics/demo-arm64/profiles.json` | One native Linux ARM64 OCI image containing plain ARM64/Ubuntu 26.04 profile data at `/profiles`; not fleet profiles |
 
@@ -72,7 +72,12 @@ require authenticated Git access because NVKE chart pin sets are checked against
 the pinned tree. Dry-run/preflight are not runtime acceptance.
 
 The site catalog pins CLI, controller and charts to one exact NVKE candidate;
-chart dependencies are acquired at exact archive digests before offline packaging,
+the installer and every NVKE source, including SPIRE, select v0.22.0 at
+`400c24fb6465b042be883d6b62472528520d6291`. The demo uses its site-spec renderer
+and deployment entrypoint with verified local charts and image digests. Tenant
+setup creates MachineImage, ClusterRelease and NodePoolRelease resources from
+the observed profiles container and selected disk before requesting the tenant.
+Chart dependencies are acquired at exact archive digests before offline packaging,
 not independently source-built or upstream-signature-verified. The tools catalog
 compiles the installer's five Linux binaries from pinned Git. The separate older
 acquired `operator-tools` selection remains in the combined artifact membership.

@@ -151,18 +151,20 @@ The generated workflow admits at most 2,000 Actions uploads per attempt, countin
 finalization uploads even when conditional. The Go transport owner acquires selected records serially,
 looking up each fixed name through the authenticated same-Run API. Exact-name queries avoid listing cutoffs
 and page-position races. The Run-attempt response binds repository IDs and head; each lookup must return
-zero or one matching artifact for exact-attempt consumers. Production retry selection admits at most
+zero or one matching artifact for exact-attempt consumers. Hosted retry selection admits at most
 100 same-name candidates in one complete response, with at most 2,000 candidates across the selection.
 Every candidate must authenticate before selecting the greatest source attempt; multiple records for
 one source attempt are ambiguous and fail closed, regardless of provider order or artifact ID.
 Truncated responses, invalid candidates and future attempts fail closed without index publication.
 Each ZIP must match its provider SHA-256 and contain one canonical record
-bound to repository, Run, source attempt and selected name. Production transfer templates explicitly admit
+bound to repository, Run, source attempt and selected name. Production and development transfer templates explicitly admit
 retained records from earlier canonical positive attempts of that same Run, no later than the consuming
 attempt. Provider repository/head and ZIP authentication still precede index publication; restoration
 preserves each original source request and private image/config binding. Different repositories, Runs,
-names and future attempts fail closed. Development templates and explicitly selected cross-Run downloads
-remain exact-attempt; the exact store and qualification APIs do not inherit this transport opt-in.
+names and future attempts fail closed. Explicitly selected cross-Run downloads remain exact-attempt;
+exact store APIs do not inherit this transport opt-in. Development qualification separately authenticates
+bounded retained metadata candidates from the same successful source run before selecting the newest
+original attempt per control name.
 Consumer Plan, invocation, signature and completeness checks still own acceptance under ADR-20.
 Private locators retain their 32 KiB decoded limit;
 public metadata uses the bounds above. ZIPs are bounded to 33 MiB and the aggregate decoded candidate bytes to 128 MiB, including unselected candidates.
@@ -171,9 +173,10 @@ uses the repository workflow token; metadata-only restoration needs no registry 
 request. Mixed stage batches admit their complete selection and private credentials before transfer. Private
 payload privacy admission is unchanged and remains mandatory for every private carrier.
 API request starts are separated by at least 100 milliseconds. Each API request permits at most four
-attempts, only for HTTP 429 or an HTTP 403 JSON response identifying a secondary rate limit. Cancellable
-waits honor `Retry-After` up to 120 seconds, with a 60-second exponentially increasing fallback and an
-increasing minimum delay for repeated rate limits. A delay beyond the bound or an exhausted primary
+attempts, only for HTTP 429, an HTTP 403 JSON response identifying a secondary rate limit, or transient
+HTTP 500/502/503/504 responses. Cancellable waits honor `Retry-After` up to 120 seconds, with a 60-second
+exponentially increasing fallback for rate limits and a two-second exponentially increasing fallback for
+transient server failures. Repeated retries have an increasing minimum delay. A delay beyond the bound or an exhausted primary
 quota fails without an early retry. Acquisition has a twenty-minute bound and each HTTP request a thirty-second bound;
 earlier caller cancellation/deadlines still win. ZIP reads use one credential-free request after an admitted
 redirect and have no generic retry. Ambiguous selections, malformed metadata and integrity or binding
@@ -1023,7 +1026,7 @@ prevent finalization. Release finalizers have a dedicated two-hour job budget fo
 carrier acquisition/restoration, complete-release authentication and record uploads; the fifteen-minute
 utility-job budget does not apply. This bound is not evidence of successful hosted completion.
 Expired carriers require a complete new Run. Signed development uses per-attempt
-registry namespaces and full-attempt retries; production's authenticated earlier-attempt reuse is unchanged.
+registry namespaces and the same authenticated earlier-attempt reuse as production.
 These retention periods govern provider locator records. Private carrier blobs have no automatic expiry
 in this implementation; registry retention must be managed separately, without removing active Run inputs.
 ADR-20 owns the separate default-branch registry cleanup protocol. Actual dispatch, credential/pool

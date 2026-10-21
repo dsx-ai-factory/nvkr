@@ -30,7 +30,7 @@ func TestNativeSharedSetupPrecedesOrdinaryTenantAndStopsDiagnostic(t *testing.T)
 					t.Fatal(err)
 				}
 			}
-			versions, err := os.ReadFile("testdata/native-v022-tool-versions.mk")
+			versions, err := os.ReadFile("testdata/native-main-tool-versions.mk")
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -10,7 +10,7 @@ sources:
   nvke-cli:
     repo: https://github.com/dsx-ai-factory/nvke.git
     constraint: v0.22.0
-    # Go 1.27.3 matches the pinned source; the controller uses the same parent
+    # Go 1.27.3 on the existing Trixie base; the controller uses the same parent
     # through its source-owned GOLANG_IMAGE build argument below.
     toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
     vendorCommand:
@@ -82,7 +82,7 @@ components:
     artifactPath: cli/bin/nvkectl
     writeDir: cli/bin
     versionStamp:
-      NVKECTL_VERSION: '{{.ModuleTag}}'
+      NVKECTL_VERSION: '{{.Tag}}'
       NVKECTL_COMMIT: '{{.Commit}}'
       NVKECTL_DATE: '{{.Date}}'
     buildCommand:
@@ -102,7 +102,7 @@ components:
     outputType: oci-image
     platforms: [linux/arm64]
     versionStamp:
-      BUILD_VERSION: '{{.Commit}}'
+      BUILD_VERSION: '{{.Tag}}'
       GIT_VERSION: '{{.Commit}}'
     buildCommand:
       - sh
@@ -121,9 +121,9 @@ components:
         controller:
           values:
             digest: image.digest
-    # Keep the installer's source-tree chart version, not the older release's
-    # 0.1.1 override. The final package is bound to the produced controller digest.
-    buildCommand: [helm, package, controller/deploy/charts/controller, --version=0.22.0, --app-version=v0.22.0, --destination=charts/]
+    # The upstream Chart.yaml version is a placeholder; package the selected release.
+    # The final package is bound to the produced controller digest.
+    buildCommand: [sh, -euc, 'helm package controller/deploy/charts/controller --version=0.22.0 --app-version=v0.22.0 --destination=charts/']
   nktp-chart:
     fromSource: true
     source: nvke-nktp-helm
@@ -131,4 +131,4 @@ components:
     outputType: tarball
     artifactPath: charts/nktp-0.22.0.tgz
     writeDir: charts
-    buildCommand: [helm, package, nktp/deploy/charts/nktp, --version=0.22.0, --app-version=v0.22.0, --destination=charts/]
+    buildCommand: [sh, -euc, 'helm package nktp/deploy/charts/nktp --version=0.22.0 --app-version=v0.22.0 --destination=charts/']

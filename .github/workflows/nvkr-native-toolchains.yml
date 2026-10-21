@@ -38,6 +38,10 @@ jobs:
         with:
           go-version-file: .go-version
           cache: false
+      - name: Set up container-backed Buildx for archive export
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
+        with:
+          driver: docker-container
       - name: Prepare and measure native images
         env:
           NATIVE_ARCH: ${{ matrix.arch }}
@@ -106,7 +110,7 @@ jobs:
           platform="linux/$NATIVE_ARCH"
           repository=ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains
           packer=$(jq -er --arg platform "$platform" \
-            --arg repository "$repository/packer@" '
+            --arg repository "$repository/packer-native@" '
             [.builds[] | select(.platform == $platform) |
              .executionGraph.nodes[] |
              .toolchain // empty |
@@ -117,7 +121,7 @@ jobs:
           inspector=$(jq -er --arg platform "$platform" \
             '.environment.diskInspectionProfiles[$platform].image' "$plan")
           case "$inspector" in
-            "$repository/inspector@sha256:"*) ;;
+            "$repository/inspector-native@sha256:"*) ;;
             *) echo 'unexpected inspector repository' >&2; exit 1 ;;
           esac
           printf 'packer=%s\ninspector=%s\n' "$packer" "$inspector" \

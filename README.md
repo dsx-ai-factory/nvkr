@@ -1,7 +1,7 @@
 # NVIDIA Kubernetes Recipes (NVKR)
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Go](https://img.shields.io/badge/Go-1.27.2-00ADD8.svg)](.go-version)
+[![Go](https://img.shields.io/badge/Go-1.27.3-00ADD8.svg)](.go-version)
 
 **Build NVKE artifacts from pinned inputs and trace releases back to their sources.**
 NVKR gives release engineers a CLI, reusable component catalogs and declarative
@@ -120,6 +120,8 @@ Contributions, bug reports and documentation improvements are welcome.
 [CONTRIBUTING.md](CONTRIBUTING.md) explains contribution and review requirements.
 
 - **Questions:** [GitHub Discussions](https://github.com/dsx-ai-factory/nvkr/discussions/categories/q-a).
+- **Chat:** the `#nvke` channel in the DSX AI Factory Slack.
+  [Get an invite](https://inviter.co/dsx-ai-factory).
 - **Bugs and feature requests:** [GitHub Issues](https://github.com/dsx-ai-factory/nvkr/issues).
 - **Security vulnerabilities:** follow [SECURITY.md](SECURITY.md) and report privately.
 - **Community:** [Code of Conduct](CODE_OF_CONDUCT.md), [Governance](GOVERNANCE.md),

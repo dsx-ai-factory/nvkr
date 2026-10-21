@@ -88,14 +88,17 @@ func TestDevelopmentQualificationPredicateUsesSourceNotQualifierInvocation(t *te
 	if err := ValidateProductionPredicate(raw, plan, source.builderID, source.invocationID); err != nil {
 		t.Fatal(err)
 	}
+	if err := ValidateProductionPredicate(raw, plan, source.builderID, "https://github.com/example/nvkr/actions/runs/12345/attempts/2"); err != nil {
+		t.Fatal(err)
+	}
 	// The publication owner still refuses to execute producer work in a qualifier.
 	assertFactoryErrorCode(t, validateHostedProductionPredicate(raw, plan, plan.Environment.Signing), e.CodeEngineCapability)
-	for _, invocation := range []string{"https://github.com/example/nvkr/actions/runs/99999/attempts/1", "https://github.com/example/nvkr/actions/runs/12345/attempts/2"} {
+	for _, invocation := range []string{"https://github.com/example/nvkr/actions/runs/99999/attempts/1", "https://github.com/example/nvkr/actions/runs/12345/attempts/0"} {
 		assertFactoryErrorCode(t, ValidateProductionPredicate(raw, plan, source.builderID, invocation), e.CodeVerifyFailed)
 	}
 }
 
-func TestDevelopmentQualificationPublicationOriginsRequireExactSourceAttempt(t *testing.T) {
+func TestDevelopmentQualificationPublicationOriginsAllowSameRunRetries(t *testing.T) {
 	plan := githubDevelopmentPublicationTestPlan(t)
 	setDevelopmentRun(t)
 	const invocation = "https://github.com/example/nvkr/actions/runs/12345/attempts/2"
@@ -117,8 +120,10 @@ func TestDevelopmentQualificationPublicationOriginsRequireExactSourceAttempt(t *
 		code      e.Code
 	}{
 		{name: "exact source"},
-		{name: "earlier aggregate preparation", prepared: previous, code: e.CodeVerifyFailed},
-		{name: "later finalizer", consuming: "https://github.com/example/nvkr/actions/runs/12345/attempts/3", code: e.CodeVerifyFailed},
+		{name: "earlier aggregate preparation", prepared: previous},
+		{name: "future aggregate preparation", prepared: "https://github.com/example/nvkr/actions/runs/12345/attempts/3", code: e.CodeVerifyFailed},
+		{name: "future signature", consuming: previous, code: e.CodeVerifyFailed},
+		{name: "later finalizer", consuming: "https://github.com/example/nvkr/actions/runs/12345/attempts/3"},
 	} {
 		t.Run("root/"+tc.name, func(t *testing.T) {
 			prepared, consuming := tc.prepared, tc.consuming
@@ -142,9 +147,10 @@ func TestDevelopmentQualificationPublicationOriginsRequireExactSourceAttempt(t *
 		code e.Code
 	}{
 		{name: "exact source"},
-		{name: "earlier preparation", edit: func(o *delivery.PublicationOrigin) { o.PreparedInvocationID = previous }, code: e.CodeVerifyFailed},
+		{name: "earlier preparation", edit: func(o *delivery.PublicationOrigin) { o.PreparedInvocationID = previous }},
 		{name: "earlier signature", edit: func(o *delivery.PublicationOrigin) { o.SignedInvocationID = previous }, code: e.CodeVerifyFailed},
-		{name: "earlier namespace", edit: func(o *delivery.PublicationOrigin) { o.Ref = strings.Replace(o.Ref, "/attempts/2/", "/attempts/1/", 1) }, code: e.CodeVerifyFailed},
+		{name: "earlier namespace", edit: func(o *delivery.PublicationOrigin) { o.Ref = strings.Replace(o.Ref, "/attempts/2/", "/attempts/1/", 1) }},
+		{name: "future namespace", edit: func(o *delivery.PublicationOrigin) { o.Ref = strings.Replace(o.Ref, "/attempts/2/", "/attempts/3/", 1) }, code: e.CodeVerifyFailed},
 		{name: "qualifier namespace", edit: func(o *delivery.PublicationOrigin) { o.Ref = strings.Replace(o.Ref, "/runs/12345/", "/runs/99999/", 1) }, code: e.CodeVerifyFailed},
 		{name: "different output route", edit: func(o *delivery.PublicationOrigin) {
 			o.Ref = strings.Replace(o.Ref, "/releases-", "/releases-other-", 1)

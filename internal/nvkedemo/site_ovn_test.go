@@ -49,15 +49,15 @@ func ovnChartArchive(t *testing.T, files map[string][]byte) []byte {
 	return buffer.Bytes()
 }
 
-func TestTemporaryKindNetworkRetainsManagementAndCAPI(t *testing.T) {
+func TestTemporaryKindNetworkWaitsForManagement(t *testing.T) {
 	for _, mode := range []string{"kind-calico", "invalid"} {
 		t.Run(mode, func(t *testing.T) {
 			var phases []string
 			session := ManagementSession{Work: privateTestDir(t), Tools: "/tools", Runner: Runner{Env: []string{"SITE_KUBECONFIG=/owned/kubeconfig"}}}
 			capture := func(_ context.Context, runner Runner, _ []string, phase string, _ time.Duration) ([]byte, error) {
 				phases = append(phases, phase)
-				if phase != "management-ready" && environmentValue(runner.Env, "STAGE_NEEDS_RELEASE") != "0" {
-					t.Fatal("CAPI stage lost its source-owned contract")
+				if environmentValue(runner.Env, "SITE_KUBECONFIG") != "/owned/kubeconfig" {
+					t.Fatal("network changed the owned kubeconfig")
 				}
 				return nil, nil
 			}
@@ -68,7 +68,7 @@ func TestTemporaryKindNetworkRetainsManagementAndCAPI(t *testing.T) {
 				}
 				return
 			}
-			if err != nil || !slices.Equal(phases, []string{"management-ready", "install-capi", "check-capi"}) || environmentValue(session.Runner.Env, "STAGE_NEEDS_RELEASE") != "" {
+			if err != nil || !slices.Equal(phases, []string{"management-ready"}) || environmentValue(session.Runner.Env, "STAGE_NEEDS_RELEASE") != "" {
 				t.Fatal("diagnostic stage order or environment differs", phases, err)
 			}
 		})
@@ -547,7 +547,7 @@ func TestSiteOVNInstallationOrdersReadinessBeforeCAPIAndStopsOnFailure(t *testin
 					"ovn":       {Observation: lifecycle.Artifact{Name: imageName, Kind: "oci", Digest: digest}},
 					"ovn-chart": {Layout: "selected-chart", Observation: lifecycle.Artifact{Name: chartName, Kind: "helm-oci", Digest: "sha256:" + strings.Repeat("b", 64)}},
 				}
-				session := ManagementSession{Name: "owned", Work: work, Tools: "selected-tools", Runner: Runner{Env: []string{"SITE_KUBECONFIG=owned-kubeconfig", "STAGE_NEEDS_RELEASE=1"}}}
+				session := ManagementSession{Name: "owned", Work: work, Tools: "selected-tools", Runner: Runner{Env: []string{"SITE_KUBECONFIG=owned-kubeconfig"}}}
 				node := strings.Repeat("d", 64)
 				if failed == "missing-node" {
 					node = ""
@@ -563,12 +563,8 @@ func TestSiteOVNInstallationOrdersReadinessBeforeCAPIAndStopsOnFailure(t *testin
 					if ctx != t.Context() || timeout <= 0 || timeout > 20*time.Minute {
 						t.Fatal("unbounded or substituted command context")
 					}
-					wantRelease := "1"
-					if phase == "install-capi" || phase == "check-capi" {
-						wantRelease = "0"
-					}
-					if environmentValue(runner.Env, "STAGE_NEEDS_RELEASE") != wantRelease || environmentValue(runner.Env, "RELEASE_FILE") != "" || environmentValue(runner.Env, "SITE_KUBECONFIG") != "owned-kubeconfig" {
-						t.Fatal("network/CAPI child environment violates the source stage contract")
+					if environmentValue(runner.Env, "RELEASE_FILE") != "" || environmentValue(runner.Env, "SITE_KUBECONFIG") != "owned-kubeconfig" {
+						t.Fatal("network changed the owned kubeconfig")
 					}
 					phases = append(phases, phase)
 					if phase == failed {
@@ -632,11 +628,11 @@ func TestSiteOVNInstallationOrdersReadinessBeforeCAPIAndStopsOnFailure(t *testin
 					}
 				}
 				err := installSelectedSiteNetwork(t.Context(), network, session, "selected-nvkr", node, outputs, reference, "https://172.18.0.3:6443", capture)
-				if environmentValue(session.Runner.Env, "STAGE_NEEDS_RELEASE") != "1" {
+				if environmentValue(session.Runner.Env, "STAGE_NEEDS_RELEASE") != "" {
 					t.Fatal("CAPI override escaped its scoped child runner")
 				}
 				if failed != "" {
-					if err == nil || slices.Contains(phases, "install-capi") || failed == "binding" && slices.Contains(phases, "site-ovs-create") {
+					if err == nil || failed == "binding" && slices.Contains(phases, "site-ovs-create") {
 						t.Fatalf("failed network reached CAPI/deployment: %v %v", phases, err)
 					}
 					var want []string
@@ -657,7 +653,7 @@ func TestSiteOVNInstallationOrdersReadinessBeforeCAPIAndStopsOnFailure(t *testin
 					}
 					return
 				}
-				want := []string{"site-ovn-chart", "site-ovn-defaults", "site-ovs-fresh", "site-ovs-create", "site-ovs-ready", "site-ovn-install", "site-ovn-control-plane-ready", "site-ovn-node-ready", "management-ready", "site-ovn-observation", "install-capi", "check-capi"}
+				want := []string{"site-ovn-chart", "site-ovn-defaults", "site-ovs-fresh", "site-ovs-create", "site-ovs-ready", "site-ovn-install", "site-ovn-control-plane-ready", "site-ovn-node-ready", "management-ready", "site-ovn-observation"}
 				if err != nil || !slices.Equal(phases, want) {
 					t.Fatalf("network/CAPI ordering: %v %v", phases, err)
 				}

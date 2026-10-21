@@ -337,16 +337,19 @@ failure leaves the original lock intact. Full catalog loads and lock writes re-d
 Catalogs with pin sets therefore require access to pinned Git objects when loaded; ordinary catalogs retain
 local loading. Offline pin-set transport remains deferred.
 
-**NVKE deploy adapter.** `format: nvke-deploy-v1` reads `nke-deploy.yaml` and each Helm item's
+**NVKE deploy adapter.** `format: nvke-deploy-v1` reads the declared deploy document and each Helm item's
 `release.yaml` from the same pinned tree. Every deploy item must appear in `members` or `accounted`;
 unknown, missing, duplicate or reclassified items fail before chart acquisition. External members bind the
-reviewed chart name/repository through `prebuilt.chart` (acquired) or member `chart` (source). Accounted local
-charts bind their relative path. An omitted local version is read from the exact pinned `Chart.yaml`; an
-explicit version must match it. Local chart versions must remain exact semantic-version strings. The optional
-accounted `chartName` binds a reviewed upstream chart rename; otherwise the deployment name must match.
-The typed `artifact`, `imageArtifact` and `profilesArtifact` fields are descriptive downstream output selectors,
-not pin authority. Unknown fields still fail closed. Order, values and installation
-remain NVKE-owned. See the [example catalog](../examples/nvke-pin-set/registry.yaml) and
+reviewed chart name/repository through `prebuilt.chart` (acquired) or member `chart` (source), and always
+require an exact version in `release.yaml`. Accounted local charts bind their relative path and authenticate
+their name and exact version against the same pinned tree's `Chart.yaml`. An optional accounted
+`chartName` explicitly binds a reviewed upstream chart rename; otherwise the release name must match. A local release may omit its version;
+when supplied it must be an exact string matching `Chart.yaml`. Empty, null, numeric and ranged versions fail.
+The local chart's optional `artifact`, `imageArtifact` and `profilesArtifact` fields accept plain names only.
+They describe downstream consumer mappings; they neither select catalog producers nor authorize Release
+membership. Other unknown fields and these mappings on external members remain rejected. Order, values and
+installation remain NVKE-owned. This is declared-metadata consistency for the admitted evidence lanes,
+not deployed compatibility or qualification. See the [example catalog](../examples/nvke-pin-set/registry.yaml) and
 [usage guide](../nvke-pin-set-usage.md). CycloneDX ingestion and qualified-set acceptance remain deferred.
 
 **Chart acquisition.** HTTPS Helm indexes and anonymous OCI repositories resolve one exact chart version.

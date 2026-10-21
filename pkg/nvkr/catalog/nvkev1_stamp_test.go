@@ -4,8 +4,8 @@
 package catalog
 
 import (
-	"context"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -15,15 +15,15 @@ import (
 const nvkeV1CatalogDir = "../../../inputs/catalogs/nvke/module-tags"
 
 // The nvkectl binary this catalog builds must report the SAME version string as a binary
-// built by NVKE's own cli/Makefile, which strips the `cli/` module prefix from the tag and
-// stamps the remainder verbatim — leading v included.
+// built by NVKE's own cli/Makefile, including the leading v. The retained v1
+// selection now follows the same repository release as the maintained M2 selection.
 //
 // This is a regression guard with a real failure behind it: the catalog originally
 // rendered {{.Version}}, which also strips the v, so the published CLI reported
 // version "0.1.0-rc.2" while the release it claimed to be reports "v0.1.0-rc.2". A digest
 // chain cannot catch that; only comparing against upstream's own stamping rule can.
 func TestNVKEV1CatalogStampsUpstreamModuleTag(t *testing.T) {
-	cat, err := LoadContext(context.Background(), Dir(filepath.FromSlash(nvkeV1CatalogDir)))
+	cat, err := LoadContext(t.Context(), Dir(filepath.FromSlash(nvkeV1CatalogDir)))
 	if err != nil {
 		t.Fatalf("loading the shipped nvke-v1 catalog: %v", err)
 	}
@@ -32,17 +32,15 @@ func TestNVKEV1CatalogStampsUpstreamModuleTag(t *testing.T) {
 		t.Fatalf("nvke-v1 catalog has no nvkectl component; components: %v", componentNames(cat))
 	}
 
-	// Derived from the v0.22.0 lock and its committer epoch,
+	// Derived from the lock (400c24fb6465b042be883d6b62472528520d6291 @ 400c24fb…, committer epoch 1792548398),
 	// never from wall-clock time or the local checkout.
 	want := map[string]string{
 		"NVKECTL_VERSION": "v0.22.0",
-		"NVKECTL_COMMIT":  "400c24fb",
+		"NVKECTL_COMMIT":  "400c24fb6465b042be883d6b62472528520d6291",
 		"NVKECTL_DATE":    "2026-10-21T02:06:38Z",
 	}
-	for key, value := range want {
-		if got := component.VersionStamp[key]; got != value {
-			t.Errorf("nvkectl versionStamp[%s] = %q, want %q", key, got, value)
-		}
+	if !reflect.DeepEqual(component.VersionStamp, want) {
+		t.Errorf("nvkectl version stamps = %v, want %v", component.VersionStamp, want)
 	}
 }
 

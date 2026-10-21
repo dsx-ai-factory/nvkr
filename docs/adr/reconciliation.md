@@ -10,8 +10,8 @@ test interfaces outside that consolidated set until acceptance. Implementation a
 are tracked below; governance, CI and broader acceptance remain pending.
 
 [ADR-24](0024-imported-validator-catalog.md) proposes an imported-validator catalog, explicit artifact-role
-bindings and versioned diagnostic profiles. It is design only and outside the consolidated set; no catalog
-loader, discovery interface, profile migration or controller/chart adapter is implemented by that proposal.
+bindings and versioned diagnostic profiles outside the consolidated set. The provisional CLI catalog implements loading, discovery and frozen local-plan dispatch, with contract tests but no new
+actual upstream catalog execution. Published-profile migration and controller/chart adapters remain deferred.
 
 ## Current boundary
 
@@ -302,7 +302,7 @@ with its overall verdict failed and no check receipt. Previously completed artif
 actual results; successful reports keep their existing six-check shape. First/final evidence-callback
 revocation fixtures cover this diagnostic boundary, not external provider acceptance.
 
-For production, the successful authenticated source attempt anchors producer completion. Root/output predicates and
+For production and development, the successful authenticated source attempt anchors producer completion. Root/output predicates and
 publication origins may retain earlier attempts of that same workflow run under ADR-20's retry contract.
 The same builder and exact Plan/input bindings remain mandatory. Output preparation precedes or equals
 output signing, which precedes or equals aggregate assembly; aggregate assembly precedes or equals root
@@ -1115,15 +1115,111 @@ interruption demonstrations remain M4-D.
 | 15 Air gap | No mirror implementation or CLI retained; supported offline signature primitives remain | Air-gap product lifecycle and zero-egress acceptance require a new admitted design |
 | 16 Release gates | Inventory/ReleaseSet/PromotionPolicy documents, exact member completeness and signed diagnostics; M3-A Run/policy artifact checks, generated exact-attempt handoff and held complete-set receipts; M3-B isolated native tool smoke and authenticated complete-set receipts; M3-C policy-only orchestration, v2 qualification evidence, receipt-only publisher, complete pre-sign gates and failure diagnostics; M4-C release-manifest schema and receipt-gated issuance | Real candidate native smoke, hosted worker/qualifier identities, qualification signing/attachment and independent M3 consumer acceptance remain unexercised. M4 manifest issuance is invoked by `run qualify --issue-manifest` and the generated production qualifier, with local contract coverage only; hosted OIDC attestation, registry read-back and independent consumer verification remain unexercised. Qualified clearance, release-specific trusted time, M4 tags and revocation remain unimplemented |
 | 17 Public lifecycle | Compiler-owned output joins, immutable attempts, failure records, process-owned snapshots, exact observations, deterministic disk retention, diagnostic output pulling, bounded descriptive progress, typed result browsers for interactive commands, read-only stored Run inspection and SDK/CLI delegation; Linux M3-A Run/policy CLI, captured-input replay and retained file diagnostic orchestration; M3-C policy-only qualification orchestration with generated-policy admission | No general resume protocol or authority restored by serialization; actual M3 candidate/provider acceptance remains unexercised. Strict local publication, private-passphrase/strict FDE publication and qualified lifecycle remain unavailable. Fresh live dashboard Run, native Linux race acceptance and human usability validation remain unexercised |
-| 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub producer generation, exact optional publication-branch allowlist, separate full-development branch workflow, mode-specific concurrency and artifact retention, scoped credentials and unconditional finalization; inline named jobs with ancestor-preserving dependency reduction and bounded exact-result collectors with diagnostic hosted evidence; at most two optional summaries per attempt with operation details in logs; explicit native ARC disk grouping, raw build-only disk transport and optional native hosted platform maps (including separate CLI output slots); authenticated independent qualification invocation/source-event binding; generated fixed native worker and qualifier with separate credentials; separately authored downstream NVKE E2E adapter configured only for native ARM64 ARC, outside product execution | Successful hosted qualification, same-run retry qualification and independent-consumer acceptance remain unproved. The downstream adapter trusts privileged pinned NVKE code and yields unsigned diagnostics; its first scheduled attempt failed before runtime and no successful combined cycle is recorded. Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate |
+| 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub producer generation, exact optional publication-branch allowlist, separate full-development branch workflow, mode-specific concurrency and artifact retention, scoped credentials and unconditional finalization; inline named jobs with ancestor-preserving dependency reduction and bounded exact-result collectors with diagnostic hosted evidence; at most two optional summaries per attempt with operation details in logs; explicit native ARC disk grouping, raw build-only disk transport and optional native hosted platform maps (including separate CLI output slots); authenticated independent qualification invocation/source-event binding; generated fixed native worker and qualifier with separate credentials; separately authored downstream NVKE E2E adapter configured only for native ARM64 ARC, outside product execution | Production hosted qualification, retry qualification of the qualifier itself and independent-consumer acceptance remain unproved. The [development record](#feature-branch-pipeline-development) documents successful qualification of the earlier main-source candidate; beta.6 validation remains pending. The downstream adapter trusts privileged pinned NVKE code and yields unsigned diagnostics; its first scheduled attempt failed before runtime and no successful combined cycle is recorded. Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate |
 | 19 Downstream boundary | Exact required/observed output membership, component evidence joins and noncircular release-content identity | Downstream owners supply topology, placement, provisioning and runtime qualification; historical topology records grant no current authority |
 | 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects with consistent named-output aliases and independent evidence, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation, selected output payload-closure retrieval and per-output assembly/finalization; consumer held-closure export bound to exact-input receipts; candidate M2 hosted signing/publication completed; public-bootstrap FDE build-provenance publication supported; development attempt namespaces and scoped GHCR cleanup; hosted GHCR package privacy admission using metadata-derived destination references and an exact-root-bound push | Package admission has local contracts, not a hosted private-publication or public-source access proof; independent grants, historical provider payloads and future visibility changes remain operational obligations. Hosted GHCR legacy layouts without the metadata contract fail closed. Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and object-store/CDN transports remain unproved or unavailable; registration is deferred |
 | 21 Generation | Exact recorded input selection, independent fixed production/development layouts, manifest-owned semantic action interfaces and Plan-derived invocation data with expanded-step validation, output-local ordinary job membership with addition/removal and failure-accounting contracts, stable result-collector membership and exact retirement of legacy producer children, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows; separately owned qualification pair and runtime policy drift admission; optional named production namespaces independently own their manifest, lock, paths and retirement; opted-in named runtime Plans compile current source pins within the complete reviewed workflow/action and Environment contract and distribute frozen data through same-Run helpers; provider artifacts contain JSON locators while private CI carriers use a digest-bound GHCR transport with package visibility and linked-repository admission | Producer generation emits manual-dispatch workflows, not cron; optional qualification generation emits its fixed event/call pair. Authored downstream scheduling has separate ownership. Combining development with a nonempty named bundle is rejected before catalog resolution or generated-output work. The inline layout has guarded dispatch admission and isolated exact-result/failure diagnostics; complete production execution, automatic PR publication and scheduled/private-source service acceptance remain unexercised. The runtime Plan handoff and private CI carrier transport have local contracts; a hosted private-carrier producer-to-E2E cycle remains unexercised. Public-repository execution requires an independently admitted storage credential/access policy; public-linked storage fails closed. Historical Actions payloads and caches are not migrated by this implementation. The workflow `catalog update-ci` renders (installed as `catalog-refresh.yaml`) opens PRs with a GitHub App installation token minted in its `pull-request` job by the SHA-pinned `actions/create-github-app-token` action for this repository only, with contents, pull requests and workflows write, and revoked by the action when the job ends; the workflow token stays read-only (shape, action inputs, bot sign-off identity and step behavior contract-tested with a stubbed `gh`; a manual dispatch on 2026-10-16 failed at the earlier hand-rolled token step with an unattributed 404). No scheduled run, token exchange, push, PR, automatically started PR check, close or branch deletion has been exercised, so M4 acceptance item 1 is implemented but not demonstrated and M4 is not claimed. The review commit is created through the GitHub API with a DCO trailer for the App's bot user (contract-tested; GitHub signing and attribution not verified). Pin-only fixtures assert the production, development and qualification workflows stay identical; a topology, label, interface or action-pin change that regenerates a closure workflow is published in the same PR. One enrolled policy is supported until generated bundle roots are per-Definition. A branch that already holds the candidate is left alone, a closed unmerged PR whose head commit carries the same candidate stays closed even after its branch is deleted, fork PRs from a branch with the same name are ignored, a lookup page that could be truncated fails the step, and an unchanged Definition closes its stale PR and deletes its branch (contract-tested with a stubbed `gh` that applies each call's real filter). The ruleset, last-push approval and code-owner settings that protect the bot branch are repository settings that this workflow does not enforce; the release owner or an administrator must validate them before scheduled writes are relied on. The policy names the dependent development Run, qualification pair and additional named Runs (the two nightly bundles, checked and regenerated through the runtime-Plan owner because they compile current pins at dispatch); refresh admits each additional Run's catalogs before compiling it, and checks, regenerates and transports every member through its owner on an exact allowlist, refuses an unnamed committed bundle and a generator stamp that differs from the committed Plans (contract-tested with real local Git for the production and development bundles, and through the real qualification owner on a fixture with synthetic trust pins that contacts no GHCR or cosign; deployment-image selection is outside the closure and must be coordinated by hand before a moving release), and `make workflows-check` compares the installed workflow with `catalog update-ci` output (not exercised in the hosted gate). Producer matrices and general callable workflows remain deferred. Qualification generation does not make both owner writes one atomic transaction; lock and generated files are separate transactions; complete crash matrix remains |
-| 22 Pins | NVKE local-chart version omission and explicit `chartName` mappings have catalog contract tests; Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets, same-release maintenance groups, whole-producer overlays, exact toolchain substitutions and authored embedded-version metadata authentication | Pin-set loading needs pinned Git access. Curated graph/SBOM edges remain deferred. Optional metadata consistency is not disk-content inspection, external acquisition or production acceptance |
-| 23 Artifact test interfaces | Proposed ADR merged in PR #139; Go Plan helper merged in #156; #138 replaces its Python diagnostic with Go factory/source/execution owners | [Implementation guide](../artifact-testing.md) separates the Go macOS ARM64/Docker fresh-build proof from historical Python native results. Upstream adoption, authenticated output membership, exhaustive suite acceptance, maintained-pin adoption, kind, CI and CAPD/CAPNICo acceptance remain outstanding; no conformance or qualification authority |
-| 24 Validator catalog | Proposed design in [ADR-24](0024-imported-validator-catalog.md); no implementation or acceptance evidence | Strict catalog/profile loading, discovery, adapter registration, CLI migration, multiple-artifact binding, controller/chart and second-repository adoption remain unimplemented. Existing CLI/published-source diagnostics do not prove catalog execution; suite completeness, authenticated membership and qualification remain separate boundaries |
+| 22 Pins | Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets including NVKE local-chart version omission, explicit reviewed chart names and descriptive artifact mappings, same-release maintenance groups, whole-producer overlays, exact toolchain substitutions and authored embedded-version metadata authentication | Pin-set loading needs pinned Git access. Curated graph/SBOM edges remain deferred. Optional metadata consistency is not disk-content inspection, external acquisition or production acceptance |
+| 23 Artifact test interfaces | Proposed ADR merged in PR #139; Go Plan helper merged in #156; #138 replaces its Python diagnostic with Go factory/source/execution owners; separate IV1 upstream bootstrap no-build interface candidate described in the [guide](../artifact-testing.md#bootstrap-e2e-interface-candidate-iv1-first-slice), without an NVKR bootstrap execution adapter | [Immutable interface source](https://github.com/dsx-ai-factory/nvke/commit/f33b7afb55d421958540589ca03d206531bfa16b) and its [Linux CLI job](https://github.com/dsx-ai-factory/nvke/actions/runs/39347477494/job/118383877388) record a passing bootstrap contract package within a failed aggregate run, not real bootstrap execution. No immutable real-bootstrap Run exists; the [guide](../artifact-testing.md#bootstrap-e2e-interface-candidate-iv1-first-slice) pins the reviewed follow-up source and local-check limits. [Implementation guide](../artifact-testing.md) separates the Go macOS ARM64/Docker fresh-build proof from historical Python native results. Upstream adoption, authenticated output membership, exhaustive suite acceptance, maintained-pin adoption, kind, CI and CAPD/CAPNICo acceptance remain outstanding; no conformance or qualification authority |
+| 24 Validator catalog | Provisional CLI discovery and local-plan profiles: strict bounded catalog/profile loading, deterministic discovery, registered `nvke-cli/v1`, complete local-plan admission and frozen dispatch through factory/sourcegit/pipeline | Discovery, refusal, snapshot edits, both suite/architecture bindings and mocked dispatch are contract-tested; [guide](../artifact-testing.md#provisional-validator-catalog) distinguishes this from actual upstream execution. Native AMD64/ARM64 catalog runtime acceptance, legacy-command migration, new-format published adapters, controller/chart and second-repository adoption remain outstanding. Existing published authentication/capture semantics, unknown exhaustive completeness, unauthenticated artifact membership and no qualification authority are preserved |
 
 ## Feature-branch pipeline development
+
+On October 20, the beta.6 [development Run 39467682189](https://github.com/dsx-ai-factory/nvkr/actions/runs/39467682189)
+failed all four OS-image producers during OVN builder preparation, before Packer. The unchanged
+`quay.io/projectquay/golang@sha256:506a668eb4c763a964ffc4d4ad0125d45d75aac899392be7e5d39380f8452564`
+returned `MANIFEST_UNKNOWN` both on the runners and in a direct registry read. Authored OVN builder
+arguments now select the Go 1.26.10 multi-platform index
+`sha256:d5acf07940fb5e6e2d07542abd853cece623d95ffd364769ec825aab5471d3b8`; registry reads verified
+its AMD64 and ARM64 manifests and recorded Go version in a point-in-time manual check.
+The default pin-binding contract checks catalog literals without contacting the registry; it does not
+continuously establish availability. The selected standard source Dockerfile requires the
+existing DNF-based builder family, and its vendored JSON adapter remains incompatible with Go 1.27.
+The separate fork at `8af51273d52dfa07454435d18d37230e582d797a` uses
+[Dockerfile.ubuntu.nv](https://github.com/dsx-ai-factory/ovn-kubernetes/blob/8af51273d52dfa07454435d18d37230e582d797a/dist/images/Dockerfile.ubuntu.nv),
+which hardcodes Go 1.26.9 at `sha256:37cfcca63222ec499bec5e8ad7aad52dbf7529db36d5812b8eae2f0621aa92d6`
+and ignores `BUILDER_IMAGE`; its unused argument is removed, not credited with a compiler repair.
+This updates a standard builder input, not the NVKE beta.6, SPIRE or harness source selections. A complete
+hosted build with the replacement remains pending.
+
+The current candidate selects NVKE `v0.22.0` at
+`400c24fb6465b042be883d6b62472528520d6291` through `catalog pin --tag` for all maintained
+NVKE source roles, including the three SPIRE package roles. The nightly harness retains
+`b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8` because the product tag omits its candidate entrypoint.
+Chart versions, native demo source admission and catalog overlay bindings follow v0.22.0.
+Hosted validation of this selection is pending; the successful records below cover their recorded inputs.
+
+At NVKR `36dd99fe3aa0c7dc6cce72b272da93d6ab8ba355`,
+[development Run 39343181108, attempt 1](https://github.com/dsx-ai-factory/nvkr/actions/runs/39343181108/attempts/1)
+completed all 580 jobs successfully, including all four OS disk builds, output publication/signing/verification,
+aggregate assembly/publication/signing/verification and final completeness. The Nktp package remained
+internal with no repository association on API read-back. The aggregate publication root was
+`ghcr.io/dsx-ai-factory/nvkr/development/runs/39343181108/attempts/1/releases@sha256:4f00024a7e63a0c862bdc63e77e37953c895837d910cbbbc523614c99c975c22`.
+The later production sibling-routing correction does not change this valid development path;
+[Merge Gate 39344901584](https://github.com/dsx-ai-factory/nvkr/actions/runs/39344901584)
+passed on merged branch head `7a4457ce824659786110e328e98da00ac45d8002`.
+
+[Attempt 2](https://github.com/dsx-ai-factory/nvkr/actions/runs/39343181108/attempts/2)
+successfully reran aggregate publication and its dependents. Provider job records retain 573 original
+successful name/start/completion/result tuples, including all four disk builds and aggregate assembly.
+Retry publication, signing, verification and final completeness passed with the same aggregate digest in the
+attempt-2 namespace, using retained output references from attempt 1. Independent development
+[qualification Run 39356370279](https://github.com/dsx-ai-factory/nvkr/actions/runs/39356370279)
+reached the artifact checks against that exact successful attempt, but both native workers returned
+`NVKR-E-TIMEOUT` at the development adapter's separate fifteen-minute deadline, before native smoke.
+ARM64 completed payload/SBOM checks and reached output provenance checks; AMD64 expired while
+materializing `nvke-node-image-arm64`. The development adapter now inherits the hosted owner's existing
+fifty-nine-minute deadline, matching production handoffs, while retaining individual operation bounds.
+[ADR-16](0016-release-gates-and-digest-first-selection.md) records earlier caller deadlines, joined cleanup
+and why this allowance is not a guaranteed return bound.
+Existing hosted-budget contracts cover earlier caller deadlines and cancellation; corrected development
+execution in [Run 39358337890](https://github.com/dsx-ai-factory/nvkr/actions/runs/39358337890)
+passed the ARM64 artifact checks for all 69 outputs and native tool smoke, then both native workers
+failed report signing because Cosign 3 rejected the explicit issuer with its default signing configuration.
+The exact-byte signer now explicitly selects detached output compatibility, raw signature/PEM encoding
+and public transparency submission. Injected and held-process protocol tests check those options;
+[Run 39360715596](https://github.com/dsx-ai-factory/nvkr/actions/runs/39360715596) on
+`8422f128e6b776ae5f353165893cd4085414bb4d` passed both native workers: each authenticated all 69
+outputs, passed native smoke and signed/uploaded its report. Final qualification also passed all 69
+artifact checks and signed/read back qualification attachments for exactly those 69 unique subjects.
+The [final result job](https://github.com/dsx-ai-factory/nvkr/actions/runs/39360715596/job/118430919815)
+reported `successful: true` with development evidence digest
+`sha256:b89ca5cfb49f78ac2fc687f000890ad043813f0c5ba584a351598e6d20eea062`.
+Delivered-tool smoke passed for `nvkectl`, `nvkectl-linux-arm64` and `operator-tools`; the other
+66 outputs correctly report that tool smoke is not applicable. The same head passed
+[Merge Gate 39360705380](https://github.com/dsx-ai-factory/nvkr/actions/runs/39360705380).
+These development observations do not establish production qualification,
+full-release consumer acceptance or a live local-demo deployment.
+
+At NVKR `92ce9fc65182a965f94ffa8a527828a971e9fc45`, [development Run 39327360895](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327360895)
+passed all four disk builds, output publication/signing/verification and aggregate assembly. Aggregate
+publication then rejected the Nktp package's repository association with `NVKR-E-TRUST-POLICY-MISSING`.
+Read-only GitHub package metadata identified `nvkr/development/runs/39327360895/attempts/1/nktp` as
+internal but linked to `dsx-ai-factory/nvke`; the other 138 packages in that run's inventory had no association.
+Helm packaging now omits the manifest-level source annotation that can cause GHCR auto-linking while
+preserving source URLs in the chart archive and Helm config. Regression coverage checks both properties;
+the successful development Run above exercises this packaging correction. Existing published bytes are not rewritten.
+The operator disconnected the existing Nktp package; API read-back confirmed internal visibility with no
+repository association. Failed jobs were rerun as attempt 2 of the same Run, retaining successful producers.
+Attempt 2 restored the original metadata, but aggregate publication incorrectly projected payload references
+into attempt 2 and failed with `MANIFEST_UNKNOWN` for the attempt-1 CAPI controller output. Delivery now
+derives output and evidence locations from their recorded original publication namespace, rejecting
+foreign registries/repositories/runs and future attempts. Regression coverage includes mixed-origin assembly
+and production sibling isolation. The successful attempt-2 publication above exercises retained output
+namespace resolution, and its complete retry passed. The immutable failed Run cannot acquire
+new executable code through a rerun.
+
+The historical October 19 main-source upgrade selected `55612dce98cf0183790fbe5f4776225d63369fc2` through `catalog pin --commit`, retaining all three SPIRE package roles and the separate nightly test-harness exception. Canonical generation and [Merge Gate 39306909978](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306909978) passed on NVKR `5953a0ac`. [Development Run 39306902739](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306902739) remains incomplete: [provisioned-provider signing](https://github.com/dsx-ai-factory/nvkr/actions/runs/39306902739/job/118254801119) failed while fetching ambient GitHub OIDC credentials because the response was not JSON. All four disk outputs nevertheless passed build, publication, signing and verification in that Run. The later successful complete Run and same-run retry are recorded above; this earlier incomplete Run does not supply that evidence. The preceding [beta Run 39276513915](https://github.com/dsx-ai-factory/nvkr/actions/runs/39276513915) failed disk production and completeness. Both plain disk logs reached an absent-file error during provisioning; the [selected source composition](https://github.com/dsx-ai-factory/nvke/blob/55612dce98cf0183790fbe5f4776225d63369fc2/os-image/packer/scripts/compose-image-inputs.py) adds the two missing network configuration files, with [source regression coverage](https://github.com/dsx-ai-factory/nvke/blob/55612dce98cf0183790fbe5f4776225d63369fc2/os-image/packer/scripts/test_build_entrypoint.py). The four successful disk outputs in the main-source Run exercise this source correction; they do not establish complete Run acceptance.
+
+Beta development [Run 39274459086](https://github.com/dsx-ai-factory/nvkr/actions/runs/39274459086)
+reached admitted native disk builds and successful SBOM signing after the operator approved its exact branch
+in both development environments. Publication jobs
+[118139197664](https://github.com/dsx-ai-factory/nvkr/actions/runs/39274459086/job/118139197664) and
+[118139250021](https://github.com/dsx-ai-factory/nvkr/actions/runs/39274459086/job/118139250021)
+then failed during helper locator acquisition with HTTP 503. The locator API owner now admits ADR-18's
+bounded transient-server retries. Recovery, exhaustion, cancellation and server-delay cases are added to
+the contract suite; [Merge Gate 39276232245](https://github.com/dsx-ai-factory/nvkr/actions/runs/39276232245) passed on `8dc975de`. Local execution remains skipped at the operator's request.
+This is not a successful complete development Run or qualification claim.
 
 The explicit `githubDevelopment` Environment setting selects separate fixed workflow/Plan/manifest paths
 with the same compiler, complete graph and helper. The committed development bundle now uses the full
@@ -1144,7 +1240,8 @@ namespace binding and generated credential/owner separation. Catalog maintenance
 development pair with its producer, so pin updates cannot leave its manifest stale.
 Development qualifier retries may retain earlier successful workers within the same qualification run,
 preserving their original branch, source/policy bindings, certificate invocation and private-carrier attempt.
-The development producer's publication remains bound to one exact source attempt and its namespace.
+Each output publication retains its original source attempt and namespace. A later aggregate attempt
+may reuse earlier same-run outputs after exact invocation and evidence checks.
 For [development Run 38951964907, attempt 1](https://github.com/dsx-ai-factory/nvkr/actions/runs/38951964907/attempts/1),
 current code reproduced the original Plan digest
 `sha256:c6373e0b96f182b596ca89eeb6d7f66ee17b9126e4da236a0c5d583a0d1d12b6`.
@@ -1154,8 +1251,9 @@ using the exact `nvkr-dev.yml@refs/heads/codex/private-ghcr-combined` identity a
 The immutable release subject was
 `ghcr.io/dsx-ai-factory/nvkr/development/runs/38951964907/attempts/1/releases@sha256:d49148699674c485d24ef0de89c2450a2632d42681b031d421bf5c3102e92d0f`.
 This read-only laptop/Colima exercise did not execute those hosted outputs or publish new evidence.
-No hosted development qualification success, qualifier OIDC identity, hosted native smoke,
-qualification attachment/read-back or independent-consumer acceptance is claimed.
+That October 16 snapshot did not establish hosted development qualification, qualifier OIDC identity,
+hosted native smoke, qualification attachment/read-back or independent-consumer acceptance.
+The later hosted success above has its own exact Run and scope.
 
 Unsigned development remains hosted build-only, static-unqualified, automatically cancelling older
 same-branch Runs and retaining transfers for one day. Signed development requires the prescribed
@@ -1166,21 +1264,23 @@ Source and pinned-toolchain read credentials retain their separate fixed prepara
 Provider pool/credential/ACL configuration is an external prerequisite, not established by rendering.
 
 The factory owner derives registry targets beneath the current run and attempt without mutating committed
-Plan bytes or Build identity. Subject/reference, metadata and predicate checks reject another attempt's
-publication. Production authenticated earlier-attempt reuse is unchanged; development retries rerun all
-jobs or dispatch a complete new Run. Signed-development helpers/carriers and all final Run records retain
+Plan bytes or Build identity. Development now uses production's same-run retry contract: retained
+subjects, controls and predicates keep their original attempt bindings; new publication work uses the
+current attempt. Other runs, future attempts and changed Plans remain rejected. Development qualification
+selects bounded provider-authenticated metadata candidates and rechecks the full original closure.
+The retry regression suite and complete repository gate passed in [Merge Gate 39327338735](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327338735) at `92ce9fc65182a965f94ffa8a527828a971e9fc45`. Local test execution was skipped at the user's request. Live partial retry and independent qualification remain pending. Signed-development helpers/carriers and all final Run records retain
 seven days; disk diagnostics retain one day. Full signed development is non-canceling.
 
 The development cleanup module inventories only private packages in that reserved attempt namespace.
 It authenticates account, package and exact completed workflow-attempt metadata; package, version and
-attempt timestamps must all be at least 24 hours old. It rechecks before whole-package deletion, fails
+original and latest attempt timestamps must all be at least 24 hours old. It rechecks before whole-package deletion, fails
 closed on unknown/ambiguous/API state, and records confirmed partial progress without retrying ambiguous
 mutation. Preview is the default. The separate daily cleanup workflow executes only default-branch code
 with a cleanup-only credential; it never loads branch executables or downloaded artifacts. Production and
 older unscoped packages remain outside this protocol.
 
 Definition/factory contracts cover admission, identity, complete M2 graph retention, exact rendering,
-credential/environment scope, retention, runtime namespace projection and cross-attempt rejection.
+credential/environment scope, retention, runtime namespace projection and same-run retry admission.
 Cleanup API fixtures cover eligibility, authentication errors, pagination, races and mutation failures;
 workflow contracts enforce default-branch scheduling and secret scope. The dispatch helper retains its
 clean/current pushed-commit preflight. These tests do not establish live GitHub execution, actual credential
@@ -1453,6 +1553,18 @@ regressions cover this failure, unchanged source bytes, the exact historical pin
 cancellation and continued rejection of delegated configuration. Command admission
 errors retain the failing phase without exposing arguments or source paths. These
 tests do not establish a completed Ubuntu site replay.
+
+The local demo now selects NVKE `v0.22.0` at
+`400c24fb6465b042be883d6b62472528520d6291`, including SPIRE packaging revision 4. Its adapter uses the source-owned site-spec renderer and
+deployment entrypoint with verified local chart archives and exact image references.
+The already admitted Kind configuration owns cluster networking; site-spec bootstrap
+fields are not executed. Before tenant creation, the adapter binds source-owned
+profile bytes to the live observed controller pod and creates MachineImage,
+ClusterRelease and NodePoolRelease resources for the selected plain ARM64 disk.
+On the preceding beta selection, focused resource, pod-binding, cancellation and profile tests passed, including
+targeted race checks. The actual beta CLI validated a diagnostic site spec and the
+source installer completed its dry-run with prepared chart paths. Those checks
+do not establish chart builds, cluster readiness, a completed tenant replay, or acceptance of the current v0.22.0 selection.
 
 Maintained OS Definitions, catalog execution and Packer toolchain assembly select Docker.
 The older authored Podman Environment and its TCG Definition are removed; generic
@@ -1956,9 +2068,9 @@ same-Run source attempts no later than the consumer, preserving original locator
 ordinary and nested restoration. Same-name retry candidates are bounded and all authenticate before
 selecting the newest source attempt; tied source attempts and incomplete listings fail closed.
 Generated fetch and restore commands disable reuse whenever an explicit Run is supplied.
-Development, explicit cross-Run and direct store APIs stay exact-attempt.
+Development transfers now use the same retry selection. Explicit cross-Run and direct store APIs stay exact-attempt.
 The review follow-up adds regression cases for candidate ordering, ties, future/corrupt candidates and
-truncated listings; local execution of these new tests is intentionally skipped pending hosted CI.
+truncated listings; these tests passed in [Merge Gate 39327338735](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327338735), with local execution intentionally skipped.
 Focused contracts reproduce the old rejection and cover private payloads, public metadata, mixed source
 attempt acquisition, unchanged bindings, future/foreign/malformed source refusal and generated policy
 separation. These local checks do not establish hosted retry completion, qualification acceptance or a
@@ -2654,7 +2766,7 @@ Both candidate disk jobs succeeded in run `37486058412`, but the aggregate relea
 before publication. The [dated carrier evidence](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-release-carrier-transport.md) records
 that failed attempt. The subsequent validation-branch run `37533806963` at commit `625980e` passed
 all candidate outputs and aggregate publication, signing, verification and finalization. That historical run
-predates the consumer-policy and timeout changes here; it is not evidence for this updated head, current main
+predates the consumer-policy and timeout changes here; it is not evidence for this updated head, current candidate
 execution, strict inspection or independent full-payload consumer acceptance. Per-output storage peaks remain unmeasured.
 The [October 6 preparation record](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md) retains final-source
 ARM64 and AMD64 Packer/inspector assembly, executable measurements, native tool validation
@@ -2688,16 +2800,13 @@ Native children are locked separately from source-owned index parents, and mater
 membership. Controlled source/pin/image tests and exact-source approval do not prove external layer acquisition,
 scanner acceptance or complete production input approval. The
 [acquisition observations](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#temporary-spire-source-selection) retain the historical mixed-source candidate and HTTP-403 limits.
-Current inputs temporarily retain the prior SPIRE packaging source `726f76944404e1106626b8333d3576bdf67b575b`
-and its source-owned acquisition/packaging commands. OS assembly, agent, Calico, kubeadm and native
-Packer capture retain their existing pins and contracts. The older SPIRE package omits DSX IMDS,
-which current NVKE requires; this is an explicitly incomplete compatibility selection, not full product parity.
-The blocked DSX producer, its material-only selections and unused source credentials are removed.
-[NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641) tracks supported DSX source admission,
-dependency-finding triage and confirmation of source/binary and distribution contracts. No source gate,
-submodule rejection or security requirement is weakened to admit that dependency. Standalone plugin
-compilation does not establish those contracts or native execution/boot acceptance. NVKE telemetry pipelines acquisition and
-offline Helm packaging were exercised locally; no successful combined hosted Run of these release additions is claimed.
+Current OS assembly, agent, Calico, kubeadm, SPIRE and native Packer inputs select NVKE
+`v0.22.0` (`400c24fb6465b042be883d6b62472528520d6291`). SPIRE uses that release's source-owned
+acquisition and Debian revision 4 packaging, which omits DSX IMDS. The prior mixed-source exception
+is no longer selected. Current-source execution remains unverified until a complete recorded development
+attempt succeeds. No source admission, submodule rejection or security requirement is weakened.
+NVKE telemetry pipeline acquisition and offline Helm packaging were exercised for the earlier recorded
+inputs; no successful combined hosted Run of the v0.22.0 selection is claimed.
 
 [Run `38809161348`](https://github.com/dsx-ai-factory/nvkr/actions/runs/38809161348) at
 `e3743a70b6e0bd19ccf53b7160ab0a5f276d0e66` failed during NVKE telemetry pipelines Helm extraction and the AMD64
@@ -2852,18 +2961,34 @@ The generated nightly source-fetch and native disk jobs prepare their selected p
 M2 toolchains through the existing read-only image-preparation owner. Temporary pull
 credentials are removed before source or producer execution; the nightly output
 namespace does not require republishing the existing pinned toolchains.
-The four CLI, controller and chart candidate sources and both suite selections
-use the same NVKE revision `a8391755d12d99f859783c6cf390338debd1e085`,
-including the release renderer, runtime `^TestE2E$` selection and candidate-input
-fixes. Relative to the previous product source, eight adapter, test and
-documentation files changed; CLI, controller and chart producer code is unchanged.
-The shared revision is consistent with ADR-23 Decision 3's proposed source/suite
-alignment; it does not establish overall interface adoption or runtime acceptance.
+The four CLI, controller and chart candidate sources now select NVKE
+`v0.22.0` at `400c24fb6465b042be883d6b62472528520d6291`.
+The nightly consumer projects authenticated profile bytes into the current resource
+API and supplies separate site and stack configuration, credentials through the child
+environment, and telemetry through the installer values handoff. Both the normal and upstream-OVN
+disk URLs, where required by the selected profile, read the same held disk and are
+checked against the exact selected Artifact. Focused contract and HTTP race tests
+passed for the preceding beta selection, and that CLI validated and rendered the diagnostic site spec. Those checks do not validate the current v0.22.0 source.
+The user-approved test-only suite pin is `b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8`,
+a signed compatibility revision of the earlier `a3206710` suite, with beta.6 deployment
+templates and an explicit stack-config/credential/telemetry handoff. It retains the
+candidate entrypoint omitted from the selected product source. The [hosted source-contract Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/39487106857/attempts/1)
+on NVKR `8df540b83aeaec5e27b865dcd65887882699755b` passed the actual
+candidate render function with the beta.6 CLI and the hook argv/environment
+regression. This source-contract-only dispatch skipped the ordinary selection,
+build, runtime selection and runtime-test jobs. The later workflow selector correction
+is covered separately by the shell-versus-Go parity test in the successful
+[Merge Gate on `caf85b27`](https://github.com/dsx-ai-factory/nvkr/actions/runs/39487820535).
+This verifies configuration composition, not published-artifact or VM
+runtime acceptance; full runtime validation of this revision remains unverified. Product sources, including SPIRE, select v0.22.0. This diagnostic selection is an exception to
+ADR-23's proposed matching-revision rule, not adoption of that proposal. Missing
+candidate hooks still fail admission; the generic rebuilding suite is no fallback.
+These source and adapter checks do not establish overall interface adoption or runtime acceptance.
 ADR-23 remains proposed and does not authorize this adapter's schedule, runner or
 credential policy; broader acceptance remains open.
-The candidate revision comes from open NVKE PR #1580 at this review; its pin
-claims neither merged-main membership nor human approval. The authored daily trigger is
-enabled at the user's explicit request.
+The authored daily trigger is
+retained at the user's explicit request and will execute after merge even though
+no combined manual cycle is recorded here.
 Existing ARC disk production and NVKE's kind plus ARM64 VM lane have completed
 externally, as linked in the nightly guide. The new job retains host/network preflight
 and publication verification. The
@@ -2917,9 +3042,9 @@ The deployment manifest moved to `deploy/nico/nvke-deploy.yaml`; controller and 
 explicitly select version `0.22.0`. External chart versions and archive digests are unchanged. CAPI `v1.13.6`, cert-manager `v1.21.1`
 and the NKTP collector `0.162.0` follow the pinned source's tool versions and chart values.
 The pin operation verified those acquired chart bytes. These are input and static-contract changes,
-not an NVKE build, runtime observation, signed release or qualification. The OS source acquisition retains Go 1.27.3 from official checksum-pinned native archives;
-agent builds select that retained compiler offline while the existing Packer image supplies VM tools.
+not an NVKE build, runtime observation, signed release or qualification. The beta migration's published
+Go 1.27.3 native toolchain images are preserved. The Ubuntu 24 agent retains a checksum-pinned Go 1.27.3
+compiler while preserving its Bookworm libc ABI builder.
 Native disk execution with this updated closure remains unexercised.
-The legacy staged-demo installer remains at its separate `8fb2d53368823bd386b4fbd55b4ab6d3c0931345`
-contract: v0.22.0 no longer contains `deploy/stages`. Migrating that diagnostic runtime is separate
-from these build catalogs and the maintained native installer source; no v0.22.0 staged-demo claim is made.
+The beta.6 migration's installer adapter is retained and its source selection advances to v0.22.0;
+there is no remaining legacy staged-installer exception. Contract checks do not establish live deployment.

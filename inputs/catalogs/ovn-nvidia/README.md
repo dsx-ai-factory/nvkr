@@ -95,8 +95,10 @@ suffix before checking package presence and never runs APT. Install the exact
 package names with `=1+git.8af51273d52d` separately, for example through
 InstallPackages, then validate chart deployment. These packages are not a
 drop-in for an empty-version request using the default stream. See the
-[pinned InstallCNI contract](https://github.com/dsx-ai-factory/nvke/blob/ff21ba8c07cafff74b68e238a8876af11e5beded/agent/pkg/agent/proto/node_agent.proto#L525-L545)
-and its [package-presence implementation](https://github.com/dsx-ai-factory/nvke/blob/ff21ba8c07cafff74b68e238a8876af11e5beded/agent/internal/agent/cni.go#L826-L875).
+[pinned InstallCNI contract](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/agent/pkg/agent/proto/node_agent.proto)
+and its [package-presence implementation](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/agent/internal/agent/cni.go).
+The current agent accepts both `nvke-cni-*` and the candidate's retained `nke-cni-*`
+installed package names when checking chart presence.
 
 ## Native image and Helm OCI outputs
 
@@ -193,7 +195,7 @@ For each native platform: linux/arm64 and linux/amd64
                                   │
   native patched installer ISO ───┤
                                   ▼
-                    source-owned Packer → non-fde/nke-node.qcow2
+                    source-owned Packer → non-fde/nvke-node.qcow2
                                   │
                        boot + agent CNI/version selection
                                   ▼
@@ -207,8 +209,8 @@ For each native platform: linux/arm64 and linux/amd64
 | AMD64               | `nvke-node-image-amd64` | `nvke-patched-installer-iso-amd64` | `amd64`                            |
 
 
-Both existing OS producers select `nke-node-non-fde.qemu.nke-non-fde`. The
-material manifest schema is `nke.dev/os-image-materials/v1`; its inputs are
+Both existing OS producers select `nvke-node-non-fde.qemu.nvke-non-fde`. The
+material manifest schema is `nvke.nvidia.com/os-image-materials/v1`; its inputs are
 `image-inputs` (archive) and `installer-iso` (disk image). NVKR supplies exact
 authenticated files and the source-owned Packer interface consumes them. Packer
 does not choose the Git repository, download OVN or compile its binaries.

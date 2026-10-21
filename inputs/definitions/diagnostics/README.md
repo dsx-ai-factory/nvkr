@@ -90,12 +90,15 @@ Manual dispatch supports these modes:
 For a full dispatch, supply an exact main-reachable NVKR commit or the copy-pr-bot mirror of a current,
 open, non-draft same-repository PR. Maintainers must vet the exact head first. The workflow does not
 authenticate an `/ok to test` comment or independently enforce human approval. `approved_nvke_commit`
-must match the selected catalog lock and every source node in the trusted compiler's complete Plans.
+must match the selected NVKE catalog lock and source nodes in the trusted compiler's complete Plans.
+Only the named SPIRE producer may use the exact pre-DSX commit/tree retained above; its catalog
+snapshot and executable source edge must both match that exception.
 This is a consistency check; the input is not itself source-owner approval.
 
 The selector and source fetch use trusted main code. The fetch job alone receives the read-only
-`NKE_SOURCE_TOKEN`; it verifies the exact source commit/tree, removes persistent credentials, and
-transports bytes to the candidate job. Candidate execution receives private source content and declared
+`NKE_SOURCE_TOKEN`; it verifies both exact source commit/tree pairs, removes persistent credentials, and
+transports one Git checkout containing both commits to the candidate job. The consumer verifies the
+archive digest and both pins before using that checkout. Candidate execution receives private source content and declared
 build network, but no source token. The process-local Git transport override keeps canonical source pins.
 
 The runner identity must already have read/write KVM access; the workflow prints device ownership/mode

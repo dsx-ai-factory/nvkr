@@ -10,11 +10,11 @@
   },
   "components": {
     "nvkectl-arm64": {
-      "artifactPath": "bin/nvkectl",
+      "artifactPath": "cli/bin/nvkectl",
       "buildCommand": [
         "bash",
         "-euc",
-        "export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor\nmake -C cli build NVKECTL_TREE=clean\ncp cli/bin/nvkectl bin/nvkectl\n"
+        "export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor\nmake -C cli build NVKECTL_TREE=clean\n"
       ],
       "cgo": false,
       "fromSource": true,
@@ -24,11 +24,11 @@
       ],
       "source": "nvke",
       "versionStamp": {
-        "NVKECTL_COMMIT": "{{slice .Commit 0 8}}",
-        "NVKECTL_DATE": "{{.Date}}",
-        "NVKECTL_VERSION": "{{.ModuleTag}}"
+        "NVKECTL_VERSION": "{{.Tag}}",
+        "NVKECTL_COMMIT": "{{.Commit}}",
+        "NVKECTL_DATE": "{{.Date}}"
       },
-      "writeDir": "bin"
+      "writeDir": "cli/bin"
     }
   },
   "sources": {
