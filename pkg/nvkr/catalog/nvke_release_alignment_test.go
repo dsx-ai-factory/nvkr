@@ -37,6 +37,11 @@ func TestNVKEReleasePinsStayAligned(t *testing.T) {
 				if source.Constraint != "v0.22.0" || source.TagPrefix != "" || pin.Tag != "v0.22.0" || pin.Commit != "400c24fb6465b042be883d6b62472528520d6291" || pin.TreeHash != "f3afc02f5c92f4aacda3a1655836a91bef093bfe" || pin.SourceDateEpoch != 1792548398 {
 					t.Fatalf("%s must select the complete NVKE v0.22.0 identity: %+v", name, pin)
 				}
+				for component, producer := range registry.Components {
+					if producer.Source == name && producer.Prebuilt != nil && producer.Prebuilt.Image != "" && lock.Artifacts[component].Tag != pin.Tag {
+						t.Fatalf("%s artifact selection must follow source %s at %s", component, name, pin.Tag)
+					}
+				}
 			}
 		})
 	}
