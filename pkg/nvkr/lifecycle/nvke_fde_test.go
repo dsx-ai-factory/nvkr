@@ -139,10 +139,10 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 		arch, installer, patched, plain, toolchain, firmwareCode, firmwareVars, memory string
 	}{
 		{"amd64", "ubuntu-installer-iso-amd64", "nvke-patched-installer-iso-amd64", "nvke-node-image-amd64",
-			"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:2a8d3ca5b447fe9d4694aa6cd977c6353299b336656b23688bc6dc11b8ab98f2",
+			"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:1415193ed0c50cd9c3d5b3bbd6207728262db3469c6ccd36717d47a6f50e3c0e",
 			"/usr/share/OVMF/OVMF_CODE_4M.fd", "/usr/share/OVMF/OVMF_VARS_4M.fd", ""},
 		{"arm64", "ubuntu-installer-iso", "nvke-patched-installer-iso", "nvke-node-image",
-			"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2",
+			"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3",
 			"/usr/share/AAVMF/AAVMF_CODE.no-secboot.fd", "/usr/share/AAVMF/AAVMF_VARS.fd", "4096"},
 	} {
 		t.Run(tc.arch, func(t *testing.T) {

@@ -110,7 +110,7 @@ jobs:
           platform="linux/$NATIVE_ARCH"
           repository=ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains
           packer=$(jq -er --arg platform "$platform" \
-            --arg repository "$repository/packer@" '
+            --arg repository "$repository/packer-native@" '
             [.builds[] | select(.platform == $platform) |
              .executionGraph.nodes[] |
              .toolchain // empty |
@@ -121,7 +121,7 @@ jobs:
           inspector=$(jq -er --arg platform "$platform" \
             '.environment.diskInspectionProfiles[$platform].image' "$plan")
           case "$inspector" in
-            "$repository/inspector@sha256:"*) ;;
+            "$repository/inspector-native@sha256:"*) ;;
             *) echo 'unexpected inspector repository' >&2; exit 1 ;;
           esac
           printf 'packer=%s\ninspector=%s\n' "$packer" "$inspector" \

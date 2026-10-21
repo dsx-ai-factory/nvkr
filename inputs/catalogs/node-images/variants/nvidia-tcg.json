@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-os-arm64-tcg-local",
-  "requiresCatalogDigest": "sha256:ddfa54c80554bac42be140e3f445e60cb5837a90afdec9c70bbf93be57e8f494",
+  "requiresCatalogDigest": "sha256:47c9ec4e8a4fe2a3f45a7e4b32fefd70c30d7ec2136edc144da6910776bfbf76",
   "components": {
     "nvke-node-image": {
       "component": {
@@ -82,7 +82,7 @@
         "tag": "v0.22.0-beta.6",
         "toolchainImages": {
           "amd64": "sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0",
-          "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2"
+          "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3"
         },
         "treeHash": "e928ae13298118b61581d9a406ba4a02f872e959",
         "vendorCommand": [

@@ -38,7 +38,7 @@ executionClasses:
 # includes the additional held subject snapshot.
 diskInspectionProfiles:
   linux/amd64:
-    image: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector@sha256:d330a9f8bc17dad13399b9b56de2434bbf2a4ea8fe5511ee83531f1545de30d5
+    image: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector-native@sha256:aa4fbd23fd6e0ddeb3f94201bd1a9cc7083d1a1ff1720f7ce0cfa996e9ca5ed3
     inspectorDigest: sha256:31f25fbb70ef79d8c5487c0d8a41613b6db5c93eb391b73f990ddaa04e6ba052
     codecDigest: sha256:634320b91165669917123e8e79cce1c4d00cee0a4aa4d662d7c0a8186479b3fb
     guestfishDigest: sha256:65739abd86dbf919cbdff5ef9bb144079bd0e97dc4c9023c9455d6b8538add8c
@@ -52,7 +52,7 @@ diskInspectionProfiles:
     maxFilesystemBytes: 17179869184
     scratchStorage: private-volume
   linux/arm64:
-    image: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector@sha256:0eeef5936cc090b1f89961d03a27688adddd9badd3ef236139e26771380b0119
+    image: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector-native@sha256:db9e17bd3cd94008ba58291b47774601e3b06c5bc741a25974de67c72e79b6bc
     inspectorDigest: sha256:e95525c7c92f9581c79c8ecc0893109519fbfbb4607a341bf473e942215bfd7b
     codecDigest: sha256:f26da24f8a7fd880ab13f6fcabf42d099fb68ea86df5de0c55e6faadfe2d9a6e
     guestfishDigest: sha256:db1f245febce9e588902858806fc63b7878cc2c02ad9651e9a87102bbebe2feb
