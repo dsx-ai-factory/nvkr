@@ -14,11 +14,12 @@ import (
 
 func TestTenantWorkloadRequiresExecutionDNSAndExactImage(t *testing.T) {
 	for _, tc := range []struct {
-		name, marker, image, fail string
-		copies                    int
-		wantError                 bool
+		name, marker, image, selected, fail string
+		copies                              int
+		wantError                           bool
 	}{
 		{name: "accepted", marker: "NVKE_LOCAL_WORKLOAD_PASS\n", image: WorkloadImage, copies: 1},
+		{name: "new acquired image", marker: "NVKE_LOCAL_WORKLOAD_PASS\n", selected: "example.invalid/workload@sha256:" + strings.Repeat("b", 64), image: "sha256:" + strings.Repeat("b", 64), copies: 1},
 		{name: "missing execution marker", image: WorkloadImage, copies: 1, wantError: true},
 		{name: "partial marker", marker: "prefixNVKE_LOCAL_WORKLOAD_PASS\n", image: WorkloadImage, copies: 1, wantError: true},
 		{name: "wrong image", marker: "NVKE_LOCAL_WORKLOAD_PASS\n", image: "sha256:wrong", copies: 1, wantError: true},
@@ -27,6 +28,10 @@ func TestTenantWorkloadRequiresExecutionDNSAndExactImage(t *testing.T) {
 		{name: "wait failed", fail: "workload-complete", wantError: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			selected := tc.selected
+			if selected == "" {
+				selected = WorkloadImage
+			}
 			failed := errors.New("owned command failed")
 			var phases []string
 			capture := func(_ context.Context, args []string, phase string, budget time.Duration) ([]byte, error) {
@@ -49,7 +54,7 @@ func TestTenantWorkloadRequiresExecutionDNSAndExactImage(t *testing.T) {
 				}
 				return nil, nil
 			}
-			_, err := runTenantWorkload(t.Context(), t.TempDir(), "tenant.config", "kubectl", capture)
+			_, err := runTenantWorkload(t.Context(), t.TempDir(), "tenant.config", "kubectl", selected, capture)
 			if (err != nil) != tc.wantError {
 				t.Fatalf("acceptance error=%v; wantError=%v", err, tc.wantError)
 			}

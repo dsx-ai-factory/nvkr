@@ -138,11 +138,6 @@ pins:
     sourceDateEpoch: 1792548398
     tag: v0.22.0
     treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
-  nvke-spire-agent-source:
-    commit: 400c24fb6465b042be883d6b62472528520d6291
-    sourceDateEpoch: 1792548398
-    tag: v0.22.0
-    treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
   nvkr-site-identity:
     commit: de567d94f0efc1532ae229ea656b69cb75fe92c4
     goVersion: 1.27.3

@@ -277,7 +277,7 @@ func nativeIdentityFreshTPM(spec nativeStaticEntrySpec, before, after nativeIden
 		return "", errors.New("permanent server has not attested the selected TPM agent")
 	}
 	proof := result.After
-	if result.SchemaVersion != siteidentity.SchemaVersion || result.Operation != "handoff" || result.Completion != siteidentity.JoinedSuccess || result.FailureCode != "" || result.Script == nil || (result.Script.Outcome != "applied" && result.Script.Outcome != "reapplied") || result.Script.NodeAgentPID <= 0 || proof == nil || result.Before.Serial == "" || result.Before.PeerID != spec.SPIFFEID || proof.PeerID != spec.SPIFFEID || result.Before.BootID == "" || result.Before.BootID != expectedBoot || proof.BootID != expectedBoot || proof.Serial == "" || proof.Serial == result.Before.Serial || proof.NotBefore.Before(dispatched.Add(-time.Minute)) || proof.NotBefore.After(now) || !proof.NotAfter.After(now.Add(time.Minute)) {
+	if result.SchemaVersion != siteidentity.SchemaVersion || result.Operation != "handoff" || result.Completion != siteidentity.JoinedSuccess || result.FailureCode != "" || (result.Reconfiguration != "applied" && result.Reconfiguration != "unchanged") || result.Status == nil || !result.Status.ConfigApplied || !result.Status.HasValidSVID || result.Status.SPIFFEID != spec.SPIFFEID || result.Status.ExpiresAt <= now.Add(time.Minute).Unix() || proof == nil || result.Before.PeerID != spec.SPIFFEID || result.Before.BootID != expectedBoot || !siteidentity.FreshPeerProof(result.Before, *proof, dispatched, now) {
 		return "", errors.New("fresh authenticated same-boot permanent host identity is unverified")
 	}
 	return serial, nil
@@ -327,8 +327,12 @@ func (s *nativeSiteAttempt) captureNativeIdentityMutation(ctx context.Context, b
 	dispatched, joined := false, false
 	defer func() {
 		if dispatched && !joined {
-			s.unjoinedWork = errors.Join(s.unjoinedWork, ErrUnjoined)
-			resultErr = errors.Join(resultErr, ErrUnjoined)
+			if !errors.Is(resultErr, ErrUnjoined) {
+				resultErr = errors.Join(resultErr, ErrUnjoined)
+			}
+			if s.unjoinedWork == nil {
+				s.unjoinedWork = resultErr
+			}
 		}
 	}()
 	result, resultErr = captureNativeIdentity(ctx, budget, func(critical context.Context) ([]byte, error) { dispatched = true; return call(critical) })

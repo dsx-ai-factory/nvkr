@@ -358,9 +358,6 @@ func connectRetained(ctx context.Context, description retainedControlDescription
 		!operatorArgument(description.Work) || !filepath.IsAbs(description.Selector) || filepath.Clean(description.Selector) != description.Selector || !operatorArgument(description.Selector) || description.PID <= 0 || len(description.Token) != 64 || !validRetainedEndpoint(description.Socket, description.Token) {
 		return nil, nvkrerr.New(nvkrerr.CodeUsage, "retained connection requires an exact session description")
 	}
-	if _, err := hex.DecodeString(description.Token); err != nil {
-		return nil, nvkrerr.New(nvkrerr.CodeUsage, "retained session token description is invalid")
-	}
 	if _, bounded := ctx.Deadline(); !bounded {
 		return nil, nvkrerr.New(nvkrerr.CodeUsage, "retained connection requires a deadline")
 	}

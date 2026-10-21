@@ -165,8 +165,8 @@ versionStamp:
   NVKECTL_DATE: '{{.Date}}'
 ```
 
-These are build inputs, not labels added after the build. For the pinned tag `v0.22.0-beta.6`,
-`.ModuleTag` is `v0.22.0-beta.6`; `.Version` is `0.22.0-beta.6`.
+These are build inputs, not labels added after the build. For the pinned tag `v0.22.0`,
+`.ModuleTag` is `v0.22.0`; `.Version` is `0.22.0-beta.6`.
 
 ## Run the local lab
 

@@ -1,7 +1,7 @@
 {
   "apiVersion": "nvkr.dev/definition/v5",
   "catalog": {
-    "base": "../../../catalogs/runtime-dependencies/native-arm64"
+    "base": "../../../catalogs/runtime-dependencies"
   },
   "kind": "Definition",
   "metadata": {

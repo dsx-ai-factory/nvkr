@@ -167,6 +167,7 @@ sources:
           type: manifest
         controller:
           path: ../../controller/deploy/charts/controller
+          chartName: nvke-controller
           type: helm
         nvke-base-config:
           type: template

@@ -184,107 +184,61 @@ func TestOSPlanSourceClosureRejectsAliasAndPinDrift(t *testing.T) {
 	}
 }
 
-func TestOSPlanSPIREExceptionCannotAuthorizeOtherConsumers(t *testing.T) {
+func TestOSPlanSPIRERequiresReleaseSource(t *testing.T) {
 	if _, err := exec.LookPath("jq"); err != nil {
 		t.Skip("OS validation requires jq")
 	}
-	t.Chdir(filepath.Dir(filepath.Dir(demoScript(t, "nvke-os-local.sh"))))
-	exceptionRaw, err := runOSPlanQuery(t, nil, "nvke_spire_source_exception", "-n")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var exception struct {
-		Commit   string `json:"commit"`
-		TreeHash string `json:"treeHash"`
-	}
-	if err := json.Unmarshal(exceptionRaw, &exception); err != nil {
-		t.Fatal(err)
-	}
-	// Model the mixed-source diagnostic explicitly. Maintained catalog pins may
-	// all agree; this projection fixture is not an executable or admitted Plan.
-	primarySource := ir.Node{ID: "fetch-primary", Kind: ir.KindFetch, Repo: "https://github.com/dsx-ai-factory/nvke.git", Commit: strings.Repeat("b", 40), TreeHash: strings.Repeat("c", 40), Dest: "source-primary"}
-	retainedSource := primarySource
-	retainedSource.ID, retainedSource.Dest = "fetch-retained-spire", "source-retained-spire"
-	retainedSource.Commit, retainedSource.TreeHash = exception.Commit, exception.TreeHash
-	spire := catalog.Component{FromSource: true, Repo: retainedSource.Repo, Commit: exception.Commit, TreeHash: exception.TreeHash}
-	fixture := factory.Plan{Builds: []factory.BuildPlan{{
-		CatalogSnapshot: &catalog.Catalog{Components: map[string]catalog.Component{"nvke-spire-agent": spire}},
-		Graph: &ir.Graph{Nodes: []ir.Node{primarySource, retainedSource, {
-			ID: "build-spire", Kind: ir.KindBuild, Component: "nvke-spire-agent", Needs: []string{retainedSource.ID},
-			SourceDest: retainedSource.Dest, SourceCommit: exception.Commit, SourceTreeHash: exception.TreeHash,
-		}}},
-	}}}
-	raw, err := json.Marshal(fixture)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, scenario := range []string{"retained SPIRE", "changed commit", "changed tree", "another consumer", "another name", "missing source edge", "snapshot drift", "distinct retained fetch"} {
+	raw, _ := nvkeOSScriptPlan(t, "amd64")
+	for _, scenario := range []string{"release", "changed commit", "changed tree", "retired SPIRE exception"} {
 		t.Run(scenario, func(t *testing.T) {
 			var plan factory.Plan
 			if err := json.Unmarshal(raw, &plan); err != nil {
 				t.Fatal(err)
 			}
 			graph := plan.Builds[0].Graph
+			var destination string
+			for _, node := range graph.Nodes {
+				if node.Kind == ir.KindBuild && node.Component == "nvke-spire-agent" {
+					destination = node.SourceDest
+				}
+			}
 			var source *ir.Node
-			var consumer *ir.Node
-			var primary ir.Node
 			for i := range graph.Nodes {
 				node := &graph.Nodes[i]
-				if node.Kind == ir.KindFetch && node.Repo == "https://github.com/dsx-ai-factory/nvke.git" {
-					if node.Commit == exception.Commit {
-						source = node
-					} else {
-						primary = *node
-					}
-				}
-				if node.Kind == ir.KindBuild && node.Component == "nvke-spire-agent" {
-					consumer = node
+				if node.Kind == ir.KindFetch && destination != "" && node.Dest == destination {
+					source = node
 				}
 			}
-			if source == nil || consumer == nil || primary.Commit == "" {
-				t.Fatal("fixture omits the mixed-source producer closure")
+			if source == nil {
+				t.Fatal("fixture omits the SPIRE source edge")
+			}
+			pin, err := json.Marshal(map[string]string{"commit": source.Commit, "treeHash": source.TreeHash})
+			if err != nil {
+				t.Fatal(err)
 			}
 			switch scenario {
-			case "distinct retained fetch":
-				duplicate := *source
-				duplicate.ID += "-other"
-				duplicate.Dest += "-other"
-				graph.Nodes = append(graph.Nodes, duplicate)
 			case "changed commit":
 				source.Commit = strings.Repeat("a", 40)
 			case "changed tree":
 				source.TreeHash = strings.Repeat("a", 40)
-			case "another consumer":
-				other := *consumer
-				other.ID, other.Component = "build-other", "other"
-				graph.Nodes = append(graph.Nodes, other)
-			case "another name":
-				consumer.Component = "other"
-			case "missing source edge":
-				consumer.Needs = nil
-			case "snapshot drift":
-				component := plan.Builds[0].CatalogSnapshot.Components["nvke-spire-agent"]
-				component.Commit = primary.Commit
-				plan.Builds[0].CatalogSnapshot.Components["nvke-spire-agent"] = component
+			case "retired SPIRE exception":
+				source.Commit = "726f76944404e1106626b8333d3576bdf67b575b"
+				source.TreeHash = "3d6ea77f85d5da2648038425f805a598e23464ba"
 			}
 			changed, err := json.Marshal(plan)
 			if err != nil {
 				t.Fatal(err)
 			}
-			pin, err := json.Marshal(map[string]string{"commit": primary.Commit, "treeHash": primary.TreeHash})
-			if err != nil {
-				t.Fatal(err)
-			}
 			output, err := runOSPlanQuery(t, changed, "nvke_source_closure($pin)", "--argjson", "pin", string(pin))
-			if scenario == "retained SPIRE" {
+			if scenario == "release" {
 				if err != nil || strings.TrimSpace(string(output)) != "true" {
-					t.Fatalf("retained source exception rejected: %v: %s", err, output)
+					t.Fatalf("release source rejected: %v: %s", err, output)
 				}
 				return
 			}
 			var exit *exec.ExitError
 			if !errors.As(err, &exit) || exit.ExitCode() != 1 || strings.TrimSpace(string(output)) != "false" {
-				t.Fatalf("changed source exception not rejected: %v: %s", err, output)
+				t.Fatalf("source mismatch not rejected: %v: %s", err, output)
 			}
 		})
 	}
@@ -554,17 +508,8 @@ exec "$NVKR_AUTHORING_TEST_EXE" -test.run='^TestAuthoringLabCLIProcess$' -- "$@"
 					if !strings.Contains(build.Name, "ubuntu24") || agent == image || !strings.HasPrefix(agent, "docker.io/library/golang@sha256:") {
 						t.Fatalf("Ubuntu 24 selection lost its compatible agent toolchain: output=%s, agent=%s", build.Name, agent)
 					}
-					patch := "patches/capture-schema.patch"
-					sourcePatch, err := os.ReadFile(filepath.Join(repository, "inputs/catalogs/node-images/release", patch))
-					if err != nil {
-						t.Fatal(err)
-					}
-					frozenPatch, err := os.ReadFile(filepath.Join(root, ".nvkr/inputs/test-attempt/catalog", patch))
-					if err != nil {
-						t.Fatal(err)
-					}
-					if !bytes.Equal(sourcePatch, frozenPatch) {
-						t.Fatal("frozen catalog lost the exact source patch")
+					if len(build.CatalogSnapshot.Components[diskRoot].Patches) != 0 {
+						t.Fatal("frozen disk must preserve stock upstream source")
 					}
 					for _, name := range []string{"native-toolchains.yaml", "ubuntu24.json"} {
 						if _, err := os.Stat(filepath.Join(root, ".nvkr/inputs/test-attempt", name)); err != nil {

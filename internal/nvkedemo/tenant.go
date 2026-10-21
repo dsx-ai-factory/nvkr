@@ -525,7 +525,7 @@ func (t *tenant) run(ctx context.Context, budget time.Duration) (result error) {
 		return err
 	}
 	progress.update(time.Now(), "tenant-workload", nodes.Items)
-	raw, err = runTenantWorkload(ctx, t.session.Work, kubeconfig, filepath.Join(t.session.Tools, "kubectl"), t.capture)
+	raw, err = runTenantWorkload(ctx, t.session.Work, kubeconfig, filepath.Join(t.session.Tools, "kubectl"), WorkloadImage, t.capture)
 	if err != nil {
 		return err
 	}
@@ -612,7 +612,7 @@ type workload struct {
 	} `json:"spec"`
 }
 
-func workloadJob() workload {
+func workloadJob(image string) workload {
 	job := workload{APIVersion: "batch/v1", Kind: "Job"}
 	job.Metadata.Name = "nvkr-smoke"
 	job.Spec.Deadline = 180
@@ -621,7 +621,7 @@ func workloadJob() workload {
 		Name    string   `json:"name"`
 		Image   string   `json:"image"`
 		Command []string `json:"command"`
-	}{"smoke", WorkloadImage, []string{"sh", "-ec", "test $(uname -m) = aarch64; nslookup kubernetes.default.svc.cluster.local; echo NVKE_LOCAL_WORKLOAD_PASS"}})
+	}{"smoke", image, []string{"sh", "-ec", "test $(uname -m) = aarch64; nslookup kubernetes.default.svc.cluster.local; echo NVKE_LOCAL_WORKLOAD_PASS"}})
 	return job
 }
 

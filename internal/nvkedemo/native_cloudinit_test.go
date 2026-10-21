@@ -44,6 +44,7 @@ func TestNativeCloudInitBindsActualExecutionAndJoinsUIDCleanup(t *testing.T) {
 }
 
 func nativeCloudInitExecutionCases(t *testing.T, count int) {
+	image := "example.invalid/selected-workload@sha256:" + strings.Repeat("b", 64)
 	for _, mode := range []string{"accepted", "host failure", "recoverable error", "missing RRO", "restarted", "missing exit", "missing restarts", "wrong image", "Pod replaced", "node replaced", "node rebooted", "cluster replaced", "mutated command", "lifecycle", "startupProbe", "livenessProbe", "readinessProbe", "cleanup replacement", "cancel", "unjoined"} {
 		t.Run(mode, func(t *testing.T) {
 			root := privateTestDir(t)
@@ -166,7 +167,7 @@ func nativeCloudInitExecutionCases(t *testing.T, count int) {
 					if mode == "Pod replaced" {
 						pod["metadata"].(map[string]any)["uid"] = "new-pod-uid"
 					}
-					image, mount, restarts, exit, phase := WorkloadImage, "Enabled", 0, 0, "Succeeded"
+					image, mount, restarts, exit, phase := image, "Enabled", 0, 0, "Succeeded"
 					if mode == "wrong image" {
 						image = "sha256:other"
 					}
@@ -195,7 +196,7 @@ func nativeCloudInitExecutionCases(t *testing.T, count int) {
 				t.Fatalf("unexpected command: %s %v", phase, args)
 				return nil, nil
 			}
-			err := runNativeCloudInit(ctx, root, "tenant.config", "kubectl", "1.34.2", count, nodes, capture)
+			err := runNativeCloudInit(ctx, root, "tenant.config", "kubectl", "1.34.2", image, count, nodes, capture)
 			if (err == nil) != (mode == "accepted") {
 				t.Fatalf("observation result=%v", err)
 			}
@@ -259,7 +260,8 @@ func TestNativeCloudInitFixtureTool(t *testing.T) {
 		name := metadata["name"].(string)
 		metadata["uid"] = "fixture-" + name
 		if object["kind"] == "Pod" {
-			object["status"] = map[string]any{"phase": "Succeeded", "containerStatuses": []any{map[string]any{"name": "status", "imageID": WorkloadImage, "containerID": "containerd://fixture", "restartCount": 0, "state": map[string]any{"terminated": map[string]int{"exitCode": 0}}, "volumeMounts": []any{map[string]string{"name": "host", "mountPath": "/host", "recursiveReadOnly": "Enabled"}}}}}
+			image := object["spec"].(map[string]any)["containers"].([]any)[0].(map[string]any)["image"].(string)
+			object["status"] = map[string]any{"phase": "Succeeded", "containerStatuses": []any{map[string]any{"name": "status", "imageID": image, "containerID": "containerd://fixture", "restartCount": 0, "state": map[string]any{"terminated": map[string]int{"exitCode": 0}}, "volumeMounts": []any{map[string]string{"name": "host", "mountPath": "/host", "recursiveReadOnly": "Enabled"}}}}}
 			if err := privateJSON(filepath.Join(root, "cloud-init-tool-"+name+".json"), object); err != nil {
 				t.Fatal(err)
 			}

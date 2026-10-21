@@ -40,7 +40,7 @@ sources:
         spire-oidc-provider-nodeport: {type: manifest}
         capnico: {type: manifest}
         nktp: {type: helm, path: ../../nktp/deploy/charts/nktp}
-        controller: {type: helm, path: ../../controller/deploy/charts/controller}
+        controller: {type: helm, path: ../../controller/deploy/charts/controller, chartName: nvke-controller}
       members:
         postgresql: {artifact: postgresql-chart}
         spire: {artifact: spire-chart}

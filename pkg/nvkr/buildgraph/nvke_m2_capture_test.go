@@ -123,7 +123,7 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 				t.Fatal("SPIRE selection unexpectedly reintroduced DSX")
 			}
 			agent := cat.Components["nvke-agent"]
-			if agent.VersionStamp["BUILD_VERSION"] != catalog.StripTagPrefix(selectedSource.Tag) || !strings.Contains(strings.Join(agent.BuildCommand, "\n"), `VERSION="$BUILD_VERSION"`) {
+			if agent.VersionStamp["BUILD_VERSION"] != catalog.StripTagPrefix(selectedSource.Tag) || !strings.Contains(strings.Join(agent.BuildCommand, "\n"), `VERSION="${BUILD_VERSION:?}"`) {
 				t.Fatal("agent version must derive from the selected source tag")
 			}
 			selected, err := Resolve(cat, Selection{Components: output.Components, Platform: output.Platform, OutputFormat: output.Format})
@@ -174,9 +174,8 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 				if node.Packer == nil || node.Packer.AcquisitionArchive != want.variant+"/apt-acquisitions.tar" {
 					t.Fatal("capture carrier did not reach compiled graph")
 				}
-				if len(node.Patches) != 1 || node.Patches[0].Name != "patches/capture-schema.patch" ||
-					!strings.Contains(node.Patches[0].Content, `+SCHEMA = "nvkr.dev/package-acquisitions/v1"`) {
-					t.Fatal("capture producer must use the same schema as its consumer through an authenticated source patch")
+				if len(node.Patches) != 0 {
+					t.Fatal("capture producer must preserve stock source; the acquisition owner accepts its original schema")
 				}
 				if node.ArtifactPath != want.variant+"/nvke-node.qcow2" || node.Disk == nil || node.Disk.Encryption != want.encryption ||
 					node.Packer.BuildName != "nvke-node-"+want.variant+".qemu.nvke-"+want.variant {

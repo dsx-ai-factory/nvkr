@@ -296,7 +296,7 @@ func TestNVKEUbuntu24AgentRejectsUnsupportedLibcBeforeWork(t *testing.T) {
 	for _, phase := range []struct {
 		name, firstTool string
 		command         []string
-	}{{"acquisition", "sha256sum", agent.VendorCommand}, {"build", "make", agent.BuildCommand}} {
+	}{{"acquisition", "mkdir", agent.VendorCommand}, {"build", "make", agent.BuildCommand}} {
 		for _, tc := range []struct {
 			name, libc string
 			missing    bool
@@ -322,6 +322,9 @@ func TestNVKEUbuntu24AgentRejectsUnsupportedLibcBeforeWork(t *testing.T) {
 					if err := os.WriteFile(filepath.Join(bin, "getconf"), []byte("#!/bin/sh\nprintf '%s\\n' \"$NVKR_TEST_LIBC\"\n"), 0700); err != nil {
 						t.Fatal(err)
 					}
+				}
+				if err := os.WriteFile(filepath.Join(bin, "uname"), []byte("#!/bin/sh\nprintf x86_64\n"), 0700); err != nil {
+					t.Fatal(err)
 				}
 				marker := filepath.Join(root, "work-started")
 				if err := os.WriteFile(filepath.Join(bin, phase.firstTool), []byte("#!/bin/sh\nprintf 'work started\\n' > \"$NVKR_TEST_MARKER\"\nexit 73\n"), 0700); err != nil {

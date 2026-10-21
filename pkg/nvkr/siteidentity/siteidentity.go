@@ -1,20 +1,16 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-// Package siteidentity owns the fixed NVKE site-host identity probe and retarget operation.
+// Package siteidentity owns the NVKE site-host identity probe and source-owned retarget RPC.
 // Its descriptive Result does not authorize bootstrap removal or release claims.
 package siteidentity
 
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	_ "embed"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/netip"
 	"runtime"
@@ -36,27 +32,21 @@ import (
 	"google.golang.org/grpc/peer"
 )
 
-//go:embed handoff.sh
-var handoffScript string
-
 // Request describes selected runtime inputs. The caller must authenticate their
 // artifact, source and Pod membership before invoking this operation.
 type Request struct {
-	SchemaVersion        string `json:"schemaVersion"`
-	Operation            string `json:"operation"`
-	Endpoint             string `json:"endpoint"`
-	ExpectedPeer         string `json:"expectedPeer"`
-	ExpectedCaller       string `json:"expectedCaller"`
-	WorkloadAPI          string `json:"workloadAPI"`
-	TrustDomain          string `json:"trustDomain"`
-	ServerAddress        string `json:"serverAddress"`
-	ServerPort           uint16 `json:"serverPort"`
-	OldEnvironmentSHA256 string `json:"oldEnvironmentSHA256"`
-	RendererSHA256       string `json:"rendererSHA256"`
-	TrustBundleSHA256    string `json:"trustBundleSHA256"`
-	TLSJWTEnabled        bool   `json:"tlsJWTEnabled"`
-	ExternalMTLSEnabled  bool   `json:"externalMTLSEnabled"`
-	BudgetSeconds        int    `json:"budgetSeconds"`
+	SchemaVersion       string `json:"schemaVersion"`
+	Operation           string `json:"operation"`
+	Endpoint            string `json:"endpoint"`
+	ExpectedPeer        string `json:"expectedPeer"`
+	ExpectedCaller      string `json:"expectedCaller"`
+	WorkloadAPI         string `json:"workloadAPI"`
+	TrustDomain         string `json:"trustDomain"`
+	ServerAddress       string `json:"serverAddress"`
+	ServerPort          uint16 `json:"serverPort"`
+	TLSJWTEnabled       bool   `json:"tlsJWTEnabled"`
+	ExternalMTLSEnabled bool   `json:"externalMTLSEnabled"`
+	BudgetSeconds       int    `json:"budgetSeconds"`
 }
 
 // PeerProof contains certificate metadata from an authenticated exact-peer RPC.
@@ -69,13 +59,14 @@ type PeerProof struct {
 	BootID    string    `json:"bootID"`
 }
 
-// ScriptResult is the fixed operation's private metadata, not a bootstrap receipt.
-type ScriptResult struct {
-	Outcome           string `json:"outcome"`
-	EnvironmentSHA256 string `json:"environmentSHA256"`
-	NodeAgentPID      int    `json:"nodeAgentPID"`
-	TPMPluginSHA256   string `json:"tpmPluginSHA256"`
-	PrivateLog        string `json:"privateLog"`
+// AgentStatus projects the source-owned status RPC; it is not a bootstrap receipt.
+type AgentStatus struct {
+	ServerAddress string `json:"serverAddress"`
+	ServerPort    uint32 `json:"serverPort"`
+	ConfigApplied bool   `json:"configApplied"`
+	HasValidSVID  bool   `json:"hasValidSVID"`
+	SPIFFEID      string `json:"spiffeID"`
+	ExpiresAt     int64  `json:"expiresAt"`
 }
 
 // Completion describes the remote mutation's observed lifecycle. It must be
@@ -95,32 +86,24 @@ var ErrRemoteCompletionUnknown = errors.New("remote operation completion is unkn
 
 const SchemaVersion = "nvkr.dev/native-site-identity/v1"
 
-// Manager/client termination alone cannot prove the systemd job has completed.
-const unknownCompletionSentinel = "NVKR_SITE_IDENTITY_REMOTE_COMPLETION_UNKNOWN"
-
 // Result is descriptive operational evidence only. Permanent SPIRE policy,
 // registration, TPM identity and artifact membership remain the native owner's job.
 type Result struct {
-	SchemaVersion string        `json:"schemaVersion"`
-	Completion    Completion    `json:"completion"`
-	FailureCode   e.Code        `json:"failureCode,omitempty"`
-	Operation     string        `json:"operation"`
-	CallerID      string        `json:"callerID"`
-	Before        PeerProof     `json:"before"`
-	Script        *ScriptResult `json:"script,omitempty"`
-	After         *PeerProof    `json:"after,omitempty"`
+	SchemaVersion   string       `json:"schemaVersion"`
+	Completion      Completion   `json:"completion"`
+	FailureCode     e.Code       `json:"failureCode,omitempty"`
+	Operation       string       `json:"operation"`
+	CallerID        string       `json:"callerID"`
+	Before          PeerProof    `json:"before"`
+	Reconfiguration string       `json:"reconfiguration,omitempty"`
+	Status          *AgentStatus `json:"status,omitempty"`
+	After           *PeerProof   `json:"after,omitempty"`
 }
 
 type agentIdentity interface {
 	x509svid.Source
 	x509bundle.Source
 }
-
-func environment(r Request) string {
-	return fmt.Sprintf("SPIRE_SERVER_ADDRESS=%s\nSPIRE_SERVER_PORT=%d\nSPIRE_TRUST_DOMAIN=%s\n", r.ServerAddress, r.ServerPort, r.TrustDomain)
-}
-
-func hash(raw string) string { sum := sha256.Sum256([]byte(raw)); return hex.EncodeToString(sum[:]) }
 
 func validate(r Request) error {
 	if r.SchemaVersion != SchemaVersion {
@@ -172,14 +155,8 @@ func validate(r Request) error {
 	if r.Operation == "probe" {
 		return nil
 	}
-	if r.BudgetSeconds < 180 || r.ServerAddress != host || r.ServerPort == 0 {
-		return errors.New("handoff requires its site address, observed SPIRE port and at least 180 seconds")
-	}
-	for _, s := range []string{r.OldEnvironmentSHA256, r.RendererSHA256, r.TrustBundleSHA256} {
-		b, err := hex.DecodeString(s)
-		if err != nil || len(b) != sha256.Size || hex.EncodeToString(b) != s {
-			return errors.New("handoff requires canonical checked SHA-256 byte digests")
-		}
+	if r.BudgetSeconds < 240 || r.ServerAddress != host || r.ServerPort == 0 {
+		return errors.New("handoff requires its site address, observed SPIRE port and at least 240 seconds")
 	}
 	return nil
 }
@@ -221,7 +198,7 @@ func dial(r Request, source agentIdentity) (*grpc.ClientConn, error) {
 	return grpc.NewClient("passthrough:///"+r.Endpoint, grpc.WithTransportCredentials(credentials.NewTLS(tls)), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(64<<10)))
 }
 
-// Run performs only authenticated probe/execute/probe. A returned result cannot
+// Run performs only authenticated probe/reconfigure/status/probe. A result cannot
 // restore authority or replace the caller's full permanent-server identity proof.
 func Run(ctx context.Context, r Request) (ret Result, resultErr error) {
 	ret, resultErr = run(ctx, r)
@@ -283,16 +260,18 @@ func run(ctx context.Context, r Request) (ret Result, resultErr error) {
 	if err := ctx.Err(); err != nil {
 		return ret, err
 	}
-	if deadline, ok := ctx.Deadline(); !ok || time.Until(deadline) < 150*time.Second {
-		return ret, errors.New("insufficient budget to dispatch and join the fixed operation")
+	if deadline, ok := ctx.Deadline(); !ok || time.Until(deadline) < 225*time.Second {
+		return ret, errors.New("insufficient budget to dispatch and join source-owned reconfiguration")
 	}
 	conn, err := dial(r, source)
 	if err != nil {
 		return ret, err
 	}
 	dispatchedAt := time.Now()
-	completion, resp, rpcErr := executeFixed(ctx, r, pb.NewNodeAgentClient(conn).ExecuteScript, 135*time.Second)
+	client := pb.NewNodeAgentClient(conn)
+	completion, outcome, rpcErr := reconfigure(ctx, r, client.ReconfigureSpireAgent, 210*time.Second)
 	ret.Completion = completion
+	ret.Reconfiguration = outcome
 	closeErr := conn.Close()
 	if rpcErr != nil {
 		return ret, errors.Join(rpcErr, closeErr)
@@ -300,20 +279,6 @@ func run(ctx context.Context, r Request) (ret Result, resultErr error) {
 	if closeErr != nil {
 		return ret, e.Wrap(e.CodePreflightFailed, closeErr, "close identity RPC")
 	}
-	var applied ScriptResult
-	dec := json.NewDecoder(strings.NewReader(resp.GetOutput()))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&applied); err != nil {
-		return ret, errors.New("fixed renderer did not return its bounded metadata receipt")
-	}
-	var extra any
-	if err := dec.Decode(&extra); err != io.EOF {
-		return ret, errors.New("renderer receipt has trailing content")
-	}
-	if applied.EnvironmentSHA256 != hash(environment(r)) || applied.NodeAgentPID < 1 || (applied.Outcome != "applied" && applied.Outcome != "reapplied") {
-		return ret, errors.New("renderer receipt does not match the reviewed environment")
-	}
-	ret.Script = &applied
 	if err := ctx.Err(); err != nil {
 		return ret, err
 	}
@@ -321,8 +286,11 @@ func run(ctx context.Context, r Request) (ret Result, resultErr error) {
 	for ctx.Err() == nil {
 		attempt, stop := context.WithTimeout(ctx, 5*time.Second)
 		after, err := probeAgent(attempt, r, source)
+		if err == nil {
+			ret.Status, err = observedStatus(attempt, r, source)
+		}
 		stop()
-		if err == nil && freshProof(ret.Before, after, dispatchedAt, time.Now()) {
+		if err == nil && FreshPeerProof(ret.Before, after, dispatchedAt, time.Now()) {
 			ret.After = &after
 			ret.Completion = JoinedSuccess
 			return ret, nil
@@ -341,11 +309,13 @@ func run(ctx context.Context, r Request) (ret Result, resultErr error) {
 	return ret, errors.Join(ctx.Err(), lastErr)
 }
 
-// The selected renderer/agent may backdate a newly issued certificate slightly.
+// FreshPeerProof checks descriptive peer metadata, not endpoint authentication
+// or artifact authority. Each caller must authenticate and bind those observations.
+// The selected SPIRE agent may backdate a newly issued certificate slightly.
 // Accept at most one minute of issuance skew, and require another minute of
 // validity at observation. Neither a changed serial nor old valid bytes suffice.
-func freshProof(before, after PeerProof, dispatchedAt, observedAt time.Time) bool {
-	return before.BootID != "" && after.BootID == before.BootID && after.PeerID == before.PeerID && after.Serial != "" && after.Serial != before.Serial &&
+func FreshPeerProof(before, after PeerProof, dispatchedAt, observedAt time.Time) bool {
+	return before.PeerID != "" && before.Serial != "" && before.BootID != "" && after.BootID == before.BootID && after.PeerID == before.PeerID && after.Serial != "" && after.Serial != before.Serial &&
 		!after.NotBefore.IsZero() && !after.NotAfter.IsZero() && !after.NotBefore.Before(dispatchedAt.Add(-time.Minute)) && !after.NotBefore.After(observedAt) && after.NotAfter.After(observedAt.Add(time.Minute))
 }
 
@@ -392,44 +362,53 @@ func DecodeRequest(ctx context.Context, raw []byte) (Request, error) {
 	return r, nil
 }
 
-// executeFixed never returns parent cancellation as proof of remote termination.
-// The selected synchronous upstream server ignores RPC cancellation. Its embedded
-// script bounds itself to110+5s; the concrete client remains owned for135s.
-func executeFixed(ctx context.Context, r Request, call func(context.Context, *pb.ExecuteScriptRequest, ...grpc.CallOption) (*pb.ExecuteScriptResponse, error), drain time.Duration) (completion Completion, response *pb.ExecuteScriptResponse, resultErr error) {
+// reconfigure delegates mutation to NVKE. Its systemd runner may outlive an RPC
+// deadline, so only applied/unchanged replies establish remote completion. A
+// failed outcome does not distinguish a queued systemd job from a joined failure.
+func reconfigure(ctx context.Context, r Request, call func(context.Context, *pb.ReconfigureSpireAgentRequest, ...grpc.CallOption) (*pb.ReconfigureSpireAgentResponse, error), drain time.Duration) (completion Completion, outcome string, resultErr error) {
 	defer func() {
 		if recover() != nil {
 			completion = Unknown
-			response = nil
+			outcome = ""
 			resultErr = e.Wrap(e.CodePreflightFailed, ErrRemoteCompletionUnknown, "remote client panicked after dispatch admission")
 		}
 	}()
 	if err := ctx.Err(); err != nil {
-		return NotStarted, nil, e.Wrap(e.CodeTimeout, err, "site identity canceled before dispatch")
+		return NotStarted, "", e.Wrap(e.CodeTimeout, err, "site identity canceled before dispatch")
 	}
 	critical, stop := context.WithTimeout(context.WithoutCancel(ctx), drain)
 	defer stop()
-	resp, err := call(critical, &pb.ExecuteScriptRequest{ScriptName: "nvkr-native-site-spire-handoff", ScriptContents: handoffScript, Async: false, Args: []string{r.ServerAddress, strconv.Itoa(int(r.ServerPort)), r.TrustDomain, r.OldEnvironmentSHA256, hash(environment(r)), r.RendererSHA256, r.TrustBundleSHA256}})
+	resp, err := call(critical, &pb.ReconfigureSpireAgentRequest{ServerAddress: r.ServerAddress, ServerPort: uint32(r.ServerPort)})
 	if err != nil {
-		return Unknown, nil, e.Wrap(e.CodePreflightFailed, errors.Join(ErrRemoteCompletionUnknown, critical.Err()), "remote completion unconfirmed; retain dependencies")
+		return Unknown, "", e.Wrap(e.CodePreflightFailed, errors.Join(ErrRemoteCompletionUnknown, critical.Err()), "remote completion unconfirmed; retain dependencies")
 	}
-	if resp == nil || (resp.GetStatus() != "success" && resp.GetStatus() != "error") {
-		return Unknown, nil, e.Wrap(e.CodeVerifyFailed, ErrRemoteCompletionUnknown, "unrecognized remote completion")
+	if resp == nil || resp.GetErrorMessage() != "" {
+		return Unknown, "", e.Wrap(e.CodeVerifyFailed, ErrRemoteCompletionUnknown, "remote reconfiguration completion unconfirmed; retain dependencies")
 	}
-	// The fixed shell marks both renderer/restart client failures as unknown:
-	// systemd's manager can still own work after a bounded client has exited.
-	exit := resp.GetExitCode()
-	if strings.Contains(resp.GetOutput(), unknownCompletionSentinel) || exit < 0 || exit >= 124 ||
-		(resp.GetStatus() == "error" && (exit == 0 || resp.GetErrorMessage() == "")) ||
-		(resp.GetStatus() == "success" && (exit != 0 || resp.GetErrorMessage() != "")) {
-		return Unknown, nil, e.Wrap(e.CodeVerifyFailed, ErrRemoteCompletionUnknown, "manager or remote completion unconfirmed; retain dependencies")
+	switch resp.GetOutcome() {
+	case pb.ReconfigureSpireAgentResponse_OUTCOME_APPLIED:
+		return JoinedFailure, "applied", nil
+	case pb.ReconfigureSpireAgentResponse_OUTCOME_UNCHANGED:
+		return JoinedFailure, "unchanged", nil
+	default:
+		return Unknown, "", e.Wrap(e.CodeVerifyFailed, ErrRemoteCompletionUnknown, "remote reconfiguration completion unconfirmed; retain dependencies")
 	}
-	// Exact selected upstream success contract: synchronous return after Runner,
-	// status=success, exitCode=0 and no ErrorMessage. Other positive failures occur
-	// before manager dispatch or after successful manager calls/local checks.
-	if resp.GetStatus() == "error" {
-		return JoinedFailure, resp, e.New(e.CodePreflightFailed, "fixed site identity operation failed after remote join")
+}
+
+func observedStatus(ctx context.Context, r Request, source agentIdentity) (_ *AgentStatus, resultErr error) {
+	conn, err := dial(r, source)
+	if err != nil {
+		return nil, err
 	}
-	return JoinedFailure, resp, nil // full helper success still requires fresh peer proof
+	defer func() { resultErr = errors.Join(resultErr, conn.Close()) }()
+	status, err := pb.NewNodeAgentClient(conn).GetSpireAgentStatus(ctx, &pb.GetSpireAgentStatusRequest{})
+	if err != nil {
+		return nil, err
+	}
+	if status == nil || status.GetServerAddress() != r.ServerAddress || status.GetServerPort() != uint32(r.ServerPort) || !status.GetConfigApplied() || !status.GetHasValidSvid() || status.GetSvidSpiffeId() != r.ExpectedPeer || status.GetSvidExpiresAtUnixSeconds() <= time.Now().Add(time.Minute).Unix() {
+		return nil, errors.New("source-owned SPIRE status does not confirm the admitted permanent endpoint and host identity")
+	}
+	return &AgentStatus{ServerAddress: status.GetServerAddress(), ServerPort: status.GetServerPort(), ConfigApplied: status.GetConfigApplied(), HasValidSVID: status.GetHasValidSvid(), SPIFFEID: status.GetSvidSpiffeId(), ExpiresAt: status.GetSvidExpiresAtUnixSeconds()}, nil
 }
 
 func admitRuntime(ctx context.Context) error {

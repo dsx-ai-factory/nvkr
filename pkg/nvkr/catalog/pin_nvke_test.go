@@ -191,25 +191,6 @@ func TestNVKEPinSetRejectsInvalidBetaLocalChartMetadata(t *testing.T) {
 	}
 }
 
-func TestNVKEPinSetLocalChartAllowsDisplayAlias(t *testing.T) {
-	for _, tc := range []struct {
-		name, chart, oldName, actualName string
-	}{
-		{"controller rename", "controller/deploy/charts/controller/Chart.yaml", "nke-controller", "nvke-controller"},
-		{"independent local chart", "nktp/deploy/charts/nktp/Chart.yaml", "nktp", "telemetry-chart"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			reg, tree := nvkeBetaPinFixture(t)
-			replaceNVKEFixture(t, tree, tc.chart, "name: "+tc.oldName, "name: "+tc.actualName)
-			versions, err := deriveNVKEPinSet(t.Context(), tree, reg, "nvke")
-			want := map[string]string{"spire": "0.30.1", "spire-crds": "0.6.1", "temporal": "0.74.0", "postgresql": "18.5.15"}
-			if err != nil || !reflect.DeepEqual(versions, want) || len(tree.reads) != len(tree.files) {
-				t.Fatalf("local display alias changed external pins or source closure: versions=%v reads=%d error=%v", versions, len(tree.reads), err)
-			}
-		})
-	}
-}
-
 func TestNVKEPinSetAllowsReviewedSourceMember(t *testing.T) {
 	reg, tree := nvkePinFixture(t)
 	set := reg.Sources["nvke"].PinSet
@@ -439,5 +420,39 @@ func TestPinSetDerivationPreservesOperationalErrors(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestNVKEPinSetLocalChartMetadata(t *testing.T) {
+	const releaseFile = "controller/deploy/nke-sbom/controller/release.yaml"
+	const chartFile = "controller/deploy/charts/controller/Chart.yaml"
+	for _, tc := range []struct {
+		name, version, chartName, reviewedName string
+		valid                                  bool
+	}{
+		{"source version", "0.0.0", "nke-controller", "", true},
+		{"reviewed rename", "0.0.0", "nvke-controller", "nvke-controller", true},
+		{"unreviewed rename", "0.0.0", "nvke-controller", "", false},
+		{"wrong reviewed name", "0.0.0", "other-controller", "nvke-controller", false},
+		{"invalid version", "latest", "nke-controller", "", false},
+		{"range version", "1.x", "nke-controller", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			reg, tree := nvkePinFixture(t)
+			replaceNVKEFixture(t, tree, releaseFile, "  version: \"0.0.0\"\n", "")
+			replaceNVKEFixture(t, tree, releaseFile, "chart:\n", "chart:\n  artifact: controller-chart\n  imageArtifact: cwe\n  profilesArtifact: controller-profiles\n")
+			tree.files[chartFile] = []byte("name: " + tc.chartName + "\nversion: \"" + tc.version + "\"\n")
+			item := reg.Sources["nvke"].PinSet.Accounted["controller"]
+			item.ChartName = tc.reviewedName
+			reg.Sources["nvke"].PinSet.Accounted["controller"] = item
+			versions, err := deriveNVKEPinSet(t.Context(), tree, reg, "nvke")
+			if !tc.valid {
+				assertCatalogContractCode(t, err, e.CodeInvalidCatalog)
+				return
+			}
+			if err != nil || versions["spire"] != "0.30.1" {
+				t.Fatalf("versions=%v error=%v", versions, err)
+			}
+		})
 	}
 }

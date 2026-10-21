@@ -22,6 +22,12 @@ a capability error; it does not fall back to a later installation or install hos
 
 Use the existing CLI to change pins. QEMU, firmware, ISO utilities and host privileges are prerequisites; these tool bundles do not install them. See the [operational guide](../../../../docs/local-nvke-demo.md#native-linux-and-mac-path) and its runtime evidence limits.
 
+`nvkr-site-identity` is an exact commit self-pin to this repository. `catalog bump`
+rejects commit-mode pins; update it explicitly with `catalog pin --commit` after
+the helper changes. Preserve the pinned commit when updating a PR branch. After a
+squash merge, re-pin it to that commit on `main` in a follow-up change so the helper
+has canonical-main provenance. A PR-branch self-pin does not establish that provenance.
+
 Packer 1.15.4 and its QEMU plugin 1.1.6 have separate Darwin and Linux ARM64 acquisitions in this same catalog, using the versions already selected by the Packer toolchain lock. Their ZIP carriers and selected executable bytes have independent CLI-managed pins. These acquisitions do not by themselves admit native Mac image execution or establish a successful QCOW build. They do not install tools globally or publish artifacts.
 
 The same pinned `nerdctl` source producer supports Darwin ARM64 and Linux ARM64. Both host tool bundles

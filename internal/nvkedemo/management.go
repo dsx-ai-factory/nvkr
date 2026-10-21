@@ -28,7 +28,7 @@ import (
 const managementBundle = "installer-tools-arm64"
 const kindConfigPath = "controller/hack/controller-capi-kind.yaml"
 const kindConfigHash = "835a53f6c852ddd71d2f26614131985383a5aa4deb7acf62e68435c328fa71f0"
-const toolVersionsHash = "a47d8c38e6812bc3da6f8cf45953c25b365e5b2712669678b53c46798f441420"
+const toolVersionsHash = "f0ed2914ec0f024af9b51fda51710446ebd486a8f4f61dd5c6ff94ae3f9d2793"
 const kindNodeImage = "kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
 const kindNodeID = "sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
 const socketMount = "  extraMounts:\n    - hostPath: /var/run/docker.sock\n      containerPath: /var/run/docker.sock\n"
@@ -197,29 +197,38 @@ func regularTree(root string) error {
 	})
 }
 
-func diagnosticIndexMatches(layout, digest string) error {
+func diagnosticIndexMatches(ctx context.Context, layout, digest string) error {
+	_, err := diagnosticIndexDigest(ctx, layout, digest)
+	return err
+}
+
+// Bind the exact admitted carrier index as well as its Run-selected child.
+func diagnosticIndexDigest(ctx context.Context, layout, digest string) (string, error) {
+	if err := requireContext(ctx); err != nil {
+		return "", err
+	}
 	parent, err := os.Lstat(filepath.Dir(layout))
 	if err != nil {
-		return err
+		return "", err
 	}
 	if !parent.IsDir() || parent.Mode()&os.ModeSymlink != 0 {
-		return errors.New("producer parent is not a regular directory")
+		return "", errors.New("producer parent is not a regular directory")
 	}
 	if err := regularTree(layout); err != nil {
-		return err
+		return "", err
 	}
 	raw, err := boundedRegularRead(filepath.Join(layout, "index.json"), diagnosticLimit)
 	if err != nil {
-		return err
+		return "", err
 	}
 	var index v1.IndexManifest
 	if err = json.Unmarshal(raw, &index); err != nil {
-		return err
+		return "", err
 	}
 	if len(index.Manifests) != 1 || index.Manifests[0].Digest.String() != digest {
-		return errors.New("selected layout differs from completed Run manifest")
+		return "", errors.New("selected layout differs from completed Run manifest")
 	}
-	return nil
+	return "sha256:" + plainSHA(raw), nil
 }
 
 func captureJSON[T any](ctx context.Context, runner Runner, args []string, phase string) (T, error) {
@@ -333,7 +342,7 @@ func admitManagement(ctx context.Context, cfg Config) (managementAdmission, erro
 		return admitted, err
 	}
 	layout := filepath.Join(root, "packages", managementBundle)
-	if err = diagnosticIndexMatches(layout, observation.Digest); err != nil {
+	if err = diagnosticIndexMatches(ctx, layout, observation.Digest); err != nil {
 		return admitted, err
 	}
 	type dockerInfo struct {

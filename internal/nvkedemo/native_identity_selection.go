@@ -16,7 +16,6 @@ import (
 )
 
 const nativeIdentityHelper = "nvkr-site-identity-helper"
-const nativeSpireRendererSource = "nvke-spire-configure-source"
 
 // Only this owner authenticates the captured source inputs against the completed
 // Run. The caller's paths and an on-disk plan alone do not select a producer.
@@ -64,7 +63,7 @@ func nativeSelectedRunPlan(ctx context.Context, root, outputName, format string)
 
 // This value is private and issued only from the recompiled tool/image selections.
 // Its hashes bind extracted bytes, not a new release or build identity.
-type nativeIdentityAssets struct{ helperSHA, rendererSHA string }
+type nativeIdentityAssets struct{ helperSHA string }
 
 func nativeIdentityComponent(plan *factory.Plan, output, buildDigest, component string) (catalog.Component, error) {
 	var selected *catalog.Component
@@ -93,19 +92,12 @@ func nativeIdentityComponent(plan *factory.Plan, output, buildDigest, component 
 }
 
 func nativeIdentitySources(tools, disk *factory.Plan, toolDigest, diskDigest, diskOutput string) error {
-	renderer, err := nativeIdentityComponent(tools, "site-startup-tools-arm64", toolDigest, nativeSpireRendererSource)
-	if err != nil {
-		return err
-	}
 	if _, err := nativeIdentityComponent(tools, "site-startup-tools-arm64", toolDigest, nativeIdentityHelper); err != nil {
 		return err
 	}
-	spire, err := nativeIdentityComponent(disk, diskOutput, diskDigest, "nvke-spire-agent")
+	_, err := nativeIdentityComponent(disk, diskOutput, diskDigest, "nvke-spire-agent")
 	if err != nil {
 		return err
-	}
-	if renderer.Repo != spire.Repo || renderer.Commit != spire.Commit || renderer.TreeHash != spire.TreeHash {
-		return errors.New("site renderer source differs from the node image SPIRE package source")
 	}
 	return nil
 }
@@ -133,17 +125,13 @@ func prepareNativeIdentityAssets(ctx context.Context, cfg NativeAssetConfig, ass
 	if err := nativeIdentitySources(tools, disk, toolOutput.BuildDigest, diskArtifact.BuildDigest, diskOutput); err != nil {
 		return err
 	}
-	if err := verifyToolMembers(assets.SiteTools, []string{"nerdctl", nativeSpireRendererSource, nativeIdentityHelper}); err != nil {
+	if err := verifyToolMembers(assets.SiteTools, []string{"nerdctl", nativeIdentityHelper}); err != nil {
 		return err
 	}
 	helper, err := DigestFile(ctx, filepath.Join(assets.SiteTools, nativeIdentityHelper))
 	if err != nil {
 		return err
 	}
-	renderer, err := DigestFile(ctx, filepath.Join(assets.SiteTools, nativeSpireRendererSource))
-	if err != nil {
-		return err
-	}
-	assets.identity = &nativeIdentityAssets{helperSHA: helper, rendererSHA: renderer}
+	assets.identity = &nativeIdentityAssets{helperSHA: helper}
 	return nil
 }

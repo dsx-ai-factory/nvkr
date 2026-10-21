@@ -93,11 +93,11 @@ func nativeCloudInitStatus(raw []byte) error {
 // retries failed systemctl queries indefinitely in wait mode. A read-only chroot
 // cannot promise access to the host systemd bus. The actual command must still
 // exit zero and report clean completion; running or degraded status is rejected.
-func nativeCloudInitPodManifest(namespace, name, node string) map[string]any {
+func nativeCloudInitPodManifest(namespace, name, node, image string) map[string]any {
 	return map[string]any{"apiVersion": "v1", "kind": "Pod", "metadata": map[string]string{"namespace": namespace, "name": name},
 		"spec": map[string]any{"nodeName": node, "restartPolicy": "Never", "activeDeadlineSeconds": 180,
 			"automountServiceAccountToken": false,
-			"containers": []any{map[string]any{"name": "status", "image": WorkloadImage, "imagePullPolicy": "Never",
+			"containers": []any{map[string]any{"name": "status", "image": image, "imagePullPolicy": "Never",
 				"command": []string{"/bin/busybox", "chroot", "/host", "/usr/bin/env", "SYSTEMD_IGNORE_CHROOT=1", "PYTHONDONTWRITEBYTECODE=1", "/usr/bin/cloud-init", "status", "--format=json"},
 				"securityContext": map[string]any{"runAsUser": 0, "allowPrivilegeEscalation": false, "readOnlyRootFilesystem": true,
 					"capabilities": map[string]any{"drop": []string{"ALL"}, "add": []string{"SYS_CHROOT"}}, "seccompProfile": map[string]string{"type": "RuntimeDefault"}},
@@ -108,9 +108,12 @@ func nativeCloudInitPodManifest(namespace, name, node string) map[string]any {
 // runNativeCloudInit observes the installed host command on each exact fresh
 // node. The Pods have no API token, network need, host namespaces or writeable
 // host mount. Their CLI output is diagnostic evidence, never release authority.
-func runNativeCloudInit(ctx context.Context, work, kubeconfig, kubectl, kubernetes string, expectedCount int, expected []tenantNode,
+func runNativeCloudInit(ctx context.Context, work, kubeconfig, kubectl, kubernetes, image string, expectedCount int, expected []tenantNode,
 	capture func(context.Context, []string, string, time.Duration) ([]byte, error)) (result error) {
 	if err := requireContext(ctx); err != nil {
+		return err
+	}
+	if _, err := workloadImageDigest(image); err != nil {
 		return err
 	}
 	ready, err := readyNativeTenantNodes(expected, kubernetes, expectedCount)
@@ -208,7 +211,7 @@ func runNativeCloudInit(ctx context.Context, work, kubeconfig, kubectl, kubernet
 	}()
 	for i, node := range nodes {
 		name := fmt.Sprintf("status-%d", i)
-		if err := nativeCloudInitProbe(ctx, work, namespace, name, node.Name, get); err != nil {
+		if err := nativeCloudInitProbe(ctx, work, namespace, name, node.Name, image, get); err != nil {
 			return err
 		}
 	}
@@ -219,9 +222,9 @@ func runNativeCloudInit(ctx context.Context, work, kubeconfig, kubectl, kubernet
 	return nil
 }
 
-func nativeCloudInitProbe(ctx context.Context, work, namespace, name, node string,
+func nativeCloudInitProbe(ctx context.Context, work, namespace, name, node, image string,
 	get func(context.Context, string, ...string) ([]byte, error)) (result error) {
-	manifest := nativeCloudInitPodManifest(namespace, name, node)
+	manifest := nativeCloudInitPodManifest(namespace, name, node, image)
 	path := filepath.Join(work, "cloud-init-"+name+".json")
 	if err := privateJSON(path, manifest); err != nil {
 		return err
@@ -293,7 +296,7 @@ func nativeCloudInitProbe(ctx context.Context, work, namespace, name, node strin
 	}
 	container := observed.Status.Containers[0]
 	if container.Name != "status" || container.RestartCount == nil || *container.RestartCount != 0 || container.State.Terminated == nil || container.State.Terminated.ExitCode == nil || *container.State.Terminated.ExitCode != 0 || !strings.HasPrefix(container.ContainerID, "containerd://") ||
-		strings.Split(container.ImageID, "@")[len(strings.Split(container.ImageID, "@"))-1] != strings.Split(WorkloadImage, "@")[1] || len(container.VolumeMounts) != 1 || container.VolumeMounts[0].Name != "host" || container.VolumeMounts[0].MountPath != "/host" || container.VolumeMounts[0].RecursiveReadOnly != "Enabled" {
+		strings.Split(container.ImageID, "@")[len(strings.Split(container.ImageID, "@"))-1] != strings.Split(image, "@")[1] || len(container.VolumeMounts) != 1 || container.VolumeMounts[0].Name != "host" || container.VolumeMounts[0].MountPath != "/host" || container.VolumeMounts[0].RecursiveReadOnly != "Enabled" {
 		return errors.New("cloud-init command lacks exact image, zero-retry exit or recursive read-only mount evidence")
 	}
 	raw, err = get(ctx, name+"-after-stdout", "get", "pod", name, "-n", namespace, "-o", "json")

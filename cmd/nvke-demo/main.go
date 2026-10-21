@@ -12,10 +12,12 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/nvkedemo"
+	"github.com/dsx-ai-factory/nvkr/internal/qemutpm"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/spf13/cobra"
 )
@@ -23,7 +25,12 @@ import (
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	defer cancel()
-	err := execute(ctx, launcherArguments(os.Args[0], os.Args[1:]), os.Stdout, os.Stderr)
+	var err error
+	if filepath.Base(os.Args[0]) == qemutpm.LauncherName {
+		err = qemutpm.Run(ctx, os.Args[1:])
+	} else {
+		err = execute(ctx, os.Args[1:], os.Stdout, os.Stderr)
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
@@ -36,7 +43,7 @@ func execute(ctx context.Context, args []string, out, diagnostics io.Writer) err
 			return nvkedemo.AdmitDemoDeployment(ctx, cfg)
 		},
 		build: nvkedemo.BuildArtifacts, tools: nvkedemo.PrepareTools,
-		guest: nvkedemo.RunNativeGuest, native: nvkedemo.RunNative,
+		guest:   nvkedemo.RunNativeGuest,
 		restore: nvkedemo.Restore, load: nvkedemo.LoadDemoFile,
 		status: nvkedemo.RetainedStatus, cleanup: nvkedemo.CleanupRetained,
 		owner: nvkedemo.ServeRetained,
@@ -64,7 +71,6 @@ type demoActions struct {
 	build   func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error)
 	tools   func(context.Context, nvkedemo.ToolConfig) (string, error)
 	guest   func(context.Context, nvkedemo.NativeGuestConfig) error
-	native  func(context.Context, nvkedemo.NativeConfig) error
 	restore func(context.Context, string, io.Writer) error
 	load    func(context.Context, string) (nvkedemo.DemoFile, error)
 	status  func(context.Context, string, io.Writer) error
@@ -87,7 +93,7 @@ func newCommand(out, diagnostics io.Writer, actions demoActions) *cobra.Command 
 		Use: "nvke-demo", Short: "Build and deploy a local NVKE demo with native host tools",
 		SilenceUsage: true, SilenceErrors: true, Args: cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error {
-			return nvkrerr.New(nvkrerr.CodeUsage, "select e2e, run, build, tools, guest, native, status, cleanup, restore or completion; use --help")
+			return nvkrerr.New(nvkrerr.CodeUsage, "select e2e, run, build, tools, guest, status, cleanup, restore or completion; use --help")
 		},
 	}
 	root.SetOut(out)
@@ -106,9 +112,7 @@ func newCommand(out, diagnostics io.Writer, actions demoActions) *cobra.Command 
 	})
 	root.AddCommand(newRunCommand(out, actions, &config), newBuildCommand(out, actions, &config), newRestoreCommand(out, actions, &config), newE2ECommand(out, actions, &config))
 	root.AddCommand(newToolsCommand(out, actions))
-	root.AddCommand(newNativeQEMUCommand())
 	root.AddCommand(newGuestCommand(out, actions))
-	root.AddCommand(newNativeCommand(out, actions))
 	root.AddCommand(newQualificationSetupCommand(out, actions, &config), newQualificationRegistryStopCommand())
 	root.AddCommand(newSessionCommand("status", out, actions), newSessionCommand("cleanup", out, actions), newSessionCommand("retained-owner", out, actions))
 	root.InitDefaultCompletionCmd()

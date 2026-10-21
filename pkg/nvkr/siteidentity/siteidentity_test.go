@@ -49,7 +49,7 @@ func TestAdmissionBeforeWork(t *testing.T) {
 		{"foreign peer", func(r *Request) { r.ExpectedPeer = "spiffe://other.test/host/one" }},
 		{"socket relay", func(r *Request) { r.WorkloadAPI = "tcp://127.0.0.1:8080" }},
 		{"unbounded budget", func(r *Request) { r.BudgetSeconds = 301 }},
-		{"missing byte pins", func(r *Request) { r.Operation = "handoff" }},
+		{"missing permanent endpoint", func(r *Request) { r.Operation = "handoff" }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := validRequest()
@@ -121,6 +121,11 @@ type nodeServer struct {
 	pb.UnimplementedNodeAgentServer
 	entered chan struct{}
 	joined  chan struct{}
+	status  *pb.GetSpireAgentStatusResponse
+}
+
+func (s *nodeServer) GetSpireAgentStatus(context.Context, *pb.GetSpireAgentStatusRequest) (*pb.GetSpireAgentStatusResponse, error) {
+	return s.status, nil
 }
 
 func (s *nodeServer) GetNodeBootInfo(ctx context.Context, _ *pb.GetNodeBootInfoRequest) (*pb.GetNodeBootInfoResponse, error) {
@@ -172,6 +177,37 @@ func TestGeneratedClientRealMutualTLS(t *testing.T) {
 	defer cancelCaller()
 	if _, err := probeAgent(ctxCaller, r, server); err == nil {
 		t.Fatal("non-controller caller certificate accepted")
+	}
+}
+
+func TestSourceOwnedStatusRequiresExactEndpointAndIdentity(t *testing.T) {
+	caller, server := identities(t)
+	for _, tc := range []struct {
+		name  string
+		edit  func(*pb.GetSpireAgentStatusResponse)
+		valid bool
+	}{
+		{"confirmed", func(*pb.GetSpireAgentStatusResponse) {}, true},
+		{"wrong server", func(s *pb.GetSpireAgentStatusResponse) { s.ServerAddress = "192.168.70.99" }, false},
+		{"wrong port", func(s *pb.GetSpireAgentStatusResponse) { s.ServerPort++ }, false},
+		{"unapplied config", func(s *pb.GetSpireAgentStatusResponse) { s.ConfigApplied = false }, false},
+		{"no valid SVID", func(s *pb.GetSpireAgentStatusResponse) { s.HasValidSvid = false }, false},
+		{"different host", func(s *pb.GetSpireAgentStatusResponse) { s.SvidSpiffeId = "spiffe://example.test/host/other" }, false},
+		{"expiring SVID", func(s *pb.GetSpireAgentStatusResponse) { s.SvidExpiresAtUnixSeconds = time.Now().Unix() }, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := validRequest()
+			r.ServerAddress, r.ServerPort = "192.168.70.10", 30081
+			status := &pb.GetSpireAgentStatusResponse{ServerAddress: r.ServerAddress, ServerPort: uint32(r.ServerPort), ConfigApplied: true, HasValidSvid: true, SvidSpiffeId: r.ExpectedPeer, SvidExpiresAtUnixSeconds: time.Now().Add(time.Hour).Unix()}
+			tc.edit(status)
+			r.Endpoint = serveNode(t, server, &nodeServer{status: status})
+			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+			defer cancel()
+			observed, err := observedStatus(ctx, r, caller)
+			if (err == nil) != tc.valid || tc.valid && (observed == nil || observed.SPIFFEID != r.ExpectedPeer) {
+				t.Fatalf("source status=%+v error=%v valid=%v", observed, err, tc.valid)
+			}
+		})
 	}
 }
 
@@ -264,12 +300,30 @@ func TestFreshProofRequiresSameBootAndNewCertificate(t *testing.T) {
 		{"expired certificate", func(p *PeerProof) { p.NotAfter = now.Add(-time.Second) }, false},
 		{"nearly expired certificate", func(p *PeerProof) { p.NotAfter = now.Add(30 * time.Second) }, false},
 		{"future issuance", func(p *PeerProof) { p.NotBefore = now.Add(time.Minute) }, false},
+		{"missing issuance", func(p *PeerProof) { p.NotBefore = time.Time{} }, false},
+		{"missing expiry", func(p *PeerProof) { p.NotAfter = time.Time{} }, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			p := fresh
 			tc.edit(&p)
-			if got := freshProof(before, p, now, now); got != tc.want {
+			if got := FreshPeerProof(before, p, now, now); got != tc.want {
 				t.Fatalf("got%v want%v", got, tc.want)
+			}
+		})
+	}
+	for _, field := range []string{"peer", "serial", "boot"} {
+		t.Run("missing original "+field, func(t *testing.T) {
+			original := before
+			switch field {
+			case "peer":
+				original.PeerID = ""
+			case "serial":
+				original.Serial = ""
+			case "boot":
+				original.BootID = ""
+			}
+			if FreshPeerProof(original, fresh, now, now) {
+				t.Fatal("incomplete original observation accepted")
 			}
 		})
 	}

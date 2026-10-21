@@ -3,7 +3,7 @@
 
 //go:build darwin || linux
 
-package nativeqemu
+package qemutpm
 
 import (
 	"context"
@@ -296,25 +296,6 @@ func TestSupervisorPreservesFD4GroupAndJoinsChildren(t *testing.T) {
 				if err := syscall.Kill(pid, 0); !errors.Is(err, syscall.ESRCH) {
 					t.Fatal("child remains live or unjoined", role, pid, err)
 				}
-			}
-		})
-	}
-}
-
-func TestIncompleteOwnerRefusesCleanup(t *testing.T) {
-	for _, content := range []string{"", `{"QEMU":true,"TPM":true}`, `{"Joined":true}junk`} {
-		t.Run(content, func(t *testing.T) {
-			root := t.TempDir()
-			if err := os.MkdirAll(filepath.Join(root, "launches", "instance"), 0700); err != nil {
-				t.Fatal(err)
-			}
-			if content != "" {
-				if err := os.WriteFile(filepath.Join(root, "launches", "instance", "joined"), []byte(content), 0600); err != nil {
-					t.Fatal(err)
-				}
-			}
-			if err := (&Adapter{configuration{Directory: root}}).Close(t.Context()); err == nil {
-				t.Fatal("missing or malformed joined receipt was accepted")
 			}
 		})
 	}

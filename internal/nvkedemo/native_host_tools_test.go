@@ -5,6 +5,7 @@ package nvkedemo
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 )
 
 func TestNativeHostToolViewPreservesOriginalBundleAndBytes(t *testing.T) {
@@ -180,7 +182,7 @@ func hostToolViewFixture(t *testing.T, platform string, aliases bool) (string, s
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = delivery.BuildPublicationRoot(t.Context(), publication, delivery.PublicationRequest{Objects: []delivery.ObjectInput{{Name: bundleName, Kind: "binary-bundle", Path: source, ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: built.SemanticDigest, OS: osName, Arch: arch, Layout: true}}})
+	_, err = delivery.BuildPublicationRoot(t.Context(), publication, delivery.PublicationRequest{Objects: []delivery.ObjectInput{{Name: bundleName, Kind: "binary-bundle", Path: source, ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: built.SemanticDigest, BlobDigest: built.RootDigest, OS: osName, Arch: arch, Layout: true}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,5 +220,40 @@ func TestNativeHostToolBindingsRequireDeclaredMemberModes(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestNativeToolAdmissionBindsExactCarrierIndex(t *testing.T) {
+	for _, changed := range []bool{false, true} {
+		t.Run(map[bool]string{false: "same carrier", true: "coherent carrier changed after Run binding"}[changed], func(t *testing.T) {
+			source, _, _ := hostToolViewFixture(t, "linux/arm64", false)
+			path := filepath.Join(source, "index.json")
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var index v1.IndexManifest
+			if err := json.Unmarshal(raw, &index); err != nil {
+				t.Fatal(err)
+			}
+			admitted, err := diagnosticIndexDigest(t.Context(), source, index.Manifests[0].Digest.String())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if changed {
+				// The child and semantic bundle remain identical. Exact index
+				// bytes must still be the ones admitted against the completed Run.
+				if err := os.WriteFile(path, append(raw, '\n'), 0600); err != nil {
+					t.Fatal(err)
+				}
+				if _, _, err := delivery.InspectBinaryBundle(t.Context(), source); err != nil {
+					t.Fatal("replacement is not a coherent bundle", err)
+				}
+			}
+			result, err := inspectAdmittedBinaryBundle(t.Context(), source, admitted)
+			if (err == nil) == changed || !changed && result.RootDigest != admitted || changed && result.RootDigest != "" {
+				t.Fatalf("exact carrier admission: result=%+v err=%v", result, err)
+			}
+		})
 	}
 }

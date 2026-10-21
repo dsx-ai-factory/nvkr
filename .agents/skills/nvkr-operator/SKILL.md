@@ -101,7 +101,7 @@ session, status, cleanup and Kubernetes access commands. Explicit `--cleanup` or
 controlled tests do not establish guest execution; retain that distinction in the report.
 
 For the maintained NVKE 64K image, explicitly select `--accelerator tcg` on Mac
-for `guest`, `native`, `run` or `e2e`. It uses native QEMU's `max` CPU and retains
+for `guest`, `run` or `e2e`. It uses native QEMU's `max` CPU and retains
 the selected kernel, NVIDIA OVN and shared source pins. HVF cannot run that image
 on a host whose feature register reports no 64K translation-granule support;
 there is no silent fallback. Linux retains KVM. Require a fresh actual guest and

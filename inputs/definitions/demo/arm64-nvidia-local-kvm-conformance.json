@@ -106,7 +106,7 @@
       "name": "csi-node-driver-registrar-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies/native-arm64"
+        "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "csi-node-driver-registrar-image"
@@ -211,9 +211,10 @@
       "name": "nvke-node-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/node-images/native-arm64",
+        "base": "../../catalogs/node-images/release",
         "overlays": [
-          "../../catalogs/node-images/variants/native-nvidia.json"
+          "../../catalogs/node-images/variants/native-nvidia.json",
+          "../../catalogs/node-images/variants/native-local-kvm.json"
         ]
       },
       "components": [
@@ -301,7 +302,7 @@
       "name": "postgresql-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies/native-arm64"
+        "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "postgresql-image"
@@ -312,7 +313,7 @@
       "name": "spiffe-csi-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies/native-arm64"
+        "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "spiffe-csi-image"
@@ -334,7 +335,7 @@
       "name": "spire-agent-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies/native-arm64"
+        "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "spire-agent-image"
@@ -345,7 +346,7 @@
       "name": "spire-bash-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies/native-arm64"
+        "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "spire-bash-image"
@@ -356,7 +357,7 @@
       "name": "spire-controller-manager-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies/native-arm64"
+        "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "spire-controller-manager-image"
@@ -378,7 +379,7 @@
       "name": "spire-oidc-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies/native-arm64"
+        "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "spire-oidc-image"
@@ -389,7 +390,7 @@
       "name": "spire-server-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies/native-arm64"
+        "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "spire-server-image"
@@ -400,7 +401,7 @@
       "name": "spire-tpm-server-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies/native-arm64"
+        "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "spire-tpm-server-image"
@@ -422,7 +423,7 @@
       "name": "temporal-admin-tools-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies/native-arm64"
+        "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "temporal-admin-tools-image"
@@ -433,7 +434,7 @@
       "name": "temporal-server-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies/native-arm64"
+        "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "temporal-server-image"
@@ -444,7 +445,7 @@
       "name": "temporal-ui-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies/native-arm64"
+        "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "temporal-ui-image"

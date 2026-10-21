@@ -38,7 +38,7 @@ func nativeIdentityProofFixture(t *testing.T) (nativeStaticEntry, nativeStaticEn
 	now := time.Unix(1800000000, 0).UTC()
 	agent := nativeSpireAgent{ID: registration.ParentID, AttestationType: "tpm", Banned: &no, ExpiresAt: json.Number("1800003600"), Serial: json.Number("123")}
 	after := nativeIdentityObservation{entries: []nativeStaticEntry{actual}, allowlist: map[string]string{tpm: "nvke.nvidia.com/managed-by=machine-spire-entry-controller"}, agents: nativeSpireAgents{Agents: []nativeSpireAgent{agent}}, registrations: nativeSpireRegistrations{Entries: []nativeSpireRegistration{registration}}}
-	result := siteidentity.Result{SchemaVersion: siteidentity.SchemaVersion, Completion: siteidentity.JoinedSuccess, Operation: "handoff", Before: siteidentity.PeerProof{PeerID: spec.SPIFFEID, Serial: "abc", BootID: "fixture-boot"}, Script: &siteidentity.ScriptResult{Outcome: "applied", NodeAgentPID: 100}, After: &siteidentity.PeerProof{PeerID: spec.SPIFFEID, Serial: "def", BootID: "fixture-boot", NotBefore: now.Add(-10 * time.Second), NotAfter: now.Add(time.Hour)}}
+	result := siteidentity.Result{SchemaVersion: siteidentity.SchemaVersion, Completion: siteidentity.JoinedSuccess, Operation: "handoff", Reconfiguration: "applied", Status: &siteidentity.AgentStatus{ConfigApplied: true, HasValidSVID: true, SPIFFEID: spec.SPIFFEID, ExpiresAt: now.Add(time.Hour).Unix()}, Before: siteidentity.PeerProof{PeerID: spec.SPIFFEID, Serial: "abc", BootID: "fixture-boot"}, After: &siteidentity.PeerProof{PeerID: spec.SPIFFEID, Serial: "def", BootID: "fixture-boot", NotBefore: now.Add(-10 * time.Second), NotAfter: now.Add(time.Hour)}}
 	return source, spec, nativeIdentityObservation{}, after, result, now, tpm
 }
 func TestNativeIdentitySPIREAgentJSONUsesSourceFieldNames(t *testing.T) {
@@ -109,15 +109,11 @@ func TestNativeIdentityBaselineAndFreshTPMAreRequired(t *testing.T) {
 		{"missing serial", func(_, a *nativeIdentityObservation, _ *siteidentity.Result) { a.agents.Agents[0].Serial = "0" }, true},
 		{"missing fresh peer", func(_, _ *nativeIdentityObservation, r *siteidentity.Result) { r.After = nil }, true},
 		{"same cached serial", func(_, _ *nativeIdentityObservation, r *siteidentity.Result) { r.After.Serial = r.Before.Serial }, true},
-		{"changed boot", func(_, _ *nativeIdentityObservation, r *siteidentity.Result) { r.After.BootID = "different" }, true},
-		{"changed peer", func(_, _ *nativeIdentityObservation, r *siteidentity.Result) {
-			r.After.PeerID = "spiffe://site.example.test/host/other"
+		{"fresh proof from another boot", func(_, _ *nativeIdentityObservation, r *siteidentity.Result) {
+			r.Before.BootID, r.After.BootID = "different", "different"
 		}, true},
-		{"old valid certificate", func(_, _ *nativeIdentityObservation, r *siteidentity.Result) {
-			r.After.NotBefore = r.After.NotBefore.Add(-time.Hour)
-		}, true},
-		{"future certificate", func(_, _ *nativeIdentityObservation, r *siteidentity.Result) {
-			r.After.NotBefore = r.After.NotBefore.Add(time.Hour)
+		{"fresh proof from another source host", func(_, _ *nativeIdentityObservation, r *siteidentity.Result) {
+			r.Before.PeerID, r.After.PeerID = "spiffe://site.example.test/host/other", "spiffe://site.example.test/host/other"
 		}, true},
 		{"remote completion unknown", func(_, _ *nativeIdentityObservation, r *siteidentity.Result) { r.Completion = siteidentity.Unknown }, true},
 	} {
@@ -211,23 +207,52 @@ func TestNativeIdentityCompletionControlsDependencyLifetime(t *testing.T) {
 		t.Fatalf("pre-dispatch cancellation called=%v err=%v retained=%v", called, err, attempt.unjoinedWork)
 	}
 }
-func TestNativeIdentityRendererSourceFollowsSelectedOSMaterial(t *testing.T) {
+
+func TestNativeIdentityStagingUsesObservedCommandCompletion(t *testing.T) {
+	digest := strings.Repeat("a", 64)
+	receipt := digest + "  /tmp/nvkr-site-identity.fixture/helper\n"
+	for _, tc := range []struct {
+		name       string
+		raw        string
+		commandErr error
+		unknown    bool
+	}{
+		{"joined exact receipt", receipt, nil, false},
+		{"joined wrong hash", strings.Replace(receipt, digest, strings.Repeat("b", 64), 1), nil, false},
+		{"joined malformed receipt", "untrusted response", nil, false},
+		{"joined exit failure", "", &CommandError{ExitCode: 7, Cause: errors.New("synthetic remote staging failure")}, false},
+		{"no remote exit observed", "", &CommandError{ExitCode: -1, Cause: context.DeadlineExceeded}, true},
+		{"unjoined local process", receipt, ErrUnjoined, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path, err := nativeIdentityStagedHelper([]byte(tc.raw), "sha256:"+digest, tc.commandErr)
+			valid := tc.raw == receipt && tc.commandErr == nil
+			if (err == nil) != valid || errors.Is(err, ErrUnjoined) != tc.unknown || !valid && path != "" {
+				t.Fatalf("staging path=%q err=%v unknown=%v", path, err, tc.unknown)
+			}
+			if tc.commandErr != nil && !errors.Is(err, tc.commandErr) {
+				t.Fatal("staging lost its original command failure")
+			}
+		})
+	}
+}
+func TestNativeIdentityInputsRequireUnmodifiedSelectedSources(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
 		mutate    func(*factory.Plan, *factory.Plan)
 		wantError bool
 	}{
-		{name: "SPIRE exception independent of ordinary tools"},
-		{"different renderer commit", func(a, _ *factory.Plan) { a.Builds[0].ResolvedComponents[0].Commit = "other" }, true},
-		{"different renderer tree", func(a, _ *factory.Plan) { a.Builds[0].ResolvedComponents[0].TreeHash = "other" }, true},
-		{"missing helper", func(a, _ *factory.Plan) { a.Builds[0].ResolvedComponents = a.Builds[0].ResolvedComponents[:1] }, true},
+		{name: "selected helper and SPIRE sources"},
+		{"missing helper", func(a, _ *factory.Plan) { a.Builds[0].ResolvedComponents = nil }, true},
+		{"missing helper commit", func(a, _ *factory.Plan) { a.Builds[0].ResolvedComponents[0].Commit = "" }, true},
+		{"missing SPIRE tree", func(_, a *factory.Plan) { a.Builds[0].ResolvedComponents[0].TreeHash = "" }, true},
 		{"wrong architecture", func(a, _ *factory.Plan) { a.Builds[0].Platform = "darwin/arm64" }, true},
 		{"wrong output build", func(_, a *factory.Plan) { a.Builds[0].BuildDigest = "other" }, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			spire := catalog.Component{Repo: "https://github.com/example/public", Commit: "spire-package-source", TreeHash: "spire-source-tree", FromSource: true}
 			helper := catalog.Component{Repo: "https://github.com/example/nvkr", Commit: "helper-source", TreeHash: "helper-tree", FromSource: true}
-			tools := &factory.Plan{Builds: []factory.BuildPlan{{Name: "site-startup-tools-arm64", BuildDigest: "tools-build", Platform: "linux/arm64", ResolvedComponents: []catalog.NamedComponent{{Name: nativeSpireRendererSource, Component: spire}, {Name: nativeIdentityHelper, Component: helper}}}}}
+			tools := &factory.Plan{Builds: []factory.BuildPlan{{Name: "site-startup-tools-arm64", BuildDigest: "tools-build", Platform: "linux/arm64", ResolvedComponents: []catalog.NamedComponent{{Name: nativeIdentityHelper, Component: helper}}}}}
 			disk := &factory.Plan{Builds: []factory.BuildPlan{{Name: DiskOutputName, BuildDigest: "disk-build", Platform: "linux/arm64", ResolvedComponents: []catalog.NamedComponent{{Name: "nvke-spire-agent", Component: spire}}}}}
 			if tc.mutate != nil {
 				tc.mutate(tools, disk)

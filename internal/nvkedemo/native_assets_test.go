@@ -8,14 +8,43 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
+
+func TestNativeSiteToolAdmissionRejectsObsoleteRuns(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		components []string
+		accepted   bool
+	}{
+		{"current helper-bearing bundle", []string{"nerdctl", nativeIdentityHelper}, true},
+		{"legacy guest tool only", []string{"nerdctl"}, false},
+		{"legacy installer", []string{"nerdctl", "nvke-installer-sources"}, false},
+		{"legacy guest CLI", []string{"nerdctl", "nvke-installer-sources", "nvkectl"}, false},
+		{"missing guest tool", []string{nativeIdentityHelper}, false},
+		{"extra unselected tool", []string{"nerdctl", nativeIdentityHelper, "nvkectl"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			members, err := sitePreparationMembers(tc.components)
+			if (err == nil) != tc.accepted || !tc.accepted && members != nil {
+				t.Fatalf("obsolete output admission: members=%v err=%v", members, err)
+			}
+			if tc.accepted && !slices.Equal(members, tc.components) {
+				t.Fatal("admission changed the selected members")
+			}
+		})
+	}
+}
 
 // Explicit local integration: verifies/extracts real completed Runs without
 // launching any guest. Ordinary tests perform no dependency acquisition.
@@ -52,10 +81,6 @@ func TestNativeAssetsLocalRuntimeClosure(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	cfg.NVKR, err = filepath.Abs(cfg.NVKR)
-	if err != nil {
-		t.Fatal(err)
-	}
 	cfg.Out = filepath.Join(caller, "prepared")
 	t.Chdir(caller)
 	assets, err := PrepareNativeAssets(t.Context(), cfg)
@@ -78,24 +103,19 @@ func TestNativeAssetsLocalRuntimeClosure(t *testing.T) {
 	}
 }
 
-func TestNativeAssetsMissingClosureHasNoWorkspaceOrSubprocess(t *testing.T) {
+func TestNativeAssetsMissingClosureHasNoWorkspace(t *testing.T) {
 	root := t.TempDir()
-	tool := filepath.Join(root, "nvkr")
-	marker := filepath.Join(root, "unexpected-execution")
-	if err := os.WriteFile(tool, []byte("#!/bin/sh\ntouch '"+marker+"'\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
 	out := filepath.Join(root, "out")
 	_, err := PrepareNativeAssets(t.Context(), NativeAssetConfig{
-		NVKR: tool, ToolsRun: filepath.Join(root, "missing-run"), Out: out,
+		ToolsRun: filepath.Join(root, "missing-run"), Out: out,
 	})
 	var coded *nvkrerr.Error
 	if !errors.As(err, &coded) || coded.Code != nvkrerr.CodePreflightFailed {
 		t.Fatalf("missing closure did not fail at the public boundary: %v", err)
 	}
-	for _, path := range []string{out, marker} {
+	for _, path := range []string{out} {
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
-			t.Fatal("incomplete artifact closure performed output or subprocess work")
+			t.Fatal("incomplete artifact closure created a workspace")
 		}
 	}
 }
@@ -109,21 +129,77 @@ func TestNativeAssetsCanceledBeforeInputIO(t *testing.T) {
 	}
 }
 
+func TestNativeAcquiredImageRequiresSelectedSourceAndChild(t *testing.T) {
+	for _, role := range []string{"workload", "capi-exec-init", "capi-exec-plugin"} {
+		for _, scenario := range []string{"selected", "updated source", "wrong source", "wrong repository", "wrong epoch", "wrong child", "wrong parent", "wrong build", "wrong platform", "missing producer", "duplicate producer"} {
+			t.Run(role+"/"+scenario, func(t *testing.T) {
+				installer := &nativeInstallerSelection{repo: "https://example.invalid/nvke.git", commit: strings.Repeat("a", 40), sourceDate: 1}
+				if scenario == "updated source" {
+					installer.commit, installer.sourceDate = strings.Repeat("b", 40), 2
+				}
+				parent, child := "sha256:"+strings.Repeat("c", 64), "sha256:"+strings.Repeat("d", 64)
+				if scenario == "updated source" {
+					parent, child = "sha256:"+strings.Repeat("e", 64), "sha256:"+strings.Repeat("f", 64)
+				}
+				component := catalog.Component{Repo: installer.repo, Commit: installer.commit, SourceDate: installer.sourceDate, Prebuilt: &catalog.Prebuilt{
+					Image: "example.invalid/" + role + "@" + parent, ImageParentDigest: parent, Digests: map[string]string{"arm64": child},
+				}}
+				selected := nativeImageSelection{role: role, output: role + "-image-arm64", observed: lifecycle.Artifact{Digest: child, BuildDigest: "build"}}
+				build := factory.BuildPlan{Name: selected.output, Platform: "linux/arm64", BuildDigest: selected.observed.BuildDigest}
+				switch scenario {
+				case "wrong source":
+					component.Commit = strings.Repeat("f", 40)
+				case "wrong repository":
+					component.Repo = "https://example.invalid/other.git"
+				case "wrong epoch":
+					component.SourceDate++
+				case "wrong child":
+					selected.observed.Digest = parent
+				case "wrong parent":
+					component.Prebuilt.ImageParentDigest = child
+				case "wrong build":
+					build.BuildDigest = "other"
+				case "wrong platform":
+					build.Platform = "linux/amd64"
+				}
+				name := "native-" + role + "-image"
+				if scenario == "missing producer" {
+					name = "unselected"
+				}
+				build.ResolvedComponents = []catalog.NamedComponent{{Name: name, Component: component}}
+				if scenario == "duplicate producer" {
+					build.ResolvedComponents = append(build.ResolvedComponents, build.ResolvedComponents[0])
+				}
+				ref, err := nativeAcquiredImage(&factory.Plan{Builds: []factory.BuildPlan{build}}, selected, installer)
+				accepted := scenario == "selected" || scenario == "updated source"
+				if (err == nil) != accepted || accepted && ref.String() != component.Prebuilt.Image {
+					t.Fatalf("source/child selection: ref=%s err=%v", ref, err)
+				}
+			})
+		}
+	}
+}
+
 func TestNativeCAPIAuthPreservesSourceAndRejectsChangedSlots(t *testing.T) {
-	for _, mutation := range []string{"none", "missing", "duplicate", "missing mount", "changed copy path"} {
+	for _, mutation := range []string{"none", "updated source", "missing", "duplicate", "missing mount", "changed copy path", "later overlay mismatch"} {
 		t.Run(mutation, func(t *testing.T) {
 			assets := NativeAssets{Installer: t.TempDir(), Images: map[string]NativeImageAsset{}}
-			source := "securityContext: {runAsNonRoot: true, readOnlyRootFilesystem: true}\ncommand: /plugin/cmd\n              subPath: ko-app\n"
-			for _, image := range nativeCAPIAuthImages {
-				digest := "sha256:" + strings.Repeat("a", 64)
-				assets.Images[image.role] = NativeImageAsset{Reference: "docker.io/nvkr-local/" + image.role + "@" + digest, ManifestDigest: digest}
-				source += "image: " + image.source + "\n"
+			parent := "sha256:" + strings.Repeat("b", 64)
+			if mutation == "updated source" {
+				parent = "sha256:" + strings.Repeat("c", 64)
 			}
+			acquired, sourceRefs := map[string]string{}, map[string]string{}
+			for _, role := range nativeCAPIAuthImages {
+				digest := "sha256:" + strings.Repeat("a", 64)
+				assets.Images[role] = NativeImageAsset{Reference: "docker.io/nvkr-local/" + role + "@" + digest, ManifestDigest: digest}
+				acquired[role], sourceRefs[role] = "example.invalid/"+role+"@"+parent, "example.invalid/"+role+":selected@"+parent
+			}
+			source := fmt.Sprintf("spec:\n  template:\n    spec:\n      securityContext: {runAsNonRoot: true, readOnlyRootFilesystem: true}\n      volumes:\n        - name: spiffe-exec-plugin\n          image:\n            reference: %s\n      initContainers:\n        - name: install-spiffe-exec-plugin\n          image: %s\n          command: [/bin/cp, /plugin/cmd]\n          volumeMounts:\n            - name: spiffe-exec-plugin\n              subPath: ko-app\n", sourceRefs["capi-exec-plugin"], sourceRefs["capi-exec-init"])
 			if mutation == "missing" {
-				source = strings.Replace(source, nativeCAPIAuthImages[0].source, "changed-source", 1)
+				source = strings.Replace(source, sourceRefs["capi-exec-init"], "changed-source", 1)
 			}
 			if mutation == "duplicate" {
-				source += nativeCAPIAuthImages[0].source
+				source += "# " + sourceRefs["capi-exec-init"] + "\n"
 			}
 			if mutation == "missing mount" {
 				source = strings.Replace(source, "              subPath: ko-app\n", "", 1)
@@ -135,15 +211,24 @@ func TestNativeCAPIAuthPreservesSourceAndRejectsChangedSlots(t *testing.T) {
 			if err := os.MkdirAll(directory, 0o700); err != nil {
 				t.Fatal(err)
 			}
-			for _, controller := range []string{"capi-controller-manager", "capi-kubeadm-bootstrap-controller-manager", "capi-kubeadm-control-plane-controller-manager", "capd-controller-manager"} {
-				if err := os.WriteFile(filepath.Join(directory, controller+".yaml"), []byte(source), 0o600); err != nil {
+			controllers := []string{"capi-controller-manager", "capi-kubeadm-bootstrap-controller-manager", "capi-kubeadm-control-plane-controller-manager", "capd-controller-manager"}
+			for _, controller := range controllers {
+				raw := source
+				if mutation == "later overlay mismatch" && controller == controllers[len(controllers)-1] {
+					raw = strings.Replace(raw, sourceRefs["capi-exec-init"], "changed-source", 1)
+				}
+				if err := os.WriteFile(filepath.Join(directory, controller+".yaml"), []byte(raw), 0o600); err != nil {
 					t.Fatal(err)
 				}
 			}
-			err := prepareNativeCAPIAuth(t.Context(), assets)
-			if mutation != "none" {
+			err := prepareNativeCAPIAuth(t.Context(), assets, acquired)
+			if mutation != "none" && mutation != "updated source" {
 				if err == nil {
-					t.Fatal("changed pinned source escaped admission")
+					t.Fatal("changed source escaped admission")
+				}
+				raw, readErr := os.ReadFile(filepath.Join(directory, controllers[0]+".yaml"))
+				if readErr != nil || string(raw) != source {
+					t.Fatal("failed overlay admission changed an earlier source file", readErr)
 				}
 				return
 			}
@@ -151,15 +236,15 @@ func TestNativeCAPIAuthPreservesSourceAndRejectsChangedSlots(t *testing.T) {
 				t.Fatal(err)
 			}
 			want := source
-			for _, image := range nativeCAPIAuthImages {
-				want = strings.Replace(want, image.source, assets.Images[image.role].Reference, 1)
+			for _, role := range nativeCAPIAuthImages {
+				want = strings.Replace(want, sourceRefs[role], assets.Images[role].Reference, 1)
 			}
 			want = strings.Replace(want, "              subPath: ko-app\n", "", 1)
 			want = strings.Replace(want, "/plugin/cmd", "/plugin/ko-app/cmd", 1)
-			for _, file := range []string{"capi-controller-manager", "capi-kubeadm-bootstrap-controller-manager", "capi-kubeadm-control-plane-controller-manager", "capd-controller-manager"} {
+			for _, file := range controllers {
 				raw, err := os.ReadFile(filepath.Join(directory, file+".yaml"))
 				if err != nil || string(raw) != want {
-					t.Fatalf("source bytes beyond the image references and root path changed: %v", err)
+					t.Fatalf("source bytes beyond image refs/root path changed: %v", err)
 				}
 			}
 		})

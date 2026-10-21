@@ -44,10 +44,12 @@ type dashboardOSLogs struct {
 
 // This bounded checklist names source-owned operations, not inferred deployment
 // milestones. Paired operations require both completed observations.
-var dashboardSiteStages = [...]struct {
+type dashboardSiteStage struct {
 	label      string
 	operations [2]string
-}{
+}
+
+var dashboardSiteStages = [...]dashboardSiteStage{
 	{"Create Kind cluster", [2]string{"create-management"}},
 	{"Registry reachable", [2]string{"start-registry", "registry-admission"}},
 	{"Site networking (OVN)", [2]string{"site-ovs-ready", "site-ovn-admission"}},
@@ -60,6 +62,17 @@ var dashboardSiteStages = [...]struct {
 	{"Check CAPI control plane", [2]string{"site-ready-capi-kubeadm-control-plane-system"}},
 	{"Secure and register", [2]string{"site-client-policy", "site-register"}},
 	{"Verify deployed images", [2]string{"site-images-admission"}},
+}
+
+var dashboardNativeSiteStages = [...]dashboardSiteStage{
+	{"Site guest Ready (NICo)", [2]string{"native-site-guest"}},
+	{"Site packages prepared", [2]string{"native-site-preparation"}},
+	{"NVKE site bootstrap", [2]string{"host-nvke-bootstrap"}},
+	{"Cluster API installed", [2]string{"host-site-capi"}},
+	{"Site stack installed", [2]string{"host-nvke-deploy"}},
+	{"CAPI SPIFFE authentication", [2]string{"host-site-spiffe-exec"}},
+	{"Site host identity handoff", [2]string{"native-site-identity-handoff"}},
+	{"NVKE API accessible", [2]string{"check-05-install-site-controller"}},
 }
 
 var dashboardTenantStages = [...]string{"Tenant kubeconfig", "Tenant API query", "Nodes Ready", "Workload and DNS"}
@@ -86,7 +99,6 @@ type dashboardSnapshot struct {
 	siteStages                    [len(dashboardSiteStages)]dashboardStage
 	siteOVN                       bool
 	nativeSite                    bool
-	nativeStages                  [len(dashboardNativeSiteStages)]dashboardStage
 	conformanceSelected           bool
 	conformance                   dashboardPhase
 	retained                      bool
@@ -396,7 +408,15 @@ func dashboardOperation(name string) (index int, label string) {
 	case "network-cleanup", "registry-cleanup", "owned-node-cleanup":
 		return 5, "Restore owned demo resources"
 	}
-	return dashboardNativeOperation(name)
+	if name == "native-site-ready" {
+		return 2, "Prepare and check the native site"
+	}
+	for _, stage := range dashboardNativeSiteStages {
+		if name != "" && slices.Contains(stage.operations[:], name) {
+			return 2, stage.label
+		}
+	}
+	return -1, ""
 }
 
 func (stage *dashboardStage) observe(part int, state string, now time.Time) {
@@ -437,10 +457,7 @@ func (stage dashboardStage) status(required int) (state string, observed int, st
 }
 
 func (d *dashboard) observeSiteStage(event nvkedemo.ProgressEvent, state string) string {
-	if d.nativeSite {
-		return d.observeNativeSiteStage(event, state)
-	}
-	if strings.HasPrefix(event.Name, "site-ovs-") || strings.HasPrefix(event.Name, "site-ovn-") {
+	if !d.nativeSite && (strings.HasPrefix(event.Name, "site-ovs-") || strings.HasPrefix(event.Name, "site-ovn-")) {
 		d.siteOVN = true
 		part := 1
 		if strings.HasPrefix(event.Name, "site-ovs-") || event.Name == "site-ovn-chart" || event.Name == "site-ovn-defaults" {
@@ -451,7 +468,7 @@ func (d *dashboard) observeSiteStage(event nvkedemo.ProgressEvent, state string)
 		}
 		return dashboardSiteStages[2].label
 	}
-	for index, stage := range dashboardSiteStages {
+	for index, stage := range d.selectedSiteStages() {
 		for part, operation := range stage.operations {
 			if operation != "" && event.Name == operation {
 				d.siteStages[index].observe(part, state, time.Now())
@@ -481,7 +498,44 @@ func stopDashboardStages(stages []dashboardStage, state string) {
 func (d *dashboard) Report(event nvkedemo.ProgressEvent) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if d.nativeProgress(event) {
+	if event.Name == "tenant-provisioning" && event.Kind == nvkedemo.DeploymentStarted {
+		d.resetTenantObservation()
+	}
+	switch event.Kind {
+	case nvkedemo.NativeDeployment:
+		if event.ExpectedNodes != 0 && (requestedTenantNodes(event.ExpectedNodes) == 0 || (event.ExpectedNodes == 3) != event.Conformance) {
+			return
+		}
+		if !d.nativeSite {
+			d.siteStages = [len(dashboardSiteStages)]dashboardStage{}
+		}
+		d.nativeSite, d.conformanceSelected = true, event.Conformance
+		if event.ExpectedNodes != 0 {
+			d.expectedNodes = event.ExpectedNodes
+		}
+		if d.conformance.state == "" {
+			d.conformance = dashboardPhase{"pending", "Requested; suite has not started"}
+		}
+		return
+	case nvkedemo.NativeRetained:
+		switch event.Status {
+		case "site-identity-failed":
+			d.resetTenantObservation()
+			d.phases[2] = dashboardPhase{"failed", "Site host identity handoff failed"}
+			d.tenant = "Tenant has not started; bootstrap and site remain available for debugging."
+			d.current = "Site identity failed; bootstrap and site retained for debugging"
+		case "available", "conformance-failed":
+			d.tenant = "Workload and DNS checks completed; the same tenant remains available."
+			d.current = "Environment retained for debugging"
+			if event.Status == "conformance-failed" {
+				d.current = "Conformance failed; cluster retained for debugging"
+			}
+		default:
+			return
+		}
+		d.retained, d.currentStarted = true, time.Time{}
+		d.phases[5] = dashboardPhase{"pending", "Retained; explicit cleanup required"}
+		d.appendActivity(d.current)
 		return
 	}
 	if event.Kind == nvkedemo.OSBuildLogs {
@@ -532,6 +586,22 @@ func (d *dashboard) Report(event nvkedemo.ProgressEvent) {
 	default:
 		return
 	}
+	if event.Name == "native-conformance" {
+		if !strings.HasPrefix(event.Kind, "phase-") {
+			return
+		}
+		if state == "observed" {
+			state = "passed"
+		}
+		d.conformanceSelected = true
+		d.conformance = dashboardPhase{state, "Conformance validation, including artifact/tool admission and original report capture"}
+		d.current, d.currentStarted = "Kubernetes conformance · "+state, time.Time{}
+		if state == "running" {
+			d.currentStarted = time.Now()
+		}
+		d.appendActivity(d.current)
+		return
+	}
 	if event.Name == "local-demo" {
 		switch event.Kind {
 		case nvkedemo.DeploymentStarted:
@@ -553,7 +623,6 @@ func (d *dashboard) Report(event nvkedemo.ProgressEvent) {
 			d.current = "Demo stopped; inspect retained private diagnostics"
 			d.currentStarted = time.Time{}
 			stopDashboardStages(d.siteStages[:], "stopped")
-			stopDashboardStages(d.nativeStages[:], "stopped")
 			if d.conformance.state == "running" {
 				d.conformance = dashboardPhase{"stopped", "Owning demo operation stopped"}
 			}
@@ -1082,11 +1151,7 @@ func dashboardChecklist(s dashboardSnapshot, now time.Time) (string, int) {
 		fmt.Fprintf(&rows, "[%s]%s[-] %-23s %s\n", color, marker, label, detail)
 	}
 	siteTotal := 0
-	stages := dashboardSiteStages[:]
-	if s.nativeSite {
-		stages = dashboardNativeSiteStages[:]
-	}
-	for index, stage := range stages {
+	for index, stage := range s.selectedSiteStages() {
 		if !s.nativeSite && index == 2 && !s.siteOVN {
 			continue
 		}
@@ -1095,11 +1160,7 @@ func dashboardChecklist(s dashboardSnapshot, now time.Time) (string, int) {
 		if stage.operations[1] != "" {
 			required = 2
 		}
-		observedStage := s.siteStages[index]
-		if s.nativeSite {
-			observedStage = s.nativeStages[index]
-		}
-		write(stage.label, observedStage, required)
+		write(stage.label, s.siteStages[index], required)
 	}
 	siteLabel := "Site stages"
 	if s.nativeSite {
@@ -1298,4 +1359,44 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 	d.header.Draw(screen)
 	d.footer.Draw(screen)
 	// The event-loop owner calls Show and handles terminal failures.
+}
+
+func (s dashboardSnapshot) selectedSiteStages() []dashboardSiteStage {
+	if s.nativeSite {
+		return dashboardNativeSiteStages[:]
+	}
+	return dashboardSiteStages[:]
+}
+
+// A site-scoped Go caller may create another tenant after natural deletion.
+// Keep the site observations, but never reuse a previous tenant's readiness or
+// suite/cleanup outcome for that fresh operation.
+func (d *dashboard) resetTenantObservation() {
+	d.tenantStages = [len(dashboardTenantStages)]dashboardStage{}
+	d.guests = [3]nvkedemo.TenantGuestObservation{}
+	d.observedAt, d.deadline, d.tenantChangedAt, d.guestsObservedAt, d.tenantActivityAt = time.Time{}, time.Time{}, time.Time{}, time.Time{}, time.Time{}
+	d.elapsed, d.registered, d.ready = 0, 0, 0
+	d.nodesObserved, d.retained = false, false
+	d.tenantStage, d.provisioning, d.provisioned = "", "", ""
+	d.tenant = "Tenant readiness has not been observed."
+	for _, index := range []int{3, 4, 5} {
+		d.phases[index] = dashboardPhase{"pending", "No operation observed for this tenant yet"}
+	}
+	d.conformance = dashboardPhase{"pending", "Requested; suite has not started"}
+}
+
+type dashboardNamedPhase struct {
+	name  string
+	phase dashboardPhase
+}
+
+func dashboardNamedPhases(s dashboardSnapshot) []dashboardNamedPhase {
+	var result []dashboardNamedPhase
+	for index, name := range []string{"Prepare", "Artifacts", "Site", "Tenant", "Workload/DNS", "Cleanup"} {
+		if index == 5 && s.conformanceSelected {
+			result = append(result, dashboardNamedPhase{"Conformance", s.conformance})
+		}
+		result = append(result, dashboardNamedPhase{name, s.phases[index]})
+	}
+	return result
 }

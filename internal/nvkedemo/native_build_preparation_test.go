@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -61,7 +62,7 @@ func TestDefaultMacPreparationJoinsExistingOwnersAndCapturedInvocation(t *testin
 		t.Skip("the installed Apple system-tool contract is Mac-only")
 	}
 	repo, bin := t.TempDir(), t.TempDir()
-	probeEnv := macBuildProbeFixtures(t, repo, bin)
+	probeEnv, packerVersion, pluginName := macBuildProbeFixtures(t, repo, bin)
 	write := func(path, body string, mode os.FileMode) {
 		t.Helper()
 		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
@@ -71,10 +72,10 @@ func TestDefaultMacPreparationJoinsExistingOwnersAndCapturedInvocation(t *testin
 			t.Fatal(err)
 		}
 	}
-	plugin := filepath.Join(bin, "packer-plugin-qemu_v1.1.6_x5.0_darwin_arm64")
+	plugin := filepath.Join(bin, pluginName)
 	write(plugin, "fixture", 0700)
 	write(plugin+"_SHA256SUM", "fixture", 0600)
-	write(filepath.Join(bin, "packer"), "#!/bin/sh\ncase \"$1\" in version) printf '%s\\n' 'Packer v1.15.4';; plugins) printf '%s\\n' \"$PLUGIN\";; *) exit 23;; esac\n", 0700)
+	write(filepath.Join(bin, "packer"), "#!/bin/sh\ncase \"$1\" in version) printf '%s\\n' 'Packer v"+packerVersion+"';; plugins) printf '%s\\n' \"$PLUGIN\";; *) exit 23;; esac\n", 0700)
 	for _, name := range []string{"qemu-img", "qemu-system-aarch64", "python3", "gdirname", "ginstall", "gmktemp", "grm", "gchmod", "gstat", "gmv", "gsha256sum", "gcat", "gmkdir", "gcp", "gtr", "ghead", "gtail", "gwc", "gcut", "gsort", "gtouch", "gsleep", "greadlink", "gln", "gtee"} {
 		write(filepath.Join(bin, name), "#!/bin/sh\nexit 31\n", 0700)
 	}
@@ -154,17 +155,20 @@ esac
 }
 
 func TestDefaultMacPreparationRejectsMissingPrerequisitesBeforeWriting(t *testing.T) {
-	for _, tc := range []struct{ name, packer, want string }{
-		{"missing packer", "", "packer"},
-		{"wrong installed version", "Packer v1.0.0", "Packer 1.15.4"},
-		{"missing reviewed plugin", "Packer v1.15.4", "QEMU plugin"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, mode := range []string{"missing packer", "wrong installed version", "missing reviewed plugin"} {
+		t.Run(mode, func(t *testing.T) {
 			repo := t.TempDir()
 			bin := t.TempDir()
-			env := macBuildProbeFixtures(t, repo, bin)
-			if tc.packer != "" {
-				body := "#!/bin/sh\nif test \"$1\" = version; then printf '%s\\n' '" + tc.packer + "'; fi\n"
+			env, packerVersion, _ := macBuildProbeFixtures(t, repo, bin)
+			packer, want := "Packer v"+packerVersion, "QEMU plugin"
+			switch mode {
+			case "missing packer":
+				packer, want = "", "packer"
+			case "wrong installed version":
+				packer, want = "Packer v1.0.0", "Packer "+packerVersion
+			}
+			if packer != "" {
+				body := "#!/bin/sh\nif test \"$1\" = version; then printf '%s\\n' '" + packer + "'; fi\n"
 				if err := os.WriteFile(filepath.Join(bin, "packer"), []byte(body), 0700); err != nil {
 					t.Fatal(err)
 				}
@@ -172,7 +176,7 @@ func TestDefaultMacPreparationRejectsMissingPrerequisitesBeforeWriting(t *testin
 			cfg := BuildConfig{Repository: repo, AttemptPrefix: "first"}
 			err := prepareDefaultMacBuild(t.Context(), Runner{Env: env}, &cfg)
 			var coded *e.Error
-			if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability || !strings.Contains(err.Error(), tc.want) {
+			if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability || !strings.Contains(err.Error(), want) {
 				t.Fatalf("prerequisite error=%v", err)
 			}
 			if _, err := os.Lstat(filepath.Join(repo, ".nvkr")); !os.IsNotExist(err) {
@@ -182,13 +186,17 @@ func TestDefaultMacPreparationRejectsMissingPrerequisitesBeforeWriting(t *testin
 	}
 }
 
-func macBuildProbeFixtures(t *testing.T, repo, bin string) []string {
+func macBuildProbeFixtures(t *testing.T, repo, bin string) ([]string, string, string) {
 	t.Helper()
 	catalogDirectory := filepath.Join(repo, "inputs", "catalogs", "tools", "native")
 	if err := os.MkdirAll(filepath.Dir(catalogDirectory), 0700); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.CopyFS(catalogDirectory, os.DirFS(filepath.Join("..", "..", "inputs", "catalogs", "tools", "native"))); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := catalog.LoadContext(t.Context(), catalog.Dir(catalogDirectory))
+	if err != nil {
 		t.Fatal(err)
 	}
 	pin, err := os.ReadFile("../../.go-version")
@@ -217,7 +225,8 @@ printf '%s\n' clang`,
 			t.Fatal(err)
 		}
 	}
-	return []string{"PATH=" + bin, "TEST_GO_VERSION=go" + strings.TrimSpace(string(pin))}
+	return []string{"PATH=" + bin, "TEST_GO_VERSION=go" + strings.TrimSpace(string(pin))},
+		strings.TrimPrefix(loaded.Components["packer"].Tag, "v"), filepath.Base(loaded.Tools["packer-plugin-qemu"].ExecutablePath)
 }
 
 func TestDefaultMacPreparationRejectsBrokenSDKAndRuntimeBeforeWork(t *testing.T) {
@@ -233,7 +242,7 @@ func TestDefaultMacPreparationRejectsBrokenSDKAndRuntimeBeforeWork(t *testing.T)
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			repo, bin := t.TempDir(), t.TempDir()
-			env := macBuildProbeFixtures(t, repo, bin)
+			env, _, _ := macBuildProbeFixtures(t, repo, bin)
 			if tc.absent != "" {
 				if err := os.Remove(filepath.Join(bin, tc.absent)); err != nil {
 					t.Fatal(err)

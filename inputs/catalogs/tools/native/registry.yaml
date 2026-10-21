@@ -184,23 +184,6 @@ components:
             - linux/arm64
         source: nvke-nicosim
         writeDir: controller/nico-sim/bin
-    nvke-spire-configure-source:
-        artifactPath: bin/nvke-spire-configure-source
-        buildCommand:
-            - bash
-            - -euc
-            - |
-              test -f os-image/files/spire-configure.sh
-              test ! -L os-image/files/spire-configure.sh
-              cp os-image/files/spire-configure.sh bin/nvke-spire-configure-source
-              chmod 0755 bin/nvke-spire-configure-source
-        cgo: false
-        fromSource: true
-        outputType: host-package
-        platforms:
-            - linux/arm64
-        source: nvke-spire-agent-source
-        writeDir: bin
     nvkr-site-identity-helper:
         artifactPath: bin/nvkr-site-identity-helper
         buildCommand:
@@ -349,11 +332,6 @@ kind: SourceBuildRegistry
 metadata:
     name: nvke-native-tools
 sources:
-    nvke-spire-agent-source:
-        constraint: v0.22.0
-        repo: https://github.com/dsx-ai-factory/nvke.git
-        toolchainImagesByArch:
-            arm64: golang@sha256:288557fbc328e4ef9a78bae2eb44f24447029ff08667be883d79eeaa9029cf0c
     nvkr-site-identity:
         constraint: '*'
         repo: https://github.com/dsx-ai-factory/nvkr.git

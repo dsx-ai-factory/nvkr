@@ -9,7 +9,6 @@ import (
 	"context"
 	"encoding/hex"
 	"net"
-	"os"
 
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"golang.org/x/sys/unix"
@@ -51,19 +50,4 @@ func retainedRequesterUID(connection *net.UnixConn) uint32 {
 		}
 	})
 	return uid
-}
-
-func detachRetainedProcess() error {
-	_, err := unix.Setsid()
-	if err != nil {
-		return err
-	}
-	sid, err := unix.Getsid(os.Getpid())
-	if err != nil {
-		return err
-	}
-	if sid != os.Getpid() || unix.Getpgrp() != os.Getpid() {
-		return unix.EPERM
-	}
-	return nil
 }

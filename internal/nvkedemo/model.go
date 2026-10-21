@@ -74,7 +74,7 @@ type BuildConfig struct {
 }
 
 const (
-	InstallerCommit    = "8db5721ae3031bdcd945e559153a740d46ea209e"
+	InstallerCommit    = "400c24fb6465b042be883d6b62472528520d6291"
 	SimulatorBundle    = "nicosim-tools-arm64"
 	DiskOutputName     = "nvke-node-image-arm64"
 	OrgID              = "novxwn552ssc"
@@ -85,7 +85,8 @@ const (
 	TenantInstanceType = "a1b2c3d4-0005-4000-8000-000000000003"
 	TenantPrefixID     = "a1b2c3d4-0004-4000-8000-000000000001"
 	SeedDigest         = "e713b6e74e884bfba5a942b10eee142171565dcec2f24c6217cd9baecea03cac"
-	WorkloadImage      = "docker.io/library/alpine@sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d"
+	// WorkloadImage belongs to the legacy Kind diagnostic; native Runs select their acquired image metadata.
+	WorkloadImage = "docker.io/library/alpine@sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d"
 )
 
 // These identifiers belong to InstallerCommit's source contract, not NVKR

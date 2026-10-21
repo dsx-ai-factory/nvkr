@@ -475,7 +475,7 @@ func nativeIdentityRequestFile(ctx context.Context, work string, request siteide
 	return file, nil
 }
 
-func nativeIdentityHelperRequest(spec nativeStaticEntrySpec, runtime nativeIdentityRuntime, ip, oldSHA, rendererSHA, caSHA string) (siteidentity.Request, error) {
+func nativeIdentityHelperRequest(spec nativeStaticEntrySpec, runtime nativeIdentityRuntime, ip string) (siteidentity.Request, error) {
 	peer, err := spiffeid.FromString(spec.SPIFFEID)
 	if err != nil {
 		return siteidentity.Request{}, err
@@ -488,15 +488,15 @@ func nativeIdentityHelperRequest(spec nativeStaticEntrySpec, runtime nativeIdent
 	if err != nil {
 		return siteidentity.Request{}, err
 	}
-	request := siteidentity.Request{SchemaVersion: siteidentity.SchemaVersion, Operation: "handoff", Endpoint: net.JoinHostPort(ip, runtime.agentPort), ExpectedPeer: spec.SPIFFEID, ExpectedCaller: caller.String(), WorkloadAPI: "unix:///spiffe-workload-api/spire-agent.sock", TrustDomain: peer.TrustDomain().Name(), ServerAddress: ip, ServerPort: uint16(port), OldEnvironmentSHA256: oldSHA, RendererSHA256: strings.TrimPrefix(rendererSHA, "sha256:"), TrustBundleSHA256: strings.TrimPrefix(caSHA, "sha256:"), BudgetSeconds: 240}
+	request := siteidentity.Request{SchemaVersion: siteidentity.SchemaVersion, Operation: "handoff", Endpoint: net.JoinHostPort(ip, runtime.agentPort), ExpectedPeer: spec.SPIFFEID, ExpectedCaller: caller.String(), WorkloadAPI: "unix:///spiffe-workload-api/spire-agent.sock", TrustDomain: peer.TrustDomain().Name(), ServerAddress: ip, ServerPort: uint16(port), BudgetSeconds: 240}
 	return request, nil
 }
 
 func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runner Runner, ip, out string) (receipt *nativeSiteIdentityReceipt, resultErr error) {
 	progress := beginProgress(runner.Progress, "native-site-identity-handoff", PhaseStarted, PhaseFinished, PhaseFailed)
 	defer func() {
-		if errors.Is(resultErr, ErrUnjoined) {
-			s.unjoinedWork = errors.Join(s.unjoinedWork, resultErr)
+		if errors.Is(resultErr, ErrUnjoined) && s.unjoinedWork == nil {
+			s.unjoinedWork = resultErr
 		}
 		progress.finish(resultErr)
 	}()
@@ -553,11 +553,7 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	if err := nativeIdentityBaseline(source, spec, before); err != nil {
 		return nil, err
 	}
-	caSHA, err := DigestFile(ctx, filepath.Join(out, "bootstrap-shared", "ca", "ca.crt"))
-	if err != nil {
-		return nil, err
-	}
-	request, err := nativeIdentityHelperRequest(spec, runtime, ip, plainSHA(s.spireEnvironment), s.assets.identity.rendererSHA, caSHA)
+	request, err := nativeIdentityHelperRequest(spec, runtime, ip)
 	if err != nil {
 		return nil, err
 	}
@@ -578,14 +574,10 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	}
 	// Fixed file staging only. No caller supplies a command or shell contents.
 	staged, err := k.exec(ctx, runtime.controller, "stage-helper", 45*time.Second, helper, "/bin/sh", "-c", `umask 077; d=$(mktemp -d /tmp/nvkr-site-identity.XXXXXXXX) || exit; cat > "$d/helper" && chmod 0700 "$d/helper" && sha256sum "$d/helper"`)
+	helperPath, err := nativeIdentityStagedHelper(staged, s.assets.identity.helperSHA, err)
 	if err != nil {
-		return nil, errors.Join(ErrUnjoined, err)
+		return nil, err
 	}
-	fields := strings.Fields(string(staged))
-	if len(fields) != 2 || fields[0] != strings.TrimPrefix(s.assets.identity.helperSHA, "sha256:") || path.Base(fields[1]) != "helper" || path.Clean(fields[1]) != fields[1] || path.Dir(path.Dir(fields[1])) != "/tmp" || !strings.HasPrefix(path.Base(path.Dir(fields[1])), "nvkr-site-identity.") {
-		return nil, errors.Join(ErrUnjoined, errors.New("remote helper staging returned no exact artifact receipt"))
-	}
-	helperPath := fields[1]
 	if err := k.recheck(ctx, runtime, s.assets, spec, ip); err != nil {
 		return nil, err
 	}
@@ -605,7 +597,7 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	if err := canonical.UnmarshalExact(bytesTrimOneNewline(probeRaw), &probe); err != nil {
 		return nil, err
 	}
-	if probe.SchemaVersion != siteidentity.SchemaVersion || probe.Operation != "probe" || probe.Completion != siteidentity.NotStarted || probe.FailureCode != "" || probe.CallerID != request.ExpectedCaller || probe.Before.PeerID != spec.SPIFFEID || probe.Before.BootID != runtime.bootID || probe.Script != nil || probe.After != nil {
+	if probe.SchemaVersion != siteidentity.SchemaVersion || probe.Operation != "probe" || probe.Completion != siteidentity.NotStarted || probe.FailureCode != "" || probe.CallerID != request.ExpectedCaller || probe.Before.PeerID != spec.SPIFFEID || probe.Before.BootID != runtime.bootID || probe.Status != nil || probe.Reconfiguration != "" || probe.After != nil {
 		return nil, errors.New("admitted identity context cannot authenticate the original same-boot host")
 	}
 	if err := k.recheck(ctx, runtime, s.assets, spec, ip); err != nil {
@@ -679,8 +671,8 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	if result.CallerID != request.ExpectedCaller {
 		return nil, errors.New("handoff caller differs from the admitted controller")
 	}
-	if result.Script == nil || result.Script.EnvironmentSHA256 != plainSHA([]byte(fmt.Sprintf("SPIRE_SERVER_ADDRESS=%s\nSPIRE_SERVER_PORT=%d\nSPIRE_TRUST_DOMAIN=%s\n", request.ServerAddress, request.ServerPort, request.TrustDomain))) {
-		return nil, errors.New("handoff environment differs from its selected permanent endpoint")
+	if result.Status == nil || result.Status.ServerAddress != request.ServerAddress || result.Status.ServerPort != uint32(request.ServerPort) {
+		return nil, errors.New("source-owned SPIRE status differs from its selected permanent endpoint")
 	}
 	proofCtx, stopProof := context.WithTimeout(ctx, time.Minute)
 	defer stopProof()
@@ -716,5 +708,22 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 		}
 	}
 	return nil, errors.Join(proofErr, proofCtx.Err())
+}
+
+// Staging cannot mutate SPIRE identity. An observed command exit or a joined
+// hash mismatch permits normal cleanup; a missing exit cannot prove the remote
+// exec stopped and must retain its dependent controller and site.
+func nativeIdentityStagedHelper(raw []byte, digest string, commandErr error) (string, error) {
+	if commandErr != nil {
+		if CommandExitCode(commandErr) < 0 && !errors.Is(commandErr, ErrUnjoined) {
+			return "", errors.Join(ErrUnjoined, commandErr)
+		}
+		return "", commandErr
+	}
+	fields := strings.Fields(string(raw))
+	if len(fields) != 2 || fields[0] != strings.TrimPrefix(digest, "sha256:") || path.Base(fields[1]) != "helper" || path.Clean(fields[1]) != fields[1] || path.Dir(path.Dir(fields[1])) != "/tmp" || !strings.HasPrefix(path.Base(path.Dir(fields[1])), "nvkr-site-identity.") {
+		return "", errors.New("remote helper staging returned no exact artifact receipt")
+	}
+	return fields[1], nil
 }
 func bytesTrimOneNewline(raw []byte) []byte { return []byte(strings.TrimSuffix(string(raw), "\n")) }

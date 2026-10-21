@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-os-ubuntu24",
-  "requiresCatalogDigest": "sha256:bf59d83b8b858e99772119f296421a4790308c2805b79ee048bff037e01b264e",
+  "requiresCatalogDigest": "sha256:1ce42d22cb097ed33275962cbf243bd3bd7eb78afd321a8958fb0170ab9430ef",
   "components": {
     "nvke-agent": {
       "component": {
@@ -17,22 +17,22 @@
         "commit": "400c24fb6465b042be883d6b62472528520d6291",
         "treeHash": "f3afc02f5c92f4aacda3a1655836a91bef093bfe",
         "toolchainImages": {
-          "amd64": "docker.io/library/golang@sha256:fea12ba16096adec0f699ce1c4da2154d320450e56c1f63671f95d2a3551c77b",
-          "arm64": "docker.io/library/golang@sha256:d3f61539a5743b1f1815ba8dd3627202f55262fb09380feda1d585ccf5a9850e"
+          "amd64": "docker.io/library/golang@sha256:55395706e9703db746cc507abfc4eb2aea75918f8a8024e4848e2cb81004f5ad",
+          "arm64": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9"
         },
         "cgo": true,
         "outputType": "host-package",
         "buildCommand": [
           "bash",
           "-ec",
-          "test \"$(getconf GNU_LIBC_VERSION)\" = 'glibc 2.36' || {\n  echo 'Ubuntu 24 agent requires the pinned Bookworm glibc 2.36 builder' >&2; exit 1;\n}\nGOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \\\n  VERSION=v0.22.0 \\\n  NFPM_BIN=/src/agent/nvkr-tools/nfpm \\\n  DEB_OUTPUT=/src/agent/bin/nvke-agent.deb\n# Match the pinned source's build-guest.sh: the agent is dynamic, but\n# its updater must remain static. A failed check denies the package output.\nbash /src/os-image/nix/check-ubuntu-elf.sh --arch {{.Arch}} \\\n  /src/agent/bin/linux_{{.Arch}}/nvke-agent\nreadonly updater=/src/agent/bin/linux_{{.Arch}}/nvke-agent-updater\ntest -f \"$updater\" || { echo 'expected updater binary' >&2; exit 1; }\nheaders=$(readelf -lW \"$updater\")\n[[ \"$headers\" != *INTERP* ]] || {\n  echo 'expected a static updater, found a program interpreter' >&2; exit 1;\n}\n"
+          "test \"$(getconf GNU_LIBC_VERSION)\" = 'glibc 2.36' || {\n  echo 'Ubuntu 24 agent requires the pinned Bookworm glibc 2.36 builder' >&2; exit 1;\n}\nPATH=\"/src/.nvkr-tools/go/bin:$PATH\" GOTOOLCHAIN=local GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \\\n  VERSION=v0.22.0 \\\n  NFPM_BIN=/src/agent/nvkr-tools/nfpm \\\n  DEB_OUTPUT=/src/agent/bin/nvke-agent.deb\n# Match the pinned source's build-guest.sh: the agent is dynamic, but\n# its updater must remain static. A failed check denies the package output.\nbash /src/os-image/nix/check-ubuntu-elf.sh --arch {{.Arch}} \\\n  /src/agent/bin/linux_{{.Arch}}/nvke-agent\nreadonly updater=/src/agent/bin/linux_{{.Arch}}/nvke-agent-updater\ntest -f \"$updater\" || { echo 'expected updater binary' >&2; exit 1; }\nheaders=$(readelf -lW \"$updater\")\n[[ \"$headers\" != *INTERP* ]] || {\n  echo 'expected a static updater, found a program interpreter' >&2; exit 1;\n}\n"
         ],
         "artifactPath": "agent/bin/nvke-agent.deb",
         "writeDir": "agent/bin",
         "vendorCommand": [
           "bash",
           "-ec",
-          "test \"$(getconf GNU_LIBC_VERSION)\" = 'glibc 2.36' || {\n  echo 'Ubuntu 24 agent requires the pinned Bookworm glibc 2.36 builder' >&2; exit 1;\n}\ncd agent\nexport GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\npins=\"$(sha256sum go.mod go.sum)\"\n# Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.\n# Go owns transport fallback; checksum failures never select another proxy.\n# Keep direct fallback limited to a missing proxy module (404/410).\nproxy=https://proxy.golang.org\nGOPROXY=\"${proxy}|${proxy}/|${proxy}//,direct\" \\\n  timeout --kill-after=10s 540s go mod download || {\n    status=$?; echo 'agent module download failed or exceeded 540s' >&2; exit \"$status\";\n  }\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during download' >&2; exit 1;\n}\n# Offline verification and vendoring run once, after acquisition succeeds.\nGOPROXY=off timeout --kill-after=10s 60s go mod verify || {\n  status=$?; echo 'agent module cache verification failed or exceeded 60s' >&2; exit \"$status\";\n}\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor || {\n  status=$?; echo 'agent offline vendoring failed or exceeded 180s' >&2; exit \"$status\";\n}\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during vendoring' >&2; exit 1;\n}\n# Capture the exact packaging executable alongside the vendored source.\n# The build phase remains offline and cannot bootstrap another nfpm.\nreadonly package_arch='{{.Arch}}'\ncase \"$package_arch\" in\n  amd64) release_arch=x86_64; archive_sha=0660ca602b2d2d2ae4781a06c692b3eeb9d437ffea05b831d76e41f4a3188783; binary_sha=17133a2467ffb7cec851c2d7bae0c6098d09d7ed7d3d101a9605f6a473323936 ;;\n  arm64) release_arch=arm64; archive_sha=1c0f5f2999b9a974bfb04fdb0cc3306096de530ac5dbb25d739cc5f5219c919c; binary_sha=4d7ddf169945f7f557ac5373035d373429050d00476925953560e1ac65e16c74 ;;\n  *) echo 'unsupported nfpm architecture' >&2; exit 1 ;;\nesac\nmkdir nvkr-tools\ncurl --fail --location --proto '=https' --proto-redir '=https' --connect-timeout 30 --max-time 300 --max-filesize 67108864 \\\n  --output nvkr-tools/nfpm.tar.gz \\\n  \"https://github.com/goreleaser/nfpm/releases/download/v2.47.0/nfpm_2.47.0_Linux_${release_arch}.tar.gz\"\nprintf '%s  %s\\n' \"$archive_sha\" nvkr-tools/nfpm.tar.gz | sha256sum --strict -c -\ntar -xzf nvkr-tools/nfpm.tar.gz -C nvkr-tools nfpm LICENSE.md\nprintf '%s  %s\\n' \"$binary_sha\" nvkr-tools/nfpm | sha256sum --strict -c -\nchmod 0755 nvkr-tools/nfpm\n"
+          "test \"$(getconf GNU_LIBC_VERSION)\" = 'glibc 2.36' || {\n  echo 'Ubuntu 24 agent requires the pinned Bookworm glibc 2.36 builder' >&2; exit 1;\n}\n# Retain the source-required compiler; the Packer image owns VM tools.\ncase \"$(uname -m)\" in\n  x86_64) go_arch=amd64; go_sha=65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40 ;;\n  aarch64) go_arch=arm64; go_sha=a06e99309dbcbdca1a8ccd2282c3ee146e55930886e26b4f1193269587165f49 ;;\n  *) echo 'Unsupported Go execution architecture' >&2; exit 1 ;;\nesac\nmkdir -p .nvkr-tools\ncurl --fail --location --max-time 120 --output .nvkr-tools/go.tar.gz \\\n  \"https://go.dev/dl/go1.27.3.linux-${go_arch}.tar.gz\"\nprintf '%s  .nvkr-tools/go.tar.gz\\n' \"$go_sha\" | sha256sum --quiet -c -\ntar -xzf .nvkr-tools/go.tar.gz -C .nvkr-tools\nexport PATH=\"${PWD}/.nvkr-tools/go/bin:$PATH\"\ntest \"$(GOTOOLCHAIN=local go version)\" = \"go version go1.27.3 linux/${go_arch}\"\ncd agent\nexport GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\npins=\"$(sha256sum go.mod go.sum)\"\n# Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.\n# Go owns transport fallback; checksum failures never select another proxy.\n# Keep direct fallback limited to a missing proxy module (404/410).\nproxy=https://proxy.golang.org\nGOPROXY=\"${proxy}|${proxy}/|${proxy}//,direct\" \\\n  timeout --kill-after=10s 540s go mod download || {\n    status=$?; echo 'agent module download failed or exceeded 540s' >&2; exit \"$status\";\n  }\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during download' >&2; exit 1;\n}\n# Offline verification and vendoring run once, after acquisition succeeds.\nGOPROXY=off timeout --kill-after=10s 60s go mod verify || {\n  status=$?; echo 'agent module cache verification failed or exceeded 60s' >&2; exit \"$status\";\n}\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor || {\n  status=$?; echo 'agent offline vendoring failed or exceeded 180s' >&2; exit \"$status\";\n}\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during vendoring' >&2; exit 1;\n}\n# Capture the exact packaging executable alongside the vendored source.\n# The build phase remains offline and cannot bootstrap another nfpm.\nreadonly package_arch='{{.Arch}}'\ncase \"$package_arch\" in\n  amd64) release_arch=x86_64; archive_sha=0660ca602b2d2d2ae4781a06c692b3eeb9d437ffea05b831d76e41f4a3188783; binary_sha=17133a2467ffb7cec851c2d7bae0c6098d09d7ed7d3d101a9605f6a473323936 ;;\n  arm64) release_arch=arm64; archive_sha=1c0f5f2999b9a974bfb04fdb0cc3306096de530ac5dbb25d739cc5f5219c919c; binary_sha=4d7ddf169945f7f557ac5373035d373429050d00476925953560e1ac65e16c74 ;;\n  *) echo 'unsupported nfpm architecture' >&2; exit 1 ;;\nesac\nmkdir nvkr-tools\ncurl --fail --location --proto '=https' --proto-redir '=https' --connect-timeout 30 --max-time 300 --max-filesize 67108864 \\\n  --output nvkr-tools/nfpm.tar.gz \\\n  \"https://github.com/goreleaser/nfpm/releases/download/v2.47.0/nfpm_2.47.0_Linux_${release_arch}.tar.gz\"\nprintf '%s  %s\\n' \"$archive_sha\" nvkr-tools/nfpm.tar.gz | sha256sum --strict -c -\ntar -xzf nvkr-tools/nfpm.tar.gz -C nvkr-tools nfpm LICENSE.md\nprintf '%s  %s\\n' \"$binary_sha\" nvkr-tools/nfpm | sha256sum --strict -c -\nchmod 0755 nvkr-tools/nfpm\n"
         ],
         "sourceDateEpoch": 1792548398
       }
@@ -94,13 +94,6 @@
         "tag": "v0.22.0",
         "commit": "400c24fb6465b042be883d6b62472528520d6291",
         "treeHash": "f3afc02f5c92f4aacda3a1655836a91bef093bfe",
-        "patches": [
-          {
-            "name": "patches/capture-schema.patch",
-            "sha256": "sha256:dd80edd27f7f2dbba79774ad90cbe4036bb187e191b4dbd992a64b0dece4c4b8",
-            "content": "--- a/os-image/packer/scripts/capture-apt-acquisitions.py\n+++ b/os-image/packer/scripts/capture-apt-acquisitions.py\n@@ -26,4 +26,4 @@\n-SCHEMA = \"nkd.dev/package-acquisitions/v1\"\n+SCHEMA = \"nvkr.dev/package-acquisitions/v1\"\n MAX_PACKAGES = 16384\n MAX_PACKAGE_BYTES = 1 << 30\n MAX_TOTAL_BYTES = 7 << 30\n"
-          }
-        ],
         "toolchainImages": {
           "amd64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:1415193ed0c50cd9c3d5b3bbd6207728262db3469c6ccd36717d47a6f50e3c0e",
           "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3"
@@ -180,13 +173,6 @@
         "tag": "v0.22.0",
         "commit": "400c24fb6465b042be883d6b62472528520d6291",
         "treeHash": "f3afc02f5c92f4aacda3a1655836a91bef093bfe",
-        "patches": [
-          {
-            "name": "patches/capture-schema.patch",
-            "sha256": "sha256:dd80edd27f7f2dbba79774ad90cbe4036bb187e191b4dbd992a64b0dece4c4b8",
-            "content": "--- a/os-image/packer/scripts/capture-apt-acquisitions.py\n+++ b/os-image/packer/scripts/capture-apt-acquisitions.py\n@@ -26,4 +26,4 @@\n-SCHEMA = \"nkd.dev/package-acquisitions/v1\"\n+SCHEMA = \"nvkr.dev/package-acquisitions/v1\"\n MAX_PACKAGES = 16384\n MAX_PACKAGE_BYTES = 1 << 30\n MAX_TOTAL_BYTES = 7 << 30\n"
-          }
-        ],
         "toolchainImages": {
           "amd64": "sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0",
           "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3"
@@ -267,13 +253,6 @@
         "tag": "v0.22.0",
         "commit": "400c24fb6465b042be883d6b62472528520d6291",
         "treeHash": "f3afc02f5c92f4aacda3a1655836a91bef093bfe",
-        "patches": [
-          {
-            "name": "patches/capture-schema.patch",
-            "sha256": "sha256:dd80edd27f7f2dbba79774ad90cbe4036bb187e191b4dbd992a64b0dece4c4b8",
-            "content": "--- a/os-image/packer/scripts/capture-apt-acquisitions.py\n+++ b/os-image/packer/scripts/capture-apt-acquisitions.py\n@@ -26,4 +26,4 @@\n-SCHEMA = \"nkd.dev/package-acquisitions/v1\"\n+SCHEMA = \"nvkr.dev/package-acquisitions/v1\"\n MAX_PACKAGES = 16384\n MAX_PACKAGE_BYTES = 1 << 30\n MAX_TOTAL_BYTES = 7 << 30\n"
-          }
-        ],
         "toolchainImages": {
           "amd64": "sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0",
           "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3"
@@ -353,13 +332,6 @@
         "tag": "v0.22.0",
         "commit": "400c24fb6465b042be883d6b62472528520d6291",
         "treeHash": "f3afc02f5c92f4aacda3a1655836a91bef093bfe",
-        "patches": [
-          {
-            "name": "patches/capture-schema.patch",
-            "sha256": "sha256:dd80edd27f7f2dbba79774ad90cbe4036bb187e191b4dbd992a64b0dece4c4b8",
-            "content": "--- a/os-image/packer/scripts/capture-apt-acquisitions.py\n+++ b/os-image/packer/scripts/capture-apt-acquisitions.py\n@@ -26,4 +26,4 @@\n-SCHEMA = \"nkd.dev/package-acquisitions/v1\"\n+SCHEMA = \"nvkr.dev/package-acquisitions/v1\"\n MAX_PACKAGES = 16384\n MAX_PACKAGE_BYTES = 1 << 30\n MAX_TOTAL_BYTES = 7 << 30\n"
-          }
-        ],
         "toolchainImages": {
           "amd64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:1415193ed0c50cd9c3d5b3bbd6207728262db3469c6ccd36717d47a6f50e3c0e",
           "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3"

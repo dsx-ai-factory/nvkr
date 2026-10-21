@@ -712,8 +712,12 @@ func (s *nativeSiteAttempt) runTenantRequest(ctx context.Context, runner Runner,
 		s.sequence++
 		return runner.Capture(ctx, args, fmt.Sprintf("native-site-%03d-%s", s.sequence, phase), timeout)
 	}
+	workloadImage, err := nativeImageDigestReference(s.assets.Images["workload"])
+	if err != nil {
+		return err
+	}
 	progress.update(time.Now(), "tenant-cloud-init", observed)
-	if err := runNativeCloudInit(budget, out, tenantConfig, kubectl, request.Kubernetes, s.tenantNodeCount(), observed, capture); err != nil {
+	if err := runNativeCloudInit(budget, out, tenantConfig, kubectl, request.Kubernetes, workloadImage, s.tenantNodeCount(), observed, capture); err != nil {
 		return err
 	}
 	if err := waitTenantDNS(budget, tenantConfig, kubectl, runner.Progress, capture); err != nil {
@@ -721,7 +725,7 @@ func (s *nativeSiteAttempt) runTenantRequest(ctx context.Context, runner Runner,
 	}
 	progress.update(time.Now(), "tenant-workload", observed)
 	s.nodes = observed
-	s.workload, err = runTenantWorkload(budget, out, tenantConfig, kubectl, capture)
+	s.workload, err = runTenantWorkload(budget, out, tenantConfig, kubectl, workloadImage, capture)
 	return err
 }
 

@@ -325,8 +325,7 @@ The shared workflow:
    before success. Without it, `run` and `e2e` return after successful checks
    and retain the environment in an independent service owner. They print its
    exact `status --session` and `cleanup --session` commands after restoring the
-   terminal. Leaving their TUI does not request cleanup. The advanced `native`
-   command retains its foreground lifetime; Ctrl-C there requests cleanup.
+   terminal. Leaving their TUI does not request cleanup.
 
 Runtime images are verified local OCI outputs. The adapter imports bootstrap
 archives into Kind's containerd and delivers guest archives through owned local
@@ -605,13 +604,13 @@ Mac or Ubuntu invocation has passed.
 
 ### Reuse a native site from Go tests
 
-Go tests in NVKE or a separate customer module can import `client/v1` and call
-`client.New().WithNativeSite` with the same descriptive native configuration and
+Go tests in NVKE or a separate customer module can import `pkg/nvkr/demo` and call
+`demo.WithSite` with the same descriptive native configuration and
 completed artifact/tool Runs used by the CLI. This provisional diagnostic facade
 delegates to the existing owner; it adds no NVKR lifecycle or qualification API.
-This starts the site once. `NativeSite.CreateTenant` creates one tenant and runs
+This starts the site once. `Site.CreateTenant` creates one tenant and runs
 the existing node, host cloud-init and single workload/DNS checks; its private
-kubeconfig is then available for additional Go tests. Select `NativeDemoConfig.Conformance`
+kubeconfig is then available for additional Go tests. Select `Config.Conformance`
 before opening the site to request one control plane and two workers and admit
 the conformance tool outputs.
 
@@ -619,13 +618,13 @@ For a combined product Run and its matching native-tools Run, the explicit
 selection is:
 
 ```go
-import client "github.com/dsx-ai-factory/nvkr/client/v1"
+import "github.com/dsx-ai-factory/nvkr/pkg/nvkr/demo"
 
-cfg := client.NativeDemoConfig{
+cfg := demo.Config{
     Repository: repo,
     NVKR: filepath.Join(repo, "bin", "nvkr"),
     DemoExecutable: filepath.Join(repo, "bin", "nvke-demo"),
-    Runs: client.NativeDemoRunInputs{
+    Runs: demo.RunInputs{
         OS: productRun, Components: productRun, Site: productRun,
         Profiles: productRun, Providers: productRun, Runtime: productRun,
         Tools: toolsRun, HostTools: toolsRun,
@@ -646,8 +645,8 @@ deployment configuration. `reports` must be an existing directory on a filesyste
 admitted for Run capture; every suite output path below must be fresh.
 
 ```go
-func exerciseTenants(ctx context.Context, cfg client.NativeDemoConfig, reports string) error {
-    return client.New().WithNativeSite(ctx, cfg, func(ctx context.Context, site *client.NativeSite) error {
+func exerciseTenants(ctx context.Context, cfg demo.Config, reports string) error {
+    return demo.WithSite(ctx, cfg, func(ctx context.Context, site *demo.Site) error {
         for _, name := range []string{"first-tenant", "second-tenant"} {
             tenant, err := site.CreateTenant(ctx, name)
             if err != nil {
@@ -686,31 +685,30 @@ race-test coverage; a real site-reuse test remains externally unverified.
 
 ## Private site identity operation helper
 
-`make site-identity-helper` builds a fixed Linux ARM64 helper for execution in
-an existing admitted NVKE controller container. `pkg/nvkr/siteidentity` owns its
-mTLS probe, fixed renderer operation and authenticated fresh-peer observation;
+The shared site-startup tool catalog builds a fixed Linux ARM64 helper for
+execution in an existing admitted NVKE controller container. `pkg/nvkr/siteidentity` owns its
+mTLS probe, upstream SPIRE reconfiguration and authenticated fresh-peer observation;
 the executable only adapts bounded standard input/output and coded errors.
-Both native host selections consume the same Linux ARM64 helper and the
-selected NVKE SPIRE renderer through the shared site-startup tool output. These
-are built from catalog-selected sources; the normal startup owner invokes the
-helper in its existing admitted controller container. Building the helper alone
+Both native host selections consume the same Linux ARM64 helper through the
+shared site-startup tool output. It is built from catalog-selected source;
+the normal startup owner invokes it in its existing admitted controller container.
+Building the helper alone
 does not deploy, import SPIRE policy or repair a site.
 
 It uses the upstream generated NodeAgent client and the existing controller CSI
 workload identity. No arbitrary script, credential, socket relay, downloader or
-new Pod is accepted. The request describes selected endpoints/identities and
-expected exact environment, CA and installed-renderer hashes. Those descriptions
-must come from the native owner's admitted artifacts and source contract; the
-helper does not grant trust to caller-supplied paths or membership. Its client
-library compatibility pin is distinct from the demo's product source selections.
+new Pod is accepted. The request describes selected endpoints and identities.
+Those descriptions must come from the native owner's admitted artifacts and source contract; the
+helper does not grant trust to caller-supplied paths or membership. Its generated
+client is resolved to the same stock NVKE v0.22.0 source.
 
 The helper reports remote completion independently from its process exit:
 
 | Completion | Meaning |
 | --- | --- |
 | `not-started` | No mutating RPC was dispatched. Probe-only requests retain this state. |
-| `joined-failure` | The fixed operation failed before manager calls, or those calls completed but the caller context or local identity proof failed. |
-| `joined-success` | The fixed operation joined and a fresh authenticated peer proof succeeded. |
+| `joined-failure` | Reconfiguration returned applied/unchanged, but the caller context or subsequent identity proof failed. |
+| `joined-success` | Source-owned reconfiguration, exact endpoint status and fresh authenticated peer proof succeeded. |
 | `unknown` | An accepted terminal remote response is unavailable. Retain dependencies and do not automatically retry. |
 
 A missing or malformed result is also unknown to the native caller, even if a
@@ -720,14 +718,13 @@ output delivery has a 2-second deadline. Cancellation before dispatch prevents
 mutation. The executable consumes its inherited directional pipes and adopts
 private nonblocking descriptors before these deadline checks. Direct Go callers
 retain the existing borrowed, pollable-file contract.
-The fixed guest operation bounds itself to 110 seconds plus a 5-second
-kill allowance, and the helper drains its synchronous RPC for 135 seconds despite
-caller cancellation. Only SPIRE restarts; the installed renderer preserves the
-CA and TPM material and verifies the node-agent PID remains unchanged.
-Failed bounded renderer or restart clients report `unknown`: systemd can retain
-queued or running work after a client exits, including a generic error exit.
-Timeouts, signals and inconsistent remote status/exit combinations also require
-dependency retention. A failed client is not manager-job completion proof.
+The helper delegates mutation to NVKE's `ReconfigureSpireAgent`, which updates
+the configuration and boot environment, restarts SPIRE and waits for an SVID.
+It drains that RPC for 210 seconds despite caller cancellation. A failed outcome
+or missing response remains `unknown`: the upstream systemd runner can own work
+after its client ends. `GetSpireAgentStatus` must then confirm the exact permanent
+endpoint, applied configuration and usable host SVID. NVKR implements neither
+the guest configuration rewrite nor a replacement shell operation.
 
 The upstream Workload API picker selects the admitted caller on every update.
 Certificate renewal may change its bytes; another default identity is refused.
@@ -736,17 +733,15 @@ Fresh peer proof requires the same SPIFFE and boot identities, a different
 certificate serial, issuance within 60 seconds before dispatch and more than
 60 seconds of validity at observation. It records certificate metadata only.
 The helper result alone does not authorize bootstrap removal. Before creating
-VMs, the native owner requires all three startup members: `nerdctl`, the helper
-and `nvke-spire-configure-source`. It recompiles the completed tool and OS Runs
-from their captured inputs and requires the renderer's unmodified source to
-match the selected OS SPIRE package. Older tool Runs missing these members must
-be rebuilt from the updated native inputs.
+VMs, the native owner requires `nerdctl` and the helper. It recompiles completed
+tool and OS Runs from their captured inputs and requires their helper and SPIRE
+package producers to retain unmodified source. Older tool Runs missing these
+members must be rebuilt from the updated native inputs.
 
 After deployment and before stopping temporary bootstrap, that owner imports
 the original source-exported host policy without replacement. It observes the
 exact controller/CSI context, permanent registration, controller-derived TPM
-allowlist, new TPM agent and fresh same-boot host certificate. Original authored
-environment bytes, the owned CA and admitted renderer bind the fixed operation.
+allowlist, new TPM agent and fresh same-boot host certificate.
 Only the complete native operation issues its private bootstrap-stop receipt.
 
 A joined handoff failure retains bootstrap and site for foreground debugging
@@ -754,13 +749,9 @@ when cleanup is not selected. Unknown remote completion preserves dependencies
 and refuses an automatic retry. The Go scoped API retains its documented
 callback lifetime and joined cleanup rules. The TUI reports the handoff as a
 site stage; a site failure does not complete tenant or conformance checks.
-A private Linux ARM64 Run, `site-startup-tools-arm64-acceptance-20261021-02`,
-built the shared output from its public source pins and verified all three
-executable members. Its delivered helper also passed an isolated invalid-request
-subprocess check using the existing canonical result decoder. These checks do
-not establish an authenticated handoff through integrated startup or a fresh
-customer first run. Complete current-source Mac and Ubuntu acceptance remain
-externally unverified.
+The earlier three-member helper Run exercised the preceding shell implementation;
+it does not validate this source-owned RPC revision. Fresh integrated Mac and Ubuntu
+acceptance of the reduced helper remains externally unverified.
 
 ## Where the NVKE versions come from
 
@@ -773,9 +764,9 @@ below. NVKR verifies the pinned commit and tree; NVIDIA OVN retains its separate
 | --- | --- | --- |
 | Native host CLI, installer and NICoSim | `v0.22.0` / `400c24fb` | [Shared tools lock](../inputs/catalogs/tools/native/pins.lock.yaml) |
 | Site CLI/controller/charts and provisioned provider | `v0.22.0` / `400c24fb` | [Native site lock](../inputs/catalogs/nvke/native-site-arm64/pins.lock.yaml) |
-| OS, agent and kubeadm | `v0.22.0` / `400c24fb` | [Native OS lock](../inputs/catalogs/node-images/native-arm64/pins.lock.yaml) |
+| OS, agent and kubeadm | `v0.22.0` / `400c24fb` | [Shared release OS lock](../inputs/catalogs/node-images/release/pins.lock.yaml) |
 | Profiles and runbooks | `v0.22.0` / `400c24fb` | [Native profiles lock](../inputs/catalogs/controller-profiles/native-nvidia-arm64/pins.lock.yaml) |
-| Upstream SPIRE/TPM agent packaging | `v0.22.0` / `400c24fb` | [Native OS lock](../inputs/catalogs/node-images/native-arm64/pins.lock.yaml) |
+| Upstream SPIRE/TPM agent packaging | `v0.22.0` / `400c24fb` | [Shared release OS lock](../inputs/catalogs/node-images/release/pins.lock.yaml) |
 | NVIDIA OVN image/chart | [`8af51273`](https://github.com/dsx-ai-factory/ovn-kubernetes/commit/8af51273d52dfa07454435d18d37230e582d797a), 2.4.2 | [Native NVIDIA overlay](../inputs/catalogs/node-images/variants/native-nvidia.json) |
 
 Both hosts use these same source selections. SPIRE packaging and its startup

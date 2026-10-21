@@ -63,11 +63,6 @@ demo: go-version-check ## Build the downstream Go local NVKE demo CLI (calls nvk
 demo-test-bin: go-version-check ## Compile opt-in native NVKE E2E tests; does not run them.
 	go test -c -o $(DEMO_TEST_BIN) ./internal/nvkedemo
 
-.PHONY: site-identity-helper
-site-identity-helper: go-version-check ## Build the private fixed Linux ARM64 site identity helper; does not deploy.
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -buildvcs=false -o bin/nvkr-site-identity-helper-linux-arm64 ./cmd/nvkr-site-identity-helper
-	chmod 0755 bin/nvkr-site-identity-helper-linux-arm64
-
 .PHONY: install
 install: ## Install nvkr into $$(go env GOBIN).
 	go install -ldflags '$(LDFLAGS)' ./cmd/nvkr
@@ -250,15 +245,13 @@ workflows-check: workflow-generator pipeline-dev-check catalog-refresh-check ## 
 # The private NVKE source the installed catalog refresh workflow was rendered with.
 CATALOG_REFRESH_SOURCE ?= dsx-ai-factory/nvke:NKE_SOURCE_TOKEN
 
-# Daily refresh is suspended while maintained roots require an explicit prerelease.
-# Restore the default schedule in both targets when stable constraints are adopted.
 .PHONY: catalog-refresh-check
 catalog-refresh-check: workflow-generator ## Check the installed catalog refresh workflow against `catalog update-ci`.
 	@# The installed file is generated, so it must equal the renderer's output for the
 	@# same source option and the canonical generator stamp. Regenerate it with
 	@# `make catalog-refresh-generate`; never edit the file by hand.
 	@rendered="$$(mktemp)" && trap 'rm -f "$$rendered"' EXIT && \
-	 bin/nvkr-exec catalog update-ci --schedule "" --source-checkout "$(CATALOG_REFRESH_SOURCE)" > "$$rendered" && \
+	 bin/nvkr-exec catalog update-ci --source-checkout "$(CATALOG_REFRESH_SOURCE)" > "$$rendered" && \
 	 { diff -u .github/workflows/catalog-refresh.yaml "$$rendered" || { \
 	   echo "catalog-refresh.yaml differs from catalog update-ci output; regenerate it from the generator" >&2; exit 1; }; }
 
@@ -267,7 +260,7 @@ catalog-refresh-generate: workflow-generator ## Regenerate the installed catalog
 	@# Render to a temporary file and replace the installed workflow only after the renderer
 	@# succeeds: a refused render (source, stamp or closure admission) leaves it untouched.
 	@rendered="$$(mktemp .github/workflows/.catalog-refresh.XXXXXX)" && trap 'rm -f "$$rendered"' EXIT && \
-	 bin/nvkr-exec catalog update-ci --schedule "" --source-checkout "$(CATALOG_REFRESH_SOURCE)" > "$$rendered" && \
+	 bin/nvkr-exec catalog update-ci --source-checkout "$(CATALOG_REFRESH_SOURCE)" > "$$rendered" && \
 	 chmod 0644 "$$rendered" && mv "$$rendered" .github/workflows/catalog-refresh.yaml
 
 .PHONY: workflows-generate

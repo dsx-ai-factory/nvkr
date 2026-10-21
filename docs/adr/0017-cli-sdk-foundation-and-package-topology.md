@@ -385,9 +385,9 @@ metadata, never a receipt. This deliberately retains the existing deep-owner typ
 instead of adding a second runtime or inventory schema. A facade-only construction API and independent
 `client/v1` acceptance harness remain deferred; direct deep-package tests do not establish that acceptance.
 
-The provisional downstream diagnostic `Client.WithNativeSite` delegates to the existing native site owner.
-`NativeDemoConfig`, `NativeDemoRunInputs` and `NativeDemoResources` alias its descriptive configuration;
-`NativeSite` and `NativeTenant` alias its opaque callback-scoped handles. This deliberate coupling adds no
+The provisional downstream diagnostic `demo.WithSite` delegates to the existing native site owner.
+`Config`, `RunInputs` and `Resources` alias its descriptive configuration;
+`Site` and `Tenant` alias its opaque callback-scoped handles. This deliberate coupling adds no
 public lifecycle object, artifact authentication rule, deployment schema or qualification authority. Every
 native admission and cleanup invariant remains with that owner. Callback exit cancels and joins operations;
 handles cannot be detached or restored from paths. The adapter requires the existing matching `nvkr` and

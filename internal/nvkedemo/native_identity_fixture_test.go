@@ -46,7 +46,7 @@ func installNativeIdentityFixture(t *testing.T, attempt *nativeSiteAttempt, tool
 	result.After.NotBefore = time.Now().Add(-time.Second)
 	result.After.NotAfter = time.Now().Add(time.Hour)
 	result.CallerID = "spiffe://" + td + "/nvke-service/controller-fixture"
-	result.Script.EnvironmentSHA256 = plainSHA([]byte("SPIRE_SERVER_ADDRESS=172.30.0.2\nSPIRE_SERVER_PORT=32123\nSPIRE_TRUST_DOMAIN=" + td + "\n"))
+	result.Status = &siteidentity.AgentStatus{ServerAddress: "172.30.0.2", ServerPort: 32123, ConfigApplied: true, HasValidSVID: true, SPIFFEID: selected.SPIFFEID, ExpiresAt: time.Now().Add(time.Hour).Unix()}
 	probe := siteidentity.Result{SchemaVersion: siteidentity.SchemaVersion, Operation: "probe", Completion: siteidentity.NotStarted, CallerID: result.CallerID, Before: result.Before}
 	writeJSON := func(name string, value any) {
 		t.Helper()
@@ -71,11 +71,9 @@ func installNativeIdentityFixture(t *testing.T, attempt *nativeSiteAttempt, tool
 		}
 	}
 	helper := []byte("synthetic helper artifact bytes\n")
-	renderer := []byte("synthetic selected renderer bytes\n")
 	writeTenantFixture(t, filepath.Join(tools, nativeIdentityHelper), helper, 0700)
-	writeTenantFixture(t, filepath.Join(tools, nativeSpireRendererSource), renderer, 0700)
 	attempt.assets.SiteTools = tools
-	attempt.assets.identity = &nativeIdentityAssets{helperSHA: "sha256:" + plainSHA(helper), rendererSHA: "sha256:" + plainSHA(renderer)}
+	attempt.assets.identity = &nativeIdentityAssets{helperSHA: "sha256:" + plainSHA(helper)}
 	attempt.spireEnvironment = nativeBootstrapSpireEnvironment(NativeSiteStartup{Name: "nvke-native-site", Gateway: attempt.bridge.gateway.String()})
 	writeTenantFixture(t, filepath.Join(root, "identity-helper-receipt"), []byte(plainSHA(helper)+"  /tmp/nvkr-site-identity.fixture/helper\n"), 0600)
 	controller := "docker.io/library/controller@sha256:" + strings.Repeat("c", 64)
@@ -158,9 +156,8 @@ func assertNativeIdentityFixtureCompletion(t *testing.T, root string) {
 		if err != nil || request.Operation != operation {
 			t.Fatalf("fixed request was not admitted: %v", err)
 		}
-		original := nativeBootstrapSpireEnvironment(NativeSiteStartup{Name: "nvke-native-site", Gateway: "172.30.0.1"})
-		if request.OldEnvironmentSHA256 != plainSHA(original) {
-			t.Fatal("original authored environment hash was not passed")
+		if request.ServerAddress != "172.30.0.2" || request.ServerPort != 32123 {
+			t.Fatal("source-owned reconfiguration did not retain the selected permanent endpoint")
 		}
 	}
 	receipts, err := filepath.Glob(filepath.Join(root, "site-identity-*", "completed.json"))

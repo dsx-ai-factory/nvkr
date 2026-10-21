@@ -71,9 +71,7 @@ func nativeRuntimeImageRoles() []string {
 	for _, role := range runtimeImages {
 		roles = append(roles, "runtime-"+role)
 	}
-	for _, image := range nativeCAPIAuthImages {
-		roles = append(roles, image.role)
-	}
+	roles = append(roles, nativeCAPIAuthImages...)
 	return roles
 }
 
@@ -201,11 +199,7 @@ func validateSiteStartup(cfg NativeSiteStartup) error {
 		if _, err := nativeImageImportScript("downloads/"+role+".tar", reference); err != nil {
 			return fmt.Errorf("site image %s: %w", role, err)
 		}
-		if role == "workload" {
-			if reference != WorkloadImage {
-				return errors.New("site workload differs from the shared diagnostic image")
-			}
-		} else if strings.HasPrefix(role, "runtime-") || strings.HasPrefix(role, "capi-exec-") {
+		if strings.HasPrefix(role, "runtime-") || strings.HasPrefix(role, "capi-exec-") {
 			if !strings.HasPrefix(reference, "docker.io/nvkr-local/"+strings.TrimPrefix(role, "runtime-")+"@") {
 				return fmt.Errorf("site runtime image %s differs from its selected local alias", role)
 			}

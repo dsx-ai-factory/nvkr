@@ -299,7 +299,7 @@ func admitDemo(ctx context.Context, cfg Config) (demoAdmission, error) {
 		return admitted, err
 	}
 	layout := filepath.Join(simulatorRoot, "packages", SimulatorBundle)
-	if err = diagnosticIndexMatches(layout, simulator.Digest); err != nil {
+	if err = diagnosticIndexMatches(ctx, layout, simulator.Digest); err != nil {
 		return admitted, err
 	}
 	parent, _, err := securepath.OpenDirectory(filepath.Dir(out))

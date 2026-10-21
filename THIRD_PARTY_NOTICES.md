@@ -26,7 +26,7 @@ Regenerate with `make notices`.
 | `github.com/cpuguy83/go-md2man/v2` | v2.0.7 | MIT |
 | `github.com/docker/cli` | v29.7.2+incompatible | Apache-2.0 |
 | `github.com/docker/docker-credential-helpers` | v0.9.3 | MIT |
-| `github.com/dsx-ai-factory/nvke/agent` | v0.3.0-rc.2.0.20261020152104-9ac6832ac965 | Apache-2.0 |
+| `github.com/dsx-ai-factory/nvke/agent` | v0.3.0 | Apache-2.0 |
 | `github.com/fsnotify/fsnotify` | v1.9.0 | BSD-3-Clause |
 | `github.com/gdamore/encoding` | v1.0.1 | Apache-2.0 |
 | `github.com/gdamore/tcell/v2` | v2.13.10 | Apache-2.0 |
@@ -381,7 +381,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ## github.com/dsx-ai-factory/nvke/agent
 
-Version: v0.3.0-rc.2.0.20261020152104-9ac6832ac965
+Version: v0.3.0
 
 ```
 Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.

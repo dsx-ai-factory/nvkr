@@ -89,7 +89,7 @@ func selectSiteOutput(ctx context.Context, root, name, kind string) (SelectedOut
 		return selected, err
 	}
 	layout := filepath.Join(root, "packages", name)
-	if err = diagnosticIndexMatches(layout, observation.Digest); err != nil {
+	if err = diagnosticIndexMatches(ctx, layout, observation.Digest); err != nil {
 		return selected, err
 	}
 	return SelectedOutput{Layout: layout, Observation: observation}, nil

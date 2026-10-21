@@ -242,7 +242,7 @@ func TestRegularProducerMembershipRejectsSubstitution(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			err := diagnosticIndexMatches(layout, digest)
+			err := diagnosticIndexMatches(t.Context(), layout, digest)
 			if (err == nil) != (name == "exact") {
 				t.Fatalf("index acceptance:%v", err)
 			}

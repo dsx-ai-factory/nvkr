@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dsx-ai-factory/nvkr/internal/nativeqemu"
+	"github.com/dsx-ai-factory/nvkr/internal/qemutpm"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"go.yaml.in/yaml/v3"
 )
@@ -109,14 +109,14 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 	}
 	runner := Runner{Work: out, Env: NativeEnvironment(), Progress: cfg.Progress}
 	runner.Env = SetEnv(runner.Env, map[string]string{"PATH": tools + string(os.PathListSeparator) + environmentValue(runner.Env, "PATH")})
-	var tpm *nativeqemu.Adapter
+	var tpm *qemutpm.Adapter
 	if runtime.GOOS == "darwin" && (cfg.site != nil || cfg.Accelerator == "tcg") {
 		qemu, qemuErr := commandPath("qemu-system-aarch64", runner.Env)
 		swtpm, tpmErr := commandPath("swtpm", runner.Env)
 		if err := errors.Join(qemuErr, tpmErr); err != nil {
 			return err
 		}
-		tpm, err = nativeqemu.Prepare(ctx, nativeqemu.Options{Executable: cfg.DemoExecutable, Directory: filepath.Join(out, "native-qemu"), Instances: filepath.Join(out, "simulator", "instances"), QEMU: qemu, SWTPM: swtpm, Environment: runner.Env, Accelerator: nativeqemu.Accelerator(cfg.Accelerator)})
+		tpm, err = qemutpm.Prepare(ctx, qemutpm.Options{Executable: cfg.DemoExecutable, Directory: filepath.Join(out, "native-qemu"), Instances: filepath.Join(out, "simulator", "instances"), QEMU: qemu, SWTPM: swtpm, Environment: runner.Env, Accelerator: qemutpm.Accelerator(cfg.Accelerator)})
 		if err != nil {
 			return err
 		}
@@ -484,7 +484,11 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 				// Registered after every dependent cleanup defer: callback
 				// panic/Goexit must publish unsafe join state before unwinding
 				// any guest, service or network owner, without a return value.
-				defer func() { result = errors.Join(result, cfg.site.unjoinedWork) }()
+				defer func() {
+					if cfg.site.unjoinedWork != nil && !errors.Is(result, cfg.site.unjoinedWork) {
+						result = errors.Join(result, cfg.site.unjoinedWork)
+					}
+				}()
 				return cfg.site.ready(ctx, runner, row, tools, out, server)
 			}
 			if disk.requests.Load() == 0 {

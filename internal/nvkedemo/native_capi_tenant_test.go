@@ -35,7 +35,7 @@ func nativeCAPITenantFixture(t *testing.T, subnet, network string) nativeSiteAtt
 		bridge: nativeBridgeConfig{prefix: prefix, gateway: gateway},
 		assets: NativeAssets{Installer: root, installerSelection: selection, Images: map[string]NativeImageAsset{
 			"ovn":      {File: payload, ManifestDigest: digest, Reference: "localhost/nvke/ovn-kubernetes@" + digest},
-			"workload": {File: payload, Reference: WorkloadImage},
+			"workload": {File: payload, Reference: "example.invalid/selected-workload@" + digest, ManifestDigest: digest},
 		}},
 	}
 }
@@ -75,7 +75,7 @@ func TestNativeCAPITenantPreservesSourceCredentialFilesAndLocalImages(t *testing
 					t.Fatal("CAPI template lost the source-selected actual QCOW boot script", err)
 				}
 				commands := infra.PreCommands[0]
-				for _, required := range []string{"NVKE_AGENT_SKIP_START=1", "nvke-kubeadm-distro-" + request.Kubernetes, "nvke-cni-ovn-charts-" + request.CNIVersion, attempt.api + "/files/ovn.tar", attempt.api + "/files/workload.tar", "sha256sum -c -", "inspecti --quiet", "test ! -e /etc/nke/spire.env", "test -s /etc/spire-agent/agent.conf", "systemctl restart spire-agent.service"} {
+				for _, required := range []string{"NVKE_AGENT_SKIP_START=1", "nvke-kubeadm-distro-" + request.Kubernetes, "nvke-cni-ovn-charts-" + request.CNIVersion, attempt.api + "/files/ovn.tar", attempt.api + "/files/workload.tar", "sha256sum -c -", "inspecti --quiet", attempt.assets.Images["workload"].Reference, "test ! -e /etc/nke/spire.env", "test -s /etc/spire-agent/agent.conf", "systemctl restart spire-agent.service"} {
 					if !strings.Contains(commands, required) {
 						t.Fatalf("missing real bootstrap step %s", required)
 					}

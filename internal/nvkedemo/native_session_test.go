@@ -36,6 +36,11 @@ func nativeSessionFixture(t *testing.T, conformance bool) (nativeSiteAttempt, Ru
 	writeTenantFixture(t, cli, []byte("#!/bin/sh\nexec \"$SESSION_TOOL\" -test.run='^TestNativeSessionFixtureTool$' -- \"$@\"\n"), 0700)
 	writeTenantFixture(t, filepath.Join(runner.Work, "site.kubeconfig"), []byte("private site fixture\n"), 0600)
 	attempt := nativeCAPITenantFixture(t, GuestCIDR, "ovn")
+	workloadPods, err := json.Marshal(map[string]any{"items": []any{map[string]any{"status": map[string]any{"containerStatuses": []any{map[string]string{"imageID": attempt.assets.Images["workload"].Reference}}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeTenantFixture(t, filepath.Join(root, "pods.json"), workloadPods, 0600)
 	attempt.assets.CLI, attempt.assets.HostTools = cli, selected.session.Tools
 	attempt.tenantTimeout = time.Minute
 	if conformance {
@@ -231,8 +236,8 @@ func TestNativeSessionRejectsMissingOwnershipAndNilCallback(t *testing.T) {
 }
 
 func TestNativeSessionUnjoinedOutcomeCannotBeSwallowed(t *testing.T) {
-	for _, concurrent := range []bool{false, true} {
-		t.Run(fmt.Sprint(concurrent), func(t *testing.T) {
+	for _, mode := range []string{"returned", "swallowed", "concurrent"} {
+		t.Run(mode, func(t *testing.T) {
 			attempt, runner, root := nativeSessionFixture(t, false)
 			finished := make(chan error, 1)
 			original := errors.New("fixture child join failed")
@@ -241,7 +246,7 @@ func TestNativeSessionUnjoinedOutcomeCannotBeSwallowed(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if concurrent {
+				if mode == "concurrent" {
 					entered := make(chan struct{})
 					go func() {
 						finished <- site.operate(t.Context(), nil, func(ctx context.Context) error {
@@ -253,7 +258,10 @@ func TestNativeSessionUnjoinedOutcomeCannotBeSwallowed(t *testing.T) {
 					<-entered
 					return nil
 				}
-				_ = site.operate(ctx, nil, func(context.Context) error { return errors.Join(original, ErrUnjoined) })
+				operationErr := site.operate(ctx, nil, func(context.Context) error { return errors.Join(original, ErrUnjoined) })
+				if mode == "returned" {
+					return operationErr
+				}
 				if err := tenant.Delete(ctx); !errors.Is(err, ErrUnjoined) || !errors.Is(err, original) {
 					t.Fatalf("delete admitted after swallowed unjoined work: %v", err)
 				}
@@ -265,7 +273,10 @@ func TestNativeSessionUnjoinedOutcomeCannotBeSwallowed(t *testing.T) {
 			if !errors.Is(err, ErrUnjoined) || !errors.Is(err, original) {
 				t.Fatalf("scope lost sticky unjoined outcome: %v", err)
 			}
-			if concurrent {
+			if strings.Count(err.Error(), original.Error()) != 1 {
+				t.Fatalf("scope reported the same child failure repeatedly: %v", err)
+			}
+			if mode == "concurrent" {
 				if err := <-finished; !errors.Is(err, ErrUnjoined) {
 					t.Fatalf("concurrent outcome lost: %v", err)
 				}
@@ -323,6 +334,7 @@ func TestNativeSessionUnjoinedOwnershipSurvivesPanicAndGoexit(t *testing.T) {
 				_ = withNativeSiteScope(t.Context(), &attempt, runner, runner.Work, runner.Work, nil, func(ctx context.Context, site *NativeSite) error {
 					if _, err := site.CreateTenant(ctx, "owned"); err != nil {
 						t.Error(err)
+						operationFinished <- err
 						return err
 					}
 					entered := make(chan struct{})

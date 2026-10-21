@@ -511,3 +511,9 @@ func (w *checkedWriter) tenantStatus(event nvkedemo.ProgressEvent) {
 	}
 	w.emit(fmt.Sprintf("  Tenant  %s elapsed · %s remaining\n          %s\n", max(time.Duration(0), event.Elapsed).Truncate(time.Second), max(time.Duration(0), event.Remaining).Truncate(time.Second), message))
 }
+
+func nativePresentation(progress io.Writer, conformance bool) {
+	if reporter, ok := progress.(nvkedemo.ProgressReporter); ok {
+		reporter.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.NativeDeployment, Conformance: conformance})
+	}
+}

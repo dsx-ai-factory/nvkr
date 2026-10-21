@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -16,22 +17,27 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/layout"
+	"go.yaml.in/yaml/v3"
 )
 
 // NativeAssetConfig selects completed immutable Runs. Extraction and exact
 // content verification remain owned by NVKR; these paths confer no authority.
 type NativeAssetConfig struct {
-	NVKR, ToolsRun, BootstrapRun, DeploymentRun, Out string
-	HostToolsRun, OSRun                              string
-	ControllerRun, ProvidersRun                      string
-	RuntimeRun                                       string
-	Network                                          string
-	Progress                                         io.Writer
+	ToolsRun, BootstrapRun, DeploymentRun, Out string
+	HostToolsRun, OSRun                        string
+	ControllerRun, ProvidersRun                string
+	RuntimeRun                                 string
+	Network                                    string
+	Progress                                   io.Writer
 }
 
 // NativeAssets holds one prepared private runtime view of original outputs.
@@ -55,12 +61,8 @@ type nativeImageSelection struct {
 	observed                      lifecycle.Artifact
 }
 
-// These exact source-overlay references are projected to verified ARM64 child
-// manifests for local import. No parent digest is assigned to different bytes.
-var nativeCAPIAuthImages = []struct{ role, source string }{
-	{"capi-exec-init", "alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6"},
-	{"capi-exec-plugin", "ghcr.io/spiffe/k8s-spiffe-workload-jwt-exec-auth:1.0.0@sha256:e30e90774e5951f84eb6dfb36f972fead08b64c3bfdc0912c5b15f988e79de3a"},
-}
+// These are stable consumer roles; the completed Run owns their source images.
+var nativeCAPIAuthImages = []string{"capi-exec-init", "capi-exec-plugin"}
 
 // PrepareNativeAssets verifies the full bootstrap/deployment image closure
 // and host/site tool bundles before producing a runtime view. No VM starts.
@@ -87,10 +89,6 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 			return assets, err
 		}
 		*root = absolute
-	}
-	tool, err := resolveExisting(cfg.NVKR)
-	if err != nil {
-		return assets, err
 	}
 	out, err := freshDestination(cfg.Out)
 	if err != nil {
@@ -122,9 +120,9 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 		for _, role := range runtimeImages {
 			selections = append(selections, nativeImageSelection{role: "runtime-" + role, root: cfg.RuntimeRun, output: role + "-image-arm64"})
 		}
-		selections = append(selections, nativeImageSelection{role: "workload", root: cfg.RuntimeRun, output: "workload-image-arm64", reference: WorkloadImage})
+		selections = append(selections, nativeImageSelection{role: "workload", root: cfg.RuntimeRun, output: "workload-image-arm64"})
 		for _, image := range nativeCAPIAuthImages {
-			selections = append(selections, nativeImageSelection{role: image.role, root: cfg.RuntimeRun, output: image.role + "-image-arm64"})
+			selections = append(selections, nativeImageSelection{role: image, root: cfg.RuntimeRun, output: image + "-image-arm64"})
 		}
 	}
 	platform := runtime.GOOS + "/" + runtime.GOARCH
@@ -136,8 +134,8 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 	if cfg.HostToolsRun != "" {
 		hostRun = cfg.HostToolsRun
 	}
-	args := []string{tool, "publish", "root"}
-	siteMembers := []string{"nerdctl"}
+	publication := delivery.PublicationRequest{}
+	var siteMembers []string
 	for _, bundle := range []string{hostBundle, "site-startup-tools-arm64"} {
 		run := cfg.ToolsRun
 		if bundle == hostBundle {
@@ -154,10 +152,29 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 			}
 		}
 		root := filepath.Join(run, "packages", bundle)
-		if err := diagnosticIndexMatches(root, observed.Digest); err != nil {
+		indexDigest, err := diagnosticIndexDigest(ctx, root, observed.Digest)
+		if err != nil {
 			return assets, err
 		}
-		args = append(args, "--bundle", bundle+"="+root)
+		inspected, err := inspectAdmittedBinaryBundle(ctx, root, indexDigest)
+		if err != nil {
+			return assets, err
+		}
+		publication.Objects = append(publication.Objects, delivery.ObjectInput{Name: bundle, Kind: "binary-bundle", Path: root,
+			ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: inspected.SemanticDigest, BlobDigest: inspected.RootDigest, Layout: true})
+	}
+	var runtimePlan *factory.Plan
+	var installer *nativeInstallerSelection
+	acquired := make(map[string]string)
+	if cfg.RuntimeRun != "" {
+		installer, err = nativeInstallerSelectionFromRun(ctx, hostRun, hostBundle)
+		if err != nil {
+			return assets, err
+		}
+		runtimePlan, _, err = nativeSelectedRunPlan(ctx, cfg.RuntimeRun, "workload-image-arm64", "oci")
+		if err != nil {
+			return assets, err
+		}
 	}
 	for i := range selections {
 		selection := &selections[i]
@@ -174,8 +191,15 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 		if strings.HasPrefix(selection.role, "capi-exec-") {
 			selection.reference = "docker.io/nvkr-local/" + selection.role + "@" + selection.observed.Digest
 		}
-		if selection.role == "workload" && selection.reference != "docker.io/library/alpine@"+selection.observed.Digest {
-			return assets, errors.New("selected workload differs from the shared diagnostic image")
+		if selection.role == "workload" || slices.Contains(nativeCAPIAuthImages, selection.role) {
+			ref, err := nativeAcquiredImage(runtimePlan, *selection, installer)
+			if err != nil {
+				return assets, err
+			}
+			acquired[selection.role] = ref.String()
+			if selection.role == "workload" {
+				selection.reference = strings.TrimSuffix(ref.String(), "@"+ref.DigestStr()) + "@" + selection.observed.Digest
+			}
 		}
 		root := filepath.Join(selection.root, "packages", selection.output)
 		inspected, err := delivery.InspectContainerImage(ctx, root, "linux/arm64")
@@ -190,9 +214,13 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 	if err := os.Mkdir(out, 0o700); err != nil {
 		return assets, err
 	}
-	runner := Runner{Work: out, Env: NativeEnvironment(), Progress: cfg.Progress}
-	args = append(args, "--out", filepath.Join(out, "publication"))
-	if err := runner.Run(ctx, args, "native-closure-verify", 5*time.Minute); err != nil {
+	publicationPath := filepath.Join(out, "publication")
+	phase := beginProgress(cfg.Progress, "native-closure-verify", PhaseStarted, PhaseFinished, PhaseFailed)
+	limited, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	_, err = delivery.BuildPublicationRoot(limited, publicationPath, publication)
+	cancel()
+	phase.finish(err)
+	if err != nil {
 		return assets, err
 	}
 	assets = NativeAssets{
@@ -200,7 +228,7 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 		Installer: filepath.Join(out, "installer"),
 		Files:     filepath.Join(out, "files"), Images: make(map[string]NativeImageAsset), RuntimeOutputs: make(map[string]SelectedOutput),
 	}
-	if err := extractNativeHostTools(ctx, filepath.Join(hostRun, "packages", hostBundle), filepath.Join(out, "publication"), assets.HostTools, platform); err != nil {
+	if err := extractNativeHostTools(ctx, filepath.Join(hostRun, "packages", hostBundle), publicationPath, assets.HostTools, platform); err != nil {
 		return assets, err
 	}
 	for _, bundle := range []struct {
@@ -209,7 +237,12 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 	}{
 		{"site-startup-tools-arm64", assets.SiteTools, siteMembers},
 	} {
-		if err := runner.Run(ctx, []string{tool, "publish", "extract", "--layout", filepath.Join(out, "publication"), "--bundle", bundle.name, "--out", bundle.directory}, "native-extract-"+bundle.name, 2*time.Minute); err != nil {
+		phase := beginProgress(cfg.Progress, "native-extract-"+bundle.name, PhaseStarted, PhaseFinished, PhaseFailed)
+		limited, cancel := context.WithTimeout(ctx, 2*time.Minute)
+		_, err := delivery.ExtractBinaryBundle(limited, publicationPath, bundle.name, bundle.directory)
+		cancel()
+		phase.finish(err)
+		if err != nil {
 			return assets, err
 		}
 		if err := verifyToolMembers(bundle.directory, bundle.members); err != nil {
@@ -237,7 +270,7 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 		}
 	}
 	if cfg.RuntimeRun != "" {
-		if err := prepareNativeCAPIAuth(ctx, assets); err != nil {
+		if err := prepareNativeCAPIAuth(ctx, assets, acquired); err != nil {
 			return assets, err
 		}
 	}
@@ -247,10 +280,47 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 	return assets, nil
 }
 
+// The replayed Plan binds acquisition metadata to the exact named completed
+// output. Upstream owns parent refs; the lock owns the observed ARM64 child.
+func nativeAcquiredImage(plan *factory.Plan, selected nativeImageSelection, installer *nativeInstallerSelection) (name.Digest, error) {
+	if plan == nil {
+		return name.Digest{}, errors.New("acquired image requires its replayed Run plan")
+	}
+	var component *catalog.Component
+	for _, build := range plan.Builds {
+		if build.Name != selected.output {
+			continue
+		}
+		if build.Platform != "linux/arm64" || build.BuildDigest != selected.observed.BuildDigest {
+			return name.Digest{}, errors.New("acquired image differs from its selected ARM64 output")
+		}
+		for _, item := range build.ResolvedComponents {
+			if item.Name != "native-"+selected.role+"-image" {
+				continue
+			}
+			if component != nil {
+				return name.Digest{}, errors.New("ambiguous acquired image producer")
+			}
+			c := item.Component
+			component = &c
+		}
+	}
+	if component == nil || installer == nil || component.FromSource || component.Prebuilt == nil || len(component.Patches) != 0 || installer.repo == "" || installer.commit == "" || component.Repo != installer.repo || component.Commit != installer.commit || component.SourceDate != installer.sourceDate {
+		return name.Digest{}, errors.New("acquired image and installer source selections differ")
+	}
+	acquired := component.Prebuilt
+	ref, err := name.NewDigest(acquired.Image, name.StrictValidation)
+	if err != nil || !nativeImageReferenceIsCanonical(ref, acquired.Image) || ref.DigestStr() != acquired.ImageParentDigest || !canonical.IsDigest(acquired.Digests["arm64"]) || acquired.Digests["arm64"] != selected.observed.Digest {
+		return name.Digest{}, errors.New("acquired image parent or ARM64 child differs from its completed Run")
+	}
+	return ref, nil
+}
+
 // This is an exact edit of four pinned source overlays, not a YAML parser.
 // Preserve security and rollout settings; mount the read-only image root and
 // use the plugin path recorded in that image rather than an image subPath.
-func prepareNativeCAPIAuth(ctx context.Context, assets NativeAssets) error {
+func prepareNativeCAPIAuth(ctx context.Context, assets NativeAssets, acquired map[string]string) error {
+	files := make(map[string][]byte)
 	for _, controller := range []string{"capi-controller-manager", "capi-kubeadm-bootstrap-controller-manager", "capi-kubeadm-control-plane-controller-manager", "capd-controller-manager"} {
 		if err := requireContext(ctx); err != nil {
 			return err
@@ -260,12 +330,44 @@ func prepareNativeCAPIAuth(ctx context.Context, assets NativeAssets) error {
 		if err != nil {
 			return err
 		}
-		for _, image := range nativeCAPIAuthImages {
-			selected, exists := assets.Images[image.role]
-			if !exists || selected.Reference != "docker.io/nvkr-local/"+image.role+"@"+selected.ManifestDigest || strings.Count(string(raw), image.source) != 1 {
-				return errors.New("CAPI authentication overlay differs from its pinned local image handoff")
+		var overlay struct {
+			Spec struct {
+				Template struct {
+					Spec struct {
+						InitContainers []struct{ Name, Image string } `yaml:"initContainers"`
+						Volumes        []struct {
+							Name  string
+							Image struct{ Reference string }
+						}
+					}
+				}
 			}
-			raw = []byte(strings.Replace(string(raw), image.source, selected.Reference, 1))
+		}
+		if err := yaml.Unmarshal(raw, &overlay); err != nil {
+			return err
+		}
+		refs := make(map[string][]string)
+		for _, init := range overlay.Spec.Template.Spec.InitContainers {
+			if init.Name == "install-spiffe-exec-plugin" {
+				refs["capi-exec-init"] = append(refs["capi-exec-init"], init.Image)
+			}
+		}
+		for _, volume := range overlay.Spec.Template.Spec.Volumes {
+			if volume.Name == "spiffe-exec-plugin" {
+				refs["capi-exec-plugin"] = append(refs["capi-exec-plugin"], volume.Image.Reference)
+			}
+		}
+		for _, role := range nativeCAPIAuthImages {
+			selected, exists := assets.Images[role]
+			if !exists || len(refs[role]) != 1 || selected.Reference != "docker.io/nvkr-local/"+role+"@"+selected.ManifestDigest || !canonical.IsDigest(selected.ManifestDigest) {
+				return errors.New("CAPI authentication overlay differs from its selected local image handoff")
+			}
+			source, err := name.NewDigest(refs[role][0])
+			parent, parentErr := name.NewDigest(acquired[role], name.StrictValidation)
+			if err != nil || parentErr != nil || source.Name() != parent.Name() || strings.Count(string(raw), refs[role][0]) != 1 {
+				return errors.New("CAPI authentication overlay differs from its acquired producer image")
+			}
+			raw = []byte(strings.Replace(string(raw), refs[role][0], selected.Reference, 1))
 		}
 		const subPath = "              subPath: ko-app\n"
 		if strings.Count(string(raw), subPath) != 1 || strings.Count(string(raw), "/plugin/cmd") != 1 {
@@ -273,23 +375,27 @@ func prepareNativeCAPIAuth(ctx context.Context, assets NativeAssets) error {
 		}
 		raw = []byte(strings.Replace(string(raw), subPath, "", 1))
 		raw = []byte(strings.Replace(string(raw), "/plugin/cmd", "/plugin/ko-app/cmd", 1))
-		if err := privateReplace(path, raw); err != nil {
+		files[path] = raw
+	}
+	for _, path := range slices.Sorted(maps.Keys(files)) {
+		if err := requireContext(ctx); err != nil {
+			return err
+		}
+		if err := privateReplace(path, files[path]); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// A retained pre-migration Run may contain the earlier Linux CLI. Its exact
-// bundle remains verified, but only the guest runtime and image bytes are
-// shared with the VM; the CLI selected for execution is always the host build.
+// Reject obsolete bundles during output admission, before extraction. Every
+// native site requires the selected identity helper as well as its guest tools.
 func sitePreparationMembers(components []string) ([]string, error) {
-	for _, known := range [][]string{{"nerdctl", nativeSpireRendererSource, nativeIdentityHelper}, {"nerdctl"}, {"nerdctl", "nvke-installer-sources"}, {"nerdctl", "nvke-installer-sources", "nvkectl"}} {
-		if slices.Equal(components, known) {
-			return slices.Clone(known), nil
-		}
+	want := []string{"nerdctl", nativeIdentityHelper}
+	if !slices.Equal(components, want) {
+		return nil, errors.New("site preparation requires the selected guest tools and identity helper; rebuild obsolete tool Runs")
 	}
-	return nil, errors.New("site preparation requires its exact known dependency set")
+	return want, nil
 }
 
 func prepareNativeImage(ctx context.Context, selection nativeImageSelection, work, files string) (NativeImageAsset, error) {

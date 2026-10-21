@@ -78,7 +78,9 @@ func withNativeSiteScope(ctx context.Context, attempt *nativeSiteAttempt, runner
 		cancel()
 		scope.gate <- struct{}{}
 		scope.closed = true
-		result = errors.Join(result, attempt.unjoinedWork)
+		if attempt.unjoinedWork != nil && !errors.Is(result, attempt.unjoinedWork) {
+			result = errors.Join(result, attempt.unjoinedWork)
+		}
 		<-scope.gate
 	}()
 	defer recoverRetainedPanic(ctx, &result)
@@ -247,10 +249,10 @@ func (s *NativeSite) operate(ctx context.Context, tenant *nativeTenantState, ope
 		return nativeSessionError(err, "native site operation")
 	}
 	err := operation(call)
-	if errors.Is(err, ErrUnjoined) {
+	if errors.Is(err, ErrUnjoined) && scope.attempt.unjoinedWork == nil {
 		// This lifecycle failure cannot be swallowed by test callbacks. Outer
 		// guest cleanup must retain dependent resources after lost child join.
-		scope.attempt.unjoinedWork = errors.Join(scope.attempt.unjoinedWork, err)
+		scope.attempt.unjoinedWork = err
 	}
 	return nativeSessionError(err, "native site operation")
 }

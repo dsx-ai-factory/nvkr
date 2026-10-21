@@ -4,7 +4,7 @@ go 1.27.3
 
 require (
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/dsx-ai-factory/nvke/agent v0.3.0-rc.2.0.20261020152104-9ac6832ac965
+	github.com/dsx-ai-factory/nvke/agent v0.3.0
 	github.com/gdamore/tcell/v2 v2.13.10
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/google/go-containerregistry v0.22.1

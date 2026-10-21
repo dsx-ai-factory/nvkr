@@ -2,7 +2,7 @@
 
 These opt-in inputs select Ubuntu **24.04.5** installers for native AMD64 and ARM64 NVKE
 QCOW2 builds. Ubuntu 26.04 remains the existing default. The release catalog pins NVKE
-v0.22.0-beta.6 (`8db5721ae3031bdcd945e559153a740d46ea209e`), which contains upstream's
+`v0.22.0` at `400c24fb6465b042be883d6b62472528520d6291`, which contains upstream's
 [Ubuntu 24 support](https://github.com/dsx-ai-factory/nvke/commit/96ccc50cb7f8ed8bb08f7cf8655906982774f809).
 The installer material and required `ubuntu_series=24.04` Packer variable select the guest OS together.
 
@@ -27,8 +27,9 @@ committed workflows.
 
 Changing only the installer is insufficient: an agent compiled against Ubuntu 26's libc can
 install successfully on Ubuntu 24 and then fail to start. The Ubuntu 24 agent uses native,
-digest-pinned **Go 1.27.3 Bookworm** images with glibc 2.36. Both preparation and compilation
-reject a different libc. Preparation downloads nFPM 2.47.0 with the archive and executable
+digest-pinned **Bookworm** images with glibc 2.36. Preparation retains checksum-pinned Go 1.27.3
+for offline compilation. Both preparation and compilation reject a different libc.
+Preparation downloads nFPM 2.47.0 with the archive and executable
 digests retained in the Packer toolchain lock, then captures it with the vendored source.
 Offline compilation uses NVKE's existing Debian packaging target and that exact executable.
 The pinned source's `check-ubuntu-elf.sh` must accept the agent binary: the native Ubuntu

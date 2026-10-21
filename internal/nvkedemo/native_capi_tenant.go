@@ -103,10 +103,11 @@ func (s *nativeSiteAttempt) capiTenantCommands(ctx context.Context, request Tena
 		if err != nil {
 			return "", err
 		}
-		reference := image.Reference
-		if role == "workload" {
-			reference = WorkloadImage
-		} else if reference != "localhost/nvke/ovn-kubernetes@"+image.ManifestDigest {
+		reference, err := nativeImageDigestReference(image)
+		if err != nil {
+			return "", err
+		}
+		if role == "ovn" && reference != "localhost/nvke/ovn-kubernetes@"+image.ManifestDigest {
 			return "", errors.New("OVN import alias differs from selected manifest")
 		}
 		preload, err := nativeImagePreloadScript(nativeImagePreload{

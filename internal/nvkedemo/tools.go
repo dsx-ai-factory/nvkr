@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 )
@@ -65,7 +66,7 @@ func siteStartupToolBundles(platform string) []companionToolBundle {
 		return nil
 	}
 	return []companionToolBundle{
-		{"site-startup-tools-arm64", "bin", []string{"nerdctl", nativeSpireRendererSource, nativeIdentityHelper}},
+		{"site-startup-tools-arm64", "bin", []string{"nerdctl", nativeIdentityHelper}},
 	}
 }
 
@@ -166,11 +167,17 @@ func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string,
 		return "", err
 	}
 	layout := filepath.Join(root, "packages", bundle)
-	if err := diagnosticIndexMatches(layout, observed.Digest); err != nil {
+	indexDigest, err := diagnosticIndexDigest(ctx, layout, observed.Digest)
+	if err != nil {
 		return "", err
 	}
 	publication := filepath.Join(out, "publication")
-	publicationArgs := []string{tool, "publish", "root", "--bundle", bundle + "=" + layout}
+	inspected, err := inspectAdmittedBinaryBundle(ctx, layout, indexDigest)
+	if err != nil {
+		return "", nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "verify completed native tool bundle")
+	}
+	request := delivery.PublicationRequest{Objects: []delivery.ObjectInput{{Name: bundle, Kind: "binary-bundle", Path: layout,
+		ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: inspected.SemanticDigest, BlobDigest: inspected.RootDigest, Layout: true}}}
 	companions := siteStartupToolBundles(platform)
 	for _, companion := range companions {
 		observed, err := CompleteOutput(ctx, root, companion.name, "executable")
@@ -178,14 +185,24 @@ func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string,
 			return "", err
 		}
 		layout := filepath.Join(root, "packages", companion.name)
-		if err := diagnosticIndexMatches(layout, observed.Digest); err != nil {
+		indexDigest, err := diagnosticIndexDigest(ctx, layout, observed.Digest)
+		if err != nil {
 			return "", err
 		}
-		publicationArgs = append(publicationArgs, "--bundle", companion.name+"="+layout)
+		inspected, err := inspectAdmittedBinaryBundle(ctx, layout, indexDigest)
+		if err != nil {
+			return "", nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "verify completed site tool bundle")
+		}
+		request.Objects = append(request.Objects, delivery.ObjectInput{Name: companion.name, Kind: "binary-bundle", Path: layout,
+			ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: inspected.SemanticDigest, BlobDigest: inspected.RootDigest, Layout: true})
 	}
-	publicationArgs = append(publicationArgs, "--out", publication)
-	if err := runner.Run(ctx, publicationArgs, "native-tools-verify", 2*time.Minute); err != nil {
-		return "", err
+	phase := beginProgress(cfg.Progress, "native-tools-verify", PhaseStarted, PhaseFinished, PhaseFailed)
+	limited, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	_, err = delivery.BuildPublicationRoot(limited, publication, request)
+	cancel()
+	phase.finish(err)
+	if err != nil {
+		return "", nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "native-tools-verify")
 	}
 	directory := filepath.Join(out, "bin")
 	if err := extractNativeHostTools(ctx, layout, publication, directory, platform); err != nil {
@@ -198,8 +215,13 @@ func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string,
 	}
 	for _, companion := range companions {
 		directory := filepath.Join(out, "site", companion.directory)
-		if err := runner.Run(ctx, []string{tool, "publish", "extract", "--layout", publication, "--bundle", companion.name, "--out", directory}, "native-site-tools-extract-"+companion.name, 2*time.Minute); err != nil {
-			return "", err
+		phase := beginProgress(cfg.Progress, "native-site-tools-extract-"+companion.name, PhaseStarted, PhaseFinished, PhaseFailed)
+		limited, cancel := context.WithTimeout(ctx, 2*time.Minute)
+		_, err := delivery.ExtractBinaryBundle(limited, publication, companion.name, directory)
+		cancel()
+		phase.finish(err)
+		if err != nil {
+			return "", nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "native-site-tools-extract-%s", companion.name)
 		}
 		if err := verifyToolMembers(directory, companion.members); err != nil {
 			return "", err
@@ -218,4 +240,17 @@ func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string,
 		}
 	}
 	return directory, nil
+}
+
+// Inspect the carrier already bound to a completed Run. Publication revalidates
+// this same exact index digest before copying any source bytes.
+func inspectAdmittedBinaryBundle(ctx context.Context, root, indexDigest string) (delivery.Result, error) {
+	_, inspected, err := delivery.InspectBinaryBundle(ctx, root)
+	if err != nil {
+		return delivery.Result{}, err
+	}
+	if inspected.RootDigest != indexDigest {
+		return delivery.Result{}, errors.New("binary bundle carrier changed after completed Run admission")
+	}
+	return inspected, nil
 }

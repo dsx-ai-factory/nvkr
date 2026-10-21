@@ -1314,8 +1314,8 @@ finalization retains its one-disk limit. The supplied Environments generate raw-
 M2 membership, and committed workflow bundles retain their existing selections.
 `pkg/nvkr/lifecycle/nvke_ubuntu24_test.go` covers compilation, exact closure/pins, changed
 Build identity, native KVM admission and deterministic generation. Script fixtures cover
-selection, frozen-input routing and retention of the shared release catalog’s exact
-`capture-schema.patch` bytes. The input-layout migration preserves the agent preparation
+selection and frozen-input routing through the shared release catalog. Disk producers
+retain stock NVKE capture source; the material owner accepts its original acquisition schema. The input-layout migration preserves the agent preparation
 and build recipe used in the package exercise below. This is contract evidence: no Ubuntu 24 KVM bake,
 guest boot, full acquired-payload ABI inspection, agent-start smoke, release publication
 or qualification is established by these tests. ADR-10/11/18/22 own the unchanged contracts.
@@ -1478,7 +1478,7 @@ and complete Mac/Linux runtime acceptance remain unverified.
 
 The downstream Go owner exposes a callback-scoped native site and independently
 created/deleted tenants through the same native engine. The provisional
-`client/v1.WithNativeSite` facade and descriptive/opaque type aliases make that
+`pkg/nvkr/demo.WithSite` facade and descriptive/opaque type aliases make that
 owner importable by separate NVKE or customer modules without another lifecycle
 or deployment engine. Independent external-module compile and nil/canceled/zero-handle
 admission coverage establish importability, not real VM acceptance. Existing matching
@@ -1495,15 +1495,20 @@ A separate fixed site-identity helper now has one deep `pkg/nvkr/siteidentity`
 owner and a thin private Linux ARM64 build target. It reuses the upstream
 generated NodeAgent client and GoSPIFFE/gRPC, admits its bounded output before
 remote work, and distinguishes not-started, joined failure and unknown remote
-completion. Failed renderer/systemd clients and inconsistent terminal responses
-remain unknown; client termination does not prove manager-job completion. The
-upstream Workload API picker retains the exact caller identity across updates.
+completion. Mutation now delegates to NVKE v0.22.0's `ReconfigureSpireAgent` and
+`GetSpireAgentStatus`; the duplicated guest shell rewrite and renderer producer
+are removed. Failed outcomes and missing responses remain unknown; client
+termination does not prove manager-job completion. The upstream Workload API
+picker retains the exact caller identity across updates.
 Fresh peer metadata requires operation-fresh issuance and remaining
-validity as well as unchanged boot/identity and a changed serial. It issues no
+validity as well as unchanged boot/identity and a changed serial. Helper and
+native caller revalidate those descriptions with one shared predicate; endpoint
+authentication, the expected boot identity and source-owned TPM policy remain
+separate requirements. It issues no
 bootstrap-stop or release receipt. The native owner requires the shared
-helper/renderer startup members before guest launch or native network configuration, recompiles captured
-completed-Run inputs, and binds the renderer source to the selected OS SPIRE
-package. After deployment and before temporary bootstrap teardown, it imports
+helper startup member before guest launch or native network configuration and
+recompiles captured completed-Run inputs. After deployment and before temporary
+bootstrap teardown, it imports
 the original host policy without replacement, checks the controller/CSI context,
 permanent registration, derived TPM allowlist, new TPM agent and renewed
 same-boot host certificate, then issues its private completion receipt. Joined
@@ -1511,7 +1516,8 @@ site-stage failures follow foreground debugging retention; unknown completion
 keeps dependencies unsafe to tear down. The site-stage/retention presentation
 leaves tenant and conformance checks pending. Private Linux ARM64 Run
 `site-startup-tools-arm64-acceptance-20261021-02` built and verified the shared
-three-member output from public source pins. The delivered helper passed an
+three-member output from public source pins for the preceding shell implementation,
+not the reduced RPC revision. The delivered helper passed an
 isolated invalid-request subprocess check; its command-owned inherited pipes
 are adopted before bounded I/O. This producer and command-boundary evidence
 does not establish an authenticated handoff through integrated startup, a fresh
@@ -1853,9 +1859,10 @@ outputs. The disk uses the renamed Packer build, artifact path and material sche
 The 32-output demo and 38-output local conformance selections share the same deployment
 closure. The native site catalog derives its four acquired chart pins from that
 source's `deploy/nico/nvke-deploy.yaml`; source-local controller and NKTP chart
-names and versions come from their exact path-bound `Chart.yaml` bytes. Local deploy chart names are
-validated display aliases, while external member names and repositories must still match their reviewed
-acquisition identities. Contract tests cover differing local aliases, unsafe metadata, exact path/version
+names and versions come from their exact path-bound `Chart.yaml` bytes. An explicit accounted `chartName`
+binds a reviewed local chart rename; otherwise its name must match the release declaration. External member
+names and repositories must match their reviewed acquisition identities. Contract tests cover reviewed and
+unreviewed renames, unsafe metadata, exact path/version
 checks and unchanged external selections; they do not establish installation or fresh runtime acceptance.
 The native runtime-image variant
 keeps its separately authenticated images and binds their selection to the same NVKE

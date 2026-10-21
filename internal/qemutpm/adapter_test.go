@@ -3,7 +3,7 @@
 
 //go:build darwin || linux
 
-package nativeqemu
+package qemutpm
 
 import (
 	"errors"

@@ -19,7 +19,8 @@ import (
 // existing owners verify the complete Run and payload. It grants no Release or
 // producer authority and cannot be supplied through the public asset config.
 type nativeInstallerSelection struct {
-	commit, capiVersion, versionsDigest, siteSpecDigest string
+	repo, commit, capiVersion, versionsDigest, siteSpecDigest string
+	sourceDate                                                int64
 }
 
 func nativeInstallerSelectionFromRun(ctx context.Context, root, bundle string) (*nativeInstallerSelection, error) {
@@ -65,7 +66,7 @@ func nativeInstallerSelectionFromPlan(plan *factory.Plan, bundle, buildDigest st
 		if err != nil || version != "v"+parsed.String() || parsed.Prerelease() != "" || parsed.Metadata() != "" {
 			return nil, errors.New("native tool Run requires an exact stable CAPI provider version")
 		}
-		return &nativeInstallerSelection{commit: installer.Commit, capiVersion: version}, nil
+		return &nativeInstallerSelection{repo: installer.Repo, commit: installer.Commit, sourceDate: installer.SourceDate, capiVersion: version}, nil
 	}
 	return nil, errors.New("native tool Run omits the selected host bundle build")
 }

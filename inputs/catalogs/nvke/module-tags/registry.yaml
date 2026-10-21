@@ -62,7 +62,7 @@ components:
         make -C cli build NVKECTL_TREE=clean
 kind: SourceBuildRegistry
 metadata:
-  description: NVKE components from the release v0.22.0. The CLI uses an offline Go build; CWE wraps the upstream Dockerfile in digest-pinned
+  description: NVKE components from the release v0.22.0 at 400c24fb6465b042be883d6b62472528520d6291. The CLI uses an offline Go build; CWE wraps the upstream Dockerfile in digest-pinned
     rootless BuildKit.
   name: nvke-v1
 sources:

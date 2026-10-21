@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-//go:build linux && arm64
+//go:build linux
 
 package main
 
@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"testing"
 	"time"
 
@@ -140,6 +141,9 @@ func TestTransferredPipeContextRefusalConsumesOriginal(t *testing.T) {
 
 func stdioChild(t *testing.T, mode string) (*exec.Cmd, *bytes.Buffer, *bytes.Buffer) {
 	t.Helper()
+	if runtime.GOARCH != "arm64" {
+		t.Skip("actual identity helper execution requires Linux ARM64; pipe ownership tests run on every Linux architecture")
+	}
 	program, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
@@ -172,7 +176,7 @@ func assertNotStarted(t *testing.T, raw []byte, code e.Code) {
 		t.Fatal(err)
 	}
 	if result.SchemaVersion != siteidentity.SchemaVersion || result.Completion != siteidentity.NotStarted ||
-		result.FailureCode != code || result.CallerID != "" || result.Script != nil || result.After != nil {
+		result.FailureCode != code || result.CallerID != "" || result.Status != nil || result.Reconfiguration != "" || result.After != nil {
 		t.Fatalf("invalid input reached identity or changed completion: %+v", result)
 	}
 }
@@ -204,6 +208,22 @@ func TestCommandContextAdmissionBeforeStdio(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestUnsupportedArchitectureRefusesBeforeStdio(t *testing.T) {
+	if runtime.GOARCH == "arm64" {
+		t.Skip("Linux ARM64 is the supported helper runtime")
+	}
+	err := run(t.Context(), nil)
+	var coded *e.Error
+	if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
+		t.Fatalf("unsupported runtime was admitted: %v", err)
+	}
+	for _, file := range []*os.File{os.Stdin, os.Stdout} {
+		if _, err := file.Stat(); err != nil {
+			t.Fatalf("unsupported runtime consumed stdio: %v", err)
+		}
 	}
 }
 

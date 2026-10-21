@@ -13,7 +13,7 @@ The CLI, controller image, controller chart and NKTP chart share the profile-own
 separate [nightly installer-tools catalog](../../catalogs/tools/installer-hosted-arm64/README.md);
 other output catalog selections remain explicit. Four tools
 remain source-built with executable `host-package` output types; clusterctl selects 1.13.6 to
-match the release installer, while kind, kubectl and ORAS retain their existing pins.
+match the beta installer, while kind, kubectl and ORAS retain their existing pins.
 Helm 4.2.4 is acquired by exact archive/executable digest because its diagnostic source preparation
 is unsupported by hosted fetching. Its recorded binary security scan has findings; this is an
 exception disclosure, not a security-pass or complete-source-build claim.
@@ -50,10 +50,9 @@ workflow does not execute that suite or establish operational acceptance.
 The coordinator checks supported native ARM64 runtime and OVN selections, authenticates the complete
 publication, and requires both test and cleanup verdicts. Checksum-pinned tool acquisition adds no
 vulnerability-clearance claim. All four site-product sources select
-NVKE v0.22.0 at `400c24fb6465b042be883d6b62472528520d6291`. The OS closure selects the same
-release for SPIRE packaging, including its public-source Debian revision 4.
+NVKE v0.22.0 at `400c24fb6465b042be883d6b62472528520d6291`. The SPIRE OS package uses the same release source and Debian revision 4.
 The test-only suite selects `b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8`, an explicit
-user-approved exception to ADR-23's proposed matching-revision rule. The separate test source is not a product build pin.
+user-approved exception to ADR-23's proposed matching-revision rule. Product sources select the exact main commit.
 
 The adapter now projects authenticated profile bytes into current `MachineImage`, `ClusterRelease`
 and `NodePoolRelease` resources, preserving the exact disk binding and the candidate suite's

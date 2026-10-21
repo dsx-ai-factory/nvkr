@@ -41,6 +41,11 @@ func nativeTenantDNSCases(t *testing.T, count int) {
 			}
 			selected.session.Runner.Env = append(selected.session.Runner.Env, "CLOUDINIT_TOOL="+executable, "NVKR_TEST_CLOUD_INIT_TOOL=1")
 			attempt := nativeCAPITenantFixture(t, GuestCIDR, "ovn")
+			workloadPods, err := json.Marshal(map[string]any{"items": []any{map[string]any{"status": map[string]any{"containerStatuses": []any{map[string]string{"imageID": attempt.assets.Images["workload"].Reference}}}}}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			writeTenantFixture(t, filepath.Join(root, "pods.json"), workloadPods, 0600)
 			attempt.tenantTimeout = 15 * time.Second
 			if count == 3 {
 				attempt.conformance = &nativeConformanceConfig{}

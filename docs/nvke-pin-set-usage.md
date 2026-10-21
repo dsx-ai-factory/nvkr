@@ -6,8 +6,6 @@ It validates chart identity and acquires package digests. NVKE retains installat
 
 The [example catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-pin-set/registry.yaml) declares four acquired chart producers and explicitly
 accounts for the other seven deploy items. It does not modify the maintained NVKE product Definition.
-This independent example is frozen at `v0.22.0-beta.6` under its own authored constraint; the maintained
-release and native demo inputs select `v0.22.0`.
 
 ## Try the example
 
@@ -17,9 +15,9 @@ Copy the example to a writable directory, then pin the NVKE release tag. Flags p
 mkdir -p /tmp/nvke-chart-catalog
 cp docs/examples/nvke-pin-set/registry.yaml /tmp/nvke-chart-catalog/registry.yaml
 go run ./cmd/nvkr catalog pin --dir /tmp/nvke-chart-catalog \
-  --tag v0.22.0-beta.6 --check nvke-controller
+  --tag v0.22.0 --check nvke-controller
 go run ./cmd/nvkr catalog pin --dir /tmp/nvke-chart-catalog \
-  --tag v0.22.0-beta.6 nvke-controller
+  --tag v0.22.0 nvke-controller
 go run ./cmd/nvkr catalog validate --data /tmp/nvke-chart-catalog
 ```
 
@@ -50,7 +48,7 @@ mkdir -p .nvkr/acquired-charts
 cp docs/examples/nvke-pin-set/*.yaml .nvkr/acquired-charts/
 # On ARM64, set utilityPlatform to linux/arm64 in environment-local.yaml.
 go run ./cmd/nvkr catalog pin --dir .nvkr/acquired-charts \
-  --tag v0.22.0-beta.6 nvke-controller
+  --tag v0.22.0 nvke-controller
 go run ./cmd/nvkr run local \
   --definition .nvkr/acquired-charts/definition.yaml \
   --environment .nvkr/acquired-charts/environment-local.yaml \
@@ -69,13 +67,14 @@ is not supported. Acquired charts cannot use image binding, because that would c
 ## Explicit membership
 
 Every deploy item must be listed in `members` or `accounted`. External Helm items become members. The local
-controller and NKTP charts are accounted for by their exact paths. Their pinned `Chart.yaml` names must be
-valid chart names; a local `release.yaml` chart name is a display alias and need not match. The pinned chart
-versions must be exact, and any explicit release version must match.
+controller chart is accounted for by its exact path. If `release.yaml` omits its version, NVKR reads the
+exact version from the pinned `Chart.yaml`; an explicit version must agree. An accounted `chartName`
+can explicitly bind an upstream chart rename; otherwise the chart name must agree with `release.yaml`.
+This does not choose the published chart version: producer packaging flags own that choice.
 Local chart paths resolve relative to the deploy root, matching NVKE's deploy format.
 
 Re-pinning fails if an item appears, disappears, changes type, switches between local and external, or changes
-an external member's reviewed chart name/repository. The existing lock remains intact. Review the upstream change and update
+its reviewed chart name/repository. The existing lock remains intact. Review the upstream change and update
 the catalog mapping before trying again. NVKR does not automatically create producers or omit unknown items.
 
 An acquired member uses `artifact: <producer>` and takes its chart identity from `prebuilt.chart`. A source

@@ -46,38 +46,31 @@ func TestDecodeCompleteBoundedRequest(t *testing.T) {
 	}
 }
 
-func TestExecuteFixedCompletionStates(t *testing.T) {
+func TestReconfigureCompletionStates(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
-		response  *pb.ExecuteScriptResponse
+		response  *pb.ReconfigureSpireAgentResponse
 		transport bool
 		panic     bool
 		want      Completion
 		wantCode  e.Code
 	}{
-		{"success awaits fresh identity", &pb.ExecuteScriptResponse{Status: "success"}, false, false, JoinedFailure, ""},
-		{"joined guest failure", &pb.ExecuteScriptResponse{Status: "error", ExitCode: 1, ErrorMessage: "synthetic private detail"}, false, false, JoinedFailure, e.CodePreflightFailed},
-		{"generic manager failure marked unknown", &pb.ExecuteScriptResponse{Status: "error", ExitCode: 1, ErrorMessage: "synthetic private detail", Output: unknownCompletionSentinel}, false, false, Unknown, e.CodeVerifyFailed},
-		{"reserved manager failure", &pb.ExecuteScriptResponse{Status: "error", ExitCode: 125, ErrorMessage: "synthetic private detail"}, false, false, Unknown, e.CodeVerifyFailed},
-		{"command timeout", &pb.ExecuteScriptResponse{Status: "error", ExitCode: 124, ErrorMessage: "synthetic private detail"}, false, false, Unknown, e.CodeVerifyFailed},
-		{"not executable", &pb.ExecuteScriptResponse{Status: "error", ExitCode: 126, ErrorMessage: "synthetic private detail"}, false, false, Unknown, e.CodeVerifyFailed},
-		{"command missing", &pb.ExecuteScriptResponse{Status: "error", ExitCode: 127, ErrorMessage: "synthetic private detail"}, false, false, Unknown, e.CodeVerifyFailed},
-		{"signal exit", &pb.ExecuteScriptResponse{Status: "error", ExitCode: 143, ErrorMessage: "synthetic private detail"}, false, false, Unknown, e.CodeVerifyFailed},
-		{"negative signal exit", &pb.ExecuteScriptResponse{Status: "error", ExitCode: -1, ErrorMessage: "synthetic private detail"}, false, false, Unknown, e.CodeVerifyFailed},
-		{"error with zero exit", &pb.ExecuteScriptResponse{Status: "error", ErrorMessage: "synthetic private detail"}, false, false, Unknown, e.CodeVerifyFailed},
-		{"error without message", &pb.ExecuteScriptResponse{Status: "error", ExitCode: 1}, false, false, Unknown, e.CodeVerifyFailed},
-		{"success with nonzero exit", &pb.ExecuteScriptResponse{Status: "success", ExitCode: 1}, false, false, Unknown, e.CodeVerifyFailed},
-		{"success with error message", &pb.ExecuteScriptResponse{Status: "success", ErrorMessage: "synthetic private detail"}, false, false, Unknown, e.CodeVerifyFailed},
-		{"success with unknown marker", &pb.ExecuteScriptResponse{Status: "success", Output: unknownCompletionSentinel}, false, false, Unknown, e.CodeVerifyFailed},
+		{"applied awaits fresh identity", &pb.ReconfigureSpireAgentResponse{Outcome: pb.ReconfigureSpireAgentResponse_OUTCOME_APPLIED}, false, false, JoinedFailure, ""},
+		{"unchanged awaits fresh identity", &pb.ReconfigureSpireAgentResponse{Outcome: pb.ReconfigureSpireAgentResponse_OUTCOME_UNCHANGED}, false, false, JoinedFailure, ""},
+		{"failed may leave systemd work", &pb.ReconfigureSpireAgentResponse{Outcome: pb.ReconfigureSpireAgentResponse_OUTCOME_FAILED, ErrorMessage: "synthetic private detail"}, false, false, Unknown, e.CodeVerifyFailed},
+		{"success contradicts error", &pb.ReconfigureSpireAgentResponse{Outcome: pb.ReconfigureSpireAgentResponse_OUTCOME_APPLIED, ErrorMessage: "synthetic private detail"}, false, false, Unknown, e.CodeVerifyFailed},
 		{"lost response", nil, true, false, Unknown, e.CodePreflightFailed},
-		{"unrecognized response", &pb.ExecuteScriptResponse{Status: "other"}, false, false, Unknown, e.CodeVerifyFailed},
+		{"unrecognized response", &pb.ReconfigureSpireAgentResponse{Outcome: 99}, false, false, Unknown, e.CodeVerifyFailed},
+		{"unspecified response", &pb.ReconfigureSpireAgentResponse{}, false, false, Unknown, e.CodeVerifyFailed},
 		{"nil response", nil, false, false, Unknown, e.CodeVerifyFailed},
 		{"client panic", nil, false, true, Unknown, e.CodePreflightFailed},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			completion, _, err := executeFixed(context.Background(), validRequest(), func(_ context.Context, r *pb.ExecuteScriptRequest, _ ...grpc.CallOption) (*pb.ExecuteScriptResponse, error) {
-				if r.Async || r.ScriptContents != handoffScript || len(r.Args) != 7 {
-					t.Fatal("arbitrary or async operation dispatched")
+			request := validRequest()
+			request.ServerAddress, request.ServerPort = "192.168.70.10", 30081
+			completion, _, err := reconfigure(context.Background(), request, func(_ context.Context, r *pb.ReconfigureSpireAgentRequest, _ ...grpc.CallOption) (*pb.ReconfigureSpireAgentResponse, error) {
+				if r.ServerAddress != request.ServerAddress || r.ServerPort != uint32(request.ServerPort) {
+					t.Fatal("reconfiguration changed the selected endpoint")
 				}
 				if tc.panic {
 					panic("synthetic private detail")
@@ -113,7 +106,7 @@ func TestExecuteFixedCompletionStates(t *testing.T) {
 func TestCanceledBeforeDispatchDoesNoRemoteWork(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	completion, _, err := executeFixed(ctx, validRequest(), func(context.Context, *pb.ExecuteScriptRequest, ...grpc.CallOption) (*pb.ExecuteScriptResponse, error) {
+	completion, _, err := reconfigure(ctx, validRequest(), func(context.Context, *pb.ReconfigureSpireAgentRequest, ...grpc.CallOption) (*pb.ReconfigureSpireAgentResponse, error) {
 		t.Fatal("canceled operation dispatched")
 		return nil, nil
 	}, time.Second)
@@ -135,11 +128,11 @@ func TestCancellationDrainsAcceptedSynchronousCall(t *testing.T) {
 	done := make(chan outcome, 1)
 	go func() {
 		defer close(joined)
-		c, _, err := executeFixed(ctx, validRequest(), func(critical context.Context, _ *pb.ExecuteScriptRequest, _ ...grpc.CallOption) (*pb.ExecuteScriptResponse, error) {
+		c, _, err := reconfigure(ctx, validRequest(), func(critical context.Context, _ *pb.ReconfigureSpireAgentRequest, _ ...grpc.CallOption) (*pb.ReconfigureSpireAgentResponse, error) {
 			entered <- critical
 			select {
 			case <-release:
-				return &pb.ExecuteScriptResponse{Status: "success"}, nil
+				return &pb.ReconfigureSpireAgentResponse{Outcome: pb.ReconfigureSpireAgentResponse_OUTCOME_APPLIED}, nil
 			case <-critical.Done():
 				return nil, critical.Err()
 			}
@@ -181,7 +174,7 @@ func TestCancellationDrainsAcceptedSynchronousCall(t *testing.T) {
 }
 
 func TestCriticalDeadlineRemainsUnknown(t *testing.T) {
-	completion, _, err := executeFixed(context.Background(), validRequest(), func(ctx context.Context, _ *pb.ExecuteScriptRequest, _ ...grpc.CallOption) (*pb.ExecuteScriptResponse, error) {
+	completion, _, err := reconfigure(context.Background(), validRequest(), func(ctx context.Context, _ *pb.ReconfigureSpireAgentRequest, _ ...grpc.CallOption) (*pb.ReconfigureSpireAgentResponse, error) {
 		<-ctx.Done()
 		return nil, ctx.Err()
 	}, 10*time.Millisecond)

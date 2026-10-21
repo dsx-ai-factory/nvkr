@@ -39,7 +39,7 @@ func addStartupRuntimeImages(cfg *NativeSiteStartup) {
 		cfg.Assets = append(cfg.Assets, StartupAsset{file, "http://172.30.0.1:18080/files/" + file, "sha256:" + strings.Repeat("a", 64)})
 		reference := "docker.io/nvkr-local/" + strings.TrimPrefix(role, "runtime-") + "@sha256:" + strings.Repeat("a", 64)
 		if role == "workload" {
-			reference = WorkloadImage
+			reference = "example.invalid/selected-workload@sha256:" + strings.Repeat("b", 64)
 		}
 		cfg.ImageImports[role] = reference
 	}
@@ -60,8 +60,8 @@ func TestSiteStartupRuntimeImagesRequireTheWholeSelectedClosure(t *testing.T) {
 		{"tag-only reference", func(c *NativeSiteStartup) {
 			c.ImageImports["runtime-postgresql"] = "docker.io/nvkr-local/postgresql:latest"
 		}},
-		{"different workload", func(c *NativeSiteStartup) {
-			c.ImageImports["workload"] = "docker.io/library/alpine@sha256:" + strings.Repeat("b", 64)
+		{"tag-only workload", func(c *NativeSiteStartup) {
+			c.ImageImports["workload"] = "docker.io/library/alpine:latest"
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

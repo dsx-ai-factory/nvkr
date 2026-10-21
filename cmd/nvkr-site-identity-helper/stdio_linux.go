@@ -1,13 +1,14 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-//go:build linux && arm64
+//go:build linux
 
 package main
 
 import (
 	"context"
 	"os"
+	"runtime"
 	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -19,7 +20,7 @@ import (
 // RunHelper files: duplicates share O_NONBLOCK with the original open file
 // description. RunHelper retains its existing pollable, borrowed-file contract.
 func runHelperWithProcessStdio(ctx context.Context) error {
-	if ctx == nil || ctx.Err() != nil {
+	if ctx == nil || ctx.Err() != nil || runtime.GOARCH != "arm64" {
 		// The identity owner returns the exact runtime/context admission error
 		// before this adapter performs descriptor work.
 		_, err := siteidentity.RunHelper(ctx, os.Stdin, os.Stdout)

@@ -145,7 +145,7 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 	for _, output := range nativeInputs.Outputs {
 		nativeOutputs[output.Name] = normalize(output, nativeInputs.Catalog, filepath.Dir(nativePath))
 	}
-	if filepath.Clean(filepath.Join(filepath.Dir(runtimePath), runtimeInputs.Catalog.Base)) != filepath.Join(root, "inputs/catalogs/runtime-dependencies/native-arm64") {
+	if filepath.Clean(filepath.Join(filepath.Dir(runtimePath), runtimeInputs.Catalog.Base)) != filepath.Join(root, "inputs/catalogs/runtime-dependencies") {
 		t.Fatal("native runtime inputs must select their source-aligned catalog owner")
 	}
 	addedRuntime := 0

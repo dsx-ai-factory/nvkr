@@ -1,10 +1,10 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-// Package nativeqemu owns the local diagnostic QEMU software-TPM adapter.
+// Package qemutpm owns the local diagnostic QEMU software-TPM adapter.
 // QEMU and swtpm implement the device and protocol; this package only owns their
 // launch, inherited network descriptor, private state and joined termination.
-package nativeqemu
+package qemutpm
 
 import (
 	"context"

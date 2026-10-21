@@ -27,14 +27,14 @@ func TestNativeNVIDIADefinitionsAlignRenamedSourceContracts(t *testing.T) {
 	// Compare compiled source identities with the owning locks. Pin updates
 	// remain data changes without another revision list in Go.
 	locks := make(map[string]map[string]catalog.Pin)
-	for _, dir := range []string{"node-images/native-arm64", "nvke/native-site-arm64", "controller-profiles/native-nvidia-arm64", "ovn-nvidia"} {
+	for _, dir := range []string{"node-images/release", "nvke/native-site-arm64", "controller-profiles/native-nvidia-arm64", "ovn-nvidia"} {
 		lock, err := catalog.LoadLockContext(t.Context(), filepath.Join(repo, "inputs/catalogs", dir))
 		if err != nil {
 			t.Fatal(err)
 		}
 		locks[dir] = lock.Pins
 	}
-	osPins, sitePins := locks["node-images/native-arm64"], locks["nvke/native-site-arm64"]
+	osPins, sitePins := locks["node-images/release"], locks["nvke/native-site-arm64"]
 	profilePins, ovnPins := locks["controller-profiles/native-nvidia-arm64"], locks["ovn-nvidia"]
 	for _, conformance := range []bool{false, true} {
 		name := "demo"
@@ -117,15 +117,20 @@ func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	osLock, err := catalog.LoadLockContext(t.Context(), filepath.Join(repo, "inputs/catalogs/node-images/release"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	nvke := osLock.Pins["nvke-os"]
 	for _, tc := range []struct {
 		dir     string
 		sources []string
 	}{
-		{"node-images/native-arm64", []string{"nvke-os", "nvke-cni-calico-source", "nvke-kubeadm-distro-source", "nvke-spire-agent-source"}},
+		{"node-images/release", []string{"nvke-os", "nvke-cni-calico-source", "nvke-kubeadm-distro-source", "nvke-spire-agent-source"}},
 		{"nvke/native-site-arm64", []string{"nvke-cli", "nvke-controller", "nvke-controller-helm", "nvke-nktp-helm", "nvke-deploy"}},
 		{"controller-profiles/native-nvidia-arm64", []string{"nvke-profiles"}},
 		{"tools/native", []string{"nvke-cli", "nvke-deploy", "nvke-nicosim"}},
-		{"runtime-dependencies/native-arm64", []string{"nvke-deployment-selection"}},
+		{"runtime-dependencies", []string{"nvke-deployment-selection"}},
 	} {
 		lock, err := catalog.LoadLockContext(t.Context(), filepath.Join(repo, "inputs/catalogs", tc.dir))
 		if err != nil {
@@ -134,6 +139,8 @@ func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
 		for _, source := range tc.sources {
 			if pin, ok := lock.Pins[source]; !ok || pin.Commit == "" || pin.TreeHash == "" || pin.SourceDateEpoch <= 0 {
 				t.Fatalf("%s/%s lost selected NVKE source", tc.dir, source)
+			} else if pin.Commit != nvke.Commit || pin.TreeHash != nvke.TreeHash || pin.SourceDateEpoch != nvke.SourceDateEpoch {
+				t.Fatalf("%s/%s differs from the selected native OS source identity", tc.dir, source)
 			}
 		}
 	}
@@ -147,7 +154,7 @@ func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		expected := map[string]string{"nvke-node-image-arm64": "inputs/catalogs/node-images/native-arm64", "cwe": "inputs/catalogs/nvke/native-site-arm64", "nvkectl": "inputs/catalogs/nvke/native-site-arm64", "controller-chart": "inputs/catalogs/nvke/native-site-arm64", "controller-profiles": "inputs/catalogs/controller-profiles/native-nvidia-arm64"}
+		expected := map[string]string{"nvke-node-image-arm64": "inputs/catalogs/node-images/release", "cwe": "inputs/catalogs/nvke/native-site-arm64", "nvkectl": "inputs/catalogs/nvke/native-site-arm64", "controller-chart": "inputs/catalogs/nvke/native-site-arm64", "controller-profiles": "inputs/catalogs/controller-profiles/native-nvidia-arm64"}
 		hostPlatforms := map[string]string{}
 		if conformance {
 			expected["conformance-image-arm64"] = "definitions/kubernetes-conformance-arm64/demo-1.36/image-catalog"
@@ -181,15 +188,19 @@ func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
 // source. Keep accelerator, material and unchanged-source checks in default CI.
 func TestNativeNVIDIAProducerRequirementsOffline(t *testing.T) {
 	root := filepath.Join("..", "..", "inputs", "catalogs")
-	base, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(root, "node-images/native-arm64")))
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(root, "node-images/release")))
 	if err != nil {
 		t.Fatal(err)
 	}
-	overlay, err := catalog.LoadOverlayContext(t.Context(), filepath.Join(root, "node-images/variants/native-nvidia.json"))
-	if err != nil {
-		t.Fatal(err)
+	var overlays []catalog.Overlay
+	for _, name := range []string{"native-nvidia.json", "native-local-kvm.json"} {
+		overlay, err := catalog.LoadOverlayContext(t.Context(), filepath.Join(root, "node-images/variants", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		overlays = append(overlays, overlay)
 	}
-	stack, err := catalog.ApplyStack(base, overlay)
+	stack, err := catalog.ApplyStack(base, overlays...)
 	if err != nil {
 		t.Fatal(err)
 	}
