@@ -6,6 +6,8 @@ It validates chart identity and acquires package digests. NVKE retains installat
 
 The [example catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-pin-set/registry.yaml) declares four acquired chart producers and explicitly
 accounts for the other seven deploy items. It does not modify the maintained NVKE product Definition.
+This independent example is frozen at `v0.22.0-beta.6` under its own authored constraint; the maintained
+release and native demo inputs select `v0.22.0`.
 
 ## Try the example
 
