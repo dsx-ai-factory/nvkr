@@ -374,7 +374,8 @@ bash scripts/nvke-full-arm64-local.sh --build-accelerator tcg \
 ```
 
 Add `--network upstream-ovn` before the attempt for the matched upstream
-selection. The historical TCG Definitions retain their own source baselines.
+selection. These TCG Definitions use the refreshed NVKE `v0.22.0` product pins
+while retaining their separate build and network selections.
 For the maintained native Mac workflow, `--accelerator tcg` explicitly selects
 software execution for the existing 64K image; it does not select these historical
 Definitions or change source pins. Native Linux still requires KVM. Do not edit
@@ -763,24 +764,27 @@ externally unverified.
 
 ## Where the NVKE versions come from
 
-The shared native NVIDIA selection uses the sources below. NVKR verifies the
-pinned commit and tree; they are not represented as one tagged NVKE release.
+The shared native NVIDIA selection uses stock NVKE `v0.22.0` at commit
+[`400c24fb`](https://github.com/dsx-ai-factory/nvke/commit/400c24fb6465b042be883d6b62472528520d6291)
+and tree `f3afc02f5c92f4aacda3a1655836a91bef093bfe` for all NVKE product sources
+below. NVKR verifies the pinned commit and tree; NVIDIA OVN retains its separate pin.
 
 | Part | Selected source | Owning input |
 | --- | --- | --- |
-| Native host CLI, installer and NICoSim | [`9ac6832a`](https://github.com/dsx-ai-factory/nvke/commit/9ac6832ac965e5222876ef910c3a28be1a392665) | [Shared tools lock](../inputs/catalogs/tools/native/pins.lock.yaml) |
-| Site CLI/controller/charts and provisioned provider | `9ac6832a` | [Native site lock](../inputs/catalogs/nvke/native-site-arm64/pins.lock.yaml) |
-| OS, agent and kubeadm | `9ac6832a` | [Native OS lock](../inputs/catalogs/node-images/native-arm64/pins.lock.yaml) |
-| Profiles and runbooks | `9ac6832a` | [Native profiles lock](../inputs/catalogs/controller-profiles/native-nvidia-arm64/pins.lock.yaml) |
-| Upstream SPIRE/TPM agent packaging | [`e7d5e32f`](https://github.com/dsx-ai-factory/nvke/commit/e7d5e32f5ec36eb57255e9d5de86853d92fa2087), [NVKE #1842](https://github.com/dsx-ai-factory/nvke/pull/1842) | [Native OS lock](../inputs/catalogs/node-images/native-arm64/pins.lock.yaml) |
+| Native host CLI, installer and NICoSim | `v0.22.0` / `400c24fb` | [Shared tools lock](../inputs/catalogs/tools/native/pins.lock.yaml) |
+| Site CLI/controller/charts and provisioned provider | `v0.22.0` / `400c24fb` | [Native site lock](../inputs/catalogs/nvke/native-site-arm64/pins.lock.yaml) |
+| OS, agent and kubeadm | `v0.22.0` / `400c24fb` | [Native OS lock](../inputs/catalogs/node-images/native-arm64/pins.lock.yaml) |
+| Profiles and runbooks | `v0.22.0` / `400c24fb` | [Native profiles lock](../inputs/catalogs/controller-profiles/native-nvidia-arm64/pins.lock.yaml) |
+| Upstream SPIRE/TPM agent packaging | `v0.22.0` / `400c24fb` | [Native OS lock](../inputs/catalogs/node-images/native-arm64/pins.lock.yaml) |
 | NVIDIA OVN image/chart | [`8af51273`](https://github.com/dsx-ai-factory/ovn-kubernetes/commit/8af51273d52dfa07454435d18d37230e582d797a), 2.4.2 | [Native NVIDIA overlay](../inputs/catalogs/node-images/variants/native-nvidia.json) |
 
-Both hosts use these same source selections. SPIRE packaging is the explicit
-source exception: it consumes NVKE #1842's upstream package scripts and lock,
-which pin public SPIRE 1.14.1 and TPM plugin 1.9.0 archives. The package revision
-is `1.14.1+tpm1.9.0-4`; no DSX binary is downloaded or included by that producer.
+Both hosts use these same source selections. SPIRE packaging and its startup
+renderer come from the same NVKE `v0.22.0` source as the OS, CLI and controller.
+The source-owned lock pins public SPIRE 1.14.1 and TPM plugin 1.9.0 archives.
+The package revision is `1.14.1+tpm1.9.0-4`; no DSX binary is downloaded or
+included by that producer.
 Tenant nodes use join-token attestation and the site uses TPM. This package does
-not provide the plugin for `dsxImds` attestation. The pin identifies the exact merged fix on NVKE main, not a tagged NVKE release. The other NVKE sources remain at `9ac6832a`.
+not provide the plugin for `dsxImds` attestation.
 
 A private Ubuntu VM-stage check with retained artifacts reached two Ready
 1.36.3 nodes, clean per-node host cloud-init exits and workload/DNS success.
@@ -795,8 +799,13 @@ requires external runtime evidence on both hosts.
 Native NVIDIA Definitions select 32 outputs, or 38 with conformance. Package
 producers inspect actual Debian `Package`/`Architecture` metadata, and the disk
 uses NVKE's renamed Packer build/material schema and QCOW2 output. Changed package
-bytes require a fresh disk build. Release, upstream, historical TCG and hosted
-nightly inputs retain their own catalog baselines and evidence.
+bytes require a fresh disk build. Maintained release, upstream and TCG product
+selections also use NVKE `v0.22.0`; their third-party pins and historical runtime
+evidence remain separate. The independent `nvke-nightly-arm64` and
+`nvke-nightly-upstream-ovn-arm64` test harnesses in
+[nightly-profiles.json](../inputs/testing/nightly-profiles.json) remain pinned to
+[`b4f90e2c`](https://github.com/dsx-ai-factory/nvke/commit/b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8)
+because `v0.22.0` omits their reviewed candidate entrypoint.
 
 The native VM recipe stages `dhcp-identifier: mac` for both hosts through NVKE's
 existing image-input composer. This makes DHCPv4 use the NIC MAC rather than an
