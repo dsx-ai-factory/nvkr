@@ -668,6 +668,57 @@ its tenant; returning starts owned cleanup. Producer runtime/runner client optio
 do not replace this native owner’s explicit prerequisites or configuration. The API has controlled subprocess and
 race-test coverage; a real site-reuse test remains externally unverified.
 
+## Private site identity operation helper
+
+`make site-identity-helper` builds a fixed Linux ARM64 helper for execution in
+an existing admitted NVKE controller container. `pkg/nvkr/siteidentity` owns its
+mTLS probe, fixed renderer operation and authenticated fresh-peer observation;
+the executable only adapts bounded standard input/output and coded errors.
+This helper is not yet selected by native tool catalogs or called by normal
+site startup. Building it does not deploy, import SPIRE policy or repair a site.
+
+It uses the upstream generated NodeAgent client and the existing controller CSI
+workload identity. No arbitrary script, credential, socket relay, downloader or
+new Pod is accepted. The request describes selected endpoints/identities and
+expected exact environment, CA and installed-renderer hashes. Those descriptions
+must come from the native owner's admitted artifacts and source contract; the
+helper does not grant trust to caller-supplied paths or membership. Its client
+library compatibility pin is distinct from the demo's product source selections.
+
+The helper reports remote completion independently from its process exit:
+
+| Completion | Meaning |
+| --- | --- |
+| `not-started` | No mutating RPC was dispatched. Probe-only requests retain this state. |
+| `joined-failure` | The fixed operation failed before manager calls, or those calls completed but the caller context or local identity proof failed. |
+| `joined-success` | The fixed operation joined and a fresh authenticated peer proof succeeded. |
+| `unknown` | An accepted terminal remote response is unavailable. Retain dependencies and do not automatically retry. |
+
+A missing or malformed result is also unknown to the native caller, even if a
+local helper or kubectl process exited. Output capability is admitted before
+identity or remote work. Input is bounded to 16 KiB with a 10-second read deadline;
+output delivery has a 2-second deadline. Cancellation before dispatch prevents
+mutation. The fixed guest operation bounds itself to 110 seconds plus a 5-second
+kill allowance, and the helper drains its synchronous RPC for 135 seconds despite
+caller cancellation. Only SPIRE restarts; the installed renderer preserves the
+CA and TPM material and verifies the node-agent PID remains unchanged.
+Failed bounded renderer or restart clients report `unknown`: systemd can retain
+queued or running work after a client exits, including a generic error exit.
+Timeouts, signals and inconsistent remote status/exit combinations also require
+dependency retention. A failed client is not manager-job completion proof.
+
+The upstream Workload API picker selects the admitted caller on every update.
+Certificate renewal may change its bytes; another default identity is refused.
+
+Fresh peer proof requires the same SPIFFE and boot identities, a different
+certificate serial, issuance within 60 seconds before dispatch and more than
+60 seconds of validity at observation. It records certificate metadata only.
+This result does not authorize bootstrap removal: exact permanent SPIRE policy,
+registration, derived TPM allowlist and TPM-agent proof remain required in the
+native owner. That integration and fresh public first-run acceptance remain
+outstanding. Controlled client, cancellation and script tests are distinct from
+an actual execution of this new production helper.
+
 ## Where the NVKE versions come from
 
 The shared native NVIDIA selection uses the sources below. NVKR verifies the

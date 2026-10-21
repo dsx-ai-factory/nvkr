@@ -1479,6 +1479,21 @@ or test fatal exit. Controlled subprocess tests cover sequential tenants, failed
 validation retention, natural deletion and those ownership boundaries. These
 contracts do not establish a real site-reuse run or complete Mac/Linux acceptance.
 
+A separate fixed site-identity helper now has one deep `pkg/nvkr/siteidentity`
+owner and a thin private Linux ARM64 build target. It reuses the upstream
+generated NodeAgent client and GoSPIFFE/gRPC, admits its bounded output before
+remote work, and distinguishes not-started, joined failure and unknown remote
+completion. Failed renderer/systemd clients and inconsistent terminal responses
+remain unknown; client termination does not prove manager-job completion. The
+upstream Workload API picker retains the exact caller identity across updates.
+Fresh peer metadata requires operation-fresh issuance and remaining
+validity as well as unchanged boot/identity and a changed serial. It issues no
+bootstrap-stop or release receipt. Native catalog delivery, source-renderer
+contract admission, permanent-policy/TPM proof and startup integration remain
+outstanding; neither a helper build nor controlled transport/script tests prove
+fresh customer E2E or Mac/Linux runtime acceptance. The [local guide](../local-nvke-demo.md#private-site-identity-operation-helper)
+records that boundary.
+
 The Mac network owner now consumes the verified upstream vmnet helper's JSON report and holds its Unix
 datagram connection through joined guest/service cleanup. Gateway binding is observed before services
 start; API, local disk delivery, callbacks and temporary Lima forwarding share that address. Contract and

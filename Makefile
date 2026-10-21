@@ -63,6 +63,11 @@ demo: go-version-check ## Build the downstream Go local NVKE demo CLI (calls nvk
 demo-test-bin: go-version-check ## Compile opt-in native NVKE E2E tests; does not run them.
 	go test -c -o $(DEMO_TEST_BIN) ./internal/nvkedemo
 
+.PHONY: site-identity-helper
+site-identity-helper: go-version-check ## Build the private fixed Linux ARM64 site identity helper; does not deploy.
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -buildvcs=false -o bin/nvkr-site-identity-helper-linux-arm64 ./cmd/nvkr-site-identity-helper
+	chmod 0755 bin/nvkr-site-identity-helper-linux-arm64
+
 .PHONY: install
 install: ## Install nvkr into $$(go env GOBIN).
 	go install -ldflags '$(LDFLAGS)' ./cmd/nvkr
