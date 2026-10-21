@@ -67,7 +67,10 @@ is not supported. Acquired charts cannot use image binding, because that would c
 ## Explicit membership
 
 Every deploy item must be listed in `members` or `accounted`. External Helm items become members. The local
-controller chart is accounted for by its exact path, and its name/version must agree with its `release.yaml`.
+controller chart is accounted for by its exact path. If `release.yaml` omits its version, NVKR reads the
+exact version from the pinned `Chart.yaml`; an explicit version must agree. An accounted `chartName`
+can explicitly bind an upstream chart rename; otherwise the chart name must agree with `release.yaml`.
+This does not choose the published chart version: producer packaging flags own that choice.
 Local chart paths resolve relative to the deploy root, matching NVKE's deploy format.
 
 Re-pinning fails if an item appears, disappears, changes type, switches between local and external, or changes

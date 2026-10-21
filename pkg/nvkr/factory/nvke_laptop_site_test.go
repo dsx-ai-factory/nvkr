@@ -124,7 +124,7 @@ func TestLaptopNKTPDependencyArchiveChecks(t *testing.T) {
 
 // These are compiler contracts, not a five-output build or installation test.
 func TestLaptopSiteArtifactContract(t *testing.T) {
-	const compiler = "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c"
+	const compiler = "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b"
 	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
 		t.Fatal(err)
@@ -190,7 +190,7 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 						t.Fatal("site applications/charts must not fall back to acquired releases")
 					case ir.KindFetch:
 						fetches++
-						if node.Commit != "8fb2d53368823bd386b4fbd55b4ab6d3c0931345" || node.TreeHash != "36569cf4ec0e2360ee023cd7e53da65b96ce770d" {
+						if node.Commit != "400c24fb6465b042be883d6b62472528520d6291" || node.TreeHash != "f3afc02f5c92f4aacda3a1655836a91bef093bfe" {
 							t.Fatal("CLI, controller and charts must share the selected installer source")
 						}
 						if build.Name == "nktp" {
@@ -233,7 +233,7 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 						if build.Name == "nvkectl" && node.Toolchain != compiler {
 							t.Fatal("site CLI must select the exact reviewed compiler, not the retained producer pin")
 						}
-						if build.Name == "nvkectl" && !strings.Contains(strings.Join(node.Command, " "), "make -C cli build NKECTL_TREE=clean") {
+						if build.Name == "nvkectl" && !strings.Contains(strings.Join(node.Command, " "), "make -C cli build NVKECTL_TREE=clean") {
 							t.Fatal("source-owned Make must own the changed CLI linker symbols and stamp assertion")
 						}
 					}

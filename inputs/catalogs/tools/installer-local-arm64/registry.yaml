@@ -9,7 +9,7 @@ metadata:
 sources:
   clusterctl:
     repo: https://github.com/kubernetes-sigs/cluster-api
-    constraint: 1.12.3
+    constraint: 1.13.6
     toolchainImagesByArch:
       arm64: docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9
     vendorCommand:

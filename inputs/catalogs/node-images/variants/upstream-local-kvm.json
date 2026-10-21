@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-os-arm64-upstream-local-kvm",
-  "requiresCatalogDigest": "sha256:5a5e20f1b358875010fba340212015049d09725462439c1ea5ce5845e17383d8",
+  "requiresCatalogDigest": "sha256:404a632690c0c9deb581812202039abf29ff44ebe5848047d7ab87df509b664b",
   "components": {
     "nvke-node-image": {
       "component": {
@@ -30,9 +30,9 @@
           "timeoutSeconds": 21600
         },
         "repo": "https://github.com/dsx-ai-factory/nvke.git",
-        "tag": "ff21ba8c07cafff74b68e238a8876af11e5beded",
-        "commit": "ff21ba8c07cafff74b68e238a8876af11e5beded",
-        "treeHash": "b915345debd33ccd63dfbf8146415bf20e94c4ea",
+        "tag": "v0.22.0",
+        "commit": "400c24fb6465b042be883d6b62472528520d6291",
+        "treeHash": "f3afc02f5c92f4aacda3a1655836a91bef093bfe",
         "patches": [
           {
             "name": "patches/capture-schema.patch",
@@ -52,12 +52,12 @@
         "packer": {
           "projectPath": "os-image/packer",
           "packerVersion": "1.15.4",
-          "buildName": "nke-node-non-fde.qemu.nke-non-fde",
+          "buildName": "nvke-node-non-fde.qemu.nvke-non-fde",
           "architectureVariable": "architecture",
           "acceleratorVariable": "accelerator",
           "materialManifestVariable": "material_manifest",
           "materialManifest": {
-            "schemaVersion": "nke.dev/os-image-materials/v1",
+            "schemaVersion": "nvke.nvidia.com/os-image-materials/v1",
             "kinds": {
               "image-inputs": "archive",
               "installer-iso": "disk-image"
@@ -82,13 +82,13 @@
           "image-inputs": "nvke-image-inputs",
           "installer-iso": "nvke-patched-installer-iso"
         },
-        "artifactPath": "non-fde/nke-node.qcow2",
+        "artifactPath": "non-fde/nvke-node.qcow2",
         "vendorCommand": [
           "bash",
           "-ec",
-          "cd agent\nexport GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\npins=\"$(sha256sum go.mod go.sum)\"\n# Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.\n# Go owns transport fallback; checksum failures never select another proxy.\n# Keep direct fallback limited to a missing proxy module (404/410).\nproxy=https://proxy.golang.org\nGOPROXY=\"${proxy}|${proxy}/|${proxy}//,direct\" \\\n  timeout --kill-after=10s 540s go mod download || {\n    status=$?; echo 'agent module download failed or exceeded 540s' \u003e\u00262; exit \"$status\";\n  }\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during download' \u003e\u00262; exit 1;\n}\n# Offline verification and vendoring run once, after acquisition succeeds.\nGOPROXY=off timeout --kill-after=10s 60s go mod verify || {\n  status=$?; echo 'agent module cache verification failed or exceeded 60s' \u003e\u00262; exit \"$status\";\n}\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor || {\n  status=$?; echo 'agent offline vendoring failed or exceeded 180s' \u003e\u00262; exit \"$status\";\n}\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during vendoring' \u003e\u00262; exit 1;\n}\n"
+          "# Retain the source-required compiler; the Packer image owns VM tools.\ncase \"$(uname -m)\" in\n  x86_64) go_arch=amd64; go_sha=65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40 ;;\n  aarch64) go_arch=arm64; go_sha=a06e99309dbcbdca1a8ccd2282c3ee146e55930886e26b4f1193269587165f49 ;;\n  *) echo 'Unsupported Go execution architecture' >&2; exit 1 ;;\nesac\nmkdir -p .nvkr-tools\ncurl --fail --location --max-time 120 --output .nvkr-tools/go.tar.gz \\\n  \"https://go.dev/dl/go1.27.3.linux-${go_arch}.tar.gz\"\nprintf '%s  .nvkr-tools/go.tar.gz\\n' \"$go_sha\" | sha256sum --quiet -c -\ntar -xzf .nvkr-tools/go.tar.gz -C .nvkr-tools\nexport PATH=\"${PWD}/.nvkr-tools/go/bin:$PATH\"\ntest \"$(GOTOOLCHAIN=local go version)\" = \"go version go1.27.3 linux/${go_arch}\"\ncd agent\nexport GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\npins=\"$(sha256sum go.mod go.sum)\"\n# Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.\n# Go owns transport fallback; checksum failures never select another proxy.\n# Keep direct fallback limited to a missing proxy module (404/410).\nproxy=https://proxy.golang.org\nGOPROXY=\"${proxy}|${proxy}/|${proxy}//,direct\" \\\n  timeout --kill-after=10s 540s go mod download || {\n    status=$?; echo 'agent module download failed or exceeded 540s' >&2; exit \"$status\";\n  }\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during download' >&2; exit 1;\n}\n# Offline verification and vendoring run once, after acquisition succeeds.\nGOPROXY=off timeout --kill-after=10s 60s go mod verify || {\n  status=$?; echo 'agent module cache verification failed or exceeded 60s' >&2; exit \"$status\";\n}\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor || {\n  status=$?; echo 'agent offline vendoring failed or exceeded 180s' >&2; exit \"$status\";\n}\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during vendoring' >&2; exit 1;\n}\n"
         ],
-        "sourceDateEpoch": 1791257393
+        "sourceDateEpoch": 1792548398
       }
     }
   }

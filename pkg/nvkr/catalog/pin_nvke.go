@@ -19,8 +19,9 @@ import (
 // PinSetItem accounts for a deploy item that is not an external chart member.
 // Local Helm charts additionally bind their exact source-owned relative path.
 type PinSetItem struct {
-	Type string `json:"type"`
-	Path string `json:"path,omitempty"`
+	Type      string `json:"type"`
+	Path      string `json:"path,omitempty"`
+	ChartName string `json:"chartName,omitempty"`
 }
 
 var nvkeItemName = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]*$`)
@@ -34,10 +35,13 @@ type nvkeDeployDocument struct {
 
 type nvkeReleaseDocument struct {
 	Chart struct {
-		Name       string `json:"name"`
-		Version    string `json:"version"`
-		Repository string `json:"repository,omitempty"`
-		Path       string `json:"path,omitempty"`
+		Name             string `json:"name"`
+		Version          string `json:"version"`
+		Repository       string `json:"repository,omitempty"`
+		Path             string `json:"path,omitempty"`
+		Artifact         string `json:"artifact,omitempty"`
+		ImageArtifact    string `json:"imageArtifact,omitempty"`
+		ProfilesArtifact string `json:"profilesArtifact,omitempty"`
 	} `json:"chart"`
 	Release struct {
 		Name      string `json:"name"`
@@ -88,12 +92,15 @@ func validateNVKEPinSet(set *PinSet) error {
 		}
 		switch item.Type {
 		case "helm":
+			if item.ChartName != "" && !helmChartName.MatchString(item.ChartName) {
+				return e.New(e.CodeInvalidCatalog, "invalid accounted local chart name %q", item.ChartName)
+			}
 			if _, err := nvkeLocalChartFile(set.File, item.Path); err != nil {
 				return err
 			}
 		case "manifest", "template", "argocd":
-			if item.Path != "" {
-				return e.New(e.CodeInvalidCatalog, "non-Helm NVKE item %q cannot declare a local chart path", name)
+			if item.Path != "" || item.ChartName != "" {
+				return e.New(e.CodeInvalidCatalog, "non-Helm NVKE item %q cannot declare local chart metadata", name)
 			}
 		default:
 			return e.New(e.CodeInvalidCatalog, "unsupported NVKE item type %q for %q", item.Type, name)
@@ -162,13 +169,16 @@ func deriveNVKEPinSet(ctx context.Context, tree pinnedTree, reg *registryDoc, so
 		if err := decodeNVKEPinDocument(raw, &release); err != nil {
 			return nil, e.Wrap(e.CodeInvalidCatalog, err, "NVKE Helm item %q", item.Name)
 		}
-		if !helmChartName.MatchString(release.Chart.Name) || !exactPinSetVersion(release.Chart.Version) ||
+		if !helmChartName.MatchString(release.Chart.Name) || (release.Chart.Version != "" && !exactPinSetVersion(release.Chart.Version)) ||
 			release.Release.Name == "" || release.Release.Namespace == "" ||
 			(release.Chart.Path == "") == (release.Chart.Repository == "") {
-			return nil, e.New(e.CodeInvalidCatalog, "NVKE Helm item %q requires chart name, exact version, release name/namespace, and exactly one repository or path", item.Name)
+			return nil, e.New(e.CodeInvalidCatalog, "NVKE Helm item %q requires chart name, an exact version when supplied, release name/namespace, and exactly one repository or path", item.Name)
 		}
 		member, external := set.Members[item.Name]
 		if external {
+			if !exactPinSetVersion(release.Chart.Version) {
+				return nil, e.New(e.CodeInvalidCatalog, "external NVKE Helm item %q requires an exact version", item.Name)
+			}
 			if err := validateNVKEExternalChart(reg, item.Name, member, release); err != nil {
 				return nil, err
 			}
@@ -214,10 +224,15 @@ func validateNVKELocalChart(ctx context.Context, tree pinnedTree, deployFile, it
 	if err != nil {
 		return err
 	}
+	expectedName := release.Chart.Name
+	if accounted.ChartName != "" {
+		expectedName = accounted.ChartName
+	}
 	chartName := pinSetObjectField(root, "name")
 	chartVersion := pinSetObjectField(root, "version")
-	if chartName == nil || chartName.Tag != "!!str" || chartName.Value != release.Chart.Name ||
-		chartVersion == nil || chartVersion.Tag != "!!str" || chartVersion.Value != release.Chart.Version {
+	if chartName == nil || chartName.Tag != "!!str" || chartName.Value != expectedName ||
+		chartVersion == nil || chartVersion.Tag != "!!str" || !exactPinSetVersion(chartVersion.Value) ||
+		(release.Chart.Version != "" && chartVersion.Value != release.Chart.Version) {
 		return e.New(e.CodeInvalidCatalog, "NVKE local chart %q name/version differs from release.yaml", item)
 	}
 	return nil

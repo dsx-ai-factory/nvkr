@@ -45,12 +45,12 @@ components:
   nvkectl:
     artifactPath: bin/nvkectl
     buildCommand:
-    - sh
-    - -c
-    - go build -mod=vendor -trimpath -ldflags "-s -w -buildid= -X main.version=$NKECTL_VERSION
-      -X main.gitCommit=$NKECTL_COMMIT -X main.gitTreeState=clean -X main.buildDate=$NKECTL_DATE
-      -X github.com/NVIDIA/nke/cli/internal/cwedeploy.capiVersion=$NKECTL_CAPI_VERSION"
-      -o /src/bin/nvkectl ./cli/cmd/nkectl
+      - bash
+      - -euc
+      - |
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+        make -C cli build NVKECTL_TREE=clean
+        cp cli/bin/nvkectl bin/nvkectl
     cgo: false
     fromSource: true
     outputType: host-package
@@ -59,10 +59,9 @@ components:
     - linux/arm64
     source: nvke
     versionStamp:
-      NKECTL_CAPI_VERSION: v1.12.3
-      NKECTL_COMMIT: '{{slice .Commit 0 8}}'
-      NKECTL_DATE: '{{.Date}}'
-      NKECTL_VERSION: '{{.ModuleTag}}'
+      NVKECTL_COMMIT: '{{slice .Commit 0 8}}'
+      NVKECTL_DATE: '{{.Date}}'
+      NVKECTL_VERSION: '{{.ModuleTag}}'
     writeDir: bin
 kind: SourceBuildRegistry
 metadata:
@@ -88,15 +87,27 @@ sources:
     kind: github-action
     repo: https://github.com/actions/download-artifact
   nvke:
-    constraint: 0.1.x
+    vendorCommand:
+      - bash
+      - -euc
+      - |
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+        test ! -e controller/deploy/charts/go.sum
+        pins="$(sha256sum cli/go.mod cli/go.sum controller/api/go.mod controller/api/go.sum controller/deploy/charts/go.mod management-engine/go.mod management-engine/go.sum)"
+        cd cli
+        timeout --kill-after=10s 540s go mod download
+        GOPROXY=off timeout --kill-after=10s 60s go mod verify
+        GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+        cd ..
+        printf '%s\n' "$pins" | sha256sum --quiet -c -
+        test ! -e controller/deploy/charts/go.sum
+    constraint: v0.22.0
     repo: https://github.com/dsx-ai-factory/nvke
-    tagPrefix: cli/
-    toolchainImage: golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
+    toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
   nvke-controller:
-    constraint: 0.1.x
+    constraint: v0.22.0
     repo: https://github.com/dsx-ai-factory/nvke
-    tagPrefix: controller/
-    toolchainImage: golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
+    toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
   setup-go:
     constraint: 7.x
     kind: github-action

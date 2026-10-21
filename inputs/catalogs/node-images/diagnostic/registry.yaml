@@ -9,8 +9,7 @@ metadata:
 sources:
   nvke-os:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0
     toolchainImagesByArch:
       # AMD64 is a substitution-only local baseline. ARM64 retains the historical
       # M2 Docker candidate publication, not reproduction of the current Dockerfile.
@@ -21,6 +20,19 @@ sources:
       - bash
       - -ec
       - |
+        # Retain the source-required compiler; the Packer image owns VM tools.
+        case "$(uname -m)" in
+          x86_64) go_arch=amd64; go_sha=65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40 ;;
+          aarch64) go_arch=arm64; go_sha=a06e99309dbcbdca1a8ccd2282c3ee146e55930886e26b4f1193269587165f49 ;;
+          *) echo 'Unsupported Go execution architecture' >&2; exit 1 ;;
+        esac
+        mkdir -p .nvkr-tools
+        curl --fail --location --max-time 120 --output .nvkr-tools/go.tar.gz \
+          "https://go.dev/dl/go1.27.3.linux-${go_arch}.tar.gz"
+        printf '%s  .nvkr-tools/go.tar.gz\n' "$go_sha" | sha256sum --quiet -c -
+        tar -xzf .nvkr-tools/go.tar.gz -C .nvkr-tools
+        export PATH="${PWD}/.nvkr-tools/go/bin:$PATH"
+        test "$(GOTOOLCHAIN=local go version)" = "go version go1.27.3 linux/${go_arch}"
         cd agent
         export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
         pins="$(sha256sum go.mod go.sum)"
@@ -47,8 +59,7 @@ sources:
         }
   nvke-cni-calico-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
@@ -66,8 +77,7 @@ sources:
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
   nvke-kubeadm-distro-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
@@ -79,8 +89,7 @@ sources:
           ARCH={{.Arch}} BIN_DIR=/usr/local/bin
   nvke-spire-agent-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
@@ -101,8 +110,8 @@ components:
       - bash
       - -ec
       - |
-        GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \
-          VERSION=v0.2.1-rc.6-109-g726f7694 \
+        PATH="/src/.nvkr-tools/go/bin:$PATH" GOTOOLCHAIN=local GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \
+          VERSION=v0.22.0 \
           NFPM_BIN=/usr/local/bin/nfpm \
           DEB_OUTPUT=/src/agent/bin/nvke-agent.deb
     writeDir: agent/bin
@@ -295,12 +304,12 @@ components:
     packer:
       projectPath: os-image/packer
       packerVersion: 1.15.4
-      buildName: nke-node-non-fde.qemu.nke-non-fde
+      buildName: nvke-node-non-fde.qemu.nvke-non-fde
       architectureVariable: architecture
       acceleratorVariable: accelerator
       materialManifestVariable: material_manifest
       materialManifest:
-        schemaVersion: nke.dev/os-image-materials/v1
+        schemaVersion: nvke.nvidia.com/os-image-materials/v1
         kinds:
           image-inputs: archive
           installer-iso: disk-image
@@ -321,7 +330,7 @@ components:
     materials:
       image-inputs: nvke-image-inputs
       installer-iso: nvke-patched-installer-iso
-    artifactPath: non-fde/nke-node.qcow2
+    artifactPath: non-fde/nvke-node.qcow2
   nvke-node-image-amd64:
     platforms: [linux/amd64]
     fromSource: true
@@ -345,12 +354,12 @@ components:
     packer:
       projectPath: os-image/packer
       packerVersion: 1.15.4
-      buildName: nke-node-non-fde.qemu.nke-non-fde
+      buildName: nvke-node-non-fde.qemu.nvke-non-fde
       architectureVariable: architecture
       acceleratorVariable: accelerator
       materialManifestVariable: material_manifest
       materialManifest:
-        schemaVersion: nke.dev/os-image-materials/v1
+        schemaVersion: nvke.nvidia.com/os-image-materials/v1
         kinds:
           image-inputs: archive
           installer-iso: disk-image
@@ -365,7 +374,7 @@ components:
     materials:
       image-inputs: nvke-image-inputs
       installer-iso: nvke-patched-installer-iso-amd64
-    artifactPath: non-fde/nke-node.qcow2
+    artifactPath: non-fde/nvke-node.qcow2
   nvke-patched-installer-iso:
     platforms: [linux/arm64]
     fromSource: true
@@ -393,7 +402,7 @@ components:
         mkdir -p /src/nvkr-output/work/os-image/packages /src/nvkr-output/spire-agent
         cp -a os-image/packages/spire-agent /src/nvkr-output/work/os-image/packages/
         cp -a os-image/files /src/nvkr-output/work/os-image/
-        SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=1 \
+        SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=4 \
           NFPM_BIN=/usr/local/bin/nfpm \
           /src/nvkr-output/work/os-image/packages/spire-agent/packaging/build-deb.sh \
           {{.Arch}} /src/os-image/packages/spire-agent/dist/1.14.1+tpm1.9.0/{{.Arch}} \

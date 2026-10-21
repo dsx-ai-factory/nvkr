@@ -334,6 +334,8 @@ _Avoid_: Output selection group, mixin, deployment topology
 An explicit catalog mapping from one pinned upstream declaration to source or acquired-artifact versions.
 Re-pinning the umbrella updates its members atomically. Loading re-derives their versions from the pinned tree;
 unknown or missing members in selected collections fail closed. This checks declared version agreement.
+Local chart versions come from pinned source metadata when the deployment declaration omits them.
+Published package versions remain explicit producer inputs; neither is a release-acceptance claim.
 _Avoid_: Dynamic output selection, qualification record, independently bumpable member
 
 **Execution requirements**:

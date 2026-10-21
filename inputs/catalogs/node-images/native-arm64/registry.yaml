@@ -3,7 +3,7 @@
 
 # Source 69ef variables.pkr.hcl and locals.pkr.hcl: empty kernel_package
 # preserves the ARM64 source default linux-nvidia-64k; no kernel substitution.
-# SPIRE packaging intentionally retains the separately reviewed 726f769 source.
+# SPIRE packaging uses the same v0.22.0 source as the other NVKE producers.
 # Agent VERSION is its source commit, not a released module-version claim.
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
@@ -14,14 +14,26 @@ metadata:
 sources:
   nvke-os:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0
     toolchainImagesByArch:
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
     vendorCommand:
     - bash
     - -ec
     - |
+      # Retain the source-required compiler; the Packer image owns VM tools.
+      case "$(uname -m)" in
+        x86_64) go_arch=amd64; go_sha=65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40 ;;
+        aarch64) go_arch=arm64; go_sha=a06e99309dbcbdca1a8ccd2282c3ee146e55930886e26b4f1193269587165f49 ;;
+        *) echo 'Unsupported Go execution architecture' >&2; exit 1 ;;
+      esac
+      mkdir -p .nvkr-tools
+      curl --fail --location --max-time 120 --output .nvkr-tools/go.tar.gz \
+        "https://go.dev/dl/go1.27.3.linux-${go_arch}.tar.gz"
+      printf '%s  .nvkr-tools/go.tar.gz\n' "$go_sha" | sha256sum --quiet -c -
+      tar -xzf .nvkr-tools/go.tar.gz -C .nvkr-tools
+      export PATH="${PWD}/.nvkr-tools/go/bin:$PATH"
+      test "$(GOTOOLCHAIN=local go version)" = "go version go1.27.3 linux/${go_arch}"
       cd agent
       export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
       pins="$(sha256sum go.mod go.sum)"
@@ -48,8 +60,7 @@ sources:
       }
   nvke-cni-calico-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0
     toolchainImagesByArch:
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
     vendorCommand:
@@ -65,8 +76,7 @@ sources:
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
   nvke-kubeadm-distro-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0
     toolchainImagesByArch:
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
     vendorCommand:
@@ -77,8 +87,7 @@ sources:
         ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
   nvke-spire-agent-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.1.x
-    tagPrefix: os-image/
+    constraint: v0.22.0
     toolchainImagesByArch:
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2
     vendorCommand:
@@ -99,7 +108,7 @@ components:
     - bash
     - -ec
     - |
-      GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \
+      PATH="/src/.nvkr-tools/go/bin:$PATH" GOTOOLCHAIN=local GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \
         VERSION="${BUILD_VERSION:?}" \
         NFPM_BIN=/usr/local/bin/nfpm \
         DEB_OUTPUT=/src/agent/bin/nvke-agent.deb
@@ -411,7 +420,7 @@ components:
       mkdir -p /src/nvkr-output/work/os-image/packages /src/nvkr-output/spire-agent
       cp -a os-image/packages/spire-agent /src/nvkr-output/work/os-image/packages/
       cp -a os-image/files /src/nvkr-output/work/os-image/
-      SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=1 \
+      SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=4 \
         NFPM_BIN=/usr/local/bin/nfpm \
         /src/nvkr-output/work/os-image/packages/spire-agent/packaging/build-deb.sh \
         {{.Arch}} /src/os-image/packages/spire-agent/dist/1.14.1+tpm1.9.0/{{.Arch}} \

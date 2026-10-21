@@ -300,7 +300,10 @@ func dashboardGuestReport(line string) string {
 		}
 		return ""
 	}
-	message, ok := strings.CutPrefix(line, "==> nke-node-non-fde.qemu.nke-non-fde: ")
+	message, ok := strings.CutPrefix(line, "==> nvke-node-non-fde.qemu.nvke-non-fde: ")
+	if !ok {
+		message, ok = strings.CutPrefix(line, "==> nke-node-non-fde.qemu.nke-non-fde: ")
+	}
 	if !ok {
 		return ""
 	}

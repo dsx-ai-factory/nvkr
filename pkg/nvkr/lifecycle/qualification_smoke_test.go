@@ -224,6 +224,11 @@ func TestNativeSmokeExpectedStampBindings(t *testing.T) {
 		code e.Code
 	}{
 		{"exact prefix", func(*ir.Node) {}, ""},
+		{"renamed stamps", func(n *ir.Node) { n.Env[0].Name = "NVKECTL_VERSION"; n.Env[1].Name = "NVKECTL_COMMIT" }, ""},
+		{"mixed stamps", func(n *ir.Node) { n.Env[0].Name = "NVKECTL_VERSION" }, e.CodeVerifyFailed},
+		{"both stamp families", func(n *ir.Node) {
+			n.Env = append(n.Env, ir.EnvVar{Name: "NVKECTL_VERSION", Value: "v1.2.3"}, ir.EnvVar{Name: "NVKECTL_COMMIT", Value: "aaaaaaaa"})
+		}, e.CodeVerifyFailed},
 		{"exact full commit", func(n *ir.Node) { n.Env[1].Value = n.SourceCommit }, ""},
 		{"commit version", func(n *ir.Node) { n.Version = n.SourceCommit; n.Env[0].Value = n.SourceCommit }, ""},
 		{"wrong commit version", func(n *ir.Node) { n.Version = strings.Repeat("b", 40); n.Env[0].Value = n.Version }, e.CodeVerifyFailed},

@@ -53,6 +53,13 @@ func TestOSAgentAcquisitionUsesGoTransportFallback(t *testing.T) {
 	if producer == nil || !slices.Equal(producer.VendorCommand, command) {
 		t.Fatal("ARM64 KVM producer must retain the same tested acquisition command")
 	}
+	// Compiler acquisition has separate checksum contracts; exercise the module
+	// transport here with the host Go compiler and the fixture proxy.
+	_, moduleCommand, found := strings.Cut(command[2], "cd agent\n")
+	if !found {
+		t.Fatal("missing agent module acquisition boundary")
+	}
+	command[2] = "cd agent\n" + moduleCommand
 	// Go recognizes GitHub's VCS route without a vanity-domain network lookup.
 	// GOVCS denies that route before any direct repository command can run.
 	const module = "github.com/nvkr-fixture/material"

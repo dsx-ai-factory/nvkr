@@ -12,49 +12,49 @@ components:
     outputType: oci-image
     platforms: [linux/amd64, linux/arm64]
     prebuilt:
-      image: registry.k8s.io/cluster-api/cluster-api-controller:v1.12.3
+      image: registry.k8s.io/cluster-api/cluster-api-controller:v1.13.6
       evidence: {none: true}
   capi-kubeadm-bootstrap-image:
     source: capi
     outputType: oci-image
     platforms: [linux/amd64, linux/arm64]
     prebuilt:
-      image: registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.12.3
+      image: registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.13.6
       evidence: {none: true}
   capi-kubeadm-control-plane-image:
     source: capi
     outputType: oci-image
     platforms: [linux/amd64, linux/arm64]
     prebuilt:
-      image: registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.12.3
+      image: registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.13.6
       evidence: {none: true}
   cert-manager-cainjector-image:
     source: cert-manager
     outputType: oci-image
     platforms: [linux/amd64, linux/arm64]
     prebuilt:
-      image: quay.io/jetstack/cert-manager-cainjector:v1.19.3
+      image: quay.io/jetstack/cert-manager-cainjector:v1.21.1
       evidence: {none: true}
   cert-manager-controller-image:
     source: cert-manager
     outputType: oci-image
     platforms: [linux/amd64, linux/arm64]
     prebuilt:
-      image: quay.io/jetstack/cert-manager-controller:v1.19.3
+      image: quay.io/jetstack/cert-manager-controller:v1.21.1
       evidence: {none: true}
   cert-manager-webhook-image:
     source: cert-manager
     outputType: oci-image
     platforms: [linux/amd64, linux/arm64]
     prebuilt:
-      image: quay.io/jetstack/cert-manager-webhook:v1.19.3
+      image: quay.io/jetstack/cert-manager-webhook:v1.21.1
       evidence: {none: true}
   nktp-collector-image:
     source: nvke-content
     outputType: oci-image
     platforms: [linux/amd64, linux/arm64]
     prebuilt:
-      image: otel/opentelemetry-collector-k8s:0.159.0
+      image: otel/opentelemetry-collector-k8s:0.162.0
       evidence: {none: true}
   nktp-kube-state-metrics-image:
     source: nvke-content
@@ -108,14 +108,14 @@ components:
   nktp-chart:
     fromSource: true
     source: nvke-nktp
-    artifactPath: charts/nktp-0.1.0-rc.2.tgz
+    artifactPath: charts/nktp-0.22.0.tgz
     writeDir: charts
     platforms: [linux/amd64, linux/arm64]
     outputType: tarball
     buildCommand:
       - sh
       - -euc
-      - .nvkr-tools/helm package nktp/deploy/charts/nktp --destination=charts/
+      - .nvkr-tools/helm package nktp/deploy/charts/nktp --version=0.22.0 --app-version=v0.22.0 --destination=charts/
   capnico-controller:
     fromSource: true
     source: capnico
@@ -158,12 +158,12 @@ components:
 sources:
   capi:
     repo: https://github.com/kubernetes-sigs/cluster-api
-    constraint: 1.12.3
+    constraint: 1.13.6
     toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
   cert-manager:
     repo: https://github.com/cert-manager/cert-manager
-    # clusterctl v1.12.3's CertManagerDefaultVersion, not current NVKE main.
-    constraint: 1.19.3
+    # Matches the pinned NVKE tool-versions.mk and clusterctl default.
+    constraint: 1.21.1
     toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
   capnico:
     repo: https://github.com/dsx-ai-factory/cluster-api-provider-nico
@@ -171,15 +171,15 @@ sources:
     toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
   nvke-content:
     repo: https://github.com/dsx-ai-factory/nvke
-    constraint: v0.21.0
+    constraint: v0.22.0
     toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
   nvke-nktp:
     repo: https://github.com/dsx-ai-factory/nvke
-    constraint: v0.21.0
+    constraint: v0.22.0
     # Empty entrypoint, curl and tar are supplied by this existing pinned image.
     # The selected NVKE tool-versions.mk owns Helm v4.2.4. Its native executable
     # is acquired and verified in fetch, retained with the source, then used offline.
-    toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
+    toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
     vendorCommand:
       - sh
       - -euc

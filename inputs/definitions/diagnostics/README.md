@@ -6,9 +6,9 @@ source-owned Packer project. Architecture-dependent build and vendor argv use th
 substitution. The AMD64 disk root and ARM64 execution overlay are explicit producer declarations, not one
 architecture-neutral root.
 
-The bootstrap lock retains Git describe-derived source selections such as
-`os-image/v0.1.0-rc.4-51-g726f7694`; these describe an exact commit, not a published
-release tag. Do not infer coordinated release acceptance from those names.
+The source lock and ARM64 producer overlay select NVKE `v0.22.0` at
+`400c24fb6465b042be883d6b62472528520d6291`. The release tag alone does not establish
+build, runtime or coordinated release acceptance.
 
 Local development and CI are parallel supported paths sharing material producers, not substitutes for one another.
 Their Definitions select explicit execution behavior:

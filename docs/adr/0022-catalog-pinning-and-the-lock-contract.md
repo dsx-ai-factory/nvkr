@@ -341,7 +341,11 @@ local loading. Offline pin-set transport remains deferred.
 `release.yaml` from the same pinned tree. Every deploy item must appear in `members` or `accounted`;
 unknown, missing, duplicate or reclassified items fail before chart acquisition. External members bind the
 reviewed chart name/repository through `prebuilt.chart` (acquired) or member `chart` (source). Accounted local
-charts bind their relative path and must match their `Chart.yaml` name/version. Order, values and installation
+charts bind their relative path. An omitted local version is read from the exact pinned `Chart.yaml`; an
+explicit version must match it. Local chart versions must remain exact semantic-version strings. The optional
+accounted `chartName` binds a reviewed upstream chart rename; otherwise the deployment name must match.
+The typed `artifact`, `imageArtifact` and `profilesArtifact` fields are descriptive downstream output selectors,
+not pin authority. Unknown fields still fail closed. Order, values and installation
 remain NVKE-owned. See the [example catalog](../examples/nvke-pin-set/registry.yaml) and
 [usage guide](../nvke-pin-set-usage.md). CycloneDX ingestion and qualified-set acceptance remain deferred.
 

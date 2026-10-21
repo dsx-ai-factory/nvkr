@@ -82,12 +82,12 @@ func TestNVKEUbuntu24NativeDiskSelections(t *testing.T) {
 						continue
 					}
 					roots++
-					if node.Component != root || node.SourceCommit != "ff21ba8c07cafff74b68e238a8876af11e5beded" || node.Packer == nil ||
+					if node.Component != root || node.SourceCommit != "400c24fb6465b042be883d6b62472528520d6291" || node.Packer == nil ||
 						node.Disk == nil || node.ExecutionBinding == nil || node.Requirements == nil {
 						t.Fatal("Ubuntu 24 disk lost its source-owned native Packer contract")
 					}
-					if node.Packer.BuildName != "nke-node-"+variant.source+".qemu.nke-"+variant.source ||
-						node.ArtifactPath != variant.source+"/nke-node.qcow2" || node.Packer.AcquisitionArchive != variant.source+"/apt-acquisitions.tar" ||
+					if node.Packer.BuildName != "nvke-node-"+variant.source+".qemu.nvke-"+variant.source ||
+						node.ArtifactPath != variant.source+"/nvke-node.qcow2" || node.Packer.AcquisitionArchive != variant.source+"/apt-acquisitions.tar" ||
 						node.Disk.Encryption != variant.encryption || node.ToolchainPlatform != build.Platform {
 						t.Fatal("Ubuntu 24 changed the pinned source's disk output contract")
 					}
@@ -282,7 +282,7 @@ func TestNVKEUbuntu24AgentRejectsUnsupportedLibcBeforeWork(t *testing.T) {
 	for _, phase := range []struct {
 		name, firstTool string
 		command         []string
-	}{{"acquisition", "sha256sum", agent.VendorCommand}, {"build", "make", agent.BuildCommand}} {
+	}{{"acquisition", "mkdir", agent.VendorCommand}, {"build", "make", agent.BuildCommand}} {
 		for _, tc := range []struct {
 			name, libc string
 			missing    bool
@@ -308,6 +308,9 @@ func TestNVKEUbuntu24AgentRejectsUnsupportedLibcBeforeWork(t *testing.T) {
 					if err := os.WriteFile(filepath.Join(bin, "getconf"), []byte("#!/bin/sh\nprintf '%s\\n' \"$NVKR_TEST_LIBC\"\n"), 0700); err != nil {
 						t.Fatal(err)
 					}
+				}
+				if err := os.WriteFile(filepath.Join(bin, "uname"), []byte("#!/bin/sh\nprintf x86_64\n"), 0700); err != nil {
+					t.Fatal(err)
 				}
 				marker := filepath.Join(root, "work-started")
 				if err := os.WriteFile(filepath.Join(bin, phase.firstTool), []byte("#!/bin/sh\nprintf 'work started\\n' > \"$NVKR_TEST_MARKER\"\nexit 73\n"), 0700); err != nil {
@@ -367,7 +370,7 @@ func TestNVKEUbuntu24AgentPreservesDynamicAgentAndStaticUpdater(t *testing.T) {
 					}
 				}
 				if !tc.missingUpdater {
-					if err := os.WriteFile(filepath.Join(binaryDirectory, "nke-agent-updater"), []byte("updater fixture"), 0600); err != nil {
+					if err := os.WriteFile(filepath.Join(binaryDirectory, "nvke-agent-updater"), []byte("updater fixture"), 0600); err != nil {
 						t.Fatal(err)
 					}
 				}
@@ -380,7 +383,7 @@ test "$#" = 4
 test "$1" = /src/os-image/nix/check-ubuntu-elf.sh
 test "$2" = --arch
 test "$3" = "$NVKR_TEST_ARCH"
-test "$4" = "$NVKR_TEST_SOURCE/agent/bin/linux_${NVKR_TEST_ARCH}/nke-agent"
+test "$4" = "$NVKR_TEST_SOURCE/agent/bin/linux_${NVKR_TEST_ARCH}/nvke-agent"
 printf 'checked agent\n' > "$NVKR_TEST_SOURCE/agent-check"
 exit "$NVKR_TEST_CHECK_EXIT"
 `,
@@ -388,7 +391,7 @@ exit "$NVKR_TEST_CHECK_EXIT"
 set -eu
 test "$#" = 2
 test "$1" = -lW
-test "$2" = "$NVKR_TEST_SOURCE/agent/bin/linux_${NVKR_TEST_ARCH}/nke-agent-updater"
+test "$2" = "$NVKR_TEST_SOURCE/agent/bin/linux_${NVKR_TEST_ARCH}/nvke-agent-updater"
 printf 'checked updater\n' > "$NVKR_TEST_SOURCE/updater-check"
 printf '%s\n' "$NVKR_TEST_HEADERS"
 exit "$NVKR_TEST_READELF_EXIT"

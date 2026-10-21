@@ -283,6 +283,9 @@ It also does not establish disk reproduction. The exact QCOW2 digest names the d
 material identities and inspected contents establish a controlled, content-validated rebuild. Only an
 independent exact comparison of ADR-14's qualified canonical disk subject may establish `Reproduced`.
 
+NVKE pin-set extraction reads omitted local chart versions from the pinned chart metadata and admits
+chart renames through explicit catalog mappings (ADR-22). Packaging versions remain producer inputs.
+
 The Run Plan embeds the admitted authored inputs and each output’s executable graph. Producer scheduling
 records carry exact output/node references; container, network, platform and execution-class settings live
 only in the referenced instruction. Rendering and local execution resolve those references through the same

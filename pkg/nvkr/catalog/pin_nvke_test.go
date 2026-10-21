@@ -103,6 +103,40 @@ func TestNVKEPinSetReadsActualUpstreamDeployMetadata(t *testing.T) {
 	}
 }
 
+func TestNVKEPinSetLocalChartMetadata(t *testing.T) {
+	const releaseFile = "controller/deploy/nke-sbom/controller/release.yaml"
+	const chartFile = "controller/deploy/charts/controller/Chart.yaml"
+	for _, tc := range []struct {
+		name, version, chartName, reviewedName string
+		valid                                  bool
+	}{
+		{"source version", "0.0.0", "nke-controller", "", true},
+		{"reviewed rename", "0.0.0", "nvke-controller", "nvke-controller", true},
+		{"unreviewed rename", "0.0.0", "nvke-controller", "", false},
+		{"wrong reviewed name", "0.0.0", "other-controller", "nvke-controller", false},
+		{"invalid version", "latest", "nke-controller", "", false},
+		{"range version", "1.x", "nke-controller", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			reg, tree := nvkePinFixture(t)
+			replaceNVKEFixture(t, tree, releaseFile, "  version: \"0.0.0\"\n", "")
+			replaceNVKEFixture(t, tree, releaseFile, "chart:\n", "chart:\n  artifact: controller-chart\n  imageArtifact: cwe\n  profilesArtifact: controller-profiles\n")
+			tree.files[chartFile] = []byte("name: " + tc.chartName + "\nversion: \"" + tc.version + "\"\n")
+			item := reg.Sources["nvke"].PinSet.Accounted["controller"]
+			item.ChartName = tc.reviewedName
+			reg.Sources["nvke"].PinSet.Accounted["controller"] = item
+			versions, err := deriveNVKEPinSet(t.Context(), tree, reg, "nvke")
+			if !tc.valid {
+				assertCatalogContractCode(t, err, e.CodeInvalidCatalog)
+				return
+			}
+			if err != nil || versions["spire"] != "0.30.1" {
+				t.Fatalf("versions=%v error=%v", versions, err)
+			}
+		})
+	}
+}
+
 func TestNVKEPinSetAllowsReviewedSourceMember(t *testing.T) {
 	reg, tree := nvkePinFixture(t)
 	set := reg.Sources["nvke"].PinSet
@@ -182,6 +216,9 @@ func TestNVKEPinSetRejectsChartIdentityAndShapeChanges(t *testing.T) {
 		{"different repository", func(t *testing.T, _ *registryDoc, tree *nvkeFixtureTree) {
 			replaceNVKEFixture(t, tree, spire, "repository: https://spiffe.github.io/helm-charts-hardened/", "repository: https://different.example/charts")
 		}},
+		{"missing external version", func(t *testing.T, _ *registryDoc, tree *nvkeFixtureTree) {
+			replaceNVKEFixture(t, tree, spire, "  version: \"0.30.1\"\n", "")
+		}},
 		{"version range", func(t *testing.T, _ *registryDoc, tree *nvkeFixtureTree) {
 			replaceNVKEFixture(t, tree, spire, "version: \"0.30.1\"", "version: \"~0.30.1\"")
 		}},
@@ -199,6 +236,9 @@ func TestNVKEPinSetRejectsChartIdentityAndShapeChanges(t *testing.T) {
 		}},
 		{"missing local chart", func(_ *testing.T, _ *registryDoc, tree *nvkeFixtureTree) {
 			delete(tree.files, "controller/deploy/charts/controller/Chart.yaml")
+		}},
+		{"local version conflicts with release", func(t *testing.T, _ *registryDoc, tree *nvkeFixtureTree) {
+			replaceNVKEFixture(t, tree, controller, "version: \"0.0.0\"", "version: \"0.22.0\"")
 		}},
 		{"local chart mismatches release", func(t *testing.T, _ *registryDoc, tree *nvkeFixtureTree) {
 			replaceNVKEFixture(t, tree, "controller/deploy/charts/controller/Chart.yaml", "name: nke-controller", "name: wrong-controller")
@@ -234,6 +274,12 @@ func TestNVKEPinSetSchemaAndCancellationFailBeforeRead(t *testing.T) {
 		{"member selector", func(s *PinSet) { m := s.Members["spire"]; m.Path = "chart.version"; s.Members["spire"] = m }},
 		{"both declarations", func(s *PinSet) { s.Accounted["spire"] = PinSetItem{Type: "helm", Path: "../charts/controller"} }},
 		{"unknown accounted kind", func(s *PinSet) { s.Accounted["capnico"] = PinSetItem{Type: "unknown"} }},
+		{"manifest chart name", func(s *PinSet) { s.Accounted["capnico"] = PinSetItem{Type: "manifest", ChartName: "controller"} }},
+		{"invalid chart name", func(s *PinSet) {
+			item := s.Accounted["controller"]
+			item.ChartName = "../controller"
+			s.Accounted["controller"] = item
+		}},
 		{"manifest chart path", func(s *PinSet) { s.Accounted["capnico"] = PinSetItem{Type: "manifest", Path: "elsewhere"} }},
 		{"escaping local path", func(s *PinSet) { s.Accounted["controller"] = PinSetItem{Type: "helm", Path: "../../../../outside"} }},
 		{"absolute local path", func(s *PinSet) { s.Accounted["controller"] = PinSetItem{Type: "helm", Path: "/tmp/chart"} }},

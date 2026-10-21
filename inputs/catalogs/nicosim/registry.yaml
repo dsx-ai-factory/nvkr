@@ -9,7 +9,7 @@ metadata:
 sources:
   nvke-nicosim:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.21.x
+    constraint: v0.22.0
     # Historical M2 Docker candidate Go/GCC toolchain. Local launchers substitute
     # freshly validated bytes; this pin does not prove current-source reproduction
     # or completed organizational review.
@@ -19,6 +19,19 @@ sources:
       - bash
       - -euc
       - |
+        # Retain the source-required compiler; the Packer image owns VM tools.
+        case "$(uname -m)" in
+          x86_64) go_arch=amd64; go_sha=65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40 ;;
+          aarch64) go_arch=arm64; go_sha=a06e99309dbcbdca1a8ccd2282c3ee146e55930886e26b4f1193269587165f49 ;;
+          *) echo 'Unsupported Go execution architecture' >&2; exit 1 ;;
+        esac
+        mkdir -p .nvkr-tools
+        curl --fail --location --max-time 120 --output .nvkr-tools/go.tar.gz \
+          "https://go.dev/dl/go1.27.3.linux-${go_arch}.tar.gz"
+        printf '%s  .nvkr-tools/go.tar.gz\n' "$go_sha" | sha256sum --quiet -c -
+        tar -xzf .nvkr-tools/go.tar.gz -C .nvkr-tools
+        export PATH="${PWD}/.nvkr-tools/go/bin:$PATH"
+        test "$(GOTOOLCHAIN=local go version)" = "go version go1.27.3 linux/${go_arch}"
         cd controller/nico-sim
         export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
         pins="$(sha256sum go.mod go.sum)"
@@ -33,7 +46,7 @@ components:
     source: nvke-nicosim
     patches:
       - name: patches/version-interface.patch
-        sha256: sha256:b45c745b03f1661572f00ce658499a6b260940c36293e03dfff4300ba940e167
+        sha256: sha256:186d3ca32819bdb0f299732414de8982e67e0b5561b9914c16a26f11641b6cde
     versionStamp:
       NICO_SIM_VERSION: 'v{{.Version}}'
       NICO_SIM_COMMIT: '{{.Commit}}'
@@ -47,6 +60,7 @@ components:
       - bash
       - -euc
       - |
+        export PATH="/src/.nvkr-tools/go/bin:$PATH"
         export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
         make -C controller/nico-sim build-static \
           BUILD_VERSION="${NICO_SIM_VERSION:?}" GIT_COMMIT="${NICO_SIM_COMMIT:?}" GIT_TREE_STATE="${NICO_SIM_TREE:?}"
@@ -55,7 +69,7 @@ components:
     source: nvke-nicosim
     patches:
       - name: patches/version-interface.patch
-        sha256: sha256:b45c745b03f1661572f00ce658499a6b260940c36293e03dfff4300ba940e167
+        sha256: sha256:186d3ca32819bdb0f299732414de8982e67e0b5561b9914c16a26f11641b6cde
     versionStamp:
       NICO_SIM_VERSION: 'v{{.Version}}'
       NICO_SIM_COMMIT: '{{.Commit}}'
@@ -70,9 +84,10 @@ components:
       - -euc
       - |
         cd controller/nico-sim
+        export PATH="/src/.nvkr-tools/go/bin:$PATH"
         export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
         CGO_ENABLED=1 go build -trimpath -tags 'netgo osusergo' \
-          -ldflags "-X github.com/dsx-ai-factory/nke/controller/nico-sim/internal/version.BuildVersion=${NICO_SIM_VERSION:?} -X github.com/dsx-ai-factory/nke/controller/nico-sim/internal/version.GitCommit=${NICO_SIM_COMMIT:?} -X github.com/dsx-ai-factory/nke/controller/nico-sim/internal/version.GitTreeState=${NICO_SIM_TREE:?} -linkmode external -extldflags -static" \
+          -ldflags "-X github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/version.BuildVersion=${NICO_SIM_VERSION:?} -X github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/version.GitCommit=${NICO_SIM_COMMIT:?} -X github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/version.GitTreeState=${NICO_SIM_TREE:?} -linkmode external -extldflags -static" \
           -o bin/nico-simctl ./cmd/nico-simctl
   nico-sim-runtime-assets:
     fromSource: true

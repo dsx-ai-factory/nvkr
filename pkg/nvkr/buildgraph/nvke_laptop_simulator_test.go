@@ -86,7 +86,7 @@ func testNICoSimSourceBuild(t *testing.T, directory string, patched bool) {
 						t.Fatalf("unexpected CGO selection for %s: got %t, want %t", node.Component, cgo, wantCGO)
 					}
 					if patched && node.Component != "nico-sim-runtime-assets" {
-						if len(node.Patches) != 1 || node.Patches[0].Content == "" || node.Patches[0].SHA256 != "sha256:b45c745b03f1661572f00ce658499a6b260940c36293e03dfff4300ba940e167" {
+						if len(node.Patches) != 1 || node.Patches[0].Content == "" || node.Patches[0].SHA256 != "sha256:186d3ca32819bdb0f299732414de8982e67e0b5561b9914c16a26f11641b6cde" {
 							t.Fatal("NICoSim version interface must be a byte-bound source patch")
 						}
 						stamps := map[string]string{}

@@ -3,7 +3,7 @@ apiVersion: nvkr.dev/lock/v1
 kind: PinLock
 pins:
   nvke-profiles:
-    commit: 69ef9924c4bf0487beba8c3613ae6e0a0260d8f3
-    sourceDateEpoch: 1792162067
-    tag: 69ef9924c4bf0487beba8c3613ae6e0a0260d8f3
-    treeHash: 50e84ede74013b8d047e08bf0ec2a23cbd475e72
+    commit: 400c24fb6465b042be883d6b62472528520d6291
+    sourceDateEpoch: 1792548398
+    tag: v0.22.0
+    treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe

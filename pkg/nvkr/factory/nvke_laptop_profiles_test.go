@@ -520,7 +520,7 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 					t.Fatal("profiles must not fall back to an acquired fleet image")
 				case ir.KindFetch:
 					fetches++
-					if node.Commit != "8fb2d53368823bd386b4fbd55b4ab6d3c0931345" || node.TreeHash != "36569cf4ec0e2360ee023cd7e53da65b96ce770d" {
+					if node.Commit != "400c24fb6465b042be883d6b62472528520d6291" || node.TreeHash != "f3afc02f5c92f4aacda3a1655836a91bef093bfe" {
 						t.Fatal("profiles must use the staged-installer source")
 					}
 				case ir.KindBuild:
