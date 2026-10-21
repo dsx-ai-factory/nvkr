@@ -107,7 +107,7 @@ func (o *launchOwner) state(ctx context.Context, instances, guest *os.File, id s
 		return instanceState{}, err
 	}
 	heldInfo, statErr := guest.Stat()
-	if err := errors.Join(statErr, named.Close(), privateDirectory(guest)); err != nil || !os.SameFile(info, heldInfo) {
+	if err := errors.Join(statErr, named.Close(), protectedGuestDirectory(guest)); err != nil || !os.SameFile(info, heldInfo) {
 		return instanceState{}, errors.Join(err, errors.New("native QEMU guest directory changed"))
 	}
 	if expected == (instanceState{}) {

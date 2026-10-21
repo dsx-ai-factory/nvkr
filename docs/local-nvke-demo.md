@@ -188,6 +188,8 @@ For the native Mac workflow, install:
 - Apple Silicon macOS, the exact Go SDK from `.go-version`, and Clang/Apple SDK.
 - Docker with Buildx reachable through `/var/run/docker.sock`, Git and jq.
 - Homebrew Bash, Python 3, QEMU and GNU coreutils on `PATH`, including `g`-prefixed commands.
+- A seed ISO builder on `PATH`: `cloud-localds`, `mkisofs` or `genisoimage`.
+  Homebrew `cdrtools` supplies `mkisofs`. The CLI checks this prerequisite before deployment work; it does not install the tool.
 - Homebrew `swtpm` and its installed `libtpms` dependency. The Mac site uses a real software TPM through the supported NICoSim QEMU executable override; NVKE sources stay unchanged. These dynamically linked dependencies remain installed on the host.
 - The matched vmnet client/helper from the [shared native catalog](../inputs/catalogs/tools/native/README.md), installed at the paths required there. Private tool extraction alone does not install these prerequisites.
 - Packer **1.15.4** and the installed QEMU plugin **1.1.6**. `packer plugins installed`

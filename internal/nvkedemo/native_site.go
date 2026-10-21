@@ -91,6 +91,9 @@ func runNativeSite(ctx context.Context, cfg NativeConfig, use func(context.Conte
 	if err := admitNativeQEMUAdapter(runtime.GOOS+"/"+runtime.GOARCH, cfg.Accelerator, cfg.DemoExecutable, true); err != nil {
 		return err
 	}
+	if err := admitNativeSeedISO(ctx, runtime.GOOS, NativeEnvironment()); err != nil {
+		return err
+	}
 	if cfg.conformance != nil && runtime.GOARCH != "arm64" {
 		return nvkrerr.New(nvkrerr.CodeEngineCapability, "local conformance requires native ARM64")
 	}

@@ -59,14 +59,17 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 	if err := admitNativeHost(runtime.GOOS+"/"+runtime.GOARCH, cfg.Accelerator); err != nil {
 		return err
 	}
+	if err := admitNativeQEMUAdapter(runtime.GOOS+"/"+runtime.GOARCH, cfg.Accelerator, cfg.DemoExecutable, cfg.site != nil); err != nil {
+		return err
+	}
+	if err := admitNativeSeedISO(ctx, runtime.GOOS, NativeEnvironment()); err != nil {
+		return err
+	}
 	if err := admitNativeAddresses(ctx, NativeEnvironment()); err != nil {
 		return err
 	}
 	ctx, failAddresses := context.WithCancelCause(ctx)
 	defer failAddresses(nil)
-	if err := admitNativeQEMUAdapter(runtime.GOOS+"/"+runtime.GOARCH, cfg.Accelerator, cfg.DemoExecutable, cfg.site != nil); err != nil {
-		return err
-	}
 	if cfg.Timeout < time.Minute || cfg.Timeout > 30*time.Minute {
 		return errors.New("guest timeout must be 1..30 minutes")
 	}

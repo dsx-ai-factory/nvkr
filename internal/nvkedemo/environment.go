@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
+	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -63,21 +64,35 @@ func checkDaemonBindings(raw []byte, bound map[string]string) error {
 	}
 	return nil
 }
-func admitLibvirtEnvironment(ctx context.Context, runner Runner) (map[string]string, error) {
+func nativeAccountHome(ctx context.Context) (string, error) {
+	if err := requireContext(ctx); err != nil {
+		return "", nvkrerr.Wrap(nvkrerr.CodeTimeout, err, "resolve native account home")
+	}
 	account, err := user.LookupId(strconv.Itoa(os.Getuid()))
 	if err != nil {
-		return nil, err
+		return "", nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "resolve native account")
 	}
 	home := account.HomeDir
 	info, err := os.Lstat(home)
 	if err != nil {
-		return nil, err
+		return "", nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "inspect native account home")
 	}
 	if !filepath.IsAbs(home) || !info.IsDir() || !currentOwner(info) {
-		return nil, errors.New("require native account regular owned home")
+		return "", nvkrerr.New(nvkrerr.CodeEngineCapability, "require native account regular owned home")
+	}
+	if err := requireContext(ctx); err != nil {
+		return "", nvkrerr.Wrap(nvkrerr.CodeTimeout, err, "resolve native account home")
+	}
+	return home, nil
+}
+
+func admitLibvirtEnvironment(ctx context.Context, runner Runner) (map[string]string, error) {
+	home, err := nativeAccountHome(ctx)
+	if err != nil {
+		return nil, err
 	}
 	runtime := filepath.Join("/run/user", strconv.Itoa(os.Getuid()))
-	info, err = os.Lstat(runtime)
+	info, err := os.Lstat(runtime)
 	if err != nil {
 		return nil, err
 	}

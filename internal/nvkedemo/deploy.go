@@ -35,6 +35,9 @@ func AdmitDemoDeployment(ctx context.Context, cfg Config) error {
 			return nvkrerr.Wrap(nvkrerr.CodeUsage, err, "conformance repository")
 		}
 	}
+	if err := admitNativeSeedISO(ctx, runtime.GOOS, NativeEnvironment()); err != nil {
+		return err
+	}
 	if err := AdmitNativeDeployment(ctx, cfg.Accelerator); err != nil {
 		return err
 	}

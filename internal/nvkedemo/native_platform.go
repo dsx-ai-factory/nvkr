@@ -35,6 +35,37 @@ func admitNativeHost(platform, accelerator string) error {
 	return nvkrerr.New(nvkrerr.CodeEngineCapability, "native demo does not support host %q with accelerator %q", platform, accelerator)
 }
 
+// NICo creates each guest's NoCloud seed before launch. Its Darwin builder can
+// fall back from cloud-localds to either ISO tool; Linux requires cloud-localds.
+// Resolve only: admission must not execute a tool or create a probe ISO.
+func admitNativeSeedISO(ctx context.Context, platform string, env []string) error {
+	if err := requireContext(ctx); err != nil {
+		return nvkrerr.Wrap(nvkrerr.CodeTimeout, err, "native seed ISO admission")
+	}
+	names := []string{"cloud-localds"}
+	switch platform {
+	case "darwin":
+		names = append(names, "mkisofs", "genisoimage")
+	case "linux":
+	default:
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "native seed ISO does not support host %q", platform)
+	}
+	available := false
+	for _, name := range names {
+		if _, err := commandPath(name, env); err == nil {
+			available = true
+			break
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return nvkrerr.Wrap(nvkrerr.CodeTimeout, err, "native seed ISO admission")
+	}
+	if !available {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "native guest seed ISO requires %s on PATH", strings.Join(names, " or "))
+	}
+	return nil
+}
+
 func admitNativeQEMUAdapter(platform, accelerator, executable string, site bool) error {
 	if platform == "darwin/arm64" && (site || accelerator == "tcg") && (!filepath.IsAbs(executable) || filepath.Clean(executable) != executable) {
 		return nvkrerr.New(nvkrerr.CodeEngineCapability, "native Mac site or TCG execution requires this demo's explicit adapter executable")

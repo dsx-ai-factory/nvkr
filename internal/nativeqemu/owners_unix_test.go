@@ -26,7 +26,11 @@ func ownerFixture(t *testing.T) (string, configuration) {
 	t.Helper()
 	root := t.TempDir()
 	for _, name := range []string{"adapter", "adapter/launches", "simulator", "simulator/instances", "simulator/instances/instance"} {
-		if err := os.Mkdir(filepath.Join(root, name), 0700); err != nil {
+		mode := os.FileMode(0700)
+		if name == "simulator/instances" || name == "simulator/instances/instance" {
+			mode = 0755 // Match NICoSim's source-owned artifact directories.
+		}
+		if err := os.Mkdir(filepath.Join(root, name), mode); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -43,6 +47,60 @@ func ownerFixture(t *testing.T) (string, configuration) {
 		t.Fatal(err)
 	}
 	return root, cfg
+}
+
+func TestSourceGuestDirectoryPermissions(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		mode os.FileMode
+		want bool
+	}{
+		{"private", 0700, true},
+		{"group readable", 0750, true},
+		{"NICoSim default", 0755, true},
+		{"group writable", 0775, false},
+		{"other writable", 0757, false},
+		{"owner inaccessible", 0500, false},
+		{"setuid", 0755 | os.ModeSetuid, false},
+		{"setgid", 0755 | os.ModeSetgid, false},
+		{"sticky", 0755 | os.ModeSticky, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root, cfg := ownerFixture(t)
+			guest := filepath.Join(cfg.Instances, "instance")
+			if err := os.Chmod(guest, tc.mode); err != nil {
+				t.Fatal(err)
+			}
+			info, err := os.Stat(guest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if special := tc.mode & (os.ModeSetuid | os.ModeSetgid | os.ModeSticky); info.Mode()&special != special {
+				t.Skip("filesystem did not retain the requested special directory bits")
+			}
+			err = startOwner(t, root, "success").wait(t)
+			if (err == nil) != tc.want {
+				t.Fatalf("mode %v: launch error %v", tc.mode, err)
+			}
+			if !tc.want {
+				for _, path := range []string{filepath.Join(guest, "nvkr-tpm"), filepath.Join(root, "qemu.pid"), filepath.Join(root, "tpm.pid")} {
+					if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
+						t.Fatalf("rejected guest created state or a child: %s: %v", path, err)
+					}
+				}
+				return
+			}
+			for _, path := range []string{cfg.Directory, filepath.Join(cfg.Directory, "launches", "instance"), filepath.Join(guest, "nvkr-tpm")} {
+				info, err := os.Stat(path)
+				if err != nil || info.Mode().Perm() != 0700 {
+					t.Fatalf("private directory permissions changed: %s: %v %v", path, info, err)
+				}
+			}
+			if err := (&Adapter{cfg}).Close(t.Context()); err != nil {
+				t.Fatal("joined launch was not accepted", err)
+			}
+		})
+	}
 }
 
 type fakeOwner struct {
@@ -227,7 +285,7 @@ func joinedOwnerFixture(t *testing.T, cfg configuration) string {
 }
 
 func TestRelaunchRejectsIncompleteOrSubstitutedOwnerAndState(t *testing.T) {
-	for _, mode := range []string{"missing join", "older join missing", "malformed join", "unjoined", "guard replaced", "guard symlink", "guard permissions", "state missing", "state replaced", "state symlink", "state permissions", "guest replaced"} {
+	for _, mode := range []string{"missing join", "older join missing", "malformed join", "unjoined", "guard replaced", "guard symlink", "guard permissions", "state missing", "state replaced", "state symlink", "state permissions", "guest replaced", "guest permissions"} {
 		t.Run(mode, func(t *testing.T) {
 			root, cfg := ownerFixture(t)
 			receipt := joinedOwnerFixture(t, cfg)
@@ -276,6 +334,8 @@ func TestRelaunchRejectsIncompleteOrSubstitutedOwnerAndState(t *testing.T) {
 				}
 			case "state permissions":
 				err = os.Chmod(state, 0755)
+			case "guest permissions":
+				err = os.Chmod(filepath.Dir(state), 0775)
 			case "guest replaced":
 				guest := filepath.Dir(state)
 				if err = os.Rename(guest, guest+"-original"); err == nil {

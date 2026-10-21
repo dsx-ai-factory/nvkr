@@ -29,7 +29,11 @@ func TestInstalledStandardTPMDevice(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, dir := range []string{"simulator", "simulator/instances", "simulator/instances/instance"} {
-		if err := os.Mkdir(filepath.Join(root, dir), 0700); err != nil {
+		mode := os.FileMode(0755) // Match NICoSim, rather than a stricter synthetic guest.
+		if dir == "simulator" {
+			mode = 0700
+		}
+		if err := os.Mkdir(filepath.Join(root, dir), mode); err != nil {
 			t.Fatal(err)
 		}
 	}

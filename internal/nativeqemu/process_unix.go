@@ -79,9 +79,8 @@ func run(ctx context.Context, cfg configuration, args []string, stdout, stderr *
 		return err
 	}
 	defer guest.Close()
-	var stat unix.Stat_t
-	if err := unix.Fstat(int(guest.Fd()), &stat); err != nil || stat.Uid != uint32(os.Getuid()) || stat.Mode&0022 != 0 {
-		return errors.Join(err, errors.New("QEMU instance directory is not owned and protected"))
+	if err := protectedGuestDirectory(guest); err != nil {
+		return err
 	}
 	launches, _, err := securepath.OpenChild(root, "launches", true)
 	if err != nil {
@@ -157,6 +156,7 @@ func run(ctx context.Context, cfg configuration, args []string, stdout, stderr *
 		return errors.New("vmnet network descriptor is missing")
 	}
 	defer network.Close()
+	var stat unix.Stat_t
 	if err := unix.Fstat(4, &stat); err != nil || stat.Mode&unix.S_IFMT != unix.S_IFSOCK {
 		return errors.Join(err, errors.New("vmnet FD4 must be a socket"))
 	}
@@ -335,6 +335,19 @@ func privateDirectory(file *os.File) error {
 	}
 	if stat.Uid != uint32(os.Getuid()) || stat.Mode&07777 != 0700 {
 		return errors.New("require a current-user-owned private QEMU adapter directory")
+	}
+	return nil
+}
+
+// NICoSim creates guest directories with 0755 beneath the private runtime.
+// Their TPM state and adapter journals remain independently private (0700).
+func protectedGuestDirectory(file *os.File) error {
+	var stat unix.Stat_t
+	if err := unix.Fstat(int(file.Fd()), &stat); err != nil {
+		return err
+	}
+	if stat.Uid != uint32(os.Getuid()) || stat.Mode&unix.S_IFMT != unix.S_IFDIR || stat.Mode&0700 != 0700 || stat.Mode&07022 != 0 {
+		return errors.New("QEMU instance directory must be owned by the current user, owner-accessible and without special bits or group/other write permissions")
 	}
 	return nil
 }

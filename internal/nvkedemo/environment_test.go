@@ -6,15 +6,50 @@ package nvkedemo
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
+
+func TestNativeAccountHomeExcludesAmbientSelection(t *testing.T) {
+	account, err := user.LookupId(strconv.Itoa(os.Getuid()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, home := range []string{"", "/synthetic/foreign-account"} {
+		t.Run("HOME="+home, func(t *testing.T) {
+			t.Setenv("HOME", home)
+			t.Setenv("USER", "synthetic-foreign-user")
+			t.Setenv("XDG_CACHE_HOME", "/synthetic/foreign-cache")
+			if home == "" {
+				if err := os.Unsetenv("HOME"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			got, err := nativeAccountHome(t.Context())
+			if err != nil || got != account.HomeDir {
+				t.Fatalf("account home=%q error=%v; want actual UID account home", got, err)
+			}
+			if os.Getenv("HOME") != home || os.Getenv("USER") != "synthetic-foreign-user" || os.Getenv("XDG_CACHE_HOME") != "/synthetic/foreign-cache" {
+				t.Fatal("account lookup changed the caller environment")
+			}
+		})
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	var coded *nvkrerr.Error
+	if _, err := nativeAccountHome(ctx); !errors.As(err, &coded) || coded.Code != nvkrerr.CodeTimeout {
+		t.Fatalf("canceled account admission lost coded timeout: %v", err)
+	}
+}
 
 func TestDaemonEnvironmentBindings(t *testing.T) {
 	bound := map[string]string{"HOME": "/account", "XDG_RUNTIME_DIR": "/run/user/501"}
