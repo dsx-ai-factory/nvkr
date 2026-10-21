@@ -139,11 +139,11 @@ pins:
     tag: v0.22.0
     treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
   nvkr-site-identity:
-    commit: de567d94f0efc1532ae229ea656b69cb75fe92c4
+    commit: 8aba19abf8a2b74dbd14f8a6abed608e02e8b744
     goVersion: 1.27.3
-    sourceDateEpoch: 1792563793
-    tag: de567d94f0efc1532ae229ea656b69cb75fe92c4
-    treeHash: 2d2d4a7c3687472882ccd25d58f6a47dcc3ea7e7
+    sourceDateEpoch: 1792621677
+    tag: 8aba19abf8a2b74dbd14f8a6abed608e02e8b744
+    treeHash: e4264190f52f98ef70ca9daa4b536306ec030aa9
   oras:
     commit: 210747c29c1d38732b3194878dfd8b5a6b9ad7eb
     sourceDateEpoch: 1783708065
