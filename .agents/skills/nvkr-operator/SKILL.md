@@ -93,7 +93,11 @@ execution VM or manual SSH workflow.
 
 For current native tenant acceptance, require every requested node Ready and every worker schedulable
 (one control plane plus two workers for conformance), the actual per-node host cloud-init
-status gate, then DNS/workload, requested conformance and natural joined cleanup. The cloud-init gate's
+status gate, then DNS/workload and requested conformance. Default native `run`/`e2e`
+return after successful checks and retain the cluster in its independent owner;
+leaving the presenter never requests deletion. Preserve the printed original
+session, status, cleanup and Kubernetes access commands. Explicit `--cleanup` or
+`cleanup --session` requires natural joined teardown. The cloud-init gate's
 controlled tests do not establish guest execution; retain that distinction in the report.
 
 For the maintained NVKE 64K image, explicitly select `--accelerator tcg` on Mac

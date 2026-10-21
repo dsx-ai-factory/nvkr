@@ -1450,10 +1450,18 @@ its source-owned static Make build in the same catalog producer.
 The standard `run` and `e2e`
 entry points now select that same three-VM deployment owner; the old Kind-site path is no longer their
 production action. Build prepares native tools through NVKR and selects the complete local runtime image
-closure. The former detached retention behavior is not provided by this foreground path.
+closure. Default native `run` and `e2e` now launch the fixed retained service owner: successful
+checks return to the shell while the native resource stack stays held until explicit
+`cleanup --session`. Presenter cancellation stops work without requesting deletion.
+The owner keeps terminal context through startup privilege checks and acknowledges
+detachment before successful return. Linux binds its control to SO_PEERPIDFD;
+macOS binds it to the originally captured process audit token and a kqueue exit
+observation, requiring CGO/public SDK support. The generic Darwin peer API remains
+refused. Controlled launcher/native-scope tests exercise retention and joined
+cleanup; a fresh NVKE VM/conformance run of this lifecycle change is not yet recorded.
 Native presentation now uses individual guest/preparation/bootstrap/deployment
 boundaries instead of the legacy Kind-site checklist. Requested conformance has
-its own phase and failed-suite foreground retention does not imply successful
+its own phase and failed-suite retention does not imply successful
 cleanup. Native tenant presentation joins the existing CAPI role/instance mapping
 to the private NICo inventory for both ordinary and conformance topologies, and
 uses the existing held-path console metadata reader for each exact instance.
@@ -1544,8 +1552,8 @@ unsupported. Relocated image observation retains compiled Plan identity.
 use controlled OCI bytes and a descriptive, unexecuted VM; they do not prove
 a real joined bake or extend hosted, signing or qualification admission.
 
-The Go downstream consumer invokes `nvkr` for build, verification and
-extraction, and NVKE's pinned staged installer for deployment. Kind hosts
+The historical legacy Kind-site consumer invokes `nvkr` for build, verification
+and extraction, and NVKE's pinned staged installer for deployment. In that consumer, Kind hosts
 management services; CAPNICo/NICoSim provisions QCOW2 tenant VMs. Full E2E success
 requires two Ready nodes, workload/DNS checks, exact disk/artifact bindings and
 owned cleanup. The explicit `--cleanup` route retains that full acceptance

@@ -392,6 +392,13 @@ public lifecycle object, artifact authentication rule, deployment schema or qual
 native admission and cleanup invariant remains with that owner. Callback exit cancels and joins operations;
 handles cannot be detached or restored from paths. The adapter requires the existing matching `nvkr` and
 `nvke-demo` helper executables and host prerequisites; importability does not imply binary-free execution.
+The native CLI default has a distinct retained lifetime: its fixed child owns the
+resource stack through an authenticated private control and explicit joined cleanup.
+Returning from the presenter or canceling it grants no teardown authority. Successful
+return requires the same live owner to acknowledge detachment and completed requested
+checks. Linux observes that owner through SO_PEERPIDFD; macOS retained controls bind
+to the original self audit token and a generation-validated kqueue registration.
+The generic Darwin peer API remains unavailable. Unsupported builds fail before work.
 External-module compile and no-work admission tests establish only that boundary. Real native site reuse
 and complete conformance remain separately evidenced operational acceptance.
 

@@ -124,16 +124,28 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 		return err
 	}
 	defer func() {
+		if holdErr := waitRetainedCleanup(ctx, result); holdErr != nil {
+			result = errors.Join(result, holdErr)
+			return
+		}
+		if runtimeRetention(ctx) != nil && (errors.Is(result, ErrUnjoined) || errors.Is(result, ErrRetainedControls)) {
+			recordRetainedCleanup(ctx, result)
+			return
+		}
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
 		defer cancel()
 		if tpm != nil {
 			if err := tpm.Close(cleanup); err != nil {
+				recordRetainedCleanup(ctx, errors.Join(ErrUnjoined, err))
 				result = errors.Join(result, ErrUnjoined, err)
 				return
 			}
 		}
-		result = errors.Join(result, bridge.Stop(cleanup))
+		cleanupErr := bridge.Stop(cleanup)
+		recordRetainedCleanup(ctx, cleanupErr)
+		result = errors.Join(result, cleanupErr)
 	}()
+	defer recoverRetainedPanic(ctx, &result)
 	network := bridge.config
 	if cfg.site != nil {
 		cfg.site.bridge = network
@@ -210,13 +222,20 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 	}
 	if guard != nil {
 		defer func() {
-			if errors.Is(result, ErrUnjoined) {
+			if holdErr := waitRetainedCleanup(ctx, result); holdErr != nil {
+				result = errors.Join(result, holdErr)
+				guard.releaseHandles()
+				return
+			}
+			if errors.Is(result, ErrUnjoined) || errors.Is(result, ErrRetainedControls) {
+				recordRetainedCleanup(ctx, result)
 				guard.releaseHandles()
 				return
 			}
 			cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 8*time.Minute)
 			defer cancel()
 			if err := guard.StopDNS(cleanup); err != nil {
+				recordRetainedCleanup(ctx, err)
 				result = errors.Join(result, err)
 				guard.releaseHandles()
 				return
@@ -224,12 +243,20 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 			domainRunner := runner
 			domainRunner.Work = ""
 			if err := SweepOwnedDomains(cleanup, domainRunner, simdir); err != nil {
+				recordRetainedCleanup(ctx, err)
 				result = errors.Join(result, err)
+				guard.releaseHandles()
+				return
+			}
+			if runtimeRetention(ctx) != nil {
+				// The explicit foreground cleanup restores this original journal
+				// after the independent owner and its producers have exited.
 				guard.releaseHandles()
 				return
 			}
 			result = errors.Join(result, guard.Close(cleanup))
 		}()
+		defer recoverRetainedPanic(ctx, &result)
 	}
 	server, err := runner.Start(ctx, []string{binary}, "native-nico")
 	if err != nil {
@@ -248,11 +275,20 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 		return runner.Capture(ctx, args, "native-"+strconv.Itoa(sequence)+"-"+phase, 40*time.Second)
 	}
 	defer func() {
+		if holdErr := waitRetainedCleanup(ctx, result); holdErr != nil {
+			result = errors.Join(result, holdErr)
+			return
+		}
+		if runtimeRetention(ctx) != nil && errors.Is(result, ErrRetainedControls) {
+			recordRetainedCleanup(ctx, result)
+			return
+		}
 		boundary := beginProgress(cfg.Progress, "owned-node-cleanup", PhaseStarted, PhaseFinished, PhaseFailed)
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), tenantCleanupTimeout+5*time.Minute)
 		defer cancel()
 		var cleanupResult error
 		defer func() {
+			recordRetainedCleanup(ctx, cleanupResult)
 			result = errors.Join(result, cleanupResult)
 			boundary.finish(cleanupResult)
 		}()
@@ -325,6 +361,7 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 			cleanupResult = errors.Join(cleanupResult, disk.Stop(cleanup))
 		}
 	}()
+	defer recoverRetainedPanic(ctx, &result)
 	startup, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	for {
@@ -339,15 +376,26 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 			return err
 		}
 	}
-	addresses, err := startNativeAddresses(ctx, runner, simdir, network, nativeGuestLimit(cfg.site), failAddresses)
+	addressLifetime := ctx
+	if owner := runtimeRetention(ctx); owner != nil {
+		addressLifetime = owner.lifetime
+	}
+	addresses, err := startNativeAddresses(addressLifetime, runner, simdir, network, nativeGuestLimit(cfg.site), failAddresses)
 	if err != nil {
 		return err
 	}
 	defer func() {
+		if holdErr := waitRetainedCleanup(ctx, result); holdErr != nil {
+			result = errors.Join(result, holdErr)
+			return
+		}
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 		defer cancel()
-		result = errors.Join(result, addresses.Stop(cleanup))
+		cleanupErr := addresses.Stop(cleanup)
+		recordRetainedCleanup(ctx, cleanupErr)
+		result = errors.Join(result, cleanupErr)
 	}()
+	defer recoverRetainedPanic(ctx, &result)
 	diskPort := "0"
 	if guard != nil {
 		diskPort = "18082"

@@ -414,6 +414,16 @@ func runNativeDemo(ctx context.Context, site *NativeSite) error {
 	if runner.Progress != nil {
 		fmt.Fprintf(runner.Progress, "Tenant checks passed: %d Ready nodes and successful workload/DNS. Site kubeconfig: %s\n", s.tenantNodeCount(), kubeconfig)
 	}
+	if owner := runtimeRetention(ctx); owner != nil {
+		if err := access.inspectFiles(); err != nil {
+			return err
+		}
+		access, err = inspectOperatorAPIs(ctx, ManagementSession{Runner: runner}, access)
+		if err != nil {
+			return err
+		}
+		return owner.markReady(ctx, access)
+	}
 	return s.holdForeground(ctx, runner, access, server, nil)
 }
 
@@ -435,6 +445,9 @@ func (s *nativeSiteAttempt) holdSiteIdentityFailure(ctx context.Context, runner 
 }
 
 func (s *nativeSiteAttempt) holdForegroundState(ctx context.Context, runner Runner, server *OwnedProcess, primary error, notice, status string, observe func(context.Context) error) error {
+	if runtimeRetention(ctx) != nil {
+		return primary // The independent owner's dependent finalizer holds services.
+	}
 	if s.cleanup || ctx.Err() != nil || errors.Is(primary, ErrUnjoined) {
 		return primary
 	}

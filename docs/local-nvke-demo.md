@@ -320,8 +320,11 @@ The shared workflow:
 6. With `--conformance`, the same fresh tenant then runs the selected conformance
    suite before cleanup. Ready nodes alone do not establish cloud-init or suite success.
 7. With `--cleanup`, natural tenant deletion and joined owned cleanup must finish
-   before success. Without it, the environment stays in this foreground command;
-   Ctrl-C requests cleanup. Current `run`, `e2e` and `native` do not detach a session.
+   before success. Without it, `run` and `e2e` return after successful checks
+   and retain the environment in an independent service owner. They print its
+   exact `status --session` and `cleanup --session` commands after restoring the
+   terminal. Leaving their TUI does not request cleanup. The advanced `native`
+   command retains its foreground lifetime; Ctrl-C there requests cleanup.
 
 Runtime images are verified local OCI outputs. The adapter imports bootstrap
 archives into Kind's containerd and delivers guest archives through owned local
@@ -403,10 +406,13 @@ the attempt output filesystem, retaining the factory's disk-backing and headroom
 checks instead of inheriting a host `/tmp` that may be memory-backed. Harness
 failure, partial/missing capture or identity change prevents success. With
 `--cleanup`, errors still lead to owned cleanup. Without it, a joined conformance
-failure keeps the foreground session and cluster available for debugging until
-Ctrl-C or the command deadline. The command then performs owned cleanup and
-returns the original failed outcome. Cancellation, an exited runtime or unjoined
-work still follows the existing shutdown and recovery rules.
+failure makes `run` and `e2e` return the original failed outcome while their
+independent owner retains the cluster for debugging. Leaving the presenter
+cancels deployment work and preserves its owned resources; it never requests
+tenant deletion. If handoff cannot be confirmed within the bounded reconciliation
+wait, the command fails and prints the original session for inspection. Only the
+explicit cleanup command releases the retained owner's teardown holds. Unknown
+or unjoined work still preserves dependent controls.
 
 Mac local diagnostics use private Mach-O snapshots with byte checks before and
 after commands; Linux retains sealed executable descriptors. Mac pathname
@@ -434,7 +440,7 @@ boundaries. A completed command marks only its own row; the site becomes complet
 only when its owning setup finishes. The temporary bootstrap Kind cluster is not
 shown as the site. Requested conformance has its own pending, running, passed or
 failed phase. A failed suite retained for debugging remains failed; cleanup stays
-pending until the foreground owner starts and joins it.
+pending until explicit cleanup requests and joins it.
 
 Tenant rows report one control plane and the requested workers separately. CAPI
 role/instance bindings are joined to the private NICo inventory, without exposing
@@ -497,7 +503,7 @@ Native output retains verified assets and the private `runtime` directory,
 including site/tenant kubeconfigs and observations. Artifact records remain at
 `.nvkr/runs/<attempt>/lifecycle.json`; native-tool records remain under
 `.nvkr/native-tools/runs/<attempt>`. Use only kubeconfig/tool paths from that
-invocation for read-only inspection while the foreground environment is running:
+invocation for read-only inspection while that environment remains running:
 
 ```sh
 "$KUBECTL" --kubeconfig "$SITE_CONFIG" --request-timeout=10s get nodes
@@ -511,14 +517,21 @@ QEMU site; Kind is no longer its management runtime.
 
 ### Retained deployment and actual cluster access
 
-This section applies to **existing legacy Kind-site sessions**, not new native
-`run`/`e2e` invocations. Keep the exact executable, `SESSION`, workspace and
+Default native `run`/`e2e` invocations and existing legacy retained sessions
+print their private service-owner selector. Keep the exact executable, `SESSION`, workspace and
 access assignments issued by the original owner. Its authenticated controls are:
 
 ```sh
 "$DEMO" status --session "$SESSION"
 "$DEMO" cleanup --session "$SESSION"
 ```
+
+The Linux owner is authenticated using its connected kernel pidfd. macOS uses
+its original process audit token and a kernel exit observation; this requires a
+CGO build with the public macOS SDK. Unsupported builds fail before deployment
+work. Session JSON is a locator and cannot authorize process adoption or signaling.
+The CLI keeps its original terminal context during startup privilege admission,
+then acknowledges independent ownership before successful return.
 
 `status` performs fresh read-only checks when Ready access exists; owner liveness
 or an old Ready timestamp alone does not establish cluster health. Use that

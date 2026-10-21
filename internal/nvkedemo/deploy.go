@@ -16,6 +16,11 @@ import (
 // AdmitDemoDeployment checks native capabilities and the fresh output destination
 // before build, sudo prompts, artifact capture, storage, or guest creation.
 func AdmitDemoDeployment(ctx context.Context, cfg Config) error {
+	if !cfg.Cleanup && runtimeRetention(ctx) == nil {
+		if err := checkRetainedPeerCapability(ctx); err != nil {
+			return err
+		}
+	}
 	if _, err := nativeDeploymentNetwork(cfg.Network); err != nil {
 		return err
 	}
@@ -109,6 +114,9 @@ func DeployArtifacts(ctx context.Context, cfg Config) error {
 			code = nvkrerr.CodeTimeout
 		}
 		return nvkrerr.Wrap(code, err, "select native deployment from NVKR outputs")
+	}
+	if !cfg.Cleanup && runtimeRetention(ctx) == nil {
+		return launchRetainedNative(ctx, cfg)
 	}
 	return RunNative(ctx, selected)
 }

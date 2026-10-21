@@ -68,7 +68,7 @@ func retainedReadyTime(checked time.Time) string {
 }
 
 func (description retainedAccessDescription) operatorAccess() OperatorAccess {
-	return OperatorAccess{kubectl: description.Kubectl, site: description.Site, tenant: description.Tenant, uiService: description.UIService, uiPort: description.UIPort, uiHTTPObserved: description.UIHTTPObserved}
+	return OperatorAccess{kubectl: description.Kubectl, site: description.Site, tenant: description.Tenant, uiService: description.UIService, uiPort: description.UIPort, uiHTTPObserved: description.UIHTTPObserved, siteQCOW: description.SiteQCOW}
 }
 
 func RetainedStatus(ctx context.Context, root string, out io.Writer) error {

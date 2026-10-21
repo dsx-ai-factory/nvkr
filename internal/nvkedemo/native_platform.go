@@ -67,14 +67,28 @@ func prepareNativeLinux(ctx context.Context, runner *Runner, cfg NativeGuestConf
 	if err != nil {
 		return nil, "", err
 	}
+	noteRetainedNetworkStart(ctx)
 	defer func() {
 		if result == nil {
 			return
 		}
+		if holdErr := waitRetainedCleanup(ctx, result); holdErr != nil {
+			result = errors.Join(result, holdErr)
+			guard.releaseHandles()
+			return
+		}
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Minute)
 		defer cancel()
+		if runtimeRetention(ctx) != nil {
+			cleanupErr := guard.StopDNS(cleanup)
+			recordRetainedCleanup(ctx, cleanupErr)
+			result = errors.Join(result, cleanupErr)
+			guard.releaseHandles()
+			return
+		}
 		result = errors.Join(result, guard.Close(cleanup))
 	}()
+	defer recoverRetainedPanic(ctx, &result)
 	if err := guard.Start(ctx); err != nil {
 		return nil, "", err
 	}

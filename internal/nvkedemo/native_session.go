@@ -69,6 +69,10 @@ func withNativeSiteScope(ctx context.Context, attempt *nativeSiteAttempt, runner
 	scopeCtx, cancel := context.WithCancel(ctx)
 	scope := &nativeSiteScope{gate: make(chan struct{}, 1), ctx: scopeCtx, attempt: attempt, runner: runner, tools: tools, out: out, server: server}
 	defer func() {
+		if holdErr := waitRetainedCleanup(ctx, result); holdErr != nil {
+			result = errors.Join(result, holdErr)
+			return
+		}
 		// Cancel calls that use an independent caller context before waiting for
 		// their subprocess owners to join. Outer guest cleanup starts afterward.
 		cancel()
@@ -77,6 +81,7 @@ func withNativeSiteScope(ctx context.Context, attempt *nativeSiteAttempt, runner
 		result = errors.Join(result, attempt.unjoinedWork)
 		<-scope.gate
 	}()
+	defer recoverRetainedPanic(ctx, &result)
 	return use(scopeCtx, &NativeSite{scope: scope})
 }
 

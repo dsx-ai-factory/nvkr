@@ -84,11 +84,12 @@ type checkedWriter struct {
 	sudoAuth    func(context.Context) error
 	// One bounded latest line per public result category, independent of the
 	// dashboard's activity ring. Success statements replay only after success.
-	results           [8]string
-	operatorStatus    string
-	walkthroughStatus string
-	guests            [3]nvkedemo.TenantGuestObservation
-	guestsReported    bool
+	results              [8]string
+	operatorStatus       string
+	walkthroughStatus    string
+	retainedInstructions string
+	guests               [3]nvkedemo.TenantGuestObservation
+	guestsReported       bool
 }
 
 // Escape controls without surrounding ordinary progress text in quoted strings.
@@ -113,7 +114,7 @@ func (w *checkedWriter) retainResult(line string) {
 		index = 0
 	case strings.HasPrefix(line, "Deployment is separate:"):
 		index = 1
-	case strings.HasPrefix(line, "PASS:"), strings.HasPrefix(line, "PASS (NVIDIA OVN):"),
+	case strings.HasPrefix(line, "PASS:"), strings.HasPrefix(line, "PASS (retained):"), strings.HasPrefix(line, "PASS (NVIDIA OVN):"),
 		strings.HasPrefix(line, "PASS (upstream OVN diagnostic; NVIDIA OVN not validated):"),
 		strings.HasPrefix(line, "PASS (Kind/Calico diagnostic; NVIDIA OVN not deployed):"):
 		index = 2
@@ -139,6 +140,9 @@ func (w *checkedWriter) retainResult(line string) {
 
 // Called with w.mu held, after the screen has restored scrolling output.
 func (w *checkedWriter) replayResults(success bool) {
+	if w.retainedInstructions != "" {
+		w.emit(w.retainedInstructions)
+	}
 	if w.walkthroughStatus != "" {
 		w.emit("\nRecorded walkthrough observed before cleanup; historical observations.\n" + w.walkthroughStatus)
 	}
@@ -150,6 +154,23 @@ func (w *checkedWriter) replayResults(success bool) {
 			w.emit(line + "\n")
 		}
 	}
+}
+
+// Preserve the complete owner-issued recovery/access commands after terminal
+// restoration, including a canceled presenter or a failed deployment.
+func (w *checkedWriter) WriteRetainedInstructions(instructions nvkedemo.RetainedInstructions) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.err != nil {
+		return w.err
+	}
+	text := instructions.Text()
+	if text == "" || len(text) > 64<<10 {
+		return w.fail("retained instructions require a bounded owner-generated presentation")
+	}
+	w.retainedInstructions = text
+	w.emit(text)
+	return w.err
 }
 
 // The owner has already redacted and validated these rows. Do not send them
@@ -292,7 +313,7 @@ func (w *checkedWriter) lineOutput() {
 		return
 	}
 	// Human subprocess markers are labeled logs, not authenticated Run events.
-	for _, prefix := range []string{"[dry-run] ", "[start] ", "[done] ", "[cached] ", "nvkr command:", "Build graph:", "  output:", "OS advisory", "Prerequisite diagnostics", "Warning:", "Build all artifacts", "Artifact builds complete;", "Artifacts Run:", "Native tools Run:", "Native catalog tools verified and prepared:", "Deployment is separate:", "Tenant created;", "PASS:", "PASS (NVIDIA OVN):", "PASS (upstream OVN diagnostic; NVIDIA OVN not validated):", "PASS (Kind/Calico diagnostic; NVIDIA OVN not deployed):", "Unqualified local diagnostic"} {
+	for _, prefix := range []string{"[dry-run] ", "[start] ", "[done] ", "[cached] ", "nvkr command:", "Build graph:", "  output:", "OS advisory", "Prerequisite diagnostics", "Warning:", "Build all artifacts", "Artifact builds complete;", "Artifacts Run:", "Native tools Run:", "Native catalog tools verified and prepared:", "Deployment is separate:", "Tenant created;", "PASS:", "PASS (retained):", "PASS (NVIDIA OVN):", "PASS (upstream OVN diagnostic; NVIDIA OVN not validated):", "PASS (Kind/Calico diagnostic; NVIDIA OVN not deployed):", "Unqualified local diagnostic"} {
 		if strings.HasPrefix(line, prefix) {
 			w.retainResult(line)
 			w.emit(fmt.Sprintf("[log +%s] %s\n", time.Since(w.started).Truncate(time.Second), w.displayText(line)))

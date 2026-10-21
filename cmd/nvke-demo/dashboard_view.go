@@ -1130,7 +1130,7 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 		d.activityView.SetRect(0, 3, width, content)
 		d.activityView.ScrollToBeginning()
 		d.header.SetRect(0, 0, width, min(3, height))
-		d.footer.SetText(" Recorded observations · pages advance automatically before cleanup\n q / Ctrl-C confirm cancel; owned cleanup remains mandatory")
+		d.footer.SetText(" Recorded observations · pages advance automatically\n q / Ctrl-C confirm cancel; lifetime follows the selected mode")
 		d.footer.SetRect(0, max(0, height-2), width, min(2, height))
 		d.activityView.Draw(screen)
 		d.header.Draw(screen)

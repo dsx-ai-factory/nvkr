@@ -21,6 +21,29 @@ import (
 
 type failedProgressWriter struct{ short bool }
 
+func TestRetainedInstructionsSurviveFailedTerminalExit(t *testing.T) {
+	const instructions = "SESSION='/private/fixture'\nDEMO='/private/demo'\n\"$DEMO\" status --session \"$SESSION\"\n\"$DEMO\" cleanup --session \"$SESSION\"\n"
+	for _, success := range []bool{false, true} {
+		t.Run(fmt.Sprint(success), func(t *testing.T) {
+			var out bytes.Buffer
+			writer := &checkedWriter{out: &out, retainedInstructions: instructions}
+			writer.retainResult("PASS (retained): synthetic successful observation")
+			writer.replayResults(success)
+			if !strings.Contains(out.String(), instructions) || strings.Contains(out.String(), "PASS (retained):") != success {
+				t.Fatal("terminal exit lost recovery commands or invented success", out.String())
+			}
+		})
+	}
+}
+
+func TestRetainedInstructionsRejectUnissuedPresentation(t *testing.T) {
+	var out bytes.Buffer
+	writer := &checkedWriter{out: &out, cancel: func() {}}
+	if err := writer.WriteRetainedInstructions(nvkedemo.RetainedInstructions{}); err == nil {
+		t.Fatal("unissued instructions crossed presentation boundary")
+	}
+}
+
 func TestBuildRunLocatorsSurviveConciseOutputAndReplay(t *testing.T) {
 	const locators = "Artifacts Run: /workspace/.nvkr/runs/artifacts-001\nNative tools Run: /workspace/.nvkr/native-tools/runs/tools-001\n"
 	for _, mode := range []string{"concise", "plain", "dashboard replay", "failed dashboard replay"} {

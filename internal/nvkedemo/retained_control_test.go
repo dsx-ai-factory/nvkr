@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -20,8 +19,13 @@ import (
 )
 
 func TestRetainedControlUnsupportedPlatformAdmitsNoEndpoint(t *testing.T) {
-	if runtime.GOOS == "linux" {
-		return // Positive native endpoint/process fixture lives in the Linux file.
+	if err := checkRetainedPeerCapability(t.Context()); err == nil {
+		return // Positive endpoint/process fixtures cover admitted platforms.
+	} else {
+		var coded *nvkrerr.Error
+		if !errors.As(err, &coded) || coded.Code != nvkrerr.CodeEngineCapability {
+			t.Fatal("unexpected platform admission failure", err)
+		}
 	}
 	owner, _, _ := retainedTestOwner(t)
 	control, err := newRetainedControl(t.Context(), owner, privateTestDir(t), detachRetainedProcess)

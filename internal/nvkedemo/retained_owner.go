@@ -73,10 +73,7 @@ func readRetainedJSON[T any](ctx context.Context, path string) (T, error) {
 // cleanup, or returned failed teardown with known-joined producers; the latter
 // never claims successful cleanup or admits host-network restoration.
 func ServeRetained(ctx context.Context, session string) error {
-	if err := networkPlatform(); err != nil {
-		return err
-	}
-	if err := CheckSupervisorPeerCapability(ctx); err != nil {
+	if err := checkRetainedPeerCapability(ctx); err != nil {
 		return err
 	}
 	directory, root, err := privateNetworkDirectory(session)
@@ -96,7 +93,7 @@ func ServeRetained(ctx context.Context, session string) error {
 		return nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "select retained owner's own executable")
 	}
 	launch.Config.DemoExecutable = executable
-	return serveRetained(ctx, root, launch, Run)
+	return serveRetained(ctx, root, launch, DeployArtifacts)
 }
 
 func serveRetained(ctx context.Context, root string, launch retainedLaunch, work func(context.Context, Config) error) error {
@@ -120,7 +117,7 @@ func serveRetained(ctx context.Context, root string, launch retainedLaunch, work
 	stopAttached := context.AfterFunc(ctx, stopWork)
 	defer stopAttached()
 	progress := &retainedProgress{cached: launch.CachedSudo}
-	control, err := newRetainedControlWithProgress(ctx, owner, launch.Config.Out, root, func() error {
+	control, err := newRetainedControlWithProgress(ctx, owner, filepath.Join(launch.Config.Out, "runtime"), root, func() error {
 		if err := detachRetainedProcess(); err != nil {
 			return err
 		}
