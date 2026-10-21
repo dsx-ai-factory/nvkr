@@ -661,6 +661,10 @@ func TestProductionRunCannotSelectKindSiteWorkflow(t *testing.T) {
 		if !strings.Contains(err.Error(), "native demo does not support host") {
 			t.Fatalf("unsupported host selected another deployment owner: %v", err)
 		}
+	} else if strings.Contains(err.Error(), "native guests require") {
+		// The real native capacity boundary can reject a constrained test host
+		// before artifact selection; it must not dispatch another backend.
+		assertCode(t, err, nvkrerr.CodeEngineCapability)
 	} else if strings.Contains(err.Error(), "native deployment requires usable KVM") {
 		assertCode(t, err, nvkrerr.CodeEngineCapability)
 	} else {

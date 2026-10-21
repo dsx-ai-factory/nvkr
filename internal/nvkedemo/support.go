@@ -73,6 +73,7 @@ type Runner struct {
 	buildActivity bool
 	directory     string     // Command cwd, independent of private diagnostic storage.
 	extraFiles    []*os.File // Explicitly owned local helper descriptors; never ambient FDs.
+	input         *os.File   // Private held regular input; lifetime stays with the caller through join.
 }
 
 // SudoAuthorizer is an optional terminal bridge on a downstream progress writer.
@@ -540,6 +541,13 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 	cmd := exec.CommandContext(commandCtx, path, args[1:]...)
 	cmd.Env = append([]string{}, r.Env...)
 	cmd.ExtraFiles = append([]*os.File(nil), r.extraFiles...)
+	if r.input != nil {
+		info, err := r.input.Stat()
+		if err != nil || !info.Mode().IsRegular() || !currentOwner(info) || info.Mode().Perm()&0o022 != 0 {
+			return nil, errors.New("command input requires a held owned regular file without group/other write permissions")
+		}
+		cmd.Stdin = r.input
+	}
 	localGitFetch := false
 	if args[0] == "git" {
 		// Admit the same effective directory Git will execute in. Diagnostic

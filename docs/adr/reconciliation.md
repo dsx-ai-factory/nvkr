@@ -1488,10 +1488,23 @@ remain unknown; client termination does not prove manager-job completion. The
 upstream Workload API picker retains the exact caller identity across updates.
 Fresh peer metadata requires operation-fresh issuance and remaining
 validity as well as unchanged boot/identity and a changed serial. It issues no
-bootstrap-stop or release receipt. Native catalog delivery, source-renderer
-contract admission, permanent-policy/TPM proof and startup integration remain
-outstanding; neither a helper build nor controlled transport/script tests prove
-fresh customer E2E or Mac/Linux runtime acceptance. The [local guide](../local-nvke-demo.md#private-site-identity-operation-helper)
+bootstrap-stop or release receipt. The native owner requires the shared
+helper/renderer startup members before guest launch or native network configuration, recompiles captured
+completed-Run inputs, and binds the renderer source to the selected OS SPIRE
+package. After deployment and before temporary bootstrap teardown, it imports
+the original host policy without replacement, checks the controller/CSI context,
+permanent registration, derived TPM allowlist, new TPM agent and renewed
+same-boot host certificate, then issues its private completion receipt. Joined
+site-stage failures follow foreground debugging retention; unknown completion
+keeps dependencies unsafe to tear down. The site-stage/retention presentation
+leaves tenant and conformance checks pending. Private Linux ARM64 Run
+`site-startup-tools-arm64-acceptance-20261021-02` built and verified the shared
+three-member output from public source pins. The delivered helper passed an
+isolated invalid-request subprocess check; its command-owned inherited pipes
+are adopted before bounded I/O. This producer and command-boundary evidence
+does not establish an authenticated handoff through integrated startup, a fresh
+customer first run or complete current-source Mac/Linux runtime acceptance.
+The [local guide](../local-nvke-demo.md#private-site-identity-operation-helper)
 records that boundary.
 
 The Mac network owner now consumes the verified upstream vmnet helper's JSON report and holds its Unix

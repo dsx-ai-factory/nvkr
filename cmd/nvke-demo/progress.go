@@ -316,12 +316,15 @@ func (w *checkedWriter) Report(event nvkedemo.ProgressEvent) {
 			w.observer.Report(event)
 			return
 		}
-		if event.Kind == nvkedemo.NativeRetained && (event.Status == "available" || event.Status == "conformance-failed") {
+		if event.Kind == nvkedemo.NativeRetained && (event.Status == "available" || event.Status == "conformance-failed" || event.Status == "site-identity-failed") {
 			w.mu.Lock()
 			defer w.mu.Unlock()
 			message := "Environment retained for debugging; Ctrl-C starts owned cleanup."
-			if event.Status == "conformance-failed" {
+			switch event.Status {
+			case "conformance-failed":
 				message = "Conformance failed; cluster retained for debugging; Ctrl-C starts owned cleanup."
+			case "site-identity-failed":
+				message = "Site identity failed; bootstrap and site retained for debugging; tenant and conformance have not started; Ctrl-C starts owned cleanup."
 			}
 			w.emit(message + "\n")
 		}

@@ -27,7 +27,9 @@
     },
     {
       "components": [
-        "nerdctl"
+        "nerdctl",
+        "nvke-spire-configure-source",
+        "nvkr-site-identity-helper"
       ],
       "format": "executable",
       "name": "site-startup-tools-arm64",

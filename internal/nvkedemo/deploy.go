@@ -166,7 +166,7 @@ func nativeDeploymentConfig(ctx context.Context, cfg Config, platform string) (N
 		conformance: conformance, Resources: cfg.Resources,
 		Cleanup: cfg.Cleanup, Walkthrough: cfg.Walkthrough, Progress: cfg.Progress, TenantTimeout: cfg.Timeout,
 		Assets: NativeAssetConfig{
-			NVKR: cfg.NVKR, ToolsRun: cfg.Runs.Tools, HostToolsRun: cfg.Runs.HostTools,
+			NVKR: cfg.NVKR, OSRun: cfg.Runs.OS, ToolsRun: cfg.Runs.Tools, HostToolsRun: cfg.Runs.HostTools,
 			BootstrapRun: cfg.Runs.Components, ControllerRun: cfg.Runs.Site,
 			DeploymentRun: cfg.Runs.Profiles, ProvidersRun: cfg.Runs.Providers,
 			RuntimeRun: runtimeRun,

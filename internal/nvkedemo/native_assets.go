@@ -27,7 +27,7 @@ import (
 // content verification remain owned by NVKR; these paths confer no authority.
 type NativeAssetConfig struct {
 	NVKR, ToolsRun, BootstrapRun, DeploymentRun, Out string
-	HostToolsRun                                     string
+	HostToolsRun, OSRun                              string
 	ControllerRun, ProvidersRun                      string
 	RuntimeRun                                       string
 	Network                                          string
@@ -43,6 +43,7 @@ type NativeAssets struct {
 	CLI                                    string
 	RuntimeOutputs                         map[string]SelectedOutput
 	installerSelection                     *nativeInstallerSelection
+	identity                               *nativeIdentityAssets
 }
 
 type NativeImageAsset struct {
@@ -77,7 +78,7 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 	// Resolve descriptions against the caller's directory once. Runner changes
 	// directory to the private output workspace; keep the original paths for
 	// both admission and later CLI invocations without resolving symlinks.
-	for _, root := range []*string{&cfg.ToolsRun, &cfg.HostToolsRun, &cfg.BootstrapRun, &cfg.DeploymentRun, &cfg.RuntimeRun, &cfg.ControllerRun, &cfg.ProvidersRun} {
+	for _, root := range []*string{&cfg.OSRun, &cfg.ToolsRun, &cfg.HostToolsRun, &cfg.BootstrapRun, &cfg.DeploymentRun, &cfg.RuntimeRun, &cfg.ControllerRun, &cfg.ProvidersRun} {
 		if *root == "" {
 			continue
 		}
@@ -240,6 +241,9 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 			return assets, err
 		}
 	}
+	if err := prepareNativeIdentityAssets(ctx, cfg, &assets); err != nil {
+		return assets, err
+	}
 	return assets, nil
 }
 
@@ -280,7 +284,7 @@ func prepareNativeCAPIAuth(ctx context.Context, assets NativeAssets) error {
 // bundle remains verified, but only the guest runtime and image bytes are
 // shared with the VM; the CLI selected for execution is always the host build.
 func sitePreparationMembers(components []string) ([]string, error) {
-	for _, known := range [][]string{{"nerdctl"}, {"nerdctl", "nvke-installer-sources"}, {"nerdctl", "nvke-installer-sources", "nvkectl"}} {
+	for _, known := range [][]string{{"nerdctl", nativeSpireRendererSource, nativeIdentityHelper}, {"nerdctl"}, {"nerdctl", "nvke-installer-sources"}, {"nerdctl", "nvke-installer-sources", "nvkectl"}} {
 		if slices.Equal(components, known) {
 			return slices.Clone(known), nil
 		}

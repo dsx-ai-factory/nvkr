@@ -41,6 +41,7 @@ type nativeSiteAttempt struct {
 	capacity                  *nativeResourceAdmission
 	use                       func(context.Context, *NativeSite) error
 	unjoinedWork              error
+	spireEnvironment          []byte
 	tenantTimeout             time.Duration
 	conformance               *nativeConformanceConfig
 	assets                    NativeAssets
@@ -263,6 +264,7 @@ func (s *nativeSiteAttempt) startup(ctx context.Context, api, diskURL, out strin
 		}
 		cfg.Assets = append(cfg.Assets, StartupAsset{Name: name, URL: api + "/files/" + name, Digest: digest})
 	}
+	s.spireEnvironment = nativeBootstrapSpireEnvironment(cfg)
 	data, err := SiteStartupUserData(ctx, cfg)
 	return []byte(data), err
 }
@@ -365,11 +367,15 @@ func (s *nativeSiteAttempt) setup(ctx context.Context, runner Runner, row native
 }
 
 func (s *nativeSiteAttempt) ready(ctx context.Context, runner Runner, row nativeInstance, tools, out string, server *OwnedProcess) error {
-	var err error
-	runner, err = s.setup(ctx, runner, row, tools, out, server)
+	configured, err := s.setup(ctx, runner, row, tools, out, server)
 	if err != nil {
+		var identityFailure *nativeSiteIdentityFailure
+		if errors.As(err, &identityFailure) {
+			return s.holdSiteIdentityFailure(ctx, runner, server, err)
+		}
 		return err
 	}
+	runner = configured
 	return withNativeSiteScope(ctx, s, runner, tools, out, server, s.use)
 }
 
@@ -414,22 +420,30 @@ func runNativeDemo(ctx context.Context, site *NativeSite) error {
 // Keep the existing foreground owner alive for debugging without converting a
 // failed suite into success or retaining resources beneath an unjoined command.
 func (s *nativeSiteAttempt) holdForeground(ctx context.Context, runner Runner, access OperatorAccess, server *OwnedProcess, primary error) error {
+	notice := "Demo remains available in this foreground session; Ctrl-C deletes only its owned guests and servers."
+	status := "available"
+	if primary != nil {
+		notice = "Conformance failed. The cluster remains available in this foreground session for debugging; Ctrl-C starts owned cleanup and preserves the failed outcome."
+		status = "conformance-failed"
+	}
+	return s.holdForegroundState(ctx, runner, server, primary, notice, status, func(ctx context.Context) error { return s.presentStatus(ctx, runner, access, false) })
+}
+
+func (s *nativeSiteAttempt) holdSiteIdentityFailure(ctx context.Context, runner Runner, server *OwnedProcess, primary error) error {
+	return s.holdForegroundState(ctx, runner, server, primary,
+		"Site host identity handoff failed. Bootstrap and site remain available in this foreground session for debugging; Ctrl-C starts owned cleanup and preserves the failed outcome.", "site-identity-failed", nil)
+}
+
+func (s *nativeSiteAttempt) holdForegroundState(ctx context.Context, runner Runner, server *OwnedProcess, primary error, notice, status string, observe func(context.Context) error) error {
 	if s.cleanup || ctx.Err() != nil || errors.Is(primary, ErrUnjoined) {
 		return primary
 	}
 	if runner.Progress != nil {
-		notice := "Demo remains available in this foreground session; Ctrl-C deletes only its owned guests and servers."
-		if primary != nil {
-			notice = "Conformance failed. The cluster remains available in this foreground session for debugging; Ctrl-C starts owned cleanup and preserves the failed outcome."
-		}
 		if _, err := fmt.Fprintln(runner.Progress, notice); err != nil {
 			return errors.Join(primary, err)
 		}
 	}
-	status := "available"
-	if primary != nil {
-		status = "conformance-failed"
-	}
+
 	reportProgress(runner.Progress, ProgressEvent{Kind: NativeRetained, Status: status})
 	refresh := time.NewTicker(time.Minute)
 	defer refresh.Stop()
@@ -441,7 +455,10 @@ func (s *nativeSiteAttempt) holdForeground(ctx context.Context, runner Runner, a
 			_, err := server.Exited()
 			return errors.Join(primary, errors.New("native NICo exited during the retained demo; inspect the private native-nico log"), err)
 		case <-refresh.C:
-			if err := s.presentStatus(ctx, runner, access, false); err != nil {
+			if observe == nil {
+				continue
+			}
+			if err := observe(ctx); err != nil {
 				if ctx.Err() != nil && !errors.Is(err, ErrUnjoined) {
 					return primary
 				}

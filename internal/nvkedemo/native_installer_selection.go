@@ -10,10 +10,8 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -25,43 +23,9 @@ type nativeInstallerSelection struct {
 }
 
 func nativeInstallerSelectionFromRun(ctx context.Context, root, bundle string) (*nativeInstallerSelection, error) {
-	output, err := CompleteOutput(ctx, root, bundle, "executable")
+	plan, output, err := nativeSelectedRunPlan(ctx, root, bundle, "executable")
 	if err != nil {
 		return nil, err
-	}
-	view, err := lifecycle.InspectRun(ctx, root+"/lifecycle.json")
-	if err != nil {
-		return nil, err
-	}
-	if view.Status != lifecycle.RunComplete || view.CleanupIncomplete {
-		return nil, errors.New("native tools require a committed complete Run")
-	}
-	raw, err := readRunFile(ctx, root, ".runner/plan.json", factory.MaxPlanBytes)
-	if err != nil {
-		return nil, err
-	}
-	var original factory.Plan
-	if err := canonical.UnmarshalExact(raw, &original); err != nil {
-		return nil, err
-	}
-	raw, err = readRunFile(ctx, root, "compile-inputs.json", 64<<20)
-	if err != nil {
-		return nil, fmt.Errorf("native tools require captured source inputs; rebuild the tool Run: %w", err)
-	}
-	var snapshot factory.InputSnapshot
-	if err := canonical.UnmarshalExact(raw, &snapshot); err != nil {
-		return nil, err
-	}
-	plan, err := factory.CompileSnapshot(ctx, snapshot, original.GeneratorVersion)
-	if err != nil {
-		return nil, err
-	}
-	digest, err := plan.Digest()
-	if err != nil {
-		return nil, err
-	}
-	if digest != view.PlanDigest {
-		return nil, errors.New("native tool source inputs differ from the completed Run")
 	}
 	return nativeInstallerSelectionFromPlan(plan, bundle, output.BuildDigest)
 }

@@ -184,6 +184,39 @@ components:
             - linux/arm64
         source: nvke-nicosim
         writeDir: controller/nico-sim/bin
+    nvke-spire-configure-source:
+        artifactPath: bin/nvke-spire-configure-source
+        buildCommand:
+            - bash
+            - -euc
+            - |
+              test -f os-image/files/spire-configure.sh
+              test ! -L os-image/files/spire-configure.sh
+              cp os-image/files/spire-configure.sh bin/nvke-spire-configure-source
+              chmod 0755 bin/nvke-spire-configure-source
+        cgo: false
+        fromSource: true
+        outputType: host-package
+        platforms:
+            - linux/arm64
+        source: nvke-spire-agent-source
+        writeDir: bin
+    nvkr-site-identity-helper:
+        artifactPath: bin/nvkr-site-identity-helper
+        buildCommand:
+            - bash
+            - -euc
+            - |
+              export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+              test "$(go env GOVERSION)" = "go$(cat .go-version)"
+              go build -trimpath -buildvcs=false -o bin/nvkr-site-identity-helper ./cmd/nvkr-site-identity-helper
+        cgo: false
+        fromSource: true
+        outputType: host-package
+        platforms:
+            - linux/arm64
+        source: nvkr-site-identity
+        writeDir: bin
     nvke-installer-sources:
         artifactPath: bin/nvke-installer-sources.tar.gz
         buildCommand:
@@ -316,6 +349,27 @@ kind: SourceBuildRegistry
 metadata:
     name: nvke-native-tools
 sources:
+    nvke-spire-agent-source:
+        constraint: 0.21.x
+        repo: https://github.com/dsx-ai-factory/nvke.git
+        toolchainImagesByArch:
+            arm64: golang@sha256:288557fbc328e4ef9a78bae2eb44f24447029ff08667be883d79eeaa9029cf0c
+    nvkr-site-identity:
+        constraint: '*'
+        repo: https://github.com/dsx-ai-factory/nvkr.git
+        toolchainImagesByArch:
+            arm64: golang@sha256:288557fbc328e4ef9a78bae2eb44f24447029ff08667be883d79eeaa9029cf0c
+        vendorCommand:
+            - bash
+            - -euc
+            - |
+              export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+              pins="$(sha256sum go.mod go.sum)"
+              timeout --kill-after=10s 540s go mod download
+              printf '%s\n' "$pins" | sha256sum --quiet -c -
+              GOPROXY=off timeout --kill-after=10s 60s go mod verify
+              GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+              printf '%s\n' "$pins" | sha256sum --quiet -c -
     packer:
         constraint: 1.15.4
         repo: https://github.com/hashicorp/packer

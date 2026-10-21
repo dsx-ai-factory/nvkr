@@ -674,8 +674,11 @@ race-test coverage; a real site-reuse test remains externally unverified.
 an existing admitted NVKE controller container. `pkg/nvkr/siteidentity` owns its
 mTLS probe, fixed renderer operation and authenticated fresh-peer observation;
 the executable only adapts bounded standard input/output and coded errors.
-This helper is not yet selected by native tool catalogs or called by normal
-site startup. Building it does not deploy, import SPIRE policy or repair a site.
+Both native host selections consume the same Linux ARM64 helper and the
+selected NVKE SPIRE renderer through the shared site-startup tool output. These
+are built from catalog-selected sources; the normal startup owner invokes the
+helper in its existing admitted controller container. Building the helper alone
+does not deploy, import SPIRE policy or repair a site.
 
 It uses the upstream generated NodeAgent client and the existing controller CSI
 workload identity. No arbitrary script, credential, socket relay, downloader or
@@ -698,7 +701,10 @@ A missing or malformed result is also unknown to the native caller, even if a
 local helper or kubectl process exited. Output capability is admitted before
 identity or remote work. Input is bounded to 16 KiB with a 10-second read deadline;
 output delivery has a 2-second deadline. Cancellation before dispatch prevents
-mutation. The fixed guest operation bounds itself to 110 seconds plus a 5-second
+mutation. The executable consumes its inherited directional pipes and adopts
+private nonblocking descriptors before these deadline checks. Direct Go callers
+retain the existing borrowed, pollable-file contract.
+The fixed guest operation bounds itself to 110 seconds plus a 5-second
 kill allowance, and the helper drains its synchronous RPC for 135 seconds despite
 caller cancellation. Only SPIRE restarts; the installed renderer preserves the
 CA and TPM material and verifies the node-agent PID remains unchanged.
@@ -713,11 +719,32 @@ Certificate renewal may change its bytes; another default identity is refused.
 Fresh peer proof requires the same SPIFFE and boot identities, a different
 certificate serial, issuance within 60 seconds before dispatch and more than
 60 seconds of validity at observation. It records certificate metadata only.
-This result does not authorize bootstrap removal: exact permanent SPIRE policy,
-registration, derived TPM allowlist and TPM-agent proof remain required in the
-native owner. That integration and fresh public first-run acceptance remain
-outstanding. Controlled client, cancellation and script tests are distinct from
-an actual execution of this new production helper.
+The helper result alone does not authorize bootstrap removal. Before creating
+VMs, the native owner requires all three startup members: `nerdctl`, the helper
+and `nvke-spire-configure-source`. It recompiles the completed tool and OS Runs
+from their captured inputs and requires the renderer's unmodified source to
+match the selected OS SPIRE package. Older tool Runs missing these members must
+be rebuilt from the updated native inputs.
+
+After deployment and before stopping temporary bootstrap, that owner imports
+the original source-exported host policy without replacement. It observes the
+exact controller/CSI context, permanent registration, controller-derived TPM
+allowlist, new TPM agent and fresh same-boot host certificate. Original authored
+environment bytes, the owned CA and admitted renderer bind the fixed operation.
+Only the complete native operation issues its private bootstrap-stop receipt.
+
+A joined handoff failure retains bootstrap and site for foreground debugging
+when cleanup is not selected. Unknown remote completion preserves dependencies
+and refuses an automatic retry. The Go scoped API retains its documented
+callback lifetime and joined cleanup rules. The TUI reports the handoff as a
+site stage; a site failure does not complete tenant or conformance checks.
+A private Linux ARM64 Run, `site-startup-tools-arm64-acceptance-20261021-02`,
+built the shared output from its public source pins and verified all three
+executable members. Its delivered helper also passed an isolated invalid-request
+subprocess check using the existing canonical result decoder. These checks do
+not establish an authenticated handoff through integrated startup or a fresh
+customer first run. Complete current-source Mac and Ubuntu acceptance remain
+externally unverified.
 
 ## Where the NVKE versions come from
 

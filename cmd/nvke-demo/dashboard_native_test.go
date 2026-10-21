@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -37,7 +38,7 @@ func TestDashboardNativeChecklistUsesIndividualOwnerBoundaries(t *testing.T) {
 					t.Fatal("native view retained legacy stage", forbidden)
 				}
 			}
-			if !strings.Contains(checklist, "Native site stages · 1/7 checked") || snapshot.phases[2].state == "complete" {
+			if !strings.Contains(checklist, fmt.Sprintf("Native site stages · 1/%d checked", len(dashboardNativeSiteStages))) || snapshot.phases[2].state == "complete" {
 				t.Fatal("partial native stages incorrectly completed the site", checklist)
 			}
 			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "native-site-ready"})
@@ -186,5 +187,43 @@ func TestTenantCloudInitProgressIsVisibleInBothPresenters(t *testing.T) {
 				t.Fatal("host cloud-init gate missing from presentation", text)
 			}
 		})
+	}
+}
+
+func TestNativeIdentityFailureRetentionDoesNotCompleteTenant(t *testing.T) {
+	d := newDashboard()
+	d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.NativeDeployment, Conformance: true, ExpectedNodes: 3})
+	d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: "native-site-identity-handoff"})
+	if s := d.snapshot(); s.phases[2].state != "running" || s.current != "Site host identity handoff" {
+		t.Fatal("identity start is hidden", s.phases[2], s.current)
+	}
+	d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFailed, Name: "native-site-identity-handoff"})
+	d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.NativeRetained, Status: "site-identity-failed"})
+	s := d.snapshot()
+	if !s.retained || s.phases[2].state != "failed" || !strings.Contains(s.current, "bootstrap and site retained") {
+		t.Fatal("site failure was hidden", s.current, s.phases[2])
+	}
+	for _, i := range []int{3, 4, 5} {
+		if s.phases[i].state != "pending" {
+			t.Fatalf("unstarted phase %d claimed %s", i, s.phases[i].state)
+		}
+	}
+	if s.conformance.state != "pending" || strings.Contains(s.tenant, "completed") || !strings.Contains(s.tenant, "not started") {
+		t.Fatal("site retention claimed tenant or suite completion", s.tenant, s.conformance)
+	}
+	for _, stage := range s.tenantStages {
+		if state, checked, _ := stage.status(1); state != "pending" || checked != 0 {
+			t.Fatal("tenant checks were inferred", state, checked)
+		}
+	}
+	var plain bytes.Buffer
+	writer := &checkedWriter{out: &plain, started: time.Now(), phases: make(map[string]time.Time)}
+	writer.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: "native-site-identity-handoff"})
+	writer.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFailed, Name: "native-site-identity-handoff"})
+	writer.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.NativeRetained, Status: "site-identity-failed"})
+	for _, want := range []string{"[START ", "[FAIL ", "native-site-identity-handoff", "tenant and conformance have not started"} {
+		if !strings.Contains(plain.String(), want) {
+			t.Fatal("plain output omitted identity state", want, plain.String())
+		}
 	}
 }

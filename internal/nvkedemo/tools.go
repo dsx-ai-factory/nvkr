@@ -65,7 +65,7 @@ func siteStartupToolBundles(platform string) []companionToolBundle {
 		return nil
 	}
 	return []companionToolBundle{
-		{"site-startup-tools-arm64", "bin", []string{"nerdctl"}},
+		{"site-startup-tools-arm64", "bin", []string{"nerdctl", nativeSpireRendererSource, nativeIdentityHelper}},
 	}
 }
 

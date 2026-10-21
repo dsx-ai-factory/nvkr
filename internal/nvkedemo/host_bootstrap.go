@@ -49,8 +49,7 @@ systemctl stop nvke-agent.service spire-agent.service
 install -d -m 0700 /etc/nke
 install -d -m 1777 /var/lib/nvke-native/postgres /var/lib/nvke-native/spire
 install -m 0644 downloads/spire-ca.crt /etc/nke/trust-bundle.pem
-printf 'SPIRE_SERVER_ADDRESS=%s\nSPIRE_SERVER_PORT=30081\nSPIRE_TRUST_DOMAIN=%s\n' \
-  {{quote .Gateway}} {{quote (printf "%s.nke.local" .Name)}} > /etc/nke/spire.env
+printf '%s' {{quote (spireEnvironment .)}} > /etc/nke/spire.env
 {{configureSpire}}
 {{range $role, $reference := .ImageImports}}
 {{importImage (printf "downloads/%s.tar" $role) $reference}}
@@ -182,6 +181,13 @@ func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, 
 	}
 	if err := s.deployFromHost(ctx, runner, cli, tools, out, specPath); err != nil {
 		return err
+	}
+	receipt, err := s.completeNativeSiteIdentity(ctx, runner, ip, out)
+	if err != nil {
+		return &nativeSiteIdentityFailure{cause: err}
+	}
+	if receipt == nil {
+		return &nativeSiteIdentityFailure{cause: errors.New("site identity owner returned no completion receipt")}
 	}
 	return s.stopBootstrap(ctx)
 }

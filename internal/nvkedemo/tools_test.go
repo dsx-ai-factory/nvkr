@@ -229,9 +229,13 @@ func TestNativeToolDefinitionsMatchHostAndSiteSelections(t *testing.T) {
 			if complete.Catalog.Base != "../../../catalogs/tools/native" {
 				t.Fatal("tools lost their shared catalog owner")
 			}
+			siteBundles := siteStartupToolBundles(platform)
+			if len(siteBundles) != 1 {
+				t.Fatal("native site requires one owner-selected companion bundle")
+			}
 			expected := map[string]definition.DefinitionOutput{
 				hostBundle:                 {Name: hostBundle, Platform: platform, Format: definition.OutputExecutable, Components: slices.Clone(members)},
-				"site-startup-tools-arm64": {Name: "site-startup-tools-arm64", Platform: "linux/arm64", Format: definition.OutputExecutable, Components: []string{"nerdctl"}},
+				"site-startup-tools-arm64": {Name: "site-startup-tools-arm64", Platform: "linux/arm64", Format: definition.OutputExecutable, Components: slices.Clone(siteBundles[0].members)},
 			}
 			if platform == "linux/arm64" {
 				for i, member := range expected[hostBundle].Components {

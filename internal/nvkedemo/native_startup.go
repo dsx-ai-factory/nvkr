@@ -124,12 +124,13 @@ func SiteStartupUserData(ctx context.Context, cfg NativeSiteStartup) (string, er
 	cfg.Assets = assets
 	var script bytes.Buffer
 	if err := template.Must(template.New("site-startup").Funcs(template.FuncMap{
-		"quote":          operatorQuote,
-		"configureSpire": func() string { return siteSpireConfigurationScript },
-		"prepareOVN":     func() string { return importOVN + "; " + valuesOVN },
-		"sha":            func(value string) string { return strings.TrimPrefix(value, "sha256:") },
-		"importImage":    nativeImageImportScript,
-		"json":           func(value string) (string, error) { raw, err := json.Marshal(value); return string(raw), err },
+		"quote":            operatorQuote,
+		"configureSpire":   func() string { return siteSpireConfigurationScript },
+		"spireEnvironment": func(cfg NativeSiteStartup) string { return string(nativeBootstrapSpireEnvironment(cfg)) },
+		"prepareOVN":       func() string { return importOVN + "; " + valuesOVN },
+		"sha":              func(value string) string { return strings.TrimPrefix(value, "sha256:") },
+		"importImage":      nativeImageImportScript,
+		"json":             func(value string) (string, error) { raw, err := json.Marshal(value); return string(raw), err },
 	}).Parse(hostSitePreparationScript)).Execute(&script, cfg); err != nil {
 		return "", nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "render site startup handoff")
 	}

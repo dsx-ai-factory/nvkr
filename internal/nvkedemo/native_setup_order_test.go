@@ -4,12 +4,14 @@
 package nvkedemo
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestNativeSharedSetupPrecedesOrdinaryTenantAndStopsDiagnostic(t *testing.T) {
@@ -95,16 +97,19 @@ esac
 			for _, role := range []string{"ovn", "workload"} {
 				attempt.assets.Images[role] = tenantFixture.assets.Images[role]
 			}
+			installNativeIdentityFixture(t, &attempt, tools, root)
 			runner := Runner{Work: root, Env: []string{"PATH=" + tools + ":/usr/bin:/bin", "FIXTURE=" + root, "EVENTS=" + events}}
 			var row nativeInstance
 			if err = json.Unmarshal([]byte("{\"id\":\"site-fixture\",\"interfaces\":[{\"ipAddresses\":[\"172.30.0.2\",\"172.30.0.3\"]}]}"), &row); err != nil {
 				t.Fatal(err)
 			}
 			server := &OwnedProcess{done: make(chan struct{})}
+			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+			defer cancel()
 			if ordinary {
-				err = attempt.ready(t.Context(), runner, row, tools, root, server)
+				err = attempt.ready(ctx, runner, row, tools, root, server)
 			} else {
-				_, err = attempt.setup(t.Context(), runner, row, tools, root, server)
+				_, err = attempt.setup(ctx, runner, row, tools, root, server)
 			}
 			if ordinary && CommandExitCode(err) != 7 || !ordinary && err != nil {
 				t.Fatalf("unexpected consumer outcome: %v", err)
@@ -114,9 +119,9 @@ esac
 				t.Fatal(readErr)
 			}
 			got := strings.Split(strings.TrimSpace(string(raw)), "\n")
-			want := []string{"generate", "nerdctl", "nerdctl", "kind", "bootstrap", "capi", "kubectl", "validate", "deploy", "spiffe", "kind", "configure", "providers"}
+			want := []string{"generate", "nerdctl", "nerdctl", "kind", "bootstrap", "capi", "kubectl", "validate", "deploy", "spiffe", "identity-stage", "identity-probe", "identity-import", "identity-handoff", "kind", "configure", "providers"}
 			// The observed selector and narrow API policy precede the first host API call.
-			want = append(want[:11], append([]string{"kubectl", "kubectl"}, want[11:]...)...)
+			want = append(want[:15], append([]string{"kubectl", "kubectl"}, want[15:]...)...)
 			if ordinary {
 				want = append(want, "tenant-inventory")
 			}
@@ -145,6 +150,7 @@ esac
 			if _, err = os.Stat(filepath.Join(root, "native-result.json")); !os.IsNotExist(err) {
 				t.Fatal("incomplete consumer produced full native result")
 			}
+			assertNativeIdentityFixtureCompletion(t, root)
 			// The test starts no VM, network, Kind or real installer. All external
 			// fixture commands above have returned through the actual Runner owner.
 		})

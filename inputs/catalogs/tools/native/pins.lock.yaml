@@ -138,6 +138,17 @@ pins:
     sourceDateEpoch: 1792509664
     tag: 9ac6832ac965e5222876ef910c3a28be1a392665
     treeHash: 41a35697cf25320c58cc87e1ae5569f66869b8c1
+  nvke-spire-agent-source:
+    commit: e7d5e32f5ec36eb57255e9d5de86853d92fa2087
+    sourceDateEpoch: 1792534790
+    tag: e7d5e32f5ec36eb57255e9d5de86853d92fa2087
+    treeHash: 772e6e99285ea7f6471eb62322d6c4893809ebf2
+  nvkr-site-identity:
+    commit: de567d94f0efc1532ae229ea656b69cb75fe92c4
+    goVersion: 1.27.3
+    sourceDateEpoch: 1792563793
+    tag: de567d94f0efc1532ae229ea656b69cb75fe92c4
+    treeHash: 2d2d4a7c3687472882ccd25d58f6a47dcc3ea7e7
   oras:
     commit: 210747c29c1d38732b3194878dfd8b5a6b9ad7eb
     sourceDateEpoch: 1783708065

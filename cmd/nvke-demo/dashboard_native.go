@@ -22,6 +22,7 @@ var dashboardNativeSiteStages = [...]struct {
 	{"Cluster API installed", [2]string{"host-site-capi"}},
 	{"Site stack installed", [2]string{"host-nvke-deploy"}},
 	{"CAPI SPIFFE authentication", [2]string{"host-site-spiffe-exec"}},
+	{"Site host identity handoff", [2]string{"native-site-identity-handoff"}},
 	{"NVKE API accessible", [2]string{"check-05-install-site-controller"}},
 }
 
@@ -72,15 +73,22 @@ func (d *dashboard) nativeProgress(event nvkedemo.ProgressEvent) bool {
 		}
 		return true
 	case nvkedemo.NativeRetained:
-		if event.Status != "available" && event.Status != "conformance-failed" {
+		if event.Status != "available" && event.Status != "conformance-failed" && event.Status != "site-identity-failed" {
 			return true
 		}
-		d.retained = true
-		d.tenant = "Workload and DNS checks completed; the same tenant remains available."
-		d.current, d.currentStarted = "Environment retained for debugging", time.Time{}
-		if event.Status == "conformance-failed" {
-			d.current = "Conformance failed; cluster retained for debugging"
+		if event.Status == "site-identity-failed" {
+			d.resetNativeTenant()
+			d.phases[2] = dashboardPhase{"failed", "Site host identity handoff failed"}
+			d.tenant = "Tenant has not started; bootstrap and site remain available for debugging."
+			d.current = "Site identity failed; bootstrap and site retained for debugging"
+		} else {
+			d.tenant = "Workload and DNS checks completed; the same tenant remains available."
+			d.current = "Environment retained for debugging"
+			if event.Status == "conformance-failed" {
+				d.current = "Conformance failed; cluster retained for debugging"
+			}
 		}
+		d.retained, d.currentStarted = true, time.Time{}
 		d.phases[5] = dashboardPhase{"pending", "Foreground retention; Ctrl-C starts owned cleanup"}
 		d.appendActivity(d.current)
 		return true
