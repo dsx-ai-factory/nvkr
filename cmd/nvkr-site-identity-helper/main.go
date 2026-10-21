@@ -13,7 +13,6 @@ import (
 	"syscall"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/siteidentity"
 )
 
 func main() {
@@ -32,6 +31,5 @@ func run(ctx context.Context, args []string) error {
 	if len(args) != 0 {
 		return e.New(e.CodeUsage, "identity helper accepts no arguments")
 	}
-	_, err := siteidentity.RunHelper(ctx, os.Stdin, os.Stdout)
-	return err
+	return runHelperWithProcessStdio(ctx)
 }
