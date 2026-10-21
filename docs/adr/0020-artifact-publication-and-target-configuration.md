@@ -34,7 +34,7 @@ cross-environment byte-identity.
 
 ### 2. Target configuration surface
 
-Environment (`nvkr.dev/environment/v1`) owns runtime settings, one optional OCI publication namespace,
+The implemented Environment (`nvkr.dev/environment/v1`) owns runtime settings, one optional OCI publication namespace,
 credential references and signing identity/issuer policy. `publication.repositoryPrefix` is an explicitly
 qualified, untagged repository prefix; credentials, anonymous access and plain HTTP are transport settings.
 When publication is configured, the release index and metadata publish under
@@ -42,8 +42,9 @@ When publication is configured, the release index and metadata publish under
 `<repositoryPrefix>/<output-name>`. The signed
 release metadata binds canonical sibling repository names and manifest digests; no complete closure is copied
 into the product repositories.
-Omitting publication produces a build-only Run. Destinations and a separate output-to-destination map are
-not authored. The generated internal routes still bind exact package inputs and targets.
+Omitting publication produces a build-only Run. In the implemented schema, destinations and a separate
+output-to-destination map are not authored. The S3 extension contract below specifies the bounded exception.
+The generated internal routes still bind exact package inputs and targets.
 Each derived route owns exactly one publisher and its publication reference. When signing is configured,
 its sign and verification operations bind that same route's package, reference and signature artifacts.
 Another publisher or signer cannot acquire route authority merely by naming an existing target.
@@ -153,16 +154,217 @@ This export grants no runtime verdict or stronger release/evidence lane. Contrac
 tests exercise origin mismatch, closure substitution, closed capabilities and
 pre-start cancellation; externally exercised end-to-end consumption remains unrecorded.
 
-An optional future S3 object and CDN URL must project those same payload bytes, not alternate Build identities.
-The signed root must bind the payload digest, exact object route and authenticated upload/read-back result
-before a consumer may accept that projection. Object-store schema, credentials, publication and consumption
-remain deferred. Qualified disk reproduction and strict FDE publication remain capability-gated. An FDE payload
+An S3 object and boot URL must project those same payload bytes, not alternate Build identities. The
+contract below binds the payload, route and authenticated read-back in a derived signed delivery root referencing
+the unchanged source publication; it does not rewrite a previously signed OCI root. Object-store execution and
+consumption remain unavailable. Qualified disk reproduction and strict FDE publication remain capability-gated. An FDE payload
 containing a private unlock credential cannot pass the existing no-secret publication rule. ADR-10's
 public `changeit` bootstrap value has no confidentiality requirement. Its native ARC publication route requires
 explicit `build-provenance-v1`, retains the exact producer encryption declaration through wrapper and signed
 metadata, and makes no inspected-content, secure-deployment or confidentiality claim. The consumer's existing
 minimum evidence policy still rejects producer-only evidence when strict is required; no separate confidentiality
 policy is implied by accepting a disk. The separate raw diagnostic route remains build-only.
+
+#### S3 file delivery contract
+
+This section freezes the proposed engineering contract for customer-controlled S3 delivery of the complete
+selected artifact set: QCOW2 disk images for VM boot and imaging, compatible EFI and iPXE assets, and Debian
+packages. Implementations must support that complete selected set. This documentation change specifies
+the contract; the S3 adapter, native-file codecs and decoders remain implementation work. Ratification by
+the named deciders, provider acceptance and boot acceptance remain outstanding. Existing OCI behavior and
+existing schema readers are unchanged.
+
+The initial source is GitHub `per-output-v1` publication in the `pipeline-attested` lane. GCS, direct APT
+repository serving, other repository managers, arbitrary upload scripts and legacy monolithic-root projection
+are not admitted by this contract. A new adapter must satisfy the same ownership and acceptance boundary.
+
+**Authored inputs and versions.** Reserve `nvkr.dev/definition/v6` for the native `file` output below,
+`nvkr.dev/environment/v2` for `publication.fileTargets`, and `nvkr.dev/run-plan/v6` for their derived graph.
+This contract reserves those versions; runtime decoders do not yet accept them. Existing v5 Definitions
+and v1 Environments remain valid under their current contracts; new fields or formats must never be silently
+interpreted under an older schema. Omitting file targets must preserve existing OCI behavior; admission
+must reject unknown or mixed fields. No current schema constant, catalog pin, generated workflow or
+executable capability changes in this freeze.
+
+Each `publication.fileTargets` entry has the closed shape below. The list is sorted by `name`, and names
+must be unique. Every configured target is required for Run success. There is no best-effort target or
+implicit selection of all outputs.
+
+| Field | Contract |
+| --- | --- |
+| `name` | Unique canonical target name, using the existing authored-name rules. |
+| `kind` | Exactly `s3`; its matching `s3` object is required. |
+| `outputs` | A nonempty, sorted list of unique, exact Definition output names. Initially only `file`, `executable` and `disk-image` outputs are admitted. Missing, duplicate, unknown or unsupported selections fail before work. |
+| `s3.endpoint`, `s3.region` | Explicit S3 API origin using HTTPS, plus the signing region. The endpoint has no user information, query, fragment or embedded credentials; provider endpoint and addressing behavior must be exercised. |
+| `s3.bucket`, `s3.prefix` | Explicit bucket and nonempty canonical relative key prefix; no traversal, empty segments or leading/trailing slash. Provider naming validation belongs to the admitted SDK/service boundary. |
+| `s3.addressing` | Exactly `path` or `virtual-host`; no silent addressing fallback. |
+| `s3.writeCredentialRef`, `s3.readCredentialRef` | Separate references to writer and verifier credentials. They resolve only in admitted operations; secret values never enter authored/generated records, URLs or logs. |
+| `s3.readBaseURL` | Optional HTTPS origin/path for ordinary file reads; mandatory for boot outputs. It is separate from the API endpoint. Each generated boot URL is a clean path with no query, fragment or secret and must be readable by the intended provisioning client. |
+| `s3.transfer` | Required positive bounds: `maxObjectBytes`, `maxTotalBytes`, `maxObjects`, `partSizeBytes`, `maxConcurrency`, `maxRequestAttempts`, `maxUploadAttempts`, `operationTimeoutSeconds`, `cleanupTimeoutSeconds`. Admission checks provider/SDK limits, memory and scratch before upload. Concurrency is global across transfers and the whole operation has a deadline. |
+
+`maxRequestAttempts` counts the initial request and all SDK retries for each API call. `maxUploadAttempts`
+counts the initial single PUT or multipart upload and each fresh whole-object restart; it does not reset the
+operation deadline. `maxObjectBytes`, `maxTotalBytes` and `maxObjects` bound the final set of unique stored
+objects for one target, including parent archives, original proof/control objects, the delivery root and
+its detached bundle. Multiple source bindings for the same object key count as one stored object. Reserve
+bounded capacity for the root and bundle before upload and reject any resulting size that exceeds it before
+committing. Repeated transfers and read-backs do not increase that stored-byte inventory, but are bounded
+independently by both attempt limits, the global concurrency/memory/scratch admission and the
+operation/cleanup deadlines.
+
+Targets affect Environment, Plan and delivery identity, never producer Build identity or unchanged file digests.
+The target must have a corresponding OCI publication source and signing configuration; the first extension does
+not replace OCI production. Local credentials may support diagnostics, but authority-bearing delivery/signing
+remains GitHub-only. Implementations may resolve those references through federation or credentials for an
+admitted S3-compatible service. Build jobs must not inherit ambient storage credentials. Dependency,
+license, provenance and security review must admit pinned AWS SDK modules and transitive dependencies
+before implementation uses them.
+
+**Native file outputs.** A `format: file` output selects one exposed producer and its required material closure.
+Its `file` object contains exactly `kind` and `representation`. `kind` is one of `deb`, `efi`, `ipxe`, `kernel`,
+`initrd` or `iso`; `representation` is `file`, `tar` or `tar-gzip`. An archive representation includes every
+regular file in the archive; authored wildcards or subsets are not allowed. Kind comes from the declaration
+and owning validator, not the filename. The existing archive owner admits safe directory structure but
+rejects duplicate normalized names, traversal, links, special files, ambiguous or empty membership and
+unsupported content before publication.
+
+Reserve `nvkr.dev/native-file/v1` with the new `nvkr.native-file` digest family. Its closed canonical object
+contains `schemaVersion`, `platform`, `producer` and sorted `files`. `producer` binds exact `artifactID`,
+`component`, `buildDigest`, source blob `sha256`, `size` and `representation`. Each file binds `name`, `kind`,
+`mediaType`, regular-file `mode`, `sha256` and `size`. Mode preserves ordinary permission bits and rejects
+set-ID/sticky bits; it does not make a package an executable tool. A direct file's name is the canonical
+basename of its producer's catalog-declared artifact path. An archive member is identified by the parent blob and
+its canonical member name as well as its own digest/size. The OCI carrier retains that original file/archive
+and the generated manifest. Initial S3 delivery retains the complete source carrier closure, including parent
+archives, in addition to projecting native members. No package rebuilding, recompression or implicit permission
+upgrade is allowed. Native DEBs must not pass through the current APT package reconstruction path.
+ADR-13 owns evidence for actual package payloads; a file inventory cannot claim dependency coverage.
+
+**Selection and authority.** Authenticate the source aggregate's metadata, signatures, provenance and required
+SBOMs under external source policy, derive exact selected `PublicationOrigin` references from that authenticated
+membership, then verify each selected complete output-local payload/evidence root. Bind exact output names,
+platforms, Plan and original preparation/signing invocations. Unrelated image/chart payloads need not be
+downloaded, but their absence cannot be described as full aggregate payload verification. Preserve existing
+whole-Plan `ExactInputReceipt` and `ExportForInvocation` guarantees; neither accepts a subset.
+
+`lifecycle` must issue a separate opaque selection receipt retaining the selected complete held publications
+and actual authenticated source signature, provenance and SBOM bundle bytes. Verification records, booleans,
+restored paths or equal Build Digests cannot replace that owner or authorize another output or Run. `sign` owns
+proof retention and supplied-bundle authentication; `delivery` owns held bytes and storage receipts; `lifecycle`
+joins them. `Close` cancels and joins active work before releasing payload and proof owners. No new authored
+lifecycle object, second scheduler or plugin authority is introduced.
+
+**Signed root and consumer locator.** Reserve `nvkr.dev/file-delivery/v1` and the new `nvkr.file-delivery`
+digest family. The generated canonical delivery root has exactly these top-level fields:
+
+| Field | Required binding |
+| --- | --- |
+| `schemaVersion` | Exactly `nvkr.dev/file-delivery/v1`. |
+| `source` | Aggregate `reference`, `index`, `rootConfig`, `definitionDigest`, `environmentDigest`, `planDigest` and `invocation`. `index` contains raw OCI index `sha256`, `size` and `mediaType`; its digest must equal the pinned reference. `rootConfig` contains canonical PublicationRoot config `sha256`, `size` and its distinct `semanticDigest`, reached through that index's checked manifest/config descriptors. |
+| `delivery` | Target `name`, `environmentDigest`, `planDigest`, `invocation`, publisher `sourcePolicyDigest` and `deliveryPolicyDigest`. Source and delivery identities remain separate even when the initial integrated operation uses the same Run. |
+| `destination` | Exact admitted `endpoint`, `region`, `bucket`, `prefix` and `addressing`. |
+| `outputs` | Sorted selected output records: `name`, `platform`, `format`, `buildDigest`, original `publicationReference`, `preparationInvocation`, `signingInvocation`, wrapper `descriptorDigest`, and exhaustive sorted `objects` key references. `format` is exactly the Definition format (`file`, `executable` or `disk-image`); `fileKind` is required only for `file` and must match its native manifest kind. |
+| `objects` | Sorted exhaustive object records: `key`, `sha256`, `size`, `mediaType`, `role`, `sourceBindings`, `readback`, and optional `versionId`/`readURL`. Roles are `payload`, `manifest`, `signature`, `provenance` or `sbom`; `manifest` covers indexes/configs/control JSON with their exact media types. Source bindings use the closed variants below. |
+
+Each `sourceBindings` record contains exactly the fields of its `type` variant. All digests below are raw
+blob SHA-256 values; structured semantic digests are never substituted. Bindings are sorted and unique by
+type, publication reference, output name, member name and selected byte digest, omitting nonexistent sort components.
+
+| `type` | Exact remaining fields and meaning |
+| --- | --- |
+| `control` | `publicationReference`, `sha256`: an original control/evidence blob or verified detached proof for that exact publication subject. |
+| `payload` | `publicationReference`, `outputName`, `descriptorDigest`, `payloadSHA256`: the exact whole payload bound by that output's authenticated wrapper. |
+| `member` | `publicationReference`, `outputName`, `parentSHA256`, `memberName`, `memberSHA256`: the original held file/archive and its exact canonical regular member. |
+
+The owning verifier derives every binding from authenticated source controls, proof bytes and held payloads.
+The binding's selected byte digest must equal the destination object's `sha256`. A member must match its
+source manifest's exact size/mode/kind and parent identity. Object references resolve by complete exact `key`,
+not basename, array position or caller-asserted checksum; every selected output's required objects must resolve.
+
+`readback` records the full-byte observation (`sha256`, `size`, and the exact `versionId` or conditional-read
+`etag` used); its digest, size and version must match the corresponding object binding. The owner must
+derive it from completed reads, never deserialize it as authority. Objects are sorted by unique exact key;
+outputs and native files are sorted by unique name. An object's optional `readURL` is the exact clean boot
+or file URL, whose contents must be fully read and rehashed before signing. Source control and evidence
+objects needed to independently authenticate aggregate membership and every selected output are mandatory
+even when they are not payloads. Unknown fields, empty object sets, missing required objects, duplicate
+bindings and subject/format confusion fail strict canonical validation.
+
+Payload/proof keys are `<prefix>/blobs/sha256/<hex>/<basename>`. A projected native/executable member uses the
+last segment of its canonical relative source name; the full member path remains in its source binding.
+A raw disk uses `<output-name>.qcow2`. Every other source blob, including parent archives, OCI index/config
+bytes and proof bundles, uses the fixed basename `blob`. Encode the basename as one URL path segment using
+the standard URL implementation; reject ambiguous/unsafe names at source admission. Shared bytes may reuse
+an exact key only with every named source binding preserved. Root bytes live at
+`<prefix>/deliveries/sha256/<root-blob-hex>.json`; the detached Sigstore
+bundle lives at `<prefix>/commits/sha256/<bundle-blob-hex>.sigstore.json`. These final two objects are outside
+the root's `objects` list. The root contains neither its own digest/location nor its signature, avoiding
+self-reference. Its semantic family digest, raw JSON SHA-256 and payload/wrapper identities are distinct.
+
+The strict caller-pinned locator `nvkr.dev/file-delivery-locator/v1` contains `schemaVersion`, `endpoint`,
+`region`, `bucket`, `addressing`, `document` and `bundle`. Each of the latter two contains `key`, `sha256`,
+`size` and optional `versionId`. The consumer admits endpoint/read access independently, hashes the downloaded
+objects and requires that the detached bundle authenticates the exact canonical document. A mutable name or
+the locator alone supplies no trust. Source and delivery Verification Policies are independent caller inputs;
+publisher-policy digests in the root are descriptive. Consumer receipts bind the policies actually enforced.
+The root cannot nominate its trusted signer, weaken disk evidence, or upgrade the lane or acceptance scope.
+Full Release qualification, revocation and offline acceptance remain outside this artifact-publication contract.
+
+**Transfer, commit and interruption.** Use conditional creation for PUT and multipart completion. A `412`
+requires full GET/digest/size reconciliation before reuse. A multipart `409` requires key reconciliation and,
+only on authenticated absence and within the bounded attempt budget, a new multipart upload. Access denied
+does not prove absence. Lost PUT/completion responses require the same reconciliation; status codes, ETags
+and provider checksum metadata are not payload identity. Use exact version reads where supported; otherwise
+admit explicit ETag-conditional reads with full rehash. A provider unable to meet a selected requirement fails
+admission, not a silent safety downgrade.
+
+The state order is source authentication → upload payloads and proofs → verify every required storage object
+and boot URL → generate canonical root → detached signing → root upload and read-back → conditional bundle
+upload last → independent root and bundle authentication → producer success. Freeze the exact root, bundle and locator bytes
+before the final commit request; retries never silently re-sign under the same key. Before that request,
+failure cannot publish a completion. Its result can be indeterminate: a lost response or failed final read-back
+may leave a valid completion remotely. Return no producer success until reconciliation; preserve objects and
+report the exact attempted locator as indeterminate. An independent consumer may accept it only after all
+signature, policy and required-closure checks pass. Do not promise rollback, absence of a valid remote commit
+after an error, or an atomic transaction across objects or targets. Every consumer checks the closure anew.
+
+Cancellation stops and joins transfer workers, then aborts only owned incomplete upload IDs under a separate
+bounded cleanup context and verifies cleanup. Cleanup errors remain visible. Process death requires an
+operator-owned incomplete-upload expiration policy; immediate cleanup or durable multipart resume is not
+promised. Never prune unrelated bucket objects. Failure or an indeterminate result for a required target
+prevents Run success without invalidating completed OCI publication or claiming that another target was
+rolled back.
+
+**Boot and package acceptance.** All selected AMD64/ARM64 QCOW2, EFI, iPXE and DEB outputs are required
+parts of the complete customer path. Source templates retain their own identities; destination- or
+machine-specific rendering has a new identity and belongs to the downstream deployment owner. That owner
+authenticates the delivered asset set before selecting or rendering it. iPXE and
+firmware do not implicitly verify NVKR JSON or Sigstore bundles. Boot endpoints must be exercised from the
+actual provisioning network using the actual clients' read-access method, separately from SDK API read-back.
+The downstream owner must bind bytes actually executed at each boot hop to the authenticated assets through
+client verification or a trusted serving boundary retaining the verified bytes and enforcing their immutable
+mapping. A successful preflight GET alone does not establish that binding. The expected QCOW2 digest must
+come from authenticated metadata, not an untrusted checksum fetched beside the image.
+
+The QCOW-imager path requires a compatible architecture-matched EFI UKI, exact QCOW2, and script bindings for
+image URL/expected SHA-256, disk selection, encryption/unlock mode, console and cloud-init datasource. Separate
+kernel/initrd/ISO outputs are required only when the selected installer protocol references them. Firmware,
+DHCP/PXE service and instance-specific metadata remain deployment prerequisites. Cosign transport signing does
+not establish UEFI Secure Boot. A built or signed EFI cannot silently substitute for another imager contract;
+the pinned NVKE source [documents incompatible disk-selection parameters](https://github.com/dsx-ai-factory/nvke/blob/ff21ba8c07cafff74b68e238a8876af11e5beded/os-image/efi/README.md#L36).
+
+Enablement requires recorded default-branch generated delivery to the named service/version, independent
+read-only S3 consumption with registry access disabled, direct VM boot of the downloaded QCOW2, and actual
+iPXE chainload → EFI image verification/disk write → installed-disk reboot → cloud-init/node-service checks
+for every supported architecture/profile. A simulator that skips EFI execution cannot establish that path.
+Install each delivered DEB on a matching clean target and check declared dependencies and runtime behavior;
+mutually exclusive package versions use separate test cases, not one impossible combined installation.
+Required tests cover corrupt or missing proof or boot files, EFI or script substitution after verification,
+wrong architectures or digests, incompatible imager parameters, equal or conflicting existing objects,
+concurrent writes, lost commit acknowledgements, denied access, interrupted multipart transfers and failed
+boot or installation. Delivery success, boot readiness and qualification remain separate results. Record
+provider capabilities, exact artifact/client identities and acceptance limits in reconciliation; no provider
+or format is enabled by this contract freeze alone.
 
 ### 3. The emitted publish phase
 

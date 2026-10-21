@@ -443,6 +443,30 @@ verification, vulnerability scanning, deployment topology, cluster E2E qualifica
 builder-profile reproduction and byte-identity guarantees. GitHub is the sole hosted workflow,
 publication and signing provider. Per-built-artifact SBOM composition remains in scope.
 
+The proposed S3 boot and package delivery extension has a specified engineering contract; implementation
+and operational acceptance remain outstanding. It requires the complete selected artifact set for both
+supported native architectures: disk images, compatible EFI imagers, iPXE assets and original Debian packages,
+together with their authenticated provenance and required inventories. Installer kernels, initial RAM
+filesystems and media belong to the set when the selected boot method needs them. Deployment owns
+machine-specific configuration, network services, firmware and instance metadata; those prerequisites must
+be exercised with the delivery.
+
+Acceptance of this extension requires:
+
+1. Every required artifact and proof is obtained and verified by an independent read-only consumer without
+   registry access or producer files. Original package/image bytes and evidence subjects are preserved.
+2. Actual boot clients retrieve assets from immutable boot URLs, chainload the compatible EFI, reject a
+   wrong image digest, install to the intended disposable disk, reboot and complete first-boot services.
+   Direct VM boot of the delivered disk is exercised separately on each supported architecture and profile.
+3. Each delivered package is installed on a matching clean system with dependency and runtime checks.
+   Mutually exclusive package versions are tested as alternatives. A list of package metadata or files
+   cannot replace evidence covering the actual package payload.
+4. Conflicting objects, missing/corrupt evidence, denied access, concurrent publication, interrupted transfer
+   and failed boot/install cannot yield a successful required operation. A lost completion acknowledgement
+   is reconciled or reported as indeterminate; already stored valid evidence is not described as rolled back.
+5. Successful delivery, demonstrated boot readiness and release qualification are distinct results.
+   The supported service, compatibility set and observed limits are recorded before enablement.
+
 A downstream nightly end-to-end test is customer CI infrastructure, outside v1
 product acceptance. It can exercise delivered artifacts without expanding the
 build/evidence qualification milestone or supplying independently signed conformance.
