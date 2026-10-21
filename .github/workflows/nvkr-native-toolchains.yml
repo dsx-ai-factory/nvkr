@@ -38,6 +38,10 @@ jobs:
         with:
           go-version-file: .go-version
           cache: false
+      - name: Set up container-backed Buildx for archive export
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
+        with:
+          driver: docker-container
       - name: Prepare and measure native images
         env:
           NATIVE_ARCH: ${{ matrix.arch }}
