@@ -52,17 +52,18 @@ type BuildFile struct {
 }
 
 type RunFile struct {
-	Accelerator    string        `yaml:"accelerator" mapstructure:"accelerator"`
-	Cleanup        bool          `yaml:"cleanup" mapstructure:"cleanup"`
-	Walkthrough    bool          `yaml:"walkthrough" mapstructure:"walkthrough"`
-	Conformance    bool          `yaml:"conformance" mapstructure:"conformance"`
-	Repo           string        `yaml:"repo" mapstructure:"repo"`
-	Network        string        `yaml:"network" mapstructure:"network"`
-	NVKECheckout   string        `yaml:"nvkeCheckout" mapstructure:"nvkeCheckout"`
-	NVKR           string        `yaml:"nvkr" mapstructure:"nvkr"`
-	Runs           RunFileInputs `yaml:"runs" mapstructure:"runs"`
-	Out            string        `yaml:"out" mapstructure:"out"`
-	TimeoutSeconds int           `yaml:"timeoutSeconds" mapstructure:"timeoutSeconds"`
+	Resources      NativeResources `yaml:"resources" mapstructure:"resources"`
+	Accelerator    string          `yaml:"accelerator" mapstructure:"accelerator"`
+	Cleanup        bool            `yaml:"cleanup" mapstructure:"cleanup"`
+	Walkthrough    bool            `yaml:"walkthrough" mapstructure:"walkthrough"`
+	Conformance    bool            `yaml:"conformance" mapstructure:"conformance"`
+	Repo           string          `yaml:"repo" mapstructure:"repo"`
+	Network        string          `yaml:"network" mapstructure:"network"`
+	NVKECheckout   string          `yaml:"nvkeCheckout" mapstructure:"nvkeCheckout"`
+	NVKR           string          `yaml:"nvkr" mapstructure:"nvkr"`
+	Runs           RunFileInputs   `yaml:"runs" mapstructure:"runs"`
+	Out            string          `yaml:"out" mapstructure:"out"`
+	TimeoutSeconds int             `yaml:"timeoutSeconds" mapstructure:"timeoutSeconds"`
 }
 
 type RunFileInputs struct {
@@ -209,6 +210,9 @@ func (file DemoFile) BuildConfig(progress io.Writer) (BuildConfig, error) {
 
 func (file DemoFile) runDescription(progress io.Writer) (Config, error) {
 	run := file.Run
+	if _, err := selectedNativeResources(run.Resources); err != nil {
+		return Config{}, err
+	}
 	if run.Runs.Artifacts != "" {
 		if !configString(run.Runs.Artifacts) {
 			return Config{}, configUsage("artifacts Run path must be explicit")
@@ -231,7 +235,7 @@ func (file DemoFile) runDescription(progress io.Writer) (Config, error) {
 	if file.Version != 1 || (run.NVKECheckout != "" && !configString(run.NVKECheckout)) || !configString(run.Out) || run.TimeoutSeconds < MinTenantTimeoutSeconds || run.TimeoutSeconds > MaxTenantTimeoutSeconds {
 		return Config{}, nvkrerr.New(nvkrerr.CodeUsage, "run requires version 1, out, valid optional nvkeCheckout and timeoutSeconds from %d to %d", MinTenantTimeoutSeconds, MaxTenantTimeoutSeconds)
 	}
-	return Config{Accelerator: run.Accelerator, Cleanup: run.Cleanup, Walkthrough: run.Walkthrough, Conformance: run.Conformance, Repository: run.Repo, Network: network, NVKECheckout: run.NVKECheckout, NVKR: run.NVKR, Out: run.Out, Timeout: time.Duration(run.TimeoutSeconds) * time.Second, Progress: progress,
+	return Config{Accelerator: run.Accelerator, Cleanup: run.Cleanup, Walkthrough: run.Walkthrough, Conformance: run.Conformance, Resources: run.Resources, Repository: run.Repo, Network: network, NVKECheckout: run.NVKECheckout, NVKR: run.NVKR, Out: run.Out, Timeout: time.Duration(run.TimeoutSeconds) * time.Second, Progress: progress,
 		Runs: RunInputs{HostTools: run.Runs.HostTools, Runtime: run.Runs.Runtime, OS: run.Runs.OS, Components: run.Runs.Components, Providers: run.Runs.Providers, Site: run.Runs.Site, Tools: run.Runs.Tools, Profiles: run.Runs.Profiles, Simulator: run.Runs.Simulator}}, nil
 }
 

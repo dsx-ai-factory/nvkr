@@ -47,7 +47,7 @@ func PrepareTools(ctx context.Context, cfg ToolConfig) (directory string, err er
 func nativeToolSelection(platform string) (definition, environment, bundle string, members []string, err error) {
 	switch platform {
 	case "darwin/arm64":
-		return "inputs/definitions/demo/native-mac/definition-tools.json", "inputs/environments/local-native-mac.json", "native-tools-darwin-arm64", []string{"clusterctl", "helm", "kind", "kubectl", "nerdctl", "nico-sim", "nico-simctl", "nvke-installer-sources", "nvkectl", "oras", "vmnet-helper", "vmnet-run"}, nil
+		return "inputs/definitions/demo/native-mac/definition-tools.json", "inputs/environments/local-native-mac.json", "native-tools-darwin-arm64", []string{"clusterctl", "helm", "kind", "kubectl", "nerdctl", "nico-sim", "nico-simctl", "nvke-installer-sources", "nvkectl", "oras", "vmnet-client", "vmnet-helper"}, nil
 	case "linux/arm64":
 		return "inputs/definitions/demo/native-linux/definition-tools.json", "inputs/environments/local-native-linux.json", "native-tools-linux-arm64", []string{"clusterctl", "helm", "kind", "kubectl", "nerdctl", "nico-sim", "nico-simctl", "nvke-installer-sources", "nvkectl", "oras"}, nil
 	default:
@@ -149,7 +149,7 @@ func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string,
 	}
 	// NVKR's full graph validation precedes the consumer workspace. RunLocal
 	// independently admits runtime capabilities before reserving its attempt.
-	args := []string{tool, "run", "local", "--definition", definition, "--environment", environment, "--attempt", cfg.Attempt, "--attempts-root", runsRelative, "--runner-source", repo, "--go", goTool, "--runtime", "docker", "--jobs", fmt.Sprint(cfg.Jobs), "--ui", "plain"}
+	args := []string{tool, "run", "local", "--definition", definition, "--environment", environment, "--attempt", cfg.Attempt, "--attempts-root", runsRelative, "--runner-source", repo, "--go", goTool, "--runtime", "docker", "--jobs", fmt.Sprint(cfg.Jobs), "--capture-inputs-root=.", "--ui", "plain"}
 	if err := runner.Run(ctx, []string{tool, "run", "plan", "--definition", definition, "--environment", environment}, "native-tools-admission", 2*time.Minute); err != nil {
 		return "", err
 	}
@@ -213,7 +213,7 @@ func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string,
 		// NVKR has already verified the archive's exact bundle member. Reuse
 		// the existing bounded standard-library decoder and held writes; these
 		// are source-owned files, not a second deployment implementation.
-		if err := extractNativeInstaller(ctx, filepath.Join(directory, "nvke-installer-sources"), installer); err != nil {
+		if _, err := extractNativeInstaller(ctx, filepath.Join(directory, "nvke-installer-sources"), installer, root, bundle); err != nil {
 			return "", err
 		}
 	}

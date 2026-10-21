@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -333,7 +334,7 @@ func TestProgressGuestProviderFailureWithoutInstance(t *testing.T) {
 	_, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	writer := &checkedWriter{out: &out, started: time.Now(), cancel: cancel}
-	writer.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantGuests, Name: "private-id", Status: "private-error", Guests: [2]nvkedemo.TenantGuestObservation{
+	writer.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantGuests, Name: "private-id", Status: "private-error", Guests: [3]nvkedemo.TenantGuestObservation{
 		{Role: nvkedemo.TenantGuestControlPlane},
 		{Role: nvkedemo.TenantGuestWorker, ProvisioningFailure: nvkedemo.TenantInstanceCreateFailed},
 	}})
@@ -394,6 +395,19 @@ func TestProgressGuestsEmitOnlyChangesOrObservedGrowth(t *testing.T) {
 			writer.Report(event)
 			if out.Len() != 0 {
 				t.Fatal("unchanged snapshot repeated its role rows")
+			}
+		})
+	}
+}
+
+func TestProgressReportsConformanceThreeNodeDenominator(t *testing.T) {
+	for _, expected := range []int{2, 3} {
+		t.Run(fmt.Sprint(expected), func(t *testing.T) {
+			var out bytes.Buffer
+			w := &checkedWriter{out: &out, started: time.Now()}
+			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-nodes", ExpectedNodes: expected, RegisteredNodes: expected, ReadyNodes: expected, Remaining: time.Hour})
+			if !strings.Contains(out.String(), fmt.Sprintf("%d/%d Ready", expected, expected)) {
+				t.Fatalf("wrong node denominator: %s", out.String())
 			}
 		})
 	}

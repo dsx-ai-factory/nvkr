@@ -17,10 +17,15 @@ import (
 
 func startupDescription() NativeSiteStartup {
 	cfg := NativeSiteStartup{
-		Name: "nvke-native-site", Gateway: "172.30.0.1",
+		Name: "nvke-native-site", Gateway: "172.30.0.1", KubernetesVersion: "1.34.2",
 		ControllerImage: "docker.io/library/nke-controller:latest",
 		ProviderImage:   "docker.io/library/cluster-api-provider-provisioned:latest",
 		OVNImage:        "localhost/nvke/ovn-kubernetes@sha256:" + strings.Repeat("a", 64),
+		ImageImports: map[string]string{
+			"controller": "docker.io/library/nke-controller@sha256:" + strings.Repeat("a", 64),
+			"profiles":   "docker.io/library/cwe-profiles@sha256:" + strings.Repeat("a", 64),
+			"capnico":    "ghcr.io/dsx-ai-factory/cluster-api-provider-nico/controller@sha256:" + strings.Repeat("a", 64),
+		},
 	}
 	for _, item := range siteStartupAssetNames {
 		cfg.Assets = append(cfg.Assets, StartupAsset{item, "http://172.30.0.1:18080/files/owned/" + item, "sha256:" + strings.Repeat("a", 64)})
@@ -28,30 +33,45 @@ func startupDescription() NativeSiteStartup {
 	return cfg
 }
 
+func addStartupRuntimeImages(cfg *NativeSiteStartup) {
+	for _, role := range nativeRuntimeImageRoles() {
+		file := role + ".tar"
+		cfg.Assets = append(cfg.Assets, StartupAsset{file, "http://172.30.0.1:18080/files/" + file, "sha256:" + strings.Repeat("a", 64)})
+		reference := "docker.io/nvkr-local/" + strings.TrimPrefix(role, "runtime-") + "@sha256:" + strings.Repeat("a", 64)
+		if role == "workload" {
+			reference = WorkloadImage
+		}
+		cfg.ImageImports[role] = reference
+	}
+}
+
 func TestSiteStartupRuntimeImagesRequireTheWholeSelectedClosure(t *testing.T) {
 	for _, tc := range []struct {
-		name string
-		omit bool
+		name   string
+		change func(*NativeSiteStartup)
 	}{
-		{"complete", false}, {"missing runtime image", true},
+		{"complete", nil},
+		{"missing archive", func(c *NativeSiteStartup) { c.Assets = c.Assets[:len(c.Assets)-1] }},
+		{"missing reference", func(c *NativeSiteStartup) { delete(c.ImageImports, "runtime-postgresql") }},
+		{"unknown role", func(c *NativeSiteStartup) { c.ImageImports["unexpected"] = c.ImageImports["runtime-postgresql"] }},
+		{"sibling image", func(c *NativeSiteStartup) {
+			c.ImageImports["runtime-postgresql"] = c.ImageImports["runtime-spire-agent"]
+		}},
+		{"tag-only reference", func(c *NativeSiteStartup) {
+			c.ImageImports["runtime-postgresql"] = "docker.io/nvkr-local/postgresql:latest"
+		}},
+		{"different workload", func(c *NativeSiteStartup) {
+			c.ImageImports["workload"] = "docker.io/library/alpine@sha256:" + strings.Repeat("b", 64)
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := startupDescription()
-			cfg.RuntimeImages = true
-			cfg.Assets = append(cfg.Assets, StartupAsset{"workload.tar", "http://172.30.0.1:18080/files/workload.tar", "sha256:" + strings.Repeat("a", 64)})
-			for _, role := range runtimeImages {
-				asset := "runtime-" + role + ".tar"
-				cfg.Assets = append(cfg.Assets, StartupAsset{asset, "http://172.30.0.1:18080/files/" + asset, "sha256:" + strings.Repeat("a", 64)})
-			}
-			for _, image := range nativeCAPIAuthImages {
-				asset := image.role + ".tar"
-				cfg.Assets = append(cfg.Assets, StartupAsset{asset, "http://172.30.0.1:18080/files/" + asset, "sha256:" + strings.Repeat("a", 64)})
-			}
-			if tc.omit {
-				cfg.Assets = cfg.Assets[:len(cfg.Assets)-1]
+			addStartupRuntimeImages(&cfg)
+			if tc.change != nil {
+				tc.change(&cfg)
 			}
 			data, err := SiteStartupUserData(t.Context(), cfg)
-			if tc.omit {
+			if tc.change != nil {
 				var coded *nvkrerr.Error
 				if data != "" || !errors.As(err, &coded) || coded.Code != nvkrerr.CodeUsage {
 					t.Fatalf("incomplete runtime closure escaped admission: %v", err)
@@ -65,10 +85,19 @@ func TestSiteStartupRuntimeImagesRequireTheWholeSelectedClosure(t *testing.T) {
 			if err := yaml.Unmarshal([]byte(data), &decoded); err != nil {
 				t.Fatal(err)
 			}
-			for _, role := range runtimeImages {
-				if !strings.Contains(decoded.WriteFiles[0].Content, " runtime-"+role) {
-					t.Fatalf("selected runtime image is not imported: %s", role)
+			script := decoded.WriteFiles[0].Content
+			for role, reference := range cfg.ImageImports {
+				if !strings.Contains(script, operatorQuote("downloads/"+role+".tar")) || !strings.Contains(script, "inspecti --quiet "+operatorQuote(reference)) {
+					t.Fatalf("selected runtime image lacks exact import and CRI check: %s", role)
 				}
+			}
+			if strings.Count(script, "images import --local --digests --base-name ") != len(cfg.ImageImports)+1 {
+				t.Fatal("every selected runtime image and OVN must use the local manifest importer")
+			}
+			command := exec.CommandContext(t.Context(), "bash", "-n")
+			command.Stdin = strings.NewReader(script)
+			if output, err := command.CombinedOutput(); err != nil {
+				t.Fatalf("runtime import shell: %v: %s", err, output)
 			}
 		})
 	}
@@ -83,6 +112,8 @@ func TestSiteStartupRejectsInvalidHandoffsBeforeReturningUserData(t *testing.T) 
 		{"public gateway", func(c *NativeSiteStartup) { c.Gateway = "8.8.8.8" }},
 		{"ipv6 gateway", func(c *NativeSiteStartup) { c.Gateway = "fd00::1" }},
 		{"invalid image", func(c *NativeSiteStartup) { c.ControllerImage = "image; command" }},
+		{"missing built image reference", func(c *NativeSiteStartup) { delete(c.ImageImports, "controller") }},
+		{"tag-only built image reference", func(c *NativeSiteStartup) { c.ImageImports["controller"] = "docker.io/library/nke-controller:latest" }},
 		{"tag-only OVN", func(c *NativeSiteStartup) { c.OVNImage = "localhost/nvke/ovn-kubernetes:latest" }},
 		{"sibling OVN", func(c *NativeSiteStartup) { c.OVNImage = "localhost/nvke/sibling@sha256:" + strings.Repeat("a", 64) }},
 		{"missing asset", func(c *NativeSiteStartup) { c.Assets = c.Assets[1:] }},
@@ -148,9 +179,15 @@ func TestSiteStartupOnlyPreparesGuestForHostBootstrap(t *testing.T) {
 			t.Fatalf("service diagnostics must use a private logging-only drop-in: %s", unit)
 		}
 	}
+	// A standalone observer does not override either source-owned service.
+	observer := files["/etc/systemd/system/nvkr-native-network-observer.service"]
+	if observer.Permissions != "0644" || observer.Content != nativeNetworkObserverUnit ||
+		!strings.Contains(prepare.Content, "\nif ! systemctl start nvkr-native-network-observer.service; then\n") {
+		t.Fatal("network diagnostics require the exact independent read-only observer")
+	}
 	dropIns := 0
 	for _, file := range decoded.WriteFiles {
-		if strings.HasPrefix(file.Path, "/etc/systemd/system/") {
+		if strings.HasPrefix(file.Path, "/etc/systemd/system/") && file.Path != observer.Path {
 			dropIns++
 		}
 	}
@@ -165,7 +202,7 @@ func TestSiteStartupOnlyPreparesGuestForHostBootstrap(t *testing.T) {
 	if installed < 0 || reloaded <= installed || stopped <= reloaded || started <= stopped || strings.Count(prepare.Content, "systemctl daemon-reload") != 1 {
 		t.Fatal("preparation must reload service drop-ins after APT and before starting the agents")
 	}
-	imported := strings.Index(prepare.Content, "images import --digests --base-name "+operatorQuote("localhost/nvke/ovn-kubernetes"))
+	imported := strings.Index(prepare.Content, "images import --local --digests --base-name "+operatorQuote("localhost/nvke/ovn-kubernetes"))
 	configured := strings.Index(prepare.Content, "> /etc/dgx/ovn-kubernetes/values-nke.yaml")
 	if imported <= stopped || configured <= imported || started <= configured {
 		t.Fatal("site agents must start after selected OVN import and values projection")
@@ -188,6 +225,43 @@ func TestSiteStartupOnlyPreparesGuestForHostBootstrap(t *testing.T) {
 	reordered, err := SiteStartupUserData(t.Context(), cfg)
 	if err != nil || reordered != data || cfg.Assets[1] != first {
 		t.Fatal("startup must be deterministic without mutating descriptions")
+	}
+}
+
+func TestNetworkObserverFailureDoesNotBypassRequiredPreparation(t *testing.T) {
+	_, startup, found := strings.Cut(hostSitePreparationScript, "systemctl daemon-reload\n")
+	if !found {
+		t.Fatal("missing startup diagnostic boundary")
+	}
+	startup, _, found = strings.Cut(startup, "install -d -m 0700 /etc/nke\n")
+	if !found {
+		t.Fatal("missing required preparation boundary")
+	}
+	for _, tc := range []struct {
+		name, observerExit, requiredExit string
+		wantSuccess                      bool
+	}{
+		{"available", "0", "0", true},
+		{"missing diagnostic", "5", "0", true},
+		{"failed diagnostic", "1", "0", true},
+		{"required agent stop fails", "1", "1", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stub := "systemctl() { if [ \"$1\" = start ]; then return " + tc.observerExit + "; else return " + tc.requiredExit + "; fi; }\n"
+			command := exec.CommandContext(t.Context(), "bash", "-euc", stub+startup+"printf 'required-preparation-continued\\n'\n")
+			output, err := command.CombinedOutput()
+			if (err == nil) != tc.wantSuccess || strings.Contains(string(output), "required-preparation-continued") != tc.wantSuccess {
+				t.Fatalf("diagnostic changed required preparation outcome: %v: %s", err, output)
+			}
+			if tc.observerExit != "0" && !strings.Contains(string(output), "Private network observer unavailable") {
+				t.Fatal("diagnostic failure was silently discarded", string(output))
+			}
+		})
+	}
+	for _, line := range strings.Split(nativeNetworkObserverUnit, "\n") {
+		if strings.HasPrefix(line, "ExecStartPre=") && !strings.HasPrefix(line, "ExecStartPre=-") {
+			t.Fatal("diagnostic preflight can abort preparation", line)
+		}
 	}
 }
 

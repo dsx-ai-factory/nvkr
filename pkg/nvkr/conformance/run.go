@@ -17,7 +17,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/internal/kubeowned"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
@@ -415,99 +415,15 @@ func (a *admitted) cleanup(ctx context.Context, workspace string, refs []resourc
 func cleanupDeleteLoop(ctx context.Context, refs []resourceRef, owned map[string]string,
 	get func(context.Context, resourceRef) (object, error),
 	deleteObject func(context.Context, resourceRef, []byte) error, interval time.Duration) error {
-	// RBAC precedes namespace deletion; every DELETE retains the exact UID precondition.
-	order := []resourceRef{refs[1], refs[2], refs[0]}
-	var firstDeleteErr error
-	deleting := map[string]bool{}
-	for {
-		if err := ctx.Err(); err != nil {
-			return errors.Join(firstDeleteErr, e.Wrap(e.CodeTimeout, err, "waiting for terminal cleanup"))
-		}
-		for _, ref := range order {
-			uid := owned[ref.path]
-			if uid == "" {
-				continue
-			}
-			found, err := get(ctx, ref)
-			if err != nil {
-				return errors.Join(firstDeleteErr, err)
-			}
-			if found.Metadata.UID == "" {
-				continue
-			}
-			if found.Metadata.UID != uid {
-				return errors.Join(firstDeleteErr, failure("attempt resource replaced; cleanup rejected"))
-			}
-			if deleting[ref.path] || found.Metadata.DeletionTimestamp != nil {
-				deleting[ref.path] = true
-				continue
-			}
-			body, err := canonical.Marshal(struct {
-				APIVersion    string `json:"apiVersion"`
-				Kind          string `json:"kind"`
-				Preconditions struct {
-					UID string `json:"uid"`
-				} `json:"preconditions"`
-			}{APIVersion: "v1", Kind: "DeleteOptions", Preconditions: struct {
-				UID string `json:"uid"`
-			}{UID: uid}})
-			if err != nil {
-				return errors.Join(firstDeleteErr, failure("encoding UID cleanup precondition"))
-			}
-			if err = deleteObject(ctx, ref, body); err != nil {
-				// Finalization may win the GET/DELETE race. Only a fresh successful
-				// GET proving absence can turn an unclassified DELETE refusal into success.
-				current, getErr := get(ctx, ref)
-				if getErr == nil && current.Metadata.UID == "" {
-					continue
-				}
-				if getErr != nil {
-					return errors.Join(firstDeleteErr, err, getErr)
-				}
-				if current.Metadata.UID != uid {
-					return errors.Join(firstDeleteErr, err, failure("attempt resource replaced; cleanup rejected"))
-				}
-				first := firstDeleteErr == nil
-				if first {
-					firstDeleteErr = err
-				}
-				if ctx.Err() != nil {
-					return errors.Join(firstDeleteErr, e.Wrap(e.CodeTimeout, ctx.Err(), "waiting for terminal cleanup"))
-				}
-				if current.Metadata.DeletionTimestamp != nil {
-					deleting[ref.path] = true
-					continue
-				}
-				var coded *e.Error
-				if !errors.As(err, &coded) || (coded.Code != e.CodeUnavailable && coded.Code != e.CodeTimeout) {
-					if first {
-						return firstDeleteErr
-					}
-					return errors.Join(firstDeleteErr, err)
-				}
-			} else {
-				deleting[ref.path] = true
-			}
-		}
-		allAbsent := true
-		for _, ref := range refs {
-			found, err := get(ctx, ref)
-			if err != nil {
-				return errors.Join(firstDeleteErr, err)
-			}
-			if found.Metadata.UID != "" {
-				allAbsent = false
-			}
-		}
-		if allAbsent {
-			return nil
-		}
-		timer := time.NewTimer(interval)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return errors.Join(firstDeleteErr, e.Wrap(e.CodeTimeout, ctx.Err(), "waiting for terminal cleanup"))
-		case <-timer.C:
-		}
+	// Preserve the existing RBAC-before-namespace order and all UID bindings.
+	bindings := make([]kubeowned.Binding, 0, len(refs))
+	for _, ref := range []resourceRef{refs[1], refs[2], refs[0]} {
+		bindings = append(bindings, kubeowned.Binding{Path: ref.path, UID: owned[ref.path]})
 	}
+	return kubeowned.Delete(ctx, bindings, func(ctx context.Context, resource string) (kubeowned.Observation, error) {
+		found, err := get(ctx, resourceRef{path: resource})
+		return kubeowned.Observation{UID: found.Metadata.UID, Deleting: found.Metadata.DeletionTimestamp != nil}, err
+	}, func(ctx context.Context, resource string, body []byte) error {
+		return deleteObject(ctx, resourceRef{path: resource}, body)
+	}, interval)
 }

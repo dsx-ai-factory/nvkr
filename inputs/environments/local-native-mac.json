@@ -18,6 +18,17 @@
         "ephemeralStorageMiB": 65536
       },
       "maxTimeoutSeconds": 21600
+    },
+    {
+      "name": "native-mac-tcg",
+      "runsOn": "local-mac-tcg",
+      "hostPlatform": "darwin/arm64",
+      "resources": {
+        "cpuMillis": 8000,
+        "memoryMiB": 10240,
+        "ephemeralStorageMiB": 65536
+      },
+      "maxTimeoutSeconds": 21600
     }
   ],
   "runtime": {

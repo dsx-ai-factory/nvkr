@@ -38,10 +38,13 @@ printf '%s  %s\n' {{quote (sha .Digest)}} {{quote (printf "downloads/%s" .Name)}
 install -m 0755 downloads/nerdctl bin/nerdctl
 export PATH="$work/bin:$PATH"
 DEBIAN_FRONTEND=noninteractive NVKE_AGENT_SKIP_START=1 apt-get install -y -o DPkg::Lock::Timeout=600 \
-  nvke-agent spire-agent nvke-kubeadm-distro-1.34.2 nvke-cni-ovn-images-{{.OVNVersion}} nvke-cni-ovn-charts-{{.OVNVersion}}
+  nvke-agent spire-agent nvke-kubeadm-distro-{{.KubernetesVersion}} nvke-cni-ovn-images-{{.OVNVersion}} nvke-cni-ovn-charts-{{.OVNVersion}}
 # Cloud-init wrote logging-only drop-ins before package installation. Reload
 # even when APT finds the packages already installed and runs no postinst.
 systemctl daemon-reload
+if ! systemctl start nvkr-native-network-observer.service; then
+  printf '%s\n' 'Private network observer unavailable; continuing required site preparation.' >&2
+fi
 systemctl stop nvke-agent.service spire-agent.service
 install -d -m 0700 /etc/nke
 install -d -m 1777 /var/lib/nvke-native/postgres /var/lib/nvke-native/spire
@@ -49,9 +52,9 @@ install -m 0644 downloads/spire-ca.crt /etc/nke/trust-bundle.pem
 printf 'SPIRE_SERVER_ADDRESS=%s\nSPIRE_SERVER_PORT=30081\nSPIRE_TRUST_DOMAIN=%s\n' \
   {{quote .Gateway}} {{quote (printf "%s.nke.local" .Name)}} > /etc/nke/spire.env
 {{configureSpire}}
-for image in controller profiles capnico{{if .RuntimeImages}} workload{{range runtimeImages}} runtime-{{.}}{{end}}{{range authImages}} {{.}}{{end}}{{end}}; do
-  nerdctl --namespace k8s.io load --input "downloads/$image.tar"
-done
+{{range $role, $reference := .ImageImports}}
+{{importImage (printf "downloads/%s.tar" $role) $reference}}
+{{end}}
 {{prepareOVN}}
 systemctl start --no-block spire-agent.service nvke-agent.service
 python3 - "$(get_tpm_pubhash)" <<'IDENTITY' > site-prepared.json
@@ -82,6 +85,10 @@ func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, 
 	if err := admitNativeSiteNetworks(s.bridge); err != nil {
 		return err
 	}
+	kubernetes, err := nativeKubernetesVersion(ctx, s.assets)
+	if err != nil {
+		return err
+	}
 	home := filepath.Join(out, "home")
 	if err := os.Mkdir(home, 0700); err != nil {
 		return err
@@ -101,7 +108,7 @@ func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, 
 	if err != nil || len(thumbprint) != 32 {
 		return errors.New("site preparation did not return a valid TPM identity")
 	}
-	if err := admitNativeSiteContract(ctx, s.assets.Installer); err != nil {
+	if err := admitNativeSiteContract(ctx, s.assets); err != nil {
 		return err
 	}
 	cli := s.assets.CLI
@@ -134,7 +141,7 @@ func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, 
 		return err
 	}
 	args := []string{cli, "generate", "sitespec", "nvke-native-site", "--nodes", filepath.Join(out, "hosts.csv"),
-		"--set", "cluster.k8sVersion=1.34.2", "--set", "cluster.cniName=ovn-kubernetes", "--set", "cluster.cniVersion=" + version,
+		"--set", "cluster.k8sVersion=" + kubernetes, "--set", "cluster.cniName=ovn-kubernetes", "--set", "cluster.cniVersion=" + version,
 		"--set", "cluster.podCidr=" + managementPodCIDR, "--set", "cluster.serviceCidr=" + managementServiceCIDR,
 		"--set", "cluster.kubeletConfig.systemReservedMemory=1Gi", "--set", "spire.trustDomain=nvke-native-site.nke.local",
 		"--set", "spire.upstreamCA=true"}
@@ -181,7 +188,7 @@ func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, 
 
 func (s *nativeSiteAttempt) deployFromHost(ctx context.Context, runner Runner, cli, tools, out, specPath string) error {
 	runner.Env = SetEnv(runner.Env, map[string]string{"KUBECONFIG": filepath.Join(out, "site.kubeconfig"), "NVKECTL": cli})
-	version, err := nativeCAPIProviderVersion(ctx, s.assets.Installer)
+	version, err := nativeCAPIProviderVersion(ctx, s.assets)
 	if err != nil {
 		return err
 	}
@@ -235,6 +242,14 @@ volumeBindingMode: Immediate
 			args = append(args, "--values-for", item+"="+path)
 		}
 	}
+	securityValues := nativeTenantSecurityValues()
+	for _, item := range []string{"controller", "spire"} {
+		path := filepath.Join(out, item+"-native-tenant-security.json")
+		if err := privateJSON(path, securityValues[item]); err != nil {
+			return err
+		}
+		args = append(args, "--values-for", item+"="+path)
+	}
 	if err := runner.Run(ctx, args, "host-nvke-deploy", 30*time.Minute); err != nil {
 		return err
 	}
@@ -243,29 +258,32 @@ volumeBindingMode: Immediate
 	return runner.Run(ctx, []string{"bash", filepath.Join(s.assets.Installer, "controller", "hack", "apply-capi-spiffe-exec-auth.sh")}, "host-site-spiffe-exec", 15*time.Minute)
 }
 
-// nativeCAPIProviderVersion binds the reviewed provider selection to the exact
-// selected source bytes. This does not parse Make syntax or resolve latest.
-// Changing either source input requires reviewing its provider contract again.
-func nativeCAPIProviderVersion(ctx context.Context, installer string) (string, error) {
-	commit, err := readRunFile(ctx, installer, "SOURCE_COMMIT", 41)
+// nativeCAPIProviderVersion rechecks the extracted metadata against the selected
+// completed tool Run. Source revisions and provider versions remain catalog data.
+func nativeCAPIProviderVersion(ctx context.Context, assets NativeAssets) (string, error) {
+	if err := requireContext(ctx); err != nil {
+		return "", err
+	}
+	selection := assets.installerSelection
+	if selection == nil {
+		return "", errors.New("native installer has no checked tool Run selection")
+	}
+	commit, err := readRunFile(ctx, assets.Installer, "SOURCE_COMMIT", 41)
 	if err != nil {
-		return "", fmt.Errorf("read native CAPI source selection: %w", err)
+		return "", fmt.Errorf("read native source selection: %w", err)
 	}
-	versions, err := readRunFile(ctx, installer, "make/tool-versions.mk", 64<<10)
+	version, err := readRunFile(ctx, assets.Installer, "CAPI_VERSION", 128)
 	if err != nil {
-		return "", fmt.Errorf("read native CAPI source versions: %w", err)
+		return "", fmt.Errorf("read native CAPI selection: %w", err)
 	}
-	return reviewedNativeCAPIProvider(string(commit), plainSHA(versions))
-}
-
-func reviewedNativeCAPIProvider(commit, versionsDigest string) (string, error) {
-	// The reviewed revision's cli/Makefile injects CAPI_VERSION from this exact file;
-	// cli/internal/bootstrap/controllerdeploy/capi.go uses it for all three
-	// upstream providers. Keep the permanent site aligned with that bootstrap.
-	if commit != nativeSiteSourceCommit || versionsDigest != "a47d8c38e6812bc3da6f8cf45953c25b365e5b2712669678b53c46798f441420" {
-		return "", errors.New("native CAPI provider selection differs from reviewed source")
+	versions, err := readRunFile(ctx, assets.Installer, "make/tool-versions.mk", 64<<10)
+	if err != nil {
+		return "", fmt.Errorf("read native source versions: %w", err)
 	}
-	return "v1.13.6", nil
+	if string(commit) != selection.commit+"\n" || string(version) != selection.capiVersion+"\n" || plainSHA(versions) != selection.versionsDigest {
+		return "", errors.New("native installer metadata differs from the checked tool Run")
+	}
+	return selection.capiVersion, nil
 }
 
 func nativeCAPIInitArgs(tools, kubeconfig, version string) []string {
@@ -294,19 +312,11 @@ func demoTelemetryValues() ([]byte, error) {
 	return yaml.Marshal(values)
 }
 
-// Both native hosts consume this maintained source contract. Historical
-// installer interfaces are rejected rather than kept as another deployment path.
-const nativeSiteSourceCommit = "8db5721ae3031bdcd945e559153a740d46ea209e\n"
-
-func admitNativeSiteContract(ctx context.Context, installer string) error {
-	commit, err := readRunFile(ctx, installer, "SOURCE_COMMIT", 41)
-	if err != nil {
-		return err
-	}
-	if string(commit) != nativeSiteSourceCommit {
-		return errors.New("native site CLI contract differs from reviewed source")
-	}
-	return nil
+// The same selected-source metadata is required at every native executable
+// boundary. Extracted text alone cannot replace the checked tool Run selection.
+func admitNativeSiteContract(ctx context.Context, assets NativeAssets) error {
+	_, err := nativeKubernetesVersion(ctx, assets)
+	return err
 }
 
 func bindNativeSpireCA(runner Runner, caRoot string) Runner {

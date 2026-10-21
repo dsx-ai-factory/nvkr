@@ -41,6 +41,13 @@ type NativePackerPreparation struct {
 // host requirements and declared Packer variables are explicit local overrides.
 // The caller must supply an Environment declaring the matching hardware class.
 func PrepareNativePackerBuild(ctx context.Context, definitionPath, environmentPath, layout, bundle, digest, out string, variables map[string]string) (NativeBuildPreparation, error) {
+	return PrepareNativePackerBuildWithAccelerator(ctx, definitionPath, environmentPath, layout, bundle, digest, out, "hvf", variables)
+}
+
+// PrepareNativePackerBuildWithAccelerator admits an explicit Mac acceleration
+// contract. Accelerator selection does not establish source/kernel compatibility.
+// Both modes require a matching independently authored Environment class.
+func PrepareNativePackerBuildWithAccelerator(ctx context.Context, definitionPath, environmentPath, layout, bundle, digest, out, accelerator string, variables map[string]string) (NativeBuildPreparation, error) {
 	if ctx == nil {
 		return NativeBuildPreparation{}, e.New(e.CodeUsage, "native Packer input preparation requires a context")
 	}
@@ -48,6 +55,9 @@ func PrepareNativePackerBuild(ctx context.Context, definitionPath, environmentPa
 	defer cancel()
 	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
 		return NativeBuildPreparation{}, e.New(e.CodeEngineCapability, "native Packer input preparation currently requires Mac ARM64")
+	}
+	if accelerator != "hvf" && accelerator != "tcg" {
+		return NativeBuildPreparation{}, e.New(e.CodeEngineCapability, "native Mac Packer requires explicit hvf or tcg acceleration")
 	}
 	files := make(map[string]any)
 	prepared, err := prepareLocalInputs(ctx, definitionPath, environmentPath, out, files,
@@ -90,6 +100,11 @@ func PrepareNativePackerBuild(ctx context.Context, definitionPath, environmentPa
 			component.BuildRequirements = execution.Clone(component.BuildRequirements)
 			component.BuildRequirements.AllowedHostPlatforms = []execution.HostPlatform{execution.HostPlatformDarwinARM64}
 			component.BuildRequirements.Capabilities = []execution.CapabilityRequirement{{Name: execution.CapabilityHVF, Policy: execution.CapabilityRequired}}
+			if accelerator == "tcg" {
+				component.BuildRequirements.Capabilities = []execution.CapabilityRequirement{
+					{Name: execution.CapabilityHVF, Policy: execution.CapabilityForbidden},
+				}
+			}
 			packer := *component.Packer
 			packer.Variables = maps.Clone(packer.Variables)
 			for _, key := range slices.Sorted(maps.Keys(variables)) {

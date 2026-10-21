@@ -29,7 +29,7 @@ func TestRunActionSelectsOwnExecutableForBothLifetimeModes(t *testing.T) {
 			name := map[bool]string{false: "retain", true: "cleanup"}[cleanup] + map[bool]string{false: "/success", true: "/refusal"}[fails]
 			t.Run(name, func(t *testing.T) {
 				var progress bytes.Buffer
-				cfg := nvkedemo.Config{DemoExecutable: "/caller-supplied-executable", Cleanup: cleanup, Network: "upstream-ovn", Out: "/selected-output", Timeout: time.Minute, Progress: &progress}
+				cfg := nvkedemo.Config{DemoExecutable: "/caller-supplied-executable", Accelerator: "tcg", Cleanup: cleanup, Network: "upstream-ovn", Out: "/selected-output", Timeout: time.Minute, Progress: &progress}
 				var expected error
 				if fails {
 					expected = nvkrerr.New(nvkrerr.CodeFetchFailed, "fixture runtime refusal")
@@ -38,7 +38,7 @@ func TestRunActionSelectsOwnExecutableForBothLifetimeModes(t *testing.T) {
 				calls := 0
 				action := withOwnDemoExecutable(func(selected context.Context, actual nvkedemo.Config) error {
 					calls++
-					if selected != ctx || actual.DemoExecutable != executable || actual.Cleanup != cfg.Cleanup || actual.Network != cfg.Network || actual.Out != cfg.Out || actual.Timeout != cfg.Timeout || actual.Progress != cfg.Progress {
+					if selected != ctx || actual.DemoExecutable != executable || actual.Accelerator != "tcg" || actual.Cleanup != cfg.Cleanup || actual.Network != cfg.Network || actual.Out != cfg.Out || actual.Timeout != cfg.Timeout || actual.Progress != cfg.Progress {
 						t.Fatal("runtime action did not receive this CLI's executable and unchanged invocation")
 					}
 					return expected
@@ -420,6 +420,39 @@ func TestE2EWithoutConfigKeepsFlagDefaultsAndFreshReferences(t *testing.T) {
 	assertCode(t, err, "")
 	if strings.Join(order, ",") != "build,run" {
 		t.Fatalf("wrong operation order: %v", order)
+	}
+}
+
+func TestE2EPreservesExplicitTCGThroughAdmissionBuildAndOwnExecutable(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var order []string
+	actions := demoActions{
+		admit: func(_ context.Context, cfg nvkedemo.Config) error {
+			order = append(order, "admit")
+			if cfg.Accelerator != "tcg" {
+				t.Fatal("TCG lost before build")
+			}
+			return nil
+		},
+		build: func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
+			order = append(order, "build")
+			return nvkedemo.BuiltInputs{NVKR: "fresh-nvkr", Runs: nvkedemo.RunInputs{OS: "fresh-os", Tools: "fresh-tools"}}, nil
+		},
+		run: withOwnDemoExecutable(func(_ context.Context, cfg nvkedemo.Config) error {
+			order = append(order, "run")
+			if cfg.Accelerator != "tcg" || cfg.DemoExecutable != executable || cfg.Runs.OS != "fresh-os" {
+				t.Fatal("TCG or adapter executable lost after build")
+			}
+			return nil
+		}),
+	}
+	err = executeRoot(t.Context(), newCommand(io.Discard, io.Discard, actions), []string{"e2e", "--repo", "repo", "--attempt", "fresh", "--out", "fresh-out", "--accelerator", "tcg"})
+	if err != nil || strings.Join(order, ",") != "admit,build,run" {
+		t.Fatalf("TCG handoff order=%v err=%v", order, err)
 	}
 }
 

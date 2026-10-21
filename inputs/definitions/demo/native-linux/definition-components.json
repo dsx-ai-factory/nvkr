@@ -22,7 +22,7 @@
     },
     {
       "catalog": {
-        "base": "../../../catalogs/nvke/release"
+        "base": "../../../catalogs/nvke/native-site-arm64"
       },
       "components": [
         "cluster-api-provider-provisioned"
@@ -33,7 +33,7 @@
     },
     {
       "catalog": {
-        "base": "../../../catalogs/controller-profiles/nvidia-arm64"
+        "base": "../../../catalogs/controller-profiles/native-nvidia-arm64"
       },
       "components": [
         "nvke-local-profiles"
@@ -44,7 +44,7 @@
     },
     {
       "catalog": {
-        "base": "../../../catalogs/nvke/local-site-arm64"
+        "base": "../../../catalogs/nvke/native-site-arm64"
       },
       "components": [
         "nvke-controller"

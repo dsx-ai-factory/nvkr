@@ -385,6 +385,16 @@ metadata, never a receipt. This deliberately retains the existing deep-owner typ
 instead of adding a second runtime or inventory schema. A facade-only construction API and independent
 `client/v1` acceptance harness remain deferred; direct deep-package tests do not establish that acceptance.
 
+The provisional downstream diagnostic `Client.WithNativeSite` delegates to the existing native site owner.
+`NativeDemoConfig`, `NativeDemoRunInputs` and `NativeDemoResources` alias its descriptive configuration;
+`NativeSite` and `NativeTenant` alias its opaque callback-scoped handles. This deliberate coupling adds no
+public lifecycle object, artifact authentication rule, deployment schema or qualification authority. Every
+native admission and cleanup invariant remains with that owner. Callback exit cancels and joins operations;
+handles cannot be detached or restored from paths. The adapter requires the existing matching `nvkr` and
+`nvke-demo` helper executables and host prerequisites; importability does not imply binary-free execution.
+External-module compile and no-work admission tests establish only that boundary. Real native site reuse
+and complete conformance remain separately evidenced operational acceptance.
+
 The producer `NodeSession` cancels admitted call contexts synchronously when `Close` starts, before exposing
 session cancellation, then joins active producers and releases source snapshots. Calls retain their caller's
 context values and deadline. An asynchronous cancellation callback alone cannot enforce this close ordering.

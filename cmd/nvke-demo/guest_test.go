@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"io"
+	"os"
 	"testing"
 	"time"
 
@@ -13,12 +14,16 @@ import (
 )
 
 func TestGuestCommandPreservesLocalSelection(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, accelerator := range []string{"hvf", "tcg"} {
 		t.Run(accelerator, func(t *testing.T) {
 			calls := 0
 			root := newCommand(io.Discard, io.Discard, demoActions{guest: func(_ context.Context, cfg nvkedemo.NativeGuestConfig) error {
 				calls++
-				if cfg.Image != "/local/node.qcow2" || cfg.Tools != "/local/tools" || cfg.Out != "/local/attempt" || cfg.Accelerator != accelerator || cfg.Timeout != 5*time.Minute {
+				if cfg.Image != "/local/node.qcow2" || cfg.Tools != "/local/tools" || cfg.Out != "/local/attempt" || cfg.Accelerator != accelerator || cfg.Timeout != 5*time.Minute || cfg.DemoExecutable != executable {
 					t.Fatal("local guest selection changed")
 				}
 				return nil

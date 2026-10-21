@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -142,6 +143,29 @@ func TestCanceledNativeGuestCreatesNothing(t *testing.T) {
 	}
 	if _, err := os.Lstat(out); !os.IsNotExist(err) {
 		t.Fatal("canceled guest created output")
+	}
+}
+
+func TestMacTCGWithoutAdapterRejectsBeforeArtifactOrOutputWork(t *testing.T) {
+	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
+		t.Skip("Mac runtime admission")
+	}
+	for _, site := range []bool{false, true} {
+		t.Run(map[bool]string{false: "guest", true: "site"}[site], func(t *testing.T) {
+			out := filepath.Join(t.TempDir(), "must-not-exist")
+			var err error
+			if site {
+				err = RunNative(t.Context(), NativeConfig{Accelerator: "tcg", Image: "/absent/image.qcow2", Out: out})
+			} else {
+				err = RunNativeGuest(t.Context(), NativeGuestConfig{Accelerator: "tcg", Image: "/absent/image.qcow2", Out: out})
+			}
+			if err == nil || !strings.Contains(err.Error(), "explicit adapter executable") {
+				t.Fatal("TCG reached artifact work without its adapter", err)
+			}
+			if _, statErr := os.Stat(out); !os.IsNotExist(statErr) {
+				t.Fatal("TCG adapter refusal created output", statErr)
+			}
+		})
 	}
 }
 

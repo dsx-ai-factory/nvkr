@@ -1,9 +1,9 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# Source 69ef variables.pkr.hcl and locals.pkr.hcl: empty kernel_package
-# preserves the ARM64 source default linux-nvidia-64k; no kernel substitution.
-# SPIRE packaging intentionally retains the separately reviewed 726f769 source.
+# The selected source owns its ARM64 linux-nvidia-64k kernel.
+# This native VM recipe declares a MAC-stable DHCPv4 profile for both hosts.
+# Both hosts share these source pins; SPIRE packaging uses its public-source fix.
 # Agent VERSION is its source commit, not a released module-version claim.
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
@@ -14,7 +14,8 @@ metadata:
 sources:
   nvke-os:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: v0.22.0-beta.6
+    constraint: 0.1.x
+    tagPrefix: os-image/
     toolchainImagesByArch:
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
     vendorCommand:
@@ -47,7 +48,8 @@ sources:
       }
   nvke-cni-calico-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: v0.22.0-beta.6
+    constraint: 0.1.x
+    tagPrefix: os-image/
     toolchainImagesByArch:
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
     vendorCommand:
@@ -63,7 +65,8 @@ sources:
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
   nvke-kubeadm-distro-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: v0.22.0-beta.6
+    constraint: 0.1.x
+    tagPrefix: os-image/
     toolchainImagesByArch:
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
     vendorCommand:
@@ -263,17 +266,12 @@ components:
     - bash
     - -ec
     - |
-      python3 /src/os-image/packer/scripts/compose-image-inputs.py \
-        --architecture {{.Arch}} \
-        --materials-dir /nvkr/inputs/materials \
-        --source-files-dir /src/os-image/files \
-        --output /src/nvkr-output/image-inputs.tar \
-        --source-date-epoch "$SOURCE_DATE_EPOCH"
-      # The pinned provisioner requires these files; its composer omits them.
-      # Use a stable MAC-based DHCP identity on both native QEMU backends.
-      configuration=/src/nvkr-output/network-defaults
-      install -d -m 0755 "$configuration"
-      cat > "$configuration/00-dhcp-all.yaml" <<'NETPLAN'
+      # Keep DHCP identity stable when NVKE moves L3 to its OVS bridge.
+      # Stage authored VM configuration; never modify the pinned source tree.
+      readonly files=/src/nvkr-output/native-image-files
+      mkdir -p "$files"
+      cp -a /src/os-image/files/. "$files/"
+      cat >"$files/00-dhcp-all.yaml" <<'NETPLAN'
       network:
         version: 2
         renderer: networkd
@@ -282,13 +280,16 @@ components:
             match:
               name: "e*"
             dhcp4: true
+            dhcp6: true
             dhcp-identifier: mac
             optional: true
       NETPLAN
-      tar --append --file /src/nvkr-output/image-inputs.tar \
-        --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owner --mode=0644 \
-        -C "$configuration" 00-dhcp-all.yaml \
-        -C /src/os-image/files 99-disable-network-config.cfg
+      python3 /src/os-image/packer/scripts/compose-image-inputs.py \
+        --architecture {{.Arch}} \
+        --materials-dir /nvkr/inputs/materials \
+        --source-files-dir "$files" \
+        --output /src/nvkr-output/image-inputs.tar \
+        --source-date-epoch "$SOURCE_DATE_EPOCH"
     writeDir: nvkr-output
     artifactPath: nvkr-output/image-inputs.tar
   nvke-kubeadm-distro:
@@ -374,7 +375,6 @@ components:
         guest_memory_mib: '4096'
         ssh_timeout: 60m
         ubuntu_series: '26.04'
-        kernel_package: ''
     materials:
       image-inputs: nvke-image-inputs
       installer-iso: nvke-patched-installer-iso
@@ -408,7 +408,7 @@ components:
       mkdir -p /src/nvkr-output/work/os-image/packages /src/nvkr-output/spire-agent
       cp -a os-image/packages/spire-agent /src/nvkr-output/work/os-image/packages/
       cp -a os-image/files /src/nvkr-output/work/os-image/
-      SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=1 \
+      SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=4 \
         NFPM_BIN=/usr/local/bin/nfpm \
         /src/nvkr-output/work/os-image/packages/spire-agent/packaging/build-deb.sh \
         {{.Arch}} /src/os-image/packages/spire-agent/dist/1.14.1+tpm1.9.0/{{.Arch}} \

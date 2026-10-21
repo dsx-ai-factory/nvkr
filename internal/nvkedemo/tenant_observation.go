@@ -9,6 +9,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -20,11 +21,17 @@ const tenantControlLabel = "cluster.x-k8s.io/control-plane"
 
 // These projections intentionally omit bootstrap bytes, condition messages and
 // console text. The pinned NVKE/CAPNICo owners supply the role/instance binding.
+type tenantObjectOwner struct {
+	APIVersion, Kind, Name, UID string
+	Controller                  *bool
+}
+
 type tenantMachineObservation struct {
 	Kind     string
 	Metadata struct {
-		Name, Namespace     string
-		Labels, Annotations map[string]string
+		Name, Namespace, UID string
+		OwnerReferences      []tenantObjectOwner
+		Labels, Annotations  map[string]string
 	}
 	Spec struct {
 		ClusterName       string
@@ -53,19 +60,30 @@ type tenantGuestObserver struct {
 	instances [2]string
 }
 
-func emptyTenantGuests() [2]TenantGuestObservation {
-	return [2]TenantGuestObservation{
+func emptyTenantGuests() [3]TenantGuestObservation {
+	return [3]TenantGuestObservation{
 		{Role: TenantGuestControlPlane, Domain: TenantDomainUnknown, ProviderReady: TenantConditionUnknown},
 		{Role: TenantGuestWorker, Domain: TenantDomainUnknown, ProviderReady: TenantConditionUnknown},
 	}
 }
 
 func tenantGuestBindings(rows []tenantMachineObservation, name, id string) ([2]tenantGuestBinding, bool) {
-	var result [2]tenantGuestBinding
-	if len(rows) > 4 || name == "" || id == "" {
+	bound, valid := tenantGuestBindingsForCount(rows, name, id, 2, false)
+	return [2]tenantGuestBinding{bound[0], bound[1]}, valid
+}
+
+func tenantGuestBindingsForCount(rows []tenantMachineObservation, name, id string, expected int, native bool) ([3]tenantGuestBinding, bool) {
+	var result [3]tenantGuestBinding
+	if (expected != 2 && expected != 3) || len(rows) > 2*expected || name == "" || (!native && id == "") {
 		return result, false
 	}
-	var seen [2]bool
+	// Stable worker ordering describes the same CAPI Machine across polls.
+	// Never mutate a caller's inventory or infer role from a provider name.
+	rows = slices.Clone(rows)
+	slices.SortFunc(rows, func(a, b tenantMachineObservation) int { return strings.Compare(a.Metadata.Name, b.Metadata.Name) })
+	var seen [3]bool
+	worker := 1
+	clusterUID, namespace := "", ""
 	for _, machine := range rows {
 		if machine.Kind != "Machine" {
 			continue
@@ -73,21 +91,42 @@ func tenantGuestBindings(rows []tenantMachineObservation, name, id string) ([2]t
 		if machine.Metadata.Labels[tenantClusterLabel] != name || machine.Spec.ClusterName != name || machine.Metadata.Namespace == "" {
 			return result, false
 		}
-		role := 1
-		if _, control := machine.Metadata.Labels[tenantControlLabel]; control {
-			role = 0
+		role := 0
+		if _, control := machine.Metadata.Labels[tenantControlLabel]; !control {
+			role = worker
+			worker++
 		}
-		if seen[role] {
+		if role >= expected || seen[role] {
 			return result, false
 		}
 		seen[role] = true
 		host := machine.Metadata.Annotations["nke.nvidia.com/host-id"]
+		if native {
+			if machine.Metadata.UID == "" || (namespace != "" && namespace != machine.Metadata.Namespace) {
+				return result, false
+			}
+			namespace = machine.Metadata.Namespace
+			matches := 0
+			for _, owner := range machine.Metadata.OwnerReferences {
+				group, _, _ := strings.Cut(owner.APIVersion, "/")
+				if group == "cluster.x-k8s.io" && owner.Kind == "Cluster" && owner.Name == name && owner.UID != "" {
+					if clusterUID != "" && clusterUID != owner.UID {
+						return result, false
+					}
+					clusterUID = owner.UID
+					matches++
+				}
+			}
+			if matches != 1 {
+				return result, false
+			}
+		}
 		ref := machine.Spec.InfrastructureRef
 		group := ref.APIGroup
 		if group == "" {
 			group, _, _ = strings.Cut(ref.APIVersion, "/")
 		}
-		if host == "" || ref.Name == "" || ref.Kind != "NicoMachine" || group != "infrastructure.cluster.x-k8s.io" {
+		if (!native && host == "") || ref.Name == "" || ref.Kind != "NicoMachine" || group != "infrastructure.cluster.x-k8s.io" {
 			return result, false
 		}
 		matches := 0
@@ -97,7 +136,21 @@ func tenantGuestBindings(rows []tenantMachineObservation, name, id string) ([2]t
 			}
 			matches++
 			_, control := infra.Metadata.Labels[tenantControlLabel]
-			if infra.Metadata.Labels[tenantClusterLabel] != name || control != (role == 0) || infra.Spec.Labels["nke.nvidia.com/node-id"] != host || infra.Spec.Labels["nke.nvidia.com/cluster-id"] != id {
+			if infra.Metadata.Labels[tenantClusterLabel] != name {
+				return result, false
+			}
+			if native {
+				ownerMatches := 0
+				for _, owner := range infra.Metadata.OwnerReferences {
+					group, _, _ := strings.Cut(owner.APIVersion, "/")
+					if group == "cluster.x-k8s.io" && owner.Kind == "Machine" && owner.Name == machine.Metadata.Name && owner.UID == machine.Metadata.UID && owner.Controller != nil && *owner.Controller {
+						ownerMatches++
+					}
+				}
+				if infra.Metadata.UID == "" || ownerMatches != 1 {
+					return result, false
+				}
+			} else if control != (role == 0) || infra.Spec.Labels["nke.nvidia.com/node-id"] != host || infra.Spec.Labels["nke.nvidia.com/cluster-id"] != id {
 				return result, false
 			}
 			ready := TenantConditionUnknown
@@ -130,8 +183,15 @@ func tenantGuestBindings(rows []tenantMachineObservation, name, id string) ([2]t
 			return result, false
 		}
 	}
-	if result[0].instance != "" && result[0].instance == result[1].instance {
-		return [2]tenantGuestBinding{}, false
+	for i, binding := range result {
+		if binding.instance == "" {
+			continue
+		}
+		for j := 0; j < i; j++ {
+			if result[j].instance == binding.instance {
+				return [3]tenantGuestBinding{}, false
+			}
+		}
 	}
 	return result, true
 }
@@ -154,9 +214,23 @@ func presentedDomainState(raw []byte) TenantDomainState {
 // Each path component is held while opening its child; no console bytes are
 // read. Missing/unsafe files provide no liveness, and cannot block on a FIFO.
 func tenantConsoleMetadata(ctx context.Context, work, instance string) ([2]os.FileInfo, error) {
+	return tenantConsoleMetadataForBackend(ctx, work, instance, "libvirt")
+}
+
+func tenantConsoleMetadataForBackend(ctx context.Context, work, instance, backend string) ([2]os.FileInfo, error) {
 	var result [2]os.FileInfo
 	if err := requireContext(ctx); err != nil {
 		return result, err
+	}
+	directories := []string{"instances", instance}
+	members := []string{"disk.qcow2.ttyS0.log", "disk.qcow2.ttyS1.log"}
+	switch backend {
+	case "libvirt":
+		directories = append([]string{"var"}, directories...)
+	case "darwin-qemu":
+		members = []string{"console.log"}
+	default:
+		return result, errors.New("unsupported guest console backend")
 	}
 	dir, info, err := securepath.OpenDirectory(work)
 	if err != nil {
@@ -166,7 +240,7 @@ func tenantConsoleMetadata(ctx context.Context, work, instance string) ([2]os.Fi
 		_ = dir.Close()
 		return result, errors.New("guest workspace is not private and owned")
 	}
-	for _, name := range []string{"var", "instances", instance} {
+	for _, name := range directories {
 		next, childInfo, readErr := securepath.OpenChild(dir, name, true)
 		_ = dir.Close()
 		if readErr != nil {
@@ -179,7 +253,7 @@ func tenantConsoleMetadata(ctx context.Context, work, instance string) ([2]os.Fi
 		dir = next
 	}
 	defer dir.Close()
-	for i, name := range []string{"disk.qcow2.ttyS0.log", "disk.qcow2.ttyS1.log"} {
+	for i, name := range members {
 		if err = requireContext(ctx); err != nil {
 			return result, err
 		}
@@ -266,7 +340,7 @@ func (observer *tenantGuestObserver) update(ctx context.Context, t *tenant, now 
 						observer.console[i] = tenantConsoleSample{}
 						observer.instances[i] = binding.instance
 					}
-					owned, readErr := OwnedDomain(limited, runner, "nico-vm-"+binding.instance, work)
+					observed, readErr := observeTenantDomain(limited, runner, work, binding.instance, &observer.console[i], &guests[i], now)
 					if errors.Is(readErr, ErrUnjoined) {
 						return readErr
 					}
@@ -274,20 +348,8 @@ func (observer *tenantGuestObserver) update(ctx context.Context, t *tenant, now 
 						err = errors.Join(err, readErr)
 						continue
 					}
-					if owned == nil {
-						continue
-					}
-					state, readErr := runner.Capture(limited, []string{"virsh", "-c", "qemu:///session", "domstate", owned.UUID}, "guest-domain-state", 30*time.Second)
-					if errors.Is(readErr, ErrUnjoined) {
-						return readErr
-					}
-					if readErr != nil {
-						err = errors.Join(err, readErr)
-						continue
-					}
-					guests[i].Available, guests[i].Domain, guests[i].ProviderReady = true, presentedDomainState(state), binding.ready
-					if files, readErr := tenantConsoleMetadata(limited, work, binding.instance); readErr == nil {
-						observer.console[i].observe(now, files, &guests[i])
+					if observed {
+						guests[i].Available, guests[i].ProviderReady = true, binding.ready
 					}
 				}
 			}
@@ -301,4 +363,22 @@ func (observer *tenantGuestObserver) update(ctx context.Context, t *tenant, now 
 	}
 	reportProgress(t.session.Runner.Progress, ProgressEvent{Kind: TenantGuests, Guests: guests})
 	return nil
+}
+
+// Native Linux and legacy presenters share the same held domain and console
+// observation. A CAPI binding or NICo readiness alone never proves a process.
+func observeTenantDomain(ctx context.Context, runner Runner, work, instance string, console *tenantConsoleSample, guest *TenantGuestObservation, now time.Time) (bool, error) {
+	owned, err := OwnedDomain(ctx, runner, "nico-vm-"+instance, work)
+	if err != nil || owned == nil {
+		return false, err
+	}
+	state, err := runner.Capture(ctx, []string{"virsh", "-c", "qemu:///session", "domstate", owned.UUID}, "guest-domain-state", 30*time.Second)
+	if err != nil {
+		return false, err
+	}
+	guest.Domain = presentedDomainState(state)
+	if files, readErr := tenantConsoleMetadata(ctx, work, instance); readErr == nil {
+		console.observe(now, files, guest)
+	}
+	return true, nil
 }

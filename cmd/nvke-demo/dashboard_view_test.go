@@ -355,7 +355,7 @@ func TestDashboardFillingSiteChecklist(t *testing.T) {
 			screen.SetSize(width, 42)
 			d.draw(screen, now, false)
 			text := dashboardText(screen)
-			for _, want := range []string{"Site stages · 6/11 checked", "Install Cluster API", "Check Cluster API", "Readiness", "Configure cluster identity", "Install NVKE stack", "1m15s", "Secure and register", "Tenant stages · 0/4 checked", "Tenant kubeconfig", "Tenant API query", "Both nodes Ready", "Workload and DNS", "pending", "observed", "ETA unknown", "Activity"} {
+			for _, want := range []string{"Site stages · 6/11 checked", "Install Cluster API", "Check Cluster API", "Readiness", "Configure cluster identity", "Install NVKE stack", "1m15s", "Secure and register", "Tenant stages · 0/4 checked", "Tenant kubeconfig", "Tenant API query", "Nodes Ready", "Workload and DNS", "pending", "observed", "ETA unknown", "Activity"} {
 				if !strings.Contains(text, want) {
 					t.Fatalf("missing %q in %d-column checklist:\n%s", want, width, text)
 				}
@@ -768,7 +768,7 @@ func TestDashboardConcurrentReportsAndDraw(t *testing.T) {
 }
 
 func dashboardGuestFixture() nvkedemo.ProgressEvent {
-	return nvkedemo.ProgressEvent{Kind: nvkedemo.TenantGuests, Guests: [2]nvkedemo.TenantGuestObservation{
+	return nvkedemo.ProgressEvent{Kind: nvkedemo.TenantGuests, Guests: [3]nvkedemo.TenantGuestObservation{
 		{Role: nvkedemo.TenantGuestControlPlane, Available: true, Domain: nvkedemo.TenantDomainRunning, ProviderReady: nvkedemo.TenantConditionTrue, ConsoleKnown: true, ConsoleBytes: 12 * 1024, ConsoleChanged: true, ConsoleLastChange: 2 * time.Minute},
 		{Role: nvkedemo.TenantGuestWorker, Available: true, Domain: nvkedemo.TenantDomainPaused, ProviderReady: nvkedemo.TenantConditionFalse, ConsoleKnown: true, ConsoleBytes: 8 * 1024},
 	}}
@@ -823,7 +823,7 @@ func TestDashboardTenantGuestLayout(t *testing.T) {
 func TestDashboardTenantGuestUnknownAndStale(t *testing.T) {
 	d := newDashboard()
 	d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-kubeconfig", Remaining: time.Hour})
-	event := nvkedemo.ProgressEvent{Kind: nvkedemo.TenantGuests, Guests: [2]nvkedemo.TenantGuestObservation{{Role: nvkedemo.TenantGuestControlPlane}, {Role: nvkedemo.TenantGuestWorker}}}
+	event := nvkedemo.ProgressEvent{Kind: nvkedemo.TenantGuests, Guests: [3]nvkedemo.TenantGuestObservation{{Role: nvkedemo.TenantGuestControlPlane}, {Role: nvkedemo.TenantGuestWorker}}}
 	d.Report(event)
 	s := d.snapshot()
 	now := s.guestsObservedAt.Add(5 * time.Minute)
@@ -846,7 +846,7 @@ func TestDashboardTenantGuestWorstWidthLayout(t *testing.T) {
 			d := newDashboard()
 			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-nodes", Remaining: time.Hour})
 			event := dashboardGuestFixture()
-			for index := range event.Guests {
+			for index := range event.Guests[:2] {
 				event.Guests[index].Domain = state
 				event.Guests[index].ProviderReady = nvkedemo.TenantConditionUnknown
 				event.Guests[index].ConsoleBytes = 1023 << 20
@@ -926,7 +926,7 @@ func TestDashboardTenantInstanceFailureIsVisibleWithoutVM(t *testing.T) {
 			d := newDashboard()
 			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-kubeconfig", Remaining: time.Hour})
 			before := d.snapshot()
-			event := nvkedemo.ProgressEvent{Kind: nvkedemo.TenantGuests, Guests: [2]nvkedemo.TenantGuestObservation{{Role: nvkedemo.TenantGuestControlPlane, Domain: nvkedemo.TenantDomainUnknown}, {Role: nvkedemo.TenantGuestWorker, Domain: nvkedemo.TenantDomainUnknown}}}
+			event := nvkedemo.ProgressEvent{Kind: nvkedemo.TenantGuests, Guests: [3]nvkedemo.TenantGuestObservation{{Role: nvkedemo.TenantGuestControlPlane, Domain: nvkedemo.TenantDomainUnknown}, {Role: nvkedemo.TenantGuestWorker, Domain: nvkedemo.TenantDomainUnknown}}}
 			event.Guests[index].ProvisioningFailure = nvkedemo.TenantInstanceCreateFailed
 			d.Report(event)
 			screen := dashboardScreen(t, 80)
@@ -1074,5 +1074,34 @@ func TestDashboardBuildLogBounds(t *testing.T) {
 	s := d.snapshot()
 	if len(s.buildSteps) != dashboardSteps || s.buildSteps[0].state != "done" || !strings.Contains(dashboardBuildRibbon(s, time.Now()), "counts incomplete") {
 		t.Fatal("unbounded listing, terminal log state regressed or truncation hidden")
+	}
+}
+
+func TestDashboardConformanceCountsEveryRequestedNode(t *testing.T) {
+	for _, count := range []int{2, 3} {
+		t.Run(fmt.Sprint(count), func(t *testing.T) {
+			d := newDashboard()
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-nodes", ExpectedNodes: count, RegisteredNodes: count, ReadyNodes: count - 1, Remaining: time.Hour})
+			state, _, _ := d.snapshot().tenantStages[2].status(1)
+			if state != "running" {
+				t.Fatal("missing requested worker was accepted")
+			}
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-nodes", ExpectedNodes: count, RegisteredNodes: count, ReadyNodes: count, Remaining: time.Hour})
+			snapshot := d.snapshot()
+			state, _, _ = snapshot.tenantStages[2].status(1)
+			if state != "observed" || snapshot.ready != count || snapshot.expectedNodes != count {
+				t.Fatal("lost complete node observation")
+			}
+			screen := dashboardScreen(t, 160)
+			screen.SetSize(160, 48)
+			d.draw(screen, time.Now(), false)
+			text := dashboardText(screen)
+			if !strings.Contains(text, fmt.Sprintf("%d/%d Ready", count, count)) {
+				t.Fatalf("wrong node denominator: %s", text)
+			}
+			if count == 3 && (!strings.Contains(text, "Worker 1") || !strings.Contains(text, "Worker 2")) {
+				t.Fatalf("worker display is incomplete: %s", text)
+			}
+		})
 	}
 }

@@ -13,8 +13,8 @@ import (
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-// AdmitDemoDeployment rejects optional conformance on unsupported hosts before
-// build, sudo prompts, artifact capture, storage, or guest creation.
+// AdmitDemoDeployment checks native capabilities and the fresh output destination
+// before build, sudo prompts, artifact capture, storage, or guest creation.
 func AdmitDemoDeployment(ctx context.Context, cfg Config) error {
 	if _, err := nativeDeploymentNetwork(cfg.Network); err != nil {
 		return err
@@ -33,7 +33,16 @@ func AdmitDemoDeployment(ctx context.Context, cfg Config) error {
 	if err := AdmitNativeDeployment(ctx, cfg.Accelerator); err != nil {
 		return err
 	}
-	_, _, err := requireBootstrapLima(ctx, Runner{Env: NativeEnvironment()}, runtime.GOOS)
+	// Recheck at guest creation; this preflight does not reserve the path.
+	out, err := freshDestination(cfg.Out)
+	if err != nil {
+		return nvkrerr.Wrap(nvkrerr.CodeUsage, err, "deployment output requires a fresh destination with an existing parent")
+	}
+	capacity := nativeResourceAdmission{resources: cfg.Resources, conformance: cfg.Conformance}
+	if err := capacity.check(ctx, filepath.Dir(out), false, cfg.Progress); err != nil {
+		return err
+	}
+	_, _, err = requireBootstrapLima(ctx, Runner{Env: NativeEnvironment()}, runtime.GOOS)
 	return err
 }
 
@@ -56,6 +65,11 @@ func AdmitNativeDeployment(ctx context.Context, accelerator string) error {
 	}
 	if _, err := nativeAccelerator(runtime.GOOS+"/"+runtime.GOARCH, accelerator); err != nil {
 		return err
+	}
+	if runtime.GOOS == "darwin" {
+		if err := admitNativeAddresses(ctx, NativeEnvironment()); err != nil {
+			return err
+		}
 	}
 	if runtime.GOOS == "linux" {
 		device, err := os.OpenFile("/dev/kvm", os.O_RDWR, 0)
@@ -103,6 +117,9 @@ func nativeDeploymentConfig(ctx context.Context, cfg Config, platform string) (N
 	if err := requireContext(ctx); err != nil {
 		return NativeConfig{}, err
 	}
+	if _, err := selectedNativeResources(cfg.Resources); err != nil {
+		return NativeConfig{}, err
+	}
 	if _, err := nativeDeploymentNetwork(cfg.Network); err != nil {
 		return NativeConfig{}, err
 	}
@@ -146,8 +163,8 @@ func nativeDeploymentConfig(ctx context.Context, cfg Config, platform string) (N
 	return NativeConfig{
 		Image: disk, Out: cfg.Out, Accelerator: accelerator,
 		Network: cfg.Network, DemoExecutable: cfg.DemoExecutable,
-		conformance: conformance,
-		Cleanup:     cfg.Cleanup, Walkthrough: cfg.Walkthrough, Progress: cfg.Progress, TenantTimeout: cfg.Timeout,
+		conformance: conformance, Resources: cfg.Resources,
+		Cleanup: cfg.Cleanup, Walkthrough: cfg.Walkthrough, Progress: cfg.Progress, TenantTimeout: cfg.Timeout,
 		Assets: NativeAssetConfig{
 			NVKR: cfg.NVKR, ToolsRun: cfg.Runs.Tools, HostToolsRun: cfg.Runs.HostTools,
 			BootstrapRun: cfg.Runs.Components, ControllerRun: cfg.Runs.Site,

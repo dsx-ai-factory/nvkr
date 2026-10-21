@@ -429,24 +429,6 @@ func TestRetainedControlSurvivesNaturalForegroundExitAndJoinsServices(t *testing
 	}
 }
 
-func TestRetainedMissingCreationDescriptorStillJoinsOriginalPrestartChild(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-	defer cancel()
-	command := exec.Command("/bin/sleep", "60")
-	child, err := startRetainedChild(ctx, command)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := child.exit.Close(); err != nil {
-		t.Fatal(err)
-	}
-	child.exit = nil // Exercise only the directly spawned pre-start refusal path.
-	err = child.stopBeforeStart(ctx)
-	if errors.Is(err, ErrUnjoined) || command.ProcessState == nil {
-		t.Fatal("actual unreaped pre-start child was not joined", err)
-	}
-}
-
 func TestRetainedControlDescriptionsDoNotSupplyCapabilities(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()

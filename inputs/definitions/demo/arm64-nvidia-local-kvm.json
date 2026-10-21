@@ -84,7 +84,7 @@
       "name": "csi-node-driver-registrar-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies"
+        "base": "../../catalogs/runtime-dependencies/native-arm64"
       },
       "components": [
         "csi-node-driver-registrar-image"
@@ -224,7 +224,7 @@
       "name": "postgresql",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke/native-site-arm64"
       },
       "components": [
         "postgresql-chart"
@@ -235,7 +235,7 @@
       "name": "postgresql-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies"
+        "base": "../../catalogs/runtime-dependencies/native-arm64"
       },
       "components": [
         "postgresql-image"
@@ -246,7 +246,7 @@
       "name": "spiffe-csi-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies"
+        "base": "../../catalogs/runtime-dependencies/native-arm64"
       },
       "components": [
         "spiffe-csi-image"
@@ -257,7 +257,7 @@
       "name": "spire",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke/native-site-arm64"
       },
       "components": [
         "spire-chart"
@@ -268,7 +268,7 @@
       "name": "spire-agent-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies"
+        "base": "../../catalogs/runtime-dependencies/native-arm64"
       },
       "components": [
         "spire-agent-image"
@@ -279,7 +279,7 @@
       "name": "spire-bash-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies"
+        "base": "../../catalogs/runtime-dependencies/native-arm64"
       },
       "components": [
         "spire-bash-image"
@@ -290,7 +290,7 @@
       "name": "spire-controller-manager-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies"
+        "base": "../../catalogs/runtime-dependencies/native-arm64"
       },
       "components": [
         "spire-controller-manager-image"
@@ -301,7 +301,7 @@
       "name": "spire-crds",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke/native-site-arm64"
       },
       "components": [
         "spire-crds-chart"
@@ -312,7 +312,7 @@
       "name": "spire-oidc-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies"
+        "base": "../../catalogs/runtime-dependencies/native-arm64"
       },
       "components": [
         "spire-oidc-image"
@@ -323,7 +323,7 @@
       "name": "spire-server-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies"
+        "base": "../../catalogs/runtime-dependencies/native-arm64"
       },
       "components": [
         "spire-server-image"
@@ -334,7 +334,7 @@
       "name": "spire-tpm-server-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies"
+        "base": "../../catalogs/runtime-dependencies/native-arm64"
       },
       "components": [
         "spire-tpm-server-image"
@@ -345,7 +345,7 @@
       "name": "temporal",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke/native-site-arm64"
       },
       "components": [
         "temporal-chart"
@@ -356,7 +356,7 @@
       "name": "temporal-admin-tools-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies"
+        "base": "../../catalogs/runtime-dependencies/native-arm64"
       },
       "components": [
         "temporal-admin-tools-image"
@@ -367,7 +367,7 @@
       "name": "temporal-server-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies"
+        "base": "../../catalogs/runtime-dependencies/native-arm64"
       },
       "components": [
         "temporal-server-image"
@@ -378,7 +378,7 @@
       "name": "temporal-ui-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/runtime-dependencies"
+        "base": "../../catalogs/runtime-dependencies/native-arm64"
       },
       "components": [
         "temporal-ui-image"

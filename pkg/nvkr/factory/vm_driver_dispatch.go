@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"runtime/debug"
 
 	"github.com/dsx-ai-factory/nvkr/internal/buildactivity"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -87,6 +88,16 @@ func dispatchAdmittedVMProducer(
 	if selected.BuilderType != ir.BuilderVMImage || selected.Packer == nil || len(selected.Command) != 0 {
 		return nil, nil, e.New(e.CodeEngineCapability,
 			"vm-image producer %q requires an unimplemented held-output command adapter", selected.Component)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, nil, e.Wrap(e.CodeTimeout, err, "VM driver context ended before capacity observation")
+	}
+	// Source acquisition and OCI verification may leave unused Go heap behind.
+	// Return only this process's idle memory before observing host capacity;
+	// admission still requires the full authored budget and never retries it.
+	debug.FreeOSMemory()
+	if err := ctx.Err(); err != nil {
+		return nil, nil, e.Wrap(e.CodeTimeout, err, "VM driver context ended before capacity observation")
 	}
 	returnErr = admission.Execute(ctx, plan, node.ID, func(runCtx context.Context, runtime *VMRuntime) error {
 		request, err := localVMRequestForPlan(plan, node.ID)

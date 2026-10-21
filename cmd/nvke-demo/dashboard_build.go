@@ -268,18 +268,18 @@ func (d *dashboard) drawBuild(screen tcell.Screen, s dashboardSnapshot, now time
 		boardWidth = width / 2
 	}
 	var phases strings.Builder
-	for index, name := range []string{"Prepare", "Artifacts", "Site", "Tenant", "Workload/DNS", "Cleanup"} {
+	for index, named := range dashboardNamedPhases(s) {
 		if index != 0 {
 			phases.WriteString(" › ")
 		}
 		color := "slategray"
-		switch s.phases[index].state {
-		case "complete":
+		switch named.phase.state {
+		case "complete", "passed":
 			color = "lightgreen"
 		case "running":
 			color = "lightcyan"
 		}
-		fmt.Fprintf(&phases, "[%s]%s[-]", color, name)
+		fmt.Fprintf(&phases, "[%s]%s[-]", color, named.name)
 	}
 	d.header.SetText(fmt.Sprintf("[lightcyan::b] NVKE local build & demo[-::-]    %s elapsed\n [goldenrod]UNQUALIFIED local diagnostic · not a signed Release[-]\n %s", dashboardBuildAge(now, s.started), phases.String()))
 	d.stateView.SetTitle(" Artifact pipeline · reported execution ")

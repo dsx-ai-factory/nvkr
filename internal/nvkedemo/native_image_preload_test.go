@@ -21,6 +21,59 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
+func TestNativeImageDigestReferencesRetainSelectedManifest(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("a", 64)
+	for _, tc := range []struct{ name, reference, manifest, want string }{
+		{"tagged source", "docker.io/library/nke-controller:latest", digest, "docker.io/library/nke-controller@" + digest},
+		{"selected digest", "docker.io/nvkr-local/postgresql@" + digest, digest, "docker.io/nvkr-local/postgresql@" + digest},
+		{"sibling digest", "docker.io/nvkr-local/postgresql@sha256:" + strings.Repeat("b", 64), digest, ""},
+		{"implicit repository", "controller:latest", digest, ""},
+		{"invalid manifest", "docker.io/library/nke-controller:latest", "latest", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := nativeImageDigestReference(NativeImageAsset{Reference: tc.reference, ManifestDigest: tc.manifest})
+			if got != tc.want || (err == nil) != (tc.want != "") {
+				t.Fatalf("reference %q: %v", got, err)
+			}
+		})
+	}
+}
+
+func TestNativeImageImportsKeepExactManifestAndDockerAlias(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("a", 64)
+	for _, tc := range []struct {
+		reference, repository string
+		valid                 bool
+	}{
+		{"docker.io/nvkr-local/postgresql@" + digest, "docker.io/nvkr-local/postgresql", true},
+		{WorkloadImage, "docker.io/library/alpine", true},
+		{"localhost/nvke/ovn-kubernetes@" + digest, "localhost/nvke/ovn-kubernetes", true},
+		{"index.docker.io/nvkr-local/postgresql@" + digest, "index.docker.io/nvkr-local/postgresql", true},
+		{"docker.io/nvkr-local/postgresql:latest", "", false},
+		{digest, "", false},
+		{"postgresql@" + digest, "", false},
+	} {
+		t.Run(tc.reference, func(t *testing.T) {
+			script, err := nativeImageImportScript("selected.tar", tc.reference)
+			if (err == nil) != tc.valid {
+				t.Fatalf("import reference: %v", err)
+			}
+			if !tc.valid {
+				if script != "" {
+					t.Fatal("invalid reference returned executable startup")
+				}
+				return
+			}
+			if strings.Contains(script, "io.cri-containerd.image") {
+				t.Fatal("CRI must create the config-ID alias before marking the imported image managed")
+			}
+			if !strings.Contains(script, "images import --local --digests --base-name "+operatorQuote(tc.repository)) || !strings.Contains(script, "inspecti --quiet "+operatorQuote(tc.reference)) {
+				t.Fatal("import must preserve the selected repository spelling and check its exact manifest through CRI")
+			}
+		})
+	}
+}
+
 func TestNativeOVNProjectionUsesOnlyTheSelectedManifest(t *testing.T) {
 	digest := "sha256:" + strings.Repeat("a", 64)
 	reference := "localhost/nvke/ovn-kubernetes@" + digest
@@ -37,10 +90,10 @@ func TestNativeOVNProjectionUsesOnlyTheSelectedManifest(t *testing.T) {
 			global := values["global"].(map[string]any)
 			image := global["image"].(map[string]any)
 			if version == siteOVNVersion {
-				if global["useImageDigest"] != true || global["skipCallToK8s"] != true || global["imagePullSecretName"] != "" || image["repository"] != "localhost/nvke/ovn-kubernetes" || image["tag"] != "nvkr" || image["sha256"] != strings.TrimPrefix(digest, "sha256:") {
-					t.Fatal("NVIDIA image override lost exact image or source settings")
+				if global["useImageDigest"] != true || global["skipCallToK8s"] != false || global["enablePodHostPort"] != true || global["imagePullSecretName"] != "" || image["repository"] != "localhost/nvke/ovn-kubernetes" || image["tag"] != "nvkr" || image["sha256"] != strings.TrimPrefix(digest, "sha256:") {
+					t.Fatal("NVIDIA native OVN projection lost exact image, Service lookup or hostPort support")
 				}
-			} else if global["enableOvnKubeIdentity"] != false || values["skipCallToK8s"] != true || image["repository"] != "localhost/nvke/ovn-kubernetes@sha256" || image["tag"] != strings.TrimPrefix(digest, "sha256:") || image["pullPolicy"] != "IfNotPresent" {
+			} else if global["enablePodHostPort"] != nil || global["enableOvnKubeIdentity"] != false || values["skipCallToK8s"] != true || image["repository"] != "localhost/nvke/ovn-kubernetes@sha256" || image["tag"] != strings.TrimPrefix(digest, "sha256:") || image["pullPolicy"] != "IfNotPresent" {
 				t.Fatal("upstream image override used the NVIDIA schema")
 			}
 			script, err := nativeImageImportScript("ovn.tar", reference)

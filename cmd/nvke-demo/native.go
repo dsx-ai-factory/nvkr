@@ -43,7 +43,7 @@ func newNativeCommand(out io.Writer, actions demoActions) *cobra.Command {
 	flags := command.Flags()
 	flags.StringVar(&cfg.Image, "image", "", "local standalone NVKE QCOW2; remains local")
 	flags.StringVar(&cfg.Out, "out", "", "fresh private native demo attempt")
-	flags.StringVar(&cfg.Accelerator, "accelerator", accelerator, "native QEMU accelerator: Mac hvf/tcg or Linux kvm")
+	flags.StringVar(&cfg.Accelerator, "accelerator", accelerator, "native QEMU accelerator: Mac hvf or explicit tcg for 64K images; Linux kvm")
 	flags.StringVar(&cfg.Network, "network", "ovn", "matched selected disk/site/tenant network: ovn (NVIDIA) or explicit upstream-ovn")
 	flags.StringVar(&cfg.Assets.NVKR, "nvkr", "", "native NVKR executable")
 	flags.StringVar(&cfg.Assets.ToolsRun, "tools-run", "", "completed host/site tool Run")

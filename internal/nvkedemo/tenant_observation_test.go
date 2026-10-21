@@ -333,7 +333,10 @@ esac
 				t.Fatalf("missing guest snapshot: %+v", writer.events)
 			}
 			guests := writer.events[0].Guests
-			for i, guest := range guests {
+			if guests[2] != (TenantGuestObservation{}) {
+				t.Fatal("legacy two-node observer invented a third guest")
+			}
+			for i, guest := range guests[:2] {
 				available := scenario != "foreign-disk" && !(scenario == "creation-failed" && i == 1)
 				known := scenario == "owned" || scenario == "creation-failed" && i == 0
 				if guest.Available != available || guest.ConsoleKnown != known || guest.ConsoleChanged {

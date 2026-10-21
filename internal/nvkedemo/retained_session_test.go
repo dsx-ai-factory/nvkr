@@ -5,7 +5,6 @@ package nvkedemo
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"io"
 	"strings"
@@ -85,44 +84,5 @@ func TestRetainedCleanupOverflowNoticeIsNeutralAndWriteFailuresSurvive(t *testin
 	var coded *nvkrerr.Error
 	if !errors.As(err, &coded) || coded.Code != nvkrerr.CodePreflightFailed || !errors.Is(err, io.ErrShortWrite) || cursor != 1 {
 		t.Fatal("failed gap presentation was suppressed or advanced the cursor", err)
-	}
-}
-
-func TestRetainedPartialFailurePreservesActualCausePrecedence(t *testing.T) {
-	foreground := nvkrerr.New(nvkrerr.CodePreflightFailed, "foreground acknowledgment or writer failure")
-	for _, row := range []struct {
-		name          string
-		primary       error
-		ownerCode     nvkrerr.Code
-		abort, cancel bool
-		want          nvkrerr.Code
-	}{
-		{"start or plain writer failure", foreground, nvkrerr.CodeTimeout, true, false, nvkrerr.CodePreflightFailed},
-		{"unacknowledged abort", foreground, nvkrerr.CodeTimeout, false, false, nvkrerr.CodeTimeout},
-		{"genuine owner internal failure", foreground, nvkrerr.CodeInternal, true, false, nvkrerr.CodeInternal},
-		{"genuine owner preflight failure", nvkrerr.New(nvkrerr.CodeInternal, "foreground defect"), nvkrerr.CodePreflightFailed, true, false, nvkrerr.CodePreflightFailed},
-		{"owner budget deadline", nil, nvkrerr.CodeTimeout, false, false, nvkrerr.CodeTimeout},
-		{"caller canceled", foreground, nvkrerr.CodeTimeout, true, true, nvkrerr.CodeTimeout},
-		{"primary canceled", nvkrerr.Wrap(nvkrerr.CodeTimeout, context.Canceled, "foreground canceled"), nvkrerr.CodeTimeout, true, false, nvkrerr.CodeTimeout},
-		{"primary deadline", nvkrerr.Wrap(nvkrerr.CodePreflightFailed, context.DeadlineExceeded, "foreground deadline"), nvkrerr.CodeTimeout, true, false, nvkrerr.CodeTimeout},
-		{"uncoded foreground cause", errors.New("foreground failure"), nvkrerr.CodeTimeout, true, false, nvkrerr.CodeTimeout},
-		{"unjoined foreground cause", errors.Join(foreground, ErrUnjoined), nvkrerr.CodeTimeout, true, false, nvkrerr.CodePreflightFailed},
-		{"owner omitted code", foreground, "", false, false, nvkrerr.CodePreflightFailed},
-	} {
-		t.Run(row.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(t.Context())
-			defer cancel()
-			if row.cancel {
-				cancel()
-			}
-			err := retainedPartialFailure(ctx, row.primary, row.ownerCode, row.abort)
-			var coded *nvkrerr.Error
-			if !errors.As(err, &coded) || coded.Code != row.want || nvkrerr.ExitCode(err) != nvkrerr.ExitCode(nvkrerr.New(row.want, "expected")) {
-				t.Fatal("partial handoff changed the actual failure code", err)
-			}
-			if row.primary != nil && !errors.Is(err, row.primary) || row.cancel && !errors.Is(err, context.Canceled) || errors.Is(row.primary, ErrUnjoined) && !errors.Is(err, ErrUnjoined) {
-				t.Fatal("partial handoff lost original cause or ownership obligation", err)
-			}
-		})
 	}
 }

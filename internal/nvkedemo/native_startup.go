@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"net/netip"
 	"net/url"
@@ -34,11 +35,11 @@ type StartupAsset struct {
 // This adapter adds no alternative Kubernetes installer or remote shell.
 type NativeSiteStartup struct {
 	Name, Gateway, ControllerImage, ProviderImage string
-	OVNVersion, OVNImage                          string
+	OVNVersion, OVNImage, KubernetesVersion       string
 	Assets                                        []StartupAsset
 	HandoffURL, HandoffToken, HandoffCertificate  string
 	Deployment                                    *NativeSiteDeployment
-	RuntimeImages                                 bool
+	ImageImports                                  map[string]string
 }
 
 // NativeSiteDeployment describes the local NICo endpoint and image import aliases.
@@ -64,6 +65,38 @@ type startupCloudConfig struct {
 var siteStartupAssetNames = []string{
 	"nerdctl", "controller.tar", "profiles.tar", "capnico.tar", "spire-ca.crt", "ovn.tar",
 }
+
+func nativeRuntimeImageRoles() []string {
+	roles := []string{"workload"}
+	for _, role := range runtimeImages {
+		roles = append(roles, "runtime-"+role)
+	}
+	for _, image := range nativeCAPIAuthImages {
+		roles = append(roles, image.role)
+	}
+	return roles
+}
+
+// Network observation stays inside the owned site VM. Standard tools report
+// private diagnostic state without applying network configuration or issuing
+// readiness evidence; VM deletion also stops this journal/console observer.
+const nativeNetworkObserverUnit = `[Unit]
+Description=NVKR private guest network observation
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/bin/env ip -json link show
+ExecStartPre=-/usr/bin/env ip -4 -json address show
+ExecStartPre=-/usr/bin/env ip -4 -json route show table all
+ExecStartPre=-/usr/bin/env netplan get
+ExecStart=/usr/bin/env ip -timestamp monitor link address route
+StandardOutput=journal+console
+StandardError=journal+console
+NoNewPrivileges=true
+Restart=no
+TimeoutStartSec=30s
+TimeoutStopSec=5s
+`
 
 // SiteStartupUserData returns startup configuration without filesystem,
 // subprocess or network work. The caller must independently admit the image,
@@ -95,21 +128,15 @@ func SiteStartupUserData(ctx context.Context, cfg NativeSiteStartup) (string, er
 		"configureSpire": func() string { return siteSpireConfigurationScript },
 		"prepareOVN":     func() string { return importOVN + "; " + valuesOVN },
 		"sha":            func(value string) string { return strings.TrimPrefix(value, "sha256:") },
-		"runtimeImages":  func() []string { return slices.Clone(runtimeImages) },
-		"authImages": func() []string {
-			var names []string
-			for _, image := range nativeCAPIAuthImages {
-				names = append(names, image.role)
-			}
-			return names
-		},
-		"json": func(value string) (string, error) { raw, err := json.Marshal(value); return string(raw), err },
+		"importImage":    nativeImageImportScript,
+		"json":           func(value string) (string, error) { raw, err := json.Marshal(value); return string(raw), err },
 	}).Parse(hostSitePreparationScript)).Execute(&script, cfg); err != nil {
 		return "", nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "render site startup handoff")
 	}
 	config := startupCloudConfig{
 		WriteFiles: []startupFile{
 			{"/var/lib/nvke-native/prepare.sh", "0700", script.String()},
+			{"/etc/systemd/system/nvkr-native-network-observer.service", "0644", nativeNetworkObserverUnit},
 			{"/etc/systemd/system/nvke-agent.service.d/10-nvkr-console.conf", "0600", "[Service]\nStandardOutput=journal+console\nStandardError=journal+console\n"},
 			{"/etc/systemd/system/spire-agent.service.d/10-nvkr-console.conf", "0600", "[Service]\nStandardOutput=journal+console\nStandardError=journal+console\n"},
 		},
@@ -136,6 +163,9 @@ func SiteStartupUserData(ctx context.Context, cfg NativeSiteStartup) (string, er
 }
 
 func validateSiteStartup(cfg NativeSiteStartup) error {
+	if !stableKubernetesVersion(cfg.KubernetesVersion) {
+		return fmt.Errorf("require an exact stable Kubernetes version selected by NVKE")
+	}
 	if cfg.OVNVersion != siteOVNVersion && cfg.OVNVersion != upstreamSiteOVNVersion {
 		return fmt.Errorf("require the explicit supported OVN version")
 	}
@@ -155,15 +185,32 @@ func validateSiteStartup(cfg NativeSiteStartup) error {
 		}
 	}
 	expected := slices.Clone(siteStartupAssetNames)
-	if cfg.RuntimeImages {
-		expected = append(expected, "workload.tar")
-		for _, role := range runtimeImages {
-			expected = append(expected, "runtime-"+role+".tar")
-		}
-		for _, image := range nativeCAPIAuthImages {
-			expected = append(expected, image.role+".tar")
+	roles := []string{"controller", "profiles", "capnico"}
+	if len(cfg.ImageImports) > len(roles) {
+		for _, role := range nativeRuntimeImageRoles() {
+			roles = append(roles, role)
+			expected = append(expected, role+".tar")
 		}
 	}
+	if len(cfg.ImageImports) != len(roles) {
+		return errors.New("site startup requires every selected image reference")
+	}
+	for _, role := range roles {
+		reference := cfg.ImageImports[role]
+		if _, err := nativeImageImportScript("downloads/"+role+".tar", reference); err != nil {
+			return fmt.Errorf("site image %s: %w", role, err)
+		}
+		if role == "workload" {
+			if reference != WorkloadImage {
+				return errors.New("site workload differs from the shared diagnostic image")
+			}
+		} else if strings.HasPrefix(role, "runtime-") || strings.HasPrefix(role, "capi-exec-") {
+			if !strings.HasPrefix(reference, "docker.io/nvkr-local/"+strings.TrimPrefix(role, "runtime-")+"@") {
+				return fmt.Errorf("site runtime image %s differs from its selected local alias", role)
+			}
+		}
+	}
+
 	if cfg.Deployment != nil {
 		for _, location := range []string{cfg.Deployment.NicoURL, cfg.Deployment.ImageURL} {
 			u, err := url.Parse(location)

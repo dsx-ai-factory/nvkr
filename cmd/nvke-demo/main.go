@@ -23,7 +23,7 @@ import (
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	defer cancel()
-	err := execute(ctx, os.Args[1:], os.Stdout, os.Stderr)
+	err := execute(ctx, launcherArguments(os.Args[0], os.Args[1:]), os.Stdout, os.Stderr)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
@@ -59,19 +59,17 @@ func withOwnDemoExecutable(action func(context.Context, nvkedemo.Config) error) 
 // Actions stay typed library calls; injection lets command tests prove help,
 // completion and invalid input do not reach configuration I/O or runtime work.
 type demoActions struct {
-	admit     func(context.Context, nvkedemo.Config) error
-	run       func(context.Context, nvkedemo.Config) error
-	build     func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error)
-	tools     func(context.Context, nvkedemo.ToolConfig) (string, error)
-	guest     func(context.Context, nvkedemo.NativeGuestConfig) error
-	native    func(context.Context, nvkedemo.NativeConfig) error
-	restore   func(context.Context, string, io.Writer) error
-	load      func(context.Context, string) (nvkedemo.DemoFile, error)
-	retention func(context.Context) error
-	status    func(context.Context, string, io.Writer) error
-	cleanup   func(context.Context, string, io.Writer) error
-	owner     func(context.Context, string) error
-	after     func(context.Context, io.Writer) error
+	admit   func(context.Context, nvkedemo.Config) error
+	run     func(context.Context, nvkedemo.Config) error
+	build   func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error)
+	tools   func(context.Context, nvkedemo.ToolConfig) (string, error)
+	guest   func(context.Context, nvkedemo.NativeGuestConfig) error
+	native  func(context.Context, nvkedemo.NativeConfig) error
+	restore func(context.Context, string, io.Writer) error
+	load    func(context.Context, string) (nvkedemo.DemoFile, error)
+	status  func(context.Context, string, io.Writer) error
+	cleanup func(context.Context, string, io.Writer) error
+	owner   func(context.Context, string) error
 }
 
 func executeRoot(ctx context.Context, root *cobra.Command, args []string) error {
@@ -108,6 +106,7 @@ func newCommand(out, diagnostics io.Writer, actions demoActions) *cobra.Command 
 	})
 	root.AddCommand(newRunCommand(out, actions, &config), newBuildCommand(out, actions, &config), newRestoreCommand(out, actions, &config), newE2ECommand(out, actions, &config))
 	root.AddCommand(newToolsCommand(out, actions))
+	root.AddCommand(newNativeQEMUCommand())
 	root.AddCommand(newGuestCommand(out, actions))
 	root.AddCommand(newNativeCommand(out, actions))
 	root.AddCommand(newQualificationSetupCommand(out, actions, &config), newQualificationRegistryStopCommand())
@@ -126,7 +125,7 @@ func newCommand(out, diagnostics io.Writer, actions demoActions) *cobra.Command 
 func newRunCommand(out io.Writer, actions demoActions, config *string) *cobra.Command {
 	flags := nvkedemo.DemoFile{Version: 1, Run: nvkedemo.RunFile{TimeoutSeconds: nvkedemo.DefaultTenantTimeoutSeconds}}
 	command := &cobra.Command{
-		Use: "run", Short: "Deploy one site and two tenant QCOW guests from completed NVKR outputs", Args: cobra.NoArgs,
+		Use: "run", Short: "Deploy a native site and tenant QCOW guests from completed NVKR outputs", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := validateTimeoutFlag(cmd, flags.Run.TimeoutSeconds); err != nil {
 				return err
@@ -144,23 +143,18 @@ func newRunCommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 					return err
 				}
 			}
-			if !cfg.Cleanup && actions.retention != nil {
-				if err := actions.retention(cmd.Context()); err != nil {
-					return err
-				}
-			}
 			plain, _ := cmd.Flags().GetBool("plain")
 			recoveryCtx, err := progressRecoveryContext(cmd.Context(), cfg.Out)
 			if err != nil {
 				return err
 			}
-			result := withTerminalSudo(recoveryCtx, out, cmd.ErrOrStderr(), func(session context.Context, refresh func(context.Context) error) error {
+			return withTerminalSudo(recoveryCtx, out, cmd.ErrOrStderr(), func(session context.Context, refresh func(context.Context) error) error {
 				return runProgress(session, out, plain, func(ctx context.Context, progress io.Writer) error {
 					cfg.Progress = progress
+					nativePresentation(progress, cfg.Conformance)
 					return actions.run(ctx, cfg)
 				}, refresh)
 			})
-			return finishRetainedInstructions(cmd.Context(), actions, out, result)
 		},
 	}
 	addRunFlags(command, &flags.Run, true)
@@ -255,11 +249,6 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 					return err
 				}
 			}
-			if !run.Cleanup && actions.retention != nil {
-				if err := actions.retention(cmd.Context()); err != nil {
-					return err
-				}
-			}
 			recoveryCtx, err := progressRecoveryContext(cmd.Context(), run.Out)
 			if err != nil {
 				return err
@@ -272,9 +261,10 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			defer cancel()
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			plain, _ := cmd.Flags().GetBool("plain")
-			result := withTerminalSudo(budget, out, cmd.ErrOrStderr(), func(session context.Context, refresh func(context.Context) error) error {
+			return withTerminalSudo(budget, out, cmd.ErrOrStderr(), func(session context.Context, refresh func(context.Context) error) error {
 				return runBuildProgress(session, out, verbose, plain, func(ctx context.Context, progress io.Writer) error {
 					build.Progress, run.Progress = progress, progress
+					nativePresentation(progress, run.Conformance)
 					built, err := actions.build(ctx, build)
 					if err != nil {
 						return err
@@ -284,7 +274,6 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 					return actions.run(ctx, run)
 				}, refresh)
 			})
-			return finishRetainedInstructions(cmd.Context(), actions, out, result)
 		},
 	}
 	addBuildFlags(command, &flags.Build)
@@ -306,7 +295,7 @@ func addBuildFlags(command *cobra.Command, cfg *nvkedemo.BuildFile) {
 }
 func addRunFlags(command *cobra.Command, cfg *nvkedemo.RunFile, existing bool) {
 	flags := command.Flags()
-	flags.StringVar(&cfg.Accelerator, "accelerator", "", "native guest accelerator: defaults to Mac hvf or Linux kvm for every VM")
+	flags.StringVar(&cfg.Accelerator, "accelerator", "", "native guest accelerator: Mac hvf or explicit tcg for the selected 64K image; Linux kvm (default)")
 	flags.BoolVar(&cfg.Conformance, "conformance", false, "run Kubernetes conformance against this disposable tenant before cleanup (native Mac or Linux ARM64)")
 	flags.BoolVar(&cfg.Walkthrough, "walkthrough", false, "show bounded read-only site, tenant and existing workload observations before cleanup")
 	flags.BoolVar(&cfg.Cleanup, "cleanup", false, "delete owned VMs after acceptance; otherwise keep the foreground demo until Ctrl-C")
@@ -411,15 +400,6 @@ func configuredFile(command *cobra.Command, path string, flags nvkedemo.DemoFile
 		selected.Run.Cleanup = flags.Run.Cleanup
 	}
 	return selected, nil
-}
-
-func finishRetainedInstructions(ctx context.Context, actions demoActions, out io.Writer, result error) error {
-	if actions.after != nil {
-		// The progress presenter and sudo refresher have already returned and
-		// restored terminal ownership. Full commands must not enter a log ring.
-		return errors.Join(result, actions.after(ctx, out))
-	}
-	return result
 }
 
 func newSessionCommand(name string, out io.Writer, actions demoActions) *cobra.Command {

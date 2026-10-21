@@ -128,9 +128,9 @@ type seedProjection struct {
 	DiskGiB       int    `json:"diskGiB"`
 }
 
-// Both native hosts use the same tenant type. NVIDIA OVN's node pod requests
-// three CPUs and 4352 MiB; Kubernetes reservations and other pods need headroom.
-// Keep those source-owned requests and reservations intact.
+// Both native hosts share the default tenant type. Native deployment may author
+// a different memory budget; CNI requests, limits and Kubernetes reservations
+// remain source-owned. The legacy projection retains these existing defaults.
 const (
 	tenantDemoVCPUs     = 6
 	tenantDemoMemoryGiB = 12

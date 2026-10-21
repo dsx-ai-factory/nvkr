@@ -62,6 +62,13 @@ func TestDeploymentSelectsSameThreeVMWorkflowOnBothHosts(t *testing.T) {
 				if assets.ToolsRun != "tools" || assets.HostToolsRun != "host" || assets.ControllerRun != "site" || assets.BootstrapRun != "components" || assets.ProvidersRun != "providers" || assets.DeploymentRun != "profiles" || assets.RuntimeRun != "runtime" {
 					t.Fatalf("Run bindings changed: %+v", assets)
 				}
+				if platform == "darwin/arm64" {
+					cfg.Accelerator = "tcg"
+					selected, err = nativeDeploymentConfig(t.Context(), cfg, platform)
+					if err != nil || selected.Accelerator != "tcg" || selected.DemoExecutable != cfg.DemoExecutable {
+						t.Fatal("explicit TCG did not reach the shared native runtime", err)
+					}
+				}
 				if err := os.WriteFile(disk, []byte("changed bytes"), 0600); err != nil {
 					t.Fatal(err)
 				}
@@ -74,7 +81,7 @@ func TestDeploymentSelectsSameThreeVMWorkflowOnBothHosts(t *testing.T) {
 }
 
 func TestDeploymentRejectsUnsupportedHostBeforeArtifactIO(t *testing.T) {
-	for _, tc := range []struct{ platform, accelerator string }{{"linux/arm64", "tcg"}, {"darwin/arm64", "kvm"}, {"darwin/arm64", "tcg"}, {"windows/arm64", ""}} {
+	for _, tc := range []struct{ platform, accelerator string }{{"linux/arm64", "tcg"}, {"darwin/arm64", "kvm"}, {"windows/arm64", ""}} {
 		t.Run(tc.platform+tc.accelerator, func(t *testing.T) {
 			_, err := nativeDeploymentConfig(t.Context(), Config{Accelerator: tc.accelerator}, tc.platform)
 			var coded *nvkrerr.Error
@@ -102,6 +109,30 @@ func TestNativeDeploymentRejectsRetiredNetworkBeforeBuildOrArtifactIO(t *testing
 				if !errors.As(err, &coded) || coded.Code != nvkrerr.CodeEngineCapability || !strings.Contains(err.Error(), "selected OVN") {
 					t.Fatalf("retired network reached later admission: %v", err)
 				}
+			}
+		})
+	}
+}
+
+func TestDemoRejectsInvalidOutputBeforeBootstrap(t *testing.T) {
+	if err := AdmitNativeDeployment(t.Context(), ""); err != nil {
+		t.Skipf("native host admission unavailable: %v", err)
+	}
+	root := privateTestDir(t)
+	for _, tc := range []struct{ name, out string }{
+		{"empty", ""},
+		{"existing", root},
+		{"missing parent", filepath.Join(root, "missing", "runtime")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := AdmitDemoDeployment(t.Context(), Config{Out: tc.out})
+			var coded *nvkrerr.Error
+			if !errors.As(err, &coded) || coded.Code != nvkrerr.CodeUsage || !strings.Contains(err.Error(), "deployment output") {
+				t.Fatalf("invalid output reached bootstrap admission: %v", err)
+			}
+			entries, err := os.ReadDir(root)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("output admission created files: %v %v", entries, err)
 			}
 		})
 	}

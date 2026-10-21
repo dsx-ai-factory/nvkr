@@ -42,6 +42,7 @@ type NativeAssets struct {
 	Images                                 map[string]NativeImageAsset
 	CLI                                    string
 	RuntimeOutputs                         map[string]SelectedOutput
+	installerSelection                     *nativeInstallerSelection
 }
 
 type NativeImageAsset struct {
@@ -220,7 +221,8 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 			return assets, err
 		}
 	}
-	if err := extractNativeInstaller(ctx, filepath.Join(assets.HostTools, "nvke-installer-sources"), assets.Installer); err != nil {
+	assets.installerSelection, err = extractNativeInstaller(ctx, filepath.Join(assets.HostTools, "nvke-installer-sources"), assets.Installer, hostRun, hostBundle)
+	if err != nil {
 		return assets, err
 	}
 	for _, selection := range selections {
@@ -333,9 +335,13 @@ func prepareNativeImage(ctx context.Context, selection nativeImageSelection, wor
 // Admit the source-owned provider selection at extraction time, before image
 // preparation or any later network/VM work. deployFromHost rechecks these bytes
 // at its executable boundary before invoking clusterctl.
-func extractNativeInstaller(ctx context.Context, archive, installer string) error {
+func extractNativeInstaller(ctx context.Context, archive, installer, run, bundle string) (*nativeInstallerSelection, error) {
+	selection, err := nativeInstallerSelectionFromRun(ctx, run, bundle)
+	if err != nil {
+		return nil, err
+	}
 	if err := safeExtractAssets(ctx, archive, installer, []string{
-		"SOURCE_COMMIT", "make/tool-versions.mk", "deploy/nvke-deploy.sh", "deploy/lib/nvke-deploy-items.py",
+		"SOURCE_COMMIT", "CAPI_VERSION", nativeSiteSpecPath, "make/tool-versions.mk", "deploy/nvke-deploy.sh", "deploy/lib/nvke-deploy-items.py",
 		"deploy/lib/render-template.py", "deploy/nico/nvke-deploy.yaml",
 		"controller/deploy/charts/controller/Chart.yaml", "nktp/deploy/charts/nktp/Chart.yaml",
 		"controller/nico-sim/internal/seed/default-seed.yaml", "controller/nico-sim/ui/index.html",
@@ -344,8 +350,21 @@ func extractNativeInstaller(ctx context.Context, archive, installer string) erro
 		"controller/test/fixtures/releases/nvke-nico-vms-24.04-arm64-fde-clusterrelease.yaml",
 		"controller/test/fixtures/releases/nvke-nico-vms-24.04-arm64-fde-nodepoolrelease.yaml",
 	}); err != nil {
-		return err
+		return nil, err
 	}
-	_, err := nativeCAPIProviderVersion(ctx, installer)
-	return err
+	versions, err := readRunFile(ctx, installer, "make/tool-versions.mk", 64<<10)
+	if err != nil || len(versions) == 0 {
+		return nil, errors.Join(err, errors.New("native installer omits source tool versions"))
+	}
+	selection.versionsDigest = plainSHA(versions)
+	spec, err := readRunFile(ctx, installer, nativeSiteSpecPath, 64<<10)
+	if err != nil {
+		return nil, err
+	}
+	selection.siteSpecDigest = plainSHA(spec)
+	err = admitNativeSiteContract(ctx, NativeAssets{Installer: installer, installerSelection: selection})
+	if err != nil {
+		return nil, err
+	}
+	return selection, nil
 }

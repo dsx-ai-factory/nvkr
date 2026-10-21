@@ -24,8 +24,18 @@ func TestNativeNVIDIADefinitionsAlignRenamedSourceContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const nvke = "8db5721ae3031bdcd945e559153a740d46ea209e"
-	const ovn = "8af51273d52dfa07454435d18d37230e582d797a"
+	// Compare compiled source identities with the owning locks. Pin updates
+	// remain data changes without another revision list in Go.
+	locks := make(map[string]map[string]catalog.Pin)
+	for _, dir := range []string{"node-images/native-arm64", "nvke/native-site-arm64", "controller-profiles/native-nvidia-arm64", "ovn-nvidia"} {
+		lock, err := catalog.LoadLockContext(t.Context(), filepath.Join(repo, "inputs/catalogs", dir))
+		if err != nil {
+			t.Fatal(err)
+		}
+		locks[dir] = lock.Pins
+	}
+	osPins, sitePins := locks["node-images/native-arm64"], locks["nvke/native-site-arm64"]
+	profilePins, ovnPins := locks["controller-profiles/native-nvidia-arm64"], locks["ovn-nvidia"]
 	for _, conformance := range []bool{false, true} {
 		name := "demo"
 		if conformance {
@@ -40,30 +50,33 @@ func TestNativeNVIDIADefinitionsAlignRenamedSourceContracts(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			expected := 32
-			if conformance {
-				expected = 38
+			definition, err := authored.LoadDefinition(t.Context(), filepath.Join(repo, dpath))
+			if err != nil {
+				t.Fatal(err)
 			}
-			if len(plan.LifecycleOutputs) != expected {
-				t.Fatalf("outputs=%d, want%d", len(plan.LifecycleOutputs), expected)
+			if len(plan.LifecycleOutputs) != len(definition.Outputs) {
+				t.Fatalf("outputs=%d, want%d", len(plan.LifecycleOutputs), len(definition.Outputs))
 			}
-			rows := []struct{ output, component, commit string }{
-				{"nvke-node-image-arm64", "nvke-agent", nvke},
-				{"nvke-node-image-arm64", "nvke-kubeadm-distro", nvke},
-				{"nvke-node-image-arm64", "nvke-cni-calico", nvke},
-				{"nvke-node-image-arm64", "nvke-node-image", nvke},
-				{"nvke-node-image-arm64", "nvke-image-inputs", nvke},
-				{"nvke-node-image-arm64", "nvke-spire-agent", "726f76944404e1106626b8333d3576bdf67b575b"},
-				{"nvke-node-image-arm64", "nvke-cni-ovn", ovn},
-				{"nvke-node-image-arm64", "ovn-kube-ubuntu", ovn},
-				{"nvke-node-image-arm64", "ovn-kubernetes-chart", ovn},
-				{"controller-chart", "nvke-controller-chart", nvke},
-				{"controller-profiles", "nvke-local-profiles", nvke},
-				{"cwe", "nvke-controller", nvke},
-				{"nvkectl", "nvkectl", nvke},
-				{"cluster-api-provider-provisioned-arm64", "cluster-api-provider-provisioned", nvke},
-				{"ovn-image-arm64", "ovn-kube-ubuntu", ovn},
-				{"ovn-chart-arm64", "ovn-kubernetes-chart", ovn},
+			rows := []struct {
+				output, component string
+				pin               catalog.Pin
+			}{
+				{"nvke-node-image-arm64", "nvke-agent", osPins["nvke-os"]},
+				{"nvke-node-image-arm64", "nvke-kubeadm-distro", osPins["nvke-kubeadm-distro-source"]},
+				{"nvke-node-image-arm64", "nvke-cni-calico", osPins["nvke-cni-calico-source"]},
+				{"nvke-node-image-arm64", "nvke-node-image", osPins["nvke-os"]},
+				{"nvke-node-image-arm64", "nvke-image-inputs", osPins["nvke-os"]},
+				{"nvke-node-image-arm64", "nvke-spire-agent", osPins["nvke-spire-agent-source"]},
+				{"nvke-node-image-arm64", "nvke-cni-ovn", ovnPins["ovn-kubernetes"]},
+				{"nvke-node-image-arm64", "ovn-kube-ubuntu", ovnPins["ovn-kubernetes"]},
+				{"nvke-node-image-arm64", "ovn-kubernetes-chart", ovnPins["ovn-kubernetes"]},
+				{"controller-chart", "nvke-controller-chart", sitePins["nvke-controller-helm"]},
+				{"controller-profiles", "nvke-local-profiles", profilePins["nvke-profiles"]},
+				{"cwe", "nvke-controller", sitePins["nvke-controller"]},
+				{"nvkectl", "nvkectl", sitePins["nvke-cli"]},
+				{"cluster-api-provider-provisioned-arm64", "cluster-api-provider-provisioned", sitePins["nvke-controller"]},
+				{"ovn-image-arm64", "ovn-kube-ubuntu", ovnPins["ovn-kubernetes"]},
+				{"ovn-chart-arm64", "ovn-kubernetes-chart", ovnPins["ovn-kubernetes"]},
 			}
 			for _, row := range rows {
 				matches := 0
@@ -76,8 +89,8 @@ func TestNativeNVIDIADefinitionsAlignRenamedSourceContracts(t *testing.T) {
 							continue
 						}
 						matches++
-						if c.Commit != row.commit {
-							t.Fatalf("%s/%s source=%s, want %s", row.output, row.component, c.Commit, row.commit)
+						if c.Commit != row.pin.Commit || c.TreeHash != row.pin.TreeHash || c.SourceDate != row.pin.SourceDateEpoch {
+							t.Fatalf("%s/%s source identity differs from its selected catalog lock", row.output, row.component)
 						}
 						if (c.Name == "nvke-node-image" || c.Name == "nvke-local-profiles") && len(c.Patches) != 0 {
 							t.Fatalf("%s must consume unchanged upstream source", c.Name)
@@ -98,9 +111,8 @@ func TestNativeNVIDIADefinitionsAlignRenamedSourceContracts(t *testing.T) {
 }
 
 // Read only authored selections and lock records. Full compilation also
-// authenticates private derived-chart pins and belongs to the extended suite.
+// authenticates source-derived chart pins and belongs to the extended suite.
 func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
-	const nvke = "8db5721ae3031bdcd945e559153a740d46ea209e"
 	repo, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
@@ -109,16 +121,18 @@ func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
 		dir     string
 		sources []string
 	}{
-		{"node-images/native-arm64", []string{"nvke-os", "nvke-cni-calico-source", "nvke-kubeadm-distro-source"}},
-		{"nvke/native-site-arm64", []string{"nvke-cli", "nvke-controller", "nvke-controller-helm", "nvke-nktp-helm"}},
+		{"node-images/native-arm64", []string{"nvke-os", "nvke-cni-calico-source", "nvke-kubeadm-distro-source", "nvke-spire-agent-source"}},
+		{"nvke/native-site-arm64", []string{"nvke-cli", "nvke-controller", "nvke-controller-helm", "nvke-nktp-helm", "nvke-deploy"}},
 		{"controller-profiles/native-nvidia-arm64", []string{"nvke-profiles"}},
+		{"tools/native", []string{"nvke-cli", "nvke-deploy", "nvke-nicosim"}},
+		{"runtime-dependencies/native-arm64", []string{"nvke-deployment-selection"}},
 	} {
 		lock, err := catalog.LoadLockContext(t.Context(), filepath.Join(repo, "inputs/catalogs", tc.dir))
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, source := range tc.sources {
-			if pin, ok := lock.Pins[source]; !ok || pin.Commit != nvke {
+			if pin, ok := lock.Pins[source]; !ok || pin.Commit == "" || pin.TreeHash == "" || pin.SourceDateEpoch <= 0 {
 				t.Fatalf("%s/%s lost selected NVKE source", tc.dir, source)
 			}
 		}
@@ -133,19 +147,13 @@ func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := 32
-		if conformance {
-			want = 38
-		}
-		if len(doc.Outputs) != want {
-			t.Fatalf("outputs%d want%d", len(doc.Outputs), want)
-		}
 		expected := map[string]string{"nvke-node-image-arm64": "inputs/catalogs/node-images/native-arm64", "cwe": "inputs/catalogs/nvke/native-site-arm64", "nvkectl": "inputs/catalogs/nvke/native-site-arm64", "controller-chart": "inputs/catalogs/nvke/native-site-arm64", "controller-profiles": "inputs/catalogs/controller-profiles/native-nvidia-arm64"}
 		hostPlatforms := map[string]string{}
 		if conformance {
+			expected["conformance-image-arm64"] = "definitions/kubernetes-conformance-arm64/demo-1.36/image-catalog"
 			for _, host := range []struct{ suffix, platform string }{{"arm64", "linux/arm64"}, {"darwin-arm64", "darwin/arm64"}} {
 				expected["hydrophone-"+host.suffix] = "definitions/kubernetes-conformance-arm64/hydrophone-catalog"
-				expected["kubectl-"+host.suffix] = "definitions/kubernetes-conformance-arm64/demo-1.34/kubectl-catalog"
+				expected["kubectl-"+host.suffix] = "definitions/kubernetes-conformance-arm64/kubectl-catalog"
 				hostPlatforms["hydrophone-"+host.suffix] = host.platform
 				hostPlatforms["kubectl-"+host.suffix] = host.platform
 			}

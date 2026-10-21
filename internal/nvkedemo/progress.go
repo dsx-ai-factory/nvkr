@@ -23,6 +23,8 @@ const (
 	DeploymentFailed   = "deployment-failed"
 	TenantWaiting      = "tenant-waiting"
 	TenantGuests       = "tenant-guests"
+	NativeDeployment   = "native-deployment"
+	NativeRetained     = "native-retained"
 	OSBuildLogs        = "os-build-logs"
 )
 
@@ -31,6 +33,14 @@ const (
 type TenantGuestRole string
 type TenantDomainState string
 type TenantProvisioningFailure string
+
+type TenantInstanceState string
+
+const (
+	TenantInstanceUnknown TenantInstanceState = "unknown"
+	TenantInstanceReady   TenantInstanceState = "Ready"
+	TenantInstanceError   TenantInstanceState = "Error"
+)
 
 const (
 	TenantGuestControlPlane    TenantGuestRole           = "control-plane"
@@ -44,6 +54,7 @@ const (
 )
 
 type TenantGuestObservation struct {
+	InstanceState TenantInstanceState
 	Role          TenantGuestRole
 	Available     bool
 	Domain        TenantDomainState
@@ -92,13 +103,15 @@ type ProgressEvent struct {
 	Kind            string
 	Name            string
 	Status          string
+	Conformance     bool
+	ExpectedNodes   int
 	RegisteredNodes int
 	ReadyNodes      int
 	Provisioning    TenantConditionStatus
 	Provisioned     TenantConditionStatus
 	Elapsed         time.Duration
 	Remaining       time.Duration
-	Guests          [2]TenantGuestObservation
+	Guests          [3]TenantGuestObservation
 	BuildLogs       buildactivity.Record
 }
 
@@ -110,10 +123,15 @@ type tenantProgress struct {
 	started, deadline, last time.Time
 	previous                ProgressEvent
 	conditions              tenantConditions
+	expectedNodes           int
 }
 
 func (p *tenantProgress) update(now time.Time, stage string, nodes []tenantNode) {
-	event := ProgressEvent{Kind: TenantWaiting, Name: stage, RegisteredNodes: len(nodes),
+	expected := p.expectedNodes
+	if expected == 0 {
+		expected = nativeTenantNodeCount(false)
+	}
+	event := ProgressEvent{Kind: TenantWaiting, Name: stage, ExpectedNodes: expected, RegisteredNodes: len(nodes),
 		Provisioning: presentedTenantCondition(p.conditions.Provisioning.Status),
 		Provisioned:  presentedTenantCondition(p.conditions.Provisioned.Status)}
 	for _, node := range nodes {

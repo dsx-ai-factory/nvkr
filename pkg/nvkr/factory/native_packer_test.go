@@ -122,6 +122,10 @@ func TestPrepareNativePackerKernelOverrideSurvivesCapturedPlan(t *testing.T) {
 		Resources:    execution.ResourceCapacity{CPUMillis: 8000, MemoryMiB: 16384, EphemeralStorageMiB: 65536},
 		Capabilities: []execution.CapabilityName{execution.CapabilityHVF}, MaxTimeoutSeconds: 10800,
 	})
+	environment.ExecutionClasses = append(environment.ExecutionClasses, execution.Class{
+		Name: "mac-tcg", RunsOn: "local-mac-tcg", HostPlatform: execution.HostPlatformDarwinARM64,
+		Resources: execution.ResourceCapacity{CPUMillis: 8000, MemoryMiB: 16384, EphemeralStorageMiB: 65536}, MaxTimeoutSeconds: 10800,
+	})
 	writeSnapshotFixtureDocument(t, root, snapshotDefinition, definition)
 	writeSnapshotFixtureDocument(t, root, snapshotEnvironment, environment)
 	original, err := loadFactoryCatalogStack(t.Context(), snapshotDefinition, definition.Catalog)
@@ -130,14 +134,18 @@ func TestPrepareNativePackerKernelOverrideSurvivesCapturedPlan(t *testing.T) {
 	}
 	layout, digest := nativePackerBundleFixture(t, "packer-toolchain", runtime.GOOS, runtime.GOARCH)
 	var defaultBuild string
-	for _, row := range []struct{ name, kernel string }{{"source-default", ""}, {"apple-hvf", "linux-generic"}} {
+	for _, row := range []struct{ name, kernel, accelerator, cpu string }{
+		{"source-default", "", "hvf", "host"},
+		{"apple-hvf", "linux-generic", "hvf", "host"},
+		{"source-tcg", "", "tcg", "max"},
+	} {
 		t.Run(row.name, func(t *testing.T) {
-			variables := map[string]string{"cpu_model": "host"}
+			variables := map[string]string{"cpu_model": row.cpu}
 			if row.kernel != "" {
 				variables["kernel_package"] = row.kernel
 			}
-			prepared, err := PrepareNativePackerBuild(t.Context(), snapshotDefinition, snapshotEnvironment, layout, "packer-tools", digest,
-				filepath.Join(".nvkr", row.name), variables)
+			prepared, err := PrepareNativePackerBuildWithAccelerator(t.Context(), snapshotDefinition, snapshotEnvironment, layout, "packer-tools", digest,
+				filepath.Join(".nvkr", row.name), row.accelerator, variables)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -173,6 +181,9 @@ func TestPrepareNativePackerKernelOverrideSurvivesCapturedPlan(t *testing.T) {
 					if !found || node.ExecutionBinding == nil || node.ExecutionBinding.Class.HostPlatform != execution.HostPlatformDarwinARM64 {
 						t.Fatalf("captured native image lost kernel %q or Mac execution binding", row.kernel)
 					}
+					if row.accelerator == "tcg" && (node.ExecutionBinding.Class.Name != "mac-tcg" || len(node.ExecutionBinding.Class.Capabilities) != 0) {
+						t.Fatal("explicit TCG preparation selected a hardware-accelerated execution class")
+					}
 					if node.SourceCommit != original.Catalog.Components["image"].Commit || node.SourceTreeHash != original.Catalog.Components["image"].TreeHash {
 						t.Fatal("kernel preparation changed the pinned image source")
 					}
@@ -181,12 +192,19 @@ func TestPrepareNativePackerKernelOverrideSurvivesCapturedPlan(t *testing.T) {
 					t.Fatalf("captured Packer producers = %d, want 1", seen)
 				}
 			}
-			if row.kernel == "" {
+			if row.name == "source-default" {
 				defaultBuild = captured.Builds[0].BuildDigest
 			} else if captured.Builds[0].BuildDigest == defaultBuild {
 				t.Fatal("explicit kernel override did not change image build identity")
 			}
 		})
+	}
+	if _, err := PrepareNativePackerBuildWithAccelerator(t.Context(), snapshotDefinition, snapshotEnvironment, layout, "packer-tools", digest,
+		".nvkr/unsupported", "kvm", nil); factoryErrorCode(err) != e.CodeEngineCapability {
+		t.Fatalf("unsupported native Mac accelerator admitted: %v", err)
+	}
+	if _, err := os.Lstat(".nvkr/unsupported"); !os.IsNotExist(err) {
+		t.Fatal("unsupported accelerator created preparation output")
 	}
 	// Preparation emits overlays; it must not change the source-selected Linux kernel.
 	unchanged, err := loadFactoryCatalogStack(t.Context(), snapshotDefinition, definition.Catalog)

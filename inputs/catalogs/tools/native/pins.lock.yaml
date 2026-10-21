@@ -5,17 +5,17 @@ artifacts:
     digests:
       arm64: sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d
     imageParentDigest: sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
-    tag: b6154b292a934dbdff7aa17596cbf2d7ef5f0f85
+    tag: 9ac6832ac965e5222876ef910c3a28be1a392665
   native-capi-exec-plugin-image:
     digests:
       arm64: sha256:a8904bb463d669541a195ee013937e9a5a457dc999b3245da222858b526660fa
     imageParentDigest: sha256:e30e90774e5951f84eb6dfb36f972fead08b64c3bfdc0912c5b15f988e79de3a
-    tag: b6154b292a934dbdff7aa17596cbf2d7ef5f0f85
+    tag: 9ac6832ac965e5222876ef910c3a28be1a392665
   native-workload-image:
     digests:
       arm64: sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d
     imageParentDigest: sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d
-    tag: b6154b292a934dbdff7aa17596cbf2d7ef5f0f85
+    tag: 9ac6832ac965e5222876ef910c3a28be1a392665
 kind: PinLock
 pins:
   clusterctl:
@@ -124,20 +124,20 @@ pins:
     tag: v2.4.1
     treeHash: 6475ba71d8f7f2a2d6c2d09cbfbd40b4a1a1f029
   nvke-cli:
-    commit: 8db5721ae3031bdcd945e559153a740d46ea209e
-    sourceDateEpoch: 1792450875
-    tag: v0.22.0-beta.6
-    treeHash: e928ae13298118b61581d9a406ba4a02f872e959
+    commit: 9ac6832ac965e5222876ef910c3a28be1a392665
+    sourceDateEpoch: 1792509664
+    tag: 9ac6832ac965e5222876ef910c3a28be1a392665
+    treeHash: 41a35697cf25320c58cc87e1ae5569f66869b8c1
   nvke-deploy:
-    commit: 8db5721ae3031bdcd945e559153a740d46ea209e
-    sourceDateEpoch: 1792450875
-    tag: v0.22.0-beta.6
-    treeHash: e928ae13298118b61581d9a406ba4a02f872e959
+    commit: 9ac6832ac965e5222876ef910c3a28be1a392665
+    sourceDateEpoch: 1792509664
+    tag: 9ac6832ac965e5222876ef910c3a28be1a392665
+    treeHash: 41a35697cf25320c58cc87e1ae5569f66869b8c1
   nvke-nicosim:
-    commit: 8db5721ae3031bdcd945e559153a740d46ea209e
-    sourceDateEpoch: 1792450875
-    tag: v0.22.0-beta.6
-    treeHash: e928ae13298118b61581d9a406ba4a02f872e959
+    commit: 9ac6832ac965e5222876ef910c3a28be1a392665
+    sourceDateEpoch: 1792509664
+    tag: 9ac6832ac965e5222876ef910c3a28be1a392665
+    treeHash: 41a35697cf25320c58cc87e1ae5569f66869b8c1
   oras:
     commit: 210747c29c1d38732b3194878dfd8b5a6b9ad7eb
     sourceDateEpoch: 1783708065
@@ -214,27 +214,27 @@ pins:
       platform: linux/arm64
       url: https://releases.hashicorp.com/packer-plugin-qemu/1.1.6/packer-plugin-qemu_1.1.6_linux_arm64.zip
     treeHash: accfb8bf3a7269c099f095c60817f309d06cfb7a
-  vmnet-helper:
-    commit: 222c121ba31e49856c9ec6c3a14426b49d77c8fe
-    sourceDateEpoch: 1785701223
-    tag: v0.13.0
+  vmnet-client:
+    commit: c593b89a2e93e92cfe7c5b1189e1eeb2c7977554
+    sourceDateEpoch: 1773407730
+    tag: v0.10.0
     tool:
-      archiveDigest: sha256:dd4355c053c0f04357285ee50169bfce7d04de3f0f49c0356487b099175ab120
-      executableDigest: sha256:1790cc0b4672c37d7af6c1f046fe96cc733809350d9d8acf576de60b615962f1
+      archiveDigest: sha256:bcf37a2631878a24fd02e2bf812b7387d4c4ff0bcee27c3f4be410c040896f8b
+      executableDigest: sha256:24742a641cd4e884502217fac6f40c4a27a6ffd08682137a69dac21f3cb198f6
+      executablePath: opt/vmnet-helper/bin/vmnet-client
+      format: tar-gzip
+      platform: darwin/arm64
+      url: https://github.com/nirs/vmnet-helper/releases/download/v0.10.0/vmnet-helper.tar.gz
+    treeHash: 8f90a3d7c452e1fad44b7916442a38bc27d06c56
+  vmnet-helper:
+    commit: c593b89a2e93e92cfe7c5b1189e1eeb2c7977554
+    sourceDateEpoch: 1773407730
+    tag: v0.10.0
+    tool:
+      archiveDigest: sha256:bcf37a2631878a24fd02e2bf812b7387d4c4ff0bcee27c3f4be410c040896f8b
+      executableDigest: sha256:3075f3297ed2f8edeb2ae058383dc83debc366fb9d7ce3aa0928a8bc51a7f3a6
       executablePath: opt/vmnet-helper/bin/vmnet-helper
       format: tar-gzip
       platform: darwin/arm64
-      url: https://github.com/nirs/vmnet-helper/releases/download/v0.13.0/vmnet-helper.tar.gz
-    treeHash: d110b5626f215a596f7a2f8b4308a6f165d4c4f4
-  vmnet-run:
-    commit: 222c121ba31e49856c9ec6c3a14426b49d77c8fe
-    sourceDateEpoch: 1785701223
-    tag: v0.13.0
-    tool:
-      archiveDigest: sha256:dd4355c053c0f04357285ee50169bfce7d04de3f0f49c0356487b099175ab120
-      executableDigest: sha256:1a65cd2b0e729cf6f559f8e9e94a1931a5e85c22a7a0aecd0f2ddb9b78e9a800
-      executablePath: opt/vmnet-helper/bin/vmnet-run
-      format: tar-gzip
-      platform: darwin/arm64
-      url: https://github.com/nirs/vmnet-helper/releases/download/v0.13.0/vmnet-helper.tar.gz
-    treeHash: d110b5626f215a596f7a2f8b4308a6f165d4c4f4
+      url: https://github.com/nirs/vmnet-helper/releases/download/v0.10.0/vmnet-helper.tar.gz
+    treeHash: 8f90a3d7c452e1fad44b7916442a38bc27d06c56

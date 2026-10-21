@@ -16,8 +16,8 @@
         "oras",
         "packer",
         "packer-plugin-qemu",
-        "vmnet-helper",
-        "vmnet-run"
+        "vmnet-client",
+        "vmnet-helper"
       ],
       "format": "executable",
       "name": "native-tools-darwin-arm64",

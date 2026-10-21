@@ -176,6 +176,8 @@ Installed-SDK CGO tools and a real HVF guest have run separately. Apple system u
 root-owned protected paths with matching bundle bytes; other Mac tools use private snapshots. Actual native
 utility execution and incorrect-digest rejection are tested. No system security setting changes. Hosted
 rendering rejects native bundle locators, and qualified authority boundaries remain unchanged.
+The native installer source and CAPI version selection now comes from replayed captured tool-Run inputs, checked against the completed Plan and selected output. The producer emits the source Make value; executable and installer source bindings must agree. Packer discovery projects versions and plugin members from the shared catalog rather than a compiled version list. Contract and actual-source Make checks cover this selection; no complete new tool-Run or runtime acceptance is inferred.
+The matched Mac vmnet client/helper passed an actual temporary-interface start/stop test. The native Mac TPM adapter uses the supported simulator QEMU override and standard installed QEMU/swtpm, preserving the inherited network descriptor and process group. An October 19 installed QEMU/swtpm probe explicitly selected TCG and the `max` CPU on a paused 64 MiB machine without an OS disk or network; startup, shared process ownership and joined cancellation passed. This bounded device probe does not establish boot of the selected 64K guest, guest TPM discovery, site attestation or complete native deployment/conformance.
 
 ## External test output and local diagnostic boundary
 
@@ -200,9 +202,9 @@ matching suite/tool outputs from the same fresh artifact Run. The shared native
 startup imports the ordinary named OVN image under its exact native digest and
 projects matching chart values after package installation and before agent startup;
 the OS package's independently built image is not treated as the named output.
-Embedded JSON chart values separate closing braces to preserve the pinned NVKE
-release CRDs' template-delimiter admission rule; projected control-plane and worker
-templates exercise that rule and the standard Go renderer in contract tests.
+The shared site startup imports each selected image through containerd's local manifest importer, preserving its repository alias and checking that exact reference through CRI before bootstrap. CRI owns the managed label: pre-setting it skips the config-ID alias required by image-volume mounts. An isolated exact-image check reproduced this distinction. A subsequent private Ubuntu VM-stage diagnostic consumed completed 38-output artifact and two-output tool Runs, reached a Ready Kubernetes 1.36.3 site, and successfully mounted the exact previously failing plugin image in all three CAPI init containers. It also reached two Ready 1.36.3 tenant nodes. That diagnostic used the earlier two-node tenant; it does not establish the current one-control-plane/two-worker conformance topology, its three-node cloud-init/OVN checks or the four-guest lifecycle. This retained-artifact check is not a fresh complete build/deployment acceptance.
+The native adapter projects Kubernetes version from the selected NVKE installer's shipped site-spec template, rechecking those verified payload bytes at execution boundaries. Site packages, bootstrap, tenant requests, readiness and optional conformance share that source-selected version; current authored conformance inputs select 1.36.3. The private retained-artifact diagnostic observed that version on the actual site and both tenant nodes; full fresh Mac/Linux conformance remains unverified.
+Native tenants use NVKE's generic CAPI NicoCluster/NicoMachineTemplate input with source-generated join-token bootstrap and retained mTLS. NVKR supplies package installation and exact local image imports as pre-kubeadm commands; NVKE owns credentials and its final agent restart. Because commit-string agent versions can bypass the controller's semver-gated cloud-init check, the adapter independently observes each fresh Ready node's actual host cloud-init status without wait mode through a temporary Pod with a recursively read-only host mount. Both actual status commands completed cleanly with exit zero and zero restarts in the private Ubuntu VM-stage diagnostic; the workload/DNS pass marker was captured. Conformance then stopped before the harness: local Run disk capture rejected the host's memory-backed default temporary directory. The shared native invocation now selects an attempt-owned scratch directory on its output filesystem, retaining the factory's disk-backing/headroom checks. Corrected conformance execution and full fresh acceptance remain unverified. The old native Release-template rewriting and compiled template-hash lists remain removed.
 The site-create request carries the source-selected MachineImage boot script,
 rendered with the existing NVKE disk-policy template and current local disk URL.
 Its admitted iPXE selection also supplies DHCP address mode to both site readiness
@@ -1449,6 +1451,33 @@ The standard `run` and `e2e`
 entry points now select that same three-VM deployment owner; the old Kind-site path is no longer their
 production action. Build prepares native tools through NVKR and selects the complete local runtime image
 closure. The former detached retention behavior is not provided by this foreground path.
+Native presentation now uses individual guest/preparation/bootstrap/deployment
+boundaries instead of the legacy Kind-site checklist. Requested conformance has
+its own phase and failed-suite foreground retention does not imply successful
+cleanup. Native tenant presentation joins the existing CAPI role/instance mapping
+to the private NICo inventory for both ordinary and conformance topologies, and
+uses the existing held-path console metadata reader for each exact instance.
+Native Linux reuses its admitted libvirt backend and existing held-domain
+observer. Mac process state remains unobserved rather than inferred from provider
+readiness. Generic CAPI observations use exact Cluster/Machine owner UID joins;
+legacy host-id/spec-label checks remain unchanged. Controlled
+subprocess and dashboard tests cover the model; a live display of this revision
+and complete Mac/Linux runtime acceptance remain unverified.
+
+The downstream Go owner exposes a callback-scoped native site and independently
+created/deleted tenants through the same native engine. The provisional
+`client/v1.WithNativeSite` facade and descriptive/opaque type aliases make that
+owner importable by separate NVKE or customer modules without another lifecycle
+or deployment engine. Independent external-module compile and nil/canceled/zero-handle
+admission coverage establish importability, not real VM acceptance. Existing matching
+`nvkr` and `nvke-demo` helpers and native host controls are still required. Go
+tests can reuse one site for sequential tenants and run conformance explicitly
+against a still-owned tenant, preserving each suite's original output in a fresh
+directory. Opaque handles expire at scope exit; cancellation joins active calls,
+and an unjoined outcome cannot be swallowed by a callback or lost during panic
+or test fatal exit. Controlled subprocess tests cover sequential tenants, failed
+validation retention, natural deletion and those ownership boundaries. These
+contracts do not establish a real site-reuse run or complete Mac/Linux acceptance.
 
 The Mac network owner now consumes the verified upstream vmnet helper's JSON report and holds its Unix
 datagram connection through joined guest/service cleanup. Gateway binding is observed before services
@@ -1771,7 +1800,9 @@ validation remain unexercised. Simulation screenshots establish presentation onl
 
 The local NVIDIA native KVM Definitions now select a coherent renamed NVKE source
 contract for agent, kubeadm, OS assembly, CLI, controller, provisioned provider and
-profiles at `69ef9924`. SPIRE packaging retains its explicit `726f7694` source;
+profiles at the explicitly selected `9ac6832ac965e5222876ef910c3a28be1a392665` snapshot.
+SPIRE packaging separately selects `e7d5e32f5ec36eb57255e9d5de86853d92fa2087`,
+NVKE #1842's public upstream SPIRE/TPM packaging fix and revision-4 package;
 NVIDIA OVN image/chart producers retain `8af51273` / 2.4.2. The custom OVN Debian
 producer changes its actual package metadata and payload paths to `nvke-*` while
 retaining source-compatible virtual package aliases and bounded image import.
@@ -1780,16 +1811,47 @@ controller can still choose its source-owned legacy per-node compatibility form.
 The owning catalogs inspect Debian package names and architectures before accepting
 outputs. The disk uses the renamed Packer build, artifact path and material schema.
 The 32-output demo and 38-output local conformance selections share the same deployment
-closure. These are native diagnostic input changes, with no release/nightly pin change
+closure. The native site catalog derives its four acquired chart pins from that
+source's `deploy/nico/nvke-deploy.yaml`; source-local controller and NKTP chart
+versions come from their exact `Chart.yaml` bytes. The native runtime-image variant
+keeps its separately authenticated images and binds their selection to the same NVKE
+source. Mac and Linux tools share the same source pins. These are native diagnostic input changes, with no release/nightly pin change
 or new Release authority. A fresh package/QCOW build, site/tenant runtime, conformance
 and joined cleanup still require external evidence; prior failed Runs remain failed.
 
+Default native Mac BUILD explicitly selects TCG and `cpu_model=max`. The source
+owns its ARM64 64-KiB kernel and image-composer network files; the native catalog
+adds no kernel override or duplicate network archive members. The existing HVF
+preparation remains available for separately selected compatible source inputs.
+Plan/capture contract tests do not establish a fresh QCOW build. Latest-source
+Mac simulator networking/TPM probes and adapter tests remain bounded checks;
+a complete selected-image guest boot, site/tenant deployment, conformance and
+joined cleanup remain unverified. BUILD does not start those deployment paths.
+An October 19 bounded GET for the preceding `8040adb` SPIRE package's exact
+ARM64 DSX IMDS binary returned HTTP 403. That remains historical evidence for
+that source selection. The selected `e7d5e32f` package instead builds from its
+locked public SPIRE 1.14.1 and TPM plugin 1.9.0 archives; it does not acquire or
+provide the DSX IMDS plugin. Native tenants select join-token attestation and
+the site uses TPM. This explicit source exception does not establish DSX parity
+or complete native runtime acceptance.
+
 The shared native host tools select kubectl 1.35.9 on both platforms. This is
 within one minor of the temporary Kind 1.36.1 bootstrap API and the permanent
-site/tenant 1.34.2 APIs; the separate conformance client remains 1.34.12. The
+site/tenant 1.36.3 APIs; the separate conformance client selects 1.36.3. The
 complete 32-output catalog smoke-policy fixture is explicitly deferred by a
 named skipped subtest. Full catalog compilation and production smoke admission
 remain required; no version stamps or smoke policy are weakened.
+
+The Mac address adapter reads actual kernel neighbor bindings for MACs in the
+fresh private NICo database and projects them through the backend's configured
+address-file interface. The existing pinned Go routing codec and system SQLite
+read-only CLI own their formats. No host DHCP change, simulator DB mutation or
+manual readiness update is used. Initial ambiguity is rejected; after NICo records
+its primary address, only that still-observed address is projected, without
+selecting another alias. Controlled tests cover binding scope, primary preservation,
+missing observations, ambiguity, cancellation and join; full native VM acceptance
+of this adapter remains pending.
+Linux keeps its existing owned dnsmasq path.
 
 Native cleanup retains the pinned backend's serial files before deleting its
 instance: Darwin's `console.log`, or Linux libvirt's `disk.qcow2.ttyS0.log` and
@@ -2802,10 +2864,12 @@ Native children are locked separately from source-owned index parents, and mater
 membership. Controlled source/pin/image tests and exact-source approval do not prove external layer acquisition,
 scanner acceptance or complete production input approval. The
 [acquisition observations](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#temporary-spire-source-selection) retain the historical mixed-source candidate and HTTP-403 limits.
-Current inputs temporarily retain the prior SPIRE packaging source `726f76944404e1106626b8333d3576bdf67b575b`
-and its source-owned acquisition/packaging commands. OS assembly, agent, Calico, kubeadm and native
-Packer capture now select NVKE `v0.22.0-beta.6` (`8db5721ae3031bdcd945e559153a740d46ea209e`),
-including its renamed Packer targets, disk filenames, material schema and required Ubuntu-series input. Current-source execution remains
+The separate maintained release inputs temporarily retain the prior SPIRE packaging source `726f76944404e1106626b8333d3576bdf67b575b`
+and its source-owned acquisition/packaging commands. The maintained release inputs' OS assembly,
+agent, Calico and kubeadm select NVKE `v0.22.0-beta.6`
+(`8db5721ae3031bdcd945e559153a740d46ea209e`), including its renamed Packer targets,
+disk filenames, material schema and required Ubuntu-series input. Native demo inputs
+use the separate source cohort described in Local ARM64 demo presentation. Current-source execution remains
 unverified until a complete recorded development attempt succeeds. The older SPIRE package omits DSX IMDS,
 which current NVKE requires; this is an explicitly incomplete compatibility selection, not full product parity.
 The blocked DSX producer, its material-only selections and unused source credentials are removed.

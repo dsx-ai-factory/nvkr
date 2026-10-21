@@ -35,6 +35,7 @@ type Config struct {
 	Cleanup      bool
 	Walkthrough  bool
 	Conformance  bool
+	Resources    NativeResources
 	Repository   string
 	Network      string
 	NVKECheckout string

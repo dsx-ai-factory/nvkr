@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -23,7 +24,7 @@ import (
 func admitNativeHost(platform, accelerator string) error {
 	switch platform {
 	case "darwin/arm64":
-		if accelerator == "hvf" {
+		if accelerator == "hvf" || accelerator == "tcg" {
 			return nil
 		}
 	case "linux/arm64":
@@ -32,6 +33,13 @@ func admitNativeHost(platform, accelerator string) error {
 		}
 	}
 	return nvkrerr.New(nvkrerr.CodeEngineCapability, "native demo does not support host %q with accelerator %q", platform, accelerator)
+}
+
+func admitNativeQEMUAdapter(platform, accelerator, executable string, site bool) error {
+	if platform == "darwin/arm64" && (site || accelerator == "tcg") && (!filepath.IsAbs(executable) || filepath.Clean(executable) != executable) {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "native Mac site or TCG execution requires this demo's explicit adapter executable")
+	}
+	return nil
 }
 
 // prepareNativeLinux reuses the existing durable bridge, privilege admission,
@@ -154,15 +162,18 @@ func (g *NetworkGuard) allowNativeBootstrap(ctx context.Context, site bool) erro
 
 // nativeLinuxVMEvidence checks local VM bindings through libvirt's own
 // XML/UUID observations and the existing private-domain owner. This diagnostic
-// checks all three guests against the same selected standalone QCOW bytes.
-func nativeLinuxVMEvidence(ctx context.Context, runner Runner, work, digest string) ([]domainEvidence, error) {
+// checks each requested guest against the same selected standalone QCOW bytes.
+func nativeLinuxVMEvidence(ctx context.Context, runner Runner, work, digest string, expected int) ([]domainEvidence, error) {
+	if expected != 1+nativeTenantNodeCount(false) && expected != 1+nativeTenantNodeCount(true) {
+		return nil, errors.New("unsupported native VM topology")
+	}
 	runner.Work = ""
 	names, err := DomainInventory(ctx, runner)
 	if err != nil {
 		return nil, err
 	}
-	if len(names) != 3 {
-		return nil, errors.New("require one real site and two real tenant libvirt domains")
+	if len(names) != expected {
+		return nil, fmt.Errorf("require exactly %d real simulator-owned site and tenant libvirt domains", expected)
 	}
 	slices.Sort(names)
 	var observed []domainEvidence

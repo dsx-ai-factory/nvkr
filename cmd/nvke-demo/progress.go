@@ -87,7 +87,7 @@ type checkedWriter struct {
 	results           [8]string
 	operatorStatus    string
 	walkthroughStatus string
-	guests            [2]nvkedemo.TenantGuestObservation
+	guests            [3]nvkedemo.TenantGuestObservation
 	guestsReported    bool
 }
 
@@ -311,6 +311,22 @@ func (w *checkedWriter) failure() error {
 // terminal controls; caller-supplied status text and private diagnostics are not
 // copied into this output. Report does not reparse subprocess log text.
 func (w *checkedWriter) Report(event nvkedemo.ProgressEvent) {
+	if event.Kind == nvkedemo.NativeDeployment || event.Kind == nvkedemo.NativeRetained {
+		if w.observer != nil {
+			w.observer.Report(event)
+			return
+		}
+		if event.Kind == nvkedemo.NativeRetained && (event.Status == "available" || event.Status == "conformance-failed") {
+			w.mu.Lock()
+			defer w.mu.Unlock()
+			message := "Environment retained for debugging; Ctrl-C starts owned cleanup."
+			if event.Status == "conformance-failed" {
+				message = "Conformance failed; cluster retained for debugging; Ctrl-C starts owned cleanup."
+			}
+			w.emit(message + "\n")
+		}
+		return
+	}
 	if event.Kind == nvkedemo.OSBuildLogs {
 		if event.BuildLogs.Validate() == nil && w.observer != nil {
 			w.observer.Report(event)
@@ -329,9 +345,9 @@ func (w *checkedWriter) Report(event nvkedemo.ProgressEvent) {
 		}
 		w.mu.Lock()
 		defer w.mu.Unlock()
-		for index, role := range [...]string{"Control plane", "Worker"} {
+		for index, role := range tenantGuestRoles(event.ExpectedNodes) {
 			guest, previous := event.Guests[index], w.guests[index]
-			changed := !w.guestsReported || guest.Available != previous.Available || guest.Domain != previous.Domain || guest.ProviderReady != previous.ProviderReady || guest.ProvisioningFailure != previous.ProvisioningFailure || guest.ConsoleKnown != previous.ConsoleKnown
+			changed := !w.guestsReported || guest.Available != previous.Available || guest.Domain != previous.Domain || guest.ProviderReady != previous.ProviderReady || guest.ProvisioningFailure != previous.ProvisioningFailure || guest.InstanceState != previous.InstanceState || guest.ConsoleKnown != previous.ConsoleKnown
 			growth := guest.Available && previous.Available && guest.ConsoleKnown && previous.ConsoleKnown && guest.ConsoleChanged && guest.ConsoleBytes > previous.ConsoleBytes
 			if !changed && !growth {
 				continue
@@ -343,6 +359,10 @@ func (w *checkedWriter) Report(event nvkedemo.ProgressEvent) {
 			}
 			if !guest.Available {
 				w.emit(prefix + "guest observation unavailable\n")
+				continue
+			}
+			if event.Name == "native" {
+				w.emit(fmt.Sprintf("%sNICo %s; Infra Ready=%s; VM %s; console observed=%t (not Kubernetes Ready)\n", prefix, guest.InstanceState, guest.ProviderReady, guest.Domain, guest.ConsoleKnown))
 				continue
 			}
 			w.emit(fmt.Sprintf("%sVM %s; infrastructure Ready=%s (not Kubernetes Ready); console observed=%t", prefix, guest.Domain, guest.ProviderReady, guest.ConsoleKnown))
@@ -408,7 +428,28 @@ func (w *checkedWriter) Report(event nvkedemo.ProgressEvent) {
 	}
 }
 
+func requestedTenantNodes(expected int) int {
+	if expected == 0 {
+		return 2
+	}
+	if expected == 2 || expected == 3 {
+		return expected
+	}
+	return 0
+}
+
+func tenantGuestRoles(expected int) []string {
+	if requestedTenantNodes(expected) == 3 {
+		return []string{"Control plane", "Worker 1", "Worker 2"}
+	}
+	return []string{"Control plane", "Worker"}
+}
+
 func (w *checkedWriter) tenantStatus(event nvkedemo.ProgressEvent) {
+	expected := requestedTenantNodes(event.ExpectedNodes)
+	if expected == 0 {
+		return
+	}
 	var message string
 	switch event.Name {
 	case "tenant-kubeconfig":
@@ -416,13 +457,15 @@ func (w *checkedWriter) tenantStatus(event nvkedemo.ProgressEvent) {
 	case "tenant-api":
 		message = "Tenant kubeconfig available; waiting for a successful tenant API node query (not yet Ready)"
 	case "tenant-nodes":
-		if event.RegisteredNodes < 0 || event.RegisteredNodes > 2 || event.ReadyNodes < 0 || event.ReadyNodes > event.RegisteredNodes {
+		if event.RegisteredNodes < 0 || event.RegisteredNodes > expected || event.ReadyNodes < 0 || event.ReadyNodes > event.RegisteredNodes {
 			return
 		}
-		message = fmt.Sprintf("Tenant nodes: %d/2 registered, %d/2 Ready; waiting for both control plane and worker", event.RegisteredNodes, event.ReadyNodes)
-		if event.RegisteredNodes == 2 && event.ReadyNodes == 2 {
-			message = "Tenant nodes: 2/2 registered, 2/2 Ready; workload and DNS checks still required"
+		message = fmt.Sprintf("Tenant nodes: %d/%d registered, %d/%d Ready; waiting for control plane and workers", event.RegisteredNodes, expected, event.ReadyNodes, expected)
+		if event.RegisteredNodes == expected && event.ReadyNodes == expected {
+			message = fmt.Sprintf("Tenant nodes: %d/%d registered, %d/%d Ready; workload and DNS checks still required", expected, expected, expected, expected)
 		}
+	case "tenant-cloud-init":
+		message = "Checking actual host cloud-init completion on the Ready tenant nodes"
 	case "tenant-workload":
 		message = "Running tenant workload and cluster DNS checks; successful completion still required"
 	default:

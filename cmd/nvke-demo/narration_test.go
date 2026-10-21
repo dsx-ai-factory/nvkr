@@ -131,12 +131,12 @@ func TestE2EWalkthroughIntroductionAdmissionAndOrder(t *testing.T) {
 				writer = failedProgressWriter{}
 			}
 			calls := 0
-			actions := demoActions{retention: func(context.Context) error {
+			actions := demoActions{build: func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
 				calls++
 				if !strings.Contains(out.String(), "32 named outputs") {
 					t.Fatal("runtime admission preceded narration")
 				}
-				return nvkrerr.New(nvkrerr.CodeEngineCapability, "bounded test stops before runtime")
+				return nvkedemo.BuiltInputs{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "bounded test stops before runtime")
 			}}
 			args := []string{"e2e", "--repo", repo, "--attempt", "fresh-01", "--out", filepath.Join(repo, "fresh-output"), "--walkthrough"}
 			if row.invalid {

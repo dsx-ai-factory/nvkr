@@ -130,8 +130,8 @@ esac
 	}
 	for _, call := range strings.Split(string(observed), "\n") {
 		if strings.HasPrefix(call, "nvkr:factory prepare-native-packer-inputs ") &&
-			!strings.Contains(" "+call+" ", " --variable kernel_package=linux-generic ") {
-			t.Fatal("normal Mac preparation retained the source's unsupported 64KB kernel default")
+			(!strings.Contains(" "+call+" ", " --accelerator tcg ") || !strings.Contains(" "+call+" ", " --variable cpu_model=max ") || !strings.Contains(" "+call+" ", " --variable ssh_timeout=180m ") || strings.Contains(call, "kernel_package=")) {
+			t.Fatal("normal Mac preparation must use source-compatible TCG without replacing its kernel")
 		}
 	}
 	sequence := []string{"probe:go:env GOVERSION", "probe:docker:buildx version", "probe:docker:version --format {{.Server.Version}}", "probe:clang:--version", "nvkr:factory prepare-native-packer ", "nvkr:factory prepare-native-packer-inputs --definition inputs/definitions/demo/arm64-nvidia-local-kvm.json --environment inputs/environments/local-native-mac.json", "nvkr:run plan ", "local_toolchain_scopes", "utility:toolchains/nvkr-packer/build.sh --arch arm64 --diagnostic-local --print-validated-image-id", "toolchain_overlay", "local_toolchain_definition", "nvkr:run local --definition .nvkr/mac-build/first/definition.json --environment .nvkr/mac-build/first/packer-inputs/environment.json"}
@@ -157,7 +157,7 @@ func TestDefaultMacPreparationRejectsMissingPrerequisitesBeforeWriting(t *testin
 	for _, tc := range []struct{ name, packer, want string }{
 		{"missing packer", "", "packer"},
 		{"wrong installed version", "Packer v1.0.0", "Packer 1.15.4"},
-		{"missing reviewed plugin", "Packer v1.15.4", "QEMU plugin 1.1.6"},
+		{"missing reviewed plugin", "Packer v1.15.4", "QEMU plugin"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := t.TempDir()
@@ -184,6 +184,13 @@ func TestDefaultMacPreparationRejectsMissingPrerequisitesBeforeWriting(t *testin
 
 func macBuildProbeFixtures(t *testing.T, repo, bin string) []string {
 	t.Helper()
+	catalogDirectory := filepath.Join(repo, "inputs", "catalogs", "tools", "native")
+	if err := os.MkdirAll(filepath.Dir(catalogDirectory), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.CopyFS(catalogDirectory, os.DirFS(filepath.Join("..", "..", "inputs", "catalogs", "tools", "native"))); err != nil {
+		t.Fatal(err)
+	}
 	pin, err := os.ReadFile("../../.go-version")
 	if err != nil {
 		t.Fatal(err)

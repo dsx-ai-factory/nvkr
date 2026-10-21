@@ -73,8 +73,8 @@ func TestNativeAssetsLocalRuntimeClosure(t *testing.T) {
 		}
 	}
 	attempt := nativeSiteAttempt{assets: assets}
-	if err := attempt.releases(t.Context(), "http://172.30.0.1:8080/local.qcow2", "http://172.30.0.1:18080", t.TempDir()); err != nil {
-		t.Fatalf("actual NVKE release templates rejected local workload startup: %v", err)
+	if err := attempt.prepareBoot(t.Context(), "http://172.30.0.1:8080/local.qcow2", "http://172.30.0.1:18080"); err != nil {
+		t.Fatalf("actual NVKE MachineImage template rejected local disk selection: %v", err)
 	}
 }
 
@@ -172,21 +172,23 @@ func TestNativeInstallerArchiveIncludesSourceOwnedCAPISelection(t *testing.T) {
 		t.Fatal(err)
 	}
 	producer, exists := loaded.Components["nvke-installer-sources"]
-	if !exists || producer.Commit != "8db5721ae3031bdcd945e559153a740d46ea209e" {
+	if !exists || producer.Commit == "" {
 		t.Fatal("installer archive lost the selected NVKE source")
 	}
 	command := strings.Join(producer.BuildCommand, " ")
-	if !strings.Contains(command, "-cf - make/tool-versions.mk deploy/nvke-deploy.sh") || !strings.Contains(command, "-C bin SOURCE_COMMIT") {
+	if !strings.Contains(command, "-cf - make/tool-versions.mk deploy/nvke-deploy.sh") || !strings.Contains(command, "-C bin SOURCE_COMMIT CAPI_VERSION") || !strings.Contains(command, "-f make/tool-versions.mk") || !strings.Contains(command, nativeSiteSpecPath) {
 		t.Fatal("installer archive omitted the provider version or source marker")
 	}
 }
 
 func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *testing.T) {
-	versions, err := os.ReadFile("testdata/native-main-tool-versions.mk")
+	run, bundle, _ := nativeCapturedToolsFixture(t)
+	selected, err := nativeInstallerSelectionFromRun(t.Context(), run, bundle)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, scenario := range []string{"complete", "missing versions", "changed versions", "missing source marker", "changed source marker", "canceled"} {
+	versions := []byte("CAPI_VERSION ?= " + selected.capiVersion + "\n")
+	for _, scenario := range []string{"complete", "missing versions", "missing site specification", "changed provider", "missing source marker", "changed source marker", "canceled"} {
 		t.Run(scenario, func(t *testing.T) {
 			entries := []assetEntry{
 				{"deploy/nvke-deploy.sh", tar.TypeReg, "installer", 0},
@@ -202,8 +204,11 @@ func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *test
 				{"controller/nico-sim/internal/seed/default-seed.yaml", tar.TypeReg, "seed", 0},
 				{"controller/nico-sim/ui/index.html", tar.TypeReg, "index", 0},
 			}
+			if scenario != "missing site specification" {
+				entries = append(entries, assetEntry{nativeSiteSpecPath, tar.TypeReg, nativeInstallerSiteSpecFixture, 0})
+			}
 			if scenario != "missing source marker" {
-				commit := "8db5721ae3031bdcd945e559153a740d46ea209e\n"
+				commit := selected.commit + "\n"
 				if scenario == "changed source marker" {
 					commit = strings.Repeat("a", 40) + "\n"
 				}
@@ -211,17 +216,20 @@ func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *test
 			}
 			if scenario != "missing versions" {
 				content := string(versions)
-				if scenario == "changed versions" {
-					content += "CAPI_VERSION ?= v9.99.0\n"
-				}
+
 				entries = append(entries, assetEntry{"make/tool-versions.mk", tar.TypeReg, content, 0})
 			}
+			provider := selected.capiVersion + "\n"
+			if scenario == "changed provider" {
+				provider = "v9.99.0\n"
+			}
+			entries = append(entries, assetEntry{"CAPI_VERSION", tar.TypeReg, provider, 0})
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			if scenario == "canceled" {
 				cancel()
 			}
-			err := extractNativeInstaller(ctx, writeAssetArchive(t, entries), privateTestDir(t))
+			_, err := extractNativeInstaller(ctx, writeAssetArchive(t, entries), privateTestDir(t), run, bundle)
 			if (err == nil) != (scenario == "complete") {
 				t.Fatalf("unexpected extraction admission: %v", err)
 			}

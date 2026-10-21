@@ -40,8 +40,8 @@ func tenantRunFixture(t *testing.T, network, fail, block string) (tenant, string
 		"rows.json":   []tenantRow{{Name: "owned", ID: "owned-id", NICo: TenantProvider{OrgID, SiteID, VPCID}}},
 		"config.json": map[string]any{"clusters": []any{map[string]any{"cluster": map[string]string{"server": "https://" + TenantVIP + ":6443"}}}},
 		"nodes.json": map[string]any{"items": []any{
-			map[string]any{"metadata": map[string]any{"name": "control-plane", "labels": map[string]string{"node-role.kubernetes.io/control-plane": ""}}, "status": map[string]any{"conditions": []any{map[string]string{"type": "Ready", "status": "True"}}, "nodeInfo": map[string]string{"architecture": "arm64", "kubeletVersion": "v1.34.2"}}},
-			map[string]any{"metadata": map[string]string{"name": "worker"}, "status": map[string]any{"conditions": []any{map[string]string{"type": "Ready", "status": "True"}}, "nodeInfo": map[string]string{"architecture": "arm64", "kubeletVersion": "v1.34.2"}}},
+			map[string]any{"metadata": map[string]any{"name": "control-plane", "uid": "control-plane-uid", "labels": map[string]string{"node-role.kubernetes.io/control-plane": ""}}, "status": map[string]any{"conditions": []any{map[string]string{"type": "Ready", "status": "True"}}, "nodeInfo": map[string]string{"architecture": "arm64", "kubeletVersion": "v1.34.2", "bootID": "control-plane-boot"}}},
+			map[string]any{"metadata": map[string]string{"name": "worker", "uid": "worker-uid"}, "status": map[string]any{"conditions": []any{map[string]string{"type": "Ready", "status": "True"}}, "nodeInfo": map[string]string{"architecture": "arm64", "kubeletVersion": "v1.34.2", "bootID": "worker-boot"}}},
 		}},
 		"pods.json": map[string]any{"items": []any{map[string]any{"status": map[string]any{"containerStatuses": []any{map[string]string{"imageID": WorkloadImage}}}}}},
 	} {
@@ -57,6 +57,7 @@ case "$1 $2" in
     printf '%s\n' "$2" >> "$FIXTURE/events"
     if test "$FAIL" = "$2"; then exit 7; fi
     ;;
+  'get nodepools') cat "$FIXTURE/pools.json" ;;
   'create cluster') : > "$FIXTURE/created" ;;
   'get kubeconfig') printf 'fixture only\n' > "$5" ;;
   *) exit 22 ;;
@@ -71,8 +72,13 @@ step() {
 }
 test "$1" = --kubeconfig
 shift 2
-if test "$1" = --request-timeout=10s; then shift; fi
+case "$1" in --request-timeout=*) shift ;; esac
 if test "$1" = -n; then shift 2; fi
+if test -n "${CLOUDINIT_TOOL:-}"; then
+  case "$1 $2" in
+    'get namespace'|'create -f'|'get pod'|'logs status-'*|'delete --raw=/api/v1/namespaces/nvkr-cloud-init-'*) exec "$CLOUDINIT_TOOL" -test.run=TestNativeCloudInitFixtureTool -- "$@" ;;
+  esac
+fi
 case "$1 $2" in
   'get pods')
     if test "${3:-}" = -l && test "$4" = app.kubernetes.io/name=nke-controller; then

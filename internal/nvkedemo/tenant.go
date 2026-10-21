@@ -62,17 +62,18 @@ func tenantCleanupContext(ctx context.Context) (context.Context, context.CancelF
 // TenantRequest is deployment intent consumed and validated by the pinned NVKE
 // CLI. It is not an NVKR Definition or an authenticated provider identity.
 type TenantRequest struct {
-	Name          string             `json:"name"`
-	Kubernetes    string             `json:"controlPlaneKubernetesVersion"`
-	CNI           string             `json:"cniPlugin"`
-	CNIVersion    string             `json:"cniVersion"`
-	EtcdEncrypted bool               `json:"etcdEncrypted"`
-	VIP           string             `json:"controlPlaneVIP,omitempty"`
-	Teleport      bool               `json:"teleportEnabled"`
-	NICo          TenantProvider     `json:"nico"`
-	ControlPlane  ControlPlaneIntent `json:"controlPlaneConfig"`
-	NodePools     []NodePoolIntent   `json:"nodePools"`
-	Network       *TenantNetwork     `json:"network,omitempty"`
+	Name          string              `json:"name"`
+	Kubernetes    string              `json:"controlPlaneKubernetesVersion"`
+	CNI           string              `json:"cniPlugin"`
+	CNIVersion    string              `json:"cniVersion"`
+	EtcdEncrypted bool                `json:"etcdEncrypted"`
+	VIP           string              `json:"controlPlaneVIP,omitempty"`
+	Teleport      bool                `json:"teleportEnabled"`
+	NICo          TenantProvider      `json:"nico,omitzero"`
+	Infra         *TenantClusterInfra `json:"infra,omitempty"`
+	ControlPlane  ControlPlaneIntent  `json:"controlPlaneConfig"`
+	NodePools     []NodePoolIntent    `json:"nodePools"`
+	Network       *TenantNetwork      `json:"network,omitempty"`
 }
 type TenantNetwork struct {
 	PodCIDR     string `json:"podCIDR"`
@@ -85,37 +86,39 @@ type TenantProvider struct {
 	VPC  string `json:"vpcID"`
 }
 type ControlPlaneIntent struct {
-	Count          int    `json:"desiredCount"`
-	Reserved       string `json:"systemReservedMemory"`
-	Teleport       bool   `json:"teleportEnabled"`
-	DisableMonitor bool   `json:"provisioningMonitorDisabled"`
+	Count          int                 `json:"desiredCount"`
+	Reserved       string              `json:"systemReservedMemory"`
+	Teleport       bool                `json:"teleportEnabled"`
+	DisableMonitor bool                `json:"provisioningMonitorDisabled"`
+	Infra          *TenantMachineInfra `json:"infra,omitempty"`
 	NICo           struct {
 		Profile  string   `json:"configProfile"`
 		OS       string   `json:"osProfile,omitempty"`
 		Release  string   `json:"release,omitempty"`
 		Types    []string `json:"instanceTypePreference"`
 		Prefixes []string `json:"vpcPrefixIDs"`
-	} `json:"nico"`
+	} `json:"nico,omitzero"`
 }
 type NodePoolIntent struct {
-	Name             string `json:"name"`
-	Prefix           string `json:"nodeNamePrefix"`
-	Count            int    `json:"desiredNodeCount"`
-	ControlPlane     bool   `json:"controlPlane"`
-	SystemReserved   string `json:"systemReservedMemory"`
-	KubeReserved     string `json:"kubeReservedMemory"`
-	Teleport         bool   `json:"teleportEnabled"`
-	DisableProvision bool   `json:"autoProvisionDisabled"`
-	DisableAuto      bool   `json:"autoModeDisabled"`
-	DisableMonitor   bool   `json:"provisioningMonitorDisabled"`
-	Recycle          int    `json:"recycleBudget"`
+	Name             string              `json:"name"`
+	Prefix           string              `json:"nodeNamePrefix"`
+	Count            int                 `json:"desiredNodeCount"`
+	ControlPlane     bool                `json:"controlPlane"`
+	SystemReserved   string              `json:"systemReservedMemory"`
+	KubeReserved     string              `json:"kubeReservedMemory"`
+	Teleport         bool                `json:"teleportEnabled"`
+	DisableProvision bool                `json:"autoProvisionDisabled"`
+	DisableAuto      bool                `json:"autoModeDisabled"`
+	DisableMonitor   bool                `json:"provisioningMonitorDisabled"`
+	Recycle          int                 `json:"recycleBudget"`
+	Infra            *TenantMachineInfra `json:"infra,omitempty"`
 	NICo             struct {
 		Profile  string   `json:"configProfile"`
 		OS       string   `json:"osProfile,omitempty"`
 		Release  string   `json:"release,omitempty"`
 		Type     string   `json:"instanceTypeID"`
 		Prefixes []string `json:"vpcPrefixIDs"`
-	} `json:"nico"`
+	} `json:"nico,omitzero"`
 }
 
 func NewTenantRequest(name string) TenantRequest {
@@ -154,10 +157,12 @@ func newTenantRequest(name, network string) (TenantRequest, error) {
 }
 
 type tenantRow struct {
-	Name       string           `json:"name"`
-	ID         string           `json:"id"`
-	NICo       TenantProvider   `json:"nico"`
-	Conditions tenantConditions `json:"conditions"`
+	Name         string              `json:"name"`
+	ID           string              `json:"id"`
+	NICo         TenantProvider      `json:"nico"`
+	Infra        *TenantClusterInfra `json:"infra,omitempty"`
+	ControlPlane *ControlPlaneIntent `json:"controlPlaneConfig,omitempty"`
+	Conditions   tenantConditions    `json:"conditions"`
 }
 
 // Retain only the two pinned API condition statuses needed for presentation.
@@ -172,6 +177,17 @@ type tenantConditions struct {
 }
 
 func selectedTenant(rows []tenantRow, name, id string) (*tenantRow, error) {
+	selected, err := selectedTenantIdentity(rows, name, id)
+	if err != nil || selected == nil {
+		return selected, err
+	}
+	if selected.Infra != nil || selected.NICo != (TenantProvider{OrgID, SiteID, VPCID}) {
+		return nil, errors.New("tenant identity/provider changed; refusing adoption or removal")
+	}
+	return selected, nil
+}
+
+func selectedTenantIdentity(rows []tenantRow, name, id string) (*tenantRow, error) {
 	var selected *tenantRow
 	for i := range rows {
 		row := &rows[i]
@@ -188,15 +204,20 @@ func selectedTenant(rows []tenantRow, name, id string) (*tenantRow, error) {
 	}
 	// NVKE owns ID interpretation. Treat its identifier as opaque; constrain it
 	// only where it becomes a filename, and never invent a UUID parser.
-	if selected.ID == "" || strings.ContainsAny(selected.ID, "/\\\x00\r\n\t ") || selected.ID == "." || selected.ID == ".." || selected.NICo != (TenantProvider{OrgID, SiteID, VPCID}) || id != "" && selected.ID != id {
+	if !safeTenantIdentity(selected.ID) || id != "" && selected.ID != id {
 		return nil, errors.New("tenant identity/provider changed; refusing adoption or removal")
 	}
 	return selected, nil
 }
 
+func safeTenantIdentity(id string) bool {
+	return id != "" && !strings.ContainsAny(id, "/\\\x00\r\n\t ") && id != "." && id != ".."
+}
+
 type tenantNode struct {
 	Metadata struct {
 		Name   string            `json:"name"`
+		UID    string            `json:"uid"`
 		Labels map[string]string `json:"labels"`
 	} `json:"metadata"`
 	Spec struct {
@@ -208,15 +229,29 @@ type tenantNode struct {
 	} `json:"spec"`
 	Status struct {
 		Conditions []struct{ Type, Status string }
-		NodeInfo   struct{ Architecture, KubeletVersion string }
+		NodeInfo   struct{ Architecture, KubeletVersion, BootID string }
 	} `json:"status"`
 }
 
 func readyNodes(nodes []tenantNode) (bool, error) {
-	if len(nodes) > 2 {
+	return readyNodesForVersion(nodes, "1.34.2")
+}
+
+func readyNodesForVersion(nodes []tenantNode, version string) (bool, error) {
+	return readyNodesForCountVersion(nodes, version, nativeTenantNodeCount(false))
+}
+
+func readyNodesForCountVersion(nodes []tenantNode, version string, expected int) (bool, error) {
+	if expected != nativeTenantNodeCount(false) && expected != nativeTenantNodeCount(true) {
+		return false, errors.New("unsupported tenant node count")
+	}
+	if !stableKubernetesVersion(version) {
+		return false, errors.New("require the selected stable Kubernetes version")
+	}
+	if len(nodes) > expected {
 		return false, errors.New("unexpected extra tenant node")
 	}
-	if len(nodes) != 2 {
+	if len(nodes) != expected {
 		return false, nil
 	}
 	control := 0
@@ -224,14 +259,14 @@ func readyNodes(nodes []tenantNode) (bool, error) {
 	names := map[string]bool{}
 	for _, node := range nodes {
 		if node.Metadata.Name == "" || names[node.Metadata.Name] {
-			return false, errors.New("require two distinct named tenant nodes")
+			return false, errors.New("require distinct named tenant nodes")
 		}
 		names[node.Metadata.Name] = true
 		_, isControlPlane := node.Metadata.Labels["node-role.kubernetes.io/control-plane"]
 		if isControlPlane {
 			control++
 		} else {
-			// The workload targets the sole worker. Node Ready may precede
+			// The workload targets workers. Node Ready may precede
 			// source-owned post-join completion and removal of its provisioning
 			// marker; wait without changing taints or adding Job tolerations.
 			if node.Spec.Unschedulable {
@@ -252,8 +287,8 @@ func readyNodes(nodes []tenantNode) (bool, error) {
 		if !ready {
 			return false, nil
 		}
-		if node.Status.NodeInfo.Architecture != "arm64" || node.Status.NodeInfo.KubeletVersion != "v1.34.2" {
-			return false, errors.New("tenant node differs from required ARM64 Kubernetes1.34.2")
+		if node.Status.NodeInfo.Architecture != "arm64" || node.Status.NodeInfo.KubeletVersion != "v"+version {
+			return false, fmt.Errorf("tenant node differs from required ARM64 Kubernetes%s", version)
 		}
 	}
 	if control != 1 {
@@ -285,6 +320,7 @@ type tenant struct {
 	sequence      int
 	cleaning      bool
 	cleanup       tenantCleanupObservations
+	nativeCAPI    *nativeCAPITenantOwnership
 }
 
 func (t *tenant) capture(ctx context.Context, args []string, phase string, budget time.Duration) ([]byte, error) {
@@ -317,6 +353,9 @@ func (t *tenant) row(ctx context.Context) (*tenantRow, error) {
 	rows, err := t.inventory(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if t.nativeCAPI != nil {
+		return t.nativeCAPIRow(ctx, rows)
 	}
 	return selectedTenant(rows, t.name, t.id)
 }
@@ -739,6 +778,9 @@ func (t *tenant) restore(ctx context.Context) (result error) {
 	}
 	t.id = row.ID
 	deleteProgress := beginProgress(t.session.Runner.Progress, "tenant-delete", PhaseStarted, PhaseFinished, PhaseFailed)
+	if t.nativeCAPI != nil {
+		t.nativeCAPI.deleting = true
+	}
 	_, err = t.capture(ctx, []string{t.cli(), "delete", "cluster", t.name}, "delete", tenantDeleteTimeout)
 	deleteProgress.finish(err)
 	if err != nil {
