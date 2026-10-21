@@ -413,6 +413,7 @@ func TestDashboardObservationBoundaries(t *testing.T) {
 		{"OVN readiness failure stays visible", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFailed, Name: "site-ovn-node-ready"}, 2, "failed"},
 		{"CAPI waits for site networking", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: "site-cluster-api"}, 2, "running"},
 		{"wrong event family", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "artifacts"}, 1, "pending"},
+		{"wrong conformance event family", nvkedemo.ProgressEvent{Kind: nvkedemo.LaneFinished, Name: "native-conformance"}, dashboardConformancePhase, "pending"},
 		{"unknown event", nvkedemo.ProgressEvent{Kind: "caller-success", Name: "artifacts"}, 1, "pending"},
 		{"private name", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFailed, Name: "private-node-name"}, 3, "pending"},
 		{"ready nodes are not workload success", nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-nodes", RegisteredNodes: 2, ReadyNodes: 2}, 4, "pending"},
@@ -439,7 +440,7 @@ func TestDashboardFailureStopsUnfinishedPhases(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		events []nvkedemo.ProgressEvent
-		states [6]string
+		states [dashboardConformancePhase + 1]string
 	}{
 		{
 			name: "workload stops when its tenant owner fails",
@@ -447,7 +448,7 @@ func TestDashboardFailureStopsUnfinishedPhases(t *testing.T) {
 				{Kind: nvkedemo.TenantWaiting, Name: "tenant-workload", RegisteredNodes: 2, ReadyNodes: 2},
 				{Kind: nvkedemo.DeploymentFailed, Name: "tenant-provisioning"},
 			},
-			states: [6]string{"pending", "pending", "pending", "failed", "stopped", "pending"},
+			states: [dashboardConformancePhase + 1]string{"pending", "pending", "pending", "failed", "stopped", "pending", "pending"},
 		},
 		{
 			name: "deployment failure stops active site and cleanup",
@@ -456,7 +457,7 @@ func TestDashboardFailureStopsUnfinishedPhases(t *testing.T) {
 				{Kind: nvkedemo.PhaseStarted, Name: "network-cleanup"},
 				{Kind: nvkedemo.DeploymentFailed, Name: "local-demo"},
 			},
-			states: [6]string{"pending", "pending", "stopped", "pending", "pending", "stopped"},
+			states: [dashboardConformancePhase + 1]string{"pending", "pending", "stopped", "pending", "pending", "stopped", "pending"},
 		},
 		{
 			name: "observed substep is not owning site completion",
@@ -464,7 +465,7 @@ func TestDashboardFailureStopsUnfinishedPhases(t *testing.T) {
 				{Kind: nvkedemo.PhaseFinished, Name: "create-management"},
 				{Kind: nvkedemo.DeploymentFailed, Name: "local-demo"},
 			},
-			states: [6]string{"pending", "pending", "stopped", "pending", "pending", "pending"},
+			states: [dashboardConformancePhase + 1]string{"pending", "pending", "stopped", "pending", "pending", "pending", "pending"},
 		},
 		{
 			name: "completed artifacts and failed cleanup remain explicit",
@@ -473,7 +474,23 @@ func TestDashboardFailureStopsUnfinishedPhases(t *testing.T) {
 				{Kind: nvkedemo.PhaseFailed, Name: "network-cleanup"},
 				{Kind: nvkedemo.DeploymentFailed, Name: "local-demo"},
 			},
-			states: [6]string{"pending", "complete", "pending", "pending", "pending", "failed"},
+			states: [dashboardConformancePhase + 1]string{"pending", "complete", "pending", "pending", "pending", "failed", "pending"},
+		},
+		{
+			name: "active conformance stops with the owning deployment",
+			events: []nvkedemo.ProgressEvent{
+				{Kind: nvkedemo.PhaseStarted, Name: "native-conformance"},
+				{Kind: nvkedemo.DeploymentFailed, Name: "local-demo"},
+			},
+			states: [dashboardConformancePhase + 1]string{"pending", "pending", "pending", "pending", "pending", "pending", "stopped"},
+		},
+		{
+			name: "captured conformance completion survives later deployment failure",
+			events: []nvkedemo.ProgressEvent{
+				{Kind: nvkedemo.PhaseFinished, Name: "native-conformance"},
+				{Kind: nvkedemo.DeploymentFailed, Name: "local-demo"},
+			},
+			states: [dashboardConformancePhase + 1]string{"pending", "pending", "pending", "pending", "pending", "pending", "complete"},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1145,17 +1162,22 @@ func TestDashboardNativeChecklistUsesIndividualOwnerBoundaries(t *testing.T) {
 
 func TestDashboardNativeConformanceAndRetention(t *testing.T) {
 	for _, scenario := range []struct {
-		kind, state, retained string
+		previous, kind, state, retained string
 	}{
-		{nvkedemo.PhaseStarted, "running", ""},
-		{nvkedemo.PhaseFinished, "passed", "available"},
-		{nvkedemo.PhaseFailed, "failed", "conformance-failed"},
+		{"", nvkedemo.PhaseStarted, "running", ""},
+		{"", nvkedemo.PhaseFinished, "complete", "available"},
+		{"", nvkedemo.PhaseFailed, "failed", "conformance-failed"},
+		{nvkedemo.PhaseFailed, nvkedemo.PhaseStarted, "running", ""},
+		{nvkedemo.PhaseFinished, nvkedemo.PhaseStarted, "running", ""},
 	} {
-		t.Run(scenario.state, func(t *testing.T) {
+		t.Run(scenario.state+"/after-"+scenario.previous, func(t *testing.T) {
 			d := newDashboard()
 			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.NativeDeployment, Conformance: true, ExpectedNodes: 3})
-			if d.snapshot().conformance.state != "pending" {
+			if d.snapshot().phases[dashboardConformancePhase].state != "pending" {
 				t.Fatal("requested conformance omitted before execution")
+			}
+			if scenario.previous != "" {
+				d.Report(nvkedemo.ProgressEvent{Kind: scenario.previous, Name: "native-conformance"})
 			}
 			d.Report(nvkedemo.ProgressEvent{Kind: scenario.kind, Name: "native-conformance"})
 			if scenario.retained != "" {
@@ -1168,6 +1190,9 @@ func TestDashboardNativeConformanceAndRetention(t *testing.T) {
 			}
 			if snapshot.phases[5].state != "pending" || snapshot.retained != (scenario.retained != "") {
 				t.Fatal("retention claimed cleanup", snapshot.phases[5], snapshot.retained)
+			}
+			if scenario.state == "running" && snapshot.currentStarted.IsZero() {
+				t.Fatal("explicit suite start lost its observation clock")
 			}
 			if scenario.retained == "conformance-failed" && !strings.Contains(snapshot.current, "failed; cluster retained") {
 				t.Fatal("suite failure hidden by retention", snapshot.current)
@@ -1242,8 +1267,8 @@ func TestDashboardNativeSequentialTenantStartsWithFreshObservations(t *testing.T
 			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "tenant-cleanup"})
 			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.DeploymentStarted, Name: "tenant-provisioning"})
 			snapshot := d.snapshot()
-			if snapshot.phases[2].state != "complete" || snapshot.phases[3].state != "running" || snapshot.phases[4].state != "pending" || snapshot.phases[5].state != "pending" || snapshot.conformance.state != "pending" {
-				t.Fatal("new tenant reused outcomes or reset the site", snapshot.phases, snapshot.conformance)
+			if snapshot.phases[2].state != "complete" || snapshot.phases[3].state != "running" || snapshot.phases[4].state != "pending" || snapshot.phases[5].state != "pending" || snapshot.phases[dashboardConformancePhase].state != "pending" {
+				t.Fatal("new tenant reused outcomes or reset the site", snapshot.phases)
 			}
 			if snapshot.nodesObserved || snapshot.registered != 0 || snapshot.ready != 0 || snapshot.retained || !snapshot.observedAt.IsZero() || !snapshot.deadline.IsZero() || !snapshot.guestsObservedAt.IsZero() {
 				t.Fatal("new tenant reused old observations")
@@ -1273,7 +1298,7 @@ func TestTenantCloudInitProgressIsVisibleInBothPresenters(t *testing.T) {
 				d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-nodes", ExpectedNodes: 3, RegisteredNodes: 3, ReadyNodes: 3})
 				d.Report(event)
 				text = dashboardTenantSummary(d.snapshot(), time.Now())
-				if d.snapshot().phases[4].state != "pending" || d.snapshot().conformance.state != "pending" {
+				if d.snapshot().phases[4].state != "pending" || d.snapshot().phases[dashboardConformancePhase].state != "pending" {
 					t.Fatal("host cloud-init observation claimed workload or conformance completion")
 				}
 			}
@@ -1302,8 +1327,8 @@ func TestNativeIdentityFailureRetentionDoesNotCompleteTenant(t *testing.T) {
 			t.Fatalf("unstarted phase %d claimed %s", i, s.phases[i].state)
 		}
 	}
-	if s.conformance.state != "pending" || strings.Contains(s.tenant, "completed") || !strings.Contains(s.tenant, "not started") {
-		t.Fatal("site retention claimed tenant or suite completion", s.tenant, s.conformance)
+	if s.phases[dashboardConformancePhase].state != "pending" || strings.Contains(s.tenant, "completed") || !strings.Contains(s.tenant, "not started") {
+		t.Fatal("site retention claimed tenant or suite completion", s.tenant, s.phases[dashboardConformancePhase])
 	}
 	for _, stage := range s.tenantStages {
 		if state, checked, _ := stage.status(1); state != "pending" || checked != 0 {
