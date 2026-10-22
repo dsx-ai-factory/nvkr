@@ -20,6 +20,10 @@ bin/nvkr release browse --reference "$RELEASE_REF"
 The listing shows named outputs, artifact types, components, Build Digests, and evidence. Registry access
 uses your existing credentials; add `--anonymous` to each command for a public registry.
 
+For an interactive overview, add `--ui=tui`. Use `/` to search names, kinds, platforms or digests,
+Enter to inspect an output and follow its evidence, and Esc to return. Press `q` then `y` to close.
+The [terminal browser reference](release-navigation.md#browse-interactively) covers selection and display options.
+
 Set `OUTPUT_NAME` to an exact name from that listing. Keep using the same terminal:
 
 ```sh

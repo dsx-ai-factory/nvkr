@@ -1731,6 +1731,15 @@ cleanup failure remain distinct. Safe panes exclude raw diagnostic and private
 transport/path data. Command results are detached descriptions within progress;
 the SDK inspection DTO has no terminal snapshot method.
 
+The opt-in release browser shares the export description projection for chart versions, native image
+children, component build subjects, declared disk metadata and complete evidence memberships. Compact
+row summaries hide when they would crowd names. Command-item search includes projected kinds and fields,
+including platforms and digests; exact dependency links remain usable outside search results. Explicit
+JSON and Mermaid output retain their plain bytes in auto mode and reject explicit TUI before acquisition.
+Controlled projection, terminal simulation and loopback-registry tests cover these behaviors, including
+zero payload-layer requests and rejection of corrupt unselected metadata. These are contract fixtures;
+they establish neither external Release acceptance nor human usability validation.
+
 The authenticity verification result browser projects the owning consumer's
 detached description and labels payload integrity as unchecked. It neither
 invokes full-payload verification nor promotes authenticated metadata to payload
