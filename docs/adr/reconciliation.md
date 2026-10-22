@@ -190,14 +190,19 @@ Local/disposable acknowledgements are operator declarations, not proof of locali
 Contract and process-fixture tests cover guards, capture, cleanup and dispatch. They do not establish
 successful external execution of the corrected published-source route. Report parsing, original JUnit
 validity, continuous installed-byte proof, AI/user adapters, Definition applicability detection,
-qualification signing and promotion from these outputs remain unimplemented. Explicit complete local diagnostic Runs are now captured through a lifecycle-owned capability,
+qualification signing and promotion from these outputs remain unimplemented.
+
+Explicit complete local diagnostic Runs are now captured through a lifecycle-owned capability,
 including original Plan/compiler inputs and held payloads. Product and tools may share one capture;
 local reports omit hosted qualification inputs. Delivery retains distinct named native image output and
 evidence bindings when their exact manifest bytes are shared. Conflicting aliases, repeated logical names
 and duplicate direct descriptors remain rejected; physical closure accounting uses distinct digests.
-Round-trip and rejection contracts cover this case; they do not prove a full native conformance run. The shared native demo has an opt-in Mac/Linux ARM64 conformance hook using
-matching suite/tool outputs from the same fresh artifact Run. The shared native
-startup imports the ordinary named OVN image under its exact native digest and
+Round-trip and rejection contracts cover this case; they do not prove a full native conformance run.
+
+The shared native demo has an opt-in Mac/Linux ARM64 conformance hook using
+matching suite/tool outputs from the same fresh artifact Run.
+
+The shared native startup imports the ordinary named OVN image under its exact native digest and
 projects matching chart values after package installation and before agent startup;
 the OS package's independently built image is not treated as the named output.
 Embedded JSON chart values separate closing braces to preserve the pinned NVKE
@@ -210,8 +215,8 @@ and bootstrap address checks; standalone guests retain the static two-address co
 Owned-subnet, reserved-address and duplicate-address rejection remain shared.
 These source and shell contracts do not prove fresh runtime import, DHCP callback
 identity or conformance acceptance. Strict manifest observations remain required.
-Linux retains
-sealed executable descriptors. Mac local diagnostics hold authenticated Darwin
+
+Linux retains sealed executable descriptors. Mac local diagnostics hold authenticated Darwin
 bytes and execute private Mach-O snapshots, checked before/after each command
 and removed after joined process cleanup. This detects replacement between
 commands, without Linux's sealed-descriptor guarantee against hostile same-user
@@ -2783,10 +2788,130 @@ The external policy read-back retained `codex/m2-arc-validation` and `main` for 
 `codex/m2-arc-validation`, `feat/nke-deploy-pipeline` and `main` for `nkd-release`; it did not admit the exact
 PR #97 branch. Removing an authored exception neither changes those provider policies nor bypasses them.
 The existing provider secret is `NKE_SOURCE_TOKEN`; the rename retains that exact
-credential reference, not an unprovisioned `NVKE_SOURCE_TOKEN`. Package Actions read access, native pool capacity and successful exact-head
+credential reference, not an unprovisioned `NVKE_SOURCE_TOKEN`. Dedicated reader-account package access, native pool capacity and successful exact-head
 execution remain external acceptance requirements.
 
 ## Maintained input and schema boundaries
+
+The NVKE four-family pilot adds independent core (20 outputs), services (28), telemetry (17) and disks (4)
+Definitions under `inputs/definitions/nvke/`, with corresponding `github-nvke-<family>` Environments and
+named production bundles. Their selected output union is the combined candidate's 69 outputs, retaining
+aggregate native children, bound chart/image relationships and complete disk material selections. They
+reuse shared catalog/pin owners and publish into separate family prefixes beneath the existing candidate
+namespace. `make nvke-split-generate` and `make nvke-split-check` own the family subset; the repository-wide
+workflow targets include it. These are authored-input and generation changes, not a new lifecycle or
+cross-Run assembly contract. No hosted family execution, publication or independent consumer acceptance
+is recorded. The combined production/development and qualification paths remain until consumer and
+qualification cutover. Named producer qualification and named development remain unsupported; the pilot
+emits no automatic association file or parent Release. Consumers independently verify exact family
+references and own any required association or compatibility decision. See the
+[pilot inputs](../../inputs/definitions/nvke/README.md#four-family-pilot) and
+[partitioning strategy](../definition-partitioning-strategy.md) for scope and historical measurements.
+
+The 2026-10-20 integration of upstream `9857feeda03d2e7f529e1baef2b4a331a011e54c` reproduced
+`CodePipelineDrift` in all four family bundles. Regeneration through `make nvke-split-generate` refreshed
+eleven JSON files, including all four Plans and manifests; family Environments, entry workflows and action
+templates remain unchanged. Independent inspection retains the exact disjoint union of 73 complete native
+build records and 69 output records against the updated combined Plan. The extended exact-regeneration
+contract passed in 4.05 seconds and the complete focused family/credential suite in 32.747 seconds on
+2026-10-20, with Go 1.27.2 on Darwin ARM64 and recorded staged tree
+`e9187e1e6ce5e5fda6d26e04b912d10622f559c0`. The
+[current measurements](../definition-partitioning-strategy.md#current-local-validation) record each family.
+The full local gate passed at 21:54:35 UTC on 2026-10-20 on staged tree
+`2ff2a400055ae9cfe429b5c0bcfeb55bfaaedb41`, with Go 1.27.2 on Darwin ARM64 and golangci-lint 2.14.0:
+`make check GO_TEST_FLAGS='-count=1 -json -p=1'`, `make build` and both diff checks. All 58 default Go
+package suites, static/shell checks and 19 Python tests passed; the vulnerability scan found none.
+Delivery took 544.323 seconds, factory 462.554 seconds and lifecycle 363.894 seconds. Subsequent integration
+through upstream `07181055` changed only documentation and formatting commands; Go sources, tests, authored
+inputs and generated bundles remain identical to the tested tree. The final formatting commands passed
+large-inventory, spaced-filename, read-only and failure fixtures plus `make fmt-check`; the full suite was
+not repeated for those formatting/documentation changes. All-owner workflow regeneration, workflow lint, targeted metadata/retry lifetime race
+checks and formatting failure/read-only fixtures also passed. New-head hosted CI remains pending.
+Native Linux signing/pipeline race and pinned-cosign interoperability were not rerun locally; raw local
+logs remain unpublished. These local contracts establish no hosted family acceptance.
+
+The maintained closure inventory checks every committed producer bundle and both qualification pairs
+offline, without skipping when private sources are unavailable. It checks exact policy selections, member
+bytes/modes and complete namespace inventory; authenticated recompilation remains owned by workflow checks.
+The existing combined/development/nightly credential matrix now states each disk expectation explicitly,
+including the development exemption. The separate actual disks-family assertion retains four producers.
+Additional PinSet contracts compare registry, resolved-catalog and snapshot admission at declaration edges,
+including the 1,024-member boundary and NVKE accounted-member bound; diagnostic text uses the shared limit.
+These are coverage and generation changes, not new authority or evidence of registry access.
+
+Upstream's [formatting job](https://github.com/dsx-ai-factory/nvkr/actions/runs/39494503833/job/118876005825)
+failed before `gofmt` because the expanded shell command exceeded Linux's per-argument limit. Format,
+check and tidy targets adopt upstream `07181055`'s recursive `gofmt` invocation on the module source
+directories; formatter failures remain errors and the check remains read-only. This fixes repository CI
+invocation, not artifact execution.
+
+Combined qualification retains same-Run live authenticated receipts and the existing publication root,
+with upstream's 59-minute operation, 60-minute step and 90-minute job budgets. Development retry reuse stays
+within its original Run and publication namespace. Lazy OCI verification retains exact subjects and
+independent signature/provenance checks within one verification operation. ADR-24 now implements the
+provisional CLI catalog, strict discovery/loading and local-plan profile dispatch; broader migration,
+published adapters and actual upstream/native-platform catalog acceptance remain deferred. Local native-tool
+support does not admit hosted family execution or named family qualification.
+
+Historical validation was recorded during the preceding `c01c9132` integration, later committed as
+`250f842cb448347e2f6b1e9f2f373eb98e41e6e5`. Its extended split comparison passed in 4.25 seconds, the focused suite in 34.227 seconds,
+and the full uncached `make check GO_TEST_FLAGS='-count=1 -json -p=1'`, build and diff checks passed at
+23:32 UTC on 2026-10-19. All 58 packages, static/shell checks and 19 Python tests passed; the vulnerability
+scan found none. Its exact-head [hosted Merge Gate](https://github.com/dsx-ai-factory/nvkr/actions/runs/39342927832)
+passed at 23:43:57 UTC. The [historical measurement table](../definition-partitioning-strategy.md#historical-validation-at-250f842c)
+records dimensions and scope. Raw local logs remain unpublished and omit a complete tested working-tree
+hash and direct toolchain dump; they cannot independently bind those measurements to the final commit.
+Hosted CI is separate evidence, not a receipt for those local commands. The earlier all-owner workflow check's unchanged-byte comparison applied
+only to the preceding integration, not the current catalog and generated JSON changes. The linked historical
+section gives reproducible immutable old/new ref-and-path checks and their exclusions.
+
+Every helper bootstrap retains the authored dispatch guard before checkout, helper compilation and private
+CI-storage upload, including helpers without catalog credentials. Negative contracts reject missing or
+broadened guards, unadmitted feature branches, tags and push events across build-only, publication and
+named-runtime helpers. No hosted family execution of this boundary is recorded.
+[ADR-18](0018-pipeline-ir-and-ci-adapter-emission.md) owns the contract;
+[bootstrap dispatch tests](../../pkg/nvkr/factory/github_bootstrap_dispatch_test.go) cover refusal.
+
+All four family Environments retain the maintained production `NVKR_REGISTRY_WRITE` publication policy.
+The exact `m2-candidate/disks` prefix also admits the existing pinned M2 toolchains for separate preparation
+with the fixed independent registry reader. Focused contracts reproduce and fix the previously omitted
+preparation, require it before all four disk producers and source-vendor execution, and reject lookalike,
+child, other-family and foreign-owner exceptions. Credential projection and cleanup contracts pass; they
+do not establish provisioned registry access or hosted family execution.
+
+The services family requires private chart pin-set revalidation even though its selected producers need no
+Git fetch node. Source-access admission now also recognizes the actual pin-set sources in revalidated
+catalog snapshots. It retains rejection of unrelated repository entries and the existing step-scoped
+credential projection: catalog recompilation may receive these credentials; artifact acquisition, build
+and publication do not. This closes a local admission gap for acquired-only selections, not a new source
+trust or credential scope. No hosted private-source read or services publication is established by this
+change; [ADR-20](0020-artifact-publication-and-target-configuration.md#2-target-configuration-surface) owns
+the contract.
+Focused local contracts pass for root/output pin-set-only sources, mixed admitted/unrelated access,
+ordinary-source and unknown-repository refusal, local-engine admission and snapshot substitution without
+partial output. A local Git fixture composes real acquired-only loading with rendering: the locked commit
+survives a moved upstream tag; malformed metadata, stale versions and stale provenance return no Plan or
+bundle. Exact catalog credential helper/mirror configuration is confined to revalidation steps.
+[Source-access contracts](../../pkg/nvkr/factory/source_access_test.go),
+[real loader composition](../../pkg/nvkr/factory/source_access_loader_test.go).
+
+Resolved snapshots reuse the catalog owner's intrinsic PinSet declaration checks. Malformed file paths and
+unsupported formats first reproduced acceptance in low-level compilation and rehashed root/output Plan
+validation, then were rejected with no Plan or credential-bearing bundle. Valid base catalogs and explicit
+producer overlays remain supported. These semantic checks and snapshot identity do not authenticate
+upstream contents; authored loading retains reciprocal membership, lock and exact pinned-tree checks.
+[ADR-22](0022-catalog-pinning-and-the-lock-contract.md#7-derived-pin-sets-one-source-may-curate-other-sources-pins)
+owns the boundary; [compiler contracts](../../pkg/nvkr/factory/pin_set_semantics_test.go) cover it.
+
+The maintained family matrix asserts combined/core/services catalog credential confinement and
+telemetry/disks absence, including raw-secret aliases and exact repository/helper/mirror bindings while
+preserving legitimate source-fetch credentials. All nondisk families explicitly reject the private-toolchain
+exception and emit no reader preparation. Default tests compare all authored family Definitions and
+Environments to committed Plans; full compilation/rendering remains extended. During the preceding
+`c01c9132` integration, the focused
+family matrix passed in 34.227 seconds, including the 73/69 identity comparison and the actual
+disks-family credential regression in 0.83 seconds. These are local
+contracts, not evidence of private registry access, hosted family execution or consumer acceptance.
 
 The [M2 Definition instructions](../../inputs/definitions/nvke/README.md) own example-specific selection and input
 preparation. The candidate requires 69 named outputs. It retains the previous 37 and adds source-built

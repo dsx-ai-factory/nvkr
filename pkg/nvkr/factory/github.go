@@ -158,9 +158,7 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		if plan.Environment.GitHubRuntimePlan && runner != sortedKeys(bootstrapJobs)[0] {
 			fmt.Fprintf(&body, "    needs: [%s]\n", bootstrapJobs[sortedKeys(bootstrapJobs)[0]])
 		}
-		if plan.Environment.GitHubDevelopment || len(githubCatalogSourceEnvironment(plan)) > 0 {
-			fmt.Fprintf(&body, "    if: ${{ %s }}\n", githubDispatchCondition(plan))
-		}
+		fmt.Fprintf(&body, "    if: ${{ %s }}\n", githubDispatchCondition(plan))
 		fmt.Fprintf(&body, "    steps:\n")
 		if err := writeGitHubPlatformCheck(&body, plan, runner); err != nil {
 			return nil, err

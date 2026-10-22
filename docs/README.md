@@ -78,6 +78,11 @@ The [ADRs](adr) own engineering contracts, and [reconciliation](adr/reconciliati
 implementation/evidence ledger. The [roadmap](milestones.md) links outcomes to the detailed
 [acceptance specification](epics-v1-spec.md).
 
+[Definition partitioning strategy](definition-partitioning-strategy.md) explains the four-family NVKE
+pilot, historical graph-capacity measurements, shared catalog ownership and related Release options.
+The [input instructions](../inputs/definitions/nvke/README.md#four-family-pilot) own generation and checking;
+the combined candidate remains available pending consumer and qualification cutover.
+
 Proposed [ADR-24: imported validator catalog](adr/0024-imported-validator-catalog.md) defines discovery,
 adapter selection and artifact bindings across repositories, including its diagnostic and evidence limits.
 The provisional local-plan CLI slice implements catalog discovery and versioned-profile execution;

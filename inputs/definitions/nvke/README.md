@@ -1,9 +1,54 @@
-# Combined NVKE M2 candidate
+# NVKE release candidate and family pilot
 
-This is the Definition used by the committed `nvkr-run.yml`. It joins independently pinned NVKE CLI,
+The combined [Definition](definition.yaml) is used by the committed `nvkr-run.yml`. It joins independently pinned NVKE CLI,
 controller and chart builds, operator executables, native node images and third-party deployment images
 into one release with **69 named outputs**. This remains a candidate; completed pipeline delivery and
 full product acceptance are separate facts.
+
+## Four-family pilot
+
+Four independent Definitions partition the combined candidate's exact named outputs. They reuse the
+shared catalogs and pins; they do not import each other or change the combined Definition into a parent.
+
+| Definition | Outputs | Membership | Environment |
+|---|---:|---|---|
+| [Core](core.yaml) | 20 | CLI/operator tools, controller and bound chart, providers/reference fixture, CAPI and cert-manager images | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) |
+| [Services](services.yaml) | 28 | SPIRE, PostgreSQL and Temporal charts and native images | [github-nvke-services.yaml](../../environments/github-nvke-services.yaml) |
+| [Telemetry](telemetry.yaml) | 17 | NKTP chart and native runtime images | [github-nvke-telemetry.yaml](../../environments/github-nvke-telemetry.yaml) |
+| [Disks](disks.yaml) | 4 | Native AMD64/ARM64 plain and public-bootstrap FDE disks, each with its complete material closure | [github-nvke-disks.yaml](../../environments/github-nvke-disks.yaml) |
+
+Each Environment selects `githubBundle: nvke-<family>`, the corresponding
+`.github/workflows/nvkr-run-nvke-<family>.yml`, an explicit main-only signer identity, and publication prefix
+`ghcr.io/dsx-ai-factory/nvkr/m2-candidate/<family>`. Its Release publishes by digest beneath that prefix's
+`releases` repository. Source-access and disk settings are scoped to the family's selected producers.
+All four families retain the maintained production registry policy: `NVKR_REGISTRY_WRITE` handles
+publication, while private native toolchain preparation uses `NVKR_REGISTRY_READ` with
+`NVKR_REGISTRY_READ_USER`. These credentials require the same operator provisioning as the combined
+candidate; generation does not verify package access.
+
+From the repository root:
+
+```sh
+make nvke-split-generate
+make nvke-split-check
+```
+
+The repository-wide `make workflows-generate` and `make workflows-check` also include these bundles.
+Generated Plans, actions and manifests retain their normal ownership; edit the authored inputs and
+regenerate. Generation and drift checking do not build, publish or qualify any family.
+
+This is a reversible pilot alongside the combined production, development and qualification workflows.
+Named production bundles have no generated qualification pair, and named development bundles remain
+unsupported. The existing combined qualification policies do not cover four independent family Runs.
+Keep the combined path until the consumer and qualification cutover has its own accepted contract.
+
+Consumers select each exact digest-pinned family Release and verify it under independently chosen policy.
+Any record associating those references belongs to the downstream consumer; this pilot emits no automatic
+association file, native parent Release or cross-Release compatibility verdict. Family output publication
+still requires every output and its exact evidence within that Definition. No hosted family build,
+publication or independent consumer acceptance is established here. The
+[partitioning strategy](../../../docs/definition-partitioning-strategy.md) records the rationale,
+historical capacity measurements and remaining cutover work.
 
 ## Selected artifacts and their owners
 
@@ -123,8 +168,9 @@ The [toolchain preparation guide](../../../toolchains/nvkr-packer/README.md)
 lists repository-owned native preparation and measurement commands, their current
 toolchain license/security gates, and the missing production inputs. The inspector's source
 README gives separate AMD64 and ARM64 assembly commands. The generated workflow uses isolated
-read-only image preparation with the ephemeral GitHub token; grant this repository Read under
-each internal toolchain package's Manage Actions access settings. Maintained manual dispatch and
+read-only image preparation with `NVKR_REGISTRY_READ` and `NVKR_REGISTRY_READ_USER`; provision access
+independently of the repository token, as described in the
+[production credential setup](../../../docs/generate-pipeline.md). Maintained manual dispatch and
 signing admit only `main`. The October 7 branch attempt at `562a609` used a temporary exact
 `codex/m2-native-arc-foundation` authored exception; it was cancelled after GitHub environment
 protection rejected that branch before attestation, disk execution and finalization steps ran
@@ -195,8 +241,10 @@ producer completion with mixed original attempts. Successful independent retry q
 Only admitted source retrieval and pinned-source revalidation steps receive `NKE_SOURCE_TOKEN` for NVKE;
 native build jobs receive source bytes without that
 credential. Internal toolchain preparation uses separate ephemeral read-only package access, removed
-before producer execution. Grant the workflow repository Actions Read access on each internal toolchain
-package. Restrict `nvkr-arc`, `nvkr-release` and the signing identity to the selected refs. Maintained inputs
+before producer execution. Grant the dedicated reader account only its required package roles and retire
+source-repository Actions access after migrating and validating the new workflow, as described in the
+[production credential setup](../../../docs/generate-pipeline.md). Restrict `nvkr-arc`, `nvkr-release`
+and the signing identity to the selected refs. Maintained inputs
 admit `main` only and contain no validation-branch dispatch exception. Ephemeral runner isolation and
 provider access restrictions remain operator obligations.
 

@@ -45,10 +45,11 @@ func githubPrivateToolchain(plan *Plan, image string) bool {
 	if plan.Environment.GitHubDevelopment && prefix == "ghcr.io/dsx-ai-factory/nvkr/development" {
 		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/")
 	}
-	// Maintained nightly outputs reuse the same published, pinned M2 tooling.
+	// Maintained disk-family and nightly outputs reuse the published M2 tooling.
 	// Output publication does not relocate those subjects or authorize other owners.
 	switch prefix {
 	case "ghcr.io/dsx-ai-factory/nvkr/m2-candidate",
+		"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks",
 		"ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64",
 		"ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-upstream-ovn-arm64":
 		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/")

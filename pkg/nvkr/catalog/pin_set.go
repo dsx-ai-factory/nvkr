@@ -40,49 +40,67 @@ func pinSetMemberNames(set *PinSet) []string {
 	return names
 }
 
+// validatePinSetDeclaration checks the shape retained in both authored and
+// resolved catalogs. It does not authenticate an upstream tree or its derived
+// pins. Reciprocal ownership remains a registry/lock invariant: resolved
+// components omit pinnedBy and may be replaced by explicit catalog overlays.
+func validatePinSetDeclaration(name string, src Source) error {
+	set := src.PinSet
+	if set == nil {
+		return nil
+	}
+	if src.Kind != "" || src.Tool != nil {
+		return e.New(e.CodeInvalidCatalog, "pin set %q requires an ordinary source", name)
+	}
+	if err := validatePinSetFilePath(set.File); err != nil {
+		return err
+	}
+	switch set.Format {
+	case "", "values":
+		if len(set.Accounted) != 0 {
+			return e.New(e.CodeInvalidCatalog, "pin set %q: accounted items require nvke-deploy-v1", name)
+		}
+	case "nvke-deploy-v1":
+		if err := validateNVKEPinSet(set); err != nil {
+			return err
+		}
+	default:
+		return e.New(e.CodeInvalidCatalog, "pin set %q: unsupported format %q", name, set.Format)
+	}
+	if len(set.Members) == 0 || len(set.Members) > maxPinSetMembers {
+		return e.New(e.CodeInvalidCatalog, "pin set %q requires 1..%d explicit members", name, maxPinSetMembers)
+	}
+	for _, key := range pinSetMemberNames(set) {
+		m := set.Members[key]
+		if strings.TrimSpace(key) == "" || key != strings.TrimSpace(key) || (m.Source == "") == (m.Artifact == "") {
+			return e.New(e.CodeInvalidCatalog, "pin set %q member %q requires exactly one source or artifact", name, key)
+		}
+		if set.Format != "nvke-deploy-v1" {
+			if m.Chart != nil {
+				return e.New(e.CodeInvalidCatalog, "pin set %q member %q: chart identity requires nvke-deploy-v1", name, key)
+			}
+			if err := validatePinSetValuePath(m.Path); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func validatePinSets(reg *registryDoc) error {
 	sourceOwners := map[string]string{}
 	artifactOwners := map[string]string{}
 	for _, name := range sortedSourceNames(reg.Sources) {
 		src := reg.Sources[name]
+		if err := validatePinSetDeclaration(name, src); err != nil {
+			return err
+		}
 		set := src.PinSet
 		if set == nil {
 			continue
 		}
-		if src.Kind != "" || src.Tool != nil {
-			return e.New(e.CodeInvalidCatalog, "pin set %q requires an ordinary source", name)
-		}
-		if err := validatePinSetFilePath(set.File); err != nil {
-			return err
-		}
-		switch set.Format {
-		case "", "values":
-			if len(set.Accounted) != 0 {
-				return e.New(e.CodeInvalidCatalog, "pin set %q: accounted items require nvke-deploy-v1", name)
-			}
-		case "nvke-deploy-v1":
-			if err := validateNVKEPinSet(set); err != nil {
-				return err
-			}
-		default:
-			return e.New(e.CodeInvalidCatalog, "pin set %q: unsupported format %q", name, set.Format)
-		}
-		if len(set.Members) == 0 || len(set.Members) > 1024 {
-			return e.New(e.CodeInvalidCatalog, "pin set %q requires 1..1024 explicit members", name)
-		}
 		for _, key := range pinSetMemberNames(set) {
 			m := set.Members[key]
-			if strings.TrimSpace(key) == "" || key != strings.TrimSpace(key) || (m.Source == "") == (m.Artifact == "") {
-				return e.New(e.CodeInvalidCatalog, "pin set %q member %q requires exactly one source or artifact", name, key)
-			}
-			if set.Format != "nvke-deploy-v1" {
-				if m.Chart != nil {
-					return e.New(e.CodeInvalidCatalog, "pin set %q member %q: chart identity requires nvke-deploy-v1", name, key)
-				}
-				if err := validatePinSetValuePath(m.Path); err != nil {
-					return err
-				}
-			}
 			if m.Source != "" {
 				member, ok := reg.Sources[m.Source]
 				if !ok || m.Source == name || member.PinnedBy != name {

@@ -343,10 +343,11 @@ disk producer's full material closure.
 
 Internal native toolchains beneath the candidate publication prefix's `toolchains/`
 repositories use a separate preparation step with `contents: read` and no workflow package scope.
-The maintained M2 and two NVKE nightly publication prefixes also reuse the already-published
-`ghcr.io/dsx-ai-factory/{nvkr,nke-recipes}/m2-candidate/toolchains/` pins. Reusing these
-toolchain subjects does not relocate them into the nightly output namespace or admit unrelated
-publication owners or toolchain repositories.
+The maintained M2, exact `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks` family and two NVKE
+nightly publication prefixes also reuse the already-published
+`ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/` pins. Reusing these toolchain subjects does
+not relocate them into family or nightly output namespaces. Other family prefixes, child or lookalike
+prefixes, unrelated publication owners and other toolchain repositories remain excluded from this exception.
 Only that step receives the independent `NVKR_REGISTRY_READ` credential and explicit account.
 The entry workflow binds both values as explicit composite inputs; composite metadata does not evaluate
 caller-only `vars` or `secrets` contexts. Calls without image preparation omit both inputs, whose empty
@@ -973,7 +974,9 @@ Maintained lifecycle targets are local and GitHub. GitLab, Tekton and Argo selec
 Generated Run workflows are manual-only. Production execution admits the default branch plus exact branch
 names explicitly listed in `Environment.githubDispatchBranches`. The optional list is sorted and unique;
 wildcards, tag/PR refs and expression syntax are rejected. It is bound into Environment and Plan identity,
-cloned with its owner, and enforced in source access, execution and finalization guards. Local execution
+cloned with its owner, and enforced in every helper bootstrap, source access, execution and finalization guard.
+Bootstrap admission applies before checkout, helper compilation and CI-storage writes, including when no
+catalog credential is required. The bundle validator rejects missing or broadened bootstrap guards. Local execution
 rejects this GitHub-only option. Omitting it preserves default-branch-only execution.
 Pull-request regeneration checks run in the separate repository Merge Gate workflow when generator inputs
 or outputs change. Default-branch push

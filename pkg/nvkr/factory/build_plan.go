@@ -202,13 +202,41 @@ func (plan Plan) validatePlanBuilds() error {
 			}
 		}
 	}
+	// Catalog loading re-derives every declared pin set from its pinned Git tree,
+	// including acquired-only outputs whose executable graph has no fetch node.
+	// Admit the same exact repositories used by catalog revalidation credentials.
+	for source := range plan.catalogPinSetRepositories() {
+		resolvedSources[source] = true
+	}
 	for source := range plan.Environment.SourceAccess {
 		if !resolvedSources[source] {
 			return e.New(e.CodeInvalidCatalog,
-				"execution settings sourceAccess %q does not match a resolved fetch source", source)
+				"execution settings sourceAccess %q does not match a resolved fetch or catalog pin-set source", source)
 		}
 	}
 	return nil
+}
+
+// catalogPinSetRepositories is shared by source-access admission and the scoped
+// GitHub catalog revalidation steps. Ordinary unselected catalog sources are not
+// credential consumers. Plan validation binds these snapshots before admission.
+func (plan *Plan) catalogPinSetRepositories() map[string]bool {
+	repositories := map[string]bool{}
+	collect := func(snapshot *catalog.Catalog) {
+		if snapshot == nil {
+			return
+		}
+		for _, source := range snapshot.Sources {
+			if source.PinSet != nil {
+				repositories[source.Repo] = true
+			}
+		}
+	}
+	collect(plan.CatalogSnapshot)
+	for _, build := range plan.Builds {
+		collect(build.CatalogSnapshot)
+	}
+	return repositories
 }
 
 // validateBuildCatalog binds the complete executable graph to its catalog and

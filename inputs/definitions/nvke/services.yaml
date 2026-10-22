@@ -1,0 +1,209 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+kind: Definition
+metadata:
+  name: nvke-services
+  description: Acquire the maintained PostgreSQL, SPIRE, SPIRE CRDs and Temporal charts with their exact AMD64 and ARM64 runtime images; deployment image-reference binding remains consumer-owned.
+catalog:
+  base: ../../catalogs/nvke/module-tags
+sbomTool: syft
+cosignTool: cosign
+outputs:
+  - name: csi-node-driver-registrar-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - csi-node-driver-registrar-image
+  - name: csi-node-driver-registrar-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - csi-node-driver-registrar-image
+  - name: postgresql
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release
+    format: helm-oci
+    components:
+      - postgresql-chart
+  - name: postgresql-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - postgresql-image
+  - name: postgresql-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - postgresql-image
+  - name: spiffe-csi-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - spiffe-csi-image
+  - name: spiffe-csi-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - spiffe-csi-image
+  - name: spire
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release
+    format: helm-oci
+    components:
+      - spire-chart
+  - name: spire-agent-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - spire-agent-image
+  - name: spire-agent-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - spire-agent-image
+  - name: spire-bash-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - spire-bash-image
+  - name: spire-bash-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - spire-bash-image
+  - name: spire-controller-manager-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - spire-controller-manager-image
+  - name: spire-controller-manager-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - spire-controller-manager-image
+  - name: spire-crds
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release
+    format: helm-oci
+    components:
+      - spire-crds-chart
+  - name: spire-oidc-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - spire-oidc-image
+  - name: spire-oidc-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - spire-oidc-image
+  - name: spire-server-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - spire-server-image
+  - name: spire-server-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - spire-server-image
+  - name: spire-tpm-server-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - spire-tpm-server-image
+  - name: spire-tpm-server-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - spire-tpm-server-image
+  - name: temporal
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/release
+    format: helm-oci
+    components:
+      - temporal-chart
+  - name: temporal-admin-tools-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - temporal-admin-tools-image
+  - name: temporal-admin-tools-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - temporal-admin-tools-image
+  - name: temporal-server-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - temporal-server-image
+  - name: temporal-server-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - temporal-server-image
+  - name: temporal-ui-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - temporal-ui-image
+  - name: temporal-ui-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/runtime-dependencies
+    format: oci
+    components:
+      - temporal-ui-image

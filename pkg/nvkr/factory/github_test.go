@@ -615,9 +615,6 @@ func TestGitHubExplicitDispatchBranchPolicy(t *testing.T) {
 			}
 			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 			for name, job := range document.Jobs {
-				if strings.HasPrefix(name, "build-runner-") {
-					continue
-				}
 				if !strings.Contains(job.If, want) {
 					t.Fatalf("job %s lost exact dispatch policy: %s", name, job.If)
 				}
