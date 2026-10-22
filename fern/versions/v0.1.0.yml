@@ -1,0 +1,64 @@
+# Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Operator-facing pages only. Contributor, audit, planning, ADR and OS-build
+# internals stay in the repository on GitHub and are intentionally not listed.
+
+navigation:
+  - section: Overview
+    contents:
+      - page: What is NVKR
+        path: v0.1.0-content/overview/what-is-nvkr.md
+      - page: Preview status and known limitations
+        path: v0.1.0-content/overview/preview-status.md
+        slug: preview-status
+      - link: NVKE documentation
+        href: https://docs.nvidia.com/nvke
+
+  - section: Get started
+    contents:
+      - page: Quickstart
+        path: v0.1.0-content/quickstart.md
+      - page: Use NVKR with your AI agent
+        path: v0.1.0-content/use-with-agents.md
+      - page: Concepts
+        path: v0.1.0-content/user-concepts.md
+      - page: Definition, Run, and Release
+        path: v0.1.0-content/lifecycle.md
+
+  - section: Catalogs and components
+    contents:
+      - page: Catalogs and components
+        path: v0.1.0-content/catalogs-and-components.md
+      - page: Catalog refreshes
+        path: v0.1.0-content/catalog-maintenance.md
+      - page: Generic pin sets
+        path: v0.1.0-content/generic-pin-set-example.md
+      - page: Pin NVKE deploy charts
+        path: v0.1.0-content/nvke-pin-set-usage.md
+      - page: Declarative Helm bindings
+        path: v0.1.0-content/declarative-helm-bindings.md
+      - page: NVKE inputs and customer choices
+        path: v0.1.0-content/nvke-customer-choices.md
+      - page: Authoring lab
+        path: v0.1.0-content/examples/authoring-lab/README.md
+
+  - section: Generate and build
+    contents:
+      - page: Generate a pipeline
+        path: v0.1.0-content/generate-pipeline.md
+      - page: Build a node image
+        path: v0.1.0-content/node-images.md
+
+  - section: Inspect and verify
+    contents:
+      - page: Plan and graph inspection
+        path: v0.1.0-content/plan-and-graph-inspection.md
+      - page: Browse, export, pull, and verify a release
+        path: v0.1.0-content/release-quickstart.md
+      - page: Release navigation
+        path: v0.1.0-content/release-navigation.md
+      - page: Publication architecture
+        path: v0.1.0-content/publication-architecture.md
+      - page: Dependency SBOMs
+        path: v0.1.0-content/dependency-sboms.md

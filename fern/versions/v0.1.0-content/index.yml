@@ -1,0 +1,64 @@
+# Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Operator-facing pages only. Contributor, audit, planning, ADR and OS-build
+# internals stay in the repository on GitHub and are intentionally not listed.
+
+navigation:
+  - section: Overview
+    contents:
+      - page: What is NVKR
+        path: overview/what-is-nvkr.md
+      - page: Preview status and known limitations
+        path: overview/preview-status.md
+        slug: preview-status
+      - link: NVKE documentation
+        href: https://docs.nvidia.com/nvke
+
+  - section: Get started
+    contents:
+      - page: Quickstart
+        path: quickstart.md
+      - page: Use NVKR with your AI agent
+        path: use-with-agents.md
+      - page: Concepts
+        path: user-concepts.md
+      - page: Definition, Run, and Release
+        path: lifecycle.md
+
+  - section: Catalogs and components
+    contents:
+      - page: Catalogs and components
+        path: catalogs-and-components.md
+      - page: Catalog refreshes
+        path: catalog-maintenance.md
+      - page: Generic pin sets
+        path: generic-pin-set-example.md
+      - page: Pin NVKE deploy charts
+        path: nvke-pin-set-usage.md
+      - page: Declarative Helm bindings
+        path: declarative-helm-bindings.md
+      - page: NVKE inputs and customer choices
+        path: nvke-customer-choices.md
+      - page: Authoring lab
+        path: examples/authoring-lab/README.md
+
+  - section: Generate and build
+    contents:
+      - page: Generate a pipeline
+        path: generate-pipeline.md
+      - page: Build a node image
+        path: node-images.md
+
+  - section: Inspect and verify
+    contents:
+      - page: Plan and graph inspection
+        path: plan-and-graph-inspection.md
+      - page: Browse, export, pull, and verify a release
+        path: release-quickstart.md
+      - page: Release navigation
+        path: release-navigation.md
+      - page: Publication architecture
+        path: publication-architecture.md
+      - page: Dependency SBOMs
+        path: dependency-sboms.md
