@@ -109,7 +109,7 @@ func TestNativeTenantRechecksCapacityBeforeCreateOnReusedSite(t *testing.T) {
 		t.Fatal(err)
 	}
 	attempt.capacity = admission
-	err := withNativeSiteScope(t.Context(), &attempt, runner, runner.Work, runner.Work, nil, func(ctx context.Context, site *NativeSite) error {
+	err := withNativeSiteScope(t.Context(), &attempt, runner, runner.Work, runner.Work, func(ctx context.Context, site *NativeSite) error {
 		_, err := site.CreateTenant(ctx, "no-capacity")
 		return err
 	})

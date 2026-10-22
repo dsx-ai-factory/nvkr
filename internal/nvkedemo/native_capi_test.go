@@ -120,6 +120,7 @@ func nativeCapturedToolsFixture(t *testing.T) (string, string, *factory.Plan) {
 		t.Fatal(err)
 	}
 	run.Status = lifecycle.RunComplete
+	run.Lane = factory.TierLocalExecution.String()
 	for _, expected := range run.Expected {
 		run.Observed = append(run.Observed, lifecycle.Artifact{Name: expected.Name, Kind: expected.Kind, Digest: "sha256:" + strings.Repeat("1", 64), BuildDigest: expected.BuildDigest, Components: expected.Components})
 	}

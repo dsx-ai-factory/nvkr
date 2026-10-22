@@ -25,13 +25,15 @@ import (
 // node/cloud-init/DNS/workload answers; this helper owns only NVKE's wire API.
 func nativeSessionFixture(t *testing.T, conformance bool) (nativeSiteAttempt, Runner, string) {
 	t.Helper()
-	selected, root := tenantRunFixture(t, "ovn", "", "")
+	selected, root := tenantRunFixture(t, "", "")
 	executable, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
 	}
 	runner := selected.session.Runner
-	runner.Env = append(runner.Env, "SESSION_TOOL="+executable, "NVKR_TEST_NATIVE_SESSION_TOOL=1", "CLOUDINIT_TOOL="+executable, "NVKR_TEST_CLOUD_INIT_TOOL=1")
+	// Each wire helper finishes synchronously. Avoid the race runtime's default
+	// one-second successful-exit sleep on every repeated child invocation.
+	runner.Env = append(runner.Env, "SESSION_TOOL="+executable, "NVKR_TEST_NATIVE_SESSION_TOOL=1", "CLOUDINIT_TOOL="+executable, "NVKR_TEST_CLOUD_INIT_TOOL=1", "GORACE=atexit_sleep_ms=0")
 	cli := filepath.Join(runner.Work, "cli", installerCLIName)
 	writeTenantFixture(t, cli, []byte("#!/bin/sh\nexec \"$SESSION_TOOL\" -test.run='^TestNativeSessionFixtureTool$' -- \"$@\"\n"), 0700)
 	writeTenantFixture(t, filepath.Join(runner.Work, "site.kubeconfig"), []byte("private site fixture\n"), 0600)
@@ -89,7 +91,7 @@ func TestNativeSessionReusesSiteAndRetainsFailedSuiteUntilExplicitDeletion(t *te
 			attempt, runner, root := nativeSessionFixture(t, conformance)
 			var escapedSite *NativeSite
 			var escapedTenant *NativeTenant
-			err := withNativeSiteScope(t.Context(), &attempt, runner, runner.Work, runner.Work, nil, func(ctx context.Context, site *NativeSite) error {
+			err := withNativeSiteScope(t.Context(), &attempt, runner, runner.Work, runner.Work, func(ctx context.Context, site *NativeSite) error {
 				escapedSite = site
 				siteConfig, err := site.Kubeconfig(ctx)
 				if err != nil || siteConfig != filepath.Join(runner.Work, "site.kubeconfig") {
@@ -181,7 +183,7 @@ func TestNativeSessionExitCancelsAndJoinsInFlightCommand(t *testing.T) {
 	runner := Runner{Work: root, Env: []string{"PATH=/usr/bin:/bin", "STARTED=" + started}}
 	finished := make(chan error, 1)
 	process := make(chan *OwnedProcess, 1)
-	err := withNativeSiteScope(t.Context(), &nativeSiteAttempt{}, runner, root, root, nil, func(_ context.Context, site *NativeSite) error {
+	err := withNativeSiteScope(t.Context(), &nativeSiteAttempt{}, runner, root, root, func(_ context.Context, site *NativeSite) error {
 		go func() {
 			// Deliberately use an independent context: scope exit must still
 			// cancel the owned child and wait for its Runner to join.
@@ -241,7 +243,7 @@ func TestNativeSessionUnjoinedOutcomeCannotBeSwallowed(t *testing.T) {
 			attempt, runner, root := nativeSessionFixture(t, false)
 			finished := make(chan error, 1)
 			original := errors.New("fixture child join failed")
-			err := withNativeSiteScope(t.Context(), &attempt, runner, runner.Work, runner.Work, nil, func(ctx context.Context, site *NativeSite) error {
+			err := withNativeSiteScope(t.Context(), &attempt, runner, runner.Work, runner.Work, func(ctx context.Context, site *NativeSite) error {
 				tenant, err := site.CreateTenant(ctx, "owned")
 				if err != nil {
 					t.Fatal(err)
@@ -290,7 +292,7 @@ func TestNativeSessionUnjoinedOutcomeCannotBeSwallowed(t *testing.T) {
 }
 
 func TestNativeSessionQueuedOperationHonorsCallerCancellation(t *testing.T) {
-	err := withNativeSiteScope(t.Context(), &nativeSiteAttempt{}, Runner{}, "", "", nil, func(ctx context.Context, site *NativeSite) error {
+	err := withNativeSiteScope(t.Context(), &nativeSiteAttempt{}, Runner{}, "", "", func(ctx context.Context, site *NativeSite) error {
 		entered, release := make(chan struct{}), make(chan struct{})
 		finished := make(chan error, 1)
 		go func() {
@@ -323,6 +325,9 @@ func TestNativeSessionUnjoinedOwnershipSurvivesPanicAndGoexit(t *testing.T) {
 	for _, mode := range []string{"panic", "Goexit"} {
 		t.Run(mode, func(t *testing.T) {
 			attempt, runner, root := nativeSessionFixture(t, false)
+			bootstrapDeleted := filepath.Join(root, "bootstrap-deleted")
+			writeTenantFixture(t, filepath.Join(attempt.assets.HostTools, "kind"), []byte("#!/bin/sh\n: > "+operatorQuote(bootstrapDeleted)+"\n"), 0o700)
+			attempt.bootstrapRunner, attempt.bootstrapName = &runner, "owned-bootstrap"
 			unwound, operationFinished := make(chan struct{}), make(chan error, 1)
 			go func() {
 				defer close(unwound)
@@ -331,7 +336,7 @@ func TestNativeSessionUnjoinedOwnershipSurvivesPanicAndGoexit(t *testing.T) {
 						t.Errorf("unexpected panic: %v", caught)
 					}
 				}()
-				_ = withNativeSiteScope(t.Context(), &attempt, runner, runner.Work, runner.Work, nil, func(ctx context.Context, site *NativeSite) error {
+				_ = withNativeSiteScope(t.Context(), &attempt, runner, runner.Work, runner.Work, func(ctx context.Context, site *NativeSite) error {
 					if _, err := site.CreateTenant(ctx, "owned"); err != nil {
 						t.Error(err)
 						operationFinished <- err
@@ -359,8 +364,13 @@ func TestNativeSessionUnjoinedOwnershipSurvivesPanicAndGoexit(t *testing.T) {
 			}
 			// The outer guest owner cannot rely on a return value during panic
 			// or Goexit. Its own sticky state must forbid destructive teardown.
-			if !errors.Is(attempt.unjoinedWork, ErrUnjoined) || !errors.Is(attempt.close(t.Context()), ErrUnjoined) {
+			cleanup, stop := context.WithTimeout(t.Context(), 5*time.Second)
+			defer stop()
+			if !errors.Is(attempt.unjoinedWork, ErrUnjoined) || !errors.Is(attempt.close(cleanup), ErrUnjoined) {
 				t.Fatal("unwinding lost the owner's unsafe-join state")
+			}
+			if _, err := os.Stat(bootstrapDeleted); !os.IsNotExist(err) || attempt.bootstrapRunner == nil {
+				t.Fatal("unjoined tenant work released its dependent bootstrap")
 			}
 			events, err := os.ReadFile(filepath.Join(root, "session-events"))
 			if err != nil || string(events) != "create owned\n" {

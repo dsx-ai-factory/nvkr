@@ -52,15 +52,12 @@ func (s *nativeSiteAttempt) capiTenantRequest(ctx context.Context, request Tenan
 		})
 		return &TenantMachineInfra{MachineTemplate: raw, PreCommands: []string{commands}}, err
 	}
-	request.NICo = TenantProvider{}
 	request.Infra = &TenantClusterInfra{Cluster: cluster}
-	request.ControlPlane.NICo = ControlPlaneIntent{}.NICo
 	request.ControlPlane.Infra, err = template("control-plane")
 	if err != nil {
 		return TenantRequest{}, err
 	}
 	for i := range request.NodePools {
-		request.NodePools[i].NICo = NodePoolIntent{}.NICo
 		request.NodePools[i].Infra, err = template(request.NodePools[i].Name)
 		if err != nil {
 			return TenantRequest{}, err
@@ -147,8 +144,8 @@ type nativeCAPITenantOwnership struct {
 }
 
 func newNativeCAPITenantOwnership(request TenantRequest) (*nativeCAPITenantOwnership, error) {
-	if request.Infra == nil || request.ControlPlane.Infra == nil || request.ControlPlane.Count != 1 || len(request.NodePools) != 1 || request.NodePools[0].Infra == nil || request.NodePools[0].ControlPlane || (request.NodePools[0].Count != nativeTenantNodeCount(false)-1 && request.NodePools[0].Count != nativeTenantNodeCount(true)-1) || request.NICo != (TenantProvider{}) ||
-		!reflect.ValueOf(request.ControlPlane.NICo).IsZero() || !reflect.ValueOf(request.NodePools[0].NICo).IsZero() {
+	if request.Infra == nil || request.ControlPlane.Infra == nil || request.ControlPlane.Count != 1 || len(request.NodePools) != 1 || request.NodePools[0].Infra == nil || request.NodePools[0].ControlPlane || (request.NodePools[0].Count != nativeTenantNodeCount(false)-1 && request.NodePools[0].Count != nativeTenantNodeCount(true)-1) ||
+		!reflect.ValueOf(request.ControlPlane.NICo).IsZero() {
 		return nil, errors.New("native tenant ownership requires its complete CAPI request")
 	}
 	// Copy the wire projection so later mutation of the caller's request cannot

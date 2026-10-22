@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
@@ -17,48 +16,18 @@ import (
 
 const nativeIdentityHelper = "nvkr-site-identity-helper"
 
-// Only this owner authenticates the captured source inputs against the completed
-// Run. The caller's paths and an on-disk plan alone do not select a producer.
+// Lifecycle rederives the frozen Run inputs; delivery separately verifies bytes.
 func nativeSelectedRunPlan(ctx context.Context, root, outputName, format string) (*factory.Plan, lifecycle.Artifact, error) {
-	output, err := CompleteOutput(ctx, root, outputName, format)
+	plan, run, err := lifecycle.InspectLocalRunInputs(ctx, root)
 	if err != nil {
 		return nil, lifecycle.Artifact{}, err
 	}
-	view, err := lifecycle.InspectRun(ctx, filepath.Join(root, "lifecycle.json"))
-	if err != nil {
-		return nil, lifecycle.Artifact{}, err
+	for _, output := range run.Observed {
+		if output.Name == outputName && output.Kind == format {
+			return plan, output, nil
+		}
 	}
-	if view.Status != lifecycle.RunComplete || view.CleanupIncomplete {
-		return nil, lifecycle.Artifact{}, errors.New("native input requires a committed complete Run")
-	}
-	raw, err := readRunFile(ctx, root, ".runner/plan.json", factory.MaxPlanBytes)
-	if err != nil {
-		return nil, lifecycle.Artifact{}, err
-	}
-	var original factory.Plan
-	if err := canonical.UnmarshalExact(raw, &original); err != nil {
-		return nil, lifecycle.Artifact{}, err
-	}
-	raw, err = readRunFile(ctx, root, "compile-inputs.json", 64<<20)
-	if err != nil {
-		return nil, lifecycle.Artifact{}, fmt.Errorf("native input requires captured source inputs: %w", err)
-	}
-	var snapshot factory.InputSnapshot
-	if err := canonical.UnmarshalExact(raw, &snapshot); err != nil {
-		return nil, lifecycle.Artifact{}, err
-	}
-	plan, err := factory.CompileSnapshot(ctx, snapshot, original.GeneratorVersion)
-	if err != nil {
-		return nil, lifecycle.Artifact{}, err
-	}
-	digest, err := plan.Digest()
-	if err != nil {
-		return nil, lifecycle.Artifact{}, err
-	}
-	if digest != view.PlanDigest {
-		return nil, lifecycle.Artifact{}, errors.New("native source inputs differ from the completed Run")
-	}
-	return plan, output, nil
+	return nil, lifecycle.Artifact{}, fmt.Errorf("completed Run omits %s output %q", format, outputName)
 }
 
 // This value is private and issued only from the recompiled tool/image selections.

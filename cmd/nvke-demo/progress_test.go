@@ -294,8 +294,8 @@ func TestDashboardProgressOmitsMechanicalTraceButKeepsFailures(t *testing.T) {
 				view = newDashboard()
 				w.observer = view
 			}
-			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: "create-management"})
-			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "create-management"})
+			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: "native-site-guest"})
+			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "native-site-guest"})
 			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-kubeconfig", Elapsed: time.Minute, Remaining: 59 * time.Minute})
 			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.DeploymentFailed, Name: "private-check"})
 			if !strings.Contains(out.String(), "[FAIL 0s] private-check") || w.failedPhase != "private-check" {
@@ -306,7 +306,7 @@ func TestDashboardProgressOmitsMechanicalTraceButKeepsFailures(t *testing.T) {
 					t.Fatalf("unexpected mechanical trace for dashboard=%v: %q", dashboardMode, out.String())
 				}
 			}
-			if dashboardMode && (view.siteStages[0].states[0] != "observed" || view.tenantStages[0].states[0] != "running") {
+			if dashboardMode && (view.siteStages[0].state != "observed" || view.tenantStages[0].state != "running") {
 				t.Fatal("suppressed trace lost typed checklist observations")
 			}
 		})
@@ -332,7 +332,7 @@ func TestProgressGuestDescriptionsUseClosedPublicFieldsOnly(t *testing.T) {
 					t.Fatal("guest event was not routed directly to dashboard")
 				}
 			} else {
-				for _, want := range []string{"Control plane: VM running", "Worker: VM paused", "infrastructure Ready=True (not Kubernetes Ready)", "console observed=true"} {
+				for _, want := range []string{"Control plane: NICo Ready", "Worker: NICo Ready", "Infra Ready=True; VM running", "console observed=true (not Kubernetes Ready)"} {
 					if !strings.Contains(out.String(), want) {
 						t.Fatalf("missing closed public description %q: %s", want, out.String())
 					}

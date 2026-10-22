@@ -108,9 +108,15 @@ type fakeOwner struct {
 	network net.Conn
 	done    chan error
 	joined  bool
+	output  bytes.Buffer
 }
 
 func startOwner(t *testing.T, root, mode string) *fakeOwner {
+	t.Helper()
+	return startOwnerWithEnvironment(t, root, append(os.Environ(), "NVKR_TEST_NATIVE_QEMU_MODE="+mode))
+}
+
+func startOwnerWithEnvironment(t *testing.T, root string, environment []string) *fakeOwner {
 	t.Helper()
 	self, err := os.Executable()
 	if err != nil {
@@ -128,16 +134,17 @@ func startOwner(t *testing.T, root, mode string) *fakeOwner {
 		t.Fatal(err)
 	}
 	command := exec.Command(self, "test-owner")
-	command.Env = append(os.Environ(), "NVKR_TEST_NATIVE_QEMU=1", "NVKR_TEST_NATIVE_QEMU_ROOT="+root, "NVKR_TEST_NATIVE_QEMU_MODE="+mode)
+	command.Env = append(environment, "NVKR_TEST_NATIVE_QEMU=1", "NVKR_TEST_NATIVE_QEMU_ROOT="+root)
 	command.ExtraFiles = []*os.File{nil, childFD}
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	p := &fakeOwner{command: command, network: conn, done: make(chan error, 1)}
+	command.Stdout, command.Stderr = &p.output, &p.output
 	if err := command.Start(); err != nil {
 		_ = childFD.Close()
 		_ = conn.Close()
 		t.Fatal(err)
 	}
 	_ = childFD.Close()
-	p := &fakeOwner{command: command, network: conn, done: make(chan error, 1)}
 	go func() { p.done <- command.Wait() }()
 	t.Cleanup(func() {
 		_ = conn.Close()

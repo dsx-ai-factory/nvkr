@@ -66,8 +66,8 @@ func nativeImagePreloadScript(image nativeImagePreload) (string, error) {
 }
 
 // Project the selected chart's exact image binding and native deployment settings.
-// These two schemas are admitted separately by siteOVNValuesForNetwork and the
-// maintained catalogs; the NVIDIA lane preserves NVKE's native hostPort owner.
+// The maintained catalogs admit the two chart schemas; the NVIDIA lane
+// preserves NVKE's hostPort owner.
 func nativeOVNValues(version, reference string) (string, error) {
 	ref, err := name.NewDigest(reference, name.StrictValidation)
 	if err != nil || ref.Name() != reference || ref.Repository.Name() != "localhost/nvke/ovn-kubernetes" || !canonical.IsDigest(ref.DigestStr()) {

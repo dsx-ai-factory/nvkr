@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
-	"golang.org/x/sys/unix"
 )
 
 func TestMain(m *testing.M) {
@@ -200,59 +199,11 @@ func TestInstanceAdmission(t *testing.T) {
 func TestSupervisorPreservesFD4GroupAndJoinsChildren(t *testing.T) {
 	for _, mode := range []string{"success", "qemu-failure", "tpm-failure", "cancel"} {
 		t.Run(mode, func(t *testing.T) {
-			root := t.TempDir()
-			for _, dir := range []string{"adapter", "adapter/launches", "simulator", "simulator/instances", "simulator/instances/instance"} {
-				if err := os.Mkdir(filepath.Join(root, dir), 0700); err != nil {
-					t.Fatal(err)
-				}
-			}
-			self, err := os.Executable()
-			if err != nil {
-				t.Fatal(err)
-			}
-			selected, err := inspectTool(t.Context(), self)
-			if err != nil {
-				t.Fatal(err)
-			}
-			cfg := configuration{filepath.Join(root, "adapter"), filepath.Join(root, "simulator", "instances"), selected, selected, TCG}
-			if err := writeJSON(filepath.Join(cfg.Directory, "configuration.json"), cfg); err != nil {
-				t.Fatal(err)
-			}
-			fds, err := unix.Socketpair(unix.AF_UNIX, unix.SOCK_DGRAM, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
-			parent, childFD := os.NewFile(uintptr(fds[0]), "parent"), os.NewFile(uintptr(fds[1]), "child")
-			connection, err := net.FileConn(parent)
-			_ = parent.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer connection.Close()
-			command := exec.Command(self, "test-owner")
-			command.Env = append(os.Environ(), "NVKR_TEST_NATIVE_QEMU=1", "NVKR_TEST_NATIVE_QEMU_ROOT="+root, "NVKR_TEST_NATIVE_QEMU_MODE="+mode)
-			command.ExtraFiles = []*os.File{nil, childFD}
-			command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-			if err := command.Start(); err != nil {
-				t.Fatal(err)
-			}
-			_ = childFD.Close()
-			joined := make(chan error, 1)
-			go func() { joined <- command.Wait() }()
-			ownerJoined := false
-			t.Cleanup(func() {
-				if !ownerJoined {
-					_ = syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
-					select {
-					case <-joined:
-					case <-time.After(5 * time.Second):
-						t.Error("failed test supervisor could not be joined")
-					}
-				}
-			})
-			_ = connection.SetReadDeadline(time.Now().Add(10 * time.Second))
+			root, cfg := ownerFixture(t)
+			owner := startOwner(t, root, mode)
+			_ = owner.network.SetReadDeadline(time.Now().Add(10 * time.Second))
 			data := make([]byte, 8192)
-			n, err := connection.Read(data)
+			n, err := owner.network.Read(data)
 			if err != nil {
 				t.Fatal("FD4 was not inherited by QEMU", err)
 			}
@@ -260,7 +211,7 @@ func TestSupervisorPreservesFD4GroupAndJoinsChildren(t *testing.T) {
 				PID, PGID int
 				Args      []string
 			}
-			if err := json.Unmarshal(data[:n], &observed); err != nil || observed.PID <= 0 || observed.PGID != command.Process.Pid {
+			if err := json.Unmarshal(data[:n], &observed); err != nil || observed.PID <= 0 || observed.PGID != owner.command.Process.Pid {
 				t.Fatal("QEMU escaped vmnet process group", observed, err)
 			}
 			if !strings.Contains(strings.Join(observed.Args, " "), "tpm-tis-device,tpmdev=nvkrtpm0") {
@@ -270,11 +221,11 @@ func TestSupervisorPreservesFD4GroupAndJoinsChildren(t *testing.T) {
 				t.Fatal("explicit TCG was not passed to the actual child", observed.Args)
 			}
 			if mode == "cancel" {
-				_ = command.Process.Signal(syscall.SIGTERM)
+				_ = owner.command.Process.Signal(syscall.SIGTERM)
 			}
 			select {
-			case err := <-joined:
-				ownerJoined = true
+			case err := <-owner.done:
+				owner.joined = true
 				if (err == nil) != (mode == "success") {
 					t.Fatal("original outcome was lost", err)
 				}
@@ -302,29 +253,16 @@ func TestSupervisorPreservesFD4GroupAndJoinsChildren(t *testing.T) {
 }
 
 func TestTPMStartupFailureStillJoins(t *testing.T) {
-	root := t.TempDir()
-	for _, dir := range []string{"adapter", "adapter/launches", "simulator", "simulator/instances", "simulator/instances/instance"} {
-		if err := os.Mkdir(filepath.Join(root, dir), 0700); err != nil {
-			t.Fatal(err)
-		}
-	}
-	self, err := os.Executable()
-	if err != nil {
-		t.Fatal(err)
-	}
-	qemu, err := inspectTool(t.Context(), self)
-	if err != nil {
-		t.Fatal(err)
-	}
+	root, cfg := ownerFixture(t)
 	failed := filepath.Join(root, "failed-tpm")
 	if err := os.WriteFile(failed, []byte("#!/bin/sh\nexit 24\n"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	tpm, err := inspectTool(t.Context(), failed)
+	var err error
+	cfg.SWTPM, err = inspectTool(t.Context(), failed)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := configuration{filepath.Join(root, "adapter"), filepath.Join(root, "simulator", "instances"), qemu, tpm, TCG}
 	err = run(t.Context(), cfg, []string{"-machine", "virt,accel=hvf", "-cpu", "host", "-pidfile", filepath.Join(cfg.Instances, "instance", "qemu.pid")}, os.Stdout, os.Stderr)
 	if err == nil || !strings.Contains(err.Error(), "before readiness") {
 		t.Fatal("startup failure was hidden", err)

@@ -75,27 +75,6 @@ func nativeRuntimeImageRoles() []string {
 	return roles
 }
 
-// Network observation stays inside the owned site VM. Standard tools report
-// private diagnostic state without applying network configuration or issuing
-// readiness evidence; VM deletion also stops this journal/console observer.
-const nativeNetworkObserverUnit = `[Unit]
-Description=NVKR private guest network observation
-
-[Service]
-Type=simple
-ExecStartPre=-/usr/bin/env ip -json link show
-ExecStartPre=-/usr/bin/env ip -4 -json address show
-ExecStartPre=-/usr/bin/env ip -4 -json route show table all
-ExecStartPre=-/usr/bin/env netplan get
-ExecStart=/usr/bin/env ip -timestamp monitor link address route
-StandardOutput=journal+console
-StandardError=journal+console
-NoNewPrivileges=true
-Restart=no
-TimeoutStartSec=30s
-TimeoutStopSec=5s
-`
-
 // SiteStartupUserData returns startup configuration without filesystem,
 // subprocess or network work. The caller must independently admit the image,
 // tools, capacity and owning runtime before using it to create an instance.
@@ -135,7 +114,6 @@ func SiteStartupUserData(ctx context.Context, cfg NativeSiteStartup) (string, er
 	config := startupCloudConfig{
 		WriteFiles: []startupFile{
 			{"/var/lib/nvke-native/prepare.sh", "0700", script.String()},
-			{"/etc/systemd/system/nvkr-native-network-observer.service", "0644", nativeNetworkObserverUnit},
 			{"/etc/systemd/system/nvke-agent.service.d/10-nvkr-console.conf", "0600", "[Service]\nStandardOutput=journal+console\nStandardError=journal+console\n"},
 			{"/etc/systemd/system/spire-agent.service.d/10-nvkr-console.conf", "0600", "[Service]\nStandardOutput=journal+console\nStandardError=journal+console\n"},
 		},

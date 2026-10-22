@@ -73,11 +73,11 @@ func TestNativeKubernetesUsesSelectedNVKESiteDefault(t *testing.T) {
 				for i := range nodes {
 					nodes[i].Status.NodeInfo.KubeletVersion = "v" + version
 				}
-				if ready, err := readyNodesForVersion(nodes, version); err != nil || !ready {
+				if ready, err := readyNodesForCountVersion(nodes, version, 2); err != nil || !ready {
 					t.Fatal("matching native nodes rejected", err)
 				}
 				nodes[1].Status.NodeInfo.KubeletVersion = "v1.33.0"
-				if _, err := readyNodesForVersion(nodes, version); err == nil {
+				if _, err := readyNodesForCountVersion(nodes, version, 2); err == nil {
 					t.Fatal("foreign Kubernetes worker accepted")
 				}
 			})

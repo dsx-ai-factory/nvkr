@@ -8,16 +8,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
-	"testing/synctest"
 
-	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -67,85 +64,6 @@ func TestNativeRetainedStatusObservesBothClustersAndPreservesFailures(t *testing
 			if strings.Contains(output.String(), "Kind management") || strings.Contains(output.String(), "PASS") {
 				t.Fatal("native observation described a different runtime or granted acceptance")
 			}
-		})
-	}
-}
-
-func TestNativeForegroundPreservesConformanceFailureUntilOwnedShutdown(t *testing.T) {
-	failure := nvkrerr.New(nvkrerr.CodeVerifyFailed, "private-suite-failure")
-	for _, tc := range []struct {
-		name                                 string
-		primary, secondary                   error
-		cleanup, canceled, exited, badOutput bool
-		wait                                 bool
-	}{
-		{name: "failed suite remains available", primary: failure, wait: true},
-		{name: "successful demo remains available", wait: true},
-		{name: "explicit cleanup after failure", primary: failure, cleanup: true},
-		{name: "explicit cleanup after success", cleanup: true},
-		{name: "already canceled", primary: failure, canceled: true},
-		{name: "unjoined suite", primary: errors.Join(failure, ErrUnjoined)},
-		{name: "runtime exit", primary: failure, exited: true, secondary: os.ErrPermission},
-		{name: "failed notice", primary: failure, badOutput: true, secondary: io.ErrClosedPipe},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			synctest.Test(t, func(t *testing.T) {
-				ctx, cancel := context.WithCancel(t.Context())
-				defer cancel()
-				if tc.canceled {
-					cancel()
-				}
-				server := &OwnedProcess{done: make(chan struct{}), waitErr: os.ErrPermission}
-				if tc.exited {
-					close(server.done)
-				}
-				var output bytes.Buffer
-				runner := Runner{Progress: &output}
-				if tc.badOutput {
-					reader, writer := io.Pipe()
-					reader.Close()
-					defer writer.Close()
-					runner.Progress = writer
-				}
-				attempt := &nativeSiteAttempt{cleanup: tc.cleanup}
-				finished := make(chan error, 1)
-				go func() {
-					finished <- attempt.holdForeground(ctx, runner, OperatorAccess{}, server, tc.primary)
-				}()
-				synctest.Wait()
-				var result error
-				select {
-				case result = <-finished:
-					if tc.wait {
-						t.Fatalf("foreground owner returned before operator cancellation: %v", result)
-					}
-				default:
-					cancel()
-					synctest.Wait()
-					result = <-finished
-					if !tc.wait {
-						t.Fatal("foreground owner retained an attempt requiring shutdown")
-					}
-				}
-				for _, cause := range []error{tc.primary, tc.secondary} {
-					if cause != nil && !errors.Is(result, cause) {
-						t.Fatalf("lost original outcome %v: %v", cause, result)
-					}
-				}
-				var coded *nvkrerr.Error
-				if tc.primary != nil && (!errors.As(result, &coded) || coded.Code != nvkrerr.CodeVerifyFailed || nvkrerr.ExitCode(result) != 22) {
-					t.Fatalf("lost original coded failure: %v", result)
-				}
-				if tc.primary == nil && tc.secondary == nil && result != nil {
-					t.Fatalf("successful foreground shutdown: %v", result)
-				}
-				if strings.Contains(output.String(), failure.Error()) || strings.Contains(output.String(), "passed") {
-					t.Fatal("foreground notice exposed private diagnostics or granted acceptance")
-				}
-				if tc.wait && tc.primary != nil && !strings.Contains(output.String(), "Conformance failed") {
-					t.Fatal("retained failure was not explained")
-				}
-			})
 		})
 	}
 }
@@ -316,12 +234,6 @@ instance_types:
 			tenant["name"], tenant["cpu_count"], tenant["memory_gib"] = "cpu6-mem12gb-disk60gb", 6, 12
 			if !reflect.DeepEqual(actual, expected) {
 				t.Fatalf("runtime seed changed fields outside selected sizing: got=%v want=%v", actual, expected)
-			}
-			for _, network := range []string{"ovn", "upstream-ovn"} {
-				request, err := newTenantRequest("native-demo-tenant", network)
-				if err != nil || !reflect.DeepEqual(request.ControlPlane.NICo.Types, []string{tenant["id"].(string)}) || len(request.NodePools) != 1 || request.NodePools[0].NICo.Type != tenant["id"] {
-					t.Fatalf("control plane and worker must select the projected 6 CPU / 12 GiB type: %+v; %v", request, err)
-				}
 			}
 			legacy := []byte(fmt.Sprintf("  - id: %q\n    name: \"cpu4-mem6gb-disk60gb\"\n    site_id: %q\n    gpu_count: 0\n    cpu_count: 4\n    memory_gib: 6\n    disk_gib: 60\n", TenantInstanceType, SiteID))
 			projected, err := projectSeedFixture(legacy, plainSHA(legacy))

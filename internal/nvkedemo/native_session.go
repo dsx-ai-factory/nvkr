@@ -38,7 +38,6 @@ type nativeSiteScope struct {
 	runner  Runner
 	tools   string
 	out     string
-	server  *OwnedProcess
 	active  *nativeTenantState
 	closed  bool
 }
@@ -65,9 +64,9 @@ func WithNativeSite(ctx context.Context, cfg Config, use func(context.Context, *
 	return nativeSessionError(err, "native site scope")
 }
 
-func withNativeSiteScope(ctx context.Context, attempt *nativeSiteAttempt, runner Runner, tools, out string, server *OwnedProcess, use func(context.Context, *NativeSite) error) (result error) {
+func withNativeSiteScope(ctx context.Context, attempt *nativeSiteAttempt, runner Runner, tools, out string, use func(context.Context, *NativeSite) error) (result error) {
 	scopeCtx, cancel := context.WithCancel(ctx)
-	scope := &nativeSiteScope{gate: make(chan struct{}, 1), ctx: scopeCtx, attempt: attempt, runner: runner, tools: tools, out: out, server: server}
+	scope := &nativeSiteScope{gate: make(chan struct{}, 1), ctx: scopeCtx, attempt: attempt, runner: runner, tools: tools, out: out}
 	defer func() {
 		if holdErr := waitRetainedCleanup(ctx, result); holdErr != nil {
 			result = errors.Join(result, holdErr)

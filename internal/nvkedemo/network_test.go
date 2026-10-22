@@ -219,6 +219,33 @@ func TestNetworkJournalContracts(t *testing.T) {
 	}
 }
 
+func TestNetworkJournalBridgeMAC(t *testing.T) {
+	for _, row := range []struct {
+		mac   string
+		valid bool
+	}{
+		{"02:11:aa:33:44:55", true},
+		{"02:11:AA:33:44:55", false},
+		{"02-11-aa-33-44-55", false},
+		{"0211.aa33.4455", false},
+		{"0211aa334455", false},
+		{"02:11:aa:33:44:55:66:77", false},
+		{"03:11:aa:33:44:55", false},
+		{"00:11:aa:33:44:55", false},
+		{"02:11:aa:33:44", false},
+		{"02:11:aa:33:44:zz", false},
+	} {
+		t.Run(row.mac, func(t *testing.T) {
+			guard := networkFixture(t)
+			state := guard.snapshot()
+			state.BridgeMAC = row.mac
+			if err := validateNetworkState(state, guard.Work); (err == nil) != row.valid {
+				t.Fatalf("bridge marker admission: %v", err)
+			}
+		})
+	}
+}
+
 func TestNetworkJournalFilesystemAndJSONNegatives(t *testing.T) {
 	for _, name := range []string{"shared", "symlink", "hardlink", "duplicate", "unknown", "oversized"} {
 		t.Run(name, func(t *testing.T) {

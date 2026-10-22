@@ -203,12 +203,13 @@ API, node, and all-namespace pod observations. Add `--conformance` to test the s
 and retain its original reports before cleanup. With `--cleanup`, natural tenant deletion and
 joined owned cleanup must finish before success; require the command's exit zero.
 
-For interactive inspection, omit `--cleanup` and leave the foreground terminal running. Use a
-second terminal with that invocation's private tool and kubeconfig paths, as described in
+For interactive inspection, omit `--cleanup`. After the checks, the foreground command
+returns and an independent owner retains the cluster. Use the printed private tool,
+kubeconfig and session paths, as described in
 [cluster access](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/local-nvke-demo.md#5-recognize-success).
-Ctrl-C requests cleanup. New native invocations do not detach a session; the guide's
-[session controls](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/local-nvke-demo.md#retained-deployment-and-actual-cluster-access)
-apply only to existing legacy Kind-site sessions.
+Use the printed `status --session` and `cleanup --session` commands from the
+[session controls](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/local-nvke-demo.md#retained-deployment-and-actual-cluster-access).
+Canceling the foreground command does not authorize retained-cluster deletion.
 
 Cleanup retains Run records and logs. This remains a local diagnostic and does not produce a
 signed Release. See the setup guide's current evidence and limitations before treating a run

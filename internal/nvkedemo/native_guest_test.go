@@ -19,7 +19,11 @@ import (
 )
 
 func TestNativeGuestsUseTenantIPAMPool(t *testing.T) {
-	tenant := NewTenantRequest("allocation-contract")
+	attempt := nativeCAPITenantFixture(t, GuestCIDR, "ovn")
+	tenant, err := attempt.namedTenantRequest(t.Context(), "allocation-contract")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, name := range []string{"nvke-native-site", "nvke-native-guest"} {
 		t.Run(name, func(t *testing.T) {
 			startup := "#cloud-config\nprivate-handoff: test-only-secret\n"
@@ -47,8 +51,23 @@ func TestNativeGuestsUseTenantIPAMPool(t *testing.T) {
 				if len(request.Interfaces) != 1 || len(request.Interfaces[0]) != 1 {
 					t.Error("guest requires exactly its shared VPC-prefix allocator")
 				} else {
-					for _, prefix := range []string{tenant.ControlPlane.NICo.Prefixes[0], tenant.NodePools[0].NICo.Prefixes[0]} {
-						if request.Interfaces[0]["vpcPrefixId"] != prefix {
+					for _, infra := range []*TenantMachineInfra{tenant.ControlPlane.Infra, tenant.NodePools[0].Infra} {
+						var machine struct {
+							Spec struct {
+								Template struct {
+									Spec struct {
+										Type       string              `json:"instanceTypeID"`
+										VPC        string              `json:"vpcID"`
+										Interfaces []map[string]string `json:"interfaces"`
+									} `json:"spec"`
+								} `json:"template"`
+							} `json:"spec"`
+						}
+						if err := json.Unmarshal(infra.MachineTemplate, &machine); err != nil {
+							t.Fatal(err)
+						}
+						instance := machine.Spec.Template.Spec
+						if instance.Type != request.Type || instance.VPC != request.VPC || len(instance.Interfaces) != 1 || request.Interfaces[0]["vpcPrefixId"] != instance.Interfaces[0]["vpcPrefixID"] {
 							t.Error("site, control-plane and worker do not share one allocation owner")
 						}
 					}

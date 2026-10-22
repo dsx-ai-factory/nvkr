@@ -123,9 +123,8 @@ after typed configuration admission, before the dashboard. This introduction is 
 it does not establish platform support, execute producers or grant runtime admission. The unchanged
 runtime checks still decide whether work can proceed. After the original workload/DNS check, bounded
 read-only native site/tenant observations show API readiness, node roles and anonymous pod status/restarts
-before cleanup. The legacy Kind management walkthrough additionally presents workload inventory,
-selected rollouts and the existing Job's zero-retry result. The native path still enforces the preceding
-zero-retry workload/DNS acceptance. The Job is never rerun to create success. No input pauses are added
+before cleanup. The host workflow enforces the preceding zero-retry workload/DNS
+acceptance. The Job is never rerun to create success. No input pauses are added
 and TUI remains the default.
 
 The inner NVKR command uses `--ui=plain` so its progress can feed the outer demo dashboard.

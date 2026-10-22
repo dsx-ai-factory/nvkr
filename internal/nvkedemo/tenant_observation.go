@@ -5,10 +5,8 @@ package nvkedemo
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -54,22 +52,12 @@ type tenantConsoleSample struct {
 	files   [2]os.FileInfo
 	changed time.Time
 }
-type tenantGuestObserver struct {
-	last      time.Time
-	console   [2]tenantConsoleSample
-	instances [2]string
-}
 
 func emptyTenantGuests() [3]TenantGuestObservation {
 	return [3]TenantGuestObservation{
 		{Role: TenantGuestControlPlane, Domain: TenantDomainUnknown, ProviderReady: TenantConditionUnknown},
 		{Role: TenantGuestWorker, Domain: TenantDomainUnknown, ProviderReady: TenantConditionUnknown},
 	}
-}
-
-func tenantGuestBindings(rows []tenantMachineObservation, name, id string) ([2]tenantGuestBinding, bool) {
-	bound, valid := tenantGuestBindingsForCount(rows, name, id, 2, false)
-	return [2]tenantGuestBinding{bound[0], bound[1]}, valid
 }
 
 func tenantGuestBindingsForCount(rows []tenantMachineObservation, name, id string, expected int, native bool) ([3]tenantGuestBinding, bool) {
@@ -303,70 +291,8 @@ func (sample *tenantConsoleSample) observe(now time.Time, files [2]os.FileInfo, 
 	}
 }
 
-func (observer *tenantGuestObserver) update(ctx context.Context, t *tenant, now time.Time) error {
-	if err := requireContext(ctx); err != nil {
-		return err
-	}
-	if _, reported := t.session.Runner.Progress.(ProgressReporter); !reported {
-		return nil
-	}
-	if !observer.last.IsZero() && now.Sub(observer.last) < 30*time.Second {
-		return nil
-	}
-	observer.last = now
-	guests := emptyTenantGuests()
-	limited, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	config := environmentValue(t.session.Runner.Env, "SITE_KUBECONFIG")
-	if config == "" {
-		reportProgress(t.session.Runner.Progress, ProgressEvent{Kind: TenantGuests, Guests: guests})
-		return nil
-	}
-	raw, err := t.capture(limited, t.kubectl(config, "--request-timeout=10s", "get", "machines.cluster.x-k8s.io,nicomachines.infrastructure.cluster.x-k8s.io", "--all-namespaces", "--selector", tenantClusterLabel+"="+t.name, "-o", "json"), "guest-bindings", 30*time.Second)
-	if err == nil {
-		var list struct{ Items []tenantMachineObservation }
-		if json.Unmarshal(raw, &list) == nil {
-			if bindings, valid := tenantGuestBindings(list.Items, t.name, t.id); valid {
-				runner := t.domains
-				runner.Work = ""
-				runner.Progress = nil
-				work := filepath.Join(filepath.Dir(t.session.Work), "simulator")
-				for i, binding := range bindings {
-					guests[i].ProvisioningFailure = binding.failure
-					if binding.instance == "" {
-						continue
-					}
-					if observer.instances[i] != binding.instance {
-						observer.console[i] = tenantConsoleSample{}
-						observer.instances[i] = binding.instance
-					}
-					observed, readErr := observeTenantDomain(limited, runner, work, binding.instance, &observer.console[i], &guests[i], now)
-					if errors.Is(readErr, ErrUnjoined) {
-						return readErr
-					}
-					if readErr != nil {
-						err = errors.Join(err, readErr)
-						continue
-					}
-					if observed {
-						guests[i].Available, guests[i].ProviderReady = true, binding.ready
-					}
-				}
-			}
-		}
-	}
-	if errors.Is(err, ErrUnjoined) {
-		return err
-	}
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	reportProgress(t.session.Runner.Progress, ProgressEvent{Kind: TenantGuests, Guests: guests})
-	return nil
-}
-
-// Native Linux and legacy presenters share the same held domain and console
-// observation. A CAPI binding or NICo readiness alone never proves a process.
+// Native Linux presentation uses the held domain and console observation.
+// A CAPI binding or NICo readiness alone never proves a process.
 func observeTenantDomain(ctx context.Context, runner Runner, work, instance string, console *tenantConsoleSample, guest *TenantGuestObservation, now time.Time) (bool, error) {
 	owned, err := OwnedDomain(ctx, runner, "nico-vm-"+instance, work)
 	if err != nil || owned == nil {

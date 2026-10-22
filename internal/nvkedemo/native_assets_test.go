@@ -251,6 +251,47 @@ func TestNativeCAPIAuthPreservesSourceAndRejectsChangedSlots(t *testing.T) {
 	}
 }
 
+func TestNativeCAPNICoReferenceFollowsSelectedInstaller(t *testing.T) {
+	for _, tc := range []struct {
+		name, image, artifact string
+		canceled, fail        bool
+	}{
+		{"selected", "example.invalid/capnico:original", "capnico-controller", false, false},
+		{"updated source", "example.invalid/fork/capnico:next", "capnico-controller", false, false},
+		{"missing artifact", "example.invalid/capnico:original", "", false, true},
+		{"other artifact", "example.invalid/capnico:original", "other-controller", false, true},
+		{"implicit tag", "example.invalid/capnico", "capnico-controller", false, true},
+		{"digest instead of source tag", "example.invalid/capnico@sha256:" + strings.Repeat("a", 64), "capnico-controller", false, true},
+		{"canceled", "example.invalid/capnico:original", "capnico-controller", true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := privateTestDir(t)
+			raw := []byte("image: " + tc.image + "\nartifact: " + tc.artifact + "\n")
+			path := filepath.Join(root, "deploy/nico/capnico/release.yaml")
+			if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+				t.Fatal(err)
+			}
+			writeTenantFixture(t, path, raw, 0600)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if tc.canceled {
+				cancel()
+			}
+			got, err := nativeCAPNICoReference(ctx, root)
+			if (err != nil) != tc.fail || !tc.fail && got != tc.image {
+				t.Fatalf("selected source alias=%q error=%v", got, err)
+			}
+			if tc.canceled && !errors.Is(err, context.Canceled) {
+				t.Fatal("source projection lost cancellation", err)
+			}
+			unchanged, err := os.ReadFile(path)
+			if err != nil || string(unchanged) != string(raw) {
+				t.Fatal("alias selection changed source release", err)
+			}
+		})
+	}
+}
+
 func TestNativeInstallerArchiveIncludesSourceOwnedCAPISelection(t *testing.T) {
 	loaded, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "inputs", "catalogs", "tools", "native")))
 	if err != nil {
@@ -273,7 +314,7 @@ func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *test
 		t.Fatal(err)
 	}
 	versions := []byte("CAPI_VERSION ?= " + selected.capiVersion + "\n")
-	for _, scenario := range []string{"complete", "missing versions", "missing site specification", "changed provider", "missing source marker", "changed source marker", "canceled"} {
+	for _, scenario := range []string{"complete", "missing versions", "missing site specification", "missing CAPNICo release", "changed provider", "missing source marker", "changed source marker", "canceled"} {
 		t.Run(scenario, func(t *testing.T) {
 			entries := []assetEntry{
 				{"deploy/nvke-deploy.sh", tar.TypeReg, "installer", 0},
@@ -291,6 +332,9 @@ func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *test
 			}
 			if scenario != "missing site specification" {
 				entries = append(entries, assetEntry{nativeSiteSpecPath, tar.TypeReg, nativeInstallerSiteSpecFixture, 0})
+			}
+			if scenario != "missing CAPNICo release" {
+				entries = append(entries, assetEntry{"deploy/nico/capnico/release.yaml", tar.TypeReg, "image: example.invalid/capnico:source\nartifact: capnico-controller\n", 0})
 			}
 			if scenario != "missing source marker" {
 				commit := selected.commit + "\n"
@@ -314,9 +358,13 @@ func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *test
 			if scenario == "canceled" {
 				cancel()
 			}
-			_, err := extractNativeInstaller(ctx, writeAssetArchive(t, entries), privateTestDir(t), run, bundle)
+			before := *selected
+			_, err := extractNativeInstaller(ctx, writeAssetArchive(t, entries), privateTestDir(t), selected)
 			if (err == nil) != (scenario == "complete") {
 				t.Fatalf("unexpected extraction admission: %v", err)
+			}
+			if *selected != before {
+				t.Fatal("extraction mutated the caller's checked selection")
 			}
 			if scenario == "canceled" && !errors.Is(err, context.Canceled) {
 				t.Fatal("extraction lost cancellation", err)

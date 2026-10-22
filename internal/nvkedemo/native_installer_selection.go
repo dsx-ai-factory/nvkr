@@ -12,6 +12,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/google/go-containerregistry/pkg/name"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -72,6 +73,25 @@ func nativeInstallerSelectionFromPlan(plan *factory.Plan, bundle, buildDigest st
 }
 
 const nativeSiteSpecPath = "cli/internal/bootstrap/sitespec/template.yaml"
+
+// NVKE's manifest release owns the tag its unchanged deployment expects. This
+// projection selects only the local import alias; NVKE still validates and
+// installs its complete release declaration, and delivery verifies image bytes.
+func nativeCAPNICoReference(ctx context.Context, installer string) (string, error) {
+	raw, err := readRunFile(ctx, installer, "deploy/nico/capnico/release.yaml", 64<<10)
+	if err != nil {
+		return "", err
+	}
+	var release struct{ Image, Artifact string }
+	if err := yaml.Unmarshal(raw, &release); err != nil {
+		return "", err
+	}
+	ref, err := name.NewTag(release.Image, name.StrictValidation)
+	if err != nil || release.Artifact != "capnico-controller" || !nativeImageReferenceIsCanonical(ref, release.Image) {
+		return "", errors.New("CAPNICo import requires the source-owned manifest image and artifact")
+	}
+	return release.Image, nil
+}
 
 // NVKE owns the full site-spec schema and validates the rendered specification.
 // This projection reads only its selected source default. It is checked against

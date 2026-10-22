@@ -1507,13 +1507,14 @@ authentication, the expected boot identity and source-owned TPM policy remain
 separate requirements. It issues no
 bootstrap-stop or release receipt. The native owner requires the shared
 helper startup member before guest launch or native network configuration and
-recompiles captured completed-Run inputs. After deployment and before temporary
+delegates captured completed-Run input replay to the lifecycle owner. That owner
+checks every frozen Run binding; payload acceptance remains separate. After deployment and before temporary
 bootstrap teardown, it imports
 the original host policy without replacement, checks the controller/CSI context,
 permanent registration, derived TPM allowlist, new TPM agent and renewed
 same-boot host certificate, then issues its private completion receipt. Joined
-site-stage failures follow foreground debugging retention; unknown completion
-keeps dependencies unsafe to tear down. The site-stage/retention presentation
+site-stage failures retain their resources under the independent owner while the
+foreground command returns; unknown completion keeps dependencies unsafe to tear down. The site-stage/retention presentation
 leaves tenant and conformance checks pending. Private Linux ARM64 Run
 `site-startup-tools-arm64-acceptance-20261021-02` built and verified the shared
 three-member output from public source pins for the preceding shell implementation,
@@ -1632,16 +1633,10 @@ tests do not establish a completed Ubuntu site replay.
 
 The local demo now selects stock NVKE `v0.22.0` at
 `400c24fb6465b042be883d6b62472528520d6291`, including that release's public SPIRE
-packaging. The retained legacy Kind-site adapter uses the source-owned site-spec
-renderer and deployment entrypoint with verified local chart archives and exact image
-references. In that adapter, the already admitted Kind configuration owns cluster
-networking; site-spec bootstrap fields are not executed. Before tenant creation, it
-binds source-owned profile bytes to the live observed controller pod and creates
-MachineImage, ClusterRelease and NodePoolRelease resources for the selected plain ARM64 disk.
-On the preceding beta selection, focused resource, pod-binding, cancellation and profile tests passed, including
-targeted race checks. The actual beta CLI validated a diagnostic site spec and the
-source installer completed its dry-run with prepared chart paths. Those checks
-do not establish chart builds, cluster readiness, a completed tenant replay, or acceptance of the current v0.22.0 selection.
+packaging. The obsolete full Kind-site adapter and its typed NICo tenant-release
+workflow are removed. The maintained host workflow still uses NVKE's temporary
+Kind bootstrap. Earlier beta source-rendering and installer dry-run checks retain
+their historical scope and do not establish acceptance of the current host workflow.
 
 Maintained OS Definitions, catalog execution and Packer toolchain assembly select Docker.
 The older authored Podman Environment and its TCG Definition are removed; generic

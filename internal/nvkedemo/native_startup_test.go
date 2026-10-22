@@ -179,15 +179,9 @@ func TestSiteStartupOnlyPreparesGuestForHostBootstrap(t *testing.T) {
 			t.Fatalf("service diagnostics must use a private logging-only drop-in: %s", unit)
 		}
 	}
-	// A standalone observer does not override either source-owned service.
-	observer := files["/etc/systemd/system/nvkr-native-network-observer.service"]
-	if observer.Permissions != "0644" || observer.Content != nativeNetworkObserverUnit ||
-		!strings.Contains(prepare.Content, "\nif ! systemctl start nvkr-native-network-observer.service; then\n") {
-		t.Fatal("network diagnostics require the exact independent read-only observer")
-	}
 	dropIns := 0
 	for _, file := range decoded.WriteFiles {
-		if strings.HasPrefix(file.Path, "/etc/systemd/system/") && file.Path != observer.Path {
+		if strings.HasPrefix(file.Path, "/etc/systemd/system/") {
 			dropIns++
 		}
 	}
@@ -225,43 +219,6 @@ func TestSiteStartupOnlyPreparesGuestForHostBootstrap(t *testing.T) {
 	reordered, err := SiteStartupUserData(t.Context(), cfg)
 	if err != nil || reordered != data || cfg.Assets[1] != first {
 		t.Fatal("startup must be deterministic without mutating descriptions")
-	}
-}
-
-func TestNetworkObserverFailureDoesNotBypassRequiredPreparation(t *testing.T) {
-	_, startup, found := strings.Cut(hostSitePreparationScript, "systemctl daemon-reload\n")
-	if !found {
-		t.Fatal("missing startup diagnostic boundary")
-	}
-	startup, _, found = strings.Cut(startup, "install -d -m 0700 /etc/nke\n")
-	if !found {
-		t.Fatal("missing required preparation boundary")
-	}
-	for _, tc := range []struct {
-		name, observerExit, requiredExit string
-		wantSuccess                      bool
-	}{
-		{"available", "0", "0", true},
-		{"missing diagnostic", "5", "0", true},
-		{"failed diagnostic", "1", "0", true},
-		{"required agent stop fails", "1", "1", false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			stub := "systemctl() { if [ \"$1\" = start ]; then return " + tc.observerExit + "; else return " + tc.requiredExit + "; fi; }\n"
-			command := exec.CommandContext(t.Context(), "bash", "-euc", stub+startup+"printf 'required-preparation-continued\\n'\n")
-			output, err := command.CombinedOutput()
-			if (err == nil) != tc.wantSuccess || strings.Contains(string(output), "required-preparation-continued") != tc.wantSuccess {
-				t.Fatalf("diagnostic changed required preparation outcome: %v: %s", err, output)
-			}
-			if tc.observerExit != "0" && !strings.Contains(string(output), "Private network observer unavailable") {
-				t.Fatal("diagnostic failure was silently discarded", string(output))
-			}
-		})
-	}
-	for _, line := range strings.Split(nativeNetworkObserverUnit, "\n") {
-		if strings.HasPrefix(line, "ExecStartPre=") && !strings.HasPrefix(line, "ExecStartPre=-") {
-			t.Fatal("diagnostic preflight can abort preparation", line)
-		}
 	}
 }
 

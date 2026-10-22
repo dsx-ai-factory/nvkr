@@ -6,7 +6,6 @@
 package qemutpm
 
 import (
-	"bytes"
 	"context"
 	"os"
 	"os/exec"
@@ -16,8 +15,6 @@ import (
 	"syscall"
 	"testing"
 	"time"
-
-	"golang.org/x/sys/unix"
 )
 
 func TestInstalledStandardTPMDevice(t *testing.T) {
@@ -56,50 +53,27 @@ func TestInstalledStandardTPMDevice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fds, err := unix.Socketpair(unix.AF_UNIX, unix.SOCK_DGRAM, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	parent, childFD := os.NewFile(uintptr(fds[0]), "parent"), os.NewFile(uintptr(fds[1]), "child")
-	defer parent.Close()
-	command := exec.Command(self, "test-owner")
-	command.Env = append(environment, "NVKR_TEST_NATIVE_QEMU=1", "NVKR_TEST_NATIVE_QEMU_ROOT="+root, "NVKR_TEST_NATIVE_QEMU_REAL=1")
-	command.ExtraFiles = []*os.File{nil, childFD}
-	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	var output bytes.Buffer
-	command.Stdout, command.Stderr = &output, &output
-	if err := command.Start(); err != nil {
-		t.Fatal(err)
-	}
-	_ = childFD.Close()
-	ownerJoined := false
-	t.Cleanup(func() {
-		if !ownerJoined {
-			_ = syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
-		}
-	})
-	done := make(chan error, 1)
-	go func() { done <- command.Wait() }()
+	owner := startOwnerWithEnvironment(t, root, append(environment, "NVKR_TEST_NATIVE_QEMU_REAL=1"))
 	deadline := time.Now().Add(10 * time.Second)
 	for {
 		select {
-		case err := <-done:
-			ownerJoined = true
-			t.Fatalf("real device exited before cancellation: %v\n%s", err, output.String())
+		case err := <-owner.done:
+			owner.joined = true
+			t.Fatalf("real device exited before cancellation: %v\n%s", err, owner.output.String())
 		default:
 		}
 		if _, err := os.Stat(filepath.Join(adapter.Instances, "instance", "qemu.pid")); err == nil {
 			break
 		}
 		if time.Now().After(deadline) {
-			_ = command.Process.Signal(syscall.SIGTERM)
+			_ = owner.command.Process.Signal(syscall.SIGTERM)
 			select {
-			case <-done:
-				ownerJoined = true
+			case <-owner.done:
+				owner.joined = true
 			case <-time.After(6 * time.Second):
 				t.Fatal("real device failed startup and could not join")
 			}
-			t.Fatal("real QEMU did not produce its PID file", output.String())
+			t.Fatal("real QEMU did not produce its PID file", owner.output.String())
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
@@ -117,24 +91,24 @@ func TestInstalledStandardTPMDevice(t *testing.T) {
 	if err != nil || !strings.Contains(string(actualArgs), "-machine virt,accel=tcg -cpu max") {
 		t.Fatalf("real child did not receive explicit TCG/max: %v %s", err, actualArgs)
 	}
-	if pgid, err := syscall.Getpgid(pid); err != nil || pgid != command.Process.Pid {
+	if pgid, err := syscall.Getpgid(pid); err != nil || pgid != owner.command.Process.Pid {
 		t.Fatal("real QEMU escaped its owner process group", pgid, err)
 	}
 	select {
-	case err := <-done:
-		ownerJoined = true
-		t.Fatalf("real TPM launch failed: %v\n%s", err, output.String())
+	case err := <-owner.done:
+		owner.joined = true
+		t.Fatalf("real TPM launch failed: %v\n%s", err, owner.output.String())
 	case <-time.After(500 * time.Millisecond):
 	}
-	_ = command.Process.Signal(syscall.SIGTERM)
+	_ = owner.command.Process.Signal(syscall.SIGTERM)
 	select {
-	case <-done:
-		ownerJoined = true
+	case <-owner.done:
+		owner.joined = true
 	case <-time.After(6 * time.Second):
 		t.Fatal("real device owner did not join after cancellation")
 	}
 	if err := adapter.Close(t.Context()); err != nil {
-		t.Fatal(err, output.String())
+		t.Fatal(err, owner.output.String())
 	}
 	state, err := os.ReadDir(filepath.Join(adapter.Instances, "instance", "nvkr-tpm"))
 	if err != nil || len(state) == 0 {

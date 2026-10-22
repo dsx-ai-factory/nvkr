@@ -380,12 +380,10 @@ software execution for the existing 64K image; it does not select these historic
 Definitions or change source pins. Native Linux still requires KVM. Do not edit
 the TCG catalog in place to simulate a KVM selection; use the maintained inputs.
 
-`kind-calico` remains a legacy Kind-site diagnostic: Kind's default CNI at the
-site and Calico 3.30.1 in the tenant. Its tenant admission requires Calico-node
-and DNS rollouts before the same zero-retry workload. **Current native `run` and
-`e2e` reject `kind-calico`** because that site requires matched OVN disk/profiles.
-Existing legacy sessions and their original compatible tools retain their status
-and cleanup path below. Neither Calico nor upstream is NVIDIA-fork acceptance.
+`kind-calico` remains a build-only diagnostic selection. **`run` and `e2e` reject
+`kind-calico`** because deployment requires matched OVN disk/profiles. The old
+full Kind-site workflow has been removed; temporary Kind bootstrap remains part
+of NVKE's source-owned host workflow. Neither Calico nor upstream is NVIDIA-fork acceptance.
 
 ## Conformance on the fresh tenant
 
@@ -744,8 +742,9 @@ exact controller/CSI context, permanent registration, controller-derived TPM
 allowlist, new TPM agent and fresh same-boot host certificate.
 Only the complete native operation issues its private bootstrap-stop receipt.
 
-A joined handoff failure retains bootstrap and site for foreground debugging
-when cleanup is not selected. Unknown remote completion preserves dependencies
+A joined handoff failure retains bootstrap and site under the independent owner
+when cleanup is not selected; the foreground command returns its failure and
+prints the existing session controls. Unknown remote completion preserves dependencies
 and refuses an automatic retry. The Go scoped API retains its documented
 callback lifetime and joined cleanup rules. The TUI reports the handoff as a
 site stage; a site failure does not complete tenant or conformance checks.

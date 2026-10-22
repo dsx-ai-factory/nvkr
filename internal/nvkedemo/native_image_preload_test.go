@@ -46,7 +46,7 @@ func TestNativeImageImportsKeepExactManifestAndDockerAlias(t *testing.T) {
 		valid                 bool
 	}{
 		{"docker.io/nvkr-local/postgresql@" + digest, "docker.io/nvkr-local/postgresql", true},
-		{WorkloadImage, "docker.io/library/alpine", true},
+		{workloadFixtureImage, "docker.io/library/alpine", true},
 		{"localhost/nvke/ovn-kubernetes@" + digest, "localhost/nvke/ovn-kubernetes", true},
 		{"index.docker.io/nvkr-local/postgresql@" + digest, "index.docker.io/nvkr-local/postgresql", true},
 		{"docker.io/nvkr-local/postgresql:latest", "", false},

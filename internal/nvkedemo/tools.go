@@ -235,7 +235,11 @@ func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string,
 		// NVKR has already verified the archive's exact bundle member. Reuse
 		// the existing bounded standard-library decoder and held writes; these
 		// are source-owned files, not a second deployment implementation.
-		if _, err := extractNativeInstaller(ctx, filepath.Join(directory, "nvke-installer-sources"), installer, root, bundle); err != nil {
+		selection, err := nativeInstallerSelectionFromRun(ctx, root, bundle)
+		if err != nil {
+			return "", err
+		}
+		if _, err := extractNativeInstaller(ctx, filepath.Join(directory, "nvke-installer-sources"), installer, selection); err != nil {
 			return "", err
 		}
 	}

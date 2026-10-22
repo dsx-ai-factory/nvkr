@@ -24,7 +24,7 @@ import (
 )
 
 // NativeConfig selects one site and the requested native tenant topology.
-// Cleanup false keeps the foreground environment until its context is canceled.
+// Cleanup false delegates lifetime to the retained deployment owner.
 type NativeConfig struct {
 	Resources               NativeResources
 	TenantTimeout           time.Duration
@@ -372,19 +372,15 @@ func (s *nativeSiteAttempt) setup(ctx context.Context, runner Runner, row native
 func (s *nativeSiteAttempt) ready(ctx context.Context, runner Runner, row nativeInstance, tools, out string, server *OwnedProcess) error {
 	configured, err := s.setup(ctx, runner, row, tools, out, server)
 	if err != nil {
-		var identityFailure *nativeSiteIdentityFailure
-		if errors.As(err, &identityFailure) {
-			return s.holdSiteIdentityFailure(ctx, runner, server, err)
-		}
 		return err
 	}
 	runner = configured
-	return withNativeSiteScope(ctx, s, runner, tools, out, server, s.use)
+	return withNativeSiteScope(ctx, s, runner, tools, out, s.use)
 }
 
 func runNativeDemo(ctx context.Context, site *NativeSite) error {
 	scope := site.scope
-	s, runner, tools, out, server := scope.attempt, scope.runner, scope.tools, scope.out, scope.server
+	s, runner, tools, out := scope.attempt, scope.runner, scope.tools, scope.out
 	kubeconfig := filepath.Join(out, "site.kubeconfig")
 	tenant, err := site.createTenant(ctx, "native-demo-tenant", out)
 	if err != nil {
@@ -396,7 +392,7 @@ func runNativeDemo(ctx context.Context, site *NativeSite) error {
 	}
 	if s.conformance != nil {
 		if err := tenant.runConformance(ctx, out); err != nil {
-			return s.holdForeground(ctx, runner, access, server, err)
+			return err
 		}
 	}
 	var domains []domainEvidence
@@ -427,61 +423,7 @@ func runNativeDemo(ctx context.Context, site *NativeSite) error {
 		}
 		return owner.markReady(ctx, access)
 	}
-	return s.holdForeground(ctx, runner, access, server, nil)
-}
-
-// Keep the existing foreground owner alive for debugging without converting a
-// failed suite into success or retaining resources beneath an unjoined command.
-func (s *nativeSiteAttempt) holdForeground(ctx context.Context, runner Runner, access OperatorAccess, server *OwnedProcess, primary error) error {
-	notice := "Demo remains available in this foreground session; Ctrl-C deletes only its owned guests and servers."
-	status := "available"
-	if primary != nil {
-		notice = "Conformance failed. The cluster remains available in this foreground session for debugging; Ctrl-C starts owned cleanup and preserves the failed outcome."
-		status = "conformance-failed"
-	}
-	return s.holdForegroundState(ctx, runner, server, primary, notice, status, func(ctx context.Context) error { return s.presentStatus(ctx, runner, access, false) })
-}
-
-func (s *nativeSiteAttempt) holdSiteIdentityFailure(ctx context.Context, runner Runner, server *OwnedProcess, primary error) error {
-	return s.holdForegroundState(ctx, runner, server, primary,
-		"Site host identity handoff failed. Bootstrap and site remain available in this foreground session for debugging; Ctrl-C starts owned cleanup and preserves the failed outcome.", "site-identity-failed", nil)
-}
-
-func (s *nativeSiteAttempt) holdForegroundState(ctx context.Context, runner Runner, server *OwnedProcess, primary error, notice, status string, observe func(context.Context) error) error {
-	if runtimeRetention(ctx) != nil {
-		return primary // The independent owner's dependent finalizer holds services.
-	}
-	if s.cleanup || ctx.Err() != nil || errors.Is(primary, ErrUnjoined) {
-		return primary
-	}
-	if runner.Progress != nil {
-		if _, err := fmt.Fprintln(runner.Progress, notice); err != nil {
-			return errors.Join(primary, err)
-		}
-	}
-
-	reportProgress(runner.Progress, ProgressEvent{Kind: NativeRetained, Status: status})
-	refresh := time.NewTicker(time.Minute)
-	defer refresh.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return primary
-		case <-server.done:
-			_, err := server.Exited()
-			return errors.Join(primary, errors.New("native NICo exited during the retained demo; inspect the private native-nico log"), err)
-		case <-refresh.C:
-			if observe == nil {
-				continue
-			}
-			if err := observe(ctx); err != nil {
-				if ctx.Err() != nil && !errors.Is(err, ErrUnjoined) {
-					return primary
-				}
-				return errors.Join(primary, err)
-			}
-		}
-	}
+	return nil
 }
 
 // Health remains a timestamped read-only observation after tenant acceptance.
@@ -583,16 +525,27 @@ func readyNativeTenantNodes(nodes []tenantNode, version string, expected int) (b
 // NVKE owns request validation. Select its reviewed wire fields from the same
 // source contract used for bootstrap and deployment on both native hosts.
 func (s *nativeSiteAttempt) namedTenantRequest(ctx context.Context, name string) (TenantRequest, error) {
-	request, err := newTenantRequest(name, s.network)
+	mode, err := normalizeNetwork(s.network)
 	if err != nil {
 		return TenantRequest{}, err
 	}
-	request.Kubernetes, err = nativeKubernetesVersion(ctx, s.assets)
+	version, err := nativeKubernetesVersion(ctx, s.assets)
 	if err != nil {
 		return TenantRequest{}, err
 	}
-	request.VIP = ""
-	request.NodePools[0].Count = s.tenantNodeCount() - request.ControlPlane.Count
+	request := TenantRequest{
+		Name: name, Kubernetes: version, CNI: "ovn-kubernetes", CNIVersion: siteOVNVersion,
+		ControlPlane: ControlPlaneIntent{Count: 1, Reserved: "1Gi", DisableMonitor: true},
+		NodePools: []NodePoolIntent{{Name: "worker", Prefix: "w", Count: s.tenantNodeCount() - 1,
+			SystemReserved: "1Gi", KubeReserved: "1Gi", DisableAuto: true, DisableMonitor: true}},
+	}
+	switch mode {
+	case "ovn":
+	case "upstream-ovn":
+		request.CNIVersion = upstreamSiteOVNVersion
+	default:
+		return TenantRequest{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "native tenant requires an OVN network selection")
+	}
 
 	// The source default pod range contains the Mac vmnet underlay. Keep both
 	// tenant ranges separate from that underlay and the site Kubernetes ranges.
@@ -624,7 +577,7 @@ func (s *nativeSiteAttempt) runTenantRequest(ctx context.Context, runner Runner,
 	if err := privateJSON(path, request); err != nil {
 		return err
 	}
-	s.tenantOwner = &tenant{name: request.Name, network: s.network, cliPath: cli, session: ManagementSession{Work: out, Tools: tools, Runner: runner}, nativeCAPI: ownership}
+	s.tenantOwner = &tenant{name: request.Name, cliPath: cli, session: ManagementSession{Work: out, Tools: tools, Runner: runner}, nativeCAPI: ownership}
 	rows, err := s.tenantOwner.inventory(ctx)
 	if err != nil {
 		return err

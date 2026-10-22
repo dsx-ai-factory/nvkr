@@ -34,7 +34,7 @@ func nativeTenantDNSCases(t *testing.T, count int) {
 		{name: "rollout deadline", block: "deployment/coredns"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			selected, root := tenantRunFixture(t, "ovn", tc.fail, tc.block)
+			selected, root := tenantRunFixture(t, tc.fail, tc.block)
 			executable, err := os.Executable()
 			if err != nil {
 				t.Fatal(err)

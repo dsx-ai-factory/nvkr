@@ -111,7 +111,7 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 	}
 	selections := []nativeImageSelection{
 		{"ovn", cfg.DeploymentRun, ovnOutput, "", lifecycle.Artifact{}},
-		{"capnico", providersRun, "capnico-controller-arm64", "ghcr.io/dsx-ai-factory/cluster-api-provider-nico/controller:v0.0.45", lifecycle.Artifact{}},
+		{"capnico", providersRun, "capnico-controller-arm64", "", lifecycle.Artifact{}},
 		{"controller", controllerRun, "cwe", "docker.io/library/nke-controller:latest", lifecycle.Artifact{}},
 		{"profiles", cfg.DeploymentRun, profilesOutput, "docker.io/library/cwe-profiles:local", lifecycle.Artifact{}},
 		{"provisioned-provider", cfg.BootstrapRun, "cluster-api-provider-provisioned-arm64", "docker.io/library/cluster-api-provider-provisioned:latest", lifecycle.Artifact{}},
@@ -164,13 +164,12 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 			ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: inspected.SemanticDigest, BlobDigest: inspected.RootDigest, Layout: true})
 	}
 	var runtimePlan *factory.Plan
-	var installer *nativeInstallerSelection
+	installer, err := nativeInstallerSelectionFromRun(ctx, hostRun, hostBundle)
+	if err != nil {
+		return assets, err
+	}
 	acquired := make(map[string]string)
 	if cfg.RuntimeRun != "" {
-		installer, err = nativeInstallerSelectionFromRun(ctx, hostRun, hostBundle)
-		if err != nil {
-			return assets, err
-		}
 		runtimePlan, _, err = nativeSelectedRunPlan(ctx, cfg.RuntimeRun, "workload-image-arm64", "oci")
 		if err != nil {
 			return assets, err
@@ -255,11 +254,18 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 			return assets, err
 		}
 	}
-	assets.installerSelection, err = extractNativeInstaller(ctx, filepath.Join(assets.HostTools, "nvke-installer-sources"), assets.Installer, hostRun, hostBundle)
+	assets.installerSelection, err = extractNativeInstaller(ctx, filepath.Join(assets.HostTools, "nvke-installer-sources"), assets.Installer, installer)
+	if err != nil {
+		return assets, err
+	}
+	capnico, err := nativeCAPNICoReference(ctx, assets.Installer)
 	if err != nil {
 		return assets, err
 	}
 	for _, selection := range selections {
+		if selection.role == "capnico" {
+			selection.reference = capnico
+		}
 		image, err := prepareNativeImage(ctx, selection, out, assets.Files)
 		if err != nil {
 			return assets, err
@@ -445,14 +451,19 @@ func prepareNativeImage(ctx context.Context, selection nativeImageSelection, wor
 // Admit the source-owned provider selection at extraction time, before image
 // preparation or any later network/VM work. deployFromHost rechecks these bytes
 // at its executable boundary before invoking clusterctl.
-func extractNativeInstaller(ctx context.Context, archive, installer, run, bundle string) (*nativeInstallerSelection, error) {
-	selection, err := nativeInstallerSelectionFromRun(ctx, run, bundle)
-	if err != nil {
+func extractNativeInstaller(ctx context.Context, archive, installer string, selection *nativeInstallerSelection) (*nativeInstallerSelection, error) {
+	if err := requireContext(ctx); err != nil {
 		return nil, err
 	}
+	if selection == nil {
+		return nil, errors.New("installer extraction requires its checked tool Run selection")
+	}
+	checked := *selection
+	selection = &checked
 	if err := safeExtractAssets(ctx, archive, installer, []string{
 		"SOURCE_COMMIT", "CAPI_VERSION", nativeSiteSpecPath, "make/tool-versions.mk", "deploy/nvke-deploy.sh", "deploy/lib/nvke-deploy-items.py",
 		"deploy/lib/render-template.py", "deploy/nico/nvke-deploy.yaml",
+		"deploy/nico/capnico/release.yaml",
 		"controller/deploy/charts/controller/Chart.yaml", "nktp/deploy/charts/nktp/Chart.yaml",
 		"controller/nico-sim/internal/seed/default-seed.yaml", "controller/nico-sim/ui/index.html",
 		"controller/deploy/k8s/capi-spiffe-exec-auth/capi-controller-manager.yaml",

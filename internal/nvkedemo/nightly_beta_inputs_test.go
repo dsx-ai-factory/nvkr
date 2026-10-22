@@ -4,16 +4,127 @@
 package nvkedemo
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/netip"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
+	"unicode/utf8"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/google/go-containerregistry/pkg/name"
+	"go.yaml.in/yaml/v3"
 )
+
+const (
+	tenantMetadataLimit = 256 << 10
+	tenantIPXELimit     = 16384
+	tenantUserDataLimit = 65536
+)
+
+type tenantProfileMetadata struct {
+	Profiles map[string]struct {
+		Kubernetes string `yaml:"kubernetes_version"`
+		Injected   bool   `yaml:"kubernetes_version_injected"`
+		Arch       string `yaml:"architecture"`
+		BuildDate  string `yaml:"build_date"`
+		Ubuntu     string `yaml:"ubuntu_version"`
+		Variant    string `yaml:"variant"`
+	} `yaml:"profiles"`
+}
+
+type tenantReleaseDocument struct {
+	Metadata struct {
+		Name        string            `json:"name"`
+		Annotations map[string]string `json:"annotations"`
+	} `json:"metadata"`
+	Spec any `json:"spec"`
+}
+
+// Describe the already verified local disk and source-owned initialization.
+// The metadata date comes from the diagnostic profile, not a build-time claim.
+func tenantReleaseDocuments(network string, image lifecycle.Artifact, metadata, ipxe, userData []byte) (string, []tenantReleaseDocument, error) {
+	invalid := func(message string) (string, []tenantReleaseDocument, error) {
+		return "", nil, e.New(e.CodePreflightFailed, "%s", message)
+	}
+	diskOutput, err := selectedDiskOutput(network)
+	if err != nil {
+		return invalid("tenant release requires a supported network selection")
+	}
+	if image.Name != diskOutput || image.Kind != "disk-image" || image.OS != "linux" || image.Arch != "arm64" || !canonical.IsDigest(image.Digest) || image.Disk == nil || image.Disk.Size <= 0 || image.Disk.Format != "qcow2" || image.Disk.Encryption != "none" || image.Disk.PayloadDigest != image.Digest {
+		return invalid("tenant release requires the verified local plain ARM64 QCOW2 output")
+	}
+	for i, raw := range [][]byte{metadata, ipxe, userData} {
+		limit := []int{tenantMetadataLimit, tenantIPXELimit, tenantUserDataLimit}[i]
+		if len(raw) == 0 || len(raw) > limit || !utf8.Valid(raw) || bytes.ContainsRune(raw, '\x00') {
+			return invalid("tenant profile data is empty, oversized or not UTF-8 text")
+		}
+	}
+	var profiles tenantProfileMetadata
+	decoder := yaml.NewDecoder(bytes.NewReader(metadata))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&profiles); err != nil {
+		return "", nil, e.Wrap(e.CodePreflightFailed, err, "decode source-owned tenant profile metadata")
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		return invalid("tenant profile metadata must contain one document")
+	}
+	profile, exists := profiles.Profiles[TenantProfile]
+	if !exists || len(profiles.Profiles) != 1 || profile.Arch != image.Arch || profile.Ubuntu != "26.04" || profile.Variant != "local-plain-tpm" || !profile.Injected || profile.Kubernetes != "" {
+		return invalid("source-owned tenant profile does not match the selected plain ARM64 image")
+	}
+	if _, err := time.Parse("2006-01-02", profile.BuildDate); err != nil {
+		return invalid("source-owned tenant profile has no valid build date")
+	}
+	if !bytes.HasPrefix(ipxe, []byte("#!ipxe\n")) || !bytes.HasPrefix(userData, []byte("#cloud-config\n")) {
+		return invalid("tenant profile is missing its iPXE or cloud-init header")
+	}
+	wantURL := "http://" + GuestGateway + ":18080/" + image.Name + ".qcow2"
+	imageURLs := 0
+	for _, line := range strings.Split(string(ipxe), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && fields[0] == "set" && fields[1] == "image-url" {
+			if len(fields) != 3 || fields[2] != wantURL {
+				return invalid("tenant profile does not select the verified local disk endpoint")
+			}
+			imageURLs++
+		}
+	}
+	if imageURLs != 1 {
+		return invalid("tenant profile requires exactly one local disk endpoint")
+	}
+	name := "nvkr-local-" + strings.TrimPrefix(image.Digest, "sha256:")[:40]
+	annotations := map[string]string{
+		"nvkr.dev/diagnostic-disk-digest": image.Digest,
+		"nvkr.dev/diagnostic-disk-size":   strconv.FormatInt(image.Disk.Size, 10),
+	}
+	var machine tenantReleaseDocument
+	machine.Metadata.Name, machine.Metadata.Annotations = name, annotations
+	machine.Spec = map[string]any{
+		"operatingSystem": map[string]string{"family": "ubuntu", "version": profile.Ubuntu},
+		"architecture":    profile.Arch, "variant": profile.Variant, "buildDate": profile.BuildDate,
+		"nico": map[string]string{"ipxeScript": string(ipxe)},
+	}
+	var release tenantReleaseDocument
+	release.Metadata.Name = name
+	release.Metadata.Annotations = map[string]string{
+		"nvkr.dev/diagnostic-disk-digest":                                   image.Digest,
+		"internal.nvke.nvidia.com/machine-init-kubernetes-version":          "",
+		"internal.nvke.nvidia.com/machine-init-kubernetes-version-injected": "true",
+	}
+	release.Spec = map[string]any{
+		"machineImageRef": map[string]string{"name": name},
+		"machineInit":     map[string]string{"userDataTemplate": string(userData)},
+		"lifecycle":       map[string]bool{"deprecated": false, "hidden": false},
+	}
+	return name, []tenantReleaseDocument{machine, release, release}, nil
+}
 
 type nightlyReleaseResource struct {
 	APIVersion string `json:"apiVersion"`

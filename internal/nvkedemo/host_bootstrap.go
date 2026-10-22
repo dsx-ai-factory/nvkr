@@ -42,9 +42,6 @@ DEBIAN_FRONTEND=noninteractive NVKE_AGENT_SKIP_START=1 apt-get install -y -o DPk
 # Cloud-init wrote logging-only drop-ins before package installation. Reload
 # even when APT finds the packages already installed and runs no postinst.
 systemctl daemon-reload
-if ! systemctl start nvkr-native-network-observer.service; then
-  printf '%s\n' 'Private network observer unavailable; continuing required site preparation.' >&2
-fi
 systemctl stop nvke-agent.service spire-agent.service
 install -d -m 0700 /etc/nke
 install -d -m 1777 /var/lib/nvke-native/postgres /var/lib/nvke-native/spire
@@ -173,7 +170,7 @@ func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, 
 		}
 	}
 	s.bootstrapName = cluster
-	runner.Env = SetEnv(runner.Env, map[string]string{"NVKECTL_BOOTSTRAP_CLUSTER_NAME": cluster, "NVKECTL_BOOTSTRAP_NODE_IMAGE": "kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5", "NVKECTL_BOOTSTRAP_WAIT_READY": "10m"})
+	runner.Env = SetEnv(runner.Env, map[string]string{"NVKECTL_BOOTSTRAP_CLUSTER_NAME": cluster, "NVKECTL_BOOTSTRAP_WAIT_READY": "10m"})
 	s.bootstrapRunner = &runner
 	if err := runner.Run(ctx, []string{cli, "bootstrap", "site", "--sitespec", specPath, "--nvke-controller-image", s.assets.Images["controller"].Reference, "--provisioned-provider-image", s.assets.Images["provisioned-provider"].Reference,
 		"--kubeconfig-out", filepath.Join(out, "site.kubeconfig"), "--encryption-key-out", filepath.Join(out, "site-etcd-encryption-key.json"), "--diagnostics-dir", filepath.Join(out, "bootstrap-diagnostics"), "--keep-bootstrap-cluster", "--timeout", "45m"}, "host-nvke-bootstrap", 60*time.Minute); err != nil {

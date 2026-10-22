@@ -332,22 +332,9 @@ func (w *checkedWriter) failure() error {
 // terminal controls; caller-supplied status text and private diagnostics are not
 // copied into this output. Report does not reparse subprocess log text.
 func (w *checkedWriter) Report(event nvkedemo.ProgressEvent) {
-	if event.Kind == nvkedemo.NativeDeployment || event.Kind == nvkedemo.NativeRetained {
+	if event.Kind == nvkedemo.NativeDeployment {
 		if w.observer != nil {
 			w.observer.Report(event)
-			return
-		}
-		if event.Kind == nvkedemo.NativeRetained && (event.Status == "available" || event.Status == "conformance-failed" || event.Status == "site-identity-failed") {
-			w.mu.Lock()
-			defer w.mu.Unlock()
-			message := "Environment retained for debugging; Ctrl-C starts owned cleanup."
-			switch event.Status {
-			case "conformance-failed":
-				message = "Conformance failed; cluster retained for debugging; Ctrl-C starts owned cleanup."
-			case "site-identity-failed":
-				message = "Site identity failed; bootstrap and site retained for debugging; tenant and conformance have not started; Ctrl-C starts owned cleanup."
-			}
-			w.emit(message + "\n")
 		}
 		return
 	}
@@ -385,11 +372,7 @@ func (w *checkedWriter) Report(event nvkedemo.ProgressEvent) {
 				w.emit(prefix + "guest observation unavailable\n")
 				continue
 			}
-			if event.Name == "native" {
-				w.emit(fmt.Sprintf("%sNICo %s; Infra Ready=%s; VM %s; console observed=%t (not Kubernetes Ready)\n", prefix, guest.InstanceState, guest.ProviderReady, guest.Domain, guest.ConsoleKnown))
-				continue
-			}
-			w.emit(fmt.Sprintf("%sVM %s; infrastructure Ready=%s (not Kubernetes Ready); console observed=%t", prefix, guest.Domain, guest.ProviderReady, guest.ConsoleKnown))
+			w.emit(fmt.Sprintf("%sNICo %s; Infra Ready=%s; VM %s; console observed=%t (not Kubernetes Ready)", prefix, guest.InstanceState, guest.ProviderReady, guest.Domain, guest.ConsoleKnown))
 			if growth {
 				w.emit(fmt.Sprintf("; console bytes grew to %d KiB; growth age %s at snapshot (not guest health)", guest.ConsoleBytes/1024, guest.ConsoleLastChange.Truncate(time.Second)))
 			}

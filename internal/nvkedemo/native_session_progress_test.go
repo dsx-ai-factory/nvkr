@@ -14,7 +14,7 @@ func TestNativeSessionSharesTenantAndConformanceProgressAcrossSiteReuse(t *testi
 	attempt, runner, root := nativeSessionFixture(t, true)
 	writer := &recordedProgress{}
 	runner.Progress = writer
-	err := withNativeSiteScope(t.Context(), &attempt, runner, runner.Work, runner.Work, nil, func(ctx context.Context, site *NativeSite) error {
+	err := withNativeSiteScope(t.Context(), &attempt, runner, runner.Work, runner.Work, func(ctx context.Context, site *NativeSite) error {
 		for _, name := range []string{"first", "second"} {
 			tenant, err := site.CreateTenant(ctx, name)
 			if err != nil {

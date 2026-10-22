@@ -24,7 +24,6 @@ const (
 	TenantWaiting      = "tenant-waiting"
 	TenantGuests       = "tenant-guests"
 	NativeDeployment   = "native-deployment"
-	NativeRetained     = "native-retained"
 	OSBuildLogs        = "os-build-logs"
 )
 
@@ -79,7 +78,7 @@ const (
 )
 
 // TenantConditionStatus is a descriptive NVKE API observation, not node readiness
-// or NVKR evidence. Values follow controller/api/models.gen.go at InstallerCommit.
+// or NVKR evidence. Values follow the selected NVKE controller API model.
 type TenantConditionStatus string
 
 const (

@@ -7,14 +7,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-	"testing/synctest"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -165,44 +162,6 @@ func TestNativeIdentityConfigProjectionCannotSelectAnotherTransport(t *testing.T
 			if (err != nil) != tc.wantError {
 				t.Fatalf("config error=%v wantError=%v", err, tc.wantError)
 			}
-		})
-	}
-}
-func TestNativeIdentityJoinedFailureRetainsTheExistingForegroundOwner(t *testing.T) {
-	for _, cleanup := range []bool{false, true} {
-		t.Run(fmt.Sprintf("cleanup-%v", cleanup), func(t *testing.T) {
-			synctest.Test(t, func(t *testing.T) {
-				ctx, cancel := context.WithCancel(t.Context())
-				defer cancel()
-				failure := errors.New("private guest renderer detail")
-				attempt := &nativeSiteAttempt{cleanup: cleanup}
-				server := &OwnedProcess{done: make(chan struct{})}
-				var output bytes.Buffer
-				finished := make(chan error, 1)
-				go func() { finished <- attempt.holdSiteIdentityFailure(ctx, Runner{Progress: &output}, server, failure) }()
-				synctest.Wait()
-				select {
-				case err := <-finished:
-					if !cleanup || !errors.Is(err, failure) {
-						t.Fatalf("unexpected foreground return %v", err)
-					}
-				default:
-					if cleanup {
-						t.Fatal("explicit cleanup was retained")
-					}
-					cancel()
-					synctest.Wait()
-					if err := <-finished; !errors.Is(err, failure) {
-						t.Fatal("lost original joined failure")
-					}
-				}
-				if strings.Contains(output.String(), failure.Error()) || strings.Contains(output.String(), "passed") {
-					t.Fatal("retention exposed private failure or granted success")
-				}
-				if !cleanup && !strings.Contains(output.String(), "Bootstrap and site remain available") {
-					t.Fatal("missing site-stage retention status")
-				}
-			})
 		})
 	}
 }
