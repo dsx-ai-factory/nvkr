@@ -13,6 +13,10 @@ catalog's native-toolchain overlay. It selects pinned installers and a compatibl
 for the [Ubuntu 24 diagnostic inputs](../definitions/diagnostics/ubuntu24/README.md), retaining
 the release catalog's other materials, Packer pins and disk-root patches.
 
+The [native ARM64 SBOM tool](tools/sbom-arm64/README.md) supplies the scanner for the ARM64
+quickstart. Its tool pin is separate from the AMD64 scanner in the maintained release catalog;
+output-scoped selections retain the same NVKE release producers.
+
 ## Current-to-shared mapping
 
 Former paths below were relative to `definitions/` at upstream commit
