@@ -4,6 +4,17 @@ The maintained scripts use the public lifecycle or demonstrate one focused
 supporting contract. They never turn local diagnostics into release authority.
 The [demo index](../demos/README.md) collects the presentation and guided journeys.
 
+## First NVKE build
+
+`bash scripts/nvkr-quickstart.sh` checks Git, Go and Docker before starting. Make is not required.
+Missing Go can be installed inside the checkout after confirmation, or with explicit `--install-go` consent.
+The SDK is verified against [official download checksums](../toolchains/quickstart/README.md).
+Supported system-package installs are shown for approval; they are never performed without consent.
+It selects the checkout's required Go compiler, compiles a native NVKR CLI, then builds
+the three [quickstart](../docs/quickstart.md) artifacts and dependency SBOMs.
+Each invocation retains a fresh attempt and prints its output path.
+The launcher runs in a child shell, so failure does not change the caller's SSH shell settings.
+
 ## Repository CI tests
 
 `ci-test-shard.py` discovers the ordinary Go suite and partitions it across the Merge Gate's eleven

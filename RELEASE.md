@@ -52,7 +52,7 @@ Git source archives omit tag signatures and the history used for version
 stamping, so the supported instructions use a Git checkout.
 
 [Development](DEVELOPMENT.md) owns tool prerequisites and
-`make check`; [the quickstart](docs/quickstart.md#build-the-cli) owns first use.
+`make check`; [the quickstart](docs/quickstart.md#build-the-artifacts) owns first use.
 Compiling the Go CLI does not require building NVKE artifacts. Executing
 producers requires their declared container/runtime tools, and
 authority-bearing execution and verification retain their documented Linux

@@ -16,3 +16,5 @@ unpublished, unqualified, and not a maintained lifecycle toolchain. See its READ
 for the mandatory non-root, credential-free and network-less execution boundary.
 
 Use `definitions/` and the demo index for current workflows. Generated hosted OS-image integration remains deferred.
+
+`quickstart/` pins the official native Go SDK archives used by the consent-based local quickstart setup.

@@ -1,7 +1,52 @@
-# Combined CLI, image and chart example
+# NVKE CLI, controller image and chart
 
-This retained example builds `nvkectl`, the upstream CWE runtime image, and the source controller Helm chart
-from NVKE `v0.22.0`. The chart depends on the exact built CWE image. Producer
+The [quickstart](../../quickstart.md) builds three outputs using the maintained NVKE release catalog:
+`nvkectl`, `nvke-controller` and `nvke-controller-chart`. The chart binds to the image built in the same Run.
+The commands select the input file automatically for your processor architecture.
+
+| File | Platform |
+|---|---|
+| `definition-amd64.yaml` | Intel Macs and AMD64 Linux; produces Linux AMD64 artifacts. |
+| `definition-arm64.yaml` | Apple Silicon and ARM64 Linux; produces Linux ARM64 artifacts. |
+| `environment-local-amd64.yaml`, `environment-local-arm64.yaml` | Matching native utility execution, with publication disabled unless explicitly requested. |
+
+Both selections use the existing NVKE producers and source pins from
+[`inputs/catalogs/nvke/release`](../../../inputs/catalogs/nvke/release). The ARM64 selection uses the
+[native ARM64 scanner](../../../inputs/catalogs/tools/sbom-arm64/README.md) at the same Syft version.
+Each Environment runs utility helpers on its matching architecture. No catalog edits or NVKE source
+checkout are required. The host NVKR CLI runs directly on macOS or Linux; Docker runs the build tools.
+
+## Preview the native build
+
+From an NVKR checkout, copy this block to build the CLI and preview the selected work.
+You need Git, Go 1.21 or later and network access; Docker and Make are not required.
+
+```sh
+(
+  set -eu
+  export GOTOOLCHAIN="go$(cat .go-version)"
+  NVKR_VERSION="$(git describe --tags --always --dirty)"
+  NVKR_COMMIT="$(git rev-parse --short HEAD)"
+  go build -ldflags "-X main.version=$NVKR_VERSION -X main.commit=$NVKR_COMMIT" -o bin/nvkr ./cmd/nvkr
+  bin/nvkr run local \
+    --definition "docs/examples/nvke-tutorial/definition-$(go env GOHOSTARCH).yaml" \
+    --environment "docs/examples/nvke-tutorial/environment-local-$(go env GOHOSTARCH).yaml" \
+    --attempt quickstart-preview --dry-run
+)
+```
+
+A preview reports `pending`, `static-unqualified` and zero observed outputs.
+It builds no NVKE artifacts and creates no attempt workspace. Follow the
+[quickstart](../../quickstart.md) for the real three-artifact build.
+
+## Retained AMD64 example
+
+The separate `definition.yaml` is retained for existing demos and scratch hosted generation.
+Its output names are `nvkectl`, `cwe` and `nvke-helm`. The instructions below describe that selection.
+Use the architecture-specific files above for the quickstart.
+
+This retained example builds `nvkectl`, the NVKE controller image (output identifier `cwe`), and the
+source controller Helm chart from NVKE `v0.22.0`. The chart depends on the exact built controller image. Producer
 instructions live in the catalog; the Definition selects and packages outputs; the Environment selects
 runtime, destination and signing.
 
@@ -15,7 +60,7 @@ a hosted run of these updated inputs.
 | File | Purpose |
 |---|---|
 | `definition.yaml` | Public Definition: direct producers, CLI/image/Helm outputs, and the Helm-to-image binding. |
-| `environment-local.yaml` | Local registry and dry-run signing settings. |
+| `environment-local.yaml` | Local Docker execution, optional registry destination and dry-run signing settings. |
 | `environment-github.yaml` | Hosted GitHub destination and signing settings. |
 | `environment-github-dev.yaml` | Build-only branch dispatch with one-day output retention and no signing or publication. |
 | `../../../inputs/catalogs/nvke/module-tags/registry.yaml` | Catalog-owned NVKE components, platforms, and source declarations. |
@@ -23,24 +68,29 @@ a hosted run of these updated inputs.
 
 ## Inspect and run
 
-```sh
-nvkr definition validate --definition docs/examples/nvke-tutorial/definition.yaml
+Build `bin/nvkr` using the [quickstart](../../quickstart.md#build-the-artifacts), then run
+these commands from the repository root. The [quickstart](../../quickstart.md#before-you-start)
+owns the platform and Docker prerequisites.
 
-nvkr run plan \
+```sh
+bin/nvkr definition validate --definition docs/examples/nvke-tutorial/definition.yaml
+
+bin/nvkr run plan \
   --definition docs/examples/nvke-tutorial/definition.yaml \
   --environment docs/examples/nvke-tutorial/environment-local.yaml
 
 # Admission and node planning only; creates no attempt storage.
-nvkr run local \
+bin/nvkr run local \
   --definition docs/examples/nvke-tutorial/definition.yaml \
   --environment docs/examples/nvke-tutorial/environment-local.yaml \
   --attempt local-check --dry-run
 
-# One immutable local attempt. Publication remains explicit.
-nvkr run local \
+# Build all three selected outputs locally, without a registry or publication.
+NVKR_ATTEMPT="tutorial-$(date -u +%Y%m%d-%H%M%S)-$$"
+bin/nvkr run local \
   --definition docs/examples/nvke-tutorial/definition.yaml \
   --environment docs/examples/nvke-tutorial/environment-local.yaml \
-  --attempt local-001 --jobs 1 --publish
+  --attempt "$NVKR_ATTEMPT" --jobs 1 --ui plain
 ```
 
 To use a local NVKE clone without changing catalog identity, scope Git's `insteadOf` setting to the command process:
@@ -53,7 +103,7 @@ export GIT_CONFIG_VALUE_0="https://github.com/dsx-ai-factory/nvke"
 
 The attempt record is `.nvkr/runs/<attempt>/lifecycle.json`. It records all three frozen expected outputs and
 their independently reopened payload observations. Planning with dry-run signing is `static-unqualified`; executed local Run records use
-`unqualified-local-execution`. Neither creates a verified Release capability. The CLI and source-chart archive builds are offline. CWE
+`unqualified-local-execution`. Neither creates a verified Release capability. The CLI and source-chart archive builds are offline. The controller producer
 uses the pinned rootless BuildKit image with network access for the upstream Dockerfile's base images and
 Alpine packages; this wrapped build does not claim hermeticity or exact image reproduction. The Docker host
 must support unprivileged overlayfs (Linux 5.11+ or an Ubuntu kernel); native snapshot fallback is disabled
@@ -75,7 +125,7 @@ verified native image manifest digest into `values.yaml`. Root charts preserve u
 nested wrappers refresh binder-owned checksums outside the chart. Templates and other values remain
 unchanged. This chart must already support digest-based image selection.
 
-After verifying and extracting the Release, supply the repository containing its CWE image:
+After verifying and extracting the Release, supply the repository containing its controller image:
 
 ```sh
 helm template controller ./controller \
@@ -84,7 +134,7 @@ helm template controller ./controller \
 
 Registry selection does not change the packaged chart bytes. Normal Helm values overrides still apply;
 overriding or clearing `image.digest` changes image selection. Deployment enforcement is outside NVKR's
-packaging contract. A new complete build/publication using this source chart remains unexercised.
+packaging contract.
 
 ## Generate hosted CI
 
@@ -118,7 +168,7 @@ nvkr run generate \
 
 Generated CI recompiles these repository-relative inputs, executes the internal graph, and finalizes an immutable Run record from exact restored outcomes. Static generation and contract tests do not establish that GitHub, a registry, OIDC, or cosign ran.
 
-The CLI source `nvke` and the shared CWE/chart source `nvke-controller` are pinned to
+The CLI source `nvke` and the shared controller/chart source `nvke-controller` are pinned to
 `v0.22.0` (`400c24fb6465b042be883d6b62472528520d6291`). The controller pin supplies the
 source chart's existing digest support. Each source role has its own lock entry;
 update both for a shared NVKE release:
