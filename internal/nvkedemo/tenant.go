@@ -107,7 +107,7 @@ type tenantRow struct {
 	Conditions   tenantConditions    `json:"conditions"`
 }
 
-// Retain only the two pinned API condition statuses needed for presentation.
+// Retain the pinned API statuses used for progress and provisioning failure.
 // Messages, transition times and unrelated response fields are not decoded.
 type tenantConditions struct {
 	Provisioning struct {

@@ -374,6 +374,14 @@ func TestNativeSessionUnjoinedOwnershipSurvivesPanicAndGoexit(t *testing.T) {
 	}
 }
 
+// Optional row transitions for the existing owned NVKE wire fixture. Reads
+// before creation do not consume them; the final answer remains in force.
+type nativeTenantRowObservation struct {
+	Provisioning, Provisioned           TenantConditionStatus
+	Missing, ChangedID, ChangedProvider bool
+	ExitCode                            int
+}
+
 func TestNativeSessionFixtureTool(t *testing.T) {
 	if os.Getenv("NVKR_TEST_NATIVE_SESSION_TOOL") != "1" {
 		return
@@ -425,7 +433,35 @@ func TestNativeSessionFixtureTool(t *testing.T) {
 	case "get clusters":
 		rows := []tenantRow{}
 		if readErr == nil {
-			rows = append(rows, tenantRow{Name: request.Name, ID: "owned-" + request.Name, Infra: request.Infra, ControlPlane: &request.ControlPlane})
+			row := tenantRow{Name: request.Name, ID: "owned-" + request.Name, Infra: request.Infra, ControlPlane: &request.ControlPlane}
+			var observed nativeTenantRowObservation
+			if raw, err := os.ReadFile(filepath.Join(root, "tenant-row-observations.json")); err == nil {
+				var observations []nativeTenantRowObservation
+				if json.Unmarshal(raw, &observations) != nil || len(observations) == 0 {
+					os.Exit(54)
+				}
+				var count int
+				if raw, err := os.ReadFile(filepath.Join(root, "tenant-row-count")); err == nil && json.Unmarshal(raw, &count) != nil {
+					os.Exit(55)
+				}
+				observed = observations[min(count, len(observations)-1)]
+				if os.WriteFile(filepath.Join(root, "tenant-row-count"), fmt.Appendf(nil, "%d", count+1), 0600) != nil {
+					os.Exit(56)
+				}
+			}
+			if observed.ExitCode != 0 {
+				os.Exit(observed.ExitCode)
+			}
+			row.Conditions.Provisioning.Status, row.Conditions.Provisioned.Status = observed.Provisioning, observed.Provisioned
+			if observed.ChangedID {
+				row.ID = "replacement-id"
+			}
+			if observed.ChangedProvider {
+				row.NICo.Org = "replacement-provider"
+			}
+			if !observed.Missing {
+				rows = append(rows, row)
+			}
 		}
 		if json.NewEncoder(os.Stdout).Encode(rows) != nil {
 			os.Exit(48)

@@ -10,15 +10,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"text/template"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/securepath"
+	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"go.yaml.in/yaml/v3"
 )
@@ -200,13 +204,63 @@ func nativeSiteSeed(ctx context.Context, source, out string, resources NativeRes
 	return path, os.WriteFile(path, raw, 0600)
 }
 
-func (s *nativeSiteAttempt) share(ctx context.Context, files string) error {
+func (s *nativeSiteAttempt) share(ctx context.Context, files string) (result error) {
+	if err := requireContext(ctx); err != nil {
+		return err
+	}
 	s.files = files
 	if err := bootstrapCA(ctx, ManagementSession{Work: filepath.Dir(files), Runner: Runner{Work: filepath.Dir(files), Env: NativeEnvironment()}}); err != nil {
 		return err
 	}
-	for name, source := range s.sources() {
-		if err := copyPrivate(ctx, source, filepath.Join(files, name), 0600); err != nil {
+	// Both directories are freshly created below this attempt's private output
+	// root. NICo and the later host consumers have not started reading them.
+	source, sourceInfo, err := securepath.OpenDirectory(s.assets.Files)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+	destination, destinationInfo, err := securepath.OpenDirectory(files)
+	if err != nil {
+		return err
+	}
+	defer destination.Close()
+	if sourceInfo.Mode().Perm() != 0o700 || !currentOwner(sourceInfo) || destinationInfo.Mode().Perm() != 0o700 || !currentOwner(destinationInfo) {
+		return errors.New("native image sharing requires private owned directories")
+	}
+	defer func() { result = errors.Join(result, source.Sync(), destination.Sync()) }()
+	for _, role := range slices.Sorted(maps.Keys(s.assets.Images)) {
+		if role == "provisioned-provider" {
+			continue
+		}
+		if err := requireContext(ctx); err != nil {
+			return err
+		}
+		name := role + ".tar"
+		image := s.assets.Images[role]
+		if image.File != filepath.Join(s.assets.Files, name) {
+			return errors.New("native image carrier differs from its private staging path")
+		}
+		carrier, info, err := securepath.OpenChild(source, name, false)
+		if err != nil {
+			return err
+		}
+		if err := carrier.Close(); err != nil {
+			return err
+		}
+		if info.Mode().Perm() != 0o600 || !currentOwner(info) {
+			return errors.New("native image sharing requires a private owned carrier")
+		}
+		if err := transportarchive.PublishAtNoReplace(int(source.Fd()), name, int(destination.Fd()), name); err != nil {
+			return err
+		}
+		// Keep each named runtime path accurate even if a later move fails.
+		// Files remains the staging root containing the host-only provider.
+		image.File = filepath.Join(files, name)
+		s.assets.Images[role] = image
+	}
+	inputs := s.sources()
+	for _, name := range []string{"nerdctl", "spire-ca.crt"} {
+		if err := copyPrivate(ctx, inputs[name], filepath.Join(files, name), 0600); err != nil {
 			return err
 		}
 	}
@@ -590,7 +644,7 @@ func (s *nativeSiteAttempt) runTenantRequest(ctx context.Context, runner Runner,
 		return errors.Join(err, errors.New("native tenant name already exists"))
 	}
 	s.tenantOwner.intent = true
-	if _, err := s.capture(ctx, runner, "tenant-create", cli, "create", "cluster", "-f", path); err != nil {
+	if _, err := s.tenantOwner.capture(ctx, []string{cli, "create", "cluster", "-f", path}, "tenant-create", 2*time.Minute); err != nil {
 		return err
 	}
 	row, err := s.tenantOwner.row(ctx)
@@ -609,16 +663,43 @@ func (s *nativeSiteAttempt) runTenantRequest(ctx context.Context, runner Runner,
 	defer cancel()
 	deadline, _ := budget.Deadline()
 	progress := tenantProgress{writer: runner.Progress, started: time.Now(), deadline: deadline, expectedNodes: s.tenantNodeCount()}
+	refresh := func(stage string, nodes []tenantNode) error {
+		var fresh *tenantRow
+		_, err := nativeReadinessObservation(budget, runner.Progress, func(ctx context.Context) ([]byte, error) {
+			fresh = nil
+			row, err := s.tenantOwner.row(ctx)
+			if err == nil {
+				fresh = row
+			}
+			return nil, err
+		})
+		if err != nil {
+			return err
+		}
+		if fresh == nil {
+			return errors.New("NVKE omitted the exact owned native tenant; refusing further readiness checks")
+		}
+		progress.conditions = fresh.Conditions
+		progress.update(time.Now(), stage, nodes)
+		// NVKE v0.22.0 clusterstate.IsProvisioningFailed uses exactly these
+		// two statuses. Missing or Unknown conditions do not prove failure.
+		if fresh.Conditions.Provisioning.Status == TenantConditionFalse && fresh.Conditions.Provisioned.Status == TenantConditionFalse {
+			return errors.New("NVKE reported native tenant provisioning failed")
+		}
+		return nil
+	}
 	tenantConfig := filepath.Join(out, "tenant.kubeconfig")
 	kubectl := filepath.Join(tools, "kubectl")
 	observer := nativeTenantObserver{}
 	for {
+		if err := refresh("tenant-kubeconfig", nil); err != nil {
+			return err
+		}
 		if err := observer.update(budget, s, runner, tools, siteConfig, time.Now()); err != nil {
 			return err
 		}
-		progress.update(time.Now(), "tenant-kubeconfig", nil)
 		raw, err := nativeReadinessObservation(budget, runner.Progress, func(ctx context.Context) ([]byte, error) {
-			return s.capture(ctx, runner, "tenant-config-secret", kubectl, "--kubeconfig", siteConfig, "-n", "nvke-system", "get", "secret", request.Name+"-admin-kubeconfig", "--ignore-not-found", "-o", "json")
+			return s.tenantOwner.capture(ctx, []string{kubectl, "--kubeconfig", siteConfig, "-n", "nvke-system", "get", "secret", request.Name + "-admin-kubeconfig", "--ignore-not-found", "-o", "json"}, "tenant-config-secret", 2*time.Minute)
 		})
 		if err != nil {
 			return err
@@ -628,7 +709,7 @@ func (s *nativeSiteAttempt) runTenantRequest(ctx context.Context, runner Runner,
 			return err
 		}
 		if published {
-			if _, err := s.capture(budget, runner, "tenant-config", cli, "get", "kubeconfig", request.Name, "--output-file", tenantConfig); err != nil {
+			if _, err := s.tenantOwner.capture(budget, []string{cli, "get", "kubeconfig", request.Name, "--output-file", tenantConfig}, "tenant-config", 2*time.Minute); err != nil {
 				return err
 			}
 			break
@@ -640,10 +721,14 @@ func (s *nativeSiteAttempt) runTenantRequest(ctx context.Context, runner Runner,
 	var observed []tenantNode
 	progress.update(time.Now(), "tenant-api", nil)
 	for {
+		// Controller conditions do not establish a successful tenant API query.
+		if err := refresh(progress.previous.Name, observed); err != nil {
+			return err
+		}
 		if err := observer.update(budget, s, runner, tools, siteConfig, time.Now()); err != nil {
 			return err
 		}
-		raw, err := s.capture(budget, runner, "tenant-nodes", kubectl, "--kubeconfig", tenantConfig, "--request-timeout=10s", "get", "nodes", "-o", "json")
+		raw, err := s.tenantOwner.capture(budget, []string{kubectl, "--kubeconfig", tenantConfig, "--request-timeout=10s", "get", "nodes", "-o", "json"}, "tenant-nodes", 2*time.Minute)
 		if err == nil {
 			var nodes struct{ Items []tenantNode }
 			if err := json.Unmarshal(raw, &nodes); err != nil {
@@ -665,10 +750,7 @@ func (s *nativeSiteAttempt) runTenantRequest(ctx context.Context, runner Runner,
 			return err
 		}
 	}
-	capture := func(ctx context.Context, args []string, phase string, timeout time.Duration) ([]byte, error) {
-		s.sequence++
-		return runner.Capture(ctx, args, fmt.Sprintf("native-site-%03d-%s", s.sequence, phase), timeout)
-	}
+	capture := s.tenantOwner.capture
 	workloadImage, err := nativeImageDigestReference(s.assets.Images["workload"])
 	if err != nil {
 		return err
