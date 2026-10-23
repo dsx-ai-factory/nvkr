@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -21,7 +22,9 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/releaseasset"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 )
 
 func TestNativeToolSelectionKeepsExplicitOSBundles(t *testing.T) {
@@ -186,6 +189,171 @@ func TestToolPreparationRejectsBeforeWorkspaceWork(t *testing.T) {
 			var coded *nvkrerr.Error
 			if out != "" || !errors.As(err, &coded) || coded.Code != tc.code {
 				t.Fatalf("admission %q, %v", out, err)
+			}
+		})
+	}
+}
+
+func TestNativeToolBuildRetainsRunWithoutExtracting(t *testing.T) {
+	t.Setenv("GIT_CONFIG_COUNT", "0")
+	for _, tc := range []struct {
+		name, corrupt                        string
+		planExit, runExit                    int
+		failed, missing, recordOnly, consume bool
+	}{
+		{name: "completed Run"},
+		{name: "graph rejected", planExit: 23},
+		{name: "producer failed", runExit: 24},
+		{name: "failed Run record", failed: true},
+		{name: "missing companion", missing: true},
+		{name: "record without payloads", recordOnly: true},
+		{name: "corrupted host payload", corrupt: "native-tools-linux-arm64"},
+		{name: "corrupted companion payload", corrupt: "site-startup-tools-arm64"},
+		{name: "standalone still extracts", consume: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := privateTestDir(t)
+			definition, environment, bundle, _, err := nativeToolSelection("linux/arm64")
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, path := range []string{definition, environment} {
+				path = filepath.Join(repo, path)
+				if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+					t.Fatal(err)
+				}
+				writeTenantFixture(t, path, []byte("{}"), 0600)
+			}
+			record := fixtureRun()
+			packages := filepath.Join(repo, "bundle-fixture")
+			if !tc.recordOnly {
+				if err := os.Mkdir(packages, 0700); err != nil {
+					t.Fatal(err)
+				}
+				source, _, _ := hostToolViewFixture(t, "linux/arm64", true)
+				if err := os.Rename(source, filepath.Join(packages, bundle)); err != nil {
+					t.Fatal(err)
+				}
+				member := filepath.Join(repo, "site-tool")
+				writeTenantFixture(t, member, []byte("exact site tool"), 0700)
+				_, err := delivery.BuildBinaryBundle(t.Context(), filepath.Join(packages, "site-startup-tools-arm64"), delivery.BinaryBundleRequest{
+					OS: "linux", Arch: "arm64", Purpose: "site-startup-tools-arm64", Epoch: 1,
+					Files: []delivery.BinaryFileInput{
+						{Name: "nerdctl", Path: member, InstallPath: "/usr/local/bin/nerdctl"},
+						{Name: nativeIdentityHelper, Path: member, InstallPath: "/usr/local/bin/" + nativeIdentityHelper},
+					},
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			for i, name := range []string{bundle, "site-startup-tools-arm64"} {
+				record["expected"].([]map[string]any)[i]["name"] = name
+				observed := record["observed"].([]map[string]any)[i]
+				observed["name"] = name
+				if !tc.recordOnly {
+					root := filepath.Join(packages, name)
+					raw, err := os.ReadFile(filepath.Join(root, "index.json"))
+					if err != nil {
+						t.Fatal(err)
+					}
+					var index v1.IndexManifest
+					if err := json.Unmarshal(raw, &index); err != nil || len(index.Manifests) != 1 {
+						t.Fatalf("bundle fixture index: %v", err)
+					}
+					manifest := index.Manifests[0].Digest
+					observed["digest"] = manifest.String()
+					if tc.corrupt == name {
+						blob := filepath.Join(root, "blobs", manifest.Algorithm, manifest.Hex)
+						if err := os.Chmod(blob, 0600); err != nil {
+							t.Fatal(err)
+						}
+						writeTenantFixture(t, blob, []byte("corrupted payload"), 0600)
+					}
+				}
+			}
+			if tc.failed {
+				record["status"] = "failed"
+			}
+			if tc.missing {
+				record["expected"] = record["expected"].([]map[string]any)[:1]
+				record["observed"] = record["observed"].([]map[string]any)[:1]
+			}
+			raw, err := json.Marshal(record)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fixture, calls := filepath.Join(repo, "record.json"), filepath.Join(repo, "calls")
+			writeTenantFixture(t, fixture, raw, 0600)
+			nvkr := filepath.Join(repo, "nvkr")
+			writeTenantFixture(t, nvkr, []byte(fmt.Sprintf(`#!/bin/sh
+set -eu
+printf '%%s\n' "$1:$2" >> %s
+case "$1:$2" in
+ run:plan) exit %d ;;
+ run:local)
+   captured=false
+   for arg do if test "$arg" = --capture-inputs-root=.; then captured=true; fi; done
+   "$captured"
+   test %d = 0 || exit %d
+   mkdir -p .nvkr/native-tools/runs/fresh
+   cp %s .nvkr/native-tools/runs/fresh/lifecycle.json
+   if test -d %s; then cp -R %s .nvkr/native-tools/runs/fresh/packages; fi ;;
+ *) exit 25 ;;
+esac
+`, operatorQuote(calls), tc.planExit, tc.runExit, tc.runExit, operatorQuote(fixture), operatorQuote(packages), operatorQuote(packages))), 0700)
+			progress := &recordedProgress{}
+			cfg := ToolConfig{Repository: repo, NVKR: nvkr, Go: "/usr/bin/true", Attempt: "fresh", Jobs: 2, Out: filepath.Join(repo, "work"), Progress: progress}
+			var got string
+			if tc.consume {
+				got, err = prepareTools(t.Context(), cfg, "linux/arm64")
+				// This fixture has real bundles but no captured installer inputs.
+				// Standalone preparation must still publish and extract them before
+				// rejecting that missing downstream source binding.
+				if got != "" || err == nil {
+					t.Fatalf("standalone accepted missing installer inputs: %q %v", got, err)
+				}
+				for _, path := range []string{"publication/index.json", "bin/kubectl", "site/bin/" + nativeIdentityHelper} {
+					if _, err := os.Stat(filepath.Join(cfg.Out, path)); err != nil {
+						t.Fatalf("standalone no longer materializes verified tools: %s %v", path, err)
+					}
+				}
+			} else {
+				got, err = buildTools(t.Context(), cfg, "linux/arm64")
+				success := tc.planExit == 0 && tc.runExit == 0 && !tc.failed && !tc.missing && !tc.recordOnly && tc.corrupt == ""
+				wantLast := LaneFailed
+				if success {
+					wantLast = LaneFinished
+					if want := filepath.Join(repo, ".nvkr/native-tools/runs/fresh"); err != nil || got != want {
+						t.Fatalf("completed Run=%q, want %q: %v", got, want, err)
+					}
+				} else {
+					var coded *nvkrerr.Error
+					if got != "" || !errors.As(err, &coded) || coded.Code != nvkrerr.CodePreflightFailed {
+						t.Fatalf("failed producer yielded a Run: %q %v", got, err)
+					}
+				}
+				last := progress.events[len(progress.events)-1]
+				if last.Name != "artifacts" || last.Kind != wantLast {
+					t.Fatalf("producer outcome was not reported: %+v", progress.events)
+				}
+				for _, name := range []string{"publication", "bin", "site", "installer"} {
+					if _, err := os.Stat(filepath.Join(cfg.Out, name)); !os.IsNotExist(err) {
+						t.Fatalf("tool producer extracted unused %s: %v", name, err)
+					}
+				}
+			}
+			wantCalls := "run:plan\n"
+			if tc.planExit == 0 {
+				wantCalls += "run:local\n"
+			}
+			if raw, err := os.ReadFile(calls); err != nil || string(raw) != wantCalls {
+				t.Fatalf("producer order=%q, want %q: %v", raw, wantCalls, err)
+			}
+			if tc.planExit != 0 {
+				if _, err := os.Stat(cfg.Out); !os.IsNotExist(err) {
+					t.Fatalf("rejected graph created consumer workspace: %v", err)
+				}
 			}
 		})
 	}

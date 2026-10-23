@@ -153,14 +153,15 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	if err != nil {
 		return BuiltInputs{}, err
 	}
-	if _, err := PrepareTools(ctx, ToolConfig{
+	toolsRun, err := buildTools(ctx, ToolConfig{
 		Repository: repo, NVKR: built.NVKR, NVKEClone: cfg.NVKEClone, Attempt: cfg.AttemptPrefix, Jobs: cfg.Jobs,
 		Out:      filepath.Join(repo, ".nvkr", "laptop-bootstrap", cfg.AttemptPrefix, "native-tools"),
 		Progress: cfg.Progress,
-	}); err != nil {
+	}, runtime.GOOS+"/"+runtime.GOARCH)
+	if err != nil {
 		return BuiltInputs{}, err
 	}
-	built.Runs.Tools = filepath.Join(repo, ".nvkr", "native-tools", "runs", cfg.AttemptPrefix)
+	built.Runs.Tools = toolsRun
 	return built, nil
 }
 
