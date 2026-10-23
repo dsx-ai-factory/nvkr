@@ -9,6 +9,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -371,4 +374,158 @@ func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *test
 			}
 		})
 	}
+}
+
+func TestNativeShareMovesPrivateImageCarriers(t *testing.T) {
+	for _, scenario := range []string{"complete", "occupied image", "later occupied image", "symlink image", "different source path", "canceled"} {
+		t.Run(scenario, func(t *testing.T) {
+			attempt, files := nativeShareFixture(t)
+			staging := attempt.assets.Files
+			originals := make(map[string]NativeImageAsset)
+			inodes := make(map[string]os.FileInfo)
+			digests := make(map[string]string)
+			for role, image := range attempt.assets.Images {
+				originals[role] = image
+				var err error
+				inodes[role], err = os.Stat(image.File)
+				if err != nil {
+					t.Fatal(err)
+				}
+				digests[role], err = DigestFile(t.Context(), image.File)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			occupied := ""
+			switch scenario {
+			case "occupied image":
+				occupied = "controller.tar"
+			case "later occupied image":
+				occupied = "runtime-postgresql.tar"
+			case "symlink image":
+				path := attempt.assets.Images["controller"].File
+				if err := os.Rename(path, path+".original"); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(path+".original", path); err != nil {
+					t.Fatal(err)
+				}
+			case "different source path":
+				image := attempt.assets.Images["controller"]
+				image.File = attempt.assets.Images["provisioned-provider"].File
+				attempt.assets.Images["controller"] = image
+			}
+			if occupied != "" {
+				writeTenantFixture(t, filepath.Join(files, occupied), []byte("existing carrier"), 0600)
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if scenario == "canceled" {
+				cancel()
+			}
+			err := attempt.share(ctx, files)
+			if (err == nil) != (scenario == "complete") {
+				t.Fatalf("share: %v", err)
+			}
+			if scenario == "canceled" && !errors.Is(err, context.Canceled) {
+				t.Fatalf("lost cancellation: %v", err)
+			}
+			if attempt.assets.Files != staging {
+				t.Fatal("host-only staging root changed")
+			}
+			if occupied != "" {
+				raw, readErr := os.ReadFile(filepath.Join(files, occupied))
+				if readErr != nil || string(raw) != "existing carrier" {
+					t.Fatalf("occupied carrier changed: %v", readErr)
+				}
+			}
+			for role, original := range originals {
+				got := attempt.assets.Images[role]
+				want := original
+				moved := role != "provisioned-provider" && (scenario == "complete" || scenario == "later occupied image" && role != "runtime-postgresql")
+				if moved {
+					want.File = filepath.Join(files, role+".tar")
+					if _, statErr := os.Lstat(original.File); !os.IsNotExist(statErr) {
+						t.Fatalf("%s retained a duplicate carrier: %v", role, statErr)
+					}
+				}
+				if scenario == "different source path" && role == "controller" {
+					want.File = originals["provisioned-provider"].File
+				}
+				if got != want {
+					t.Fatalf("%s runtime path or identity differs: got=%+v want=%+v", role, got, want)
+				}
+				if scenario == "different source path" && role == "controller" {
+					continue
+				}
+				info, statErr := os.Stat(got.File)
+				digest, digestErr := DigestFile(t.Context(), got.File)
+				if scenario == "symlink image" && role == "controller" {
+					if statErr != nil || !os.SameFile(inodes[role], info) {
+						t.Fatal("symlink refusal changed original image")
+					}
+					continue
+				}
+				if statErr != nil || digestErr != nil || !os.SameFile(inodes[role], info) || info.Mode().Perm() != 0600 || digest != digests[role] {
+					t.Fatalf("%s carrier identity/bytes changed: stat=%v digest=%v", role, statErr, digestErr)
+				}
+
+			}
+			if _, statErr := os.Lstat(filepath.Join(files, "provisioned-provider.tar")); !os.IsNotExist(statErr) {
+				t.Fatalf("host-only provider was served: %v", statErr)
+			}
+			if scenario != "complete" {
+				return
+			}
+			for _, name := range []string{"nerdctl", "spire-ca.crt"} {
+				original := attempt.sources()[name]
+				before, err := os.Stat(original)
+				if err != nil {
+					t.Fatal(err)
+				}
+				after, err := os.Stat(filepath.Join(files, name))
+				if err != nil || os.SameFile(before, after) {
+					t.Fatalf("shared small input must retain its source: %s, %v", name, err)
+				}
+			}
+			server := httptest.NewServer(http.FileServer(http.Dir(files)))
+			defer server.Close()
+			for _, role := range []string{"controller", "ovn", "runtime-postgresql", "provisioned-provider"} {
+				response, err := server.Client().Get(server.URL + "/" + role + ".tar")
+				if err != nil {
+					t.Fatal(err)
+				}
+				raw, readErr := io.ReadAll(response.Body)
+				response.Body.Close()
+				if role == "provisioned-provider" {
+					if response.StatusCode != http.StatusNotFound {
+						t.Fatal("host-only provider is publicly served")
+					}
+				} else if readErr != nil || response.StatusCode != http.StatusOK || "sha256:"+plainSHA(raw) != digests[role] {
+					t.Fatalf("%s serving lost exact bytes: status=%d error=%v", role, response.StatusCode, readErr)
+				}
+			}
+		})
+	}
+}
+
+func nativeShareFixture(t *testing.T) (*nativeSiteAttempt, string) {
+	t.Helper()
+	root := privateTestDir(t)
+	staging, tools, files := filepath.Join(root, "assets", "files"), filepath.Join(root, "site-tools"), filepath.Join(root, "runtime", "simulator", "files")
+	for _, path := range []string{staging, tools, files} {
+		if err := os.MkdirAll(path, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeTenantFixture(t, filepath.Join(tools, "openssl"), []byte("#!/bin/sh\nset -eu\ncase \"$1\" in\nreq) printf certificate > ca.crt; printf key > ca.key;;\nverify) test -f ca.crt;;\n*) exit 4;;\nesac\n"), 0700)
+	writeTenantFixture(t, filepath.Join(tools, "nerdctl"), []byte("selected guest tool"), 0700)
+	t.Setenv("PATH", tools+":/usr/bin:/bin")
+	attempt := &nativeSiteAttempt{assets: NativeAssets{Files: staging, SiteTools: tools, Images: make(map[string]NativeImageAsset)}}
+	for _, role := range []string{"controller", "ovn", "runtime-postgresql", "provisioned-provider"} {
+		path := filepath.Join(staging, role+".tar")
+		writeTenantFixture(t, path, []byte("selected private archive "+role), 0600)
+		attempt.assets.Images[role] = NativeImageAsset{File: path, Reference: "example.invalid/" + role + "@sha256:" + strings.Repeat("a", 64), ManifestDigest: "sha256:" + strings.Repeat("a", 64)}
+	}
+	return attempt, files
 }
