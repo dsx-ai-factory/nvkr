@@ -24,6 +24,8 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 )
 
@@ -197,16 +199,18 @@ func TestToolPreparationRejectsBeforeWorkspaceWork(t *testing.T) {
 func TestNativeToolBuildRetainsRunWithoutExtracting(t *testing.T) {
 	t.Setenv("GIT_CONFIG_COUNT", "0")
 	for _, tc := range []struct {
-		name, corrupt                        string
-		planExit, runExit                    int
-		failed, missing, recordOnly, consume bool
+		name, corrupt                                    string
+		planExit, runExit                                int
+		failed, missing, recordOnly, consume, uncaptured bool
+		code                                             nvkrerr.Code
 	}{
 		{name: "completed Run"},
 		{name: "graph rejected", planExit: 23},
 		{name: "producer failed", runExit: 24},
-		{name: "failed Run record", failed: true},
-		{name: "missing companion", missing: true},
+		{name: "failed Run record", failed: true, code: nvkrerr.CodeVerifyFailed},
+		{name: "missing companion", missing: true, code: nvkrerr.CodeVerifyFailed},
 		{name: "record without payloads", recordOnly: true},
+		{name: "uncaptured Run", uncaptured: true, code: nvkrerr.CodeVerifyFailed},
 		{name: "corrupted host payload", corrupt: "native-tools-linux-arm64"},
 		{name: "corrupted companion payload", corrupt: "site-startup-tools-arm64"},
 		{name: "standalone still extracts", consume: true},
@@ -224,7 +228,11 @@ func TestNativeToolBuildRetainsRunWithoutExtracting(t *testing.T) {
 				}
 				writeTenantFixture(t, path, []byte("{}"), 0600)
 			}
-			record := fixtureRun()
+			plan, inputs, err := factory.CaptureCompileFiles(t.Context(), filepath.Join("..", ".."), definition, environment, "native-tool-fixture")
+			if err != nil {
+				t.Fatal(err)
+			}
+			observations := make(map[string]lifecycle.Artifact)
 			packages := filepath.Join(repo, "bundle-fixture")
 			if !tc.recordOnly {
 				if err := os.Mkdir(packages, 0700); err != nil {
@@ -247,10 +255,7 @@ func TestNativeToolBuildRetainsRunWithoutExtracting(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			for i, name := range []string{bundle, "site-startup-tools-arm64"} {
-				record["expected"].([]map[string]any)[i]["name"] = name
-				observed := record["observed"].([]map[string]any)[i]
-				observed["name"] = name
+			for _, name := range []string{bundle, "site-startup-tools-arm64"} {
 				if !tc.recordOnly {
 					root := filepath.Join(packages, name)
 					raw, err := os.ReadFile(filepath.Join(root, "index.json"))
@@ -262,7 +267,7 @@ func TestNativeToolBuildRetainsRunWithoutExtracting(t *testing.T) {
 						t.Fatalf("bundle fixture index: %v", err)
 					}
 					manifest := index.Manifests[0].Digest
-					observed["digest"] = manifest.String()
+					observations[name] = lifecycle.Artifact{Digest: manifest.String()}
 					if tc.corrupt == name {
 						blob := filepath.Join(root, "blobs", manifest.Algorithm, manifest.Hex)
 						if err := os.Chmod(blob, 0600); err != nil {
@@ -272,19 +277,21 @@ func TestNativeToolBuildRetainsRunWithoutExtracting(t *testing.T) {
 					}
 				}
 			}
+			fixture, calls := filepath.Join(repo, "run-fixture", "fresh"), filepath.Join(repo, "calls")
+			record := writeCapturedRunFixture(t, fixture, plan, inputs, observations)
 			if tc.failed {
-				record["status"] = "failed"
+				record.Status = lifecycle.RunFailed
 			}
 			if tc.missing {
-				record["expected"] = record["expected"].([]map[string]any)[:1]
-				record["observed"] = record["observed"].([]map[string]any)[:1]
+				record.Observed = record.Observed[:1]
 			}
-			raw, err := json.Marshal(record)
-			if err != nil {
-				t.Fatal(err)
+			writeCanonicalRunFixture(t, filepath.Join(fixture, "lifecycle.json"), record)
+			if tc.uncaptured {
+				path := filepath.Join(fixture, "compile-inputs.json")
+				if err := os.Rename(path, path+".saved"); err != nil {
+					t.Fatal(err)
+				}
 			}
-			fixture, calls := filepath.Join(repo, "record.json"), filepath.Join(repo, "calls")
-			writeTenantFixture(t, fixture, raw, 0600)
 			nvkr := filepath.Join(repo, "nvkr")
 			writeTenantFixture(t, nvkr, []byte(fmt.Sprintf(`#!/bin/sh
 set -eu
@@ -296,8 +303,8 @@ case "$1:$2" in
    for arg do if test "$arg" = --capture-inputs-root=.; then captured=true; fi; done
    "$captured"
    test %d = 0 || exit %d
-   mkdir -p .nvkr/native-tools/runs/fresh
-   cp %s .nvkr/native-tools/runs/fresh/lifecycle.json
+   mkdir -p .nvkr/native-tools/runs
+   cp -R %s .nvkr/native-tools/runs/fresh
    if test -d %s; then cp -R %s .nvkr/native-tools/runs/fresh/packages; fi ;;
  *) exit 25 ;;
 esac
@@ -307,11 +314,12 @@ esac
 			var got string
 			if tc.consume {
 				got, err = prepareTools(t.Context(), cfg, "linux/arm64")
-				// This fixture has real bundles but no captured installer inputs.
+				// This fixture has real bundles and captured compiler inputs,
+				// but its installer archive contains synthetic payload bytes.
 				// Standalone preparation must still publish and extract them before
-				// rejecting that missing downstream source binding.
+				// rejecting that invalid source archive.
 				if got != "" || err == nil {
-					t.Fatalf("standalone accepted missing installer inputs: %q %v", got, err)
+					t.Fatalf("standalone accepted synthetic installer: %q %v", got, err)
 				}
 				for _, path := range []string{"publication/index.json", "bin/kubectl", "site/bin/" + nativeIdentityHelper} {
 					if _, err := os.Stat(filepath.Join(cfg.Out, path)); err != nil {
@@ -320,7 +328,7 @@ esac
 				}
 			} else {
 				got, err = buildTools(t.Context(), cfg, "linux/arm64")
-				success := tc.planExit == 0 && tc.runExit == 0 && !tc.failed && !tc.missing && !tc.recordOnly && tc.corrupt == ""
+				success := tc.planExit == 0 && tc.runExit == 0 && !tc.failed && !tc.missing && !tc.recordOnly && !tc.uncaptured && tc.corrupt == ""
 				wantLast := LaneFailed
 				if success {
 					wantLast = LaneFinished
@@ -329,7 +337,11 @@ esac
 					}
 				} else {
 					var coded *nvkrerr.Error
-					if got != "" || !errors.As(err, &coded) || coded.Code != nvkrerr.CodePreflightFailed {
+					wantCode := tc.code
+					if wantCode == "" {
+						wantCode = nvkrerr.CodePreflightFailed
+					}
+					if got != "" || !errors.As(err, &coded) || coded.Code != wantCode {
 						t.Fatalf("failed producer yielded a Run: %q %v", got, err)
 					}
 				}

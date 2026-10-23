@@ -5,7 +5,6 @@ package nvkedemo
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -14,19 +13,20 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
 
 func TestDeploymentSelectsSameThreeVMWorkflowOnBothHosts(t *testing.T) {
 	for _, platform := range []string{"darwin/arm64", "linux/arm64"} {
 		for _, network := range []string{"ovn", "upstream-ovn"} {
 			t.Run(platform+"/"+network, func(t *testing.T) {
-				root := privateTestDir(t)
+				root := filepath.Join(privateTestDir(t), "disk-run")
 				name, err := selectedDiskOutput(network)
 				if err != nil {
 					t.Fatal(err)
 				}
 				disk := filepath.Join(root, "outputs", name+".qcow2")
-				if err := os.Mkdir(filepath.Dir(disk), 0700); err != nil {
+				if err := os.MkdirAll(filepath.Dir(disk), 0700); err != nil {
 					t.Fatal(err)
 				}
 				if err := os.WriteFile(disk, []byte("observed disk fixture"), 0600); err != nil {
@@ -36,19 +36,11 @@ func TestDeploymentSelectsSameThreeVMWorkflowOnBothHosts(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				record := fixtureRun()
-				expected := record["expected"].([]map[string]any)
-				observed := record["observed"].([]map[string]any)
-				expected[1]["name"], expected[1]["kind"] = name, "disk-image"
-				observed[1]["name"], observed[1]["kind"], observed[1]["digest"] = name, "disk-image", digest
-				observed[1]["disk"] = delivery.DiskOutput{PayloadDigest: digest, Producer: "disk-build", Component: "component", Format: "qcow2", Encryption: "none", Size: int64(len("observed disk fixture")), PlanDigest: "sha256:" + strings.Repeat("1", 64), Outcome: "succeeded"}
-				raw, err := json.Marshal(record)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(filepath.Join(root, "lifecycle.json"), raw, 0600); err != nil {
-					t.Fatal(err)
-				}
+				capturedArtifactRunFixture(t, root, []lifecycle.DefinitionOutput{
+					{Name: name, Platform: "linux/arm64", Format: "disk-image", Components: []string{"disk"}},
+				}, map[string]lifecycle.Artifact{name: {Digest: digest,
+					Disk: &delivery.DiskOutput{PayloadDigest: digest, Producer: "build-disk", Component: "disk", Format: "qcow2", Encryption: "none", Size: int64(len("observed disk fixture")), Outcome: "succeeded"},
+				}})
 				cfg := Config{Walkthrough: network == "ovn", Network: network, NVKR: "nvkr", Out: filepath.Join(root, "deploy"), DemoExecutable: "demo", Cleanup: true, Runs: RunInputs{OS: root, Components: "components", Providers: "providers", Site: "site", Tools: "tools", Profiles: "profiles", Runtime: "runtime", HostTools: "host"}}
 				selected, err := nativeDeploymentConfig(t.Context(), cfg, platform)
 				want := "hvf"

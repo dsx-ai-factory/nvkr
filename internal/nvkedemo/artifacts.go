@@ -10,20 +10,18 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"golang.org/x/sys/unix"
 )
@@ -73,51 +71,15 @@ func readRunFile(ctx context.Context, root, relative string, limit int64) ([]byt
 	return data.Bytes(), nil
 }
 
-// CompleteOutput checks a local Run's descriptive membership, not its authority.
-// Payload acceptance/extraction still belongs to nvkr's existing owners.
-func CompleteOutput(ctx context.Context, root, name, kind string) (lifecycle.Artifact, error) {
-	raw, err := readRunFile(ctx, root, "lifecycle.json", diagnosticLimit)
-	if err != nil {
-		return lifecycle.Artifact{}, err
-	}
-	if err := canonical.ValidateJSONDocument(raw); err != nil {
-		return lifecycle.Artifact{}, err
-	}
-	var run lifecycle.Run
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&run); err != nil {
-		return lifecycle.Artifact{}, err
-	}
-	if run.SchemaVersion != lifecycle.RunSchemaVersion || run.Status != lifecycle.RunComplete || run.Failure != nil || len(run.Expected) == 0 || len(run.Expected) != len(run.Observed) {
-		return lifecycle.Artifact{}, errors.New("require a complete current local Run with exact observations")
-	}
-	if !canonical.IsDigest(run.PlanDigest) || !canonical.IsDigest(run.DefinitionDigest) || !canonical.IsDigest(run.EnvironmentDigest) {
-		return lifecycle.Artifact{}, errors.New("local Run omits its descriptive input identities")
-	}
-	actual := make(map[string]lifecycle.Artifact, len(run.Observed))
-	for _, item := range run.Observed {
-		if err := item.Validate(); err != nil {
-			return lifecycle.Artifact{}, err
+// selectedRunOutput selects a consumer role from lifecycle-inspected metadata.
+// It grants no authority; payload acceptance remains with the delivery owner.
+func selectedRunOutput(run lifecycle.Run, name, kind string) (lifecycle.Artifact, error) {
+	for _, output := range run.Observed {
+		if output.Name == name && output.Kind == kind {
+			return output, nil
 		}
-		if _, exists := actual[item.Name]; exists {
-			return lifecycle.Artifact{}, errors.New("duplicated observed output")
-		}
-		actual[item.Name] = item
 	}
-	seen := make(map[string]bool, len(run.Expected))
-	for _, expected := range run.Expected {
-		observed, exists := actual[expected.Name]
-		if seen[expected.Name] || !exists || !canonical.IsDigest(expected.BuildDigest) || observed.Kind != expected.Kind || observed.BuildDigest != expected.BuildDigest || !slices.Equal(observed.Components, expected.Components) {
-			return lifecycle.Artifact{}, errors.New("missing, extra, duplicated or substituted producer binding")
-		}
-		seen[expected.Name] = true
-	}
-	selected, exists := actual[name]
-	if !exists || selected.Kind != kind {
-		return lifecycle.Artifact{}, errors.New("Run omits the exact required output")
-	}
-	return selected, nil
+	return lifecycle.Artifact{}, nvkrerr.New(nvkrerr.CodeVerifyFailed, "completed Run omits %s output %q", kind, name)
 }
 
 // DigestFile identifies exact blob bytes only. It grants no structured identity

@@ -14,7 +14,6 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
@@ -115,32 +114,8 @@ func nativeCapturedToolsFixture(t *testing.T) (string, string, *factory.Plan) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	run, err := lifecycle.PrepareRun(plan.Definition, plan.Environment, plan, "native-selection-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	run.Status = lifecycle.RunComplete
-	run.Lane = factory.TierLocalExecution.String()
-	for _, expected := range run.Expected {
-		run.Observed = append(run.Observed, lifecycle.Artifact{Name: expected.Name, Kind: expected.Kind, Digest: "sha256:" + strings.Repeat("1", 64), BuildDigest: expected.BuildDigest, Components: expected.Components})
-	}
-	run.ContentSubject, err = delivery.ContentDigest(run.Observed)
-	if err != nil {
-		t.Fatal(err)
-	}
-	root := filepath.Join(privateTestDir(t), run.Attempt)
-	for _, dir := range []string{root, filepath.Join(root, ".runner")} {
-		if err := os.Mkdir(dir, 0700); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for name, value := range map[string]any{"lifecycle.json": run, ".runner/plan.json": plan, "compile-inputs.json": inputs} {
-		raw, err := canonical.Marshal(value)
-		if err != nil {
-			t.Fatal(err)
-		}
-		writeTenantFixture(t, filepath.Join(root, name), raw, 0600)
-	}
+	root := filepath.Join(privateTestDir(t), "native-selection-test")
+	writeCapturedRunFixture(t, root, plan, inputs, nil)
 	return root, "native-tools-linux-arm64", plan
 }
 

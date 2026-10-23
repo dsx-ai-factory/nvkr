@@ -363,6 +363,14 @@ bin/nvke-demo run --artifacts-run /absolute/path/to/artifact-run \
 ```
 
 This is a separate deployment invocation, not a continuous fresh-build recording.
+Every selected artifact or tool Run must be a complete local execution with its
+original `compile-inputs.json` and `.runner/plan.json`, produced by input-capturing
+execution (`run local --capture-inputs-root=.`). The demo asks lifecycle to replay
+those inputs and validate the frozen Run bindings before selecting outputs.
+A standalone `lifecycle.json`, a noncanonical record, a different evidence lane or
+an unfinished disk commit is refused. Rebuild older uncaptured Runs; editing their
+records does not supply the missing capture. Delivery separately verifies the
+selected payload bytes.
 Explicit `--definition`, `--environment` and `--nvkr` build selections also remain
 available. Those repository-contained inputs must already bind their native
 dependencies; local signing/publication requests are refused on that path.

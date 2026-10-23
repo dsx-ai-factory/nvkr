@@ -159,7 +159,7 @@ func nativeDeploymentConfig(ctx context.Context, cfg Config, platform string) (N
 	if err != nil {
 		return NativeConfig{}, err
 	}
-	image, err := CompleteOutput(ctx, root, name, "disk-image")
+	_, image, err := nativeSelectedRunPlan(ctx, root, name, "disk-image")
 	if err != nil {
 		return NativeConfig{}, err
 	}

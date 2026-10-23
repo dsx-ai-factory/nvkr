@@ -17,6 +17,7 @@ import (
 	"time"
 
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/testresults"
 )
 
@@ -48,19 +49,10 @@ func nativeSessionFixture(t *testing.T, conformance bool) (nativeSiteAttempt, Ru
 	if conformance {
 		runner.Env = append(runner.Env, "SESSION_SUITE=1")
 		run := filepath.Join(root, "conformance-run")
-		if err := os.Mkdir(run, 0700); err != nil {
-			t.Fatal(err)
-		}
-		record := fixtureRun()
-		for i, name := range []string{"conformance-image-arm64", "busybox-image-arm64"} {
-			for _, field := range []string{"expected", "observed"} {
-				row := record[field].([]map[string]any)[i]
-				row["name"], row["kind"] = name, "oci"
-			}
-		}
-		if err := privateJSON(filepath.Join(run, "lifecycle.json"), record); err != nil {
-			t.Fatal(err)
-		}
+		capturedArtifactRunFixture(t, run, []lifecycle.DefinitionOutput{
+			{Name: "busybox-image-arm64", Platform: "linux/arm64", Format: "oci", Components: []string{"image"}},
+			{Name: "conformance-image-arm64", Platform: "linux/arm64", Format: "oci", Components: []string{"image"}},
+		}, nil)
 		nvkr := filepath.Join(root, "nvkr")
 		writeTenantFixture(t, nvkr, []byte("#!/bin/sh\nexec \"$SESSION_TOOL\" -test.run='^TestNativeSessionConformanceTool$' -- \"$@\"\n"), 0700)
 		attempt.conformance = &nativeConformanceConfig{repository: root, run: "conformance-run", nvkr: nvkr}

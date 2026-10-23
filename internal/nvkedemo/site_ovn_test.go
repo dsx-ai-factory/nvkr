@@ -4,10 +4,10 @@
 package nvkedemo
 
 import (
-	"encoding/json"
-	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
 
 func TestUpstreamOVNProfilesRejectOppositeModeRun(t *testing.T) {
@@ -21,26 +21,22 @@ func TestUpstreamOVNProfilesRejectOppositeModeRun(t *testing.T) {
 			if err != nil || (selected == "controller-profiles-upstream-ovn") != (network == "upstream-ovn") {
 				t.Fatal("profiles selection differs from the network", selected, err)
 			}
-			root := privateTestDir(t)
-			record := fixtureRun()
-			expected, observed := record["expected"].([]map[string]any), record["observed"].([]map[string]any)
-			expected[1]["name"], expected[1]["kind"] = selected, "oci"
-			observed[1]["name"], observed[1]["kind"] = selected, "oci"
-			raw, err := json.Marshal(record)
+			root := filepath.Join(privateTestDir(t), "profiles")
+			capturedArtifactRunFixture(t, root, []lifecycle.DefinitionOutput{
+				{Name: selected, Platform: "linux/arm64", Format: "oci", Components: []string{"image"}},
+			}, nil)
+			_, run, err := lifecycle.InspectLocalRunInputs(t.Context(), root)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err = os.WriteFile(filepath.Join(root, "lifecycle.json"), raw, 0o600); err != nil {
-				t.Fatal(err)
-			}
-			if _, err = CompleteOutput(t.Context(), root, selected, "oci"); err != nil {
+			if _, err = selectedRunOutput(run, selected, "oci"); err != nil {
 				t.Fatal("selected profiles output rejected", err)
 			}
 			foreign := "controller-profiles-upstream-ovn"
 			if network == "upstream-ovn" {
 				foreign = "controller-profiles"
 			}
-			if _, err = CompleteOutput(t.Context(), root, foreign, "oci"); err == nil {
+			if _, err = selectedRunOutput(run, foreign, "oci"); err == nil {
 				t.Fatal("opposite-mode profiles replay accepted")
 			}
 		})
