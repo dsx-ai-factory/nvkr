@@ -35,14 +35,27 @@ func PrepareTools(ctx context.Context, cfg ToolConfig) (directory string, err er
 	boundary := beginProgress(cfg.Progress, "artifacts", LaneStarted, LaneFinished, LaneFailed)
 	defer func() { boundary.finish(err) }()
 	path, err := prepareTools(ctx, cfg, runtime.GOOS+"/"+runtime.GOARCH)
+	return path, toolPreparationError(err)
+}
+
+// BUILD retains the completed tool Run. Its consumers admit and extract the
+// selected bytes when needed rather than keeping an unused extracted copy.
+func buildTools(ctx context.Context, cfg ToolConfig, platform string) (root string, err error) {
+	boundary := beginProgress(cfg.Progress, "artifacts", LaneStarted, LaneFinished, LaneFailed)
+	defer func() { boundary.finish(err) }()
+	produced, err := produceToolRun(ctx, cfg, platform)
+	return produced.root, toolPreparationError(err)
+}
+
+func toolPreparationError(err error) error {
 	if err != nil {
 		var coded *nvkrerr.Error
 		if errors.As(err, &coded) {
-			return "", err
+			return err
 		}
-		return "", nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "prepare native demo dependencies through NVKR")
+		return nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "prepare native demo dependencies through NVKR")
 	}
-	return path, nil
+	return nil
 }
 
 func nativeToolSelection(platform string) (definition, environment, bundle string, members []string, err error) {
@@ -70,42 +83,47 @@ func siteStartupToolBundles(platform string) []companionToolBundle {
 	}
 }
 
-func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string, error) {
+type producedToolRun struct {
+	root, work  string
+	publication delivery.PublicationRequest
+}
+
+func produceToolRun(ctx context.Context, cfg ToolConfig, platform string) (producedToolRun, error) {
 	if err := requireContext(ctx); err != nil {
-		return "", err
+		return producedToolRun{}, err
 	}
 	definition, environment, bundle, _, err := nativeToolSelection(platform)
 	if err != nil {
-		return "", err
+		return producedToolRun{}, err
 	}
 	if !safePhase(cfg.Attempt) || cfg.Jobs < 1 {
-		return "", nvkrerr.New(nvkrerr.CodeUsage, "tools require a canonical fresh attempt and positive jobs")
+		return producedToolRun{}, nvkrerr.New(nvkrerr.CodeUsage, "tools require a canonical fresh attempt and positive jobs")
 	}
 	repo, err := resolveExisting(cfg.Repository)
 	if err != nil {
-		return "", err
+		return producedToolRun{}, err
 	}
 	for _, path := range []string{definition, environment} {
 		if _, err := boundedRegularRead(filepath.Join(repo, path), 1<<20); err != nil {
-			return "", err
+			return producedToolRun{}, err
 		}
 	}
 	tool, err := resolveExisting(cfg.NVKR)
 	if err != nil {
-		return "", err
+		return producedToolRun{}, err
 	}
 	env, err := localBuildEnvironment()
 	if err != nil {
-		return "", err
+		return producedToolRun{}, err
 	}
 	if cfg.NVKEClone != "" {
 		clone, err := resolveExisting(cfg.NVKEClone)
 		if err != nil {
-			return "", err
+			return producedToolRun{}, err
 		}
 		env, err = localBuildSourceEnvironment(env, clone)
 		if err != nil {
-			return "", err
+			return producedToolRun{}, err
 		}
 	}
 	if cfg.Go == "" {
@@ -113,38 +131,38 @@ func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string,
 	}
 	goTool, err := commandPath(cfg.Go, env)
 	if err != nil {
-		return "", err
+		return producedToolRun{}, err
 	}
 	out, err := freshDestination(cfg.Out)
 	if err != nil {
-		return "", err
+		return producedToolRun{}, err
 	}
 	runsRelative := filepath.Join(".nvkr", "native-tools", "runs")
 	runs := filepath.Join(repo, runsRelative)
 	if insidePath(out, filepath.Join(runs, cfg.Attempt)) || insidePath(filepath.Join(runs, cfg.Attempt), out) {
-		return "", nvkrerr.New(nvkrerr.CodeUsage, "tool extraction must not overlap its immutable Run")
+		return producedToolRun{}, nvkrerr.New(nvkrerr.CodeUsage, "tool extraction must not overlap its immutable Run")
 	}
 	runner := Runner{Env: env, Progress: cfg.Progress, directory: repo}
 	if platform == "darwin/arm64" {
 		root, err := runner.Capture(ctx, []string{goTool, "env", "GOROOT"}, "native-go-sdk-location", time.Minute)
 		if err != nil {
-			return "", err
+			return producedToolRun{}, err
 		}
 		compiler, err := commandPath("clang", env)
 		if err != nil {
-			return "", err
+			return producedToolRun{}, err
 		}
 		compiler, err = filepath.EvalSymlinks(compiler)
 		if err != nil {
-			return "", err
+			return producedToolRun{}, err
 		}
 		input, err := runner.Capture(ctx, []string{tool, "factory", "prepare-native-go", "--definition", definition, "--environment", environment, "--go-root", strings.TrimSpace(string(root)), "--cc", compiler, "--out", filepath.Join(".nvkr", "native-tools", "prepared", cfg.Attempt)}, "native-go-input-preparation", 0)
 		if err != nil {
-			return "", err
+			return producedToolRun{}, err
 		}
 		var prepared factory.NativeBuildPreparation
 		if err := json.Unmarshal(input, &prepared); err != nil {
-			return "", err
+			return producedToolRun{}, err
 		}
 		definition, environment = prepared.Definition, prepared.Environment
 	}
@@ -152,29 +170,28 @@ func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string,
 	// independently admits runtime capabilities before reserving its attempt.
 	args := []string{tool, "run", "local", "--definition", definition, "--environment", environment, "--attempt", cfg.Attempt, "--attempts-root", runsRelative, "--runner-source", repo, "--go", goTool, "--runtime", "docker", "--jobs", fmt.Sprint(cfg.Jobs), "--capture-inputs-root=.", "--ui", "plain"}
 	if err := runner.Run(ctx, []string{tool, "run", "plan", "--definition", definition, "--environment", environment}, "native-tools-admission", 0); err != nil {
-		return "", err
+		return producedToolRun{}, err
 	}
 	if err := os.Mkdir(out, 0o700); err != nil {
-		return "", err
+		return producedToolRun{}, err
 	}
 	runner.Work, runner.output = out, cfg.Progress
 	if err := runner.Run(ctx, args, "native-tools-run", 0); err != nil {
-		return "", err
+		return producedToolRun{}, err
 	}
 	root := filepath.Join(runs, cfg.Attempt)
 	observed, err := CompleteOutput(ctx, root, bundle, "executable")
 	if err != nil {
-		return "", err
+		return producedToolRun{}, err
 	}
 	layout := filepath.Join(root, "packages", bundle)
 	indexDigest, err := diagnosticIndexDigest(ctx, layout, observed.Digest)
 	if err != nil {
-		return "", err
+		return producedToolRun{}, err
 	}
-	publication := filepath.Join(out, "publication")
 	inspected, err := inspectAdmittedBinaryBundle(ctx, layout, indexDigest)
 	if err != nil {
-		return "", nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "verify completed native tool bundle")
+		return producedToolRun{}, nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "verify completed native tool bundle")
 	}
 	request := delivery.PublicationRequest{Objects: []delivery.ObjectInput{{Name: bundle, Kind: "binary-bundle", Path: layout,
 		ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: inspected.SemanticDigest, BlobDigest: inspected.RootDigest, Layout: true}}}
@@ -182,22 +199,38 @@ func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string,
 	for _, companion := range companions {
 		observed, err := CompleteOutput(ctx, root, companion.name, "executable")
 		if err != nil {
-			return "", err
+			return producedToolRun{}, err
 		}
 		layout := filepath.Join(root, "packages", companion.name)
 		indexDigest, err := diagnosticIndexDigest(ctx, layout, observed.Digest)
 		if err != nil {
-			return "", err
+			return producedToolRun{}, err
 		}
 		inspected, err := inspectAdmittedBinaryBundle(ctx, layout, indexDigest)
 		if err != nil {
-			return "", nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "verify completed site tool bundle")
+			return producedToolRun{}, nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "verify completed site tool bundle")
 		}
 		request.Objects = append(request.Objects, delivery.ObjectInput{Name: companion.name, Kind: "binary-bundle", Path: layout,
 			ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: inspected.SemanticDigest, BlobDigest: inspected.RootDigest, Layout: true})
 	}
+	return producedToolRun{root: root, work: out, publication: request}, nil
+}
+
+func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string, error) {
+	produced, err := produceToolRun(ctx, cfg, platform)
+	if err != nil {
+		return "", err
+	}
+	_, _, bundle, _, err := nativeToolSelection(platform)
+	if err != nil {
+		return "", err
+	}
+	root, out := produced.root, produced.work
+	layout := filepath.Join(root, "packages", bundle)
+	publication := filepath.Join(out, "publication")
+	companions := siteStartupToolBundles(platform)
 	phase := beginProgress(cfg.Progress, "native-tools-verify", PhaseStarted, PhaseFinished, PhaseFailed)
-	_, err = delivery.BuildPublicationRoot(ctx, publication, request)
+	_, err = delivery.BuildPublicationRoot(ctx, publication, produced.publication)
 	phase.finish(err)
 	if err != nil {
 		return "", nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "native-tools-verify")
