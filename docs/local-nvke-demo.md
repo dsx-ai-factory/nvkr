@@ -439,7 +439,8 @@ after commands; Linux retains sealed executable descriptors. Mac pathname
 execution does not provide the Linux guarantee against a hostile same-user
 process. Published validation and signing retain Linux admission.
 Prepared/local-signing combinations are refused.
-The suite has a four-hour ceiling and increases the `e2e` work ceiling to 12 hours.
+Conformance shares the operation deadline; selecting it gives `e2e` a 12-hour
+work ceiling, including the preceding build and deployment.
 The complete native demo plus conformance remains externally unverified.
 Original JUnit owns the results; this does not issue a signed qualification
 verdict or upload to TestGrid. See [external test output](external-test-output-contract.md).
