@@ -562,15 +562,15 @@ Isolation and the fixed environment/mount contract are identical across all engi
   only inside those volumes. It runs no producer command, mounts no host source or runtime socket, and grants
   the build no root privilege. The producer mounts source read-only; declared output is returned through bounded
   archive transport before ordinary host collection. Preparation, transfer and failure paths own bounded cleanup.
-  Each preparation staging operation (capacity admission, packing, holding/hashing, each volume creation,
-  helper creation and authenticated copying) has its own five-minute allowance. Helper start,
-  explicit exit observation, diagnostics and removal each receive a separate two-minute RPC budget derived
-  from the original caller context. Earlier caller deadlines and cancellation bound every phase; one RPC
-  cannot consume the next operation's allowance. The nine staging and four completion allowances total
-  fifty-three minutes before existing bounded failure diagnostics, child-process joining and owned cleanup;
-  this is not a hard kernel-I/O
-  return deadline. Descriptive transport logs retain the operation count, allowance and measured held-archive
-  byte sizes, without private paths. No RPC retries producer or runtime work. The local scheduler records
+  Preparation and export inherit the caller's work context, including its deadline and cancellation;
+  they impose no additional fixed duration based on assumptions about host speed or runtime load.
+  Failure diagnostics, child-process joining and owned teardown retain independent finite cleanup bounds.
+  During exit observation, a joined observer periodically reads the fixed helper's last phase report
+  (archive verification, extraction, ownership, or ready). Reports are diagnostic only: silence,
+  observation failure and a ready report do not establish a stall, failure or successful exit. Only the
+  explicit helper exit status admits completion. Unknown/private output is excluded from public progress.
+  Descriptive transport logs retain the operation count, caller time remaining and measured held-archive
+  byte sizes, without private paths. No observation retries producer work. The local scheduler records
   the first worker error before canceling its batch and joins all workers before returning it; original caller
   cancellation still takes precedence. Run scheduler records reference the exact embedded producer instruction;
   network, container and platform are

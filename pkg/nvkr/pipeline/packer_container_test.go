@@ -20,6 +20,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -525,6 +526,7 @@ func TestStartPackerBuildContainerClassifiesProjectionFailure(t *testing.T) {
 }
 
 type recordingPackerRuntime struct {
+	mu         sync.Mutex
 	name       string
 	endpoint   string
 	digest     string
@@ -587,7 +589,9 @@ func (runtime *recordingPackerRuntime) AdmittedIdentity() (string, string) {
 }
 
 func (runtime *recordingPackerRuntime) Run(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, args ...string) error {
+	runtime.mu.Lock()
 	runtime.calls = append(runtime.calls, append([]string(nil), args...))
+	runtime.mu.Unlock()
 	if runtime.runContext != nil {
 		return runtime.runContext(ctx, stdin, stdout, stderr, args)
 	}
