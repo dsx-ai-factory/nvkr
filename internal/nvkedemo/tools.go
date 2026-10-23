@@ -18,6 +18,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
 
 // ToolConfig selects dependency preparation through the existing NVKR CLI.
@@ -86,6 +87,8 @@ func siteStartupToolBundles(platform string) []companionToolBundle {
 type producedToolRun struct {
 	root, work  string
 	publication delivery.PublicationRequest
+	plan        *factory.Plan
+	hostOutput  lifecycle.Artifact
 }
 
 func produceToolRun(ctx context.Context, cfg ToolConfig, platform string) (producedToolRun, error) {
@@ -180,7 +183,11 @@ func produceToolRun(ctx context.Context, cfg ToolConfig, platform string) (produ
 		return producedToolRun{}, err
 	}
 	root := filepath.Join(runs, cfg.Attempt)
-	observed, err := CompleteOutput(ctx, root, bundle, "executable")
+	plan, run, err := lifecycle.InspectLocalRunInputs(ctx, root)
+	if err != nil {
+		return producedToolRun{}, err
+	}
+	observed, err := selectedRunOutput(run, bundle, "executable")
 	if err != nil {
 		return producedToolRun{}, err
 	}
@@ -197,7 +204,7 @@ func produceToolRun(ctx context.Context, cfg ToolConfig, platform string) (produ
 		ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: inspected.SemanticDigest, BlobDigest: inspected.RootDigest, Layout: true}}}
 	companions := siteStartupToolBundles(platform)
 	for _, companion := range companions {
-		observed, err := CompleteOutput(ctx, root, companion.name, "executable")
+		observed, err := selectedRunOutput(run, companion.name, "executable")
 		if err != nil {
 			return producedToolRun{}, err
 		}
@@ -213,7 +220,7 @@ func produceToolRun(ctx context.Context, cfg ToolConfig, platform string) (produ
 		request.Objects = append(request.Objects, delivery.ObjectInput{Name: companion.name, Kind: "binary-bundle", Path: layout,
 			ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: inspected.SemanticDigest, BlobDigest: inspected.RootDigest, Layout: true})
 	}
-	return producedToolRun{root: root, work: out, publication: request}, nil
+	return producedToolRun{root: root, work: out, publication: request, plan: plan, hostOutput: observed}, nil
 }
 
 func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string, error) {
@@ -264,7 +271,7 @@ func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string,
 		// NVKR has already verified the archive's exact bundle member. Reuse
 		// the existing bounded standard-library decoder and held writes; these
 		// are source-owned files, not a second deployment implementation.
-		selection, err := nativeInstallerSelectionFromRun(ctx, root, bundle)
+		selection, err := nativeInstallerSelectionFromPlan(produced.plan, bundle, produced.hostOutput.BuildDigest)
 		if err != nil {
 			return "", err
 		}

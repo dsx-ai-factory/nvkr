@@ -6,7 +6,6 @@ package nvkedemo
 import (
 	"context"
 	"errors"
-	"fmt"
 	"path/filepath"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
@@ -22,12 +21,11 @@ func nativeSelectedRunPlan(ctx context.Context, root, outputName, format string)
 	if err != nil {
 		return nil, lifecycle.Artifact{}, err
 	}
-	for _, output := range run.Observed {
-		if output.Name == outputName && output.Kind == format {
-			return plan, output, nil
-		}
+	output, err := selectedRunOutput(run, outputName, format)
+	if err != nil {
+		return nil, lifecycle.Artifact{}, err
 	}
-	return nil, lifecycle.Artifact{}, fmt.Errorf("completed Run omits %s output %q", format, outputName)
+	return plan, output, nil
 }
 
 // This value is private and issued only from the recompiled tool/image selections.
@@ -71,28 +69,11 @@ func nativeIdentitySources(tools, disk *factory.Plan, toolDigest, diskDigest, di
 	return nil
 }
 
-func prepareNativeIdentityAssets(ctx context.Context, cfg NativeAssetConfig, assets *NativeAssets) error {
+// Source selections are checked against the operation's inspected Plans before
+// extraction. This step binds the verified helper bytes in the private view.
+func prepareNativeIdentityAssets(ctx context.Context, assets *NativeAssets) error {
 	if assets == nil {
 		return errors.New("identity inputs require a prepared asset owner")
-	}
-	diskOutput, err := selectedDiskOutput(cfg.Network)
-	if err != nil {
-		return err
-	}
-	diskRun := cfg.OSRun
-	if diskRun == "" {
-		diskRun = cfg.BootstrapRun
-	}
-	tools, toolOutput, err := nativeSelectedRunPlan(ctx, cfg.ToolsRun, "site-startup-tools-arm64", "executable")
-	if err != nil {
-		return err
-	}
-	disk, diskArtifact, err := nativeSelectedRunPlan(ctx, diskRun, diskOutput, "disk-image")
-	if err != nil {
-		return err
-	}
-	if err := nativeIdentitySources(tools, disk, toolOutput.BuildDigest, diskArtifact.BuildDigest, diskOutput); err != nil {
-		return err
 	}
 	if err := verifyToolMembers(assets.SiteTools, []string{"nerdctl", nativeIdentityHelper}); err != nil {
 		return err

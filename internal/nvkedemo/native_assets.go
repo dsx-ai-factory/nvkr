@@ -134,22 +134,56 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 	if cfg.HostToolsRun != "" {
 		hostRun = cfg.HostToolsRun
 	}
+	diskOutput, err := selectedDiskOutput(cfg.Network)
+	if err != nil {
+		return assets, err
+	}
+	diskRun := cfg.OSRun
+	if diskRun == "" {
+		diskRun = cfg.BootstrapRun
+	}
+	// Lifecycle owns metadata admission and captured-input replay. Keep each
+	// detached description within this operation so sibling output selection,
+	// installer admission and identity checks do not recompile the same Run.
+	runInputs := make(map[string]struct {
+		plan *factory.Plan
+		run  lifecycle.Run
+	})
+	roots := []string{hostRun, cfg.ToolsRun, cfg.BootstrapRun, cfg.DeploymentRun, controllerRun, providersRun, diskRun}
+	if cfg.RuntimeRun != "" {
+		roots = append(roots, cfg.RuntimeRun)
+	}
+	for _, root := range roots {
+		inputs, exists := runInputs[root]
+		if exists {
+			continue
+		}
+		inputs.plan, inputs.run, err = lifecycle.InspectLocalRunInputs(ctx, root)
+		if err != nil {
+			return assets, err
+		}
+		runInputs[root] = inputs
+	}
 	publication := delivery.PublicationRequest{}
 	var siteMembers []string
+	var hostOutput, siteOutput lifecycle.Artifact
 	for _, bundle := range []string{hostBundle, "site-startup-tools-arm64"} {
 		run := cfg.ToolsRun
 		if bundle == hostBundle {
 			run = hostRun
 		}
-		observed, err := CompleteOutput(ctx, run, bundle, "executable")
+		observed, err := selectedRunOutput(runInputs[run].run, bundle, "executable")
 		if err != nil {
 			return assets, err
 		}
 		if bundle == "site-startup-tools-arm64" {
+			siteOutput = observed
 			siteMembers, err = sitePreparationMembers(observed.Components)
 			if err != nil {
 				return assets, err
 			}
+		} else {
+			hostOutput = observed
 		}
 		root := filepath.Join(run, "packages", bundle)
 		indexDigest, err := diagnosticIndexDigest(ctx, root, observed.Digest)
@@ -163,21 +197,14 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 		publication.Objects = append(publication.Objects, delivery.ObjectInput{Name: bundle, Kind: "binary-bundle", Path: root,
 			ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: inspected.SemanticDigest, BlobDigest: inspected.RootDigest, Layout: true})
 	}
-	var runtimePlan *factory.Plan
-	installer, err := nativeInstallerSelectionFromRun(ctx, hostRun, hostBundle)
+	installer, err := nativeInstallerSelectionFromPlan(runInputs[hostRun].plan, hostBundle, hostOutput.BuildDigest)
 	if err != nil {
 		return assets, err
 	}
 	acquired := make(map[string]string)
-	if cfg.RuntimeRun != "" {
-		runtimePlan, _, err = nativeSelectedRunPlan(ctx, cfg.RuntimeRun, "workload-image-arm64", "oci")
-		if err != nil {
-			return assets, err
-		}
-	}
 	for i := range selections {
 		selection := &selections[i]
-		selection.observed, err = CompleteOutput(ctx, selection.root, selection.output, "oci")
+		selection.observed, err = selectedRunOutput(runInputs[selection.root].run, selection.output, "oci")
 		if err != nil {
 			return assets, err
 		}
@@ -191,7 +218,7 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 			selection.reference = "docker.io/nvkr-local/" + selection.role + "@" + selection.observed.Digest
 		}
 		if selection.role == "workload" || slices.Contains(nativeCAPIAuthImages, selection.role) {
-			ref, err := nativeAcquiredImage(runtimePlan, *selection, installer)
+			ref, err := nativeAcquiredImage(runInputs[selection.root].plan, *selection, installer)
 			if err != nil {
 				return assets, err
 			}
@@ -208,6 +235,13 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 		// The diagnostic publication CLI consumes binary bundles. Images are
 		// independently verified by NVKR's existing delivery owner above and
 		// again after assigning their private containerd import aliases.
+	}
+	diskArtifact, err := selectedRunOutput(runInputs[diskRun].run, diskOutput, "disk-image")
+	if err != nil {
+		return assets, err
+	}
+	if err := nativeIdentitySources(runInputs[cfg.ToolsRun].plan, runInputs[diskRun].plan, siteOutput.BuildDigest, diskArtifact.BuildDigest, diskOutput); err != nil {
+		return assets, err
 	}
 	// All selected observations/platforms were admitted before creating output.
 	if err := os.Mkdir(out, 0o700); err != nil {
@@ -276,7 +310,7 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 			return assets, err
 		}
 	}
-	if err := prepareNativeIdentityAssets(ctx, cfg, &assets); err != nil {
+	if err := prepareNativeIdentityAssets(ctx, &assets); err != nil {
 		return assets, err
 	}
 	return assets, nil

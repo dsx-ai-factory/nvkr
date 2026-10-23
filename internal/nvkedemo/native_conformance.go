@@ -18,6 +18,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/conformance"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/testresults"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/validation"
 	"go.yaml.in/yaml/v3"
@@ -169,8 +170,12 @@ func (s *nativeSiteAttempt) runConformance(ctx context.Context, runner Runner, t
 		return err
 	}
 	local.Timeouts.Run, local.Timeouts.Startup = timeout.String(), timeout.String()
+	_, run, err := lifecycle.InspectLocalRunInputs(ctx, filepath.Join(cfg.repository, cfg.run))
+	if err != nil {
+		return err
+	}
 	for _, tool := range []struct{ output, repository string }{{"conformance-image-arm64", "registry.k8s.io/conformance"}, {"busybox-image-arm64", "registry.k8s.io/e2e-test-images/busybox"}} {
-		observed, err := CompleteOutput(ctx, filepath.Join(cfg.repository, cfg.run), tool.output, "oci")
+		observed, err := selectedRunOutput(run, tool.output, "oci")
 		if err != nil {
 			return err
 		}

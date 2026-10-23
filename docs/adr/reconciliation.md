@@ -1496,8 +1496,17 @@ authentication, the expected boot identity and source-owned TPM policy remain
 separate requirements. It issues no
 bootstrap-stop or release receipt. The native owner requires the shared
 helper startup member before guest launch or native network configuration and
-delegates captured completed-Run input replay to the lifecycle owner. That owner
-checks every frozen Run binding; payload acceptance remains separate. After deployment and before temporary
+delegates captured completed-Run input replay to the lifecycle owner. All native demo
+output selection now uses that owner rather than a second Run decoder and membership
+validator. Artifact preparation reuses one descriptive Plan/Run per distinct selected
+Run within the operation, including installer and identity-source checks; tool
+preparation and conformance also reuse their inspected descriptions for sibling outputs.
+Every selected Run must retain its original captured compiler inputs and Plan; uncaptured,
+noncanonical, nonlocal and unfinished-commit records are refused. Disk selection and
+subsequent asset preparation retain separate replay boundaries. The owner checks every
+frozen Run binding; delivery payload acceptance remains separate. Controlled captured-input,
+selection and payload-substitution fixtures cover these boundaries, not a fresh native
+build/deployment. After deployment and before temporary
 bootstrap teardown, it imports
 the original host policy without replacement, checks the controller/CSI context,
 permanent registration, derived TPM allowlist, new TPM agent and renewed
