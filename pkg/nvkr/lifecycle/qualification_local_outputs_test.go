@@ -258,3 +258,114 @@ func testLocalCaptureCleanup(t *testing.T, workspace string, inputs *localQualif
 		})
 	}
 }
+
+func TestLocalQualificationCapturePreservesOuterPublication(t *testing.T) {
+	for _, mode := range []string{"exact", "missing root", "wrong member name", "wrong member media type", "wrong member digest"} {
+		t.Run(mode, func(t *testing.T) {
+			baseline := prepareBinaryObservationFixture(t)
+			definition := baseline.plan.Definition.Clone()
+			definition.Catalog.Base = "catalog"
+			prepared := captureMixedFixtureInputs(t, definition, baseline.plan.Environment, baseline.plan.CatalogSnapshot)
+			root, err := filepath.EvalSymlinks(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Chdir(root)
+			workspace := ".nvkr/runs/mixed"
+			toolBytes := []byte("captured outer-publication executable fixture")
+			observed := writeLocalCaptureFixture(t, workspace, prepared, toolBytes)
+			pending := prepared.Description()
+			pending.Lane = factory.TierLocalExecution.String()
+			run, err := bindObserved(&pending, []Artifact{observed})
+			if err != nil {
+				t.Fatal(err)
+			}
+			run, err = bindReleaseContent(prepared.plan, run)
+			if err != nil {
+				t.Fatal(err)
+			}
+			writeCanonicalTestFile(t, filepath.Join(workspace, "lifecycle.json"), run)
+			writeCanonicalTestFile(t, filepath.Join(workspace, ".runner", "plan.json"), prepared.plan)
+			if err := os.WriteFile(filepath.Join(workspace, "compile-inputs.json"), []byte(prepared.inputs), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			inputs, err := loadLocalQualificationInputs(t.Context(), workspace)
+			if err != nil {
+				t.Fatal(err)
+			}
+			slot := inputs.run.Expected[0]
+			artifacts, err := localQualificationOutputArtifacts(t.Context(), workspace, inputs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			member, outer := artifacts[slot.MemberArtifactID], artifacts[slot.ArtifactID]
+			if member.ID == outer.ID {
+				t.Fatal("fixture must retain an original enclosing publication")
+			}
+			if mode != "exact" && mode != "wrong member media type" {
+				if err := os.Rename(outer.Path, outer.Path+".saved"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			switch mode {
+			case "wrong member media type":
+				for index := range inputs.plan.Graph.Artifacts {
+					if inputs.plan.Graph.Artifacts[index].ID == slot.MemberArtifactID {
+						inputs.plan.Graph.Artifacts[index].MediaType = "application/x-substituted"
+					}
+				}
+			case "wrong member name", "wrong member digest":
+				name, payload := member.Name, toolBytes
+				if mode == "wrong member name" {
+					name = "sibling"
+				} else {
+					payload = []byte("foreign ordinary package bytes")
+				}
+				foreignSource := filepath.Join(workspace, "foreign-executable")
+				if err := os.WriteFile(foreignSource, payload, 0o755); err != nil {
+					t.Fatal(err)
+				}
+				foreignPath := filepath.Join(workspace, "foreign-package")
+				built, err := delivery.BuildBinaryBundle(t.Context(), foreignPath, delivery.BinaryBundleRequest{OS: "linux", Arch: "amd64", Purpose: name,
+					Files: []delivery.BinaryFileInput{{Name: "kubectl", Path: foreignSource, InstallPath: "/usr/local/bin/kubectl", Mode: 0o755}}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				descriptor, err := delivery.PayloadDescriptor(t.Context(), foreignPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				request := testReleaseRequest(t,
+					[]Artifact{{Name: name, Kind: slot.Kind, Digest: descriptor.Digest, BuildDigest: slot.BuildDigest, Components: slot.Components}},
+					[]delivery.ObjectInput{{Name: name, Kind: member.Kind, Path: foreignPath, Layout: true, ArtifactType: member.MediaType, SemanticDigest: built.SemanticDigest, BlobDigest: built.RootDigest}},
+					map[string]string{"kubectl": pipeline.FileDigest(payload)})
+				if _, err := delivery.BuildPublicationRoot(t.Context(), outer.Path, request); err != nil {
+					t.Fatal(err)
+				}
+			}
+			ordinaryCalls := 0
+			held, err := captureLocalQualificationPayloadsWith(t.Context(), workspace, inputs, func(ctx context.Context, plan *factory.Plan, workspace string) (*delivery.Publication, string, error) {
+				ordinaryCalls++
+				return factory.CaptureWorkspaceOrdinaryPublication(ctx, plan, workspace)
+			})
+			if mode != "exact" {
+				code := e.CodeVerifyFailed
+				if mode == "wrong member name" {
+					code = e.CodeReleaseIncomplete
+				}
+				assertCode(t, err, code)
+				if held != nil || ordinaryCalls != 0 {
+					t.Fatal("changed original publication reached ordinary assembly or returned a capture")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = held.Close() })
+			if ordinaryCalls != 1 {
+				t.Fatalf("ordinary capture called %d times, want once", ordinaryCalls)
+			}
+		})
+	}
+}
