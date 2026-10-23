@@ -42,12 +42,13 @@ func captureLocalQualificationDisks(ctx context.Context, workspace string, input
 	return captureLocalQualificationDisksWith(ctx, workspace, inputs, factory.CaptureRetainedDiskSubject)
 }
 
-// Capture completes the same all-output check as the diagnostic path. Every
-// disk snapshot is matched to its own recorded Run slot. Any later refusal,
-// including an ordinary-output failure, closes all previously captured disks.
+// Capture matches every disk snapshot to its original Run slot and retains
+// lifecycle's ordinary slot and outer-publication checks. The complete capture's
+// factory publication owner verifies ordinary producer and package bytes once.
+// Any refusal closes all previously captured disks.
 func captureLocalQualificationDisksWith(ctx context.Context, workspace string, inputs *localQualificationInputs, capture localDiskCapture) (*localQualificationDisks, error) {
 	disks := &localQualificationDisks{members: map[string]*delivery.DiskArtifact{}}
-	err := checkLocalQualificationPayloadsWith(ctx, workspace, inputs, func(ctx context.Context, plan *factory.Plan, slot factory.LifecycleOutputPlan, payload string, subject factory.DiskPayloadObservation) (factory.DiskPayloadObservation, error) {
+	observeDisk := func(ctx context.Context, plan *factory.Plan, slot factory.LifecycleOutputPlan, payload string, subject factory.DiskPayloadObservation) (factory.DiskPayloadObservation, error) {
 		owner, observed, err := capture(ctx, plan, slot, payload, subject)
 		if err != nil {
 			if owner != nil {
@@ -67,7 +68,17 @@ func captureLocalQualificationDisksWith(ctx context.Context, workspace string, i
 			return factory.DiskPayloadObservation{}, e.New(e.CodeVerifyFailed, "local disk snapshot differs from retained observation")
 		}
 		return observed, nil
-	})
+	}
+	err := checkLocalQualificationPayloadsWith(ctx, workspace, inputs, observeDisk,
+		func(ctx context.Context, slot requiredOutput, want Artifact, artifacts map[string]factory.Artifact) error {
+			member, err := ordinaryOutputMember(slot, artifacts)
+			if err != nil {
+				return err
+			}
+			// Factory's subsequent held capture must match this recorded subject.
+			// APT observations use the repository semantic digest in both fields.
+			return checkOutputPublicationMember(ctx, slot, member, artifacts, want.Digest, want.Digest)
+		})
 	if err != nil {
 		return nil, errors.Join(err, disks.Close())
 	}

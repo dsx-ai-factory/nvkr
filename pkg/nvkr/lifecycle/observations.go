@@ -92,30 +92,11 @@ func observeOutput(ctx context.Context, slot requiredOutput, artifacts map[strin
 		}
 		return observeHeldDiskOutput(ctx, slot, plan, execution.ObserveDiskLifecyclePayload)
 	}
-	member, ok := artifacts[slot.MemberArtifactID]
-	if !ok {
-		return Artifact{}, e.New(e.CodeReleaseIncomplete, "run plan has no typed member for frozen output %q", slot.Name)
-	}
-	// Lifecycle owns the frozen result slots; factory owns re-observing their
-	// exact instruction, record and payload bytes.
-
-	bindings, err := requiredProducerBindings(slot)
+	member, err := ordinaryOutputMember(slot, artifacts)
 	if err != nil {
 		return Artifact{}, err
 	}
-	if len(slot.ComponentResults) != len(bindings) {
-		return Artifact{}, e.New(e.CodeReleaseIncomplete, "output %q has incomplete frozen producer mappings", slot.Name)
-	}
-	for index, id := range slot.ComponentResults {
-		binding := bindings[index]
-		result, exists := artifacts[id]
-		if !exists {
-			return Artifact{}, e.New(e.CodeReleaseIncomplete, "output %q has no frozen producer result %q", slot.Name, id)
-		}
-		if id != binding.id || result.Kind != "producer-result" || result.BuildTarget != binding.target || result.Component != binding.component {
-			return Artifact{}, e.New(e.CodeVerifyFailed, "output %q substitutes its frozen producer mapping %q", slot.Name, id)
-		}
-	}
+
 	expected := factory.LifecycleOutputPlan{Name: slot.Name, Kind: slot.Kind, ArtifactID: slot.MemberArtifactID,
 		BuildDigest: slot.BuildDigest, Components: append([]string(nil), slot.Components...), ImageIndex: slot.ImageIndex.Clone()}
 	observation, err := factory.ObserveWorkspaceLifecyclePayload(ctx, plan, expected, workspace, artifacts)
@@ -126,14 +107,56 @@ func observeOutput(ctx context.Context, slot requiredOutput, artifacts map[strin
 	if !equalStrings(components, slot.Components) {
 		return Artifact{}, e.New(e.CodeVerifyFailed, "output %q bundle members differ from its frozen component mapping", slot.Name)
 	}
+	if err := checkOutputPublicationMember(ctx, slot, member, artifacts, digest, semantic); err != nil {
+		return Artifact{}, err
+	}
+	return Artifact{Name: slot.Name, Kind: slot.Kind, Digest: digest, BuildDigest: slot.BuildDigest,
+		Components: components, ImageIndex: observation.ImageIndex.Clone()}, nil
+}
+
+// ordinaryOutputMember checks lifecycle's frozen member and producer-result
+// mappings without opening payload bytes. Factory owns producer verification.
+func ordinaryOutputMember(slot requiredOutput, artifacts map[string]factory.Artifact) (factory.Artifact, error) {
+	member, ok := artifacts[slot.MemberArtifactID]
+	if !ok {
+		return factory.Artifact{}, e.New(e.CodeReleaseIncomplete, "run plan has no typed member for frozen output %q", slot.Name)
+	}
+	// Lifecycle owns the frozen result slots; factory owns re-observing their
+	// exact instruction, record and payload bytes.
+
+	bindings, err := requiredProducerBindings(slot)
+	if err != nil {
+		return factory.Artifact{}, err
+	}
+	if len(slot.ComponentResults) != len(bindings) {
+		return factory.Artifact{}, e.New(e.CodeReleaseIncomplete, "output %q has incomplete frozen producer mappings", slot.Name)
+	}
+	for index, id := range slot.ComponentResults {
+		binding := bindings[index]
+		result, exists := artifacts[id]
+		if !exists {
+			return factory.Artifact{}, e.New(e.CodeReleaseIncomplete, "output %q has no frozen producer result %q", slot.Name, id)
+		}
+		if id != binding.id || result.Kind != "producer-result" || result.BuildTarget != binding.target || result.Component != binding.component {
+			return factory.Artifact{}, e.New(e.CodeVerifyFailed, "output %q substitutes its frozen producer mapping %q", slot.Name, id)
+		}
+	}
+	return member, nil
+}
+
+// checkOutputPublicationMember retains lifecycle's outer-publication join.
+// The caller must independently verify the member bytes against these subjects.
+func checkOutputPublicationMember(ctx context.Context, slot requiredOutput, member factory.Artifact,
+	artifacts map[string]factory.Artifact, digest, semantic string,
+) error {
 	if slot.ArtifactID != slot.MemberArtifactID {
 		outer, found := artifacts[slot.ArtifactID]
 		if !found || outer.Kind != factory.PackageOCI {
-			return Artifact{}, e.New(e.CodeReleaseIncomplete, "run plan has no publication root for frozen output %q", slot.Name)
+			return e.New(e.CodeReleaseIncomplete, "run plan has no publication root for frozen output %q", slot.Name)
 		}
 		inspection, inspectErr := delivery.Inspect(ctx, outer.Path)
 		if inspectErr != nil {
-			return Artifact{}, inspectErr
+			return inspectErr
 		}
 		matches := 0
 		for _, object := range inspection.Root.Objects {
@@ -144,16 +167,15 @@ func observeOutput(ctx context.Context, slot requiredOutput, artifacts map[strin
 					exact = object.SemanticDigest == semantic
 				}
 				if object.ArtifactType != member.MediaType || !exact {
-					return Artifact{}, e.New(e.CodeVerifyFailed, "output %q publication root substitutes its planned typed member", slot.Name)
+					return e.New(e.CodeVerifyFailed, "output %q publication root substitutes its planned typed member", slot.Name)
 				}
 			}
 		}
 		if matches != 1 {
-			return Artifact{}, e.New(e.CodeReleaseIncomplete, "output %q publication root does not contain its exact planned binary member", slot.Name)
+			return e.New(e.CodeReleaseIncomplete, "output %q publication root does not contain its exact planned binary member", slot.Name)
 		}
 	}
-	return Artifact{Name: slot.Name, Kind: slot.Kind, Digest: digest, BuildDigest: slot.BuildDigest,
-		Components: components, ImageIndex: observation.ImageIndex.Clone()}, nil
+	return nil
 }
 
 type heldDiskObserver func(context.Context, *factory.Plan, factory.LifecycleOutputPlan) (factory.DiskPayloadObservation, error)

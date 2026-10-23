@@ -884,13 +884,18 @@ payload, then verifies it before commit. Host registry fixtures cover both suppo
 unpinned references, wrong platforms and insufficient payload bounds without output. Focused race checks
 pass. These use small opaque disk fixtures; production-sized disk capacity and external-registry acceptance
 remain unexercised. The caller must admit scratch/destination capacity before invoking this transport.
-The lifecycle disk-set owner now uses this capture through the same all-output checking operation
-as diagnostic payload checks. It matches each held disk to its exact named Run slot and checks
-transport/observation consistency before retaining it. Refusal closes captured handles, including
-a completed capture whose producer bytes differ from the original Run. Focused lifecycle and race
-tests cover that mismatch, late capture errors, cancellation, named ownership and source mutation
-after capture. This disk set alone is not a complete held publication or authenticated source receipt
-and cannot authorize signing.
+The lifecycle disk-set capture retains frozen output mappings and original outer-publication membership,
+matches each held disk to its exact named Run slot, and checks transport/observation consistency.
+Factory's ordinary publication capture owns ordinary producer verification and package reproduction once;
+the complete capture still compares every held ordinary output and the complete named set to the original Run.
+A captured-input mixed fixture restores ordinary producer/package paths only when real factory assembly
+starts; the prior lifecycle producer/package observation would reject that fixture. Outer-publication
+substitution, changed producers, missing packages and changed Run subjects still fail closed. No wall-clock
+improvement is established.
+Refusal closes captured handles, including a completed capture whose producer bytes differ from the original
+Run. Focused lifecycle and race tests cover that mismatch, late capture errors, cancellation, named ownership
+and source mutation after capture. This disk set alone is not a complete held publication or authenticated
+source receipt and cannot authorize signing.
 Factory now provides ordinary-output capture through the existing publication assembly and
 held-byte delivery owner. It derives every non-disk slot from the original Plan, rechecks producer
 payloads and required inventories, and binds the original Plan identity without a hosted invocation.
