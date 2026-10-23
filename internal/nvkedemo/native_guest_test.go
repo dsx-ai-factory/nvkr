@@ -14,9 +14,90 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
+
+func TestNativeSimulatorReadinessBudget(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		site    bool
+		timeout time.Duration
+		budget  time.Duration
+		parent  time.Duration
+	}{
+		{name: "site inherits work deadline", site: true, budget: 2 * time.Hour},
+		{name: "site ignores standalone and tenant limits", site: true, timeout: time.Minute, budget: 30 * time.Minute},
+		{name: "site respects earlier parent", site: true, budget: 2 * time.Hour, parent: 15 * time.Minute},
+		{name: "standalone explicit budget", timeout: 5 * time.Minute},
+		{name: "standalone earlier caller", timeout: 5 * time.Minute, budget: time.Minute},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := t.Context()
+			for _, budget := range []time.Duration{tc.parent, tc.budget} {
+				if budget != 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, budget)
+					defer cancel()
+				}
+			}
+			cfg := NativeGuestConfig{Timeout: tc.timeout, Accelerator: "kvm"}
+			if tc.site {
+				cfg.site = &nativeSiteAttempt{tenantTimeout: 2 * time.Hour}
+			}
+			deadline, _ := ctx.Deadline()
+			before := time.Until(deadline)
+			values, err := nativeSimulatorEnvironment(ctx, cfg, linuxNativeBridge(), "/image.qcow2", "/seed.yaml", "/simulator")
+			after := time.Until(deadline)
+			if err != nil {
+				t.Fatal(err)
+			}
+			env := SetEnv([]string{"NICO_VMS_READINESS_TIMEOUT=0s"}, values)
+			got, err := time.ParseDuration(environmentValue(env, "NICO_VMS_READINESS_TIMEOUT"))
+			if err != nil || got <= 0 || tc.site && (got < after || got > before) || !tc.site && got != tc.timeout {
+				t.Fatalf("simulator readiness timeout=%v err=%v; caller remaining=[%v,%v]", got, err, after, before)
+			}
+			if strings.Count(strings.Join(env, "\n"), "NICO_VMS_READINESS_TIMEOUT=") != 1 {
+				t.Fatal("simulator environment retained a stale readiness timeout")
+			}
+			for key, want := range map[string]string{"NICO_VMS_CLEANUP_ORPHANED_VMS": "false", "NICO_VMS_DIAG_SSH_ENABLED": "false", "NICO_VMS_BASE_IMAGE": "/image.qcow2"} {
+				if got := environmentValue(env, key); got != want {
+					t.Fatalf("%s=%q, want %q", key, got, want)
+				}
+			}
+			if cfg.Timeout != tc.timeout {
+				t.Fatal("simulator budget changed the guest readiness policy")
+			}
+		})
+	}
+}
+
+func TestNativeSimulatorRejectsUnavailableSiteBudget(t *testing.T) {
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	expired, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+	defer cancel()
+	for _, tc := range []struct {
+		name  string
+		ctx   context.Context
+		code  nvkrerr.Code
+		cause error
+	}{
+		{"nil", nil, nvkrerr.CodeUsage, nil},
+		{"unbounded", context.Background(), nvkrerr.CodeUsage, nil},
+		{"canceled", canceled, nvkrerr.CodeTimeout, context.Canceled},
+		{"expired", expired, nvkrerr.CodeTimeout, context.DeadlineExceeded},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			env, err := nativeSimulatorEnvironment(tc.ctx, NativeGuestConfig{site: &nativeSiteAttempt{}}, linuxNativeBridge(), "/image.qcow2", "/seed.yaml", "/simulator")
+			var coded *nvkrerr.Error
+			if env != nil || !errors.As(err, &coded) || coded.Code != tc.code || tc.cause != nil && !errors.Is(err, tc.cause) {
+				t.Fatalf("environment=%v error=%v", env, err)
+			}
+		})
+	}
+}
 
 func TestNativeGuestsUseTenantIPAMPool(t *testing.T) {
 	attempt := nativeCAPITenantFixture(t, GuestCIDR, "ovn")

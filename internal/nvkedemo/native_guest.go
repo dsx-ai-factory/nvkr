@@ -45,6 +45,31 @@ type nativeInstance struct {
 	} `json:"interfaces"`
 }
 
+func nativeSimulatorEnvironment(ctx context.Context, cfg NativeGuestConfig, network nativeBridgeConfig,
+	image, seedPath, simdir string,
+) (map[string]string, error) {
+	readinessTimeout := cfg.Timeout
+	if cfg.site != nil {
+		var err error
+		readinessTimeout, err = remainingWork(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return map[string]string{
+		"NICO_SIM_LISTEN_ADDR": net.JoinHostPort(network.gateway.String(), "18080"), "NICO_SIM_DB_PATH": filepath.Join(simdir, "nico.db"),
+		"NICO_SIM_SEED_PATH": seedPath, "NICO_SIM_FILES_DIR": filepath.Join(simdir, "files"),
+		"NICO_VMS_VM_BACKEND": "darwin-qemu", "NICO_VMS_BRIDGE_CIDR": network.prefix.String(),
+		"NICO_VMS_BASE_IMAGE": image, "NICO_VMS_QEMU_ACCELERATOR": cfg.Accelerator,
+		"NICO_VMS_BGP_ENABLED": "false", "NICO_CONTAINERS_ENABLED": "false",
+		"NICO_VMS_DIAG_SSH_ENABLED": "false", "NICO_VMS_CLEANUP_ORPHANED_VMS": "false",
+		"NICO_VMS_CONSOLE_SSH_PORT":   "-1",
+		"NICO_VMS_IMAGE_CACHE_DIR":    filepath.Join(simdir, "cache"),
+		"NICO_VMS_RECONCILE_INTERVAL": "1s", "NICO_VMS_READINESS_PROBE_INTERVAL": "1s",
+		"NICO_VMS_READINESS_TIMEOUT": readinessTimeout.String(),
+	}, nil
+}
+
 // RunNativeGuest starts one 2 GiB guest through NICo using the local Go disk
 // server. All instance deletion and child/server joining precedes return.
 func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
@@ -196,18 +221,11 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 	}
 	// This private server starts from an empty database. Cleanup owns only its
 	// instances; it never adopts a shared NICo server or scans unrelated VMs.
-	runner.Env = SetEnv(runner.Env, map[string]string{
-		"NICO_SIM_LISTEN_ADDR": net.JoinHostPort(network.gateway.String(), "18080"), "NICO_SIM_DB_PATH": filepath.Join(simdir, "nico.db"),
-		"NICO_SIM_SEED_PATH": seedPath, "NICO_SIM_FILES_DIR": filepath.Join(simdir, "files"),
-		"NICO_VMS_VM_BACKEND": "darwin-qemu", "NICO_VMS_BRIDGE_CIDR": network.prefix.String(),
-		"NICO_VMS_BASE_IMAGE": image, "NICO_VMS_QEMU_ACCELERATOR": cfg.Accelerator,
-		"NICO_VMS_BGP_ENABLED": "false", "NICO_CONTAINERS_ENABLED": "false",
-		"NICO_VMS_DIAG_SSH_ENABLED": "false", "NICO_VMS_CLEANUP_ORPHANED_VMS": "false",
-		"NICO_VMS_CONSOLE_SSH_PORT":   "-1",
-		"NICO_VMS_IMAGE_CACHE_DIR":    filepath.Join(simdir, "cache"),
-		"NICO_VMS_RECONCILE_INTERVAL": "1s", "NICO_VMS_READINESS_PROBE_INTERVAL": "1s",
-		"NICO_VMS_READINESS_TIMEOUT": cfg.Timeout.String(),
-	})
+	nicoEnvironment, err := nativeSimulatorEnvironment(ctx, cfg, network, image, seedPath, simdir)
+	if err != nil {
+		return err
+	}
+	runner.Env = SetEnv(runner.Env, nicoEnvironment)
 	if err := configureNativeAddresses(&runner, simdir); err != nil {
 		return err
 	}
