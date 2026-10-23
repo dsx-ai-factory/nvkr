@@ -256,7 +256,8 @@ func TestMergeGateLintInstaller(t *testing.T) {
 	fixtureChecksum := fmt.Sprintf("%x", sha256.Sum256([]byte(archiveFixture)))
 	step.Run = strings.Replace(step.Run, releaseChecksum, fixtureChecksum, 1)
 	var checksumTool string
-	for _, name := range []string{"sha256sum", "gsha256sum"} {
+	// Prefer the optional coreutils prefix over a platform-provided namesake.
+	for _, name := range []string{"gsha256sum", "sha256sum"} {
 		path, err := exec.LookPath(name)
 		if err != nil {
 			continue
