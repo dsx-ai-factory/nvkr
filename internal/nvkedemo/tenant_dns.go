@@ -34,21 +34,20 @@ func waitTenantDNS(ctx context.Context, kubeconfig, kubectl string, progress io.
 	if err := requireContext(ctx); err != nil {
 		return err
 	}
-	ready, cancel := context.WithTimeout(ctx, 4*time.Minute)
-	defer cancel()
 	for _, resource := range []struct{ name, phase string }{
 		{"deployment/coredns", "dns-coredns-rollout"},
 		{"daemonset/node-local-dns", "dns-node-local-rollout"},
 	} {
 		stage = "waiting for tenant DNS " + resource.name + " rollout"
-		if err := ready.Err(); err != nil {
+		timeout, err := remainingWork(ctx)
+		if err != nil {
 			return err
 		}
-		args := []string{kubectl, "--kubeconfig", kubeconfig, "-n", "kube-system", "rollout", "status", resource.name, "--timeout=240s"}
-		if _, err := capture(ready, args, resource.phase, 4*time.Minute); err != nil {
+		args := []string{kubectl, "--kubeconfig", kubeconfig, "-n", "kube-system", "rollout", "status", resource.name, "--timeout=" + timeout.String()}
+		if _, err := capture(ctx, args, resource.phase, 0); err != nil {
 			return err
 		}
-		if err := ready.Err(); err != nil {
+		if err := ctx.Err(); err != nil {
 			return err
 		}
 	}

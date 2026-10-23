@@ -14,7 +14,6 @@ import (
 	"runtime"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -215,9 +214,7 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 	}
 	publicationPath := filepath.Join(out, "publication")
 	phase := beginProgress(cfg.Progress, "native-closure-verify", PhaseStarted, PhaseFinished, PhaseFailed)
-	limited, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	_, err = delivery.BuildPublicationRoot(limited, publicationPath, publication)
-	cancel()
+	_, err = delivery.BuildPublicationRoot(ctx, publicationPath, publication)
 	phase.finish(err)
 	if err != nil {
 		return assets, err
@@ -237,9 +234,7 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 		{"site-startup-tools-arm64", assets.SiteTools, siteMembers},
 	} {
 		phase := beginProgress(cfg.Progress, "native-extract-"+bundle.name, PhaseStarted, PhaseFinished, PhaseFailed)
-		limited, cancel := context.WithTimeout(ctx, 2*time.Minute)
-		_, err := delivery.ExtractBinaryBundle(limited, publicationPath, bundle.name, bundle.directory)
-		cancel()
+		_, err := delivery.ExtractBinaryBundle(ctx, publicationPath, bundle.name, bundle.directory)
 		phase.finish(err)
 		if err != nil {
 			return assets, err

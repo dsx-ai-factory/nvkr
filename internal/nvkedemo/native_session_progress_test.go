@@ -8,13 +8,16 @@ import (
 	"fmt"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestNativeSessionSharesTenantAndConformanceProgressAcrossSiteReuse(t *testing.T) {
 	attempt, runner, root := nativeSessionFixture(t, true)
 	writer := &recordedProgress{}
 	runner.Progress = writer
-	err := withNativeSiteScope(t.Context(), &attempt, runner, runner.Work, runner.Work, func(ctx context.Context, site *NativeSite) error {
+	ctx, cancel := context.WithTimeout(t.Context(), time.Hour)
+	defer cancel()
+	err := withNativeSiteScope(ctx, &attempt, runner, runner.Work, runner.Work, func(ctx context.Context, site *NativeSite) error {
 		for _, name := range []string{"first", "second"} {
 			tenant, err := site.CreateTenant(ctx, name)
 			if err != nil {

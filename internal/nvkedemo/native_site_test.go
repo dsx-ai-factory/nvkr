@@ -247,7 +247,7 @@ instance_types:
 func TestNativeSiteStartupNeverCopiesOrRunsHostCLI(t *testing.T) {
 	cfg := startupDescription()
 	cfg.Deployment = &NativeSiteDeployment{NicoURL: "http://172.30.0.1:18080", ImageURL: "http://172.30.0.1:18081/local.qcow2", ProfilesImage: "docker.io/library/cwe-profiles:local"}
-	data, err := SiteStartupUserData(t.Context(), cfg)
+	data, err := SiteStartupUserData(startupTestContext(t), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

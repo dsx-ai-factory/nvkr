@@ -10,10 +10,18 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"go.yaml.in/yaml/v3"
 )
+
+func startupTestContext(t *testing.T) context.Context {
+	t.Helper()
+	ctx, cancel := context.WithDeadline(t.Context(), time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC))
+	t.Cleanup(cancel)
+	return ctx
+}
 
 func startupDescription() NativeSiteStartup {
 	cfg := NativeSiteStartup{
@@ -70,7 +78,7 @@ func TestSiteStartupRuntimeImagesRequireTheWholeSelectedClosure(t *testing.T) {
 			if tc.change != nil {
 				tc.change(&cfg)
 			}
-			data, err := SiteStartupUserData(t.Context(), cfg)
+			data, err := SiteStartupUserData(startupTestContext(t), cfg)
 			if tc.change != nil {
 				var coded *nvkrerr.Error
 				if data != "" || !errors.As(err, &coded) || coded.Code != nvkrerr.CodeUsage {
@@ -129,7 +137,7 @@ func TestSiteStartupRejectsInvalidHandoffsBeforeReturningUserData(t *testing.T) 
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := startupDescription()
 			tc.change(&cfg)
-			data, err := SiteStartupUserData(t.Context(), cfg)
+			data, err := SiteStartupUserData(startupTestContext(t), cfg)
 			var coded *nvkrerr.Error
 			if data != "" || !errors.As(err, &coded) || coded.Code != nvkrerr.CodeUsage {
 				t.Fatalf("unsafe startup escaped admission: data=%d error=%v", len(data), err)
@@ -140,7 +148,7 @@ func TestSiteStartupRejectsInvalidHandoffsBeforeReturningUserData(t *testing.T) 
 
 func TestSiteStartupOnlyPreparesGuestForHostBootstrap(t *testing.T) {
 	cfg := startupDescription()
-	data, err := SiteStartupUserData(t.Context(), cfg)
+	data, err := SiteStartupUserData(startupTestContext(t), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +156,7 @@ func TestSiteStartupOnlyPreparesGuestForHostBootstrap(t *testing.T) {
 	if err := yaml.Unmarshal([]byte(data), &decoded); err != nil {
 		t.Fatal(err)
 	}
-	if len(decoded.RunCmd) != 1 || len(decoded.RunCmd[0]) != 2 || decoded.RunCmd[0][1] != "/var/lib/nvke-native/prepare.sh" {
+	if len(decoded.RunCmd) != 1 || len(decoded.RunCmd[0]) != 3 || decoded.RunCmd[0][1] != "-ec" || !strings.Contains(decoded.RunCmd[0][2], "exec /bin/bash /var/lib/nvke-native/prepare.sh") || !strings.Contains(decoded.RunCmd[0][2], "exec timeout --kill-after=5s") {
 		t.Fatal("cloud-init must only prepare and queue the site service")
 	}
 	files := map[string]startupFile{}
@@ -216,7 +224,7 @@ func TestSiteStartupOnlyPreparesGuestForHostBootstrap(t *testing.T) {
 	// Descriptions are borrowed: rendering must not sort the caller's slice.
 	first := cfg.Assets[0]
 	cfg.Assets[0], cfg.Assets[1] = cfg.Assets[1], cfg.Assets[0]
-	reordered, err := SiteStartupUserData(t.Context(), cfg)
+	reordered, err := SiteStartupUserData(startupTestContext(t), cfg)
 	if err != nil || reordered != data || cfg.Assets[1] != first {
 		t.Fatal("startup must be deterministic without mutating descriptions")
 	}
@@ -240,7 +248,7 @@ func TestSiteStartupPinsTheAuthenticatedTLSReturnChannel(t *testing.T) {
 	cfg.HandoffURL = "https://172.30.0.1:18443/site-kubeconfig"
 	cfg.HandoffToken = strings.Repeat("b", 64)
 	cfg.HandoffCertificate = certificate
-	data, err := SiteStartupUserData(t.Context(), cfg)
+	data, err := SiteStartupUserData(startupTestContext(t), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +274,7 @@ func TestSiteStartupPinsTheAuthenticatedTLSReturnChannel(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg.HandoffCertificate = wrongCertificate
-	if data, err := SiteStartupUserData(t.Context(), cfg); data != "" || err == nil {
+	if data, err := SiteStartupUserData(startupTestContext(t), cfg); data != "" || err == nil {
 		t.Fatal("startup admitted a trust anchor for a different endpoint")
 	}
 }
@@ -284,7 +292,7 @@ func TestSiteStartupUsesSelectedOVNPackageVersion(t *testing.T) {
 			if network == "upstream-ovn" {
 				cfg.OVNVersion = version
 			}
-			data, err := SiteStartupUserData(t.Context(), cfg)
+			data, err := SiteStartupUserData(startupTestContext(t), cfg)
 			if err != nil {
 				t.Fatal(err)
 			}

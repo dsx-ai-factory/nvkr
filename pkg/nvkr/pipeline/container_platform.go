@@ -35,8 +35,11 @@ func CheckContainerPlatform(ctx context.Context, runtimeBinary, image, platform 
 	default:
 		return e.New(e.CodeEngineCapability, "container platform admission requires Docker or Podman")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-	defer cancel()
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 10*time.Minute)
+		defer cancel()
+	}
 	defer func() {
 		if ctx.Err() != nil {
 			err = e.Wrap(e.CodeTimeout, ctx.Err(), "container platform admission canceled")
@@ -128,6 +131,8 @@ func checkContainerPlatform(raw []byte, image, platform string) error {
 
 // Inspection is small JSON; bound captured bytes as well as subprocess lifetime.
 func containerPlatformOutput(ctx context.Context, runtimeBinary string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 	cmd := execCmd(RunOptions{Ctx: ctx}, runtimeBinary, args...)
 	var output containerPlatformBuffer
 	cmd.Stdout, cmd.Stderr = &output, io.Discard

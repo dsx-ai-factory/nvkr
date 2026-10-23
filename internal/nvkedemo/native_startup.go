@@ -78,6 +78,8 @@ func nativeRuntimeImageRoles() []string {
 // SiteStartupUserData returns startup configuration without filesystem,
 // subprocess or network work. The caller must independently admit the image,
 // tools, capacity and owning runtime before using it to create an instance.
+// Its work deadline is carried into guest preparation; an unbounded context
+// cannot describe when detached guest commands must stop.
 func SiteStartupUserData(ctx context.Context, cfg NativeSiteStartup) (string, error) {
 	if err := requireContext(ctx); err != nil {
 		return "", nvkrerr.Wrap(nvkrerr.CodeUsage, err, "site startup context")
@@ -111,13 +113,17 @@ func SiteStartupUserData(ctx context.Context, cfg NativeSiteStartup) (string, er
 	}).Parse(hostSitePreparationScript)).Execute(&script, cfg); err != nil {
 		return "", nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "render site startup handoff")
 	}
+	preparation, err := guestWorkCommand(ctx, "exec /bin/bash /var/lib/nvke-native/prepare.sh")
+	if err != nil {
+		return "", err
+	}
 	config := startupCloudConfig{
 		WriteFiles: []startupFile{
 			{"/var/lib/nvke-native/prepare.sh", "0700", script.String()},
 			{"/etc/systemd/system/nvke-agent.service.d/10-nvkr-console.conf", "0600", "[Service]\nStandardOutput=journal+console\nStandardError=journal+console\n"},
 			{"/etc/systemd/system/spire-agent.service.d/10-nvkr-console.conf", "0600", "[Service]\nStandardOutput=journal+console\nStandardError=journal+console\n"},
 		},
-		RunCmd: [][]string{{"/bin/bash", "/var/lib/nvke-native/prepare.sh"}},
+		RunCmd: [][]string{{"/bin/bash", "-ec", preparation}},
 	}
 	config.PhoneHome.URL = "http://" + cfg.Gateway + ":7777/latest/meta-data/phone_home"
 	config.PhoneHome.Post, config.PhoneHome.Tries = "all", 10

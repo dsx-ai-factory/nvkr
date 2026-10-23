@@ -129,7 +129,11 @@ func (s *nativeSiteAttempt) capiTenantCommands(ctx context.Context, request Tena
 	// and requested conformance checks remain separate runtime requirements.
 	// This late drop-in also cannot prevent initial agent startup before runcmd;
 	// runNativeCloudInit independently checks the real status on every requested Ready node.
-	return "/bin/bash -ec " + operatorQuote(script), nil
+	preparation, err := guestWorkCommand(ctx, script)
+	if err != nil {
+		return "", err
+	}
+	return "/bin/bash -ec " + operatorQuote(preparation), nil
 }
 
 // Native ownership includes the exact submitted infrastructure manifests and

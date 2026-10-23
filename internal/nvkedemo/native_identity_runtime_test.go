@@ -25,7 +25,7 @@ func TestNativeIdentityAuthoredEnvironmentIsTheExactGuestInput(t *testing.T) {
 				cfg.Assets[i].URL = strings.Replace(cfg.Assets[i].URL, cfg.Gateway, tc.gateway, 1)
 			}
 			cfg.Gateway = tc.gateway
-			raw, err := SiteStartupUserData(t.Context(), cfg)
+			raw, err := SiteStartupUserData(startupTestContext(t), cfg)
 			if err != nil {
 				t.Fatal(err)
 			}

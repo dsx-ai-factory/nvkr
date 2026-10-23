@@ -164,6 +164,11 @@ func (s *nativeSiteAttempt) runConformance(ctx context.Context, runner Runner, t
 		Busybox:          conformance.ImageSelector{Output: "busybox-image-arm64", Platform: "linux/arm64"},
 		Targets:          []conformance.DeploymentTarget{{Output: ovnOutput, Namespace: "ovn-kubernetes", LabelSelector: "app=ovnkube-node", Container: "ovnkube-controller", RequiredReplicas: nativeTenantNodeCount(true)}},
 	}, Bindings: conformance.LocalBindings{ProductImages: []conformance.LocalImageBinding{{Output: ovnOutput, Reference: alias}}}}
+	timeout, err := remainingWork(ctx)
+	if err != nil {
+		return err
+	}
+	local.Timeouts.Run, local.Timeouts.Startup = timeout.String(), timeout.String()
 	for _, tool := range []struct{ output, repository string }{{"conformance-image-arm64", "registry.k8s.io/conformance"}, {"busybox-image-arm64", "registry.k8s.io/e2e-test-images/busybox"}} {
 		observed, err := CompleteOutput(ctx, filepath.Join(cfg.repository, cfg.run), tool.output, "oci")
 		if err != nil {
@@ -195,7 +200,7 @@ func (s *nativeSiteAttempt) runConformance(ctx context.Context, runner Runner, t
 		return err
 	}
 	invocation := nativeConformanceInvocation(runner, cfg.repository, scratch)
-	raw, runErr := invocation.Capture(ctx, []string{cfg.nvkr, "validate", "--config", profilePath, "--workspace", reports}, "tenant-conformance", 4*time.Hour+15*time.Minute)
+	raw, runErr := invocation.Capture(ctx, []string{cfg.nvkr, "validate", "--config", profilePath, "--workspace", reports}, "tenant-conformance", 0)
 	// Capture stdout even when the harness exits unsuccessfully. The original
 	// reports are retained by NVKR; this wrapper does not rewrite their verdicts.
 	if len(raw) > 0 {

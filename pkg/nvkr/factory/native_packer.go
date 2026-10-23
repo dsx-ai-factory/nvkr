@@ -51,8 +51,11 @@ func PrepareNativePackerBuildWithAccelerator(ctx context.Context, definitionPath
 	if ctx == nil {
 		return NativeBuildPreparation{}, e.New(e.CodeUsage, "native Packer input preparation requires a context")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 2*time.Minute)
+		defer cancel()
+	}
 	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
 		return NativeBuildPreparation{}, e.New(e.CodeEngineCapability, "native Packer input preparation currently requires Mac ARM64")
 	}
@@ -131,8 +134,11 @@ func PrepareNativePacker(ctx context.Context, manifest, out string) (result Nati
 	if ctx == nil {
 		return result, e.New(e.CodeUsage, "native Packer preparation requires a context")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 2*time.Minute)
+		defer cancel()
+	}
 	if err := ctx.Err(); err != nil {
 		return result, e.Wrap(e.CodeTimeout, err, "preparing native Packer dependencies")
 	}

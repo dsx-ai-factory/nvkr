@@ -28,6 +28,8 @@ type retainedLaunch struct {
 	Version    int    `json:"version"`
 	Config     Config `json:"config"`
 	CachedSudo bool   `json:"cachedSudo"`
+	// Private scheduling data, not ownership or a persisted execution receipt.
+	WorkDeadline time.Time `json:"workDeadline,omitempty"`
 }
 
 func readRetainedJSON[T any](ctx context.Context, path string) (T, error) {
@@ -98,7 +100,15 @@ func ServeRetained(ctx context.Context, session string) error {
 
 func serveRetained(ctx context.Context, root string, launch retainedLaunch, work func(context.Context, Config) error) error {
 	lifetime := context.WithoutCancel(ctx)
-	operation, stopWork := context.WithTimeout(lifetime, 8*time.Hour)
+	deadline := launch.WorkDeadline
+	if deadline.IsZero() {
+		var bounded bool
+		deadline, bounded = ctx.Deadline()
+		if !bounded {
+			deadline = time.Now().Add(8 * time.Hour) // Legacy launch records only.
+		}
+	}
+	operation, stopWork := context.WithDeadline(lifetime, deadline)
 	defer stopWork()
 	owner, err := newRetainedRuntime(lifetime, stopWork)
 	if err != nil {

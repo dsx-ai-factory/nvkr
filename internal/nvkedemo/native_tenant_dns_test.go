@@ -39,7 +39,9 @@ func nativeTenantDNSCases(t *testing.T, count int) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			selected.session.Runner.Env = append(selected.session.Runner.Env, "CLOUDINIT_TOOL="+executable, "NVKR_TEST_CLOUD_INIT_TOOL=1")
+			// Fixtures finish synchronously; the race runtime's default exit
+			// sleep must not consume the selected DNS/readiness test budget.
+			selected.session.Runner.Env = append(selected.session.Runner.Env, "CLOUDINIT_TOOL="+executable, "NVKR_TEST_CLOUD_INIT_TOOL=1", "GORACE=atexit_sleep_ms=0")
 			attempt := nativeCAPITenantFixture(t, GuestCIDR, "ovn")
 			workloadPods, err := json.Marshal(map[string]any{"items": []any{map[string]any{"status": map[string]any{"containerStatuses": []any{map[string]string{"imageID": attempt.assets.Images["workload"].Reference}}}}}})
 			if err != nil {

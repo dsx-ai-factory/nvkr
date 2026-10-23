@@ -91,7 +91,9 @@ func TestNativeSessionReusesSiteAndRetainsFailedSuiteUntilExplicitDeletion(t *te
 			attempt, runner, root := nativeSessionFixture(t, conformance)
 			var escapedSite *NativeSite
 			var escapedTenant *NativeTenant
-			err := withNativeSiteScope(t.Context(), &attempt, runner, runner.Work, runner.Work, func(ctx context.Context, site *NativeSite) error {
+			ctx, cancel := context.WithTimeout(t.Context(), time.Hour)
+			defer cancel()
+			err := withNativeSiteScope(ctx, &attempt, runner, runner.Work, runner.Work, func(ctx context.Context, site *NativeSite) error {
 				escapedSite = site
 				siteConfig, err := site.Kubeconfig(ctx)
 				if err != nil || siteConfig != filepath.Join(runner.Work, "site.kubeconfig") {

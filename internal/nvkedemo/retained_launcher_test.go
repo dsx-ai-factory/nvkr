@@ -56,6 +56,9 @@ func TestRetainedNativeLauncherChild(t *testing.T) {
 	}
 	if launch.Config.Network == "production-owner" {
 		if err := serveRetained(t.Context(), root, launch, func(ctx context.Context, cfg Config) error {
+			if deadline, bounded := ctx.Deadline(); !bounded || !deadline.Equal(launch.WorkDeadline) {
+				return errors.New("retained owner reset the caller work deadline")
+			}
 			return retainedLauncherProductionWork(ctx, root, cfg)
 		}); err != nil {
 			t.Fatal("production retained worker/control did not join", err)

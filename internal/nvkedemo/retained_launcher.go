@@ -65,7 +65,11 @@ func launchRetainedNativeWithCommand(ctx context.Context, cfg Config, commandFor
 	if err != nil {
 		return nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "allocate private retained owner selection")
 	}
-	if err := privateJSON(filepath.Join(root, retainedRequestFile), retainedLaunch{Version: 1, Config: cfg, CachedSudo: cached}); err != nil {
+	deadline, bounded := ctx.Deadline()
+	if !bounded {
+		deadline = time.Now().Add(8 * time.Hour)
+	}
+	if err := privateJSON(filepath.Join(root, retainedRequestFile), retainedLaunch{Version: 1, Config: cfg, CachedSudo: cached, WorkDeadline: deadline}); err != nil {
 		return nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "retain private native launch intent")
 	}
 	started := false
