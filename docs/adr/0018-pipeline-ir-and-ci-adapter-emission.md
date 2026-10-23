@@ -564,6 +564,13 @@ Isolation and the fixed environment/mount contract are identical across all engi
   archive transport before ordinary host collection. Preparation, transfer and failure paths own bounded cleanup.
   Preparation and export inherit the caller's work context, including its deadline and cancellation;
   they impose no additional fixed duration based on assumptions about host speed or runtime load.
+  Native compilation, source/input preparation and ordinary payload acquisition/transport likewise
+  preserve a supplied caller deadline; their default limits apply only when the caller supplies none.
+  The downstream owner passes its absolute RFC3339 deadline to child CLIs as private scheduling
+  data; the CLI bounds its context before command work and cancels it on return. This neither
+  changes authored inputs/build identity nor grants execution or persistent ownership authority.
+  Small control requests remain independently bounded. This does not change authored producer execution
+  limits, hosted provider policy, identity proof validity or cleanup/termination grace.
   Failure diagnostics, child-process joining and owned teardown retain independent finite cleanup bounds.
   During exit observation, a joined observer periodically reads the fixed helper's last phase report
   (archive verification, extraction, ownership, or ready). Reports are diagnostic only: silence,

@@ -4,8 +4,10 @@
 package nvkedemo
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -15,6 +17,18 @@ import (
 // These are transport descriptions selected from verified ordinary outputs, not
 // substitutes for the lifecycle owner's later exact Run and payload capture.
 type nativeImagePreload struct{ location, digest, file, reference string }
+
+// Guest preparation outlives its renderer. Carry the caller's absolute deadline
+// into the guest, rather than resetting a duration when cloud-init gets to it.
+// timeout owns the preparation process group and escalates termination after a
+// bounded grace; it does not delete the VM or substitute for host-side readiness.
+func guestWorkCommand(ctx context.Context, script string) (string, error) {
+	if _, err := remainingWork(ctx); err != nil {
+		return "", err
+	}
+	deadline, _ := ctx.Deadline()
+	return fmt.Sprintf("set -eu; remaining=$((%d - $(date +%%s))); test \"$remaining\" -gt 0; exec timeout --kill-after=5s \"${remaining}s\" /bin/bash -ec %s", deadline.Unix(), operatorQuote(script)), nil
+}
 
 // Use the verified manifest as the import subject while retaining the repository
 // spelling used in the archive. In particular, containerd uses docker.io aliases.
@@ -49,7 +63,8 @@ func nativeImageImportScript(file, reference string) (string, error) {
 	// label after creating the config-ID alias used by image-volume mounts;
 	// pre-setting that label suppresses alias creation in containerd.
 	repository := strings.TrimSuffix(reference, "@"+ref.DigestStr())
-	return "ctr --address /run/containerd/containerd.sock --namespace k8s.io --timeout 120s images import --local --digests --base-name " + operatorQuote(repository) + " --platform linux/arm64 " + operatorQuote(file) +
+	// The enclosing guest preparation command enforces the caller deadline.
+	return "ctr --address /run/containerd/containerd.sock --namespace k8s.io --timeout 0s images import --local --digests --base-name " + operatorQuote(repository) + " --platform linux/arm64 " + operatorQuote(file) +
 		"; crictl --runtime-endpoint unix:///run/containerd/containerd.sock --image-endpoint unix:///run/containerd/containerd.sock --timeout 10s inspecti --quiet " + operatorQuote(reference) + " >/dev/null", nil
 }
 
@@ -61,7 +76,7 @@ func nativeImagePreloadScript(image nativeImagePreload) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return "curl --fail --silent --show-error --connect-timeout 10 --max-time 120 " + operatorQuote(image.location) + " -o " + operatorQuote(image.file) +
+	return "curl --fail --silent --show-error --connect-timeout 10 " + operatorQuote(image.location) + " -o " + operatorQuote(image.file) +
 		"; printf '%s  %s\n' " + operatorQuote(strings.TrimPrefix(image.digest, "sha256:")) + " " + operatorQuote(image.file) + " | sha256sum -c -; " + imported, nil
 }
 

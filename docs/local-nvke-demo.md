@@ -492,13 +492,24 @@ activity; none establishes guest health, artifact completion or an ETA.
 | Ceiling | Scope |
 | --- | --- |
 | Eight hours; 12 with conformance | `e2e` work context |
-| Six hours | Artifact build, including preparation and packaging |
+| Inherits the caller deadline; six-hour fallback for an unbounded Go caller | Artifact build, including preparation and packaging |
 | 60 minutes in the native NVIDIA producer | Packer SSH wait, inside the build deadline |
 | 60 minutes by default; `--timeout 300..7200` seconds | Tenant provisioning |
 | One hour, including a 45-minute disappearance wait | Independent tenant cleanup |
 | Eight minutes | Subsequent owned host-runtime cleanup |
 
 The earliest active deadline wins; `--timeout` changes tenant provisioning only.
+Payload downloads, image imports, bundle verification/extraction, compilation,
+site startup, DNS rollout, smoke completion and the conformance wrapper inherit
+the operation deadline instead of imposing shorter fixed workload cutoffs. The
+child NVKR CLI receives the same absolute deadline, including through bootstrap
+shell invocations, without changing the selected Definition or Environment. The
+retained owner carries that same deadline across the process boundary. Guest
+preparation receives the absolute deadline and terminates its process group when
+it expires. Go callers rendering guest startup must supply a deadline. Connection
+and API probes, identity proof validity, child joining and cleanup retain their
+own finite limits. Authored producer/Packer settings and pinned upstream scripts
+can still impose their separately declared limits; this does not alter NVKE.
 Silence alone is not grounds to restart. Build failures name their retained private
 log; raw public build output is capped at 8 MiB. Private installer, guest console,
 panic and provider logs must stay off the shared screen.

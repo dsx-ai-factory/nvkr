@@ -32,8 +32,11 @@ func PrepareNativeGo(ctx context.Context, definitionPath, environmentPath, goRoo
 	if ctx == nil {
 		return NativeBuildPreparation{}, e.New(e.CodeUsage, "native Go preparation requires a context")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 2*time.Minute)
+		defer cancel()
+	}
 	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
 		return NativeBuildPreparation{}, e.New(e.CodeEngineCapability, "native demo Go preparation currently requires Mac ARM64")
 	}

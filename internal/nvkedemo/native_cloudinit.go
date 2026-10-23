@@ -263,11 +263,9 @@ func nativeCloudInitProbe(ctx context.Context, work, namespace, name, node, imag
 	if err := json.Unmarshal(requested, &expected); err != nil || !reflect.DeepEqual(selected, expected) {
 		return errors.New("created cloud-init Pod differs from authored diagnostic")
 	}
-	deadline, cancel := context.WithTimeout(ctx, 4*time.Minute)
-	defer cancel()
 	var observed nativeCloudInitPod
 	for {
-		raw, err := get(deadline, name+"-observe", "get", "pod", name, "-n", namespace, "-o", "json")
+		raw, err := get(ctx, name+"-observe", "get", "pod", name, "-n", namespace, "-o", "json")
 		if err != nil {
 			return err
 		}
@@ -277,7 +275,7 @@ func nativeCloudInitProbe(ctx context.Context, work, namespace, name, node, imag
 		if observed.Status.Phase == "Succeeded" || observed.Status.Phase == "Failed" {
 			break
 		}
-		if err := pause(deadline, time.Second); err != nil {
+		if err := pause(ctx, time.Second); err != nil {
 			return err
 		}
 	}

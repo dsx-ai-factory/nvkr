@@ -100,7 +100,9 @@ func startDiskServiceWithNightlyAlias(ctx context.Context, path, address, alias 
 		service.requests.Add(1)
 		http.ServeContent(writer, request, name, info.ModTime(), io.NewSectionReader(file, 0, info.Size()))
 	})
-	service.server = &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 5 * time.Second, WriteTimeout: 180 * time.Second, BaseContext: func(net.Listener) context.Context { return serveContext }}
+	// Payload transfers live for the owned service context. A whole-body write
+	// deadline would reject a valid large disk on a slower host or connection.
+	service.server = &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 5 * time.Second, BaseContext: func(net.Listener) context.Context { return serveContext }}
 	service.server.SetKeepAlivesEnabled(false)
 	go func() { service.done <- service.server.Serve(listener) }()
 	return service, nil
@@ -147,9 +149,7 @@ func verifyHTTPDisk(ctx context.Context, url string, image lifecycle.Artifact) e
 	if image.Disk == nil || image.Disk.Size <= 0 {
 		return errors.New("missing exact disk description")
 	}
-	budget, cancel := context.WithTimeout(ctx, 180*time.Second)
-	defer cancel()
-	request, err := http.NewRequestWithContext(budget, http.MethodGet, url, nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}

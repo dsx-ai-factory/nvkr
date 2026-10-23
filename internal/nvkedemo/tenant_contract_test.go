@@ -31,7 +31,7 @@ case "$FAIL:$*" in
 esac
 `), 0o700)
 			selected := tenant{session: ManagementSession{Work: work, Tools: work, Runner: Runner{Work: work, Env: []string{"PATH=/usr/bin:/bin", "CALLS=" + calls, "FAIL=" + name}}}}
-			ctx, cancel := context.WithCancel(t.Context())
+			ctx, cancel := context.WithTimeout(t.Context(), time.Hour)
 			defer cancel()
 			if name == "canceled" {
 				cancel()
@@ -75,12 +75,21 @@ esac
 			if readErr != nil {
 				t.Fatal(readErr)
 			}
-			want := "--kubeconfig owned-tenant-kubeconfig -n kube-system rollout status deployment/coredns --timeout=240s\n"
+			want := []string{"deployment/coredns"}
 			if name == "ready" || name == "node-local failure" {
-				want += "--kubeconfig owned-tenant-kubeconfig -n kube-system rollout status daemonset/node-local-dns --timeout=240s\n"
+				want = append(want, "daemonset/node-local-dns")
 			}
-			if string(raw) != want {
+			lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+			if len(lines) != len(want) {
 				t.Fatalf("unexpected readiness commands: %q", raw)
+			}
+			for i, resource := range want {
+				prefix := "--kubeconfig owned-tenant-kubeconfig -n kube-system rollout status " + resource + " --timeout="
+				value, ok := strings.CutPrefix(lines[i], prefix)
+				budget, err := time.ParseDuration(value)
+				if !ok || err != nil || budget <= 0 || budget > time.Hour || name != "deadline" && budget < 59*time.Minute {
+					t.Fatalf("rollout did not inherit remaining work budget: %q", lines[i])
+				}
 			}
 		})
 	}

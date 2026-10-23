@@ -41,7 +41,7 @@ func TestNativeKubernetesUsesSelectedNVKESiteDefault(t *testing.T) {
 						attempt.assets.installerSelection.siteSpecDigest = plainSHA([]byte(tc.raw))
 					}
 				}
-				ctx, cancel := context.WithCancel(t.Context())
+				ctx, cancel := context.WithCancel(startupTestContext(t))
 				defer cancel()
 				if tc.canceled {
 					cancel()

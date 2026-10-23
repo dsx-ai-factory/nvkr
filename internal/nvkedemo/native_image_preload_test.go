@@ -6,11 +6,15 @@ package nvkedemo
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
@@ -20,6 +24,48 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/static"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 )
+
+func TestGuestPreparationCarriesAndEnforcesCallerDeadline(t *testing.T) {
+	tool, err := exec.LookPath("timeout")
+	if err != nil {
+		tool, err = exec.LookPath("gtimeout")
+	}
+	if err != nil {
+		t.Fatal("guest deadline contract requires coreutils timeout")
+	}
+	tools := privateTestDir(t)
+	if err := os.Symlink(tool, filepath.Join(tools, "timeout")); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, script string
+		exit         int
+	}{
+		{"completion", "printf completed", 0},
+		{"guest deadline", "printf started; exec sleep 60", 124},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			work, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+			defer cancel()
+			command, err := guestWorkCommand(work, tc.script)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// The host allows more time, so only the generated guest command
+			// can enforce the original deadline in this real subprocess test.
+			host, stop := context.WithTimeout(t.Context(), 10*time.Second)
+			defer stop()
+			runner := Runner{Env: []string{"PATH=" + tools + ":" + os.Getenv("PATH")}}
+			raw, err := runner.Capture(host, []string{"/bin/bash", "-ec", command}, "guest-budget", 0)
+			if tc.exit == 0 && (err != nil || string(raw) != "completed") {
+				t.Fatalf("guest completion: %s %v", raw, err)
+			}
+			if tc.exit != 0 && (CommandExitCode(err) != tc.exit || errors.Is(err, ErrUnjoined) || string(raw) != "started") {
+				t.Fatalf("guest deadline did not stop and join preparation: %s %v", raw, err)
+			}
+		})
+	}
+}
 
 func TestNativeImageDigestReferencesRetainSelectedManifest(t *testing.T) {
 	digest := "sha256:" + strings.Repeat("a", 64)

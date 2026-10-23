@@ -84,7 +84,7 @@ func TestProgressRunnerObservedBoundaries(t *testing.T) {
 			case "invalid phase":
 				phase = "../secret-progress-sentinel"
 			case "invalid timeout":
-				timeout = 0
+				timeout = -time.Second
 			case "storage failure":
 				if err := os.Chmod(work, 0o755); err != nil {
 					t.Fatal(err)

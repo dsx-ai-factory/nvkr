@@ -141,7 +141,7 @@ func runNativeSite(ctx context.Context, cfg NativeConfig, use func(context.Conte
 	attempt := &nativeSiteAttempt{use: use, assets: assets, cleanup: cfg.Cleanup, walkthrough: cfg.Walkthrough, network: mode, tenantTimeout: cfg.TenantTimeout, conformance: cfg.conformance, resources: resources, capacity: capacity}
 	result = RunNativeGuest(ctx, NativeGuestConfig{
 		Image: cfg.Image, Tools: assets.HostTools, Out: filepath.Join(out, "runtime"),
-		Accelerator: cfg.Accelerator, Timeout: 30 * time.Minute, Progress: cfg.Progress, site: attempt, DemoExecutable: cfg.DemoExecutable,
+		Accelerator: cfg.Accelerator, Progress: cfg.Progress, site: attempt, DemoExecutable: cfg.DemoExecutable,
 	})
 	return result
 }
@@ -336,9 +336,7 @@ func (s *nativeSiteAttempt) setup(ctx context.Context, runner Runner, row native
 	}
 	stage := beginProgress(runner.Progress, "site-05-install-site-controller", PhaseStarted, PhaseFinished, PhaseFailed)
 	prepared := beginProgress(runner.Progress, "native-site-preparation", PhaseStarted, PhaseFinished, PhaseFailed)
-	budget, cancel := context.WithTimeout(ctx, 2*time.Hour)
-	err = waitNativeSiteHandoff(budget, s.handoff, server)
-	cancel()
+	err = waitNativeSiteHandoff(ctx, s.handoff, server)
 	prepared.finish(err)
 	if err == nil {
 		err = s.bootstrapOnHost(ctx, runner, ip, tools, out)
@@ -558,7 +556,13 @@ func (s *nativeSiteAttempt) namedTenantRequest(ctx context.Context, name string)
 			return TenantRequest{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "tenant Kubernetes range %s overlaps guest subnet %s", network, s.bridge.prefix)
 		}
 	}
-	return s.capiTenantRequest(ctx, request)
+	timeout := s.tenantTimeout
+	if timeout == 0 {
+		timeout = 45 * time.Minute
+	}
+	preparation, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return s.capiTenantRequest(preparation, request)
 }
 
 func (s *nativeSiteAttempt) runTenantRequest(ctx context.Context, runner Runner, cli, tools, out, siteConfig string, request TenantRequest) error {

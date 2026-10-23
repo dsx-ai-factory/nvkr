@@ -70,7 +70,7 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 	}
 	ctx, failAddresses := context.WithCancelCause(ctx)
 	defer failAddresses(nil)
-	if cfg.Timeout < time.Minute || cfg.Timeout > 30*time.Minute {
+	if cfg.site == nil && (cfg.Timeout < time.Minute || cfg.Timeout > 30*time.Minute) {
 		return errors.New("guest timeout must be 1..30 minutes")
 	}
 	image, err := filepath.Abs(cfg.Image)
@@ -458,7 +458,11 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 		return errors.New("native create response lacks exact instance identity")
 	}
 	instanceID = instance.ID
-	budget, stop := context.WithTimeout(ctx, cfg.Timeout)
+	budget, stop := context.WithCancel(ctx)
+	if cfg.Timeout > 0 {
+		stop()
+		budget, stop = context.WithTimeout(ctx, cfg.Timeout)
+	}
 	defer stop()
 	for {
 		raw, err := nativeReadinessObservation(budget, cfg.Progress, func(ctx context.Context) ([]byte, error) {

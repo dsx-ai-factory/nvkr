@@ -31,7 +31,7 @@ source "$work/return-status.sh"
 install -d -m 0700 "$work/bin" "$work/downloads"
 cd "$work"
 {{range .Assets}}
-curl --fail --silent --show-error --connect-timeout 10 --max-time 900 --proto '=http' \
+curl --fail --silent --show-error --connect-timeout 10 --proto '=http' \
   {{quote .URL}} -o {{quote (printf "downloads/%s" .Name)}}
 printf '%s  %s\n' {{quote (sha .Digest)}} {{quote (printf "downloads/%s" .Name)}} | sha256sum -c -
 {{end}}
@@ -151,7 +151,7 @@ func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, 
 		return err
 	}
 	for _, role := range []string{"controller", "provisioned-provider"} {
-		if err := runner.Run(ctx, []string{"nerdctl", "load", "--input", s.assets.Images[role].File}, "host-import-"+role, 3*time.Minute); err != nil {
+		if err := runner.Run(ctx, []string{"nerdctl", "load", "--input", s.assets.Images[role].File}, "host-import-"+role, 0); err != nil {
 			return err
 		}
 	}
@@ -170,10 +170,14 @@ func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, 
 		}
 	}
 	s.bootstrapName = cluster
-	runner.Env = SetEnv(runner.Env, map[string]string{"NVKECTL_BOOTSTRAP_CLUSTER_NAME": cluster, "NVKECTL_BOOTSTRAP_WAIT_READY": "10m"})
+	timeout, err := remainingWork(ctx)
+	if err != nil {
+		return err
+	}
+	runner.Env = SetEnv(runner.Env, map[string]string{"NVKECTL_BOOTSTRAP_CLUSTER_NAME": cluster, "NVKECTL_BOOTSTRAP_WAIT_READY": timeout.String()})
 	s.bootstrapRunner = &runner
 	if err := runner.Run(ctx, []string{cli, "bootstrap", "site", "--sitespec", specPath, "--nvke-controller-image", s.assets.Images["controller"].Reference, "--provisioned-provider-image", s.assets.Images["provisioned-provider"].Reference,
-		"--kubeconfig-out", filepath.Join(out, "site.kubeconfig"), "--encryption-key-out", filepath.Join(out, "site-etcd-encryption-key.json"), "--diagnostics-dir", filepath.Join(out, "bootstrap-diagnostics"), "--keep-bootstrap-cluster", "--timeout", "45m"}, "host-nvke-bootstrap", 60*time.Minute); err != nil {
+		"--kubeconfig-out", filepath.Join(out, "site.kubeconfig"), "--encryption-key-out", filepath.Join(out, "site-etcd-encryption-key.json"), "--diagnostics-dir", filepath.Join(out, "bootstrap-diagnostics"), "--keep-bootstrap-cluster", "--timeout", timeout.String()}, "host-nvke-bootstrap", 0); err != nil {
 		return err
 	}
 	if err := s.deployFromHost(ctx, runner, cli, tools, out, specPath); err != nil {
@@ -195,7 +199,13 @@ func (s *nativeSiteAttempt) deployFromHost(ctx context.Context, runner Runner, c
 	if err != nil {
 		return err
 	}
-	if err := runner.Run(ctx, nativeCAPIInitArgs(tools, filepath.Join(out, "site.kubeconfig"), version), "host-site-capi", 5*time.Minute); err != nil {
+	timeout, err := remainingWork(ctx)
+	if err != nil {
+		return err
+	}
+	// The selected clusterctl's init --help declares integer seconds.
+	initArgs := append(nativeCAPIInitArgs(tools, filepath.Join(out, "site.kubeconfig"), version), fmt.Sprintf("--wait-provider-timeout=%d", (timeout-1)/time.Second+1))
+	if err := runner.Run(ctx, initArgs, "host-site-capi", 0); err != nil {
 		return err
 	}
 	storage := `apiVersion: storage.k8s.io/v1
@@ -253,12 +263,12 @@ volumeBindingMode: Immediate
 		}
 		args = append(args, "--values-for", item+"="+path)
 	}
-	if err := runner.Run(ctx, args, "host-nvke-deploy", 30*time.Minute); err != nil {
+	if err := runner.Run(ctx, args, "host-nvke-deploy", 0); err != nil {
 		return err
 	}
-	// The source script allows 180 seconds for each of four controller rollouts.
-	// Bound the entire script while allowing those individual source deadlines.
-	return runner.Run(ctx, []string{"bash", filepath.Join(s.assets.Installer, "controller", "hack", "apply-capi-spiffe-exec-auth.sh")}, "host-site-spiffe-exec", 15*time.Minute)
+	// The pinned upstream script retains its own rollout policy. The wrapper
+	// must not add a second, shorter deadline to the selected work context.
+	return runner.Run(ctx, []string{"bash", filepath.Join(s.assets.Installer, "controller", "hack", "apply-capi-spiffe-exec-auth.sh")}, "host-site-spiffe-exec", 0)
 }
 
 // nativeCAPIProviderVersion rechecks the extracted metadata against the selected

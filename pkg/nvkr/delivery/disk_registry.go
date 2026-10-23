@@ -28,8 +28,11 @@ func PushDiskArtifact(ctx context.Context, artifact *DiskArtifact, repository, s
 	if err := deliveryContext(ctx); err != nil {
 		return "", err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
-	defer cancel()
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 30*time.Minute)
+		defer cancel()
+	}
 	if err := options.Validate(); err != nil {
 		return "", err
 	}
@@ -86,8 +89,11 @@ func PullDiskArtifact(ctx context.Context, reference, out, platform string, maxP
 	if err := deliveryContext(ctx); err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
-	defer cancel()
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 30*time.Minute)
+		defer cancel()
+	}
 	if err := options.Validate(); err != nil {
 		return err
 	}

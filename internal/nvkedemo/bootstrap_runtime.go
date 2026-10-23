@@ -177,15 +177,17 @@ func prepareHostBootstrap(ctx context.Context, runner Runner, platform, shared, 
 	backend.runner = backend.bind(runner)
 	args := []string{limactl, "start", "--foreground", "--tty=false", "--name=bootstrap"}
 	args = append(args, platformArgs...)
+	timeout, err := remainingWork(ctx)
+	if err != nil {
+		return backend, err
+	}
 	args = append(args,
-		"--cpus=4", "--memory=6", "--disk=20", "--containerd=user", "--timeout=8m", "--mount-only="+mounts,
+		"--cpus=4", "--memory=6", "--disk=20", "--containerd=user", "--timeout="+timeout.String(), "--mount-only="+mounts,
 		"--set", fmt.Sprintf(`.portForwards = [{"guestPort":30081,"hostPort":30081,"hostIP":%q,"proto":"tcp"}]`, gateway), "template:default")
 	backend.process, err = backend.runner.Start(ctx, args, "bootstrap-lima-runtime")
 	if err != nil {
 		return backend, err
 	}
-	budget, cancel := context.WithTimeout(ctx, 8*time.Minute)
-	defer cancel()
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	probe := backend.runner
@@ -196,7 +198,7 @@ func prepareHostBootstrap(ctx context.Context, runner Runner, platform, shared, 
 		}
 		backend.sequence++
 		phase := fmt.Sprintf("bootstrap-lima-ready-%03d", backend.sequence)
-		probeErr := backend.checkReady(budget, probe, phase)
+		probeErr := backend.checkReady(ctx, probe, phase)
 		if probeErr == nil {
 			if exited, err := backend.process.Exited(); exited {
 				return backend, errors.Join(errors.New("temporary Lima backend exited during readiness"), err)
@@ -207,8 +209,8 @@ func prepareHostBootstrap(ctx context.Context, runner Runner, platform, shared, 
 			return backend, probeErr
 		}
 		select {
-		case <-budget.Done():
-			return backend, budget.Err()
+		case <-ctx.Done():
+			return backend, ctx.Err()
 		case <-tick.C:
 		}
 	}

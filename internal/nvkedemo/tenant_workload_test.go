@@ -38,7 +38,7 @@ func TestTenantWorkloadRequiresExecutionDNSAndExactImage(t *testing.T) {
 			var phases []string
 			capture := func(_ context.Context, args []string, phase string, budget time.Duration) ([]byte, error) {
 				phases = append(phases, phase)
-				if len(args) < 4 || args[0] != "kubectl" || args[1] != "--kubeconfig" || args[2] != "tenant.config" || budget <= 0 {
+				if len(args) < 4 || args[0] != "kubectl" || args[1] != "--kubeconfig" || args[2] != "tenant.config" || budget < 0 || budget == 0 && phase != "workload-complete" {
 					t.Fatalf("invalid command admission: %v %v", args, budget)
 				}
 				if phase == tc.fail {
@@ -56,7 +56,9 @@ func TestTenantWorkloadRequiresExecutionDNSAndExactImage(t *testing.T) {
 				}
 				return nil, nil
 			}
-			_, err := runTenantWorkload(t.Context(), t.TempDir(), "tenant.config", "kubectl", selected, capture)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Hour)
+			defer cancel()
+			_, err := runTenantWorkload(ctx, t.TempDir(), "tenant.config", "kubectl", selected, capture)
 			if (err != nil) != tc.wantError {
 				t.Fatalf("acceptance error=%v; wantError=%v", err, tc.wantError)
 			}

@@ -32,7 +32,11 @@ func runTenantWorkload(ctx context.Context, work, kubeconfig, kubectl, image str
 	if _, err := capture(ctx, command("apply", "-f", job), "workload-apply", 30*time.Second); err != nil {
 		return nil, err
 	}
-	if _, err := capture(ctx, command("wait", "job/nvkr-smoke", "--for=condition=Complete", "--timeout=210s"), "workload-complete", 240*time.Second); err != nil {
+	timeout, err := remainingWork(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := capture(ctx, command("wait", "job/nvkr-smoke", "--for=condition=Complete", "--timeout="+timeout.String()), "workload-complete", 0); err != nil {
 		return nil, err
 	}
 	raw, err := capture(ctx, command("logs", "job/nvkr-smoke"), "workload-log", 30*time.Second)

@@ -1959,6 +1959,17 @@ layout, bounded/sanitized snapshots, concurrent reports, cancellation joining an
 terminal failures. These are controlled presentation/race contracts, not a completed
 fresh E2E or live interruption acceptance for this candidate.
 
+The downstream demo propagates its work deadline through payload transfer,
+bundle verification/extraction, host compilation, site startup, DNS rollout,
+workload completion and the conformance wrapper. The retained launcher records
+that deadline as private scheduling data and its owner preserves it after
+detachment; it grants no persistent execution or ownership authority. Generated
+guest preparation enforces the absolute deadline through a process-group timeout
+with bounded termination grace. Context/transport and real-subprocess tests cover
+deadline propagation, cancellation and joining; these do not establish a fresh
+E2E or conformance result. Connection/probe bounds, identity validity, independent
+cleanup and authored/upstream producer policies remain separate.
+
 The interactive Linux CLI authenticates before opening the
 dashboard or starting work, then refresh its existing sudo session using bounded
 non-interactive checks while that workflow runs. Deployment and independently

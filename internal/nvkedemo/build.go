@@ -242,8 +242,11 @@ func localBuildEnvironment() ([]string, error) {
 }
 
 func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg BuildConfig) (result error) {
-	ctx, cancel := context.WithTimeout(ctx, 6*time.Hour)
-	defer cancel()
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 6*time.Hour)
+		defer cancel()
+	}
 	boundary := beginProgress(runner.Progress, "artifacts", LaneStarted, LaneFinished, LaneFailed)
 	defer func() { boundary.finish(result) }()
 	if runner.Progress != nil {
@@ -293,7 +296,7 @@ func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg 
 	if !filepath.IsAbs(args[0]) {
 		args[0] = filepath.Join(cfg.Repository, args[0])
 	}
-	return runner.Run(ctx, args, "build-all", 6*time.Hour)
+	return runner.Run(ctx, args, "build-all", 0)
 }
 
 func buildSelectionFlags(cfg BuildConfig) ([]string, error) {
@@ -441,5 +444,5 @@ func prepareLocalArtifacts(ctx context.Context, runner Runner, script string, cf
 		return err
 	}
 	args := append([]string{"bash", script, "--prepare-only"}, flags...)
-	return runner.Run(ctx, append(args, cfg.AttemptPrefix, strconv.Itoa(cfg.Jobs), "all"), "build-prepare", 6*time.Hour)
+	return runner.Run(ctx, append(args, cfg.AttemptPrefix, strconv.Itoa(cfg.Jobs), "all"), "build-prepare", 0)
 }
