@@ -193,7 +193,7 @@ if [[ "${build_accelerator}" == tcg ]]; then environment="inputs/environments/lo
 # This is one narrow developer bootstrap, not an Environment validator. Admit
 # its exact reviewed bootstrap image/platform before creating storage or running
 # caller-edited inputs. The compiled runner owns complete document validation.
-utility='golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c'
+utility='golang@sha256:f20d83a83e18dbd2a4714b8ffd4b30b287b6243962dd75608e86abcc63ba4efc'
 if ! jq -e --arg image "${utility}" --arg runtime "${runtime}" '
   .utilityContainer == $image and .utilityPlatform == "linux/arm64" and
   .runtime.runtime == $runtime

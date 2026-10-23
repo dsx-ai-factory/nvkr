@@ -37,6 +37,7 @@ The first example ends with a local artifact. CI, signing, and Releases come lat
 Use an existing NVKR checkout, or clone one:
 
 ```sh
+umask 022
 git clone https://github.com/dsx-ai-factory/nvkr.git
 cd nvkr
 ```

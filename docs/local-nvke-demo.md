@@ -143,7 +143,7 @@ prerequisite package selection is:
 ```sh
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends \
-  git jq coreutils python3 openssh-client bash curl openssl \
+  git make gcc libc6-dev jq coreutils python3 openssh-client bash curl openssl \
   libvirt-daemon-system libvirt-clients qemu-system-arm qemu-utils \
   qemu-efi-aarch64 cloud-image-utils swtpm swtpm-tools gnutls-bin ipxe-qemu \
   dnsmasq-base iptables iproute2 libcap2-bin e2fsprogs kmod
@@ -151,8 +151,9 @@ sudo apt-get install -y --no-install-recommends \
 
 The CLI refuses conflicting resources and overlapping networks; it does not
 install those packages or delete an existing libvirt session. Linux bootstrap
-additionally requires the reviewed source-built Lima `f47461e` distribution and
-matched helpers described in [native Linux bootstrap](native-linux-bootstrap.md).
+additionally requires the source-built Lima `f47461e` distribution and matched
+helpers. Follow the [public source installation procedure](native-linux-bootstrap.md#install-from-public-source-on-ubuntu-arm64)
+once, keeping its installation directory on `PATH` in the terminal used below.
 That candidate's binary vulnerability findings and bounded pilot scope remain
 visible there; a backend-only pilot is not full native runtime acceptance.
 
@@ -260,13 +261,32 @@ need their endpoints.
 
 ## 4. Build and run the demo
 
-Choose a fresh attempt and output directory for each invocation. On Mac, use
-explicit TCG for the selected 64K image; on Linux omit `--accelerator tcg` to use KVM:
+Choose a fresh attempt and output directory for each invocation. With the host
+prerequisites installed and on `PATH`, run these commands from the NVKR checkout
+on Ubuntu ARM64. This builds fresh artifact and tool Runs, creates the site and
+three tenant VMs, checks workload/DNS, runs conformance and retains the cluster:
+
+```sh
+mkdir -p .nvkr
+bin/nvke-demo e2e --repo "$PWD" \
+  --attempt demo-01 --out "$PWD/.nvkr/demo-01" \
+  --jobs 8 --conformance
+```
+
+NVIDIA OVN and Linux KVM are defaults. These commands select the catalogs'
+canonical source URLs and fresh Runs, without local source overrides or existing
+artifact paths. Before another
+deployment on the same host, use the exact `cleanup --session` command printed
+by the previous retained demo; an existing demo network is not adopted or deleted
+by a new invocation. Add `--walkthrough` for read-only cluster observations or
+`--cleanup` to request deletion after acceptance.
+
+On Mac, use explicit TCG for the selected 64K image:
 
 ```sh
 bin/nvke-demo e2e --repo "$PWD" \
   --attempt native-demo-01 --out "$PWD/.nvkr/native-demo-01" \
-  --jobs 2 --network ovn --accelerator tcg --walkthrough --cleanup
+  --jobs 2 --accelerator tcg --walkthrough
 ```
 
 Add `--nvke-clone /absolute/path/to/nvke` when supplying local source objects.
