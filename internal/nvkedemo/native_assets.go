@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
@@ -436,8 +437,33 @@ func prepareNativeImage(ctx context.Context, selection nativeImageSelection, wor
 	if err := transportarchive.Pack(ctx, archive, directory, []string{"blobs", "index.json", "oci-layout"}); err != nil {
 		return NativeImageAsset{}, err
 	}
+	source, _, err := securepath.OpenDirectory(directory)
+	if err != nil {
+		return NativeImageAsset{}, err
+	}
+	defer source.Close()
+	packed, _, err := securepath.OpenChild(source, "image.tar", false)
+	if err != nil {
+		return NativeImageAsset{}, err
+	}
+	if err := errors.Join(packed.Chmod(0o600), packed.Close()); err != nil {
+		return NativeImageAsset{}, err
+	}
+	destination, _, err := securepath.OpenDirectory(files)
+	if err != nil {
+		return NativeImageAsset{}, err
+	}
+	defer destination.Close()
+	if err := requireContext(ctx); err != nil {
+		return NativeImageAsset{}, err
+	}
+	// Move the completed carrier into the serving directory without retaining
+	// a second full copy. The existing publisher rejects an occupied name.
 	file := filepath.Join(files, selection.role+".tar")
-	if err := copyPrivate(ctx, archive, file, 0o600); err != nil {
+	if err := transportarchive.PublishAtNoReplace(int(source.Fd()), "image.tar", int(destination.Fd()), filepath.Base(file)); err != nil {
+		return NativeImageAsset{}, err
+	}
+	if err := errors.Join(source.Sync(), destination.Sync()); err != nil {
 		return NativeImageAsset{}, err
 	}
 	return NativeImageAsset{file, selection.reference, inspected.ManifestDigest}, nil

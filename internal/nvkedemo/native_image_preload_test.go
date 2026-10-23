@@ -163,9 +163,13 @@ func TestNativeOVNArchiveRetainsTheExactObservedManifest(t *testing.T) {
 	for _, tc := range []struct {
 		name, arch  string
 		wrongDigest bool
+		existing    bool
 		valid       bool
 	}{
-		{"selected", "arm64", false, true}, {"sibling observation", "arm64", true, false}, {"wrong platform", "amd64", false, false},
+		{"selected", "arm64", false, false, true},
+		{"sibling observation", "arm64", true, false, false},
+		{"wrong platform", "amd64", false, false, false},
+		{"occupied destination", "arm64", false, true, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			run := t.TempDir()
@@ -216,12 +220,23 @@ func TestNativeOVNArchiveRetainsTheExactObservedManifest(t *testing.T) {
 			if err := os.Mkdir(files, 0700); err != nil {
 				t.Fatal(err)
 			}
+			if tc.existing {
+				if err := os.WriteFile(filepath.Join(files, "ovn.tar"), []byte("existing archive"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
 			reference := "localhost/nvke/ovn-kubernetes@" + observed
 			got, err := prepareNativeImage(t.Context(), nativeImageSelection{role: "ovn", root: run, output: "ovn-image-arm64", reference: reference, observed: lifecycle.Artifact{Digest: observed}}, work, files)
 			if (err == nil) != tc.valid {
 				t.Fatalf("image projection: %v", err)
 			}
 			if !tc.valid {
+				if tc.existing {
+					raw, readErr := os.ReadFile(filepath.Join(files, "ovn.tar"))
+					if readErr != nil || string(raw) != "existing archive" {
+						t.Fatalf("existing archive replaced: %v", readErr)
+					}
+				}
 				return
 			}
 			if got.Reference != reference || got.ManifestDigest != observed {
@@ -233,6 +248,12 @@ func TestNativeOVNArchiveRetainsTheExactObservedManifest(t *testing.T) {
 			}
 			if _, err := DigestFile(t.Context(), got.File); err != nil {
 				t.Fatal(err)
+			}
+			if info, err := os.Stat(got.File); err != nil || info.Mode().Perm() != 0600 {
+				t.Fatalf("served archive must remain private: %v", err)
+			}
+			if _, err := os.Lstat(filepath.Join(work, "images", "ovn", "image.tar")); !os.IsNotExist(err) {
+				t.Fatalf("redundant image archive remains: %v", err)
 			}
 		})
 	}
