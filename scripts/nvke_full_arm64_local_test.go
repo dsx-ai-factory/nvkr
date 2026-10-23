@@ -31,6 +31,21 @@ func linkLauncherTestTimeout(t *testing.T, tools string) {
 	}
 }
 
+func launcherUtilityImage(t *testing.T) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "inputs/environments/local-arm64-kvm.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var selected struct {
+		UtilityContainer string `json:"utilityContainer"`
+	}
+	if err := json.Unmarshal(raw, &selected); err != nil || selected.UtilityContainer == "" {
+		t.Fatalf("read selected bootstrap image: %v", err)
+	}
+	return selected.UtilityContainer
+}
+
 func TestBuildNetworkSelectionFailsBeforeProducerWork(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -143,7 +158,7 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 			}
 			switch tc.name {
 			case "mutable bootstrap pin rejected":
-				env = []byte(strings.ReplaceAll(string(env), "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c", "golang:latest"))
+				env = []byte(strings.ReplaceAll(string(env), launcherUtilityImage(t), "golang:latest"))
 			case "foreign bootstrap platform rejected":
 				env = []byte(strings.ReplaceAll(string(env), "linux/arm64", "linux/amd64"))
 			}
@@ -516,7 +531,7 @@ esac
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, required := range []string{"golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c", "GOTOOLCHAIN=local", "make -C /src build BIN=/out/nvkr"} {
+			for _, required := range []string{launcherUtilityImage(t), "GOTOOLCHAIN=local", "make -C /src build BIN=/out/nvkr"} {
 				if !strings.Contains(string(calls), required) {
 					t.Fatalf("bootstrap omitted pinned SDK/build contract %q: %s", required, calls)
 				}

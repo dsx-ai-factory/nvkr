@@ -21,33 +21,28 @@ NVKR owns the build and release workflow that supplies their artifacts.
 
 ## Build your first artifact
 
-Start with a small greeting executable. You need **Git 2.38 or later, Make,
-Python 3, running Docker, and the exact Go version in [.go-version](.go-version)**.
-No NVKE checkout or registry credentials are needed. The first run downloads Go
-modules and a pinned Alpine image. On Apple Silicon, Docker needs Linux AMD64
-emulation for this example.
+Build the NVKE CLI, controller container image and Helm chart locally, with dependency SBOMs.
+You need **Git 2.38 or later, Bash and running Docker**. The pinned Go compiler is required; the launcher asks before installing it locally if needed. No Make or host Python is required.
+Use Docker Desktop on macOS, or Docker on Linux.
+NVKR runs on your host; the NVKE CLI and image it builds target Linux.
+The launcher checks prerequisites, selects the required Go compiler and builds NVKR from source for your CPU architecture.
+Git must already be installed. Supported Docker installation actions and local Go setup are shown for approval before proceeding.
+
+Open a terminal in a directory without an existing `nvkr` folder and copy the whole block:
 
 ```sh
-git clone https://github.com/dsx-ai-factory/nvkr.git
-cd nvkr
-GOTOOLCHAIN=local make build
-bash demos/demo-local.sh
+git clone https://github.com/dsx-ai-factory/nvkr.git &&
+cd nvkr &&
+bash scripts/nvkr-quickstart.sh
 ```
 
-The demo pins a local source repository, generates a Plan, builds in a container,
-checks the artifact against its software bill of materials (SBOM), and runs it.
-Look for these lines in the output:
+Wait for `status: complete` and `observed outputs: 3`. The block lists the payload files
+and prints the full path to the artifacts and SBOMs. The native CLI is `bin/nvkr`.
+The launcher runs in a child shell, so a failed build returns an error without changing your SSH shell settings.
+Nothing is published or deployed; the local build is unsigned.
 
-```text
-Run: complete | output: hello | lane: unqualified-local-execution
-Artifact bytes match the recorded SBOM subject.
-Hello, team! This is hello v1.0.0, built by NVKR.
-```
-
-This is a real local build; it does not sign or publish anything. The demo prints
-the directory containing its inputs, Plan, Run record and artifact. Follow the
-[quickstart](docs/quickstart.md) to change the source version and explore NVKE
-outputs. Without Docker, use the [planning preview](docs/quickstart.md#preview-the-nvke-outputs).
+The [quickstart](docs/quickstart.md) explains the output files and next steps.
+This builds three selected artifacts; OS images belong to the larger NVKE selection.
 
 ## From components to releases
 

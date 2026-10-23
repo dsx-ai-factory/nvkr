@@ -24,6 +24,42 @@ release archive were not built. The selected ARM64 limactl is SHA256
 `3c9f2b85164973a53a08e5bb1beb9a10eca27a8723cab6db2c802d46334370a3`.
 This is a local diagnostic build record, not an upstream release signature.
 
+## Install from public source on Ubuntu ARM64
+
+Use the Go version in the NVKR checkout's `.go-version`, with Go, Make, GCC and
+Git on `PATH`. The Ubuntu prerequisite packages in the
+[demo guide](local-nvke-demo.md#2-install-prerequisites-on-the-ubuntu-execution-host)
+include the compiler. Run this once in your normal user account. The source and
+installation directories must be fresh; do not replace an existing Lima install.
+
+```sh
+umask 022
+lima_source="$HOME/.local/src/lima-f47461e"
+lima_prefix="$HOME/.local/opt/lima-f47461e"
+test ! -e "$lima_source" && test ! -e "$lima_prefix" &&
+mkdir -p "$HOME/.local/src" "$HOME/.local/opt" &&
+git init "$lima_source" &&
+git -C "$lima_source" remote add origin https://github.com/lima-vm/lima.git &&
+git -C "$lima_source" fetch --depth=1 origin f47461ed7d03f300297e01fd659e9aefc6c228b9 &&
+git -C "$lima_source" checkout --detach FETCH_HEAD &&
+GOTOOLCHAIN=local make -C "$lima_source" native documentation install PREFIX="$lima_prefix" &&
+install -m 0644 "$lima_source/NOTICE" "$lima_prefix/share/doc/lima/NOTICE" &&
+export PATH="$lima_prefix/bin:$PATH" &&
+limactl --version &&
+command -v nerdctl.lima
+```
+
+The version must report `f47461e`. These commands use upstream's native build
+and installation targets to install the matching host tools, ARM64 guest agent
+and templates together. They require no previously prepared NVKR tool bundle.
+Keep the exported `PATH` in each terminal used for the demo. The CLI reports a
+missing or incompatible prerequisite before its E2E build; it does not install Lima.
+
+Building with the current NVKR Go SDK can produce different binary bytes from
+the historical Go 1.27.2 pilot above. Its recorded hash and runtime observations
+do not authenticate or establish acceptance of a new build. The fresh full demo
+must exercise the newly installed prerequisite and record its result.
+
 ## Vulnerability evidence and its scope
 
 The required NVKR source vulnerability gate remains unchanged; see

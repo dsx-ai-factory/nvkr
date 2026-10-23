@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog/v3
+kind: SourceBuildRegistry
+metadata:
+  name: sbom-tools-arm64
+  description: Native Linux ARM64 Syft at the maintained release catalog's scanner version.
+components:
+  syft:
+    source: syft
+    platforms: [linux/arm64]
+    outputType: host-package
+    prebuilt:
+      releaseExecutable: true
+      evidence:
+        none: true
+sources:
+  syft:
+    repo: https://github.com/anchore/syft
+    constraint: 1.51.1
+    tool:
+      format: tar-gzip
+      url: https://github.com/anchore/syft/releases/download/{{.Tag}}/syft_{{.Version}}_linux_arm64.tar.gz
+      platform: linux/arm64
+      executablePath: syft

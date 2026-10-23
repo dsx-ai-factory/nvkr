@@ -1,7 +1,7 @@
 # Definition, Run, and Release workflow
 
 This reference covers output completeness, immutable attempts, release verification and SDK use.
-Start with the [quickstart](quickstart.md) for CLI setup and the [concept reference](user-concepts.md)
+Start with the [quickstart](quickstart.md#build-only-the-cli) for CLI setup and the [concept reference](user-concepts.md)
 for the six public objects. [ADR-17](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0017-cli-sdk-foundation-and-package-topology.md) owns the
 lifecycle contract; [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md) owns current implementation and evidence.
 
