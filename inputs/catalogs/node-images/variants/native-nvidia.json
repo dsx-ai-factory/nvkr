@@ -17,8 +17,8 @@
         "commit": "8af51273d52dfa07454435d18d37230e582d797a",
         "treeHash": "c4a54b0b3b615e5bd6df2d591451d7ab03dffc08",
         "toolchainImages": {
-          "amd64": "docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90",
-          "arm64": "docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b"
+          "amd64": "docker.io/library/golang@sha256:8aa2821993207ae840ce09e4223217efcd14e01f71525db734faf4232bd59999",
+          "arm64": "docker.io/library/golang@sha256:288557fbc328e4ef9a78bae2eb44f24447029ff08667be883d79eeaa9029cf0c"
         },
         "outputType": "tarball",
         "buildCommand": [
