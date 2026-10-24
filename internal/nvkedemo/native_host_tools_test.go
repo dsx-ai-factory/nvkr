@@ -28,8 +28,12 @@ func TestNativeHostToolViewPreservesOriginalBundleAndBytes(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			source, publication, originalNames := hostToolViewFixture(t, tc.platform, tc.aliases)
+			bundle, _, err := delivery.InspectBinaryBundle(t.Context(), source)
+			if err != nil {
+				t.Fatal(err)
+			}
 			out := filepath.Join(privateTestDir(t), "tools")
-			if err := extractNativeHostTools(t.Context(), source, publication, out, tc.platform); err != nil {
+			if err := extractNativeHostTools(t.Context(), bundle, publication, out, tc.platform); err != nil {
 				t.Fatal(err)
 			}
 			_, _, _, members, err := nativeToolSelection(tc.platform)
@@ -62,7 +66,7 @@ func TestNativeHostToolViewPreservesOriginalBundleAndBytes(t *testing.T) {
 			if _, _, err := delivery.InspectBinaryBundle(t.Context(), source); err != nil {
 				t.Fatal("original bundle changed", err)
 			}
-			if err := extractNativeHostTools(t.Context(), source, publication, out, tc.platform); err == nil {
+			if err := extractNativeHostTools(t.Context(), bundle, publication, out, tc.platform); err == nil {
 				t.Fatal("existing tool view was overwritten")
 			}
 		})
@@ -73,6 +77,10 @@ func TestNativeHostToolViewRejectsBeforeExtraction(t *testing.T) {
 	for _, scenario := range []string{"wrong platform", "existing view", "existing original", "canceled", "unsupported"} {
 		t.Run(scenario, func(t *testing.T) {
 			source, publication, _ := hostToolViewFixture(t, "darwin/arm64", false)
+			bundle, _, err := delivery.InspectBinaryBundle(t.Context(), source)
+			if err != nil {
+				t.Fatal(err)
+			}
 			out := filepath.Join(privateTestDir(t), "tools")
 			platform := "darwin/arm64"
 			ctx, cancel := context.WithCancel(t.Context())
@@ -98,7 +106,7 @@ func TestNativeHostToolViewRejectsBeforeExtraction(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			err := extractNativeHostTools(ctx, source, publication, out, platform)
+			err = extractNativeHostTools(ctx, bundle, publication, out, platform)
 			var coded *nvkrerr.Error
 			if !errors.As(err, &coded) || coded.Code != nvkrerr.CodeVerifyFailed {
 				t.Fatalf("uncoded rejection: %v", err)
@@ -250,9 +258,76 @@ func TestNativeToolAdmissionBindsExactCarrierIndex(t *testing.T) {
 					t.Fatal("replacement is not a coherent bundle", err)
 				}
 			}
-			result, err := inspectAdmittedBinaryBundle(t.Context(), source, admitted)
+			_, result, err := inspectAdmittedBinaryBundle(t.Context(), source, admitted)
 			if (err == nil) == changed || !changed && result.RootDigest != admitted || changed && result.RootDigest != "" {
 				t.Fatalf("exact carrier admission: result=%+v err=%v", result, err)
+			}
+		})
+	}
+}
+
+// These are real independently built bundle layouts, not fabricated receipt or
+// validator descriptions. Delivery owns each publication copy and extraction.
+func TestNativeHostToolViewUsesCapturedBytes(t *testing.T) {
+	for _, scenario := range []string{"source changed before capture", "source moved after capture", "different captured bundle"} {
+		t.Run(scenario, func(t *testing.T) {
+			const platform = "linux/arm64"
+			source, publication, _ := hostToolViewFixture(t, platform, true)
+			bundle, inspected, err := delivery.InspectBinaryBundle(t.Context(), source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			captured := filepath.Join(filepath.Dir(publication), "captured")
+			request := delivery.PublicationRequest{Objects: []delivery.ObjectInput{{Name: bundle.Purpose, Kind: "binary-bundle", Path: source,
+				ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: inspected.SemanticDigest, BlobDigest: inspected.RootDigest, Layout: true}}}
+			if scenario == "source changed before capture" {
+				path := filepath.Join(source, "index.json")
+				raw, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, append(raw, '\n'), 0600); err != nil {
+					t.Fatal(err)
+				}
+				if _, _, err := delivery.InspectBinaryBundle(t.Context(), source); err != nil {
+					t.Fatal("replacement must remain a coherent bundle", err)
+				}
+			}
+			_, err = delivery.BuildPublicationRoot(t.Context(), captured, request)
+			if scenario == "source changed before capture" {
+				var coded *nvkrerr.Error
+				if !errors.As(err, &coded) || coded.Code != nvkrerr.CodeVerifyFailed {
+					t.Fatal("publication accepted a substituted original carrier", err)
+				}
+				if _, statErr := os.Lstat(captured); !os.IsNotExist(statErr) {
+					t.Fatal("rejected carrier committed a publication", statErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if scenario == "source moved after capture" {
+				if err := os.Rename(source, source+"-moved"); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				_, captured, _ = hostToolViewFixture(t, platform, false)
+			}
+			out := filepath.Join(privateTestDir(t), "tools")
+			err = extractNativeHostTools(t.Context(), bundle, captured, out, platform)
+			if scenario == "source moved after capture" {
+				if err != nil {
+					t.Fatal("captured bytes depended on the original source path", err)
+				}
+				return
+			}
+			var coded *nvkrerr.Error
+			if !errors.As(err, &coded) || coded.Code != nvkrerr.CodeVerifyFailed {
+				t.Fatal("different captured bundle escaped the original binding", err)
+			}
+			if _, statErr := os.Lstat(out); !os.IsNotExist(statErr) {
+				t.Fatal("mismatched bundle produced the final tool view", statErr)
 			}
 		})
 	}

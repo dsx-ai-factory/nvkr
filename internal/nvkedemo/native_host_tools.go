@@ -17,7 +17,7 @@ import (
 // Native dependency IDs differ where upstream assets have different platforms.
 // Only this private runtime view uses conventional command names; the original
 // authenticated extraction, bundle entries and immutable Run stay unchanged.
-func extractNativeHostTools(ctx context.Context, source, publication, out, platform string) (result error) {
+func extractNativeHostTools(ctx context.Context, bundle delivery.BinaryBundle, publication, out, platform string) (result error) {
 	defer func() {
 		if result != nil {
 			result = nvkrerr.Wrap(nvkrerr.CodeVerifyFailed, result, "prepare native host tool view")
@@ -27,10 +27,6 @@ func extractNativeHostTools(ctx context.Context, source, publication, out, platf
 		return err
 	}
 	_, _, name, members, err := nativeToolSelection(platform)
-	if err != nil {
-		return err
-	}
-	bundle, _, err := delivery.InspectBinaryBundle(ctx, source)
 	if err != nil {
 		return err
 	}

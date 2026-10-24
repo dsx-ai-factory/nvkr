@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
+	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
@@ -174,7 +175,7 @@ func verifyHTTPDisk(ctx context.Context, url string, image lifecycle.Artifact) e
 	return nil
 }
 func copyPrivate(ctx context.Context, source, destination string, mode os.FileMode) error {
-	input, _, err := securepath.OpenRegular(source)
+	input, info, err := securepath.OpenRegular(source)
 	if err != nil {
 		return err
 	}
@@ -183,30 +184,17 @@ func copyPrivate(ctx context.Context, source, destination string, mode os.FileMo
 	if err != nil {
 		return err
 	}
-	buffer := make([]byte, 1<<20)
-	for {
-		if err = ctx.Err(); err != nil {
-			break
-		}
-		var n int
-		n, err = input.Read(buffer)
-		if n > 0 {
-			written, writeErr := output.Write(buffer[:n])
-			if writeErr != nil {
-				err = writeErr
-				break
-			}
-			if written != n {
-				err = io.ErrShortWrite
-				break
-			}
-		}
-		if err == io.EOF {
-			err = nil
-			break
-		}
-		if err != nil {
-			break
+	_, err = transportarchive.CopyExact(ctx, output, input, info.Size())
+	// Keep error mapping with the existing callers, as the private copy did
+	// before delegating transfer to the transport owner.
+	var copied *nvkrerr.Error
+	if errors.As(err, &copied) && copied.Err != nil {
+		err = copied.Err
+	}
+	if err == nil {
+		after, statErr := input.Stat()
+		if statErr != nil || !securepath.SameMetadata(info, after) {
+			err = errors.Join(statErr, errors.New("private copy source changed while reading"))
 		}
 	}
 	if err == nil {

@@ -4,12 +4,16 @@
 package nvkedemo
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 func TestNativeEnvironmentExcludesForeignTargets(t *testing.T) {
@@ -92,5 +96,116 @@ func TestPrivateWriteNeverReplaces(t *testing.T) {
 	raw, err := os.ReadFile(path)
 	if err != nil || string(raw) != "accepted" {
 		t.Fatal("accepted bytes changed")
+	}
+}
+
+// Observe actual copied bytes, not a count of context polls or copy chunks.
+// This uses the same synchronous fault-injection pattern as transportarchive.
+type privateCopyContext struct {
+	context.Context
+	observe func()
+}
+
+func (ctx privateCopyContext) Err() error {
+	ctx.observe()
+	return ctx.Context.Err()
+}
+
+func TestPrivateCopyPreservesFileContract(t *testing.T) {
+	for _, scenario := range []string{"same", "occupied", "symlink", "canceled", "grown", "truncated", "canceled partial"} {
+		t.Run(scenario, func(t *testing.T) {
+			root := t.TempDir()
+			source, destination := filepath.Join(root, "source"), filepath.Join(root, "destination")
+			payload := strings.Repeat("private-copy-data", 1<<17)
+			writeTenantFixture(t, source, []byte(payload), 0644)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			switch scenario {
+			case "occupied":
+				writeTenantFixture(t, destination, []byte("existing"), 0640)
+			case "symlink":
+				link := source + "-link"
+				if err := os.Symlink(source, link); err != nil {
+					t.Fatal(err)
+				}
+				source = link
+			case "canceled":
+				cancel()
+			}
+			injected := false
+			observed := privateCopyContext{Context: ctx, observe: func() {
+				if injected || scenario != "grown" && scenario != "truncated" && scenario != "canceled partial" {
+					return
+				}
+				info, err := os.Stat(destination)
+				if os.IsNotExist(err) || err == nil && info.Size() == 0 {
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				injected = true
+				switch scenario {
+				case "grown":
+					err = os.Truncate(source, int64(len(payload))+1)
+				case "truncated":
+					err = os.Truncate(source, info.Size())
+				case "canceled partial":
+					cancel()
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+			}}
+			err := copyPrivate(observed, source, destination, 0755)
+			if (err == nil) != (scenario == "same") {
+				t.Fatalf("private copy %s: %v", scenario, err)
+			}
+			if err != nil {
+				want := nvkrerr.CodePreflightFailed
+				if errors.Is(err, context.Canceled) {
+					want = nvkrerr.CodeTimeout
+				}
+				var coded *nvkrerr.Error
+				if !errors.As(nativeSessionError(err, "private copy"), &coded) || coded.Code != want {
+					t.Fatal("copy changed the existing caller error mapping", err)
+				}
+			}
+			if scenario == "grown" || scenario == "truncated" || scenario == "canceled partial" {
+				if !injected {
+					t.Fatal("copy did not exercise the injected failure")
+				}
+			}
+			if scenario == "symlink" {
+				if _, statErr := os.Lstat(destination); !os.IsNotExist(statErr) {
+					t.Fatal("rejected source created output", statErr)
+				}
+				return
+			}
+			data, readErr := os.ReadFile(destination)
+			info, statErr := os.Stat(destination)
+			if readErr != nil || statErr != nil {
+				t.Fatal("copy lost its destination", readErr, statErr)
+			}
+			switch scenario {
+			case "same":
+				if string(data) != payload || info.Mode().Perm() != 0755 {
+					t.Fatal("copy changed successful bytes or mode")
+				}
+			case "occupied":
+				if string(data) != "existing" || info.Mode().Perm() != 0640 {
+					t.Fatal("copy replaced existing bytes or mode")
+				}
+			default:
+				if info.Mode().Perm() != 0600 || len(data) > len(payload) {
+					t.Fatal("failed copy exposed or extended partial bytes")
+				}
+			}
+			if scenario == "canceled" || scenario == "canceled partial" {
+				if !errors.Is(err, context.Canceled) || scenario == "canceled" && len(data) != 0 || scenario == "canceled partial" && (len(data) == 0 || len(data) >= len(payload)) {
+					t.Fatal("copy lost cancellation or changed partial-output behavior", err)
+				}
+			}
+		})
 	}
 }
