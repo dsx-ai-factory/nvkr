@@ -23,13 +23,13 @@ import (
 const registryImage = "docker.io/library/registry@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8"
 
 var runtimeImages = []string{"csi-node-driver-registrar", "postgresql", "spiffe-csi", "spire-agent", "spire-bash", "spire-controller-manager", "spire-oidc", "spire-server", "spire-tpm-server", "temporal-admin-tools", "temporal-server", "temporal-ui"}
-var temporalTags = map[string]string{"temporal-server": "1.30.3", "temporal-admin-tools": "1.30.3", "temporal-ui": "2.48.1"}
 
 // SelectedOutput is an observed immutable attempt description. nvkr and ORAS,
 // not this struct, verify byte integrity at extraction and registry handoff.
 type SelectedOutput struct {
 	Layout      string
 	Observation lifecycle.Artifact
+	imageTag    string
 }
 type kindNetwork struct{ Gateway, CIDR, ID string }
 
@@ -191,7 +191,7 @@ func runtimeValues(host string, outputs map[string]SelectedOutput) map[string]an
 	postgres.Global.Security.AllowInsecureImages = true
 	postgres.Image = pinnedImage{Registry: host, Repository: "nvkr-local/postgresql", Digest: outputs["runtime-postgresql"].Observation.Digest}
 	temporalImage := func(key string) imageOverride {
-		return imageOverride{Image: pinnedImage{Repository: host + "/nvkr-local/" + key, Tag: temporalTags[key] + "@" + outputs["runtime-"+key].Observation.Digest}}
+		return imageOverride{Image: pinnedImage{Repository: host + "/nvkr-local/" + key, Tag: outputs["runtime-"+key].imageTag + "@" + outputs["runtime-"+key].Observation.Digest}}
 	}
 	return map[string]any{"spire": spire, "postgresql": postgres, "temporal": temporalOverrides{Server: temporalImage("temporal-server"), AdminTools: temporalImage("temporal-admin-tools"), Web: temporalImage("temporal-ui")}}
 }

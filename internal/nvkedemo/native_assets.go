@@ -202,6 +202,7 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 		return assets, err
 	}
 	acquired := make(map[string]string)
+	runtimeOutputs := make(map[string]SelectedOutput)
 	for i := range selections {
 		selection := &selections[i]
 		selection.observed, err = selectedRunOutput(runInputs[selection.root].run, selection.output, "oci")
@@ -213,6 +214,14 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 		}
 		if strings.HasPrefix(selection.role, "runtime-") {
 			selection.reference = "docker.io/nvkr-local/" + strings.TrimPrefix(selection.role, "runtime-") + "@" + selection.observed.Digest
+			output := SelectedOutput{Layout: filepath.Join(selection.root, "packages", selection.output), Observation: selection.observed}
+			if strings.HasPrefix(selection.role, "runtime-temporal-") {
+				output.imageTag, err = runtimeImageTag(runInputs[selection.root].plan, selection.observed)
+				if err != nil {
+					return assets, err
+				}
+			}
+			runtimeOutputs[selection.role] = output
 		}
 		if strings.HasPrefix(selection.role, "capi-exec-") {
 			selection.reference = "docker.io/nvkr-local/" + selection.role + "@" + selection.observed.Digest
@@ -257,7 +266,7 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 	assets = NativeAssets{
 		HostTools: filepath.Join(out, "host"), SiteTools: filepath.Join(out, "site"),
 		Installer: filepath.Join(out, "installer"),
-		Files:     filepath.Join(out, "files"), Images: make(map[string]NativeImageAsset), RuntimeOutputs: make(map[string]SelectedOutput),
+		Files:     filepath.Join(out, "files"), Images: make(map[string]NativeImageAsset), RuntimeOutputs: runtimeOutputs,
 	}
 	if err := extractNativeHostTools(ctx, filepath.Join(hostRun, "packages", hostBundle), publicationPath, assets.HostTools, platform); err != nil {
 		return assets, err
@@ -301,9 +310,6 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 			return assets, err
 		}
 		assets.Images[selection.role] = image
-		if strings.HasPrefix(selection.role, "runtime-") {
-			assets.RuntimeOutputs[selection.role] = SelectedOutput{Layout: filepath.Join(selection.root, "packages", selection.output), Observation: selection.observed}
-		}
 	}
 	if cfg.RuntimeRun != "" {
 		if err := prepareNativeCAPIAuth(ctx, assets, acquired); err != nil {
@@ -314,6 +320,34 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 		return assets, err
 	}
 	return assets, nil
+}
+
+// The caller has already admitted this exact Plan/output through lifecycle (or
+// the nightly publication expectation). Project only the selected declaration;
+// graph validity and byte acceptance remain with their existing owners.
+func runtimeImageTag(plan *factory.Plan, output lifecycle.Artifact) (string, error) {
+	var declarations []string
+	if plan != nil {
+		for _, build := range plan.Builds {
+			if build.Name != output.Name {
+				continue
+			}
+			for _, component := range build.ResolvedComponents {
+				if slices.Contains(output.Components, component.Name) && component.Prebuilt != nil {
+					declarations = append(declarations, component.Prebuilt.Image)
+				}
+			}
+		}
+	}
+	if len(declarations) != 1 {
+		return "", nvkrerr.New(nvkrerr.CodeVerifyFailed, "Temporal output %q requires one declared image producer", output.Name)
+	}
+	reference, err := name.ParseReference(declarations[0], name.WithDefaultTag(""))
+	tag, tagged := reference.(name.Tag)
+	if err != nil || !tagged || tag.TagStr() == "" {
+		return "", nvkrerr.New(nvkrerr.CodeVerifyFailed, "Temporal output %q requires an explicit declared image tag", output.Name)
+	}
+	return tag.TagStr(), nil
 }
 
 // The replayed Plan binds acquisition metadata to the exact named completed

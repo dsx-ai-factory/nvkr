@@ -166,6 +166,10 @@ root-owned protected paths with matching bundle bytes; other Mac tools use priva
 utility execution and incorrect-digest rejection are tested. No system security setting changes. Hosted
 rendering rejects native bundle locators, and qualified authority boundaries remain unchanged.
 The native installer source and CAPI version selection now comes from replayed captured tool-Run inputs, checked against the completed Plan and selected output. The producer emits the source Make value; executable and installer source bindings must agree. Packer discovery projects versions and plugin members from the shared catalog rather than a compiled version list. Contract and actual-source Make checks cover this selection; no complete new tool-Run or runtime acceptance is inferred.
+Temporal Helm image tags now project from each admitted output's resolved prebuilt declaration while
+retaining its observed child digest. The deployment and nightly consumers use that same projection.
+Compiler/save/reload, changed-tag and refusal contracts cover this descriptive selection; no fresh
+payload build or runtime acceptance is established.
 Prepared image carriers move from asset staging into the attempt's simulator serving directory through
 the existing descriptor-relative no-replace publisher. Both fresh private directories share the attempt
 filesystem; each runtime image path follows its completed move, including partial failure. The host-only
