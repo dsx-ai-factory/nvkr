@@ -27,6 +27,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/layout"
 	"go.yaml.in/yaml/v3"
+	"golang.org/x/sys/unix"
 )
 
 // NativeAssetConfig selects completed immutable Runs. Extraction and exact
@@ -490,6 +491,28 @@ func prepareNativeImage(ctx context.Context, selection nativeImageSelection, wor
 		return NativeImageAsset{}, err
 	}
 	directory := filepath.Join(work, "images", selection.role)
+	parent, child, err := securepath.CreateParentBeneath(work, filepath.Join("images", selection.role))
+	if err != nil {
+		return NativeImageAsset{}, err
+	}
+	defer parent.Close()
+	if err := unix.Mkdirat(int(parent.Fd()), child, 0o700); err != nil {
+		return NativeImageAsset{}, err
+	}
+	source, sourceInfo, err := securepath.OpenChild(parent, child, true)
+	if err != nil {
+		return NativeImageAsset{}, err
+	}
+	defer source.Close()
+	projection, err := os.OpenRoot(directory)
+	if err != nil {
+		return NativeImageAsset{}, err
+	}
+	defer func() { _ = projection.Close() }()
+	projectionInfo, err := projection.Stat(".")
+	if err != nil || !os.SameFile(sourceInfo, projectionInfo) {
+		return NativeImageAsset{}, errors.Join(err, errors.New("native image projection directory changed while opening"))
+	}
 	projected, err := layout.Write(directory, empty.Index)
 	if err != nil {
 		return NativeImageAsset{}, err
@@ -509,11 +532,6 @@ func prepareNativeImage(ctx context.Context, selection nativeImageSelection, wor
 	if err := transportarchive.Pack(ctx, archive, directory, []string{"blobs", "index.json", "oci-layout"}); err != nil {
 		return NativeImageAsset{}, err
 	}
-	source, _, err := securepath.OpenDirectory(directory)
-	if err != nil {
-		return NativeImageAsset{}, err
-	}
-	defer source.Close()
 	packed, _, err := securepath.OpenChild(source, "image.tar", false)
 	if err != nil {
 		return NativeImageAsset{}, err
@@ -538,7 +556,25 @@ func prepareNativeImage(ctx context.Context, selection nativeImageSelection, wor
 	if err := errors.Join(source.Sync(), destination.Sync()); err != nil {
 		return NativeImageAsset{}, err
 	}
+	if err := errors.Join(cleanNativeImageProjection(ctx, projection), source.Sync()); err != nil {
+		return NativeImageAsset{}, err
+	}
 	return NativeImageAsset{file, selection.reference, inspected.ManifestDigest}, nil
+}
+
+// Only a successfully published carrier releases its private OCI projection.
+// Root retains the original directory across pathname replacement; keep its
+// empty role directory rather than reopen a pathname to remove the directory.
+func cleanNativeImageProjection(ctx context.Context, projection *os.Root) error {
+	for _, member := range []string{"blobs", "index.json", "oci-layout"} {
+		if err := requireContext(ctx); err != nil {
+			return err
+		}
+		if err := projection.RemoveAll(member); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Admit the source-owned provider selection at extraction time, before image

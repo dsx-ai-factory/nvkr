@@ -74,15 +74,21 @@ func startNativeAddresses(ctx context.Context, runner Runner, simdir string, net
 	if err != nil {
 		return nil, err
 	}
+	diagnostics, err := nativeObservationRunner(ctx, runner, "native-address-observation-")
+	if err != nil {
+		return nil, nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "native Mac address source")
+	}
+	latest := filepath.Join(diagnostics.Work, "latest.log")
+	if err := privateWrite(latest, nil); err != nil {
+		return nil, nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "native Mac address source")
+	}
 	sequence := 0
-	// Read-only address polling is private diagnostic data, not a public phase.
-	runner.Progress = nil
 	observe := func(ctx context.Context) error {
 		sequence++
 		// SQLite owns its live WAL/locking and JSON encoding. No DB writes, custom
 		// SQLite reader, QEMU argv parser, ARP text parser or DHCP packet code.
 		query := `SELECT json_group_array(json_object('instance_id',instance_id,'mac_address',mac_address,'ip_addresses_json',ip_addresses_json)) FROM (SELECT instance_id,mac_address,ip_addresses_json FROM instance_interfaces WHERE mac_address <> '' ORDER BY instance_id);`
-		raw, err := runner.Capture(ctx, []string{sqlite, "-safe", "-readonly", "-batch", "-init", "/dev/null", "-cmd", ".timeout 1000", filepath.Join(simdir, "nico.db"), query}, fmt.Sprintf("native-address-%d", sequence), 10*time.Second)
+		raw, err := captureNativeAddressObservation(ctx, runner, []string{sqlite, "-safe", "-readonly", "-batch", "-init", "/dev/null", "-cmd", ".timeout 1000", filepath.Join(simdir, "nico.db"), query}, fmt.Sprintf("native-address-%d", sequence), latest)
 		if err != nil {
 			return err
 		}
@@ -125,6 +131,32 @@ func startNativeAddresses(ctx context.Context, runner Runner, simdir string, net
 		return nil, nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "native Mac address source")
 	}
 	return runNativeAddressObserver(ctx, observe, fail), nil
+}
+
+func captureNativeAddressObservation(ctx context.Context, runner Runner, args []string, phase, latest string) ([]byte, error) {
+	// Poll continuously without accumulating per-command files or exposing private
+	// address data. Clearing diagnostic storage must not change the command cwd.
+	if runner.directory == "" {
+		runner.directory = runner.Work
+	}
+	runner.Work, runner.Progress = "", nil
+	sink := &boundedDiagnostic{remaining: diagnosticLimit, capture: true}
+	runner.output = sink
+	raw, err := runner.Capture(ctx, args, phase, 10*time.Second)
+	if errors.Is(err, ErrUnjoined) {
+		return raw, err
+	}
+	// Only joined drains yield a complete combined capture. An empty canceled
+	// poll cannot erase the last meaningful output; the original error owns status.
+	combined, retentionErr := sink.result()
+	var storeErr error
+	if len(combined) != 0 {
+		storeErr = privateReplace(latest, combined)
+	}
+	if diagnosticErr := errors.Join(retentionErr, storeErr); diagnosticErr != nil {
+		return raw, &CommandError{Phase: phase, ExitCode: -1, Cause: errors.Join(err, diagnosticErr)}
+	}
+	return raw, err
 }
 
 func runNativeAddressObserver(ctx context.Context, observe func(context.Context) error, fail context.CancelCauseFunc) *nativeAddressOwner {

@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
@@ -161,15 +162,17 @@ func TestNativeOVNProjectionUsesOnlyTheSelectedManifest(t *testing.T) {
 
 func TestNativeOVNArchiveRetainsTheExactObservedManifest(t *testing.T) {
 	for _, tc := range []struct {
-		name, arch  string
-		wrongDigest bool
-		existing    bool
-		valid       bool
+		name, arch, projection string
+		wrongDigest            bool
+		existing               bool
+		valid                  bool
 	}{
-		{"selected", "arm64", false, false, true},
-		{"sibling observation", "arm64", true, false, false},
-		{"wrong platform", "amd64", false, false, false},
-		{"occupied destination", "arm64", false, true, false},
+		{"selected", "arm64", "", false, false, true},
+		{"sibling observation", "arm64", "", true, false, false},
+		{"wrong platform", "amd64", "", false, false, false},
+		{"occupied destination", "arm64", "", false, true, false},
+		{"occupied projection", "arm64", "directory", false, false, false},
+		{"linked projection", "arm64", "symlink", false, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			run := t.TempDir()
@@ -211,6 +214,10 @@ func TestNativeOVNArchiveRetainsTheExactObservedManifest(t *testing.T) {
 			if err := index.AppendImage(image); err != nil {
 				t.Fatal(err)
 			}
+			originalIndex, err := os.ReadFile(filepath.Join(root, "index.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
 			observed := digest.String()
 			if tc.wrongDigest {
 				observed = "sha256:" + strings.Repeat("b", 64)
@@ -225,10 +232,30 @@ func TestNativeOVNArchiveRetainsTheExactObservedManifest(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			if tc.projection != "" {
+				if err := os.Mkdir(filepath.Join(work, "images"), 0700); err != nil {
+					t.Fatal(err)
+				}
+				retained := filepath.Join(work, "images", "ovn")
+				if tc.projection == "symlink" {
+					retained = t.TempDir()
+					if err := os.Symlink(retained, filepath.Join(work, "images", "ovn")); err != nil {
+						t.Fatal(err)
+					}
+				} else if err := os.Mkdir(retained, 0700); err != nil {
+					t.Fatal(err)
+				}
+				writeTenantFixture(t, filepath.Join(retained, "sentinel"), []byte("retain"), 0600)
+			}
 			reference := "localhost/nvke/ovn-kubernetes@" + observed
 			got, err := prepareNativeImage(t.Context(), nativeImageSelection{role: "ovn", root: run, output: "ovn-image-arm64", reference: reference, observed: lifecycle.Artifact{Digest: observed}}, work, files)
 			if (err == nil) != tc.valid {
 				t.Fatalf("image projection: %v", err)
+			}
+			unchangedIndex, readErr := os.ReadFile(filepath.Join(root, "index.json"))
+			original, inspectErr := delivery.InspectContainerImage(t.Context(), root, "linux/"+tc.arch)
+			if readErr != nil || !bytes.Equal(originalIndex, unchangedIndex) || inspectErr != nil || original.ManifestDigest != digest.String() {
+				t.Fatalf("original Run image changed: %v %v", readErr, inspectErr)
 			}
 			if !tc.valid {
 				if tc.existing {
@@ -236,13 +263,31 @@ func TestNativeOVNArchiveRetainsTheExactObservedManifest(t *testing.T) {
 					if readErr != nil || string(raw) != "existing archive" {
 						t.Fatalf("existing archive replaced: %v", readErr)
 					}
+					projection := filepath.Join(work, "images", "ovn")
+					retained, inspectErr := delivery.InspectContainerImage(t.Context(), projection, "linux/arm64")
+					if inspectErr != nil || retained.ManifestDigest != observed {
+						t.Fatalf("failed publication lost diagnostic projection: %v", inspectErr)
+					}
+					if _, statErr := os.Stat(filepath.Join(projection, "image.tar")); statErr != nil {
+						t.Fatal("failed publication lost its packed carrier", statErr)
+					}
+				}
+				if tc.projection != "" {
+					raw, readErr := os.ReadFile(filepath.Join(work, "images", "ovn", "sentinel"))
+					if readErr != nil || string(raw) != "retain" {
+						t.Fatal("unowned projection changed", readErr)
+					}
 				}
 				return
 			}
 			if got.Reference != reference || got.ManifestDigest != observed {
 				t.Fatal("image alias changed selected subject")
 			}
-			inspected, err := delivery.InspectContainerImage(t.Context(), filepath.Join(work, "images", "ovn"), "linux/arm64")
+			restored := t.TempDir()
+			if err := transportarchive.Unpack(t.Context(), got.File, restored, []string{"blobs", "index.json", "oci-layout"}); err != nil {
+				t.Fatal(err)
+			}
+			inspected, err := delivery.InspectContainerImage(t.Context(), restored, "linux/arm64")
 			if err != nil || inspected.ManifestDigest != observed {
 				t.Fatalf("projected manifest: %v", err)
 			}
@@ -254,6 +299,73 @@ func TestNativeOVNArchiveRetainsTheExactObservedManifest(t *testing.T) {
 			}
 			if _, err := os.Lstat(filepath.Join(work, "images", "ovn", "image.tar")); !os.IsNotExist(err) {
 				t.Fatalf("redundant image archive remains: %v", err)
+			}
+			if entries, err := os.ReadDir(filepath.Join(work, "images", "ovn")); err != nil || len(entries) != 0 {
+				t.Fatalf("successful publication retained its OCI projection: %v", err)
+			}
+		})
+	}
+}
+
+func TestNativeImageProjectionCleanupUsesHeldDirectory(t *testing.T) {
+	for _, scenario := range []string{"directory replacement", "symlink replacement", "canceled", "closed root"} {
+		t.Run(scenario, func(t *testing.T) {
+			work := t.TempDir()
+			path := filepath.Join(work, "projection")
+			if err := os.MkdirAll(filepath.Join(path, "blobs", "sha256"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			for _, member := range []string{"blobs/sha256/payload", "index.json", "oci-layout"} {
+				writeTenantFixture(t, filepath.Join(path, member), []byte("projection"), 0600)
+			}
+			projection, err := os.OpenRoot(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer projection.Close()
+			owned := path
+			if scenario == "directory replacement" || scenario == "symlink replacement" {
+				owned = filepath.Join(work, "held-projection")
+				if err := os.Rename(path, owned); err != nil {
+					t.Fatal(err)
+				}
+				if scenario == "directory replacement" {
+					if err := os.Mkdir(path, 0700); err != nil {
+						t.Fatal(err)
+					}
+				} else if err := os.Symlink(t.TempDir(), path); err != nil {
+					t.Fatal(err)
+				}
+				writeTenantFixture(t, filepath.Join(path, "sentinel"), []byte("retain"), 0600)
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if scenario == "canceled" {
+				cancel()
+			}
+			if scenario == "closed root" {
+				if err := projection.Close(); err != nil {
+					t.Fatal(err)
+				}
+			}
+			err = cleanNativeImageProjection(ctx, projection)
+			if scenario == "canceled" || scenario == "closed root" {
+				if err == nil || scenario == "canceled" && !errors.Is(err, context.Canceled) {
+					t.Fatal("cleanup failure was lost", err)
+				}
+				if raw, err := os.ReadFile(filepath.Join(owned, "blobs", "sha256", "payload")); err != nil || string(raw) != "projection" {
+					t.Fatal("failed cleanup lost diagnostic projection", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if entries, err := os.ReadDir(owned); err != nil || len(entries) != 0 {
+				t.Fatal("held projection was not cleaned", err)
+			}
+			if raw, err := os.ReadFile(filepath.Join(path, "sentinel")); err != nil || string(raw) != "retain" {
+				t.Fatal("replacement path was changed", err)
 			}
 		})
 	}
