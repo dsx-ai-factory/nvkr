@@ -173,13 +173,23 @@ func produceToolRun(ctx context.Context, cfg ToolConfig, platform string) (produ
 	// NVKR's full graph validation precedes the consumer workspace. RunLocal
 	// independently admits runtime capabilities before reserving its attempt.
 	args := []string{tool, "run", "local", "--definition", definition, "--environment", environment, "--attempt", cfg.Attempt, "--attempts-root", runsRelative, "--runner-source", repo, "--go", goTool, "--runtime", "docker", "--jobs", fmt.Sprint(cfg.Jobs), "--capture-inputs-root=.", "--ui", "plain"}
-	if err := runner.Run(ctx, []string{tool, "run", "plan", "--definition", definition, "--environment", environment}, "native-tools-admission", 0); err != nil {
+	raw, err := runner.Capture(ctx, []string{tool, "run", "plan", "--definition", definition, "--environment", environment, "--json"}, "native-tools-admission", 0)
+	if err != nil {
 		return producedToolRun{}, err
 	}
 	if err := os.Mkdir(out, 0o700); err != nil {
 		return producedToolRun{}, err
 	}
+	selected := filepath.Join(out, "selected-plan.json")
+	if err := privateWrite(selected, raw); err != nil {
+		return producedToolRun{}, err
+	}
+	plan, err := factory.LoadPlanContext(ctx, selected)
+	if err != nil {
+		return producedToolRun{}, err
+	}
 	runner.Work, runner.output = out, cfg.Progress
+	reportBuildPlan(cfg.Progress, plan, cfg.Attempt, "native-tools")
 	if err := runner.Run(ctx, args, "native-tools-run", 0); err != nil {
 		return producedToolRun{}, err
 	}

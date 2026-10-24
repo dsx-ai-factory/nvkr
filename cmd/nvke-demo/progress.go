@@ -293,17 +293,6 @@ func (w *checkedWriter) lineOutput() {
 	if w.discard || line == "" {
 		return
 	}
-	// Owner-generated graph projections use existing JSON records. Keep them
-	// out of the activity wall and plain output; only the dashboard consumes
-	// them as bounded descriptions. The retained raw log still has the trace.
-	for _, prefix := range []string{"Build vertex: ", "Build edge: ", "Build display: "} {
-		if strings.HasPrefix(line, prefix) {
-			if w.observer != nil {
-				w.emit(line + "\n")
-			}
-			return
-		}
-	}
 	if summary := dashboardGuestReport(line); summary != "" {
 		w.emit(fmt.Sprintf("[log +%s] %s%s\n", time.Since(w.started).Truncate(time.Second), dashboardGuestReportPrefix, summary))
 		return
@@ -332,6 +321,16 @@ func (w *checkedWriter) failure() error {
 // terminal controls; caller-supplied status text and private diagnostics are not
 // copied into this output. Report does not reparse subprocess log text.
 func (w *checkedWriter) Report(event nvkedemo.ProgressEvent) {
+	if event.Kind == nvkedemo.BuildPlanSelected {
+		w.mu.Lock()
+		w.lineOutput()
+		w.discard = false
+		w.mu.Unlock()
+		if w.observer != nil {
+			w.observer.Report(event)
+		}
+		return
+	}
 	if event.Kind == nvkedemo.NativeDeployment {
 		if w.observer != nil {
 			w.observer.Report(event)

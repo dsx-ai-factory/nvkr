@@ -90,6 +90,8 @@ type dashboardSnapshot struct {
 	buildPreview, buildTruncated  bool
 	buildChangedAt                time.Time
 	buildOutputs                  []string
+	buildRequired                 int
+	buildRun                      string
 	buildOutputAt                 time.Time
 	buildOutputBytes              uint64
 	buildProcess                  string
@@ -152,10 +154,6 @@ func (d *dashboard) Write(data []byte) (int, error) {
 	for _, value := range data {
 		if value == '\n' {
 			line := string(d.partial)
-			if !d.dropped && d.observeBuildGraph(line) {
-				d.partial = d.partial[:0]
-				continue
-			}
 			if !d.dropped {
 				d.observeBuildLog(line)
 			}
@@ -416,6 +414,9 @@ func (d *dashboard) Report(event nvkedemo.ProgressEvent) {
 		d.resetTenantObservation()
 	}
 	switch event.Kind {
+	case nvkedemo.BuildPlanSelected:
+		d.observeBuildPlan(event)
+		return
 	case nvkedemo.NativeDeployment:
 		if event.ExpectedNodes != 0 && (requestedTenantNodes(event.ExpectedNodes) == 0 || event.Conformance && event.ExpectedNodes != 3) {
 			return
@@ -446,7 +447,7 @@ func (d *dashboard) Report(event nvkedemo.ProgressEvent) {
 		return
 	}
 	if event.Kind == nvkedemo.ProcessStarted || event.Kind == nvkedemo.ProcessExited {
-		if event.Name == "build-all" {
+		if event.Name == "build-all" || event.Name == "native-tools-run" {
 			if event.Kind == nvkedemo.ProcessExited {
 				d.buildProcess = "exited"
 			} else if d.buildProcess != "exited" {

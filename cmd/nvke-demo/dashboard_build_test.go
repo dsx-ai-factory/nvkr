@@ -6,23 +6,18 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
-	"os"
-	"os/exec"
-	"slices"
 	"strings"
 	"testing"
 	"time"
-	"unicode/utf8"
 
 	"github.com/dsx-ai-factory/nvkr/internal/buildactivity"
 	"github.com/dsx-ai-factory/nvkr/internal/nvkedemo"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/planview"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/progress"
 	"github.com/gdamore/tcell/v2"
 )
 
@@ -113,6 +108,108 @@ func TestDashboardProjectionFailureDoesNotInventCapReason(t *testing.T) {
 	}
 }
 
+func TestDashboardSelectedPlansReplaceRunState(t *testing.T) {
+	t.Chdir("../..")
+	artifacts, err := factory.LoadPlanContext(t.Context(), ".github/nvkr-run/plan.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tools, _, err := factory.CaptureCompileFiles(t.Context(), ".", "inputs/definitions/demo/native-linux/definition-tools.json", "inputs/environments/local-native-linux.json", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	project := func(plan *factory.Plan, name string) nvkedemo.ProgressEvent {
+		t.Helper()
+		monitor, err := factory.NewProgress(plan, "same-attempt")
+		if err != nil {
+			t.Fatal(err)
+		}
+		document, err := planview.Inspect(plan)
+		if err != nil {
+			t.Fatal(err)
+		}
+		graph, err := document.GraphSnapshot("artifacts")
+		if err != nil {
+			t.Fatal(err)
+		}
+		snapshot := monitor.Snapshot()
+		return nvkedemo.ProgressEvent{Kind: nvkedemo.BuildPlanSelected, Name: name, BuildPlan: &snapshot, BuildGraph: &graph}
+	}
+	artifactPlan, toolPlan := project(artifacts, "artifacts"), project(tools, "native-tools")
+	for _, scenario := range []string{"tools Plan", "oversized prior line", "tools Plan unavailable", "artifact failure"} {
+		t.Run(scenario, func(t *testing.T) {
+			d := newDashboard()
+			w := &checkedWriter{out: d, observer: d, started: time.Now(), phases: make(map[string]time.Time)}
+			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.LaneStarted, Name: "artifacts"})
+			w.Report(artifactPlan)
+			before := d.snapshot()
+			if before.buildRequired != len(artifacts.LifecycleOutputs) ||
+				!strings.Contains(dashboardBuildRibbon(before, time.Now()), fmt.Sprintf("Required outputs[-::-] %d", len(artifacts.LifecycleOutputs))) {
+				t.Fatal("display lost the exact selected output count")
+			}
+			step := before.buildSteps[0]
+			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.ProcessStarted, Name: "build-all"})
+			_, _ = fmt.Fprintf(w, "[start] %s (%s)\n[done] %s\n", step.id, step.kind, step.id)
+			_, _ = io.WriteString(w, "==> nvke-node-non-fde.qemu.nvke-non-fde: Connected to SSH!\n")
+			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.ProcessExited, Name: "build-all"})
+			outcome := nvkedemo.LaneFinished
+			if scenario == "artifact failure" {
+				outcome = nvkedemo.LaneFailed
+			}
+			w.Report(nvkedemo.ProgressEvent{Kind: outcome, Name: "artifacts"})
+			prior := "prior unfinished output"
+			if scenario == "oversized prior line" {
+				prior = strings.Repeat("x", 16<<10+1)
+			}
+			_, _ = io.WriteString(w, prior)
+			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.LaneStarted, Name: "artifacts"})
+			selected := toolPlan
+			if scenario == "tools Plan unavailable" {
+				selected = nvkedemo.ProgressEvent{Kind: nvkedemo.BuildPlanSelected, Name: "native-tools"}
+			}
+			w.Report(selected)
+			after := d.snapshot()
+			if scenario == "artifact failure" {
+				if after.phases[1].state != "failed" || after.buildRun != "artifacts" || after.buildSteps[0].state != "done" {
+					t.Fatal("a later selected Run masked the failed artifact lane")
+				}
+				return
+			}
+			if after.phases[1].state != "running" || after.buildRun != "native-tools" || after.buildProcess != "" ||
+				after.buildOutputBytes != 0 || !after.buildOutputAt.IsZero() || after.buildGuestStage != "" || !after.buildChangedAt.IsZero() || len(after.buildLogs) != 0 {
+				t.Fatal("new Run retained old completion or telemetry")
+			}
+			if scenario == "tools Plan unavailable" {
+				if after.buildRequired != 0 || len(after.buildSteps) != 0 || len(after.buildVertices) != 0 || len(after.buildEdges) != 0 ||
+					!strings.Contains(dashboardBuildRibbon(after, time.Now()), "Required output total unknown") {
+					t.Fatal("missing new Plan retained the preceding Run's totals or links")
+				}
+				return
+			}
+			if after.buildRequired != len(tools.LifecycleOutputs) || len(after.buildSteps) != len(tools.Graph.Nodes) || len(after.buildEdges) == 0 || after.buildTruncated {
+				t.Fatal("native tools did not replace the artifact graph and output count")
+			}
+			for _, row := range after.buildSteps {
+				if row.state != "queued" {
+					t.Fatal("planned operation became a completion observation")
+				}
+			}
+			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.ProcessStarted, Name: "native-tools-run"})
+			step = after.buildSteps[0]
+			_, _ = fmt.Fprintf(w, "[start] %s (%s)\n", step.id, step.kind)
+			if d.snapshot().buildSteps[0].state != "running" {
+				t.Fatal("previous Run's unfinished stdout hid the new operation start")
+			}
+			_, _ = fmt.Fprintf(w, "[done] %s\n", step.id)
+			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.ProcessExited, Name: "native-tools-run"})
+			after = d.snapshot()
+			if after.buildProcess != "exited" || after.buildSteps[0].state != "done" || after.phases[1].state != "running" {
+				t.Fatal("tools logs were ignored or process join became artifact completion")
+			}
+		})
+	}
+}
+
 func TestDashboardBuildElapsedIsNeverTruncated(t *testing.T) {
 	for _, elapsed := range []time.Duration{75 * time.Second, time.Hour + 10*time.Second, time.Hour + 12*time.Minute + 34*time.Second, 10 * time.Hour} {
 		t.Run(elapsed.String(), func(t *testing.T) {
@@ -197,36 +294,22 @@ func TestDashboardBuildLogLocatorSurvivesActivityEviction(t *testing.T) {
 	}
 }
 
-func graphRecord(t *testing.T, out io.Writer, prefix string, value any) {
-	t.Helper()
-	raw, err := json.Marshal(value)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := fmt.Fprintf(out, "%s%s\n", prefix, raw); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestDashboardReceivesGraphAndHiddenRawOutput(t *testing.T) {
 	d := newDashboard()
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	w := &checkedWriter{out: d, observer: d, started: time.Now(), phases: make(map[string]time.Time), cancel: cancel}
 	w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.LaneStarted, Name: "artifacts"})
-	w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.ProcessStarted, Name: "build-all"})
 	vertices := []planview.Vertex{
 		{Key: "operation/os/build-disk", Kind: "operation", Reference: "os/build-disk", Label: "os/build-disk (build)", Build: "os"},
 		{Key: "artifact/input", Kind: "artifact", Reference: "input"},
 		{Key: "artifact/disk", Kind: "artifact", Reference: "disk"},
 	}
-	for _, vertex := range vertices {
-		graphRecord(t, w, "Build vertex: ", vertex)
-	}
-	for _, edge := range []planview.Edge{{From: "artifact/input", To: "operation/os/build-disk", Relation: "consumed by"}, {From: "operation/os/build-disk", To: "artifact/disk", Relation: "produces"}} {
-		graphRecord(t, w, "Build edge: ", edge)
-	}
-	graphRecord(t, w, "Build display: ", map[string]any{"vertices": 3, "edges": 2, "truncated": false})
+	w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.BuildPlanSelected, Name: "artifacts",
+		BuildPlan: &progress.Snapshot{Outputs: []progress.Output{{Name: "disk"}}, Operations: []progress.Operation{{ID: "os/build-disk", Kind: "build"}}},
+		BuildGraph: &planview.Graph{Vertices: append(vertices, planview.Vertex{Key: "route/private", Kind: "route", Label: "private-route-sentinel"}),
+			Edges: []planview.Edge{{From: "artifact/input", To: "operation/os/build-disk", Relation: "consumed by"}, {From: "operation/os/build-disk", To: "artifact/disk", Relation: "produces"}, {From: "artifact/disk", To: "route/private", Relation: "publication route"}}}})
+	w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.ProcessStarted, Name: "build-all"})
 	_, _ = io.WriteString(w, "[dry-run] os/build-disk (build)\n[start] os/build-disk (build)\n")
 	before := d.snapshot()
 	_, _ = io.WriteString(w, "compilation output hidden by concise mode\n")
@@ -239,8 +322,8 @@ func TestDashboardReceivesGraphAndHiddenRawOutput(t *testing.T) {
 		t.Fatal("owner graph/process observations lost or display canceled work")
 	}
 	for _, line := range after.activity {
-		if strings.Contains(line, "Build vertex:") || strings.Contains(line, "Build edge:") {
-			t.Fatal("graph records flooded the activity wall")
+		if strings.Contains(line, "private-route-sentinel") {
+			t.Fatal("typed graph exposed a private route in the activity wall")
 		}
 	}
 	detail := dashboardBuildDetail(after, after.buildOutputAt.Add(time.Minute))
@@ -271,18 +354,24 @@ func TestDashboardReceivesGraphAndHiddenRawOutput(t *testing.T) {
 }
 
 func TestDashboardGraphDisplayBounds(t *testing.T) {
-	for _, input := range []string{
-		`Build vertex: {"key":"operation/build","kind":"route","reference":"build"}`,
-		`Build vertex: {"key":"operation/\u001b","kind":"operation","reference":"build"}`,
-		`Build vertex: {"key":"artifact/input","kind":"artifact","reference":"input","label":"` + strings.Repeat("a", 513) + `"}`,
-		`Build edge: {"from":"artifact/input","to":"operation/build","relation":"private-message"}`,
-		`Build display: {"vertices":1,"edges":0,"truncated":false}`,
-		`Build vertex: {invalid-json}`,
+	for _, input := range []struct {
+		name   string
+		vertex *planview.Vertex
+		edge   *planview.Edge
+	}{
+		{name: "unsupported vertex", vertex: &planview.Vertex{Key: "operation/build", Kind: "route", Reference: "build"}},
+		{name: "terminal controls", vertex: &planview.Vertex{Key: "operation/\x1b", Kind: "operation", Reference: "build"}},
+		{name: "overlong label", vertex: &planview.Vertex{Key: "artifact/input", Kind: "artifact", Reference: "input", Label: strings.Repeat("a", 513)}},
+		{name: "private relation", edge: &planview.Edge{From: "artifact/input", To: "operation/build", Relation: "private-message"}},
 	} {
-		t.Run(input[:min(80, len(input))], func(t *testing.T) {
+		t.Run(input.name, func(t *testing.T) {
 			d := newDashboard()
 			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.LaneStarted, Name: "artifacts"})
-			_, _ = io.WriteString(d, input+"\n")
+			if input.vertex != nil {
+				d.observeBuildVertex(*input.vertex)
+			} else {
+				d.observeBuildEdge(*input.edge)
+			}
 			if !d.snapshot().buildTruncated || len(d.snapshot().buildVertices) != 0 || len(d.snapshot().buildEdges) != 0 || d.snapshot().phases[1].state != "running" {
 				t.Fatal("malformed display was accepted, authorized completion or omitted incomplete status")
 			}
@@ -323,152 +412,6 @@ func TestDashboardGuestReportsFollowMaintainedPackerSelectors(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestDashboardMaintainedPlanThroughLauncherProjection(t *testing.T) {
-	t.Chdir("../..")
-	for _, small := range []bool{false, true} {
-		name := "complete M2 truncated"
-		if small {
-			name = "real CLI selection complete"
-		}
-		t.Run(name, func(t *testing.T) {
-			var plan *factory.Plan
-			var err error
-			if small {
-				const definitionPath = "docs/examples/nvke-tutorial/definition.yaml"
-				const environmentPath = "docs/examples/nvke-tutorial/environment-github.yaml"
-				authored, loadErr := definition.LoadDefinition(t.Context(), definitionPath)
-				if loadErr != nil {
-					t.Fatal(loadErr)
-				}
-				authored.Outputs = slices.DeleteFunc(authored.Outputs, func(output definition.DefinitionOutput) bool { return output.Name != "nvkectl" })
-				if len(authored.Outputs) != 1 {
-					t.Fatal("real CLI output is absent")
-				}
-				environment, loadErr := definition.LoadEnvironment(t.Context(), environmentPath)
-				if loadErr != nil {
-					t.Fatal(loadErr)
-				}
-				plan, err = factory.CompileDocuments(t.Context(), definitionPath, authored, environmentPath, environment, "test")
-			} else {
-				plan, err = factory.LoadPlanContext(t.Context(), ".github/nvkr-run/plan.json")
-			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			assertDashboardLauncherProjection(t, plan, !small)
-		})
-	}
-}
-
-func assertDashboardLauncherProjection(t *testing.T, plan *factory.Plan, wantTruncated bool) {
-	t.Helper()
-	jq, err := exec.LookPath("jq")
-	if err != nil {
-		t.Skip("launcher projection integration requires jq")
-	}
-	doc, err := planview.Inspect(plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	graph, err := doc.Graph(planview.GraphOptions{View: "complete", Format: "json"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	script, err := os.ReadFile("scripts/nvke-full-arm64-local.sh")
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Execute the launcher's actual jq expression, not a copied projection or
-	// fabricated vertex/edge fixture. Exact delimiters fail on script drift.
-	start := "# verification. Preserve owner keys/edges; omit route refs and producer duplicates.\njq -r '\n"
-	end := "\n' \"${bootstrap}/graph.json\" >&2"
-	if strings.Count(string(script), start) != 1 {
-		t.Fatal("launcher graph projection boundary changed")
-	}
-	_, projection, _ := strings.Cut(string(script), start)
-	expression, _, found := strings.Cut(projection, end)
-	if !found {
-		t.Fatal("launcher graph projection terminator changed")
-	}
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-	defer cancel()
-	command := exec.CommandContext(ctx, jq, "-r", expression)
-	command.Stdin = bytes.NewReader(graph)
-	command.WaitDelay = time.Second
-	raw, err := command.Output()
-	if err != nil {
-		t.Fatal("actual launcher projection failed", err)
-	}
-	d := newDashboard()
-	d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.LaneStarted, Name: "artifacts"})
-	if _, err := d.Write(raw); err != nil {
-		t.Fatal(err)
-	}
-	s := d.snapshot()
-	// The maintained selection may outgrow the launcher's deliberate display
-	// bounds. Preserve its explicit incomplete-display marker, not an assumption
-	// that every complete Release fits in the diagnostic view.
-	_, summary, found := strings.Cut(string(raw), "Build display: ")
-	var totals struct {
-		Vertices  int  `json:"vertices"`
-		Edges     int  `json:"edges"`
-		Truncated bool `json:"truncated"`
-	}
-	if !found || json.Unmarshal([]byte(summary), &totals) != nil {
-		t.Fatal("launcher projection omitted its bounded-display summary")
-	}
-	if totals.Truncated != wantTruncated {
-		t.Fatalf("real Plan display truncation = %t, want %t", totals.Truncated, wantTruncated)
-	}
-	if s.buildTruncated != totals.Truncated || len(s.buildVertices) != totals.Vertices ||
-		len(s.buildEdges) != totals.Edges || len(s.buildVertices) == 0 || len(s.buildEdges) == 0 || s.phases[1].state != "running" {
-		t.Fatal("maintained Plan projection lost links or promoted execution authority")
-	}
-	vertices := make(map[string]bool, len(s.buildVertices))
-	for _, vertex := range s.buildVertices {
-		vertices[vertex.Key] = true
-	}
-	for _, edge := range s.buildEdges {
-		if !vertices[edge.From] || !vertices[edge.To] {
-			t.Fatal("launcher emitted a dangling Plan link")
-		}
-	}
-	// Compute membership from the typed complete graph, independently of the
-	// launcher's emitted summary and the dashboard's parser. Apply limits before
-	// text filtering, matching the documented bounded display contract.
-	complete, err := doc.GraphSnapshot("complete")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var operations, artifacts []planview.Vertex
-	for _, vertex := range complete.Vertices {
-		switch vertex.Kind {
-		case "operation":
-			operations = append(operations, vertex)
-		case "artifact", "output":
-			artifacts = append(artifacts, vertex)
-		}
-	}
-	wantVertices := append(slices.Clone(operations[:min(512, len(operations))]), artifacts[:min(1024, len(artifacts))]...)
-	wantVertices = slices.DeleteFunc(wantVertices, func(vertex planview.Vertex) bool {
-		return utf8.RuneCountInString(vertex.Key) > 256 || utf8.RuneCountInString(vertex.Reference) > 256 ||
-			utf8.RuneCountInString(vertex.Build) > 256 || utf8.RuneCountInString(vertex.Label) > 512
-	})
-	retained := make(map[string]bool, len(wantVertices))
-	for _, vertex := range wantVertices {
-		retained[vertex.Key] = true
-	}
-	var wantEdges []planview.Edge
-	for _, edge := range complete.Edges {
-		if retained[edge.From] && retained[edge.To] && utf8.RuneCountInString(edge.Relation) <= 64 && len(wantEdges) < 4096 {
-			wantEdges = append(wantEdges, edge)
-		}
-	}
-	if !slices.Equal(s.buildVertices, wantVertices) || !slices.Equal(s.buildEdges, wantEdges) {
-		t.Fatal("launcher/dashboard projection differs from independently retained real Plan membership")
 	}
 }
 
