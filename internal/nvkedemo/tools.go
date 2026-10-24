@@ -89,6 +89,7 @@ type producedToolRun struct {
 	publication delivery.PublicationRequest
 	plan        *factory.Plan
 	hostOutput  lifecycle.Artifact
+	hostBundle  delivery.BinaryBundle
 }
 
 func produceToolRun(ctx context.Context, cfg ToolConfig, platform string) (producedToolRun, error) {
@@ -196,7 +197,7 @@ func produceToolRun(ctx context.Context, cfg ToolConfig, platform string) (produ
 	if err != nil {
 		return producedToolRun{}, err
 	}
-	inspected, err := inspectAdmittedBinaryBundle(ctx, layout, indexDigest)
+	hostBundle, inspected, err := inspectAdmittedBinaryBundle(ctx, layout, indexDigest)
 	if err != nil {
 		return producedToolRun{}, nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "verify completed native tool bundle")
 	}
@@ -213,14 +214,14 @@ func produceToolRun(ctx context.Context, cfg ToolConfig, platform string) (produ
 		if err != nil {
 			return producedToolRun{}, err
 		}
-		inspected, err := inspectAdmittedBinaryBundle(ctx, layout, indexDigest)
+		_, inspected, err := inspectAdmittedBinaryBundle(ctx, layout, indexDigest)
 		if err != nil {
 			return producedToolRun{}, nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "verify completed site tool bundle")
 		}
 		request.Objects = append(request.Objects, delivery.ObjectInput{Name: companion.name, Kind: "binary-bundle", Path: layout,
 			ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: inspected.SemanticDigest, BlobDigest: inspected.RootDigest, Layout: true})
 	}
-	return producedToolRun{root: root, work: out, publication: request, plan: plan, hostOutput: observed}, nil
+	return producedToolRun{root: root, work: out, publication: request, plan: plan, hostOutput: observed, hostBundle: hostBundle}, nil
 }
 
 func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string, error) {
@@ -232,8 +233,7 @@ func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string,
 	if err != nil {
 		return "", err
 	}
-	root, out := produced.root, produced.work
-	layout := filepath.Join(root, "packages", bundle)
+	out := produced.work
 	publication := filepath.Join(out, "publication")
 	companions := siteStartupToolBundles(platform)
 	phase := beginProgress(cfg.Progress, "native-tools-verify", PhaseStarted, PhaseFinished, PhaseFailed)
@@ -243,7 +243,7 @@ func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string,
 		return "", nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "native-tools-verify")
 	}
 	directory := filepath.Join(out, "bin")
-	if err := extractNativeHostTools(ctx, layout, publication, directory, platform); err != nil {
+	if err := extractNativeHostTools(ctx, produced.hostBundle, publication, directory, platform); err != nil {
 		return "", err
 	}
 	if len(companions) > 0 {
@@ -282,15 +282,15 @@ func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string,
 	return directory, nil
 }
 
-// Inspect the carrier already bound to a completed Run. Publication revalidates
-// this same exact index digest before copying any source bytes.
-func inspectAdmittedBinaryBundle(ctx context.Context, root, indexDigest string) (delivery.Result, error) {
-	_, inspected, err := delivery.InspectBinaryBundle(ctx, root)
+// Inspect the carrier already bound to a completed Run. Publication checks this
+// exact index digest after importing into private staging, before committing.
+func inspectAdmittedBinaryBundle(ctx context.Context, root, indexDigest string) (delivery.BinaryBundle, delivery.Result, error) {
+	bundle, inspected, err := delivery.InspectBinaryBundle(ctx, root)
 	if err != nil {
-		return delivery.Result{}, err
+		return delivery.BinaryBundle{}, delivery.Result{}, err
 	}
 	if inspected.RootDigest != indexDigest {
-		return delivery.Result{}, errors.New("binary bundle carrier changed after completed Run admission")
+		return delivery.BinaryBundle{}, delivery.Result{}, errors.New("binary bundle carrier changed after completed Run admission")
 	}
-	return inspected, nil
+	return bundle, inspected, nil
 }

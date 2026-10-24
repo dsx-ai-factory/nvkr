@@ -167,6 +167,7 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 	publication := delivery.PublicationRequest{}
 	var siteMembers []string
 	var hostOutput, siteOutput lifecycle.Artifact
+	var hostTools delivery.BinaryBundle
 	for _, bundle := range []string{hostBundle, "site-startup-tools-arm64"} {
 		run := cfg.ToolsRun
 		if bundle == hostBundle {
@@ -190,9 +191,12 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 		if err != nil {
 			return assets, err
 		}
-		inspected, err := inspectAdmittedBinaryBundle(ctx, root, indexDigest)
+		contents, inspected, err := inspectAdmittedBinaryBundle(ctx, root, indexDigest)
 		if err != nil {
 			return assets, err
+		}
+		if bundle == hostBundle {
+			hostTools = contents
 		}
 		publication.Objects = append(publication.Objects, delivery.ObjectInput{Name: bundle, Kind: "binary-bundle", Path: root,
 			ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: inspected.SemanticDigest, BlobDigest: inspected.RootDigest, Layout: true})
@@ -268,7 +272,7 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 		Installer: filepath.Join(out, "installer"),
 		Files:     filepath.Join(out, "files"), Images: make(map[string]NativeImageAsset), RuntimeOutputs: runtimeOutputs,
 	}
-	if err := extractNativeHostTools(ctx, filepath.Join(hostRun, "packages", hostBundle), publicationPath, assets.HostTools, platform); err != nil {
+	if err := extractNativeHostTools(ctx, hostTools, publicationPath, assets.HostTools, platform); err != nil {
 		return assets, err
 	}
 	for _, bundle := range []struct {
