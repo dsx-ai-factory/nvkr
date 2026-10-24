@@ -4,10 +4,15 @@
 package nvkedemo
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"net/netip"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -15,6 +20,151 @@ import (
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"golang.org/x/net/route"
 )
+
+func TestNativeAddressCaptureRetainsOnlyLatestPrivateOutput(t *testing.T) {
+	for _, explicitDirectory := range []bool{false, true} {
+		t.Run(fmt.Sprintf("explicit-directory-%v", explicitDirectory), func(t *testing.T) {
+			work, logs := privateTestDir(t), privateTestDir(t)
+			latest := filepath.Join(logs, "latest.log")
+			if err := privateWrite(latest, nil); err != nil {
+				t.Fatal(err)
+			}
+			program := filepath.Join(work, "capture")
+			writeTenantFixture(t, program, []byte("#!/bin/sh\nset -eu\ntest \"$PWD\" = \"$EXPECTED_CWD\"\nprintf '%s' \"$1\"\nprintf '%s' \"$2\" >&2\nexit \"$3\"\n"), 0o700)
+			var public bytes.Buffer
+			runner := Runner{Work: work, Progress: &public, output: &public}
+			cwd := work
+			if explicitDirectory {
+				cwd = privateTestDir(t)
+				runner.directory = cwd
+			}
+			runner.Env = []string{"PATH=/usr/bin:/bin", "EXPECTED_CWD=" + cwd}
+			for i, exit := range []int{0, 0, 7} {
+				stdout, stderr := fmt.Sprintf("stdout-%d", i), fmt.Sprintf("private-stderr-%d", i)
+				phase := fmt.Sprintf("native-address-%d", i)
+				raw, err := captureNativeAddressObservation(t.Context(), runner, []string{program, stdout, stderr, fmt.Sprint(exit)}, phase, latest)
+				if string(raw) != stdout || exit == 0 && err != nil || exit != 0 && CommandExitCode(err) != exit {
+					t.Fatalf("stdout=%q err=%v", raw, err)
+				}
+				if exit != 0 {
+					var command *CommandError
+					if !errors.As(err, &command) || command.Phase != phase {
+						t.Fatalf("lost command phase: %v", err)
+					}
+				}
+				combined, readErr := os.ReadFile(latest)
+				if readErr != nil || !strings.Contains(string(combined), stdout) || !strings.Contains(string(combined), stderr) || len(combined) != len(stdout)+len(stderr) {
+					t.Fatalf("latest output=%q err=%v", combined, readErr)
+				}
+			}
+			entries, err := os.ReadDir(logs)
+			if err != nil || len(entries) != 1 || entries[0].Name() != "latest.log" {
+				t.Fatalf("per-poll diagnostic files accumulated: %v %v", entries, err)
+			}
+			info, err := os.Stat(latest)
+			if err != nil || info.Mode().Perm() != 0o600 || public.Len() != 0 {
+				t.Fatalf("nonprivate diagnostic: %v %v public=%q", info, err, &public)
+			}
+			entries, err = os.ReadDir(work)
+			if err != nil || len(entries) != 1 || entries[0].Name() != "capture" {
+				t.Fatalf("capture wrote per-command logs: %v %v", entries, err)
+			}
+		})
+	}
+}
+
+func TestNativeAddressCaptureCanceledBeforeLaunchPreservesLatest(t *testing.T) {
+	work := privateTestDir(t)
+	latest, marker := filepath.Join(work, "latest.log"), filepath.Join(work, "launched")
+	if err := privateWrite(latest, []byte("previous meaningful output")); err != nil {
+		t.Fatal(err)
+	}
+	program := filepath.Join(work, "capture")
+	writeTenantFixture(t, program, []byte("#!/bin/sh\nprintf launched > \"$MARKER\"\n"), 0o700)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	raw, err := captureNativeAddressObservation(ctx, Runner{Work: work, Env: []string{"PATH=/usr/bin:/bin", "MARKER=" + marker}}, []string{program}, "native-address-canceled", latest)
+	if len(raw) != 0 || !errors.Is(err, context.Canceled) || errors.Is(err, ErrUnjoined) {
+		t.Fatalf("cancellation changed: stdout=%q err=%v", raw, err)
+	}
+	retained, readErr := os.ReadFile(latest)
+	if readErr != nil || string(retained) != "previous meaningful output" {
+		t.Fatalf("empty canceled poll erased evidence: %q %v", retained, readErr)
+	}
+	if _, err := os.Stat(marker); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("canceled command launched: %v", err)
+	}
+}
+
+func TestNativeAddressCaptureRefusesUnsafeLatestStorage(t *testing.T) {
+	for _, scenario := range []string{"missing", "symlink", "directory"} {
+		t.Run(scenario, func(t *testing.T) {
+			work := privateTestDir(t)
+			latest, target := filepath.Join(work, "latest.log"), filepath.Join(work, "foreign")
+			if err := privateWrite(target, []byte("unchanged")); err != nil {
+				t.Fatal(err)
+			}
+			switch scenario {
+			case "symlink":
+				if err := os.Symlink(target, latest); err != nil {
+					t.Fatal(err)
+				}
+			case "directory":
+				if err := os.Mkdir(latest, 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			program := filepath.Join(work, "capture")
+			writeTenantFixture(t, program, []byte("#!/bin/sh\nprintf partial\nprintf private-failure >&2\nexit 7\n"), 0o700)
+			raw, err := captureNativeAddressObservation(t.Context(), Runner{Work: work, Env: []string{"PATH=/usr/bin:/bin"}}, []string{program}, "native-address-storage", latest)
+			var exit *exec.ExitError
+			if string(raw) != "partial" || CommandExitCode(err) != -1 || !errors.As(err, &exit) || exit.ExitCode() != 7 {
+				t.Fatalf("diagnostic failure hid original command failure: stdout=%q err=%v", raw, err)
+			}
+			retained, readErr := os.ReadFile(target)
+			if readErr != nil || string(retained) != "unchanged" {
+				t.Fatalf("unsafe target changed: %q %v", retained, readErr)
+			}
+			if scenario == "missing" {
+				if _, err := os.Stat(latest); !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("missing slot was adopted: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestNativeAddressCaptureBoundsCombinedOutput(t *testing.T) {
+	work := privateTestDir(t)
+	latest := filepath.Join(work, "latest.log")
+	if err := privateWrite(latest, nil); err != nil {
+		t.Fatal(err)
+	}
+	program, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := Runner{Work: work, Env: []string{"NVKR_ADDRESS_CAPTURE_HELPER=1"}}
+	raw, err := captureNativeAddressObservation(t.Context(), runner, []string{program, "-test.run=^TestNativeAddressCaptureHelperProcess$"}, "native-address-large", latest)
+	if err == nil || CommandExitCode(err) != -1 || errors.Is(err, ErrUnjoined) || len(raw) != diagnosticLimit/2 || bytes.Count(raw, []byte("x")) != len(raw) {
+		t.Fatalf("combined bound lost: stdout=%d err=%v", len(raw), err)
+	}
+	retained, readErr := os.ReadFile(latest)
+	if readErr != nil || len(retained) != diagnosticLimit || !bytes.Contains(retained, []byte("x")) || !bytes.Contains(retained, []byte("y")) {
+		t.Fatalf("combined output not bounded and retained: len=%d err=%v", len(retained), readErr)
+	}
+}
+
+func TestNativeAddressCaptureHelperProcess(t *testing.T) {
+	if os.Getenv("NVKR_ADDRESS_CAPTURE_HELPER") == "" {
+		return
+	}
+	// Neither stream individually exceeds Runner's bound; only their combined
+	// output does, so ignoring the caller-owned sink's result would hide failure.
+	_, _ = os.Stdout.Write(bytes.Repeat([]byte("x"), diagnosticLimit/2))
+	_, _ = os.Stderr.Write(bytes.Repeat([]byte("y"), diagnosticLimit/2+1))
+	os.Exit(0)
+}
 
 func TestNativeAddressProjectionRequiresObservedOwnedBinding(t *testing.T) {
 	network := nativeBridgeConfig{prefix: netip.MustParsePrefix("192.0.2.0/24"), gateway: netip.MustParseAddr("192.0.2.1"), last: netip.MustParseAddr("192.0.2.254"), dhcp: true}
