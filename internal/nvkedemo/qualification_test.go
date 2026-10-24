@@ -16,6 +16,7 @@ import (
 )
 
 func TestDemoQualificationGate(t *testing.T) {
+	buildDockerFixture(t, "")
 	for _, tc := range []struct {
 		name                      string
 		status, attempt, exit     string

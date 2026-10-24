@@ -24,12 +24,13 @@ import (
 )
 
 func TestBuildOnlyPreservesDeveloperGitHome(t *testing.T) {
+	buildDockerFixture(t, "")
 	t.Setenv("GIT_CONFIG_COUNT", "0")
 	for _, home := range []string{"", "/developer/home"} {
 		t.Run("HOME="+home, func(t *testing.T) {
 			t.Setenv("HOME", home)
 			t.Setenv("GH_TOKEN", "not-forwarded")
-			build, err := localBuildEnvironment()
+			build, err := localBuildEnvironment(t.Context())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -52,6 +53,7 @@ func TestBuildOnlyPreservesDeveloperGitHome(t *testing.T) {
 }
 
 func TestBuildTransportSettingsReachOnlyGitFetch(t *testing.T) {
+	buildDockerFixture(t, "")
 	t.Setenv("GIT_CONFIG_COUNT", "0")
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
@@ -61,7 +63,7 @@ func TestBuildTransportSettingsReachOnlyGitFetch(t *testing.T) {
 	for _, key := range keys {
 		t.Setenv(key, "synthetic-transport-setting")
 	}
-	build, err := localBuildEnvironment()
+	build, err := localBuildEnvironment(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,6 +96,7 @@ func TestBuildTransportSettingsReachOnlyGitFetch(t *testing.T) {
 }
 
 func TestBuildLocalSourceRedirectsAreValidatedAndFetchOnly(t *testing.T) {
+	buildDockerFixture(t, "")
 	for _, test := range []struct {
 		name, count, key string
 		valid            bool
@@ -112,7 +115,7 @@ func TestBuildLocalSourceRedirectsAreValidatedAndFetchOnly(t *testing.T) {
 			t.Setenv("GIT_CONFIG_VALUE_0", "https://github.com/dsx-ai-factory/ovn-kubernetes")
 			t.Setenv("GIT_CONFIG_KEY_9", "credential.helper")
 			t.Setenv("GIT_CONFIG_VALUE_9", "!unselected-callback")
-			build, err := localBuildEnvironment()
+			build, err := localBuildEnvironment(t.Context())
 			if !test.valid {
 				var coded *nvkrerr.Error
 				if build != nil || !errors.As(err, &coded) || coded.Code != nvkrerr.CodeEngineCapability {
@@ -513,5 +516,127 @@ func TestBuildAttemptDiagnostics(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// The installed Docker CLI owns context/config decoding and selection. This
+// fixture checks its invocation and the consumer's endpoint admission only.
+func buildDockerFixture(t *testing.T, body string) {
+	t.Helper()
+	if body == "" {
+		body = `case "$1:$2" in
+ context:show) printf '%s\n' fixture-selected ;;
+ context:inspect) test "$5" = --; test "$6" = fixture-selected; printf '%s\n' unix:///private/tmp/nvkr-build-fixture.sock ;;
+ *) exit 91 ;;
+esac`
+	}
+	bin := t.TempDir()
+	writeTenantFixture(t, filepath.Join(bin, "docker"), []byte("#!/bin/sh\nset -eu\n"+body+"\n"), 0700)
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func TestLocalBuildDockerEndpointAdmission(t *testing.T) {
+	for _, tc := range []struct {
+		name, platform, endpoint, failure string
+		cancel, timeout                   bool
+		code                              nvkrerr.Code
+	}{
+		{name: "selected Unix socket", platform: "darwin", endpoint: "unix:///private/tmp/selected.sock"},
+		{name: "Linux unchanged", platform: "linux", endpoint: "ssh://foreign"},
+		{name: "remote SSH", platform: "darwin", endpoint: "ssh://foreign", code: nvkrerr.CodeEngineCapability},
+		{name: "remote TCP", platform: "darwin", endpoint: "tcp://foreign:2375", code: nvkrerr.CodeEngineCapability},
+		{name: "empty endpoint", platform: "darwin", code: nvkrerr.CodeEngineCapability},
+		{name: "relative socket", platform: "darwin", endpoint: "unix:relative", code: nvkrerr.CodeEngineCapability},
+		{name: "socket authority", platform: "darwin", endpoint: "unix://foreign/socket", code: nvkrerr.CodeEngineCapability},
+		{name: "socket query", platform: "darwin", endpoint: "unix:///socket?target=foreign", code: nvkrerr.CodeEngineCapability},
+		{name: "socket fragment", platform: "darwin", endpoint: "unix:///socket#foreign", code: nvkrerr.CodeEngineCapability},
+		{name: "malformed URL", platform: "darwin", endpoint: "unix:///socket%zz", code: nvkrerr.CodeEngineCapability},
+		{name: "multiple endpoints", platform: "darwin", endpoint: "unix:///one\nunix:///two", code: nvkrerr.CodeEngineCapability},
+		{name: "selection failed", platform: "darwin", failure: "show", code: nvkrerr.CodeEngineCapability},
+		{name: "selection empty", platform: "darwin", failure: "empty", code: nvkrerr.CodeEngineCapability},
+		{name: "inspection failed", platform: "darwin", failure: "inspect", code: nvkrerr.CodeEngineCapability},
+		{name: "inspection deadline", platform: "darwin", timeout: true, code: nvkrerr.CodeTimeout},
+		{name: "canceled before inspection", platform: "darwin", cancel: true, code: nvkrerr.CodeTimeout},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("GIT_CONFIG_COUNT", "0")
+			// Both selectors reach Docker unchanged. The fixture's selected context
+			// and endpoint deliberately differ from these caller descriptions.
+			t.Setenv("DOCKER_HOST", "unix:///private/tmp/ambient.sock")
+			t.Setenv("DOCKER_CONTEXT", "ambient-context")
+			t.Setenv("DOCKER_CONFIG", "/synthetic/docker-config")
+			t.Setenv("DOCKER_TLS_VERIFY", "1")
+			t.Setenv("DOCKER_CERT_PATH", "/synthetic/credentials")
+			calls := filepath.Join(t.TempDir(), "calls")
+			body := "printf '%s:%s|%s|%s|%s\\n' \"$1\" \"$2\" \"${DOCKER_HOST-}\" \"${DOCKER_CONTEXT-}\" \"${DOCKER_CONFIG-}\" >> " + operatorQuote(calls) + "\n"
+			body += `case "$1:$2" in
+ context:show) `
+			switch tc.failure {
+			case "show":
+				body += "exit 17"
+			case "empty":
+				body += "exit 0"
+			default:
+				body += "printf '%s\\n' fixture-selected"
+			}
+			body += ` ;;
+ context:inspect) test "$3" = --format; test "$5" = --; test "$6" = fixture-selected; `
+			switch {
+			case tc.timeout:
+				body += "exec /bin/sleep 30"
+			case tc.failure == "inspect":
+				body += "exit 18"
+			default:
+				body += "printf '%s\\n' " + operatorQuote(tc.endpoint)
+			}
+			body += " ;;\n *) exit 91 ;;\nesac"
+			buildDockerFixture(t, body)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if tc.cancel {
+				cancel()
+			}
+			if tc.timeout {
+				var stop context.CancelFunc
+				ctx, stop = context.WithTimeout(ctx, 2*time.Second)
+				defer stop()
+			}
+			env, err := localBuildEnvironmentFor(ctx, tc.platform)
+			if tc.code != "" {
+				var coded *nvkrerr.Error
+				if env != nil || !errors.As(err, &coded) || coded.Code != tc.code {
+					t.Fatalf("endpoint admission=%v, want %s", err, tc.code)
+				}
+				if tc.cancel || tc.timeout {
+					if !errors.Is(err, ctx.Err()) {
+						t.Fatalf("caller cancellation lost: %v", err)
+					}
+				}
+			} else {
+				want := tc.endpoint
+				if tc.platform == "linux" {
+					want = "unix:///var/run/docker.sock"
+				}
+				if err != nil || environmentValue(env, "DOCKER_HOST") != want {
+					t.Fatalf("selected build endpoint=%q: %v", environmentValue(env, "DOCKER_HOST"), err)
+				}
+				for _, key := range []string{"DOCKER_CONTEXT", "DOCKER_CONFIG", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH"} {
+					if environmentValue(env, key) != "" {
+						t.Fatalf("build retained %s", key)
+					}
+				}
+			}
+			raw, readErr := os.ReadFile(calls)
+			if tc.platform == "linux" || tc.cancel {
+				if !os.IsNotExist(readErr) {
+					t.Fatalf("unexpected Docker inspection: %q %v", raw, readErr)
+				}
+			} else if readErr != nil || !strings.Contains(string(raw), "context:show|unix:///private/tmp/ambient.sock|ambient-context|/synthetic/docker-config") {
+				t.Fatalf("Docker did not receive original selectors: %q %v", raw, readErr)
+			}
+			if environmentValue(NativeEnvironment(), "DOCKER_HOST") != "unix:///var/run/docker.sock" || environmentValue(NativeEnvironment(), "DOCKER_CONTEXT") != "" {
+				t.Fatal("build endpoint escaped into deployment")
+			}
+		})
 	}
 }

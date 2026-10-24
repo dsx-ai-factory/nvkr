@@ -115,7 +115,7 @@ func produceToolRun(ctx context.Context, cfg ToolConfig, platform string) (produ
 	if err != nil {
 		return producedToolRun{}, err
 	}
-	env, err := localBuildEnvironment()
+	env, err := localBuildEnvironment(ctx)
 	if err != nil {
 		return producedToolRun{}, err
 	}

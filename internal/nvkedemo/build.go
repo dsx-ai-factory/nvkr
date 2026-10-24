@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -100,7 +101,7 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	} else if err := resolveSelectedBuild(ctx, repo, &cfg); err != nil {
 		return BuiltInputs{}, err
 	}
-	env, err := localBuildEnvironment()
+	env, err := localBuildEnvironment(ctx)
 	if err != nil {
 		return BuiltInputs{}, err
 	}
@@ -226,7 +227,14 @@ func builtInputs(repo, attempt string) BuiltInputs {
 // sourcegit owner narrows its own Git children to fetch-only credentials; this
 // does not isolate every launcher subprocess from the launcher environment.
 // Deployment uses a separate environment without ambient source credentials.
-func localBuildEnvironment() ([]string, error) {
+func localBuildEnvironment(ctx context.Context) ([]string, error) {
+	return localBuildEnvironmentFor(ctx, runtime.GOOS)
+}
+
+func localBuildEnvironmentFor(ctx context.Context, platform string) ([]string, error) {
+	if err := requireContext(ctx); err != nil {
+		return nil, nvkrerr.Wrap(nvkrerr.CodeTimeout, err, "local build environment")
+	}
 	redirects, err := sourcegit.LocalRedirectEnvironment(os.Environ())
 	if err != nil {
 		return nil, err
@@ -239,7 +247,43 @@ func localBuildEnvironment() ([]string, error) {
 			env = SetEnv(env, map[string]string{key: value})
 		}
 	}
-	return append(env, redirects...), nil
+	env = append(env, redirects...)
+	if platform != "darwin" {
+		return env, nil
+	}
+	// Docker owns context selection. Inspect with its developer selectors, then
+	// bind only the admitted local endpoint to build children. Deployment keeps
+	// the separate NativeEnvironment and Linux keeps its existing fixed socket.
+	probe := SetEnv(env, map[string]string{"DOCKER_HOST": ""})
+	for _, key := range []string{"DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG"} {
+		if value, ok := os.LookupEnv(key); ok {
+			probe = SetEnv(probe, map[string]string{key: value})
+		}
+	}
+	bounded, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	runner := Runner{Env: probe}
+	selected, err := runner.Capture(bounded, []string{"docker", "context", "show"}, "build-docker-context", 0)
+	if err == nil && strings.TrimSpace(string(selected)) == "" {
+		err = errors.New("no Docker context selected")
+	}
+	var endpoint []byte
+	if err == nil {
+		endpoint, err = runner.Capture(bounded, []string{"docker", "context", "inspect", "--format", "{{.Endpoints.docker.Host}}", "--", strings.TrimSpace(string(selected))}, "build-docker-endpoint", 0)
+	}
+	if err != nil {
+		if bounded.Err() != nil {
+			return nil, nvkrerr.Wrap(nvkrerr.CodeTimeout, errors.Join(err, bounded.Err()), "inspect local Docker endpoint")
+		}
+		return nil, nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "inspect local Docker endpoint")
+	}
+	host := strings.TrimSpace(string(endpoint))
+	parsed, err := url.Parse(host)
+	if err != nil || parsed.Scheme != "unix" || parsed.Host != "" || parsed.User != nil || parsed.Opaque != "" ||
+		!filepath.IsAbs(parsed.Path) || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" {
+		return nil, nvkrerr.New(nvkrerr.CodeEngineCapability, "native Mac builds require a Docker context with a local Unix socket")
+	}
+	return SetEnv(env, map[string]string{"DOCKER_HOST": host}), nil
 }
 
 func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg BuildConfig) (result error) {
