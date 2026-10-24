@@ -31,6 +31,7 @@ import (
 // Cleanup false delegates lifetime to the retained deployment owner.
 type NativeConfig struct {
 	Resources               NativeResources
+	TenantWorkers           int
 	TenantTimeout           time.Duration
 	Image, Out, Accelerator string
 	Network, DemoExecutable string
@@ -42,6 +43,7 @@ type NativeConfig struct {
 
 type nativeSiteAttempt struct {
 	resources                 NativeResources
+	tenantNodes               int
 	capacity                  *nativeResourceAdmission
 	use                       func(context.Context, *NativeSite) error
 	unjoinedWork              error
@@ -89,6 +91,10 @@ func runNativeSite(ctx context.Context, cfg NativeConfig, use func(context.Conte
 	if use == nil {
 		return configUsage("native site requires a lifecycle callback")
 	}
+	tenantNodes, err := selectedNativeTenantNodes(cfg.TenantWorkers, cfg.conformance != nil)
+	if err != nil {
+		return err
+	}
 	if err := admitNativeHost(runtime.GOOS+"/"+runtime.GOARCH, cfg.Accelerator); err != nil {
 		return err
 	}
@@ -122,7 +128,7 @@ func runNativeSite(ctx context.Context, cfg NativeConfig, use func(context.Conte
 	if err != nil {
 		return err
 	}
-	capacity := &nativeResourceAdmission{resources: resources, conformance: cfg.conformance != nil}
+	capacity := &nativeResourceAdmission{resources: resources, tenantWorkers: cfg.TenantWorkers, conformance: cfg.conformance != nil}
 	if err := capacity.check(ctx, filepath.Dir(out), false, cfg.Progress); err != nil {
 		return err
 	}
@@ -141,8 +147,8 @@ func runNativeSite(ctx context.Context, cfg NativeConfig, use func(context.Conte
 	if err != nil {
 		return err
 	}
-	reportProgress(cfg.Progress, ProgressEvent{Kind: NativeDeployment, ExpectedNodes: nativeTenantNodeCount(cfg.conformance != nil), Conformance: cfg.conformance != nil})
-	attempt := &nativeSiteAttempt{use: use, assets: assets, cleanup: cfg.Cleanup, walkthrough: cfg.Walkthrough, network: mode, tenantTimeout: cfg.TenantTimeout, conformance: cfg.conformance, resources: resources, capacity: capacity}
+	reportProgress(cfg.Progress, ProgressEvent{Kind: NativeDeployment, ExpectedNodes: tenantNodes, Conformance: cfg.conformance != nil})
+	attempt := &nativeSiteAttempt{use: use, assets: assets, cleanup: cfg.Cleanup, walkthrough: cfg.Walkthrough, network: mode, tenantTimeout: cfg.TenantTimeout, conformance: cfg.conformance, tenantNodes: tenantNodes, resources: resources, capacity: capacity}
 	result = RunNativeGuest(ctx, NativeGuestConfig{
 		Image: cfg.Image, Tools: assets.HostTools, Out: filepath.Join(out, "runtime"),
 		Accelerator: cfg.Accelerator, Progress: cfg.Progress, site: attempt, DemoExecutable: cfg.DemoExecutable,
@@ -545,16 +551,33 @@ func (s *nativeSiteAttempt) prepareBoot(ctx context.Context, imageURL, api strin
 	return nil
 }
 
-// nativeTenantNodeCount owns the shared native runtime policy. Conformance needs
-// two schedulable workers; ordinary diagnostics keep the smaller two-node tenant.
-func nativeTenantNodeCount(conformance bool) int {
-	if conformance {
-		return 3
+// selectedNativeTenantNodes owns downstream topology selection independently of
+// artifact selection. Conformance requires two schedulable workers.
+func selectedNativeTenantNodes(workers int, conformance bool) (int, error) {
+	if workers == 0 {
+		workers = 1
+		if conformance {
+			workers = 2
+		}
 	}
-	return 2
+	if workers != 1 && workers != 2 || conformance && workers != 2 {
+		return 0, configUsage("tenantWorkers must be 1 or 2; conformance requires 2")
+	}
+	return 1 + workers, nil
 }
 
-func (s *nativeSiteAttempt) tenantNodeCount() int { return nativeTenantNodeCount(s.conformance != nil) }
+// The existing bounded observers use the two supported default counts.
+func nativeTenantNodeCount(conformance bool) int {
+	nodes, _ := selectedNativeTenantNodes(0, conformance)
+	return nodes
+}
+
+func (s *nativeSiteAttempt) tenantNodeCount() int {
+	if s.tenantNodes != 0 {
+		return s.tenantNodes
+	}
+	return nativeTenantNodeCount(s.conformance != nil)
+}
 
 // Native acceptance binds every requested Kubernetes node to a distinct VM boot.
 // The legacy diagnostic owner has a separate observation contract.

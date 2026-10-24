@@ -15,7 +15,7 @@ import (
 )
 
 func TestNativeSessionSharesTenantAndConformanceProgressAcrossSiteReuse(t *testing.T) {
-	attempt, runner, root := nativeSessionFixture(t, true)
+	attempt, runner, root := nativeSessionFixture(t, true, 0)
 	writer := &recordedProgress{}
 	runner.Progress = writer
 	ctx, cancel := context.WithTimeout(t.Context(), time.Hour)
@@ -124,7 +124,7 @@ func TestNativeTenantRefreshesOwnedConditionsBeforeReadiness(t *testing.T) {
 		{name: "provider changed", observations: []nativeTenantRowObservation{starting, {ChangedProvider: true}}, wantError: "infrastructure changed"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			attempt, runner, root := nativeSessionFixture(t, false)
+			attempt, runner, root := nativeSessionFixture(t, false, 0)
 			writer := &recordedProgress{}
 			if !tc.quiet {
 				runner.Progress = writer

@@ -417,7 +417,7 @@ func (d *dashboard) Report(event nvkedemo.ProgressEvent) {
 	}
 	switch event.Kind {
 	case nvkedemo.NativeDeployment:
-		if event.ExpectedNodes != 0 && (requestedTenantNodes(event.ExpectedNodes) == 0 || (event.ExpectedNodes == 3) != event.Conformance) {
+		if event.ExpectedNodes != 0 && (requestedTenantNodes(event.ExpectedNodes) == 0 || event.Conformance && event.ExpectedNodes != 3) {
 			return
 		}
 		d.conformanceSelected = event.Conformance

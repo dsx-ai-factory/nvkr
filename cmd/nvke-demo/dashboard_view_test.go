@@ -921,9 +921,22 @@ func TestDashboardBuildLogBounds(t *testing.T) {
 }
 
 func TestDashboardConformanceCountsEveryRequestedNode(t *testing.T) {
-	for _, count := range []int{2, 3} {
-		t.Run(fmt.Sprint(count), func(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		count       int
+		conformance bool
+	}{
+		{"one worker", 2, false},
+		{"two workers without suite", 3, false},
+		{"two workers with suite", 3, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			count := tc.count
 			d := newDashboard()
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.NativeDeployment, Conformance: tc.conformance, ExpectedNodes: count})
+			if snapshot := d.snapshot(); snapshot.expectedNodes != count || snapshot.conformanceSelected != tc.conformance {
+				t.Fatal("deployment topology changed suite selection", snapshot.expectedNodes, snapshot.conformanceSelected)
+			}
 			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-nodes", ExpectedNodes: count, RegisteredNodes: count, ReadyNodes: count - 1, Remaining: time.Hour})
 			state := d.snapshot().tenantStages[2].status()
 			if state != "running" {

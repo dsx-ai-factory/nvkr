@@ -6,6 +6,7 @@ package nvkedemo
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,10 +14,11 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
 
-func TestDeploymentSelectsSameThreeVMWorkflowOnBothHosts(t *testing.T) {
+func TestDeploymentSelectsSameNativeWorkflowOnBothHosts(t *testing.T) {
 	for _, platform := range []string{"darwin/arm64", "linux/arm64"} {
 		for _, network := range []string{"ovn", "upstream-ovn"} {
 			t.Run(platform+"/"+network, func(t *testing.T) {
@@ -41,13 +43,13 @@ func TestDeploymentSelectsSameThreeVMWorkflowOnBothHosts(t *testing.T) {
 				}, map[string]lifecycle.Artifact{name: {Digest: digest,
 					Disk: &delivery.DiskOutput{PayloadDigest: digest, Producer: "build-disk", Component: "disk", Format: "qcow2", Encryption: "none", Size: int64(len("observed disk fixture")), Outcome: "succeeded"},
 				}})
-				cfg := Config{Walkthrough: network == "ovn", Network: network, NVKR: "nvkr", Out: filepath.Join(root, "deploy"), DemoExecutable: "demo", Cleanup: true, Runs: RunInputs{OS: root, Components: "components", Providers: "providers", Site: "site", Tools: "tools", Profiles: "profiles", Runtime: "runtime", HostTools: "host"}}
+				cfg := Config{TenantWorkers: 2, Walkthrough: network == "ovn", Network: network, NVKR: "nvkr", Out: filepath.Join(root, "deploy"), DemoExecutable: "demo", Cleanup: true, Runs: RunInputs{OS: root, Components: "components", Providers: "providers", Site: "site", Tools: "tools", Profiles: "profiles", Runtime: "runtime", HostTools: "host"}}
 				selected, err := nativeDeploymentConfig(t.Context(), cfg, platform)
 				want := "hvf"
 				if platform == "linux/arm64" {
 					want = "kvm"
 				}
-				if err != nil || selected.Image != disk || selected.Accelerator != want || selected.Network != network || !selected.Cleanup || selected.DemoExecutable != cfg.DemoExecutable || selected.Walkthrough != cfg.Walkthrough {
+				if err != nil || selected.Image != disk || selected.Accelerator != want || selected.Network != network || !selected.Cleanup || selected.DemoExecutable != cfg.DemoExecutable || selected.Walkthrough != cfg.Walkthrough || selected.TenantWorkers != 2 || selected.conformance != nil {
 					t.Fatalf("native deployment selection: %+v %v", selected, err)
 				}
 				assets := selected.Assets
@@ -66,6 +68,57 @@ func TestDeploymentSelectsSameThreeVMWorkflowOnBothHosts(t *testing.T) {
 				}
 				if _, err := nativeDeploymentConfig(t.Context(), cfg, platform); err == nil {
 					t.Fatal("substituted disk admitted")
+				}
+			})
+		}
+	}
+}
+
+func TestNativeTenantWorkersRefusedBeforeWork(t *testing.T) {
+	for _, tc := range []struct {
+		workers     int
+		conformance bool
+	}{{-1, false}, {3, false}, {1, true}} {
+		for _, boundary := range []string{"deployment admission", "deployment selection", "direct native", "capacity"} {
+			t.Run(fmt.Sprintf("%d/%t/%s", tc.workers, tc.conformance, boundary), func(t *testing.T) {
+				root := privateTestDir(t)
+				cfg := Config{TenantWorkers: tc.workers, Conformance: tc.conformance, Out: filepath.Join(root, "output")}
+				var err error
+				switch boundary {
+				case "deployment admission":
+					err = AdmitDemoDeployment(t.Context(), cfg)
+				case "deployment selection":
+					_, err = nativeDeploymentConfig(t.Context(), cfg, "darwin/arm64")
+				case "direct native":
+					selected := NativeConfig{TenantWorkers: tc.workers, Out: cfg.Out}
+					if tc.conformance {
+						selected.conformance = &nativeConformanceConfig{}
+					}
+					err = RunNative(t.Context(), selected)
+				case "capacity":
+					admission := nativeResourceAdmission{tenantWorkers: tc.workers, conformance: tc.conformance, observe: func(context.Context, string) (execution.ResourceCapacity, error) {
+						t.Fatal("invalid worker selection reached capacity observation")
+						return execution.ResourceCapacity{}, nil
+					}}
+					err = admission.check(t.Context(), root, false, nil)
+				}
+				var coded *nvkrerr.Error
+				wantCode := nvkrerr.CodeUsage
+				if boundary == "direct native" {
+					wantCode = nvkrerr.CodePreflightFailed
+				}
+				if !errors.As(err, &coded) || coded.Code != wantCode {
+					t.Fatalf("invalid worker selection reached later admission: %v", err)
+				}
+				if boundary == "direct native" {
+					var cause *nvkrerr.Error
+					if !errors.As(coded.Unwrap(), &cause) || cause.Code != nvkrerr.CodeUsage {
+						t.Fatalf("native preflight did not preserve worker usage cause: %v", err)
+					}
+				}
+				entries, readErr := os.ReadDir(root)
+				if readErr != nil || len(entries) != 0 {
+					t.Fatalf("invalid worker selection created output: %v %v", entries, readErr)
 				}
 			})
 		}

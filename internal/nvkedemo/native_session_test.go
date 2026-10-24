@@ -24,7 +24,7 @@ import (
 // Use the actual tenant routines and owned subprocesses, without a replacement
 // deployment engine or real guests. The existing native fixtures provide the
 // node/cloud-init/DNS/workload answers; this helper owns only NVKE's wire API.
-func nativeSessionFixture(t *testing.T, conformance bool) (nativeSiteAttempt, Runner, string) {
+func nativeSessionFixture(t *testing.T, conformance bool, workers int) (nativeSiteAttempt, Runner, string) {
 	t.Helper()
 	selected, root := tenantRunFixture(t, "", "")
 	executable, err := os.Executable()
@@ -39,6 +39,10 @@ func nativeSessionFixture(t *testing.T, conformance bool) (nativeSiteAttempt, Ru
 	writeTenantFixture(t, cli, []byte("#!/bin/sh\nexec \"$SESSION_TOOL\" -test.run='^TestNativeSessionFixtureTool$' -- \"$@\"\n"), 0700)
 	writeTenantFixture(t, filepath.Join(runner.Work, "site.kubeconfig"), []byte("private site fixture\n"), 0600)
 	attempt := nativeCAPITenantFixture(t, GuestCIDR, "ovn")
+	attempt.tenantNodes, err = selectedNativeTenantNodes(workers, conformance)
+	if err != nil {
+		t.Fatal(err)
+	}
 	workloadPods, err := json.Marshal(map[string]any{"items": []any{map[string]any{"status": map[string]any{"containerStatuses": []any{map[string]string{"imageID": attempt.assets.Images["workload"].Reference}}}}}})
 	if err != nil {
 		t.Fatal(err)
@@ -80,7 +84,7 @@ func nativeSessionFixture(t *testing.T, conformance bool) (nativeSiteAttempt, Ru
 func TestNativeSessionReusesSiteAndRetainsFailedSuiteUntilExplicitDeletion(t *testing.T) {
 	for _, conformance := range []bool{false, true} {
 		t.Run(fmt.Sprint(conformance), func(t *testing.T) {
-			attempt, runner, root := nativeSessionFixture(t, conformance)
+			attempt, runner, root := nativeSessionFixture(t, conformance, 0)
 			var escapedSite *NativeSite
 			var escapedTenant *NativeTenant
 			ctx, cancel := context.WithTimeout(t.Context(), time.Hour)
@@ -169,6 +173,47 @@ func TestNativeSessionReusesSiteAndRetainsFailedSuiteUntilExplicitDeletion(t *te
 	}
 }
 
+func TestNativeOrdinaryDemoChecksRequestedWorkersWithoutSuite(t *testing.T) {
+	for _, workers := range []int{1, 2} {
+		t.Run(fmt.Sprint(workers), func(t *testing.T) {
+			attempt, runner, root := nativeSessionFixture(t, false, workers)
+			// The ordinary CLI callback must complete the same tenant gates without
+			// selecting suite tools or creating any conformance output.
+			runner.Progress = nil
+			err := withNativeSiteScope(t.Context(), &attempt, runner, runner.Work, runner.Work, func(ctx context.Context, site *NativeSite) error {
+				if err := runNativeDemo(ctx, site); err != nil {
+					return err
+				}
+				raw, err := os.ReadFile(filepath.Join(root, "active-request.json"))
+				if err != nil {
+					return err
+				}
+				var request TenantRequest
+				if err := json.Unmarshal(raw, &request); err != nil {
+					return err
+				}
+				if request.ControlPlane.Count != 1 || len(request.NodePools) != 1 || request.NodePools[0].Count != workers || len(attempt.nodes) != workers+1 || nativeGuestLimit(&attempt) != workers+2 || attempt.conformance != nil {
+					t.Fatalf("ordinary request lost selected topology: %+v", request)
+				}
+				for _, name := range []string{"native-result.json", fmt.Sprintf("cloud-init-status-%d-stdout.json", workers)} {
+					if _, err := os.Stat(filepath.Join(runner.Work, name)); err != nil {
+						t.Fatalf("ordinary acceptance omitted %s: %v", name, err)
+					}
+				}
+				for _, name := range []string{"conformance", "conformance-output.json"} {
+					if _, err := os.Stat(filepath.Join(runner.Work, name)); !os.IsNotExist(err) {
+						t.Fatalf("ordinary callback selected suite work: %s %v", name, err)
+					}
+				}
+				return (&NativeTenant{state: site.scope.active}).Delete(ctx)
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestNativeSessionExitCancelsAndJoinsInFlightCommand(t *testing.T) {
 	root := privateTestDir(t)
 	command := filepath.Join(root, "block")
@@ -234,7 +279,7 @@ func TestNativeSessionRejectsMissingOwnershipAndNilCallback(t *testing.T) {
 func TestNativeSessionUnjoinedOutcomeCannotBeSwallowed(t *testing.T) {
 	for _, mode := range []string{"returned", "swallowed", "concurrent"} {
 		t.Run(mode, func(t *testing.T) {
-			attempt, runner, root := nativeSessionFixture(t, false)
+			attempt, runner, root := nativeSessionFixture(t, false, 0)
 			finished := make(chan error, 1)
 			original := errors.New("fixture child join failed")
 			err := withNativeSiteScope(t.Context(), &attempt, runner, runner.Work, runner.Work, func(ctx context.Context, site *NativeSite) error {
@@ -318,7 +363,7 @@ func TestNativeSessionQueuedOperationHonorsCallerCancellation(t *testing.T) {
 func TestNativeSessionUnjoinedOwnershipSurvivesPanicAndGoexit(t *testing.T) {
 	for _, mode := range []string{"panic", "Goexit"} {
 		t.Run(mode, func(t *testing.T) {
-			attempt, runner, root := nativeSessionFixture(t, false)
+			attempt, runner, root := nativeSessionFixture(t, false, 0)
 			bootstrapDeleted := filepath.Join(root, "bootstrap-deleted")
 			writeTenantFixture(t, filepath.Join(attempt.assets.HostTools, "kind"), []byte("#!/bin/sh\n: > "+operatorQuote(bootstrapDeleted)+"\n"), 0o700)
 			attempt.bootstrapRunner, attempt.bootstrapName = &runner, "owned-bootstrap"

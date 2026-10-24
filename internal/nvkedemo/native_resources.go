@@ -35,9 +35,10 @@ func selectedNativeResources(value NativeResources) (NativeResources, error) {
 }
 
 type nativeResourceAdmission struct {
-	resources   NativeResources
-	conformance bool
-	observe     func(context.Context, string) (execution.ResourceCapacity, error)
+	resources     NativeResources
+	tenantWorkers int
+	conformance   bool
+	observe       func(context.Context, string) (execution.ResourceCapacity, error)
 }
 
 func observeNativeResources(ctx context.Context, work string) (execution.ResourceCapacity, error) {
@@ -57,6 +58,10 @@ func (admission nativeResourceAdmission) check(ctx context.Context, work string,
 	if err := requireContext(ctx); err != nil {
 		return nvkrerr.Wrap(nvkrerr.CodeTimeout, err, "native guest capacity observation")
 	}
+	tenantNodes, err := selectedNativeTenantNodes(admission.tenantWorkers, admission.conformance)
+	if err != nil {
+		return err
+	}
 	resources, err := selectedNativeResources(admission.resources)
 	if err != nil {
 		return err
@@ -69,7 +74,7 @@ func (admission nativeResourceAdmission) check(ctx context.Context, work string,
 	if err != nil {
 		return nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "observe native guest capacity")
 	}
-	tenantMiB := uint64(nativeTenantNodeCount(admission.conformance)) * uint64(resources.TenantMemoryGiB) * 1024
+	tenantMiB := uint64(tenantNodes) * uint64(resources.TenantMemoryGiB) * 1024
 	needed := tenantMiB
 	if !tenantOnly {
 		// The temporary 6-GiB bootstrap backend is joined before tenants start.

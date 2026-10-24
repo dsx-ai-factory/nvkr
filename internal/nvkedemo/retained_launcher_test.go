@@ -56,6 +56,10 @@ func TestRetainedNativeLauncherChild(t *testing.T) {
 	}
 	if launch.Config.Network == "production-owner" {
 		if err := serveRetained(t.Context(), root, launch, func(ctx context.Context, cfg Config) error {
+			nodes, err := selectedNativeTenantNodes(cfg.TenantWorkers, cfg.Conformance)
+			if err != nil || cfg.TenantWorkers != 2 || cfg.Conformance || nodes != 3 {
+				return errors.New("retained child lost ordinary two-worker selection")
+			}
 			if deadline, bounded := ctx.Deadline(); !bounded || !deadline.Equal(launch.WorkDeadline) {
 				return errors.New("retained owner reset the caller work deadline")
 			}
@@ -206,6 +210,9 @@ func TestRetainedNativeLauncherReturnsOnlyAfterDetachedReady(t *testing.T) {
 				out.cancel = cancel
 			}
 			cfg := Config{Out: filepath.Join(root, "deployment"), DemoExecutable: os.Args[0], Network: test.name, Progress: out}
+			if test.name == "production-owner" {
+				cfg.TenantWorkers = 2
+			}
 			var selector string
 			err := launchRetainedNativeWithCommand(ctx, cfg, func(executable, session string, environment []string) *exec.Cmd {
 				selector = session

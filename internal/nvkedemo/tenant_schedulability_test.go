@@ -129,7 +129,7 @@ func (p *tenantSchedulabilityProgress) Report(event ProgressEvent) {
 func TestTenantRunBlockedReadyWorkerCannotSubmitWorkload(t *testing.T) {
 	for _, name := range []string{"canceled", "deadline"} {
 		t.Run(name, func(t *testing.T) {
-			attempt, runner, root := nativeSessionFixture(t, false)
+			attempt, runner, root := nativeSessionFixture(t, false, 0)
 			request, err := attempt.namedTenantRequest(t.Context(), "native-demo-tenant")
 			if err != nil {
 				t.Fatal(err)
@@ -172,7 +172,7 @@ func TestTenantRunBlockedReadyWorkerCannotSubmitWorkload(t *testing.T) {
 }
 
 func TestTenantRunObservesSourceClearedWorkerBeforeWorkload(t *testing.T) {
-	attempt, runner, root := nativeSessionFixture(t, false)
+	attempt, runner, root := nativeSessionFixture(t, false, 0)
 	request, err := attempt.namedTenantRequest(t.Context(), "native-demo-tenant")
 	if err != nil {
 		t.Fatal(err)
