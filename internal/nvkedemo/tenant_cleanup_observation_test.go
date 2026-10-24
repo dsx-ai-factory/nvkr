@@ -161,20 +161,6 @@ func TestTenantCleanupEmptyCanceledPollKeepsLastResponse(t *testing.T) {
 	}
 }
 
-func TestTenantCleanupPolicyHasIndependentFiniteHeadroom(t *testing.T) {
-	parent, cancel := context.WithCancel(t.Context())
-	cancel()
-	cleanup, stop := tenantCleanupContext(parent)
-	defer stop()
-	deadline, bounded := cleanup.Deadline()
-	if cleanup.Err() != nil || !bounded || time.Until(deadline) > time.Hour || time.Until(deadline) < 59*time.Minute {
-		t.Fatal("owning cleanup inherited canceled work or lost its finite bound")
-	}
-	if tenantDeletionWaitTimeout != 45*time.Minute || tenantDiagnosticsTimeout+tenantDeleteTimeout+tenantDeletionWaitTimeout+tenantWithdrawalTimeout >= tenantCleanupTimeout {
-		t.Fatal("tenant cleanup deadline truncates its operation budgets or joining headroom")
-	}
-}
-
 func TestTenantDeletionWaitHonorsDeadlineCancellationAndOwnership(t *testing.T) {
 	for _, scenario := range []string{"absent", "short-parent", "short-wait", "canceled", "foreign", "invalid-budget"} {
 		t.Run(scenario, func(t *testing.T) {

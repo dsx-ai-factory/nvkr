@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-os-arm64-upstream-local-kvm",
-  "requiresCatalogDigest": "sha256:a7f2426c23724947da1e58b7a988557dc836b938ce020669d659f3644ce3fdfd",
+  "requiresCatalogDigest": "sha256:06b31d7b37e93be9e488f9a4cba92fc79732929e7eba971a4e15aee34456525a",
   "components": {
     "nvke-node-image": {
       "component": {
@@ -33,13 +33,6 @@
         "tag": "v0.22.0",
         "commit": "400c24fb6465b042be883d6b62472528520d6291",
         "treeHash": "f3afc02f5c92f4aacda3a1655836a91bef093bfe",
-        "patches": [
-          {
-            "name": "patches/capture-schema.patch",
-            "sha256": "sha256:dd80edd27f7f2dbba79774ad90cbe4036bb187e191b4dbd992a64b0dece4c4b8",
-            "content": "--- a/os-image/packer/scripts/capture-apt-acquisitions.py\n+++ b/os-image/packer/scripts/capture-apt-acquisitions.py\n@@ -26,4 +26,4 @@\n-SCHEMA = \"nkd.dev/package-acquisitions/v1\"\n+SCHEMA = \"nvkr.dev/package-acquisitions/v1\"\n MAX_PACKAGES = 16384\n MAX_PACKAGE_BYTES = 1 << 30\n MAX_TOTAL_BYTES = 7 << 30\n"
-          }
-        ],
         "toolchainImages": {
           "amd64": "sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0",
           "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3"

@@ -33,8 +33,11 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 	if err := options.Validate(); err != nil {
 		return Inspection{}, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Minute)
-	defer cancel()
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 20*time.Minute)
+		defer cancel()
+	}
 	parse := []name.Option{name.StrictValidation}
 	if options.PlainHTTP {
 		parse = append(parse, name.Insecure)
@@ -261,8 +264,11 @@ func PushMetadataWithOptions(ctx context.Context, source, repository string, req
 	if len(request.ImageTags) != 0 {
 		return "", e.New(e.CodeUsage, "metadata publication cannot advance image tags")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Minute)
-	defer cancel()
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 20*time.Minute)
+		defer cancel()
+	}
 	inspection, err := InspectMetadata(ctx, source)
 	if err != nil {
 		return "", err

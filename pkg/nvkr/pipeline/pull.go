@@ -173,6 +173,11 @@ func downloadReleaseExecutableWithTransport(ctx context.Context, node ir.Node, r
 		}
 		return nil
 	}}
+	if ctx != nil {
+		if _, bounded := ctx.Deadline(); bounded {
+			client.Timeout = 0 // The request carries the selected work deadline.
+		}
+	}
 	return downloadReleaseExecutableWithClient(ctx, node, root, relative, client)
 }
 
@@ -234,6 +239,9 @@ func downloadVerify(ctx context.Context, url, root, relative, want string) (stri
 		return "", 0, e.Wrap(e.CodeTimeout, err, "downloading %s canceled", url)
 	}
 	client := &http.Client{Timeout: 10 * time.Minute}
+	if _, bounded := ctx.Deadline(); bounded {
+		client.Timeout = 0
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return "", 0, e.Wrap(e.CodeFetchFailed, err, "constructing GET %s", url)

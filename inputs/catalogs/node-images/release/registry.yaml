@@ -72,8 +72,15 @@ sources:
       - bash
       - -ec
       - |
+        test ! -e os-image/packages/kubeadm-distro/dist
+        test ! -L os-image/packages/kubeadm-distro/dist
+        # Stage beside the checkout; protected vendors mount /tmp with noexec.
+        bundle_root="$(mktemp -d "$(dirname "$PWD")/nvkr-kubeadm.XXXXXXXX")"
+        trap 'rm -rf -- "$bundle_root"' EXIT
         make -C os-image/packages/kubeadm-distro bundle nfpm \
+          DIST_DIR="$bundle_root/dist" \
           ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
+        cp -a "$bundle_root/dist" os-image/packages/kubeadm-distro/dist
   nvke-spire-agent-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
     constraint: v0.22.0
@@ -98,9 +105,12 @@ components:
       - -ec
       - |
         GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \
-          VERSION="$BUILD_VERSION" \
+          VERSION="${BUILD_VERSION:?}" \
           NFPM_BIN=/usr/local/bin/nfpm \
           DEB_OUTPUT=/src/agent/bin/nvke-agent.deb
+        test -f "/src/agent/bin/nvke-agent.deb"
+        test "$(dpkg-deb --field "/src/agent/bin/nvke-agent.deb" Package)" = "nvke-agent"
+        test "$(dpkg-deb --field "/src/agent/bin/nvke-agent.deb" Architecture)" = "{{.Arch}}"
     writeDir: agent/bin
     artifactPath: agent/bin/nvke-agent.deb
     versionStamp:
@@ -123,6 +133,14 @@ components:
           /src/nvkr-output/work/cni-common/build-deb.sh v3.30.1 \
           /src/os-image/packages/cni-calico/dist/v3.30.1 \
           /src/nvkr-output/calico
+        packages=("/src/nvkr-output/calico"/*.deb)
+        test "${#packages[@]}" -eq 2
+        test -f "/src/nvkr-output/calico/nvke-cni-calico-images-3.30.1_1_{{.Arch}}.deb"
+        test "$(dpkg-deb --field "/src/nvkr-output/calico/nvke-cni-calico-images-3.30.1_1_{{.Arch}}.deb" Package)" = "nvke-cni-calico-images-3.30.1"
+        test "$(dpkg-deb --field "/src/nvkr-output/calico/nvke-cni-calico-images-3.30.1_1_{{.Arch}}.deb" Architecture)" = "{{.Arch}}"
+        test -f "/src/nvkr-output/calico/nvke-cni-calico-manifests-3.30.1_1_{{.Arch}}.deb"
+        test "$(dpkg-deb --field "/src/nvkr-output/calico/nvke-cni-calico-manifests-3.30.1_1_{{.Arch}}.deb" Package)" = "nvke-cni-calico-manifests-3.30.1"
+        test "$(dpkg-deb --field "/src/nvkr-output/calico/nvke-cni-calico-manifests-3.30.1_1_{{.Arch}}.deb" Architecture)" = "{{.Arch}}"
         tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
           --numeric-owner -C /src/nvkr-output/calico \
           -cf /src/nvkr-output/nvke-cni-calico.tar .
@@ -266,6 +284,17 @@ components:
             "$version" "/src/os-image/packages/kubeadm-distro/dist/$version" \
             /src/nvkr-output/kubeadm-distro
         done
+        packages=("/src/nvkr-output/kubeadm-distro"/*.deb)
+        test "${#packages[@]}" -eq 3
+        test -f "/src/nvkr-output/kubeadm-distro/nvke-kubeadm-distro-1.36.3_1_{{.Arch}}.deb"
+        test "$(dpkg-deb --field "/src/nvkr-output/kubeadm-distro/nvke-kubeadm-distro-1.36.3_1_{{.Arch}}.deb" Package)" = "nvke-kubeadm-distro-1.36.3"
+        test "$(dpkg-deb --field "/src/nvkr-output/kubeadm-distro/nvke-kubeadm-distro-1.36.3_1_{{.Arch}}.deb" Architecture)" = "{{.Arch}}"
+        test -f "/src/nvkr-output/kubeadm-distro/nvke-kubeadm-distro-1.35.3_1_{{.Arch}}.deb"
+        test "$(dpkg-deb --field "/src/nvkr-output/kubeadm-distro/nvke-kubeadm-distro-1.35.3_1_{{.Arch}}.deb" Package)" = "nvke-kubeadm-distro-1.35.3"
+        test "$(dpkg-deb --field "/src/nvkr-output/kubeadm-distro/nvke-kubeadm-distro-1.35.3_1_{{.Arch}}.deb" Architecture)" = "{{.Arch}}"
+        test -f "/src/nvkr-output/kubeadm-distro/nvke-kubeadm-distro-1.34.2_1_{{.Arch}}.deb"
+        test "$(dpkg-deb --field "/src/nvkr-output/kubeadm-distro/nvke-kubeadm-distro-1.34.2_1_{{.Arch}}.deb" Package)" = "nvke-kubeadm-distro-1.34.2"
+        test "$(dpkg-deb --field "/src/nvkr-output/kubeadm-distro/nvke-kubeadm-distro-1.34.2_1_{{.Arch}}.deb" Architecture)" = "{{.Arch}}"
         tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
           --numeric-owner -C /src/nvkr-output/kubeadm-distro \
           -cf /src/nvkr-output/nvke-kubeadm-distro.tar .
@@ -275,9 +304,6 @@ components:
     platforms: [linux/amd64]
     fromSource: true
     source: nvke-os
-    patches:
-      - name: patches/capture-schema.patch
-        sha256: sha256:dd80edd27f7f2dbba79774ad90cbe4036bb187e191b4dbd992a64b0dece4c4b8
     builderType: vm-image
     buildNetwork: default
     outputType: disk-image
@@ -328,9 +354,6 @@ components:
     platforms: [linux/arm64]
     fromSource: true
     source: nvke-os
-    patches:
-      - name: patches/capture-schema.patch
-        sha256: sha256:dd80edd27f7f2dbba79774ad90cbe4036bb187e191b4dbd992a64b0dece4c4b8
     builderType: vm-image
     buildNetwork: default
     outputType: disk-image
@@ -382,9 +405,6 @@ components:
     platforms: [linux/arm64]
     fromSource: true
     source: nvke-os
-    patches:
-      - name: patches/capture-schema.patch
-        sha256: sha256:dd80edd27f7f2dbba79774ad90cbe4036bb187e191b4dbd992a64b0dece4c4b8
     builderType: vm-image
     buildNetwork: default
     outputType: disk-image
@@ -433,9 +453,6 @@ components:
     platforms: [linux/amd64]
     fromSource: true
     source: nvke-os
-    patches:
-      - name: patches/capture-schema.patch
-        sha256: sha256:dd80edd27f7f2dbba79774ad90cbe4036bb187e191b4dbd992a64b0dece4c4b8
     builderType: vm-image
     buildNetwork: default
     outputType: disk-image

@@ -4,89 +4,104 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/nvkedemo"
 	"github.com/dsx-ai-factory/nvkr/internal/tuitheme"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/planview"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
 
-// The launcher streams the existing planview JSON projection. This reader is
-// display-only: it neither reads paths named by logs nor constructs a Plan,
-// validates an execution graph or grants artifact authority.
-func (d *dashboard) observeBuildGraph(line string) bool {
-	if d.phases[1].state != "running" {
-		return false
+func (d *dashboard) observeBuildVertex(vertex planview.Vertex) {
+	if !dashboardBuildID(vertex.Key) || !dashboardBuildID(vertex.Reference) || len(vertex.Label) > 512 ||
+		vertex.Build != "" && !dashboardBuildID(vertex.Build) {
+		d.buildTruncated = true
+		return
 	}
-	if raw, ok := strings.CutPrefix(line, "Build vertex: "); ok {
-		var vertex planview.Vertex
-		if json.Unmarshal([]byte(raw), &vertex) != nil || !dashboardBuildID(vertex.Key) ||
-			!dashboardBuildID(vertex.Reference) || len(vertex.Label) > 512 ||
-			vertex.Build != "" && !dashboardBuildID(vertex.Build) {
+	switch vertex.Kind {
+	case "operation", "artifact", "output":
+	default:
+		d.buildTruncated = true
+		return
+	}
+	if !strings.HasPrefix(vertex.Key, vertex.Kind+"/") {
+		d.buildTruncated = true
+		return
+	}
+	index := slices.IndexFunc(d.buildVertices, func(v planview.Vertex) bool { return v.Key == vertex.Key })
+	if index >= 0 {
+		if d.buildVertices[index] != vertex {
 			d.buildTruncated = true
-			return true
 		}
-		switch vertex.Kind {
-		case "operation", "artifact", "output":
-		default:
-			d.buildTruncated = true
-			return true
-		}
-		if !strings.HasPrefix(vertex.Key, vertex.Kind+"/") {
-			d.buildTruncated = true
-			return true
-		}
-		index := slices.IndexFunc(d.buildVertices, func(v planview.Vertex) bool { return v.Key == vertex.Key })
-		if index >= 0 {
-			if d.buildVertices[index] != vertex {
-				d.buildTruncated = true
-			}
-		} else if len(d.buildVertices) < 1536 {
-			d.buildVertices = append(d.buildVertices, vertex)
+	} else if len(d.buildVertices) < 1536 {
+		d.buildVertices = append(d.buildVertices, vertex)
+	} else {
+		d.buildTruncated = true
+	}
+}
+
+func (d *dashboard) observeBuildEdge(edge planview.Edge) {
+	if !dashboardBuildID(edge.From) || !dashboardBuildID(edge.To) {
+		d.buildTruncated = true
+		return
+	}
+	switch edge.Relation {
+	case "consumed by", "produces", "fulfills slot":
+	default:
+		d.buildTruncated = true
+		return
+	}
+	if !slices.Contains(d.buildEdges, edge) {
+		if len(d.buildEdges) < 4096 {
+			d.buildEdges = append(d.buildEdges, edge)
 		} else {
 			d.buildTruncated = true
 		}
-		return true
 	}
-	if raw, ok := strings.CutPrefix(line, "Build edge: "); ok {
-		var edge planview.Edge
-		if json.Unmarshal([]byte(raw), &edge) != nil || !dashboardBuildID(edge.From) || !dashboardBuildID(edge.To) {
-			d.buildTruncated = true
-			return true
-		}
-		switch edge.Relation {
-		case "consumed by", "produces", "fulfills slot":
-		default:
-			d.buildTruncated = true
-			return true
-		}
-		if !slices.Contains(d.buildEdges, edge) {
-			if len(d.buildEdges) < 4096 {
-				d.buildEdges = append(d.buildEdges, edge)
-			} else {
-				d.buildTruncated = true
-			}
-		}
-		return true
+}
+
+// Each selected Run replaces the previous display, including a completed artifact
+// lane followed by native tools. Neither a Plan nor a new Run clears failure.
+func (d *dashboard) observeBuildPlan(event nvkedemo.ProgressEvent) {
+	if (event.Name != "artifacts" && event.Name != "native-tools") || d.phases[1].state == "failed" {
+		return
 	}
-	if raw, ok := strings.CutPrefix(line, "Build display: "); ok {
-		var totals struct {
-			Vertices  int  `json:"vertices"`
-			Edges     int  `json:"edges"`
-			Truncated bool `json:"truncated"`
-		}
-		if json.Unmarshal([]byte(raw), &totals) != nil || totals.Truncated ||
-			totals.Vertices != len(d.buildVertices) || totals.Edges != len(d.buildEdges) {
-			d.buildTruncated = true
-		}
-		return true
+	d.phases[1] = dashboardPhase{"running", "Selected " + event.Name + " Run"}
+	d.buildRun, d.buildRequired = event.Name, 0
+	d.buildSteps, d.buildOutputs, d.buildVertices, d.buildEdges, d.buildLogs = nil, nil, nil, nil, nil
+	d.buildPreview, d.buildTruncated, d.buildSelected = false, false, -1
+	d.buildChangedAt, d.buildOutputAt, d.buildGuestAt = time.Time{}, time.Time{}, time.Time{}
+	d.buildOutputBytes, d.buildProcess, d.buildGuestStage = 0, "", ""
+	d.partial, d.dropped, d.offset = nil, false, 0
+	if event.BuildPlan == nil || event.BuildGraph == nil || event.BuildPlan.PlanDigest != event.BuildGraph.PlanDigest {
+		return
 	}
-	return false
+	d.buildRequired, d.buildPreview = len(event.BuildPlan.Outputs), true
+	for _, operation := range event.BuildPlan.Operations {
+		if len(d.buildSteps) == dashboardSteps || !dashboardBuildID(operation.ID) {
+			d.buildTruncated = true
+			continue
+		}
+		d.buildSteps = append(d.buildSteps, dashboardBuildStep{id: operation.ID, kind: operation.Kind, state: "queued", previewed: true})
+	}
+	keys := make(map[string]bool)
+	for _, vertex := range event.BuildGraph.Vertices {
+		if vertex.Kind != "route" {
+			d.observeBuildVertex(vertex)
+		}
+	}
+	for _, vertex := range d.buildVertices {
+		keys[vertex.Key] = true
+	}
+	for _, edge := range event.BuildGraph.Edges {
+		if keys[edge.From] && keys[edge.To] {
+			d.observeBuildEdge(edge)
+		}
+	}
 }
 
 // Called for every received public build byte, including output hidden by the
@@ -244,7 +259,7 @@ func dashboardBuildDetail(s dashboardSnapshot, now time.Time) string {
 			}
 		}
 		if len(refs) > 2 {
-			fmt.Fprintf(&text, "\n  +%d more links (full graph.json)", len(refs)-2)
+			fmt.Fprintf(&text, "\n  +%d more planned links", len(refs)-2)
 		}
 	}
 	if len(s.buildVertices) == 0 || s.buildTruncated {
@@ -268,18 +283,18 @@ func (d *dashboard) drawBuild(screen tcell.Screen, s dashboardSnapshot, now time
 		boardWidth = width / 2
 	}
 	var phases strings.Builder
-	for index, name := range []string{"Prepare", "Artifacts", "Site", "Tenant", "Workload/DNS", "Cleanup"} {
+	for index, named := range dashboardNamedPhases(s) {
 		if index != 0 {
 			phases.WriteString(" › ")
 		}
 		color := "slategray"
-		switch s.phases[index].state {
-		case "complete":
+		switch named.phase.state {
+		case "complete", "passed":
 			color = "lightgreen"
 		case "running":
 			color = "lightcyan"
 		}
-		fmt.Fprintf(&phases, "[%s]%s[-]", color, name)
+		fmt.Fprintf(&phases, "[%s]%s[-]", color, named.name)
 	}
 	d.header.SetText(fmt.Sprintf("[lightcyan::b] NVKE local build & demo[-::-]    %s elapsed\n [goldenrod]UNQUALIFIED local diagnostic · not a signed Release[-]\n %s", dashboardBuildAge(now, s.started), phases.String()))
 	d.stateView.SetTitle(" Artifact pipeline · reported execution ")
@@ -361,8 +376,15 @@ func dashboardBuildRibbon(s dashboardSnapshot, now time.Time) string {
 			}
 		}
 	}
-	if len(s.buildOutputs) > 0 && !s.buildTruncated {
-		fmt.Fprintf(&text, "[lightcyan::b]Required outputs[-::-] %d   [lightcyan::b]Steps[-::-] ", len(s.buildOutputs))
+	if s.buildRun != "" {
+		fmt.Fprintf(&text, "[lightcyan::b]Selected %s Run[-::-]\n", s.buildRun)
+	}
+	required := s.buildRequired
+	if required == 0 && !s.buildTruncated {
+		required = len(s.buildOutputs)
+	}
+	if required > 0 {
+		fmt.Fprintf(&text, "[lightcyan::b]Required outputs[-::-] %d   [lightcyan::b]Steps[-::-] ", required)
 	} else {
 		text.WriteString("Required output total unknown   ")
 	}

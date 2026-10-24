@@ -92,7 +92,7 @@ func TestFailedWalkthroughReleasesPageForCleanupAndRetainsReplay(t *testing.T) {
 			// They must not dismiss it as if the workflow had advanced.
 			for _, event := range []nvkedemo.ProgressEvent{
 				{Kind: nvkedemo.OSBuildLogs, BuildLogs: buildactivity.Record{Version: 1, Operation: "os/build-disk"}},
-				{Kind: nvkedemo.TenantGuests, Guests: [2]nvkedemo.TenantGuestObservation{{Role: nvkedemo.TenantGuestControlPlane}, {Role: nvkedemo.TenantGuestWorker}}},
+				{Kind: nvkedemo.TenantGuests, Guests: [3]nvkedemo.TenantGuestObservation{{Role: nvkedemo.TenantGuestControlPlane}, {Role: nvkedemo.TenantGuestWorker}}},
 				{Kind: nvkedemo.TenantWaiting, Name: "tenant-nodes", RegisteredNodes: 2, ReadyNodes: 2},
 				{Kind: nvkedemo.ProcessStarted, Name: "build-all"},
 				{Kind: nvkedemo.ProcessExited, Name: "build-all"},

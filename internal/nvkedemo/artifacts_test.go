@@ -9,106 +9,130 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"golang.org/x/sys/unix"
 )
 
-func fixtureRun() map[string]any {
-	expected := []map[string]any{}
-	observed := []map[string]any{}
-	for _, name := range []string{"other", "tools"} {
-		binding := map[string]any{"name": name, "kind": "executable", "buildDigest": "sha256:" + strings.Repeat("b", 64), "components": []string{"component"}, "artifactId": "package/" + name, "memberArtifactId": "package/" + name, "componentResults": []string{"result/" + name + "/component"}}
-		expected = append(expected, binding)
-		observed = append(observed, map[string]any{"name": name, "kind": "executable", "buildDigest": binding["buildDigest"], "components": binding["components"], "digest": "sha256:" + strings.Repeat("a", 64)})
-	}
-	return map[string]any{"schemaVersion": lifecycle.RunSchemaVersion, "attempt": "fixture", "status": "complete", "expected": expected, "observed": observed, "planDigest": "sha256:" + strings.Repeat("1", 64), "definitionDigest": "sha256:" + strings.Repeat("2", 64), "environmentDigest": "sha256:" + strings.Repeat("3", 64), "lane": "unqualified-local-execution"}
-}
-
-func TestCompleteOutputMembership(t *testing.T) {
-	for _, name := range []string{"complete", "failed", "failure", "empty", "duplicate expected", "duplicate observed", "extra", "missing", "wrong name", "wrong kind", "wrong build", "wrong components", "bad digest", "wrong schema", "duplicate JSON", "symlink record", "symlink root", "missing selected", "canceled"} {
-		t.Run(name, func(t *testing.T) {
-			root := privateTestDir(t)
-			record := fixtureRun()
-			expected := record["expected"].([]map[string]any)
-			observed := record["observed"].([]map[string]any)
-			selected := "tools"
-			ctx := t.Context()
-			switch name {
-			case "failed":
-				record["status"] = "failed"
-			case "failure":
-				record["failure"] = map[string]string{"code": "failed", "message": "failed"}
-			case "empty":
-				record["expected"] = []map[string]any{}
-				record["observed"] = []map[string]any{}
-			case "duplicate expected":
-				expected[0] = expected[1]
-			case "duplicate observed":
-				observed[0] = observed[1]
-			case "extra":
-				record["observed"] = append(observed, map[string]any{"name": "extra"})
-			case "missing":
-				record["observed"] = observed[:1]
-			case "wrong name":
-				observed[1]["name"] = "different"
-			case "wrong kind":
-				observed[0]["kind"] = "oci-image"
-			case "wrong build":
-				observed[0]["buildDigest"] = "sha256:" + strings.Repeat("c", 64)
-			case "wrong components":
-				observed[0]["components"] = []string{"different"}
-			case "bad digest":
-				observed[0]["digest"] = "tag:mutable"
-			case "wrong schema":
-				record["schemaVersion"] = "nvkr.dev/run/v2"
+func TestNativeRunSelectionDelegatesMetadataAdmission(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		code nvkrerr.Code
+	}{
+		{"selected", ""}, {"missing selected", nvkrerr.CodeVerifyFailed}, {"wrong selected kind", nvkrerr.CodeVerifyFailed},
+		{"failed", nvkrerr.CodeVerifyFailed}, {"empty", nvkrerr.CodeVerifyFailed},
+		{"duplicate expected", nvkrerr.CodeVerifyFailed}, {"duplicate observed", nvkrerr.CodeVerifyFailed},
+		{"extra", nvkrerr.CodeVerifyFailed}, {"missing", nvkrerr.CodeVerifyFailed},
+		{"wrong build", nvkrerr.CodeVerifyFailed}, {"wrong components", nvkrerr.CodeVerifyFailed},
+		{"wrong schema", nvkrerr.CodeVerifyFailed}, {"duplicate JSON", nvkrerr.CodeVerifyFailed},
+		{"noncanonical JSON", nvkrerr.CodeVerifyFailed}, {"symlink record", nvkrerr.CodeVerifyFailed}, {"symlink root", nvkrerr.CodeVerifyFailed},
+		{"uncaptured", nvkrerr.CodeVerifyFailed}, {"missing original Plan", nvkrerr.CodeVerifyFailed},
+		{"wrong Plan", nvkrerr.CodePipelineDrift}, {"wrong attempt", nvkrerr.CodeVerifyFailed},
+		{"hosted lane", nvkrerr.CodeGateUnmet}, {"missing content identity", nvkrerr.CodeGateUnmet},
+		{"unfinished disk commit", nvkrerr.CodeImmutableViolation}, {"canceled", nvkrerr.CodeTimeout}, {"nil context", nvkrerr.CodeUsage},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := filepath.Join(privateTestDir(t), "fixture")
+			_, run := capturedArtifactRunFixture(t, root, []lifecycle.DefinitionOutput{
+				{Name: "other", Platform: "linux/arm64", Format: "executable", Components: []string{"tool"}},
+				{Name: "tools", Platform: "linux/arm64", Format: "executable", Components: []string{"tool"}},
+			}, nil)
+			selected, kind, ctx := "tools", "executable", t.Context()
+			switch tc.name {
 			case "missing selected":
 				selected = "absent"
+			case "wrong selected kind":
+				kind = "oci"
+			case "failed":
+				run.Status = lifecycle.RunFailed
+			case "empty":
+				run.Expected, run.Observed = nil, nil
+			case "duplicate expected":
+				run.Expected[0] = run.Expected[1]
+			case "duplicate observed":
+				run.Observed[0] = run.Observed[1]
+			case "extra":
+				extra := run.Observed[0]
+				extra.Name = "extra"
+				run.Observed = append(run.Observed, extra)
+			case "missing":
+				run.Observed = run.Observed[:1]
+			case "wrong build":
+				run.Observed[0].BuildDigest = "sha256:" + strings.Repeat("c", 64)
+			case "wrong components":
+				run.Observed[0].Components = []string{"different"}
+			case "wrong schema":
+				run.SchemaVersion = "nvkr.dev/run/v2"
+			case "wrong Plan":
+				run.PlanDigest = "sha256:" + strings.Repeat("9", 64)
+			case "wrong attempt":
+				run.Attempt = "other"
+			case "hosted lane":
+				run.Lane = lifecycle.LanePipeline
+			case "missing content identity":
+				run.ContentSubject = ""
 			case "canceled":
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)
 				cancel()
+			case "nil context":
+				ctx = nil
 			}
-			raw, err := json.Marshal(record)
+			file := filepath.Join(root, "lifecycle.json")
+			raw, err := canonical.Marshal(run)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if name == "duplicate JSON" {
+			switch tc.name {
+			case "duplicate JSON":
 				raw = bytes.Replace(raw, []byte(`"status":"complete"`), []byte(`"status":"failed","status":"complete"`), 1)
+			case "noncanonical JSON":
+				raw = append(raw, '\n')
 			}
-			file := filepath.Join(root, "lifecycle.json")
-			if err := os.WriteFile(file, raw, 0o600); err != nil {
-				t.Fatal(err)
-			}
-			if name == "symlink record" {
-				held := filepath.Join(root, "held")
-				if err := os.Rename(file, held); err != nil {
+			writeTenantFixture(t, file, raw, 0600)
+			switch tc.name {
+			case "symlink record":
+				if err := os.Rename(file, file+".saved"); err != nil {
 					t.Fatal(err)
 				}
-				if err := os.Symlink(held, file); err != nil {
+				if err := os.Symlink(file+".saved", file); err != nil {
 					t.Fatal(err)
 				}
-			}
-			if name == "symlink root" {
+			case "symlink root":
 				link := filepath.Join(privateTestDir(t), "link")
 				if err := os.Symlink(root, link); err != nil {
 					t.Fatal(err)
 				}
 				root = link
-			}
-			artifact, err := CompleteOutput(ctx, root, selected, "executable")
-			if name == "complete" {
-				if err != nil || artifact.Name != "tools" {
-					t.Fatalf("artifact=%+v error=%v", artifact, err)
+			case "uncaptured", "missing original Plan":
+				path := filepath.Join(root, "compile-inputs.json")
+				if tc.name == "missing original Plan" {
+					path = filepath.Join(root, ".runner", "plan.json")
 				}
-			} else if err == nil {
-				t.Fatal("unsafe Run description admitted")
+				if err := os.Rename(path, path+".saved"); err != nil {
+					t.Fatal(err)
+				}
+			case "unfinished disk commit":
+				writeTenantFixture(t, filepath.Join(root, ".disk-commit-in-progress"), []byte("pending"), 0600)
+			}
+			plan, artifact, err := nativeSelectedRunPlan(ctx, root, selected, kind)
+			if tc.code == "" {
+				if err != nil || plan == nil || artifact.Name != "tools" {
+					t.Fatalf("selected artifact=%+v error=%v", artifact, err)
+				}
+			} else {
+				var coded *nvkrerr.Error
+				if plan != nil || artifact.Name != "" || !errors.As(err, &coded) || coded.Code != tc.code {
+					t.Fatalf("rejected metadata yielded plan=%v artifact=%+v error=%v, want %s", plan != nil, artifact, err, tc.code)
+				}
 			}
 		})
 	}

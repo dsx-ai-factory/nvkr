@@ -10,17 +10,30 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"go.yaml.in/yaml/v3"
 )
 
+func startupTestContext(t *testing.T) context.Context {
+	t.Helper()
+	ctx, cancel := context.WithDeadline(t.Context(), time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC))
+	t.Cleanup(cancel)
+	return ctx
+}
+
 func startupDescription() NativeSiteStartup {
 	cfg := NativeSiteStartup{
-		Name: "nvke-native-site", Gateway: "172.30.0.1",
+		Name: "nvke-native-site", Gateway: "172.30.0.1", KubernetesVersion: "1.34.2",
 		ControllerImage: "docker.io/library/nke-controller:latest",
 		ProviderImage:   "docker.io/library/cluster-api-provider-provisioned:latest",
 		OVNImage:        "localhost/nvke/ovn-kubernetes@sha256:" + strings.Repeat("a", 64),
+		ImageImports: map[string]string{
+			"controller": "docker.io/library/nke-controller@sha256:" + strings.Repeat("a", 64),
+			"profiles":   "docker.io/library/cwe-profiles@sha256:" + strings.Repeat("a", 64),
+			"capnico":    "ghcr.io/dsx-ai-factory/cluster-api-provider-nico/controller@sha256:" + strings.Repeat("a", 64),
+		},
 	}
 	for _, item := range siteStartupAssetNames {
 		cfg.Assets = append(cfg.Assets, StartupAsset{item, "http://172.30.0.1:18080/files/owned/" + item, "sha256:" + strings.Repeat("a", 64)})
@@ -28,30 +41,45 @@ func startupDescription() NativeSiteStartup {
 	return cfg
 }
 
+func addStartupRuntimeImages(cfg *NativeSiteStartup) {
+	for _, role := range nativeRuntimeImageRoles() {
+		file := role + ".tar"
+		cfg.Assets = append(cfg.Assets, StartupAsset{file, "http://172.30.0.1:18080/files/" + file, "sha256:" + strings.Repeat("a", 64)})
+		reference := "docker.io/nvkr-local/" + strings.TrimPrefix(role, "runtime-") + "@sha256:" + strings.Repeat("a", 64)
+		if role == "workload" {
+			reference = "example.invalid/selected-workload@sha256:" + strings.Repeat("b", 64)
+		}
+		cfg.ImageImports[role] = reference
+	}
+}
+
 func TestSiteStartupRuntimeImagesRequireTheWholeSelectedClosure(t *testing.T) {
 	for _, tc := range []struct {
-		name string
-		omit bool
+		name   string
+		change func(*NativeSiteStartup)
 	}{
-		{"complete", false}, {"missing runtime image", true},
+		{"complete", nil},
+		{"missing archive", func(c *NativeSiteStartup) { c.Assets = c.Assets[:len(c.Assets)-1] }},
+		{"missing reference", func(c *NativeSiteStartup) { delete(c.ImageImports, "runtime-postgresql") }},
+		{"unknown role", func(c *NativeSiteStartup) { c.ImageImports["unexpected"] = c.ImageImports["runtime-postgresql"] }},
+		{"sibling image", func(c *NativeSiteStartup) {
+			c.ImageImports["runtime-postgresql"] = c.ImageImports["runtime-spire-agent"]
+		}},
+		{"tag-only reference", func(c *NativeSiteStartup) {
+			c.ImageImports["runtime-postgresql"] = "docker.io/nvkr-local/postgresql:latest"
+		}},
+		{"tag-only workload", func(c *NativeSiteStartup) {
+			c.ImageImports["workload"] = "docker.io/library/alpine:latest"
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := startupDescription()
-			cfg.RuntimeImages = true
-			cfg.Assets = append(cfg.Assets, StartupAsset{"workload.tar", "http://172.30.0.1:18080/files/workload.tar", "sha256:" + strings.Repeat("a", 64)})
-			for _, role := range runtimeImages {
-				asset := "runtime-" + role + ".tar"
-				cfg.Assets = append(cfg.Assets, StartupAsset{asset, "http://172.30.0.1:18080/files/" + asset, "sha256:" + strings.Repeat("a", 64)})
+			addStartupRuntimeImages(&cfg)
+			if tc.change != nil {
+				tc.change(&cfg)
 			}
-			for _, image := range nativeCAPIAuthImages {
-				asset := image.role + ".tar"
-				cfg.Assets = append(cfg.Assets, StartupAsset{asset, "http://172.30.0.1:18080/files/" + asset, "sha256:" + strings.Repeat("a", 64)})
-			}
-			if tc.omit {
-				cfg.Assets = cfg.Assets[:len(cfg.Assets)-1]
-			}
-			data, err := SiteStartupUserData(t.Context(), cfg)
-			if tc.omit {
+			data, err := SiteStartupUserData(startupTestContext(t), cfg)
+			if tc.change != nil {
 				var coded *nvkrerr.Error
 				if data != "" || !errors.As(err, &coded) || coded.Code != nvkrerr.CodeUsage {
 					t.Fatalf("incomplete runtime closure escaped admission: %v", err)
@@ -65,10 +93,19 @@ func TestSiteStartupRuntimeImagesRequireTheWholeSelectedClosure(t *testing.T) {
 			if err := yaml.Unmarshal([]byte(data), &decoded); err != nil {
 				t.Fatal(err)
 			}
-			for _, role := range runtimeImages {
-				if !strings.Contains(decoded.WriteFiles[0].Content, " runtime-"+role) {
-					t.Fatalf("selected runtime image is not imported: %s", role)
+			script := decoded.WriteFiles[0].Content
+			for role, reference := range cfg.ImageImports {
+				if !strings.Contains(script, operatorQuote("downloads/"+role+".tar")) || !strings.Contains(script, "inspecti --quiet "+operatorQuote(reference)) {
+					t.Fatalf("selected runtime image lacks exact import and CRI check: %s", role)
 				}
+			}
+			if strings.Count(script, "images import --local --digests --base-name ") != len(cfg.ImageImports)+1 {
+				t.Fatal("every selected runtime image and OVN must use the local manifest importer")
+			}
+			command := exec.CommandContext(t.Context(), "bash", "-n")
+			command.Stdin = strings.NewReader(script)
+			if output, err := command.CombinedOutput(); err != nil {
+				t.Fatalf("runtime import shell: %v: %s", err, output)
 			}
 		})
 	}
@@ -83,6 +120,8 @@ func TestSiteStartupRejectsInvalidHandoffsBeforeReturningUserData(t *testing.T) 
 		{"public gateway", func(c *NativeSiteStartup) { c.Gateway = "8.8.8.8" }},
 		{"ipv6 gateway", func(c *NativeSiteStartup) { c.Gateway = "fd00::1" }},
 		{"invalid image", func(c *NativeSiteStartup) { c.ControllerImage = "image; command" }},
+		{"missing built image reference", func(c *NativeSiteStartup) { delete(c.ImageImports, "controller") }},
+		{"tag-only built image reference", func(c *NativeSiteStartup) { c.ImageImports["controller"] = "docker.io/library/nke-controller:latest" }},
 		{"tag-only OVN", func(c *NativeSiteStartup) { c.OVNImage = "localhost/nvke/ovn-kubernetes:latest" }},
 		{"sibling OVN", func(c *NativeSiteStartup) { c.OVNImage = "localhost/nvke/sibling@sha256:" + strings.Repeat("a", 64) }},
 		{"missing asset", func(c *NativeSiteStartup) { c.Assets = c.Assets[1:] }},
@@ -98,7 +137,7 @@ func TestSiteStartupRejectsInvalidHandoffsBeforeReturningUserData(t *testing.T) 
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := startupDescription()
 			tc.change(&cfg)
-			data, err := SiteStartupUserData(t.Context(), cfg)
+			data, err := SiteStartupUserData(startupTestContext(t), cfg)
 			var coded *nvkrerr.Error
 			if data != "" || !errors.As(err, &coded) || coded.Code != nvkrerr.CodeUsage {
 				t.Fatalf("unsafe startup escaped admission: data=%d error=%v", len(data), err)
@@ -109,7 +148,7 @@ func TestSiteStartupRejectsInvalidHandoffsBeforeReturningUserData(t *testing.T) 
 
 func TestSiteStartupOnlyPreparesGuestForHostBootstrap(t *testing.T) {
 	cfg := startupDescription()
-	data, err := SiteStartupUserData(t.Context(), cfg)
+	data, err := SiteStartupUserData(startupTestContext(t), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +156,7 @@ func TestSiteStartupOnlyPreparesGuestForHostBootstrap(t *testing.T) {
 	if err := yaml.Unmarshal([]byte(data), &decoded); err != nil {
 		t.Fatal(err)
 	}
-	if len(decoded.RunCmd) != 1 || len(decoded.RunCmd[0]) != 2 || decoded.RunCmd[0][1] != "/var/lib/nvke-native/prepare.sh" {
+	if len(decoded.RunCmd) != 1 || len(decoded.RunCmd[0]) != 3 || decoded.RunCmd[0][1] != "-ec" || !strings.Contains(decoded.RunCmd[0][2], "exec /bin/bash /var/lib/nvke-native/prepare.sh") || !strings.Contains(decoded.RunCmd[0][2], "exec timeout --kill-after=5s") {
 		t.Fatal("cloud-init must only prepare and queue the site service")
 	}
 	files := map[string]startupFile{}
@@ -165,7 +204,7 @@ func TestSiteStartupOnlyPreparesGuestForHostBootstrap(t *testing.T) {
 	if installed < 0 || reloaded <= installed || stopped <= reloaded || started <= stopped || strings.Count(prepare.Content, "systemctl daemon-reload") != 1 {
 		t.Fatal("preparation must reload service drop-ins after APT and before starting the agents")
 	}
-	imported := strings.Index(prepare.Content, "images import --digests --base-name "+operatorQuote("localhost/nvke/ovn-kubernetes"))
+	imported := strings.Index(prepare.Content, "images import --local --digests --base-name "+operatorQuote("localhost/nvke/ovn-kubernetes"))
 	configured := strings.Index(prepare.Content, "> /etc/dgx/ovn-kubernetes/values-nke.yaml")
 	if imported <= stopped || configured <= imported || started <= configured {
 		t.Fatal("site agents must start after selected OVN import and values projection")
@@ -185,7 +224,7 @@ func TestSiteStartupOnlyPreparesGuestForHostBootstrap(t *testing.T) {
 	// Descriptions are borrowed: rendering must not sort the caller's slice.
 	first := cfg.Assets[0]
 	cfg.Assets[0], cfg.Assets[1] = cfg.Assets[1], cfg.Assets[0]
-	reordered, err := SiteStartupUserData(t.Context(), cfg)
+	reordered, err := SiteStartupUserData(startupTestContext(t), cfg)
 	if err != nil || reordered != data || cfg.Assets[1] != first {
 		t.Fatal("startup must be deterministic without mutating descriptions")
 	}
@@ -209,7 +248,7 @@ func TestSiteStartupPinsTheAuthenticatedTLSReturnChannel(t *testing.T) {
 	cfg.HandoffURL = "https://172.30.0.1:18443/site-kubeconfig"
 	cfg.HandoffToken = strings.Repeat("b", 64)
 	cfg.HandoffCertificate = certificate
-	data, err := SiteStartupUserData(t.Context(), cfg)
+	data, err := SiteStartupUserData(startupTestContext(t), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +274,7 @@ func TestSiteStartupPinsTheAuthenticatedTLSReturnChannel(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg.HandoffCertificate = wrongCertificate
-	if data, err := SiteStartupUserData(t.Context(), cfg); data != "" || err == nil {
+	if data, err := SiteStartupUserData(startupTestContext(t), cfg); data != "" || err == nil {
 		t.Fatal("startup admitted a trust anchor for a different endpoint")
 	}
 }
@@ -253,7 +292,7 @@ func TestSiteStartupUsesSelectedOVNPackageVersion(t *testing.T) {
 			if network == "upstream-ovn" {
 				cfg.OVNVersion = version
 			}
-			data, err := SiteStartupUserData(t.Context(), cfg)
+			data, err := SiteStartupUserData(startupTestContext(t), cfg)
 			if err != nil {
 				t.Fatal(err)
 			}

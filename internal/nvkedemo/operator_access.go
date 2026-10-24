@@ -197,7 +197,13 @@ func (access OperatorAccess) WriteInstructions(out io.Writer) error {
 	}
 	var text strings.Builder
 	fmt.Fprintf(&text, "\nKubernetes access (on this execution host):\nKUBECTL=%s\nSITE_CONFIG=%s\nTENANT_CONFIG=%s\n\n", operatorQuote(access.kubectl), operatorQuote(access.site), operatorQuote(access.tenant))
-	text.WriteString("# Tenant: the real QCOW2 nodes and their workloads\n\"$KUBECTL\" --kubeconfig \"$TENANT_CONFIG\" --request-timeout=10s get nodes\n\"$KUBECTL\" --kubeconfig \"$TENANT_CONFIG\" --request-timeout=10s get pods -A\n\n# Management: Kind nodes, provisioning and supporting services\n\"$KUBECTL\" --kubeconfig \"$SITE_CONFIG\" --request-timeout=10s get nodes\n\"$KUBECTL\" --kubeconfig \"$SITE_CONFIG\" --request-timeout=10s get pods -A\n")
+	text.WriteString("# Tenant: the real QCOW2 nodes and their workloads\n\"$KUBECTL\" --kubeconfig \"$TENANT_CONFIG\" --request-timeout=10s get nodes\n\"$KUBECTL\" --kubeconfig \"$TENANT_CONFIG\" --request-timeout=10s get pods -A\n")
+	if access.siteQCOW {
+		text.WriteString("\n# Management: native QCOW2 site, provisioning and supporting services\n")
+	} else {
+		text.WriteString("\n# Management: Kind nodes, provisioning and supporting services\n")
+	}
+	text.WriteString("\"$KUBECTL\" --kubeconfig \"$SITE_CONFIG\" --request-timeout=10s get nodes\n\"$KUBECTL\" --kubeconfig \"$SITE_CONFIG\" --request-timeout=10s get pods -A\n")
 	if access.uiService == "" {
 		text.WriteString("\nBrowser access: no unambiguous Temporal UI Service/port was discovered.\n\"$KUBECTL\" --kubeconfig \"$SITE_CONFIG\" --request-timeout=10s -n temporal get services\n")
 	} else if !access.uiHTTPObserved {

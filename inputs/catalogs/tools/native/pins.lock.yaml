@@ -138,6 +138,12 @@ pins:
     sourceDateEpoch: 1792548398
     tag: v0.22.0
     treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
+  nvkr-site-identity:
+    commit: 8aba19abf8a2b74dbd14f8a6abed608e02e8b744
+    goVersion: 1.27.3
+    sourceDateEpoch: 1792621677
+    tag: 8aba19abf8a2b74dbd14f8a6abed608e02e8b744
+    treeHash: e4264190f52f98ef70ca9daa4b536306ec030aa9
   oras:
     commit: 210747c29c1d38732b3194878dfd8b5a6b9ad7eb
     sourceDateEpoch: 1783708065
@@ -214,27 +220,27 @@ pins:
       platform: linux/arm64
       url: https://releases.hashicorp.com/packer-plugin-qemu/1.1.6/packer-plugin-qemu_1.1.6_linux_arm64.zip
     treeHash: accfb8bf3a7269c099f095c60817f309d06cfb7a
-  vmnet-helper:
-    commit: 222c121ba31e49856c9ec6c3a14426b49d77c8fe
-    sourceDateEpoch: 1785701223
-    tag: v0.13.0
+  vmnet-client:
+    commit: c593b89a2e93e92cfe7c5b1189e1eeb2c7977554
+    sourceDateEpoch: 1773407730
+    tag: v0.10.0
     tool:
-      archiveDigest: sha256:dd4355c053c0f04357285ee50169bfce7d04de3f0f49c0356487b099175ab120
-      executableDigest: sha256:1790cc0b4672c37d7af6c1f046fe96cc733809350d9d8acf576de60b615962f1
+      archiveDigest: sha256:bcf37a2631878a24fd02e2bf812b7387d4c4ff0bcee27c3f4be410c040896f8b
+      executableDigest: sha256:24742a641cd4e884502217fac6f40c4a27a6ffd08682137a69dac21f3cb198f6
+      executablePath: opt/vmnet-helper/bin/vmnet-client
+      format: tar-gzip
+      platform: darwin/arm64
+      url: https://github.com/nirs/vmnet-helper/releases/download/v0.10.0/vmnet-helper.tar.gz
+    treeHash: 8f90a3d7c452e1fad44b7916442a38bc27d06c56
+  vmnet-helper:
+    commit: c593b89a2e93e92cfe7c5b1189e1eeb2c7977554
+    sourceDateEpoch: 1773407730
+    tag: v0.10.0
+    tool:
+      archiveDigest: sha256:bcf37a2631878a24fd02e2bf812b7387d4c4ff0bcee27c3f4be410c040896f8b
+      executableDigest: sha256:3075f3297ed2f8edeb2ae058383dc83debc366fb9d7ce3aa0928a8bc51a7f3a6
       executablePath: opt/vmnet-helper/bin/vmnet-helper
       format: tar-gzip
       platform: darwin/arm64
-      url: https://github.com/nirs/vmnet-helper/releases/download/v0.13.0/vmnet-helper.tar.gz
-    treeHash: d110b5626f215a596f7a2f8b4308a6f165d4c4f4
-  vmnet-run:
-    commit: 222c121ba31e49856c9ec6c3a14426b49d77c8fe
-    sourceDateEpoch: 1785701223
-    tag: v0.13.0
-    tool:
-      archiveDigest: sha256:dd4355c053c0f04357285ee50169bfce7d04de3f0f49c0356487b099175ab120
-      executableDigest: sha256:1a65cd2b0e729cf6f559f8e9e94a1931a5e85c22a7a0aecd0f2ddb9b78e9a800
-      executablePath: opt/vmnet-helper/bin/vmnet-run
-      format: tar-gzip
-      platform: darwin/arm64
-      url: https://github.com/nirs/vmnet-helper/releases/download/v0.13.0/vmnet-helper.tar.gz
-    treeHash: d110b5626f215a596f7a2f8b4308a6f165d4c4f4
+      url: https://github.com/nirs/vmnet-helper/releases/download/v0.10.0/vmnet-helper.tar.gz
+    treeHash: 8f90a3d7c452e1fad44b7916442a38bc27d06c56

@@ -73,6 +73,7 @@ type Runner struct {
 	buildActivity bool
 	directory     string     // Command cwd, independent of private diagnostic storage.
 	extraFiles    []*os.File // Explicitly owned local helper descriptors; never ambient FDs.
+	input         *os.File   // Private held regular input; lifetime stays with the caller through join.
 }
 
 // SudoAuthorizer is an optional terminal bridge on a downstream progress writer.
@@ -486,6 +487,26 @@ func requireContext(ctx context.Context) error {
 	return ctx.Err()
 }
 
+// Command-line tools need an explicit duration in addition to process context
+// cancellation. Derive it from the existing operation deadline, never host speed.
+func remainingWork(ctx context.Context) (time.Duration, error) {
+	if ctx == nil {
+		return 0, nvkrerrors.New(nvkrerrors.CodeUsage, "work budget requires a caller context")
+	}
+	if err := requireContext(ctx); err != nil {
+		return 0, nvkrerrors.Wrap(nvkrerrors.CodeTimeout, err, "work budget unavailable")
+	}
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return 0, nvkrerrors.New(nvkrerrors.CodeUsage, "work command requires a caller deadline")
+	}
+	remaining := time.Until(deadline)
+	if remaining <= 0 {
+		return 0, nvkrerrors.Wrap(nvkrerrors.CodeTimeout, context.DeadlineExceeded, "work budget expired")
+	}
+	return remaining, nil
+}
+
 func safePhase(phase string) bool {
 	if phase == "" || phase == "." || phase == ".." || len(phase) > 128 {
 		return false
@@ -540,6 +561,13 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 	cmd := exec.CommandContext(commandCtx, path, args[1:]...)
 	cmd.Env = append([]string{}, r.Env...)
 	cmd.ExtraFiles = append([]*os.File(nil), r.extraFiles...)
+	if r.input != nil {
+		info, err := r.input.Stat()
+		if err != nil || !info.Mode().IsRegular() || !currentOwner(info) || info.Mode().Perm()&0o022 != 0 {
+			return nil, errors.New("command input requires a held owned regular file without group/other write permissions")
+		}
+		cmd.Stdin = r.input
+	}
 	localGitFetch := false
 	if args[0] == "git" {
 		// Admit the same effective directory Git will execute in. Diagnostic
@@ -567,6 +595,11 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 			return nil, &CommandError{Phase: phase, ExitCode: -1, Cause: err}
 		}
 		localGitFetch = gitArgs[0] == "fetch"
+	}
+	if deadline, bounded := ctx.Deadline(); bounded && !ownedLifetime {
+		// Go contexts do not cross exec. The child CLI (including one invoked
+		// through bootstrap shell work) must retain this absolute work bound.
+		cmd.Env = SetEnv(cmd.Env, map[string]string{"NVKR_WORK_DEADLINE": deadline.UTC().Format(time.RFC3339Nano)})
 	}
 	cmd.Dir = r.Work
 	if r.directory != "" {
@@ -714,6 +747,8 @@ func (r Runner) Start(ctx context.Context, args []string, phase string) (*OwnedP
 	return process, nil
 }
 
+// A zero timeout inherits the caller's cancelable work context. Positive values
+// are reserved for independently bounded control requests and cleanup.
 func (r Runner) Capture(ctx context.Context, args []string, phase string, timeout time.Duration) ([]byte, error) {
 	return r.execute(ctx, args, phase, timeout, true)
 }
@@ -728,11 +763,14 @@ func (r Runner) execute(ctx context.Context, args []string, phase string, timeou
 	if err := requireContext(ctx); err != nil {
 		return nil, err
 	}
-	if timeout <= 0 {
-		return nil, errors.New("positive command timeout required")
+	if timeout < 0 || timeout == 0 && ctx.Done() == nil {
+		return nil, errors.New("command requires a positive timeout or cancelable caller context")
 	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 	p, err := r.start(ctx, args, phase, capture, false)
 	if err != nil {
 		return nil, err

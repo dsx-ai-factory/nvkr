@@ -8,12 +8,14 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
@@ -95,7 +97,16 @@ func testReleaseExecutableAcquisition(t *testing.T, format string) {
 			if test.change != nil {
 				test.change(&node)
 			}
-			digest, size, err := downloadReleaseExecutableWithClient(t.Context(), node, root, "tool", server.Client())
+			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Hour)
+			defer cancel()
+			deadline, _ := ctx.Deadline()
+			transport := releaseExecutableRoundTripper(func(request *http.Request) (*http.Response, error) {
+				if actual, bounded := request.Context().Deadline(); !bounded || !actual.Equal(deadline) {
+					t.Error("payload transport replaced the caller deadline")
+				}
+				return server.Client().Transport.RoundTrip(request)
+			})
+			digest, size, err := downloadReleaseExecutableWithTransport(ctx, node, root, "tool", transport)
 			if code(err) != test.code {
 				t.Fatalf("error %v; want %s", err, test.code)
 			}

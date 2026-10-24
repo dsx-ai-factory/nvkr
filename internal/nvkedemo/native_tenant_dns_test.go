@@ -7,7 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net/netip"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -19,6 +19,12 @@ import (
 // Exercise the native orchestration with owned fixture commands, not guests.
 // Ready nodes must not bypass DNS admission or permit a smoke retry.
 func TestNativeTenantAdmitsDNSBeforeSingleSmoke(t *testing.T) {
+	for _, count := range []int{2, 3} {
+		t.Run(fmt.Sprint(count), func(t *testing.T) { nativeTenantDNSCases(t, count) })
+	}
+}
+
+func nativeTenantDNSCases(t *testing.T, count int) {
 	for _, tc := range []struct {
 		name, fail, block string
 	}{
@@ -28,28 +34,54 @@ func TestNativeTenantAdmitsDNSBeforeSingleSmoke(t *testing.T) {
 		{name: "rollout deadline", block: "deployment/coredns"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			selected, root := tenantRunFixture(t, "ovn", tc.fail, tc.block)
-			rows, err := json.Marshal([]tenantRow{{Name: "native-demo-tenant", ID: "owned-id", NICo: TenantProvider{OrgID, SiteID, VPCID}}})
+			selected, root := tenantRunFixture(t, tc.fail, tc.block)
+			executable, err := os.Executable()
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := os.WriteFile(filepath.Join(root, "rows.json"), rows, 0600); err != nil {
+			// Fixtures finish synchronously; the race runtime's default exit
+			// sleep must not consume the selected DNS/readiness test budget.
+			selected.session.Runner.Env = append(selected.session.Runner.Env, "CLOUDINIT_TOOL="+executable, "NVKR_TEST_CLOUD_INIT_TOOL=1", "GORACE=atexit_sleep_ms=0")
+			attempt := nativeCAPITenantFixture(t, GuestCIDR, "ovn")
+			workloadPods, err := json.Marshal(map[string]any{"items": []any{map[string]any{"status": map[string]any{"containerStatuses": []any{map[string]string{"imageID": attempt.assets.Images["workload"].Reference}}}}}})
+			if err != nil {
 				t.Fatal(err)
 			}
-			installer := privateTestDir(t)
-			writeTenantFixture(t, filepath.Join(installer, "SOURCE_COMMIT"), []byte("400c24fb6465b042be883d6b62472528520d6291\n"), 0600)
-			attempt := nativeSiteAttempt{
-				assets: NativeAssets{Installer: installer}, network: "ovn", tenantTimeout: 5 * time.Second,
-				bridge: nativeBridgeConfig{prefix: netip.MustParsePrefix(GuestCIDR)},
+			writeTenantFixture(t, filepath.Join(root, "pods.json"), workloadPods, 0600)
+			attempt.tenantTimeout = 15 * time.Second
+			if count == 3 {
+				attempt.conformance = &nativeConformanceConfig{}
+			}
+			nodeBytes, err := json.Marshal(map[string]any{"items": nativeTopologyNodes(count)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			writeTenantFixture(t, filepath.Join(root, "nodes.json"), nodeBytes, 0600)
+			request, err := attempt.namedTenantRequest(t.Context(), "native-demo-tenant")
+			if err != nil {
+				t.Fatal(err)
+			}
+			rows := []tenantRow{{Name: request.Name, ID: "owned-id", Infra: request.Infra, ControlPlane: &request.ControlPlane}}
+			encoded, err := json.Marshal(rows)
+			if err != nil {
+				t.Fatal(err)
+			}
+			writeTenantFixture(t, filepath.Join(root, "rows.json"), encoded, 0600)
+			if err := privateJSON(filepath.Join(root, "pools.json"), []map[string]any{{"id": "owned-worker", "name": "worker", "clusterID": "owned-id", "infra": request.NodePools[0].Infra, "desiredNodeCount": request.NodePools[0].Count}}); err != nil {
+				t.Fatal(err)
 			}
 			ctx := t.Context()
 			if tc.block != "" {
 				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(ctx, time.Second)
+				ctx, cancel = context.WithTimeout(ctx, 10*time.Second)
 				defer cancel()
 			}
-			err = attempt.runTenant(ctx, selected.session.Runner, filepath.Join(selected.session.Work, "cli", installerCLIName), selected.session.Tools, selected.session.Work, "site.config")
-			want := []string{"kubeconfig", "nodes", "deployment/coredns"}
+			err = attempt.runTenantRequest(ctx, selected.session.Runner, filepath.Join(selected.session.Work, "cli", installerCLIName), selected.session.Tools, selected.session.Work, "site.config", request)
+			want := []string{"kubeconfig", "nodes", "nodes"}
+			for i := range count {
+				want = append(want, fmt.Sprintf("cloud-init-status-%d", i))
+			}
+			want = append(want, "nodes", "deployment/coredns")
 			if tc.fail != "deployment/coredns" && tc.block == "" {
 				want = append(want, "daemonset/node-local-dns")
 			}

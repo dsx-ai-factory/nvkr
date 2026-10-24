@@ -11,14 +11,100 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
+func TestNativeSimulatorReadinessBudget(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		site    bool
+		timeout time.Duration
+		budget  time.Duration
+		parent  time.Duration
+	}{
+		{name: "site inherits work deadline", site: true, budget: 2 * time.Hour},
+		{name: "site ignores standalone and tenant limits", site: true, timeout: time.Minute, budget: 30 * time.Minute},
+		{name: "site respects earlier parent", site: true, budget: 2 * time.Hour, parent: 15 * time.Minute},
+		{name: "standalone explicit budget", timeout: 5 * time.Minute},
+		{name: "standalone earlier caller", timeout: 5 * time.Minute, budget: time.Minute},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := t.Context()
+			for _, budget := range []time.Duration{tc.parent, tc.budget} {
+				if budget != 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, budget)
+					defer cancel()
+				}
+			}
+			cfg := NativeGuestConfig{Timeout: tc.timeout, Accelerator: "kvm"}
+			if tc.site {
+				cfg.site = &nativeSiteAttempt{tenantTimeout: 2 * time.Hour}
+			}
+			deadline, _ := ctx.Deadline()
+			before := time.Until(deadline)
+			values, err := nativeSimulatorEnvironment(ctx, cfg, linuxNativeBridge(), "/image.qcow2", "/seed.yaml", "/simulator")
+			after := time.Until(deadline)
+			if err != nil {
+				t.Fatal(err)
+			}
+			env := SetEnv([]string{"NICO_VMS_READINESS_TIMEOUT=0s"}, values)
+			got, err := time.ParseDuration(environmentValue(env, "NICO_VMS_READINESS_TIMEOUT"))
+			if err != nil || got <= 0 || tc.site && (got < after || got > before) || !tc.site && got != tc.timeout {
+				t.Fatalf("simulator readiness timeout=%v err=%v; caller remaining=[%v,%v]", got, err, after, before)
+			}
+			if strings.Count(strings.Join(env, "\n"), "NICO_VMS_READINESS_TIMEOUT=") != 1 {
+				t.Fatal("simulator environment retained a stale readiness timeout")
+			}
+			for key, want := range map[string]string{"NICO_VMS_CLEANUP_ORPHANED_VMS": "false", "NICO_VMS_DIAG_SSH_ENABLED": "false", "NICO_VMS_BASE_IMAGE": "/image.qcow2"} {
+				if got := environmentValue(env, key); got != want {
+					t.Fatalf("%s=%q, want %q", key, got, want)
+				}
+			}
+			if cfg.Timeout != tc.timeout {
+				t.Fatal("simulator budget changed the guest readiness policy")
+			}
+		})
+	}
+}
+
+func TestNativeSimulatorRejectsUnavailableSiteBudget(t *testing.T) {
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	expired, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+	defer cancel()
+	for _, tc := range []struct {
+		name  string
+		ctx   context.Context
+		code  nvkrerr.Code
+		cause error
+	}{
+		{"nil", nil, nvkrerr.CodeUsage, nil},
+		{"unbounded", context.Background(), nvkrerr.CodeUsage, nil},
+		{"canceled", canceled, nvkrerr.CodeTimeout, context.Canceled},
+		{"expired", expired, nvkrerr.CodeTimeout, context.DeadlineExceeded},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			env, err := nativeSimulatorEnvironment(tc.ctx, NativeGuestConfig{site: &nativeSiteAttempt{}}, linuxNativeBridge(), "/image.qcow2", "/seed.yaml", "/simulator")
+			var coded *nvkrerr.Error
+			if env != nil || !errors.As(err, &coded) || coded.Code != tc.code || tc.cause != nil && !errors.Is(err, tc.cause) {
+				t.Fatalf("environment=%v error=%v", env, err)
+			}
+		})
+	}
+}
+
 func TestNativeGuestsUseTenantIPAMPool(t *testing.T) {
-	tenant := NewTenantRequest("allocation-contract")
+	attempt := nativeCAPITenantFixture(t, GuestCIDR, "ovn")
+	tenant, err := attempt.namedTenantRequest(t.Context(), "allocation-contract")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, name := range []string{"nvke-native-site", "nvke-native-guest"} {
 		t.Run(name, func(t *testing.T) {
 			startup := "#cloud-config\nprivate-handoff: test-only-secret\n"
@@ -46,8 +132,23 @@ func TestNativeGuestsUseTenantIPAMPool(t *testing.T) {
 				if len(request.Interfaces) != 1 || len(request.Interfaces[0]) != 1 {
 					t.Error("guest requires exactly its shared VPC-prefix allocator")
 				} else {
-					for _, prefix := range []string{tenant.ControlPlane.NICo.Prefixes[0], tenant.NodePools[0].NICo.Prefixes[0]} {
-						if request.Interfaces[0]["vpcPrefixId"] != prefix {
+					for _, infra := range []*TenantMachineInfra{tenant.ControlPlane.Infra, tenant.NodePools[0].Infra} {
+						var machine struct {
+							Spec struct {
+								Template struct {
+									Spec struct {
+										Type       string              `json:"instanceTypeID"`
+										VPC        string              `json:"vpcID"`
+										Interfaces []map[string]string `json:"interfaces"`
+									} `json:"spec"`
+								} `json:"template"`
+							} `json:"spec"`
+						}
+						if err := json.Unmarshal(infra.MachineTemplate, &machine); err != nil {
+							t.Fatal(err)
+						}
+						instance := machine.Spec.Template.Spec
+						if instance.Type != request.Type || instance.VPC != request.VPC || len(instance.Interfaces) != 1 || request.Interfaces[0]["vpcPrefixId"] != instance.Interfaces[0]["vpcPrefixID"] {
 							t.Error("site, control-plane and worker do not share one allocation owner")
 						}
 					}
@@ -142,6 +243,29 @@ func TestCanceledNativeGuestCreatesNothing(t *testing.T) {
 	}
 	if _, err := os.Lstat(out); !os.IsNotExist(err) {
 		t.Fatal("canceled guest created output")
+	}
+}
+
+func TestMacTCGWithoutAdapterRejectsBeforeArtifactOrOutputWork(t *testing.T) {
+	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
+		t.Skip("Mac runtime admission")
+	}
+	for _, site := range []bool{false, true} {
+		t.Run(map[bool]string{false: "guest", true: "site"}[site], func(t *testing.T) {
+			out := filepath.Join(t.TempDir(), "must-not-exist")
+			var err error
+			if site {
+				err = RunNative(t.Context(), NativeConfig{Accelerator: "tcg", Image: "/absent/image.qcow2", Out: out})
+			} else {
+				err = RunNativeGuest(t.Context(), NativeGuestConfig{Accelerator: "tcg", Image: "/absent/image.qcow2", Out: out})
+			}
+			if err == nil || !strings.Contains(err.Error(), "explicit adapter executable") {
+				t.Fatal("TCG reached artifact work without its adapter", err)
+			}
+			if _, statErr := os.Stat(out); !os.IsNotExist(statErr) {
+				t.Fatal("TCG adapter refusal created output", statErr)
+			}
+		})
 	}
 }
 

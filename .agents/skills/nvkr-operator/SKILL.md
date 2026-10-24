@@ -76,10 +76,12 @@ distinguishes source fixes from actual startup acceptance. Explicit `--network u
 matched upstream alternative for image, site and tenant; it does not validate the NVIDIA fork.
 
 The [shared native path](../../../docs/local-nvke-demo.md#native-linux-and-mac-path) runs the Go CLIs and
-TUI on Linux ARM64 or Apple Silicon macOS, with one QEMU site and two QEMU tenant guests. Tools are prepared
+TUI on Linux ARM64 or Apple Silicon macOS, with one QEMU site, one tenant control plane,
+and one tenant worker ordinarily. Conformance requires two workers in the same worker pool:
+three tenant guests and four QEMU guests in total on either host. Tools are prepared
 through NVKR's shared catalog; host virtualization prerequisites remain separate. The October 15 Mac runtime
 record covers existing artifacts, upstream OVN and TCG on a pre-integration draft, not fresh-machine or Linux
-full runtime acceptance. Standard `run` and `e2e` now select that same three-VM deployment owner;
+full runtime acceptance. Standard `run` and `e2e` select that same native deployment owner;
 they do not deploy the site into Kind. Kind is temporary bootstrap infrastructure. Fresh complete Mac
 customer first-invocation acceptance remains unverified. Default Mac BUILD selects the committed product
 Definition and Mac Environment, admits installed prerequisites and delegates native Packer preparation to
@@ -88,6 +90,23 @@ does not install them. Explicit Definition, Environment and native NVKR selectio
 Mac or Linux with their dependencies already bound. Controlled adapter tests do not establish full Mac E2E
 acceptance. Preserve an expressly requested native host; do not substitute a Linux
 execution VM or manual SSH workflow.
+
+For current native tenant acceptance, require every requested node Ready and every worker schedulable
+(one control plane plus two workers for conformance), the actual per-node host cloud-init
+status gate, then DNS/workload and requested conformance. Default native `run`/`e2e`
+return after successful checks and retain the cluster in its independent owner;
+leaving the presenter never requests deletion. Preserve the printed original
+session, status, cleanup and Kubernetes access commands. Explicit `--cleanup` or
+`cleanup --session` requires natural joined teardown. The cloud-init gate's
+controlled tests do not establish guest execution; retain that distinction in the report.
+
+For the maintained NVKE 64K image, explicitly select `--accelerator tcg` on Mac
+for `guest`, `run` or `e2e`. It uses native QEMU's `max` CPU and retains
+the selected kernel, NVIDIA OVN and shared source pins. HVF cannot run that image
+on a host whose feature register reports no 64K translation-granule support;
+there is no silent fallback. Linux retains KVM. Require a fresh actual guest and
+workload/conformance result before reporting success; a paused device probe is
+not boot acceptance.
 
 Use configured credential references and existing authentication without printing keys, tokens, environments
 or private provider logs. Do not ask the customer to paste secrets into the conversation. Treat catalog

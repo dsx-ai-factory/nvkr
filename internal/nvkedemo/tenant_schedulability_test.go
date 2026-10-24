@@ -20,8 +20,8 @@ import (
 // tenant wait paths. These are observations, not Kubernetes scheduling proof.
 func schedulableTenantJSON(controlSpec, workerSpec string) []byte {
 	return fmt.Appendf(nil, `{"items":[
-{"metadata":{"name":"control-plane","labels":{"node-role.kubernetes.io/control-plane":""}},"spec":%s,"status":{"conditions":[{"type":"Ready","status":"True"}],"nodeInfo":{"architecture":"arm64","kubeletVersion":"v1.34.2"}}},
-{"metadata":{"name":"worker"},"spec":%s,"status":{"conditions":[{"type":"Ready","status":"True"}],"nodeInfo":{"architecture":"arm64","kubeletVersion":"v1.34.2"}}}
+{"metadata":{"name":"control-plane","uid":"control-plane-uid","labels":{"node-role.kubernetes.io/control-plane":""}},"spec":%s,"status":{"conditions":[{"type":"Ready","status":"True"}],"nodeInfo":{"architecture":"arm64","kubeletVersion":"v1.34.2","bootID":"control-plane-boot"}}},
+{"metadata":{"name":"worker","uid":"worker-uid"},"spec":%s,"status":{"conditions":[{"type":"Ready","status":"True"}],"nodeInfo":{"architecture":"arm64","kubeletVersion":"v1.34.2","bootID":"worker-boot"}}}
 ]}`, controlSpec, workerSpec)
 }
 
@@ -52,7 +52,7 @@ func TestTenantReadyNodesRequiresSchedulableWorker(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ready, err := readyNodes(nodes.Items)
+			ready, err := readyNodesForCountVersion(nodes.Items, "1.34.2", 2)
 			if err != nil || ready != test.ready {
 				t.Fatalf("ready=%v err=%v, want ready=%v", ready, err, test.ready)
 			}
@@ -74,7 +74,7 @@ func TestTenantReadyNodesWaitsForSourceToClearProvisioning(t *testing.T) {
 		if err := json.Unmarshal(schedulableTenantJSON(`{"taints":[{"key":"node-role.kubernetes.io/control-plane","effect":"NoSchedule"}]}`, worker), &nodes); err != nil {
 			t.Fatal(err)
 		}
-		ready, err := readyNodes(nodes.Items)
+		ready, err := readyNodesForCountVersion(nodes.Items, "1.34.2", 2)
 		if err != nil || ready != (worker == `{}`) {
 			t.Fatalf("source transition worker=%s: ready=%v err=%v", worker, ready, err)
 		}
@@ -100,7 +100,7 @@ func TestTenantBlockedWorkerStillRejectsInvalidNodeGraph(t *testing.T) {
 			case "no control plane":
 				nodes.Items[0].Metadata.Labels = nil
 			}
-			if ready, err := readyNodes(nodes.Items); ready || err == nil {
+			if ready, err := readyNodesForCountVersion(nodes.Items, "1.34.2", 2); ready || err == nil {
 				t.Fatalf("blocked worker masked invalid graph: ready=%v err=%v", ready, err)
 			}
 		})
@@ -129,8 +129,13 @@ func (p *tenantSchedulabilityProgress) Report(event ProgressEvent) {
 func TestTenantRunBlockedReadyWorkerCannotSubmitWorkload(t *testing.T) {
 	for _, name := range []string{"canceled", "deadline"} {
 		t.Run(name, func(t *testing.T) {
-			selected, root := tenantRunFixture(t, "ovn", "", "")
+			attempt, runner, root := nativeSessionFixture(t, false, 0)
+			request, err := attempt.namedTenantRequest(t.Context(), "native-demo-tenant")
+			if err != nil {
+				t.Fatal(err)
+			}
 			raw := schedulableTenantJSON(`{"taints":[{"key":"node-role.kubernetes.io/control-plane","effect":"NoSchedule"}]}`, `{"taints":[{"key":"nke.nvidia.com/provisioning","value":"true","effect":"NoSchedule"}]}`)
+			raw = []byte(strings.ReplaceAll(string(raw), "v1.34.2", "v"+request.Kubernetes))
 			writeTenantFixture(t, filepath.Join(root, "nodes.json"), raw, 0o600)
 			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 			defer cancel()
@@ -140,8 +145,9 @@ func TestTenantRunBlockedReadyWorkerCannotSubmitWorkload(t *testing.T) {
 				// evaluation, so cancel exactly when the real wait rejects the worker.
 				progress.cancel = cancel
 			}
-			selected.session.Runner.Progress = progress
-			err := selected.run(ctx, 8*time.Second)
+			runner.Progress = progress
+			attempt.tenantTimeout = 8 * time.Second
+			err = attempt.runTenantRequest(ctx, runner, attempt.assets.CLI, attempt.assets.HostTools, runner.Work, filepath.Join(runner.Work, "site.kubeconfig"), request)
 			cause := context.Canceled
 			if name == "deadline" {
 				cause = context.DeadlineExceeded
@@ -157,7 +163,7 @@ func TestTenantRunBlockedReadyWorkerCannotSubmitWorkload(t *testing.T) {
 				t.Fatalf("blocked worker advanced to workload: %s, %v", events, readErr)
 			}
 			for _, file := range []string{"workload.json", "tenant-result.json"} {
-				if _, statErr := os.Stat(filepath.Join(selected.session.Work, file)); !os.IsNotExist(statErr) {
+				if _, statErr := os.Stat(filepath.Join(runner.Work, file)); !os.IsNotExist(statErr) {
 					t.Fatalf("blocked worker produced %s: %v", file, statErr)
 				}
 			}
@@ -166,9 +172,14 @@ func TestTenantRunBlockedReadyWorkerCannotSubmitWorkload(t *testing.T) {
 }
 
 func TestTenantRunObservesSourceClearedWorkerBeforeWorkload(t *testing.T) {
-	selected, root := tenantRunFixture(t, "ovn", "", "")
+	attempt, runner, root := nativeSessionFixture(t, false, 0)
+	request, err := attempt.namedTenantRequest(t.Context(), "native-demo-tenant")
+	if err != nil {
+		t.Fatal(err)
+	}
 	control := `{"taints":[{"key":"node-role.kubernetes.io/control-plane","effect":"NoSchedule"}]}`
 	blocked := schedulableTenantJSON(control, `{"unschedulable":true,"taints":[{"key":"nke.nvidia.com/provisioning","value":"true","effect":"NoSchedule"}]}`)
+	blocked = []byte(strings.ReplaceAll(string(blocked), "v1.34.2", "v"+request.Kubernetes))
 	path := filepath.Join(root, "nodes.json")
 	writeTenantFixture(t, path, blocked, 0o600)
 	cleared := false
@@ -183,16 +194,18 @@ func TestTenantRunObservesSourceClearedWorkerBeforeWorkload(t *testing.T) {
 		if err != nil || strings.Contains(string(events), "workload-") {
 			t.Fatalf("workload submitted before source cleared worker: %s %v", events, err)
 		}
-		writeTenantFixture(t, path, schedulableTenantJSON(control, `{}`), 0o600)
+		available := strings.ReplaceAll(string(schedulableTenantJSON(control, `{}`)), "v1.34.2", "v"+request.Kubernetes)
+		writeTenantFixture(t, path, []byte(available), 0o600)
 		cleared = true
 	}}
-	selected.session.Runner.Progress = progress
-	if err := selected.run(t.Context(), 25*time.Second); err != nil {
+	runner.Progress = progress
+	attempt.tenantTimeout = 25 * time.Second
+	if err := attempt.runTenantRequest(t.Context(), runner, attempt.assets.CLI, attempt.assets.HostTools, runner.Work, filepath.Join(runner.Work, "site.kubeconfig"), request); err != nil {
 		t.Fatal(err)
 	}
 	events, err := os.ReadFile(filepath.Join(root, "events"))
-	if err != nil || !cleared || !progress.observed || strings.Count(string(events), "nodes\n") != 2 || !strings.Contains(string(events), "workload-apply\n") {
-		t.Fatalf("source-clear transition did not admit workload after two observations: %s %v", events, err)
+	if err != nil || !cleared || !progress.observed || strings.Count(string(events), "nodes\n") != 4 || !strings.Contains(string(events), "workload-apply\n") {
+		t.Fatalf("source-clear transition did not admit workload after readiness and cloud-init observations: %s %v", events, err)
 	}
 }
 
@@ -206,7 +219,7 @@ func TestTenantNotReadyPartialNodeInfoRemainsPending(t *testing.T) {
 			nodes.Items[1].Status.Conditions[0].Status = status
 			nodes.Items[1].Status.NodeInfo.Architecture = ""
 			nodes.Items[1].Status.NodeInfo.KubeletVersion = ""
-			if ready, err := readyNodes(nodes.Items); ready || err != nil {
+			if ready, err := readyNodesForCountVersion(nodes.Items, "1.34.2", 2); ready || err != nil {
 				t.Fatalf("transient non-Ready node must remain pending: ready=%v err=%v", ready, err)
 			}
 		})

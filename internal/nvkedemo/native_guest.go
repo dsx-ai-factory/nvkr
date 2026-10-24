@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/qemutpm"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"go.yaml.in/yaml/v3"
 )
@@ -44,6 +45,31 @@ type nativeInstance struct {
 	} `json:"interfaces"`
 }
 
+func nativeSimulatorEnvironment(ctx context.Context, cfg NativeGuestConfig, network nativeBridgeConfig,
+	image, seedPath, simdir string,
+) (map[string]string, error) {
+	readinessTimeout := cfg.Timeout
+	if cfg.site != nil {
+		var err error
+		readinessTimeout, err = remainingWork(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return map[string]string{
+		"NICO_SIM_LISTEN_ADDR": net.JoinHostPort(network.gateway.String(), "18080"), "NICO_SIM_DB_PATH": filepath.Join(simdir, "nico.db"),
+		"NICO_SIM_SEED_PATH": seedPath, "NICO_SIM_FILES_DIR": filepath.Join(simdir, "files"),
+		"NICO_VMS_VM_BACKEND": "darwin-qemu", "NICO_VMS_BRIDGE_CIDR": network.prefix.String(),
+		"NICO_VMS_BASE_IMAGE": image, "NICO_VMS_QEMU_ACCELERATOR": cfg.Accelerator,
+		"NICO_VMS_BGP_ENABLED": "false", "NICO_CONTAINERS_ENABLED": "false",
+		"NICO_VMS_DIAG_SSH_ENABLED": "false", "NICO_VMS_CLEANUP_ORPHANED_VMS": "false",
+		"NICO_VMS_CONSOLE_SSH_PORT":   "-1",
+		"NICO_VMS_IMAGE_CACHE_DIR":    filepath.Join(simdir, "cache"),
+		"NICO_VMS_RECONCILE_INTERVAL": "1s", "NICO_VMS_READINESS_PROBE_INTERVAL": "1s",
+		"NICO_VMS_READINESS_TIMEOUT": readinessTimeout.String(),
+	}, nil
+}
+
 // RunNativeGuest starts one 2 GiB guest through NICo using the local Go disk
 // server. All instance deletion and child/server joining precedes return.
 func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
@@ -58,7 +84,18 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 	if err := admitNativeHost(runtime.GOOS+"/"+runtime.GOARCH, cfg.Accelerator); err != nil {
 		return err
 	}
-	if cfg.Timeout < time.Minute || cfg.Timeout > 30*time.Minute {
+	if err := admitNativeQEMUAdapter(runtime.GOOS+"/"+runtime.GOARCH, cfg.Accelerator, cfg.DemoExecutable, cfg.site != nil); err != nil {
+		return err
+	}
+	if err := admitNativeSeedISO(ctx, runtime.GOOS, NativeEnvironment()); err != nil {
+		return err
+	}
+	if err := admitNativeAddresses(ctx, NativeEnvironment()); err != nil {
+		return err
+	}
+	ctx, failAddresses := context.WithCancelCause(ctx)
+	defer failAddresses(nil)
+	if cfg.site == nil && (cfg.Timeout < time.Minute || cfg.Timeout > 30*time.Minute) {
 		return errors.New("guest timeout must be 1..30 minutes")
 	}
 	image, err := filepath.Abs(cfg.Image)
@@ -80,6 +117,9 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 	if err := verifyToolMembers(tools, members); err != nil {
 		return err
 	}
+	if err := admitNativeVMNet(ctx, runtime.GOOS, tools); err != nil {
+		return err
+	}
 	out, err := freshDestination(cfg.Out)
 	if err != nil {
 		return err
@@ -87,17 +127,53 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 	if err := os.Mkdir(out, 0o700); err != nil {
 		return err
 	}
+	if cfg.site != nil {
+		if err := prepareNativeSimulatorUI(ctx, cfg.site.assets.Installer, out); err != nil {
+			return err
+		}
+	}
 	runner := Runner{Work: out, Env: NativeEnvironment(), Progress: cfg.Progress}
 	runner.Env = SetEnv(runner.Env, map[string]string{"PATH": tools + string(os.PathListSeparator) + environmentValue(runner.Env, "PATH")})
+	var tpm *qemutpm.Adapter
+	if runtime.GOOS == "darwin" && (cfg.site != nil || cfg.Accelerator == "tcg") {
+		qemu, qemuErr := commandPath("qemu-system-aarch64", runner.Env)
+		swtpm, tpmErr := commandPath("swtpm", runner.Env)
+		if err := errors.Join(qemuErr, tpmErr); err != nil {
+			return err
+		}
+		tpm, err = qemutpm.Prepare(ctx, qemutpm.Options{Executable: cfg.DemoExecutable, Directory: filepath.Join(out, "native-qemu"), Instances: filepath.Join(out, "simulator", "instances"), QEMU: qemu, SWTPM: swtpm, Environment: runner.Env, Accelerator: qemutpm.Accelerator(cfg.Accelerator)})
+		if err != nil {
+			return err
+		}
+		runner.Env = SetEnv(runner.Env, tpm.Environment())
+	}
 	bridge, err := startNativeBridge(ctx, runner, runtime.GOOS, tools)
 	if err != nil {
 		return err
 	}
 	defer func() {
+		if holdErr := waitRetainedCleanup(ctx, result); holdErr != nil {
+			result = errors.Join(result, holdErr)
+			return
+		}
+		if runtimeRetention(ctx) != nil && (errors.Is(result, ErrUnjoined) || errors.Is(result, ErrRetainedControls)) {
+			recordRetainedCleanup(ctx, result)
+			return
+		}
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
 		defer cancel()
-		result = errors.Join(result, bridge.Stop(cleanup))
+		if tpm != nil {
+			if err := tpm.Close(cleanup); err != nil {
+				recordRetainedCleanup(ctx, errors.Join(ErrUnjoined, err))
+				result = errors.Join(result, ErrUnjoined, err)
+				return
+			}
+		}
+		cleanupErr := bridge.Stop(cleanup)
+		recordRetainedCleanup(ctx, cleanupErr)
+		result = errors.Join(result, cleanupErr)
 	}()
+	defer recoverRetainedPanic(ctx, &result)
 	network := bridge.config
 	if cfg.site != nil {
 		cfg.site.bridge = network
@@ -125,7 +201,7 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 		return fmt.Errorf("require the extracted source-owned NICo seed: %w", err)
 	}
 	if cfg.site != nil {
-		seedPath, err = nativeSiteSeed(ctx, seedPath, out)
+		seedPath, err = nativeSiteSeed(ctx, seedPath, out, cfg.site.resources)
 		if err != nil {
 			return err
 		}
@@ -145,18 +221,14 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 	}
 	// This private server starts from an empty database. Cleanup owns only its
 	// instances; it never adopts a shared NICo server or scans unrelated VMs.
-	runner.Env = SetEnv(runner.Env, map[string]string{
-		"NICO_SIM_LISTEN_ADDR": net.JoinHostPort(network.gateway.String(), "18080"), "NICO_SIM_DB_PATH": filepath.Join(simdir, "nico.db"),
-		"NICO_SIM_SEED_PATH": seedPath, "NICO_SIM_FILES_DIR": filepath.Join(simdir, "files"),
-		"NICO_VMS_VM_BACKEND": "darwin-qemu", "NICO_VMS_BRIDGE_CIDR": network.prefix.String(),
-		"NICO_VMS_BASE_IMAGE": image, "NICO_VMS_QEMU_ACCELERATOR": cfg.Accelerator,
-		"NICO_VMS_BGP_ENABLED": "false", "NICO_CONTAINERS_ENABLED": "false",
-		"NICO_VMS_DIAG_SSH_ENABLED": "false", "NICO_VMS_CLEANUP_ORPHANED_VMS": "false",
-		"NICO_VMS_CONSOLE_SSH_PORT":   "-1",
-		"NICO_VMS_IMAGE_CACHE_DIR":    filepath.Join(simdir, "cache"),
-		"NICO_VMS_RECONCILE_INTERVAL": "1s", "NICO_VMS_READINESS_PROBE_INTERVAL": "1s",
-		"NICO_VMS_READINESS_TIMEOUT": cfg.Timeout.String(),
-	})
+	nicoEnvironment, err := nativeSimulatorEnvironment(ctx, cfg, network, image, seedPath, simdir)
+	if err != nil {
+		return err
+	}
+	runner.Env = SetEnv(runner.Env, nicoEnvironment)
+	if err := configureNativeAddresses(&runner, simdir); err != nil {
+		return err
+	}
 	binary := filepath.Join(tools, "nico-sim")
 	var guard *NetworkGuard
 	if runtime.GOOS == "linux" {
@@ -171,13 +243,20 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 	}
 	if guard != nil {
 		defer func() {
-			if errors.Is(result, ErrUnjoined) {
+			if holdErr := waitRetainedCleanup(ctx, result); holdErr != nil {
+				result = errors.Join(result, holdErr)
+				guard.releaseHandles()
+				return
+			}
+			if errors.Is(result, ErrUnjoined) || errors.Is(result, ErrRetainedControls) {
+				recordRetainedCleanup(ctx, result)
 				guard.releaseHandles()
 				return
 			}
 			cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 8*time.Minute)
 			defer cancel()
 			if err := guard.StopDNS(cleanup); err != nil {
+				recordRetainedCleanup(ctx, err)
 				result = errors.Join(result, err)
 				guard.releaseHandles()
 				return
@@ -185,12 +264,20 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 			domainRunner := runner
 			domainRunner.Work = ""
 			if err := SweepOwnedDomains(cleanup, domainRunner, simdir); err != nil {
+				recordRetainedCleanup(ctx, err)
 				result = errors.Join(result, err)
+				guard.releaseHandles()
+				return
+			}
+			if runtimeRetention(ctx) != nil {
+				// The explicit foreground cleanup restores this original journal
+				// after the independent owner and its producers have exited.
 				guard.releaseHandles()
 				return
 			}
 			result = errors.Join(result, guard.Close(cleanup))
 		}()
+		defer recoverRetainedPanic(ctx, &result)
 	}
 	server, err := runner.Start(ctx, []string{binary}, "native-nico")
 	if err != nil {
@@ -209,11 +296,20 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 		return runner.Capture(ctx, args, "native-"+strconv.Itoa(sequence)+"-"+phase, 40*time.Second)
 	}
 	defer func() {
+		if holdErr := waitRetainedCleanup(ctx, result); holdErr != nil {
+			result = errors.Join(result, holdErr)
+			return
+		}
+		if runtimeRetention(ctx) != nil && errors.Is(result, ErrRetainedControls) {
+			recordRetainedCleanup(ctx, result)
+			return
+		}
 		boundary := beginProgress(cfg.Progress, "owned-node-cleanup", PhaseStarted, PhaseFinished, PhaseFailed)
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), tenantCleanupTimeout+5*time.Minute)
 		defer cancel()
 		var cleanupResult error
 		defer func() {
+			recordRetainedCleanup(ctx, cleanupResult)
 			result = errors.Join(result, cleanupResult)
 			boundary.finish(cleanupResult)
 		}()
@@ -244,11 +340,15 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 			if len(rows) == 0 {
 				break
 			}
-			if len(rows) > 3 {
-				cleanupResult = errors.Join(cleanupResult, errors.New("private native fixture exceeds one site and two tenant guests"))
+			inventoryLimit := nativeGuestLimit(cfg.site)
+			if cfg.site == nil {
+				inventoryLimit = 3
+			}
+			if len(rows) > inventoryLimit {
+				cleanupResult = errors.Join(cleanupResult, errors.New("private native fixture exceeds its requested guest count"))
 				break
 			}
-			owned, rejected := nativeCleanupRows(rows, instanceID, cfg.site != nil)
+			owned, rejected := nativeCleanupRows(rows, instanceID, nativeGuestLimit(cfg.site))
 			cleanupResult = errors.Join(cleanupResult, rejected)
 			for _, row := range owned {
 				if deleted[row.ID] {
@@ -282,6 +382,7 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 			cleanupResult = errors.Join(cleanupResult, disk.Stop(cleanup))
 		}
 	}()
+	defer recoverRetainedPanic(ctx, &result)
 	startup, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	for {
@@ -296,6 +397,26 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 			return err
 		}
 	}
+	addressLifetime := ctx
+	if owner := runtimeRetention(ctx); owner != nil {
+		addressLifetime = owner.lifetime
+	}
+	addresses, err := startNativeAddresses(addressLifetime, runner, simdir, network, nativeGuestLimit(cfg.site), failAddresses)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if holdErr := waitRetainedCleanup(ctx, result); holdErr != nil {
+			result = errors.Join(result, holdErr)
+			return
+		}
+		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		defer cancel()
+		cleanupErr := addresses.Stop(cleanup)
+		recordRetainedCleanup(ctx, cleanupErr)
+		result = errors.Join(result, cleanupErr)
+	}()
+	defer recoverRetainedPanic(ctx, &result)
 	diskPort := "0"
 	if guard != nil {
 		diskPort = "18082"
@@ -338,6 +459,11 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 		}
 		boot = cfg.site.boot
 	}
+	var guestProgress *progressBoundary
+	if cfg.site != nil {
+		guestProgress = beginProgress(cfg.Progress, "native-site-guest", PhaseStarted, PhaseFinished, PhaseFailed)
+		defer func() { guestProgress.finish(result) }()
+	}
 	created, err := createNativeGuest(ctx, api, instanceName, instanceType, userBytes, boot)
 	if err != nil {
 		return err
@@ -350,7 +476,11 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 		return errors.New("native create response lacks exact instance identity")
 	}
 	instanceID = instance.ID
-	budget, stop := context.WithTimeout(ctx, cfg.Timeout)
+	budget, stop := context.WithCancel(ctx)
+	if cfg.Timeout > 0 {
+		stop()
+		budget, stop = context.WithTimeout(ctx, cfg.Timeout)
+	}
 	defer stop()
 	for {
 		raw, err := nativeReadinessObservation(budget, cfg.Progress, func(ctx context.Context) ([]byte, error) {
@@ -372,6 +502,15 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 				return err
 			}
 			if cfg.site != nil {
+				guestProgress.finish(nil)
+				// Registered after every dependent cleanup defer: callback
+				// panic/Goexit must publish unsafe join state before unwinding
+				// any guest, service or network owner, without a return value.
+				defer func() {
+					if cfg.site.unjoinedWork != nil && !errors.Is(result, cfg.site.unjoinedWork) {
+						result = errors.Join(result, cfg.site.unjoinedWork)
+					}
+				}()
 				return cfg.site.ready(ctx, runner, row, tools, out, server)
 			}
 			if disk.requests.Load() == 0 {
@@ -530,14 +669,26 @@ journalctl -b -u systemd-networkd.service --no-pager -n 30
 printf 'NVKE_NATIVE_NETWORK_INSPECTION_END\n'
 `
 
-func nativeCleanupRows(rows []nativeInstance, instanceID string, site bool) ([]nativeInstance, error) {
+func nativeGuestLimit(site *nativeSiteAttempt) int {
+	if site == nil {
+		return 1
+	}
+	return 1 + site.tenantNodeCount()
+}
+
+func nativeCleanupRows(rows []nativeInstance, instanceID string, limit int) ([]nativeInstance, error) {
+	if limit != 1 && limit != 1+nativeTenantNodeCount(false) && limit != 1+nativeTenantNodeCount(true) || limit != 1 && len(rows) > limit {
+		return nil, errors.New("private native cleanup inventory exceeds the requested topology")
+	}
 	var owned []nativeInstance
 	var rejected bool
+	seen := map[string]bool{}
 	for _, row := range rows {
-		if row.ID == "" || !site && (row.Name != "nvke-native-guest" || instanceID != "" && row.ID != instanceID) {
+		if row.ID == "" || seen[row.ID] || limit == 1 && (row.Name != "nvke-native-guest" || instanceID != "" && row.ID != instanceID) {
 			rejected = true
 			continue
 		}
+		seen[row.ID] = true
 		owned = append(owned, row)
 	}
 	if rejected {

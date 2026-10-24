@@ -18,6 +18,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/conformance"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/testresults"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/validation"
 	"go.yaml.in/yaml/v3"
@@ -66,10 +67,11 @@ func selectNativeConformance(cfg Config) (*nativeConformanceConfig, error) {
 // Only read-only API selection happens here. The conformance owner subsequently
 // requires the selected containers' runtime manifests to match the held output,
 // and checks the same pod/container/node identities again after the suite.
-func conformanceOVNAlias(raw []byte) (string, error) {
+func conformanceOVNAlias(raw []byte, nodes []tenantNode) (string, error) {
 	var pods struct {
 		Items []struct {
 			Spec struct {
+				NodeName   string
 				Containers []struct{ Name, Image string }
 			}
 		}
@@ -77,11 +79,22 @@ func conformanceOVNAlias(raw []byte) (string, error) {
 	if err := canonical.ValidateJSONDocument(raw); err != nil {
 		return "", err
 	}
-	if err := json.Unmarshal(raw, &pods); err != nil || len(pods.Items) != 2 {
-		return "", nvkrerr.New(nvkrerr.CodeVerifyFailed, "conformance requires exactly two tenant OVN node pods")
+	if err := json.Unmarshal(raw, &pods); err != nil || len(nodes) != nativeTenantNodeCount(true) || len(pods.Items) != len(nodes) {
+		return "", nvkrerr.New(nvkrerr.CodeVerifyFailed, "conformance requires an OVN node pod on each of the three requested tenant nodes")
+	}
+	expected, seen := map[string]bool{}, map[string]bool{}
+	for _, node := range nodes {
+		if node.Metadata.Name == "" || expected[node.Metadata.Name] {
+			return "", nvkrerr.New(nvkrerr.CodeVerifyFailed, "conformance tenant nodes are ambiguous")
+		}
+		expected[node.Metadata.Name] = true
 	}
 	alias := ""
 	for _, pod := range pods.Items {
+		if !expected[pod.Spec.NodeName] || seen[pod.Spec.NodeName] {
+			return "", nvkrerr.New(nvkrerr.CodeVerifyFailed, "conformance OVN pods must cover distinct requested tenant nodes")
+		}
+		seen[pod.Spec.NodeName] = true
 		matches := 0
 		for _, container := range pod.Spec.Containers {
 			if container.Name != "ovnkube-controller" {
@@ -100,10 +113,16 @@ func conformanceOVNAlias(raw []byte) (string, error) {
 	return alias, nil
 }
 
-func (s *nativeSiteAttempt) runConformance(ctx context.Context, runner Runner, tools, out string) error {
+func (s *nativeSiteAttempt) runConformance(ctx context.Context, runner Runner, tools, out string) (result error) {
 	cfg := s.conformance
 	if cfg == nil {
 		return nil
+	}
+	stage := beginProgress(runner.Progress, "native-conformance", PhaseStarted, PhaseFinished, PhaseFailed)
+	defer func() { stage.finish(result) }()
+	kubernetes, err := nativeKubernetesVersion(ctx, s.assets)
+	if err != nil {
+		return err
 	}
 	kubeconfig := filepath.Join(out, "tenant.kubeconfig")
 	kubeBytes, err := boundedRegularRead(kubeconfig, 1<<20)
@@ -124,7 +143,7 @@ func (s *nativeSiteAttempt) runConformance(ctx context.Context, runner Runner, t
 	if err != nil {
 		return err
 	}
-	alias, err := conformanceOVNAlias(raw)
+	alias, err := conformanceOVNAlias(raw, s.nodes)
 	if err != nil {
 		return err
 	}
@@ -141,13 +160,22 @@ func (s *nativeSiteAttempt) runConformance(ctx context.Context, runner Runner, t
 		Hydrophone: conformance.ExecutableSelector{Output: hydrophoneOutput, Member: "hydrophone", Platform: platform},
 		Kubectl:    conformance.ExecutableSelector{Output: kubectlOutput, Member: "kubectl", Platform: platform},
 		Kubeconfig: conformance.Tool{Path: kubeconfig, Digest: kubeDigest}, Context: kube.Current,
-		CNINamespace: "ovn-kubernetes", CNISelector: "app=ovnkube-node", ImageVersion: "1.34.2", SuiteName: "kubernetes-conformance", Role: "local", DisposableCluster: true,
+		CNINamespace: "ovn-kubernetes", CNISelector: "app=ovnkube-node", ImageVersion: kubernetes, SuiteName: "kubernetes-conformance", Role: "local", DisposableCluster: true,
 		ConformanceImage: conformance.ImageSelector{Output: "conformance-image-arm64", Platform: "linux/arm64"},
 		Busybox:          conformance.ImageSelector{Output: "busybox-image-arm64", Platform: "linux/arm64"},
-		Targets:          []conformance.DeploymentTarget{{Output: ovnOutput, Namespace: "ovn-kubernetes", LabelSelector: "app=ovnkube-node", Container: "ovnkube-controller", RequiredReplicas: 2}},
+		Targets:          []conformance.DeploymentTarget{{Output: ovnOutput, Namespace: "ovn-kubernetes", LabelSelector: "app=ovnkube-node", Container: "ovnkube-controller", RequiredReplicas: nativeTenantNodeCount(true)}},
 	}, Bindings: conformance.LocalBindings{ProductImages: []conformance.LocalImageBinding{{Output: ovnOutput, Reference: alias}}}}
+	timeout, err := remainingWork(ctx)
+	if err != nil {
+		return err
+	}
+	local.Timeouts.Run, local.Timeouts.Startup = timeout.String(), timeout.String()
+	_, run, err := lifecycle.InspectLocalRunInputs(ctx, filepath.Join(cfg.repository, cfg.run))
+	if err != nil {
+		return err
+	}
 	for _, tool := range []struct{ output, repository string }{{"conformance-image-arm64", "registry.k8s.io/conformance"}, {"busybox-image-arm64", "registry.k8s.io/e2e-test-images/busybox"}} {
-		observed, err := CompleteOutput(ctx, filepath.Join(cfg.repository, cfg.run), tool.output, "oci")
+		observed, err := selectedRunOutput(run, tool.output, "oci")
 		if err != nil {
 			return err
 		}
@@ -167,11 +195,17 @@ func (s *nativeSiteAttempt) runConformance(ctx context.Context, runner Runner, t
 		return err
 	}
 	if runner.Progress != nil {
-		fmt.Fprintln(runner.Progress, "Running Kubernetes conformance on this tenant; original JUnit and before/after API observations will be retained.")
+		fmt.Fprintln(runner.Progress, "Starting conformance validation for this tenant; artifact/tool admission precedes test execution. Original JUnit and before/after API observations will be retained.")
 	}
-	invocation := runner
-	invocation.directory = cfg.repository
-	raw, runErr := invocation.Capture(ctx, []string{cfg.nvkr, "validate", "--config", profilePath, "--workspace", reports}, "tenant-conformance", 4*time.Hour+15*time.Minute)
+	// Run capture snapshots retained disks before starting the harness. Keep its
+	// temporary files on the attempt's output filesystem; the factory still
+	// admits disk backing and headroom instead of trusting the path alone.
+	scratch := filepath.Join(out, "conformance-tmp")
+	if err := os.Mkdir(scratch, 0700); err != nil {
+		return err
+	}
+	invocation := nativeConformanceInvocation(runner, cfg.repository, scratch)
+	raw, runErr := invocation.Capture(ctx, []string{cfg.nvkr, "validate", "--config", profilePath, "--workspace", reports}, "tenant-conformance", 0)
 	// Capture stdout even when the harness exits unsuccessfully. The original
 	// reports are retained by NVKR; this wrapper does not rewrite their verdicts.
 	if len(raw) > 0 {
@@ -189,6 +223,12 @@ func (s *nativeSiteAttempt) runConformance(ctx context.Context, runner Runner, t
 		fmt.Fprintf(runner.Progress, "Conformance execution and report capture completed. Original results: %s\n", reports)
 	}
 	return nil
+}
+
+func nativeConformanceInvocation(runner Runner, repository, scratch string) Runner {
+	runner.directory = repository
+	runner.Env = SetEnv(runner.Env, map[string]string{"TMPDIR": scratch})
+	return runner
 }
 
 func checkConformanceCapture(raw []byte) error {

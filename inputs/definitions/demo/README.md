@@ -22,8 +22,11 @@ The separate KVM variants have their own hosted publication policies; see the
 
 Use `../../environments/local-arm64-tcg.json` with native Linux ARM64 Docker, the
 launcher's default runtime. The OS image build uses TCG. Standard deployment
-uses the same three-VM owner on both hosts: KVM on Linux, HVF on Mac. Fresh Mac
-QCOW builds remain unsupported by the current NVKR disk execution path.
+uses the same native owner on both hosts: KVM on Linux and explicit TCG on Mac
+for the selected 64 KiB image. Mac builds prepare installed native dependencies
+through NVKR and build the Linux utility image through Docker Buildx; follow the
+[native guide](../../../docs/local-nvke-demo.md#native-linux-and-mac-path) for
+prerequisites and current validation limits.
 The full demo uses one NVKR/demo bootstrap and a measured
 Packer/Go/GCC toolchain across its selected output scopes; that image also includes
 digest-checked Helm 4.2.4 and ORAS 1.3.3. There is no separate Helm-wrapper image.

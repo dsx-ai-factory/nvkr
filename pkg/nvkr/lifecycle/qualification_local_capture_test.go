@@ -49,8 +49,9 @@ func writeLocalCaptureFixture(t *testing.T, workspace string, prepared *Prepared
 		}
 	}
 	bundle := artifacts[slot.MemberArtifactID]
-	if _, err := delivery.BuildBinaryBundle(t.Context(), bundle.Path, delivery.BinaryBundleRequest{OS: "linux", Arch: "amd64", Purpose: "cli",
-		Files: []delivery.BinaryFileInput{{Name: "kubectl", Path: source.Path, InstallPath: "/usr/local/bin/kubectl", Mode: 0o755}}}); err != nil {
+	built, err := delivery.BuildBinaryBundle(t.Context(), bundle.Path, delivery.BinaryBundleRequest{OS: "linux", Arch: "amd64", Purpose: "cli",
+		Files: []delivery.BinaryFileInput{{Name: "kubectl", Path: source.Path, InstallPath: "/usr/local/bin/kubectl", Mode: 0o755}}})
+	if err != nil {
 		t.Fatal(err)
 	}
 	bom, err := sbom.NewSubject(slot.BuildDigest, "kubectl", record.SHA256)
@@ -65,6 +66,19 @@ func writeLocalCaptureFixture(t *testing.T, workspace string, prepared *Prepared
 		Entries: []sbom.IndexEntry{{Artifact: "kubectl", ArtifactSHA: record.SHA256, SBOMDigest: digest}}}
 	writeCanonicalTestFile(t, filepath.Join(artifacts["sbom/cli"].Path, "index.json"), index)
 	writeCanonicalTestFile(t, filepath.Join(artifacts["sbom/cli"].Path, "kubectl.cdx.json"), bom)
+	if slot.ArtifactID != slot.MemberArtifactID {
+		descriptor, err := delivery.PayloadDescriptor(t.Context(), bundle.Path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		request := testReleaseRequest(t,
+			[]Artifact{{Name: bundle.Name, Kind: slot.Kind, Digest: descriptor.Digest, BuildDigest: slot.BuildDigest, Components: slot.Components}},
+			[]delivery.ObjectInput{{Name: bundle.Name, Kind: bundle.Kind, Path: bundle.Path, Layout: true, ArtifactType: bundle.MediaType, SemanticDigest: built.SemanticDigest, BlobDigest: built.RootDigest}},
+			map[string]string{"kubectl": record.SHA256})
+		if _, err := delivery.BuildPublicationRoot(t.Context(), artifacts[slot.ArtifactID].Path, request); err != nil {
+			t.Fatal(err)
+		}
+	}
 	observed, err := observeOutput(t.Context(), slot, artifacts, prepared.plan, nil, workspace)
 	if err != nil {
 		t.Fatal(err)
@@ -73,7 +87,7 @@ func writeLocalCaptureFixture(t *testing.T, workspace string, prepared *Prepared
 }
 
 func TestLocalQualificationCaptureMixedDiskAndExecutable(t *testing.T) {
-	for _, mode := range []string{"complete", "missing ordinary inventory", "missing materials", "substituted materials"} {
+	for _, mode := range []string{"complete", "ordinary payloads restored at assembly", "changed ordinary producer", "changed ordinary Run subject", "missing ordinary package", "missing ordinary inventory", "missing materials", "substituted materials"} {
 		t.Run(mode, func(t *testing.T) {
 			missingInventory := mode == "missing ordinary inventory"
 			disk, _ := diskLifecycleFixtureWithProducer(t, "mixed", true)
@@ -154,6 +168,13 @@ func TestLocalQualificationCaptureMixedDiskAndExecutable(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			if mode == "changed ordinary Run subject" {
+				run.Observed[0].Digest = "sha256:" + repeat("9", 64)
+				run, err = bindReleaseContent(plan, run)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
 			if missingInventory {
 				if err := os.Rename(inventoryPath, inventoryPath+".saved"); err != nil {
 					t.Fatal(err)
@@ -178,8 +199,56 @@ func TestLocalQualificationCaptureMixedDiskAndExecutable(t *testing.T) {
 				materials.Disks[0].PayloadDigest = "sha256:" + repeat("9", 64)
 				writeCanonicalTestFile(t, filepath.Join(workspace, localDiskMaterialsFile), materials)
 			}
-			held, err := captureLocalQualificationPayloads(t.Context(), workspace, inputs)
-			if mode != "complete" {
+			var producerPath, packagePath string
+			for _, artifact := range plan.Graph.Artifacts {
+				if artifact.ID != "artifact/cli/kubectl" && artifact.ID != pending.Expected[0].MemberArtifactID {
+					continue
+				}
+				path, err := lifecycleArtifactPath(artifact.Path, workspace)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if artifact.ID == "artifact/cli/kubectl" {
+					producerPath = path
+				} else {
+					packagePath = path
+				}
+			}
+			if producerPath == "" || packagePath == "" {
+				t.Fatal("mixed fixture requires the original ordinary producer and package")
+			}
+			ordinaryPayloads := []string{producerPath, packagePath}
+			switch mode {
+			case "ordinary payloads restored at assembly":
+				for _, path := range ordinaryPayloads {
+					if err := os.Rename(path, path+".saved"); err != nil {
+						t.Fatal(err)
+					}
+				}
+			case "changed ordinary producer":
+				if err := os.WriteFile(producerPath, []byte("changed ordinary producer bytes"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			case "missing ordinary package":
+				if err := os.Rename(packagePath, packagePath+".saved"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			ordinaryCalls := 0
+			held, err := captureLocalQualificationPayloadsWith(t.Context(), workspace, inputs, func(ctx context.Context, plan *factory.Plan, workspace string) (*delivery.Publication, string, error) {
+				ordinaryCalls++
+				if mode == "ordinary payloads restored at assembly" {
+					// The real factory owner must perform the sole ordinary producer and
+					// package check. Earlier payload observation would fail this case.
+					for _, path := range ordinaryPayloads {
+						if err := os.Rename(path+".saved", path); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+				return factory.CaptureWorkspaceOrdinaryPublication(ctx, plan, workspace)
+			})
+			if mode != "complete" && mode != "ordinary payloads restored at assembly" {
 				code := e.CodeVerifyFailed
 				if missingInventory {
 					code = e.CodeProvenanceMissing
@@ -193,6 +262,9 @@ func TestLocalQualificationCaptureMixedDiskAndExecutable(t *testing.T) {
 			}
 			if err != nil {
 				t.Fatal(err)
+			}
+			if ordinaryCalls != 1 {
+				t.Fatalf("ordinary capture called %d times, want exactly once", ordinaryCalls)
 			}
 			t.Cleanup(func() { _ = held.Close() })
 			if held.materialBytes == "" {

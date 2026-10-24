@@ -145,9 +145,10 @@
       "name": "nvke-node-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/node-images/native-arm64",
+        "base": "../../catalogs/node-images/release",
         "overlays": [
-          "../../catalogs/node-images/variants/native-nvidia.json"
+          "../../catalogs/node-images/variants/native-nvidia.json",
+          "../../catalogs/node-images/variants/native-local-kvm.json"
         ]
       },
       "components": [
@@ -224,7 +225,7 @@
       "name": "postgresql",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke/native-site-arm64"
       },
       "components": [
         "postgresql-chart"
@@ -257,7 +258,7 @@
       "name": "spire",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke/native-site-arm64"
       },
       "components": [
         "spire-chart"
@@ -301,7 +302,7 @@
       "name": "spire-crds",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke/native-site-arm64"
       },
       "components": [
         "spire-crds-chart"
@@ -345,7 +346,7 @@
       "name": "temporal",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke/native-site-arm64"
       },
       "components": [
         "temporal-chart"

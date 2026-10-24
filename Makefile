@@ -53,10 +53,12 @@ info: ## Print version / toolchain info.
 .PHONY: build
 build: go-version-check ## Compile the nvkr binary.
 	go build -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/nvkr
+	chmod 0755 $(BIN)
 
 .PHONY: demo demo-test-bin
 demo: go-version-check ## Build the downstream Go local NVKE demo CLI (calls nvkr).
 	go build -o $(DEMO_BIN) ./cmd/nvke-demo
+	chmod 0755 $(DEMO_BIN)
 
 demo-test-bin: go-version-check ## Compile opt-in native NVKE E2E tests; does not run them.
 	go test -c -o $(DEMO_TEST_BIN) ./internal/nvkedemo

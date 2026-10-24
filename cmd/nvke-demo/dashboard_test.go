@@ -348,7 +348,7 @@ func TestDashboardPresentationFailurePrecedesWorkerCancellation(t *testing.T) {
 					want = nvkrerr.CodeInternal
 				}
 				assertCode(t, err, want)
-				if mode == "output" && notice.Len() != 0 || mode != "output" && (strings.Count(notice.String(), "waiting for owned cleanup") != 1 || strings.ContainsRune(notice.String(), '\x1b')) {
+				if mode == "output" && notice.Len() != 0 || mode != "output" && (strings.Count(notice.String(), "waiting for the work owner to return") != 1 || strings.ContainsRune(notice.String(), '\x1b')) {
 					t.Fatal("cleanup wait notice repeated, retried failed output or leaked terminal controls")
 				}
 			case <-time.After(3 * time.Second):

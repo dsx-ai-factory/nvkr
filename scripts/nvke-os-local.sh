@@ -94,7 +94,6 @@ definition_catalog='../../catalogs/node-images/diagnostic'
 definition_overlays='[]'
 overlay_source=""
 ubuntu_overlay_source=""
-patch_source=""
 if [[ "${arch}" == arm64 ]]; then
   overlay_source="inputs/catalogs/node-images/variants/diagnostic-arm64-kvm.yaml"
   definition_overlays='["../../catalogs/node-images/variants/diagnostic-arm64-kvm.yaml"]'
@@ -104,7 +103,6 @@ if [[ "${ubuntu_version}" == 24.04 ]]; then
   catalog_source="inputs/catalogs/node-images/release"
   overlay_source="inputs/catalogs/node-images/variants/native-toolchains.yaml"
   ubuntu_overlay_source="inputs/catalogs/node-images/variants/ubuntu24.json"
-  patch_source="${catalog_source}/patches/capture-schema.patch"
   definition_catalog='../../../catalogs/node-images/release'
   definition_overlays='["../../../catalogs/node-images/variants/native-toolchains.yaml","../../../catalogs/node-images/variants/ubuntu24.json"]'
 fi
@@ -115,9 +113,6 @@ if [[ -n "${overlay_source}" ]]; then
 fi
 if [[ -n "${ubuntu_overlay_source}" ]]; then
   required_inputs+=("${ubuntu_overlay_source}")
-fi
-if [[ -n "${patch_source}" ]]; then
-  required_inputs+=("${patch_source}")
 fi
 for required_input in "${required_inputs[@]}"; do
   if [[ ! -f "${required_input}" ]]; then
@@ -155,10 +150,6 @@ if [[ -n "${overlay_source}" ]]; then
 fi
 if [[ -n "${ubuntu_overlay_source}" ]]; then
   cp "${ubuntu_overlay_source}" "${input_root}/ubuntu24.json"
-fi
-if [[ -n "${patch_source}" ]]; then
-  mkdir -p "${input_root}/catalog/patches"
-  cp "${patch_source}" "${input_root}/catalog/patches/capture-schema.patch"
 fi
 
 # Build the bootstrap runner from this checkout in the exact pinned native

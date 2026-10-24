@@ -341,6 +341,9 @@ jobs:
         env:
           # Rendered workflow-step tests fail instead of skipping when bash, git, jq or yq is missing.
           NVKR_REQUIRE_SHELL_TOOLS: '1'
+          # Disk transport tests require writable disk-backed scratch.
+          # The runner's /tmp may be tmpfs.
+          TMPDIR: ${{ runner.temp }}
           TEST_SHARD_GROUP: ${{ matrix.group }}
           TEST_SHARD_INDEX: ${{ matrix.index }}
         run: make test-shard | tee "$RUNNER_TEMP/go-test.jsonl"

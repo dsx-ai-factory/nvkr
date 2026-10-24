@@ -562,15 +562,22 @@ Isolation and the fixed environment/mount contract are identical across all engi
   only inside those volumes. It runs no producer command, mounts no host source or runtime socket, and grants
   the build no root privilege. The producer mounts source read-only; declared output is returned through bounded
   archive transport before ordinary host collection. Preparation, transfer and failure paths own bounded cleanup.
-  Each preparation staging operation (capacity admission, packing, holding/hashing, each volume creation,
-  helper creation and authenticated copying) has its own five-minute allowance. Helper start,
-  explicit exit observation, diagnostics and removal each receive a separate two-minute RPC budget derived
-  from the original caller context. Earlier caller deadlines and cancellation bound every phase; one RPC
-  cannot consume the next operation's allowance. The nine staging and four completion allowances total
-  fifty-three minutes before existing bounded failure diagnostics, child-process joining and owned cleanup;
-  this is not a hard kernel-I/O
-  return deadline. Descriptive transport logs retain the operation count, allowance and measured held-archive
-  byte sizes, without private paths. No RPC retries producer or runtime work. The local scheduler records
+  Preparation and export inherit the caller's work context, including its deadline and cancellation;
+  they impose no additional fixed duration based on assumptions about host speed or runtime load.
+  Native compilation, source/input preparation and ordinary payload acquisition/transport likewise
+  preserve a supplied caller deadline; their default limits apply only when the caller supplies none.
+  The downstream owner passes its absolute RFC3339 deadline to child CLIs as private scheduling
+  data; the CLI bounds its context before command work and cancels it on return. This neither
+  changes authored inputs/build identity nor grants execution or persistent ownership authority.
+  Small control requests remain independently bounded. This does not change authored producer execution
+  limits, hosted provider policy, identity proof validity or cleanup/termination grace.
+  Failure diagnostics, child-process joining and owned teardown retain independent finite cleanup bounds.
+  During exit observation, a joined observer periodically reads the fixed helper's last phase report
+  (archive verification, extraction, ownership, or ready). Reports are diagnostic only: silence,
+  observation failure and a ready report do not establish a stall, failure or successful exit. Only the
+  explicit helper exit status admits completion. Unknown/private output is excluded from public progress.
+  Descriptive transport logs retain the operation count, caller time remaining and measured held-archive
+  byte sizes, without private paths. No observation retries producer work. The local scheduler records
   the first worker error before canceling its batch and joins all workers before returning it; original caller
   cancellation still takes precedence. Run scheduler records reference the exact embedded producer instruction;
   network, container and platform are
@@ -662,9 +669,28 @@ It retains authenticated executable bytes, copies each selected tool once to a p
 snapshot, and checks the snapshot inode, mode, size and digest before and after commands.
 A separate owner-only kubeconfig snapshot belongs to each command. Owned process-group
 cancellation and join precede snapshot cleanup. The same upstream suite and original-report
-capture run on both hosts; conformance images remain Linux OCI subjects. This local diagnostic
-has the pathname-execution limitation described below and issues no qualification receipt.
+capture run on both hosts; conformance images remain Linux OCI subjects. The native demo selects
+private temporary storage beneath its attempt output for local Run capture; the factory still
+requires writable disk backing and sufficient headroom. It does not inherit a memory-backed
+host temporary directory or relax capture admission. This local diagnostic has the pathname-execution
+limitation described below and issues no qualification receipt.
 Published-source validation and global held-executable/signing admission stay Linux-only.
+
+The local Mac demo bridges NICo's address-discovery contract to Apple vmnet with
+observed kernel neighbor records. The existing pinned `x/net/route` library owns
+the kernel RIB codec; the system SQLite CLI reads the private NICo database in
+read-only safe mode with its startup configuration disabled. Only MACs recorded
+by that fresh database, on the observed vmnet interface and allocation range,
+can enter the private address file. Initial discovery requires one eligible
+address per owned MAC. Once NICo records its primary interface address, only
+that address can be projected, and only while it is still observed for the same
+MAC. Additional aliases cannot replace it. Missing bindings remain pending;
+malformed or ambiguous initial bindings fail closed. No DHCP packets, peer-authentication claim,
+simulator DB writes or host-network changes are introduced. Observation failure
+cancels the runtime; cancellation and join precede service/network cleanup. This
+is local diagnostic observation under the existing host trust boundary, not a
+qualification receipt or an authenticated DHCP lease. Linux retains its existing
+owned dnsmasq address source.
 
 The existing direct-Packer driver separates host mechanics through one private execution-class interface.
 Validation/build arguments, authenticated material staging, plugin closure, exact output collection and
@@ -673,7 +699,10 @@ paths. The Mac implementation uses digest-pinned, read-only private Mach-O execu
 PATH/plugin closure and the existing owned-process cancellation/join helper. Noninteractive Mac Packer
 commands run in a private session without the caller's controlling terminal, retaining their private group
 for cancellation and join. It validates the native executable
-architecture and rejects KVM or cross-architecture HVF. TCG remains explicit. Snapshot verification before and
+architecture and rejects KVM or cross-architecture HVF. TCG remains explicit. Native input preparation
+defaults to its existing HVF contract; an explicit TCG request instead forbids HVF on the Darwin-only producer
+and must match an independently authored TCG execution class. Packer CPU variables and source-owned
+kernels remain part of the exact selected producer identity. Snapshot verification before and
 after commands detects substitution between operations; pathname execution on Mac does not provide Linux's
 sealed-descriptor guarantee against a hostile same-UID process. Dynamic-loader/library realization remains an
 outer toolchain responsibility. This implementation is restricted to local unqualified execution; qualified

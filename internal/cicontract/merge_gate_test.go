@@ -192,6 +192,7 @@ func TestMergeGateShardPipeline(t *testing.T) {
 	for name, want := range map[string]string{
 		"TEST_SHARD_GROUP": "${{ matrix.group }}",
 		"TEST_SHARD_INDEX": "${{ matrix.index }}",
+		"TMPDIR":           "${{ runner.temp }}",
 	} {
 		if step.Env[name] != want {
 			t.Fatalf("%s must bind to %s, got %q", name, want, step.Env[name])
@@ -211,6 +212,7 @@ func TestMergeGateShardPipeline(t *testing.T) {
 			fake := `#!/bin/sh
 [ "$#" -eq 1 ] && [ "$1" = test-shard ] || exit 99
 [ "$TEST_SHARD_GROUP" = factory ] && [ "$TEST_SHARD_INDEX" = 2 ] || exit 99
+[ "$TMPDIR" = "$RUNNER_TEMP" ] || exit 99
 printf '%s' "$FAKE_DIAGNOSTIC"
 exit "$FAKE_EXIT"
 `
@@ -219,7 +221,7 @@ exit "$FAKE_EXIT"
 			}
 			env := []string{"FAKE_DIAGNOSTIC=" + diagnostic, "FAKE_EXIT=" + tc.exit}
 			for name, value := range step.Env {
-				value = strings.NewReplacer("${{ matrix.group }}", "factory", "${{ matrix.index }}", "2").Replace(value)
+				value = strings.NewReplacer("${{ matrix.group }}", "factory", "${{ matrix.index }}", "2", "${{ runner.temp }}", root).Replace(value)
 				env = append(env, name+"="+value)
 			}
 			output, code := runMergeGateStep(t, step, root, env)
@@ -254,24 +256,21 @@ func TestMergeGateLintInstaller(t *testing.T) {
 	fixtureChecksum := fmt.Sprintf("%x", sha256.Sum256([]byte(archiveFixture)))
 	step.Run = strings.Replace(step.Run, releaseChecksum, fixtureChecksum, 1)
 	var checksumTool string
-	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-	defer cancel()
-	for _, name := range []string{"sha256sum", "gsha256sum"} {
+	// Prefer the optional coreutils prefix over a platform-provided namesake.
+	for _, name := range []string{"gsha256sum", "sha256sum"} {
 		path, err := exec.LookPath(name)
 		if err != nil {
 			continue
 		}
-		version, err := exec.CommandContext(ctx, path, "--version").Output()
-		if err == nil && strings.Contains(string(version), "GNU coreutils") {
-			checksumTool = path
-			break
-		}
+		checksumTool = path
+		break
 	}
 	if checksumTool == "" && runtime.GOOS == "linux" {
-		t.Fatal("Linux installer contract requires GNU sha256sum")
+		t.Fatal("Linux installer contract requires sha256sum")
 	}
-	// Preserve the workflow's serialized input for GNU verification when
-	// available, with the portable stub fallback for macOS without coreutils.
+	// Exercise --check --status with both matching and corrupt archive bytes;
+	// GNU and uutils implementations must satisfy the same checksum contract.
+	// The stub fallback remains limited to macOS without a checksum executable.
 	// Only the test copy substitutes a synthetic hash; no release is downloaded.
 	const stub = `#!/bin/sh
 set -eu

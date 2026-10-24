@@ -148,6 +148,7 @@ func cmdFactory() *cli.Command {
 				&cli.StringFlag{Name: "bundle", Required: true},
 				&cli.StringFlag{Name: "toolchain", Required: true},
 				&cli.StringFlag{Name: "out", Required: true},
+				&cli.StringFlag{Name: "accelerator", Value: "hvf", Usage: "explicit native Mac accelerator: hvf or tcg"},
 				&cli.StringSliceFlag{Name: "variable"},
 			},
 			Action: func(c *cli.Context) error {
@@ -162,7 +163,7 @@ func cmdFactory() *cli.Command {
 					}
 					variables[key] = value
 				}
-				prepared, err := factory.PrepareNativePackerBuild(c.Context, c.String("definition"), c.String("environment"), c.String("layout"), c.String("bundle"), c.String("toolchain"), c.String("out"), variables)
+				prepared, err := factory.PrepareNativePackerBuildWithAccelerator(c.Context, c.String("definition"), c.String("environment"), c.String("layout"), c.String("bundle"), c.String("toolchain"), c.String("out"), c.String("accelerator"), variables)
 				if err != nil {
 					return err
 				}

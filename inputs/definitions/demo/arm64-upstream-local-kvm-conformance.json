@@ -68,7 +68,7 @@
       "name": "conformance-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../../definitions/kubernetes-conformance-arm64/demo-1.34/image-catalog"
+        "base": "../../../definitions/kubernetes-conformance-arm64/demo-1.36/image-catalog"
       },
       "components": [
         "conformance-image"
@@ -165,7 +165,7 @@
       "name": "kubectl-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../../definitions/kubernetes-conformance-arm64/demo-1.34/kubectl-catalog"
+        "base": "../../../definitions/kubernetes-conformance-arm64/kubectl-catalog"
       },
       "components": [
         "kubectl"
@@ -176,7 +176,7 @@
       "name": "kubectl-darwin-arm64",
       "platform": "darwin/arm64",
       "catalog": {
-        "base": "../../../definitions/kubernetes-conformance-arm64/demo-1.34/kubectl-catalog"
+        "base": "../../../definitions/kubernetes-conformance-arm64/kubectl-catalog"
       },
       "components": [
         "kubectl"

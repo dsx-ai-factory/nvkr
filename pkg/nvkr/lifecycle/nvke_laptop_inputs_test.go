@@ -136,13 +136,27 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	nativePath := filepath.Join(root, "inputs/definitions/demo/arm64-nvidia-local-kvm.json")
+	nativeInputs, err := authored.LoadDefinition(t.Context(), nativePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nativeOutputs := map[string]authored.DefinitionOutput{}
+	for _, output := range nativeInputs.Outputs {
+		nativeOutputs[output.Name] = normalize(output, nativeInputs.Catalog, filepath.Dir(nativePath))
+	}
+	if filepath.Clean(filepath.Join(filepath.Dir(runtimePath), runtimeInputs.Catalog.Base)) != filepath.Join(root, "inputs/catalogs/runtime-dependencies") {
+		t.Fatal("native runtime inputs must select their source-aligned catalog owner")
+	}
 	addedRuntime := 0
 	for _, output := range runtimeInputs.Outputs {
 		output = normalize(output, runtimeInputs.Catalog, filepath.Dir(runtimePath))
-		if existing, found := parts[output.Name]; found {
-			if !reflect.DeepEqual(existing, output) {
-				t.Fatalf("runtime dependency differs from the shared owner: %s", output.Name)
-			}
+		if !reflect.DeepEqual(nativeOutputs[output.Name], output) {
+			t.Fatalf("runtime dependency differs from the native combined selection: %s", output.Name)
+		}
+		if _, found := parts[output.Name]; found {
+			// The retained TCG diagnostic uses its release catalog; the native
+			// selection above independently binds the current deployment owner.
 			continue
 		}
 		switch output.Name {

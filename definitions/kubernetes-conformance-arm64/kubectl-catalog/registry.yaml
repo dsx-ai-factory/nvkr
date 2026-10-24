@@ -14,8 +14,9 @@ components:
         go build -trimpath -mod=vendor -tags selinux,notest,grpcnotrace -ldflags "-s -w -buildid= -X k8s.io/component-base/version.gitVersion=$BUILD_VERSION -X k8s.io/component-base/version.gitCommit=$GIT_VERSION -X k8s.io/component-base/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/component-base/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/component-base/version.gitTreeState=dirty -X k8s.io/component-base/version.buildDate=$build_date -X k8s.io/client-go/pkg/version.gitVersion=$BUILD_VERSION -X k8s.io/client-go/pkg/version.gitCommit=$GIT_VERSION -X k8s.io/client-go/pkg/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/client-go/pkg/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/client-go/pkg/version.gitTreeState=dirty -X k8s.io/client-go/pkg/version.buildDate=$build_date" -o /src/nvkr-output/kubectl ./cmd/kubectl
     cgo: false
     fromSource: true
-    outputType: raw
+    outputType: host-package
     platforms:
+      - darwin/arm64
       - linux/arm64
     source: kubectl
     versionStamp:

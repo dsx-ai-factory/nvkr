@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -23,7 +24,7 @@ import (
 func admitNativeHost(platform, accelerator string) error {
 	switch platform {
 	case "darwin/arm64":
-		if accelerator == "hvf" {
+		if accelerator == "hvf" || accelerator == "tcg" {
 			return nil
 		}
 	case "linux/arm64":
@@ -32,6 +33,44 @@ func admitNativeHost(platform, accelerator string) error {
 		}
 	}
 	return nvkrerr.New(nvkrerr.CodeEngineCapability, "native demo does not support host %q with accelerator %q", platform, accelerator)
+}
+
+// NICo creates each guest's NoCloud seed before launch. Its Darwin builder can
+// fall back from cloud-localds to either ISO tool; Linux requires cloud-localds.
+// Resolve only: admission must not execute a tool or create a probe ISO.
+func admitNativeSeedISO(ctx context.Context, platform string, env []string) error {
+	if err := requireContext(ctx); err != nil {
+		return nvkrerr.Wrap(nvkrerr.CodeTimeout, err, "native seed ISO admission")
+	}
+	names := []string{"cloud-localds"}
+	switch platform {
+	case "darwin":
+		names = append(names, "mkisofs", "genisoimage")
+	case "linux":
+	default:
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "native seed ISO does not support host %q", platform)
+	}
+	available := false
+	for _, name := range names {
+		if _, err := commandPath(name, env); err == nil {
+			available = true
+			break
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return nvkrerr.Wrap(nvkrerr.CodeTimeout, err, "native seed ISO admission")
+	}
+	if !available {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "native guest seed ISO requires %s on PATH", strings.Join(names, " or "))
+	}
+	return nil
+}
+
+func admitNativeQEMUAdapter(platform, accelerator, executable string, site bool) error {
+	if platform == "darwin/arm64" && (site || accelerator == "tcg") && (!filepath.IsAbs(executable) || filepath.Clean(executable) != executable) {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "native Mac site or TCG execution requires this demo's explicit adapter executable")
+	}
+	return nil
 }
 
 // prepareNativeLinux reuses the existing durable bridge, privilege admission,
@@ -59,14 +98,28 @@ func prepareNativeLinux(ctx context.Context, runner *Runner, cfg NativeGuestConf
 	if err != nil {
 		return nil, "", err
 	}
+	noteRetainedNetworkStart(ctx)
 	defer func() {
 		if result == nil {
 			return
 		}
+		if holdErr := waitRetainedCleanup(ctx, result); holdErr != nil {
+			result = errors.Join(result, holdErr)
+			guard.releaseHandles()
+			return
+		}
 		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Minute)
 		defer cancel()
+		if runtimeRetention(ctx) != nil {
+			cleanupErr := guard.StopDNS(cleanup)
+			recordRetainedCleanup(ctx, cleanupErr)
+			result = errors.Join(result, cleanupErr)
+			guard.releaseHandles()
+			return
+		}
 		result = errors.Join(result, guard.Close(cleanup))
 	}()
+	defer recoverRetainedPanic(ctx, &result)
 	if err := guard.Start(ctx); err != nil {
 		return nil, "", err
 	}
@@ -154,15 +207,18 @@ func (g *NetworkGuard) allowNativeBootstrap(ctx context.Context, site bool) erro
 
 // nativeLinuxVMEvidence checks local VM bindings through libvirt's own
 // XML/UUID observations and the existing private-domain owner. This diagnostic
-// checks all three guests against the same selected standalone QCOW bytes.
-func nativeLinuxVMEvidence(ctx context.Context, runner Runner, work, digest string) ([]domainEvidence, error) {
+// checks each requested guest against the same selected standalone QCOW bytes.
+func nativeLinuxVMEvidence(ctx context.Context, runner Runner, work, digest string, expected int) ([]domainEvidence, error) {
+	if expected != 1+nativeTenantNodeCount(false) && expected != 1+nativeTenantNodeCount(true) {
+		return nil, errors.New("unsupported native VM topology")
+	}
 	runner.Work = ""
 	names, err := DomainInventory(ctx, runner)
 	if err != nil {
 		return nil, err
 	}
-	if len(names) != 3 {
-		return nil, errors.New("require one real site and two real tenant libvirt domains")
+	if len(names) != expected {
+		return nil, fmt.Errorf("require exactly %d real simulator-owned site and tenant libvirt domains", expected)
 	}
 	slices.Sort(names)
 	var observed []domainEvidence

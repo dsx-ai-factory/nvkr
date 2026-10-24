@@ -6,12 +6,16 @@ package nvkedemo
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -58,6 +62,12 @@ func TestBootstrapRuntimeBindsPrivateDependencies(t *testing.T) {
 }
 
 func TestBootstrapVersionAdmissionBeforeRuntime(t *testing.T) {
+	t.Setenv("HOME", "")
+	if err := os.Unsetenv("HOME"); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("USER", "synthetic-foreign-user")
+	t.Setenv("XDG_CACHE_HOME", "/synthetic/foreign-cache")
 	for _, test := range []struct {
 		platform, observed string
 		accepted           bool
@@ -95,6 +105,66 @@ func TestBootstrapVersionAdmissionBeforeRuntime(t *testing.T) {
 	}
 }
 
+func TestBootstrapAccountEnvironment(t *testing.T) {
+	account, err := user.LookupId(strconv.Itoa(os.Getuid()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		platform, cache string
+		canceled        bool
+		code            e.Code
+	}{
+		{"darwin", filepath.Join(account.HomeDir, "Library", "Caches"), false, ""},
+		{"linux", filepath.Join(account.HomeDir, ".cache"), false, ""},
+		{"windows", "", false, e.CodeEngineCapability},
+		{"darwin", "", true, e.CodeTimeout},
+		{"linux", "", true, e.CodeTimeout},
+	} {
+		t.Run(fmt.Sprintf("%s/canceled=%t", test.platform, test.canceled), func(t *testing.T) {
+			base := []string{"HOME=/synthetic/foreign", "XDG_CACHE_HOME=/synthetic/cache", "LIMA_HOME=/private/state", "LIMA_INSTANCE=bootstrap", "XDG_CONFIG_HOME=/private/config"}
+			before := slices.Clone(base)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if test.canceled {
+				cancel()
+			}
+			got, err := bootstrapAccountEnvironment(ctx, test.platform, base)
+			if test.code != "" {
+				var coded *e.Error
+				if got != nil || !errors.As(err, &coded) || coded.Code != test.code {
+					t.Fatalf("environment=%v error=%v; want %s", got, err, test.code)
+				}
+			} else if err != nil || environmentValue(got, "HOME") != account.HomeDir || environmentValue(got, "XDG_CACHE_HOME") != test.cache || environmentValue(got, "LIMA_HOME") != "/private/state" || environmentValue(got, "LIMA_INSTANCE") != "bootstrap" || environmentValue(got, "XDG_CONFIG_HOME") != "/private/config" {
+				t.Fatalf("account cache or private bootstrap binding lost: %v", err)
+			}
+			if !slices.Equal(base, before) {
+				t.Fatal("bootstrap changed the caller environment")
+			}
+		})
+	}
+}
+
+func TestBootstrapLimaInstalledVersionWithoutHome(t *testing.T) {
+	if (runtime.GOOS != "darwin" && runtime.GOOS != "linux") || os.Getenv("NVKR_TEST_LIMA_VERSION") != "1" {
+		t.Skip("requires explicitly selected installed Lima; version admission only, no VM")
+	}
+	t.Setenv("HOME", "")
+	if err := os.Unsetenv("HOME"); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("USER", "synthetic-foreign-user")
+	t.Setenv("XDG_CACHE_HOME", "/synthetic/foreign-cache")
+	runner := Runner{Env: NativeEnvironment()}
+	before := slices.Clone(runner.Env)
+	if _, _, err := requireBootstrapLima(t.Context(), runner, runtime.GOOS); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(runner.Env, before) || os.Getenv("HOME") != "" || os.Getenv("XDG_CACHE_HOME") != "/synthetic/foreign-cache" {
+		t.Fatal("version-only admission changed the caller environment")
+	}
+}
+
 func TestBootstrapLimaOwnsForegroundProcessThroughCleanup(t *testing.T) {
 	for _, platform := range []string{"darwin", "linux"} {
 		t.Run(platform, func(t *testing.T) { checkBootstrapOwnedLifecycle(t, platform) })
@@ -103,6 +173,20 @@ func TestBootstrapLimaOwnsForegroundProcessThroughCleanup(t *testing.T) {
 
 func checkBootstrapOwnedLifecycle(t *testing.T, platform string) {
 	t.Helper()
+	t.Setenv("HOME", "")
+	if err := os.Unsetenv("HOME"); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("USER", "synthetic-foreign-user")
+	t.Setenv("XDG_CACHE_HOME", "/synthetic/foreign-cache")
+	account, err := user.LookupId(strconv.Itoa(os.Getuid()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cache := filepath.Join(account.HomeDir, ".cache")
+	if platform == "darwin" {
+		cache = filepath.Join(account.HomeDir, "Library", "Caches")
+	}
 	root := privateTestDir(t)
 	bin, shared, images := filepath.Join(root, "bin"), filepath.Join(root, "shared"), filepath.Join(root, "images")
 	for _, dir := range []string{bin, shared, filepath.Join(shared, "tmp"), images} {
@@ -112,6 +196,8 @@ func checkBootstrapOwnedLifecycle(t *testing.T, platform string) {
 	}
 	writeTenantFixture(t, filepath.Join(bin, "limactl"), []byte(`#!/bin/sh
 set -eu
+test "$HOME" = "$EXPECTED_HOME"
+test "$XDG_CACHE_HOME" = "$EXPECTED_CACHE"
 case "$1" in
  --version) printf 'limactl version %s\n' "$VERSION";;
  start) trap 'exit 0' TERM INT; : > "$LIMA_HOME.fixture-ready"; while :; do sleep 1; done;;
@@ -136,7 +222,8 @@ esac
 	if err != nil {
 		t.Fatal(err)
 	}
-	runner := Runner{Work: root, Env: []string{"PATH=" + bin + ":/usr/bin:/bin", "HOME=" + root, "VERSION=" + version}}
+	runner := Runner{Work: root, Env: []string{"PATH=" + bin + ":/usr/bin:/bin", "HOME=" + root, "VERSION=" + version, "USER=synthetic-foreign-user", "XDG_CACHE_HOME=/synthetic/foreign-cache", "XDG_CONFIG_HOME=" + filepath.Join(root, "private-config"), "EXPECTED_HOME=" + account.HomeDir, "EXPECTED_CACHE=" + cache}}
+	before := slices.Clone(runner.Env)
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	backend, err := prepareHostBootstrap(ctx, runner, platform, shared, GuestGateway, []string{filepath.Join(images, "controller.tar")})
@@ -151,6 +238,9 @@ esac
 			t.Error(err)
 		}
 	})
+	if !slices.Equal(runner.Env, before) || environmentValue(backend.runner.Env, "LIMA_HOME") != filepath.Join(backend.root, "state") || environmentValue(backend.runner.Env, "LIMA_INSTANCE") != "bootstrap" || environmentValue(backend.runner.Env, "XDG_CONFIG_HOME") != filepath.Join(root, "private-config") {
+		t.Fatal("bootstrap changed caller environment or lost private instance/config selection")
+	}
 	if exited, err := backend.process.Exited(); exited {
 		t.Fatalf("backend exited before cleanup: %v", err)
 	}

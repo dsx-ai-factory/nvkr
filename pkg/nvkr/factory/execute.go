@@ -143,6 +143,9 @@ func executeToolAcquire(ctx context.Context, node Node, output Artifact, stdout 
 		return e.Wrap(e.CodeInvalidCatalog, err, "creating tool request")
 	}
 	client := &http.Client{Timeout: 30 * time.Minute}
+	if _, bounded := ctx.Deadline(); bounded {
+		client.Timeout = 0
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		return classifyContext(ctx, e.Wrap(e.CodeUnavailable, err, "downloading tool %s", node.ID))

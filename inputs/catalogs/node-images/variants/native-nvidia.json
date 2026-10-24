@@ -2,11 +2,12 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-native-arm64-nvidia",
-  "requiresCatalogDigest": "sha256:eec88dbfd0104c3919a3acc07408569da33888ff3b5a6cd07809f2b155369264",
+  "requiresCatalogDigest": "sha256:b45e4482aff6016f789deed9cfeb936938f1bcfa9c159d8cbd01586d6af8b1e6",
   "components": {
     "nvke-cni-ovn": {
       "component": {
         "platforms": [
+          "linux/amd64",
           "linux/arm64"
         ],
         "fromSource": true,
@@ -16,7 +17,8 @@
         "commit": "8af51273d52dfa07454435d18d37230e582d797a",
         "treeHash": "c4a54b0b3b615e5bd6df2d591451d7ab03dffc08",
         "toolchainImages": {
-          "arm64": "docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b"
+          "amd64": "docker.io/library/golang@sha256:8aa2821993207ae840ce09e4223217efcd14e01f71525db734faf4232bd59999",
+          "arm64": "docker.io/library/golang@sha256:288557fbc328e4ef9a78bae2eb44f24447029ff08667be883d79eeaa9029cf0c"
         },
         "outputType": "tarball",
         "buildCommand": [
@@ -36,6 +38,7 @@
     "ovn-kube-ubuntu": {
       "component": {
         "platforms": [
+          "linux/amd64",
           "linux/arm64"
         ],
         "fromSource": true,
@@ -100,6 +103,7 @@
           }
         },
         "platforms": [
+          "linux/amd64",
           "linux/arm64"
         ],
         "fromSource": true,
@@ -109,6 +113,7 @@
         "commit": "8af51273d52dfa07454435d18d37230e582d797a",
         "treeHash": "c4a54b0b3b615e5bd6df2d591451d7ab03dffc08",
         "toolchainImages": {
+          "amd64": "docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90",
           "arm64": "docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b"
         },
         "outputType": "tarball",

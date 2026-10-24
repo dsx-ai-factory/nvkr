@@ -27,7 +27,8 @@
     },
     {
       "components": [
-        "nerdctl"
+        "nerdctl",
+        "nvkr-site-identity-helper"
       ],
       "format": "executable",
       "name": "site-startup-tools-arm64",

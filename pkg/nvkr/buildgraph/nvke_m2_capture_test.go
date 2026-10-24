@@ -20,26 +20,43 @@ import (
 // These maintained-catalog checks preserve exact pinned upstream filenames.
 // They are not framework requirements for customer catalogs or component names.
 func TestNVKEControllerPinnedChartFilename(t *testing.T) {
-	for _, tc := range []struct{ catalog, component, artifact string }{
-		{"../../../inputs/catalogs/nvke/release", "nvke-controller-chart", "charts/nvke-controller-0.22.0.tgz"},
-		{"../../../inputs/catalogs/nvke/local-site-arm64", "nvke-controller-chart", "charts/nvke-controller-0.22.0.tgz"},
+	for _, tc := range []struct{ catalog, source string }{
+		{"../../../inputs/catalogs/nvke/release", "nvke-helm"},
+		{"../../../inputs/catalogs/nvke/local-site-arm64", "nvke-controller-helm"},
 	} {
 		t.Run(tc.catalog, func(t *testing.T) {
+			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(tc.catalog))
+			if err != nil {
+				t.Fatal(err)
+			}
+			pin, err := cat.SourcePin(tc.source)
+			if err != nil {
+				t.Fatal(err)
+			}
 			raw, err := os.ReadFile(filepath.Join(tc.catalog, "registry.yaml"))
 			if err != nil {
 				t.Fatal(err)
 			}
 			var declarations struct {
 				Components map[string]struct {
+					Source       string `yaml:"source"`
 					ArtifactPath string `yaml:"artifactPath"`
 				} `yaml:"components"`
 			}
 			if err := yaml.Unmarshal(raw, &declarations); err != nil {
 				t.Fatal(err)
 			}
-			component, ok := declarations.Components[tc.component]
-			if !ok || component.ArtifactPath != tc.artifact {
-				t.Fatalf("component %q must retain pinned upstream artifact %q, got %q", tc.component, tc.artifact, component.ArtifactPath)
+			component, ok := declarations.Components["nvke-controller-chart"]
+			version := catalog.NormalizeVersion(pin.Tag)
+			artifact := "charts/nvke-controller-" + version + ".tgz"
+			if !ok || component.Source != tc.source || component.ArtifactPath != artifact {
+				t.Fatalf("controller chart must use source %q and pinned upstream artifact %q, got %+v", tc.source, artifact, component)
+			}
+			command := strings.Join(cat.Components["nvke-controller-chart"].BuildCommand, " ")
+			for _, required := range []string{"controller/deploy/charts/controller", "--version=" + version, "--app-version=" + catalog.StripTagPrefix(pin.Tag), "--destination=charts/"} {
+				if !slices.Contains(strings.Fields(command), required) {
+					t.Fatalf("controller chart packaging must retain %q, got %q", required, command)
+				}
 			}
 		})
 	}
@@ -47,7 +64,6 @@ func TestNVKEControllerPinnedChartFilename(t *testing.T) {
 
 func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 	const inputRoot = "../../../inputs/definitions/nvke"
-	const selectedSource = "400c24fb6465b042be883d6b62472528520d6291"
 	authored, err := definition.LoadDefinition(t.Context(), filepath.Join(inputRoot, "definition.yaml"))
 	if err != nil {
 		t.Fatal(err)
@@ -76,26 +92,38 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			agent := cat.Components["nvke-agent"]
-			for _, name := range []string{"nvke-agent", "nvke-cni-calico", "nvke-kubeadm-distro"} {
-				component := cat.Components[name]
-				if component.Tag != "v0.22.0" || component.Commit != selectedSource || component.TreeHash != "f3afc02f5c92f4aacda3a1655836a91bef093bfe" || component.SourceDate != 1792548398 {
-					t.Fatalf("%s does not retain the selected source commit/commit/tree/epoch", name)
+			selectedSource, err := cat.SourcePin("nvke-os")
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, selection := range []struct{ component, source string }{
+				{"nvke-agent", "nvke-os"},
+				{"nvke-cni-calico", "nvke-cni-calico-source"},
+				{"nvke-kubeadm-distro", "nvke-kubeadm-distro-source"},
+				{"nvke-spire-agent", "nvke-spire-agent-source"},
+			} {
+				pin, err := cat.SourcePin(selection.source)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if pin.Tag != selectedSource.Tag || pin.Commit != selectedSource.Commit || pin.TreeHash != selectedSource.TreeHash || pin.SourceDateEpoch != selectedSource.SourceDateEpoch {
+					t.Fatalf("%s must share the selected OS release source, got %+v, want %+v", selection.source, pin, selectedSource)
+				}
+				component, ok := cat.Components[selection.component]
+				if !ok || component.Tag != pin.Tag || component.Commit != pin.Commit || component.TreeHash != pin.TreeHash || component.SourceDate != pin.SourceDateEpoch {
+					t.Fatalf("%s does not retain its validated source tag/commit/tree/epoch", selection.component)
 				}
 			}
-			// SPIRE packaging is part of the same release source identity.
 			spire := cat.Components["nvke-spire-agent"]
-			if spire.Tag != "v0.22.0" || spire.Commit != selectedSource || spire.TreeHash != "f3afc02f5c92f4aacda3a1655836a91bef093bfe" || spire.SourceDate != 1792548398 {
-				t.Fatal("SPIRE source must match the release")
-			}
 			if len(spire.Materials) != 0 || !strings.Contains(strings.Join(spire.VendorCommand, "\n"), "make -C os-image/packages/spire-agent bundle nfpm") ||
-				!strings.Contains(strings.Join(spire.BuildCommand, "\n"), "SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=4") {
-				t.Fatal("release SPIRE producer must retain its source-owned acquisition and packaging revision 4 without DSX materials")
+				!strings.Contains(strings.Join(spire.BuildCommand, "\n"), "/src/nvkr-output/work/os-image/packages/spire-agent/packaging/build-deb.sh") {
+				t.Fatal("SPIRE producer must retain source-owned acquisition and offline packaging without DSX materials")
 			}
 			if _, exists := cat.Components["dsx-imds-node-attestor-agent"]; exists || slices.Contains(output.Components, "dsx-imds-node-attestor-agent") {
-				t.Fatal("release SPIRE selection unexpectedly reintroduced DSX")
+				t.Fatal("SPIRE selection unexpectedly reintroduced DSX")
 			}
-			if agent.VersionStamp["BUILD_VERSION"] != "v0.22.0" || !strings.Contains(strings.Join(agent.BuildCommand, "\n"), `VERSION="$BUILD_VERSION"`) {
+			agent := cat.Components["nvke-agent"]
+			if agent.VersionStamp["BUILD_VERSION"] != catalog.StripTagPrefix(selectedSource.Tag) || !strings.Contains(strings.Join(agent.BuildCommand, "\n"), `VERSION="${BUILD_VERSION:?}"`) {
 				t.Fatal("agent version must derive from the selected source tag")
 			}
 			selected, err := Resolve(cat, Selection{Components: output.Components, Platform: output.Platform, OutputFormat: output.Format})
@@ -117,13 +145,13 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 				if node.Kind == ir.KindBuild && node.Component == "nvke-spire-agent" {
 					spireFound = true
 					if node.SourceCommit != spire.Commit || node.Network != ir.NetworkNone || len(node.Materials) != 0 {
-						t.Fatal("SPIRE packaging must use the exact temporary source and its acquired closure offline")
+						t.Fatal("SPIRE packaging must use its selected source and acquired closure offline")
 					}
 				}
 				if node.Kind == ir.KindBuild && node.Component == "nvke-image-inputs" {
 					compositionFound = true
 					arch := strings.TrimPrefix(output.Platform, "linux/")
-					if node.SourceCommit != selectedSource || !strings.Contains(strings.Join(node.Command, "\n"), "--architecture "+arch) {
+					if node.SourceCommit != selectedSource.Commit || !strings.Contains(strings.Join(node.Command, "\n"), "--architecture "+arch) {
 						t.Fatal("image composition must use the selected source's required native architecture argument")
 					}
 					spireMaterial := false
@@ -140,15 +168,14 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 					continue
 				}
 				found = true
-				if node.Platform != output.Platform || node.ToolchainPlatform != output.Platform || node.SourceCommit != selectedSource {
+				if node.Platform != output.Platform || node.ToolchainPlatform != output.Platform || node.SourceCommit != selectedSource.Commit {
 					t.Fatalf("native source/toolchain binding changed: %+v", node)
 				}
 				if node.Packer == nil || node.Packer.AcquisitionArchive != want.variant+"/apt-acquisitions.tar" {
 					t.Fatal("capture carrier did not reach compiled graph")
 				}
-				if len(node.Patches) != 1 || node.Patches[0].Name != "patches/capture-schema.patch" ||
-					!strings.Contains(node.Patches[0].Content, `+SCHEMA = "nvkr.dev/package-acquisitions/v1"`) {
-					t.Fatal("capture producer must use the same schema as its consumer through an authenticated source patch")
+				if len(node.Patches) != 0 {
+					t.Fatal("capture producer must preserve stock source; the acquisition owner accepts its original schema")
 				}
 				if node.ArtifactPath != want.variant+"/nvke-node.qcow2" || node.Disk == nil || node.Disk.Encryption != want.encryption ||
 					node.Packer.BuildName != "nvke-node-"+want.variant+".qemu.nvke-"+want.variant {

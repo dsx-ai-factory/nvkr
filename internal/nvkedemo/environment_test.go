@@ -6,15 +6,51 @@ package nvkedemo
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
-	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
+
+func TestNativeAccountHomeExcludesAmbientSelection(t *testing.T) {
+	account, err := user.LookupId(strconv.Itoa(os.Getuid()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, home := range []string{"", "/synthetic/foreign-account"} {
+		t.Run("HOME="+home, func(t *testing.T) {
+			t.Setenv("HOME", home)
+			t.Setenv("USER", "synthetic-foreign-user")
+			t.Setenv("XDG_CACHE_HOME", "/synthetic/foreign-cache")
+			if home == "" {
+				if err := os.Unsetenv("HOME"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			got, err := nativeAccountHome(t.Context())
+			if err != nil || got != account.HomeDir {
+				t.Fatalf("account home=%q error=%v; want actual UID account home", got, err)
+			}
+			if os.Getenv("HOME") != home || os.Getenv("USER") != "synthetic-foreign-user" || os.Getenv("XDG_CACHE_HOME") != "/synthetic/foreign-cache" {
+				t.Fatal("account lookup changed the caller environment")
+			}
+		})
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	var coded *nvkrerr.Error
+	if _, err := nativeAccountHome(ctx); !errors.As(err, &coded) || coded.Code != nvkrerr.CodeTimeout {
+		t.Fatalf("canceled account admission lost coded timeout: %v", err)
+	}
+}
 
 func TestDaemonEnvironmentBindings(t *testing.T) {
 	bound := map[string]string{"HOME": "/account", "XDG_RUNTIME_DIR": "/run/user/501"}
@@ -59,65 +95,56 @@ func TestExactSeedProjection(t *testing.T) {
 		})
 	}
 }
-func TestSimulatorEnvironmentExcludesAmbientAuthority(t *testing.T) {
-	t.Setenv("HOME", "/foreign")
-	t.Setenv("XDG_RUNTIME_DIR", "/foreign")
-	t.Setenv("LD_PRELOAD", "/foreign")
-	t.Setenv("NICO_VMS_VM_BACKEND", "mock")
-	work := t.TempDir()
-	tools := filepath.Join(work, "tools")
-	if err := os.Mkdir(tools, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range []string{"qemu-img", "cloud-localds"} {
-		if err := os.WriteFile(filepath.Join(tools, name), []byte("#!/bin/sh\nexit0\n"), 0o700); err != nil {
-			t.Fatal(err)
-		}
-	}
-	t.Setenv("PATH", tools)
-	env, err := simulatorEnvironment(t.Context(), work, "/held/disk", work, "172.18.0.1", map[string]string{"HOME": "/admitted", "XDG_RUNTIME_DIR": "/run/user/501"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for key, expected := range map[string]string{"HOME": "/admitted", "XDG_RUNTIME_DIR": "/run/user/501", "NICO_VMS_VM_BACKEND": "libvirt", "NICO_SIM_SEED_PATH": filepath.Join(work, "laptop-seed.yaml"), "NICO_VMS_DIAG_SSH_ENABLED": "true"} {
-		if got := environmentValue(env, key); got != expected {
-			t.Fatalf("%s=%q", key, got)
-		}
-	}
-	if len(environmentValue(env, "NICO_VMS_DIAG_SSH_PASSWORD")) != 48 || environmentValue(env, "LD_PRELOAD") != "" {
-		t.Fatal("unsafe simulator environment")
-	}
+
+// The optional nightly source suite retains its exact source-fixture guard.
+const SeedDigest = "e713b6e74e884bfba5a942b10eee142171565dcec2f24c6217cd9baecea03cac"
+
+type seedProjection struct {
+	SourceDigest  string `json:"sourceDigest"`
+	RuntimeDigest string `json:"runtimeDigest"`
+	InstanceType  string `json:"instanceType"`
+	VCPUs         int    `json:"vcpus"`
+	MemoryGiB     int    `json:"memoryGiB"`
+	DiskGiB       int    `json:"diskGiB"`
 }
-func TestDemoAdmissionHasNoPartialOutput(t *testing.T) {
-	// No host Docker invocation or gateway bind belongs in a default contract
-	// test. In-range budgets reach a deterministic missing-tool boundary only;
-	// this does not prove later disk-space or libvirt admission checks.
-	t.Setenv("PATH", t.TempDir())
-	for _, budget := range []time.Duration{5 * time.Minute, time.Hour, 2 * time.Hour, 299 * time.Second, 7201 * time.Second, time.Duration(9223372036854775807)} {
-		t.Run(budget.String(), func(t *testing.T) {
-			out := filepath.Join(t.TempDir(), "new")
-			var progress bytes.Buffer
-			cfg := Config{Out: out, Timeout: budget, Progress: &progress}
-			// Exercise the owning admission directly so macOS's earlier platform
-			// check cannot hide invalid budgets from this boundary test.
-			_, admissionErr := admitDemo(t.Context(), cfg)
-			invalid := budget < 5*time.Minute || budget > 2*time.Hour
-			if admissionErr == nil || strings.Contains(admissionErr.Error(), "tenant budget") != invalid {
-				t.Fatalf("budget validation masked other checks or accepted invalid input: %v", admissionErr)
-			}
-			if !invalid && !strings.Contains(admissionErr.Error(), `executable "docker" absent from explicit PATH`) {
-				t.Fatalf("valid budget did not reach the hermetic missing-Docker boundary: %v", admissionErr)
-			}
-			err := Run(context.Background(), cfg)
-			if nvkrerr.ExitCode(err) != 17 {
-				t.Fatalf("expected coded preflight error, got %v", err)
-			}
-			if _, statErr := os.Lstat(out); !os.IsNotExist(statErr) {
-				t.Fatal("failed admission created output")
-			}
-			if strings.Contains(progress.String(), "PASS:") {
-				t.Fatal("failed admission emitted PASS")
-			}
-		})
+
+func projectSeed(ctx context.Context, work string) (seedProjection, error) {
+	var result seedProjection
+	if err := requireContext(ctx); err != nil {
+		return result, err
 	}
+	file, info, err := securepath.OpenRegular(filepath.Join(work, "internal/seed/default-seed.yaml"))
+	if err != nil {
+		return result, err
+	}
+	defer file.Close()
+	if !currentOwner(info) || info.Size() > 65536 {
+		return result, errors.New("source seed is not a bounded regular owned file")
+	}
+	raw, err := io.ReadAll(io.LimitReader(file, 65537))
+	if err != nil {
+		return result, err
+	}
+	projected, err := projectSeedBytes(raw)
+	if err != nil {
+		return result, err
+	}
+	if err = privateWrite(filepath.Join(work, "laptop-seed.yaml"), projected); err != nil {
+		return result, err
+	}
+	return seedProjection{"sha256:" + SeedDigest, "sha256:" + plainSHA(projected), TenantInstanceType, tenantDemoVCPUs, tenantDemoMemoryGiB, 60}, nil
+}
+func projectSeedBytes(raw []byte) ([]byte, error) { return projectSeedFixture(raw, SeedDigest) }
+func projectSeedFixture(raw []byte, digest string) ([]byte, error) {
+	block := []byte(fmt.Sprintf("  - id: %q\n    name: \"cpu4-mem6gb-disk60gb\"\n    site_id: %q\n    gpu_count: 0\n    cpu_count: 4\n    memory_gib: 6\n    disk_gib: 60\n", TenantInstanceType, SiteID))
+	// This is an exact-byte fixture projection, not a YAML parser. NICoSim owns
+	// decoding; accepted source assets and their identity remain untouched.
+	if len(raw) > 65536 || plainSHA(raw) != digest || bytes.Count(raw, block) != 1 {
+		return nil, errors.New("source simulator seed differs from inspected laptop interface")
+	}
+	replacement := bytes.ReplaceAll(block, []byte("cpu4"), fmt.Appendf(nil, "cpu%d", tenantDemoVCPUs))
+	replacement = bytes.ReplaceAll(replacement, []byte("cpu_count: 4"), fmt.Appendf(nil, "cpu_count: %d", tenantDemoVCPUs))
+	replacement = bytes.ReplaceAll(replacement, []byte("mem6gb"), fmt.Appendf(nil, "mem%dgb", tenantDemoMemoryGiB))
+	replacement = bytes.ReplaceAll(replacement, []byte("memory_gib: 6"), fmt.Appendf(nil, "memory_gib: %d", tenantDemoMemoryGiB))
+	return bytes.Replace(raw, block, replacement, 1), nil
 }

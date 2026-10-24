@@ -74,7 +74,11 @@ func TestNativeCleanupRejectsForeignRowsWithoutLosingOwnedDeletion(t *testing.T)
 		{"empty identity", []nativeInstance{{}}, "", true, 0, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			owned, err := nativeCleanupRows(tc.rows, tc.id, tc.site)
+			limit := 1
+			if tc.site {
+				limit += nativeTenantNodeCount(false)
+			}
+			owned, err := nativeCleanupRows(tc.rows, tc.id, limit)
 			if len(owned) != tc.want || (err != nil) != tc.rejected {
 				t.Fatalf("owned=%v err=%v", owned, err)
 			}

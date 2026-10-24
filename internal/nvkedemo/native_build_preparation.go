@@ -14,6 +14,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
@@ -29,11 +30,11 @@ func defaultMacBuild(cfg *BuildConfig, platform, executable string) (bool, error
 	if cfg.Prepared || cfg.QualifyLocal || cfg.QualificationPolicy != "" {
 		return false, e.New(e.CodeEngineCapability, "default Mac BUILD supports unsigned local execution")
 	}
-	definition, _, err := LocalArtifactInputsFor(cfg.Network, cfg.Conformance)
+	definition, environment, err := LocalArtifactInputsFor(cfg.Network, cfg.Conformance, "darwin")
 	if err != nil {
 		return false, err
 	}
-	cfg.Definition, cfg.Environment = definition, "inputs/environments/local-native-mac.json"
+	cfg.Definition, cfg.Environment = definition, environment
 	cfg.NVKR = filepath.Join(filepath.Dir(executable), "nvkr")
 	return true, nil
 }
@@ -41,7 +42,7 @@ func defaultMacBuild(cfg *BuildConfig, platform, executable string) (bool, error
 // discoverMacPackerFiles selects the installed Homebrew tool roles used by the
 // reviewed native driver. It issues no execution receipt: factory/delivery and
 // the native execution owner capture and authenticate every selected byte.
-func discoverMacPackerFiles(ctx context.Context, runner Runner) (delivery.BinaryBundleRequest, error) {
+func discoverMacPackerFiles(ctx context.Context, runner Runner, repository string) (delivery.BinaryBundleRequest, error) {
 	request := delivery.BinaryBundleRequest{OS: "darwin", Arch: "arm64", Purpose: "packer-toolchain"}
 	add := func(name, source, destination string, mode uint32) error {
 		resolved, err := filepath.EvalSymlinks(source)
@@ -62,8 +63,15 @@ func discoverMacPackerFiles(ctx context.Context, runner Runner) (delivery.Binary
 		}
 		return filepath.EvalSymlinks(path)
 	}
-	// Catalog and source-owned Packer contracts select these exact versions. A
-	// missing installed plugin is a prerequisite failure, never an install command.
+	// The catalog owns release versions and the exact plugin archive member.
+	loaded, err := catalog.LoadContext(ctx, catalog.Dir(filepath.Join(repository, "inputs", "catalogs", "tools", "native")))
+	if err != nil {
+		return request, err
+	}
+	packerVersion, pluginName, err := macPackerPrerequisiteSelection(loaded.Components["packer"], loaded.Tools["packer-plugin-qemu"])
+	if err != nil {
+		return request, err
+	}
 	packer, err := lookup("packer")
 	if err != nil {
 		return request, err
@@ -72,26 +80,25 @@ func discoverMacPackerFiles(ctx context.Context, runner Runner) (delivery.Binary
 	if err != nil {
 		return request, err
 	}
-	if strings.TrimSpace(string(version)) != "Packer v1.15.4" {
-		return request, e.New(e.CodeEngineCapability, "native Mac BUILD requires installed Packer 1.15.4")
+	if strings.TrimSpace(string(version)) != "Packer v"+packerVersion {
+		return request, e.New(e.CodeEngineCapability, "native Mac BUILD requires catalog-selected Packer %s", packerVersion)
 	}
 	plugins, err := runner.Capture(ctx, []string{packer, "plugins", "installed"}, "native-packer-prerequisite-plugin", 15*time.Second)
 	if err != nil {
 		return request, err
 	}
-	const pluginName = "packer-plugin-qemu_v1.1.6_x5.0_darwin_arm64"
 	plugin := ""
 	for line := range strings.SplitSeq(strings.TrimSpace(string(plugins)), "\n") {
 		if filepath.Base(line) != pluginName {
 			continue
 		}
 		if plugin != "" || !filepath.IsAbs(line) || filepath.Clean(line) != line {
-			return request, e.New(e.CodeEngineCapability, "native Mac BUILD requires one exact installed QEMU plugin 1.1.6")
+			return request, e.New(e.CodeEngineCapability, "native Mac BUILD requires one exact installed QEMU plugin %s", pluginName)
 		}
 		plugin = line
 	}
 	if plugin == "" {
-		return request, e.New(e.CodeEngineCapability, "native Mac BUILD requires installed QEMU plugin 1.1.6")
+		return request, e.New(e.CodeEngineCapability, "native Mac BUILD requires catalog-selected QEMU plugin %s", pluginName)
 	}
 	for _, file := range []delivery.BinaryFileInput{
 		{Name: "packer", Path: packer, InstallPath: "/usr/local/bin/packer", Mode: 0755},
@@ -213,7 +220,7 @@ func prepareDefaultMacBuild(ctx context.Context, runner Runner, cfg *BuildConfig
 	if err := admitMacBuildPrerequisites(ctx, runner, cfg.Repository); err != nil {
 		return err
 	}
-	request, err := discoverMacPackerFiles(ctx, runner)
+	request, err := discoverMacPackerFiles(ctx, runner, cfg.Repository)
 	if err != nil {
 		return err
 	}
@@ -228,6 +235,8 @@ func prepareDefaultMacBuild(ctx context.Context, runner Runner, cfg *BuildConfig
 		return err
 	}
 	runner.Work = absolute
+	// Keep bootstrap bind sources inside the attempt's repository workspace.
+	runner.Env = SetEnv(runner.Env, map[string]string{"TMPDIR": runner.Work})
 	manifest := filepath.Join(root, "native-packer-files.json")
 	if err := privateJSON(filepath.Join(cfg.Repository, manifest), request); err != nil {
 		return err
@@ -240,13 +249,13 @@ func prepareDefaultMacBuild(ctx context.Context, runner Runner, cfg *BuildConfig
 		return json.Unmarshal(raw, into)
 	}
 	var bundle factory.NativePackerPreparation
-	if err := invoke([]string{cfg.NVKR, "factory", "prepare-native-packer", "--manifest", manifest, "--out", filepath.Join(root, "toolchain")}, "native-packer-dependency-preparation", 3*time.Minute, &bundle); err != nil {
+	if err := invoke([]string{cfg.NVKR, "factory", "prepare-native-packer", "--manifest", manifest, "--out", filepath.Join(root, "toolchain")}, "native-packer-dependency-preparation", 0, &bundle); err != nil {
 		return err
 	}
 	var prepared factory.NativeBuildPreparation
 	if err := invoke([]string{cfg.NVKR, "factory", "prepare-native-packer-inputs", "--definition", cfg.Definition, "--environment", cfg.Environment,
 		"--layout", bundle.Layout, "--bundle", bundle.Bundle, "--toolchain", bundle.Toolchain, "--out", filepath.Join(root, "packer-inputs"),
-		"--variable", "cpu_model=host", "--variable", "kernel_package=linux-generic", "--variable", "efi_firmware_code=/nvkr/toolchain/firmware/code.fd", "--variable", "efi_firmware_vars=/nvkr/toolchain/firmware/vars.fd"}, "native-packer-input-preparation", 3*time.Minute, &prepared); err != nil {
+		"--accelerator", "tcg", "--variable", "cpu_model=max", "--variable", "ssh_timeout=180m", "--variable", "efi_firmware_code=/nvkr/toolchain/firmware/code.fd", "--variable", "efi_firmware_vars=/nvkr/toolchain/firmware/vars.fd"}, "native-packer-input-preparation", 0, &prepared); err != nil {
 		return err
 	}
 	// The Linux vendoring image and Darwin execution bundle retain separate pins.
@@ -320,4 +329,14 @@ func prepareDefaultMacBuild(ctx context.Context, runner Runner, cfg *BuildConfig
 	}
 	cfg.Definition, cfg.Environment = final, prepared.Environment
 	return nil
+}
+
+// This projects catalog-validated metadata; it does not resolve tags or parse
+// plugin versions. The installed Packer/plugin probes remain the runtime checks.
+func macPackerPrerequisiteSelection(packer catalog.Component, plugin catalog.ToolPin) (string, string, error) {
+	version := strings.TrimPrefix(packer.Tag, "v")
+	if version == "" || plugin.Platform != "darwin/arm64" || plugin.ExecutablePath == "" {
+		return "", "", e.New(e.CodeEngineCapability, "native Mac BUILD requires catalog-selected Packer and Darwin QEMU plugin metadata")
+	}
+	return version, filepath.Base(plugin.ExecutablePath), nil
 }

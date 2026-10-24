@@ -94,6 +94,7 @@ func retainNativeSiteFailure(ctx context.Context, runner Runner, tools, kubeconf
 		args  []string
 	}{
 		{"site-pods", []string{"get", "pods", "--all-namespaces", "-o", "json"}},
+		{"site-events", []string{"get", "events", "--all-namespaces", "-o", "json"}},
 		{"site-services", []string{"get", "services", "--all-namespaces", "-o", "json"}},
 		{"site-endpointslices", []string{"get", "endpointslices.discovery.k8s.io", "--all-namespaces", "-o", "json"}},
 	}

@@ -5,6 +5,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
+	"golang.org/x/net/http2"
 )
 
 const maxOCIArchiveBytes int64 = 64 << 20
@@ -33,10 +35,13 @@ func downloadOCIBlobVerify(ctx context.Context, artifact, root, relative, want s
 	if err != nil {
 		return "", 0, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-	defer cancel()
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 10*time.Minute)
+		defer cancel()
+	}
 	roundTripper, err := transport.NewWithContext(ctx, ref.Registry, authn.Anonymous,
-		remote.DefaultTransport, []string{ref.Scope("pull")})
+		ociBlobTransport(remote.DefaultTransport), []string{ref.Scope("pull")})
 	if err != nil {
 		return "", 0, mapCancellation(ctx, e.Wrap(e.CodeFetchFailed, err, "authenticating OCI blob transport %s", artifact), "OCI blob acquisition")
 	}
@@ -50,7 +55,7 @@ func downloadOCIBlobVerify(ctx context.Context, artifact, root, relative, want s
 	}
 	request.Header.Set("User-Agent", "nvkr/oci-blob-acquire")
 	request.Header.Set("Accept-Encoding", "identity")
-	client := &http.Client{Transport: roundTripper, Timeout: 10 * time.Minute}
+	client := &http.Client{Transport: roundTripper}
 	response, err := client.Do(request)
 	if err != nil {
 		return "", 0, mapCancellation(ctx, e.Wrap(e.CodeFetchFailed, err, "fetching OCI blob %s", artifact), "OCI blob acquisition")
@@ -63,4 +68,16 @@ func downloadOCIBlobVerify(ctx context.Context, artifact, root, relative, want s
 		return "", 0, e.New(e.CodeFetchFailed, "OCI blob %s exceeds the %d-byte archive limit", artifact, maxOCIArchiveBytes)
 	}
 	return writeVerifiedDownload(ctx, response.Body, artifact, root, relative, want, maxOCIArchiveBytes)
+}
+
+// Registry pings and anonymous token requests are reads. Retry a peer's transient
+// stream failure before any body is published; integrity checks are outside this
+// transport and can never authorize another attempt. The pinned library owns the
+// three-attempt backoff, and every request retains its acquisition context.
+func ociBlobTransport(base http.RoundTripper) http.RoundTripper {
+	return transport.NewRetry(base, transport.WithRetryPredicate(func(err error) bool {
+		var stream http2.StreamError
+		return errors.As(err, &stream) && stream.StreamID != 0 && stream.Code == http2.ErrCodeInternal &&
+			stream.Cause != nil && stream.Cause.Error() == "received from peer"
+	}))
 }

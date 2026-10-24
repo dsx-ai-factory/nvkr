@@ -159,7 +159,13 @@ func TestNVKEPinSetRejectsInvalidBetaLocalChartMetadata(t *testing.T) {
 		{"local numeric version", controller, "chart:\n", "chart:\n  version: 1\n"},
 		{"local version range", controller, "chart:\n", "chart:\n  version: \"~0.0.0\"\n"},
 		{"local mismatched version", controller, "chart:\n", "chart:\n  version: \"0.0.1\"\n"},
-		{"local chart name", chart, "name: nke-controller", "name: other"},
+		{"local chart unsafe name", chart, "name: nke-controller", "name: ../controller"},
+		{"local chart name absent", chart, "name: nke-controller\n", ""},
+		{"local chart empty name", chart, "name: nke-controller", "name: \"\""},
+		{"local chart numeric name", chart, "name: nke-controller", "name: 42"},
+		{"local chart null name", chart, "name: nke-controller", "name: null"},
+		{"local chart oversized name", chart, "name: nke-controller", "name: " + strings.Repeat("a", 254)},
+		{"local display alias unsafe", controller, "name: nke-controller", "name: ../controller"},
 		{"local chart version absent", chart, "version: \"0.0.0\"\n", ""},
 		{"local chart version range", chart, "version: \"0.0.0\"", "version: \"~0.0.0\""},
 		{"local chart version numeric", chart, "version: \"0.0.0\"", "version: 1"},
@@ -267,6 +273,9 @@ func TestNVKEPinSetRejectsChartIdentityAndShapeChanges(t *testing.T) {
 		{"version range", func(t *testing.T, _ *registryDoc, tree *nvkeFixtureTree) {
 			replaceNVKEFixture(t, tree, spire, "version: \"0.30.1\"", "version: \"~0.30.1\"")
 		}},
+		{"external version omitted", func(t *testing.T, _ *registryDoc, tree *nvkeFixtureTree) {
+			replaceNVKEFixture(t, tree, spire, "  version: \"0.30.1\"\n", "")
+		}},
 		{"both sources", func(t *testing.T, _ *registryDoc, tree *nvkeFixtureTree) {
 			replaceNVKEFixture(t, tree, spire, "chart:\n", "chart:\n  path: ../charts/controller\n")
 		}},
@@ -282,8 +291,8 @@ func TestNVKEPinSetRejectsChartIdentityAndShapeChanges(t *testing.T) {
 		{"missing local chart", func(_ *testing.T, _ *registryDoc, tree *nvkeFixtureTree) {
 			delete(tree.files, "controller/deploy/charts/controller/Chart.yaml")
 		}},
-		{"local chart mismatches release", func(t *testing.T, _ *registryDoc, tree *nvkeFixtureTree) {
-			replaceNVKEFixture(t, tree, "controller/deploy/charts/controller/Chart.yaml", "name: nke-controller", "name: wrong-controller")
+		{"local chart invalid name", func(t *testing.T, _ *registryDoc, tree *nvkeFixtureTree) {
+			replaceNVKEFixture(t, tree, "controller/deploy/charts/controller/Chart.yaml", "name: nke-controller", "name: wrong/controller")
 		}},
 		{"extra release field", func(t *testing.T, _ *registryDoc, tree *nvkeFixtureTree) {
 			replaceNVKEFixture(t, tree, spire, "chart:\n", "chart:\n  command: run\n")
@@ -303,6 +312,46 @@ func TestNVKEPinSetRejectsChartIdentityAndShapeChanges(t *testing.T) {
 			assertCatalogContractCode(t, err, e.CodeInvalidCatalog)
 			if versions != nil {
 				t.Fatal("failed derivation returned partial versions")
+			}
+		})
+	}
+}
+
+func TestNVKEPinSetLocalChartOwnsOptionalReleaseVersion(t *testing.T) {
+	const release = "controller/deploy/nke-sbom/controller/release.yaml"
+	const chart = "controller/deploy/charts/controller/Chart.yaml"
+	for _, tc := range []struct {
+		name string
+		edit func(*testing.T, *nvkeFixtureTree)
+		want e.Code
+	}{
+		{"source-owned version", func(*testing.T, *nvkeFixtureTree) {}, ""},
+		{"missing chart version", func(t *testing.T, tree *nvkeFixtureTree) {
+			replaceNVKEFixture(t, tree, chart, "version: \"0.0.0\"\n", "")
+		}, e.CodeInvalidCatalog},
+		{"invalid chart version", func(t *testing.T, tree *nvkeFixtureTree) {
+			replaceNVKEFixture(t, tree, chart, "version: \"0.0.0\"", "version: \"~0.0.0\"")
+		}, e.CodeInvalidCatalog},
+		{"unknown artifact field", func(t *testing.T, tree *nvkeFixtureTree) {
+			replaceNVKEFixture(t, tree, release, "chart:\n", "chart:\n  arbitraryArtifact: other\n")
+		}, e.CodeInvalidCatalog},
+		{"invalid artifact name", func(t *testing.T, tree *nvkeFixtureTree) {
+			replaceNVKEFixture(t, tree, release, "artifact: controller-chart", "artifact: ../other")
+		}, e.CodeInvalidCatalog},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			reg, tree := nvkePinFixture(t)
+			replaceNVKEFixture(t, tree, release, "  version: \"0.0.0\"\n", "")
+			replaceNVKEFixture(t, tree, release, "chart:\n", "chart:\n  artifact: controller-chart\n  imageArtifact: cwe\n  profilesArtifact: controller-profiles\n")
+			tc.edit(t, tree)
+			versions, err := deriveNVKEPinSet(t.Context(), tree, reg, "nvke")
+			if tc.want != "" {
+				assertCatalogContractCode(t, err, tc.want)
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if tc.want == "" && (len(versions) != 4 || versions["spire"] != "0.30.1") {
+				t.Fatal("local chart metadata changed external chart selections")
 			}
 		})
 	}

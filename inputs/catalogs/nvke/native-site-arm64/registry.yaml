@@ -26,6 +26,26 @@ sources:
       cd ..
       printf '%s\n' "$pins" | sha256sum --quiet -c -
       test ! -e controller/deploy/charts/go.sum
+  nvke-deploy:
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    constraint: v0.22.0
+    toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+    pinSet:
+      file: deploy/nico/nvke-deploy.yaml
+      format: nvke-deploy-v1
+      accounted:
+        nvke-base-config: {type: template}
+        spire-tpm-pubhashes: {type: manifest}
+        spire-server-nodeport: {type: manifest}
+        spire-oidc-provider-nodeport: {type: manifest}
+        capnico: {type: manifest}
+        nktp: {type: helm, path: ../../nktp/deploy/charts/nktp}
+        controller: {type: helm, path: ../../controller/deploy/charts/controller, chartName: nvke-controller}
+      members:
+        postgresql: {artifact: postgresql-chart}
+        spire: {artifact: spire-chart}
+        spire-crds: {artifact: spire-crds-chart}
+        temporal: {artifact: temporal-chart}
   nvke-controller:
     repo: https://github.com/dsx-ai-factory/nvke.git
     constraint: v0.22.0
@@ -112,7 +132,7 @@ components:
     platforms:
     - linux/arm64
     outputType: tarball
-    artifactPath: charts/nke-controller-0.0.0.tgz
+    artifactPath: charts/nvke-controller-0.0.0.tgz
     writeDir: charts
     helm:
       chart: .
@@ -154,3 +174,51 @@ components:
     - linux/arm64
     versionStamp:
       BUILD_VERSION: git-{{.Commit}}
+  postgresql-chart:
+    outputType: raw
+    pinnedBy: nvke-deploy
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      chart:
+        name: postgresql
+        repository: oci://registry-1.docker.io/bitnamicharts
+      evidence:
+        none: true
+  spire-chart:
+    outputType: raw
+    pinnedBy: nvke-deploy
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      chart:
+        name: spire
+        repository: https://spiffe.github.io/helm-charts-hardened/
+      evidence:
+        none: true
+  spire-crds-chart:
+    outputType: raw
+    pinnedBy: nvke-deploy
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      chart:
+        name: spire-crds
+        repository: https://spiffe.github.io/helm-charts-hardened/
+      evidence:
+        none: true
+  temporal-chart:
+    outputType: raw
+    pinnedBy: nvke-deploy
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      chart:
+        name: temporal
+        repository: https://go.temporal.io/helm-charts
+      evidence:
+        none: true

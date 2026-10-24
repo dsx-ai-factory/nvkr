@@ -20,20 +20,19 @@ func TestNativeTenantRequestSelectsReviewedAPI(t *testing.T) {
 		name, commit, subnet string
 		modern, rejected     bool
 	}{
-		{"modern Mac", "400c24fb6465b042be883d6b62472528520d6291\n", "192.168.64.0/24", true, false},
-		{"modern Linux", "400c24fb6465b042be883d6b62472528520d6291\n", "172.30.0.0/24", true, false},
+		{"modern Mac", "dfc817aa34205e8099dad91dfd05170499d00b60\n", "192.168.64.0/24", true, false},
+		{"modern Linux", "dfc817aa34205e8099dad91dfd05170499d00b60\n", "172.30.0.0/24", true, false},
 		{"historical", "b6154b292a934dbdff7aa17596cbf2d7ef5f0f85\n", "172.30.0.0/24", false, true},
 		{"unreviewed", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", "192.168.64.0/24", false, true},
-		{"pod overlap", "400c24fb6465b042be883d6b62472528520d6291\n", "10.245.0.0/24", true, true},
-		{"service overlap", "400c24fb6465b042be883d6b62472528520d6291\n", "10.97.0.0/24", true, true},
-		{"missing underlay", "400c24fb6465b042be883d6b62472528520d6291\n", "", true, true},
+		{"pod overlap", "dfc817aa34205e8099dad91dfd05170499d00b60\n", "10.245.0.0/24", true, true},
+		{"service overlap", "dfc817aa34205e8099dad91dfd05170499d00b60\n", "10.97.0.0/24", true, true},
+		{"missing underlay", "dfc817aa34205e8099dad91dfd05170499d00b60\n", "", true, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			installer := privateTestDir(t)
-			writeTenantFixture(t, filepath.Join(installer, "SOURCE_COMMIT"), []byte(tc.commit), 0600)
-			subnet, _ := netip.ParsePrefix(tc.subnet)
-			attempt := nativeSiteAttempt{assets: NativeAssets{Installer: installer}, network: "upstream-ovn", bridge: nativeBridgeConfig{prefix: subnet}}
-			request, err := attempt.tenantRequest(t.Context())
+			attempt := nativeCAPITenantFixture(t, tc.subnet, "upstream-ovn")
+			writeTenantFixture(t, filepath.Join(attempt.assets.Installer, "SOURCE_COMMIT"), []byte(tc.commit), 0600)
+			subnet := attempt.bridge.prefix
+			request, err := attempt.namedTenantRequest(t.Context(), "native-demo-tenant")
 			if tc.rejected {
 				if err == nil || !reflect.DeepEqual(request, TenantRequest{}) {
 					t.Fatalf("rejected selection produced intent: %+v %v", request, err)
@@ -60,29 +59,8 @@ func TestNativeTenantRequestSelectsReviewedAPI(t *testing.T) {
 			if _, present := wire["controlPlaneVIP"]; present {
 				t.Fatal("no-VIP intent must omit the optional field")
 			}
-			var decoded struct {
-				ControlPlane struct {
-					NICo map[string]json.RawMessage `json:"nico"`
-				} `json:"controlPlaneConfig"`
-				NodePools []struct {
-					NICo map[string]json.RawMessage `json:"nico"`
-				} `json:"nodePools"`
-			}
-			if err := json.Unmarshal(raw, &decoded); err != nil {
-				t.Fatal(err)
-			}
-			if len(decoded.NodePools) != 1 {
-				t.Fatal("worker topology changed")
-			}
-			selected, absent := "release", "osProfile"
-			for _, provider := range []map[string]json.RawMessage{decoded.ControlPlane.NICo, decoded.NodePools[0].NICo} {
-				var release string
-				if err := json.Unmarshal(provider[selected], &release); err != nil || release != TenantProfile {
-					t.Fatalf("wrong selected release: %s %v", provider[selected], err)
-				}
-				if _, present := provider[absent]; present {
-					t.Fatalf("source received incompatible field %s", absent)
-				}
+			if _, present := wire["nico"]; present || request.Infra == nil || request.ControlPlane.Infra == nil || len(request.NodePools) != 1 || request.NodePools[0].Infra == nil {
+				t.Fatal("native topology must use only generic CAPI provider fields")
 			}
 			if request.Network == nil {
 				t.Fatal("missing explicit tenant networks")
@@ -96,15 +74,8 @@ func TestNativeTenantRequestSelectsReviewedAPI(t *testing.T) {
 					t.Fatal("tenant networks overlap site")
 				}
 			}
-			request.VIP = TenantVIP
-			request.Network = nil
-			request.ControlPlane.NICo.OS = TenantProfile
-			request.ControlPlane.NICo.Release = ""
-			request.NodePools[0].NICo.OS = TenantProfile
-			request.NodePools[0].NICo.Release = ""
-			want, err := newTenantRequest("native-demo-tenant", "upstream-ovn")
-			if err != nil || !reflect.DeepEqual(request, want) {
-				t.Fatalf("unrelated topology changed: %+v %v", request, err)
+			if request.ControlPlane.Count != 1 || request.NodePools[0].Count != 1 || request.NodePools[0].ControlPlane {
+				t.Fatal("native topology must keep one control plane and one worker")
 			}
 		})
 	}
@@ -114,7 +85,7 @@ func TestNativeTenantRequestRejectsCanceledSourceRead(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	attempt := nativeSiteAttempt{network: "upstream-ovn", assets: NativeAssets{Installer: privateTestDir(t)}}
-	request, err := attempt.tenantRequest(ctx)
+	request, err := attempt.namedTenantRequest(ctx, "native-demo-tenant")
 	if !errors.Is(err, context.Canceled) || !reflect.DeepEqual(request, TenantRequest{}) {
 		t.Fatalf("canceled intent: %+v %v", request, err)
 	}

@@ -26,9 +26,11 @@ const (
 
 type dashboardPhase struct{ state, detail string }
 
+const dashboardConformancePhase = 6
+
 type dashboardStage struct {
-	states  [2]string
-	started [2]time.Time
+	state   string
+	started time.Time
 }
 
 type dashboardBuildStep struct {
@@ -43,36 +45,35 @@ type dashboardOSLogs struct {
 }
 
 // This bounded checklist names source-owned operations, not inferred deployment
-// milestones. Paired operations require both completed observations.
-var dashboardSiteStages = [...]struct {
-	label      string
-	operations [2]string
-}{
-	{"Create Kind cluster", [2]string{"create-management"}},
-	{"Registry reachable", [2]string{"start-registry", "registry-admission"}},
-	{"Site networking (OVN)", [2]string{"site-ovs-ready", "site-ovn-admission"}},
-	{"Site nodes Ready", [2]string{"management-ready"}},
-	{"Readiness", [2]string{"site-readiness"}},
-	{"Install Cluster API", [2]string{"site-cluster-api"}},
-	{"Install NVKE stack", [2]string{"site-install"}},
-	{"Configure cluster identity", [2]string{"site-capi-identity"}},
-	{"Check Cluster API", [2]string{"site-ready-capi-system", "site-ready-capi-kubeadm-bootstrap-system"}},
-	{"Check CAPI control plane", [2]string{"site-ready-capi-kubeadm-control-plane-system"}},
-	{"Secure and register", [2]string{"site-client-policy", "site-register"}},
-	{"Verify deployed images", [2]string{"site-images-admission"}},
+// milestones. Each completed observation belongs to exactly one operation.
+type dashboardSiteStage struct {
+	label     string
+	operation string
 }
 
-var dashboardTenantStages = [...]string{"Tenant kubeconfig", "Tenant API query", "Both nodes Ready", "Workload and DNS"}
+var dashboardSiteStages = [...]dashboardSiteStage{
+	{"Site guest Ready (NICo)", "native-site-guest"},
+	{"Site packages prepared", "native-site-preparation"},
+	{"NVKE site bootstrap", "host-nvke-bootstrap"},
+	{"Cluster API installed", "host-site-capi"},
+	{"Site stack installed", "host-nvke-deploy"},
+	{"CAPI SPIFFE authentication", "host-site-spiffe-exec"},
+	{"Site host identity handoff", "native-site-identity-handoff"},
+	{"NVKE API accessible", "check-05-install-site-controller"},
+}
+
+var dashboardTenantStages = [...]string{"Tenant kubeconfig", "Tenant API query", "Nodes Ready", "Workload and DNS"}
 
 type dashboardSnapshot struct {
 	started, observedAt, deadline time.Time
 	elapsed                       time.Duration
-	phases                        [6]dashboardPhase
+	phases                        [dashboardConformancePhase + 1]dashboardPhase
 	activity                      []string
 	operatorPage                  string
 	tenant, current               string
 	focus, offset                 int
 	registered, ready             int
+	expectedNodes                 int
 	nodesObserved                 bool
 	confirmCancel                 bool
 	confirmForce, forceAvailable  bool
@@ -80,15 +81,17 @@ type dashboardSnapshot struct {
 	tenantChangedAt               time.Time
 	tenantStage                   string
 	provisioning, provisioned     nvkedemo.TenantConditionStatus
-	guests                        [2]nvkedemo.TenantGuestObservation
+	guests                        [3]nvkedemo.TenantGuestObservation
 	guestsObservedAt              time.Time
 	siteStages                    [len(dashboardSiteStages)]dashboardStage
-	siteOVN                       bool
+	conformanceSelected           bool
 	tenantStages                  [len(dashboardTenantStages)]dashboardStage
 	buildSteps                    []dashboardBuildStep
 	buildPreview, buildTruncated  bool
 	buildChangedAt                time.Time
 	buildOutputs                  []string
+	buildRequired                 int
+	buildRun                      string
 	buildOutputAt                 time.Time
 	buildOutputBytes              uint64
 	buildProcess                  string
@@ -151,10 +154,6 @@ func (d *dashboard) Write(data []byte) (int, error) {
 	for _, value := range data {
 		if value == '\n' {
 			line := string(d.partial)
-			if !d.dropped && d.observeBuildGraph(line) {
-				d.partial = d.partial[:0]
-				continue
-			}
 			if !d.dropped {
 				d.observeBuildLog(line)
 			}
@@ -343,42 +342,14 @@ func dashboardOperation(name string) (index int, label string) {
 		return 1, "Execute the combined artifact graph"
 	case "network-preflight", "network-setup":
 		return 2, "Prepare isolated demo networking"
-	case "create-management":
-		return 2, "Create and check Kind management cluster"
-	case "management-ready":
-		// Stage order changes when a network gate is added. Match the owning
-		// operation, not an array position that may name a different check.
-		for _, stage := range dashboardSiteStages {
-			if stage.operations[0] == name {
-				return 2, stage.label
-			}
-		}
-		return -1, ""
-	case "start-registry", "node-registry-connectivity", "registry-admission":
-		return 2, "Admit registry access from the actual node"
-	case "node-simulator-connectivity":
-		return 2, "Check Kind-to-simulator connectivity before site installation"
-	case "site-ovn-chart", "site-ovn-defaults":
-		return 2, "Verify the selected OVN chart and image bindings"
-	case "site-ovs-fresh", "site-ovs-create", "site-ovs-ready":
-		return 2, "Start and check Open vSwitch for the owned Kind node"
-	case "site-ovn-install", "site-ovn-control-plane-ready", "site-ovn-node-ready":
-		return 2, "Install selected OVN and wait for its site controllers"
-	case "site-ovn-observation", "site-ovn-admission":
-		return 2, "Check live site OVN images against the selected output"
-	case "site-readiness", "site-cluster-api", "site-install", "site-capi-identity", "site-ready-capi-system", "site-ready-capi-kubeadm-bootstrap-system", "site-ready-capi-kubeadm-control-plane-system", "site-client-policy", "site-register", "site-images-admission":
-		for _, stage := range dashboardSiteStages {
-			if slices.Contains(stage.operations[:], name) {
-				return 2, stage.label
-			}
-		}
-		return -1, ""
 	case "tenant-provisioning":
 		return 3, "Provision QCOW2 control plane and worker"
 	case "tenant-cni-readiness":
 		return 4, "Wait for tenant Calico node agents before DNS checks"
 	case "tenant-dns-readiness":
 		return 4, "Wait for CoreDNS and node-local DNS rollout before the smoke test"
+	case "native-conformance":
+		return dashboardConformancePhase, "Kubernetes conformance validation and original report capture"
 	case "tenant-cleanup":
 		return 5, "Clean up the owned tenant"
 	case "tenant-diagnostics":
@@ -390,70 +361,39 @@ func dashboardOperation(name string) (index int, label string) {
 	case "network-cleanup", "registry-cleanup", "owned-node-cleanup":
 		return 5, "Restore owned demo resources"
 	}
+	if name == "native-site-ready" {
+		return 2, "Prepare and check the native site"
+	}
+	for _, stage := range dashboardSiteStages {
+		if name == stage.operation {
+			return 2, stage.label
+		}
+	}
 	return -1, ""
 }
 
-func (stage *dashboardStage) observe(part int, state string, now time.Time) {
-	if stage.states[part] == "failed" || stage.states[part] == "observed" && state != "failed" {
+func (stage *dashboardStage) observe(state string, now time.Time) {
+	if stage.state == "failed" || stage.state == "observed" && state != "failed" {
 		return
 	}
-	if state == "running" && stage.started[part].IsZero() {
-		stage.started[part] = now
+	if state == "running" && stage.started.IsZero() {
+		stage.started = now
 	}
-	stage.states[part] = state
+	stage.state = state
 }
 
-func (stage dashboardStage) status(required int) (state string, observed int, started time.Time) {
-	state = "pending"
-	for part := range required {
-		switch stage.states[part] {
-		case "observed":
-			observed++
-		case "running":
-			if state == "pending" {
-				state = "running"
-			}
-			if started.IsZero() || stage.started[part].Before(started) {
-				started = stage.started[part]
-			}
-		case "failed":
-			state = "failed"
-		case "stopped":
-			if state != "failed" {
-				state = "stopped"
-			}
-		}
+func (stage dashboardStage) status() string {
+	if stage.state == "" {
+		return "pending"
 	}
-	if observed == required {
-		state = "observed"
-	}
-	return state, observed, started
+	return stage.state
 }
 
 func (d *dashboard) observeSiteStage(event nvkedemo.ProgressEvent, state string) string {
-	if strings.HasPrefix(event.Name, "site-ovs-") || strings.HasPrefix(event.Name, "site-ovn-") {
-		d.siteOVN = true
-		part := 1
-		if strings.HasPrefix(event.Name, "site-ovs-") || event.Name == "site-ovn-chart" || event.Name == "site-ovn-defaults" {
-			part = 0
-		}
-		if state != "observed" || event.Name == dashboardSiteStages[2].operations[part] {
-			d.siteStages[2].observe(part, state, time.Now())
-		}
-		return dashboardSiteStages[2].label
-	}
 	for index, stage := range dashboardSiteStages {
-		for part, operation := range stage.operations {
-			if operation != "" && event.Name == operation {
-				d.siteStages[index].observe(part, state, time.Now())
-				label := stage.label
-				if strings.HasPrefix(operation, "site-") {
-					label += " · run"
-				} else if strings.HasPrefix(operation, "check-") && stage.operations[1] != "" {
-					label += " · check"
-				}
-				return label
-			}
+		if event.Name == stage.operation {
+			d.siteStages[index].observe(state, time.Now())
+			return stage.label
 		}
 	}
 	return ""
@@ -461,10 +401,8 @@ func (d *dashboard) observeSiteStage(event nvkedemo.ProgressEvent, state string)
 
 func stopDashboardStages(stages []dashboardStage, state string) {
 	for index := range stages {
-		for part, previous := range stages[index].states {
-			if previous == "running" {
-				stages[index].states[part] = state
-			}
+		if stages[index].state == "running" {
+			stages[index].state = state
 		}
 	}
 }
@@ -472,6 +410,23 @@ func stopDashboardStages(stages []dashboardStage, state string) {
 func (d *dashboard) Report(event nvkedemo.ProgressEvent) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if event.Name == "tenant-provisioning" && event.Kind == nvkedemo.DeploymentStarted {
+		d.resetTenantObservation()
+	}
+	switch event.Kind {
+	case nvkedemo.BuildPlanSelected:
+		d.observeBuildPlan(event)
+		return
+	case nvkedemo.NativeDeployment:
+		if event.ExpectedNodes != 0 && (requestedTenantNodes(event.ExpectedNodes) == 0 || event.Conformance && event.ExpectedNodes != 3) {
+			return
+		}
+		d.conformanceSelected = event.Conformance
+		if event.ExpectedNodes != 0 {
+			d.expectedNodes = event.ExpectedNodes
+		}
+		return
+	}
 	if event.Kind == nvkedemo.OSBuildLogs {
 		if d.phases[1].state != "running" || event.BuildLogs.Validate() != nil {
 			return
@@ -492,7 +447,7 @@ func (d *dashboard) Report(event nvkedemo.ProgressEvent) {
 		return
 	}
 	if event.Kind == nvkedemo.ProcessStarted || event.Kind == nvkedemo.ProcessExited {
-		if event.Name == "build-all" {
+		if event.Name == "build-all" || event.Name == "native-tools-run" {
 			if event.Kind == nvkedemo.ProcessExited {
 				d.buildProcess = "exited"
 			} else if d.buildProcess != "exited" {
@@ -520,36 +475,6 @@ func (d *dashboard) Report(event nvkedemo.ProgressEvent) {
 	default:
 		return
 	}
-	if event.Name == "local-demo" {
-		switch event.Kind {
-		case nvkedemo.DeploymentStarted:
-			d.current = "Prepare management cluster and local delivery"
-			d.currentStarted = time.Now()
-		case nvkedemo.DeploymentFinished:
-			d.currentStarted = time.Time{}
-			for _, index := range []int{2, 3, 4} {
-				d.phases[index] = dashboardPhase{"complete", "Owning demo operation completed"}
-			}
-			if event.Status == "retained" {
-				d.current = "Environment retained; not cleaned up"
-				d.phases[5] = dashboardPhase{"pending", "Retained; explicit cleanup required"}
-			} else {
-				d.current = "Deployment, tenant checks and owned cleanup completed"
-				d.phases[5] = dashboardPhase{"complete", "Owning demo operation completed"}
-			}
-		case nvkedemo.DeploymentFailed:
-			d.current = "Demo stopped; inspect retained private diagnostics"
-			d.currentStarted = time.Time{}
-			stopDashboardStages(d.siteStages[:], "stopped")
-			stopDashboardStages(d.tenantStages[:], "stopped")
-			for index := range d.phases {
-				if d.phases[index].state == "running" || d.phases[index].state == "observed" {
-					d.phases[index] = dashboardPhase{"stopped", "Stopped without owning phase completion"}
-				}
-			}
-		}
-		return
-	}
 	index, label := dashboardOperation(event.Name)
 	if index < 0 {
 		return
@@ -564,16 +489,30 @@ func (d *dashboard) Report(event nvkedemo.ProgressEvent) {
 	if !strings.HasPrefix(event.Kind, family) {
 		return
 	}
+	if index == dashboardConformancePhase {
+		d.conformanceSelected = true
+		if state == "running" {
+			// A retained tenant may run another explicit suite after an outcome.
+			d.phases[index] = dashboardPhase{}
+		}
+	}
 	if event.Kind == nvkedemo.PhaseStarted || event.Kind == nvkedemo.PhaseFinished || event.Kind == nvkedemo.PhaseFailed {
 		if stageLabel := d.observeSiteStage(event, state); stageLabel != "" {
 			label = stageLabel
 		}
 	}
-	if event.Name == "artifacts" && event.Kind == nvkedemo.LaneFinished || event.Name == "installer-preparation" && event.Kind == nvkedemo.PhaseFinished {
+	if event.Kind == nvkedemo.LaneFinished && event.Name == "artifacts" || event.Kind == nvkedemo.PhaseFinished && (event.Name == "installer-preparation" || index == dashboardConformancePhase) {
 		state = "complete"
 	}
-	if d.phases[index].state != "failed" && (d.phases[index].state != "complete" || state == "failed") {
-		d.phases[index] = dashboardPhase{state, label}
+	phaseState := state
+	if index == 2 && state == "observed" {
+		phaseState = "running"
+	}
+	if event.Name == "native-site-ready" && event.Kind == nvkedemo.PhaseFinished {
+		phaseState = "complete"
+	}
+	if d.phases[index].state != "failed" && (d.phases[index].state != "complete" || phaseState == "failed") {
+		d.phases[index] = dashboardPhase{phaseState, label}
 	}
 	d.current = label
 	if state == "running" {
@@ -583,8 +522,8 @@ func (d *dashboard) Report(event nvkedemo.ProgressEvent) {
 	}
 	d.appendActivity(state + ": " + label)
 	if event.Name == "tenant-provisioning" && event.Kind == nvkedemo.DeploymentFinished {
-		if d.tenantStages[3].states[0] == "running" {
-			d.tenantStages[3].observe(0, "observed", time.Now())
+		if d.tenantStages[3].state == "running" {
+			d.tenantStages[3].observe("observed", time.Now())
 		}
 		d.phases[3] = dashboardPhase{"complete", "Owning tenant operation completed"}
 		d.phases[4] = dashboardPhase{"complete", "Workload and DNS checks completed"}
@@ -600,39 +539,47 @@ func (d *dashboard) Report(event nvkedemo.ProgressEvent) {
 }
 
 func (d *dashboard) tenantObservation(event nvkedemo.ProgressEvent) {
-	if event.RegisteredNodes < 0 || event.RegisteredNodes > 2 || event.ReadyNodes < 0 || event.ReadyNodes > event.RegisteredNodes || event.Elapsed < 0 || event.Remaining < 0 {
+	expected := requestedTenantNodes(event.ExpectedNodes)
+	if expected == 0 {
+		return
+	}
+	if event.RegisteredNodes < 0 || event.RegisteredNodes > expected || event.ReadyNodes < 0 || event.ReadyNodes > event.RegisteredNodes || event.Elapsed < 0 || event.Remaining < 0 {
 		return
 	}
 	message := ""
 	stage := 0
 	now := time.Now()
 	previousRegistered, previousReady := d.registered, d.ready
+	d.expectedNodes = expected
 	switch event.Name {
 	case "tenant-kubeconfig":
-		d.tenantStages[0].observe(0, "running", now)
+		d.tenantStages[0].observe("running", now)
 		message = "Waiting for NVKE to publish tenant kubeconfig. Guest boot and node readiness are not yet observed."
 	case "tenant-api":
 		stage = 1
-		if d.tenantStages[0].states[0] == "running" {
-			d.tenantStages[0].observe(0, "observed", now)
+		if d.tenantStages[0].state == "running" {
+			d.tenantStages[0].observe("observed", now)
 		}
-		d.tenantStages[1].observe(0, "running", now)
+		d.tenantStages[1].observe("running", now)
 		message = "Kubeconfig available. Waiting for a successful tenant API node query; readiness is not yet observed."
 	case "tenant-nodes":
 		stage = 2
-		if d.tenantStages[1].states[0] == "running" {
-			d.tenantStages[1].observe(0, "observed", now)
+		if d.tenantStages[1].state == "running" {
+			d.tenantStages[1].observe("observed", now)
 		}
-		d.tenantStages[2].observe(0, "running", now)
+		d.tenantStages[2].observe("running", now)
 		d.registered, d.ready, d.nodesObserved = event.RegisteredNodes, event.ReadyNodes, true
-		message = fmt.Sprintf("QCOW2 tenant: %d/2 registered · %d/2 Ready. Waiting for control plane and worker.", event.RegisteredNodes, event.ReadyNodes)
-		if event.RegisteredNodes == 2 && event.ReadyNodes == 2 {
-			d.tenantStages[2].observe(0, "observed", now)
-			message = "QCOW2 tenant: 2/2 registered · 2/2 Ready. Workload and DNS checks still required."
+		message = fmt.Sprintf("QCOW2 tenant: %d/%d registered · %d/%d Ready. Waiting for control plane and workers.", event.RegisteredNodes, expected, event.ReadyNodes, expected)
+		if event.RegisteredNodes == expected && event.ReadyNodes == expected {
+			d.tenantStages[2].observe("observed", now)
+			message = fmt.Sprintf("QCOW2 tenant: %d/%d registered · %d/%d Ready. Workload and DNS checks still required.", expected, expected, expected, expected)
 		}
+	case "tenant-cloud-init":
+		stage = 2
+		message = "Checking actual host cloud-init completion on the Ready tenant nodes; workload and DNS checks remain pending."
 	case "tenant-workload":
 		stage = 3
-		d.tenantStages[3].observe(0, "running", now)
+		d.tenantStages[3].observe("running", now)
 		message = "Running workload and cluster DNS checks. Successful completion is still required."
 		d.phases[4] = dashboardPhase{"running", "Check workload execution and cluster DNS"}
 	default:
@@ -672,7 +619,7 @@ func (d *dashboard) tenantObservation(event nvkedemo.ProgressEvent) {
 		if changed {
 			activity = "reported state changed · " + dashboardTenantStages[stage]
 			if event.Name == "tenant-nodes" {
-				activity += fmt.Sprintf(" · %d/2 registered · %d/2 Ready", d.registered, d.ready)
+				activity += fmt.Sprintf(" · %d/%d registered · %d/%d Ready", d.registered, expected, d.ready, expected)
 			}
 			if d.provisioning != "" {
 				activity += " · Provisioning=" + string(d.provisioning)
@@ -695,12 +642,12 @@ func (d *dashboard) tenantGuestObservation(event nvkedemo.ProgressEvent) {
 	if !dashboardValidGuests(event.Guests) {
 		return
 	}
-	for index, role := range [...]string{"Control plane", "Worker"} {
+	for index, role := range tenantGuestRoles(event.ExpectedNodes) {
 		guest, previous := event.Guests[index], d.guests[index]
-		if guest.Available != previous.Available || guest.Domain != previous.Domain || guest.ProviderReady != previous.ProviderReady || guest.ProvisioningFailure != previous.ProvisioningFailure {
+		if guest.Available != previous.Available || guest.Domain != previous.Domain || guest.ProviderReady != previous.ProviderReady || guest.ProvisioningFailure != previous.ProvisioningFailure || guest.InstanceState != previous.InstanceState {
 			message := role + ": guest observation unavailable"
 			if guest.Available {
-				message = fmt.Sprintf("%s: VM %s; infrastructure Ready=%s (not Kubernetes Ready)", role, guest.Domain, guest.ProviderReady)
+				message = fmt.Sprintf("%s: NICo %s; Infra Ready=%s; VM %s", role, guest.InstanceState, guest.ProviderReady, guest.Domain)
 			}
 			if guest.ProvisioningFailure == nvkedemo.TenantInstanceCreateFailed {
 				message = role + ": provider reports instance lookup/create failure"
@@ -713,9 +660,12 @@ func (d *dashboard) tenantGuestObservation(event nvkedemo.ProgressEvent) {
 	d.guests, d.guestsObservedAt = event.Guests, time.Now()
 }
 
-func dashboardValidGuests(guests [2]nvkedemo.TenantGuestObservation) bool {
-	roles := [2]nvkedemo.TenantGuestRole{nvkedemo.TenantGuestControlPlane, nvkedemo.TenantGuestWorker}
+func dashboardValidGuests(guests [3]nvkedemo.TenantGuestObservation) bool {
+	roles := [3]nvkedemo.TenantGuestRole{nvkedemo.TenantGuestControlPlane, nvkedemo.TenantGuestWorker, nvkedemo.TenantGuestWorker}
 	for index, guest := range guests {
+		if index == 2 && guest == (nvkedemo.TenantGuestObservation{}) {
+			continue
+		}
 		if guest.Role != roles[index] || guest.ConsoleBytes < 0 || guest.ConsoleLastChange < 0 {
 			return false
 		}
@@ -724,8 +674,13 @@ func dashboardValidGuests(guests [2]nvkedemo.TenantGuestObservation) bool {
 		default:
 			return false
 		}
+		switch guest.InstanceState {
+		case "", nvkedemo.TenantInstanceUnknown, nvkedemo.TenantInstanceReady, nvkedemo.TenantInstanceError:
+		default:
+			return false
+		}
 		if !guest.Available {
-			if guest.Domain != "" && guest.Domain != nvkedemo.TenantDomainUnknown || guest.ProviderReady != "" && guest.ProviderReady != nvkedemo.TenantConditionUnknown || guest.ConsoleKnown || guest.ConsoleBytes != 0 || guest.ConsoleChanged || guest.ConsoleLastChange != 0 {
+			if guest.Domain != "" && guest.Domain != nvkedemo.TenantDomainUnknown || guest.ProviderReady != "" && guest.ProviderReady != nvkedemo.TenantConditionUnknown || guest.ConsoleKnown || guest.ConsoleBytes != 0 || guest.ConsoleChanged || guest.ConsoleLastChange != 0 || guest.InstanceState != "" && guest.InstanceState != nvkedemo.TenantInstanceUnknown {
 				return false
 			}
 			continue
@@ -748,20 +703,32 @@ func dashboardValidGuests(guests [2]nvkedemo.TenantGuestObservation) bool {
 }
 
 func dashboardTenantSummary(s dashboardSnapshot, now time.Time) string {
+	expected := requestedTenantNodes(s.expectedNodes)
+	if expected == 0 {
+		expected = 2
+	}
 	blocker := "Waiting for tenant kubeconfig"
 	switch s.tenantStage {
 	case "tenant-api":
 		blocker = "Waiting for a successful tenant API query"
 	case "tenant-nodes":
 		blocker = "Waiting for both tenant nodes Ready"
-		if s.registered == 2 && s.ready == 2 {
-			blocker = "Both nodes Ready; workload and DNS checks pending"
+		if expected == 3 {
+			blocker = "Waiting for all three tenant nodes Ready"
 		}
+		if s.registered == expected && s.ready == expected {
+			blocker = "Both nodes Ready; workload and DNS checks pending"
+			if expected == 3 {
+				blocker = "All three nodes Ready; workload and DNS checks pending"
+			}
+		}
+	case "tenant-cloud-init":
+		blocker = "Checking host cloud-init on the tenant nodes"
 	case "tenant-workload":
 		blocker = "Running workload and DNS checks"
 	}
-	if s.tenantStage == "tenant-kubeconfig" || s.tenantStage == "tenant-api" || s.tenantStage == "tenant-nodes" {
-		for index, role := range [...]string{"Control plane", "Worker"} {
+	if s.tenantStage == "tenant-kubeconfig" || s.tenantStage == "tenant-api" || s.tenantStage == "tenant-nodes" || s.tenantStage == "tenant-cloud-init" {
+		for index, role := range tenantGuestRoles(s.expectedNodes) {
 			if s.guests[index].ProvisioningFailure == nvkedemo.TenantInstanceCreateFailed {
 				blocker = role + ": instance lookup/create failed (provider report)"
 				break
@@ -771,7 +738,7 @@ func dashboardTenantSummary(s dashboardSnapshot, now time.Time) string {
 	var checkpoints strings.Builder
 	completed := 0
 	for index, label := range [...]string{"Kubeconfig", "API", "Nodes", "Workload/DNS"} {
-		state, _, _ := s.tenantStages[index].status(1)
+		state := s.tenantStages[index].status()
 		color, marker := "goldenrod", "○"
 		switch state {
 		case "observed":
@@ -785,32 +752,34 @@ func dashboardTenantSummary(s dashboardSnapshot, now time.Time) string {
 		fmt.Fprintf(&checkpoints, " [%s]%s %s[-]", color, marker, label)
 	}
 	lines := []string{fmt.Sprintf("[lightcyan::b]%s[-::-]", blocker), fmt.Sprintf("Checks %s %d/4%s", tview.Escape("["+strings.Repeat("#", completed)+strings.Repeat("-", 4-completed)+"]"), completed, checkpoints.String())}
-	for index, role := range [...]string{"Control plane", "Worker"} {
+	for index, role := range tenantGuestRoles(s.expectedNodes) {
 		guest := s.guests[index]
-		row := fmt.Sprintf("%-13s  VM unavailable; guest observation unknown", role)
-		if guest.Available {
-			console := "console unavailable"
-			if guest.ConsoleKnown {
-				console = fmt.Sprintf("console %s; baseline", dashboardConsoleSize(guest.ConsoleBytes))
-				if guest.ConsoleChanged {
-					console = fmt.Sprintf("console %s; growth age %s", dashboardConsoleSize(guest.ConsoleBytes), dashboardGuestAge(guest.ConsoleLastChange))
-				}
-			}
-			row = fmt.Sprintf("%-13s VM %-8s Infra %s %s", role, guest.Domain, guest.ProviderReady, console)
-		}
-		if guest.ProvisioningFailure == nvkedemo.TenantInstanceCreateFailed {
+		var row string
+		switch {
+		case guest.ProvisioningFailure == nvkedemo.TenantInstanceCreateFailed:
 			domain := guest.Domain
 			if domain == "" {
 				domain = nvkedemo.TenantDomainUnknown
 			}
 			row = fmt.Sprintf("[lightcoral]%-13s  instance lookup/create failed; VM observation %s[-]", role, domain)
+		case !guest.Available:
+			row = fmt.Sprintf("%-13s  VM state unobserved; provider observation unavailable", role)
+		default:
+			vm := "unobserved"
+			if guest.Domain != nvkedemo.TenantDomainUnknown {
+				vm = string(guest.Domain)
+			}
+			row = fmt.Sprintf("%-13s NICo %s Infra Ready=%s; VM %s", role, guest.InstanceState, guest.ProviderReady, vm)
+			if guest.ConsoleKnown {
+				row += fmt.Sprintf("; console %s", dashboardConsoleSize(guest.ConsoleBytes))
+			}
 		}
 		lines = append(lines, row)
 	}
-	lines = append(lines, "VM/console activity and Infra status are not Kubernetes readiness.")
+	lines = append(lines, "Kubernetes node readiness is reported separately below.")
 	nodes := "Kubernetes: registered unknown; Ready unknown (no node query yet)"
 	if s.nodesObserved {
-		nodes = fmt.Sprintf("Kubernetes: %d/2 registered · %d/2 Ready", s.registered, s.ready)
+		nodes = fmt.Sprintf("Kubernetes: %d/%d registered · %d/%d Ready", s.registered, expected, s.ready, expected)
 	}
 	lines = append(lines, nodes)
 	conditions := "NVKE: Provisioning unknown; Provisioned unknown"
@@ -819,9 +788,9 @@ func dashboardTenantSummary(s dashboardSnapshot, now time.Time) string {
 	}
 	lines = append(lines, conditions)
 	lines = append(lines, fmt.Sprintf("State unchanged: %s · last wait report: %s ago", max(time.Duration(0), now.Sub(s.tenantChangedAt)).Truncate(time.Second), max(time.Duration(0), now.Sub(s.observedAt)).Truncate(time.Second)))
-	guests := "Guest snapshot: not observed; guest progress unknown"
+	guests := "Provider/VM snapshot: not observed; guest progress unknown"
 	if !s.guestsObservedAt.IsZero() {
-		guests = fmt.Sprintf("Guest snapshot: %s old; growth ages measured at snapshot", max(time.Duration(0), now.Sub(s.guestsObservedAt)).Truncate(time.Second))
+		guests = fmt.Sprintf("Provider/VM snapshot: %s old; unknown fields remain unobserved", max(time.Duration(0), now.Sub(s.guestsObservedAt)).Truncate(time.Second))
 	}
 	lines = append(lines, guests)
 	lines = append(lines, fmt.Sprintf("Tenant budget: %s elapsed · Timeout remaining: %s (not an ETA)", (s.elapsed+max(time.Duration(0), now.Sub(s.observedAt))).Truncate(time.Second), max(time.Duration(0), s.deadline.Sub(now)).Truncate(time.Second)))
@@ -836,13 +805,6 @@ func dashboardConsoleSize(bytes int64) string {
 		return fmt.Sprintf("%d MiB", bytes/(1<<20))
 	}
 	return fmt.Sprintf("%d KiB", bytes/1024)
-}
-
-func dashboardGuestAge(age time.Duration) string {
-	if age >= 24*time.Hour {
-		return "over 24h"
-	}
-	return age.Truncate(time.Second).String()
 }
 
 func dashboardConditionLabel(condition nvkedemo.TenantConditionStatus) string {
@@ -979,8 +941,8 @@ func (d *dashboard) forceInput(event *tcell.EventKey) bool {
 func dashboardChecklist(s dashboardSnapshot, now time.Time) (string, int) {
 	var rows strings.Builder
 	checked := 0
-	write := func(label string, stage dashboardStage, required int) {
-		state, observed, started := stage.status(required)
+	write := func(label string, stage dashboardStage) {
+		state := stage.status()
 		color, marker := "goldenrod", "○"
 		detail := state
 		switch state {
@@ -989,41 +951,27 @@ func dashboardChecklist(s dashboardSnapshot, now time.Time) (string, int) {
 			color, marker = "lightgreen", "✓"
 		case "running":
 			color, marker = "lightcyan", "▶"
-			if !started.IsZero() {
-				detail = max(time.Duration(0), now.Sub(started)).Truncate(time.Second).String()
+			if !stage.started.IsZero() {
+				detail = max(time.Duration(0), now.Sub(stage.started)).Truncate(time.Second).String()
 			}
 		case "failed":
 			color, marker = "lightcoral", "✗"
 		case "stopped":
 			color, marker = "lightsalmon", "■"
 		}
-		if required == 2 && observed == 1 && state == "pending" {
-			detail = "1/2 pending"
-		} else if required == 2 && state == "running" {
-			detail = fmt.Sprintf("%d/2 · %s", observed, detail)
-		}
 		fmt.Fprintf(&rows, "[%s]%s[-] %-23s %s\n", color, marker, label, detail)
 	}
-	siteTotal := 0
 	for index, stage := range dashboardSiteStages {
-		if index == 2 && !s.siteOVN {
-			continue
-		}
-		siteTotal++
-		required := 1
-		if stage.operations[1] != "" {
-			required = 2
-		}
-		write(stage.label, s.siteStages[index], required)
+		write(stage.label, s.siteStages[index])
 	}
-	site := fmt.Sprintf("[lightcyan::b]Site stages · %d/%d checked[-::-]\n", checked, siteTotal) + rows.String()
+	site := fmt.Sprintf("[lightcyan::b]Native site stages · %d/%d checked[-::-]\n", checked, len(dashboardSiteStages)) + rows.String()
 	rows.Reset()
 	checked = 0
 	for index, label := range dashboardTenantStages {
-		write(label, s.tenantStages[index], 1)
+		write(label, s.tenantStages[index])
 	}
 	tenant := fmt.Sprintf("[lightcyan::b]Tenant stages · %d/%d checked[-::-]\n", checked, len(dashboardTenantStages)) + rows.String()
-	return site + "\n" + tenant, siteTotal + len(dashboardTenantStages) + 3
+	return site + "\n" + tenant, len(dashboardSiteStages) + len(dashboardTenantStages) + 3
 }
 
 func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
@@ -1041,7 +989,7 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 		d.activityView.SetRect(0, 3, width, content)
 		d.activityView.ScrollToBeginning()
 		d.header.SetRect(0, 0, width, min(3, height))
-		d.footer.SetText(" Recorded observations · pages advance automatically before cleanup\n q / Ctrl-C confirm cancel; owned cleanup remains mandatory")
+		d.footer.SetText(" Recorded observations · pages advance automatically\n q / Ctrl-C confirm cancel; lifetime follows the selected mode")
 		d.footer.SetRect(0, max(0, height-2), width, min(2, height))
 		d.activityView.Draw(screen)
 		d.header.Draw(screen)
@@ -1057,18 +1005,19 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 	d.stateView.SetTitle(" Observed state ")
 	d.activityView.SetWrap(false)
 	var phases strings.Builder
-	names := [...]string{"Prepare", "Artifacts", "Site", "Tenant", "Workload/DNS", "Cleanup"}
+	namedPhases := dashboardNamedPhases(s)
 	colors := map[string]string{"pending": "goldenrod", "running": "lightcyan", "observed": "lightsteelblue", "complete": "lightgreen", "failed": "lightcoral", "stopped": "lightsalmon"}
-	for index, phase := range s.phases {
+	for index, named := range namedPhases {
+		phase := named.phase
 		if width <= 90 {
-			fmt.Fprintf(&phases, "[%s::b]%s[-::-] %s", colors[phase.state], names[index], phase.state)
+			fmt.Fprintf(&phases, "[%s::b]%s[-::-] %s", colors[phase.state], named.name, phase.state)
 			if index%3 == 2 {
 				phases.WriteByte('\n')
 			} else {
 				phases.WriteString(" · ")
 			}
 		} else {
-			fmt.Fprintf(&phases, "[%s::b]%-14s[-::-] %s\n", colors[phase.state], names[index], phase.state)
+			fmt.Fprintf(&phases, "[%s::b]%-14s[-::-] %s\n", colors[phase.state], named.name, phase.state)
 		}
 	}
 	checklist, stageRows := dashboardChecklist(s, now)
@@ -1095,11 +1044,13 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 		} else {
 			state += "\nCancellation requested; waiting for work to stop and its owner to return."
 		}
+	} else if s.phases[dashboardConformancePhase].state == "running" {
+		state += "\nWorkload/DNS completed. Conformance validation is preparing artifacts/tools or executing the suite on this same tenant. Test progress and original report outcome remain pending."
 	} else {
 		state += "\n" + tview.Escape(s.tenant)
 	}
 	if !canceling && s.nodesObserved {
-		state += fmt.Sprintf("\nLast node query: %d/2 registered · %d/2 Ready", s.registered, s.ready)
+		state += fmt.Sprintf("\nLast node query: %d/%d registered · %d/%d Ready", s.registered, requestedTenantNodes(s.expectedNodes), s.ready, requestedTenantNodes(s.expectedNodes))
 	}
 	if !canceling && (s.provisioning != "" || s.provisioned != "") {
 		conditions := []string{}
@@ -1128,9 +1079,9 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 		d.stateView.SetText(dashboardTenantSummary(s, now))
 		if tenantStacked {
 			var strip strings.Builder
-			for index, name := range names {
+			for _, named := range namedPhases {
 				marker := "○"
-				switch s.phases[index].state {
+				switch named.phase.state {
 				case "complete", "observed":
 					marker = "✓"
 				case "running":
@@ -1138,7 +1089,7 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 				case "failed":
 					marker = "✗"
 				}
-				fmt.Fprintf(&strip, "[%s]%s%s[-] ", colors[s.phases[index].state], name, marker)
+				fmt.Fprintf(&strip, "[%s]%s%s[-] ", colors[named.phase.state], named.name, marker)
 			}
 			d.header.SetText(d.header.GetText(false) + "\n " + strip.String())
 		}
@@ -1204,4 +1155,39 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 	d.header.Draw(screen)
 	d.footer.Draw(screen)
 	// The event-loop owner calls Show and handles terminal failures.
+}
+
+// A site-scoped Go caller may create another tenant after natural deletion.
+// Keep the site observations, but never reuse a previous tenant's readiness or
+// suite/cleanup outcome for that fresh operation.
+func (d *dashboard) resetTenantObservation() {
+	d.tenantStages = [len(dashboardTenantStages)]dashboardStage{}
+	d.guests = [3]nvkedemo.TenantGuestObservation{}
+	d.observedAt, d.deadline, d.tenantChangedAt, d.guestsObservedAt, d.tenantActivityAt = time.Time{}, time.Time{}, time.Time{}, time.Time{}, time.Time{}
+	d.elapsed, d.registered, d.ready = 0, 0, 0
+	d.nodesObserved = false
+	d.tenantStage, d.provisioning, d.provisioned = "", "", ""
+	d.tenant = "Tenant readiness has not been observed."
+	for _, index := range []int{3, 4, 5, dashboardConformancePhase} {
+		d.phases[index] = dashboardPhase{"pending", "No operation observed for this tenant yet"}
+	}
+}
+
+type dashboardNamedPhase struct {
+	name  string
+	phase dashboardPhase
+}
+
+func dashboardNamedPhases(s dashboardSnapshot) []dashboardNamedPhase {
+	var result []dashboardNamedPhase
+	for _, phase := range []struct {
+		index int
+		name  string
+	}{{0, "Prepare"}, {1, "Artifacts"}, {2, "Site"}, {3, "Tenant"}, {4, "Workload/DNS"}, {dashboardConformancePhase, "Conformance"}, {5, "Cleanup"}} {
+		if phase.index == dashboardConformancePhase && !s.conformanceSelected {
+			continue
+		}
+		result = append(result, dashboardNamedPhase{phase.name, s.phases[phase.index]})
+	}
+	return result
 }
