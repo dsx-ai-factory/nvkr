@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -197,6 +198,7 @@ func TestToolPreparationRejectsBeforeWorkspaceWork(t *testing.T) {
 }
 
 func TestNativeToolBuildRetainsRunWithoutExtracting(t *testing.T) {
+	buildDockerFixture(t, "")
 	t.Setenv("GIT_CONFIG_COUNT", "0")
 	for _, tc := range []struct {
 		name, corrupt                                    string
@@ -293,9 +295,15 @@ func TestNativeToolBuildRetainsRunWithoutExtracting(t *testing.T) {
 				}
 			}
 			nvkr := filepath.Join(repo, "nvkr")
+			endpoint := "unix:///var/run/docker.sock"
+			if runtime.GOOS == "darwin" {
+				endpoint = "unix:///private/tmp/nvkr-build-fixture.sock"
+			}
 			writeTenantFixture(t, nvkr, []byte(fmt.Sprintf(`#!/bin/sh
 set -eu
 printf '%%s\n' "$1:$2" >> %s
+test "$DOCKER_HOST" = %s
+test -z "${DOCKER_CONTEXT-}${DOCKER_CONFIG-}"
 case "$1:$2" in
  run:plan) exit %d ;;
  run:local)
@@ -308,7 +316,7 @@ case "$1:$2" in
    if test -d %s; then cp -R %s .nvkr/native-tools/runs/fresh/packages; fi ;;
  *) exit 25 ;;
 esac
-`, operatorQuote(calls), tc.planExit, tc.runExit, tc.runExit, operatorQuote(fixture), operatorQuote(packages), operatorQuote(packages))), 0700)
+`, operatorQuote(calls), operatorQuote(endpoint), tc.planExit, tc.runExit, tc.runExit, operatorQuote(fixture), operatorQuote(packages), operatorQuote(packages))), 0700)
 			progress := &recordedProgress{}
 			cfg := ToolConfig{Repository: repo, NVKR: nvkr, Go: "/usr/bin/true", Attempt: "fresh", Jobs: 2, Out: filepath.Join(repo, "work"), Progress: progress}
 			var got string
@@ -432,6 +440,56 @@ func TestNativeToolDefinitionsMatchHostAndSiteSelections(t *testing.T) {
 			}
 			if len(expected) != 0 {
 				t.Fatal("complete selection omitted required bundles", expected)
+			}
+		})
+	}
+}
+
+func TestNativeToolsRejectDockerEndpointBeforeOutput(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("Mac build endpoint admission")
+	}
+	for _, tc := range []struct {
+		name, body string
+		timeout    bool
+		code       nvkrerr.Code
+	}{
+		{"remote", `case "$2" in show) echo fixture-selected;; inspect) echo tcp://foreign:2375;; esac`, false, nvkrerr.CodeEngineCapability},
+		{"empty", `case "$2" in show) echo fixture-selected;; inspect) exit 0;; esac`, false, nvkrerr.CodeEngineCapability},
+		{"failed", "exit 19", false, nvkrerr.CodeEngineCapability},
+		{"deadline", `case "$2" in show) echo fixture-selected;; inspect) exec /bin/sleep 30;; esac`, true, nvkrerr.CodeTimeout},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("GIT_CONFIG_COUNT", "0")
+			buildDockerFixture(t, tc.body)
+			repo := privateTestDir(t)
+			definition, environment, _, _, err := nativeToolSelection("darwin/arm64")
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, name := range []string{definition, environment} {
+				path := filepath.Join(repo, name)
+				if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+					t.Fatal(err)
+				}
+				writeTenantFixture(t, path, []byte("{}"), 0600)
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if tc.timeout {
+				ctx, cancel = context.WithTimeout(ctx, 2*time.Second)
+				defer cancel()
+			}
+			out := filepath.Join(repo, "work")
+			got, err := buildTools(ctx, ToolConfig{Repository: repo, NVKR: "/usr/bin/true", Go: "/usr/bin/true", Attempt: "fresh", Jobs: 1, Out: out}, "darwin/arm64")
+			var coded *nvkrerr.Error
+			if got != "" || !errors.As(err, &coded) || coded.Code != tc.code {
+				t.Fatalf("rejected endpoint yielded Run %q: %v", got, err)
+			}
+			for _, path := range []string{out, filepath.Join(repo, ".nvkr")} {
+				if _, err := os.Lstat(path); !os.IsNotExist(err) {
+					t.Fatalf("endpoint refusal wrote %s: %v", path, err)
+				}
 			}
 		})
 	}

@@ -117,7 +117,7 @@ func qualifyBuiltArtifacts(ctx context.Context, cfg BuildConfig) error {
 	// Compiler replay authenticates upstream pin sets through sourcegit, which
 	// needs the same bounded developer transport settings as the build. The
 	// isolated smoke owner independently removes source and registry credentials.
-	env, err := localBuildEnvironment()
+	env, err := localBuildEnvironment(ctx)
 	if err != nil {
 		return nvkrerr.Wrap(nvkrerr.CodeBuildFailed, err, "invalid local qualification source transport environment")
 	}

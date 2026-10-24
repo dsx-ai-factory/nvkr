@@ -187,7 +187,7 @@ See the upstream [sudo manual](https://raw.githubusercontent.com/sudo-project/su
 For the native Mac workflow, install:
 
 - Apple Silicon macOS, the exact Go SDK from `.go-version`, and Clang/Apple SDK.
-- Docker with Buildx reachable through `/var/run/docker.sock`, Git and jq.
+- Docker with Buildx and a selected Docker context using a local Unix socket, Git and jq.
 - Homebrew Bash, Python 3, QEMU and GNU coreutils on `PATH`, including `g`-prefixed commands.
 - A seed ISO builder on `PATH`: `cloud-localds`, `mkisofs` or `genisoimage`.
   Homebrew `cdrtools` supplies `mkisofs`. The CLI checks this prerequisite before deployment work; it does not install the tool.
