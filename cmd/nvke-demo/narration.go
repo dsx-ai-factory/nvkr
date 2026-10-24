@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"runtime"
 	"slices"
 
 	"github.com/dsx-ai-factory/nvkr/internal/nvkedemo"
@@ -25,7 +26,7 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 	if ctx == nil || out == nil {
 		return nvkrerr.New(nvkrerr.CodeUsage, "walkthrough introduction requires a context and writer")
 	}
-	definitionName, environmentName, err := nvkedemo.LocalArtifactInputsFor(cfg.Network, cfg.Conformance)
+	definitionName, environmentName, err := nvkedemo.LocalArtifactInputsFor(cfg.Network, cfg.Conformance, runtime.GOOS)
 	if err != nil {
 		return err
 	}

@@ -349,7 +349,7 @@ func buildSelectionFlags(cfg BuildConfig) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, _, err := LocalArtifactInputsFor(cfg.Network, cfg.Conformance); err != nil {
+	if _, _, err := LocalArtifactInputsFor(cfg.Network, cfg.Conformance, "linux"); err != nil {
 		return nil, err
 	}
 	if cfg.Conformance {
@@ -375,12 +375,13 @@ func buildNetworkFlags(network string) ([]string, error) {
 // artifact workflow. Guest deployment keeps its shared native KVM/HVF owner.
 // The TCG inputs remain explicit diagnostics; KVM never falls back to them.
 func LocalArtifactInputs(network string) (definition, environment string, err error) {
-	return LocalArtifactInputsFor(network, false)
+	return LocalArtifactInputsFor(network, false, "linux")
 }
 
-// LocalArtifactInputsFor adds version-matched diagnostic tools to the SAME Run
-// only when explicitly requested; ordinary demo selections stay unchanged.
-func LocalArtifactInputsFor(network string, conformance bool) (definition, environment string, err error) {
+// LocalArtifactInputsFor selects the shared product Definition and the host
+// Environment. Conformance adds version-matched diagnostic tools to the SAME Run.
+// Host architecture and execution capabilities remain admitted by the build owner.
+func LocalArtifactInputsFor(network string, conformance bool, hostOS string) (definition, environment string, err error) {
 	mode, err := normalizeNetwork(network)
 	if err != nil {
 		return "", "", err
@@ -395,7 +396,15 @@ func LocalArtifactInputsFor(network string, conformance bool) (definition, envir
 		}
 		definition = strings.TrimSuffix(definition, ".json") + "-conformance.json"
 	}
-	return definition, "inputs/environments/local-arm64-kvm.json", nil
+	switch hostOS {
+	case "linux":
+		environment = "inputs/environments/local-arm64-kvm.json"
+	case "darwin":
+		environment = "inputs/environments/local-native-mac.json"
+	default:
+		return "", "", nvkrerr.New(nvkrerr.CodeEngineCapability, "local demo input selection does not support host OS %q", hostOS)
+	}
+	return definition, environment, nil
 }
 
 func preparedBuildInvocation(cfg BuildConfig) ([]string, error) {
@@ -429,7 +438,7 @@ func preparedBuildInvocation(cfg BuildConfig) ([]string, error) {
 		return args, nil
 	}
 	definition := args[4]
-	authored, environment, err := LocalArtifactInputsFor(cfg.Network, cfg.Conformance)
+	authored, environment, err := LocalArtifactInputsFor(cfg.Network, cfg.Conformance, "linux")
 	if err != nil {
 		return nil, err
 	}

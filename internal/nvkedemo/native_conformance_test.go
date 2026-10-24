@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
+	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/testresults"
 )
 
@@ -134,18 +135,31 @@ func TestNativeConformanceRequiresCompleteOriginalCaptureAndNaturalZero(t *testi
 }
 
 func TestConformanceDefinitionSelectionIsExplicit(t *testing.T) {
-	for _, network := range []string{"ovn", "upstream-ovn"} {
-		ordinary, env, err := LocalArtifactInputs(network)
-		if err != nil {
-			t.Fatal(err)
+	for _, host := range []struct{ os, environment string }{
+		{"linux", "inputs/environments/local-arm64-kvm.json"},
+		{"darwin", "inputs/environments/local-native-mac.json"},
+	} {
+		for _, network := range []string{"ovn", "upstream-ovn"} {
+			t.Run(host.os+"/"+network, func(t *testing.T) {
+				ordinary, linuxEnv, err := LocalArtifactInputs(network)
+				if err != nil || linuxEnv != "inputs/environments/local-arm64-kvm.json" {
+					t.Fatalf("Linux wrapper changed: %s %s %v", ordinary, linuxEnv, err)
+				}
+				selectedOrdinary, env, err := LocalArtifactInputsFor(network, false, host.os)
+				if err != nil || selectedOrdinary != ordinary || env != host.environment {
+					t.Fatalf("ordinary=%s env=%s err=%v", selectedOrdinary, env, err)
+				}
+				selected, selectedEnv, err := LocalArtifactInputsFor(network, true, host.os)
+				if err != nil || selected != strings.TrimSuffix(ordinary, ".json")+"-conformance.json" || selectedEnv != host.environment {
+					t.Fatalf("selected=%s env=%s err=%v", selected, selectedEnv, err)
+				}
+			})
 		}
-		selected, selectedEnv, err := LocalArtifactInputsFor(network, true)
-		if err != nil || selected != strings.TrimSuffix(ordinary, ".json")+"-conformance.json" || env != selectedEnv {
-			t.Fatalf("selected=%s env=%s err=%v", selected, selectedEnv, err)
-		}
+		_, _, err := LocalArtifactInputsFor("kind-calico", true, host.os)
+		assertConfigUsage(t, err)
 	}
-	_, _, err := LocalArtifactInputsFor("kind-calico", true)
-	assertConfigUsage(t, err)
+	_, _, err := LocalArtifactInputsFor("ovn", false, "unsupported")
+	assertNightlyCode(t, err, nvkrerr.CodeEngineCapability)
 }
 
 func TestConformanceDefinitionsPreserveOrdinaryDeploymentOutputs(t *testing.T) {
@@ -154,7 +168,7 @@ func TestConformanceDefinitionsPreserveOrdinaryDeploymentOutputs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		selected, _, err := LocalArtifactInputsFor(network, true)
+		selected, _, err := LocalArtifactInputsFor(network, true, "linux")
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -30,11 +30,11 @@ func defaultMacBuild(cfg *BuildConfig, platform, executable string) (bool, error
 	if cfg.Prepared || cfg.QualifyLocal || cfg.QualificationPolicy != "" {
 		return false, e.New(e.CodeEngineCapability, "default Mac BUILD supports unsigned local execution")
 	}
-	definition, _, err := LocalArtifactInputsFor(cfg.Network, cfg.Conformance)
+	definition, environment, err := LocalArtifactInputsFor(cfg.Network, cfg.Conformance, "darwin")
 	if err != nil {
 		return false, err
 	}
-	cfg.Definition, cfg.Environment = definition, "inputs/environments/local-native-mac.json"
+	cfg.Definition, cfg.Environment = definition, environment
 	cfg.NVKR = filepath.Join(filepath.Dir(executable), "nvkr")
 	return true, nil
 }

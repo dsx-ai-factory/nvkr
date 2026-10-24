@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -776,7 +777,10 @@ func narrationRepository(t *testing.T) string {
 	for _, relative := range []string{
 		"inputs/definitions/demo/arm64-nvidia-local-kvm.json",
 		"inputs/definitions/demo/arm64-upstream-local-kvm.json",
+		"inputs/definitions/demo/arm64-nvidia-local-kvm-conformance.json",
+		"inputs/definitions/demo/arm64-upstream-local-kvm-conformance.json",
 		"inputs/environments/local-arm64-kvm.json",
+		"inputs/environments/local-native-mac.json",
 	} {
 		if err := os.MkdirAll(filepath.Dir(filepath.Join(repo, relative)), 0o700); err != nil {
 			t.Fatal(err)
@@ -824,7 +828,11 @@ func TestDemoNarrationFailuresBeforeExecution(t *testing.T) {
 }
 
 func TestDemoNarrationInvalidAuthoredInputsEmitNothing(t *testing.T) {
-	for _, name := range []string{"inputs/definitions/demo/arm64-nvidia-local-kvm.json", "inputs/environments/local-arm64-kvm.json"} {
+	environment := "inputs/environments/local-arm64-kvm.json"
+	if runtime.GOOS == "darwin" {
+		environment = "inputs/environments/local-native-mac.json"
+	}
+	for _, name := range []string{"inputs/definitions/demo/arm64-nvidia-local-kvm.json", environment} {
 		t.Run(name, func(t *testing.T) {
 			repo := narrationRepository(t)
 			if err := os.WriteFile(filepath.Join(repo, name), []byte(`{"unknown":"rejected"}`), 0o600); err != nil {
@@ -842,10 +850,16 @@ func TestDemoNarrationInvalidAuthoredInputsEmitNothing(t *testing.T) {
 func TestE2EWalkthroughIntroductionAdmissionAndOrder(t *testing.T) {
 	repo := narrationRepository(t)
 	for _, row := range []struct {
-		name                   string
-		invalid, outputFailure bool
+		name, network, definition                     string
+		invalid, outputFailure, conformance, explicit bool
 	}{
-		{"admitted", false, false}, {"invalid config", true, false}, {"output failure", false, true},
+		{name: "admitted", definition: "arm64-nvidia-local-kvm.json"},
+		{name: "upstream", network: "upstream-ovn", definition: "arm64-upstream-local-kvm.json"},
+		{name: "conformance", conformance: true, definition: "arm64-nvidia-local-kvm-conformance.json"},
+		{name: "upstream conformance", network: "upstream-ovn", conformance: true, definition: "arm64-upstream-local-kvm-conformance.json"},
+		{name: "explicit selection", explicit: true, definition: "arm64-upstream-local-kvm.json"},
+		{name: "invalid config", invalid: true},
+		{name: "output failure", outputFailure: true},
 	} {
 		t.Run(row.name, func(t *testing.T) {
 			var out bytes.Buffer
@@ -854,14 +868,38 @@ func TestE2EWalkthroughIntroductionAdmissionAndOrder(t *testing.T) {
 				writer = failedProgressWriter{}
 			}
 			calls := 0
-			actions := demoActions{build: func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
+			actions := demoActions{build: func(_ context.Context, cfg nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
 				calls++
 				if out.Len() == 0 {
 					t.Fatal("runtime admission preceded narration")
 				}
+				definition := filepath.Join("inputs/definitions/demo", row.definition)
+				environment := "inputs/environments/local-arm64-kvm.json"
+				if runtime.GOOS == "darwin" {
+					environment = "inputs/environments/local-native-mac.json"
+				}
+				if row.explicit {
+					if cfg.Definition != definition || cfg.Environment != "inputs/environments/local-arm64-kvm.json" || cfg.NVKR != "/explicit/nvkr" {
+						t.Fatal("explicit build selection changed", cfg)
+					}
+					definition = filepath.Join(repo, definition)
+					environment = filepath.Join(repo, cfg.Environment)
+				}
+				if !strings.Contains(out.String(), fmt.Sprintf("%q", definition)) || !strings.Contains(out.String(), fmt.Sprintf("%q", environment)) {
+					t.Fatalf("narration differs from build selection: Definition=%s Environment=%s", definition, environment)
+				}
 				return nvkedemo.BuiltInputs{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "bounded test stops before runtime")
 			}}
 			args := []string{"e2e", "--repo", repo, "--attempt", "fresh-01", "--out", filepath.Join(repo, "fresh-output"), "--walkthrough"}
+			if row.network != "" {
+				args = append(args, "--network", row.network)
+			}
+			if row.conformance {
+				args = append(args, "--conformance")
+			}
+			if row.explicit {
+				args = append(args, "--definition", filepath.Join("inputs/definitions/demo", row.definition), "--environment", "inputs/environments/local-arm64-kvm.json", "--nvkr", "/explicit/nvkr")
+			}
 			if row.invalid {
 				args = append(args, "--network", "unknown")
 			}
