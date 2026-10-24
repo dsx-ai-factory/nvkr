@@ -305,7 +305,7 @@ printf '%%s\n' "$1:$2" >> %s
 test "$DOCKER_HOST" = %s
 test -z "${DOCKER_CONTEXT-}${DOCKER_CONFIG-}"
 case "$1:$2" in
- run:plan) exit %d ;;
+ run:plan) test %d = 0 || exit %d; cat %s ;;
  run:local)
    captured=false
    for arg do if test "$arg" = --capture-inputs-root=.; then captured=true; fi; done
@@ -316,7 +316,7 @@ case "$1:$2" in
    if test -d %s; then cp -R %s .nvkr/native-tools/runs/fresh/packages; fi ;;
  *) exit 25 ;;
 esac
-`, operatorQuote(calls), operatorQuote(endpoint), tc.planExit, tc.runExit, tc.runExit, operatorQuote(fixture), operatorQuote(packages), operatorQuote(packages))), 0700)
+`, operatorQuote(calls), operatorQuote(endpoint), tc.planExit, tc.planExit, operatorQuote(filepath.Join(fixture, ".runner/plan.json")), tc.runExit, tc.runExit, operatorQuote(fixture), operatorQuote(packages), operatorQuote(packages))), 0700)
 			progress := &recordedProgress{}
 			cfg := ToolConfig{Repository: repo, NVKR: nvkr, Go: "/usr/bin/true", Attempt: "fresh", Jobs: 2, Out: filepath.Join(repo, "work"), Progress: progress}
 			var got string
@@ -369,6 +369,23 @@ esac
 			}
 			if raw, err := os.ReadFile(calls); err != nil || string(raw) != wantCalls {
 				t.Fatalf("producer order=%q, want %q: %v", raw, wantCalls, err)
+			}
+			selected := slices.IndexFunc(progress.events, func(event ProgressEvent) bool { return event.Kind == BuildPlanSelected })
+			started := slices.IndexFunc(progress.events, func(event ProgressEvent) bool {
+				return event.Kind == ProcessStarted && event.Name == "native-tools-run"
+			})
+			if tc.planExit == 0 {
+				if selected < 0 || started <= selected {
+					t.Fatal("native tools started before presenting their own selected Plan")
+				}
+				event := progress.events[selected]
+				if event.Name != "native-tools" || event.BuildPlan == nil || event.BuildGraph == nil ||
+					event.BuildPlan.PlanDigest != record.PlanDigest || event.BuildGraph.PlanDigest != record.PlanDigest ||
+					len(event.BuildPlan.Outputs) != len(plan.LifecycleOutputs) {
+					t.Fatal("native tool display inherited a different Run's Plan")
+				}
+			} else if selected >= 0 || started >= 0 {
+				t.Fatal("refused native tool admission presented or started a Run")
 			}
 			if tc.planExit != 0 {
 				if _, err := os.Stat(cfg.Out); !os.IsNotExist(err) {

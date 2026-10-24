@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/buildactivity"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/planview"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/progress"
 )
 
 const (
@@ -25,6 +28,7 @@ const (
 	TenantGuests       = "tenant-guests"
 	NativeDeployment   = "native-deployment"
 	OSBuildLogs        = "os-build-logs"
+	BuildPlanSelected  = "build-plan-selected"
 )
 
 // Guest observations describe infrastructure and console activity only. They
@@ -112,6 +116,33 @@ type ProgressEvent struct {
 	Remaining       time.Duration
 	Guests          [3]TenantGuestObservation
 	BuildLogs       buildactivity.Record
+	// Foreground-only descriptions; never expand the retained progress protocol.
+	BuildPlan  *progress.Snapshot `json:"-"`
+	BuildGraph *planview.Graph    `json:"-"`
+}
+
+// Project the selected Plan through its existing owners, never log text. A view
+// failure leaves the presenter's unknown fallback and cannot prevent execution.
+func reportBuildPlan(writer io.Writer, plan *factory.Plan, attempt, name string) {
+	if _, ok := writer.(ProgressReporter); !ok {
+		return
+	}
+	event := ProgressEvent{Kind: BuildPlanSelected, Name: name}
+	defer func() { reportProgress(writer, event) }()
+	monitor, err := factory.NewProgress(plan, attempt)
+	if err != nil {
+		return
+	}
+	document, err := planview.Inspect(plan)
+	if err != nil {
+		return
+	}
+	graph, err := document.GraphSnapshot("artifacts")
+	if err != nil {
+		return
+	}
+	snapshot := monitor.Snapshot()
+	event.BuildPlan, event.BuildGraph = &snapshot, &graph
 }
 
 // Tenant polling reports interpreted observations, not successful subprocess

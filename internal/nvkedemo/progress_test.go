@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -334,7 +335,12 @@ func TestProgressCombinedBuildOrdering(t *testing.T) {
 					ProgressEvent{Kind: ProcessExited, Name: "build-all", Status: "exited"}, phases[1])
 			}
 			want = append(want, ProgressEvent{Kind: laneLast, Name: "artifacts", Status: status})
-			if !reflect.DeepEqual(writer.events, want) {
+			selected := slices.IndexFunc(writer.events, func(event ProgressEvent) bool { return event.Kind == BuildPlanSelected })
+			if failLane == "prepare" && selected >= 0 || failLane != "prepare" && (selected < 0 || writer.events[selected].BuildPlan != nil) {
+				t.Fatal("missing fixture Plan did not preserve the presentation-only fallback")
+			}
+			boundaries := slices.DeleteFunc(slices.Clone(writer.events), func(event ProgressEvent) bool { return event.Kind == BuildPlanSelected })
+			if !reflect.DeepEqual(boundaries, want) {
 				t.Fatalf("events=%+v want=%+v", writer.events, want)
 			}
 		})

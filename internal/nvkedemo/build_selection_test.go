@@ -74,7 +74,8 @@ case "$1:$2" in
  *) exit 23 ;;
 esac
 `), 0700)
-	runner := Runner{Env: []string{"PATH=/usr/bin:/bin", "NVKE_LOCAL_CLONE=/local/nvke.git", "GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=url./local/ovn.git.insteadOf", "GIT_CONFIG_VALUE_0=https://github.com/dsx-ai-factory/ovn-kubernetes.git", "PLAN_FIXTURE=" + fixture, "CALLS=" + calls}}
+	progress := &recordedProgress{}
+	runner := Runner{Env: []string{"PATH=/usr/bin:/bin", "NVKE_LOCAL_CLONE=/local/nvke.git", "GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0=url./local/ovn.git.insteadOf", "GIT_CONFIG_VALUE_0=https://github.com/dsx-ai-factory/ovn-kubernetes.git", "PLAN_FIXTURE=" + fixture, "CALLS=" + calls}, Progress: progress}
 	cfg := BuildConfig{Repository: repo, NVKR: nvkr, Definition: "definition.json", Environment: "environment.json", AttemptPrefix: "fresh", Jobs: 2, Conformance: true}
 	if err := buildLocalArtifacts(t.Context(), runner, "", cfg); err != nil {
 		t.Fatal(err)
@@ -85,6 +86,18 @@ esac
 	}
 	if environmentValue(runner.Env, "GIT_CONFIG_COUNT") != "1" {
 		t.Fatal("planning changed the caller's environment")
+	}
+	selected := slices.IndexFunc(progress.events, func(event ProgressEvent) bool { return event.Kind == BuildPlanSelected })
+	started := slices.IndexFunc(progress.events, func(event ProgressEvent) bool { return event.Kind == ProcessStarted })
+	if selected < 0 || started <= selected {
+		t.Fatal("selected Plan was not presented before the final child started")
+	}
+	event := progress.events[selected]
+	digest, err := plan.Digest()
+	if err != nil || event.Name != "artifacts" || event.BuildPlan == nil || event.BuildGraph == nil ||
+		event.BuildPlan.PlanDigest != digest || event.BuildGraph.PlanDigest != digest ||
+		len(event.BuildPlan.Outputs) != len(plan.LifecycleOutputs) || len(event.BuildPlan.Operations) != len(plan.Graph.Nodes) {
+		t.Fatalf("selected Plan projection lost the exact owner graph: %+v; %v", event, err)
 	}
 }
 

@@ -304,6 +304,7 @@ func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg 
 			return err
 		}
 	}
+	plan, planErr := factory.LoadPlanContext(ctx, filepath.Join(cfg.Repository, ".nvkr/laptop-bootstrap", cfg.AttemptPrefix, "selected-plan.json"))
 	if cfg.QualificationPolicy != "" {
 		policy, err := lifecycle.LoadLocalQualificationPolicy(ctx, cfg.QualificationPolicy)
 		if err != nil {
@@ -312,9 +313,8 @@ func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg 
 		if policy.Platform != "linux/arm64" {
 			return nvkrerr.New(nvkrerr.CodeEngineCapability, "demo qualification policy requires linux/arm64")
 		}
-		plan, err := factory.LoadPlanContext(ctx, filepath.Join(cfg.Repository, ".nvkr/laptop-bootstrap", cfg.AttemptPrefix, "selected-plan.json"))
-		if err != nil {
-			return err
+		if planErr != nil {
+			return planErr
 		}
 		if err := policy.RequirePlan(plan); err != nil {
 			return err
@@ -341,6 +341,7 @@ func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg 
 	if !filepath.IsAbs(args[0]) {
 		args[0] = filepath.Join(cfg.Repository, args[0])
 	}
+	reportBuildPlan(runner.Progress, plan, cfg.AttemptPrefix, "artifacts")
 	return runner.Run(ctx, args, "build-all", 0)
 }
 
