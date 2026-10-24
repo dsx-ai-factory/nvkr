@@ -4,9 +4,10 @@
 
 The Go demo runs `nvkr`, `nvke-demo`, `nvkectl` and NICoSim on the execution
 host. NICoSim manages real QEMU guests from the selected local QCOW2:
-one Kubernetes site, one tenant control plane and one tenant worker for ordinary
-runs. Conformance requests two workers in the same worker pool: three tenant
-guests and four QEMU guests in total on either host.
+one Kubernetes site, one tenant control plane and, by default, one tenant worker
+for ordinary runs. `run.tenantWorkers: 2` requests two workers without selecting
+conformance. Conformance defaults to and requires two workers in the same worker
+pool: three tenant guests and four QEMU guests in total on either host.
 The permanent NVKE site stack runs in the site guest. Kind is a temporary
 bootstrap cluster, removed before tenant provisioning.
 
@@ -19,7 +20,7 @@ flowchart TD
   SIM["Host NICoSim service"]
   SITE["QEMU site: Kubernetes, NVKE, CAPI, CAPNICo,<br/>PostgreSQL, Temporal and SPIRE"]
   CP["QEMU tenant control plane"]
-  WORKER["QEMU tenant workers:<br/>one ordinary / two conformance"]
+  WORKER["QEMU tenant workers:<br/>one or two; conformance requires two"]
   CLI --> BUILD --> FILES
   CLI -->|"nvkectl bootstrap site"| KIND
   KIND -->|"bootstrap site Kubernetes"| SITE
@@ -66,9 +67,9 @@ and [remaining source-build gaps](full-nvke-source-build.md).
 Use a dedicated trusted Ubuntu ARM64 host with usable KVM and sufficient native
 storage for source builds, OCI outputs, the QCOW2 and guest overlays. The native
 workflow allocates **4 CPUs / 12 GiB to the site and 6 CPUs / 12 GiB to each
-tenant**: 36 GiB for ordinary runs or 48 GiB for conformance's four Kubernetes
-guests, before host, QEMU and Docker overhead. The
-separate temporary bootstrap backend uses four CPUs, 6 GiB RAM and a 20-GiB disk.
+tenant**: 36 GiB with one tenant worker or 48 GiB with two workers, before host,
+QEMU and Docker overhead. The separate temporary bootstrap backend uses four
+CPUs, 6 GiB RAM and a 20-GiB disk.
 Build containers and image staging need additional capacity.
 
 Native deployment checks the peak guest memory plus 4 GiB of additional
@@ -79,23 +80,28 @@ capacity check requires enough host CPUs for the largest guest, rather than
 claiming one physical CPU for every configured vCPU.
 
 An explicit demo configuration may set the shared memory profile for both
-hosts. For example, the following `run` fields select a 12-GiB site and 8 GiB
-for each tenant VM, requiring 40 GiB available for the four-guest phase including
+hosts. For example, the following `run` fields select a 12-GiB site and 6 GiB
+for each tenant VM, with one control plane and two workers but no conformance
+suite, requiring 34 GiB available for the four-guest phase including
 the declared headroom:
 
 ```yaml
 run:
+  tenantWorkers: 2
+  conformance: false
   resources:
     siteMemoryGiB: 12
-    tenantMemoryGiB: 8
+    tenantMemoryGiB: 6
     headroomMiB: 4096
 ```
 
-This is a sizing example, not a verified smaller-profile conformance result.
+This is a sizing example, not a verified smaller-profile runtime result.
 Merge it into the existing version-1 demo configuration with its required
 build/run selections. All three resource fields are required when overriding
-the defaults; guest disks, source pins, CNI resources and the requested node
-count remain unchanged.
+the defaults. `tenantWorkers` accepts only 1 or 2; omission or zero retains one
+worker ordinarily and two with conformance. Explicitly selecting one worker with
+conformance is rejected before work. Worker count changes neither the selected
+artifacts nor source pins; the ordinary 32-output Run supplies this deployment.
 
 The Linux artifact preflight checks eight CPUs, 10 GiB available RAM and 64 GiB
 free workspace. These are stage-specific advisory checks, not reserved resources
@@ -527,7 +533,7 @@ panic and provider logs must stay off the shared screen.
 
 For a full continuous demonstration, require the same fresh Run's complete
 required outputs, exact consumed bytes, a real site and every requested tenant
-node (one control plane plus one worker ordinarily, or two workers for conformance), the unchanged
+node (one control plane plus the selected one or two workers), the unchanged
 zero-retry workload/DNS result, natural tenant deletion, joined owned cleanup and
 natural exit zero. Current native cleanup success prints:
 
@@ -648,9 +654,10 @@ completed artifact/tool Runs used by the CLI. This provisional diagnostic facade
 delegates to the existing owner; it adds no NVKR lifecycle or qualification API.
 This starts the site once. `Site.CreateTenant` creates one tenant and runs
 the existing node, host cloud-init and single workload/DNS checks; its private
-kubeconfig is then available for additional Go tests. Select `Config.Conformance`
-before opening the site to request one control plane and two workers and admit
-the conformance tool outputs.
+kubeconfig is then available for additional Go tests. `Config.TenantWorkers: 2`
+requests one control plane and two workers independently of suite selection.
+Select `Config.Conformance` before opening the site to admit the conformance
+tool outputs; it requires two workers.
 
 For a combined product Run and its matching native-tools Run, the explicit
 selection is:

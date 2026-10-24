@@ -53,6 +53,7 @@ type BuildFile struct {
 
 type RunFile struct {
 	Resources      NativeResources `yaml:"resources" mapstructure:"resources"`
+	TenantWorkers  int             `yaml:"tenantWorkers" mapstructure:"tenantWorkers"`
 	Accelerator    string          `yaml:"accelerator" mapstructure:"accelerator"`
 	Cleanup        bool            `yaml:"cleanup" mapstructure:"cleanup"`
 	Walkthrough    bool            `yaml:"walkthrough" mapstructure:"walkthrough"`
@@ -210,6 +211,9 @@ func (file DemoFile) BuildConfig(progress io.Writer) (BuildConfig, error) {
 
 func (file DemoFile) runDescription(progress io.Writer) (Config, error) {
 	run := file.Run
+	if _, err := selectedNativeTenantNodes(run.TenantWorkers, run.Conformance); err != nil {
+		return Config{}, err
+	}
 	if _, err := selectedNativeResources(run.Resources); err != nil {
 		return Config{}, err
 	}
@@ -235,7 +239,7 @@ func (file DemoFile) runDescription(progress io.Writer) (Config, error) {
 	if file.Version != 1 || (run.NVKECheckout != "" && !configString(run.NVKECheckout)) || !configString(run.Out) || run.TimeoutSeconds < MinTenantTimeoutSeconds || run.TimeoutSeconds > MaxTenantTimeoutSeconds {
 		return Config{}, nvkrerr.New(nvkrerr.CodeUsage, "run requires version 1, out, valid optional nvkeCheckout and timeoutSeconds from %d to %d", MinTenantTimeoutSeconds, MaxTenantTimeoutSeconds)
 	}
-	return Config{Accelerator: run.Accelerator, Cleanup: run.Cleanup, Walkthrough: run.Walkthrough, Conformance: run.Conformance, Resources: run.Resources, Repository: run.Repo, Network: network, NVKECheckout: run.NVKECheckout, NVKR: run.NVKR, Out: run.Out, Timeout: time.Duration(run.TimeoutSeconds) * time.Second, Progress: progress,
+	return Config{Accelerator: run.Accelerator, Cleanup: run.Cleanup, Walkthrough: run.Walkthrough, Conformance: run.Conformance, TenantWorkers: run.TenantWorkers, Resources: run.Resources, Repository: run.Repo, Network: network, NVKECheckout: run.NVKECheckout, NVKR: run.NVKR, Out: run.Out, Timeout: time.Duration(run.TimeoutSeconds) * time.Second, Progress: progress,
 		Runs: RunInputs{HostTools: run.Runs.HostTools, Runtime: run.Runs.Runtime, OS: run.Runs.OS, Components: run.Runs.Components, Providers: run.Runs.Providers, Site: run.Runs.Site, Tools: run.Runs.Tools, Profiles: run.Runs.Profiles, Simulator: run.Runs.Simulator}}, nil
 }
 

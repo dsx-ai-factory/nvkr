@@ -50,20 +50,25 @@ func TestNativeCapacityChecksAggregatePhasesAndIncrementalTenants(t *testing.T) 
 		profile                       NativeResources
 		conformance, tenantOnly, fail bool
 		memory, cpu                   uint64
+		workers                       int
 	}{
-		{"ordinary forty GiB budget", NativeResources{}, false, false, false, 40 * 1024, 14000},
-		{"four guests cannot fill a 48 GiB host", NativeResources{}, true, false, true, 48 * 1024, 14000},
-		{"conformance full budget", NativeResources{}, true, false, false, 52 * 1024, 14000},
-		{"explicit shared 8 GiB tenants", NativeResources{12, 8, 4096}, true, false, false, 40 * 1024, 14000},
-		{"headroom included", NativeResources{12, 8, 4096}, true, false, true, 36 * 1024, 14000},
-		{"site already consumes memory", NativeResources{12, 8, 4096}, true, true, false, 28 * 1024, 14000},
-		{"incremental budget fell", NativeResources{12, 8, 4096}, true, true, true, 27 * 1024, 14000},
-		{"time shared guest CPUs", NativeResources{}, true, false, false, 52 * 1024, 6000},
-		{"largest guest CPU unavailable", NativeResources{}, true, false, true, 52 * 1024, 5999},
-		{"memory unobserved", NativeResources{}, true, false, true, 0, 14000},
+		{"ordinary forty GiB budget", NativeResources{}, false, false, false, 40 * 1024, 14000, 0},
+		{"four guests cannot fill a 48 GiB host", NativeResources{}, true, false, true, 48 * 1024, 14000, 0},
+		{"conformance full budget", NativeResources{}, true, false, false, 52 * 1024, 14000, 0},
+		{"explicit shared 8 GiB tenants", NativeResources{12, 8, 4096}, true, false, false, 40 * 1024, 14000, 0},
+		{"headroom included", NativeResources{12, 8, 4096}, true, false, true, 36 * 1024, 14000, 0},
+		{"site already consumes memory", NativeResources{12, 8, 4096}, true, true, false, 28 * 1024, 14000, 0},
+		{"incremental budget fell", NativeResources{12, 8, 4096}, true, true, true, 27 * 1024, 14000, 0},
+		{"time shared guest CPUs", NativeResources{}, true, false, false, 52 * 1024, 6000, 0},
+		{"largest guest CPU unavailable", NativeResources{}, true, false, true, 52 * 1024, 5999, 0},
+		{"memory unobserved", NativeResources{}, true, false, true, 0, 14000, 0},
+		{"ordinary two workers full budget", NativeResources{12, 6, 4096}, false, false, false, 34 * 1024, 6000, 2},
+		{"ordinary second worker needs memory", NativeResources{12, 6, 4096}, false, false, true, 33 * 1024, 6000, 2},
+		{"ordinary two workers incremental budget", NativeResources{12, 6, 4096}, false, true, false, 22 * 1024, 6000, 2},
+		{"ordinary incremental budget fell", NativeResources{12, 6, 4096}, false, true, true, 21 * 1024, 6000, 2},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			admission := nativeResourceAdmission{resources: tc.profile, conformance: tc.conformance, observe: func(context.Context, string) (execution.ResourceCapacity, error) {
+			admission := nativeResourceAdmission{resources: tc.profile, tenantWorkers: tc.workers, conformance: tc.conformance, observe: func(context.Context, string) (execution.ResourceCapacity, error) {
 				return execution.ResourceCapacity{CPUMillis: tc.cpu, MemoryMiB: tc.memory}, nil
 			}}
 			err := admission.check(t.Context(), t.TempDir(), tc.tenantOnly, nil)
@@ -95,7 +100,7 @@ func TestNativeCapacityCancellationDoesNotObserve(t *testing.T) {
 }
 
 func TestNativeTenantRechecksCapacityBeforeCreateOnReusedSite(t *testing.T) {
-	attempt, runner, _ := nativeSessionFixture(t, true)
+	attempt, runner, _ := nativeSessionFixture(t, true, 0)
 	observations := 0
 	admission := &nativeResourceAdmission{resources: NativeResources{12, 8, 4096}, conformance: true, observe: func(context.Context, string) (execution.ResourceCapacity, error) {
 		observations++

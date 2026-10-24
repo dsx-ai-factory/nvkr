@@ -27,20 +27,25 @@ func nativeTopologyNodes(count int) []tenantNode {
 
 func TestNativeRequestedTopologyUsesOneWorkerPool(t *testing.T) {
 	for _, subnet := range []string{"192.168.64.0/24", GuestCIDR} {
-		for _, conformance := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%s/conformance-%v", subnet, conformance), func(t *testing.T) {
+		for _, tc := range []struct {
+			workers, nodes int
+			conformance    bool
+		}{{0, 2, false}, {1, 2, false}, {2, 3, false}, {0, 3, true}, {2, 3, true}} {
+			t.Run(fmt.Sprintf("%s/workers-%d/conformance-%v", subnet, tc.workers, tc.conformance), func(t *testing.T) {
 				attempt := nativeCAPITenantFixture(t, subnet, "ovn")
-				if conformance {
+				if tc.conformance {
 					attempt.conformance = &nativeConformanceConfig{}
+				}
+				var err error
+				attempt.tenantNodes, err = selectedNativeTenantNodes(tc.workers, tc.conformance)
+				if err != nil {
+					t.Fatal(err)
 				}
 				request, err := attempt.namedTenantRequest(t.Context(), "native-demo-tenant")
 				if err != nil {
 					t.Fatal(err)
 				}
-				expected := 2
-				if conformance {
-					expected = 3
-				}
+				expected := tc.nodes
 				if request.ControlPlane.Count != 1 || len(request.NodePools) != 1 || request.NodePools[0].Count != expected-1 || request.NodePools[0].ControlPlane || request.NodePools[0].Name != "worker" || attempt.tenantNodeCount() != expected || nativeGuestLimit(&attempt) != expected+1 {
 					t.Fatalf("wrong native topology: %+v", request)
 				}

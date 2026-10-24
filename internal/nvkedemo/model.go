@@ -40,6 +40,9 @@ type Config struct {
 	Network      string
 	NVKECheckout string
 	NVKR         string
+	// TenantWorkers selects one or two workers. Zero retains the ordinary or
+	// conformance default; conformance requires two workers.
+	TenantWorkers int
 	// DemoExecutable is supplied by the CLI or native Go integration, never
 	// authored YAML or flags. Only its fixed privileged-port helper is invoked.
 	DemoExecutable string

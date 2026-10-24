@@ -1501,6 +1501,13 @@ and an unjoined outcome cannot be swallowed by a callback or lost during panic
 or test fatal exit. Controlled subprocess tests cover sequential tenants, failed
 validation retention, natural deletion and those ownership boundaries. These
 contracts do not establish a real site-reuse run or complete Mac/Linux acceptance.
+The same downstream owner accepts one or two tenant workers independently of
+suite selection through `run.tenantWorkers` or `Config.TenantWorkers`. Omission
+retains the ordinary one-worker or conformance two-worker default; conformance
+rejects an explicit one-worker selection before work. Controlled tests cover
+count propagation through capacity, tenant requests, readiness/cloud-init,
+inventory/cleanup and retained-child transport without changing artifact or
+source selection. Smaller-profile runtime acceptance remains unverified.
 
 A separate fixed site-identity helper now has one deep `pkg/nvkr/siteidentity`
 owner and a thin private Linux ARM64 build target. It reuses the upstream

@@ -16,6 +16,9 @@ import (
 // AdmitDemoDeployment checks native capabilities and the fresh output destination
 // before build, sudo prompts, artifact capture, storage, or guest creation.
 func AdmitDemoDeployment(ctx context.Context, cfg Config) error {
+	if _, err := selectedNativeTenantNodes(cfg.TenantWorkers, cfg.Conformance); err != nil {
+		return err
+	}
 	if !cfg.Cleanup && runtimeRetention(ctx) == nil {
 		if err := checkRetainedPeerCapability(ctx); err != nil {
 			return err
@@ -49,7 +52,7 @@ func AdmitDemoDeployment(ctx context.Context, cfg Config) error {
 	if err != nil {
 		return nvkrerr.Wrap(nvkrerr.CodeUsage, err, "deployment output requires a fresh destination with an existing parent")
 	}
-	capacity := nativeResourceAdmission{resources: cfg.Resources, conformance: cfg.Conformance}
+	capacity := nativeResourceAdmission{resources: cfg.Resources, tenantWorkers: cfg.TenantWorkers, conformance: cfg.Conformance}
 	if err := capacity.check(ctx, filepath.Dir(out), false, cfg.Progress); err != nil {
 		return err
 	}
@@ -131,6 +134,9 @@ func nativeDeploymentConfig(ctx context.Context, cfg Config, platform string) (N
 	if err := requireContext(ctx); err != nil {
 		return NativeConfig{}, err
 	}
+	if _, err := selectedNativeTenantNodes(cfg.TenantWorkers, cfg.Conformance); err != nil {
+		return NativeConfig{}, err
+	}
 	if _, err := selectedNativeResources(cfg.Resources); err != nil {
 		return NativeConfig{}, err
 	}
@@ -177,7 +183,7 @@ func nativeDeploymentConfig(ctx context.Context, cfg Config, platform string) (N
 	return NativeConfig{
 		Image: disk, Out: cfg.Out, Accelerator: accelerator,
 		Network: cfg.Network, DemoExecutable: cfg.DemoExecutable,
-		conformance: conformance, Resources: cfg.Resources,
+		conformance: conformance, TenantWorkers: cfg.TenantWorkers, Resources: cfg.Resources,
 		Cleanup: cfg.Cleanup, Walkthrough: cfg.Walkthrough, Progress: cfg.Progress, TenantTimeout: cfg.Timeout,
 		Assets: NativeAssetConfig{
 			OSRun: cfg.Runs.OS, ToolsRun: cfg.Runs.Tools, HostToolsRun: cfg.Runs.HostTools,

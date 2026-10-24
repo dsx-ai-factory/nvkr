@@ -101,10 +101,10 @@ func (s *NativeSite) Kubeconfig(ctx context.Context) (string, error) {
 // available for further Go tests or explicit RunConformance until Delete or
 // scope exit. Every tenant has a fresh private diagnostic directory.
 //
-// cfg.Conformance on WithNativeSite selects one control plane and two workers;
-// otherwise the existing ordinary topology has one worker. A failed creation
-// can return a handle for explicit deletion; it never authorizes a second
-// creation until deletion completes. NVKE owns tenant-name/schema validation.
+// cfg.TenantWorkers on WithNativeSite selects one or two workers independently
+// of conformance. Zero keeps one worker ordinarily or two for conformance.
+// A failed creation can return a handle for explicit deletion; it never
+// authorizes a second creation until deletion completes. NVKE owns tenant-name/schema validation.
 func (s *NativeSite) CreateTenant(ctx context.Context, name string) (*NativeTenant, error) {
 	return s.createTenant(ctx, name, "")
 }
