@@ -42,7 +42,7 @@ func TestNativeNVIDIADefinitionsAlignRenamedSourceContracts(t *testing.T) {
 			name = "conformance"
 		}
 		t.Run(name, func(t *testing.T) {
-			dpath, epath, err := LocalArtifactInputsFor("ovn", conformance)
+			dpath, epath, err := LocalArtifactInputsFor("ovn", conformance, "linux")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -145,7 +145,7 @@ func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
 		}
 	}
 	for _, conformance := range []bool{false, true} {
-		path, _, err := LocalArtifactInputsFor("ovn", conformance)
+		path, _, err := LocalArtifactInputsFor("ovn", conformance, "linux")
 		if err != nil {
 			t.Fatal(err)
 		}
