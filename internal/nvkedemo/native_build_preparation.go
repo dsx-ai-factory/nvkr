@@ -235,6 +235,8 @@ func prepareDefaultMacBuild(ctx context.Context, runner Runner, cfg *BuildConfig
 		return err
 	}
 	runner.Work = absolute
+	// Keep bootstrap bind sources inside the attempt's repository workspace.
+	runner.Env = SetEnv(runner.Env, map[string]string{"TMPDIR": runner.Work})
 	manifest := filepath.Join(root, "native-packer-files.json")
 	if err := privateJSON(filepath.Join(cfg.Repository, manifest), request); err != nil {
 		return err

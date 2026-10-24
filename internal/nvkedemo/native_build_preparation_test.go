@@ -83,7 +83,14 @@ func TestDefaultMacPreparationJoinsExistingOwnersAndCapturedInvocation(t *testin
 		write(filepath.Join(filepath.Dir(bin), "share/qemu", name), "fixture", 0600)
 	}
 	pin := "sha256:" + strings.Repeat("a", 64)
-	write(filepath.Join(bin, "bash"), "#!/bin/sh\nprintf '%s\\n' \"utility:$*\" >>\"$CALLS\"\nprintf '%s\\n' \"$UTILITY\"\n", 0700)
+	write(filepath.Join(bin, "bash"), `#!/bin/sh
+set -eu
+test "${TMPDIR:-}" = "$EXPECTED_WORK"
+test -d "$TMPDIR"
+test . -ef "$EXPECTED_REPOSITORY"
+printf '%s\n' "utility:$*" >>"$CALLS"
+printf '%s\n' "$UTILITY"
+`, 0700)
 	write(filepath.Join(bin, "jq"), `#!/bin/sh
 printf '%s\n' "projection:$*" >>"$CALLS"
 case "$*" in
@@ -114,10 +121,14 @@ case "$1:$2" in
 esac
 `, 0700)
 	calls := filepath.Join(repo, "calls")
-	runner := Runner{Env: append(probeEnv, "PLUGIN="+plugin, "CALLS="+calls, "PLAN="+planPath, "UTILITY="+pin)}
+	work := filepath.Join(repo, ".nvkr/mac-build/first")
+	runner := Runner{Env: append(probeEnv, "PLUGIN="+plugin, "CALLS="+calls, "PLAN="+planPath, "UTILITY="+pin, "EXPECTED_WORK="+work, "EXPECTED_REPOSITORY="+repo)}
 	cfg := BuildConfig{Repository: repo, Definition: "inputs/definitions/demo/arm64-nvidia-local-kvm.json", Environment: "inputs/environments/local-native-mac.json", NVKR: nvkr, AttemptPrefix: "first", Jobs: 2}
 	if err := prepareDefaultMacBuild(t.Context(), runner, &cfg); err != nil {
 		t.Fatal(err)
+	}
+	if info, err := os.Stat(work); err != nil || !info.IsDir() || info.Mode().Perm() != 0700 {
+		t.Fatalf("temporary storage must remain in the private attempt workspace: %v, %v", info, err)
 	}
 	if cfg.Definition != ".nvkr/mac-build/first/definition.json" || cfg.Environment != ".nvkr/mac-build/first/packer-inputs/environment.json" {
 		t.Fatalf("prepared invocation selection: %+v", cfg)
