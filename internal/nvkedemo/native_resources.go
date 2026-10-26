@@ -18,9 +18,9 @@ import (
 // headroom. It changes neither selected artifact bytes nor their build identity.
 // Zero selects the existing shared defaults; an override must be complete.
 type NativeResources struct {
-	SiteMemoryGiB   int `yaml:"siteMemoryGiB" mapstructure:"siteMemoryGiB"`
-	TenantMemoryGiB int `yaml:"tenantMemoryGiB" mapstructure:"tenantMemoryGiB"`
-	HeadroomMiB     int `yaml:"headroomMiB" mapstructure:"headroomMiB"`
+	SiteMemoryGiB   int `yaml:"siteMemoryGiB"`
+	TenantMemoryGiB int `yaml:"tenantMemoryGiB"`
+	HeadroomMiB     int `yaml:"headroomMiB"`
 }
 
 func selectedNativeResources(value NativeResources) (NativeResources, error) {

@@ -1611,7 +1611,7 @@ lifetime, matching NVKE's local E2E CA convention. The real certificate regressi
 verifies trust after 48 hours and rejects expiry; it does not prove live SPIRE
 renewal or full retained runtime acceptance. Existing retained roots are unchanged,
 and automatic upstream-root renewal remains unavailable.
-Cobra/Viper configuration supplies descriptions, not receipts.
+Cobra flags and typed YAML configuration supply descriptions, not receipts.
 The combined build reuses bootstrap executables and the measured toolchain;
 catalog substitutions retain their own exact predecessor binding. `--jobs`
 bounds concurrent ready producer and packaging operations in the existing

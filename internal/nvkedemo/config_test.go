@@ -161,7 +161,7 @@ func TestDemoCleanupRequiresStrictBoolean(t *testing.T) {
 	for _, test := range []struct {
 		value          string
 		valid, cleanup bool
-	}{{"false", true, false}, {"true", true, true}, {"'true'", false, false}, {"1", false, false}, {"null", false, false}, {"[]", false, false}} {
+	}{{"false", true, false}, {"true", true, true}, {"'true'", false, false}, {"yes", false, false}, {"on", false, false}, {"1", false, false}, {"null", false, false}, {"[]", false, false}} {
 		t.Run(test.value, func(t *testing.T) {
 			contents := strings.Replace(fullDemoYAML, "run:\n", "run:\n  cleanup: "+test.value+"\n", 1)
 			file, err := LoadDemoFile(t.Context(), demoConfigPath(t, contents))
