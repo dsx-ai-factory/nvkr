@@ -318,7 +318,8 @@ jobs:
   tests:
     needs: [check-paths]
     if: needs.check-paths.outputs.code == 'true'
-    runs-on: ubuntu-latest
+    # Disk-backed /tmp and GNU coreutils are ordinary-suite prerequisites.
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     strategy:
       # Keep every shard's diagnostics when another fails. The aggregate gate
