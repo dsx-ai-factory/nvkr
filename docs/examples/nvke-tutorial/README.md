@@ -6,9 +6,12 @@ The commands select the input file automatically for your processor architecture
 
 | File | Platform |
 |---|---|
-| `definition-amd64.yaml` | Intel Macs and AMD64 Linux; produces Linux AMD64 artifacts. |
+| `definition-amd64.yaml` | AMD64 Linux; produces Linux AMD64 artifacts. |
 | `definition-arm64.yaml` | Apple Silicon and ARM64 Linux; produces Linux ARM64 artifacts. |
 | `environment-local-amd64.yaml`, `environment-local-arm64.yaml` | Matching native utility execution, with publication disabled unless explicitly requested. |
+
+Native artifact builds have been exercised on Apple Silicon macOS and Ubuntu ARM64/AMD64.
+Intel Mac input selection and SDK checksums are present, but native Intel Mac execution remains unverified.
 
 Both selections use the existing NVKE producers and source pins from
 [`inputs/catalogs/nvke/release`](../../../inputs/catalogs/nvke/release). The ARM64 selection uses the
@@ -19,12 +22,13 @@ checkout are required. The host NVKR CLI runs directly on macOS or Linux; Docker
 ## Preview the native build
 
 From an NVKR checkout, copy this block to build the CLI and preview the selected work.
-You need Git, Go 1.21 or later and network access; Docker and Make are not required.
+You need Git, the Go version in `.go-version` and network access; Docker and Make are not required.
+Compiler installation is separate from this preview; automatic compiler downloads stay disabled.
 
 ```sh
 (
   set -eu
-  export GOTOOLCHAIN="go$(cat .go-version)"
+  export GOTOOLCHAIN=local
   NVKR_VERSION="$(git describe --tags --always --dirty)"
   NVKR_COMMIT="$(git rev-parse --short HEAD)"
   go build -ldflags "-X main.version=$NVKR_VERSION -X main.commit=$NVKR_COMMIT" -o bin/nvkr ./cmd/nvkr
@@ -55,7 +59,7 @@ This three-output Definition retains a smaller unsigned development example for 
 Its [historical hosted run](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md)
 passed real signing, complete Run finalization and independent consumption in a personal namespace.
 That record predates the current schema, tool pins, Helm binding and namespace; it does not validate
-a hosted run of these updated inputs.
+a hosted run of these updated inputs. A complete publication using this source chart remains unexercised.
 
 | File | Purpose |
 |---|---|
@@ -68,9 +72,27 @@ a hosted run of these updated inputs.
 
 ## Inspect and run
 
-Build `bin/nvkr` using the [quickstart](../../quickstart.md#build-the-artifacts), then run
+Build `bin/nvkr` using [CLI setup](../../quickstart.md#build-only-the-cli), then run
 these commands from the repository root. The [quickstart](../../quickstart.md#before-you-start)
-owns the platform and Docker prerequisites.
+owns the platform and Docker prerequisites. Local Runs compile a helper and still need the pinned Go compiler.
+For another native three-output build, rerun `bash scripts/nvkr-quickstart.sh`; it automatically reuses its local SDK.
+
+If the launcher installed your only Go compiler, activate that SDK before custom commands in this terminal:
+
+```sh
+case "$(uname -s)/$(uname -m)" in
+  Darwin/arm64) NVKR_SDK_PLATFORM=darwin-arm64 ;;
+  Darwin/x86_64) NVKR_SDK_PLATFORM=darwin-amd64 ;;
+  Linux/aarch64|Linux/arm64) NVKR_SDK_PLATFORM=linux-arm64 ;;
+  Linux/x86_64|Linux/amd64) NVKR_SDK_PLATFORM=linux-amd64 ;;
+  *) echo 'Unsupported quickstart SDK platform'; false ;;
+esac &&
+export PATH="$PWD/.nvkr/quickstart-sdk/go$(cat .go-version).$NVKR_SDK_PLATFORM/go/bin:$PATH" &&
+export GOTOOLCHAIN=local
+```
+
+This changes only the current terminal, without modifying a shell profile. With an existing matching Go,
+set `GOTOOLCHAIN=local` and keep that compiler on `PATH`.
 
 ```sh
 bin/nvkr definition validate --definition docs/examples/nvke-tutorial/definition.yaml

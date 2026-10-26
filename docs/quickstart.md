@@ -5,24 +5,25 @@
 Build NVKR from source, then use it to build the NVKE CLI, controller container image and Helm chart.
 All three artifacts and their dependency SBOMs stay on your machine.
 
-**NVKR runs on macOS or Linux. The NVKE CLI and container image produced here target Linux.**
-The commands select ARM64 on Apple Silicon and ARM64 Linux, or AMD64 on Intel Macs and AMD64 Linux.
+**NVKR runs on Apple Silicon macOS or Linux. The NVKE CLI and container image produced here target Linux.**
+The commands select ARM64 on Apple Silicon and ARM64 Linux, or AMD64 on AMD64 Linux.
 
 ## Before you start
 
 You need:
 
-- Git 2.38 or later and Bash. Go is required to compile NVKR; if it is missing, the launcher asks before installing it locally.
-- Docker Desktop running on macOS, or Docker running on Linux, accessible to your user.
+- Git 2.38 or later already installed, and Bash. The launcher offers the required Go compiler if it is missing or differs from the checkout’s version. Local Runs also use it to compile their execution helper.
+- Docker Desktop running on macOS, or Docker running on Linux, accessible to your user. The Linux Docker host must support unprivileged overlayfs (kernel 5.11 or later, or an Ubuntu kernel) for the controller’s rootless BuildKit build; on macOS this is the Docker backend’s Linux kernel.
 - Internet access to download source code, compilers, container images and packages.
 
 ## Build the artifacts
 
 Open a terminal in a directory that does not already contain an `nvkr` folder, then copy this whole block.
 The launcher checks Docker, compiles NVKR from this checkout and builds all three NVKE artifacts.
-It checks prerequisites before building. If Go is missing, it offers a verified installation inside this checkout;
-confirm with `y` to install and continue. No Make or host Python is required. Supported Git/Docker package installs
-are also shown for approval; Docker must be running and accessible to your user before the build can start.
+It checks prerequisites before building. If the required Go compiler is missing, it offers a verified installation
+inside this checkout; confirm with `y` to install and continue. It reuses a matching compiler without a download.
+No Make or host Python is required. Supported Docker package installs are shown for approval; Git must already
+be installed for the clone command, and Docker must be running and accessible before the build can start.
 The launcher runs in a child shell. A failed command returns an error without changing your SSH shell settings.
 
 ```sh
@@ -58,6 +59,30 @@ Open the build directory printed at the end. These paths are relative to that di
 | `lifecycle.json` | Build status and artifact digests. |
 
 Keep the build directory together. This local build is unsigned; deployment and qualification are separate steps.
+
+## Build only the CLI
+
+For planning, pipeline generation or release inspection, build NVKR without running NVKE producers.
+From an existing checkout, use an installed Go compiler matching `.go-version` and copy this block.
+Docker, Make and Python are not required; Go may download module dependencies.
+
+```sh
+(
+  set -eu
+  export GOTOOLCHAIN=local
+  test "$(go env GOVERSION)" = "go$(cat .go-version)" || {
+    echo 'Install the Go version in .go-version, or use the guided artifact build above.' >&2
+    exit 1
+  }
+  NVKR_VERSION="$(git describe --tags --always --dirty)"
+  NVKR_COMMIT="$(git rev-parse --short HEAD)"
+  go build -ldflags "-X main.version=$NVKR_VERSION -X main.commit=$NVKR_COMMIT" -o bin/nvkr ./cmd/nvkr
+  bin/nvkr --version
+)
+```
+
+This preserves the Makefile’s version and commit stamps. Use `bin/nvkr` from this checkout.
+The guided build’s local SDK downloader requires Docker; this CLI-only route assumes Go is already installed.
 
 ## Next steps
 

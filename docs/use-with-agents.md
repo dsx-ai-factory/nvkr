@@ -60,7 +60,7 @@ evidence limits. Do not deploy the NVKE demo or publish anything.
 
 The [quickstart](quickstart.md#before-you-start) owns the prerequisites, platform limits and commands.
 This example needs Git, Bash and Go, plus Docker Desktop on macOS or Docker on Linux.
-If Go is missing, the launcher offers a verified installation inside the checkout; Make is not required.
+If the pinned Go compiler is missing, the launcher offers a verified installation inside the checkout; Make is not required.
 The launcher checks prerequisites before starting.
 It downloads pinned inputs and retains
 all three selected outputs locally. The build is unsigned and unqualified.

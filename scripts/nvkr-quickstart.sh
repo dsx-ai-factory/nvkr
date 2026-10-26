@@ -60,7 +60,11 @@ case "$(uname -m)" in
   aarch64|arm64) arch=arm64 ;;
   *) echo 'The quickstart supports AMD64 and ARM64 processors.' >&2; exit 1 ;;
 esac
-if ! command -v git >/dev/null; then install_package git; fi
+command -v git >/dev/null || { echo 'Install Git 2.38 or later before running the quickstart.' >&2; exit 1; }
+git ls-files --format='%(path)' -- . >/dev/null || {
+  echo 'The quickstart requires Git 2.38 or later in an NVKR checkout.' >&2
+  exit 1
+}
 if ! command -v docker >/dev/null; then install_package docker.io; fi
 if ! docker info >/dev/null; then
   echo 'Docker is not ready. Start Docker and grant your user daemon access, then rerun.' >&2
@@ -71,13 +75,12 @@ sdk="${repo_root}/.nvkr/quickstart-sdk/go${go_version}.${host_os}-${arch}"
 if [[ -x "${sdk}/go/bin/go" ]]; then
   export PATH="${sdk}/go/bin:$PATH"
 fi
-GOTOOLCHAIN="go${go_version}"
-export GOTOOLCHAIN
+# Never let a version probe or build install a compiler before consent.
+export GOTOOLCHAIN=local
 need_sdk=1
 if command -v go >/dev/null; then
   if actual="$(go env GOVERSION)" && [[ "${actual}" == "go${go_version}" ]]; then need_sdk=0; fi
 fi
-if [[ "${install_go}" == 1 && ! -x "${sdk}/go/bin/go" ]]; then need_sdk=1; fi
 if [[ "${need_sdk}" == 1 ]]; then
   printf 'Proposed Go installation: Go %s inside %s (no sudo or shell-profile changes).\n' "${go_version}" "${sdk}" >&2
   if [[ "${install_go}" != 1 ]]; then confirm 'Download, verify and install this Go SDK?' || exit 1; fi

@@ -22,11 +22,11 @@ NVKR owns the build and release workflow that supplies their artifacts.
 ## Build your first artifact
 
 Build the NVKE CLI, controller container image and Helm chart locally, with dependency SBOMs.
-You need **Git 2.38 or later, Bash and running Docker**. Go is required; the launcher asks before installing it locally if missing. No Make or host Python is required.
+You need **Git 2.38 or later, Bash and running Docker**. The pinned Go compiler is required; the launcher asks before installing it locally if needed. No Make or host Python is required.
 Use Docker Desktop on macOS, or Docker on Linux.
 NVKR runs on your host; the NVKE CLI and image it builds target Linux.
 The launcher checks prerequisites, selects the required Go compiler and builds NVKR from source for your CPU architecture.
-It shows supported missing-tool installation actions for approval before proceeding.
+Git must already be installed. Supported Docker installation actions and local Go setup are shown for approval before proceeding.
 
 Open a terminal in a directory without an existing `nvkr` folder and copy the whole block:
 

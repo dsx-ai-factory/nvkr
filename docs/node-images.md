@@ -71,7 +71,7 @@ NVKR provides the checked handoff; the source-owned build defines how those form
 
 ## Inspect without starting a VM
 
-After [building the CLI](quickstart.md), run from the repository root. These commands need no Docker,
+After [building the CLI](quickstart.md#build-only-the-cli), run from the repository root. These commands need no Docker,
 KVM or Packer execution:
 
 ```sh

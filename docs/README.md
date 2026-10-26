@@ -12,6 +12,7 @@ The [34-concept reference](user-concepts.md) explains the vocabulary and connect
 |---|---|
 | Ask an AI agent to acquire the CLI, author inputs, and operate NVKR | [Use NVKR with Your AI Agent](use-with-agents.md), [operator skill](../.agents/skills/nvkr-operator/SKILL.md) |
 | Understand NVKR and try my first local artifact | [Quickstart](quickstart.md) |
+| Build only the CLI for planning and inspection | [CLI setup](quickstart.md#build-only-the-cli) |
 | Present catalog → build → publication → NVKE through the Go CLIs | [Runnable commands](nvkr-demo.md) |
 | Start local Linux ARM64 NVKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../inputs/definitions/demo/README.md) |
 | Build and run the native Ubuntu ARM64 or Mac demo | [Shared build-and-demo guide and validation limits](local-nvke-demo.md) |
