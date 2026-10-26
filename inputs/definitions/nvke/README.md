@@ -22,9 +22,9 @@ Each Environment selects `githubBundle: nvke-<family>`, the corresponding
 `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/<family>`. Its Release publishes by digest beneath that prefix's
 `releases` repository. Source-access and disk settings are scoped to the family's selected producers.
 All four families retain the maintained production registry policy: `NVKR_REGISTRY_WRITE` handles
-publication, while private native toolchain preparation uses `NVKR_REGISTRY_READ` with
-`NVKR_REGISTRY_READ_USER`. These credentials require the same operator provisioning as the combined
-candidate; generation does not verify package access.
+publication, and `NVKR_REGISTRY_READ` with `NVKR_REGISTRY_READ_USER` handles publication verification.
+Only the disks family also uses that reader for private native toolchain preparation. These credentials
+require the same operator provisioning as the combined candidate; generation does not verify package access.
 
 From the repository root:
 
