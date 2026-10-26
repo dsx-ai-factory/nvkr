@@ -1535,8 +1535,9 @@ noncanonical, nonlocal and unfinished-commit records are refused. Disk selection
 subsequent asset preparation retain separate replay boundaries. The owner checks every
 frozen Run binding; delivery payload acceptance remains separate. Controlled captured-input,
 selection and payload-substitution fixtures cover these boundaries, not a fresh native
-build/deployment. After deployment and before temporary
-bootstrap teardown, it imports
+build/deployment. Source host-policy decoding is local and uses the existing
+strict YAML admission; CRD schema validation remains at the server create.
+After deployment and before temporary bootstrap teardown, it imports
 the original host policy without replacement, checks the controller/CSI context,
 permanent registration, derived TPM allowlist, new TPM agent and renewed
 same-boot host certificate, then issues its private completion receipt. Joined

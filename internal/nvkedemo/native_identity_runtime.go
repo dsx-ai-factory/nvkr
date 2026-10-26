@@ -534,11 +534,7 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 		return nil, err
 	}
 	defer original.Close()
-	decoded, err := k.capture(ctx, "source-policy", 15*time.Second, original, "create", "--dry-run=client", "-f", "-", "-o", "json")
-	if err != nil {
-		return nil, err
-	}
-	source, spec, err := nativeSourceStaticEntry(decoded, prepared.TPM)
+	source, spec, err := nativeSourceStaticEntry(sourceRaw, prepared.TPM)
 	if err != nil {
 		return nil, err
 	}

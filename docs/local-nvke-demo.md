@@ -66,7 +66,7 @@ and [remaining source-build gaps](full-nvke-source-build.md).
 
 Use a dedicated trusted Ubuntu ARM64 host with usable KVM and sufficient native
 storage for source builds, OCI outputs, the QCOW2 and guest overlays. The native
-workflow allocates **4 CPUs / 12 GiB to the site and 6 CPUs / 12 GiB to each
+workflow allocates **6 CPUs / 12 GiB to the site and 6 CPUs / 12 GiB to each
 tenant**: 36 GiB with one tenant worker or 48 GiB with two workers, before host,
 QEMU and Docker overhead. The separate temporary bootstrap backend uses four
 CPUs, 6 GiB RAM and a 20-GiB disk.

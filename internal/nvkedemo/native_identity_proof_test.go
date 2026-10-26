@@ -17,12 +17,13 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/siteidentity"
+	"go.yaml.in/yaml/v3"
 )
 
 func nativeIdentityProofFixture(t *testing.T) (nativeStaticEntry, nativeStaticEntrySpec, nativeIdentityObservation, nativeIdentityObservation, siteidentity.Result, time.Time, string) {
 	t.Helper()
 	tpm := strings.Repeat("a", 64)
-	raw := []byte(`{"kind":"ClusterStaticEntry","metadata":{"name":"host-fixture","labels":{"nvke.nvidia.com/managed-by":"machine-spire-entry-controller"}},"spec":{"className":"fixture-class","parentID":"spiffe://site.example.test/spire/agent/tpm/` + tpm + `","spiffeID":"spiffe://site.example.test/host/fixture","selectors":["unix:uid:0"],"x509SVIDTTL":"0s"}}`)
+	raw := []byte(`{"apiVersion":"spire.spiffe.io/v1alpha1","kind":"ClusterStaticEntry","metadata":{"name":"host-fixture","labels":{"nvke.nvidia.com/managed-by":"machine-spire-entry-controller"}},"spec":{"className":"fixture-class","parentID":"spiffe://site.example.test/spire/agent/tpm/` + tpm + `","spiffeID":"spiffe://site.example.test/host/fixture","selectors":["unix:uid:0"],"x509SVIDTTL":"0s"}}`)
 	source, spec, err := nativeSourceStaticEntry(raw, tpm)
 	if err != nil {
 		t.Fatal(err)
@@ -40,6 +41,47 @@ func nativeIdentityProofFixture(t *testing.T) (nativeStaticEntry, nativeStaticEn
 	after := nativeIdentityObservation{entries: []nativeStaticEntry{actual}, allowlist: map[string]string{tpm: "nvke.nvidia.com/managed-by=machine-spire-entry-controller"}, agents: nativeSpireAgents{Agents: []nativeSpireAgent{agent}}, registrations: nativeSpireRegistrations{Entries: []nativeSpireRegistration{registration}}}
 	result := siteidentity.Result{SchemaVersion: siteidentity.SchemaVersion, Completion: siteidentity.JoinedSuccess, Operation: "handoff", Reconfiguration: "applied", Status: &siteidentity.AgentStatus{ConfigApplied: true, HasValidSVID: true, SPIFFEID: spec.SPIFFEID, ExpiresAt: now.Add(time.Hour).Unix()}, Before: siteidentity.PeerProof{PeerID: spec.SPIFFEID, Serial: "abc", BootID: "fixture-boot"}, After: &siteidentity.PeerProof{PeerID: spec.SPIFFEID, Serial: "def", BootID: "fixture-boot", NotBefore: now.Add(-10 * time.Second), NotAfter: now.Add(time.Hour)}}
 	return source, spec, nativeIdentityObservation{}, after, result, now, tpm
+}
+
+func TestNativeIdentitySourceDocumentAdmission(t *testing.T) {
+	source, expected, _, _, _, _, tpm := nativeIdentityProofFixture(t)
+	encoded, err := json.Marshal(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var entry map[string]any
+	if err := json.Unmarshal(encoded, &entry); err != nil {
+		t.Fatal(err)
+	}
+	list := map[string]any{"apiVersion": "v1", "kind": "List", "items": []any{entry}}
+	raw, err := yaml.Marshal(list)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name  string
+		raw   []byte
+		valid bool
+	}{
+		{"source YAML List", raw, true},
+		{"source JSON entry", encoded, true},
+		{"additional document", append(append([]byte{}, raw...), []byte("---\napiVersion: v1\nkind: List\nitems: []\n")...), false},
+		{"duplicate key", append(append([]byte{}, raw...), []byte("apiVersion: v1\n")...), false},
+		{"alias", []byte("apiVersion: v1\nkind: List\nitems: &entries []\ncopy: *entries\n"), false},
+		{"wrong List version", []byte(strings.Replace(string(raw), "apiVersion: v1\n", "apiVersion: v2\n", 1)), false},
+		{"wrong CSE version", []byte(strings.Replace(string(encoded), "spire.spiffe.io/v1alpha1", "spire.spiffe.io/v1alpha2", 1)), false},
+		{"missing CSE version", []byte(strings.Replace(string(encoded), `"apiVersion":"spire.spiffe.io/v1alpha1",`, "", 1)), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, spec, err := nativeSourceStaticEntry(tc.raw, tpm)
+			if (err == nil) != tc.valid {
+				t.Fatalf("source document admission: %v", err)
+			}
+			if tc.valid && (got.Metadata.Name != source.Metadata.Name || spec.SPIFFEID != expected.SPIFFEID || spec.ParentID != expected.ParentID) {
+				t.Fatal("source description changed the host identity")
+			}
+		})
+	}
 }
 func TestNativeIdentitySPIREAgentJSONUsesSourceFieldNames(t *testing.T) {
 	for _, tc := range []struct{ name, serial, expiry string }{
@@ -274,6 +316,7 @@ func TestNativeIdentityCreatedEntryBindsExactSourceAndServerUID(t *testing.T) {
 		{name: "exact server-created source"},
 		{"no server UID", func(v *nativeStaticEntry) { v.Metadata.UID = "" }, true},
 		{"wrong name", func(v *nativeStaticEntry) { v.Metadata.Name = "other-fixture" }, true},
+		{"wrong API version", func(v *nativeStaticEntry) { v.APIVersion = "spire.spiffe.io/v1alpha2" }, true},
 		{"changed source spec", func(v *nativeStaticEntry) { v.Spec = []byte(`{"className":"changed-fixture"}`) }, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

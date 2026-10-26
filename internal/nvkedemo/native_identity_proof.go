@@ -16,10 +16,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/documentpath"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/siteidentity"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
+	"sigs.k8s.io/yaml"
 )
 
 type nativeSiteIdentityFailure struct{ cause error }
@@ -30,8 +32,9 @@ func (e *nativeSiteIdentityFailure) Error() string {
 func (e *nativeSiteIdentityFailure) Unwrap() error { return e.cause }
 
 type nativeStaticEntry struct {
-	Kind     string
-	Metadata struct {
+	APIVersion string `json:"apiVersion"`
+	Kind       string
+	Metadata   struct {
 		Name, UID string
 		Labels    map[string]string
 	}
@@ -95,6 +98,18 @@ func nativeIdentityJSON(raw []byte, out any) error {
 	return dec.Decode(out)
 }
 func nativeSourceStaticEntry(raw []byte, tpm string) (nativeStaticEntry, nativeStaticEntrySpec, error) {
+	if len(raw) > 1<<20 {
+		return nativeStaticEntry{}, nativeStaticEntrySpec{}, errors.New("source host policy exceeds its byte bound")
+	}
+	// Describe the source export locally. Server-side CRD validation remains at
+	// the later exactly-once create, after the live identity context is checked.
+	if _, err := documentpath.Decode(raw); err != nil {
+		return nativeStaticEntry{}, nativeStaticEntrySpec{}, fmt.Errorf("decode source host policy document: %w", err)
+	}
+	raw, err := yaml.YAMLToJSONStrict(raw)
+	if err != nil {
+		return nativeStaticEntry{}, nativeStaticEntrySpec{}, fmt.Errorf("convert source host policy document: %w", err)
+	}
 	var object struct {
 		nativeStaticEntry
 		Items []nativeStaticEntry
@@ -104,13 +119,13 @@ func nativeSourceStaticEntry(raw []byte, tpm string) (nativeStaticEntry, nativeS
 	}
 	entry := object.nativeStaticEntry
 	if object.Kind == "List" {
-		if len(object.Items) != 1 {
+		if object.APIVersion != "v1" || len(object.Items) != 1 {
 			return entry, nativeStaticEntrySpec{}, errors.New("source export requires exactly one site host policy")
 		}
 		entry = object.Items[0]
 	}
 	var spec nativeStaticEntrySpec
-	if entry.Kind != "ClusterStaticEntry" || entry.Metadata.Name == "" {
+	if entry.APIVersion != "spire.spiffe.io/v1alpha1" || entry.Kind != "ClusterStaticEntry" || entry.Metadata.Name == "" {
 		return entry, spec, errors.New("source export is not a named host ClusterStaticEntry")
 	}
 	if err := nativeIdentityJSON(entry.Spec, &spec); err != nil {

@@ -229,7 +229,7 @@ instance_types:
 			}
 			items := expected["instance_types"].([]any)
 			site := items[0].(map[string]any)
-			site["name"], site["cpu_count"], site["memory_gib"] = "native-site-cpu4-mem12gb-disk60gb", 4, 12
+			site["name"], site["memory_gib"] = "native-site-cpu6-mem12gb-disk60gb", 12
 			tenant := items[1].(map[string]any)
 			tenant["name"], tenant["cpu_count"], tenant["memory_gib"] = "cpu6-mem12gb-disk60gb", 6, 12
 			if !reflect.DeepEqual(actual, expected) {

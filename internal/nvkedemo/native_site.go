@@ -200,7 +200,7 @@ func nativeSiteSeed(ctx context.Context, source, out string, resources NativeRes
 	}
 	// Change only runtime sizing after both selected source rows are admitted.
 	// Source artifacts remain untouched, and tenant CNI requests remain intact.
-	site["name"], site["cpu_count"], site["memory_gib"] = fmt.Sprintf("native-site-cpu4-mem%dgb-disk60gb", resources.SiteMemoryGiB), 4, resources.SiteMemoryGiB
+	site["name"], site["memory_gib"] = fmt.Sprintf("native-site-cpu%d-mem%dgb-disk60gb", site["cpu_count"], resources.SiteMemoryGiB), resources.SiteMemoryGiB
 	tenant["name"], tenant["cpu_count"], tenant["memory_gib"] = fmt.Sprintf("cpu%d-mem%dgb-disk60gb", tenantDemoVCPUs, resources.TenantMemoryGiB), tenantDemoVCPUs, resources.TenantMemoryGiB
 	raw, err = yaml.Marshal(doc)
 	if err != nil {

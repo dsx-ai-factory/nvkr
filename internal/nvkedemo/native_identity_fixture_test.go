@@ -14,6 +14,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/siteidentity"
+	"go.yaml.in/yaml/v3"
 )
 
 // The fixture supplies only source/CLI observations. The production handoff
@@ -28,7 +29,7 @@ func installNativeIdentityFixture(t *testing.T, attempt *nativeSiteAttempt, tool
 	if err := json.Unmarshal(source.Spec, &spec); err != nil {
 		t.Fatal(err)
 	}
-	sourceRaw, err := json.Marshal(map[string]any{"apiVersion": "spire.spiffe.io/v1alpha1", "kind": "ClusterStaticEntry", "metadata": map[string]any{"name": source.Metadata.Name, "labels": source.Metadata.Labels}, "spec": spec})
+	sourceRaw, err := yaml.Marshal(map[string]any{"apiVersion": "v1", "kind": "List", "items": []any{map[string]any{"apiVersion": "spire.spiffe.io/v1alpha1", "kind": "ClusterStaticEntry", "metadata": map[string]any{"name": source.Metadata.Name, "labels": source.Metadata.Labels}, "spec": spec}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +58,6 @@ func installNativeIdentityFixture(t *testing.T, attempt *nativeSiteAttempt, tool
 		writeTenantFixture(t, filepath.Join(root, name), raw, 0600)
 	}
 	writeTenantFixture(t, filepath.Join(root, "clusterstaticentries.yaml"), sourceRaw, 0600)
-	writeTenantFixture(t, filepath.Join(root, "identity-source.json"), sourceRaw, 0600)
 	writeJSON("identity-created.json", after.entries[0])
 	for name, value := range map[string]any{"identity-entries-empty.json": map[string]any{"items": []any{}}, "identity-entries.json": map[string]any{"items": after.entries}, "identity-agents-empty.json": nativeSpireAgents{}, "identity-agents.json": after.agents, "identity-registrations-empty.json": nativeSpireRegistrations{}, "identity-registrations.json": after.registrations, "identity-map-empty.json": map[string]any{"data": map[string]string{}}, "identity-map.json": map[string]any{"data": after.allowlist}, "identity-probe.json": probe, "identity-result.json": result} {
 		if name == "identity-probe.json" || name == "identity-result.json" {
@@ -95,7 +95,7 @@ func installNativeIdentityFixture(t *testing.T, attempt *nativeSiteAttempt, tool
 	writeTenantFixture(t, filepath.Join(tools, "kubectl"), []byte(`#!/bin/sh
 set -eu
 case "$*" in
- *"create --dry-run=client -f -"*) cmp - "$FIXTURE/clusterstaticentries.yaml"; cat "$FIXTURE/identity-source.json"; exit;;
+ *"--dry-run=client"*) printf 'source description must be offline\n' >&2; exit 64;;
  *"create -f - -o json"*)
   test ! -e "$FIXTURE/identity-imported"
   cmp - "$FIXTURE/clusterstaticentries.yaml"
