@@ -1606,6 +1606,11 @@ Live access presentation executes bounded read-only bundled kubectl API/node
 queries for the site and tenant and keeps raw responses private. Its focused
 tests do not establish real Ubuntu runtime acceptance. New retained work does
 not retroactively change the exact-revision complete recording below.
+The shared bootstrap/SPIRE upstream CA for new demos has a finite 3,650-day
+lifetime, matching NVKE's local E2E CA convention. The real certificate regression
+verifies trust after 48 hours and rejects expiry; it does not prove live SPIRE
+renewal or full retained runtime acceptance. Existing retained roots are unchanged,
+and automatic upstream-root renewal remains unavailable.
 Cobra/Viper configuration supplies descriptions, not receipts.
 The combined build reuses bootstrap executables and the measured toolchain;
 catalog substitutions retain their own exact predecessor binding. `--jobs`

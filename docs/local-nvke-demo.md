@@ -579,6 +579,11 @@ work. Session JSON is a locator and cannot authorize process adoption or signali
 The CLI keeps its original terminal context during startup privilege admission,
 then acknowledges independent ownership before successful return.
 
+New demos issue their shared bootstrap/SPIRE upstream CA for 3,650 days, following
+NVKE's local E2E CA convention. This finite lifetime has no automatic root renewal.
+It does not extend certificates in existing retained environments; inspect the
+original CA's expiry before relying on a long-retained environment.
+
 `status` performs fresh read-only checks when Ready access exists; owner liveness
 or an old Ready timestamp alone does not establish cluster health. Use that
 session's printed kubectl and discovered Temporal UI instructions. Do not infer

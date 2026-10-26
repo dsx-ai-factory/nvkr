@@ -4,12 +4,16 @@
 package nvkedemo
 
 import (
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
@@ -18,6 +22,56 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
+
+func TestBootstrapCARetainedLifetime(t *testing.T) {
+	if _, err := exec.LookPath("openssl"); err != nil {
+		t.Skip("real bootstrap CA verification requires OpenSSL")
+	}
+	work := privateTestDir(t)
+	if err := bootstrapCA(t.Context(), ManagementSession{Work: work, Runner: Runner{Work: work, Env: NativeEnvironment()}}); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(work, "ca.crt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	block, rest := pem.Decode(raw)
+	if block == nil || block.Type != "CERTIFICATE" || len(strings.TrimSpace(string(rest))) != 0 {
+		t.Fatal("bootstrap did not produce one certificate")
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cert.CheckSignatureFrom(cert); err != nil {
+		t.Fatalf("bootstrap CA is not self-signed: %v", err)
+	}
+	roots := x509.NewCertPool()
+	roots.AddCert(cert)
+	for _, tc := range []struct {
+		name string
+		at   time.Time
+		ok   bool
+	}{
+		{"current", time.Now(), true},
+		{"retained for two days", time.Now().Add(48 * time.Hour), true},
+		{"expired", cert.NotAfter.Add(time.Second), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := cert.Verify(x509.VerifyOptions{Roots: roots, CurrentTime: tc.at, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny}})
+			if (err == nil) != tc.ok {
+				t.Fatalf("certificate validity at %s: %v", tc.at, err)
+			}
+		})
+	}
+	key, err := os.Stat(filepath.Join(work, "ca.key"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if key.Mode().Perm() != 0o600 {
+		t.Fatal("bootstrap CA key must remain private")
+	}
+}
 
 func TestKindNetworkAdmission(t *testing.T) {
 	for _, row := range []struct {

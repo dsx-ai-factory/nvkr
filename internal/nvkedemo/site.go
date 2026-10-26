@@ -224,7 +224,9 @@ type podContainerState struct {
 
 func bootstrapCA(ctx context.Context, session ManagementSession) error {
 	cert, key := filepath.Join(session.Work, "ca.crt"), filepath.Join(session.Work, "ca.key")
-	if err := session.Runner.Run(ctx, []string{"openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", "/CN=nvkr-local-demo", "-addext", "basicConstraints=critical,CA:TRUE", "-addext", "keyUsage=critical,keyCertSign,cRLSign", "-keyout", key, "-out", cert}, "local-bootstrap-ca", 30*time.Second); err != nil {
+	// Bootstrap and retained sites share this finite root. Match NVKE's local
+	// E2E CA lifetime so retaining a demo does not expire its root after one day.
+	if err := session.Runner.Run(ctx, []string{"openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "3650", "-subj", "/CN=nvkr-local-demo", "-addext", "basicConstraints=critical,CA:TRUE", "-addext", "keyUsage=critical,keyCertSign,cRLSign", "-keyout", key, "-out", cert}, "local-bootstrap-ca", 30*time.Second); err != nil {
 		return err
 	}
 	if err := os.Chmod(key, 0o600); err != nil {
