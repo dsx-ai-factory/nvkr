@@ -13,6 +13,7 @@ elif [[ $# != 0 ]]; then
   echo 'Usage: bash scripts/nvkr-quickstart.sh [--install-go]' >&2
   exit 1
 fi
+# Require explicit installation consent from an interactive terminal.
 confirm() {
   local answer=""
   if [[ ! -t 0 ]]; then
@@ -23,6 +24,7 @@ confirm() {
   read -r answer || return 1
   [[ "${answer}" == y || "${answer}" == Y || "${answer}" == yes ]]
 }
+# Show the supported package-manager action and run it only after consent.
 install_package() {
   local package="$1"
   local -a privilege=()

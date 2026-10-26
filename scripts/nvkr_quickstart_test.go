@@ -13,6 +13,7 @@ import (
 	"time"
 )
 
+// TestQuickstartSetupAndFailureHandling uses synthetic tools to check consent, SDK activation and build failures.
 func TestQuickstartSetupAndFailureHandling(t *testing.T) {
 	for _, tc := range []struct {
 		name         string
