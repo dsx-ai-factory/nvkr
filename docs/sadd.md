@@ -994,8 +994,9 @@ finalization. The development account must lack production-package write/admin a
 cannot enforce provider ACLs. Unsigned development cancels superseded Runs and retains transfers for one day.
 Signed development and production remain non-canceling with seven-day transfers; final Run records retain
 seven days and disk diagnostics one day. Development registry packages are isolated per run attempt and
-become cleanup candidates after completion and 24 hours of inactivity. A default-branch-only owner
-rechecks authenticated provider metadata before whole-package deletion; it never executes branch artifacts.
+become cleanup candidates only with internal visibility, after completion and 24 hours of inactivity.
+A default-branch-only owner rechecks authenticated provider metadata before whole-package deletion;
+it never executes branch artifacts.
 Expired transfers or a development retry require a complete attempt; cancellation can prevent finalization.
 These are contract-tested behaviors pending external execution, access-policy and deletion evidence.
 Repository Merge Gate checks both producer bundles and the qualification pair for PR drift.

@@ -1271,7 +1271,7 @@ selects bounded provider-authenticated metadata candidates and rechecks the full
 The retry regression suite and complete repository gate passed in [Merge Gate 39327338735](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327338735) at `92ce9fc65182a965f94ffa8a527828a971e9fc45`. Local test execution was skipped at the user's request. Live partial retry and independent qualification remain pending. Signed-development helpers/carriers and all final Run records retain
 seven days; disk diagnostics retain one day. Full signed development is non-canceling.
 
-The development cleanup module inventories only private packages in that reserved attempt namespace.
+The development cleanup module inventories only internal packages in that reserved attempt namespace.
 It authenticates account, package and exact completed workflow-attempt metadata; package, version and
 original and latest attempt timestamps must all be at least 24 hours old. It rechecks before whole-package deletion, fails
 closed on unknown/ambiguous/API state, and records confirmed partial progress without retrying ambiguous
@@ -1281,7 +1281,8 @@ older unscoped packages remain outside this protocol.
 
 Definition/factory contracts cover admission, identity, complete M2 graph retention, exact rendering,
 credential/environment scope, retention, runtime namespace projection and same-run retry admission.
-Cleanup API fixtures cover eligibility, authentication errors, pagination, races and mutation failures;
+Cleanup API fixtures cover internal visibility, rejection of private/public/unknown visibility at inventory
+and deletion recheck, eligibility, authentication errors, pagination, races and mutation failures;
 workflow contracts enforce default-branch scheduling and secret scope. The dispatch helper retains its
 clean/current pushed-commit preflight. These tests do not establish live GitHub execution, actual credential
 scope, ephemeral runner isolation, successful keyless services, GHCR deletion or physical storage reclaim.
