@@ -1897,8 +1897,34 @@ keeps its separately authenticated images and binds their selection to the same 
 source. Mac and Linux tools share the same NVKE source pins. Maintained release,
 native demo and nightly product-build selections use this release; the independently
 pinned nightly test harnesses retain their separate source exception. Selection grants
-no Release authority. A fresh package/QCOW build, site/tenant runtime, conformance
-and joined cleanup still require external evidence; prior failed Runs remain failed.
+no Release authority; prior failed Runs remain failed.
+
+The private Ubuntu attempt `ubuntu-9905-e2e-02` used consumer
+`990519c1a53335390ce9464c3eee3d8135076b51`, this stock NVKE source and NVIDIA
+OVN. Its recorded native result passed site/tenant readiness, per-node cloud-init
+and workload/DNS checks with one site and three tenant nodes. Original conformance
+capture completed with harness exit 0: 446 passed, zero failed or pending and
+7,133 skipped, in 7,416.042 seconds. The original JUnit SHA-256 is
+`f1a0ad57581388bdc770c0ed6a1b9cd9f96adc60f869f7194e78f7a319a5a909`;
+seven additional passing suite hooks explain its 7,586 XML testcase records.
+The frozen Plan includes the existing Hydrophone report-download patch,
+SHA-256 `d0014a0f2e39033d5a63a5938b46793e908ccf2cdc1282c8cba1cc7ffe85770b`.
+These are private diagnostic records, not published qualification evidence.
+The foreground command's exit was not captured independently. Subsequent inventory
+and the original CLI's network recovery confirmed no session VMs remaining and
+restored network controls on 2026-10-26. This result does not validate later
+consumer revisions or the startup configuration below.
+
+The private Mac attempt `mac-readiness-01` at consumer
+`8e432f23a47f9934fcff7be523c942aa2742635b` used the same stock NVKE source,
+TCG, a 12-GiB site and two 6-GiB tenant selections. Its site API became Ready,
+but controller installation failed before tenant launch. The foreground exited
+17 at `host-nvke-deploy`; the retained owner reported `held-partial` with no
+completed Ready check. Kubernetes recorded a liveness-probe restart during the
+first controller startup, followed by persistent migration-lock conflicts.
+Read-only inspection found 35 of 71 ARM64 migrations applied; no database repair
+was performed. The original failed invocation remains failed. A fresh Mac
+site/tenant run is required to validate the startup configuration below.
 
 Default native Mac BUILD explicitly selects TCG and `cpu_model=max`. The source
 owns its ARM64 64-KiB kernel and image-composer network files; the native catalog
@@ -2013,6 +2039,19 @@ with bounded termination grace. Context/transport and real-subprocess tests cove
 deadline propagation, cancellation and joining; these do not establish a fresh
 E2E or conformance result. Connection/probe bounds, identity validity, independent
 cleanup and authored/upstream producer policies remain separate.
+
+Site installation uses the selected NVKE installer's existing Helm post-renderer
+handoff. A private Helm subprocess plugin delegates YAML transformation to the
+selected kubectl's Kustomize, targeting only the site controller Deployment and
+container. It adds a startup probe before the unchanged liveness/readiness
+probes and derives the startup allowance, Deployment progress deadline and Helm
+timeout from the caller's remaining work budget. The original process context
+still bounds the whole installation. This prevents the source controller's
+migrations from being interrupted by its HTTP liveness check before the HTTP
+listener starts; it neither changes NVKE source nor repairs an abandoned
+migration lock. The plugin uses private per-invocation scratch, removed after
+its joined subprocess returns. Contract coverage and offline rendered-resource
+comparison do not establish fresh Mac deployment acceptance.
 
 The interactive Linux CLI authenticates before opening the
 dashboard or starting work, then refresh its existing sudo session using bounded

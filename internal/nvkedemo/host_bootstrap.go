@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"net/netip"
 	"os"
@@ -263,12 +264,102 @@ volumeBindingMode: Immediate
 		}
 		args = append(args, "--values-for", item+"="+path)
 	}
-	if err := runner.Run(ctx, args, "host-nvke-deploy", 0); err != nil {
+	deployment, helmArgs, err := prepareSiteHelm(ctx, runner, tools, out)
+	if err != nil {
 		return err
 	}
-	// The pinned upstream script retains its own rollout policy. The wrapper
-	// must not add a second, shorter deadline to the selected work context.
+	args = append(args, helmArgs...)
+	if err := deployment.Run(ctx, args, "host-nvke-deploy", 0); err != nil {
+		return err
+	}
+	// Both source commands remain under the original work deadline.
 	return runner.Run(ctx, []string{"bash", filepath.Join(s.assets.Installer, "controller", "hack", "apply-capi-spiffe-exec-auth.sh")}, "host-site-spiffe-exec", 0)
+}
+
+// The source controller starts HTTP after migrations. Gate its unchanged
+// liveness/readiness probes on startup, using Helm's supported post-renderer
+// and the bundled kubectl's Kustomize rather than modifying source charts.
+// The original Runner context still bounds the installation process.
+func prepareSiteHelm(ctx context.Context, runner Runner, tools, out string) (Runner, []string, error) {
+	budget, err := remainingWork(ctx)
+	if err != nil {
+		return runner, nil, err
+	}
+	seconds := int64((budget-1)/time.Second + 1)
+	if seconds > math.MaxInt32 {
+		return runner, nil, nvkrerr.New(nvkrerr.CodeUsage, "site work budget exceeds the Kubernetes progress deadline range")
+	}
+	home := filepath.Join(out, "site-helm")
+	if err := os.Mkdir(home, 0700); err != nil {
+		return runner, nil, err
+	}
+	plugins := filepath.Join(home, "plugins")
+	plugin := filepath.Join(plugins, "nvkr-site-startup")
+	if err := os.MkdirAll(plugin, 0700); err != nil {
+		return runner, nil, err
+	}
+	files := []struct{ name, content string }{
+		{"plugin.yaml", `apiVersion: v1
+type: postrenderer/v1
+name: nvkr-site-startup
+version: 0.1.0
+runtime: subprocess
+runtimeConfig:
+  platformCommand:
+    - command: /bin/sh
+      args: ["${HELM_PLUGIN_DIR}/render.sh"]
+`},
+		{"render.sh", `#!/bin/sh
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+set -eu
+umask 077
+scratch=$(mktemp -d "$HELM_PLUGIN_DIR/render.XXXXXX")
+trap 'rm -rf "$scratch"' EXIT
+trap 'exit 1' HUP INT TERM
+cat > "$scratch/rendered.yaml"
+cp "$HELM_PLUGIN_DIR/kustomization.yaml" "$scratch/kustomization.yaml"
+"$NVKR_SITE_KUBECTL" kustomize "$scratch"
+`},
+		{"kustomization.yaml", fmt.Sprintf(`apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources: [rendered.yaml]
+patches:
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: nke-controller
+      namespace: nke-controller
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: nke-controller
+        namespace: nke-controller
+      spec:
+        progressDeadlineSeconds: %d
+        template:
+          spec:
+            containers:
+              - name: nke-controller
+                startupProbe:
+                  httpGet: {path: /healthz, port: http}
+                  periodSeconds: 10
+                  failureThreshold: %d
+`, seconds, (seconds+9)/10)},
+	}
+	for _, file := range files {
+		if err := privateWrite(filepath.Join(plugin, file.name), []byte(file.content)); err != nil {
+			return runner, nil, err
+		}
+	}
+	runner.Env = SetEnv(runner.Env, map[string]string{
+		"HELM_PLUGINS": plugins, "HELM_CACHE_HOME": filepath.Join(home, "cache"),
+		"HELM_CONFIG_HOME": filepath.Join(home, "config"), "HELM_DATA_HOME": filepath.Join(home, "data"),
+		"NVKR_SITE_KUBECTL": filepath.Join(tools, "kubectl"),
+	})
+	return runner, []string{"--timeout", budget.String(), "--", "--post-renderer", "nvkr-site-startup"}, nil
 }
 
 // nativeCAPIProviderVersion rechecks the extracted metadata against the selected

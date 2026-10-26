@@ -79,6 +79,10 @@ esac
  test -f "$NVKECTL_SPIRE_CA_CERT_FILE"
  test -f "$NVKECTL_SPIRE_CA_KEY_FILE"
  case "$*" in *--stack-config*) ;; *) exit 53;; esac
+ test "$HELM_PLUGINS" = "$FIXTURE/site-helm/plugins"
+ test "$NVKR_SITE_KUBECTL" = "$FIXTURE/tools/kubectl"
+ test -f "$HELM_PLUGINS/nvkr-site-startup/plugin.yaml"
+ case " $* " in *" --timeout "*" -- --post-renderer nvkr-site-startup ") ;; *) exit 58;; esac
 `
 				}
 				body += "printf '%s\\n' '" + event + "' >> \"$EVENTS\"\n"

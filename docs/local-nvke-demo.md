@@ -57,6 +57,11 @@ selects 1.36.3; site package installation, bootstrap, tenant creation, node chec
 and conformance use that selection. The conformance Definition selects the
 matching 1.36.3 suite image and tools.
 
+Site installation adds a controller startup probe through the source installer's
+Helm extension point so migrations can finish before HTTP liveness checks start.
+Its allowance follows the remaining operation budget; see the
+[implementation and evidence limits](adr/reconciliation.md#local-arm64-demo-presentation).
+
 The native path remains a local diagnostic.
 A complete fresh Mac/Linux build, deployment and cleanup result has not yet been
 established for this candidate. See [current implementation and evidence](adr/reconciliation.md)
@@ -828,15 +833,10 @@ included by that producer.
 Tenant nodes use join-token attestation and the site uses TPM. This package does
 not provide the plugin for `dsxImds` attestation.
 
-A private Ubuntu VM-stage check with retained artifacts reached two Ready
-1.36.3 nodes, clean per-node host cloud-init exits and workload/DNS success.
-That diagnostic used the earlier two-node tenant. It does not establish the
-current conformance topology of one control plane and two workers, its three-node
-cloud-init/OVN checks, or the resulting four-guest site/tenant lifecycle.
-Conformance stopped before its harness when Run capture rejected memory-backed
-temporary storage; the shared invocation now selects attempt-owned scratch.
-The corrected complete native build/deployment/conformance sequence still
-requires external runtime evidence on both hosts.
+The [implementation and evidence ledger](adr/reconciliation.md#local-arm64-demo-presentation)
+owns the exact Ubuntu conformance result, completed cleanup, failed Mac attempt
+and limits of each recorded revision. Earlier retained-artifact diagnostics used
+a two-node tenant and do not establish the current four-guest conformance topology.
 
 Native NVIDIA Definitions select 32 outputs, or 38 with conformance. Package
 producers inspect actual Debian `Package`/`Architecture` metadata, and the disk
