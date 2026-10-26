@@ -1281,7 +1281,7 @@ older unscoped packages remain outside this protocol.
 
 Definition/factory contracts cover admission, identity, complete M2 graph retention, exact rendering,
 credential/environment scope, retention, runtime namespace projection and same-run retry admission.
-Cleanup API fixtures cover internal visibility, rejection of private/public/unknown visibility at inventory
+Cleanup API fixtures cover internal visibility, rejection of private/public/missing/empty/unknown visibility at inventory
 and deletion recheck, eligibility, authentication errors, pagination, races and mutation failures;
 workflow contracts enforce default-branch scheduling and secret scope. The dispatch helper retains its
 clean/current pushed-commit preflight. These tests do not establish live GitHub execution, actual credential
