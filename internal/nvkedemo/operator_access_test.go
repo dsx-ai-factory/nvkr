@@ -36,7 +36,8 @@ func operatorSessionFixture(t *testing.T) ManagementSession {
 set -eu
 case "$*" in
   *--raw=/readyz*) printf '%s\n' "${READY_REPLY:-ok}" ;;
-  *--raw=/api/v1/namespaces/temporal/services/observed-ui/proxy/*) test "${UI_FAIL:-0}" = 0; printf '%s' "${UI_HTTP-<html>private-ui-response-sentinel</html>}" ;;
+  *--raw=/api/v1/namespaces/temporal/services/observed-ui:8123/proxy/*) test "${UI_FAIL:-0}" = 0; printf '%s' "${UI_HTTP-<html>private-ui-response-sentinel</html>}" ;;
+  *--raw=/api/v1/namespaces/temporal/services/*/proxy/*) exit 1 ;;
   *'get services -o json'*)
     if test -f "$0.readback"; then printf '%s\n' "${UI_READBACK-$UI_JSON}";
     else touch "$0.readback"; printf '%s\n' "$UI_JSON"; fi ;;

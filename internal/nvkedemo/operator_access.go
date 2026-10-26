@@ -101,7 +101,7 @@ func inspectOperatorAPIs(ctx context.Context, session ManagementSession, access 
 			// Kubernetes owns Service routing and HTTP error handling. A TCP port
 			// declaration alone does not establish an HTTP endpoint. Do not
 			// interpret or print the private response body, or claim UI health.
-			proxy := "/api/v1/namespaces/temporal/services/" + url.PathEscape(access.uiService) + "/proxy/"
+			proxy := "/api/v1/namespaces/temporal/services/" + url.PathEscape(fmt.Sprintf("%s:%d", access.uiService, access.uiPort)) + "/proxy/"
 			response, probeErr := session.Runner.Capture(ctx, []string{access.kubectl, "--kubeconfig", access.site, "--request-timeout=10s", "get", "--raw=" + proxy}, "operator-ui-http", 15*time.Second)
 			if errors.Is(probeErr, ErrUnjoined) || ctx.Err() != nil {
 				return OperatorAccess{}, errors.Join(probeErr, ctx.Err())
