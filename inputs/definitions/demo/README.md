@@ -72,8 +72,8 @@ require authenticated Git access because NVKE chart pin sets are checked against
 the pinned tree. Dry-run/preflight are not runtime acceptance.
 
 The site catalog pins CLI, controller and charts to one exact NVKE candidate;
-the installer and every NVKE source except SPIRE select v0.22.0-beta.6 at
-`8db5721ae3031bdcd945e559153a740d46ea209e`. The demo uses its site-spec renderer
+the installer and every NVKE source, including SPIRE, select v0.22.0 at
+`400c24fb6465b042be883d6b62472528520d6291`. The demo uses its site-spec renderer
 and deployment entrypoint with verified local charts and image digests. Tenant
 setup creates MachineImage, ClusterRelease and NodePoolRelease resources from
 the observed profiles container and selected disk before requesting the tenant.
@@ -88,11 +88,9 @@ packages and demo tenant select stream `2.4.0`. Packer still consumes staged
 materials; it does not fetch the fork or compile OVN. A fresh bake and tenant
 acceptance are separate gates from compiling this selection.
 
-The shared OS catalog temporarily retains SPIRE packaging at NVKE commit `726f7694`, without the
-DSX IMDS plugin. These local selections do not schedule the blocked DSX source build or require its
-credentials. This restores the prior producer contract, not a fresh runtime acceptance result or full
-NVKE content parity. DSX restoration is tracked in [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641).
-No local NVKE checkout or runner profile is repinned by this catalog update.
+The shared OS catalog selects NVKE `v0.22.0` for every NVKE producer, including SPIRE
+packaging revision `4`. That source-owned package excludes DSX IMDS and requires no DSX
+build credentials. The updated inputs do not establish a new runtime acceptance result.
 
 The combined selection also produces standalone OVN OCI image and image-bound
 Helm OCI outputs. They have their own build identities; do not assume their bytes

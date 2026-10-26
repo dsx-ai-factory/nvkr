@@ -73,7 +73,7 @@ type BuildConfig struct {
 }
 
 const (
-	InstallerCommit    = "8db5721ae3031bdcd945e559153a740d46ea209e"
+	InstallerCommit    = "400c24fb6465b042be883d6b62472528520d6291"
 	SimulatorBundle    = "nicosim-tools-arm64"
 	DiskOutputName     = "nvke-node-image-arm64"
 	OrgID              = "novxwn552ssc"

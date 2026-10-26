@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-os-arm64-upstream-local-kvm",
-  "requiresCatalogDigest": "sha256:1b4b822d5a71470d8b8f75d07cf9d6246d539b9393353fdf4739dd598f620fb4",
+  "requiresCatalogDigest": "sha256:a7f2426c23724947da1e58b7a988557dc836b938ce020669d659f3644ce3fdfd",
   "components": {
     "nvke-node-image": {
       "component": {
@@ -30,9 +30,9 @@
           "timeoutSeconds": 21600
         },
         "repo": "https://github.com/dsx-ai-factory/nvke.git",
-        "tag": "v0.22.0-beta.6",
-        "commit": "8db5721ae3031bdcd945e559153a740d46ea209e",
-        "treeHash": "e928ae13298118b61581d9a406ba4a02f872e959",
+        "tag": "v0.22.0",
+        "commit": "400c24fb6465b042be883d6b62472528520d6291",
+        "treeHash": "f3afc02f5c92f4aacda3a1655836a91bef093bfe",
         "patches": [
           {
             "name": "patches/capture-schema.patch",
@@ -42,7 +42,7 @@
         ],
         "toolchainImages": {
           "amd64": "sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0",
-          "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2"
+          "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3"
         },
         "outputType": "disk-image",
         "disk": {
@@ -89,7 +89,7 @@
           "-ec",
           "cd agent\nexport GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\npins=\"$(sha256sum go.mod go.sum)\"\n# Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.\n# Go owns transport fallback; checksum failures never select another proxy.\n# Keep direct fallback limited to a missing proxy module (404/410).\nproxy=https://proxy.golang.org\nGOPROXY=\"${proxy}|${proxy}/|${proxy}//,direct\" \\\n  timeout --kill-after=10s 540s go mod download || {\n    status=$?; echo 'agent module download failed or exceeded 540s' >&2; exit \"$status\";\n  }\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during download' >&2; exit 1;\n}\n# Offline verification and vendoring run once, after acquisition succeeds.\nGOPROXY=off timeout --kill-after=10s 60s go mod verify || {\n  status=$?; echo 'agent module cache verification failed or exceeded 60s' >&2; exit \"$status\";\n}\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor || {\n  status=$?; echo 'agent offline vendoring failed or exceeded 180s' >&2; exit \"$status\";\n}\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during vendoring' >&2; exit 1;\n}\n"
         ],
-        "sourceDateEpoch": 1792450875
+        "sourceDateEpoch": 1792548398
       }
     }
   }

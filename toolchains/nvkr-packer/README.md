@@ -4,7 +4,7 @@ This directory defines the OCI toolchain consumed by NVKR's local direct-Packer
 executor. Each host-platform image contains Packer 1.15.4, the QEMU plugin 1.1.6,
 QEMU for both supported guest architectures, AMD64 and ARM64 UEFI firmware, `qemu-img`,
 `ssh-keygen`, Python, `tar`, a shell and the core utilities used by the NVKE
-Packer project. It also contains Go 1.27.2, crane 0.21.9, nfpm 2.47.0,
+Packer project. It also contains Go 1.27.3, crane 0.21.9, nfpm 2.47.0,
 Helm 4.2.4 and ORAS 1.3.3,
 `dpkg-scanpackages`, `cloud-localds`, a native C compiler, Git, GnuPG, 7-Zip
 and xorriso. Those are the preparation and ISO-composition tools required by the

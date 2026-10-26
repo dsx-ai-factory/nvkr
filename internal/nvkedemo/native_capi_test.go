@@ -15,8 +15,8 @@ import (
 )
 
 func TestNativeCAPIAdmitsOnlyReviewedSourcePolicy(t *testing.T) {
-	const source = "8db5721ae3031bdcd945e559153a740d46ea209e\n"
-	const digest = "a47d8c38e6812bc3da6f8cf45953c25b365e5b2712669678b53c46798f441420"
+	const source = "400c24fb6465b042be883d6b62472528520d6291\n"
+	const digest = "f0ed2914ec0f024af9b51fda51710446ebd486a8f4f61dd5c6ff94ae3f9d2793"
 	for _, tc := range []struct {
 		name, commit, digest string
 		accepted             bool
@@ -49,7 +49,7 @@ func TestNativeCAPISourceFailurePrecedesCommandsAndOutput(t *testing.T) {
 	for _, name := range []string{"missing commit", "oversize commit", "missing versions", "changed versions", "oversize versions", "symlink versions", "directory versions", "canceled"} {
 		t.Run(name, func(t *testing.T) {
 			installer, out := t.TempDir(), t.TempDir()
-			commit := []byte("8db5721ae3031bdcd945e559153a740d46ea209e\n")
+			commit := []byte("400c24fb6465b042be883d6b62472528520d6291\n")
 			if name == "oversize commit" {
 				commit = append(commit, '\n')
 			}
@@ -100,7 +100,7 @@ func TestNativeCAPISourceFailurePrecedesCommandsAndOutput(t *testing.T) {
 }
 
 func TestNativeCAPIInitSelectsAllThreeProvidersAndWaits(t *testing.T) {
-	version, err := reviewedNativeCAPIProvider("8db5721ae3031bdcd945e559153a740d46ea209e\n", "a47d8c38e6812bc3da6f8cf45953c25b365e5b2712669678b53c46798f441420")
+	version, err := reviewedNativeCAPIProvider("400c24fb6465b042be883d6b62472528520d6291\n", "f0ed2914ec0f024af9b51fda51710446ebd486a8f4f61dd5c6ff94ae3f9d2793")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,10 @@ func TestNativeHostClusterctlMatchesAuthenticatedCAPIRelease(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	version, err := reviewedNativeCAPIProvider("8db5721ae3031bdcd945e559153a740d46ea209e\n", plainSHA(versions))
+	if plainSHA(versions) != toolVersionsHash {
+		t.Fatal("management and native installers must admit the same tool versions")
+	}
+	version, err := reviewedNativeCAPIProvider("400c24fb6465b042be883d6b62472528520d6291\n", plainSHA(versions))
 	if err != nil {
 		t.Fatal(err)
 	}

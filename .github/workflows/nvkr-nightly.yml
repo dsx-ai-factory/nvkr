@@ -46,11 +46,11 @@ jobs:
           set -euo pipefail
           commit=$(jq -er 'map(.harness_commit) | unique | if length == 1 and (.[0] | test("^[0-9a-f]{40}$")) then .[0] else error("ambiguous harness") end' inputs/testing/nightly-profiles.json)
           printf 'commit=%s\n' "$commit" >> "$GITHUB_OUTPUT"
-      - name: Check out selected beta.6 CLI source
+      - name: Check out selected v0.22.0 CLI source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: dsx-ai-factory/nvke
-          ref: 8db5721ae3031bdcd945e559153a740d46ea209e
+          ref: 400c24fb6465b042be883d6b62472528520d6291
           path: .nvkr/source-contract/product
           token: ${{ secrets.NKE_SOURCE_TOKEN }}
           persist-credentials: false
@@ -332,7 +332,7 @@ jobs:
                 (map(.commit) | unique | length) == 1 then .[0].commit
               else error("site products require one exact NVKE suite revision") end
             ' .nightly-private/runtime-inputs/plan.json)
-            if [[ "$suite" == 8db5721ae3031bdcd945e559153a740d46ea209e ]]; then
+            if [[ "$suite" == 400c24fb6465b042be883d6b62472528520d6291 ]]; then
               [[ "$PINNED_SUITE" == b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8 ]] || { echo "unrecognized retained suite pin" >&2; exit 1; }
               suite="$PINNED_SUITE"
             fi

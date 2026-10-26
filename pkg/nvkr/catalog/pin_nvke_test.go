@@ -373,3 +373,37 @@ func TestPinSetDerivationPreservesOperationalErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestNVKEPinSetLocalChartMetadata(t *testing.T) {
+	const releaseFile = "controller/deploy/nke-sbom/controller/release.yaml"
+	const chartFile = "controller/deploy/charts/controller/Chart.yaml"
+	for _, tc := range []struct {
+		name, version, chartName, reviewedName string
+		valid                                  bool
+	}{
+		{"source version", "0.0.0", "nke-controller", "", true},
+		{"reviewed rename", "0.0.0", "nvke-controller", "nvke-controller", true},
+		{"unreviewed rename", "0.0.0", "nvke-controller", "", false},
+		{"wrong reviewed name", "0.0.0", "other-controller", "nvke-controller", false},
+		{"invalid version", "latest", "nke-controller", "", false},
+		{"range version", "1.x", "nke-controller", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			reg, tree := nvkePinFixture(t)
+			replaceNVKEFixture(t, tree, releaseFile, "  version: \"0.0.0\"\n", "")
+			replaceNVKEFixture(t, tree, releaseFile, "chart:\n", "chart:\n  artifact: controller-chart\n  imageArtifact: cwe\n  profilesArtifact: controller-profiles\n")
+			tree.files[chartFile] = []byte("name: " + tc.chartName + "\nversion: \"" + tc.version + "\"\n")
+			item := reg.Sources["nvke"].PinSet.Accounted["controller"]
+			item.ChartName = tc.reviewedName
+			reg.Sources["nvke"].PinSet.Accounted["controller"] = item
+			versions, err := deriveNVKEPinSet(t.Context(), tree, reg, "nvke")
+			if !tc.valid {
+				assertCatalogContractCode(t, err, e.CodeInvalidCatalog)
+				return
+			}
+			if err != nil || versions["spire"] != "0.30.1" {
+				t.Fatalf("versions=%v error=%v", versions, err)
+			}
+		})
+	}
+}

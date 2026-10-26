@@ -50,8 +50,7 @@ workflow does not execute that suite or establish operational acceptance.
 The coordinator checks supported native ARM64 runtime and OVN selections, authenticates the complete
 publication, and requires both test and cleanup verdicts. Checksum-pinned tool acquisition adds no
 vulnerability-clearance claim. All four site-product sources select
-NVKE v0.22.0-beta.6 at `8db5721ae3031bdcd945e559153a740d46ea209e`. The OS closure
-retains the explicit pre-DSX SPIRE exception at `726f76944404e1106626b8333d3576bdf67b575b`.
+NVKE v0.22.0 at `400c24fb6465b042be883d6b62472528520d6291`. The SPIRE OS package uses the same release source and Debian revision 4.
 The test-only suite selects `b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8`, an explicit
 user-approved exception to ADR-23's proposed matching-revision rule. Product sources select the exact main commit.
 

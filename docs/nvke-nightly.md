@@ -57,12 +57,11 @@ profile, exact suite revision, native runtime target and network. There is no
 self-declared security approval field. Artifact authentication, source matching,
 native-host preflight and owned-resource cleanup remain required.
 
-Both Definitions select the profile-owned site catalog at NVKE `v0.22.0-beta.6`,
-commit `8db5721ae3031bdcd945e559153a740d46ea209e`, for the CLI, controller image,
+Both Definitions select the profile-owned site catalog at NVKE `v0.22.0`,
+commit `400c24fb6465b042be883d6b62472528520d6291`, for the CLI, controller image,
 controller chart and NKTP chart. The test-only suite checkout selects
-`a32067108ab89d1e2b2b6720766ffe97270a166a`.
-The OS closure retains SPIRE at the explicit pre-DSX exception commit
-`726f76944404e1106626b8333d3576bdf67b575b`. Clusterctl selects 1.13.6 to match the
+`b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8`.
+The SPIRE OS package uses the same v0.22.0 source and Debian revision 4. Clusterctl selects 1.13.6 to match the
 selected installer. The separate test pin is a user-approved exception to ADR-23's proposed
 matching-revision rule; it establishes no runtime compatibility or broader acceptance.
 ADR-23 remains proposed and excludes CI trigger, runner and credential policy.

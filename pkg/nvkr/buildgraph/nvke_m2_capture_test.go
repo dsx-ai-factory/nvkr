@@ -21,8 +21,8 @@ import (
 // They are not framework requirements for customer catalogs or component names.
 func TestNVKEControllerPinnedChartFilename(t *testing.T) {
 	for _, tc := range []struct{ catalog, component, artifact string }{
-		{"../../../inputs/catalogs/nvke/release", "nvke-controller-chart", "charts/nke-controller-0.22.0-beta.6.tgz"},
-		{"../../../inputs/catalogs/nvke/local-site-arm64", "nvke-controller-chart", "charts/nke-controller-0.22.0-beta.6.tgz"},
+		{"../../../inputs/catalogs/nvke/release", "nvke-controller-chart", "charts/nvke-controller-0.22.0.tgz"},
+		{"../../../inputs/catalogs/nvke/local-site-arm64", "nvke-controller-chart", "charts/nvke-controller-0.22.0.tgz"},
 	} {
 		t.Run(tc.catalog, func(t *testing.T) {
 			raw, err := os.ReadFile(filepath.Join(tc.catalog, "registry.yaml"))
@@ -47,7 +47,7 @@ func TestNVKEControllerPinnedChartFilename(t *testing.T) {
 
 func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 	const inputRoot = "../../../inputs/definitions/nvke"
-	const selectedSource = "8db5721ae3031bdcd945e559153a740d46ea209e"
+	const selectedSource = "400c24fb6465b042be883d6b62472528520d6291"
 	authored, err := definition.LoadDefinition(t.Context(), filepath.Join(inputRoot, "definition.yaml"))
 	if err != nil {
 		t.Fatal(err)
@@ -79,23 +79,23 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 			agent := cat.Components["nvke-agent"]
 			for _, name := range []string{"nvke-agent", "nvke-cni-calico", "nvke-kubeadm-distro"} {
 				component := cat.Components[name]
-				if component.Tag != "v0.22.0-beta.6" || component.Commit != selectedSource || component.TreeHash != "e928ae13298118b61581d9a406ba4a02f872e959" || component.SourceDate != 1792450875 {
+				if component.Tag != "v0.22.0" || component.Commit != selectedSource || component.TreeHash != "f3afc02f5c92f4aacda3a1655836a91bef093bfe" || component.SourceDate != 1792548398 {
 					t.Fatalf("%s does not retain the selected source commit/commit/tree/epoch", name)
 				}
 			}
-			// Temporary SPIRE-only rollback is tracked in NVKE issue #1641.
+			// SPIRE packaging is part of the same release source identity.
 			spire := cat.Components["nvke-spire-agent"]
-			if spire.Commit != "726f76944404e1106626b8333d3576bdf67b575b" || spire.TreeHash != "3d6ea77f85d5da2648038425f805a598e23464ba" || spire.SourceDate != 1790192178 {
-				t.Fatal("temporary SPIRE source pin changed")
+			if spire.Tag != "v0.22.0" || spire.Commit != selectedSource || spire.TreeHash != "f3afc02f5c92f4aacda3a1655836a91bef093bfe" || spire.SourceDate != 1792548398 {
+				t.Fatal("SPIRE source must match the release")
 			}
 			if len(spire.Materials) != 0 || !strings.Contains(strings.Join(spire.VendorCommand, "\n"), "make -C os-image/packages/spire-agent bundle nfpm") ||
-				!strings.Contains(strings.Join(spire.BuildCommand, "\n"), "SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=1") {
-				t.Fatal("temporary SPIRE producer must retain its source-owned acquisition and packaging revision 1 without DSX materials")
+				!strings.Contains(strings.Join(spire.BuildCommand, "\n"), "SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=4") {
+				t.Fatal("release SPIRE producer must retain its source-owned acquisition and packaging revision 4 without DSX materials")
 			}
 			if _, exists := cat.Components["dsx-imds-node-attestor-agent"]; exists || slices.Contains(output.Components, "dsx-imds-node-attestor-agent") {
-				t.Fatal("temporary SPIRE selection unexpectedly reintroduced DSX")
+				t.Fatal("release SPIRE selection unexpectedly reintroduced DSX")
 			}
-			if agent.VersionStamp["BUILD_VERSION"] != "v0.22.0-beta.6" || !strings.Contains(strings.Join(agent.BuildCommand, "\n"), `VERSION="$BUILD_VERSION"`) {
+			if agent.VersionStamp["BUILD_VERSION"] != "v0.22.0" || !strings.Contains(strings.Join(agent.BuildCommand, "\n"), `VERSION="$BUILD_VERSION"`) {
 				t.Fatal("agent version must derive from the selected source tag")
 			}
 			selected, err := Resolve(cat, Selection{Components: output.Components, Platform: output.Platform, OutputFormat: output.Format})

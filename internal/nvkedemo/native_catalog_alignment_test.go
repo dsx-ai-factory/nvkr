@@ -24,7 +24,7 @@ func TestNativeNVIDIADefinitionsAlignRenamedSourceContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const nvke = "8db5721ae3031bdcd945e559153a740d46ea209e"
+	const nvke = "400c24fb6465b042be883d6b62472528520d6291"
 	const ovn = "8af51273d52dfa07454435d18d37230e582d797a"
 	for _, conformance := range []bool{false, true} {
 		name := "demo"
@@ -53,7 +53,7 @@ func TestNativeNVIDIADefinitionsAlignRenamedSourceContracts(t *testing.T) {
 				{"nvke-node-image-arm64", "nvke-cni-calico", nvke},
 				{"nvke-node-image-arm64", "nvke-node-image", nvke},
 				{"nvke-node-image-arm64", "nvke-image-inputs", nvke},
-				{"nvke-node-image-arm64", "nvke-spire-agent", "726f76944404e1106626b8333d3576bdf67b575b"},
+				{"nvke-node-image-arm64", "nvke-spire-agent", "400c24fb6465b042be883d6b62472528520d6291"},
 				{"nvke-node-image-arm64", "nvke-cni-ovn", ovn},
 				{"nvke-node-image-arm64", "ovn-kube-ubuntu", ovn},
 				{"nvke-node-image-arm64", "ovn-kubernetes-chart", ovn},
@@ -100,7 +100,7 @@ func TestNativeNVIDIADefinitionsAlignRenamedSourceContracts(t *testing.T) {
 // Read only authored selections and lock records. Full compilation also
 // authenticates private derived-chart pins and belongs to the extended suite.
 func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
-	const nvke = "8db5721ae3031bdcd945e559153a740d46ea209e"
+	const nvke = "400c24fb6465b042be883d6b62472528520d6291"
 	repo, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)

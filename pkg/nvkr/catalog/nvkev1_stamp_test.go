@@ -32,12 +32,12 @@ func TestNVKEV1CatalogStampsUpstreamModuleTag(t *testing.T) {
 		t.Fatalf("nvke-v1 catalog has no nvkectl component; components: %v", componentNames(cat))
 	}
 
-	// Derived from the lock (8db5721ae3031bdcd945e559153a740d46ea209e @ 8db5721a…, committer epoch 1792450875),
+	// Derived from the lock (400c24fb6465b042be883d6b62472528520d6291 @ 400c24fb…, committer epoch 1792548398),
 	// never from wall-clock time or the local checkout.
 	want := map[string]string{
-		"NVKECTL_VERSION": "v0.22.0-beta.6",
-		"NVKECTL_COMMIT":  "8db5721ae3031bdcd945e559153a740d46ea209e",
-		"NVKECTL_DATE":    "2026-10-19T23:01:15Z",
+		"NVKECTL_VERSION": "v0.22.0",
+		"NVKECTL_COMMIT":  "400c24fb6465b042be883d6b62472528520d6291",
+		"NVKECTL_DATE":    "2026-10-21T02:06:38Z",
 	}
 	if !reflect.DeepEqual(component.VersionStamp, want) {
 		t.Errorf("nvkectl version stamps = %v, want %v", component.VersionStamp, want)

@@ -44,7 +44,7 @@ func TestNVKEFDEOnlyGeneratedSelection(t *testing.T) {
 		}
 		roots++
 		if node.Component != "nvke-node-fde-amd64" || node.Disk.Encryption != "luks2" || node.ArtifactPath != "fde/nvke-node.qcow2" ||
-			node.Packer.BuildName != "nvke-node-fde.qemu.nvke-fde" || node.SourceCommit != "8db5721ae3031bdcd945e559153a740d46ea209e" {
+			node.Packer.BuildName != "nvke-node-fde.qemu.nvke-fde" || node.SourceCommit != "400c24fb6465b042be883d6b62472528520d6291" {
 			t.Fatal("FDE producer no longer selects the audited source contract")
 		}
 		if err := pipeline.ValidateVMImagePackerDiskExecution(node); err != nil {
@@ -139,10 +139,10 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 		arch, installer, patched, plain, toolchain, firmwareCode, firmwareVars, memory string
 	}{
 		{"amd64", "ubuntu-installer-iso-amd64", "nvke-patched-installer-iso-amd64", "nvke-node-image-amd64",
-			"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:2a8d3ca5b447fe9d4694aa6cd977c6353299b336656b23688bc6dc11b8ab98f2",
+			"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:1415193ed0c50cd9c3d5b3bbd6207728262db3469c6ccd36717d47a6f50e3c0e",
 			"/usr/share/OVMF/OVMF_CODE_4M.fd", "/usr/share/OVMF/OVMF_VARS_4M.fd", ""},
 		{"arm64", "ubuntu-installer-iso", "nvke-patched-installer-iso", "nvke-node-image",
-			"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2",
+			"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3",
 			"/usr/share/AAVMF/AAVMF_CODE.no-secboot.fd", "/usr/share/AAVMF/AAVMF_VARS.fd", "4096"},
 	} {
 		t.Run(tc.arch, func(t *testing.T) {
@@ -167,7 +167,7 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 				if node.Component != name || node.Disk == nil || node.Packer == nil || node.ExecutionBinding == nil || node.Requirements == nil {
 					t.Fatal("incomplete native FDE producer")
 				}
-				if node.SourceCommit != "8db5721ae3031bdcd945e559153a740d46ea209e" || node.Toolchain != tc.toolchain ||
+				if node.SourceCommit != "400c24fb6465b042be883d6b62472528520d6291" || node.Toolchain != tc.toolchain ||
 					node.ToolchainPlatform != build.Platform || node.Disk.Format != "qcow2" || node.Disk.Encryption != "luks2" ||
 					node.ArtifactPath != "fde/nvke-node.qcow2" || node.Packer.BuildName != "nvke-node-fde.qemu.nvke-fde" ||
 					node.Packer.AcquisitionArchive != "fde/apt-acquisitions.tar" {

@@ -3,14 +3,13 @@
 This profile-owned catalog retains the local installer tools' source pins, vendoring and build
 commands for clusterctl v1.13.6, kind v0.32.0, kubectl v1.36.0 and ORAS v1.3.3. Their produced binaries
 are `host-package` outputs, matching executable packaging and the existing production SBOM inspector.
-The local source catalog uses the same tool versions.
+The local and hosted clusterctl selections match NVKE v0.22.0.
 
 Helm remains version 4.2.4 but is an acquired ARM64 executable. The hosted source fetch owner rejects
 the external test symlinks in that source before the local diagnostic vendor command can remove
 them. This catalog uses the existing release-executable contract rather than weakening source capture.
 `nvkr catalog pin --dir inputs/catalogs/tools/installer-hosted-arm64 --tag v4.2.4 helm`
-generated its lock entry on October 13, 2026. Cluster API is pinned to v1.13.6 with
-`catalog pin`, matching the v0.22.0-beta.6 installer; kind, kubectl and ORAS retain their source pins.
+generated its lock entry on October 13, 2026. Clusterctl now follows NVKE v0.22.0; kind, kubectl and ORAS retain their prior pins.
 
 | Binding | Verified value |
 | --- | --- |

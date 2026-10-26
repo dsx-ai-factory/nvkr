@@ -19,8 +19,9 @@ import (
 // PinSetItem accounts for a deploy item that is not an external chart member.
 // Local Helm charts additionally bind their exact source-owned relative path.
 type PinSetItem struct {
-	Type string `json:"type"`
-	Path string `json:"path,omitempty"`
+	Type      string `json:"type"`
+	Path      string `json:"path,omitempty"`
+	ChartName string `json:"chartName,omitempty"`
 }
 
 var nvkeItemName = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]*$`)
@@ -123,12 +124,15 @@ func validateNVKEPinSet(set *PinSet) error {
 		}
 		switch item.Type {
 		case "helm":
+			if item.ChartName != "" && !helmChartName.MatchString(item.ChartName) {
+				return e.New(e.CodeInvalidCatalog, "invalid accounted local chart name %q", item.ChartName)
+			}
 			if _, err := nvkeLocalChartFile(set.File, item.Path); err != nil {
 				return err
 			}
 		case "manifest", "template", "argocd":
-			if item.Path != "" {
-				return e.New(e.CodeInvalidCatalog, "non-Helm NVKE item %q cannot declare a local chart path", name)
+			if item.Path != "" || item.ChartName != "" {
+				return e.New(e.CodeInvalidCatalog, "non-Helm NVKE item %q cannot declare local chart metadata", name)
 			}
 		default:
 			return e.New(e.CodeInvalidCatalog, "unsupported NVKE item type %q for %q", item.Type, name)
@@ -255,9 +259,13 @@ func validateNVKELocalChart(ctx context.Context, tree pinnedTree, deployFile, it
 	if err != nil {
 		return err
 	}
+	expectedName := release.Chart.Name
+	if accounted.ChartName != "" {
+		expectedName = accounted.ChartName
+	}
 	chartName := pinSetObjectField(root, "name")
 	chartVersion := pinSetObjectField(root, "version")
-	if chartName == nil || chartName.Tag != "!!str" || chartName.Value != release.Chart.Name ||
+	if chartName == nil || chartName.Tag != "!!str" || chartName.Value != expectedName ||
 		chartVersion == nil || chartVersion.Tag != "!!str" || !exactPinSetVersion(chartVersion.Value) ||
 		(release.Chart.Version != "" && chartVersion.Value != string(release.Chart.Version)) {
 		return e.New(e.CodeInvalidCatalog, "NVKE local chart %q name/version differs from release.yaml", item)

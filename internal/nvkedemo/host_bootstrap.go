@@ -262,7 +262,7 @@ func reviewedNativeCAPIProvider(commit, versionsDigest string) (string, error) {
 	// The reviewed revision's cli/Makefile injects CAPI_VERSION from this exact file;
 	// cli/internal/bootstrap/controllerdeploy/capi.go uses it for all three
 	// upstream providers. Keep the permanent site aligned with that bootstrap.
-	if commit != nativeSiteSourceCommit || versionsDigest != "a47d8c38e6812bc3da6f8cf45953c25b365e5b2712669678b53c46798f441420" {
+	if commit != nativeSiteSourceCommit || versionsDigest != "f0ed2914ec0f024af9b51fda51710446ebd486a8f4f61dd5c6ff94ae3f9d2793" {
 		return "", errors.New("native CAPI provider selection differs from reviewed source")
 	}
 	return "v1.13.6", nil
@@ -296,7 +296,7 @@ func demoTelemetryValues() ([]byte, error) {
 
 // Both native hosts consume this maintained source contract. Historical
 // installer interfaces are rejected rather than kept as another deployment path.
-const nativeSiteSourceCommit = "8db5721ae3031bdcd945e559153a740d46ea209e\n"
+const nativeSiteSourceCommit = "400c24fb6465b042be883d6b62472528520d6291\n"
 
 func admitNativeSiteContract(ctx context.Context, installer string) error {
 	commit, err := readRunFile(ctx, installer, "SOURCE_COMMIT", 41)

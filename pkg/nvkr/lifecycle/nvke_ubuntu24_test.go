@@ -92,7 +92,7 @@ func TestNVKEUbuntu24NativeDiskSelections(t *testing.T) {
 						continue
 					}
 					roots++
-					if node.Component != root || node.SourceCommit != "8db5721ae3031bdcd945e559153a740d46ea209e" || node.Packer == nil ||
+					if node.Component != root || node.SourceCommit != "400c24fb6465b042be883d6b62472528520d6291" || node.Packer == nil ||
 						node.Disk == nil || node.ExecutionBinding == nil || node.Requirements == nil {
 						t.Fatal("Ubuntu 24 disk lost its source-owned native Packer contract")
 					}
@@ -292,7 +292,7 @@ func TestNVKEUbuntu24AgentRejectsUnsupportedLibcBeforeWork(t *testing.T) {
 	for _, phase := range []struct {
 		name, firstTool string
 		command         []string
-	}{{"acquisition", "sha256sum", agent.VendorCommand}, {"build", "make", agent.BuildCommand}} {
+	}{{"acquisition", "mkdir", agent.VendorCommand}, {"build", "make", agent.BuildCommand}} {
 		for _, tc := range []struct {
 			name, libc string
 			missing    bool
@@ -318,6 +318,9 @@ func TestNVKEUbuntu24AgentRejectsUnsupportedLibcBeforeWork(t *testing.T) {
 					if err := os.WriteFile(filepath.Join(bin, "getconf"), []byte("#!/bin/sh\nprintf '%s\\n' \"$NVKR_TEST_LIBC\"\n"), 0700); err != nil {
 						t.Fatal(err)
 					}
+				}
+				if err := os.WriteFile(filepath.Join(bin, "uname"), []byte("#!/bin/sh\nprintf x86_64\n"), 0700); err != nil {
+					t.Fatal(err)
 				}
 				marker := filepath.Join(root, "work-started")
 				if err := os.WriteFile(filepath.Join(bin, phase.firstTool), []byte("#!/bin/sh\nprintf 'work started\\n' > \"$NVKR_TEST_MARKER\"\nexit 73\n"), 0700); err != nil {

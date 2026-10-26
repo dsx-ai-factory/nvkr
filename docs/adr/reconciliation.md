@@ -1124,7 +1124,7 @@ interruption demonstrations remain M4-D.
 | 19 Downstream boundary | Exact required/observed output membership, component evidence joins and noncircular release-content identity | Downstream owners supply topology, placement, provisioning and runtime qualification; historical topology records grant no current authority |
 | 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects with consistent named-output aliases and independent evidence, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation, selected output payload-closure retrieval and per-output assembly/finalization; consumer held-closure export bound to exact-input receipts; candidate M2 hosted signing/publication completed; public-bootstrap FDE build-provenance publication supported; development attempt namespaces and scoped GHCR cleanup; hosted GHCR package privacy admission using metadata-derived destination references and an exact-root-bound push | Package admission has local contracts, not a hosted private-publication or public-source access proof; independent grants, historical provider payloads and future visibility changes remain operational obligations. Hosted GHCR legacy layouts without the metadata contract fail closed. Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and object-store/CDN transports remain unproved or unavailable; registration is deferred |
 | 21 Generation | Exact recorded input selection, independent fixed production/development layouts, manifest-owned semantic action interfaces and Plan-derived invocation data with expanded-step validation, output-local ordinary job membership with addition/removal and failure-accounting contracts, stable result-collector membership and exact retirement of legacy producer children, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows; separately owned qualification pair and runtime policy drift admission; optional named production namespaces independently own their manifest, lock, paths and retirement; opted-in named runtime Plans compile current source pins within the complete reviewed workflow/action and Environment contract and distribute frozen data through same-Run helpers; provider artifacts contain JSON locators while private CI carriers use a digest-bound GHCR transport with package visibility and linked-repository admission | Producer generation emits manual-dispatch workflows, not cron; optional qualification generation emits its fixed event/call pair. Authored downstream scheduling has separate ownership. Combining development with a nonempty named bundle is rejected before catalog resolution or generated-output work. The inline layout has guarded dispatch admission and isolated exact-result/failure diagnostics; complete production execution, automatic PR publication and scheduled/private-source service acceptance remain unexercised. The runtime Plan handoff and private CI carrier transport have local contracts; a hosted private-carrier producer-to-E2E cycle remains unexercised. Public-repository execution requires an independently admitted storage credential/access policy; public-linked storage fails closed. Historical Actions payloads and caches are not migrated by this implementation. The workflow `catalog update-ci` renders (installed as `catalog-refresh.yaml`) opens PRs with a GitHub App installation token minted in its `pull-request` job by the SHA-pinned `actions/create-github-app-token` action for this repository only, with contents, pull requests and workflows write, and revoked by the action when the job ends; the workflow token stays read-only (shape, action inputs, bot sign-off identity and step behavior contract-tested with a stubbed `gh`; a manual dispatch on 2026-10-16 failed at the earlier hand-rolled token step with an unattributed 404). No scheduled run, token exchange, push, PR, automatically started PR check, close or branch deletion has been exercised, so M4 acceptance item 1 is implemented but not demonstrated and M4 is not claimed. The review commit is created through the GitHub API with a DCO trailer for the App's bot user (contract-tested; GitHub signing and attribution not verified). Pin-only fixtures assert the production, development and qualification workflows stay identical; a topology, label, interface or action-pin change that regenerates a closure workflow is published in the same PR. One enrolled policy is supported until generated bundle roots are per-Definition. A branch that already holds the candidate is left alone, a closed unmerged PR whose head commit carries the same candidate stays closed even after its branch is deleted, fork PRs from a branch with the same name are ignored, a lookup page that could be truncated fails the step, and an unchanged Definition closes its stale PR and deletes its branch (contract-tested with a stubbed `gh` that applies each call's real filter). The ruleset, last-push approval and code-owner settings that protect the bot branch are repository settings that this workflow does not enforce; the release owner or an administrator must validate them before scheduled writes are relied on. The policy names the dependent development Run, qualification pair and additional named Runs (the two nightly bundles, checked and regenerated through the runtime-Plan owner because they compile current pins at dispatch); refresh admits each additional Run's catalogs before compiling it, and checks, regenerates and transports every member through its owner on an exact allowlist, refuses an unnamed committed bundle and a generator stamp that differs from the committed Plans (contract-tested with real local Git for the production and development bundles, and through the real qualification owner on a fixture with synthetic trust pins that contacts no GHCR or cosign; deployment-image selection is outside the closure and must be coordinated by hand before a moving release), and `make workflows-check` compares the installed workflow with `catalog update-ci` output (not exercised in the hosted gate). Producer matrices and general callable workflows remain deferred. Qualification generation does not make both owner writes one atomic transaction; lock and generated files are separate transactions; complete crash matrix remains |
-| 22 Pins | Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets including NVKE beta local-chart version omission and descriptive artifact mappings, same-release maintenance groups, whole-producer overlays, exact toolchain substitutions and authored embedded-version metadata authentication | Pin-set loading needs pinned Git access. Curated graph/SBOM edges remain deferred. Optional metadata consistency is not disk-content inspection, external acquisition or production acceptance |
+| 22 Pins | Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets including NVKE local-chart version omission, explicit reviewed chart names and descriptive artifact mappings, same-release maintenance groups, whole-producer overlays, exact toolchain substitutions and authored embedded-version metadata authentication | Pin-set loading needs pinned Git access. Curated graph/SBOM edges remain deferred. Optional metadata consistency is not disk-content inspection, external acquisition or production acceptance |
 | 23 Artifact test interfaces | Proposed ADR merged in PR #139; Go Plan helper merged in #156; #138 replaces its Python diagnostic with Go factory/source/execution owners; separate IV1 upstream bootstrap no-build interface candidate described in the [guide](../artifact-testing.md#bootstrap-e2e-interface-candidate-iv1-first-slice), without an NVKR bootstrap execution adapter | [Immutable interface source](https://github.com/dsx-ai-factory/nvke/commit/f33b7afb55d421958540589ca03d206531bfa16b) and its [Linux CLI job](https://github.com/dsx-ai-factory/nvke/actions/runs/39347477494/job/118383877388) record a passing bootstrap contract package within a failed aggregate run, not real bootstrap execution. No immutable real-bootstrap Run exists; the [guide](../artifact-testing.md#bootstrap-e2e-interface-candidate-iv1-first-slice) pins the reviewed follow-up source and local-check limits. [Implementation guide](../artifact-testing.md) separates the Go macOS ARM64/Docker fresh-build proof from historical Python native results. Upstream adoption, authenticated output membership, exhaustive suite acceptance, maintained-pin adoption, kind, CI and CAPD/CAPNICo acceptance remain outstanding; no conformance or qualification authority |
 | 24 Validator catalog | Provisional CLI discovery and local-plan profiles: strict bounded catalog/profile loading, deterministic discovery, registered `nvke-cli/v1`, complete local-plan admission and frozen dispatch through factory/sourcegit/pipeline | Discovery, refusal, snapshot edits, both suite/architecture bindings and mocked dispatch are contract-tested; [guide](../artifact-testing.md#provisional-validator-catalog) distinguishes this from actual upstream execution. Native AMD64/ARM64 catalog runtime acceptance, legacy-command migration, new-format published adapters, controller/chart and second-repository adoption remain outstanding. Existing published authentication/capture semantics, unknown exhaustive completeness, unauthenticated artifact membership and no qualification authority are preserved |
 
@@ -1147,13 +1147,12 @@ and ignores `BUILDER_IMAGE`; its unused argument is removed, not credited with a
 This updates a standard builder input, not the NVKE beta.6, SPIRE or harness source selections. A complete
 hosted build with the replacement remains pending.
 
-The current candidate selects NVKE `v0.22.0-beta.6` at
-`8db5721ae3031bdcd945e559153a740d46ea209e` through `catalog pin --tag` for all 37
-updated NVKE source roles. The three SPIRE package roles retain pre-DSX commit
-`726f76944404e1106626b8333d3576bdf67b575b`; the nightly harness retains
-`b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8`. Chart versions, native demo source
-admission and catalog overlay bindings follow beta.6. Hosted validation of this
-new selection is pending; the successful records below cover the preceding main pin.
+The current candidate selects NVKE `v0.22.0` at
+`400c24fb6465b042be883d6b62472528520d6291` through `catalog pin --tag` for all maintained
+NVKE source roles, including the three SPIRE package roles. The nightly harness retains
+`b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8` because the product tag omits its candidate entrypoint.
+Chart versions, native demo source admission and catalog overlay bindings follow v0.22.0.
+Hosted validation of this selection is pending; the successful records below cover their recorded inputs.
 
 At NVKR `36dd99fe3aa0c7dc6cce72b272da93d6ab8ba355`,
 [development Run 39343181108, attempt 1](https://github.com/dsx-ai-factory/nvkr/actions/runs/39343181108/attempts/1)
@@ -1560,9 +1559,8 @@ cancellation and continued rejection of delegated configuration. Command admissi
 errors retain the failing phase without exposing arguments or source paths. These
 tests do not establish a completed Ubuntu site replay.
 
-The local demo now selects NVKE `v0.22.0-beta.6` at
-`8db5721ae3031bdcd945e559153a740d46ea209e`, retaining the shared pre-DSX SPIRE
-packaging exception. Its adapter uses the source-owned site-spec renderer and
+The local demo now selects NVKE `v0.22.0` at
+`400c24fb6465b042be883d6b62472528520d6291`, including SPIRE packaging revision 4. Its adapter uses the source-owned site-spec renderer and
 deployment entrypoint with verified local chart archives and exact image references.
 The already admitted Kind configuration owns cluster networking; site-spec bootstrap
 fields are not executed. Before tenant creation, the adapter binds source-owned
@@ -1571,7 +1569,7 @@ ClusterRelease and NodePoolRelease resources for the selected plain ARM64 disk.
 On the preceding beta selection, focused resource, pod-binding, cancellation and profile tests passed, including
 targeted race checks. The actual beta CLI validated a diagnostic site spec and the
 source installer completed its dry-run with prepared chart paths. Those checks
-do not establish chart builds, cluster readiness, a completed tenant replay, or acceptance of the current beta.6 selection.
+do not establish chart builds, cluster readiness, a completed tenant replay, or acceptance of the current v0.22.0 selection.
 
 Maintained OS Definitions, catalog execution and Packer toolchain assembly select Docker.
 The older authored Podman Environment and its TCG Definition are removed; generic
@@ -2927,18 +2925,13 @@ Native children are locked separately from source-owned index parents, and mater
 membership. Controlled source/pin/image tests and exact-source approval do not prove external layer acquisition,
 scanner acceptance or complete production input approval. The
 [acquisition observations](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#temporary-spire-source-selection) retain the historical mixed-source candidate and HTTP-403 limits.
-Current inputs temporarily retain the prior SPIRE packaging source `726f76944404e1106626b8333d3576bdf67b575b`
-and its source-owned acquisition/packaging commands. OS assembly, agent, Calico, kubeadm and native
-Packer capture now select NVKE `v0.22.0-beta.6` (`8db5721ae3031bdcd945e559153a740d46ea209e`),
-including its renamed Packer targets, disk filenames, material schema and required Ubuntu-series input. Current-source execution remains
-unverified until a complete recorded development attempt succeeds. The older SPIRE package omits DSX IMDS,
-which current NVKE requires; this is an explicitly incomplete compatibility selection, not full product parity.
-The blocked DSX producer, its material-only selections and unused source credentials are removed.
-[NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641) tracks supported DSX source admission,
-dependency-finding triage and confirmation of source/binary and distribution contracts. No source gate,
-submodule rejection or security requirement is weakened to admit that dependency. Standalone plugin
-compilation does not establish those contracts or native execution/boot acceptance. NVKE telemetry pipelines acquisition and
-offline Helm packaging were exercised locally; no successful combined hosted Run of these release additions is claimed.
+Current OS assembly, agent, Calico, kubeadm, SPIRE and native Packer inputs select NVKE
+`v0.22.0` (`400c24fb6465b042be883d6b62472528520d6291`). SPIRE uses that release's source-owned
+acquisition and Debian revision 4 packaging, which omits DSX IMDS. The prior mixed-source exception
+is no longer selected. Current-source execution remains unverified until a complete recorded development
+attempt succeeds. No source admission, submodule rejection or security requirement is weakened.
+NVKE telemetry pipeline acquisition and offline Helm packaging were exercised for the earlier recorded
+inputs; no successful combined hosted Run of the v0.22.0 selection is claimed.
 
 [Run `38809161348`](https://github.com/dsx-ai-factory/nvkr/actions/runs/38809161348) at
 `e3743a70b6e0bd19ccf53b7160ab0a5f276d0e66` failed during NVKE telemetry pipelines Helm extraction and the AMD64
@@ -3094,13 +3087,13 @@ M2 toolchains through the existing read-only image-preparation owner. Temporary 
 credentials are removed before source or producer execution; the nightly output
 namespace does not require republishing the existing pinned toolchains.
 The four CLI, controller and chart candidate sources now select NVKE
-`v0.22.0-beta.6` at `8db5721ae3031bdcd945e559153a740d46ea209e`.
+`v0.22.0` at `400c24fb6465b042be883d6b62472528520d6291`.
 The nightly consumer projects authenticated profile bytes into the current resource
 API and supplies separate site and stack configuration, credentials through the child
 environment, and telemetry through the installer values handoff. Both the normal and upstream-OVN
 disk URLs, where required by the selected profile, read the same held disk and are
 checked against the exact selected Artifact. Focused contract and HTTP race tests
-passed for the preceding beta selection, and that CLI validated and rendered the diagnostic site spec. Those checks do not validate the current beta.6 source.
+passed for the preceding beta selection, and that CLI validated and rendered the diagnostic site spec. Those checks do not validate the current v0.22.0 source.
 The user-approved test-only suite pin is `b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8`,
 a signed compatibility revision of the earlier `a3206710` suite, with beta.6 deployment
 templates and an explicit stack-config/credential/telemetry handoff. It retains the
@@ -3112,8 +3105,7 @@ build, runtime selection and runtime-test jobs. The later workflow selector corr
 is covered separately by the shell-versus-Go parity test in the successful
 [Merge Gate on `caf85b27`](https://github.com/dsx-ai-factory/nvkr/actions/runs/39487820535).
 This verifies configuration composition, not published-artifact or VM
-runtime acceptance; full runtime validation of this revision remains unverified. Product sources select beta.6
-with the explicit SPIRE exception. This diagnostic selection is an exception to
+runtime acceptance; full runtime validation of this revision remains unverified. Product sources, including SPIRE, select v0.22.0. This diagnostic selection is an exception to
 ADR-23's proposed matching-revision rule, not adoption of that proposal. Missing
 candidate hooks still fail admission; the generic rebuilding suite is no fallback.
 These source and adapter checks do not establish overall interface adoption or runtime acceptance.
@@ -3165,3 +3157,19 @@ payloads. Its description reports `payloadIntegrityVerified: false`; it grants n
 exact-input receipt, qualification or revocation acceptance. Contract fixtures cover rejected signatures,
 missing or substituted evidence, whole-release membership, policy enforcement, capability separation and
 zero payload-layer retrieval. These are controlled contracts, not a recorded external authenticity run.
+
+## NVKE v0.22.0 input alignment
+
+All NVKE source roles under `inputs/catalogs` select tag `v0.22.0`, commit
+`400c24fb6465b042be883d6b62472528520d6291`, including SPIRE OS-agent packaging revision 4. Complete producer replacements in node-image overlays
+carry the same source identity.
+The deployment manifest moved to `deploy/nico/nvke-deploy.yaml`; controller and NKTP packages
+explicitly select version `0.22.0`. External chart versions and archive digests are unchanged. CAPI `v1.13.6`, cert-manager `v1.21.1`
+and the NKTP collector `0.162.0` follow the pinned source's tool versions and chart values.
+The pin operation verified those acquired chart bytes. These are input and static-contract changes,
+not an NVKE build, runtime observation, signed release or qualification. The beta migration's published
+Go 1.27.3 native toolchain images are preserved. The Ubuntu 24 agent retains a checksum-pinned Go 1.27.3
+compiler while preserving its Bookworm libc ABI builder.
+Native disk execution with this updated closure remains unexercised.
+The beta.6 migration's installer adapter is retained and its source selection advances to v0.22.0;
+there is no remaining legacy staged-installer exception. Contract checks do not establish live deployment.
