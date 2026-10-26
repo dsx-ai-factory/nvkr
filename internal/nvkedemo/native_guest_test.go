@@ -280,15 +280,17 @@ func TestNativeReadinessObservation(t *testing.T) {
 	}{
 		{"success", nil, 1, nil},
 		{"transient observation failure", []error{joined}, 2, nil},
-		{"three failures", []error{joined, joined, joined}, 3, failure},
+		{"recovers after four failures", []error{joined, joined, joined, joined}, 5, nil},
 		{"other exit", []error{&CommandError{ExitCode: 2, Cause: failure}}, 1, failure},
 		{"cancellation", []error{errors.Join(joined, context.Canceled)}, 1, context.Canceled},
 		{"deadline", []error{errors.Join(joined, context.DeadlineExceeded)}, 1, context.DeadlineExceeded},
 		{"unjoined process", []error{errors.Join(joined, ErrUnjoined)}, 1, ErrUnjoined},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+			defer cancel()
 			calls := 0
-			raw, err := nativeReadinessObservation(t.Context(), nil, func(context.Context) ([]byte, error) {
+			raw, err := nativeReadinessObservation(ctx, nil, func(context.Context) ([]byte, error) {
 				calls++
 				if calls <= len(tc.errors) {
 					return nil, tc.errors[calls-1]
@@ -303,7 +305,7 @@ func TestNativeReadinessObservation(t *testing.T) {
 }
 
 func TestNativeReadinessCancellationDuringRetry(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
 	calls := 0
 	_, err := nativeReadinessObservation(ctx, nil, func(context.Context) ([]byte, error) {
@@ -313,5 +315,63 @@ func TestNativeReadinessCancellationDuringRetry(t *testing.T) {
 	})
 	if calls != 1 || !errors.Is(err, context.Canceled) {
 		t.Fatalf("calls=%d err=%v", calls, err)
+	}
+}
+
+func TestNativeReadinessRequiresOriginalBudget(t *testing.T) {
+	canceled, cancel := context.WithTimeout(t.Context(), time.Minute)
+	cancel()
+	expired, stopExpired := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+	defer stopExpired()
+	for _, tc := range []struct {
+		name string
+		ctx  context.Context
+		code nvkrerr.Code
+		want error
+	}{
+		{"nil", nil, nvkrerr.CodeUsage, nil},
+		{"unbounded", context.Background(), nvkrerr.CodeUsage, nil},
+		{"canceled before observation", canceled, nvkrerr.CodeTimeout, context.Canceled},
+		{"expired before observation", expired, nvkrerr.CodeTimeout, context.DeadlineExceeded},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			_, err := nativeReadinessObservation(tc.ctx, nil, func(context.Context) ([]byte, error) {
+				calls++
+				return []byte("must not run"), nil
+			})
+			var coded *nvkrerr.Error
+			if calls != 0 || !errors.As(err, &coded) || coded.Code != tc.code || tc.want != nil && !errors.Is(err, tc.want) {
+				t.Fatalf("calls=%d err=%v", calls, err)
+			}
+		})
+	}
+}
+
+func TestNativeReadinessStopsAtOriginalDeadline(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
+	defer cancel()
+	failure := &CommandError{ExitCode: 1, Cause: errors.New("read failed")}
+	calls := 0
+	raw, err := nativeReadinessObservation(ctx, nil, func(context.Context) ([]byte, error) {
+		calls++
+		return nil, failure
+	})
+	if calls != 1 || len(raw) != 0 || !errors.Is(err, context.DeadlineExceeded) || !errors.Is(err, failure) || CommandExitCode(err) != -1 {
+		t.Fatalf("calls=%d raw=%q err=%v", calls, raw, err)
+	}
+}
+
+func TestNativeReadinessRejectsLateSuccess(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	calls := 0
+	raw, err := nativeReadinessObservation(ctx, nil, func(context.Context) ([]byte, error) {
+		calls++
+		cancel()
+		return []byte("too late"), nil
+	})
+	if calls != 1 || len(raw) != 0 || !errors.Is(err, context.Canceled) {
+		t.Fatalf("calls=%d raw=%q err=%v", calls, raw, err)
 	}
 }

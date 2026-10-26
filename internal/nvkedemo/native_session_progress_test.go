@@ -101,11 +101,10 @@ func TestNativeTenantRefreshesOwnedConditionsBeforeReadiness(t *testing.T) {
 	starting := nativeTenantRowObservation{Provisioning: TenantConditionTrue, Provisioned: TenantConditionFalse}
 	failed := nativeTenantRowObservation{Provisioning: TenantConditionFalse, Provisioned: TenantConditionFalse}
 	for _, tc := range []struct {
-		name                                                      string
-		observations                                              []nativeTenantRowObservation
-		wantError, failedStage                                    string
-		wantSecret, wantNodes, quiet, nodesUnready, nodeReadFails bool
-		wantExit                                                  int
+		name                                                                    string
+		observations                                                            []nativeTenantRowObservation
+		wantError, failedStage                                                  string
+		wantSecret, wantNodes, quiet, nodesUnready, nodeReadFails, readDeadline bool
 	}{
 		{name: "failed before Secret", observations: []nativeTenantRowObservation{starting, failed}, wantError: "provisioning failed", failedStage: "tenant-kubeconfig"},
 		{name: "failed without presenter", observations: []nativeTenantRowObservation{starting, failed}, wantError: "provisioning failed", quiet: true},
@@ -117,8 +116,8 @@ func TestNativeTenantRefreshesOwnedConditionsBeforeReadiness(t *testing.T) {
 		{name: "False with Unknown peer", observations: []nativeTenantRowObservation{starting, {Provisioning: TenantConditionFalse, Provisioned: TenantConditionUnknown}}, wantSecret: true, wantNodes: true},
 		{name: "still provisioning", observations: []nativeTenantRowObservation{starting}, wantSecret: true, wantNodes: true},
 		{name: "provisioned still needs nodes", observations: []nativeTenantRowObservation{starting, {Provisioning: TenantConditionFalse, Provisioned: TenantConditionTrue}}, wantSecret: true, wantNodes: true, nodesUnready: true},
-		{name: "transient read recovers", observations: []nativeTenantRowObservation{starting, {ExitCode: 1}, starting}, wantSecret: true, wantNodes: true},
-		{name: "read exhaustion", observations: []nativeTenantRowObservation{starting, {ExitCode: 1}}, wantExit: 1},
+		{name: "transient reads recover after four failures", observations: []nativeTenantRowObservation{starting, {ExitCode: 1}, {ExitCode: 1}, {ExitCode: 1}, {ExitCode: 1}, starting}, wantSecret: true, wantNodes: true},
+		{name: "read deadline", observations: []nativeTenantRowObservation{starting, {ExitCode: 1}}, readDeadline: true},
 		{name: "missing after transient read", observations: []nativeTenantRowObservation{starting, {ExitCode: 1}, {Missing: true}}, wantError: "omitted the exact owned native tenant"},
 		{name: "identity changed", observations: []nativeTenantRowObservation{starting, {ChangedID: true}}, wantError: "identity/provider changed"},
 		{name: "provider changed", observations: []nativeTenantRowObservation{starting, {ChangedProvider: true}}, wantError: "infrastructure changed"},
@@ -132,8 +131,10 @@ func TestNativeTenantRefreshesOwnedConditionsBeforeReadiness(t *testing.T) {
 			if err := privateJSON(filepath.Join(root, "tenant-row-observations.json"), tc.observations); err != nil {
 				t.Fatal(err)
 			}
-			if tc.nodesUnready {
+			if tc.nodesUnready || tc.readDeadline {
 				attempt.tenantTimeout = 2 * time.Second
+			}
+			if tc.nodesUnready {
 				writeTenantFixture(t, filepath.Join(root, "nodes.json"), []byte(`{"items":[]}`), 0600)
 			}
 			if tc.nodeReadFails {
@@ -156,8 +157,8 @@ exec "$0-fixture" "$@"
 				if err == nil || !strings.Contains(err.Error(), tc.wantError) {
 					t.Fatalf("fresh owned row did not stop readiness: %v", err)
 				}
-			case tc.wantExit != 0:
-				if CommandExitCode(err) != tc.wantExit || strings.Contains(err.Error(), "provisioning failed") {
+			case tc.readDeadline:
+				if !errors.Is(err, context.DeadlineExceeded) || CommandExitCode(err) != -1 || strings.Contains(err.Error(), "provisioning failed") {
 					t.Fatalf("read failure became controller failure: %v", err)
 				}
 			case tc.nodesUnready:

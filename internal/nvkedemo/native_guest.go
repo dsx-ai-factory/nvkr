@@ -607,19 +607,28 @@ func nativePrimaryAddress(row nativeInstance, network nativeBridgeConfig) (strin
 
 // A joined read-only CLI failure is not a guest state observation. Retry it
 // within the original readiness budget, requiring a successful response before
-// interpreting state. Three consecutive failures stop the attempt; cancellation,
-// timeout, unsafe ownership and other exit codes are never retried.
+// interpreting state. The caller's original deadline bounds the observation;
+// cancellation, timeout, unsafe ownership and other exit codes are never retried.
 func nativeReadinessObservation(ctx context.Context, progress io.Writer, observe func(context.Context) ([]byte, error)) ([]byte, error) {
+	if _, err := remainingWork(ctx); err != nil {
+		return nil, err
+	}
 	for attempt := 1; ; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		raw, err := observe(ctx)
-		if err == nil || CommandExitCode(err) != 1 || attempt == 3 {
+		if canceled := ctx.Err(); canceled != nil {
+			return nil, errors.Join(err, canceled)
+		}
+		if err == nil || CommandExitCode(err) != 1 {
 			return raw, err
 		}
 		if progress != nil {
-			fmt.Fprintf(progress, "Native readiness observation failed (%d/3); retrying within the existing deadline; readiness remains unconfirmed.\n", attempt)
+			fmt.Fprintf(progress, "Native readiness observation failed (attempt %d); retrying within the existing deadline; readiness remains unconfirmed.\n", attempt)
 		}
-		if err := pause(ctx, 2*time.Second); err != nil {
-			return nil, err
+		if waitErr := pause(ctx, 2*time.Second); waitErr != nil {
+			return nil, errors.Join(err, waitErr)
 		}
 	}
 }
