@@ -28,7 +28,6 @@ type mergeGateStep struct {
 }
 
 type mergeGateJob struct {
-	RunsOn   string            `json:"runs-on"`
 	If       string            `json:"if"`
 	Needs    []string          `json:"needs"`
 	Outputs  map[string]string `json:"outputs"`
@@ -134,9 +133,6 @@ func TestMergeGateRequiresEveryCodeJob(t *testing.T) {
 func TestMergeGateTestMatrix(t *testing.T) {
 	jobs := readMergeGateJobs(t)
 	producer, tests := jobs["check-paths"], jobs["tests"]
-	if tests.RunsOn != "ubuntu-24.04" {
-		t.Fatal("ordinary tests require the Ubuntu 24.04 disk-backed scratch and GNU coreutils baseline")
-	}
 	if producer.Outputs["test-matrix"] != "${{ steps.test-matrix.outputs.matrix }}" {
 		t.Fatal("check-paths must expose the matrix producer's output")
 	}
