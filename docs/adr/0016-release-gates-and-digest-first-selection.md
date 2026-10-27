@@ -173,7 +173,7 @@ construction. Qualified promotion under §1–§4 remains all-or-nothing for its
 there is no mixed-evidence shortcut around a missing reproduction receipt.
 
 The current M3 MVP is a build/evidence qualification gate over the exact complete M2 publication. It authenticates every named
-output against its producing Run, attempt, commit, Definition and relevant input identities. Strict input and
+output against its producing Run, original attempt identities, commit, Definition and relevant input identities. Strict input and
 evidence schemas, exact output membership, applicable pins/digests and source consistency, and cryptographically
 verified build signatures and provenance are mandatory. Missing, duplicate, extra, substituted or mismatched
 members/evidence fail with stable coded errors. Acquired payload identity and OCI delivery-container identity
@@ -217,8 +217,14 @@ metadata and the per-output route records required by qualification. It emits no
 admission returns a capability error before publication work; it cannot claim complete M3 transport.
 
 The owning lifecycle module issues an opaque, subject-bound check receipt after authenticating its exact
-inputs and build evidence. It retains the held verified publication and frozen Plan. Closing it revokes all
-copies, cancels and joins registered operations, then releases the held publication and any owned source
+inputs and build evidence. Hosted checks independently verify every output's complete payload in sequence;
+non-executable payload scratch is released before the next output. The delivery owner retains the checked
+control documents, evidence and exact executable bundle bytes, and issues no complete-set capability until every
+output and the aggregate content identity pass. This bounds transient payload storage by the current output
+instead of the sum of all outputs; one output must still fit the available scratch capacity. Discarded bytes
+cannot be exported through this owner. Ordinary full-publication verification retains its separate export
+capability. The check receipt retains this verified owner and frozen Plan. Closing it revokes all
+copies, cancels and joins registered operations, then releases the retained bytes and any owned source
 receipt. A decoded report, caller-supplied digest or passed boolean cannot restore the
 receipt, and the receipt itself grants no qualification signing authority. M3-B supplies applicable
 delivered CLI/operator version smoke results from those exact payload bytes with networking disabled.
@@ -234,6 +240,9 @@ nvkectl, Helm, kubectl, Kind, clusterctl or ORAS version profiles by exact compo
 expected versions and source stamps come from A's frozen Plan. Kind uses its quiet version response;
 clusterctl and ORAS additionally require the exact source commit, clean tree and native platform in
 their responses. A profile cannot substitute usage text or unsuccessful execution for a version check.
+nvkectl requires exactly one legacy `NKECTL_VERSION`/`NKECTL_COMMIT` or current
+`NVKECTL_VERSION`/`NVKECTL_COMMIT` stamp pair; mixed families fail closed. Both bind the
+normalized source version and a checked prefix of the exact source commit.
 OCI/APT non-tool scope requires an
 exact named output, kind, component set and deployment-image/package-repository role. It does not assert
 that those artifacts contain no tools. Disk and Helm use the explicit non-tool format rule. An explicit
@@ -248,8 +257,30 @@ reads. It rejects missing or extra tool profiles, non-tool membership and native
 validates expected versions/source stamps. Generated workers cover exactly the selected executable
 platforms; the final AMD64 signer additionally requires its independently pinned cosign executable.
 
+The hosted worker and final qualifier each own a fifty-nine-minute operation deadline inside their
+sixty-minute Actions step and ninety-minute job. The complete-operation budget covers source admission,
+metadata and payload acquisition, evidence authentication, native smoke or qualification publication, and
+production release-manifest issuance. Manifest issuance shares the final qualifier's original deadline;
+it does not start a fresh budget after qualification publication. A shorter caller deadline still wins.
+Development source recovery and complete artifact checking inherit that same caller budget; they do not
+impose a separate shorter whole-candidate deadline.
+The remaining minute allows cooperative
+joined cleanup and failure diagnostics; it is not a guaranteed return bound. Expiration cannot establish
+successful completion; attachments already published are not rolled back.
+Generated terminal commands replace the shell so cancellation reaches the CLI's signal handler.
+Each standalone SBOM verification also owns a three-minute deadline, including its cosign subprocess,
+and rejects success after cancellation. Metadata acquisition retains its twenty-minute bound. Payload
+acquisition inherits the complete-operation deadline; the delivery adapter's thirty-minute default applies
+only when its caller supplies no deadline, not as an additional per-output limit. These bounds contain
+failed work; they do not establish that a complete candidate fits the hosted budget. Explicit local artifact checks retain their caller's overall
+deadline and the individual operation bounds.
+
 Pipeline owns native ELF and image admission, bounded execution in a nonroot network-disabled container,
-clean payload environment, no host mounts or credentials, bounded output and stop/join cleanup. Lifecycle
+clean payload environment, no host mounts or credentials, bounded output and stop/join cleanup. Local image
+inspection uses the exact pin with portable Docker inspection arguments, then checks the returned platform,
+image identity and inherited configuration. It does not require the newer inspection-only platform option;
+an unexpected local variant still fails admission. Pull and container creation retain explicit platform selection,
+and the smoke owner checks the created container's image identity before streaming the executable. Lifecycle
 streams exact held members and evaluates fixed version responses; it issues a native receipt only after
 cleanup. The worker signs only that live receipt's canonical report under its separate worker identity.
 No worker has final qualification publication credentials. Failed native reports retain actual observations
@@ -261,10 +292,15 @@ preserves A's results and returns the original coded error; no qualification evi
 final owner therefore runs after completed worker failure as well as success, subject to the same trusted
 source condition and cancellation refusal. Failed or missing worker evidence cannot issue a B receipt.
 
-Hosted aggregation independently rechecks A and the current invocation, admits every required successful
-worker job from that exact attempt and authenticates each worker document. The same verified certificate
-must match the independently selected worker SAN and GitHub issuer and bind the top-level workflow URI,
-workflow commit and exact Run attempt. Provider artifact metadata and job status alone are insufficient.
+Hosted aggregation independently rechecks A and the current invocation and selects the latest worker job
+for each required native platform within the same qualification Run, no later than the current attempt.
+Every selected job must succeed; a later failed or unfinished worker cannot fall back to an earlier success.
+An earlier successful worker is reusable only with the same repository, workflow, commit, branch, exact A
+results and full independent policy. The same verified certificate must match the independently selected
+worker SAN and GitHub issuer and bind that worker's original top-level workflow URI, workflow commit and
+Run attempt. Artifact names and provider jobs select the original attempt; neither authenticates the worker
+document without signature verification. Original worker invocations are retained, while aggregation and
+qualification signing bind the current invocation.
 The owner recomputes complete disjoint native member coverage, exact payload sizes/digests, expected and
 observed versions, image selections and the full policy identity before issuing a B receipt. B borrows
 A and the invocation; closure revokes copies. Caller-authored reports and booleans cannot restore it.
@@ -273,11 +309,17 @@ Production hosted qualification takes one independently selected policy; its sou
 `workflow_run` event and provider API. Native cosign byte pins are independent of producer tool selection.
 The pinned release version is a bootstrap download locator, never authority in place of those byte pins.
 
-The MVP requires each root/output production predicate's invocation to equal the authenticated source Run
-attempt exactly. Where an output carries a publication-origin record, both its preparation and signing
-invocations must equal that source attempt. ADR-20's existing publication retry/reuse behavior is unchanged,
-but an earlier-attempt publication cannot satisfy this qualification gate. Reusing bytes never permits
-relabelling their producing attempt; authenticated qualification reuse remains deferred.
+For production and development, the authenticated successful source attempt is the completion boundary for the producer workflow run.
+Root and output production predicates may name current or earlier attempts of that same run under ADR-20's
+publication retry contract. The repository, server, workflow builder and exact Plan/input bindings must
+match. Output preparation must precede or equal its signing, which must precede or equal aggregate assembly;
+aggregate assembly must precede or equal aggregate signing, which must precede or equal source completion.
+Every output predicate must match its authenticated original signing invocation. Different runs, future
+attempts, missing or inconsistent origins, changed inputs or missing evidence fail closed. An earlier attempt need not
+have succeeded as a whole when its authenticated successful output is reused by a later complete attempt.
+The consumer verifies the full artifact and evidence closure and retains original predicates and origins;
+retrying never relabels earlier bytes as current-attempt production. This admits producer recovery, not
+reuse of an earlier qualification verdict in place of current complete-set verification.
 
 Every output has exactly one overall pass/fail verdict and every applicable check has a result. The overall
 verdict includes final source-receipt admission: if revocation is detected after artifact checks complete,
@@ -293,8 +335,9 @@ qualification invocation (ADR-18); a green build or the publisher's own identity
 Smoke execution receives no qualification signing authority.
 
 The current scope permits merging the reviewed implementation and concrete candidate
-policy/workflows before real acceptance runs. After merge, a fresh complete producer attempt with its original
-handoff and hosted positive/negative qualification and independent-consumer checks must establish acceptance.
+policy/workflows before real acceptance runs. After merge, a complete producer run with its original evidence
+and a handoff for its successful completion attempt, hosted positive/negative qualification and
+independent-consumer checks must establish acceptance. Authenticated partial retries are permitted.
 Until those results are recorded, production readiness remains unproved; merge is not operational acceptance.
 All runtime gates remain mandatory for those runs. External acceptance must retain immutable Run/artifact
 references for a real `workflow_run` exercise: the certificate SAN and OIDC issuer from the verified bundle,
@@ -333,6 +376,13 @@ canonical manifest (ADR-01) to the publication root under the qualification iden
 attached bytes again. The receipt is rechecked and cancellation is observed between every step. Issuance uses
 M2's existing bytes and never rebuilds, repacks or relabels a member.
 
+The production adapter derives that independent manifest policy from the one loaded qualification-policy
+snapshot: its repository, qualification workflow and default branch select the exact expected certificate
+identity, and its typed policy digest selects the evidence contract. The generated production qualifier
+requests issuance explicitly in the same process; development qualification cannot request a production
+manifest. The retained operation owns and closes the source, invocation, artifact and smoke receipts.
+It preserves qualification diagnostics on a later manifest failure and reports the overall operation as failed.
+
 An opaque manifest receipt is returned only after that verification; decoding a manifest cannot restore it.
 Attestation and verification are not atomic: an operational failure may leave a manifest attachment and is
 reported as a failed issuance. The release tag rule, tag creation, publisher exclusion, consumer manifest
@@ -340,7 +390,7 @@ verification and interruption handling belong to the separate M4 publication ste
 does not establish a release.
 
 Full disk inspection/material reconciliation, waivers, offline pull-request qualification, a dedicated
-verify-only dispatch and incremental reuse are deferred hardening. External qualification suites such as
+verify-only dispatch and cross-run qualification reuse are deferred hardening. External qualification suites such as
 NVKE's have a reserved integration boundary: results must be independently authenticated and bound to exact
 artifact subjects, invocation and policy before inclusion. A suite outside this MVP is explicitly
 `not evaluated—outside MVP scope`, never passed. Once policy requires a suite, absent or failing authenticated
@@ -361,10 +411,13 @@ inputs and recovers its original public metadata controls. A production handoff 
 separate path. Recovery supplies descriptions only: the same artifact verification, native tool smoke,
 complete-set receipts, signing and attachment read-back remain mandatory. Source and qualifier branches
 may differ; both exact commits and invocations are retained without relabeling the original build.
+Development publications retain their original namespaces and attempt bindings within the same source run. Within a qualification run,
+successful native workers may be retained from earlier attempts under the same worker-retry checks above;
+original branch, source, policy, artifact and certificate bindings remain mandatory.
 
 Development evidence uses `nvkr.dev/development-qualification-evidence/v1`, gate
 `nvkr.dev/development-qualification-gate/v1` and the separate predicate registered in ADR-01. Every subject
-must remain inside the original source Run/attempt namespace. The production decoder and publisher reject
+must remain inside its original publication namespace of the selected source Run, no later than completion. The production decoder and publisher reject
 development evidence and receipts. Development success grants no production acceptance, reproduction,
 full disk inspection or external-suite acceptance. Hosted execution remains separately evidenced.
 
@@ -598,6 +651,18 @@ Lifecycle authenticates each root and its exact producing Run, retains live rece
 executable members through the delivery owner. The adapter runs those held Linux executables with an
 embedded kubeconfig and bounded child-process lifetimes. Tools and suite images are ordinary catalog
 outputs; caller-authored binary paths, payload digests or raw image references cannot restore authority.
+An explicit diagnostic `source.kind: local` instead captures the original complete local Run,
+its recorded Plan and compiler inputs, and its exact payloads through lifecycle's concrete
+`LocalDiagnosticArtifacts` owner. Product and tools may share that one owner; separate local
+Runs require separate captures. No publication identity, hosted origin, policy receipt or qualification
+input is synthesized. Local image aliases are descriptions only: selected running manifests must match
+the held output before and after the suite. Local executable members use the same held delivery export. Native Mac local diagnostics additionally admit exact Darwin ARM64 members through that local owner,
+using private Mach-O snapshots with checks before/after commands and owned process cleanup.
+Linux retains sealed executable descriptors. The Mac diagnostic does not widen published-source
+validation or qualified signing, and its pathname execution cannot prevent a hostile same-user
+writer from racing execution. Both hosts retain the same suite/image bindings and original JUnit.
+This capability is limited to `unqualified-local-execution`; partial, changed and dry-run attempts fail.
+
 The operator must explicitly declare an existing disposable local cluster. That declaration proves
 neither locality nor exclusive ownership. This host execution is not a sandbox (ADR-18 §3).
 

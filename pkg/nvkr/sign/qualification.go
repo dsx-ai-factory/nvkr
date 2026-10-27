@@ -58,6 +58,9 @@ func (s *CosignOCISigner) attestExact(ctx context.Context, subject Subject, pred
 	if err := subject.Validate(); err != nil {
 		return err
 	}
+	if _, err := admitOCIRegistry(subject, s.credential); err != nil {
+		return err
+	}
 	if err := requireOCIPredicateWithLimit(predicate, MaxQualificationPredicateBytes, e.CodeVerifyFailed, label+" predicate"); err != nil {
 		return err
 	}
@@ -110,6 +113,9 @@ func (s *CosignOCISigner) verifyExact(ctx context.Context, subject Subject, pred
 		return err
 	}
 	if err := subject.Validate(); err != nil {
+		return err
+	}
+	if _, err := admitOCIRegistry(subject, s.credential); err != nil {
 		return err
 	}
 	if len(predicate) == 0 {

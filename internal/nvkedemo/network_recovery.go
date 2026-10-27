@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"slices"
@@ -53,7 +54,7 @@ func readNetworkState(work string) (networkState, error) {
 
 func validNetworkID(id networkFileID) bool { return id.Inode > 0 && id.Mode <= 0o7777 }
 func validateNetworkState(s networkState, work string) error {
-	if s.Version != 3 || s.Work != work || s.UID != uint32(os.Getuid()) || s.PID <= 0 {
+	if (s.Version != 3 && s.Version != 4) || s.Work != work || s.UID != uint32(os.Getuid()) || s.PID <= 0 {
 		return fmt.Errorf("recovery journal version/work/owner differs")
 	}
 	owner := strings.TrimPrefix(s.Owner, "nvke-demo-")
@@ -69,18 +70,12 @@ func validateNetworkState(s networkState, work string) error {
 	if err != nil || strings.Join(boot, "") != hex.EncodeToString(raw) {
 		return fmt.Errorf("invalid boot identity")
 	}
-	mac := strings.Split(s.BridgeMAC, ":")
-	if len(mac) != 6 {
+	mac, err := net.ParseMAC(s.BridgeMAC)
+	if err != nil || len(mac) != 6 || mac[0]&3 != 2 {
 		return fmt.Errorf("invalid bridge marker")
 	}
-	raw, err = hex.DecodeString(strings.Join(mac, ""))
-	if err != nil || len(raw) != 6 || raw[0]&3 != 2 {
-		return fmt.Errorf("invalid bridge marker")
-	}
-	for i, part := range mac {
-		if len(part) != 2 || part != hex.EncodeToString(raw[i:i+1]) {
-			return fmt.Errorf("noncanonical bridge marker")
-		}
+	if mac.String() != s.BridgeMAC {
+		return fmt.Errorf("noncanonical bridge marker")
 	}
 	if s.BridgeID != "" {
 		index, err := strconv.Atoi(s.BridgeID)
@@ -118,11 +113,15 @@ func validateNetworkState(s networkState, work string) error {
 		seen[key] = true
 	}
 	// Reuse the constructor's IP admission, without opening work or generating IDs.
-	if err := validateNetworkKind(s.KindCIDR); err != nil {
+	if s.Version == 4 {
+		if s.KindCIDR != "" || s.KindGateway != "" || s.BGPIntent {
+			return fmt.Errorf("native host transport cannot carry Kind or BGP bindings")
+		}
+	} else if err := validateNetworkKind(s.KindCIDR); err != nil {
 		return err
 	}
-	allowed := networkRules(s.Owner, s.KindCIDR)
-	maxRules := 14
+	allowed := append(networkRules(s.Owner, s.KindCIDR), nativeBootstrapRules(s.Owner, s.KindCIDR)...)
+	maxRules := 14 + len(nativeBootstrapRules(s.Owner, s.KindCIDR))
 	if s.KindGateway != "" {
 		if err := admittedKindGateway(s.KindCIDR, s.KindGateway); err != nil {
 			return err
@@ -149,7 +148,7 @@ func validateNetworkState(s networkState, work string) error {
 		if exact {
 			continue
 		}
-		if row.Table != "raw" || row.Chain != "PREROUTING" || len(row.Args) != 16 {
+		if s.Version == 4 || row.Table != "raw" || row.Chain != "PREROUTING" || len(row.Args) != 16 {
 			return fmt.Errorf("unknown firewall intent")
 		}
 		port, err := strconv.Atoi(row.Args[13])
@@ -175,8 +174,8 @@ func validateNetworkState(s networkState, work string) error {
 }
 
 // RecoverNetworkGuard authenticates only the original operator recovery journal.
-// It never signals serialized PIDs or resumes builds. Only version-3 journals
-// are supported.
+// It never signals serialized PIDs or resumes builds. It supports version-3 Kind
+// and version-4 native journals with their distinct admitted control sets.
 func RecoverNetworkGuard(ctx context.Context, runner Runner) (*NetworkGuard, error) {
 	if err := requireContext(ctx); err != nil {
 		return nil, err

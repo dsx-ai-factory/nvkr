@@ -1,0 +1,38 @@
+{
+  "apiVersion": "nvkr.dev/definition/v5",
+  "catalog": {
+    "base": "../../../catalogs/nvke/module-cli-arm64"
+  },
+  "kind": "Definition",
+  "metadata": {
+    "name": "nvke-local-dev-arm64-os-kvm",
+    "description": "Local ARM64 non-FDE disk and its exact material closure using required KVM; no publication or signing."
+  },
+  "outputs": [
+    {
+      "catalog": {
+        "base": "../../../catalogs/node-images/release",
+        "overlays": [
+          "../../../catalogs/node-images/variants/nvidia-tcg.json",
+          "../../../catalogs/node-images/variants/nvidia-local-kvm.json"
+        ]
+      },
+      "components": [
+        "nvke-agent",
+        "nvke-cni-calico",
+        "nvke-cni-ovn",
+        "nvke-image-inputs",
+        "nvke-kubeadm-distro",
+        "nvke-node-image",
+        "nvke-patched-installer-iso",
+        "nvke-spire-agent",
+        "ovn-kube-ubuntu",
+        "ovn-kubernetes-chart",
+        "ubuntu-installer-iso"
+      ],
+      "format": "disk-image",
+      "name": "nvke-node-image-arm64",
+      "platform": "linux/arm64"
+    }
+  ]
+}

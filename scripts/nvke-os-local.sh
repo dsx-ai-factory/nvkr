@@ -17,6 +17,7 @@ with Docker and KVM. This is a development bootstrap route.
 
 CONTAINER_RUNTIME defaults to docker; this launcher requires Docker.
 Set NVKE_OS_ARCH=amd64 or NVKE_OS_ARCH=arm64. ARM64 is the compatibility default.
+Set NVKE_OS_UBUNTU_VERSION=24.04 to select Ubuntu 24.04.5; 26.04 is the default.
 Set NVKE_LOCAL_CLONE to a local NVKE Git checkout when replacing the pinned
 repository fetch.
 EOF
@@ -39,6 +40,7 @@ fi
 input_root=".nvkr/inputs/${attempt}"
 runtime="${CONTAINER_RUNTIME:-docker}"
 arch="${NVKE_OS_ARCH:-arm64}"
+ubuntu_version="${NVKE_OS_UBUNTU_VERSION:-26.04}"
 case "${runtime}" in
   docker) ;;
   *) echo "CONTAINER_RUNTIME must be docker" >&2; exit 2 ;;
@@ -46,6 +48,10 @@ esac
 case "${arch}" in
   amd64|arm64) ;;
   *) echo "NVKE_OS_ARCH must be amd64 or arm64" >&2; exit 2 ;;
+esac
+case "${ubuntu_version}" in
+  24.04|26.04) ;;
+  *) echo "NVKE_OS_UBUNTU_VERSION must be 24.04 or 26.04" >&2; exit 2 ;;
 esac
 command -v "${runtime}" >/dev/null 2>&1 || {
   echo "container runtime not found: ${runtime}" >&2
@@ -83,15 +89,30 @@ command -v jq >/dev/null 2>&1 || {
 }
 definition_source="inputs/definitions/diagnostics/os-${arch}.yaml"
 environment_source="inputs/environments/local-linux-${arch}-kvm.yaml"
+catalog_source="inputs/catalogs/node-images/diagnostic"
+definition_catalog='../../catalogs/node-images/diagnostic'
+definition_overlays='[]'
 overlay_source=""
-# Only maintained Definitions that declare an architecture overlay need one.
-# A missing declared overlay still fails when NVKR loads the frozen Definition.
-if [[ -f "inputs/catalogs/node-images/variants/diagnostic-${arch}-kvm.yaml" ]]; then
-  overlay_source="inputs/catalogs/node-images/variants/diagnostic-${arch}-kvm.yaml"
+ubuntu_overlay_source=""
+if [[ "${arch}" == arm64 ]]; then
+  overlay_source="inputs/catalogs/node-images/variants/diagnostic-arm64-kvm.yaml"
+  definition_overlays='["../../catalogs/node-images/variants/diagnostic-arm64-kvm.yaml"]'
 fi
-required_inputs=("${definition_source}" "${environment_source}")
+if [[ "${ubuntu_version}" == 24.04 ]]; then
+  definition_source="inputs/definitions/diagnostics/ubuntu24/definition-${arch}.yaml"
+  catalog_source="inputs/catalogs/node-images/release"
+  overlay_source="inputs/catalogs/node-images/variants/native-toolchains.yaml"
+  ubuntu_overlay_source="inputs/catalogs/node-images/variants/ubuntu24.json"
+  definition_catalog='../../../catalogs/node-images/release'
+  definition_overlays='["../../../catalogs/node-images/variants/native-toolchains.yaml","../../../catalogs/node-images/variants/ubuntu24.json"]'
+fi
+required_inputs=("${definition_source}" "${environment_source}"
+  "${catalog_source}/registry.yaml" "${catalog_source}/pins.lock.yaml")
 if [[ -n "${overlay_source}" ]]; then
   required_inputs+=("${overlay_source}")
+fi
+if [[ -n "${ubuntu_overlay_source}" ]]; then
+  required_inputs+=("${ubuntu_overlay_source}")
 fi
 for required_input in "${required_inputs[@]}"; do
   if [[ ! -f "${required_input}" ]]; then
@@ -122,10 +143,13 @@ fi
 
 mkdir -p "${input_root}/catalog"
 cp "${environment_source}" "${input_root}/environment-local.yaml"
-cp inputs/catalogs/node-images/diagnostic/pins.lock.yaml "${input_root}/catalog/pins.lock.yaml"
-cp inputs/catalogs/node-images/diagnostic/registry.yaml "${input_root}/catalog/registry.yaml"
+cp "${catalog_source}/pins.lock.yaml" "${input_root}/catalog/pins.lock.yaml"
+cp "${catalog_source}/registry.yaml" "${input_root}/catalog/registry.yaml"
 if [[ -n "${overlay_source}" ]]; then
-  cp "${overlay_source}" "${input_root}/diagnostic-${arch}-kvm.yaml"
+  cp "${overlay_source}" "${input_root}/$(basename "${overlay_source}")"
+fi
+if [[ -n "${ubuntu_overlay_source}" ]]; then
+  cp "${ubuntu_overlay_source}" "${input_root}/ubuntu24.json"
 fi
 
 # Build the bootstrap runner from this checkout in the exact pinned native
@@ -151,14 +175,13 @@ if [[ ! -x "${runner}" ]]; then
 fi
 
 frozen_definition="${input_root}/definition.yaml"
-# Keep the frozen catalog and overlays local to this immutable attempt even
-# though authored Definitions and catalogs live in separate input directories.
+# Keep the exact selected catalog stack and source patches local to this attempt.
+# Reject authored drift instead of silently replacing an unexpected catalog.
 "${runner}" definition inspect --definition "${definition_source}" |
-  jq --arg catalog '../../catalogs/node-images/diagnostic' \
-    --arg overlay "../../catalogs/node-images/variants/diagnostic-${arch}-kvm.yaml" '
+  jq --arg catalog "${definition_catalog}" --argjson overlays "${definition_overlays}" '
     if .catalog.base != $catalog or any(.outputs[]; .catalog != null) or
-      any((.catalog.overlays // [])[]; . != $overlay) then
-      error("OS bootstrap requires the maintained diagnostic catalog and architecture overlay")
+      (.catalog.overlays // []) != $overlays then
+      error("OS bootstrap requires the maintained catalog and ordered overlays")
     else . end |
     .catalog.base = "catalog" |
     if .catalog.overlays then .catalog.overlays |= map(split("/") | last) else . end' \

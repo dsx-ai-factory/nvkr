@@ -202,8 +202,8 @@ func TestLaptopProfilesLocalAPTProjection(t *testing.T) {
 	}
 	packages := []string{
 		"teleport-ent=18.6.4",
-		"nke-agent nke-kubeadm-distro-{{ trimPrefix .KubernetesVersion \"v\" }} spire-agent",
-		"nke-cni-calico-images-3.30.1 nke-cni-calico-manifests-3.30.1",
+		"nvke-agent nvke-kubeadm-distro-{{ trimPrefix .KubernetesVersion \"v\" }} spire-agent",
+		"nvke-cni-calico-images-3.30.1 nvke-cni-calico-manifests-3.30.1",
 		"nke-cni-ovn-images-2.4.2 nke-cni-ovn-charts-2.4.2",
 	}
 	if len(commands) != len(packages) {
@@ -273,7 +273,7 @@ func TestLaptopProfilesImageContext(t *testing.T) {
 	}
 }
 
-// Exact bytes from NVKE 8fb2d53368823bd386b4fbd55b4ab6d3c0931345, not a
+// Exact bytes from NVKE 8db5721ae3031bdcd945e559153a740d46ea209e, not a
 // Dockerfile grammar or semantic validator. BuildKit owns that interpretation.
 const laptopProfilesDockerfile = `# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
@@ -510,6 +510,11 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 			if err := plan.Validate(); err != nil {
 				t.Fatal(err)
 			}
+			profilesPin, err := plan.CatalogSnapshot.SourcePin("nvke-profiles")
+			if err != nil {
+				t.Fatal(err)
+			}
+			profilesRepository := plan.CatalogSnapshot.Sources["nvke-profiles"].Repo
 			if len(plan.Builds) != 1 || len(plan.LifecycleOutputs) != 1 || plan.LifecycleOutputs[0].Name != "controller-profiles" || plan.LifecycleOutputs[0].Kind != "oci" {
 				t.Fatal("profiles must remain a separate single-output selection")
 			}
@@ -520,7 +525,7 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 					t.Fatal("profiles must not fall back to an acquired fleet image")
 				case ir.KindFetch:
 					fetches++
-					if node.Commit != "8fb2d53368823bd386b4fbd55b4ab6d3c0931345" || node.TreeHash != "36569cf4ec0e2360ee023cd7e53da65b96ce770d" {
+					if node.Repo != profilesRepository || node.Commit != profilesPin.Commit || node.TreeHash != profilesPin.TreeHash {
 						t.Fatal("profiles must use the staged-installer source")
 					}
 				case ir.KindBuild:
@@ -547,7 +552,7 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 						}
 					}
 					if len(node.Patches) != 1 || node.Patches[0].Name != "patches/local-profile.patch" ||
-						node.Patches[0].SHA256 != "sha256:e0a9bd1571a45554f7751fbfe0cf9205034a18f5d1af411bfb41740e5e439397" {
+						node.Patches[0].SHA256 != "sha256:3928811f56ba0a47011afd16dc066c54189be06c238da43d801e92ae3fd02e22" {
 						t.Fatal("Plan must retain the exact authenticated source patch")
 					}
 					command := node.Patches[0].Content

@@ -1,7 +1,7 @@
 # Definition, Run, and Release workflow
 
 This reference covers output completeness, immutable attempts, release verification and SDK use.
-Start with the [quickstart](quickstart.md) for CLI setup and the [concept reference](user-concepts.md)
+Start with the [quickstart](quickstart.md#build-only-the-cli) for CLI setup and the [concept reference](user-concepts.md)
 for the six public objects. [ADR-17](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0017-cli-sdk-foundation-and-package-topology.md) owns the
 lifecycle contract; [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md) owns current implementation and evidence.
 
@@ -162,7 +162,7 @@ execution; producer resolution; all catalog inspection and maintenance commands;
 and Release inspection, browsing, export, pulling and verification. Other than the interactive
 local Run default described above, commands default to `--ui=plain` and keep their
 existing text, canonical JSON or diagram output. On commands with a result
-browser, `--ui=auto` selects it when the terminal is eligible. Explicit JSON output
+browser, `--ui=auto` selects it when the terminal is eligible. Explicit JSON or Mermaid output
 and `--ui=tui` are incompatible and fail before input, network or write work.
 `validate`, `run check-artifacts` and `run qualify` retain canonical machine-readable diagnostics and do not offer
 presentation flags.
@@ -177,11 +177,14 @@ Graph and release browsers start with an output overview when their supplied
 results also contain internal nodes or evidence entries. Press `g` to toggle all
 supplied entries; `/` searches the complete supplied set. Producer-only graph
 views keep their supplied producers. The default list uses one row per entry,
-with readable output names; repeated static states are omitted. Full digests and command context live in
+with readable output names; repeated static states are omitted. Release rows add compact kind/platform or
+chart-version summaries when the complete row fits. Full digests and command context live in
 Details.
 
 Results and Details show projected names, identities, counts and dependencies;
-`/` searches names and `f` cycles the available All, Changed and Failed filters.
+`/` searches result names, navigation identities, kinds and projected metadata fields, and `f` cycles the
+available All, Changed and Failed filters. Searches match a case-insensitive substring across the supplied
+entries; global command context is outside item search. Run progress keeps its output-name search.
 Static views offer Activity only when activity is supplied; live Runs retain it.
 Tab cycles the available panes, and 1/2/3 selects a pane when available.
 Details group navigable dependencies before item metadata and command context.
@@ -481,9 +484,11 @@ or signature-verification I/O.
 Every selected output is checked for schema/membership, exact Run and inputs, signed evidence, build
 signature/provenance, applicable payload pins and any authored embedded declarations. Failed checks return coded
 diagnostics; only a complete passing set produces an opaque `ArtifactCheckReceipt`. Its description is
-defensive data and grants no authority. A successful receipt retains the verified publication and a frozen
-Plan until closed. Closure revokes all shallow copies, cancels and joins registered operations, then releases
-held payload bytes. This lifetime does not itself authorize smoke execution. The direct consumer and handoff
+defensive data and grants no authority. Hosted checks verify every output's complete payload in sequence,
+releasing non-executable scratch after each output. A successful receipt retains verified controls, evidence,
+exact executable bundle bytes and a frozen Plan until closed; it cannot export discarded payloads. Closure revokes
+all shallow copies, cancels and joins registered operations, then releases held bytes. This lifetime does not
+itself authorize smoke execution. The direct consumer and handoff
 methods borrow the caller's source Run receipt, whose closure also revokes the check receipt. The Run and
 file adapters transfer their internally created source owner to the returned receipt and close it with that
 receipt.
@@ -499,10 +504,13 @@ An incomplete evidence traversal is labeled as a failure of the complete publica
 signed-evidence diagnostic. Output-specific signature failures remain visible alongside that global failure;
 no output receives a passing evidence verdict merely because its own signature check did not fail.
 
-Qualification requires the root and every output predicate to name that exact source attempt. When output
-metadata records publication origin, both preparation and signing invocations must also match. Earlier-attempt
-publication reuse remains available to the existing publication retry protocol, but cannot satisfy this MVP
-qualification gate. Earlier bytes are never relabeled as produced by the current attempt. The CLI writes
+Production qualification accepts authenticated publications from earlier attempts of the same producer workflow run.
+The selected successful attempt anchors completion; each output retains its original preparation and signing
+identities and exact predicate bytes. Preparation must precede or equal signing, output signing must precede
+or equal aggregate assembly, and aggregate assembly/signing must precede or equal source completion.
+All subjects must match the same exact Plan, inputs and workflow builder. Missing origins, other runs,
+future attempts, changed inputs and invalid or incomplete evidence still fail. An earlier attempt may have
+failed unrelated jobs; its successfully authenticated outputs need not be rebuilt. The CLI writes
 check diagnostics and returns the stable failure code; its serialized output cannot restore a live receipt
 or grant qualification signing authority.
 
@@ -532,6 +540,27 @@ The generated workflow supplies its environment and credentials. The command dis
 from the authenticated `workflow_run` event, verifies the source's exact successful attempt, and downloads
 its original handoff. There are no source-commit, candidate-file, verdict-file or skip-smoke flags.
 A manually dispatched qualifier or the source build's own identity is rejected.
+
+The generated production qualifier adds `--issue-manifest`:
+
+```sh
+nvkr run qualify --policy qualification.yaml --issue-manifest
+```
+
+This keeps the live artifact-check receipt through complete qualification publication and manifest
+issuance. The same independently loaded policy selects the exact default-branch qualification identity
+and policy digest; evidence cannot select its own trusted signer. The issuer verifies the exact canonical
+qualification evidence on every artifact, attests the manifest to the publication root, then verifies its
+attached bytes. Development policies refuse this option before provider or publication work; their
+generated qualifier publishes development qualification only.
+
+With this option, canonical diagnostics contain the qualification result and, after successful issuance,
+the manifest, its digest and subject. A manifest failure returns a nonzero exit status and preserves the
+qualification diagnostics, including a successful qualification whose later manifest step failed. Earlier
+attachments may remain; failure does not imply rollback. Without the option, the command retains its
+qualification-only output shape. Neither mode creates a release tag, moves a channel, issues qualified-lane
+clearance or establishes full-release consumer acceptance. Hosted OIDC and registry acceptance remain
+subject to the evidence recorded in reconciliation.
 
 Add `--qualification-policy qualification.yaml` to the normal `run generate` invocation to generate the
 qualifier and its native smoke worker alongside the producer. The worker is a generated reusable GitHub
@@ -618,12 +647,15 @@ check results remain intact; this does not claim the payload itself was executed
 
 After workers complete with success or failure, the final job repeats artifact checks and attempts to
 authenticate the complete smoke set. This produces refusal diagnostics when a worker failed. Canceled,
-skipped or untrusted source invocations do not enter this final job. Publication still requires successful worker
-jobs from the exact current attempt and verifies each report's signature, worker certificate SAN and GitHub
-issuer. The same verified leaf must bind the top-level workflow, workflow commit and exact Run attempt.
-It then recomputes the complete expected member set and compares the full independent policy, payload
-identities, native images, expected versions and observed results. A missing architecture, missing member,
-wrong identity, reused attempt or failed check prevents signing.
+skipped or untrusted source invocations do not enter this final job. For each platform, publication selects
+the latest worker job in the same qualifier run, up to the current attempt, and requires it to succeed.
+Successful workers from earlier attempts can be reused; a later failed or unfinished job blocks fallback.
+The original attempt's artifact, report signature, worker certificate SAN and GitHub issuer are verified.
+The same verified leaf must bind the worker's original top-level workflow, workflow commit and Run attempt.
+The final owner requires unchanged source artifact checks, commit, full independent policy, native images
+and complete expected member identities/results. A missing architecture or member, another run or workflow,
+future attempt, changed policy or failed check prevents signing. The final qualification evidence binds the
+current invocation and preserves every worker's original invocation.
 
 `qualification.PublishTriggeredRun` owns this orchestration. The lower-level publisher consumes live A,
 B and invocation receipts; serialized reports cannot restore them. The old `qualification.PublishFiles`
@@ -645,7 +677,8 @@ the command returns a failure code and retains those subjects in its diagnostics
 not establish successful qualification or release authorization.
 
 The maintained candidate's reviewed policy and generated workflows may merge before real acceptance runs.
-After merge, a fresh complete producer attempt must provide its original exact-attempt handoff; the hosted
+After merge, a complete producer run must provide its original evidence and a handoff for its successful
+completion attempt; authenticated partial retries are permitted. The hosted
 worker/qualifier and independent consumer then exercise positive and negative cases. These observations
 remain unproved and are required before production-readiness claims. Local native-container, race and protocol
 tests do not establish GitHub's actual reusable-job names, OIDC claims, production attachment/read-back or

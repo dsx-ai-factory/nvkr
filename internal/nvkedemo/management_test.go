@@ -9,12 +9,11 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
-	"time"
+
+	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 func TestNativeEnvironmentExcludesForeignTargets(t *testing.T) {
@@ -36,171 +35,6 @@ func TestNativeEnvironmentExcludesForeignTargets(t *testing.T) {
 	}
 	if !slices.IsSorted(updated) {
 		t.Fatal("environment not sorted")
-	}
-}
-
-func TestManagementKindImageAdmissionDiagnostics(t *testing.T) {
-	for _, row := range []struct {
-		name, id, arch string
-		exit           int
-	}{
-		{name: "cached", id: kindNodeID, arch: "arm64"},
-		{name: "missing", exit: 1},
-		{name: "docker-unavailable", exit: 42},
-		{name: "wrong-image", id: "foreign-id", arch: "arm64"},
-	} {
-		t.Run(row.name, func(t *testing.T) {
-			work := privateTestDir(t)
-			script := "#!/bin/sh\n[ \"$1 $2\" = 'image inspect' ] && [ \"$3\" = \"$PIN\" ] || exit 99\nprintf '%s\\n' 'private Docker diagnostic' >&2\nprintf '%s\\n' \"$IMAGE\"\nexit \"$EXIT\"\n"
-			if err := os.WriteFile(filepath.Join(work, "docker"), []byte(script), 0o700); err != nil {
-				t.Fatal(err)
-			}
-			raw, err := json.Marshal([]dockerImage{{ID: row.id, Architecture: row.arch}})
-			if err != nil {
-				t.Fatal(err)
-			}
-			runner := Runner{Work: work, Env: []string{"PATH=" + work + ":/usr/bin:/bin", "PIN=" + kindNodeImage, "IMAGE=" + string(raw), "EXIT=" + strconv.Itoa(row.exit)}}
-			err = admitKindImage(t.Context(), runner)
-			if row.name == "cached" {
-				if err != nil {
-					t.Fatal(err)
-				}
-				return
-			}
-			if err == nil || !strings.Contains(err.Error(), "cache") || !strings.Contains(err.Error(), kindNodeImage) || !strings.Contains(err.Error(), "docs/local-nvke-demo.md#4-build-and-run-the-demo") || strings.Contains(err.Error(), "private Docker diagnostic") {
-				t.Fatalf("cache prerequisite diagnostic=%v", err)
-			}
-			if row.exit != 0 {
-				var command *CommandError
-				if !errors.As(err, &command) || command.Phase != "admit-kind-image" || command.ExitCode != row.exit || !strings.Contains(err.Error(), "could not inspect") {
-					t.Fatalf("inspection cause=%v", err)
-				}
-			}
-		})
-	}
-}
-
-func TestManagementConfigProjectionAdmitsExactSourceAndUsesIPv4(t *testing.T) {
-	source, err := os.ReadFile("testdata/pinned-kind.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if plainSHA(source) != kindConfigHash {
-		t.Fatal("fixture differs from pinned NVKE source")
-	}
-	before := string(source)
-	for _, name := range []string{"exact", "already-projected", "missing-family", "duplicate-family", "missing-socket", "changed-image", "trailing-content"} {
-		t.Run(name, func(t *testing.T) {
-			input := before
-			switch name {
-			case "already-projected":
-				input = strings.Replace(input, sourceKindIPFamily, "  ipFamily: ipv4\n", 1)
-			case "missing-family":
-				input = strings.Replace(input, sourceKindIPFamily, "", 1)
-			case "duplicate-family":
-				input = strings.Replace(input, sourceKindIPFamily, sourceKindIPFamily+sourceKindIPFamily, 1)
-			case "missing-socket":
-				input = strings.Replace(input, socketMount, "", 1)
-			case "changed-image":
-				input = strings.Replace(input, kindNodeImage, "kindest/node:latest", 1)
-			case "trailing-content":
-				input += "---\n"
-			}
-			projected, projectErr := projectManagementConfig([]byte(input))
-			if name != "exact" {
-				if projectErr == nil || projected != nil {
-					t.Fatal("changed source accepted or partial projection returned", projectErr)
-				}
-				return
-			}
-			want := strings.Replace(strings.Replace(before, socketMount, "", 1), sourceKindIPFamily, "  ipFamily: ipv4\n  disableDefaultCNI: true\n  kubeProxyMode: none\n  podSubnet: "+managementPodCIDR+"\n  serviceSubnet: "+managementServiceCIDR+"\n", 1)
-			if projectErr != nil || string(projected) != want || string(source) != before || !strings.Contains(string(projected), kindNodeImage) {
-				t.Fatal("projection differs from the admitted IPv4 OVN topology", projectErr)
-			}
-		})
-	}
-}
-
-func TestManagementTemporaryKindProjection(t *testing.T) {
-	source, err := os.ReadFile("testdata/pinned-kind.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, mode := range []string{"kind-calico", "invalid"} {
-		t.Run(mode, func(t *testing.T) {
-			projected, err := projectManagementConfigForNetwork(source, mode)
-			if mode == "invalid" {
-				if err == nil || projected != nil {
-					t.Fatal("unknown network accepted", err)
-				}
-				return
-			}
-			want := strings.Replace(strings.Replace(string(source), socketMount, "", 1), sourceKindIPFamily, "  ipFamily: ipv4\n  podSubnet: "+managementPodCIDR+"\n  serviceSubnet: "+managementServiceCIDR+"\n", 1)
-			if err != nil || string(projected) != want {
-				t.Fatal("Kind defaults not preserved", err)
-			}
-		})
-	}
-}
-
-func TestManagementUpstreamOVNDisablesKindCNI(t *testing.T) {
-	source, err := os.ReadFile("testdata/pinned-kind.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	upstream, err := projectManagementConfigForNetwork(source, "upstream-ovn")
-	if err != nil {
-		t.Fatal(err)
-	}
-	maintained, err := projectManagementConfig(source)
-	if err != nil || string(upstream) != string(maintained) {
-		t.Fatal("explicit OVN options must preserve the admitted topology", err)
-	}
-}
-
-func TestManagementRejectsUnsupportedHostBeforeOutput(t *testing.T) {
-	if runtime.GOOS == "linux" && runtime.GOARCH == "arm64" {
-		t.Skip("unsupported-platform case does not apply")
-	}
-	out := filepath.Join(t.TempDir(), "new")
-	_, err := admitManagement(context.Background(), Config{Out: out})
-	if err == nil {
-		t.Fatal("accepted unsupported host")
-	}
-	if _, err = os.Lstat(out); !errors.Is(err, os.ErrNotExist) {
-		t.Fatal("created output before admission")
-	}
-}
-
-func TestOwnedManagementDescriptionRejectsSubstitution(t *testing.T) {
-	for _, name := range []string{"exact", "missing", "duplicate", "foreignID", "role", "image", "name", "cluster"} {
-		t.Run(name, func(t *testing.T) {
-			row := dockerContainer{ID: "captured-id", Name: "/nvkr-test-control-plane", Image: kindNodeID}
-			row.Config.Labels = map[string]string{"io.x-k8s.kind.cluster": "nvkr-test", "io.x-k8s.kind.role": "control-plane"}
-			switch name {
-			case "foreignID":
-				row.ID = "foreign"
-			case "role":
-				row.Config.Labels["io.x-k8s.kind.role"] = "worker"
-			case "image":
-				row.Image = "foreign"
-			case "name":
-				row.Name = "/shared-control-plane"
-			case "cluster":
-				row.Config.Labels["io.x-k8s.kind.cluster"] = "foreign"
-			}
-			rows := []dockerContainer{row}
-			if name == "missing" {
-				rows = nil
-			}
-			if name == "duplicate" {
-				rows = append(rows, row)
-			}
-			err := validateOwnedNodes(rows, []string{"captured-id"}, "nvkr-test")
-			if (err == nil) != (name == "exact") {
-				t.Fatalf("ownership result:%v", err)
-			}
-		})
 	}
 }
 
@@ -242,7 +76,7 @@ func TestRegularProducerMembershipRejectsSubstitution(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			err := diagnosticIndexMatches(layout, digest)
+			_, err := diagnosticIndexDigest(t.Context(), layout, digest)
 			if (err == nil) != (name == "exact") {
 				t.Fatalf("index acceptance:%v", err)
 			}
@@ -265,98 +99,112 @@ func TestPrivateWriteNeverReplaces(t *testing.T) {
 	}
 }
 
-func TestCleanupAfterJoinedWorkPreservesFailureAndRetention(t *testing.T) {
-	ordinary := errors.New("failed installation")
-	cleanupFailure := errors.New("cleanup failed")
-	for _, name := range []string{"success", "ordinary", "canceled", "unjoined", "retained", "cleanupFailure"} {
-		t.Run(name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			var primary error
-			switch name {
-			case "ordinary", "cleanupFailure":
-				primary = ordinary
-			case "canceled":
-				cancel()
-				primary = context.Canceled
-			case "unjoined":
-				primary = errors.Join(ordinary, ErrUnjoined)
-			case "retained":
-				primary = errors.Join(ordinary, ErrRetainedControls)
-			}
-			called := false
-			err := cleanupAfterJoinedWork(ctx, primary, time.Second, func(cleanupCtx context.Context) error {
-				called = true
-				if cleanupCtx.Err() != nil {
-					t.Fatal("cleanup inherited canceled context")
-				}
-				if _, bounded := cleanupCtx.Deadline(); !bounded {
-					t.Fatal("unbounded cleanup")
-				}
-				if name == "cleanupFailure" {
-					return cleanupFailure
-				}
-				return nil
-			})
-			if called != (name != "unjoined" && name != "retained") {
-				t.Fatal("cleanup retention changed")
-			}
-			if primary != nil && !errors.Is(err, primary) {
-				t.Fatalf("lost primary failure: %v", err)
-			}
-			if name == "success" && err != nil {
-				t.Fatal(err)
-			}
-			if name == "cleanupFailure" && !errors.Is(err, cleanupFailure) {
-				t.Fatal("lost cleanup failure")
-			}
-		})
-	}
+// Observe actual copied bytes, not a count of context polls or copy chunks.
+// This uses the same synchronous fault-injection pattern as transportarchive.
+type privateCopyContext struct {
+	context.Context
+	observe func()
 }
 
-func TestManagementVolumeOwnershipRejectsForeignOrSharedStorage(t *testing.T) {
-	for _, name := range []string{"exact", "predates", "shared", "named", "destination", "extra", "foreignID", "missingVar", "readonly"} {
-		t.Run(name, func(t *testing.T) {
-			work := t.TempDir()
-			row := dockerContainer{ID: "exact-id", Mounts: []dockerMount{{Type: "volume", Name: "owned-volume", Destination: "/var", Driver: "local", RW: true}}}
-			row.Config.Volumes = map[string]json.RawMessage{"/var": json.RawMessage("{}")}
-			volume := dockerVolume{Name: "owned-volume", Driver: "local", Labels: map[string]string{"com.docker.volume.anonymous": ""}}
-			existing := make(map[string]bool)
-			consumer := "exact-id"
-			switch name {
-			case "predates":
-				existing["owned-volume"] = true
-			case "shared":
-				consumer = "foreign-id"
-			case "named":
-				volume.Labels = nil
-			case "destination":
-				row.Mounts[0].Destination = "/foreign"
-			case "extra":
-				row.Mounts = append(row.Mounts, row.Mounts[0])
-			case "foreignID":
-				row.ID = "foreign-id"
-			case "missingVar":
-				row.Config.Volumes = nil
-			case "readonly":
-				row.Mounts[0].RW = false
-			}
-			for path, value := range map[string]any{"nodes.json": []dockerContainer{row}, "volume.json": []dockerVolume{volume}} {
-				if err := privateJSON(filepath.Join(work, path), value); err != nil {
+func (ctx privateCopyContext) Err() error {
+	ctx.observe()
+	return ctx.Context.Err()
+}
+
+func TestPrivateCopyPreservesFileContract(t *testing.T) {
+	for _, scenario := range []string{"same", "occupied", "symlink", "canceled", "grown", "truncated", "canceled partial"} {
+		t.Run(scenario, func(t *testing.T) {
+			root := t.TempDir()
+			source, destination := filepath.Join(root, "source"), filepath.Join(root, "destination")
+			payload := strings.Repeat("private-copy-data", 1<<17)
+			writeTenantFixture(t, source, []byte(payload), 0644)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			switch scenario {
+			case "occupied":
+				writeTenantFixture(t, destination, []byte("existing"), 0640)
+			case "symlink":
+				link := source + "-link"
+				if err := os.Symlink(source, link); err != nil {
 					t.Fatal(err)
 				}
+				source = link
+			case "canceled":
+				cancel()
 			}
-			script := "#!/bin/sh\ncase \"$1\" in\n inspect) /bin/cat \"$FIXTURE/nodes.json\";;\n volume) /bin/cat \"$FIXTURE/volume.json\";;\n ps) printf '%s\\n' \"$CONSUMER\";;\n *) exit 42;;\nesac\n"
-			if err := os.WriteFile(filepath.Join(work, "docker"), []byte(script), 0o700); err != nil {
-				t.Fatal(err)
-			}
-			volumes, err := managementVolumes(context.Background(), Runner{Env: []string{"PATH=" + work + ":/usr/bin:/bin", "FIXTURE=" + work, "CONSUMER=" + consumer}}, []string{"exact-id"}, existing)
-			if name == "exact" {
-				if err != nil || !slices.Equal(volumes, []string{"owned-volume"}) {
-					t.Fatalf("ownership:%v %v", volumes, err)
+			injected := false
+			observed := privateCopyContext{Context: ctx, observe: func() {
+				if injected || scenario != "grown" && scenario != "truncated" && scenario != "canceled partial" {
+					return
 				}
-			} else if err == nil {
-				t.Fatal("foreign storage accepted")
+				info, err := os.Stat(destination)
+				if os.IsNotExist(err) || err == nil && info.Size() == 0 {
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				injected = true
+				switch scenario {
+				case "grown":
+					err = os.Truncate(source, int64(len(payload))+1)
+				case "truncated":
+					err = os.Truncate(source, info.Size())
+				case "canceled partial":
+					cancel()
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+			}}
+			err := copyPrivate(observed, source, destination, 0755)
+			if (err == nil) != (scenario == "same") {
+				t.Fatalf("private copy %s: %v", scenario, err)
+			}
+			if err != nil {
+				want := nvkrerr.CodePreflightFailed
+				if errors.Is(err, context.Canceled) {
+					want = nvkrerr.CodeTimeout
+				}
+				var coded *nvkrerr.Error
+				if !errors.As(nativeSessionError(err, "private copy"), &coded) || coded.Code != want {
+					t.Fatal("copy changed the existing caller error mapping", err)
+				}
+			}
+			if scenario == "grown" || scenario == "truncated" || scenario == "canceled partial" {
+				if !injected {
+					t.Fatal("copy did not exercise the injected failure")
+				}
+			}
+			if scenario == "symlink" {
+				if _, statErr := os.Lstat(destination); !os.IsNotExist(statErr) {
+					t.Fatal("rejected source created output", statErr)
+				}
+				return
+			}
+			data, readErr := os.ReadFile(destination)
+			info, statErr := os.Stat(destination)
+			if readErr != nil || statErr != nil {
+				t.Fatal("copy lost its destination", readErr, statErr)
+			}
+			switch scenario {
+			case "same":
+				if string(data) != payload || info.Mode().Perm() != 0755 {
+					t.Fatal("copy changed successful bytes or mode")
+				}
+			case "occupied":
+				if string(data) != "existing" || info.Mode().Perm() != 0640 {
+					t.Fatal("copy replaced existing bytes or mode")
+				}
+			default:
+				if info.Mode().Perm() != 0600 || len(data) > len(payload) {
+					t.Fatal("failed copy exposed or extended partial bytes")
+				}
+			}
+			if scenario == "canceled" || scenario == "canceled partial" {
+				if !errors.Is(err, context.Canceled) || scenario == "canceled" && len(data) != 0 || scenario == "canceled partial" && (len(data) == 0 || len(data) >= len(payload)) {
+					t.Fatal("copy lost cancellation or changed partial-output behavior", err)
+				}
 			}
 		})
 	}

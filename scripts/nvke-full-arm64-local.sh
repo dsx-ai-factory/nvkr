@@ -17,8 +17,10 @@ usage() {
     '       bash scripts/nvke-full-arm64-local.sh --check [all|components|os|providers|simulator|site|tools|profiles]' \
     '       bash scripts/nvke-full-arm64-local.sh --prepare-only ATTEMPT [JOBS] [all|components|os|providers|simulator|site|tools|profiles]' \
     'Explicit upstream alternative: add --network upstream-ovn before ATTEMPT (all selection only).' \
+    'Linux image builds require KVM by default. Explicit slow diagnostic: --build-accelerator tcg.' \
     'NVIDIA OVN remains the default. This alternative does not validate the NVIDIA fork.' \
-    'all: one Run with 29 outputs; components: 22; os: one disk; providers: two source-built images.' \
+    'Add --conformance for 38 outputs in one Run, including matching Kubernetes conformance tools (native Linux KVM all only).' \
+    'all: one Run with 32 outputs; components: 22; os: one disk; providers: two source-built images.' \
     'simulator: one executable bundle with the source-built Linux ARM64 NICoSim server and CLI.' \
     'simulator bootstraps the same pinned Go/GCC Docker toolchain.' \
     'site: five source-aligned installer outputs (controller, profiles image, CLI, controller chart and NKTP chart).' \
@@ -41,6 +43,8 @@ if [[ $# == 1 && ( "$1" == --help || "$1" == -h ) ]]; then usage; exit 0; fi
 check_only=0
 prepare_only=0
 network=ovn
+build_accelerator=kvm
+conformance=0
 # Go-demo preparation handoff: no activity descriptor is inherited by this shell.
 # It prepares the same selected inputs, but the Go process launches the final
 # unchanged run-local vector directly so only that child receives telemetry.
@@ -48,12 +52,21 @@ if [[ "${1:-}" == --prepare-only ]]; then
   prepare_only=1
   shift
 fi
-if [[ "${1:-}" == --network ]]; then
+while [[ "${1:-}" == --network || "${1:-}" == --build-accelerator || "${1:-}" == --conformance ]]; do
+  if [[ "$1" == --conformance ]]; then conformance=1; shift; continue; fi
   [[ $# -ge 2 ]] || { usage >&2; exit 2; }
-  network="$2"
-  case "${network}" in ovn|upstream-ovn) ;; *) echo 'Build network must be ovn or upstream-ovn.' >&2; exit 2 ;; esac
+  case "$1" in
+    --network)
+      network="$2"
+      case "${network}" in ovn|upstream-ovn) ;; *) echo 'Build network must be ovn or upstream-ovn.' >&2; exit 2 ;; esac
+      ;;
+    --build-accelerator)
+      build_accelerator="$2"
+      case "${build_accelerator}" in kvm|tcg) ;; *) echo 'Build accelerator must be kvm or tcg.' >&2; exit 2 ;; esac
+      ;;
+  esac
   shift 2
-fi
+done
 if [[ "${1:-}" == --check ]]; then
   [[ "${prepare_only}" == 0 ]] || { usage >&2; exit 2; }
   [[ $# -le 2 ]] || { usage >&2; exit 2; }
@@ -73,6 +86,9 @@ fi
 case "${lane}" in all|components|os|providers|simulator|site|tools|profiles) ;; *) echo 'Select all, components, os, providers, simulator, site, tools or profiles.' >&2; exit 2 ;; esac
 if [[ "${network}" == upstream-ovn && "${lane}" != all ]]; then
   echo 'Upstream OVN requires the complete all selection so chart, image and QCOW2 inputs stay aligned.' >&2; exit 2
+fi
+if [[ "${conformance}" == 1 && ( "${lane}" != all || "${build_accelerator}" != kvm || "$(uname -s)" != Linux ) ]]; then
+  echo "Conformance selection requires native Linux KVM and the complete all selection." >&2; exit 2
 fi
 # Keep invocation-local redirects when a second local repository is selected.
 # Bound the scalar before arithmetic, host diagnostics or any producer work.
@@ -172,11 +188,12 @@ if [[ -n "${NVKE_LOCAL_CLONE:-}" ]]; then
   # source identity. The bare NVKE form also prefix-matches sibling repository
   # names, so use this override only for this maintained NVKE selection.
 fi
-environment="inputs/environments/local-arm64-tcg.json"
+environment="inputs/environments/local-arm64-kvm.json"
+if [[ "${build_accelerator}" == tcg ]]; then environment="inputs/environments/local-arm64-tcg.json"; fi
 # This is one narrow developer bootstrap, not an Environment validator. Admit
 # its exact reviewed bootstrap image/platform before creating storage or running
 # caller-edited inputs. The compiled runner owns complete document validation.
-utility='golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c'
+utility='golang@sha256:f20d83a83e18dbd2a4714b8ffd4b30b287b6243962dd75608e86abcc63ba4efc'
 if ! jq -e --arg image "${utility}" --arg runtime "${runtime}" '
   .utilityContainer == $image and .utilityPlatform == "linux/arm64" and
   .runtime.runtime == $runtime
@@ -234,9 +251,15 @@ if [[ -z "${shared_bootstrap}" ]]; then
 fi
 runner="${tools}/nvkr"
 [[ -f "${runner}" && -x "${runner}" && ! -L "${runner}" ]] || { echo 'Bootstrap did not produce a regular executable.' >&2; exit 1; }
-definition="inputs/definitions/demo/arm64-nvidia-tcg.json"
-if [[ "${network}" == upstream-ovn ]]; then definition="inputs/definitions/demo/arm64-upstream-tcg.json"; fi
+definition="inputs/definitions/demo/arm64-nvidia-local-kvm.json"
+if [[ "${network}" == upstream-ovn ]]; then definition="inputs/definitions/demo/arm64-upstream-local-kvm.json"; fi
+if [[ "${build_accelerator}" == tcg ]]; then
+  definition="inputs/definitions/demo/arm64-nvidia-tcg.json"
+  if [[ "${network}" == upstream-ovn ]]; then definition="inputs/definitions/demo/arm64-upstream-tcg.json"; fi
+fi
 if [[ "${lane}" != all ]]; then definition="inputs/definitions/diagnostics/demo-arm64/${lane}.json"; fi
+if [[ "${lane}" == os && "${build_accelerator}" == kvm ]]; then definition="inputs/definitions/diagnostics/demo-arm64/os-kvm.json"; fi
+if [[ "${conformance}" == 1 ]]; then definition="${definition%.json}-conformance.json"; fi
 if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}" == site ]]; then
   # Admit the compiled selection before building/loading/probing a replacement
   # toolchain. The narrow utility bootstrap above supplies this Plan owner.
@@ -274,7 +297,7 @@ if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}"
   fi
   # Freeze fresh local bytes through the existing overlay contract, not a tag
   # or a hand-edited maintained lock. Each output retains its own catalog scope.
-  jq --arg image "${image}" 'map(select(.pin != $image))' "${bootstrap}/toolchain-scopes.json" >"${bootstrap}/substitutions.json"
+  jq -L scripts --arg image "${image}" 'include "nvke-os-plan"; local_toolchain_substitutions($image)' "${bootstrap}/toolchain-scopes.json" >"${bootstrap}/substitutions.json"
   if [[ "$(jq length "${bootstrap}/substitutions.json")" != 0 ]]; then
   while IFS= read -r index; do
     file=toolchain-attempt.json
@@ -287,45 +310,16 @@ if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}"
   # Keep its references relocatable so compilation can capture and replay the
   # original input closure without the producer checkout's absolute paths.
   definition_dir="${definition%/*}"
-  jq -e --arg definition_dir "${definition_dir}" \
-    --slurpfile scopes "${bootstrap}/substitutions.json" '
-    def relocate: if startswith("/") then error("local demo catalog references must be repository-relative")
-      else "../../../" + $definition_dir + "/" + . end;
-    def locate: .base |= relocate | if .overlays then .overlays |= map(relocate) else . end;
-    .catalog |= locate |
-    .catalog as $default |
-    .outputs |= map(.name as $name |
-      if .catalog then .catalog |= locate else .catalog = $default end |
-      .catalog.overlays = ((.catalog.overlays // []) +
-        [$scopes[0] | to_entries[] | select(.value.outputs | index($name)) |
-          "./toolchain-attempt" + (if .key == 0 then "" else "-" + (.key | tostring) end) + ".json"]))
-  ' "${definition}" >"${bootstrap}/definition.json"
+  jq -L scripts -e --arg definition_dir "${definition_dir}" \
+    --slurpfile scopes "${bootstrap}/substitutions.json" \
+    'include "nvke-os-plan"; local_toolchain_definition($definition_dir; "../../../"; $scopes[0])' \
+    "${definition}" >"${bootstrap}/definition.json"
   definition="${bootstrap}/definition.json"
   fi
 fi
 selected_plan_command=("${runner}" run plan --definition "${definition}" --environment "${environment}" --json)
 print_nvkr_command "${selected_plan_command[@]}"
 "${selected_plan_command[@]}" >"${bootstrap}/selected-plan.json"
-selected_graph_command=("${runner}" run graph --plan "${bootstrap}/selected-plan.json" --view complete --format json)
-print_nvkr_command "${selected_graph_command[@]}"
-"${selected_graph_command[@]}" >"${bootstrap}/graph.json"
-# This bounded display projection describes the selected Plan, not execution or
-# verification. Preserve owner keys/edges; omit route refs and producer duplicates.
-jq -r '
-  [.vertices[] | select(.kind == "operation")] as $operations |
-  [.vertices[] | select(.kind == "artifact" or .kind == "output")] as $artifacts |
-  ($operations[:512] + $artifacts[:1024] |
-    map(select(([.key, .reference, (.build // "")] | all(type == "string" and length <= 256)) and
-      (.label | type == "string" and length <= 512)))) as $vertices |
-  ($vertices | map({key: .key, value: true}) | from_entries) as $keys |
-  [.edges[] | select($keys[.from] and $keys[.to])] as $displayEdges |
-  ($displayEdges | map(select(.relation | type == "string" and length <= 64))) as $edges |
-  ($vertices[] | "Build vertex: " + tojson),
-  ($edges[:4096][] | "Build edge: " + tojson),
-  "Build display: " + ({vertices: ($vertices | length), edges: ($edges[:4096] | length),
-    truncated: (($operations | length) + ($artifacts | length) > ($vertices | length) or
-      ($displayEdges | length) > ($edges | length) or ($edges | length) > 4096)} | tojson)
-' "${bootstrap}/graph.json" >&2
 preview_command=("${runner}" run local --definition "${definition}" --environment "${environment}" --attempt "${attempt}-preview" --capture-inputs-root=. --dry-run)
 print_nvkr_command "${preview_command[@]}"
 "${preview_command[@]}"

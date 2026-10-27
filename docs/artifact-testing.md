@@ -30,6 +30,91 @@ must provide Go and Make; Plan validation does not prove those tools are present
 - `--suite cli` runs the full upstream CLI Go suite. Its contracts use the binary;
   other unit tests exercise upstream source. Bootstrap E2E is separate.
 
+## Provisional validator catalog
+
+The provisional CLI catalog adds discovery and explicit local selection of these same two suites.
+The ADR-24 schemas and SDK methods remain provisional; schema stabilization and
+maintained upstream adoption remain deferred. Discovery reads only the catalog
+index and its entry files. It neither imports source nor probes Docker or prepares an
+environment. `available` describes installed adapter support; runtime readiness stays
+`unverified`. Adapter-owned limitations remain visible independently of authored display text.
+
+```sh
+bin/nvkr validators list --catalog inputs/testing/validators/catalog.yaml
+bin/nvkr validators describe --catalog inputs/testing/validators/catalog.yaml nvke/nvkectl/contract
+bin/nvkr validators run --profile /path/to/validation.yaml --keep
+```
+
+The diagnostic command group is hidden from normal lifecycle help while its contracts
+are provisional. The SDK exposes `ListValidators`, `DescribeValidator`, and
+`PrepareValidatorProfile`; execute the returned invocation with `Run(ctx)`.
+No implicit catalog or suite fallback is installed.
+
+A profile uses ADR-24's explicit catalog, source and role bindings. Paths below are
+relative to the profile file:
+
+```yaml
+apiVersion: nvkr.dev/validation-profile/v1
+kind: ValidationProfile
+catalog: /path/to/nvkr/inputs/testing/validators/catalog.yaml
+source:
+  kind: local-plan
+  plan: ./plan.json
+checks:
+  - name: cli-contract
+    validator: nvke/nvkectl/contract
+    inputs:
+      executable:
+        output: nvkectl
+        artifact: ./nvkectl
+```
+
+Use `nvke/nvkectl/cli` for the full CLI suite. Every selected instance must explicitly
+bind `executable` to one named output and one artifact path; no inference, glob or
+run-all behavior exists. Multiple instances execute in profile order and stop at the
+first failure. Complete structural, adapter and Plan admission finishes before any
+workspace creation, source acquisition, artifact staging or execution. Executable
+paths are checked for regular executable files during admission; supplied bytes are
+copied and hashed by the existing private staging owner when each check starts.
+Artifact locations remain descriptions, not authenticated membership.
+
+One admitted invocation holds the selected entries, resolved absolute artifact paths,
+validated Plan, producer/source descriptions and suite selectors. `Run` does not reopen
+profiles, entries or Plans. With `--keep`, each existing CLI workspace also retains
+`selection.json`: canonical resolved configuration, exact profile/index/entry document
+SHA-256 values, the admitted Plan document SHA-256 and that check's factory inputs.
+The SDK's `Configuration()` returns a detached canonical description of the full
+selection and resolved inputs. These are diagnostic records, not new semantic identities.
+Original `tests.jsonl` and success-only `result.json` retain their existing meanings.
+Default cleanup still removes the workspace, including selection metadata.
+
+The new format currently admits **local-plan only**, through `nvke-cli/v1` with no
+adapter-configuration extension. Unknown fields, versions, duplicate keys/IDs/instances,
+missing or extra roles, unknown outputs, unsupported adapters or requirements fail
+without executable work or fallback. YAML aliases, merge keys, multi-document streams,
+symlink traversal and escaping index paths are forbidden. YAML and JSON use the same
+strict typed model. See ADR-24 for document, catalog and instance limits.
+
+`timeout` in an entry bounds its test container and cannot exceed the adapter's
+30-minute maximum. Dependency acquisition has its own fixed 30-minute bound; source
+Git commands and cleanup retain their existing independent bounds. A shorter caller
+context wins. This differs explicitly from legacy `--timeout`, which still sets both
+container bounds. Existing `run artifact-test` flags, default suite, error mapping and
+custom timeout remain supported directly through factory; migration of that interface
+to catalog entries is deferred rather than silently narrowing its accepted budgets.
+Legacy `validate --config` retains its separate published-source authentication and
+capture-only semantics, together with its independently admitted complete-local-Run
+conformance route. New profiles are not reinterpreted as legacy documents, and neither
+legacy route is relaxed. A new-format published adapter remains unsupported in this slice.
+
+Contract tests cover deterministic discovery, strict refusal, complete admission before
+execution, edits during dispatch, both suite/architecture selections and retained
+configuration. Factory import/container dispatch is mocked in the new parity tests;
+these tests do not constitute a fresh actual upstream execution or native-host evidence.
+The prior actual CLI execution records below remain the baseline. New catalog execution
+on native Linux AMD64/ARM64, upstream adoption, bootstrap, controller/chart adapters,
+CI migration and shared schema stabilization remain separate work.
+
 ## How it works
 
 1. Factory validates the complete canonical Plan and selects one CLI producer
@@ -72,6 +157,113 @@ coded error after otherwise successful execution; with `--keep`, a completed
 passing result may still be retained. Output failures do not replace a failed
 suite's primary status. Executable staging and rehashing observe cancellation at
 copy chunk boundaries; cancellation cannot interrupt an already-blocked kernel I/O.
+
+## Bootstrap E2E interface candidate (IV1 first slice)
+
+The NVKE bootstrap interface candidate [#1801](https://github.com/dsx-ai-factory/nvke/pull/1801),
+stacked on process-contract interface [#1578](https://github.com/dsx-ai-factory/nvke/pull/1578),
+adds a producer-neutral entrypoint:
+
+```sh
+# From the matching NVKE checkout, on an already prepared Linux host:
+sudo -E env "PATH=$PATH" make -C cli test-e2e-bootstrap-artifact \
+  NVKECTL=/absolute/path/to/staged/nvkectl \
+  NVKECTL_EXPECTED_VERSION=<version-selected-from-the-Plan>
+```
+
+This is a candidate upstream interface, **not an implemented NVKR bootstrap
+adapter**. `nvkr run artifact-test` still admits only `contract` and `cli`;
+its default, selection, source import, offline containers and error semantics are
+unchanged. Do not point its offline runner at bootstrap or patch an imported
+checkout to add this target. Once adopted, the target must exist at the exact
+artifact source commit selected by `LoadCLIArtifactTestInputs` and imported by
+`sourcegit`; a convenient local checkout is not an alternative test revision.
+
+The new target has no CLI build prerequisite, requires an explicit executable
+and expected version, makes a relative path absolute, and calls the existing
+bootstrap script. Before fixture preparation that script hashes the executable
+and runs its `version -o short`, bounded by GNU timeout to 30 seconds plus five
+seconds of kill grace. Both `generate sitespec` and `bootstrap site` use the same
+read-only shell variable. Once fixture cleanup is installed, exit paths also
+rehash the executable; a mismatch fails an otherwise successful invocation and
+cannot replace an earlier preparation or suite failure. No staging, Plan
+interpretation or source-selection implementation is added upstream.
+
+The default `test-e2e-bootstrap: build` and direct upstream CI invocation remain
+available. All assertions and supporting preparation stay upstream. The candidate
+also stops and joins the background bootstrap process group before tearing down
+its resources, with a five-second termination grace and escalation to SIGKILL.
+This is process cleanup, not a guarantee that all external resources disappeared.
+
+| Resource or phase | Existing owner and requirements |
+|---|---|
+| Subject and source | NVKR factory selects one output from the complete Plan; sourcegit imports its exact commit/tree; the eventual adapter must reuse private staging and pipeline execution ownership |
+| Host and capacity | Caller/upstream CI supplies a disposable, native Linux host with root, sufficient capacity, `/dev/vtpmx`, Go, Make, GNU timeout/coreutils, Kind, kubectl, Helm, clusterctl and jq for VIP checks |
+| Runtime daemons | Host owner supplies standalone containerd, nerdctl and BuildKit; upstream `cli/hack/bootstrap-e2e-host.sh` installs them in CI; daemon installation and Docker removal are not suite teardown duties |
+| Controller image | Caller/CI builds it into the same containerd image store and names it with `NVKECTL_CONTROLLER_IMAGE`; this is a supporting dependency, not the CLI subject |
+| Other support | Upstream prepares OVN/Helm packages, agent/fake-node and provisioned-provider images; caches may reuse existing support images under upstream semantics |
+| Live fixture | Upstream creates fake nodes/network, bootstrap Kind cluster, SPIRE/TPM, Postgres, Temporal, provider/controller, tenant control planes, FRR/BGP, and the Traefik/whoami workload |
+| Networking | Upstream installs cross-bridge/VIP forwarding and addresses/routes; downloads modules, images and charts using its existing mirror controls. This requires connected execution, unlike IV0 |
+| Teardown | Upstream registers fixture removal in reverse order and collects failure diagnostics; caller owns host services, preloaded images and caches. Several removals suppress errors and diagnostics may remain |
+
+Traceability to the draft imported-validation specification:
+
+- **IV-R01, IV-R03, IV-R05; IV1-A2/A3:** no-build interface, explicit input,
+  shared upstream preparation/assertions, and documented dependency ownership.
+  Contract tests consume a supplied executable at version preflight and the real
+  site-spec invocation, with a working default present; broken/version-mismatched
+  subjects fail. This is not real cluster execution.
+- **IV-R09/R10; IV1-A1/A4 (partial):** before/after byte observations on exercised
+  fixture exit paths, preparation and supplied-process failures, bounded version
+  timeout, preparation process-group cancellation, and Linux bootstrap-group
+  stop/join contracts. Cleanup after failure remains best effort; full phase budgets,
+  cleanup-failure reporting, retention and real runtime cancellation are unproved.
+- **IV-R04/R11/R13–R15; IV1-A1/A5 (open):** no fresh matching-revision NVKR build
+  has completed bootstrap. No machine-readable upstream completion protocol or
+  NVKR bootstrap result parser exists; process success must not become an IV1
+  acceptance result. Required bootstrap completeness remains unestablished.
+
+Validation record (source/interface contracts only; no real bootstrap Run):
+
+- The interface reviewed in [NVKE source commit
+  `f33b7afb55d421958540589ca03d206531bfa16b`](https://github.com/dsx-ai-factory/nvke/commit/f33b7afb55d421958540589ca03d206531bfa16b)
+  includes the corrected process helper. The [hosted CLI job for that exact
+  head](https://github.com/dsx-ai-factory/nvke/actions/runs/39347477494/job/118383877388)
+  passed the bootstrap contract package on Linux. The overall job and workflow
+  failed: the CLI telemetry contract encountered `CloseIdleConnections`, and
+  other jobs reported tracing and API compatibility failures. A package pass
+  does not establish a clean repository gate or real bootstrap acceptance.
+- On 2026-10-20, the review follow-up source was checked at [NVKE commit
+  `e8562635ef329f3ce335c668f5bb0a533d511a6a`](https://github.com/dsx-ai-factory/nvke/commit/e8562635ef329f3ce335c668f5bb0a533d511a6a),
+  tree `204643ad1ad0575400ad583e3373b59f3490163d`.
+  `gmake preflight MODULES=cli PREFLIGHT_BASE=HEAD` passed on the identical
+  pre-commit tree on macOS ARM64, including CLI lint, the full CLI Go suite with
+  race detection, license checks and shell checks. A restricted-PATH probe also
+  passed all three input-admission cases while skipping only shell-dependent
+  cases. These local logs are not retained immutable CI artifacts; the source
+  commit identifies the tested implementation, not an authenticated Run.
+- Earlier local preflight and Linux ARM64 container checks were recorded before
+  their source identities were pinned in this guide. Their original logs are
+  local diagnostics, not immutable acceptance evidence. The source and hosted
+  job above replace mutable PR references as the inspectable record.
+
+No fresh NVKR-built CLI has completed real bootstrap on a native Linux AMD64
+host. There is no immutable real-bootstrap Run or artifact to cite. The
+source/interface contracts use controlled supporting tools and cannot establish
+live cluster assertions or exhaustive teardown. The NVKR documentation branch's
+aggregate local gate also failed two timing-sensitive contracts; separate passing
+reruns do not make that aggregate gate successful.
+
+The execution follow-up must retain upstream bootstrap preparation, runtime,
+networking and assertions in development and verification. It must use an
+importable matching source commit and identify upstream/integration/execution
+owners. Native Linux AMD64 execution remains to be demonstrated. This work does not grant host privileges, add runner
+policy, change maintained pins, introduce catalog infrastructure, or weaken IV0.
+The next smallest slice is an upstream-owned terminal completion/cleanup report
+(with missing-result and teardown-failure negatives), then pipeline-owned bounded
+execution on the agreed route using existing factory/source selection. A real
+fresh-build positive and broken-executable negative on that route must precede
+IV1 acceptance. Local contract logs are validation, not operational evidence.
 
 ## Validation and remaining work
 

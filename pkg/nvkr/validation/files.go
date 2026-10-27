@@ -25,7 +25,8 @@ import (
 
 const configurationByteLimit = 1 << 20
 
-// Configuration selects an immutable published source and its configured checks.
+// Configuration selects a published source or complete local diagnostic Run
+// and its independently configured checks.
 // Credential scope remains in runtime options, never in this profile.
 type Configuration struct {
 	Source Source  `json:"source"`
@@ -33,8 +34,9 @@ type Configuration struct {
 }
 type Source struct {
 	Kind      string `json:"kind"`
-	Reference string `json:"reference"`
-	Policy    string `json:"policy"`
+	Reference string `json:"reference,omitempty"`
+	Policy    string `json:"policy,omitempty"`
+	Workspace string `json:"workspace,omitempty"`
 }
 type Check struct {
 	Name    string `json:"name"`
@@ -60,6 +62,11 @@ func RunFiles(ctx context.Context, checkName, configPath string, options lifecyc
 	profile, checks, err := loadConfiguration(ctx, checkName, configPath)
 	if err != nil {
 		return nil, err
+	}
+	if profile.Source.Kind == "local" {
+		return runSelected(ctx, profile.Source, checks, options, func(ctx context.Context, _, _, config string, options lifecycle.QualificationRuntimeOptions) (testresults.Output, error) {
+			return conformance.RunLocalFiles(ctx, profile.Source.Workspace, config, options)
+		})
 	}
 	return runSelected(ctx, profile.Source, checks, options, conformance.RunReferenceFiles)
 }
@@ -129,7 +136,9 @@ func loadConfiguration(ctx context.Context, checkName, path string) (Configurati
 		}
 		return filepath.Join(filepath.Dir(absolute), value)
 	}
-	profile.Source.Policy = resolve(profile.Source.Policy)
+	if profile.Source.Policy != "" {
+		profile.Source.Policy = resolve(profile.Source.Policy)
+	}
 	for i := range selected {
 		selected[i].Config = resolve(selected[i].Config)
 	}
@@ -137,19 +146,11 @@ func loadConfiguration(ctx context.Context, checkName, path string) (Configurati
 }
 func (profile Configuration) validate() error {
 	if profile.Source.Kind == "local" {
-		return e.New(e.CodeEngineCapability, "validation local source requires an owning diagnostic capability")
-	}
-	if profile.Source.Kind != "published" {
-		return e.New(e.CodeUnsupported, "validation source kind %q is unsupported; local source requires an owning diagnostic capability", profile.Source.Kind)
-	}
-	if !pathText(profile.Source.Reference) || strings.Contains(profile.Source.Reference, "://") {
-		return e.New(e.CodeUsage, "validation source requires an immutable OCI publication reference")
-	}
-	if err := delivery.ValidatePublicationReference(profile.Source.Reference); err != nil {
-		return e.Wrap(e.CodeUsage, err, "validation source reference")
-	}
-	if !pathText(profile.Source.Policy) {
-		return e.New(e.CodeUsage, "validation source requires a bounded policy path")
+		if !pathText(profile.Source.Workspace) || profile.Source.Reference != "" || profile.Source.Policy != "" {
+			return e.New(e.CodeUsage, "local validation requires an explicit workspace without publication or policy fields")
+		}
+	} else if err := profile.validatePublishedSource(); err != nil {
+		return err
 	}
 	if len(profile.Checks) == 0 || len(profile.Checks) > 64 {
 		return e.New(e.CodeUsage, "validation profile requires 1..64 configured checks")
@@ -175,6 +176,25 @@ func (profile Configuration) validate() error {
 	}
 	return nil
 }
+
+func (profile Configuration) validatePublishedSource() error {
+	if profile.Source.Kind != "published" {
+		return e.New(e.CodeUnsupported, "validation source kind %q is unsupported", profile.Source.Kind)
+	}
+	if profile.Source.Workspace != "" {
+		return e.New(e.CodeUsage, "published validation cannot include a local workspace")
+	}
+	if !pathText(profile.Source.Reference) || strings.Contains(profile.Source.Reference, "://") {
+		return e.New(e.CodeUsage, "validation source requires an immutable OCI publication reference")
+	}
+	if err := delivery.ValidatePublicationReference(profile.Source.Reference); err != nil {
+		return e.Wrap(e.CodeUsage, err, "validation source reference")
+	}
+	if !pathText(profile.Source.Policy) {
+		return e.New(e.CodeUsage, "validation source requires a bounded policy path")
+	}
+	return nil
+}
 func pathText(value string) bool {
 	return safetext.Valid(value, 4096, false) && strings.TrimSpace(value) == value
 }
@@ -184,6 +204,10 @@ func configurationError(ctx context.Context, err error, message string) error {
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return e.Wrap(e.CodeTimeout, err, "%s", message)
+	}
+	var coded *e.Error
+	if errors.As(err, &coded) {
+		return err
 	}
 	return e.Wrap(e.CodeUsage, err, "%s", message)
 }

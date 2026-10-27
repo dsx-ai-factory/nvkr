@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"runtime"
 	"strings"
 	"time"
 
@@ -36,6 +37,7 @@ type Options struct {
 	Kubectl           ExecutableSelector              `json:"kubectl"`
 	Kubeconfig        Tool                            `json:"kubeconfig"`
 	Context           string                          `json:"context"`
+	CNINamespace      string                          `json:"cniNamespace,omitempty"`
 	CNISelector       string                          `json:"cniSelector"`
 	Image             string                          `json:"-"`
 	ConformanceImage  ImageSelector                   `json:"conformanceImage"`
@@ -54,12 +56,15 @@ type Options struct {
 	ToolArtifacts     *lifecycle.ArtifactCheckReceipt `json:"-"`
 	Artifacts         *lifecycle.ArtifactCheckReceipt `json:"-"`
 	Targets           []DeploymentTarget              `json:"targets"`
+	localImageAliases map[string]string
+	localDiagnostic   bool
 }
 
 type admitted struct {
 	options                         Options
 	hydrophone, kubectl, kubeconfig *heldfile.File
 	kubeBytes                       []byte
+	native                          nativeExecution
 }
 
 func failure(reason string) error { return e.New(e.CodeVerifyFailed, "conformance: %s", reason) }
@@ -74,6 +79,16 @@ func captureFailure(ctx context.Context, err error, code e.Code, message string)
 	}
 	return e.Wrap(code, err, "%s", message)
 }
+
+// Darwin snapshots are restricted to captured local diagnostics. Published,
+// signing and qualification execution retain Linux held-descriptor admission.
+func requireExecutionSupport(local bool) error {
+	if local && runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" {
+		return nil
+	}
+	return heldfile.RequireExecutableSupport()
+}
+
 func capability(err error) error {
 	return e.Wrap(e.CodeEngineCapability, err, "conformance requires held Linux executable support")
 }
@@ -89,7 +104,7 @@ func admit(ctx context.Context, o Options) (*admitted, error) {
 		return nil, err
 	}
 	o = validated
-	if err = heldfile.RequireExecutableSupport(); err != nil {
+	if err = requireExecutionSupport(o.localDiagnostic); err != nil {
 		return nil, capability(err)
 	}
 	a := &admitted{options: o}
@@ -123,6 +138,8 @@ func (a *admitted) close() {
 		}
 	}
 }
+
+func (a *admitted) closeNative() error { return a.native.close() }
 
 // Kubeconfig syntax is owned by the established sigs.k8s.io/yaml decoder.
 // This deliberately narrow admission profile admits only self-contained static
@@ -215,6 +232,12 @@ func validateOptions(o Options) (Options, error) {
 	if !safetext.Valid(o.SuiteName, 256, false) || strings.TrimSpace(o.SuiteName) != o.SuiteName || !safetext.Valid(o.WorkspaceRoot, 4096, false) {
 		return Options{}, e.New(e.CodeUsage, "conformance requires named suite and private workspace root")
 	}
+	if o.CNINamespace == "" {
+		o.CNINamespace = "kube-system"
+	}
+	if !safetext.Valid(o.CNINamespace, 256, false) || strings.ContainsAny(o.CNINamespace, "/ \t") {
+		return Options{}, e.New(e.CodeUsage, "conformance requires a valid explicit CNI namespace")
+	}
 	if o.Context == "" || len(o.Context) > 4096 || strings.ContainsAny(o.Context, "\x00\r\n") || o.CNISelector == "" || len(o.CNISelector) > 4096 || strings.ContainsAny(o.CNISelector, "\x00\r\n") {
 		return Options{}, e.New(e.CodeUsage, "conformance: explicit private context and CNI selector required")
 	}
@@ -231,7 +254,7 @@ func validateOptions(o Options) (Options, error) {
 		return Options{}, e.New(e.CodeUnpinnedInput, "conformance requires an exact kubeconfig access pin")
 	}
 	for _, selector := range []ExecutableSelector{o.Hydrophone, o.Kubectl} {
-		if err := validateExecutableSelector(selector); err != nil {
+		if err := validateExecutableSelectorFor(selector, o.localDiagnostic); err != nil {
 			return Options{}, err
 		}
 	}

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Regenerate THIRD_PARTY_NOTICES.md from the modules linked into nvkr and
-# the local nvke-demo command. Tools invoked as separate processes are excluded: they
+# the local nvke-demo command and private site identity helper. Tools invoked as separate processes are excluded: they
 # are not linked, so Apache-2.0 section 4(d) does not reach them.
 #
 # The linked-module set is the union over GOOS in {linux, darwin} at
@@ -42,7 +42,7 @@ trap 'rm -f "$linked" "$generated"' EXIT
 # module rather than reproducing its own license as a dependency notice.
 for goos in linux darwin; do
   GOOS="$goos" GOARCH=amd64 \
-    go list -deps -f '{{if .Module}}{{.Module.Path}}{{end}}' ./cmd/nvkr ./cmd/nvke-demo
+    go list -deps -f '{{if .Module}}{{.Module.Path}}{{end}}' ./cmd/nvkr ./cmd/nvke-demo ./cmd/nvkr-site-identity-helper
 done | sort -u | grep -v '^$' | grep -v '^github.com/dsx-ai-factory/nvkr' > "$linked"
 
 python3 scripts/gen_notices.py "$linked" > "$generated"

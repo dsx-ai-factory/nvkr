@@ -19,6 +19,9 @@ import (
 )
 
 func TestInspectReleaseRegistryFailureClassification(t *testing.T) {
+	// Delivery's metadataFetchError table owns the HTTP status matrix. One
+	// transport refusal proves public error propagation and staging cleanup;
+	// repeating retry backoff for each transient status adds no lifecycle signal.
 	for _, test := range []struct {
 		name      string
 		status    int
@@ -26,11 +29,7 @@ func TestInspectReleaseRegistryFailureClassification(t *testing.T) {
 		exit      int
 		retryable bool
 	}{
-		{"service unavailable", http.StatusServiceUnavailable, e.CodeUnavailable, 30, true},
-		{"request timeout", http.StatusRequestTimeout, e.CodeUnavailable, 30, true},
-		{"rate limited", http.StatusTooManyRequests, e.CodeUnavailable, 30, true},
 		{"forbidden", http.StatusForbidden, e.CodeFetchFailed, 20, false},
-		{"not found", http.StatusNotFound, e.CodeFetchFailed, 20, false},
 		{"deadline", 0, e.CodeTimeout, 31, true},
 		{"canceled during request", 0, e.CodeTimeout, 31, true},
 	} {

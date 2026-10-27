@@ -1,7 +1,7 @@
 # Catalogs and components
 
 A catalog defines reusable components and how to build or acquire them. A Definition chooses which
-components belong in each required output. Start with the [quickstart](quickstart.md) for CLI setup;
+components belong in each required output. Start with the [quickstart](quickstart.md#build-only-the-cli) for CLI setup;
 the [concept reference](user-concepts.md) explains the broader lifecycle.
 
 Adding a catalog with existing NVKR capabilities requires declarations and pins, not Go code or
@@ -20,6 +20,13 @@ The catalog has two files:
 |---|---|---|
 | `registry.yaml` | Sources, allowed versions, supported platforms, toolchains and producer instructions | Edit the declarations. |
 | `pins.lock.yaml` | Exact source commits, trees and timestamps; acquired-artifact and tool digests | Use `catalog pin`/`bump` for source releases and their tool assets; `catalog pin-artifacts` for direct acquired-artifact/image pins. |
+
+A command producer may declare `buildCommandByPlatform` with complete argument arrays for explicitly
+supported platforms. The compiler selects the exact matching array, falling back to `buildCommand` when no
+override exists, before deriving the IR and Build Digest. This keeps host linker differences in one producer:
+the native NICoSim catalog retains Linux's static Make build and selects Go compilation on Darwin. It does
+not duplicate source pins, material declarations or deployment orchestration. Unknown targets and empty
+overrides fail validation; command overrides are unavailable to Packer, Nix and acquired producers.
 
 A source can serve several components. A pin set can derive several source or acquired-artifact versions
 from one upstream release's version file. Update those members through their owning source. Use
@@ -120,6 +127,15 @@ A disk output currently selects its root and every transitive material producer 
 unrelated extras. Root-only selection does not expand dependencies automatically. See
 [node images](node-images.md) for the complete example.
 
+## Acquired executables
+
+A source `tool` selects an exact upstream executable with `format: raw`, `tar-gzip` or `zip`, an HTTPS
+URL, a concrete platform and an exact `executablePath`. Its `releaseExecutable: true` component uses
+`outputType: host-package`. `catalog pin` records both carrier and executable digests. Acquisition checks
+both identities and scans all archive entries with bounded standard-library readers; it never extracts
+archive paths into the filesystem. Archive format is part of the compiled identity. Existing tar-gzip IR
+records retain their original encoding.
+
 ## Build tools and version stamps
 
 The catalog also selects how source components are built:
@@ -140,16 +156,17 @@ checking the expected old digest. It keeps the existing source and command decla
 `components` fields. This differs from replacing the complete producer.
 
 **Version stamps** render source-pin values into build environment variables. This excerpt from the
-[NVKE CLI producer](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/nvke/module-tags/registry.yaml) embeds its commit and module tag:
+[NVKE CLI producer](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/nvke/module-tags/registry.yaml) embeds its exact commit, release tag and source date:
 
 ```yaml
 versionStamp:
-  NKECTL_COMMIT: '{{slice .Commit 0 8}}'
-  NKECTL_VERSION: '{{.ModuleTag}}'
+  NVKECTL_VERSION: '{{.ModuleTag}}'
+  NVKECTL_COMMIT: '{{.Commit}}'
+  NVKECTL_DATE: '{{.Date}}'
 ```
 
-These are build inputs, not labels added after the build. For the pinned tag `cli/v0.1.0-rc.2`,
-`.ModuleTag` is `v0.1.0-rc.2`; `.Version` is `0.1.0-rc.2`.
+These are build inputs, not labels added after the build. For the pinned tag `v0.22.0`,
+`.ModuleTag` is `v0.22.0`; `.Version` is `0.22.0-beta.6`.
 
 ## Run the local lab
 

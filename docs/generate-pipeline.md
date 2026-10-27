@@ -4,7 +4,7 @@ Turn a Definition and Environment into a reviewable pipeline bundle. A **Definit
 outputs to build; an **Environment** supplies execution, publication, and signing settings. This walkthrough
 uses the three-output NVKE tutorial: a CLI executable, a container image, and a Helm chart.
 
-Start at the repository root with `bin/nvkr` built as described in the [quickstart](quickstart.md).
+Start at the repository root with `bin/nvkr` built as described in the [quickstart](quickstart.md#build-only-the-cli).
 Run these commands in the same terminal. They write to a temporary directory, leaving the repository's
 generated pipeline untouched.
 

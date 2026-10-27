@@ -10,15 +10,17 @@ DEMO_TEST_BIN ?= bin/nvke-demo.test
 PKG         := ./...
 # Optional diagnostic flags, e.g. GO_TEST_FLAGS=-json for CI timing capture.
 GO_TEST_FLAGS ?=
-# Bound each package explicitly; the hosted factory suite can exceed Go's
-# implicit 10-minute default while still executing its ordinary contracts.
+# Bound each package explicitly; the local unsharded suite can exceed Go's
+# implicit 10-minute default. Hosted shards have a separate five-minute job budget.
 GO_TEST_TIMEOUT ?= 20m
+# CI splits the ordinary suite; reproduce any matrix entry with make test-shard.
+TEST_SHARD_GROUP ?=
+TEST_SHARD_INDEX ?=
 # Dispatch is explicit about the repository: a checkout may have a fork and upstream.
 PIPELINE_DEV_REPO ?=
 export PIPELINE_DEV_REPO
 # Module source dirs only (never the vendored trees checked out under .nvkr/).
 GOSRC       := client cmd internal pkg
-GOFILES     := $(shell find $(GOSRC) -type f -name '*.go' -print)
 GO_VERSION  := $(shell cat .go-version 2>/dev/null)
 VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT      := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -51,10 +53,12 @@ info: ## Print version / toolchain info.
 .PHONY: build
 build: go-version-check ## Compile the nvkr binary.
 	go build -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/nvkr
+	chmod 0755 $(BIN)
 
 .PHONY: demo demo-test-bin
 demo: go-version-check ## Build the downstream Go local NVKE demo CLI (calls nvkr).
 	go build -o $(DEMO_BIN) ./cmd/nvke-demo
+	chmod 0755 $(DEMO_BIN)
 
 demo-test-bin: go-version-check ## Compile opt-in native NVKE E2E tests; does not run them.
 	go test -c -o $(DEMO_TEST_BIN) ./internal/nvkedemo
@@ -76,11 +80,12 @@ go-version-check: ## Require the exact Go patch pinned in .go-version.
 
 .PHONY: fmt
 fmt: ## Format code (gofmt -s -w).
-	gofmt -s -w $(GOFILES)
+	gofmt -s -w $(GOSRC)
 
 .PHONY: fmt-check
 fmt-check: ## Check formatting (CI-friendly, no writes).
-	@test -z "$$(gofmt -l $(GOFILES))" || { echo "unformatted files — run 'make fmt':"; gofmt -l $(GOFILES); exit 1; }
+	@unformatted="$$(gofmt -l $(GOSRC))" || exit $$?; \
+	  test -z "$$unformatted" || { echo "unformatted files — run 'make fmt':"; printf '%s\n' "$$unformatted"; exit 1; }
 	@echo "formatting ok"
 
 .PHONY: vet
@@ -106,6 +111,10 @@ vulncheck: go-version-check ## Check reachable Go vulnerabilities using the pinn
 test: ## Fast default tests for CI and agents (no extended fixtures or instrumentation).
 	go test -timeout $(GO_TEST_TIMEOUT) $(GO_TEST_FLAGS) $(PKG)
 
+.PHONY: test-shard
+test-shard: go-version-check ## Reproduce one CI test shard (TEST_SHARD_GROUP and TEST_SHARD_INDEX required).
+	python3 -B scripts/ci-test-shard.py --group '$(TEST_SHARD_GROUP)' --index '$(TEST_SHARD_INDEX)' --timeout '$(GO_TEST_TIMEOUT)'
+
 .PHONY: test-race
 test-race: ## Opt-in race detection and coverage for the default suite.
 	go test -timeout 20m -race -covermode=atomic -coverprofile=coverage.out $(GO_TEST_FLAGS) $(PKG)
@@ -116,7 +125,7 @@ test-full: ## Include extended capacity/integration fixtures with race + coverag
 	NVKR_TEST_EXTENDED=1 $(MAKE) test-race
 
 .PHONY: test-ci-tools
-test-ci-tools: ## Require Python and check the existing CI report tools.
+test-ci-tools: ## Require Python and check CI sharding, reports and local adapters.
 	python3 -B -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else "Python 3.12+ is required for CI report tests")'
 	python3 -B -m unittest discover -s scripts -p '*_test.py'
 
@@ -126,7 +135,7 @@ cover: test-race ## Open the HTML coverage report in a browser.
 
 .PHONY: tidy
 tidy: ## Format + go mod tidy.
-	gofmt -s -w $(GOFILES)
+	gofmt -s -w $(GOSRC)
 	go mod tidy
 
 .PHONY: notices

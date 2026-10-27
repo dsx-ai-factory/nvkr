@@ -245,6 +245,100 @@ func TestEffectiveCgroupMemorySkipsUsageForUnlimitedAncestors(t *testing.T) {
 	}
 }
 
+func TestEffectiveCgroupCapacityDisabledControllersPreserveAncestors(t *testing.T) {
+	for _, controller := range []string{"cpu", "memory"} {
+		for _, levels := range []int{1, 2} {
+			t.Run(controller+"/"+strconv.Itoa(levels), func(t *testing.T) {
+				root, parent, leaf := cgroupCapacityFixture(t)
+				writeCgroupValue(t, leaf, "cgroup.controllers", "pids")
+				writeCgroupValue(t, parent, "cgroup.subtree_control", "pids")
+				limitDirectory := parent
+				if levels == 2 {
+					writeCgroupValue(t, parent, "cgroup.controllers", "pids")
+					writeCgroupValue(t, root, "cgroup.subtree_control", "pids")
+					limitDirectory = root
+				}
+				var got, want uint64
+				var err error
+				if controller == "cpu" {
+					writeCgroupValue(t, limitDirectory, "cpu.max", "150000 100000")
+					got, err = effectiveCgroupCPUMillis(leaf, root, 4000)
+					want = 1500
+				} else {
+					writeCgroupMemory(t, limitDirectory, 512*1024*1024, 128*1024*1024)
+					got, err = effectiveCgroupMemoryMiB(leaf, root, 2048)
+					want = 384
+				}
+				if err != nil || got != want {
+					t.Fatalf("effective %s = %d, %v; want ancestor bound %d", controller, got, err, want)
+				}
+			})
+		}
+	}
+}
+
+func TestEffectiveCgroupCapacityRejectsUnprovenMissingController(t *testing.T) {
+	for _, controller := range []string{"cpu", "memory"} {
+		for _, tc := range []struct {
+			name          string
+			child, parent string
+			missingChild  bool
+			missingParent bool
+		}{
+			{name: "child advertises controller", child: controller, parent: "pids"},
+			{name: "parent enables controller", child: "pids", parent: controller},
+			{name: "child metadata absent", missingChild: true, parent: "pids"},
+			{name: "parent metadata absent", child: "pids", missingParent: true},
+			{name: "child uses write syntax", child: "+" + controller, parent: "pids"},
+			{name: "parent uses write syntax", child: "pids", parent: "-" + controller},
+			{name: "child contains NUL", child: "pids\x00", parent: "pids"},
+			{name: "parent exceeds bound", child: "pids", parent: strings.Repeat("pids ", 1000)},
+		} {
+			t.Run(controller+"/"+tc.name, func(t *testing.T) {
+				root, parent, leaf := cgroupCapacityFixture(t)
+				if !tc.missingChild {
+					writeCgroupValue(t, leaf, "cgroup.controllers", tc.child)
+				}
+				if !tc.missingParent {
+					writeCgroupValue(t, parent, "cgroup.subtree_control", tc.parent)
+				}
+				var err error
+				if controller == "cpu" {
+					writeCgroupValue(t, parent, "cpu.max", "150000 100000")
+					_, err = effectiveCgroupCPUMillis(leaf, root, 4000)
+				} else {
+					writeCgroupMemory(t, parent, 512*1024*1024, 128*1024*1024)
+					_, err = effectiveCgroupMemoryMiB(leaf, root, 2048)
+				}
+				if errorCode(err) != nvkrerr.CodeEngineCapability {
+					t.Fatalf("missing %s control error = %v, want %s", controller, err, nvkrerr.CodeEngineCapability)
+				}
+			})
+		}
+	}
+}
+
+func TestEffectiveCgroupCapacityNeverSkipsMalformedExistingLimit(t *testing.T) {
+	for _, controller := range []string{"cpu", "memory"} {
+		t.Run(controller, func(t *testing.T) {
+			root, parent, leaf := cgroupCapacityFixture(t)
+			writeCgroupValue(t, leaf, "cgroup.controllers", "pids")
+			writeCgroupValue(t, parent, "cgroup.subtree_control", "pids")
+			writeCgroupValue(t, leaf, controller+".max", "invalid")
+			var err error
+			if controller == "cpu" {
+				_, err = effectiveCgroupCPUMillis(leaf, root, 4000)
+			} else {
+				writeCgroupValue(t, leaf, "memory.current", "0")
+				_, err = effectiveCgroupMemoryMiB(leaf, root, 2048)
+			}
+			if errorCode(err) != nvkrerr.CodeEngineCapability {
+				t.Fatalf("malformed %s limit error = %v, want %s", controller, err, nvkrerr.CodeEngineCapability)
+			}
+		})
+	}
+}
+
 func cgroupCapacityFixture(t *testing.T) (string, string, string) {
 	t.Helper()
 	root := t.TempDir()

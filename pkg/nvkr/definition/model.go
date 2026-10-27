@@ -9,6 +9,7 @@ package definition
 
 import (
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -143,11 +144,25 @@ type Publication struct {
 	PlainHTTP        bool              `json:"plainHTTP,omitempty"`
 }
 
+// NativeToolchain locates an existing local NVKR binary-bundle output.
+// The map key in Runtime is its exact semantic identity; paths are descriptions
+// authenticated by the consuming toolchain owner, never execution proof.
+type NativeToolchain struct {
+	Layout string `json:"layout,omitempty"`
+	Bundle string `json:"bundle,omitempty"`
+	// The installed Go form is local only. The consumer remeasures these
+	// descriptive locations against the canonical manifest and map key.
+	GoManifest string `json:"goManifest,omitempty"`
+	GoRoot     string `json:"goRoot,omitempty"`
+	Compiler   string `json:"compiler,omitempty"`
+}
+
 type Runtime struct {
-	PodmanStorageDriver PodmanStorageDriver `json:"podmanStorageDriver,omitempty"`
-	Runtime             string              `json:"runtime,omitempty"`
-	RuntimeImage        string              `json:"runtimeImage,omitempty"`
-	HelperImage         string              `json:"helperImage,omitempty"`
+	NativeToolchains    map[string]NativeToolchain `json:"nativeToolchains,omitempty"`
+	PodmanStorageDriver PodmanStorageDriver        `json:"podmanStorageDriver,omitempty"`
+	Runtime             string                     `json:"runtime,omitempty"`
+	RuntimeImage        string                     `json:"runtimeImage,omitempty"`
+	HelperImage         string                     `json:"helperImage,omitempty"`
 	// BuilderImage retains the retired GitLab bootstrap schema allocation.
 	// Nonempty values are unsupported by maintained execution targets.
 	BuilderImage      string            `json:"builderImage,omitempty"`
@@ -444,6 +459,25 @@ func (profile Environment) RuntimeBinary() string {
 }
 
 func (profile Runtime) validate() error {
+	if len(profile.NativeToolchains) > 256 {
+		return e.New(e.CodeInvalidCatalog, "native toolchain inventory exceeds 256 entries")
+	}
+	for digest, toolchain := range profile.NativeToolchains {
+		if toolchain.GoManifest != "" || toolchain.GoRoot != "" || toolchain.Compiler != "" {
+			if !canonical.IsDigest(digest) || toolchain.Layout != "" || toolchain.Bundle != "" {
+				return e.New(e.CodeInvalidCatalog, "native Go and binary-bundle toolchain locations cannot be mixed")
+			}
+			for _, location := range []string{toolchain.GoManifest, toolchain.GoRoot, toolchain.Compiler} {
+				if !filepath.IsAbs(location) || filepath.Clean(location) != location || strings.ContainsAny(location, "\r\n\x00") {
+					return e.New(e.CodeInvalidCatalog, "native Go toolchain requires three clean absolute local paths")
+				}
+			}
+			continue
+		}
+		if !canonical.IsDigest(digest) || !namePattern.MatchString(toolchain.Bundle) || strings.TrimSpace(toolchain.Layout) == "" || strings.ContainsAny(toolchain.Layout, "\r\n\x00") {
+			return e.New(e.CodeInvalidCatalog, "native toolchain requires an exact digest, canonical bundle name and safe local layout path")
+		}
+	}
 	if err := profile.PodmanStorageDriver.Validate(profile.Runtime); err != nil {
 		return err
 	}

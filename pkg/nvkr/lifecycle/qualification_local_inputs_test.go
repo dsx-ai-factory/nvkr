@@ -57,6 +57,10 @@ func TestLocalQualificationInputsReplayWithoutProducerCheckout(t *testing.T) {
 		!bytes.Equal(got.inputBytes, []byte(prepared.inputs)) {
 		t.Fatal("saved local input identity changed during replay")
 	}
+	plan, run, err := InspectLocalRunInputs(t.Context(), workspace)
+	if err != nil || plan == nil || run.PlanDigest != got.run.PlanDigest || run.ContentSubject != complete.ContentSubject {
+		t.Fatalf("local input inspection changed its frozen metadata: %v", err)
+	}
 	// This fixture deliberately contains no payloads. Input replay alone must
 	// remain a private description, never an artifact or qualification receipt.
 	if _, err := os.Stat(filepath.Join(workspace, "artifacts")); !os.IsNotExist(err) {
@@ -146,9 +150,9 @@ func TestLocalQualificationInputsRefuseSubstitutedOrIncompleteRecords(t *testing
 		t.Run(tc.name, func(t *testing.T) {
 			root, prepared, run := localQualificationInputFixture(t)
 			tc.edit(t, root, prepared, run)
-			got, err := loadLocalQualificationInputs(t.Context(), root)
+			plan, inspected, err := InspectLocalRunInputs(t.Context(), root)
 			assertCode(t, err, tc.code)
-			if got != nil {
+			if plan != nil || inspected.Attempt != "" {
 				t.Fatal("rejected metadata returned prepared inputs")
 			}
 		})
@@ -158,9 +162,9 @@ func TestLocalQualificationInputsRefuseSubstitutedOrIncompleteRecords(t *testing
 func TestLocalQualificationInputsCanceledBeforeFilesystem(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	got, err := loadLocalQualificationInputs(ctx, "missing")
+	plan, run, err := InspectLocalRunInputs(ctx, "missing")
 	assertCode(t, err, e.CodeTimeout)
-	if got != nil || !errors.Is(err, context.Canceled) {
+	if plan != nil || run.Attempt != "" || !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancellation lost: %v", err)
 	}
 }

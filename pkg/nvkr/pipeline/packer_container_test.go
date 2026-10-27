@@ -20,6 +20,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -525,6 +526,7 @@ func TestStartPackerBuildContainerClassifiesProjectionFailure(t *testing.T) {
 }
 
 type recordingPackerRuntime struct {
+	mu         sync.Mutex
 	name       string
 	endpoint   string
 	digest     string
@@ -587,7 +589,9 @@ func (runtime *recordingPackerRuntime) AdmittedIdentity() (string, string) {
 }
 
 func (runtime *recordingPackerRuntime) Run(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, args ...string) error {
+	runtime.mu.Lock()
 	runtime.calls = append(runtime.calls, append([]string(nil), args...))
+	runtime.mu.Unlock()
 	if runtime.runContext != nil {
 		return runtime.runContext(ctx, stdin, stdout, stderr, args)
 	}
@@ -648,7 +652,11 @@ func TestObserveLocalPackerImageUsesExactHostPlatformWithoutPull(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			runtime := &recordingPackerRuntime{name: test.runtime, run: func(_ io.Reader, stdout, _ io.Writer, _ []string) error {
+			runtime := &recordingPackerRuntime{name: test.runtime, run: func(_ io.Reader, stdout, stderr io.Writer, args []string) error {
+				if slices.Contains(args, "--platform") {
+					_, _ = io.WriteString(stderr, "unknown flag: --platform")
+					return errors.New("exit status 125")
+				}
 				_, _ = io.WriteString(stdout, test.inspection)
 				return nil
 			}}
@@ -658,7 +666,7 @@ func TestObserveLocalPackerImageUsesExactHostPlatformWithoutPull(t *testing.T) {
 			}
 			want := test.want
 			if want == nil {
-				want = []string{"image", "inspect", "--platform", "linux/arm64", "--format", "{{json .}}", node.Toolchain}
+				want = []string{"image", "inspect", "--format", "{{json .}}", node.Toolchain}
 			}
 			if !reflect.DeepEqual(runtime.calls, [][]string{want}) {
 				t.Fatalf("image calls = %#v, want %#v", runtime.calls, [][]string{want})

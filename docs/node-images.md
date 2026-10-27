@@ -71,7 +71,7 @@ NVKR provides the checked handoff; the source-owned build defines how those form
 
 ## Inspect without starting a VM
 
-After [building the CLI](quickstart.md), run from the repository root. These commands need no Docker,
+After [building the CLI](quickstart.md#build-only-the-cli), run from the repository root. These commands need no Docker,
 KVM or Packer execution:
 
 ```sh
@@ -97,9 +97,11 @@ Native Docker/KVM execution requires matching Linux architecture, a running Dock
 `jq`, KVM access, 8 CPUs, 10 GiB memory,
 64 GiB free workspace storage, and access to pinned source/toolchain inputs. Follow the
 [maintained wrapper instructions](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/diagnostics/README.md) for source-locked toolchain bootstrap
-and a fresh immutable attempt. There is no maintained macOS/Podman disk-build route.
-For the ARM64 local demo's Docker/Colima Linux execution setup, see the
-[local demo guide](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/local-nvke-demo.md); a macOS CLI build does not admit native macOS deployment.
+and a fresh immutable attempt. These instructions select the Linux Docker/KVM route;
+they do not admit Podman execution. The separate
+[native Ubuntu and Mac demo guide](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/local-nvke-demo.md#native-linux-and-mac-path)
+describes native Packer preparation, shared three-VM deployment and its pending
+complete customer setup/runtime acceptance.
 
 A successful local Run retains its disk and record under `.nvkr/runs/<attempt>/`; it remains unqualified.
 Material tracing and published `build-provenance-v1` evidence do not establish a complete installed-software

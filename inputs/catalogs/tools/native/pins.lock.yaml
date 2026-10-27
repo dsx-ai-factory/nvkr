@@ -1,0 +1,246 @@
+# Machine-managed by `nvkr catalog pin` / `nvkr catalog bump`. Do not hand-edit.
+apiVersion: nvkr.dev/lock/v1
+artifacts:
+  native-capi-exec-init-image:
+    digests:
+      arm64: sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d
+    imageParentDigest: sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+    tag: v0.22.0
+  native-capi-exec-plugin-image:
+    digests:
+      arm64: sha256:a8904bb463d669541a195ee013937e9a5a457dc999b3245da222858b526660fa
+    imageParentDigest: sha256:e30e90774e5951f84eb6dfb36f972fead08b64c3bfdc0912c5b15f988e79de3a
+    tag: v0.22.0
+  native-workload-image:
+    digests:
+      arm64: sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d
+    imageParentDigest: sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d
+    tag: v0.22.0
+kind: PinLock
+pins:
+  clusterctl:
+    commit: bd8162edfe045c1bb490d431b3acddd568bdb887
+    sourceDateEpoch: 1788866431
+    tag: v1.13.6
+    tool:
+      archiveDigest: sha256:1a04967e188dcb70124f15508e7941335f3bddc5b456d1ed38d6dc4005c187a2
+      executableDigest: sha256:1a04967e188dcb70124f15508e7941335f3bddc5b456d1ed38d6dc4005c187a2
+      executablePath: clusterctl
+      format: raw
+      platform: darwin/arm64
+      url: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.13.6/clusterctl-darwin-arm64
+    treeHash: 8c584c260a47253fb8ebc5681a7eb894798ace7a
+  clusterctl-linux:
+    commit: bd8162edfe045c1bb490d431b3acddd568bdb887
+    sourceDateEpoch: 1788866431
+    tag: v1.13.6
+    tool:
+      archiveDigest: sha256:c3fe61fd44fa63d2efcee2a93432619527909b210a84cda7ee86eea1425de8c2
+      executableDigest: sha256:c3fe61fd44fa63d2efcee2a93432619527909b210a84cda7ee86eea1425de8c2
+      executablePath: clusterctl
+      format: raw
+      platform: linux/arm64
+      url: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.13.6/clusterctl-linux-arm64
+    treeHash: 8c584c260a47253fb8ebc5681a7eb894798ace7a
+  helm:
+    commit: 3900f434fd3ef2b84065dc04508df48f288dba00
+    sourceDateEpoch: 1786632363
+    tag: v4.2.4
+    tool:
+      archiveDigest: sha256:d747eb4e28bd2727173d15b759fa0a17822291ec09db7ced3d55af290a3661a2
+      executableDigest: sha256:66f6b8881392bfa15c6c1dceef980426a28709c8122d5dc8a7a29697cad7334c
+      executablePath: darwin-arm64/helm
+      format: tar-gzip
+      platform: darwin/arm64
+      url: https://get.helm.sh/helm-v4.2.4-darwin-arm64.tar.gz
+    treeHash: 16e7ec45b01a241f5011caad2fe8751208a7ba94
+  helm-linux:
+    commit: 3900f434fd3ef2b84065dc04508df48f288dba00
+    sourceDateEpoch: 1786632363
+    tag: v4.2.4
+    tool:
+      archiveDigest: sha256:564de2191b881e9f71b5606b25345821ea1682f06ab90499d3ab22b530176da1
+      executableDigest: sha256:0690653ac2aad19150f0c22383ceb8aaf4fd96666fcfabb9d4641fbf757e0490
+      executablePath: linux-arm64/helm
+      format: tar-gzip
+      platform: linux/arm64
+      url: https://get.helm.sh/helm-v4.2.4-linux-arm64.tar.gz
+    treeHash: 16e7ec45b01a241f5011caad2fe8751208a7ba94
+  kind:
+    commit: cda67ef8588f6bfdac5358233f2471cb2149ecaf
+    goVersion: 1.26.3
+    sourceDateEpoch: 1780417734
+    tag: v0.32.0
+    tool:
+      archiveDigest: sha256:dca67911095a110c2b5c36e26df6cac860c602033e456c0db47be498cdef1ebb
+      executableDigest: sha256:dca67911095a110c2b5c36e26df6cac860c602033e456c0db47be498cdef1ebb
+      executablePath: kind
+      format: raw
+      platform: darwin/arm64
+      url: https://github.com/kubernetes-sigs/kind/releases/download/v0.32.0/kind-darwin-arm64
+    treeHash: be4d44635ebcab72f70760c8e04684cbd98d3969
+  kind-linux:
+    commit: cda67ef8588f6bfdac5358233f2471cb2149ecaf
+    goVersion: 1.26.3
+    sourceDateEpoch: 1780417734
+    tag: v0.32.0
+    tool:
+      archiveDigest: sha256:b92cd615e97585de8ddade28ed5cd7feb4248d717c233eea5b03c37298900f5d
+      executableDigest: sha256:b92cd615e97585de8ddade28ed5cd7feb4248d717c233eea5b03c37298900f5d
+      executablePath: kind
+      format: raw
+      platform: linux/arm64
+      url: https://github.com/kubernetes-sigs/kind/releases/download/v0.32.0/kind-linux-arm64
+    treeHash: be4d44635ebcab72f70760c8e04684cbd98d3969
+  kubectl:
+    commit: 329000efd0b26bd78155e51e4df449130f0fca00
+    goVersion: 1.26.8
+    sourceDateEpoch: 1790183268
+    tag: v1.35.9
+    tool:
+      archiveDigest: sha256:652548e6a9405266c5acd2719703bc8d36befa46e79e151a0d646904aa32c89b
+      executableDigest: sha256:652548e6a9405266c5acd2719703bc8d36befa46e79e151a0d646904aa32c89b
+      executablePath: kubectl
+      format: raw
+      platform: darwin/arm64
+      url: https://dl.k8s.io/release/v1.35.9/bin/darwin/arm64/kubectl
+    treeHash: 125da0aec19fa2c7f9f8d834db1ba7fa70e952ed
+  kubectl-linux:
+    commit: 329000efd0b26bd78155e51e4df449130f0fca00
+    goVersion: 1.26.8
+    sourceDateEpoch: 1790183268
+    tag: v1.35.9
+    tool:
+      archiveDigest: sha256:39c98bca82875d9a9ddfb6f3c5ab17c3f78ea0801230683e538a67d5c053308d
+      executableDigest: sha256:39c98bca82875d9a9ddfb6f3c5ab17c3f78ea0801230683e538a67d5c053308d
+      executablePath: kubectl
+      format: raw
+      platform: linux/arm64
+      url: https://dl.k8s.io/release/v1.35.9/bin/linux/arm64/kubectl
+    treeHash: 125da0aec19fa2c7f9f8d834db1ba7fa70e952ed
+  nerdctl-site:
+    commit: 9039d5272eb8646d35322b9f4413bdf18ce7231a
+    sourceDateEpoch: 1790975074
+    tag: v2.4.1
+    treeHash: 6475ba71d8f7f2a2d6c2d09cbfbd40b4a1a1f029
+  nvke-cli:
+    commit: 400c24fb6465b042be883d6b62472528520d6291
+    sourceDateEpoch: 1792548398
+    tag: v0.22.0
+    treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
+  nvke-deploy:
+    commit: 400c24fb6465b042be883d6b62472528520d6291
+    sourceDateEpoch: 1792548398
+    tag: v0.22.0
+    treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
+  nvke-nicosim:
+    commit: 400c24fb6465b042be883d6b62472528520d6291
+    sourceDateEpoch: 1792548398
+    tag: v0.22.0
+    treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
+  nvkr-site-identity:
+    commit: 8aba19abf8a2b74dbd14f8a6abed608e02e8b744
+    goVersion: 1.27.3
+    sourceDateEpoch: 1792621677
+    tag: 8aba19abf8a2b74dbd14f8a6abed608e02e8b744
+    treeHash: e4264190f52f98ef70ca9daa4b536306ec030aa9
+  oras:
+    commit: 210747c29c1d38732b3194878dfd8b5a6b9ad7eb
+    sourceDateEpoch: 1783708065
+    tag: v1.3.3
+    tool:
+      archiveDigest: sha256:f33fc12753c54172b0d0d19eaa0318d3f90fe9b094d96e8b259c881713c92e1c
+      executableDigest: sha256:4b8a42fc8e7976710eef8b846309b5426aa4d12d0de9dfd691d58507f23cf180
+      executablePath: oras
+      format: tar-gzip
+      platform: darwin/arm64
+      url: https://github.com/oras-project/oras/releases/download/v1.3.3/oras_1.3.3_darwin_arm64.tar.gz
+    treeHash: a4b0547c6e18c9abc9b1eac5fb8add27a7c4ce2f
+  oras-linux:
+    commit: 210747c29c1d38732b3194878dfd8b5a6b9ad7eb
+    sourceDateEpoch: 1783708065
+    tag: v1.3.3
+    tool:
+      archiveDigest: sha256:ac7156f93a21e903f7ad606c792f3560f17e0cd0e36365634701b1e7cc4e4eca
+      executableDigest: sha256:f4bdc5f948233b03042734bf679d6926323701f4dcc08de25301af82b648d6f3
+      executablePath: oras
+      format: tar-gzip
+      platform: linux/arm64
+      url: https://github.com/oras-project/oras/releases/download/v1.3.3/oras_1.3.3_linux_arm64.tar.gz
+    treeHash: a4b0547c6e18c9abc9b1eac5fb8add27a7c4ce2f
+  packer:
+    commit: 9f42be3f6686a9c00b3b1325fcecbba337b8b93b
+    goVersion: 1.25.11
+    sourceDateEpoch: 1780491485
+    tag: v1.15.4
+    tool:
+      archiveDigest: sha256:d95ba177dd2ebb84d7d155493b4188ec2a519d2c3b041528db5b63a6aff9da80
+      executableDigest: sha256:1729663b9c6e0f7a32fbab6efa5d23dee9d92d61bc319d39eb7198b796e54a8b
+      executablePath: packer
+      format: zip
+      platform: darwin/arm64
+      url: https://releases.hashicorp.com/packer/1.15.4/packer_1.15.4_darwin_arm64.zip
+    treeHash: 1f899e252355e6f43e54111ff29e77bfe7d51607
+  packer-linux:
+    commit: 9f42be3f6686a9c00b3b1325fcecbba337b8b93b
+    goVersion: 1.25.11
+    sourceDateEpoch: 1780491485
+    tag: v1.15.4
+    tool:
+      archiveDigest: sha256:23e6d2e596dd9e2527e0f7bea9aedd26059729375a0d17c462c2621f1b97b82d
+      executableDigest: sha256:147b17e1088be369f4b7d74fb3a5744edf0162632083c58d63c7c41d5a73fd4e
+      executablePath: packer
+      format: zip
+      platform: linux/arm64
+      url: https://releases.hashicorp.com/packer/1.15.4/packer_1.15.4_linux_arm64.zip
+    treeHash: 1f899e252355e6f43e54111ff29e77bfe7d51607
+  packer-plugin-qemu:
+    commit: cc9522dd1de3bf7e0c2c6eb5cf54ec59803bd13c
+    goVersion: 1.25.11
+    sourceDateEpoch: 1784198226
+    tag: v1.1.6
+    tool:
+      archiveDigest: sha256:3fce2e8b5c3fce0aac5f47f59b81b7ecfffd397532ecd4021ba7b6dfd2935ba6
+      executableDigest: sha256:73440227248a65d23a3084d03846cfe911ca956634e9d961710e01c4f3774d80
+      executablePath: packer-plugin-qemu_v1.1.6_x5.0_darwin_arm64
+      format: zip
+      platform: darwin/arm64
+      url: https://releases.hashicorp.com/packer-plugin-qemu/1.1.6/packer-plugin-qemu_1.1.6_darwin_arm64.zip
+    treeHash: accfb8bf3a7269c099f095c60817f309d06cfb7a
+  packer-plugin-qemu-linux:
+    commit: cc9522dd1de3bf7e0c2c6eb5cf54ec59803bd13c
+    goVersion: 1.25.11
+    sourceDateEpoch: 1784198226
+    tag: v1.1.6
+    tool:
+      archiveDigest: sha256:81a91755dfbb50317a51652fe3fa68b0253da864374bdf219e4d32ebbe08af58
+      executableDigest: sha256:d672c5b820cb4ce54c8eb6bde1f453b04976935a144f5180f836b6457cd2556c
+      executablePath: packer-plugin-qemu_v1.1.6_x5.0_linux_arm64
+      format: zip
+      platform: linux/arm64
+      url: https://releases.hashicorp.com/packer-plugin-qemu/1.1.6/packer-plugin-qemu_1.1.6_linux_arm64.zip
+    treeHash: accfb8bf3a7269c099f095c60817f309d06cfb7a
+  vmnet-client:
+    commit: c593b89a2e93e92cfe7c5b1189e1eeb2c7977554
+    sourceDateEpoch: 1773407730
+    tag: v0.10.0
+    tool:
+      archiveDigest: sha256:bcf37a2631878a24fd02e2bf812b7387d4c4ff0bcee27c3f4be410c040896f8b
+      executableDigest: sha256:24742a641cd4e884502217fac6f40c4a27a6ffd08682137a69dac21f3cb198f6
+      executablePath: opt/vmnet-helper/bin/vmnet-client
+      format: tar-gzip
+      platform: darwin/arm64
+      url: https://github.com/nirs/vmnet-helper/releases/download/v0.10.0/vmnet-helper.tar.gz
+    treeHash: 8f90a3d7c452e1fad44b7916442a38bc27d06c56
+  vmnet-helper:
+    commit: c593b89a2e93e92cfe7c5b1189e1eeb2c7977554
+    sourceDateEpoch: 1773407730
+    tag: v0.10.0
+    tool:
+      archiveDigest: sha256:bcf37a2631878a24fd02e2bf812b7387d4c4ff0bcee27c3f4be410c040896f8b
+      executableDigest: sha256:3075f3297ed2f8edeb2ae058383dc83debc366fb9d7ce3aa0928a8bc51a7f3a6
+      executablePath: opt/vmnet-helper/bin/vmnet-helper
+      format: tar-gzip
+      platform: darwin/arm64
+      url: https://github.com/nirs/vmnet-helper/releases/download/v0.10.0/vmnet-helper.tar.gz
+    treeHash: 8f90a3d7c452e1fad44b7916442a38bc27d06c56

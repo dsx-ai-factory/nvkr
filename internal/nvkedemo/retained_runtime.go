@@ -41,7 +41,6 @@ type retainedRuntime struct {
 	lifetime         context.Context
 	cancelOperations context.CancelFunc
 	cleanup          chan struct{}
-	changed          chan struct{}
 	snapshot         retainedRuntimeSnapshot
 	cleanupErr       error
 	teardownReturned bool
@@ -75,7 +74,7 @@ func newRetainedRuntime(lifetime context.Context, cancelOperations context.Cance
 	if _, deadline := lifetime.Deadline(); deadline || lifetime.Done() != nil {
 		return nil, nvkrerr.New(nvkrerr.CodeUsage, "retained owner lifetime must be independent of viewer cancellation and deadlines")
 	}
-	return &retainedRuntime{lifetime: lifetime, cancelOperations: cancelOperations, cleanup: make(chan struct{}), changed: make(chan struct{}), snapshot: retainedRuntimeSnapshot{state: retainedStarting}}, nil
+	return &retainedRuntime{lifetime: lifetime, cancelOperations: cancelOperations, cleanup: make(chan struct{}), snapshot: retainedRuntimeSnapshot{state: retainedStarting}}, nil
 }
 
 func (owner *retainedRuntime) issued() bool {
@@ -86,11 +85,6 @@ func (owner *retainedRuntime) issued() bool {
 func runtimeRetention(ctx context.Context) *retainedRuntime {
 	owner, _ := ctx.Value(retainedRuntimeKey{}).(*retainedRuntime)
 	return owner
-}
-
-func (owner *retainedRuntime) notifyLocked() {
-	close(owner.changed)
-	owner.changed = make(chan struct{})
 }
 
 // markReady is called only after the tenant owner has completed its exact real
@@ -110,7 +104,6 @@ func (owner *retainedRuntime) markReady(ctx context.Context, access OperatorAcce
 		return nvkrerr.New(nvkrerr.CodePreflightFailed, "retained readiness cannot replace a held or cleanup state")
 	}
 	owner.snapshot = retainedRuntimeSnapshot{state: retainedReady, checkedAt: time.Now(), access: access}
-	owner.notifyLocked()
 	return nil
 }
 
@@ -136,7 +129,6 @@ func (owner *retainedRuntime) requestCleanup(ctx context.Context) error {
 		}
 		owner.snapshot.state = retainedCleanupRequested
 		close(owner.cleanup)
-		owner.notifyLocked()
 	}
 	owner.mu.Unlock()
 	// Release the state lock before cancellation reaches a callback. No
@@ -163,7 +155,6 @@ func (owner *retainedRuntime) hold() error {
 	}
 	if owner.snapshot.state == retainedStarting {
 		owner.snapshot.state = retainedPartial
-		owner.notifyLocked()
 	}
 	owner.mu.Unlock()
 	select {
@@ -179,38 +170,6 @@ func (owner *retainedRuntime) hold() error {
 			return nil
 		}
 		return errors.Join(ErrRetainedControls, nvkrerr.Wrap(nvkrerr.CodeTimeout, owner.lifetime.Err(), "retained owner ended without explicit cleanup"))
-	}
-}
-
-// observe supplies bounded read-only snapshots to an owning presenter. Closing
-// or timing out this observation cannot release the runtime or alter readiness.
-func (owner *retainedRuntime) observe(ctx context.Context) (retainedRuntimeSnapshot, error) {
-	if !owner.issued() || ctx == nil {
-		return retainedRuntimeSnapshot{}, nvkrerr.New(nvkrerr.CodeUsage, "retained observation requires a live owner and bounded context")
-	}
-	if _, bounded := ctx.Deadline(); !bounded {
-		return retainedRuntimeSnapshot{}, nvkrerr.New(nvkrerr.CodeUsage, "retained observation requires a deadline")
-	}
-	for {
-		if err := errors.Join(ctx.Err(), owner.lifetime.Err()); err != nil {
-			return retainedRuntimeSnapshot{}, nvkrerr.Wrap(nvkrerr.CodeTimeout, err, "retained observation unavailable")
-		}
-		owner.mu.Lock()
-		snapshot, changed := owner.snapshot, owner.changed
-		owner.mu.Unlock()
-		switch snapshot.state {
-		case retainedStarting, retainedPartial, retainedReady, retainedCleanupRequested:
-		default:
-			return retainedRuntimeSnapshot{}, nvkrerr.New(nvkrerr.CodePreflightFailed, "retained observation refused an unknown owner state")
-		}
-		if snapshot.state != retainedStarting {
-			return snapshot, nil
-		}
-		select {
-		case <-changed:
-		case <-ctx.Done():
-		case <-owner.lifetime.Done():
-		}
 	}
 }
 

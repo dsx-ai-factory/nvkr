@@ -108,7 +108,10 @@ func TestUploadGitHubCarrierCanceledBeforeAdmission(t *testing.T) {
 }
 
 func TestGitHubMetadataProducedControlsRoundtrip(t *testing.T) {
-	plan, artifacts, _ := referenceMetadataFixture(t)
+	selected := recompileGitHubStabilityPlan(t, referenceTestPlan(t), func(inputs *githubStabilityInputs) {
+		inputs.definition.Outputs = inputs.definition.Outputs[:1]
+	})
+	plan, artifacts, _ := referenceMetadataFixtureForPlan(t, selected)
 	output := plan.LifecycleOutputs[0].Name
 	route := outputPublicationRoute(output)
 	snapshotRoot := t.TempDir()
@@ -135,8 +138,8 @@ func TestGitHubMetadataProducedControlsRoundtrip(t *testing.T) {
 }
 
 func TestGitHubMetadataRejectsMalformedOCIArchiveWithoutReceipt(t *testing.T) {
-	plan, artifacts, _ := referenceMetadataFixture(t)
-	artifact := artifacts["metadata/"+outputPublicationRoute(plan.LifecycleOutputs[0].Name)]
+	// Archive admission needs the expected descriptor, not a signed release.
+	artifact := Artifact{ID: "metadata/output", Kind: ArtifactPublicationMetadata, Path: "metadata/output"}
 	snapshotRoot := t.TempDir()
 	t.Setenv("TMPDIR", snapshotRoot)
 	for _, kind := range []string{"parent traversal", "absolute path", "symlink", "hardlink", "duplicate", "invalid layout", "canceled"} {
@@ -204,7 +207,7 @@ func TestGitHubMetadataRejectsMalformedOCIArchiveWithoutReceipt(t *testing.T) {
 }
 
 func TestGitHubMetadataRejectsChangedSBOMMembershipAndDigest(t *testing.T) {
-	_, artifacts, _ := referenceMetadataFixture(t)
+	_, artifacts, _ := publicationSBOMFixture(t)
 	var artifact Artifact
 	for _, a := range artifacts {
 		if a.Kind == "sbom-set" {

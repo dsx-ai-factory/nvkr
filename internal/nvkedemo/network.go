@@ -179,7 +179,15 @@ func privateNetworkDirectory(path string) (*os.File, string, error) {
 }
 
 func newNetworkGuard(runner Runner, kindCIDR string) (*NetworkGuard, error) {
-	if err := validateNetworkKind(kindCIDR); err != nil {
+	return newNetworkGuardScope(runner, kindCIDR, false)
+}
+
+func newNetworkGuardScope(runner Runner, kindCIDR string, native bool) (*NetworkGuard, error) {
+	if native {
+		if kindCIDR != "" {
+			return nil, fmt.Errorf("native host transport must not declare a host Kind subnet")
+		}
+	} else if err := validateNetworkKind(kindCIDR); err != nil {
 		return nil, err
 	}
 	directory, work, err := privateNetworkDirectory(runner.Work)
@@ -206,6 +214,12 @@ func validateNetworkKind(kindCIDR string) error {
 // NewNetworkGuard admits the host, resources, private workspace and kernel lock,
 // then durably records an empty intent ledger before returning a Start obligation.
 func NewNetworkGuard(ctx context.Context, runner Runner, kindCIDR, demoExecutable string) (result *NetworkGuard, resultErr error) {
+	return admitNetworkGuard(ctx, runner, kindCIDR, demoExecutable, false)
+}
+
+// Native bootstrap transport originates on the host through its owned backend;
+// there is no Kind bridge in the host namespace to admit or grant forwarding.
+func admitNetworkGuard(ctx context.Context, runner Runner, kindCIDR, demoExecutable string, native bool) (result *NetworkGuard, resultErr error) {
 	boundary := beginProgress(runner.Progress, "network-preflight", PhaseStarted, PhaseFinished, PhaseFailed)
 	defer func() {
 		if resultErr != nil {
@@ -228,7 +242,7 @@ func NewNetworkGuard(ctx context.Context, runner Runner, kindCIDR, demoExecutabl
 			return nil, err
 		}
 	}
-	g, err := newNetworkGuard(runner, kindCIDR)
+	g, err := newNetworkGuardScope(runner, kindCIDR, native)
 	if err != nil {
 		return nil, err
 	}
@@ -594,7 +608,11 @@ func networkFile(ctx context.Context, path string, private bool) (networkFileID,
 }
 
 func (g *NetworkGuard) snapshot() networkState {
-	return networkState{Version: 3, Work: g.Work, UID: uint32(os.Getuid()), Boot: g.boot, PID: g.pid, Owner: g.Owner, KindCIDR: g.KindCIDR, KindGateway: g.kindGateway, BridgeMAC: g.BridgeMAC, BridgeID: g.BridgeID, BridgeIntent: g.BridgeIntent, PolicyID: g.policyID, Staging: g.staging, HelperID: g.helperID, HelperHash: g.helperHash, HelperGranted: g.helperGranted, Sysctls: g.sysctls, SysctlIntents: g.sysctlIntents, Rules: g.rules, Caps: g.caps, Finished: g.finished, BGPIntent: g.BGPIntent}
+	version := 3
+	if g.KindCIDR == "" {
+		version = 4
+	}
+	return networkState{Version: version, Work: g.Work, UID: uint32(os.Getuid()), Boot: g.boot, PID: g.pid, Owner: g.Owner, KindCIDR: g.KindCIDR, KindGateway: g.kindGateway, BridgeMAC: g.BridgeMAC, BridgeID: g.BridgeID, BridgeIntent: g.BridgeIntent, PolicyID: g.policyID, Staging: g.staging, HelperID: g.helperID, HelperHash: g.helperHash, HelperGranted: g.helperGranted, Sysctls: g.sysctls, SysctlIntents: g.sysctlIntents, Rules: g.rules, Caps: g.caps, Finished: g.finished, BGPIntent: g.BGPIntent}
 }
 
 func (g *NetworkGuard) Checkpoint(ctx context.Context) error {
@@ -686,7 +704,11 @@ func networkRules(owner, kind string) []networkRule {
 	for _, row := range [][2]string{{"udp", "67"}, {"udp", "53"}, {"tcp", "53"}, {"tcp", "7777"}, {"tcp", "10179"}, {"tcp", "18080"}} {
 		rows = append(rows, networkRule{"filter", "INPUT", []string{"-i", BridgeName, "-p", row[0], "--dport", row[1], "-j", "ACCEPT"}})
 	}
-	rows = append(rows, networkRule{"filter", "FORWARD", []string{"-i", BridgeName, "-s", GuestCIDR, "-j", "ACCEPT"}}, networkRule{"filter", "FORWARD", []string{"-o", BridgeName, "-d", GuestCIDR, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"}}, networkRule{"filter", "FORWARD", []string{"-o", BridgeName, "-s", kind, "-d", VIPCIDR, "-p", "tcp", "--dport", "6443", "-j", "ACCEPT"}}, networkRule{"nat", "POSTROUTING", []string{"-s", GuestCIDR, "!", "-d", GuestCIDR, "-j", "MASQUERADE"}})
+	rows = append(rows, networkRule{"filter", "FORWARD", []string{"-i", BridgeName, "-s", GuestCIDR, "-j", "ACCEPT"}}, networkRule{"filter", "FORWARD", []string{"-o", BridgeName, "-d", GuestCIDR, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"}})
+	if kind != "" {
+		rows = append(rows, networkRule{"filter", "FORWARD", []string{"-o", BridgeName, "-s", kind, "-d", VIPCIDR, "-p", "tcp", "--dport", "6443", "-j", "ACCEPT"}})
+	}
+	rows = append(rows, networkRule{"nat", "POSTROUTING", []string{"-s", GuestCIDR, "!", "-d", GuestCIDR, "-j", "MASQUERADE"}})
 	for _, row := range [][2]string{{"80", "7777"}, {"179", "10179"}} {
 		rows = append(rows, networkRule{"nat", "PREROUTING", []string{"-i", BridgeName, "-d", GuestGateway, "-p", "tcp", "--dport", row[0], "-j", "REDIRECT", "--to-port", row[1]}})
 	}
@@ -1037,71 +1059,6 @@ func networkLast(prefix netip.Prefix) netip.Addr {
 		a[i/8] |= 1 << uint(7-i%8)
 	}
 	return netip.AddrFrom4(a)
-}
-func (g *NetworkGuard) AllowGuestTCP(ctx context.Context, address string, ports []int) error {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if err := admittedGuestTCP(g.KindCIDR, address, ports); err != nil {
-		return err
-	}
-	if g.cleaning || !g.BridgeIntent {
-		return fmt.Errorf("guest TCP requires active owned bridge")
-	}
-	binding, err := g.BridgeBinding(ctx)
-	if err != nil {
-		return err
-	}
-	if binding == "" {
-		return fmt.Errorf("owned bridge absent")
-	}
-	ports = slices.Clone(ports)
-	slices.Sort(ports)
-	for _, port := range ports {
-		row := guestTCPRule(g.Owner, address, port)
-		for _, old := range g.rules {
-			if old.Table == row.Table && old.Chain == row.Chain && slices.Equal(old.Args, row.Args) {
-				return fmt.Errorf("duplicate guest TCP rule")
-			}
-		}
-		exists, err := g.ruleExists(ctx, row)
-		if err != nil {
-			return err
-		}
-		if exists {
-			return fmt.Errorf("fresh guest TCP rule exists")
-		}
-		g.rules = append(g.rules, row)
-		if err = g.checkpoint(ctx); err != nil {
-			return err
-		}
-		if err = g.ruleCommand(ctx, row, "-I"); err != nil {
-			return err
-		}
-		exists, err = g.ruleExists(ctx, row)
-		if err != nil {
-			return err
-		}
-		if !exists {
-			return fmt.Errorf("guest TCP insert did not survive readback")
-		}
-	}
-	return nil
-}
-func (g *NetworkGuard) RevokeGuestTCP(ctx context.Context) error {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	previous := g.cleaning
-	g.cleaning = true
-	defer func() { g.cleaning = previous }()
-	for i := len(g.rules) - 1; i >= 0; i-- {
-		row := g.rules[i]
-		if row.Table == "raw" && row.Chain == "PREROUTING" {
-			if err := g.withdrawRule(ctx, row); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 func (g *NetworkGuard) withdrawRule(ctx context.Context, row networkRule) error {
 	exists, err := g.ruleExists(ctx, row)

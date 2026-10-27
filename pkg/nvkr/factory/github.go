@@ -82,6 +82,9 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	if plan == nil {
 		return nil, e.New(e.CodeInvalidCatalog, "GitHub factory rendering requires a plan")
 	}
+	if len(plan.Environment.Runtime.NativeToolchains) != 0 {
+		return nil, e.New(e.CodeEngineCapability, "native toolchain bundle execution is local-only")
+	}
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}

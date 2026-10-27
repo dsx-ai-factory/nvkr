@@ -676,6 +676,14 @@ func nightlyPlanHarnessCommit(plan *factory.Plan, profile NightlyProfile) (strin
 	if len(selected) != len(roles) {
 		return "", e.New(e.CodeProvenanceMissing, "nightly Plan omits a required NVKE source role")
 	}
+	// The selected products retain a separate candidate entrypoint. This exact diagnostic pair is the
+	// reviewed test-only exception; it does not authorize another product pin.
+	if commit == "400c24fb6465b042be883d6b62472528520d6291" {
+		if profile.HarnessCommit != "b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8" {
+			return "", e.New(e.CodeUnpinnedInput, "selected products require the reviewed candidate harness pin")
+		}
+		return profile.HarnessCommit, nil
+	}
 	return commit, nil
 }
 

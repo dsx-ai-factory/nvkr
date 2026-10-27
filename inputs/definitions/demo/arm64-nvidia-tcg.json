@@ -6,9 +6,31 @@
   "kind": "Definition",
   "metadata": {
     "name": "nvke-local-dev-arm64",
-    "description": "One local ARM64 Run selecting 29 outputs for components, providers, OS, installer, tools, simulator, profiles and standalone NVIDIA OVN image/chart; no publication or signing; acquired inputs and the mixed SPIRE-source exception remain explicit."
+    "description": "One local ARM64 Run selecting 32 outputs for components, providers, OS, installer, tools, simulator, profiles and standalone NVIDIA OVN image/chart; no publication or signing; acquired inputs and the mixed SPIRE-source exception remain explicit."
   },
   "outputs": [
+    {
+      "catalog": {
+        "base": "../../catalogs/tools/native"
+      },
+      "components": [
+        "native-capi-exec-init-image"
+      ],
+      "format": "oci",
+      "name": "capi-exec-init-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../catalogs/tools/native"
+      },
+      "components": [
+        "native-capi-exec-plugin-image"
+      ],
+      "format": "oci",
+      "name": "capi-exec-plugin-image-arm64",
+      "platform": "linux/arm64"
+    },
     {
       "catalog": {
         "base": "../../catalogs/capnico/local-arm64"
@@ -97,7 +119,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nicosim"
+        "base": "../../catalogs/tools/native"
       },
       "components": [
         "nico-sim",
@@ -361,6 +383,17 @@
       ],
       "format": "oci",
       "name": "temporal-ui-image-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../catalogs/tools/native"
+      },
+      "components": [
+        "native-workload-image"
+      ],
+      "format": "oci",
+      "name": "workload-image-arm64",
       "platform": "linux/arm64"
     }
   ]

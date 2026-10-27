@@ -5,13 +5,123 @@ The ordinary gate runs contract tests without race or coverage instrumentation. 
 external integrations retain their explicit opt-ins; passing ordinary tests proves their exercised
 contracts, not registry, signing-service or production acceptance.
 
-`make test` gives each package an explicit 20-minute timeout, including the hosted Merge Gate.
+`make test` gives each package an explicit 20-minute timeout for local diagnostics. The hosted
+Merge Gate now has a five-minute job budget and partitions the ordinary suite as described below.
 The factory suite exceeded Go's implicit 10-minute package limit in
 [PR #188's check job](https://github.com/dsx-ai-factory/nvkr/actions/runs/38831324801/job/116750572956)
 while still executing contracts. The preceding green
 [PR #187 check](https://github.com/dsx-ai-factory/nvkr/actions/runs/38823898898/job/116726770763)
 already spent 515.003 seconds in that package. Override `GO_TEST_TIMEOUT` for diagnostics when needed; race,
 coverage and extended fixtures remain separate opt-ins.
+
+## October 19, 2026 follow-up
+
+[PR #179's check job](https://github.com/dsx-ai-factory/nvkr/actions/runs/39301452391/job/118227493423)
+passed at `c562181d7587bd45396febed61c61fc41e5693ef`, but its ordinary test step took 17m52s.
+The retained `merge-gate-tests` event stream reports 852.897s for factory and 382.202s for lifecycle.
+This audit changes the shared tests in the local checkout based on `b8a5095350ec38ef2401947a9b77309c6a8a3d25`;
+that checkout is distinct from the PR head. CI durations below identify priorities, not predicted savings.
+
+| Expensive work in the linked CI run | Seconds | Decision |
+|---|---:|---|
+| Maintained M2 private-image credential mutations | 103.05 | Keep one maintained positive check; exercise mutations with one native disk and its vendor fetch. Remove repeated caller substitutions already covered by the owning validator, retaining one composed substitution. |
+| Output addition/removal matrix | 54.77 | Reduce 15 combinations to seven: all three insertion positions once, plus each distinct execution policy and the real collector boundary. Retain exact restoration and existing-job comparisons. |
+| Maintained inline-job checks | 42.22 | Share the same four maintained renders with credential checks; consolidate three additional default-bundle regeneration tests into that parent. Retain byte-exact drift, input selection and size headroom. |
+| Qualification evidence mutations | 36.43 | Assemble the release once, then copy its files for every mutation. Keep all eight rejection cases and no-partial-evidence assertions. |
+| Finalizer command/environment admission | 34.86 | Use a small compiled snapshot with an authenticated PinSet credential instead of the complete product graph. |
+| Tenant wait cancellation/deadlines | 32.26 | Keep cancellation at all six blocking stages and one real eight-second deadline at the last readiness stage. Remove three repeated waits on the same overall budget. |
+| Private-image publication-policy matrix | 30.44 | Keep all three credential policies using the small native disk fixture. |
+| Development graph and private toolchain reads | 17.98 | Use one disk and its vendor fetch; retain producer identities, graph membership, private reads and finalizer controls. |
+| Nightly OVN credentials | 15.66 | Check the selected source configuration directly. Keep emitted credential confinement and substitution tests at the workflow renderer. |
+| Dependency projection admission | 15.28 | Construct the projection from a small compiled collector plan instead of rendering the maintained product for a mutation table. |
+| Registry failure classification | 12.96 | Move the status matrix to the owning error classifier. Retain real HTTP refusal, deadline, cancellation and staging cleanup; remove three repeated retry-backoff waits. |
+| Collected-run recovery | 10.34 | Cross the actual collector threshold with six small outputs instead of the full product. |
+
+Runtime delivery/install tests also share immutable compiled preparation and copy files into independent
+roots. Every member retains corruption or old-byte substitution coverage; missing and nonregular-file
+checks use representative cases at each distinct reader boundary instead of a full Cartesian product.
+Lifecycle qualification fixtures now create only their final publication, rather than two discarded
+publications along the way. Smoke tables share authenticated artifact preparation while retaining separate
+invocations and mutable runtime state. The FDE regression checks the complete authored output
+list, then compiles and renders its four native disks without rebuilding unrelated controllers and charts.
+That deliberately removes full-product compilation from the default FDE test; the existing opt-in
+`TestMaintainedM2AllOutputGraphs` and separate generated-bundle drift gate retain their broader scope.
+
+Diagnostic operations now borrow one authenticated fixture, with source revocation last; joining and
+close admission retain their own destructive fixture. Executable-source revocation checks both the active
+stream and subsequent admission against the same receipt. Registry authentication retains every distinct
+output transport and strict-policy acceptance/rejection, while dropping architecture/encryption
+combinations that exercise the same metadata-only route. Negative evidence cases share immutable
+registry bytes with independent verifiers and workspaces. Metadata archive rejection no longer builds
+an unrelated signed release, and its successful transport round trip uses one output.
+
+The PR-only
+[`TestRunnerBlockedDiagnosticSinkRetainsUnjoinedOutcome`](https://github.com/dsx-ai-factory/nvkr/blob/c562181d7587bd45396febed61c61fc41e5693ef/internal/nvkedemo/support_test.go#L313)
+deliberately consumes 45 seconds.
+It protects a distinct deadlock regression when a diagnostic writer holds the capture mutex after cleanup
+times out. Deleting it would lose useful coverage. Its assertion should move to a focused result-collection
+boundary or use a per-owner injectable cleanup budget; the production ownership allowance should remain
+unchanged. That test was absent from the audit's starting checkout; integrating PR #179 later brought it
+into this branch unchanged.
+
+The five-minute CI target also requires shortening the critical path: the linked job spent 70 seconds
+in vet and 160 seconds in lint before starting tests. Its other jobs already finished within three minutes
+(generated-bundle checks: 2m14s; CodeQL: 2m50s). Repository checks therefore separate static checks, lint,
+vulnerability scanning and ordinary tests into concurrent jobs. Eleven deterministic test shards split
+factory across four jobs, lifecycle across two, and the remaining packages across five. Discovery includes
+new tests automatically; sharding must preserve each ordinary test exactly once and propagate failures.
+The existing local `make test` and `make check` remain available without sharding or new opt-in conditions.
+The workflow derives its matrix from the same shard definition used by the runner. Contract tests exercise
+partition completeness, compiled examples/fuzz discovery, missing/extra results, child failures,
+process-group timeout cleanup, and aggregate rejection of skipped, failed or canceled code jobs.
+
+The later [review-fix run](https://github.com/dsx-ai-factory/nvkr/actions/runs/39332732975) at
+`903b3ec3b1fe04d7799f73198f72224ec1eb3913` passed all 21 required jobs in 314 seconds, exceeding the
+target. Three CLI action-descriptor tests accounted for 99.24 seconds in its slowest shard by repeatedly
+rendering the complete product Plan. Their fixture now compiles one executable producer from the small
+test catalog and renders real shared action data. All existing command, coded-error and output-sink
+cases remain. The sum of the three top-level test durations fell from 20.03 to 0.82 seconds locally;
+that comparison does not establish the hosted savings. These were single runs on macOS ARM64 with
+Go 1.27.2, before at `903b3ec3b1fe04d7799f73198f72224ec1eb3913` and after the fixture change committed
+as `42325df37b743b3d71a1db43d7638570f8b708c6`. The existing build cache was retained; `-count=1`
+bypassed the test-result cache. Default concurrency was unchanged, with no race or coverage
+instrumentation. Package durations, including startup, were 20.474 and 4.148 seconds respectively.
+Repeat the focused comparison at those revisions with the pinned Go toolchain:
+
+```sh
+GOTOOLCHAIN=local go test ./cmd/nvkr -run '^TestDescribeActionCommand' -count=1 -json
+```
+
+Sum the `Elapsed` fields of the three top-level `pass` events to compare test execution; exclude
+subtest and package events, and do not treat that sum as command wall time.
+
+Two shards for the remaining packages were rejected: one accumulated 538 seconds of package execution
+in the linked CI record. Scheduling those package durations alphabetically across two execution slots
+estimated 311 seconds before compilation or job setup. Five package shards reduce that same scheduling
+estimate to 151 seconds at the slowest shard. This is a distribution check against historical durations,
+not a hosted benchmark; it omits compilation, runner queues and timing changes from these fixture cuts.
+
+The NVKR product code is unchanged. The first hosted
+[`workflow_dispatch` run](https://github.com/dsx-ai-factory/nvkr/actions/runs/39323382691), at commit
+`d1b957a379fa2ea95bd93277f1bdd00db693e045`, completed in **273 seconds (4m33s)**. After integrating
+current `main`, the [PR run](https://github.com/dsx-ai-factory/nvkr/actions/runs/39325384719) at
+`23fa7cc6e0aae1fb7cc7c9daff0229c4bb392c11` completed in **266 seconds (4m26s)**. Both measurements run
+from workflow creation through aggregate-gate completion; all eleven test shards and all 21 required
+jobs passed. These are individual observations against a 22m55s baseline from a different commit,
+not a controlled benchmark or a guarantee about runner queues. They establish repository CI timing,
+not external release qualification.
+
+Local validation on macOS ARM64 with Go 1.27.2 completed all 62 packages and 3,505 unique top-level
+test/example/fuzz results, including existing skips, without failures. The full run used the initial
+eight-way distribution; the final eleven-way assignment was then checked against the compiled inventory
+and successful package events. Redistributing the other packages changes no package's test selection.
+A separate real Go fixture exercised all eleven shards with 748 targets exactly once and verified that
+an injected test failure propagated. All 16 Python tool tests and the executable aggregate-gate contracts
+passed. Targeted race checks passed for the changed factory/runtime and lifecycle shared fixtures and
+ownership tests. Formatting, license headers, vet, golangci-lint, shellcheck, vulnerability scanning
+(no vulnerabilities), build, actionlint, yamllint and `git diff --check` passed. Raw local events and
+check logs are in `/tmp/nvkr-test-audit-oct19/` on the measuring host; this is not a durable CI artifact
+or evidence of Linux-only release execution.
 
 ## October 14, 2026 audit
 

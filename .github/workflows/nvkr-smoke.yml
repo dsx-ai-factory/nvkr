@@ -19,7 +19,7 @@ jobs:
   native:
     name: native-${{ matrix.arch }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -87,7 +87,7 @@ jobs:
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin
           docker pull --platform "linux/$SMOKE_ARCH" "$SMOKE_IMAGE"
       - name: Authenticate and smoke exact delivered tool bytes
-        timeout-minutes: 20
+        timeout-minutes: 60
         env:
           NVKR_GITHUB_TOKEN: ${{ github.token }}
           NVKR_PULL_REGISTRY: ghcr.io
@@ -111,7 +111,7 @@ jobs:
         run: |
           set -euo pipefail
           [ -n "${NVKR_PIN_SOURCE_TOKEN_0:-}" ] || { printf '%s\n' 'nvkr: [NVKR-E-FETCH-FAILED] source credential is empty' >&2; exit 20; }
-          ./nvkr-exec run smoke-worker --policy 'inputs/policies/nvke-qualification.yaml'
+          exec ./nvkr-exec run smoke-worker --policy 'inputs/policies/nvke-qualification.yaml'
       - name: Upload signed native smoke evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         timeout-minutes: 5

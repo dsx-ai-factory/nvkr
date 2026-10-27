@@ -17,156 +17,112 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-type testStopper struct {
-	stop func(context.Context) error
-}
-
-func (s testStopper) Stop(ctx context.Context) error { return s.stop(ctx) }
-
-func TestJoinRuntimeVisitsIndependentProducersAfterFailures(t *testing.T) {
-	for _, failed := range []string{"simulator", "http", "dns", "none"} {
-		t.Run(failed, func(t *testing.T) {
-			var stopped []string
-			stop := func(name string) func(context.Context) error {
-				return func(context.Context) error {
-					stopped = append(stopped, name)
-					if name == failed {
-						return ErrUnjoined
+func TestRestoreWithdrawsControlsDespiteENOSPC(t *testing.T) {
+	t.Run("restore", func(t *testing.T) {
+		g := networkFixture(t)
+		path := filepath.Join(g.Work, "nico-sim")
+		if err := os.WriteFile(path, []byte("private simulator bytes"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		id, digest, err := networkFile(t.Context(), path, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		g.caps = []networkCapability{{path, id, digest, networkCapabilities["nico-sim"]}}
+		g.rules = networkRules(g.Owner, g.KindCIDR)[:1]
+		g.sysctlIntents = []string{networkSysctls[0]}
+		g.BGPIntent, g.BridgeIntent, g.BridgeID = true, true, "42"
+		if err = g.Checkpoint(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		g.checkpointHook = func() error { return unix.ENOSPC }
+		capPresent, rulePresent, bridgePresent, routePresent := true, true, true, true
+		sysctl, verified := "1", false
+		var mutations []string
+		g.capture = func(_ context.Context, args []string, privileged bool) ([]byte, error) {
+			switch args[0] {
+			case "ps", "virsh":
+				return nil, nil
+			case "ip":
+				if slices.Equal(args, []string{"ip", "-j", "route", "show", "table", "main"}) {
+					if routePresent {
+						return []byte(`[{"dst":"172.31.0.0/24","type":"blackhole","flags":[]}]`), nil
 					}
-					return nil
+					return []byte("[]"), nil
 				}
-			}
-			err := joinRuntime(t.Context(), []stopper{testStopper{stop("simulator")}, testStopper{stop("http")}}, stop("dns"))
-			if !slices.Equal(stopped, []string{"simulator", "http", "dns"}) {
-				t.Fatalf("producers stopped=%v", stopped)
-			}
-			if (err == nil) != (failed == "none") || failed != "none" && !errors.Is(err, ErrUnjoined) {
-				t.Fatalf("join result=%v", err)
-			}
-		})
-	}
-}
-
-func TestCleanupAndRestoreWithdrawControlsDespiteENOSPC(t *testing.T) {
-	for _, mode := range []string{"cleanup", "restore"} {
-		t.Run(mode, func(t *testing.T) {
-			g := networkFixture(t)
-			path := filepath.Join(g.Work, "nico-sim")
-			if err := os.WriteFile(path, []byte("private simulator bytes"), 0o700); err != nil {
-				t.Fatal(err)
-			}
-			id, digest, err := networkFile(t.Context(), path, true)
-			if err != nil {
-				t.Fatal(err)
-			}
-			g.caps = []networkCapability{{path, id, digest, networkCapabilities["nico-sim"]}}
-			g.rules = networkRules(g.Owner, g.KindCIDR)[:1]
-			g.sysctlIntents = []string{networkSysctls[0]}
-			g.BGPIntent, g.BridgeIntent, g.BridgeID = true, true, "42"
-			if err = g.Checkpoint(t.Context()); err != nil {
-				t.Fatal(err)
-			}
-			g.checkpointHook = func() error { return unix.ENOSPC }
-			capPresent, rulePresent, bridgePresent, routePresent := true, true, true, true
-			sysctl, verified := "1", false
-			var mutations []string
-			g.capture = func(_ context.Context, args []string, privileged bool) ([]byte, error) {
-				switch args[0] {
-				case "ps", "virsh":
-					return nil, nil
-				case "ip":
-					if slices.Equal(args, []string{"ip", "-j", "route", "show", "table", "main"}) {
-						if routePresent {
-							return []byte(`[{"dst":"172.31.0.0/24","type":"blackhole","flags":[]}]`), nil
-						}
-						return []byte("[]"), nil
+				if slices.Equal(args, []string{"ip", "route", "delete", "blackhole", VIPCIDR, "table", "main"}) {
+					if !privileged {
+						t.Fatal("route withdrawal without admitted privilege")
 					}
-					if slices.Equal(args, []string{"ip", "route", "delete", "blackhole", VIPCIDR, "table", "main"}) {
-						if !privileged {
-							t.Fatal("route withdrawal without admitted privilege")
-						}
-						mutations = append(mutations, "route")
-						routePresent = false
-						return nil, nil
-					}
-					if slices.Equal(args, []string{"ip", "link", "delete", BridgeName, "type", "bridge"}) {
-						mutations = append(mutations, "bridge")
-						bridgePresent = false
-						return nil, nil
-					}
-					if !bridgePresent {
-						return []byte("[]"), nil
-					}
-					return []byte(fmt.Sprintf(`[{"ifname":"nvkevm0","ifindex":42,"address":%q,"linkinfo":{"info_kind":"bridge"}}]`, g.BridgeMAC)), nil
-				case "getcap":
-					if capPresent {
-						return []byte("opaque-libcap-presence"), nil
-					}
-					return nil, nil
-				case "setcap":
-					if args[1] == "-v" {
-						verified = true
-					}
-					if args[1] == "-r" {
-						if !verified {
-							t.Fatal("unverified capability removed")
-						}
-						mutations = append(mutations, "cap")
-						capPresent = false
-					}
-					return nil, nil
-				case "iptables":
-					if args[5] == "-C" && !rulePresent {
-						return nil, &CommandError{ExitCode: 1, Cause: errors.New("absent")}
-					}
-					if args[5] == "-D" {
-						mutations = append(mutations, "rule")
-						rulePresent = false
-					}
-					return nil, nil
-				case "sysctl":
-					if args[1] == "-n" {
-						return []byte(sysctl), nil
-					}
-					mutations = append(mutations, "sysctl")
-					sysctl = "0"
-					return nil, nil
-				default:
-					t.Fatalf("unexpected cleanup command %v", args)
+					mutations = append(mutations, "route")
+					routePresent = false
 					return nil, nil
 				}
-			}
-			if mode == "restore" {
-				err = restoreNetwork(t.Context(), g)
-			} else {
-				tools := privateTestDir(t)
-				if err = os.WriteFile(filepath.Join(tools, "virsh"), []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
-					t.Fatal(err)
+				if slices.Equal(args, []string{"ip", "link", "delete", BridgeName, "type", "bridge"}) {
+					mutations = append(mutations, "bridge")
+					bridgePresent = false
+					return nil, nil
 				}
-				domains := Runner{Env: []string{"PATH=" + tools + ":/usr/bin:/bin"}, Work: filepath.Join(g.Work, "unwritable-diagnostics")}
-				err = cleanupRuntime(t.Context(), nil, nil, g, g.Work, domains, true)
-				if _, statErr := os.Stat(domains.Work); !errors.Is(statErr, os.ErrNotExist) {
-					t.Fatal("cleanup created diagnostic files")
+				if !bridgePresent {
+					return []byte("[]"), nil
 				}
+				return []byte(fmt.Sprintf(`[{"ifname":"nvkevm0","ifindex":42,"address":%q,"linkinfo":{"info_kind":"bridge"}}]`, g.BridgeMAC)), nil
+			case "getcap":
+				if capPresent {
+					return []byte("opaque-libcap-presence"), nil
+				}
+				return nil, nil
+			case "setcap":
+				if args[1] == "-v" {
+					verified = true
+				}
+				if args[1] == "-r" {
+					if !verified {
+						t.Fatal("unverified capability removed")
+					}
+					mutations = append(mutations, "cap")
+					capPresent = false
+				}
+				return nil, nil
+			case "iptables":
+				if args[5] == "-C" && !rulePresent {
+					return nil, &CommandError{ExitCode: 1, Cause: errors.New("absent")}
+				}
+				if args[5] == "-D" {
+					mutations = append(mutations, "rule")
+					rulePresent = false
+				}
+				return nil, nil
+			case "sysctl":
+				if args[1] == "-n" {
+					return []byte(sysctl), nil
+				}
+				mutations = append(mutations, "sysctl")
+				sysctl = "0"
+				return nil, nil
+			default:
+				t.Fatalf("unexpected cleanup command %v", args)
+				return nil, nil
 			}
-			if !errors.Is(err, unix.ENOSPC) {
-				t.Fatalf("cleanup must not report PASS on persistence failure: %v", err)
-			}
-			if capPresent || rulePresent || bridgePresent || routePresent || sysctl != "0" {
-				t.Fatalf("controls retained after ENOSPC: %v", mutations)
-			}
-			if !slices.Equal(mutations, []string{"route", "cap", "rule", "sysctl", "bridge"}) {
-				t.Fatalf("withdrawal order=%v", mutations)
-			}
-			state, readErr := readNetworkState(g.Work)
-			if readErr != nil {
-				t.Fatal(readErr)
-			}
-			if state.Finished || !state.BGPIntent || !state.BridgeIntent {
-				t.Fatal("failed persistence fabricated completed durable cleanup")
-			}
-		})
-	}
+		}
+		err = restoreNetwork(t.Context(), g)
+		if !errors.Is(err, unix.ENOSPC) {
+			t.Fatalf("cleanup must not report PASS on persistence failure: %v", err)
+		}
+		if capPresent || rulePresent || bridgePresent || routePresent || sysctl != "0" {
+			t.Fatalf("controls retained after ENOSPC: %v", mutations)
+		}
+		if !slices.Equal(mutations, []string{"route", "cap", "rule", "sysctl", "bridge"}) {
+			t.Fatalf("withdrawal order=%v", mutations)
+		}
+		state, readErr := readNetworkState(g.Work)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		if state.Finished || !state.BGPIntent || !state.BridgeIntent {
+			t.Fatal("failed persistence fabricated completed durable cleanup")
+		}
+	})
 }
 
 func bgpRows(t *testing.T, value string) []map[string]json.RawMessage {
@@ -282,27 +238,35 @@ func TestBGPWithdrawalRechecksExactRouteAndFinalAbsence(t *testing.T) {
 	}
 }
 
-func TestCleanupRefusesUnknownDomainWithoutHostMutation(t *testing.T) {
+func TestRestoreRefusesUnknownDomainWithoutHostMutation(t *testing.T) {
 	for _, value := range []string{"foreign-domain", "query-failed"} {
 		t.Run(value, func(t *testing.T) {
 			g := networkFixture(t)
 			g.BGPIntent = true
-			calls := 0
-			g.capture = func(context.Context, []string, bool) ([]byte, error) { calls++; return nil, nil }
-			tools := privateTestDir(t)
-			body := "#!/bin/sh\nprintf foreign-domain\\n\n"
-			if value == "query-failed" {
-				body = "#!/bin/sh\nexit 2\n"
+			mutations := 0
+			g.capture = func(_ context.Context, args []string, privileged bool) ([]byte, error) {
+				if privileged {
+					mutations++
+				}
+				switch args[0] {
+				case "ps":
+					return nil, nil
+				case "virsh":
+					if value == "query-failed" {
+						return nil, errors.New("domain inventory unavailable")
+					}
+					return []byte("foreign-domain\n"), nil
+				default:
+					t.Fatalf("unexpected restoration command %v", args)
+					return nil, nil
+				}
 			}
-			if err := os.WriteFile(filepath.Join(tools, "virsh"), []byte(body), 0o700); err != nil {
-				t.Fatal(err)
-			}
-			err := cleanupRuntime(t.Context(), nil, nil, g, g.Work, Runner{Env: []string{"PATH=" + tools + ":/usr/bin:/bin"}}, true)
-			if err == nil || calls != 0 || !g.BGPIntent {
-				t.Fatalf("unsafe cleanup: %v calls=%d bgp=%v", err, calls, g.BGPIntent)
+			err := restoreNetwork(t.Context(), g)
+			if err == nil || mutations != 0 || !g.BGPIntent {
+				t.Fatalf("unsafe restoration: %v mutations=%d bgp=%v", err, mutations, g.BGPIntent)
 			}
 			if strings.Contains(err.Error(), "PASS") {
-				t.Fatal("refused cleanup reported PASS")
+				t.Fatal("refused restoration reported PASS")
 			}
 		})
 	}

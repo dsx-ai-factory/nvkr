@@ -11,11 +11,110 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/urfave/cli/v2"
 )
+
+func TestChildWorkDeadlineBoundsCommandContext(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		value      string
+		fromEnv    bool
+		parentWins bool
+		canceled   bool
+		actionFail bool
+		wait       bool
+		want       e.Code
+	}{
+		{name: "unchanged without handoff"},
+		{name: "absolute deadline", value: "future"},
+		{name: "bootstrap environment", value: "future", fromEnv: true},
+		{name: "earlier parent wins", value: "future", parentWins: true},
+		{name: "malformed", value: "tomorrow", want: e.CodeUsage},
+		{name: "expired", value: "past", want: e.CodeTimeout},
+		{name: "canceled parent", value: "future", canceled: true, want: e.CodeTimeout},
+		{name: "failed command cancels timer", value: "future", actionFail: true, want: e.CodeBuildFailed},
+		{name: "deadline stops command", value: "future", wait: true, want: e.CodeTimeout},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("NVKR_WORK_DEADLINE", "")
+			deadline := time.Now().Add(5 * time.Minute).UTC()
+			if test.wait {
+				deadline = time.Now().Add(100 * time.Millisecond).UTC()
+			}
+			value := test.value
+			switch value {
+			case "future":
+				value = deadline.Format(time.RFC3339Nano)
+			case "past":
+				value = time.Now().Add(-time.Minute).UTC().Format(time.RFC3339Nano)
+			}
+			parent, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if test.parentWins {
+				deadline = time.Now().Add(time.Minute)
+				var stop context.CancelFunc
+				parent, stop = context.WithDeadline(parent, deadline)
+				defer stop()
+			}
+			if test.canceled {
+				cancel()
+			}
+			var observed context.Context
+			app := newApp()
+			app.Commands = []*cli.Command{{Name: "probe", Subcommands: []*cli.Command{{Name: "child", Action: func(c *cli.Context) error {
+				observed = c.Context
+				if test.wait {
+					<-c.Done()
+					return e.Wrap(e.CodeTimeout, c.Err(), "synthetic work stopped")
+				}
+				if test.actionFail {
+					return e.New(e.CodeBuildFailed, "synthetic command failure")
+				}
+				return nil
+			}}}}}
+			args := []string{"nvkr"}
+			if test.fromEnv {
+				t.Setenv("NVKR_WORK_DEADLINE", value)
+			} else if value != "" {
+				args = append(args, "--work-deadline", value)
+			}
+			err := app.RunContext(parent, append(args, "probe", "child"))
+			if test.want != "" {
+				var coded *e.Error
+				if !errors.As(err, &coded) || coded.Code != test.want {
+					t.Fatalf("error=%v, want %s", err, test.want)
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if observed == nil {
+				if test.want == "" || test.actionFail || test.wait {
+					t.Fatal("command did not run")
+				}
+				return
+			}
+			if value == "" {
+				if observed != parent || observed.Err() != nil {
+					t.Fatal("missing handoff changed caller context")
+				}
+				return
+			}
+			got, bounded := observed.Deadline()
+			cause := context.Canceled
+			if test.wait {
+				cause = context.DeadlineExceeded
+			}
+			if !bounded || !got.Equal(deadline) || !errors.Is(observed.Err(), cause) {
+				t.Fatalf("deadline=%s, bounded=%v, error=%v", got, bounded, observed.Err())
+			}
+		})
+	}
+}
 
 func lifecycleCommandRepo(t *testing.T) {
 	t.Helper()

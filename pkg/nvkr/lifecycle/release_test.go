@@ -324,6 +324,12 @@ type exactInputFixture struct {
 
 func newExactInputFixture(t *testing.T) exactInputFixture {
 	t.Helper()
+	plan := newExactInputPlan(t)
+	return exactInputFixtureForPlan(t, plan.Definition, plan.Environment, plan)
+}
+
+func newExactInputPlan(t *testing.T) *factory.Plan {
+	t.Helper()
 	definition, environment := testDefinition(t), testEnvironment()
 	definition.Outputs = append(definition.Outputs, DefinitionOutput{Name: "runtime", Platform: "linux/amd64",
 		Components: []string{"kubeadm"}, Format: OutputExecutable})
@@ -331,10 +337,15 @@ func newExactInputFixture(t *testing.T) exactInputFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return exactInputFixtureForPlan(t, definition, environment, plan)
+	return plan
 }
 
 func exactInputFixtureForPlan(t *testing.T, definition Definition, environment Environment, plan *factory.Plan) exactInputFixture {
+	t.Helper()
+	return exactInputFixtureForPlanAndInvocation(t, definition, environment, plan, "")
+}
+
+func exactInputFixtureForPlanAndInvocation(t *testing.T, definition Definition, environment Environment, plan *factory.Plan, invocation string, mutations ...func(*delivery.PublicationRequest)) exactInputFixture {
 	t.Helper()
 	builds := make(map[string]factory.BuildPlan, len(plan.Builds))
 	for _, build := range plan.Builds {
@@ -370,6 +381,7 @@ func exactInputFixtureForPlan(t *testing.T, definition Definition, environment E
 		subjects[component] = pipeline.FileDigest(payload)
 	}
 	request := testReleaseRequest(t, artifacts, objects, subjects)
+	request.Release.InvocationID = invocation
 	var err error
 	request.Release.DefinitionDigest, err = definition.Digest()
 	if err != nil {
@@ -382,6 +394,9 @@ func exactInputFixtureForPlan(t *testing.T, definition Definition, environment E
 	request.Release.EnvironmentDigest, err = environment.Digest()
 	if err != nil {
 		t.Fatal(err)
+	}
+	for _, mutate := range mutations {
+		mutate(&request)
 	}
 	layout := filepath.Join(t.TempDir(), "publication")
 	publication, err := delivery.BuildPublicationRoot(t.Context(), layout, request)

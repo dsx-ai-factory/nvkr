@@ -149,7 +149,7 @@ func SetupQualification(ctx context.Context, file DemoFile, out string, progress
 	cfg.QualificationPolicy, cfg.Qualification = policyPath, q
 	// Recompile with the existing bootstrap and authenticate all private key roles
 	// before starting the registry. No stored preview authorizes a build.
-	env, err := localBuildEnvironment()
+	env, err := localBuildEnvironment(ctx)
 	if err != nil {
 		return "", err
 	}

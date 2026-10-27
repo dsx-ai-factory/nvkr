@@ -45,15 +45,6 @@ func TestNightlyOVNFetchReceivesSelectedSourceCredential(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			bundle, err := RenderGitHub(t.Context(), plan)
-			if err != nil {
-				t.Fatal(err)
-			}
-			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
-			_, nodeJobs, err := githubStages(plan)
-			if err != nil {
-				t.Fatal(err)
-			}
 			found := 0
 			for _, node := range plan.Graph.Nodes {
 				if node.Kind != NodeFetch {
@@ -69,27 +60,14 @@ func TestNightlyOVNFetchReceivesSelectedSourceCredential(t *testing.T) {
 					continue
 				}
 				found++
-				job := document.Jobs[nodeJobs[node.ID]]
-				if job.Env[sourceTokenEnv] != "" {
-					t.Fatal("source token escaped into the whole job")
-				}
-				tokenSteps := 0
-				for _, step := range job.Steps {
-					if step.Env[sourceTokenEnv] == "" {
-						continue
-					}
-					tokenSteps++
-					if step.Env[sourceTokenEnv] != "${{ secrets.NKE_SOURCE_TOKEN }}" ||
-						step.Env["GIT_CONFIG_KEY_2"] != "credential."+test.source+".helper" {
+				environment := githubSourceEnvironment(plan, node)
+				if test.private {
+					if environment[sourceTokenEnv] != "${{ secrets.NKE_SOURCE_TOKEN }}" ||
+						environment["GIT_CONFIG_KEY_2"] != "credential."+test.source+".helper" {
 						t.Fatal("OVN fetch does not receive the selected repository-scoped token")
 					}
-				}
-				want := 0
-				if test.private {
-					want = 1
-				}
-				if tokenSteps != want {
-					t.Fatalf("OVN source %s has %d credential-bearing steps, want %d", test.source, tokenSteps, want)
+				} else if len(environment) != 0 {
+					t.Fatal("public OVN fetch received private source configuration")
 				}
 			}
 			if found == 0 {

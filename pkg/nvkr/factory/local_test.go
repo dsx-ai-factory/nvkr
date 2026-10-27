@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -155,6 +156,90 @@ func TestLocalRunnerIsRerunnableAndPreservesSourceCache(t *testing.T) {
 	}
 	if raw, err := os.ReadFile(filepath.Join(root, "outside-canary")); err != nil || string(raw) != "outside" {
 		t.Fatalf("rerun followed a derived-output symlink: %q, %v", raw, err)
+	}
+}
+
+func TestLocalSchedulerPreservesInitiatingTimeout(t *testing.T) {
+	for _, parentCanceled := range []bool{false, true} {
+		t.Run(map[bool]string{false: "operation timeout", true: "parent cancellation wins"}[parentCanceled], func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			base, err := catalog.LoadContext(t.Context(), testCatalogProvider(t))
+			if err != nil {
+				t.Fatal(err)
+			}
+			stack, err := catalog.ApplyStack(base)
+			if err != nil {
+				t.Fatal(err)
+			}
+			definition, environment := fixtureInputs("causal-timeout", "first", "")
+			definition.Outputs[0].Components = []string{"kubectl"}
+			sibling := definition.Outputs[0]
+			sibling.Name = "second"
+			definition.Outputs = append(definition.Outputs, sibling)
+			plan, err := Compile(t.Context(), definition, environment, stack, "test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var fetches []string
+			for _, node := range topologicalFactoryNodes(plan.Graph) {
+				if node.Kind == NodeFetch {
+					fetches = append(fetches, node.ID)
+				}
+			}
+			if len(fetches) != 2 || fetches[0] >= fetches[1] {
+				t.Fatalf("fixture needs ordered independent fetches: %v", fetches)
+			}
+			initiating := e.Wrap(e.CodeTimeout, context.DeadlineExceeded, "authenticated carrier copy deadline")
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			var started sync.WaitGroup
+			var joined atomic.Int32
+			started.Add(2)
+			deps := localRunDeps{
+				prepareRunner: func(context.Context, *Plan, LocalRunOptions, []string) (map[string]string, error) { return nil, nil },
+				executeNode: func(batchCtx context.Context, _ *Plan, node Node, _ LocalRunOptions, _ map[string]string) error {
+					if node.Kind != NodeFetch {
+						t.Errorf("failure allowed later operation %s", node.ID)
+						return errors.New("unexpected later operation")
+					}
+					defer joined.Add(1)
+					started.Done()
+					started.Wait()
+					if node.ID == fetches[1] {
+						operation, stop := context.WithTimeout(batchCtx, time.Millisecond)
+						defer stop()
+						<-operation.Done()
+						if !errors.Is(operation.Err(), context.DeadlineExceeded) {
+							t.Errorf("initiating operation did not time out: %v", operation.Err())
+						}
+						if parentCanceled {
+							cancel()
+						}
+						return initiating
+					}
+					<-batchCtx.Done()
+					return e.Wrap(e.CodeTimeout, batchCtx.Err(), "lexically earlier sibling canceled")
+				},
+			}
+			result, err := runLocal(ctx, plan, withLocalDefaults(LocalRunOptions{Workspace: ".nvkr/causal-timeout", Jobs: 2}), deps)
+			assertFactoryErrorCode(t, err, e.CodeTimeout)
+			if joined.Load() != 2 {
+				t.Fatalf("batch returned before both workers joined: %d", joined.Load())
+			}
+			if result != nil {
+				t.Fatal("failed batch returned a successful result")
+			}
+			if parentCanceled {
+				if !strings.Contains(err.Error(), "local Run canceled") || errors.Is(err, initiating) {
+					t.Fatalf("parent cancellation did not win: %v", err)
+				}
+			} else if !errors.Is(err, initiating) || !strings.Contains(err.Error(), fetches[1]) {
+				t.Fatalf("initiating timeout replaced by cancellation fallout: %v", err)
+			}
+			if _, err := os.Stat(".nvkr/causal-timeout/run.json"); !os.IsNotExist(err) {
+				t.Fatalf("failed batch persisted a successful Run: %v", err)
+			}
+		})
 	}
 }
 

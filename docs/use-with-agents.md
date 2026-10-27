@@ -49,18 +49,21 @@ Supply the catalog location, source and release, plus the Definition and Environ
 you want explained. The skill directs the agent to use the CLI's pin commands rather than editing locks
 by hand. [Catalog refreshes](catalog-maintenance.md) covers coordinated updates and regeneration.
 
-**Try one small local build:**
+**Build the NVKE tutorial artifacts locally:**
 
 ```text
-Use https://github.com/dsx-ai-factory/nvkr to follow only the quickstart's first
-hello-artifact build in a fresh workspace. Check prerequisites first, build and run
-that example, and report its local artifact and evidence limits. Do not continue
-into the NVKE demo or publish anything.
+Use https://github.com/dsx-ai-factory/nvkr to follow the quickstart in a fresh
+workspace. Check prerequisites, build NVKR from source, then build all three
+selected NVKE artifacts locally. Report the output locations, Run result and
+evidence limits. Do not deploy the NVKE demo or publish anything.
 ```
 
-The [quickstart](quickstart.md#build-and-use-your-first-artifact) owns the prerequisites and commands.
-This example needs Docker, `python3` and the CLI build prerequisites. On Apple Silicon, Docker also needs
-Linux AMD64 emulation. It may download pinned inputs; it is a local build, not a signed release.
+The [quickstart](quickstart.md#before-you-start) owns the prerequisites, platform limits and commands.
+This example needs Git, Bash and Go, plus Docker Desktop on macOS or Docker on Linux.
+If the pinned Go compiler is missing, the launcher offers a verified installation inside the checkout; Make is not required.
+The launcher checks prerequisites before starting.
+It downloads pinned inputs and retains
+all three selected outputs locally. The build is unsigned and unqualified.
 
 ## What the agent does
 

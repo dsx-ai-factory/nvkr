@@ -82,9 +82,6 @@ func TestCleanupCommandsKeepActualClusterOutput(t *testing.T) {
 						}
 						return file, nil
 					},
-					prepare: func(_ context.Context, _ nvkedemo.BuildConfig, cfg nvkedemo.Config) (nvkedemo.Config, error) {
-						return cfg, nil
-					},
 					build: func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
 						return nvkedemo.BuiltInputs{}, nil
 					},

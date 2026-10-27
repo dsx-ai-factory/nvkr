@@ -27,7 +27,7 @@ sets, clearance, publication roots, and qualification records are generated/auth
 through inspection. Normal callers neither construct nor connect their receipt graph.
 
 Generic `bundle-oci` outputs select one pinned source tarball producer and retain the same complete lifecycle,
-independent output observation and evidence obligations. [ADR-24](0024-generic-oci-bundles-and-aicr-producers.md)
+independent output observation and evidence obligations. [ADR-25](0025-generic-oci-bundles-and-aicr-producers.md)
 owns their archive/OCI contract and the AICR integration; a deployment bundle is distinct from a native Helm chart.
 
 Definition declares named outputs directly. Each native output selects exact catalog components and a concrete target
@@ -217,6 +217,13 @@ JSON, are preserved. Interactive `run local` defaults to the dashboard and does
 not replay successful producer output. Nonempty `CI` keeps auto plain; explicit
 terminal mode remains available. Hidden CI/execution helpers retain their existing interface.
 
+Release browsing reuses that shared terminal explorer and its session ownership.
+Its output overview supplies compact metadata summaries when they fit;
+full fields remain available in Details. Command-item search covers only the supplied public names,
+kinds and projected fields. Release browse and export share the sorted description projection so chart,
+native-image and exact evidence memberships stay consistent. Explicit JSON or Mermaid output forces plain
+presentation in auto mode and conflicts with explicit terminal presentation before acquisition.
+
 Normal commands are `validate`, `definition validate|inspect`, `run plan|graph|diff|inspect|local|generate|check-artifacts|qualify|qualify-local`,
 and `release verify|inspect|browse|export|pull`. Producer operations select authored inputs with `--definition` and
 `--environment`; artifact checking and qualification use the Run/policy interfaces above. Catalog maintenance
@@ -371,6 +378,12 @@ The CLI supplies the explicit anonymous-registry default; SDK callers must selec
 complete host-scoped credentials themselves. The alias exposes future changes to that owner and remains
 an explicit SDK coupling, like `LocalRunOptions` below.
 
+The provisional diagnostic methods `ListValidators`, `DescribeValidator` and `PrepareValidatorProfile`
+delegate to `validation` for catalog discovery and frozen local-plan admission (ADR-24).
+`ValidatorDescription`, `ValidatorInvocation` and `ValidatorRuntime` alias that package's types, so changes
+to the provisional catalog/profile surfaces also affect `client/v1`. They provide no authenticated receipt,
+artifact membership or qualification authority. The corresponding hidden CLI group is `validators`.
+
 The non-owning installed-inventory receipt in ADR-13 borrows the issuing Run's
 lifetime; it has no separate close obligation or resource ownership. The Run's
 idempotent `Close` revokes every borrowed receipt and shallow copy. Live receipt
@@ -382,6 +395,23 @@ pipeline selection type. `Run.InstalledDiskInventories` exposes factory subject 
 metadata, never a receipt. This deliberately retains the existing deep-owner types for the optional diagnostic
 instead of adding a second runtime or inventory schema. A facade-only construction API and independent
 `client/v1` acceptance harness remain deferred; direct deep-package tests do not establish that acceptance.
+
+The provisional downstream diagnostic `demo.WithSite` delegates to the existing native site owner.
+`Config`, `RunInputs` and `Resources` alias its descriptive configuration;
+`Site` and `Tenant` alias its opaque callback-scoped handles. This deliberate coupling adds no
+public lifecycle object, artifact authentication rule, deployment schema or qualification authority. Every
+native admission and cleanup invariant remains with that owner. Callback exit cancels and joins operations;
+handles cannot be detached or restored from paths. The adapter requires the existing matching `nvkr` and
+`nvke-demo` helper executables and host prerequisites; importability does not imply binary-free execution.
+The native CLI default has a distinct retained lifetime: its fixed child owns the
+resource stack through an authenticated private control and explicit joined cleanup.
+Returning from the presenter or canceling it grants no teardown authority. Successful
+return requires the same live owner to acknowledge detachment and completed requested
+checks. Linux observes that owner through SO_PEERPIDFD; macOS retained controls bind
+to the original self audit token and a generation-validated kqueue registration.
+The generic Darwin peer API remains unavailable. Unsupported builds fail before work.
+External-module compile and no-work admission tests establish only that boundary. Real native site reuse
+and complete conformance remain separately evidenced operational acceptance.
 
 The producer `NodeSession` cancels admitted call contexts synchronously when `Close` starts, before exposing
 session cancellation, then joins active producers and releases source snapshots. Calls retain their caller's

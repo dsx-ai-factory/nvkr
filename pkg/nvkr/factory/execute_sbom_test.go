@@ -138,3 +138,90 @@ func TestExecuteSBOMBillsEachBuiltComponentAgainstItsObservedDigest(t *testing.T
 		t.Fatalf("index billed %d subjects but only %d were observed", len(index.Entries), len(expectComponents))
 	}
 }
+
+func TestExecuteSBOMSelectsExecutableToolchain(t *testing.T) {
+	amd64 := "golang@sha256:" + strings.Repeat("a", 64)
+	arm64 := "golang@sha256:" + strings.Repeat("b", 64)
+	for _, tc := range []struct{ platform, toolchain string }{
+		{"linux/amd64", amd64}, {"linux/arm64", arm64}, {"darwin/arm64", arm64},
+	} {
+		t.Run(tc.platform, func(t *testing.T) {
+			plan := sbomTestPlan(t)
+			for i := range plan.Builds {
+				plan.Builds[i].Platform = tc.platform
+				for j := range plan.Builds[i].ResolvedComponents {
+					c := &plan.Builds[i].ResolvedComponents[j]
+					if c.FromSource {
+						c.ToolchainImage = ""
+						c.ToolchainImages = map[string]string{"amd64": amd64, "arm64": arm64}
+					}
+				}
+			}
+			t.Chdir(t.TempDir())
+			nodes, artifacts := planIndex(plan)
+			node := nodes["node-worker/sbom"]
+			observed := "sha256:" + strings.Repeat("c", 64)
+			for _, input := range node.Inputs {
+				artifact := artifacts[input]
+				raw := []byte("{}\n")
+				if artifact.Kind == "producer-result" {
+					var err error
+					raw, err = canonical.Marshal(pipeline.ArtifactResult{Component: artifact.Component, OutputType: "binary", Path: artifact.Component, SHA256: observed})
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				if err := writeFactoryFile(t.Context(), artifact.Path, raw, 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := executeSBOM(t.Context(), plan, node, artifacts, io.Discard); err != nil {
+				t.Fatal(err)
+			}
+			dir := artifacts[node.Outputs[0]].Path
+			raw, err := os.ReadFile(filepath.Join(dir, "index.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var index sbom.Index
+			if err := canonical.UnmarshalExact([]byte(strings.TrimSpace(string(raw))), &index); err != nil {
+				t.Fatal(err)
+			}
+			if err := index.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			if index.BuildDigest != plan.Builds[0].BuildDigest || len(index.Entries) == 0 {
+				t.Fatal("SBOM index lost exact build binding")
+			}
+			for _, entry := range index.Entries {
+				raw, err := os.ReadFile(filepath.Join(dir, entry.Artifact+".cdx.json"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				var bom sbom.BOM
+				if err := canonical.UnmarshalExact([]byte(strings.TrimSpace(string(raw))), &bom); err != nil {
+					t.Fatal(err)
+				}
+				if err := bom.Validate(); err != nil {
+					t.Fatal(err)
+				}
+				got := ""
+				for _, p := range bom.Metadata.Component.Properties {
+					if p.Name == "nvkr:toolchain" {
+						got = p.Value
+					}
+				}
+				if got != tc.toolchain {
+					t.Fatalf("toolchain = %q, want %q", got, tc.toolchain)
+				}
+				digest, err := bom.Digest()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if entry.ArtifactSHA != observed || entry.SBOMDigest != digest || len(bom.Metadata.Component.Hashes) != 1 || "sha256:"+bom.Metadata.Component.Hashes[0].Content != observed {
+					t.Fatal("SBOM changed the observed subject/index binding")
+				}
+			}
+		})
+	}
+}

@@ -5,6 +5,7 @@ package catalog
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -243,5 +244,72 @@ artifacts:
 	_, err := LoadContext(context.Background(), bytesProvider{RegistryFile: []byte(reg), LockFile: []byte(lock)})
 	if e, ok := err.(*nvkrerr.Error); !ok || e.Code != nvkrerr.CodeInvalidCatalog {
 		t.Fatalf("unknown ref token must fail closed, got %v", err)
+	}
+}
+
+func TestFixedImageArtifactTagIndependence(t *testing.T) {
+	for _, rendered := range []bool{false, true} {
+		label := "fixed"
+		if rendered {
+			label = "source-rendered"
+		}
+		t.Run(label, func(t *testing.T) {
+			var baseline *Catalog
+			for _, tag := range []string{"v1.32.0", "v1.31.0"} {
+				t.Run(tag, func(t *testing.T) {
+					ref := "registry.example.test/tool:v1.32.0"
+					if rendered {
+						ref = "registry.example.test/tool:{{.Tag}}"
+					}
+					reg := `apiVersion: nvkr.dev/catalog/v3
+kind: SourceBuildRegistry
+sources: {s: {repo: https://github.com/o/r}}
+components:
+  c:
+    platforms: [linux/amd64, linux/arm64]
+    source: s
+    outputType: oci-image
+    prebuilt:
+      image: ` + ref + `
+      evidence: {none: true}
+`
+					lock := `apiVersion: nvkr.dev/lock/v1
+kind: PinLock
+pins:
+  s: {tag: v1.32.0, commit: ` + goodCommit + `, treeHash: ` + goodTree + `, sourceDateEpoch: 123}
+artifacts:
+  c:
+    tag: ` + tag + `
+    imageParentDigest: ` + goodArtifactDigest + `
+    digests: {amd64: ` + goodArtifactDigest + `, arm64: ` + goodArtifactDigest + `}
+`
+					got, err := LoadContext(t.Context(), bytesProvider{RegistryFile: []byte(reg), LockFile: []byte(lock)})
+					if rendered && tag != "v1.32.0" {
+						if codeOf(err) != nvkrerr.CodeInvalidCatalog {
+							t.Fatalf("stale rendered acquisition: %v", err)
+						}
+						return
+					}
+					if err != nil {
+						t.Fatal(err)
+					}
+					if baseline == nil {
+						baseline = got
+						return
+					}
+					if !reflect.DeepEqual(got.Components, baseline.Components) {
+						t.Fatal("descriptive tag changed resolved acquisition or parent/native bindings")
+					}
+					a, err := baseline.SnapshotDigest()
+					if err != nil {
+						t.Fatal(err)
+					}
+					b, err := got.SnapshotDigest()
+					if err != nil || a != b {
+						t.Fatalf("descriptive tag changed catalog identity: %s %s %v", a, b, err)
+					}
+				})
+			}
+		})
 	}
 }

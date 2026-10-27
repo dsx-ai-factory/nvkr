@@ -9,10 +9,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -27,44 +25,10 @@ const (
 	maxVerificationBundles       = 32
 )
 
-func ociDownloadBundleArgs(ref, predicateType string) []string {
-	return []string{"download", "attestation", "--predicate-type", predicateType, ref}
-}
-
 func ociVerifyBundleArgs(path, digest, predicateType string, policy VerifyPolicy) []string {
 	return []string{"verify-blob-attestation", "--bundle", path, "--type", predicateType,
 		"--digest", strings.TrimPrefix(digest, "sha256:"), "--digestAlg", "sha256",
 		"--certificate-identity-regexp", policy.IdentityRegexp, "--certificate-oidc-issuer", policy.Issuer}
-}
-
-// decodeOCIBundles admits only bounded, complete Sigstore bundle documents.
-// Legacy DSSE reports are not a fallback. Registry order cannot select authority.
-func decodeOCIBundles(raw []byte) ([][]byte, error) {
-	if int64(len(raw)) > maxCosignOutputBytes {
-		return nil, e.New(e.CodeSignatureInvalid, "bundle download exceeds size limit")
-	}
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	var bundles [][]byte
-	for {
-		var document json.RawMessage
-		if err := decoder.Decode(&document); err == io.EOF {
-			break
-		} else if err != nil {
-			return nil, e.Wrap(e.CodeSignatureInvalid, err, "decoding downloaded bundles")
-		}
-		if len(bundles) == maxVerificationBundles {
-			return nil, e.New(e.CodeSignatureInvalid, "too many verification bundles")
-		}
-		if err := canonical.ValidateJSONDocument(document); err != nil {
-			return nil, e.Wrap(e.CodeSignatureInvalid, err, "invalid verification bundle")
-		}
-		bundles = append(bundles, document)
-	}
-	if len(bundles) == 0 {
-		return nil, e.New(e.CodeSignatureInvalid, "no required attestation bundles found")
-	}
-	sort.Slice(bundles, func(i, j int) bool { return bytes.Compare(bundles[i], bundles[j]) < 0 })
-	return bundles, nil
 }
 
 // ociBundleClaims describes the exact certificate and statement supplied to
@@ -152,26 +116,73 @@ func ociBundleClaims(raw []byte, digest, predicateType string, policy VerifyPoli
 
 func (s *CosignOCISigner) verifyOCIBundles(ctx context.Context, subject Subject, predicateType string,
 	policy VerifyPolicy, workspace string, environment []string) (string, string, [][]string, error) {
-	download := ociDownloadBundleArgs(subject.Ref, predicateType)
-	raw, err := s.capture(ctx, download, environment)
+	source, err := s.newOCIBundleSource(ctx, subject)
 	if err != nil {
 		return "", "", nil, err
 	}
-	bundles, err := decodeOCIBundles(raw)
-	if err != nil {
-		return "", "", nil, err
+	defer source.close()
+	return s.verifyOCIType(ctx, source, subject, predicateType, policy, workspace, environment)
+}
+
+func (s *CosignOCISigner) newOCIBundleSource(ctx context.Context, subject Subject) (*ociBundleSource, error) {
+	if s.bundleSource != nil {
+		return s.bundleSource(ctx, subject, s.credential)
 	}
-	ran := [][]string{argv(s.binary, download)}
-	var lastErr error
-	var claimsRejected, verificationFailed int
-	for _, bundle := range bundles {
+	return newRegistryBundleSource(ctx, subject, s.credential)
+}
+
+// A type annotation controls search order only. The statement's actual type
+// determines its per-type work budget; every accepted type still passes the
+// complete claims gate and normal pinned cryptographic verification.
+func (s *CosignOCISigner) verifyOCIType(ctx context.Context, source *ociBundleSource, subject Subject, predicateType string,
+	policy VerifyPolicy, workspace string, environment []string) (string, string, [][]string, error) {
+	var ran [][]string
+	var lastErr error = e.New(e.CodeSignatureInvalid, "no required attestation bundles found")
+	var claimsRejected, verificationFailed, relevant, attempted int
+	var relevantBytes int64
+	for _, descriptor := range source.candidates(predicateType) {
+		if err := contextError(ctx); err != nil {
+			return "", "", nil, err
+		}
+		bundle, err := source.bundle(ctx, descriptor)
+		if err != nil {
+			if ctxErr := contextError(ctx); ctxErr != nil {
+				return "", "", nil, ctxErr
+			}
+			if failure := source.failure(); failure != nil {
+				return "", "", nil, failure
+			}
+			lastErr = err
+			claimsRejected++
+			attempted++
+			continue
+		}
+		actualType, typeErr := ociBundlePredicateType(bundle)
+		if typeErr == nil && actualType != predicateType {
+			if attempted == 0 {
+				lastErr = e.New(e.CodeVerifyFailed, "OCI bundle does not bind the required predicate and exact subject")
+			}
+			continue
+		}
+		attempted++
+		if typeErr == nil {
+			relevant++
+			relevantBytes += int64(len(bundle))
+			if relevant > maxVerificationBundles || relevantBytes > maxCosignOutputBytes {
+				return "", "", nil, e.New(e.CodeSignatureInvalid, "required OCI bundle candidates exceed count or byte limit")
+			}
+		} else {
+			lastErr = typeErr
+			claimsRejected++
+			continue
+		}
 		identity, issuer, err := ociBundleClaims(bundle, subject.Digest, predicateType, policy)
 		if err != nil {
 			claimsRejected++
 			lastErr = err
 			continue
 		}
-		path := filepath.Join(workspace, strings.TrimPrefix(digestBytes(bundle), "sha256:")+".json")
+		path := filepath.Join(workspace, descriptor.Digest.Hex+".json")
 		if err := writePrivateFile(ctx, path, bundle); err != nil {
 			return "", "", nil, err
 		}
@@ -188,8 +199,41 @@ func (s *CosignOCISigner) verifyOCIBundles(ctx context.Context, subject Subject,
 		if err := assertPrivateFileUnchanged(path, bundle); err != nil {
 			return "", "", nil, err
 		}
+		if err := contextError(ctx); err != nil {
+			return "", "", nil, err
+		}
 		return identity, issuer, ran, nil
 	}
 	return "", "", nil, fmt.Errorf("all %d OCI bundles failed (%d rejected by claims checks, %d failed cosign verification); last failure: %w",
-		len(bundles), claimsRejected, verificationFailed, lastErr)
+		attempted, claimsRejected, verificationFailed, lastErr)
+}
+
+// Unauthenticated classification can only save work on a different evidence
+// class. It never replaces ociBundleClaims or verifies any part of a bundle.
+func ociBundlePredicateType(raw []byte) (string, error) {
+	if err := canonical.ValidateJSONDocument(raw); err != nil {
+		return "", e.Wrap(e.CodeSignatureInvalid, err, "invalid verification bundle")
+	}
+	var bundle struct {
+		DSSE struct {
+			Payload string `json:"payload"`
+		} `json:"dsseEnvelope"`
+	}
+	if err := json.Unmarshal(raw, &bundle); err != nil || bundle.DSSE.Payload == "" {
+		return "", e.New(e.CodeSignatureInvalid, "OCI bundle is missing a DSSE payload")
+	}
+	payload, err := base64.StdEncoding.DecodeString(bundle.DSSE.Payload)
+	if err != nil {
+		return "", e.Wrap(e.CodeSignatureInvalid, err, "decoding OCI bundle statement")
+	}
+	if err := canonical.ValidateJSONDocument(payload); err != nil {
+		return "", e.Wrap(e.CodeSignatureInvalid, err, "invalid OCI bundle statement")
+	}
+	var statement struct {
+		PredicateType string `json:"predicateType"`
+	}
+	if err := json.Unmarshal(payload, &statement); err != nil || statement.PredicateType == "" {
+		return "", e.New(e.CodeSignatureInvalid, "OCI bundle is missing a predicate type")
+	}
+	return statement.PredicateType, nil
 }

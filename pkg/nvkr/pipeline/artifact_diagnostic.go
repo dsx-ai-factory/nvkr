@@ -21,6 +21,8 @@ import (
 // ArtifactDiagnostic describes a trusted-input test invocation, not an admitted
 // producer or an authenticated Run. Each call uses a private empty cache.
 type ArtifactDiagnostic struct {
+	// DependencyTimeout overrides only acquisition; zero retains the legacy bound.
+	DependencyTimeout                                    time.Duration
 	Workspace, Artifact, Image, Platform, Version, Suite string
 	Timeout                                              time.Duration
 }
@@ -95,9 +97,14 @@ func runArtifactDiagnostic(ctx context.Context, input ArtifactDiagnostic, stdout
 		}
 		return err
 	}
+	testTimeout := timeout
+	if input.DependencyTimeout > 0 {
+		timeout = input.DependencyTimeout
+	}
 	if err := container(append(append([]string{}, args...), input.Image, "go", "mod", "download"), stdout); err != nil {
 		return err
 	}
+	timeout = testTimeout
 	log, err := os.Create(filepath.Join(input.Workspace, "tests.jsonl"))
 	if err != nil {
 		return e.Wrap(e.CodeBuildFailed, err, "creating diagnostic log")

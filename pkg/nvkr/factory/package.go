@@ -12,6 +12,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 // executePackage admits every declared input before dispatching format-specific I/O.
@@ -72,6 +73,11 @@ func packageInputs(plan *Plan, node Node, artifacts map[string]Artifact) ([]Arti
 }
 
 func executeBinaryPackage(ctx context.Context, plan *Plan, output Artifact, inputs []Artifact) error {
+	platform, err := binaryPackagePlatform(plan, inputs)
+	if err != nil {
+		return err
+	}
+	osName, arch, _ := strings.Cut(platform, "/")
 	files := make([]delivery.BinaryFileInput, 0, len(inputs))
 	for _, input := range inputs {
 		mode := uint32(0o755)
@@ -83,10 +89,36 @@ func executeBinaryPackage(ctx context.Context, plan *Plan, output Artifact, inpu
 		files = append(files, delivery.BinaryFileInput{Name: input.Name, Path: input.Path,
 			InstallPath: "/usr/local/bin/" + input.Name, Mode: mode})
 	}
-	_, err := delivery.BuildBinaryBundle(ctx, output.Path, delivery.BinaryBundleRequest{
-		OS: "linux", Arch: packageArch(plan, inputs), Purpose: output.Name, Files: files,
+	_, err = delivery.BuildBinaryBundle(ctx, output.Path, delivery.BinaryBundleRequest{
+		OS: osName, Arch: arch, Purpose: output.Name, Files: files,
 	})
 	return err
+}
+
+func binaryPackagePlatform(plan *Plan, inputs []Artifact) (string, error) {
+	platform := ""
+	for _, input := range inputs {
+		selected := ""
+		for _, build := range plan.Builds {
+			if build.Name == input.BuildTarget {
+				if selected != "" {
+					return "", e.New(e.CodePipelineDrift, "binary input %q has ambiguous build targets", input.ID)
+				}
+				selected = build.Platform
+			}
+		}
+		if err := target.ValidateExecutablePlatform(selected); err != nil {
+			return "", err
+		}
+		if platform != "" && selected != platform {
+			return "", e.New(e.CodePipelineDrift, "binary bundle inputs have different target platforms")
+		}
+		platform = selected
+	}
+	if platform == "" {
+		return "", e.New(e.CodeReleaseIncomplete, "binary bundle has no target-bound inputs")
+	}
+	return platform, nil
 }
 
 func packageArch(plan *Plan, inputs []Artifact) string {

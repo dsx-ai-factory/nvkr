@@ -15,6 +15,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 func resolveComponent(name string, raw rawComponent, sources map[string]Source, lock *PinLock) (Component, error) {
@@ -22,22 +23,23 @@ func resolveComponent(name string, raw rawComponent, sources map[string]Source, 
 		return Component{}, e.New(e.CodeInvalidCatalog, "component %q: toolchain override requires a from-source build", name)
 	}
 	c := Component{
-		Embeds:          CloneEmbeddedComponents(raw.Embeds),
-		Helm:            raw.Helm,
-		Platforms:       append([]string(nil), raw.Platforms...),
-		FromSource:      raw.FromSource,
-		BuilderType:     raw.BuilderType,
-		BuildNetwork:    raw.BuildNetwork,
-		Flake:           raw.Flake,
-		CGO:             raw.CGO,
-		OutputType:      raw.OutputType,
-		Disk:            raw.Disk,
-		Packer:          clonePackerConfig(raw.Packer),
-		BuildCommand:    raw.BuildCommand,
-		Materials:       cloneStringMap(raw.Materials),
-		ArtifactPath:    raw.ArtifactPath,
-		WriteDir:        raw.WriteDir,
-		ExclusionReason: raw.ExclusionReason,
+		Embeds:                 CloneEmbeddedComponents(raw.Embeds),
+		Helm:                   raw.Helm,
+		Platforms:              append([]string(nil), raw.Platforms...),
+		FromSource:             raw.FromSource,
+		BuilderType:            raw.BuilderType,
+		BuildNetwork:           raw.BuildNetwork,
+		Flake:                  raw.Flake,
+		CGO:                    raw.CGO,
+		OutputType:             raw.OutputType,
+		Disk:                   raw.Disk,
+		Packer:                 clonePackerConfig(raw.Packer),
+		BuildCommand:           raw.BuildCommand,
+		BuildCommandByPlatform: raw.BuildCommandByPlatform,
+		Materials:              cloneStringMap(raw.Materials),
+		ArtifactPath:           raw.ArtifactPath,
+		WriteDir:               raw.WriteDir,
+		ExclusionReason:        raw.ExclusionReason,
 
 		BuildRequirements: execution.Clone(raw.BuildRequirements),
 	}
@@ -160,7 +162,7 @@ func resolvePrebuilt(name string, raw rawComponent, src Source, pin Pin, lock *P
 		}
 		tool := *pin.Tool
 		c.Prebuilt = &Prebuilt{URL: tool.URL, Executable: &tool,
-			Digests:  map[string]string{strings.TrimPrefix(tool.Platform, "linux/"): tool.ExecutableDigest},
+			Digests:  map[string]string{target.ExecutableArch(tool.Platform): tool.ExecutableDigest},
 			Evidence: raw.Prebuilt.Evidence}
 		return c, nil
 	}

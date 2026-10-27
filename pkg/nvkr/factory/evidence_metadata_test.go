@@ -110,6 +110,7 @@ func TestMetadataEvidenceAttestationNeedsNoPayloadPath(t *testing.T) {
 }
 
 func TestMetadataEvidenceRejectsForeignControlsBeforeSigner(t *testing.T) {
+	plan, original, signer := referenceMetadataFixture(t)
 	for _, tc := range []struct {
 		name        string
 		foreignRun  bool
@@ -119,7 +120,7 @@ func TestMetadataEvidenceRejectsForeignControlsBeforeSigner(t *testing.T) {
 		{name: "other run", foreignRun: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			plan, artifacts, signer := referenceMetadataFixture(t)
+			artifacts := maps.Clone(original)
 			routeName := outputPublicationRoute(plan.LifecycleOutputs[0].Name)
 			node := planNode(plan, NodeAttestEvidence+"/"+routeName)
 			if tc.foreignName {

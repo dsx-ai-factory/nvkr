@@ -6,6 +6,7 @@ package conformance
 import (
 	"context"
 	"debug/elf"
+	"debug/macho"
 	"errors"
 	"io"
 	"runtime"
@@ -28,16 +29,20 @@ type ExecutableSelector struct {
 type executableCapture func(context.Context, ExecutableSelector) (*heldfile.File, error)
 type executableStream func(context.Context, string, string, string, int64, io.Writer) (lifecycle.ExecutableMemberDescription, error)
 
-func validateExecutableSelector(selector ExecutableSelector) error {
+func validateExecutableSelectorFor(selector ExecutableSelector, local bool) error {
 	for _, value := range []string{selector.Output, selector.Member} {
 		if !safetext.Valid(value, 4096, false) || strings.TrimSpace(value) != value {
 			return e.New(e.CodeUsage, "conformance tool requires an exact output and member selector")
 		}
 	}
-	if err := target.ValidatePlatform(selector.Platform); err != nil {
+	if err := target.ValidateExecutablePlatform(selector.Platform); err != nil {
 		return e.Wrap(e.CodeEngineCapability, err, "conformance tool platform")
 	}
-	if selector.Platform != "linux/"+runtime.GOARCH {
+	expected := "linux/" + runtime.GOARCH
+	if local && runtime.GOOS == "darwin" {
+		expected = "darwin/arm64"
+	}
+	if selector.Platform != expected {
 		return e.New(e.CodeEngineCapability, "conformance tool platform must match the native execution host")
 	}
 	return nil
@@ -97,9 +102,23 @@ func captureExecutable(ctx context.Context, selector ExecutableSelector, stream 
 	if descriptor.Output != selector.Output || descriptor.Member != selector.Member || descriptor.Platform != selector.Platform || descriptor.PayloadDigest != sealed.Digest() || descriptor.Size != sealed.Size() {
 		return nil, failure("conformance tool bytes differ from authenticated member")
 	}
-	held, err := heldfile.FromReaderContext(ctx, io.NewSectionReader(sealed.OSFile(), 0, sealed.Size()), heldfile.Options{Label: "authenticated conformance executable", Executable: true, MaxBytes: maxToolBytes, ExpectedDigest: descriptor.PayloadDigest})
+	held, err := heldfile.FromReaderContext(ctx, io.NewSectionReader(sealed.OSFile(), 0, sealed.Size()), heldfile.Options{Label: "authenticated conformance executable", Executable: selector.Platform != "darwin/arm64", MaxBytes: maxToolBytes, ExpectedDigest: descriptor.PayloadDigest})
 	if err != nil {
 		return nil, captureFailure(ctx, err, e.CodeEngineCapability, "holding native conformance executable")
+	}
+	if selector.Platform == "darwin/arm64" {
+		parsed, parseErr := macho.NewFile(held)
+		if parseErr != nil {
+			_ = held.Close()
+			return nil, e.New(e.CodeEngineCapability, "local conformance tool must be native ARM64 Mach-O")
+		}
+		valid := runtime.GOOS == "darwin" && parsed.Cpu == macho.CpuArm64 && parsed.Type == macho.TypeExec
+		_ = parsed.Close()
+		if !valid {
+			_ = held.Close()
+			return nil, e.New(e.CodeEngineCapability, "local conformance tool must be native ARM64 Mach-O")
+		}
+		return held, nil
 	}
 	return validateHeldExecutable(held)
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationorigin"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
@@ -108,8 +109,9 @@ func (evidence Evidence) validate() error {
 			if err != nil {
 				return err
 			}
-			if parsed.RunID() != checks.Origin.RunID || parsed.Attempt() != checks.Origin.Attempt {
-				return e.New(e.CodeVerifyFailed, "development evidence escaped the exact source attempt")
+			invocation := "https://github.com/" + namespace.Repository() + "/actions/runs/" + parsed.RunID() + "/attempts/" + parsed.Attempt()
+			if err := factory.ValidatePublicationInvocation(invocation, checks.Origin.InvocationID); err != nil {
+				return err
 			}
 		}
 	}

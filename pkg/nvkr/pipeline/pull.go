@@ -173,6 +173,11 @@ func downloadReleaseExecutableWithTransport(ctx context.Context, node ir.Node, r
 		}
 		return nil
 	}}
+	if ctx != nil {
+		if _, bounded := ctx.Deadline(); bounded {
+			client.Timeout = 0 // The request carries the selected work deadline.
+		}
+	}
 	return downloadReleaseExecutableWithClient(ctx, node, root, relative, client)
 }
 
@@ -211,7 +216,7 @@ func downloadReleaseExecutableWithClient(ctx context.Context, node ir.Node, root
 	if held.Digest() != node.ExecutableArchive.Digest {
 		return "", 0, e.New(e.CodeVerifyFailed, "release carrier digest %s does not match pinned %s", held.Digest(), node.ExecutableArchive.Digest)
 	}
-	member, err := releaseasset.SelectTarGzip(ctx, io.NewSectionReader(held, 0, held.Size()), node.ExecutableArchive.Member, releaseasset.ToolLimits())
+	member, err := releaseasset.Select(ctx, held, held.Size(), node.ExecutableArchive.Format, node.ExecutableArchive.Member, releaseasset.ToolLimits())
 	if err != nil {
 		return "", 0, err
 	}
@@ -234,6 +239,9 @@ func downloadVerify(ctx context.Context, url, root, relative, want string) (stri
 		return "", 0, e.Wrap(e.CodeTimeout, err, "downloading %s canceled", url)
 	}
 	client := &http.Client{Timeout: 10 * time.Minute}
+	if _, bounded := ctx.Deadline(); bounded {
+		client.Timeout = 0
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return "", 0, e.Wrap(e.CodeFetchFailed, err, "constructing GET %s", url)

@@ -11,163 +11,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
-	"golang.org/x/sys/unix"
 )
-
-func TestTenantSelectsMaintainedOVNChartStream(t *testing.T) {
-	request := NewTenantRequest("owned")
-	if request.CNI != "ovn-kubernetes" || request.CNIVersion != siteOVNVersion {
-		t.Fatalf("tenant must select the packaged NVIDIA OVN chart stream: %+v", request)
-	}
-}
-
-func TestTenantNetworkSelectionIsExplicitAndPreservesTopology(t *testing.T) {
-	for _, test := range []struct {
-		name, network, cni, version string
-	}{
-		{"default", "", "ovn-kubernetes", siteOVNVersion},
-		{"maintained", "ovn", "ovn-kubernetes", siteOVNVersion},
-		{"upstream diagnostic", "upstream-ovn", "ovn-kubernetes", upstreamSiteOVNVersion},
-		{"temporary diagnostic", "kind-calico", "calico", "3.30.1"},
-		{"unknown", "calico", "", ""},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			request, err := newTenantRequest("owned", test.network)
-			if test.cni == "" {
-				assertConfigUsage(t, err)
-				if !reflect.DeepEqual(request, TenantRequest{}) {
-					t.Fatalf("unknown network must reject without request: %+v %v", request, err)
-				}
-				return
-			}
-			if err != nil || request.CNI != test.cni || request.CNIVersion != test.version {
-				t.Fatalf("request selected unexpected CNI: %+v %v", request, err)
-			}
-			request.CNI, request.CNIVersion = "ovn-kubernetes", siteOVNVersion
-			if !reflect.DeepEqual(request, NewTenantRequest("owned")) {
-				t.Fatal("network selection changed unrelated tenant topology")
-			}
-		})
-	}
-}
-
-func TestTenantRejectsUnknownNetworkBeforeInventory(t *testing.T) {
-	work := privateTestDir(t)
-	selected := tenant{name: "owned", network: "unknown", session: ManagementSession{Work: work, Runner: Runner{Work: work}}}
-	assertConfigUsage(t, selected.run(t.Context(), 0))
-	entries, err := os.ReadDir(work)
-	if err != nil || len(entries) != 0 {
-		t.Fatalf("rejected network left output: %v %v", entries, err)
-	}
-}
-
-func TestDemoNetworkDiagnosticScopeIsExplicit(t *testing.T) {
-	for _, test := range []struct{ input, mode, label string }{
-		{"", "ovn", "NVIDIA OVN"},
-		{"ovn", "ovn", "NVIDIA OVN"},
-		{"upstream-ovn", "upstream-ovn", "upstream OVN diagnostic; NVIDIA OVN not validated"},
-		{"kind-calico", "kind-calico", "Kind/Calico diagnostic; NVIDIA OVN not deployed"},
-	} {
-		t.Run(test.mode+"/"+test.input, func(t *testing.T) {
-			mode, err := normalizeNetwork(test.input)
-			if err != nil || mode != test.mode {
-				t.Fatalf("network normalization: %q %v", mode, err)
-			}
-			if summary := demoSuccessSummary(mode); !strings.HasPrefix(summary, "PASS ("+test.label+"):") || !strings.Contains(summary, "not a signed Release") {
-				t.Fatalf("ambiguous diagnostic summary: %q", summary)
-			}
-			path := filepath.Join(privateTestDir(t), "tenant-result.json")
-			if err := privateJSON(path, tenantResult{Scope: "unqualified-local-demo", Network: mode}); err != nil {
-				t.Fatal(err)
-			}
-			raw, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			var result tenantResult
-			if err := json.Unmarshal(raw, &result); err != nil || result.Network != test.mode || result.Scope != "unqualified-local-demo" {
-				t.Fatalf("retained diagnostic lost network/scope: %+v %v", result, err)
-			}
-		})
-	}
-}
-
-func TestTenantCalicoRolloutIsExplicitBoundedAndFailClosed(t *testing.T) {
-	for _, test := range []struct{ name, network string }{
-		{"default", ""}, {"ovn", "ovn"}, {"upstream-ovn", "upstream-ovn"}, {"ready", "kind-calico"},
-		{"failed", "kind-calico"}, {"canceled", "kind-calico"},
-		{"deadline", "kind-calico"}, {"unknown", "calico"},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			work := privateTestDir(t)
-			calls := filepath.Join(work, "calls")
-			writeTenantFixture(t, filepath.Join(work, "kubectl"), []byte(`#!/bin/sh
-set -eu
-printf '%s\n' "$*" >> "$CALLS"
-case "$FAIL" in
-  failed) exit 7 ;;
-  deadline) exec sleep 60 ;;
-esac
-`), 0o700)
-			selected := tenant{network: test.network, session: ManagementSession{Work: work, Tools: work, Runner: Runner{Work: work, Env: []string{"PATH=/usr/bin:/bin", "CALLS=" + calls, "FAIL=" + test.name}}}}
-			ctx, cancel := context.WithCancel(t.Context())
-			defer cancel()
-			if test.name == "canceled" {
-				cancel()
-			}
-			if test.name == "deadline" {
-				var deadlineCancel context.CancelFunc
-				ctx, deadlineCancel = context.WithTimeout(ctx, 100*time.Millisecond)
-				defer deadlineCancel()
-			}
-			err := selected.waitCNI(ctx, "owned-tenant-kubeconfig")
-			switch test.name {
-			case "canceled":
-				if !errors.Is(err, context.Canceled) {
-					t.Fatalf("canceled CNI readiness: %v", err)
-				}
-			case "deadline":
-				if !errors.Is(err, context.DeadlineExceeded) || errors.Is(err, ErrUnjoined) {
-					t.Fatalf("CNI readiness must honor remaining deadline and join child: %v", err)
-				}
-			case "failed":
-				if CommandExitCode(err) != 7 {
-					t.Fatalf("Calico rollout failure was hidden: %v", err)
-				}
-			case "unknown":
-				assertConfigUsage(t, err)
-			default:
-				if err != nil {
-					t.Fatal(err)
-				}
-			}
-			raw, readErr := os.ReadFile(calls)
-			if test.name == "deadline" && os.IsNotExist(readErr) {
-				return // The parent may expire before command admission.
-			}
-			if test.name == "default" || test.name == "ovn" || test.name == "upstream-ovn" || test.name == "unknown" || test.name == "canceled" {
-				if !os.IsNotExist(readErr) {
-					t.Fatalf("unselected or rejected CNI readiness started work: %v", readErr)
-				}
-				return
-			}
-			if readErr != nil {
-				t.Fatal(readErr)
-			}
-			want := "--kubeconfig owned-tenant-kubeconfig -n calico-system rollout status daemonset/calico-node --timeout=240s\n"
-			if string(raw) != want {
-				t.Fatalf("unexpected CNI readiness commands: %q", raw)
-			}
-		})
-	}
-}
 
 func TestTenantDNSRolloutIsBoundedAndFailClosed(t *testing.T) {
 	for _, name := range []string{"ready", "coredns failure", "node-local failure", "canceled", "deadline"} {
@@ -184,7 +31,7 @@ case "$FAIL:$*" in
 esac
 `), 0o700)
 			selected := tenant{session: ManagementSession{Work: work, Tools: work, Runner: Runner{Work: work, Env: []string{"PATH=/usr/bin:/bin", "CALLS=" + calls, "FAIL=" + name}}}}
-			ctx, cancel := context.WithCancel(t.Context())
+			ctx, cancel := context.WithTimeout(t.Context(), time.Hour)
 			defer cancel()
 			if name == "canceled" {
 				cancel()
@@ -194,7 +41,7 @@ esac
 				ctx, deadlineCancel = context.WithTimeout(ctx, 100*time.Millisecond)
 				defer deadlineCancel()
 			}
-			err := selected.waitDNS(ctx, "owned-tenant-kubeconfig")
+			err := waitTenantDNS(ctx, "owned-tenant-kubeconfig", filepath.Join(work, "kubectl"), selected.session.Runner.Progress, selected.capture)
 			switch name {
 			case "ready":
 				if err != nil {
@@ -228,12 +75,21 @@ esac
 			if readErr != nil {
 				t.Fatal(readErr)
 			}
-			want := "--kubeconfig owned-tenant-kubeconfig -n kube-system rollout status deployment/coredns --timeout=240s\n"
+			want := []string{"deployment/coredns"}
 			if name == "ready" || name == "node-local failure" {
-				want += "--kubeconfig owned-tenant-kubeconfig -n kube-system rollout status daemonset/node-local-dns --timeout=240s\n"
+				want = append(want, "daemonset/node-local-dns")
 			}
-			if string(raw) != want {
+			lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+			if len(lines) != len(want) {
 				t.Fatalf("unexpected readiness commands: %q", raw)
+			}
+			for i, resource := range want {
+				prefix := "--kubeconfig owned-tenant-kubeconfig -n kube-system rollout status " + resource + " --timeout="
+				value, ok := strings.CutPrefix(lines[i], prefix)
+				budget, err := time.ParseDuration(value)
+				if !ok || err != nil || budget <= 0 || budget > time.Hour || name != "deadline" && budget < 59*time.Minute {
+					t.Fatalf("rollout did not inherit remaining work budget: %q", lines[i])
+				}
 			}
 		})
 	}
@@ -336,7 +192,7 @@ func TestTenantRequiresTwoDistinctReadyNativeNodes(t *testing.T) {
 			case "two control planes":
 				nodes[1].Metadata.Labels["node-role.kubernetes.io/control-plane"] = ""
 			}
-			ready, err := readyNodes(nodes)
+			ready, err := readyNodesForCountVersion(nodes, "1.34.2", 2)
 			if ready != (name == "exact") || (err != nil) != expectError {
 				t.Fatalf("ready=%v err=%v, want ready=%v error=%v", ready, err, name == "exact", expectError)
 			}
@@ -344,21 +200,15 @@ func TestTenantRequiresTwoDistinctReadyNativeNodes(t *testing.T) {
 	}
 }
 
-func tenantVMFixture(t *testing.T) (Runner, string, lifecycle.Artifact, string, []string) {
-	return tenantVMFixtureAt(t, "")
-}
-
-func tenantVMFixtureAt(t *testing.T, simulatorWork string) (Runner, string, lifecycle.Artifact, string, []string) {
+func tenantVMFixture(t *testing.T) (Runner, string, string, string, []string) {
 	t.Helper()
 	runner, root, work, first := domainFixture(t)
-	if simulatorWork != "" {
-		work = simulatorWork
-	}
 	second := strings.Replace(first, "000000000001", "000000000002", 1)
-	names := []string{first, second}
+	third := strings.Replace(first, "000000000001", "000000000003", 1)
+	names := []string{first, second, third}
 	for _, name := range names {
 		id := strings.TrimPrefix(name, "nico-vm-")
-		raw := fmt.Sprintf(`<domain><name>%s</name><uuid>%s</uuid><os><type>hvm</type></os><devices><tpm/><disk><source file="%s"/></disk></devices></domain>`, name, id, filepath.Join(work, "var/instances", id, "disk.qcow2"))
+		raw := fmt.Sprintf(`<domain type="kvm"><name>%s</name><uuid>%s</uuid><os><type arch="aarch64">hvm</type></os><devices><tpm/><disk><source file="%s"/></disk></devices></domain>`, name, id, filepath.Join(work, "var/instances", id, "disk.qcow2"))
 		writeTenantFixture(t, filepath.Join(root, name+".xml"), []byte(raw), 0o600)
 		writeTenantFixture(t, filepath.Join(root, name+".uuid"), []byte(id), 0o600)
 	}
@@ -371,11 +221,11 @@ func tenantVMFixtureAt(t *testing.T, simulatorWork string) (Runner, string, life
 	writeTenantFixture(t, base, contents, 0o600)
 	writeTenantBacking(t, root, base)
 	writeTenantFixture(t, filepath.Join(root, "qemu-img"), []byte("#!/bin/sh\nset -eu\ntest \"$1\" = info\ncat \"$FIXTURE/backing.json\"\n"), 0o700)
-	image := lifecycle.Artifact{Digest: fmt.Sprintf("sha256:%x", sha256.Sum256(contents)), Disk: &delivery.DiskOutput{Size: int64(len(contents))}}
+	digest := fmt.Sprintf("sha256:%x", sha256.Sum256(contents))
 	// A nonempty Runner.Work must not turn the second VM's repeated inspection
-	// phase into an exclusive-log collision. vmEvidence uses volatile capture.
+	// phase into an exclusive-log collision. The live observer uses volatile capture.
 	runner.Work = privateTestDir(t)
-	return runner, root, image, work, names
+	return runner, root, digest, work, names
 }
 
 func writeTenantFixture(t *testing.T, path string, raw []byte, mode os.FileMode) {
@@ -394,15 +244,15 @@ func writeTenantBacking(t *testing.T, root, backing string) {
 	writeTenantFixture(t, filepath.Join(root, "backing.json"), raw, 0o600)
 }
 
-func TestTenantVMEvidenceRejectsSubstitution(t *testing.T) {
+func TestNativeLinuxVMEvidenceRejectsSubstitution(t *testing.T) {
 	for _, tc := range []struct{ name, message string }{
-		{"exact", ""}, {"one domain", "exactly two"}, {"extra domain", "exactly two"},
-		{"foreign disk", "not owned"}, {"missing TPM", "lacks real"}, {"missing OS", "lacks real"},
-		{"relative backing", "absolute"}, {"outside cache", "exact downloaded"}, {"backing symlink", "exact downloaded"},
-		{"wrong size", "exact downloaded"}, {"wrong digest", "digest differs"}, {"missing disk description", "exact downloaded"},
+		{"exact", ""}, {"one domain", "exactly 3"}, {"extra domain", "exactly 3"},
+		{"foreign disk", "outside"}, {"missing TPM", "lacks its real"}, {"missing OS", "lacks its real"},
+		{"wrong architecture", "lacks its real"}, {"wrong engine", "lacks its real"}, {"duplicate TPM", "lacks its real"},
+		{"relative backing", "absolute"}, {"backing symlink", ""}, {"wrong digest", "backing differs"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			runner, root, image, work, names := tenantVMFixture(t)
+			runner, root, digest, work, names := tenantVMFixture(t)
 			xmlFile := filepath.Join(root, names[1]+".xml")
 			raw, err := os.ReadFile(xmlFile)
 			if err != nil {
@@ -418,44 +268,34 @@ func TestTenantVMEvidenceRejectsSubstitution(t *testing.T) {
 			case "missing TPM":
 				raw = stringsToBytesReplace(raw, "<tpm/>", "")
 			case "missing OS":
-				raw = stringsToBytesReplace(raw, "<type>hvm</type>", "")
+				raw = stringsToBytesReplace(raw, `<type arch="aarch64">hvm</type>`, "")
+			case "wrong architecture":
+				raw = stringsToBytesReplace(raw, `arch="aarch64"`, `arch="x86_64"`)
+			case "wrong engine":
+				raw = stringsToBytesReplace(raw, `type="kvm"`, `type="qemu"`)
+			case "duplicate TPM":
+				raw = stringsToBytesReplace(raw, "<tpm/>", "<tpm/><tpm/>")
 			case "relative backing":
 				writeTenantBacking(t, root, "cache/accepted.qcow2")
-			case "outside cache":
-				base := filepath.Join(privateTestDir(t), "foreign.qcow2")
-				accepted, readErr := os.ReadFile(filepath.Join(work, "cache", "accepted.qcow2"))
-				if readErr != nil {
-					t.Fatal(readErr)
-				}
-				// Byte-identical outside data isolates the containment check;
-				// a wrong size/digest must not mask its removal.
-				writeTenantFixture(t, base, accepted, 0o600)
-				writeTenantBacking(t, root, base)
 			case "backing symlink":
 				link := filepath.Join(work, "cache", "link")
 				if err := os.Symlink(filepath.Join(work, "cache", "accepted.qcow2"), link); err != nil {
 					t.Fatal(err)
 				}
-				linkInfo, statErr := os.Lstat(link)
-				if statErr != nil {
-					t.Fatal(statErr)
-				}
-				// Match lstat size so the independent no-symlink guard is
-				// decisive even if its neighboring size check remains intact.
-				image.Disk.Size = linkInfo.Size()
 				writeTenantBacking(t, root, link)
-			case "wrong size":
-				image.Disk.Size++
 			case "wrong digest":
-				image.Digest = "sha256:" + strings.Repeat("0", 64)
-			case "missing disk description":
-				image.Disk = nil
+				digest = "sha256:" + strings.Repeat("0", 64)
 			}
 			writeTenantFixture(t, xmlFile, raw, 0o600)
-			observed, err := vmEvidence(t.Context(), work, image, runner)
+			observed, err := nativeLinuxVMEvidence(t.Context(), runner, work, digest, 3)
 			if tc.name == "exact" {
-				if err != nil || len(observed) != 2 || observed[0].BackingDigest != image.Digest || observed[1].BackingDigest != image.Digest {
-					t.Fatalf("exact two-domain observation rejected: %v %v", observed, err)
+				if err != nil || len(observed) != 3 {
+					t.Fatalf("exact site and tenant observation rejected: %v %v", observed, err)
+				}
+				for _, domain := range observed {
+					if domain.BackingDigest != digest {
+						t.Fatal("native domain lost its selected backing bytes")
+					}
 				}
 			} else if err == nil || !strings.Contains(err.Error(), tc.message) || observed != nil {
 				t.Fatalf("wrong refusal for %s: observed=%v err=%v", tc.name, observed, err)
@@ -469,55 +309,4 @@ func TestTenantVMEvidenceRejectsSubstitution(t *testing.T) {
 
 func stringsToBytesReplace(raw []byte, old, replacement string) []byte {
 	return []byte(strings.ReplaceAll(string(raw), old, replacement))
-}
-
-func TestTenantDiagnosticHeaderAdmission(t *testing.T) {
-	for _, name := range []string{"exact", "empty", "too large", "public mode", "hardlink", "symlink", "directory", "FIFO", "foreign owner"} {
-		t.Run(name, func(t *testing.T) {
-			root := privateTestDir(t)
-			path := filepath.Join(root, "header")
-			writeTenantFixture(t, path, []byte("Authorization: Bearer fixture-only-token\n"), 0o600)
-			switch name {
-			case "empty":
-				writeTenantFixture(t, path, nil, 0o600)
-			case "too large":
-				writeTenantFixture(t, path, make([]byte, 257), 0o600)
-			case "public mode":
-				if err := os.Chmod(path, 0o644); err != nil {
-					t.Fatal(err)
-				}
-			case "hardlink":
-				if err := os.Link(path, filepath.Join(root, "alias")); err != nil {
-					t.Fatal(err)
-				}
-			case "symlink", "directory", "FIFO":
-				if err := os.Rename(path, filepath.Join(root, "held")); err != nil {
-					t.Fatal(err)
-				}
-				var err error
-				switch name {
-				case "symlink":
-					err = os.Symlink(filepath.Join(root, "held"), path)
-				case "directory":
-					err = os.Mkdir(path, 0o700)
-				case "FIFO":
-					err = unix.Mkfifo(path, 0o600)
-				}
-				if err != nil {
-					t.Fatal(err)
-				}
-			case "foreign owner":
-				if err := os.Chown(path, os.Getuid()+1, -1); err != nil {
-					if errors.Is(err, unix.EPERM) {
-						t.Skip("foreign-UID fixture requires chown capability")
-					}
-					t.Fatal(err)
-				}
-			}
-			err := privateHeader(path)
-			if (err == nil) != (name == "exact") {
-				t.Fatalf("header %s admission: %v", name, err)
-			}
-		})
-	}
 }

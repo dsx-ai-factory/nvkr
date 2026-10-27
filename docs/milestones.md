@@ -16,7 +16,9 @@ not complete a milestone.
 M2 disk delivery binds the exact produced disk and traced materials. The
 initial scope decision
 retains producer-only disk evidence and defers deep inventory, material reconciliation, waivers, offline
-pull-request qualification, a dedicated verify-only dispatch and incremental reuse.
+pull-request qualification, a dedicated verify-only dispatch and cross-run qualification reuse. Authenticated
+partial retries within one producer or qualification workflow run preserve original evidence and attempt
+identities while keeping complete-output, exact-input and policy checks mandatory.
 
 The current scope makes embedded-component declarations optional. Omission is not
 applicable, while authored declarations must match their referenced

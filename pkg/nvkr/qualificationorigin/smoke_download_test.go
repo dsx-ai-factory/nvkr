@@ -14,6 +14,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -21,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/cistore"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -106,9 +108,12 @@ func (fixture *nativeSmokeFixture) github(t *testing.T) *GitHub {
 			switch request.URL.Path {
 			case "/repos/example/nvkr":
 				phase, value = "repository", fixture.repository
-			case "/repos/example/nvkr/actions/runs/2345/attempts/3":
+			case "/repos/example/nvkr/actions/runs/2345/attempts/" + fixture.invocation.description.Attempt:
 				phase, value = "invocation", fixture.run
-			case "/repos/example/nvkr/actions/runs/2345/attempts/3/jobs":
+			case "/repos/example/nvkr/actions/runs/2345/jobs":
+				if request.URL.Query().Get("filter") != "all" {
+					t.Fatal("job selection omitted previous attempts")
+				}
 				page, err := strconv.Atoi(request.URL.Query().Get("page"))
 				if err != nil || request.URL.Query().Get("per_page") != "100" {
 					t.Fatal("incorrect job page")
@@ -196,6 +201,149 @@ func TestDownloadNativeSmokeExactAttemptSortedCompleteTransport(t *testing.T) {
 	}
 }
 
+func TestDownloadNativeSmokePartialRetryKeepsOriginalSuccessfulWorker(t *testing.T) {
+	fixture := newNativeSmokeFixture(t)
+	fixture.jobs[0].Attempt = "1"
+	artifact := fixture.artifacts["nvkr-smoke-2345-3-amd64"]
+	artifact.Artifacts[0].Name = "nvkr-smoke-2345-1-amd64"
+	fixture.artifacts[artifact.Artifacts[0].Name] = artifact
+	delete(fixture.artifacts, "nvkr-smoke-2345-3-amd64")
+	got, err := fixture.github(t).DownloadNativeSmoke(t.Context(), fixture.invocation, []string{"linux/amd64", "linux/arm64"})
+	if err != nil || len(got) != 2 {
+		t.Fatalf("partial retry lost earlier successful worker: %v", err)
+	}
+	if got[0].Invocation.Attempt != "1" || got[1].Invocation.Attempt != "3" {
+		t.Fatal("transport relabeled original worker attempts")
+	}
+}
+
+func TestDownloadNativeSmokePartialRetryPreservesBranchAndPrivateOrigin(t *testing.T) {
+	for _, tc := range []struct {
+		name, branch string
+		private      bool
+		wrongAttempt bool
+	}{
+		{name: "development public", branch: "feature/qualification"},
+		{name: "production private", private: true},
+		{name: "development private", branch: "feature/qualification", private: true},
+		{name: "private locator cannot relabel worker attempt", private: true, wrongAttempt: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture := newNativeSmokeFixture(t)
+			origin := fixture.invocation.description
+			fixture.invocation.description = describe(SourceRequest{Branch: tc.branch, Repository: origin.Repository, RunID: origin.RunID,
+				Attempt: origin.Attempt, Commit: origin.Commit, Workflow: origin.Workflow, DefaultBranch: origin.DefaultBranch})
+			if tc.branch != "" {
+				fixture.run.HeadBranch, fixture.run.Event = tc.branch, "workflow_dispatch"
+			}
+			fixture.jobs[0].Attempt = "1"
+			name := "nvkr-smoke-2345-1-amd64"
+			listing := fixture.artifacts["nvkr-smoke-2345-3-amd64"]
+			listing.Artifacts[0].Name = name
+			listing.Artifacts[0].WorkflowRun.HeadBranch = fixture.invocation.description.SourceBranch()
+			request := cistore.Request{Repository: origin.Repository, RunID: origin.RunID, Attempt: "1", Name: name}
+			if tc.private {
+				locatorRequest := request
+				if tc.wrongAttempt {
+					locatorRequest.Attempt = origin.Attempt
+				}
+				archive := privateLocatorZIP(t, name, locatorRequest, func(value map[string]any) {
+					value["paths"] = []string{"worker.bundle.json", "worker.json", "worker.pem", "worker.sig"}
+				})
+				listing.Artifacts[0].Size = json.Number(strconv.Itoa(len(archive)))
+				listing.Artifacts[0].Digest = handoffArchiveDigest(archive)
+				fixture.archives[string(listing.Artifacts[0].ID)] = archive
+			}
+			fixture.artifacts[name] = listing
+			delete(fixture.artifacts, "nvkr-smoke-2345-3-amd64")
+			g := fixture.github(t)
+			g.storageToken, g.storageUsername = "private-read-secret", "storage-reader"
+			called, staged := false, ""
+			g.downloadPrivate = func(_ context.Context, got cistore.Request, locator cistore.Locator, destination string, options cistore.Options) error {
+				called, staged = true, destination
+				if tc.wrongAttempt || got != request || locator.Request != request || options.Token != "private-read-secret" || options.Username != "storage-reader" || options.RepositoryToken != "read-secret" {
+					t.Fatal("private retry lost its original worker or separate credential binding")
+				}
+				if err := os.Mkdir(destination, 0o700); err != nil {
+					return err
+				}
+				for _, header := range nativeSmokeHeaders() {
+					if err := os.WriteFile(filepath.Join(destination, header.Name), []byte("worker-amd64"), 0o600); err != nil {
+						return err
+					}
+				}
+				return nil
+			}
+			got, err := g.DownloadNativeSmoke(t.Context(), fixture.invocation, []string{"linux/amd64"})
+			if tc.wrongAttempt {
+				assertCode(t, err, e.CodeVerifyFailed)
+				if got != nil || called {
+					t.Fatal("mismatched private locator returned evidence or reached storage")
+				}
+				return
+			}
+			if err != nil || len(got) != 1 {
+				t.Fatalf("partial retry failed: %v", err)
+			}
+			if got[0].Invocation.Attempt != "1" || got[0].Invocation.Branch != tc.branch || got[0].Invocation.Ref != fixture.invocation.description.Ref || called != tc.private {
+				t.Fatal("retry changed original worker attempt, branch or transport")
+			}
+			if err := got[0].Invocation.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			if staged != "" {
+				if _, err := os.Stat(filepath.Dir(staged)); !os.IsNotExist(err) {
+					t.Fatal("private retry staging survived completion")
+				}
+			}
+		})
+	}
+}
+
+func TestDownloadNativeSmokeSelectsLatestWorkerWithoutStaleFallback(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		earlierResult string
+		latestResult  string
+		latestStatus  string
+		newestFirst   bool
+	}{
+		{name: "rerun failed worker succeeds", earlierResult: "failure", latestResult: "success", latestStatus: "completed"},
+		{name: "newer failure blocks stale success", earlierResult: "success", latestResult: "failure", latestStatus: "completed"},
+		{name: "older success cannot replace first-listed failure", earlierResult: "success", latestResult: "failure", latestStatus: "completed", newestFirst: true},
+		{name: "running rerun blocks stale success", earlierResult: "success", latestStatus: "in_progress"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture := newNativeSmokeFixture(t)
+			fixture.run.Attempt = "12"
+			fixture.invocation.description.Attempt = "12"
+			fixture.invocation.description.InvocationID = "https://github.com/example/nvkr/actions/runs/2345/attempts/12"
+			earlier, latest := fixture.jobs[0], fixture.jobs[0]
+			earlier.ID, earlier.Attempt, earlier.Conclusion = "99", "2", tc.earlierResult
+			latest.Attempt, latest.Status, latest.Conclusion = "11", tc.latestStatus, tc.latestResult
+			fixture.jobs = []nativeSmokeJob{earlier, latest, fixture.jobs[1]}
+			if tc.newestFirst {
+				fixture.jobs[0], fixture.jobs[1] = fixture.jobs[1], fixture.jobs[0]
+			}
+			artifact := fixture.artifacts["nvkr-smoke-2345-3-amd64"]
+			artifact.Artifacts[0].Name = "nvkr-smoke-2345-11-amd64"
+			fixture.artifacts[artifact.Artifacts[0].Name] = artifact
+			delete(fixture.artifacts, "nvkr-smoke-2345-3-amd64")
+			got, err := fixture.github(t).DownloadNativeSmoke(t.Context(), fixture.invocation, []string{"linux/amd64", "linux/arm64"})
+			if tc.latestResult == "success" {
+				if err != nil || len(got) != 2 || got[0].Invocation.Attempt != "11" || got[1].Invocation.Attempt != "3" {
+					t.Fatalf("latest successful workers were not selected: %+v %v", got, err)
+				}
+				return
+			}
+			assertCode(t, err, e.CodeGateUnmet)
+			if got != nil || len(fixture.requests) != 3 {
+				t.Fatal("unsuccessful latest job reached artifact transport or returned partial data")
+			}
+		})
+	}
+}
+
 func TestDownloadNativeSmokeRejectsWrongProviderBindings(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -211,7 +359,9 @@ func TestDownloadNativeSmokeRejectsWrongProviderBindings(t *testing.T) {
 		{"wrong job name", func(f *nativeSmokeFixture) { f.jobs[0].Name = "other / native-amd64" }, e.CodeGateUnmet},
 		{"duplicate job name", func(f *nativeSmokeFixture) { f.jobs[1].Name = f.jobs[0].Name }, e.CodeGateUnmet},
 		{"duplicate job ID", func(f *nativeSmokeFixture) { f.jobs[1].ID = f.jobs[0].ID }, e.CodeVerifyFailed},
-		{"wrong job attempt", func(f *nativeSmokeFixture) { f.jobs[0].Attempt = "2" }, e.CodeVerifyFailed},
+		{"future job attempt", func(f *nativeSmokeFixture) { f.jobs[0].Attempt = "4" }, e.CodeVerifyFailed},
+		{"absent job attempt", func(f *nativeSmokeFixture) { f.jobs[0].Attempt = "" }, e.CodeVerifyFailed},
+		{"malformed job attempt", func(f *nativeSmokeFixture) { f.jobs[0].Attempt = "1.5" }, e.CodeVerifyFailed},
 		{"wrong job run", func(f *nativeSmokeFixture) { f.jobs[0].RunID = "1234" }, e.CodeVerifyFailed},
 		{"wrong job commit", func(f *nativeSmokeFixture) { f.jobs[0].HeadSHA = strings.Repeat("a", 40) }, e.CodeVerifyFailed},
 		{"excessive job count", func(f *nativeSmokeFixture) { f.jobCount = "1001" }, e.CodeVerifyFailed},
@@ -274,7 +424,7 @@ func TestDownloadNativeSmokeBoundsAndCompletesJobPagination(t *testing.T) {
 			fixture := newNativeSmokeFixture(t)
 			first := make([]nativeSmokeJob, 100)
 			for i := range first {
-				first[i] = nativeSmokeJob{ID: json.Number(strconv.Itoa(i + 1000)), RunID: fixture.run.ID, HeadSHA: fixture.run.HeadSHA, Name: "other", Status: "in_progress"}
+				first[i] = nativeSmokeJob{ID: json.Number(strconv.Itoa(i + 1000)), RunID: fixture.run.ID, Attempt: fixture.run.Attempt, HeadSHA: fixture.run.HeadSHA, Name: "other", Status: "in_progress"}
 			}
 			fixture.jobPages = map[int][]nativeSmokeJob{1: first, 2: fixture.jobs}
 			fixture.jobCount = "102"

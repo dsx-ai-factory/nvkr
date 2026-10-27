@@ -440,7 +440,7 @@ func observeContainerImageWith(ctx context.Context, node ir.Node, output func(..
 
 // A VM toolchain runs on its selected host, not the guest/output platform.
 func localToolchainPlatform(node ir.Node) string {
-	if node.BuilderType == ir.BuilderVMImage {
+	if node.BuilderType == ir.BuilderVMImage || node.Platform == "darwin/arm64" {
 		return node.ToolchainPlatform
 	}
 	return node.Platform
@@ -530,6 +530,9 @@ func qualifySelectedExecution(ctx context.Context, request *QualifiedExecution, 
 	}
 	profileSnapshot := cloneProfile(request.Profile)
 	nodeSnapshot := cloneBuildNodes(nodes)
+	if err := profile.ValidateExecutionPlan(ctx, profileSnapshot, nodeSnapshot); err != nil {
+		return nil, runtimeBinary, err
+	}
 	runtimePath, err := resolveExecutionRuntime(runtimeBinary)
 	if err != nil {
 		return nil, runtimeBinary, err

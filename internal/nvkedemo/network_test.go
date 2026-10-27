@@ -219,6 +219,33 @@ func TestNetworkJournalContracts(t *testing.T) {
 	}
 }
 
+func TestNetworkJournalBridgeMAC(t *testing.T) {
+	for _, row := range []struct {
+		mac   string
+		valid bool
+	}{
+		{"02:11:aa:33:44:55", true},
+		{"02:11:AA:33:44:55", false},
+		{"02-11-aa-33-44-55", false},
+		{"0211.aa33.4455", false},
+		{"0211aa334455", false},
+		{"02:11:aa:33:44:55:66:77", false},
+		{"03:11:aa:33:44:55", false},
+		{"00:11:aa:33:44:55", false},
+		{"02:11:aa:33:44", false},
+		{"02:11:aa:33:44:zz", false},
+	} {
+		t.Run(row.mac, func(t *testing.T) {
+			guard := networkFixture(t)
+			state := guard.snapshot()
+			state.BridgeMAC = row.mac
+			if err := validateNetworkState(state, guard.Work); (err == nil) != row.valid {
+				t.Fatalf("bridge marker admission: %v", err)
+			}
+		})
+	}
+}
+
 func TestNetworkJournalFilesystemAndJSONNegatives(t *testing.T) {
 	for _, name := range []string{"shared", "symlink", "hardlink", "duplicate", "unknown", "oversized"} {
 		t.Run(name, func(t *testing.T) {
@@ -509,25 +536,6 @@ func TestNetworkRuleOwnerAndGatewayBinding(t *testing.T) {
 	}
 }
 
-func TestNetworkGuestTCPInvalidBeforeWork(t *testing.T) {
-	for _, row := range []struct {
-		address string
-		ports   []int
-	}{{"8.8.8.8", []int{30440}}, {"172.18.0.0", []int{30440}}, {"172.18.255.255", []int{30440}}, {"172.18.0.2", nil}, {"172.18.0.2", []int{0}}, {"172.18.0.2", []int{80}}, {"172.18.0.2", []int{30440, 30440}}} {
-		t.Run(fmt.Sprint(row), func(t *testing.T) {
-			g := networkFixture(t)
-			calls := 0
-			g.capture = func(context.Context, []string, bool) ([]byte, error) { calls++; return nil, nil }
-			if err := g.AllowGuestTCP(t.Context(), row.address, row.ports); err == nil {
-				t.Fatal("invalid exception accepted")
-			}
-			if calls != 0 || len(g.rules) != 0 {
-				t.Fatal("invalid grant performed work")
-			}
-		})
-	}
-}
-
 func TestNetworkKindSimulatorInvalidBeforeWork(t *testing.T) {
 	for _, gateway := range []string{"", "8.8.8.8", "172.19.0.1", "172.18.0.0", "172.18.255.255", "172.18.0.1/32", "::ffff:172.18.0.1"} {
 		t.Run(gateway, func(t *testing.T) {
@@ -669,52 +677,6 @@ func TestNetworkKindSimulatorIntentAndWithdrawal(t *testing.T) {
 				t.Fatal("gateway binding rewritten")
 			}
 		})
-	}
-}
-
-func TestNetworkGuestTCPAmbiguousInsertRetainsIntent(t *testing.T) {
-	g := networkFixture(t)
-	g.BridgeIntent = true
-	inserted := false
-	fail := true
-	g.capture = func(_ context.Context, args []string, _ bool) ([]byte, error) {
-		if args[0] == "ip" {
-			return []byte(fmt.Sprintf(`[{"ifname":"nvkevm0","ifindex":42,"address":%q,"linkinfo":{"info_kind":"bridge"}}]`, g.BridgeMAC)), nil
-		}
-		if args[0] == "iptables" {
-			switch args[5] {
-			case "-C":
-				if inserted {
-					return nil, nil
-				}
-				return nil, &CommandError{ExitCode: 1, Cause: errors.New("absent")}
-			case "-I":
-				inserted = true
-				if fail {
-					return nil, errors.New("ambiguous joined insert")
-				}
-			case "-D":
-				inserted = false
-			}
-		}
-		return nil, nil
-	}
-	if err := g.AllowGuestTCP(t.Context(), "172.18.0.2", []int{30440}); err == nil {
-		t.Fatal("ambiguous insert succeeded")
-	}
-	if len(g.rules) != 1 || !inserted {
-		t.Fatal("grant intent lost")
-	}
-	state, err := readNetworkState(g.Work)
-	if err != nil || len(state.Rules) != 1 {
-		t.Fatal(state, err)
-	}
-	fail = false
-	if err = g.RevokeGuestTCP(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	if inserted || len(g.rules) != 1 || g.cleaning {
-		t.Fatal("revocation lost ledger or failed cleanup")
 	}
 }
 

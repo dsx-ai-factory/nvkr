@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"runtime"
 	"slices"
 
 	"github.com/dsx-ai-factory/nvkr/internal/nvkedemo"
@@ -25,12 +26,15 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 	if ctx == nil || out == nil {
 		return nvkrerr.New(nvkrerr.CodeUsage, "walkthrough introduction requires a context and writer")
 	}
-	selected := "arm64-nvidia-tcg.json"
+	definitionName, environmentName, err := nvkedemo.LocalArtifactInputsFor(cfg.Network, cfg.Conformance, runtime.GOOS)
+	if err != nil {
+		return err
+	}
+	selected := filepath.Base(definitionName)
 	network := "NVIDIA OVN (default)"
 	switch cfg.Network {
 	case "", "ovn":
 	case "upstream-ovn":
-		selected = "arm64-upstream-tcg.json"
 		network = "upstream OVN diagnostic; does not validate the NVIDIA fork"
 	case "kind-calico":
 		network = "Kind/Calico diagnostic; does not validate NVIDIA OVN"
@@ -40,7 +44,18 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 	visibleRoot := filepath.Join("inputs", "definitions", "demo")
 	root := filepath.Join(cfg.Repository, visibleRoot)
 	definitionPath := filepath.Join(root, selected)
-	environmentPath := filepath.Join(cfg.Repository, "inputs/environments/local-arm64-tcg.json")
+	environmentPath := filepath.Join(cfg.Repository, environmentName)
+	if cfg.Definition != "" {
+		definitionPath, environmentPath = cfg.Definition, cfg.Environment
+		if !filepath.IsAbs(definitionPath) {
+			definitionPath = filepath.Join(cfg.Repository, definitionPath)
+		}
+		if !filepath.IsAbs(environmentPath) {
+			environmentPath = filepath.Join(cfg.Repository, environmentPath)
+		}
+		visibleRoot, selected = filepath.Dir(definitionPath), filepath.Base(definitionPath)
+		environmentName = environmentPath
+	}
 	authored, err := definition.LoadDefinition(ctx, definitionPath)
 	if err != nil {
 		return err
@@ -57,11 +72,17 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 	}
 	catalogFiles := make(map[string]bool)
 	for _, stack := range stacks {
-		catalogRoot := filepath.Join(visibleRoot, stack.Base)
+		catalogRoot := stack.Base
+		if !filepath.IsAbs(catalogRoot) {
+			catalogRoot = filepath.Join(visibleRoot, catalogRoot)
+		}
 		catalogFiles[filepath.Join(catalogRoot, "registry.yaml")] = true
 		catalogFiles[filepath.Join(catalogRoot, "pins.lock.yaml")] = true
 		for _, overlay := range stack.Overlays {
-			catalogFiles[filepath.Join(visibleRoot, overlay)] = true
+			if !filepath.IsAbs(overlay) {
+				overlay = filepath.Join(visibleRoot, overlay)
+			}
+			catalogFiles[overlay] = true
 		}
 	}
 	paths := make([]string, 0, len(catalogFiles))
@@ -72,19 +93,22 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 	var text bytes.Buffer
 	fmt.Fprintln(&text, "NVKR → NVKE walkthrough: catalog + Environment → build → local publication → cluster")
 	fmt.Fprintf(&text, "Networking: %s\n", network)
-	fmt.Fprintln(&text, "All paths below are relative to the checkout selected by --repo.")
+	fmt.Fprintln(&text, "Relative paths below use the checkout selected by --repo; absolute selections retain their location.")
 	fmt.Fprintf(&text, "1. Definition requests %d named outputs: %q\n", len(authored.Outputs), filepath.Join(visibleRoot, selected))
 	fmt.Fprintln(&text, "2. Reusable catalog producers describe how to build; pins select exact source, tool and artifact inputs.")
 	fmt.Fprintln(&text, "   Open these selected catalog-stack files (reading paths is not execution or pin verification):")
 	for _, path := range paths {
 		fmt.Fprintf(&text, "   %q\n", path)
 	}
-	fmt.Fprintf(&text, "3. Environment selects execution settings: %q\n", "inputs/environments/local-arm64-tcg.json")
+	fmt.Fprintf(&text, "3. Environment selects execution settings: %q\n", environmentName)
 	fmt.Fprintln(&text, "4. NVKR compiles the selection into a generated Plan, then records each required output's result.")
 	fmt.Fprintf(&text, "   Attempt Plan, created during preparation: %q\n", filepath.Join(".nvkr", "laptop-bootstrap", cfg.AttemptPrefix, "selected-plan.json"))
 	fmt.Fprintf(&text, "   Run record, written by execution: %q\n", filepath.Join(".nvkr", "runs", cfg.AttemptPrefix, "lifecycle.json"))
 	fmt.Fprintln(&text, "5. Local publication distributes exact artifacts to NVKE; it is not a signed or qualified Release.")
 	fmt.Fprintln(&text, "6. NVKE installs management services, boots the tenant VMs, checks workload/DNS, then follows the selected lifetime policy.")
+	if cfg.Conformance {
+		fmt.Fprintln(&text, "   Conformance uses the same fresh tenant and the version-matched tools from this Run; original JUnit and API observations are retained before cleanup.")
+	}
 	fmt.Fprintln(&text, "   With --cleanup: natural tenant deletion and joined owned cleanup must finish before success.")
 	fmt.Fprintln(&text, "A Plan describes intent; observed artifact bytes, runtime checks and the natural exit establish the result.")
 	fmt.Fprintln(&text, "Reference documentation at the reviewed source baseline:")

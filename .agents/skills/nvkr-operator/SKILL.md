@@ -71,15 +71,42 @@ local signing keys and explicit registry destination. Report its `unqualified-lo
 actual result; preserve unsupported-tool refusals and publication references from failed read-back.
 The command's availability does not prove a full NVKE demo exercise.
 
-For NVKE, NVIDIA OVN remains the default but has a [documented startup
-blocker](../../../docs/local-nvke-demo.md). The [quickstart](../../../docs/quickstart.md) explicitly selects a
-matched upstream OVN alternative with diagnostic-only scope; it does not fix or validate NVIDIA OVN. Do not
-expect a full default demo pass or invent catalog workarounds.
+For NVKE, NVIDIA OVN remains the default. The [local demo guide](../../../docs/local-nvke-demo.md)
+distinguishes source fixes from actual startup acceptance. Explicit `--network upstream-ovn` selects the
+matched upstream alternative for image, site and tenant; it does not validate the NVIDIA fork.
 
-The current [local NVKE demo guide](../../../docs/local-nvke-demo.md) documents an Ubuntu ARM64 execution host
-and a Colima-hosted Linux alternative on Apple Silicon. Explain that supported alternative when relevant. If
-the customer expressly requests native macOS, report the current deployment limitation and preserve that
-requirement; do not silently substitute Colima or invent a manual VM/SSH workflow.
+The [shared native path](../../../docs/local-nvke-demo.md#native-linux-and-mac-path) runs the Go CLIs and
+TUI on Linux ARM64 or Apple Silicon macOS, with one QEMU site, one tenant control plane,
+and one tenant worker ordinarily. Conformance requires two workers in the same worker pool:
+three tenant guests and four QEMU guests in total on either host. Tools are prepared
+through NVKR's shared catalog; host virtualization prerequisites remain separate. The October 15 Mac runtime
+record covers existing artifacts, upstream OVN and TCG on a pre-integration draft, not fresh-machine or Linux
+full runtime acceptance. Standard `run` and `e2e` select that same native deployment owner;
+they do not deploy the site into Kind. Kind is temporary bootstrap infrastructure. Fresh complete Mac
+customer first-invocation acceptance remains unverified. Default Mac BUILD selects the committed product
+Definition and Mac Environment, admits installed prerequisites and delegates native Packer preparation to
+NVKR's existing owners. Follow the guide's pinned Packer/plugin setup before BUILD; ordinary demo `tools`
+does not install them. Explicit Definition, Environment and native NVKR selections remain supported on
+Mac or Linux with their dependencies already bound. Controlled adapter tests do not establish full Mac E2E
+acceptance. Preserve an expressly requested native host; do not substitute a Linux
+execution VM or manual SSH workflow.
+
+For current native tenant acceptance, require every requested node Ready and every worker schedulable
+(one control plane plus two workers for conformance), the actual per-node host cloud-init
+status gate, then DNS/workload and requested conformance. Default native `run`/`e2e`
+return after successful checks and retain the cluster in its independent owner;
+leaving the presenter never requests deletion. Preserve the printed original
+session, status, cleanup and Kubernetes access commands. Explicit `--cleanup` or
+`cleanup --session` requires natural joined teardown. The cloud-init gate's
+controlled tests do not establish guest execution; retain that distinction in the report.
+
+For the maintained NVKE 64K image, explicitly select `--accelerator tcg` on Mac
+for `guest`, `run` or `e2e`. It uses native QEMU's `max` CPU and retains
+the selected kernel, NVIDIA OVN and shared source pins. HVF cannot run that image
+on a host whose feature register reports no 64K translation-granule support;
+there is no silent fallback. Linux retains KVM. Require a fresh actual guest and
+workload/conformance result before reporting success; a paused device probe is
+not boot acceptance.
 
 Use configured credential references and existing authentication without printing keys, tokens, environments
 or private provider logs. Do not ask the customer to paste secrets into the conversation. Treat catalog

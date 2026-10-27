@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/buildactivity"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/planview"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/progress"
 )
 
 const (
@@ -23,7 +26,9 @@ const (
 	DeploymentFailed   = "deployment-failed"
 	TenantWaiting      = "tenant-waiting"
 	TenantGuests       = "tenant-guests"
+	NativeDeployment   = "native-deployment"
 	OSBuildLogs        = "os-build-logs"
+	BuildPlanSelected  = "build-plan-selected"
 )
 
 // Guest observations describe infrastructure and console activity only. They
@@ -31,6 +36,14 @@ const (
 type TenantGuestRole string
 type TenantDomainState string
 type TenantProvisioningFailure string
+
+type TenantInstanceState string
+
+const (
+	TenantInstanceUnknown TenantInstanceState = "unknown"
+	TenantInstanceReady   TenantInstanceState = "Ready"
+	TenantInstanceError   TenantInstanceState = "Error"
+)
 
 const (
 	TenantGuestControlPlane    TenantGuestRole           = "control-plane"
@@ -44,6 +57,7 @@ const (
 )
 
 type TenantGuestObservation struct {
+	InstanceState TenantInstanceState
 	Role          TenantGuestRole
 	Available     bool
 	Domain        TenantDomainState
@@ -68,7 +82,7 @@ const (
 )
 
 // TenantConditionStatus is a descriptive NVKE API observation, not node readiness
-// or NVKR evidence. Values follow controller/api/models.gen.go at InstallerCommit.
+// or NVKR evidence. Values follow the selected NVKE controller API model.
 type TenantConditionStatus string
 
 const (
@@ -92,14 +106,43 @@ type ProgressEvent struct {
 	Kind            string
 	Name            string
 	Status          string
+	Conformance     bool
+	ExpectedNodes   int
 	RegisteredNodes int
 	ReadyNodes      int
 	Provisioning    TenantConditionStatus
 	Provisioned     TenantConditionStatus
 	Elapsed         time.Duration
 	Remaining       time.Duration
-	Guests          [2]TenantGuestObservation
+	Guests          [3]TenantGuestObservation
 	BuildLogs       buildactivity.Record
+	// Foreground-only descriptions; never expand the retained progress protocol.
+	BuildPlan  *progress.Snapshot `json:"-"`
+	BuildGraph *planview.Graph    `json:"-"`
+}
+
+// Project the selected Plan through its existing owners, never log text. A view
+// failure leaves the presenter's unknown fallback and cannot prevent execution.
+func reportBuildPlan(writer io.Writer, plan *factory.Plan, attempt, name string) {
+	if _, ok := writer.(ProgressReporter); !ok {
+		return
+	}
+	event := ProgressEvent{Kind: BuildPlanSelected, Name: name}
+	defer func() { reportProgress(writer, event) }()
+	monitor, err := factory.NewProgress(plan, attempt)
+	if err != nil {
+		return
+	}
+	document, err := planview.Inspect(plan)
+	if err != nil {
+		return
+	}
+	graph, err := document.GraphSnapshot("artifacts")
+	if err != nil {
+		return
+	}
+	snapshot := monitor.Snapshot()
+	event.BuildPlan, event.BuildGraph = &snapshot, &graph
 }
 
 // Tenant polling reports interpreted observations, not successful subprocess
@@ -110,10 +153,15 @@ type tenantProgress struct {
 	started, deadline, last time.Time
 	previous                ProgressEvent
 	conditions              tenantConditions
+	expectedNodes           int
 }
 
 func (p *tenantProgress) update(now time.Time, stage string, nodes []tenantNode) {
-	event := ProgressEvent{Kind: TenantWaiting, Name: stage, RegisteredNodes: len(nodes),
+	expected := p.expectedNodes
+	if expected == 0 {
+		expected = nativeTenantNodeCount(false)
+	}
+	event := ProgressEvent{Kind: TenantWaiting, Name: stage, ExpectedNodes: expected, RegisteredNodes: len(nodes),
 		Provisioning: presentedTenantCondition(p.conditions.Provisioning.Status),
 		Provisioned:  presentedTenantCondition(p.conditions.Provisioned.Status)}
 	for _, node := range nodes {

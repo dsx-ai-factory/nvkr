@@ -17,7 +17,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/internal/kubeowned"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
@@ -33,6 +33,7 @@ const JUnitProfile = "kubernetes-e2e-ginkgo"
 type Producer struct {
 	options     Options
 	captureTool executableCapture
+	local       *localSources
 }
 
 var _ testresults.Producer = (*Producer)(nil)
@@ -40,6 +41,7 @@ var _ testresults.Producer = (*Producer)(nil)
 // New validates configuration and the borrowed artifact receipt. Produce authenticates executable bytes and
 // the kubeconfig before cluster I/O. Caller environment is never inherited.
 func New(options Options) (*Producer, error) {
+	options.localDiagnostic = false
 	options, err := validateOptions(options)
 	if err != nil {
 		return nil, err
@@ -77,6 +79,9 @@ func (p *Producer) Produce(ctx context.Context) (output testresults.Output, resu
 	}
 	if p == nil {
 		return testresults.Output{}, e.New(e.CodeUsage, "configured conformance producer required")
+	}
+	if p.local != nil {
+		return p.produceLocal(ctx)
 	}
 	err := p.options.ToolArtifacts.WithDiagnosticOperation(ctx, func(toolsContext context.Context, tools lifecycle.ArtifactCheckDescription) error {
 		if err := validateToolSelections(tools, p.options); err != nil {
@@ -116,10 +121,13 @@ func (p *Producer) produce(ctx context.Context, description, tools lifecycle.Art
 	if err != nil {
 		return testresults.Output{}, err
 	}
-	defer a.close()
+	defer func() { a.close(); resultErr = errors.Join(resultErr, a.closeNative()) }()
 	capture := p.captureTool
 	if capture == nil {
 		capture = func(ctx context.Context, selector ExecutableSelector) (*heldfile.File, error) {
+			if p.local != nil {
+				return captureExecutable(ctx, selector, p.local.tools.WriteExecutableMember)
+			}
 			return captureExecutable(ctx, selector, p.options.ToolArtifacts.WriteExecutableMember)
 		}
 	}
@@ -147,6 +155,9 @@ func (p *Producer) produce(ctx context.Context, description, tools lifecycle.Art
 		Harness:  &testresults.HarnessIdentity{Name: "hydrophone", Version: testresults.Metadata{Status: "unknown"}},
 	}
 	facts := append(publicationFacts("sourceRun", description), publicationFacts("toolsSource", tools)...)
+	if p.local != nil {
+		facts = append(localSourceFacts("sourceRun", p.local.productDescription), localSourceFacts("toolsSource", p.local.toolsDescription)...)
+	}
 	for _, tool := range []struct {
 		name     string
 		selector ExecutableSelector
@@ -176,6 +187,9 @@ func (p *Producer) produce(ctx context.Context, description, tools lifecycle.Art
 	}
 	inputs := description.Inputs
 	output.Binding = &testresults.Binding{Inputs: &inputs, Subjects: subjects}
+	if p.local != nil {
+		output.Binding.Inputs = nil
+	}
 	if err = appendProjection(&output, deploymentFacts(baseline, "before")); err != nil {
 		return output, err
 	}
@@ -401,99 +415,15 @@ func (a *admitted) cleanup(ctx context.Context, workspace string, refs []resourc
 func cleanupDeleteLoop(ctx context.Context, refs []resourceRef, owned map[string]string,
 	get func(context.Context, resourceRef) (object, error),
 	deleteObject func(context.Context, resourceRef, []byte) error, interval time.Duration) error {
-	// RBAC precedes namespace deletion; every DELETE retains the exact UID precondition.
-	order := []resourceRef{refs[1], refs[2], refs[0]}
-	var firstDeleteErr error
-	deleting := map[string]bool{}
-	for {
-		if err := ctx.Err(); err != nil {
-			return errors.Join(firstDeleteErr, e.Wrap(e.CodeTimeout, err, "waiting for terminal cleanup"))
-		}
-		for _, ref := range order {
-			uid := owned[ref.path]
-			if uid == "" {
-				continue
-			}
-			found, err := get(ctx, ref)
-			if err != nil {
-				return errors.Join(firstDeleteErr, err)
-			}
-			if found.Metadata.UID == "" {
-				continue
-			}
-			if found.Metadata.UID != uid {
-				return errors.Join(firstDeleteErr, failure("attempt resource replaced; cleanup rejected"))
-			}
-			if deleting[ref.path] || found.Metadata.DeletionTimestamp != nil {
-				deleting[ref.path] = true
-				continue
-			}
-			body, err := canonical.Marshal(struct {
-				APIVersion    string `json:"apiVersion"`
-				Kind          string `json:"kind"`
-				Preconditions struct {
-					UID string `json:"uid"`
-				} `json:"preconditions"`
-			}{APIVersion: "v1", Kind: "DeleteOptions", Preconditions: struct {
-				UID string `json:"uid"`
-			}{UID: uid}})
-			if err != nil {
-				return errors.Join(firstDeleteErr, failure("encoding UID cleanup precondition"))
-			}
-			if err = deleteObject(ctx, ref, body); err != nil {
-				// Finalization may win the GET/DELETE race. Only a fresh successful
-				// GET proving absence can turn an unclassified DELETE refusal into success.
-				current, getErr := get(ctx, ref)
-				if getErr == nil && current.Metadata.UID == "" {
-					continue
-				}
-				if getErr != nil {
-					return errors.Join(firstDeleteErr, err, getErr)
-				}
-				if current.Metadata.UID != uid {
-					return errors.Join(firstDeleteErr, err, failure("attempt resource replaced; cleanup rejected"))
-				}
-				first := firstDeleteErr == nil
-				if first {
-					firstDeleteErr = err
-				}
-				if ctx.Err() != nil {
-					return errors.Join(firstDeleteErr, e.Wrap(e.CodeTimeout, ctx.Err(), "waiting for terminal cleanup"))
-				}
-				if current.Metadata.DeletionTimestamp != nil {
-					deleting[ref.path] = true
-					continue
-				}
-				var coded *e.Error
-				if !errors.As(err, &coded) || (coded.Code != e.CodeUnavailable && coded.Code != e.CodeTimeout) {
-					if first {
-						return firstDeleteErr
-					}
-					return errors.Join(firstDeleteErr, err)
-				}
-			} else {
-				deleting[ref.path] = true
-			}
-		}
-		allAbsent := true
-		for _, ref := range refs {
-			found, err := get(ctx, ref)
-			if err != nil {
-				return errors.Join(firstDeleteErr, err)
-			}
-			if found.Metadata.UID != "" {
-				allAbsent = false
-			}
-		}
-		if allAbsent {
-			return nil
-		}
-		timer := time.NewTimer(interval)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return errors.Join(firstDeleteErr, e.Wrap(e.CodeTimeout, ctx.Err(), "waiting for terminal cleanup"))
-		case <-timer.C:
-		}
+	// Preserve the existing RBAC-before-namespace order and all UID bindings.
+	bindings := make([]kubeowned.Binding, 0, len(refs))
+	for _, ref := range []resourceRef{refs[1], refs[2], refs[0]} {
+		bindings = append(bindings, kubeowned.Binding{Path: ref.path, UID: owned[ref.path]})
 	}
+	return kubeowned.Delete(ctx, bindings, func(ctx context.Context, resource string) (kubeowned.Observation, error) {
+		found, err := get(ctx, resourceRef{path: resource})
+		return kubeowned.Observation{UID: found.Metadata.UID, Deleting: found.Metadata.DeletionTimestamp != nil}, err
+	}, func(ctx context.Context, resource string, body []byte) error {
+		return deleteObject(ctx, resourceRef{path: resource}, body)
+	}, interval)
 }

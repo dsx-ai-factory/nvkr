@@ -14,34 +14,54 @@ never reset, clean, discard stashes, or overwrite an existing directory. For a f
 failures as setup blockers, without substituting a mirror or fork or asking for secrets in chat. Resolve and
 inspect the chosen revision there; use the same revision's docs throughout.
 
-Choose the setup route from the requested task guide first. When it supplies a pinned CLI bootstrap, such as
-the [NVKE demo quickstart](../../../../docs/quickstart.md), follow that route instead of requiring host Go.
-Inspect its source revision and pinned container/tool identity; do not substitute an arbitrary image. This
-bootstrap still requires the guide's runtime and source access.
+Choose the setup route from the requested task guide first. The
+[quickstart](../../../../docs/quickstart.md) requires existing Git and Bash, plus usable Docker; Make is not required. It selects the pinned Go compiler for CLI and local execution-helper compilation.
+Its launcher checks prerequisites, builds NVKR from source with the exact compiler
+selected automatically, then runs the three-output NVKE build. It runs in a child
+shell and does not change the caller's shell settings. If the pinned Go compiler is missing it offers a checksum-verified
+checkout-local SDK installation; `--install-go` explicitly authorizes that installation when needed,
+without an interactive prompt. A matching installed compiler is reused. Repeat builds through the launcher
+automatically restore the SDK environment; see the tutorial for custom direct-command SDK activation. Do not approve system package installs without customer authorization.
+Do not paste `set -e` into
+an interactive SSH shell.
+For CLI setup without executing producers, use the host build route below; it requires an existing Go installation.
+If another selected guide supplies a pinned compiler bootstrap, inspect and follow
+its exact source and tool identity rather than substituting an arbitrary image.
 
 For the host build route, read `.go-version`, `Makefile`, and [DEVELOPMENT.md](../../../../DEVELOPMENT.md)
-from the repository root. Check the host platform, Git, Make, and `go version`. The build requires the exact
-Go patch from `.go-version` and access to pinned Go dependencies; do not hardcode a historical version. Build
-using:
+from the repository root. Check the host platform, Git and Go. This block uses the checkout's
+installed exact compiler without changing the caller's shell environment:
 
 ```sh
-GOTOOLCHAIN=local make build
+(
+set -eu
+export GOTOOLCHAIN=local
+test "$(go env GOVERSION)" = "go$(cat .go-version)" || { echo "The installed compiler must match .go-version" >&2; exit 1; }
+NVKR_VERSION="$(git describe --tags --always --dirty)"
+NVKR_COMMIT="$(git rev-parse --short HEAD)"
+go build -ldflags "-X main.version=$NVKR_VERSION -X main.commit=$NVKR_COMMIT" -o bin/nvkr ./cmd/nvkr
 bin/nvkr --version
 bin/nvkr --help
+)
 ```
+
+This route requires the pinned compiler already installed and disables implicit toolchain downloads.
+If it is absent, use the guided quickstart with customer consent or report the missing prerequisite.
+Use `bin/nvkr` directly from the repository root. The stamped direct Go build is equivalent to the
+Makefile’s build recipe; Make itself is optional.
 
 Record the full `git rev-parse HEAD` together with the CLI stamp. A dirty tree is not equivalent to that
 committed revision; disclose local changes. If an existing binary's provenance cannot be matched to the
-requested source, rebuild instead of relying on its filename or abbreviated version alone. Do not replace the
-supported Makefile build with an unstamped convenience build. A maintained bundle can deliberately require
+requested source, rebuild instead of relying on its filename or abbreviated version alone. Preserve the Makefile’s version and commit stamps when using direct Go compilation. A maintained bundle can deliberately require
 `dev`/`unknown` generator stamps: follow [catalog maintenance](../../../../docs/catalog-maintenance.md) or
 `make workflows-check` for that case, recording both the inspected full source commit and required generator
 identity.
 
 A missing prerequisite is a concrete setup blocker, not permission to alter the customer's system. Reuse a
-matching installed toolchain where available; report the required version and installation options when a new
-tool is needed. Install only within the customer's authorized setup scope, without modifying global
-configuration implicitly. Do not weaken the version gate or let Go silently select another toolchain.
+matching installed toolchain where available; the source-build route explicitly selects the compiler
+pinned by the checkout without silently downloading it. Install missing tools only within the customer's
+authorized setup scope, without modifying global configuration implicitly. Do not weaken the version
+gate or substitute an unpinned compiler.
 
 Only check heavier prerequisites for the selected task. Read the quickstart and selected
 Definition/Environment guide for Docker or podman, native VM/KVM tools, source credentials, and hosted signing

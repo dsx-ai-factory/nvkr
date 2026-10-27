@@ -276,3 +276,21 @@ func TestDiskBuildProvenanceAdmission(t *testing.T) {
 		})
 	}
 }
+
+func TestHostedDiskCaptureRemainsLinuxOnly(t *testing.T) {
+	if runtime.GOOS == "linux" {
+		t.Skip("non-Linux rejection contract")
+	}
+	workspace := filepath.Join(t.TempDir(), "must-not-be-created")
+	capture := &reconciledDiskCapture{ctx: t.Context(), workspace: workspace, parent: workspace, size: 1}
+	n, err := capture.Write([]byte("x"))
+	if n != 0 || factoryErrorCode(err) != e.CodeEngineCapability {
+		t.Fatalf("hosted capture escaped platform admission: %d %v", n, err)
+	}
+	if capture.file != nil || capture.directory != nil {
+		t.Fatal("platform rejection retained filesystem capabilities")
+	}
+	if _, err := os.Stat(workspace); !os.IsNotExist(err) {
+		t.Fatalf("unsupported hosted capture mutated workspace: %v", err)
+	}
+}

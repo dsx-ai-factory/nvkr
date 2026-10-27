@@ -1,8 +1,8 @@
 # Build Linux ARM64 NVKE artifacts locally
 
-For your first complete build/deploy/tenant test, follow the
-[Ubuntu ARM64 quickstart](local-nvke-demo.md). On macOS that guide adds a Colima
-Linux VM; outputs are Linux ARM64, not Darwin binaries.
+For the shared native Ubuntu ARM64 or Apple Silicon build/deploy/tenant workflow,
+follow the [native demo guide and current validation limits](local-nvke-demo.md#native-linux-and-mac-path).
+This reference describes the focused Linux artifact launcher.
 
 This reference covers focused artifact builds and committed source changes.
 NVKR's `nvkr` builds named outputs from a Definition, pinned catalog and
@@ -28,12 +28,14 @@ arbitrary SSH commands and other global URL rewrites are not inherited.
 Use a compatible configured helper or an explicit local repository containing
 the pinned objects; checkout and status receive no developer helper or HOME.
 
-### Apple Silicon Mac with Colima
+### Explicit legacy Colima build route
 
-Follow [the quickstart's macOS setup](local-nvke-demo.md#additional-macos-setup)
-and enter its native ext4 source export. Invoke all OS/demo commands inside
-Linux, not on the Mac shared mount. Inspect physical Mac capacity separately;
-a 150-GiB sparse guest disk does not reserve that much host space.
+An existing Colima ARM64 Linux profile can host the legacy artifact launcher.
+Keep the checkout and build workspace on its native Linux filesystem, rather
+than the Mac shared mount, and run OS/build commands inside that Linux guest.
+Inspect guest and physical Mac capacity separately; sparse guest storage does
+not reserve host space. The [native Mac demo](local-nvke-demo.md#additional-macos-setup)
+uses the Mac CLI directly.
 
 For component-only builds the launcher also supports an explicitly selected
 `COLIMA_PROFILE=NAME` route. The forwarded Mac route
@@ -319,9 +321,9 @@ byte-reproduction evidence.
 bash scripts/nvke-full-arm64-local.sh first-tools 1 tools
 ```
 
-The bundle contains Linux ARM64 Helm 4.2.4, kubectl 1.36.0, clusterctl 1.12.3,
+The bundle contains Linux ARM64 Helm 4.2.4, kubectl 1.36.0, clusterctl 1.13.6,
 ORAS 1.3.3 and Kind 0.32.0, matching
-[NVKE's pinned installer declarations](https://github.com/dsx-ai-factory/nvke/blob/8fb2d53368823bd386b4fbd55b4ab6d3c0931345/make/tool-versions.mk).
+[NVKE's pinned installer declarations](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/make/tool-versions.mk).
 See [catalog producers](../inputs/catalogs/tools/installer-local-arm64/registry.yaml)
 and generated pins for exact commits, compiler and preparation instructions.
 
@@ -379,7 +381,7 @@ For tight edit loops use NVKE's own Make/tests. To test NVKR packaging, commit y
 change in a dedicated NVKE clone and pin the changed producer. `NVKE_LOCAL_CLONE`
 changes transport only; it does not follow your branch or include dirty files.
 
-For the retained CLI example, start from its `cli/v0.1.0-rc.2` baseline.
+For the retained CLI example, start from its `v0.22.0` baseline.
 Use native `nvkr` built with the repository's pinned Go:
 
 ```sh

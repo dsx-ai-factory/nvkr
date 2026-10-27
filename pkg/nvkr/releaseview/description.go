@@ -6,6 +6,8 @@ package releaseview
 import (
 	"cmp"
 	"slices"
+
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 )
 
 // DescriptionSchemaVersion identifies the external JSON presentation contract.
@@ -149,6 +151,17 @@ type EvidenceBinding struct {
 type Source struct {
 	Repo   string `json:"repo,omitempty"`
 	Commit string `json:"commit,omitempty"`
+}
+
+// Describe returns the same detached, sorted description as JSON rendering,
+// optionally selecting one exact output after the owner's complete inspection.
+// Like Render, it describes that prerequisite; it does not authenticate inputs.
+func Describe(publication delivery.PublicationDescription, output string) (Description, error) {
+	selected, err := selectView(publication, Options{Output: output})
+	if err != nil {
+		return Description{}, err
+	}
+	return describe(selected), nil
 }
 
 func describe(selected view) Description {

@@ -32,6 +32,10 @@ const diagnosticLimit = 8 << 20
 // ErrUnjoined requires retaining controls depended on by possibly live work.
 var ErrUnjoined = errors.New("owned process group did not join")
 
+// Issued only after a bounded command joins without output failures while its
+// caller remains active. Read-only observers may retry; mutations must not.
+var errCommandDeadline = errors.New("joined command exceeded its independent deadline")
+
 // CommandError preserves the command's exit status and original cause without
 // printing its arguments, environment, or potentially sensitive output.
 type CommandError struct {
@@ -71,7 +75,9 @@ type Runner struct {
 	// Opted in only for the directly executed final nvkr local Run. Bootstrap
 	// shells and every source/utility command receive no inherited activity FD.
 	buildActivity bool
-	directory     string // Command cwd, independent of private diagnostic storage.
+	directory     string     // Command cwd, independent of private diagnostic storage.
+	extraFiles    []*os.File // Explicitly owned local helper descriptors; never ambient FDs.
+	input         *os.File   // Private held regular input; lifetime stays with the caller through join.
 }
 
 // SudoAuthorizer is an optional terminal bridge on a downstream progress writer.
@@ -160,6 +166,7 @@ type OwnedProcess struct {
 	mu          sync.Mutex
 	waitErr     error
 	joinErr     error
+	outputErr   error
 	stdout      *boundedDiagnostic
 	stderr      *boundedDiagnostic
 	diagnostic  *boundedDiagnostic
@@ -173,6 +180,51 @@ type OwnedProcess struct {
 	processExitOnce sync.Once
 	activity        *buildactivity.Receiver
 	localGitFetch   bool
+	outputPipes     []*ownedOutputPipe
+}
+
+// The owner drains explicit pipes rather than letting exec.Cmd apply its
+// termination grace to successful output copying. The child ends are real files,
+// so Wait owns process exit only; done still requires every drain to join.
+type ownedOutputPipe struct {
+	reader, writer *os.File
+	destination    io.Writer
+	done           chan error
+}
+
+func (p *OwnedProcess) childOutput(destination io.Writer) (*os.File, error) {
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		return nil, err
+	}
+	p.outputPipes = append(p.outputPipes, &ownedOutputPipe{
+		reader: reader, writer: writer, destination: destination, done: make(chan error, 1),
+	})
+	return writer, nil
+}
+
+func (p *OwnedProcess) startOutputDrains() {
+	for _, pipe := range p.outputPipes {
+		closeErr := pipe.writer.Close()
+		go func() {
+			_, err := io.Copy(pipe.destination, pipe.reader)
+			pipe.done <- errors.Join(closeErr, err, pipe.reader.Close())
+		}()
+	}
+}
+
+func (p *OwnedProcess) closeUnstartedOutput() {
+	for _, pipe := range p.outputPipes {
+		_ = pipe.writer.Close()
+		_ = pipe.reader.Close()
+	}
+}
+
+func (p *OwnedProcess) joinOutputDrains() (result error) {
+	for _, pipe := range p.outputPipes {
+		result = errors.Join(result, <-pipe.done)
+	}
+	return result
 }
 
 func (p *OwnedProcess) PID() int { return p.cmd.Process.Pid }
@@ -183,7 +235,7 @@ func (p *OwnedProcess) Exited() (bool, error) {
 	case <-p.done:
 		p.observeProcessExit()
 		p.mu.Lock()
-		err := errors.Join(p.waitErr, p.joinErr)
+		err := errors.Join(p.waitErr, p.joinErr, p.outputErr)
 		p.mu.Unlock()
 		if p.progress != nil {
 			p.progress.finish(err)
@@ -214,14 +266,6 @@ func (p *OwnedProcess) observeProcessExit() {
 	}
 }
 
-func groupAlive(pid int) (bool, error) {
-	err := unix.Kill(-pid, 0)
-	if errors.Is(err, unix.ESRCH) {
-		return false, nil
-	}
-	return err == nil, err
-}
-
 func signalGroup(pid int, signal unix.Signal) error {
 	err := unix.Kill(-pid, signal)
 	if errors.Is(err, unix.ESRCH) {
@@ -249,22 +293,34 @@ func (p *OwnedProcess) awaitGroup(ctx context.Context) error {
 	}
 }
 
+// A failed signal never proves disappearance. Only an independent, successful
+// group observation may supersede EPERM after the direct child has been reaped.
+func (p *OwnedProcess) confirmGroupJoin(ctx context.Context, signalErr error) error {
+	if errors.Is(signalErr, unix.EPERM) {
+		alive, err := p.groupProbe(p.PID())
+		if err != nil || alive {
+			return errors.Join(signalErr, err)
+		}
+	} else if signalErr != nil && !errors.Is(signalErr, os.ErrProcessDone) {
+		return signalErr
+	}
+	return p.awaitGroup(ctx)
+}
+
 func (p *OwnedProcess) finish() {
 	waitErr := p.cmd.Wait()
 	// Join descendants even if the direct leader exited first. Reuse the shared
 	// signaling owner, but add explicit bounded disappearance verification.
-	joinErr := ownedcmd.KillDescendants(p.cmd)
-	if errors.Is(joinErr, os.ErrProcessDone) {
-		joinErr = nil
-	}
-	if joinErr == nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		joinErr = p.awaitGroup(ctx)
-		cancel()
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	joinErr := p.confirmGroupJoin(ctx, ownedcmd.KillDescendants(p.cmd))
+	cancel()
 	if joinErr != nil {
 		joinErr = fmt.Errorf("%w: %s: %w", ErrUnjoined, p.phase, joinErr)
 	}
+	// A successful leader can finish while its bounded diagnostic sink is
+	// still writing. Preserve that output without imposing the TERM grace;
+	// waitOwned/Stop retain the existing command and cleanup deadlines.
+	outputErr := p.joinOutputDrains()
 	if p.activity != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		activityErr := p.activity.Close(ctx)
@@ -280,7 +336,7 @@ func (p *OwnedProcess) finish() {
 		_ = p.logDir.Close()
 	}
 	p.mu.Lock()
-	p.waitErr, p.joinErr = waitErr, joinErr
+	p.waitErr, p.joinErr, p.outputErr = waitErr, joinErr, outputErr
 	p.mu.Unlock()
 	close(p.done)
 }
@@ -368,6 +424,9 @@ func (p *OwnedProcess) Stop(ctx context.Context) (result error) {
 					observedExit = nil
 				}
 			}
+			if p.outputErr != nil {
+				return true, errors.Join(p.joinErr, p.outputErr)
+			}
 			return true, p.joinErr
 		default:
 			return false, nil
@@ -432,6 +491,26 @@ func requireContext(ctx context.Context) error {
 	return ctx.Err()
 }
 
+// Command-line tools need an explicit duration in addition to process context
+// cancellation. Derive it from the existing operation deadline, never host speed.
+func remainingWork(ctx context.Context) (time.Duration, error) {
+	if ctx == nil {
+		return 0, nvkrerrors.New(nvkrerrors.CodeUsage, "work budget requires a caller context")
+	}
+	if err := requireContext(ctx); err != nil {
+		return 0, nvkrerrors.Wrap(nvkrerrors.CodeTimeout, err, "work budget unavailable")
+	}
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return 0, nvkrerrors.New(nvkrerrors.CodeUsage, "work command requires a caller deadline")
+	}
+	remaining := time.Until(deadline)
+	if remaining <= 0 {
+		return 0, nvkrerrors.Wrap(nvkrerrors.CodeTimeout, context.DeadlineExceeded, "work budget expired")
+	}
+	return remaining, nil
+}
+
 func safePhase(phase string) bool {
 	if phase == "" || phase == "." || phase == ".." || len(phase) > 128 {
 		return false
@@ -485,6 +564,14 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 	}
 	cmd := exec.CommandContext(commandCtx, path, args[1:]...)
 	cmd.Env = append([]string{}, r.Env...)
+	cmd.ExtraFiles = append([]*os.File(nil), r.extraFiles...)
+	if r.input != nil {
+		info, err := r.input.Stat()
+		if err != nil || !info.Mode().IsRegular() || !currentOwner(info) || info.Mode().Perm()&0o022 != 0 {
+			return nil, errors.New("command input requires a held owned regular file without group/other write permissions")
+		}
+		cmd.Stdin = r.input
+	}
 	localGitFetch := false
 	if args[0] == "git" {
 		// Admit the same effective directory Git will execute in. Diagnostic
@@ -513,6 +600,11 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 		}
 		localGitFetch = gitArgs[0] == "fetch"
 	}
+	if deadline, bounded := ctx.Deadline(); bounded && !ownedLifetime {
+		// Go contexts do not cross exec. The child CLI (including one invoked
+		// through bootstrap shell work) must retain this absolute work bound.
+		cmd.Env = SetEnv(cmd.Env, map[string]string{"NVKR_WORK_DEADLINE": deadline.UTC().Format(time.RFC3339Nano)})
+	}
 	cmd.Dir = r.Work
 	if r.directory != "" {
 		cmd.Dir = r.directory
@@ -521,6 +613,12 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 		return nil, err
 	}
 	p := &OwnedProcess{cmd: cmd, phase: phase, done: make(chan struct{}), groupProbe: groupAlive, groupSignal: signalGroup, localGitFetch: localGitFetch}
+	started := false
+	defer func() {
+		if !started {
+			p.closeUnstartedOutput()
+		}
+	}()
 	if r.Work != "" {
 		p.logDir, _, err = securepath.OpenDirectory(r.Work)
 		if err != nil {
@@ -564,7 +662,22 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 	if capture {
 		p.stderr = &boundedDiagnostic{writer: sink, remaining: diagnosticLimit}
 	}
-	cmd.Stdout, cmd.Stderr = p.stdout, p.stderr
+	cmd.Stdout, err = p.childOutput(p.stdout)
+	if err == nil {
+		cmd.Stderr = cmd.Stdout
+		if p.stderr != p.stdout {
+			cmd.Stderr, err = p.childOutput(p.stderr)
+		}
+	}
+	if err != nil {
+		if p.log != nil {
+			_ = p.log.Close()
+		}
+		if p.logDir != nil {
+			_ = p.logDir.Close()
+		}
+		return nil, &CommandError{Phase: phase, ExitCode: -1, Cause: err}
+	}
 	if r.Progress != nil {
 		_, _ = fmt.Fprintf(r.Progress, "Demo phase: %s\n", phase)
 	}
@@ -618,6 +731,8 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 		}
 		return nil, &CommandError{Phase: phase, ExitCode: -1, Cause: err}
 	}
+	p.startOutputDrains()
+	started = true
 	reportProgress(p.processWriter, ProgressEvent{Kind: ProcessStarted, Name: phase, Status: "started"})
 	go p.finish()
 	return p, nil
@@ -636,6 +751,8 @@ func (r Runner) Start(ctx context.Context, args []string, phase string) (*OwnedP
 	return process, nil
 }
 
+// A zero timeout inherits the caller's cancelable work context. Positive values
+// are reserved for independently bounded control requests and cleanup.
 func (r Runner) Capture(ctx context.Context, args []string, phase string, timeout time.Duration) ([]byte, error) {
 	return r.execute(ctx, args, phase, timeout, true)
 }
@@ -650,18 +767,24 @@ func (r Runner) execute(ctx context.Context, args []string, phase string, timeou
 	if err := requireContext(ctx); err != nil {
 		return nil, err
 	}
-	if timeout <= 0 {
-		return nil, errors.New("positive command timeout required")
+	if timeout < 0 || timeout == 0 && ctx.Done() == nil {
+		return nil, errors.New("command requires a positive timeout or cancelable caller context")
 	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	caller := ctx
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 	p, err := r.start(ctx, args, phase, capture, false)
 	if err != nil {
 		return nil, err
 	}
 	if err := p.waitOwned(ctx); errors.Is(err, ErrUnjoined) {
-		raw, diagnosticErr := p.stdout.result()
-		return raw, errors.Join(err, diagnosticErr)
+		// A diagnostic sink may itself still be blocked while holding its
+		// capture mutex. An unjoined owner cannot yield a complete capture;
+		// leave its files/handles owned rather than blocking on that mutex.
+		return nil, err
 	}
 	p.observeProcessExit()
 	raw, outErr := p.stdout.result()
@@ -671,15 +794,18 @@ func (r Runner) execute(ctx context.Context, args []string, phase string, timeou
 		outErr = errors.Join(outErr, logErr)
 	}
 	p.mu.Lock()
-	waitErr, joinErr := p.waitErr, p.joinErr
+	waitErr, joinErr, outputErr := p.waitErr, p.joinErr, p.outputErr
 	p.mu.Unlock()
 	if joinErr != nil {
-		return raw, errors.Join(joinErr, waitErr, ctx.Err(), outErr, stderrErr)
+		return raw, errors.Join(joinErr, waitErr, ctx.Err(), outErr, stderrErr, outputErr)
 	}
-	if err := errors.Join(waitErr, ctx.Err(), outErr, stderrErr); err != nil {
+	if err := errors.Join(waitErr, ctx.Err(), outErr, stderrErr, outputErr); err != nil {
+		if timeout > 0 && ctx.Err() == context.DeadlineExceeded && caller.Err() == nil && outErr == nil && stderrErr == nil && outputErr == nil {
+			err = errors.Join(err, errCommandDeadline)
+		}
 		code := -1
 		var exit *exec.ExitError
-		if outErr == nil && stderrErr == nil && errors.As(waitErr, &exit) {
+		if outErr == nil && stderrErr == nil && outputErr == nil && errors.As(waitErr, &exit) {
 			code = exit.ExitCode()
 		}
 		if p.localGitFetch && waitErr != nil && ctx.Err() == nil {

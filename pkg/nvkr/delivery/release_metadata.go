@@ -26,7 +26,8 @@ type ReleaseMetadata struct {
 type OutputBinding struct {
 	// Publication retains the authenticated output-local handoff selected by assembly.
 	Publication *PublicationOrigin `json:"publication,omitempty"`
-	// Repository is a sibling repository name relative to the release repository namespace.
+	// Repository is a sibling name in the original Publication namespace when
+	// retained, otherwise in the release repository namespace.
 	Repository    string             `json:"repository"`
 	Format        string             `json:"format"`
 	BuildDigest   string             `json:"buildDigest"`

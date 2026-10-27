@@ -31,6 +31,21 @@ func linkLauncherTestTimeout(t *testing.T, tools string) {
 	}
 }
 
+func launcherUtilityImage(t *testing.T) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "inputs/environments/local-arm64-kvm.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var selected struct {
+		UtilityContainer string `json:"utilityContainer"`
+	}
+	if err := json.Unmarshal(raw, &selected); err != nil || selected.UtilityContainer == "" {
+		t.Fatalf("read selected bootstrap image: %v", err)
+	}
+	return selected.UtilityContainer
+}
+
 func TestBuildNetworkSelectionFailsBeforeProducerWork(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -43,6 +58,9 @@ func TestBuildNetworkSelectionFailsBeforeProducerWork(t *testing.T) {
 		{"upstream subset", []string{"--network", "upstream-ovn", "--check", "profiles"}, "requires the complete all selection"},
 		{"upstream implicit subset", []string{"--network", "upstream-ovn", "fresh"}, "requires the complete all selection"},
 		{"private upstream subset", []string{"--prepare-only", "--network", "upstream-ovn", "fresh", "1", "os"}, "requires the complete all selection"},
+		{"missing accelerator", []string{"--build-accelerator"}, "Usage:"},
+		{"unknown accelerator", []string{"--build-accelerator", "guessed", "--check", "all"}, "Build accelerator must"},
+		{"foreign accelerator", []string{"--build-accelerator", "hvf", "--check", "all"}, "Build accelerator must"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -134,17 +152,17 @@ func TestLocalDeveloperPreflight(t *testing.T) {
 			if err := os.MkdirAll(inputs, 0700); err != nil {
 				t.Fatal(err)
 			}
-			env, err := os.ReadFile(filepath.Join("..", "inputs/environments/local-arm64-tcg.json"))
+			env, err := os.ReadFile(filepath.Join("..", "inputs/environments/local-arm64-kvm.json"))
 			if err != nil {
 				t.Fatal(err)
 			}
 			switch tc.name {
 			case "mutable bootstrap pin rejected":
-				env = []byte(strings.ReplaceAll(string(env), "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c", "golang:latest"))
+				env = []byte(strings.ReplaceAll(string(env), launcherUtilityImage(t), "golang:latest"))
 			case "foreign bootstrap platform rejected":
 				env = []byte(strings.ReplaceAll(string(env), "linux/arm64", "linux/amd64"))
 			}
-			if err := os.WriteFile(filepath.Join(inputs, "local-arm64-tcg.json"), env, 0600); err != nil {
+			if err := os.WriteFile(filepath.Join(inputs, "local-arm64-kvm.json"), env, 0600); err != nil {
 				t.Fatal(err)
 			}
 			linkLauncherTestTimeout(t, tools)
@@ -404,6 +422,58 @@ func TestAllLocalToolchainScopes(t *testing.T) {
 	}
 }
 
+func TestLocalToolchainDefinitionRetainsScopedRelativeInputs(t *testing.T) {
+	for _, tc := range []struct {
+		name, base string
+		fail       bool
+	}{
+		{"repository relative", "../../catalogs/os", false},
+		{"absolute rejected", "/private/catalog", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			input := `{"catalog":{"base":"` + tc.base + `"},"outputs":[{"name":"disk"},{"name":"other","catalog":{"base":"../../catalogs/site","overlays":["./original.json"]}}]}`
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", `include "nvke-os-plan"; local_toolchain_definition("inputs/definitions/demo"; "../../../"; [{outputs:["disk"]}])`)
+			cmd.Stdin = strings.NewReader(input)
+			raw, err := cmd.CombinedOutput()
+			if (err != nil) != tc.fail {
+				t.Fatalf("projection: %v %s", err, raw)
+			}
+			if tc.fail {
+				return
+			}
+			var result struct {
+				Outputs []struct {
+					Catalog struct {
+						Base     string
+						Overlays []string
+					}
+				}
+			}
+			if err := json.Unmarshal(raw, &result); err != nil {
+				t.Fatal(err)
+			}
+			if len(result.Outputs) != 2 || filepath.Clean(result.Outputs[0].Catalog.Base) != "../../../inputs/catalogs/os" ||
+				!slices.Equal(result.Outputs[0].Catalog.Overlays, []string{"./toolchain-attempt.json"}) ||
+				!slices.Equal(result.Outputs[1].Catalog.Overlays, []string{"../../../inputs/definitions/demo/./original.json"}) {
+				t.Fatalf("changed catalog scoping or relative inputs: %s", raw)
+			}
+		})
+	}
+}
+
+func TestLocalToolchainSubstitutionsKeepOnlyChangedPins(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-c", `include "nvke-os-plan"; local_toolchain_substitutions("same")`)
+	cmd.Stdin = strings.NewReader(`[{"pin":"same","outputs":["unchanged"]},{"pin":"old","outputs":["changed"]}]`)
+	raw, err := cmd.CombinedOutput()
+	if err != nil || string(raw) != "[{\"pin\":\"old\",\"outputs\":[\"changed\"]}]\n" {
+		t.Fatalf("unchanged image received an invalid self-substitution: %s %v", raw, err)
+	}
+}
+
 func TestSimulatorScopeRejectsBeforeToolchainWork(t *testing.T) {
 	for _, tc := range []struct{ name, plan, want string }{
 		{"unsupported build", `{"builds":[]}`, "expected one simulator tools build"},
@@ -423,7 +493,7 @@ func TestSimulatorScopeRejectsBeforeToolchainWork(t *testing.T) {
 			}
 			for _, path := range []string{
 				"scripts/nvke-full-arm64-local.sh", "scripts/nvke-os-plan.jq",
-				"inputs/environments/local-arm64-tcg.json",
+				"inputs/environments/local-arm64-kvm.json",
 			} {
 				data, err := os.ReadFile(filepath.Join("..", path))
 				if err != nil {
@@ -461,7 +531,7 @@ esac
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, required := range []string{"golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c", "GOTOOLCHAIN=local", "make -C /src build BIN=/out/nvkr"} {
+			for _, required := range []string{launcherUtilityImage(t), "GOTOOLCHAIN=local", "make -C /src build BIN=/out/nvkr"} {
 				if !strings.Contains(string(calls), required) {
 					t.Fatalf("bootstrap omitted pinned SDK/build contract %q: %s", required, calls)
 				}
@@ -486,7 +556,6 @@ esac
 func TestSimulatorLauncherUsesValidatedToolchainID(t *testing.T) {
 	const validated = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	const plan = `{"lifecycleOutputs":[{"name":"nicosim-tools-arm64","kind":"executable","components":["nico-sim"]}],"builds":[{"name":"nicosim-tools-arm64","catalogDigest":"catalog","components":["nico-sim"],"executionGraph":{"nodes":[{"id":"fetch","needs":[]},{"id":"build","needs":["fetch"]}]},"catalogSnapshot":{"Components":{"nico-sim":{"fromSource":true,"toolchainImages":{"arm64":"old"}}}}}]}`
-	const selectedGraph = `{"vertices":[{"key":"operation/build","kind":"operation","label":"build (build)","reference":"build","build":"nicosim-tools-arm64"},{"key":"artifact/tools","kind":"artifact","label":"tools (executable)","reference":"tools","build":"nicosim-tools-arm64"},{"key":"output/nicosim-tools-arm64","kind":"output","label":"nicosim-tools-arm64 (required executable)","reference":"tools","build":"nicosim-tools-arm64"},{"key":"route/private","kind":"route","label":"private-secret-ref","reference":"private-ref"},{"key":"producer/build","kind":"producer","label":"duplicate producer","reference":"build"}],"edges":[{"from":"operation/build","to":"artifact/tools","relation":"produces"},{"from":"artifact/tools","to":"output/nicosim-tools-arm64","relation":"fulfills slot"},{"from":"artifact/tools","to":"route/private","relation":"publication route"},{"from":"producer/build","to":"operation/build","relation":"instruction"}]}`
 	for _, tc := range []struct {
 		name, returned, buildExit string
 		wantError                 bool
@@ -502,8 +571,7 @@ func TestSimulatorLauncherUsesValidatedToolchainID(t *testing.T) {
 		{"shared image cannot be a tag", "local:latest", "99", true, true, validated, false},
 		{"shared image unavailable in runtime", validated, "99", true, true, "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", false},
 		{"graph failure prevents toolchain work", validated, "0", true, false, "", true},
-		{"selected graph failure prevents execution", validated, "0", true, false, "", false},
-		{"overlong display record omitted", validated, "0", false, false, "", false},
+		{"selected Plan failure prevents execution", validated, "0", true, false, "", false},
 		{"preserve OVN redirect with NVKE clone", validated, "0", false, false, "", false},
 		{"private preparation excludes final execution", validated, "0", false, false, "", false},
 	} {
@@ -520,14 +588,14 @@ func TestSimulatorLauncherUsesValidatedToolchainID(t *testing.T) {
 				}
 			}
 			for _, path := range []string{"scripts/nvke-full-arm64-local.sh", "scripts/nvke-os-plan.jq",
-				"inputs/environments/local-arm64-tcg.json"} {
+				"inputs/environments/local-arm64-kvm.json"} {
 				data, err := os.ReadFile(filepath.Join("..", path))
 				if err != nil {
 					t.Fatal(err)
 				}
 				write(path, data, 0600)
 			}
-			write("inputs/definitions/diagnostics/demo-arm64/simulator.json", []byte(`{"catalog":{"base":"../../../catalogs/nicosim"},"outputs":[{"name":"nicosim-tools-arm64"}]}`), 0600)
+			write("inputs/definitions/diagnostics/demo-arm64/simulator.json", []byte(`{"catalog":{"base":"../../../catalogs/tools/native"},"outputs":[{"name":"nicosim-tools-arm64"}]}`), 0600)
 			write("toolchains/nvkr-packer/build.sh", []byte(`#!/bin/sh
 printf 'toolchain-build %s\n' "$*" >>"$TEST_CALLS"
 case " $* " in *' --print-validated-image-id '*) ;; *) exit 99;; esac
@@ -539,18 +607,15 @@ printf '%s\n' "$*" >>"$TEST_CALLS"
 case "$1 $2" in
   'run plan')
     if [ "$4" = .nvkr/laptop-bootstrap/id-probe/definition.json ]; then
+      [ "$TEST_SELECTED_PLAN_EXIT" = 0 ] || exit "$TEST_SELECTED_PLAN_EXIT"
       jq -e '.outputs[0].catalog.overlays[-1] == "./toolchain-attempt.json" and
-        .catalog.base == "../../../inputs/definitions/diagnostics/demo-arm64/../../../catalogs/nicosim" and
+        .catalog.base == "../../../inputs/definitions/diagnostics/demo-arm64/../../../catalogs/tools/native" and
         .outputs[0].catalog.base == .catalog.base' "$4" >/dev/null || exit 99
       printf '%s\n' "$TEST_PLAN" | jq '. + {selected: true}'
     else printf '%s\n' "$TEST_PLAN"; fi;;
   'run graph')
     [ "$TEST_GRAPH_EXIT" = 0 ] || exit "$TEST_GRAPH_EXIT"
-    if [ "$8" = json ]; then
-      [ "$TEST_SELECTED_GRAPH_EXIT" = 0 ] || exit "$TEST_SELECTED_GRAPH_EXIT"
-      jq -e '.selected == true' "$4" >/dev/null || exit 99
-      printf '%s\n' "$TEST_SELECTED_GRAPH"
-    else printf 'flowchart LR\n  fetch --> build\n'; fi;;
+    printf 'flowchart LR\n  fetch --> build\n';;
   'run local')
     case " $* " in *' --capture-inputs-root=. '*) ;; *) exit 99;; esac
     jq -e --arg id "$TEST_VALIDATED" '.toolchainSubstitutions[0].to == $id' "$TEST_REPO/.nvkr/laptop-bootstrap/id-probe/toolchain-attempt.json" || exit 99
@@ -592,13 +657,9 @@ esac
 			if tc.graphFail {
 				graphExit = "42"
 			}
-			selectedGraphExit := "0"
-			if tc.name == "selected graph failure prevents execution" {
-				selectedGraphExit = "42"
-			}
-			displayGraph := selectedGraph
-			if tc.name == "overlong display record omitted" {
-				displayGraph = strings.Replace(displayGraph, "build (build)", strings.Repeat("x", 513), 1)
+			selectedPlanExit := "0"
+			if tc.name == "selected Plan failure prevents execution" {
+				selectedPlanExit = "42"
 			}
 			args := []string{filepath.Join(dir, "scripts/nvke-full-arm64-local.sh"), "id-probe", "1", "simulator"}
 			if tc.name == "private preparation excludes final execution" {
@@ -609,7 +670,7 @@ esac
 				"CONTAINER_RUNTIME=docker", "NVKE_LOCAL_CLONE=", "DOCKER_HOST=", "DOCKER_CONTEXT=", "COLIMA_PROFILE=",
 				"TEST_REPO="+dir, "TEST_PLAN="+plan, "TEST_RETURNED="+tc.returned, "TEST_BUILD_EXIT="+tc.buildExit,
 				"TEST_VALIDATED="+validated, "TEST_CALLS="+filepath.Join(dir, "calls"), "NVKR_LOCAL_BOOTSTRAP="+shared, "TEST_INSPECTED="+tc.inspected,
-				"NVKE_SOURCE_TOKEN=command-log-environment-sentinel", "TEST_GRAPH_EXIT="+graphExit, "TEST_SELECTED_GRAPH="+displayGraph, "TEST_SELECTED_GRAPH_EXIT="+selectedGraphExit)
+				"NVKE_SOURCE_TOKEN=command-log-environment-sentinel", "TEST_GRAPH_EXIT="+graphExit, "TEST_SELECTED_PLAN_EXIT="+selectedPlanExit)
 			if tc.name == "preserve OVN redirect with NVKE clone" {
 				clone := filepath.Join(dir, "nvke-clone")
 				init := exec.CommandContext(ctx, "git", "init", "--quiet", clone)
@@ -681,9 +742,9 @@ esac
 					invoked = append(invoked, "nvkr command: "+runner+" "+line)
 				}
 			}
-			wantCount := 6 // Baseline and selected Plans/graphs, dry-run preview, and final exec.
+			wantCount := 5 // Baseline Plan/graph, selected Plan, dry-run preview, and final exec.
 			if tc.name == "private preparation excludes final execution" {
-				wantCount = 5
+				wantCount = 4
 				path := filepath.Join(dir, ".nvkr/laptop-bootstrap/id-probe/build-invocation.json")
 				info, err := os.Lstat(path)
 				if err != nil || info.Mode().Perm() != 0600 {
@@ -709,8 +770,8 @@ esac
 			if tc.wantError {
 				wantCount = 2 // Graph or toolchain rejection prevents execution.
 			}
-			if selectedGraphExit != "0" {
-				wantCount = 4 // Selected graph rejection prevents preview and execution.
+			if selectedPlanExit != "0" {
+				wantCount = 3 // Selected Plan rejection prevents preview and execution.
 			}
 			if len(logged) != wantCount || !slices.Equal(logged, invoked) {
 				t.Fatalf("logged commands=%q, executed commands=%q; want %d", logged, invoked, wantCount)
@@ -747,43 +808,20 @@ esac
 				if err != nil {
 					t.Fatal(err)
 				}
-				wantCatalog := filepath.Join(physicalDir, "inputs/catalogs/nicosim")
+				wantCatalog := filepath.Join(physicalDir, "inputs/catalogs/tools/native")
 				definitionDir := filepath.Join(physicalDir, ".nvkr/laptop-bootstrap/id-probe")
 				if filepath.IsAbs(authored.Catalog.Base) || filepath.Join(definitionDir, authored.Catalog.Base) != wantCatalog || len(authored.Outputs) != 1 ||
 					filepath.IsAbs(authored.Outputs[0].Catalog.Base) || filepath.Join(definitionDir, authored.Outputs[0].Catalog.Base) != wantCatalog {
 					t.Fatal("frozen catalogs did not resolve relative to the selected Definition")
 				}
-				graph, err := os.ReadFile(filepath.Join(dir, ".nvkr/laptop-bootstrap/id-probe/graph.json"))
-				if err != nil || string(graph) != displayGraph+"\n" {
-					t.Fatalf("selected owner graph was not preserved: %v %s", err, graph)
+				selectedPlan, err := os.ReadFile(filepath.Join(dir, ".nvkr/laptop-bootstrap/id-probe/selected-plan.json"))
+				var selected struct{ Selected bool }
+				if err != nil || json.Unmarshal(selectedPlan, &selected) != nil || !selected.Selected {
+					t.Fatal("selected owner Plan was not preserved after toolchain substitution", err)
 				}
-				selected := "run plan --definition .nvkr/laptop-bootstrap/id-probe/definition.json"
-				if strings.Index(string(calls), selected) < strings.Index(string(calls), "toolchain-build") ||
-					!strings.Contains(string(calls), "run graph --plan .nvkr/laptop-bootstrap/id-probe/selected-plan.json --view complete --format json") {
-					t.Fatalf("selected graph did not follow toolchain substitution: %s", calls)
-				}
-				requiredRecords := []string{
-					`Build display: {"vertices":3,"edges":2,"truncated":false}`,
-					`Build vertex: {"key":"operation/build","kind":"operation","label":"build (build)","reference":"build","build":"nicosim-tools-arm64"}`,
-					`Build edge: {"from":"artifact/tools","to":"output/nicosim-tools-arm64","relation":"fulfills slot"}`,
-				}
-				if tc.name == "overlong display record omitted" {
-					requiredRecords = []string{`Build display: {"vertices":2,"edges":1,"truncated":true}`, requiredRecords[2]}
-					if strings.Contains(stderr.String(), `"key":"operation/build"`) || strings.Contains(stderr.String(), `"from":"operation/build"`) {
-						t.Fatal("display kept an oversized record or its dangling edge")
-					}
-				}
-				for _, required := range requiredRecords {
-					if !strings.Contains(stderr.String(), required) {
-						t.Fatalf("missing selected graph display record %q: %s", required, &stderr)
-					}
-				}
-				if strings.Index(stderr.String(), "Build display:") < strings.LastIndex(stderr.String(), "Build edge:") ||
-					strings.Index(stderr.String(), "Build display:") < strings.LastIndex(stderr.String(), "Build vertex:") {
-					t.Fatal("display completion metadata preceded graph records")
-				}
-				if strings.Contains(stderr.String(), "private-secret-ref") || strings.Contains(stderr.String(), "producer/build") {
-					t.Fatal("display leaked excluded route or duplicated producer records")
+				selectedCommand := "run plan --definition .nvkr/laptop-bootstrap/id-probe/definition.json"
+				if strings.Index(string(calls), selectedCommand) < strings.Index(string(calls), "toolchain-build") {
+					t.Fatalf("selected Plan did not follow toolchain substitution: %s", calls)
 				}
 			}
 		})

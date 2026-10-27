@@ -128,6 +128,54 @@ func collectPackerContainerAcquisitions(ctx context.Context, runtime packerConta
 	return capture, nil
 }
 
+type nativePackerAcquisitionRequest struct {
+	archivePath string
+	workspace   *os.File
+	budget      execution.ResourceRequest
+}
+
+// The native driver retains the declared carrier before its private output tree
+// is removed. It shares collection limits and content validation with the
+// container driver; no caller-selected post-build file can supply acquisitions.
+func collectNativePackerAcquisitions(ctx context.Context, outputDir string, request *nativePackerAcquisitionRequest,
+	diskBytes int64,
+) (capture *heldfile.File, returnErr error) {
+	facts, err := execution.ObserveLocalHost(ctx, request.workspace)
+	if err != nil {
+		return nil, err
+	}
+	limit, err := packerAcquisitionCollectionLimit(request.budget, facts.Resources, diskBytes)
+	if err != nil {
+		return nil, err
+	}
+	file, info, err := openRegularBeneath(outputDir, request.archivePath)
+	if err != nil {
+		return nil, e.Wrap(e.CodeVerifyFailed, err, "opening declared native acquisition carrier")
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			if capture != nil {
+				err = errors.Join(err, capture.Close())
+				capture = nil
+			}
+			returnErr = e.Wrap(e.CodeInternal, errors.Join(returnErr, err), "closing native acquisition carrier")
+		}
+	}()
+	if info.Size() <= 0 || info.Size() > limit {
+		return nil, e.New(e.CodeEngineCapability, "native acquisition carrier exceeds its admitted collection budget")
+	}
+	capture, err = heldfile.FromReaderContext(ctx, io.NewSectionReader(file, 0, info.Size()), heldfile.Options{
+		Label: "producer-acquisition-carrier", MaxBytes: limit,
+	})
+	if err != nil {
+		return nil, e.Wrap(e.CodeVerifyFailed, err, "holding native producer acquisition carrier")
+	}
+	if _, err := material.ObserveAcquisitionArchive(ctx, capture); err != nil {
+		return nil, errors.Join(err, capture.Close())
+	}
+	return capture, nil
+}
+
 // Outer transport and inner capture can coexist as sealed RAM-backed files on
 // Linux. Reserve 64 MiB for bounded manifest decoding and bookkeeping, then
 // account for both copies separately from the three scratch copies and the

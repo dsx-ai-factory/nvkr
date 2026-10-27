@@ -43,6 +43,11 @@ func runHeldCosignSignHelper() int {
 	if processArgAfter(args, "--oidc-issuer") != "https://issuer.example.test" {
 		return 55
 	}
+	for _, flag := range []string{"--use-signing-config=false", "--new-bundle-format=false", "--b64=false", "--tlog-upload=true"} {
+		if !containsArg(args, flag) {
+			return 56
+		}
+	}
 	for _, flag := range []string{"--output-signature", "--output-certificate"} {
 		path := processArgAfter(args, flag)
 		if path == "" || !strings.HasPrefix(path, "/proc/self/fd/") {

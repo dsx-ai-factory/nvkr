@@ -36,26 +36,33 @@ const (
 // LoadPlanContext admits the exact generated execution plan. The plan is not an
 // authority receipt, but node execution must still reject a changed or unsafe file.
 func LoadPlanContext(ctx context.Context, path string) (*Plan, error) {
+	plan, _, err := loadPlanDocument(ctx, path)
+	return plan, err
+}
+
+// loadPlanDocument retains the exact admitted document's blob integrity separately
+// from producer Build identity. No second read can describe a different Plan.
+func loadPlanDocument(ctx context.Context, path string) (*Plan, string, error) {
 	if ctx == nil {
-		return nil, e.New(e.CodeUsage, "factory plan load requires a context")
+		return nil, "", e.New(e.CodeUsage, "factory plan load requires a context")
 	}
 	held, err := heldfile.OpenContext(ctx, path, heldfile.Options{Label: "run-plan", MaxBytes: MaxPlanBytes})
 	if err != nil {
-		return nil, classifyContext(ctx, e.Wrap(e.CodePipelineDrift, err, "opening factory plan"))
+		return nil, "", classifyContext(ctx, e.Wrap(e.CodePipelineDrift, err, "opening factory plan"))
 	}
 	defer func() { _ = held.Close() }()
 	raw, err := held.ReadAllContext(ctx, MaxPlanBytes)
 	if err != nil {
-		return nil, classifyContext(ctx, e.Wrap(e.CodePipelineDrift, err, "reading factory plan"))
+		return nil, "", classifyContext(ctx, e.Wrap(e.CodePipelineDrift, err, "reading factory plan"))
 	}
 	var plan Plan
 	if err := canonical.UnmarshalExact(raw, &plan); err != nil {
-		return nil, e.Wrap(e.CodePipelineDrift, err, "decoding factory plan")
+		return nil, "", e.Wrap(e.CodePipelineDrift, err, "decoding factory plan")
 	}
 	if err := plan.Validate(); err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return &plan, nil
+	return &plan, held.Digest(), nil
 }
 
 // ExecuteNode validates and executes one operation from the complete Plan.
@@ -136,6 +143,9 @@ func executeToolAcquire(ctx context.Context, node Node, output Artifact, stdout 
 		return e.Wrap(e.CodeInvalidCatalog, err, "creating tool request")
 	}
 	client := &http.Client{Timeout: 30 * time.Minute}
+	if _, bounded := ctx.Deadline(); bounded {
+		client.Timeout = 0
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		return classifyContext(ctx, e.Wrap(e.CodeUnavailable, err, "downloading tool %s", node.ID))

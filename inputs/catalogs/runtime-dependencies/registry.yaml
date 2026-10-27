@@ -130,3 +130,4 @@ components:
 sources:
   nvke-deployment-selection:
     repo: https://github.com/dsx-ai-factory/nvke
+    constraint: v0.22.0

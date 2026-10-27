@@ -8,6 +8,10 @@ name: NVKR nightly NVKE end-to-end tests
     - cron: '17 3 * * *'
   workflow_dispatch:
     inputs:
+      source_contract_only:
+        description: Validate the pinned nightly handoff without builds or VM deployment
+        type: boolean
+        default: false
       profile:
         description: Maintained nightly project to build and test
         type: choice
@@ -26,8 +30,61 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  source-contract:
+    if: github.event_name == 'workflow_dispatch' && inputs.source_contract_only && github.repository == 'dsx-ai-factory/nvkr'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out selected adapter
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Read exact harness selection
+        id: harness
+        run: |
+          set -euo pipefail
+          commit=$(jq -er 'map(.harness_commit) | unique | if length == 1 and (.[0] | test("^[0-9a-f]{40}$")) then .[0] else error("ambiguous harness") end' inputs/testing/nightly-profiles.json)
+          printf 'commit=%s\n' "$commit" >> "$GITHUB_OUTPUT"
+      - name: Check out selected v0.22.0 CLI source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: dsx-ai-factory/nvke
+          ref: 400c24fb6465b042be883d6b62472528520d6291
+          path: .nvkr/source-contract/product
+          token: ${{ secrets.NKE_SOURCE_TOKEN }}
+          persist-credentials: false
+      - name: Check out exact compatible harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: dsx-ai-factory/nvke
+          ref: ${{ steps.harness.outputs.commit }}
+          path: .nvkr/source-contract/harness
+          token: ${{ secrets.NKE_SOURCE_TOKEN }}
+          persist-credentials: false
+      - name: Set up pinned Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+      - name: Compile beta.6 CLI and exercise the exact candidate hook
+        env:
+          GOTOOLCHAIN: local
+        run: |
+          set -euo pipefail
+          root="$GITHUB_WORKSPACE"
+          cd "$root/.nvkr/source-contract/product/cli"
+          go build -o "$RUNNER_TEMP/nvkectl-beta6" ./cmd/nvkectl
+          cd "$root"
+          NVKR_NVKE_SOURCE_CONTRACT="$root/.nvkr/source-contract/product" \
+          NVKR_NVKE_SOURCE_CLI="$RUNNER_TEMP/nvkectl-beta6" \
+          NVKR_NVKE_NIGHTLY_SOURCE_CONTRACT="$root/.nvkr/source-contract/harness" \
+            go test ./internal/nvkedemo -run '^TestNightlyBeta(Site|.*Handoff)' -count=1 -timeout=5m
+          cd "$root/.nvkr/source-contract/harness/controller/test/e2e"
+          go test . -run '^TestUnit_CandidateStackConfigurationHandoff$' -count=1 -timeout=2m
+
   select:
-    if: github.repository == 'dsx-ai-factory/nvkr' && github.ref == 'refs/heads/main'
+    if: github.repository == 'dsx-ai-factory/nvkr' && github.ref == 'refs/heads/main' && !inputs.source_contract_only
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
@@ -275,6 +332,10 @@ jobs:
                 (map(.commit) | unique | length) == 1 then .[0].commit
               else error("site products require one exact NVKE suite revision") end
             ' .nightly-private/runtime-inputs/plan.json)
+            if [[ "$suite" == 400c24fb6465b042be883d6b62472528520d6291 ]]; then
+              [[ "$PINNED_SUITE" == b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8 ]] || { echo "unrecognized retained suite pin" >&2; exit 1; }
+              suite="$PINNED_SUITE"
+            fi
           fi
           [[ "$suite" =~ ^[0-9a-f]{40}$ ]]
           printf 'commit=%s\n' "$suite" >> "$GITHUB_OUTPUT"

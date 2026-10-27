@@ -408,9 +408,6 @@ func TestGitHubPrivateTransfersExposeOnlyLocatorsToActions(t *testing.T) {
 					}
 					if run := githubYAMLValue(node, "run"); strings.Contains(run, " factory github ci-fetch-locators ") || strings.Contains(run, " factory github ci-download ") {
 						want := "allow_earlier=true"
-						if plan.Environment.GitHubDevelopment {
-							want = "allow_earlier=false"
-						}
 						if !strings.Contains(run, want) || !strings.Contains(run, "if [ -n \"$NVKR_CI_RUN\" ]; then allow_earlier=false; fi") || !strings.Contains(run, "--allow-earlier-attempts=\"$allow_earlier\"") {
 							t.Fatalf("transport retry policy differs for %s", fixture.name)
 						}
@@ -740,7 +737,7 @@ func TestPrivateTransferRetryPolicyAtInvocation(t *testing.T) {
 								if err != nil {
 									t.Fatalf("generated command failed: %v: %s", err, output)
 								}
-								want := "--allow-earlier-attempts=" + strconv.FormatBool(!development && run == "")
+								want := "--allow-earlier-attempts=" + strconv.FormatBool(run == "")
 								if !strings.Contains(string(output), want+"\n") {
 									t.Fatalf("missing %s in arguments: %s", want, output)
 								}

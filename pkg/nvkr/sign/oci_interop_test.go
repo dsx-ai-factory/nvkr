@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
@@ -151,6 +152,11 @@ func testCosignProvenanceDiscovery(t *testing.T, binary string, withSBOM bool) {
 	}
 	requireRun(signArgs(ociAttestArgs(subject, "provenance.json"))...)
 	requireRun(signArgs(exactAttestArgs(QualificationPredicateType, subject, "qualification.json"))...)
+	source, err := newRegistryBundleSource(ctx, Subject{Ref: subject, Digest: digest.String()}, Credential{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer source.close()
 	for _, predicate := range []string{CosignSignaturePredicateType, ProvenancePredicateType, QualificationPredicateType} {
 		bundles, err := decodeOCIBundles(requireRun(ociDownloadBundleArgs(subject, predicate)...))
 		if err != nil {
@@ -168,8 +174,37 @@ func testCosignProvenanceDiscovery(t *testing.T, binary string, withSBOM bool) {
 		if document.MediaType != sbom.BundleMediaType {
 			t.Fatalf("unexpected bundle format: %s", document.MediaType)
 		}
+		// Exercise the production transport against cosign-published OCI bytes.
+		// Independent cosign download is comparison evidence only; the normal
+		// reader's exact raw bytes are what the keyed fixture verifies below.
+		var acquired []byte
+		for _, descriptor := range source.candidates(predicate) {
+			raw, err := source.bundle(ctx, descriptor)
+			if err != nil {
+				t.Fatal(err)
+			}
+			typ, err := ociBundlePredicateType(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if typ == predicate {
+				acquired = raw
+				break
+			}
+		}
+		if len(acquired) == 0 {
+			t.Fatalf("normal OCI reader did not find %s", predicate)
+		}
+		want, err := canonical.Marshal(json.RawMessage(bundles[0]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := canonical.Marshal(json.RawMessage(acquired))
+		if err != nil || !bytes.Equal(got, want) {
+			t.Fatalf("normal OCI reader differs from independent cosign download: %v", err)
+		}
 		path := filepath.Join(workspace, "verify.json")
-		if err := os.WriteFile(path, bundles[0], 0o600); err != nil {
+		if err := os.WriteFile(path, acquired, 0o600); err != nil {
 			t.Fatal(err)
 		}
 		// These are keyed fixtures; production takes identity from a verified

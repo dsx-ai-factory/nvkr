@@ -1,9 +1,10 @@
 # Documentation
 
-Start with the [quickstart](quickstart.md): learn the workflow, build a tiny local artifact, change its
-version, and extend the same ideas into the NVKE tenant demo. It also includes a planning preview
-without Docker. The [34-concept reference](user-concepts.md) explains the vocabulary and connects
-each concept to a worked example.
+Start with the [quickstart](quickstart.md): copy one block to build NVKR from source and produce
+the NVKE CLI, controller image, Helm chart and dependency SBOMs locally on macOS or Linux.
+The guide shows the resulting files and links to larger builds, publication and deployment.
+For a preview without Docker, see the [tutorial inputs](examples/nvke-tutorial/README.md#preview-the-native-build).
+The [34-concept reference](user-concepts.md) explains the vocabulary and connects each concept to a worked example.
 
 ## User tasks
 
@@ -11,10 +12,12 @@ each concept to a worked example.
 |---|---|
 | Ask an AI agent to acquire the CLI, author inputs, and operate NVKR | [Use NVKR with Your AI Agent](use-with-agents.md), [operator skill](../.agents/skills/nvkr-operator/SKILL.md) |
 | Understand NVKR and try my first local artifact | [Quickstart](quickstart.md) |
+| Build only the CLI for planning and inspection | [CLI setup](quickstart.md#build-only-the-cli) |
 | Present catalog → build → publication → NVKE through the Go CLIs | [Runnable commands](nvkr-demo.md) |
 | Start local Linux ARM64 NVKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../inputs/definitions/demo/README.md) |
-| Build and run a real QCOW2 tenant on Ubuntu ARM64, optionally inside Colima on macOS | [Ubuntu ARM64 build-and-demo guide and validation limits](local-nvke-demo.md) |
-| Inspect my first Plan | [Quickstart](quickstart.md) |
+| Build and run the native Ubuntu ARM64 or Mac demo | [Shared build-and-demo guide and validation limits](local-nvke-demo.md) |
+| Understand native Linux/Mac execution with one QEMU site and two tenant guests | [Shared native topology and validation scope](local-nvke-demo.md#native-linux-and-mac-path) |
+| Inspect my first Plan | [Plan and graph inspection](plan-and-graph-inspection.md) |
 | Browse public command results | [Command result browser](lifecycle.md#browse-public-command-results) |
 | Watch a local Run or inspect its recorded outcome | [Lifecycle dashboard and read-only inspection](lifecycle.md#choose-local-run-presentation) |
 | Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |
@@ -30,6 +33,8 @@ each concept to a worked example.
 Example-specific inputs and commands live beside their Definitions: [three-output tutorial](examples/nvke-tutorial/README.md),
 [nine-output deploy example](examples/nvke-deploy/README.md), [69-output M2 candidate and committed workflow](../inputs/definitions/nvke/README.md),
 and [OS-image routes](../inputs/definitions/diagnostics/README.md). The separate
+[Ubuntu 24 inputs](../inputs/definitions/diagnostics/ubuntu24/README.md) select native plain and
+public-bootstrap FDE disk builds alongside the existing Ubuntu 26 default. The
 [FDE-only diagnostic workflow](../inputs/definitions/diagnostics/fde.md) selects one native disk for branch iteration.
 The [demo index](../demos/README.md) lists presentations, runnable journeys, and prerequisites.
 
@@ -50,6 +55,7 @@ records source availability and remaining gaps.
 | Reviewable updates and matching regeneration (the installed `catalog-refresh.yaml` is generated, never hand-edited) | [Catalog maintenance](catalog-maintenance.md) |
 | Chart slots, image outputs, and registry-independent bytes | [Declarative Helm bindings](declarative-helm-bindings.md) |
 | Software inventories and their exact subjects/stages | [Dependency SBOMs](dependency-sboms.md) |
+| Discover and explicitly select provisional CLI validators | [CLI artifact testing](artifact-testing.md#provisional-validator-catalog) |
 | External test output descriptions and configured diagnostic checks | [External test output contract](external-test-output-contract.md) |
 | Bounded guest capture format and acquisition ownership | [OS acquisition contract](nvke-os-acquisition-contract.md) |
 | Optional live-owner disk inspection and material observations | [OS live inspection](nvke-os-live-inspection.md) |
@@ -61,7 +67,7 @@ records source availability and remaining gaps.
 | Build artifacts, install a local site, and validate a real QCOW2-backed tenant plus workload | [Integrated Ubuntu ARM64 guide](local-nvke-demo.md) |
 | Review exact-revision evidence from the successful fresh upstream OVN diagnostic | [2026-10-11 runtime evidence](evidence/local-upstream-ovn-2026-10-11.md) |
 | Build the diagnostic ARM64/Ubuntu 26.04 plain controller profiles image | [Local profiles guide](local-controller-profiles.md) |
-| Understand the NVKR-to-installer artifact handoff | [Staged-installer handoff](nvkr-to-nvke-demo.md) |
+| Inspect older staged-installer sessions and recovery controls | [Legacy handoff and recovery](nvkr-to-nvke-demo.md) |
 | Determine what remains for a full source-built local NVKE distribution | [Full-source gap map](full-nvke-source-build.md) |
 
 ## Engineering and maintenance
@@ -74,6 +80,11 @@ The [input index](../inputs/README.md) and [catalog ownership map](../inputs/cat
 The [ADRs](adr) own engineering contracts, and [reconciliation](adr/reconciliation.md) is the current
 implementation/evidence ledger. The [roadmap](milestones.md) links outcomes to the detailed
 [acceptance specification](epics-v1-spec.md).
+
+Proposed [ADR-24: imported validator catalog](adr/0024-imported-validator-catalog.md) defines discovery,
+adapter selection and artifact bindings across repositories, including its diagnostic and evidence limits.
+The provisional local-plan CLI slice implements catalog discovery and versioned-profile execution;
+broader adapter and profile support remains deferred.
 
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
 Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) covers branch

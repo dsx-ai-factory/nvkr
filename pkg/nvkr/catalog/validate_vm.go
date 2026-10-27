@@ -40,9 +40,9 @@ func validateVMImageBuildRequirements(name string, requirements *execution.Requi
 		return e.New(e.CodeInvalidCatalog,
 			"component %q: vm-image buildRequirements require an allowed host platform", name)
 	}
-	if len(requirements.Capabilities) != 1 || requirements.Capabilities[0].Name != execution.CapabilityKVM {
+	if len(requirements.Capabilities) != 1 || (requirements.Capabilities[0].Name != execution.CapabilityKVM && requirements.Capabilities[0].Name != execution.CapabilityHVF) {
 		return e.New(e.CodeInvalidCatalog,
-			"component %q: vm-image buildRequirements require an explicit KVM capability policy", name)
+			"component %q: vm-image buildRequirements require an explicit KVM or HVF capability policy", name)
 	}
 	if requirements.TimeoutSeconds == 0 {
 		return e.New(e.CodeInvalidCatalog,
@@ -151,7 +151,7 @@ func ValidateVMImageHostRoute(name string, component Component, guestArch string
 	}
 	policy := execution.CapabilityPolicy("")
 	for _, capability := range component.BuildRequirements.Capabilities {
-		if capability.Name == execution.CapabilityKVM {
+		if capability.Name == execution.CapabilityKVM || capability.Name == execution.CapabilityHVF {
 			policy = capability.Policy
 			break
 		}
@@ -160,12 +160,15 @@ func ValidateVMImageHostRoute(name string, component Component, guestArch string
 		return nil
 	}
 	expected := execution.HostPlatform("linux/" + guestArch)
+	if component.BuildRequirements.Capabilities[0].Name == execution.CapabilityHVF {
+		expected = execution.HostPlatform("darwin/" + guestArch)
+	}
 	for _, platform := range component.BuildRequirements.AllowedHostPlatforms {
 		if platform == expected {
 			return nil
 		}
 	}
 	return e.New(e.CodeInvalidCatalog,
-		"vm-image component %q requires KVM but has no same-architecture host platform for guest architecture %q",
+		"vm-image component %q requires hardware virtualization but has no matching host platform for guest architecture %q",
 		name, guestArch)
 }

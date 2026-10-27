@@ -32,8 +32,11 @@ func PushDocumentArtifact(ctx context.Context, repository, mediaType string, raw
 	if err := admitDocumentTransport(ctx, mediaType, int64(len(raw)), options); err != nil {
 		return "", err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 5*time.Minute)
+		defer cancel()
+	}
 	parse := []name.Option{name.StrictValidation}
 	if options.PlainHTTP {
 		parse = append(parse, name.Insecure)
@@ -63,8 +66,11 @@ func PullDocumentArtifact(ctx context.Context, reference, mediaType string, limi
 	if err := admitDocumentTransport(ctx, mediaType, limit, options); err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 5*time.Minute)
+		defer cancel()
+	}
 	parse := []name.Option{name.StrictValidation}
 	if options.PlainHTTP {
 		parse = append(parse, name.Insecure)

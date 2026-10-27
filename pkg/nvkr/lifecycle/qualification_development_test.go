@@ -21,7 +21,8 @@ func TestDevelopmentQualificationReferenceScope(t *testing.T) {
 		{"exact", "ghcr.io/example/nvkr/development/runs/123/attempts/2/releases" + digest, ""},
 		{"production namespace", "ghcr.io/example/nvkr/releases" + digest, e.CodeEngineCapability},
 		{"foreign repository", "ghcr.io/other/nvkr/development/runs/123/attempts/2/releases" + digest, e.CodeEngineCapability},
-		{"other attempt", "ghcr.io/example/nvkr/development/runs/123/attempts/1/releases" + digest, e.CodeVerifyFailed},
+		{"earlier attempt", "ghcr.io/example/nvkr/development/runs/123/attempts/1/releases" + digest, ""},
+		{"future attempt", "ghcr.io/example/nvkr/development/runs/123/attempts/3/releases" + digest, e.CodeVerifyFailed},
 		{"other run", "ghcr.io/example/nvkr/development/runs/124/attempts/2/releases" + digest, e.CodeVerifyFailed},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

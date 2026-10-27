@@ -6,6 +6,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"strings"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
@@ -90,6 +91,84 @@ func cmdFactory() *cli.Command {
 				}
 				if err := json.NewEncoder(c.App.Writer).Encode(description); err != nil {
 					return e.Wrap(e.CodeVerifyFailed, err, "writing source inspection")
+				}
+				return nil
+			},
+		}, {
+			Name:   "prepare-native-go",
+			Hidden: true,
+			Usage:  "bind local Mac CGO producers to an existing installed SDK",
+			Flags: []cli.Flag{
+				&cli.StringFlag{Name: "definition", Required: true},
+				&cli.StringFlag{Name: "environment", Required: true},
+				&cli.StringFlag{Name: "go-root", Required: true},
+				&cli.StringFlag{Name: "cc", Required: true},
+				&cli.StringFlag{Name: "out", Required: true},
+			},
+			Action: func(c *cli.Context) error {
+				if c.Args().Present() {
+					return e.New(e.CodeUsage, "prepare-native-go accepts no positional arguments")
+				}
+				prepared, err := factory.PrepareNativeGo(c.Context, c.String("definition"), c.String("environment"), c.String("go-root"), c.String("cc"), c.String("out"))
+				if err != nil {
+					return err
+				}
+				if err := json.NewEncoder(c.App.Writer).Encode(prepared); err != nil {
+					return e.Wrap(e.CodeInternal, err, "writing native Go input locations")
+				}
+				return nil
+			},
+		}, {
+			Name: "prepare-native-packer", Hidden: true,
+			Usage: "capture and validate a local native Packer dependency bundle",
+			Flags: []cli.Flag{
+				&cli.StringFlag{Name: "manifest", Required: true},
+				&cli.StringFlag{Name: "out", Required: true},
+			},
+			Action: func(c *cli.Context) error {
+				if c.Args().Present() {
+					return e.New(e.CodeUsage, "prepare-native-packer accepts no positional arguments")
+				}
+				prepared, err := factory.PrepareNativePacker(c.Context, c.String("manifest"), c.String("out"))
+				if err != nil {
+					return err
+				}
+				if err := json.NewEncoder(c.App.Writer).Encode(prepared); err != nil {
+					return e.Wrap(e.CodeInternal, err, "writing native Packer dependency locations")
+				}
+				return nil
+			},
+		}, {
+			Name: "prepare-native-packer-inputs", Hidden: true,
+			Usage: "bind selected disk producers to a verified native Packer bundle",
+			Flags: []cli.Flag{
+				&cli.StringFlag{Name: "definition", Required: true},
+				&cli.StringFlag{Name: "environment", Required: true},
+				&cli.StringFlag{Name: "layout", Required: true},
+				&cli.StringFlag{Name: "bundle", Required: true},
+				&cli.StringFlag{Name: "toolchain", Required: true},
+				&cli.StringFlag{Name: "out", Required: true},
+				&cli.StringFlag{Name: "accelerator", Value: "hvf", Usage: "explicit native Mac accelerator: hvf or tcg"},
+				&cli.StringSliceFlag{Name: "variable"},
+			},
+			Action: func(c *cli.Context) error {
+				if c.Args().Present() {
+					return e.New(e.CodeUsage, "prepare-native-packer-inputs accepts no positional arguments")
+				}
+				variables := make(map[string]string)
+				for _, override := range c.StringSlice("variable") {
+					key, value, ok := strings.Cut(override, "=")
+					if _, repeated := variables[key]; !ok || key == "" || value == "" || repeated {
+						return e.New(e.CodeUsage, "require unique nonempty Packer variable assignments")
+					}
+					variables[key] = value
+				}
+				prepared, err := factory.PrepareNativePackerBuildWithAccelerator(c.Context, c.String("definition"), c.String("environment"), c.String("layout"), c.String("bundle"), c.String("toolchain"), c.String("out"), c.String("accelerator"), variables)
+				if err != nil {
+					return err
+				}
+				if err := json.NewEncoder(c.App.Writer).Encode(prepared); err != nil {
+					return e.Wrap(e.CodeInternal, err, "writing native Packer build input locations")
 				}
 				return nil
 			},

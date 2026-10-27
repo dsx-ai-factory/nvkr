@@ -1,0 +1,30 @@
+{
+  "apiVersion": "nvkr.dev/environment/v1",
+  "executionClasses": [
+    {
+      "capabilities": [
+        "kvm"
+      ],
+      "hostPlatform": "linux/arm64",
+      "maxTimeoutSeconds": 21600,
+      "name": "linux-arm64-kvm-local-docker",
+      "resources": {
+        "cpuMillis": 8000,
+        "ephemeralStorageMiB": 65536,
+        "memoryMiB": 10240
+      },
+      "runsOn": "local-linux-arm64-docker-kvm"
+    }
+  ],
+  "kind": "Environment",
+  "metadata": {
+    "description": "Native Linux ARM64 Docker developer execution with required KVM for image assembly; no publication or signing.",
+    "name": "nvke-local-dev-arm64-kvm-docker"
+  },
+  "runtime": {
+    "buildNetworkPolicy": "producer-declared",
+    "runtime": "docker"
+  },
+  "utilityContainer": "golang@sha256:f20d83a83e18dbd2a4714b8ffd4b30b287b6243962dd75608e86abcc63ba4efc",
+  "utilityPlatform": "linux/arm64"
+}

@@ -2,26 +2,31 @@
 
 For setup and the complete journey, use the
 [Ubuntu ARM64 build-and-demo guide](../../../docs/local-nvke-demo.md). These inputs
-target Linux ARM64; macOS supplies a Colima Linux VM, not Darwin artifacts.
+target Linux ARM64 artifact builds. Native host tools have separate OS selections
+in the shared tool catalog; Mac deployment does not use a Colima execution host.
 They do not publish, sign or build a complete source-only NVKE distribution.
 The separate KVM variants have their own hosted publication policies; see the
 [NVIDIA nightly](nightly-nvidia.md) and [upstream nightly](nightly-upstream.md) instructions.
 
 | Selection | Definition | Outputs |
 | --- | --- | --- |
-| Complete demo artifact set | `arm64-nvidia-tcg.json` | 29: disk, images, installer-aligned charts/CLI, tools, profiles and simulator in one Run |
-| Explicit upstream OVN diagnostic | `arm64-upstream-tcg.json` | 29: replaces the disk, OVN image/chart and profiles outputs together; not NVIDIA-fork validation |
+| Complete demo artifact set | `arm64-nvidia-tcg.json` | 32: disk, images, installer-aligned charts/CLI, tools, profiles and simulator in one Run |
+| Explicit upstream OVN diagnostic | `arm64-upstream-tcg.json` | 32: replaces the disk, OVN image/chart and profiles outputs together; not NVIDIA-fork validation |
 | Faster component loop | `../diagnostics/demo-arm64/components.json` | 22: historical components without the disk; not the complete demo selection |
 | OS-only loop | `../diagnostics/demo-arm64/os.json` | One disk with its complete material closure |
 | Source-built provider loop | `../diagnostics/demo-arm64/providers.json` | Two native provider images, no disk |
 | NICoSim build loop | `../diagnostics/demo-arm64/simulator.json` | One executable bundle: source-built Linux ARM64 server, CLI and pinned seed/UI archive |
-| Staged-installer site loop | `../diagnostics/demo-arm64/site.json` | Five source-aligned candidates: CLI, controller image, native diagnostic profiles image, image-bound controller chart and NKTP chart |
+| Installer site loop | `../diagnostics/demo-arm64/site.json` | Five source-aligned candidates: CLI, controller image, native diagnostic profiles image, image-bound controller chart and NKTP chart |
 | Source-built installer tools | `../diagnostics/demo-arm64/tools.json` | One five-component Linux ARM64 executable bundle; distinct from the acquired `operator-tools` |
 | Diagnostic controller profiles | `../diagnostics/demo-arm64/profiles.json` | One native Linux ARM64 OCI image containing plain ARM64/Ubuntu 26.04 profile data at `/profiles`; not fleet profiles |
 
 Use `../../environments/local-arm64-tcg.json` with native Linux ARM64 Docker, the
-launcher's default runtime. The OS uses TCG. On macOS, follow the guide's
-Colima setup and run OS/demo commands inside Linux on native ext4 storage.
+launcher's default runtime. The OS image build uses TCG. Standard deployment
+uses the same native owner on both hosts: KVM on Linux and explicit TCG on Mac
+for the selected 64 KiB image. Mac builds prepare installed native dependencies
+through NVKR and build the Linux utility image through Docker Buildx; follow the
+[native guide](../../../docs/local-nvke-demo.md#native-linux-and-mac-path) for
+prerequisites and current validation limits.
 The full demo uses one NVKR/demo bootstrap and a measured
 Packer/Go/GCC toolchain across its selected output scopes; that image also includes
 digest-checked Helm 4.2.4 and ORAS 1.3.3. There is no separate Helm-wrapper image.
@@ -33,7 +38,7 @@ its `requiresCatalogDigest` binds that exact predecessor, not the base catalog
 alone. Regenerate and review both bindings after changing either predecessor.
 
 `arm64-upstream-tcg.json` substitutes these four outputs as one matched
-diagnostic selection; the other 25 output names remain unchanged:
+diagnostic selection; the other 28 output names remain unchanged:
 
 | Output | Format | Role |
 | --- | --- | --- |
@@ -70,7 +75,12 @@ require authenticated Git access because NVKE chart pin sets are checked against
 the pinned tree. Dry-run/preflight are not runtime acceptance.
 
 The site catalog pins CLI, controller and charts to one exact NVKE candidate;
-chart dependencies are acquired at exact archive digests before offline packaging,
+the installer and every NVKE source, including SPIRE, select v0.22.0 at
+`400c24fb6465b042be883d6b62472528520d6291`. The demo uses its site-spec renderer
+and deployment entrypoint with verified local charts and image digests. Tenant
+setup creates MachineImage, ClusterRelease and NodePoolRelease resources from
+the observed profiles container and selected disk before requesting the tenant.
+Chart dependencies are acquired at exact archive digests before offline packaging,
 not independently source-built or upstream-signature-verified. The tools catalog
 compiles the installer's five Linux binaries from pinned Git. The separate older
 acquired `operator-tools` selection remains in the combined artifact membership.
@@ -81,11 +91,9 @@ packages and demo tenant select stream `2.4.0`. Packer still consumes staged
 materials; it does not fetch the fork or compile OVN. A fresh bake and tenant
 acceptance are separate gates from compiling this selection.
 
-The shared OS catalog temporarily retains SPIRE packaging at NVKE commit `726f7694`, without the
-DSX IMDS plugin. These local selections do not schedule the blocked DSX source build or require its
-credentials. This restores the prior producer contract, not a fresh runtime acceptance result or full
-NVKE content parity. DSX restoration is tracked in [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641).
-No local NVKE checkout or runner profile is repinned by this catalog update.
+The shared OS catalog selects NVKE `v0.22.0` for every NVKE producer, including SPIRE
+packaging revision `4`. That source-owned package excludes DSX IMDS and requires no DSX
+build credentials. The updated inputs do not establish a new runtime acceptance result.
 
 The combined selection also produces standalone OVN OCI image and image-bound
 Helm OCI outputs. They have their own build identities; do not assume their bytes

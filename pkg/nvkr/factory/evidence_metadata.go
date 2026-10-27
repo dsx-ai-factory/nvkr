@@ -93,7 +93,7 @@ func admitEvidenceMetadata(plan *Plan, route Route, inspection delivery.Inspecti
 	if err != nil {
 		return err
 	}
-	if err := admitPlanReferenceInvocation(plan, metadata.InvocationID, run.InvocationID()); err != nil {
+	if err := admitReferenceInvocation(metadata.InvocationID, run.InvocationID()); err != nil {
 		return err
 	}
 	var required []LifecycleOutputPlan

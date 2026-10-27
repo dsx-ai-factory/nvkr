@@ -23,10 +23,14 @@ import (
 // or preempt a callback. Callers must arrange cancellation before waiting for
 // Close when an active callback needs cancellation to finish.
 func (publication *Publication) VisitEvidence(ctx context.Context, visit func(context.Context, EvidenceBinding, []byte) error) error {
+	return publication.retainedState().visitEvidence(ctx, visit)
+}
+
+func (publication *publicationState) visitEvidence(ctx context.Context, visit func(context.Context, EvidenceBinding, []byte) error) error {
 	if err := deliveryContext(ctx); err != nil {
 		return err
 	}
-	if publication == nil || publication.publicationState == nil || visit == nil {
+	if publication == nil || visit == nil {
 		return e.New(e.CodeGateUnmet, "evidence visitation requires an open publication and visitor")
 	}
 	publication.mu.RLock()

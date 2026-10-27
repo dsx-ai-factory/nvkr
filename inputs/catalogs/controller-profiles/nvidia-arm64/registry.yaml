@@ -9,8 +9,8 @@ metadata:
 sources:
   nvke-profiles:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: 0.21.x
-    toolchainImage: docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9
+    constraint: v0.22.0
+    toolchainImage: docker.io/library/golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
 components:
   nvke-local-profiles:
     fromSource: true
@@ -19,7 +19,7 @@ components:
     toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
     patches:
       - name: patches/local-profile.patch
-        sha256: sha256:e0a9bd1571a45554f7751fbfe0cf9205034a18f5d1af411bfb41740e5e439397
+        sha256: sha256:3928811f56ba0a47011afd16dc066c54189be06c238da43d801e92ae3fd02e22
     artifactPath: bin/nvke-local-profiles-{{.Arch}}.oci.tar
     writeDir: bin
     outputType: oci-image

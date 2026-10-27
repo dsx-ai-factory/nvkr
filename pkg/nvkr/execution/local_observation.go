@@ -23,7 +23,7 @@ type ObservedHostFacts struct {
 	Capabilities []CapabilityName `json:"capabilities,omitempty"`
 }
 
-// ObserveLocalHost returns one point-in-time Linux host observation relative to
+// ObserveLocalHost returns one point-in-time native host observation relative to
 // the caller's already-open workspace directory. It duplicates that directory
 // only for the duration of this call and closes every retained handle before
 // returning. The result is diagnostic: it does not authenticate an Environment
@@ -100,7 +100,7 @@ func validateObservedHostFacts(observed ObservedHostFacts) error {
 	}
 	previous := CapabilityName("")
 	for _, capability := range observed.Capabilities {
-		if capability != CapabilityKVM {
+		if !capabilityMatchesHost(capability, observed.Platform) {
 			return e.New(e.CodeEngineCapability,
 				"local observer reported unsupported capability %q", capability)
 		}

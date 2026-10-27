@@ -329,16 +329,26 @@ func nightlyRuntimeRelease() lifecycle.Release {
 	release := lifecycle.Release{}
 	for _, role := range runtimeImages {
 		digest := "sha256:" + strings.Repeat("a", 64)
-		release.Artifacts = append(release.Artifacts, lifecycle.Artifact{Name: role + "-image-arm64", Kind: lifecycle.OutputOCI, Digest: digest, Reference: "registry.example:5000/team/" + role + "@" + digest})
+		release.Artifacts = append(release.Artifacts, lifecycle.Artifact{Name: role + "-image-arm64", Kind: lifecycle.OutputOCI, Digest: digest, Reference: "registry.example:5000/team/" + role + "@" + digest, Components: []string{role + "-image"}})
 	}
 	return release
 }
 
 func TestNightlyRuntimeImageRolesPreserveExactRegistryAndDigest(t *testing.T) {
+	plan, _ := runtimeValueInputs(t)
+	for i := range plan.Builds {
+		if plan.Builds[i].Name == "temporal-server-image-arm64" {
+			plan.Builds[i].ResolvedComponents[0].Prebuilt.Image = "temporalio/server:9.4.2"
+		}
+	}
 	release := nightlyRuntimeRelease()
-	values, err := nightlyRuntimeValues(release)
+	values, err := nightlyRuntimeValues(plan, release)
 	if err != nil {
 		t.Fatal(err)
+	}
+	image := values["temporal"].(map[string]any)["server"].(map[string]any)["image"].(map[string]any)
+	if image["tag"] != "9.4.2@sha256:"+strings.Repeat("a", 64) {
+		t.Fatal("nightly ignored its selected producer tag", image)
 	}
 	seen := map[string]int{}
 	var walk func(map[string]any)
@@ -387,7 +397,7 @@ func TestNightlyRuntimeImageRolesPreserveExactRegistryAndDigest(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			changed := nightlyRuntimeRelease()
 			test.change(&changed)
-			_, err := nightlyRuntimeValues(changed)
+			_, err := nightlyRuntimeValues(plan, changed)
 			assertNightlyCode(t, err, e.CodeVerifyFailed)
 		})
 	}
@@ -565,8 +575,15 @@ func TestNightlySuiteUsesAdmittedInterpreterAndActualEntrypoint(t *testing.T) {
 }
 
 func TestNightlySourceAdmitsBothReviewedEntrypoints(t *testing.T) {
-	for _, present := range []bool{false, true} {
-		t.Run(fmt.Sprint(present), func(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		candidate, e2e bool
+	}{
+		{"both reviewed entrypoints", true, true},
+		{"missing suite", true, false},
+		{"generic suite without candidate adapter", false, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
 			source, work := privateTestDir(t), privateTestDir(t)
 			git := func(args ...string) string {
 				t.Helper()
@@ -585,10 +602,12 @@ func TestNightlySourceAdmitsBothReviewedEntrypoints(t *testing.T) {
 			if err := os.MkdirAll(directory, 0700); err != nil {
 				t.Fatal(err)
 			}
-			if err := os.WriteFile(filepath.Join(directory, "nico-vms-candidate.sh"), []byte("candidate"), 0600); err != nil {
-				t.Fatal(err)
+			if test.candidate {
+				if err := os.WriteFile(filepath.Join(directory, "nico-vms-candidate.sh"), []byte("candidate"), 0600); err != nil {
+					t.Fatal(err)
+				}
 			}
-			if present {
+			if test.e2e {
 				if err := os.WriteFile(filepath.Join(directory, "nico-vms-e2e.sh"), []byte("e2e"), 0600); err != nil {
 					t.Fatal(err)
 				}
@@ -596,7 +615,7 @@ func TestNightlySourceAdmitsBothReviewedEntrypoints(t *testing.T) {
 			git("add", ".")
 			git("-c", "commit.gpgsign=false", "commit", "-qm", "fixture")
 			err := nightlySource(t.Context(), Runner{Work: work, Env: NativeEnvironment()}, source, git("rev-parse", "HEAD"))
-			if present {
+			if test.candidate && test.e2e {
 				if err != nil {
 					t.Fatal(err)
 				}

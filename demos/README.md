@@ -1,8 +1,9 @@
 # Demos
 
 Use these guided examples to explore NVKR with a team or at your own pace. Start with the
-[quickstart](../docs/quickstart.md) for the deck's core ideas, a tiny real local build, and the
-continuation into the NVKE tenant demo. The [documentation map](../docs/README.md) connects deeper tasks.
+[quickstart](../docs/quickstart.md) for a local three-artifact NVKE build, or
+[build only the CLI](../docs/quickstart.md#build-only-the-cli) for planning and inspection.
+The [concept reference](../docs/user-concepts.md) explains the core ideas. The [documentation map](../docs/README.md) connects deeper tasks.
 
 ## Team tour
 
@@ -48,6 +49,7 @@ remain unverified. The [facilitator guide](team-guide.md) explains the separate 
 | Build your first artifact in seconds after warm-up | [Tiny local demo](quickstart/README.md) and [script](demo-local.sh) |
 | Build, publish, and recover the local NVKE CLI | [Local NVKE walkthrough](m1-local.md) and [script](../scripts/demo-m1-local.sh) |
 | Bake an OS image on a prepared host | [OS-image routes and prerequisites](../inputs/definitions/diagnostics/README.md) |
+| Understand the native Linux/Mac site plus two-guest topology under validation | [Shared native path](../docs/local-nvke-demo.md#native-linux-and-mac-path) |
 | Build and deploy a real local ARM64 QCOW2 tenant | [Ubuntu ARM64 guide](../docs/local-nvke-demo.md) and [declarative demo inputs](local-nvke.yaml) |
 | Compare catalog overlays and component selection | [Runnable authoring lab](../docs/examples/authoring-lab/README.md) |
 | Preview and apply source-pin changes | [Catalog change script](../scripts/demo-catalog-change.sh) |

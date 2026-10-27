@@ -86,7 +86,7 @@ type artifactCheckLifetime struct {
 	closeSource      func() error
 	closeErr         error
 	closeDone        chan struct{}
-	verified         *VerifiedRelease
+	verified         *verifiedQualificationPublication
 	plan             *factory.Plan
 	members          []QualificationReleaseMember
 	operationContext context.Context
@@ -209,7 +209,7 @@ func (consumer *Consumer) CheckQualification(ctx context.Context, request Qualif
 	return consumer.checkQualification(ctx, request, request.Origin)
 }
 
-func (consumer *Consumer) checkQualification(ctx context.Context, request QualificationRequest, source qualificationSource) (*ArtifactCheckReceipt, *ArtifactCheckDescription, error) {
+func (consumer *Consumer) checkQualification(ctx context.Context, request QualificationRequest, source qualificationSource) (_ *ArtifactCheckReceipt, _ *ArtifactCheckDescription, resultErr error) {
 	// Invalid source and Plan inputs take diagnostic precedence over missing
 	// consumer adapters. Every admission check still precedes external work.
 	if source == nil {
@@ -267,7 +267,7 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 	policy := VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication,
 		IdentityRegexp: "^" + regexp.QuoteMeta(origin.BuilderID) + "$", Issuer: signing.Issuer,
 		MinimumDiskEvidence: DiskEvidenceBuildProvenance}
-	if consumer == nil || (consumer.verifier == nil && consumer.verifierFor == nil) || consumer.materialize == nil {
+	if consumer == nil || (consumer.verifier == nil && consumer.verifierFor == nil) || consumer.qualificationMaterializer() == nil {
 		return nil, nil, e.New(e.CodeEngineCapability, "artifact qualification requires signature and registry adapters")
 	}
 	verifier := consumer.verifier
@@ -288,26 +288,24 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 	if _, found := predicates[request.Reference]; !found {
 		return nil, nil, e.New(e.CodeProvenanceMissing, "qualification omits the exact release production predicate")
 	}
-	verified, inputs, err := consumer.VerifyExactInputs(ctx, request.Reference, policy, expectation)
+	verified, inputDescription, err := consumer.verifyQualificationInputs(ctx, request.Reference, policy, expectation)
 	if err != nil {
 		return nil, nil, err
 	}
 	transferred := false
 	defer func() {
 		if !transferred {
-			_ = verified.Close()
+			if closeErr := verified.Close(); closeErr != nil {
+				resultErr = errors.Join(resultErr, closeErr)
+			}
 		}
 	}()
-	inputDescription, err := inputs.Description()
-	if err != nil {
-		return nil, nil, err
-	}
 	publication, err := verified.publication.Description(request.Reference)
 	if err != nil {
 		return nil, nil, err
 	}
-	if publication.Metadata.InvocationID != origin.InvocationID {
-		return nil, nil, e.New(e.CodeVerifyFailed, "publication belongs to another producing Run attempt")
+	if err := factory.ValidateQualificationRootInvocation(predicates[request.Reference], &plan, publication.Metadata.InvocationID, origin.InvocationID); err != nil {
+		return nil, nil, err
 	}
 	if len(predicates) != len(publication.Outputs)+1 {
 		return nil, nil, e.New(e.CodeReleaseIncomplete, "qualification predicates do not cover the exact root and output set")
@@ -340,10 +338,7 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 		checks := []ArtifactCheckResult{{Name: "schema-and-membership", Status: "pass"}}
 		memberEvidenceErrs := evidenceFailures[output.Name]
 		outputEvidenceErr := errors.Join(errors.Join(memberEvidenceErrs...), evidenceErr)
-		var outputRunOriginErr error
-		if output.Publication != nil && (output.Publication.PreparedInvocationID != origin.InvocationID || output.Publication.SignedInvocationID != origin.InvocationID) {
-			outputRunOriginErr = e.New(e.CodeVerifyFailed, "output %q was prepared or signed by another producing attempt; qualification reuse is not admitted", output.Name)
-		}
+		outputRunOriginErr := factory.ValidateQualificationOutputOrigin(predicates[output.Reference], &plan, output, publication.Metadata.InvocationID)
 		outputRunErr := errors.Join(rootErr, outputRunOriginErr)
 		checks = append(checks, qualificationCheck("run-and-inputs", outputRunErr), qualificationCheck("signed-evidence", outputEvidenceErr))
 		signatureErr := verifyQualificationSubject(ctx, verifier, output.Reference, predicates[output.Reference], policy, origin)

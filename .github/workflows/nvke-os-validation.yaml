@@ -301,8 +301,7 @@ jobs:
             exit 1
           }
           pin="$(bin/nvkr catalog source-pin \
-            --data .candidate-inputs/inputs/catalogs/node-images/diagnostic \
-            nvke-os)"
+            --data .candidate-inputs/inputs/catalogs/node-images/diagnostic nvke-os)"
           # One lock entry cannot establish the full component/overlay closure.
           # New input schemas must land in main before this trusted reader.
           for target_arch in "${required_arches[@]}"; do

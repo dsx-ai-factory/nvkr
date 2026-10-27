@@ -224,7 +224,18 @@ func PullPublication(ctx context.Context, reference, workspace string, options R
 }
 
 func (publication *Publication) Close() error {
-	if publication == nil || publication.publicationState == nil {
+	return publication.retainedState().close()
+}
+
+func (publication *Publication) retainedState() *publicationState {
+	if publication == nil {
+		return nil
+	}
+	return publication.publicationState
+}
+
+func (publication *publicationState) close() error {
+	if publication == nil {
 		return nil
 	}
 	publication.mu.Lock()
@@ -268,7 +279,11 @@ func (publication *Publication) Outputs() ([]Output, error) {
 // Artifacts projects exact named outputs, binding their transport references to
 // this root. The content subject never includes those repository locators.
 func (publication *Publication) Artifacts(reference string) ([]Output, string, error) {
-	if publication == nil || publication.publicationState == nil {
+	return publication.retainedState().artifacts(reference)
+}
+
+func (publication *publicationState) artifacts(reference string) ([]Output, string, error) {
+	if publication == nil {
 		return nil, "", e.New(e.CodeGateUnmet, "publication is not open")
 	}
 	publication.mu.RLock()
@@ -295,7 +310,11 @@ func (publication *Publication) Artifacts(reference string) ([]Output, string, e
 }
 
 func (publication *Publication) RequireAttestedEvidence() error {
-	if publication == nil || publication.publicationState == nil {
+	return publication.retainedState().requireAttestedEvidence()
+}
+
+func (publication *publicationState) requireAttestedEvidence() error {
+	if publication == nil {
 		return e.New(e.CodeGateUnmet, "publication is not open")
 	}
 	publication.mu.RLock()

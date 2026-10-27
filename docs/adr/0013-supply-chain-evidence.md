@@ -140,7 +140,7 @@ The internal index uses `nvkr.dev/sbom-index/v2`; generated CycloneDX properties
 Replacing the former Recipe binding changes document identity; old evidence is not silently translated.
 
 A generic `bundle-oci` output always receives the internal `bundle-files/v1` inventory defined by
-[ADR-24](0024-generic-oci-bundles-and-aicr-producers.md), even without `sbomTool`. It binds every regular
+[ADR-25](0025-generic-oci-bundles-and-aicr-producers.md), even without `sbomTool`. It binds every regular
 archive file's relative path, exact hash, size and mode to the observed archive. Packaging evidence separately
 binds the final OCI manifest and that archive's inspection digest. Referenced charts, images, Terraform
 providers and runtime packages are not downloaded or inspected; this is delivered-file coverage only.
@@ -223,7 +223,7 @@ Per-material mixed scanner/package-reader/file-walk documents use the descriptiv
 inspection method, not `syft-cyclonedx/v1`. Only the final correspondence operation uses
 `disk-reconciled/v1` with an `operating-system` subject. File dependency inventories are admitted only
 for these per-artifact disk methods, the separately scoped `archive-content/v1` method below, and
-ADR-24's `bundle-files/v1` method, not ordinary Helm/Syft dependency documents. Source declarations
+ADR-25's `bundle-files/v1` method, not ordinary Helm/Syft dependency documents. Source declarations
 cannot relabel the inspected disk subject. This is descriptive vocabulary validation: neither a subject
 type nor a method string restores a runtime receipt or grants publication authority.
 
@@ -344,12 +344,15 @@ limits visible through the current cgroup mount, not a reservation, hidden ances
 allocation or a hosted identity boundary. The generic APIs do not by themselves connect a production disk
 compiler, packaging consumer or publisher.
 
-The diagnostic guest package capture schema `nvkr.dev/package-acquisitions/v1` has scope
+The diagnostic guest package capture schemas `nvkr.dev/package-acquisitions/v1` and the original upstream
+NVKE envelope `nkd.dev/package-acquisitions/v1` have scope
 `apt-pre-install-pkgs` and target `amd64` or `arm64`. Its canonical JSON manifest is the first USTAR member,
 followed by nonempty, unique package members in digest order with exact digest-derived paths and sizes.
 Limits are 16,384 packages, 1 GiB per package, 8 MiB manifest, 8 GiB archive, and 1–32 bounded raw repository
 locations per package, each at most 4,096 bytes. The owning held-archive verifier checks member-byte
 correspondence without extraction; package display metadata and locations remain source-reported descriptions.
+The reader preserves the original envelope and digest-bound bytes; accepting either exact schema name does
+not rewrite the producer, permit other versions or change the validation and authority boundaries.
 Header metadata and member padding are opaque digest-bound bytes, not canonical package evidence. Capture
 settings belong to the selected producer configuration. The [capture contract](../nvke-os-acquisition-contract.md)
 describes the unpinned NVKE candidate. The generic collector binds a selected carrier to its original

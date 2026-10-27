@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -167,6 +168,13 @@ func TestCollectQualificationEvidencePreservesEveryOriginalPredicate(t *testing.
 }
 
 func TestCollectQualificationEvidenceRejectsIncompleteOrSubstitutedRecords(t *testing.T) {
+	plan, prepared, original, _ := qualificationEvidenceFixture(t, true)
+	// These cases mutate restored control files, not the producer execution.
+	// Assemble the immutable release once and give each case independent bytes.
+	prepared, err := filepath.Abs(prepared)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tc := range []struct {
 		name string
 		edit func(*testing.T, *Plan, map[string]Artifact, string)
@@ -221,7 +229,18 @@ func TestCollectQualificationEvidenceRejectsIncompleteOrSubstitutedRecords(t *te
 		}, e.CodePipelineDrift},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			plan, workspace, artifacts, _ := qualificationEvidenceFixture(t, true)
+			workspace := filepath.Join(t.TempDir(), "restored")
+			if err := os.CopyFS(workspace, os.DirFS(prepared)); err != nil {
+				t.Fatal(err)
+			}
+			artifacts := maps.Clone(original)
+			for id, artifact := range artifacts {
+				artifact.Path = filepath.Join(workspace, strings.TrimPrefix(artifact.Path, ".nvkr/factory/"))
+				artifacts[id] = artifact
+			}
+			if _, _, err := CollectQualificationEvidence(t.Context(), workspace, plan); err != nil {
+				t.Fatalf("copied fixture must be valid before its intended mutation: %v", err)
+			}
 			tc.edit(t, plan, artifacts, outputPublicationRoute(plan.LifecycleOutputs[0].Name))
 			reference, predicates, err := CollectQualificationEvidence(t.Context(), workspace, plan)
 			assertFactoryErrorCode(t, err, tc.code)

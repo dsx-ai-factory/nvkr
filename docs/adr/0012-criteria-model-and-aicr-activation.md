@@ -20,8 +20,8 @@ routes. Neither requires an NVKR Recipe, deployment topology, or a generic crite
 
 ### 1. Concrete target platforms
 
-Every native Definition output declares `platform: linux/amd64` or `linux/arm64`; no wildcard, missing value or
-host-derived default is admitted. Catalog components declare sorted supported `platforms`, with complete exact
+Every native Definition output declares `platform: linux/amd64` or `linux/arm64`; the local executable
+diagnostic also admits `darwin/arm64`. No wildcard, missing value or host-derived default is admitted. Catalog components declare sorted supported `platforms`, with complete exact
 pin/toolchain routes for those declarations. Selecting an unsupported route fails before external work.
 `pkg/nvkr/target` owns the platform and architecture domains.
 
@@ -32,9 +32,20 @@ output is a standard OCI image index whose concrete native children exhaust that
 this output must declare a platform contained in the required set. Executable outputs remain separate named
 native artifacts; the image-index contract does not create an executable aggregate.
 
+The Darwin exception admits HTTPS executable acquisition and CGO-free `oci-hermetic` host-package or
+tarball producers. Its payload target is `darwin/arm64`; its explicit `toolchainPlatform` is `linux/arm64`.
+The compiler sets `GOOS=darwin`, `GOARCH=arm64` and `CGO_ENABLED=0`. Images, disks, CGO producers, hosted
+execution, signing and qualified authority do not inherit this exception. Linux target admission is unchanged.
+
+ADR-10 separately admits the local `native-go` diagnostic builder for host-matching executable packages,
+including CGO. Its `toolchainPlatform` equals its payload platform, and the toolchain identity binds the
+installed Go SDK tree and C compiler bytes. It requires an explicit local Environment binding and declared
+host network; it provides no hosted, signing, publication, qualified or container-isolation claim.
+
 Targets remain distinct from execution-host requirements. A VM producer's eligible host, KVM/TCG route and
-capability policy are execution contracts, not target defaults. Source builds retain the native-target container
-model; a foreign host requires its admitted execution mechanism. The typed `{{.Arch}}` producer token is resolved
+capability policy are execution contracts, not target defaults. Linux source builds retain the native-target container
+model; Darwin executable cross-builds use the explicit exception above. A foreign host otherwise requires
+its admitted execution mechanism. The typed `{{.Arch}}` producer token is resolved
 from the explicit target. Other command values are never inferred from deployment context.
 
 ### 2. Retired AICR profile model
@@ -47,7 +58,7 @@ removed: it had no concrete consumer, and the rendering/publication boundary (§
 closed end-to-end. `canonical.KindAICRBundle` remains a permanently reserved, retired digest domain (ADR-01 §3) so
 no future family can silently reuse its identity.
 
-[ADR-24](0024-generic-oci-bundles-and-aicr-producers.md) admits current AICR rendering through ordinary
+[ADR-25](0025-generic-oci-bundles-and-aicr-producers.md) admits current AICR rendering through ordinary
 pinned source producers and the generic `bundle-oci` artifact format. It does not restore these retired
 fields, the old qualified adapter or its digest domain. Upstream hardware recipe support and deployment
 acceptance remain explicit limitations of the selected inputs.

@@ -55,7 +55,7 @@ func TestTenantGuestBindingRequiresExactSourceOwnerJoin(t *testing.T) {
 			case "pending":
 				rows[1].Status.InstanceID = ""
 			}
-			bound, valid := tenantGuestBindings(rows, "tenant", "cluster-id")
+			bound, valid := tenantGuestBindingsForCount(rows, "tenant", "cluster-id", 2, false)
 			if valid != (name == "valid" || name == "pending") {
 				t.Fatalf("binding validity %v for %s", valid, name)
 			}
@@ -89,7 +89,7 @@ func TestTenantGuestFailureIsClosedAndRoleBound(t *testing.T) {
 			case "forged-cluster":
 				rows[3].Spec.Labels["nke.nvidia.com/cluster-id"] = "foreign"
 			}
-			bindings, valid := tenantGuestBindings(rows, "tenant", "cluster-id")
+			bindings, valid := tenantGuestBindingsForCount(rows, "tenant", "cluster-id", 2, false)
 			if valid != (scenario != "duplicate-condition" && scenario != "forged-host" && scenario != "forged-cluster") {
 				t.Fatalf("unexpected source admission: %v", valid)
 			}
@@ -217,7 +217,7 @@ func TestTenantConsoleChangeIsObservedNotInferredFromBaseline(t *testing.T) {
 	}
 }
 
-func TestTenantGuestObserverUnavailableAndCancellationAreBounded(t *testing.T) {
+func TestNativeTenantObserverUnavailableAndCancellationAreBounded(t *testing.T) {
 	for _, scenario := range []string{"unavailable", "canceled", "deadline"} {
 		t.Run(scenario, func(t *testing.T) {
 			work := privateTestDir(t)
@@ -238,16 +238,18 @@ func TestTenantGuestObserverUnavailableAndCancellationAreBounded(t *testing.T) {
 				ctx, cancelDeadline = context.WithTimeout(ctx, 100*time.Millisecond)
 				defer cancelDeadline()
 			}
-			observer := tenantGuestObserver{}
-			err := observer.update(ctx, &selected, time.Now())
+			observer := nativeTenantObserver{}
+			site := &nativeSiteAttempt{tenantOwner: &selected}
+			runner := selected.session.Runner
+			err := observer.update(ctx, site, runner, work, "owned", time.Now())
 			if scenario == "unavailable" {
 				if err != nil || len(writer.events) != 1 || writer.events[0].Kind != TenantGuests || writer.events[0].Guests != emptyTenantGuests() {
 					t.Fatalf("unavailable observation: %+v %v", writer.events, err)
 				}
-				if err = observer.update(ctx, &selected, observer.last.Add(time.Second)); err != nil || len(writer.events) != 1 {
+				if err = observer.update(ctx, site, runner, work, "owned", observer.last.Add(time.Second)); err != nil || len(writer.events) != 1 {
 					t.Fatal("observer ignored 30-second cadence")
 				}
-			} else if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) || errors.Is(err, ErrUnjoined) || len(writer.events) != 0 {
+			} else if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) || errors.Is(err, ErrUnjoined) || len(writer.events) != map[string]int{"canceled": 0, "deadline": 1}[scenario] {
 				t.Fatalf("canceled observer did not join: %v %+v", err, writer.events)
 			}
 			if scenario == "canceled" {
@@ -267,106 +269,69 @@ func TestTenantDomainPresentationIsClosed(t *testing.T) {
 	}
 }
 
-func TestTenantGuestObserverUsesOnlyExactOwnedDomains(t *testing.T) {
-	for _, scenario := range []string{"owned", "foreign-disk", "unsafe-console", "creation-failed"} {
+func TestTenantDomainObservationUsesOnlyExactOwnedDomains(t *testing.T) {
+	for _, scenario := range []string{"owned", "foreign-disk", "unsafe-console"} {
 		t.Run(scenario, func(t *testing.T) {
 			base := privateTestDir(t)
-			site, simulator, tools := filepath.Join(base, "site"), filepath.Join(base, "simulator"), filepath.Join(base, "tools")
-			for _, dir := range []string{site, simulator, tools} {
-				if err := os.Mkdir(dir, 0o700); err != nil {
+			simulator, tools := filepath.Join(base, "simulator"), filepath.Join(base, "tools")
+			dir := filepath.Join(simulator, "var", "instances", "cp-instance")
+			for _, path := range []string{dir, tools} {
+				if err := os.MkdirAll(path, 0o700); err != nil {
 					t.Fatal(err)
 				}
 			}
-			for _, instance := range []string{"cp-instance", "worker-instance"} {
-				dir := filepath.Join(simulator, "var", "instances", instance)
-				if err := os.MkdirAll(dir, 0o700); err != nil {
+			writeTenantFixture(t, filepath.Join(dir, "disk.qcow2"), []byte("disk"), 0o600)
+			console := filepath.Join(dir, "disk.qcow2.ttyS0.log")
+			if scenario == "unsafe-console" {
+				if err := os.Symlink("/etc/passwd", console); err != nil {
 					t.Fatal(err)
 				}
-				if err := os.WriteFile(filepath.Join(dir, "disk.qcow2"), []byte("disk"), 0o600); err != nil {
-					t.Fatal(err)
-				}
-				console := filepath.Join(dir, "disk.qcow2.ttyS0.log")
-				if scenario == "unsafe-console" {
-					if err := os.Symlink("/etc/passwd", console); err != nil {
-						t.Fatal(err)
-					}
-				} else if err := os.WriteFile(console, []byte("private console secret"), 0o600); err != nil {
-					t.Fatal(err)
-				}
+			} else {
+				writeTenantFixture(t, console, []byte("private console secret"), 0o600)
 			}
-			boundRows := guestBindingFixture(t)
-			if scenario == "creation-failed" {
-				boundRows[3].Status.InstanceID = ""
-				boundRows[3].Status.Conditions = []struct{ Type, Status, Reason string }{{"MachineProvisioned", "False", "InstanceCreateFailed"}}
-			}
-			rows, err := json.Marshal(struct{ Items []tenantMachineObservation }{boundRows})
-			if err != nil {
-				t.Fatal(err)
-			}
-			fixture := filepath.Join(base, "rows.json")
-			if err = os.WriteFile(fixture, rows, 0o600); err != nil {
-				t.Fatal(err)
-			}
-			writeTenantFixture(t, filepath.Join(tools, "kubectl"), []byte("#!/bin/sh\ncat \"$ROWS\"\n"), 0o700)
 			writeTenantFixture(t, filepath.Join(tools, "virsh"), []byte(`#!/bin/sh
 case "$3" in
  dumpxml)
-   instance=${4#nico-vm-}
-   disk="$SIM/var/instances/$instance/disk.qcow2"
+   disk="$SIM/var/instances/cp-instance/disk.qcow2"
    if test "$SCENARIO" = foreign-disk; then disk=/foreign/disk.qcow2; fi
-   printf '<domain><name>%s</name><uuid>%s-uuid</uuid><devices><disk><source file="%s"/></disk></devices></domain>' "$4" "$instance" "$disk"
+   printf '<domain><name>%s</name><uuid>cp-instance-uuid</uuid><devices><disk><source file="%s"/></disk></devices></domain>' "$4" "$disk"
    ;;
- domuuid) printf '%s-uuid' "${4#nico-vm-}" ;;
+ domuuid) printf cp-instance-uuid ;;
  domstate) printf running ;;
  *) exit 9 ;;
 esac
 `), 0o700)
-			writer := &recordedProgress{}
-			env := []string{"PATH=" + tools + ":/usr/bin:/bin", "ROWS=" + fixture, "SIM=" + simulator, "SCENARIO=" + scenario, "SITE_KUBECONFIG=owned"}
-			selected := tenant{name: "tenant", id: "cluster-id", session: ManagementSession{Work: site, Tools: tools, Runner: Runner{Work: site, Env: env, Progress: writer}}, domains: Runner{Env: env}}
-			observer := tenantGuestObserver{}
+			runner := Runner{Env: []string{"PATH=" + tools + ":/usr/bin:/bin", "SIM=" + simulator, "SCENARIO=" + scenario}}
+			sample := tenantConsoleSample{}
+			guest := TenantGuestObservation{Domain: TenantDomainUnknown, ProviderReady: TenantConditionUnknown}
 			observedAt := time.Unix(1000, 0)
-			if err = observer.update(t.Context(), &selected, observedAt); err != nil {
-				t.Fatal(err)
+			observed, err := observeTenantDomain(t.Context(), runner, simulator, "cp-instance", &sample, &guest, observedAt)
+			if err != nil || observed != (scenario != "foreign-disk") || guest.ConsoleKnown != (scenario == "owned") || guest.ConsoleChanged || guest.Available || guest.ProviderReady != TenantConditionUnknown {
+				t.Fatalf("domain observation invented readiness or unsafe console metadata: %+v %v", guest, err)
 			}
-			if len(writer.events) != 1 || writer.events[0].Kind != TenantGuests {
-				t.Fatalf("missing guest snapshot: %+v", writer.events)
+			wantDomain := TenantDomainUnknown
+			if observed {
+				wantDomain = TenantDomainRunning
 			}
-			guests := writer.events[0].Guests
-			for i, guest := range guests {
-				available := scenario != "foreign-disk" && !(scenario == "creation-failed" && i == 1)
-				known := scenario == "owned" || scenario == "creation-failed" && i == 0
-				if guest.Available != available || guest.ConsoleKnown != known || guest.ConsoleChanged {
-					t.Fatalf("%s: %+v", scenario, guest)
-				}
-			}
-			if scenario == "creation-failed" && (guests[1].Available || guests[1].ProvisioningFailure != TenantInstanceCreateFailed || guests[1].ProviderReady != TenantConditionUnknown) {
-				t.Fatalf("failure before instance creation was lost or granted readiness: %+v", guests[1])
-			}
-			if scenario == "owned" && (guests[0].Domain != TenantDomainRunning || guests[0].ProviderReady != TenantConditionFalse || guests[1].ProviderReady != TenantConditionTrue) {
-				t.Fatalf("incorrect descriptive readiness: %+v", guests)
+			if guest.Domain != wantDomain {
+				t.Fatal("foreign or owned domain state lost", guest)
 			}
 			if scenario == "owned" {
-				console := filepath.Join(simulator, "var", "instances", "cp-instance", "disk.qcow2.ttyS0.log")
-				if err = os.WriteFile(console, []byte("private console secret grows"), 0o600); err != nil {
-					t.Fatal(err)
-				}
+				writeTenantFixture(t, console, []byte("private console secret grows"), 0o600)
 				for _, elapsed := range []time.Duration{30 * time.Second, 75 * time.Second} {
-					if err = observer.update(t.Context(), &selected, observedAt.Add(elapsed)); err != nil {
-						t.Fatal(err)
+					guest = TenantGuestObservation{}
+					if _, err := observeTenantDomain(t.Context(), runner, simulator, "cp-instance", &sample, &guest, observedAt.Add(elapsed)); err != nil || !guest.ConsoleChanged || guest.ConsoleLastChange != elapsed-30*time.Second {
+						t.Fatal("domain observer discarded its injected observation time", guest, err)
 					}
 				}
-				if len(writer.events) != 3 || !writer.events[1].Guests[0].ConsoleChanged || writer.events[1].Guests[0].ConsoleLastChange != 0 || writer.events[2].Guests[0].ConsoleLastChange != 45*time.Second {
-					t.Fatal("guest update discarded its injected observation time", writer.events)
-				}
 			}
-			public, err := json.Marshal(writer.events)
+			public, err := json.Marshal(guest)
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, private := range []string{"secret", "cp-instance", "worker-instance", "private-cp", "private-worker", base} {
+			for _, private := range []string{"secret", "cp-instance", base} {
 				if strings.Contains(string(public), private) {
-					t.Fatalf("guest progress leaked %s", private)
+					t.Fatalf("domain progress leaked %s", private)
 				}
 			}
 		})

@@ -76,8 +76,11 @@ func pullOutput(ctx context.Context, reference, output, out, workspace string, o
 	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		return PulledOutput{}, e.New(e.CodeEngineCapability, "release pull requires atomic no-replace directory publication")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Minute)
-	defer cancel()
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 20*time.Minute)
+		defer cancel()
+	}
 	if workspace != "" {
 		outAbsolute, err := resolvePullPath(ctx, out)
 		if err != nil {
