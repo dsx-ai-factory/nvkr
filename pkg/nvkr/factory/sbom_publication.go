@@ -129,9 +129,18 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 					}
 				}
 			}
-			if (kind == "bundle-archive" && (method != "bundle-files/v1" || scanner != "")) ||
-				(kind == "tarball" && method != "helm-manifests/v1") ||
-				(kind != "tarball" && kind != "bundle-archive" && (method != "syft-cyclonedx/v1" || scanner != toolExecutableDigest(plan, plan.Definition.SBOMTool))) {
+			matches := false
+			switch kind {
+			case "tarball":
+				matches = method == "helm-manifests/v1" && scanner == ""
+			case "bundle-archive":
+				matches = method == sbom.BundleFilesMethod && scanner == ""
+			case "file-archive":
+				matches = method == "archive-content/v1" && scanner == ""
+			case "host-package", "oci-image":
+				matches = method == "syft-cyclonedx/v1" && scanner == toolExecutableDigest(plan, plan.Definition.SBOMTool)
+			}
+			if !matches {
 				return nil, e.New(e.CodeVerifyFailed, "hosted SBOM inspection does not match the planned scanner")
 			}
 		}

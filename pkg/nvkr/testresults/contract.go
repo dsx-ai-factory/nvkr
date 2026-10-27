@@ -40,7 +40,7 @@ const FormatCTRF = "ctrf-json"
 // does not validate JSON against the upstream schema or interpret test results.
 const CTRFProfile = "ctrf-0.2.0"
 
-// Producer implementations external to NVKR own configuration and
+// Producer implementations own configuration and
 // execution. On error, any retained output must use CapturePartial. Neither
 // output, CaptureComplete nor Validate implies that tests passed.
 type Producer interface {

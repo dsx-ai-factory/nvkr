@@ -288,6 +288,24 @@ func (r hostedPredicateRun) StartedOn() time.Time  { return r.startedOn }
 func (r hostedPredicateRun) FinishedOn() time.Time { return r.finishedOn }
 
 func validateHostedProductionPredicate(raw []byte, plan *Plan, signing *definition.Signing) error {
+	builder, invocation := "", ""
+	if plan.Environment.GitHubDevelopment {
+		digest, err := plan.IdentityDigest()
+		if err != nil {
+			return err
+		}
+		run, err := publicationRunContext(plan, digest, time.Now().UTC(), time.Now().UTC())
+		if err != nil {
+			return err
+		}
+		builder, invocation = run.BuilderID(), run.InvocationID()
+	}
+	return validateProductionPredicateOrigin(raw, plan, signing, builder, invocation)
+}
+
+// Origin values constrain this descriptive validation only. Signature verification
+// and provider-authenticated receipts remain mandatory at consumer boundaries.
+func validateProductionPredicateOrigin(raw []byte, plan *Plan, signing *definition.Signing, builder, invocation string) error {
 	var predicate provenance.Predicate
 	trimmed := bytes.TrimSuffix(raw, []byte{'\n'})
 	if err := canonical.UnmarshalExact(trimmed, &predicate); err != nil {
@@ -300,19 +318,10 @@ func validateHostedProductionPredicate(raw []byte, plan *Plan, signing *definiti
 	if err != nil || !identity.MatchString(predicate.RunDetails.Builder.ID) {
 		return e.New(e.CodeVerifyFailed, "hosted production predicate builder does not match the signing identity policy")
 	}
-	if plan.Environment.GitHubDevelopment {
-		digest, err := plan.IdentityDigest()
-		if err != nil {
-			return err
-		}
-		run, err := publicationRunContext(plan, digest, time.Now().UTC(), time.Now().UTC())
-		if err != nil {
-			return err
-		}
-		if predicate.RunDetails.Builder.ID != run.BuilderID() || predicate.RunDetails.Metadata["invocationId"] != run.InvocationID() {
-			return e.New(e.CodeVerifyFailed, "development provenance belongs to another workflow or run attempt")
-		}
+	if builder != "" && (predicate.RunDetails.Builder.ID != builder || predicate.RunDetails.Metadata["invocationId"] != invocation) {
+		return e.New(e.CodeVerifyFailed, "production provenance belongs to another workflow or Run attempt")
 	}
+
 	startedOn, err := time.Parse(time.RFC3339Nano, predicate.RunDetails.Metadata["startedOn"])
 	if err != nil {
 		return e.Wrap(e.CodeProvenanceMissing, err, "decoding hosted production predicate start time")

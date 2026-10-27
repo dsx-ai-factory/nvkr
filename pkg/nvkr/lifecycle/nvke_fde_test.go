@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -27,8 +28,8 @@ func TestNVKEFDEOnlyGeneratedSelection(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(repo)
-	const definition = "definitions/nvke-fde/definition.yaml"
-	const environment = "definitions/nvke-fde/environment-github.yaml"
+	const definition = "inputs/definitions/diagnostics/fde-amd64.yaml"
+	const environment = "inputs/environments/github-diagnostics.yaml"
 	plan, err := CompileFiles(t.Context(), definition, environment, "test (deadbeef)")
 	if err != nil {
 		t.Fatal(err)
@@ -81,8 +82,8 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(repo)
-	const definitionPath = "definitions/nvke-m2/definition.yaml"
-	const environmentPath = "definitions/nvke-m2/environment-github.yaml"
+	const definitionPath = "inputs/definitions/nvke/definition.yaml"
+	const environmentPath = "inputs/environments/github-release.yaml"
 	definition, err := LoadDefinition(t.Context(), definitionPath)
 	if err != nil {
 		t.Fatal(err)
@@ -94,7 +95,7 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 	controllerCatalog := nvkeM2ControllerCatalogFixture(t)
 	for i := range definition.Outputs {
 		output := &definition.Outputs[i]
-		if output.Catalog != nil && output.Catalog.Base == "../nvke-controller/catalog" {
+		if output.Catalog != nil && output.Catalog.Base == "../../catalogs/nvke/release" {
 			output.Catalog.Base = controllerCatalog
 		}
 	}
@@ -138,10 +139,10 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 		arch, installer, patched, plain, toolchain, firmwareCode, firmwareVars, memory string
 	}{
 		{"amd64", "ubuntu-installer-iso-amd64", "nvke-patched-installer-iso-amd64", "nvke-node-image-amd64",
-			"ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:5bea678dc304d7d6814cd60646cc67b59194644335e83d7fe0a81920e8996013",
+			"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:2a8d3ca5b447fe9d4694aa6cd977c6353299b336656b23688bc6dc11b8ab98f2",
 			"/usr/share/OVMF/OVMF_CODE_4M.fd", "/usr/share/OVMF/OVMF_VARS_4M.fd", ""},
 		{"arm64", "ubuntu-installer-iso", "nvke-patched-installer-iso", "nvke-node-image",
-			"ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer@sha256:ad467e43ae0ee7f3aaf5b646a117003623b9ea23de035630dc7f5c844758e0db",
+			"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:1685a47997af96b802d050b31c212868e65626c614f5a69488141a9e979f2ad2",
 			"/usr/share/AAVMF/AAVMF_CODE.no-secboot.fd", "/usr/share/AAVMF/AAVMF_VARS.fd", "4096"},
 	} {
 		t.Run(tc.arch, func(t *testing.T) {
@@ -247,18 +248,25 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 func nvkeM2ControllerCatalogFixture(t *testing.T) string {
 	t.Helper()
 	directory := t.TempDir()
-	if err := os.CopyFS(directory, os.DirFS("definitions/nvke-controller/catalog")); err != nil {
+	if err := os.CopyFS(directory, os.DirFS("inputs/catalogs/nvke/release")); err != nil {
 		t.Fatal(err)
 	}
 	lock, err := catalog.LoadLockContext(t.Context(), directory)
 	if err != nil {
 		t.Fatal(err)
 	}
-	const sourceCommit = "33fb71b2f4224b470ebc628a9165fc4b92870406"
+	// The release is whatever the authored lock records, so a reviewed catalog
+	// maintenance bump does not break this fixture. The chart-owning nvke source
+	// and its chart source are one maintained release cohort and must agree; the
+	// independent nvke-cli role only has to be a complete commit.
+	sourceCommit := lock.Pins["nvke"].Commit
 	for _, name := range []string{"nvke", "nvke-cli", "nvke-helm"} {
-		if lock.Pins[name].Commit != sourceCommit {
-			t.Fatalf("authored %s source=%s, want %s", name, lock.Pins[name].Commit, sourceCommit)
+		if !fullCommit.MatchString(lock.Pins[name].Commit) {
+			t.Fatalf("authored %s source=%q is not a full commit", name, lock.Pins[name].Commit)
 		}
+	}
+	if lock.Pins["nvke-helm"].Commit != sourceCommit {
+		t.Fatalf("authored nvke-helm source=%s, want the nvke source %s", lock.Pins["nvke-helm"].Commit, sourceCommit)
 	}
 	repo := t.TempDir()
 	if err := os.CopyFS(repo, os.DirFS("pkg/nvkr/catalog/testdata/nvke-pin-set")); err != nil {
@@ -310,3 +318,5 @@ func nvkeM2ControllerCatalogFixture(t *testing.T) string {
 	}
 	return directory
 }
+
+var fullCommit = regexp.MustCompile(`^[0-9a-f]{40}$`)

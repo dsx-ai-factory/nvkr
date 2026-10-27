@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/environment/v1
+kind: Environment
+metadata:
+  name: validation-tools-local-arm64-candidate
+runtime:
+  buildNetworkPolicy: producer-declared
+  runtime: docker
+utilityContainer: docker.io/library/golang@sha256:a83e961ad968e2e7abc2a59554e356f00c2a270a15fbb39f2c84a4caf13be9c3
+utilityPlatform: linux/arm64

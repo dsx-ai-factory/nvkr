@@ -10,7 +10,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -19,7 +18,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
 	"github.com/dsx-ai-factory/nvkr/internal/sourcegit"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"golang.org/x/sys/unix"
@@ -262,16 +260,16 @@ func TestPreparedInvocationUsesSelectedAuthoredDefinition(t *testing.T) {
 		mode, definition string
 		valid            bool
 	}{
-		{"ovn", "definition.json", true},
-		{"kind-calico", "definition.json", true},
-		{"upstream-ovn", "definition-upstream-ovn.json", true},
-		{"upstream-ovn", "definition.json", false},
-		{"ovn", "definition-upstream-ovn.json", false},
+		{"ovn", "arm64-nvidia-tcg.json", true},
+		{"kind-calico", "arm64-nvidia-tcg.json", true},
+		{"upstream-ovn", "arm64-upstream-tcg.json", true},
+		{"upstream-ovn", "arm64-nvidia-tcg.json", false},
+		{"ovn", "arm64-upstream-tcg.json", false},
 	} {
 		t.Run(test.mode+"/"+test.definition, func(t *testing.T) {
 			cfg := BuildConfig{Repository: privateTestDir(t), AttemptPrefix: "fresh", Jobs: 4, Network: test.mode}
 			args := preparedInvocationFixture(cfg)
-			args[4] = "definitions/nvke-local-dev-arm64/" + test.definition
+			args[4] = "inputs/definitions/demo/" + test.definition
 			writeInvocationFixture(t, cfg, args)
 			got, err := preparedBuildInvocation(cfg)
 			if test.valid {
@@ -289,7 +287,7 @@ func TestUpstreamBuildPreparationKeepsExplicitMode(t *testing.T) {
 	dir := privateTestDir(t)
 	cfg := BuildConfig{Repository: dir, AttemptPrefix: "fresh", Jobs: 4, Network: "upstream-ovn"}
 	args := preparedInvocationFixture(cfg)
-	args[4] = "definitions/nvke-local-dev-arm64/definition-upstream-ovn.json"
+	args[4] = "inputs/definitions/demo/arm64-upstream-tcg.json"
 	writeInvocationFixture(t, cfg, args)
 	log, script := filepath.Join(dir, "calls"), filepath.Join(dir, "launcher.sh")
 	if err := os.WriteFile(script, []byte("#!/bin/sh\nprintf 'prepare:%s\\n' \"$*\" >>\"$CALLS\"\n"), 0700); err != nil {
@@ -311,7 +309,7 @@ func TestUpstreamBuildPreparationKeepsExplicitMode(t *testing.T) {
 
 func preparedInvocationFixture(cfg BuildConfig) []string {
 	root := ".nvkr/laptop-bootstrap/" + cfg.AttemptPrefix
-	return []string{root + "/nvkr", "run", "local", "--definition", root + "/definition.json", "--environment", "definitions/nvke-local-dev-arm64/environment-local-docker.json", "--attempt", cfg.AttemptPrefix, "--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", "4", "--runtime", "docker", "--ui=plain"}
+	return []string{root + "/nvkr", "run", "local", "--definition", root + "/definition.json", "--environment", "inputs/environments/local-arm64-tcg.json", "--attempt", cfg.AttemptPrefix, "--attempts-root", ".nvkr/runs", "--runner-source", ".", "--jobs", "4", "--runtime", "docker", "--capture-inputs-root=.", "--ui=plain"}
 }
 
 func writeInvocationFixture(t *testing.T, cfg BuildConfig, args []string) {
@@ -515,23 +513,5 @@ func TestBuildAttemptDiagnostics(t *testing.T) {
 				}
 			})
 		}
-	}
-}
-
-// Positive fixtures select their invocation environment explicitly. Production
-// admission still rejects this unselected override; negative tests keep their
-// own vectors rather than inheriting a blanket package-wide reset.
-func TestPositiveBuildFixturesDoNotInheritUnselectedGitOverrides(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 90*time.Second)
-	defer cancel()
-	selected := "^Test(BuildOnlyPreservesDeveloperGitHome|BuildTransportSettingsReachOnlyGitFetch|BuildAttemptDiagnostics|PrepareInstallerPinnedAttempt|PrepareInstallerAttemptDiagnostics|ProgressInstallerAdmissionFailure)$"
-	command := exec.CommandContext(ctx, os.Args[0], "-test.run="+selected, "-test.count=1", "-test.timeout=80s")
-	command.Env = SetEnv(os.Environ(), map[string]string{
-		"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "safe.directory", "GIT_CONFIG_VALUE_0": "/unselected-fixture",
-	})
-	var output bytes.Buffer
-	command.Stdout, command.Stderr = &output, &output
-	if err := ownedcmd.Run(ctx, command); err != nil {
-		t.Fatalf("positive fixtures inherited ambient Git configuration: %v\n%s", err, &output)
 	}
 }

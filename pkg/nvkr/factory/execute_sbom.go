@@ -221,7 +221,7 @@ func (plan *Plan) validateSBOMGraph() error {
 					if err != nil {
 						return err
 					}
-					if kind != "host-package" && kind != "oci-image" && kind != "tarball" && kind != "bundle-archive" {
+					if kind != "host-package" && kind != "oci-image" && kind != "tarball" && kind != "file-archive" && kind != "bundle-archive" {
 						return e.New(e.CodeEngineCapability, "SBOM dependency inspection does not support %q", candidate.Kind)
 					}
 					matches++
@@ -301,8 +301,8 @@ func readProducerResult(ctx context.Context, path string) (pipeline.ArtifactResu
 	return result, nil
 }
 
-// sbomPayloadKind dispatches archive readers only through their exact output
-// selection. Raw charts require acquisition; generic bundles require source builds.
+// sbomPayloadKind dispatches archive readers only through exact output and
+// producer selections. Bundle, executable-asset and Helm inventories stay distinct.
 func (plan *Plan) sbomPayloadKind(payload Artifact) (string, error) {
 	if plan.hasBundleTarget(payload.BuildTarget) {
 		for _, output := range plan.Definition.Outputs {
@@ -315,6 +315,32 @@ func (plan *Plan) sbomPayloadKind(payload Artifact) (string, error) {
 			}
 		}
 		return "", e.New(e.CodeEngineCapability, "bundle SBOM payload %q is not its exact source archive", payload.ID)
+	}
+	if payload.Kind == "tarball" {
+		for _, output := range plan.Definition.Outputs {
+			if output.Name != payload.BuildTarget || output.Format != authored.OutputExecutable || !containsString(output.Components, payload.Component) {
+				continue
+			}
+			for _, build := range plan.Builds {
+				if build.Name != payload.BuildTarget {
+					continue
+				}
+				for _, component := range build.ResolvedComponents {
+					if component.Name != payload.Component {
+						continue
+					}
+					if component.Helm != nil {
+						return "tarball", nil
+					}
+					for _, producer := range plan.Graph.Nodes {
+						if component.FromSource && component.OutputType == "tarball" && producer.ID == payload.Producer && producer.Kind == NodeBuild && producer.BuildTarget == payload.BuildTarget && containsString(producer.Outputs, payload.ID) {
+							return "file-archive", nil
+						}
+					}
+				}
+			}
+			return "", e.New(e.CodeEngineCapability, "archive SBOM payload %q is not an exact source-built executable bundle member", payload.ID)
+		}
 	}
 	if payload.Kind != "raw" {
 		return payload.Kind, nil

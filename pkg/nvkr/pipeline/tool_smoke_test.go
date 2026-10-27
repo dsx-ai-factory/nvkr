@@ -85,6 +85,10 @@ func TestToolSmokeAdmission(t *testing.T) {
 		{ToolSmokeNVKECTL, []string{"version", "--output", "json"}},
 		{ToolSmokeHelm, []string{"version", "--template", "{{.Version}}"}},
 		{ToolSmokeKubectl, []string{"version", "--client", "--output", "json"}},
+		{ToolSmokeKind, []string{"version", "-q"}},
+		{ToolSmokeClusterctl, []string{"version", "--output=json"}},
+		{ToolSmokeORAS, []string{"version"}},
+		{ToolSmokeNICoSim, []string{"version", "--output=json"}},
 	} {
 		got, err := toolSmokeArguments(tc.profile)
 		if err != nil || !slices.Equal(got, tc.want) {

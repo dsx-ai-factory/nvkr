@@ -54,6 +54,7 @@ func newApp() *cli.App {
 		Commands: []*cli.Command{
 			cmdDefinition(),
 			cmdRun(),
+			cmdValidate(),
 			// The Definition -> Run -> Release lifecycle is the normal surface (ADR-17).
 			// Low-level execution and evidence tools are hidden from the product workflow.
 			cmdResolve(),

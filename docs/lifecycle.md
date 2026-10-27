@@ -16,8 +16,8 @@ The Build Digest identifies that generated graph's logical content. Output label
 execution settings remain in their owning records. Two outputs can share a Build Digest while requiring
 separate producer jobs, observations and evidence; one successful output cannot satisfy a missing sibling.
 
-The [NVKE Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-v1/definition.yaml) directly selects `nvkectl`, `cwe`, and `nvke-helm`
-for three outputs. The Helm output explicitly depends on the CWE image output. No reusable membership group,
+The [NVKE Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-tutorial/definition.yaml) directly selects `nvkectl`, `cwe`, and `nvke-helm`
+for three outputs. The Helm output explicitly depends on the NVKE management-plane image output (`cwe`). No reusable membership group,
 criteria query, inheritance chain, or mixin sits between an output and its producers.
 
 Deployment topology and placement are owned by the system that consumes the artifacts;
@@ -25,8 +25,8 @@ Definitions and Releases contain no cluster views, deployment roles or categorie
 
 ## Select an Environment
 
-The [local Environment](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-v1/environment-local.yaml) supplies execution settings and a local
-registry destination. The [GitHub Environment](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-v1/environment-github.yaml) supplies the
+The [local Environment](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-tutorial/environment-local.yaml) supplies execution settings and a local
+registry destination. The [GitHub Environment](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-tutorial/environment-github.yaml) supplies the
 corresponding hosted-run settings. Environments own runner routes and may declare named execution classes with
 host platform, resource capacity, exposed capabilities, and timeout ceilings. The compiler deterministically
 binds a requested build to one satisfying class and records that exact route in the Plan. A class declaration is
@@ -47,11 +47,11 @@ With `bin/nvkr` built as described in the quickstart, inspect the three-output N
 
 ```sh
 bin/nvkr definition validate \
-  --definition definitions/nvke-v1/definition.yaml
+  --definition docs/examples/nvke-tutorial/definition.yaml
 
 bin/nvkr run plan \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-local.yaml
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-local.yaml
 ```
 
 For saved generated Plans, `run plan --plan <path>` prints the required outputs and instructions;
@@ -59,23 +59,23 @@ For saved generated Plans, `run plan --plan <path>` prints the required outputs 
 and `run diff` explains changes between canonical Plans. See [Plan and graph inspection](plan-and-graph-inspection.md).
 
 Generation writes provider files and their commit manifest from the same admitted inputs. This example
-uses a temporary root: the repository's committed bundle selects M2, not the three-output Definition.
+uses a temporary root: the repository's committed bundle selects the maintained NVKE Definition, not the three-output Definition.
 The matching `--check` invocation regenerates in memory and fails if generated files differ:
 
 ```sh
 NVKR_LIFECYCLE_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-lifecycle.XXXXXX")
 bin/nvkr run generate \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-github.yaml \
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-github.yaml \
   --engine github --root "$NVKR_LIFECYCLE_ROOT"
 
 bin/nvkr run generate \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-github.yaml \
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-github.yaml \
   --engine github --root "$NVKR_LIFECYCLE_ROOT" --check
 ```
 
-Use the [M2 instructions](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/README.md) to regenerate the committed bundle.
+Use the [maintained NVKE Definition's instructions](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md) to regenerate the committed bundle.
 Generated CI defaults to generic hosted runners; ADR-18 separately admits the explicit native ARC disk
 route. Publication and signing belong to the GitHub v1 lane. Generation does not prove provider execution.
 
@@ -85,8 +85,8 @@ Inspect a local attempt without creating its workspace or executing nodes:
 
 ```sh
 bin/nvkr run local \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-local.yaml \
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-local.yaml \
   --attempt review-001 --dry-run
 ```
 
@@ -107,8 +107,8 @@ observation, finalization, release verification or runtime health.
 
 ```sh
 bin/nvkr run local \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-local.yaml \
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-local.yaml \
   --attempt build-001 --ui=plain
 ```
 
@@ -164,13 +164,13 @@ local Run default described above, commands default to `--ui=plain` and keep the
 existing text, canonical JSON or diagram output. On commands with a result
 browser, `--ui=auto` selects it when the terminal is eligible. Explicit JSON output
 and `--ui=tui` are incompatible and fail before input, network or write work.
-`run check-artifacts` and `run qualify` retain canonical machine-readable diagnostics and do not offer
+`validate`, `run check-artifacts` and `run qualify` retain canonical machine-readable diagnostics and do not offer
 presentation flags.
 
 ```sh
-bin/nvkr definition inspect --definition definitions/nvke-v1/definition.yaml --ui=tui
+bin/nvkr definition inspect --definition docs/examples/nvke-tutorial/definition.yaml --ui=tui
 bin/nvkr run graph --plan .github/nvkr-run/plan.json --ui=tui
-bin/nvkr catalog list --data definitions/nvke-v1/catalog --ui=tui
+bin/nvkr catalog list --data inputs/catalogs/nvke/module-tags --ui=tui
 ```
 
 Graph and release browsers start with an output overview when their supplied
@@ -408,7 +408,7 @@ release acceptance still requires its deferred qualification, membership, and re
 result cannot substitute for them. The ADR-04 stock-cosign consumer contract remains independent of the
 convenience NVKR reader.
 
-## Authenticate an M3 candidate
+## Authenticate a qualification candidate
 
 On Linux, `nvkr run check-artifacts` checks the already-published bytes against one exact producing Run
 attempt and an independently selected trust policy:
@@ -455,7 +455,7 @@ delivered payload reference. The collector joins bounded aggregate metadata and 
 without reading payload packages. The handoff contains no consumer policy. Development, unsigned, dry-run and legacy aggregate workflows do not produce it;
 an older Run without a complete handoff fails instead of rebuilding or reconstructing missing evidence.
 Legacy aggregate builds/publication remain available, but they lack invocation-bound release metadata and
-the per-output route records needed for M3 qualification; direct qualification rejects that capability before publication work.
+the per-output route records needed for qualification; direct qualification rejects that capability before publication work.
 
 The lifecycle owner recompiles the captured authored bytes with their original logical paths and requires
 the exact original Plan identity. Authored reads have no checkout fallback. Catalog-owned authentication
@@ -536,7 +536,7 @@ A manually dispatched qualifier or the source build's own identity is rejected.
 Add `--qualification-policy qualification.yaml` to the normal `run generate` invocation to generate the
 qualifier and its native smoke worker alongside the producer. The worker is a generated reusable GitHub
 Actions workflow; the operator does not write or maintain a separate worker implementation. The maintained
-candidate supplies `definitions/nvke-m2/qualification.yaml` and emits `.github/workflows/nvkr-qualify.yml`
+candidate supplies `inputs/policies/nvke-qualification.yaml` and emits `.github/workflows/nvkr-qualify.yml`
 and `.github/workflows/nvkr-smoke.yml`. The same invocation with `--check` compares
 all owned bytes without writing. The separately owned qualification manifest records both workflow files;
 hand edits and unowned files are not silently overwritten. The worker is a fixed same-repository reusable
@@ -552,11 +552,12 @@ The independent policy extends the artifact-check policy with these decisions:
 | `cosign.version` and `cosign.platformDigests` | An exact release locator and independently approved executable bytes for every worker platform plus the AMD64 final signer |
 | `smoke.workflow` | A separate same-repository worker identity, distinct from both builder and final signer |
 | `smoke.images` | Exact native execution-image references, pinned by digest |
-| `smoke.tools` | Exact component names mapped to fixed nvkectl, Helm or kubectl version-check profiles |
+| `smoke.tools` | Exact component names mapped to fixed nvkectl, Helm, kubectl, Kind, clusterctl or ORAS version-check profiles |
 | `smoke.nonToolOutputs` | Exact OCI/APT output names, kinds and components explicitly outside loose-tool smoke |
+| `smoke.nonToolMembers` | Exact output/member pairs for non-executable runtime-assets archives in mixed executable bundles |
 | `outsideMVPSuites` / `requiredSuites` | Unevaluated external suites, or a requirement that currently blocks qualification |
 
-The [maintained-candidate policy](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/qualification.yaml)
+The [maintained-candidate policy](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/nvke-qualification.yaml)
 contains concrete verifier/native-image pins and exact output scope. Review those independent trust selections
 with the generated workflows before merge. Other Definitions need their own matching scope and native pins;
 the candidate policy is not a wildcard approval. The trust policy belongs to the operator, not the producing
@@ -576,15 +577,27 @@ are `kind: oci` with `reason: deployment-image`, and `kind: apt-repository` with
 candidate policy contains all 25 OCI records, alongside three profiles covering its four native
 tool invocations. It contains no Helm/disk exemptions because those formats have a fixed non-tool rule.
 
+For a mixed bundle, `smoke.nonToolMembers` accepts records with `output`, `member` and
+`reason: runtime-assets-archive`. Each must select a source-built `tarball` producer in that exact
+output; the delivered member must have no executable mode bits. Sibling tools still require their
+fixed profiles, and each executable output must contain at least one tool. The archive remains
+subject to artifact and provenance checks. This does not assert that its contents contain no tools.
+Missing, extra, duplicate and tool-overlapping member rules fail closed.
+
 Use independently approved native images containing `/bin/sh`, `cat`, `wc`, `sha256sum`, `chmod` and
 `/usr/bin/env`. They must have no declared volumes or extra inherited environment. The payload environment
-is fixed to `PATH=/usr/bin:/bin`, `HOME=/work`, `TMPDIR=/work`, `LC_ALL=C` and `TZ=UTC`; image configuration
+is fixed to `PATH=/usr/bin:/bin`, `HOME=/work`, `TMPDIR=/work`, `LC_ALL=C`, `TZ=UTC` and
+`CLUSTERCTL_DISABLE_VERSIONCHECK=true`. The last setting disables clusterctl's optional network update
+check after its version command; version/source checks and network isolation remain required. Image configuration
 must not add or conflict with it. Builder images and pins are not automatically trusted smoke images.
 The generated route also requires a GitHub-signing producer, its generated source workflow, and GHCR
 publication under the same repository owner with the existing `github:GITHUB_TOKEN` credential reference.
 
-The fixed profiles are `nvkectl-version-json`, `helm-version` and `kubectl-client-version-json`. Expected
-versions and the nvkectl commit come from the authenticated frozen Plan. The policy cannot supply a
+The fixed profiles include `nvkectl-version-json`, `helm-version`, `kubectl-client-version-json`,
+`kind-version`, `clusterctl-version-json`, `oras-version`, `nicosim-version-json` and
+`nicosim-patched-version-json`. NICoSim profiles require exact version, source commit and platform,
+with `clean` for unpatched inputs or `patched` for declared authenticated patch inputs. Dirty or unknown
+tree stamps fail. Expected versions and source commits come from the authenticated frozen Plan. The policy cannot supply a
 replacement expected version or arbitrary executable arguments. Every member of every executable bundle
 must be covered. OCI deployment-image and APT package-repository exemptions require exact membership;
 there is no wildcard exemption for an artifact format. Disk and Helm outputs use their explicit non-tool
@@ -692,7 +705,7 @@ Typed evidence explains reproduction, compatibility, conformance, or qualificati
 Clearance and publication roots explain authorization and transport. These records are useful diagnostic views;
 normal product authors do not construct and join them manually.
 
-Maintained inputs under `definitions/` use Definition and Environment. Superseded factory authoring APIs
+Maintained inputs under `inputs/` use Definition and Environment; teaching selections live in `docs/examples/`. Superseded factory authoring APIs
 and their migration fixtures are removed; backward compatibility is not a requirement.
 The direct-output model uses Definition v5, catalog v3 and producer IR v4. Generated Run Plans use v5; Run and Release use v4. Older recipe layouts and cluster/placement fields
 are rejected before work. Current migration checks and maintained-input build evidence are tracked in reconciliation;

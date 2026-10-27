@@ -22,7 +22,7 @@ func TestLaptopInstallerToolsContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(root)
-	path := filepath.Join("definitions", "nvke-local-dev-arm64", "definition-tools.json")
+	path := filepath.Join("inputs", "definitions", "diagnostics", "demo-arm64", "tools.json")
 	for _, tc := range []struct {
 		name               string
 		foreign, duplicate bool
@@ -37,7 +37,7 @@ func TestLaptopInstallerToolsContract(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			envPath := filepath.Join(filepath.Dir(path), "environment-local-docker.json")
+			envPath := "inputs/environments/local-arm64-tcg.json"
 			env, err := definition.LoadEnvironment(t.Context(), envPath)
 			if err != nil {
 				t.Fatal(err)

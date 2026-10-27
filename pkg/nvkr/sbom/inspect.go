@@ -94,10 +94,10 @@ func inspectPathDependencies(ctx context.Context, artifactPath, artifactDigest, 
 	if !canonical.IsDigest(artifactDigest) {
 		return DependencyInventory{}, e.New(e.CodeUnverifiedRef, "dependency inspection requires an exact artifact digest")
 	}
-	if kind != "host-package" && kind != "oci-image" && kind != "tarball" && kind != "bundle-archive" {
+	if kind != "host-package" && kind != "oci-image" && kind != "tarball" && kind != "file-archive" && kind != "bundle-archive" {
 		return DependencyInventory{}, e.New(e.CodeEngineCapability, "dependency inspection does not support artifact kind %q", kind)
 	}
-	if kind != "tarball" && kind != "bundle-archive" {
+	if kind != "tarball" && kind != "file-archive" && kind != "bundle-archive" {
 		if !canonical.IsDigest(scanner.Digest) || scanner.Path == "" {
 			return DependencyInventory{}, e.New(e.CodeProvenanceMissing, "dependency inspection requires a pinned Syft executable")
 		}
@@ -119,7 +119,14 @@ func inspectPathDependencies(ctx context.Context, artifactPath, artifactDigest, 
 	if subject.Digest() != artifactDigest {
 		return DependencyInventory{}, e.New(e.CodeVerifyFailed, "SBOM subject bytes differ from producer digest")
 	}
-	return inspectHeldDependencies(ctx, subject, kind, scanner, debianArchiveMetadata)
+	inventory, err := inspectHeldDependencies(ctx, subject, kind, scanner, debianArchiveMetadata)
+	if err != nil {
+		return DependencyInventory{}, err
+	}
+	if err := subject.AssertUnchangedContext(ctx); err != nil {
+		return DependencyInventory{}, e.Wrap(e.CodeVerifyFailed, err, "rechecking SBOM subject")
+	}
+	return inventory, nil
 }
 
 // InspectHeldDependencies consumes the existing held capability without opening
@@ -163,6 +170,10 @@ func inspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind s
 	artifactDigest := subject.Digest()
 	if kind == "bundle-archive" {
 		return inspectBundleArchive(ctx, io.NewSectionReader(subject, 0, subject.Size()))
+	}
+	if kind == "file-archive" {
+		components, err := inspectArchiveContents(ctx, io.NewSectionReader(subject, 0, subject.Size()))
+		return DependencyInventory{Components: components, Method: archiveContentMethod}, err
 	}
 	if kind == "tarball" {
 		components, err := inspectHelmArchive(ctx, io.NewSectionReader(subject, 0, subject.Size()))

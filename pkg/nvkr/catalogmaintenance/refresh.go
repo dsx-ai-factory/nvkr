@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
@@ -30,15 +31,17 @@ type Result struct {
 // writes retain their own owners; they are not one crash-atomic transaction.
 // On failure after pin commit, keep the dirty checkout for diagnosis or discard
 // that disposable checkout. No PR should be published until every gate succeeds.
-func Refresh(ctx context.Context, config Config, generatorVersion string, check bool) (Result, error) {
-	return refresh(ctx, config, generatorVersion, check, catalog.UpdateSourcePins)
+// sourceRepository names the private owner/repository the workflow transports
+// through a local Git rewrite, or is empty; it is admitted before any mutation.
+func Refresh(ctx context.Context, config Config, generatorVersion string, check bool, sourceRepository string) (Result, error) {
+	return refresh(ctx, config, generatorVersion, check, sourceRepository, catalog.UpdateSourcePins)
 }
 
-func refresh(ctx context.Context, config Config, generatorVersion string, check bool,
+func refresh(ctx context.Context, config Config, generatorVersion string, check bool, sourceRepository string,
 	updatePins func(context.Context, catalog.SourcePinRequest) (catalog.SourcePinUpdate, error),
 ) (Result, error) {
 	var result Result
-	plan, err := prepare(ctx, config, generatorVersion)
+	plan, err := prepare(ctx, config, generatorVersion, sourceRepository)
 	if err != nil {
 		return result, err
 	}
@@ -47,6 +50,13 @@ func refresh(ctx context.Context, config Config, generatorVersion string, check 
 		return result, err
 	}
 	if err := factory.CheckGeneratedBundle(ctx, ".", baseline); err != nil {
+		return result, err
+	}
+	members, err := buildClosure(ctx, config, generatorVersion, plan, baseline, sourceRepository)
+	if err != nil {
+		return result, err
+	}
+	if err := members.check(ctx); err != nil {
 		return result, err
 	}
 	result.PlanDigest = baseline.PlanDigest
@@ -73,17 +83,17 @@ func refresh(ctx context.Context, config Config, generatorVersion string, check 
 func regenerate(ctx context.Context, config Config, generatorVersion string,
 	generate func(context.Context, string, string, string, string, string, bool) (string, error),
 ) (string, error) {
-	digest, err := generate(ctx, config.Definition, config.Environment, generatorVersion, factory.EngineGitHub, ".", false)
+	digest, err := generateClosure(ctx, config, generatorVersion, false, generate)
 	if err != nil {
 		return "", fmt.Errorf("pins committed but regeneration failed; retain the disposable checkout for diagnosis: %w", err)
 	}
-	if _, err := generate(ctx, config.Definition, config.Environment, generatorVersion, factory.EngineGitHub, ".", true); err != nil {
+	if _, err := generateClosure(ctx, config, generatorVersion, true, generate); err != nil {
 		return "", fmt.Errorf("pins committed but candidate regeneration did not reproduce; retain the disposable checkout for diagnosis: %w", err)
 	}
 	return digest, nil
 }
 
-func prepare(ctx context.Context, config Config, generatorVersion string) (*factory.Plan, error) {
+func prepare(ctx context.Context, config Config, generatorVersion, sourceRepository string) (*factory.Plan, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "catalog maintenance requires a context")
 	}
@@ -93,16 +103,64 @@ func prepare(ctx context.Context, config Config, generatorVersion string) (*fact
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
+	if err := ValidateSourceRepository(sourceRepository); err != nil {
+		return nil, err
+	}
 	for _, relative := range []string{config.Catalog, config.Definition, config.Environment} {
 		if err := admitPath(relative); err != nil {
 			return nil, err
 		}
 	}
-	def, err := definition.LoadDefinition(ctx, config.Definition)
+	catalogs, err := definitionCatalogs(ctx, config.Definition)
 	if err != nil {
 		return nil, err
 	}
-	used := false
+	if !catalogs[config.Catalog] {
+		return nil, e.New(e.CodeUsage, "maintenance catalog is not selected by this Definition")
+	}
+	sources, err := catalog.ReadSourcesContext(ctx, catalog.Dir(config.Catalog))
+	if err != nil {
+		return nil, err
+	}
+	sourceAccessUsed := sourceRepository == ""
+	for _, name := range config.Sources {
+		source, ok := sources[name]
+		if !ok || source.PinnedBy != "" || strings.TrimSpace(source.Constraint) == "" {
+			return nil, e.New(e.CodeInvalidCatalog, "maintenance source %q requires an independent root with an explicit release constraint", name)
+		}
+		if matchesSourceCheckout(sourceRepository, source.Repo) {
+			sourceAccessUsed = true
+		}
+	}
+	if !sourceAccessUsed {
+		return nil, e.New(e.CodeUsage, "source checkout does not transport a selected maintenance root")
+	}
+	if err := admitSourceCheckoutCatalogs(ctx, config, sourceRepository, sources, catalogs); err != nil {
+		return nil, err
+	}
+	plan, err := lifecycle.CompileFiles(ctx, config.Definition, config.Environment, generatorVersion)
+	if err != nil {
+		return nil, err
+	}
+	if err := admitPlanTransport(sourceRepository, plan); err != nil {
+		return nil, err
+	}
+	if config.Validation == "local-run" {
+		if err := factory.AdmitLocalPlan(ctx, plan); err != nil {
+			return nil, err
+		}
+	}
+	return plan, nil
+}
+
+// definitionCatalogs admits and returns the repository-relative base catalogs a
+// Definition selects, at the top level and per output; overlays are admitted as
+// paths only.
+func definitionCatalogs(ctx context.Context, definitionPath string) (map[string]bool, error) {
+	def, err := definition.LoadDefinition(ctx, definitionPath)
+	if err != nil {
+		return nil, err
+	}
 	catalogs := map[string]bool{}
 	selections := []definition.Catalog{def.Catalog}
 	for _, output := range def.Outputs {
@@ -116,7 +174,7 @@ func prepare(ctx context.Context, config Config, generatorVersion string) (*fact
 			if filepath.IsAbs(selected) {
 				return nil, e.New(e.CodeUsage, "maintenance catalogs must stay within the repository")
 			}
-			relative := filepath.ToSlash(filepath.Clean(filepath.Join(filepath.Dir(config.Definition), selected)))
+			relative := filepath.ToSlash(filepath.Clean(filepath.Join(filepath.Dir(definitionPath), selected)))
 			if !safeRelative(relative) {
 				return nil, e.New(e.CodeUsage, "maintenance catalog escapes repository: %q", relative)
 			}
@@ -125,50 +183,51 @@ func prepare(ctx context.Context, config Config, generatorVersion string) (*fact
 			}
 			if i == 0 {
 				catalogs[relative] = true
-				used = used || relative == config.Catalog
 			}
 		}
 	}
-	if !used {
-		return nil, e.New(e.CodeUsage, "maintenance catalog is not selected by this Definition")
+	return catalogs, nil
+}
+
+// admitRunCatalogs applies the source-checkout admission to every catalog an
+// additional Run's Definition selects, including each declared pin set and its
+// nested members, before compilation revalidates and fetches them.
+func admitRunCatalogs(ctx context.Context, definitionPath, repository string) error {
+	if repository == "" {
+		return nil
 	}
-	sources, err := catalog.ReadSourcesContext(ctx, catalog.Dir(config.Catalog))
+	catalogs, err := definitionCatalogs(ctx, definitionPath)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	sourceAccessUsed := config.SourceCheckout == nil
-	for _, name := range config.Sources {
-		source, ok := sources[name]
-		if !ok || source.PinnedBy != "" || strings.TrimSpace(source.Constraint) == "" {
-			return nil, e.New(e.CodeInvalidCatalog, "maintenance source %q requires an independent root with an explicit release constraint", name)
+	paths := make([]string, 0, len(catalogs))
+	for path := range catalogs {
+		paths = append(paths, path)
+	}
+	slices.Sort(paths)
+	for _, path := range paths {
+		sources, err := catalog.ReadSourcesContext(ctx, catalog.Dir(path))
+		if err != nil {
+			return err
 		}
-		if matchesSourceCheckout(config.SourceCheckout, source.Repo) {
-			sourceAccessUsed = true
+		if err := admitSourceCheckoutSources(repository, sources, nil); err != nil {
+			return err
 		}
 	}
-	if !sourceAccessUsed {
-		return nil, e.New(e.CodeUsage, "source checkout does not transport a selected maintenance root")
-	}
-	if err := admitSourceCheckoutCatalogs(ctx, config, sources, catalogs); err != nil {
-		return nil, err
-	}
-	plan, err := lifecycle.CompileFiles(ctx, config.Definition, config.Environment, generatorVersion)
-	if err != nil {
-		return nil, err
-	}
+	return nil
+}
+
+// admitPlanTransport applies the source-checkout prefix admission to every
+// compiled fetch of one Plan.
+func admitPlanTransport(sourceRepository string, plan *factory.Plan) error {
 	for _, build := range plan.Builds {
 		for _, node := range build.Graph.Nodes {
-			if err := admitSourceCheckoutRepo(config.SourceCheckout, node.Repo); err != nil {
-				return nil, err
+			if err := admitSourceCheckoutRepo(sourceRepository, node.Repo); err != nil {
+				return err
 			}
 		}
 	}
-	if config.Validation == "local-run" {
-		if err := factory.AdmitLocalPlan(ctx, plan); err != nil {
-			return nil, err
-		}
-	}
-	return plan, nil
+	return nil
 }
 
 // Reject authored path symlinks before resolution. Owning loaders still hold and

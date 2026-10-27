@@ -20,7 +20,7 @@ workflows; consumers verify the results with standard tooling and no NVKR softwa
   or installed composition; the NVKE OS image build team owns embedded software correctness and runtime validation.
 - V1 production acceptance retains its AMD64-only product floor. M2 requires producer provenance; M3 adds
   authenticated build/evidence checks while retaining producer-only disk scope. The
-  [approved October 12 M3 scope](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
+  approved initial scope
   defers strict inspection and material reconciliation; scope approval is not organizational ADR ratification.
   ARM64 is an implementation extension recorded in the
   [implementation record](adr/reconciliation.md#native-arc-disk-route). Any additional architecture explicitly selected
@@ -281,10 +281,10 @@ incomplete; a build failure cannot create an implicit deferral.
 Successful qualification produces independently verifiable evidence under an identity distinct from the
 builder. Release issuance requires successful qualification and evidence publication for the complete selected set.
 
-This specification records the current scope directed by the user, including optional embedded-component
-metadata. The [October 12 decision](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
+This specification records the current scope, including optional embedded-component
+metadata. The initial scope decision
 establishes producer-only disk evidence and the deferred capabilities described below. The
-[implementation plan](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021930) separates artifact
+implementation plan separates artifact
 authentication, delivered-tool smoke, independent evidence publication and acceptance demonstrations.
 Scope approval does not establish completed implementation or organizational ADR ratification. The reviewed
 implementation and candidate configuration may merge before real operational acceptance. A fresh complete
@@ -374,8 +374,9 @@ predictably when two runs overlap or a run is interrupted part-way.
 - **Pin detection and regeneration.** A scheduled workflow detects new upstream versions, refreshes source pins,
   lockfile pins, and action pins in one pass, regenerates the workflows, and opens a pull request using a GitHub
   App installation token (the workflow's own token does not trigger pull-request workflows; a personal token is
-  not used) scoped to contents and pull requests on this repository only. The App's private key is the only
-  long-lived secret the pin-update workflow holds and is absent from every other workflow. The App authors the PR,
+  not used) scoped to contents, pull requests and workflows on this repository only, so a regenerated workflow
+  travels in the same reviewed pull request. The App's private key is the only
+  long-lived write secret the pin-update workflow holds and is absent from every other workflow. The App authors the PR,
   cannot approve it, and a code-owner approval is required to merge. The PR body lists, for every changed pin,
   the old and new tag, commit, tree hash, and digest. Merging to the default branch is the release decision for
   v1; the pin-update PR is the one that changes which pins are released.
@@ -429,7 +430,7 @@ anti-rollback guarantees on revocation; cluster-scoped qualification.
 
 **Definition of done**
 - Tests cover the pin refresh end to end on a fixture definition and lockfile, deterministic serialization of the release manifest, the "already released" no-op on a re-run, tag immutability and conditional tag creation against a registry, the channel winner rule, the interrupted-publication re-run, the revocation marker's shape and role, and release-scope verification rejecting a revoked digest.
-- An independent review of the release step, the pin tooling, the revocation dispatch's identity and environment restriction, and the pin-update workflow (App permission scope, key storage and rotation, least privilege, code-owner approval required) is closed before the release run is declared evidence; the final decision-record text is reviewed.
+- An independent review of the release step, the pin tooling, the revocation dispatch's identity and environment restriction, and the pin-update workflow (App permission scope, key storage and rotation, least privilege, code-owner approval required, and the repository settings that protect the pull-request branch) is closed before the release run is declared evidence; the final decision-record text is reviewed.
 - The evidence log records the pull request URL, run URLs, manifest reference, consumer transcripts, the tag-move refusal, the overlapping-run and interrupted-run logs, and the revocation transcript.
 - The owning decision records are final, including the release-manifest and revocation-marker schemas registered before implementation, the tag rule, the winner rule and the durable-record store and retention period; the implementation record, contributor guidance (including the explicit list of capabilities excluded from v1), and this specification's artifact source/delivery matrix match what shipped.
 

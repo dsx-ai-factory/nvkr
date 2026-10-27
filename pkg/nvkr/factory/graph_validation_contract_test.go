@@ -61,6 +61,17 @@ func TestArtifactGraphValidatesExecutionAndDataflowBindings(t *testing.T) {
 		{"missing input", func(g *ArtifactGraph) { g.Nodes[1].Inputs = []string{"artifact/missing"} }, e.CodeInvalidCatalog, "unknown artifact"},
 		{"self input", func(g *ArtifactGraph) { g.Nodes[0].Inputs = []string{"artifact/a"} }, e.CodeInvalidCatalog, "own output"},
 		{"cycle", func(g *ArtifactGraph) { g.Nodes[0].Inputs = []string{"artifact/c"} }, e.CodeInvalidCatalog, "dataflow cycle"},
+		{"cycle with ready sibling", func(g *ArtifactGraph) {
+			g.Nodes[0].Inputs = []string{"artifact/c"}
+			sibling := g.Nodes[0]
+			sibling.ID, sibling.Inputs, sibling.Outputs = "build/c", nil, []string{"artifact/d"}
+			g.Nodes = append(g.Nodes, sibling)
+			g.Artifacts = append(g.Artifacts, Artifact{ID: "artifact/d", Path: ".nvkr/d", Producer: "build/c"})
+		}, e.CodeInvalidCatalog, "dataflow cycle"},
+		{"missing input precedes cycle", func(g *ArtifactGraph) {
+			g.Nodes[0].Inputs = []string{"artifact/c"}
+			g.Nodes[1].Inputs = append(g.Nodes[1].Inputs, "artifact/missing")
+		}, e.CodeInvalidCatalog, "unknown artifact"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			graph := validContractArtifactGraph()

@@ -46,6 +46,7 @@ type Publication struct {
 }
 
 type Publisher struct {
+	development  bool
 	cosignDigest string
 	newAttester  func(string) (qualificationAttester, error)
 }
@@ -67,6 +68,34 @@ func NewPublisher(options Options) (*Publisher, error) {
 			Binary: options.CosignBinary, BinaryDigest: options.CosignDigest, Identity: "^" + regexp.QuoteMeta(identity) + "$", Issuer: "https://token.actions.githubusercontent.com", Credential: options.Credential,
 		})
 	}}, nil
+}
+
+// NewDevelopmentPublisher selects the separate development predicate transport.
+func NewDevelopmentPublisher(options Options) (*Publisher, error) {
+	publisher, err := NewPublisher(options)
+	if err != nil {
+		return nil, err
+	}
+	production := publisher.newAttester
+	publisher.development = true
+	publisher.newAttester = func(identity string) (qualificationAttester, error) {
+		signer, err := production(identity)
+		if err != nil {
+			return nil, err
+		}
+		concrete, ok := signer.(*sign.CosignOCISigner)
+		if !ok {
+			return nil, e.New(e.CodeEngineCapability, "development signing adapter is unavailable")
+		}
+		return developmentAttester{concrete}, nil
+	}
+	return publisher, nil
+}
+
+type developmentAttester struct{ signer *sign.CosignOCISigner }
+
+func (a developmentAttester) AttestQualification(ctx context.Context, subject sign.Subject, predicate []byte) error {
+	return a.signer.AttestDevelopmentQualification(ctx, subject, predicate)
 }
 
 // Publish admits all gate and smoke verdicts before the first signing operation.
@@ -93,6 +122,9 @@ func (p *Publisher) Publish(ctx context.Context, checks *lifecycle.ArtifactCheck
 	if err != nil {
 		return nil, err
 	}
+	if p.development != (description.Origin.Branch != "") || p.development != (qualifier.Branch != "") {
+		return nil, e.New(e.CodeUntrustedSigner, "qualification publisher rejects a different evidence lane")
+	}
 	if err := invocation.RequireSource(description.Origin); err != nil {
 		return nil, err
 	}
@@ -112,6 +144,10 @@ func (p *Publisher) Publish(ctx context.Context, checks *lifecycle.ArtifactCheck
 		return result, err
 	}
 	evidence := Evidence{SchemaVersion: SchemaVersion, GateVersion: GateVersion, ArtifactChecks: description, Invocation: qualifier, Smoke: verdicts, ToolSmoke: smokeDescription, ExternalSuites: suites}
+	if p.development {
+		evidence.SchemaVersion = DevelopmentSchemaVersion
+		evidence.GateVersion = DevelopmentGateVersion
+	}
 	return p.publishEvidence(ctx, evidence, result, func() error {
 		if _, err := checks.Description(); err != nil {
 			return err

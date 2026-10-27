@@ -231,6 +231,10 @@ func VisitMetadataEvidence(ctx context.Context, root, expectedRootDigest string,
 // BuildMetadataRoot writes descriptions and evidence from independently admitted
 // source roots. It issues no trust receipt and never copies output layers.
 func BuildMetadataRoot(ctx context.Context, out string, root PublicationRoot, sources map[string]string) (Result, error) {
+	return buildMetadataRoot(ctx, out, root, sources, "")
+}
+
+func buildMetadataRoot(ctx context.Context, out string, root PublicationRoot, sources map[string]string, expectedRoot string) (Result, error) {
 	if err := deliveryContext(ctx); err != nil {
 		return Result{}, err
 	}
@@ -297,6 +301,9 @@ func BuildMetadataRoot(ctx context.Context, out string, root PublicationRoot, so
 	if err != nil {
 		return Result{}, err
 	}
+	if expectedRoot != "" && digest != expectedRoot {
+		return Result{}, e.New(e.CodeVerifyFailed, "exported publication metadata differs from expected root")
+	}
 	if _, err := InspectMetadata(ctx, stage); err != nil {
 		return Result{}, err
 	}
@@ -308,15 +315,32 @@ func BuildMetadataRoot(ctx context.Context, out string, root PublicationRoot, so
 
 // ExportMetadata is called only after a full output-local publication check.
 func ExportMetadata(ctx context.Context, source, out string) (Result, error) {
+	return exportMetadata(ctx, source, out, "")
+}
+
+// ExportMetadataWithExpectedRoot exports bounded controls only after both the
+// complete source and the generated metadata match the exact published root.
+// It commits no destination on an identity mismatch and issues no payload receipt.
+func ExportMetadataWithExpectedRoot(ctx context.Context, source, out, expectedRoot string) (Result, error) {
+	if !canonical.IsDigest(expectedRoot) {
+		return Result{}, e.New(e.CodeUsage, "metadata export requires an exact expected root digest")
+	}
+	return exportMetadata(ctx, source, out, expectedRoot)
+}
+
+func exportMetadata(ctx context.Context, source, out, expectedRoot string) (Result, error) {
 	inspection, err := Inspect(ctx, source)
 	if err != nil {
 		return Result{}, err
+	}
+	if expectedRoot != "" && inspection.RootDigest != expectedRoot {
+		return Result{}, e.New(e.CodeVerifyFailed, "publication changed before metadata export")
 	}
 	sources := map[string]string{}
 	for _, o := range inspection.Root.Objects {
 		sources[o.Name] = source
 	}
-	return BuildMetadataRoot(ctx, out, inspection.Root, sources)
+	return buildMetadataRoot(ctx, out, inspection.Root, sources, expectedRoot)
 }
 
 func metadataManifest(ctx context.Context, root string, object PublishedObject) (ociManifest, error) {

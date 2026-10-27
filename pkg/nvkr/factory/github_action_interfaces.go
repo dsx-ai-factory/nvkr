@@ -299,11 +299,25 @@ func githubProjectInterfaceRole(plan *Plan, original, call *yamlv3.Node, actions
 		return nil, e.New(e.CodeEngineCapability, "semantic GitHub recovery omits its provider-result input")
 	}
 	if role.kind == "prepare-images" {
-		if present && !githubInterfaceEnvironmentEqual(originalEnv, githubImageEnvironment()) {
+		expected := githubImageEnvironment()
+		for key := range expected {
+			input := strings.ToLower(strings.ReplaceAll(key, "_", "-"))
+			expected[key] = "${{ inputs." + input + " }}"
+		}
+		if present && !githubInterfaceEnvironmentEqual(originalEnv, expected) {
 			return nil, e.New(e.CodeEngineCapability, "semantic image preparation changes its read credential")
 		}
-		for _, key := range sortedKeys(githubImageEnvironment()) {
-			githubYAMLSet(env, key, githubYAMLString(githubImageEnvironment()[key]))
+		for _, key := range sortedKeys(expected) {
+			input := strings.ToLower(strings.ReplaceAll(key, "_", "-"))
+			githubYAMLSet(inputs, input, githubYAMLMap("description", githubYAMLString("Independent private toolchain reader when image preparation is present"), "required", &yamlv3.Node{Kind: yamlv3.ScalarNode, Tag: "!!bool", Value: "false"}, "default", githubYAMLString("")))
+			if present {
+				value := githubYAMLValue(githubYAMLField(call, "with"), input)
+				if value != githubImageEnvironment()[key] {
+					return nil, e.New(e.CodeEngineCapability, "semantic image preparation changes its caller credential")
+				}
+				githubYAMLSet(invocation.Arguments, input, githubYAMLString(value))
+			}
+			githubYAMLSet(env, key, githubYAMLString(expected[key]))
 		}
 	} else if originalEnv != nil {
 		if originalEnv.Kind != yamlv3.MappingNode || (role.kind != "execute-source" && role.kind != "recover" && role.kind != "finalize") {

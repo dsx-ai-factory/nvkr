@@ -150,7 +150,7 @@ func testCosignProvenanceDiscovery(t *testing.T, binary string, withSBOM bool) {
 		t.Fatal("missing provenance was accepted")
 	}
 	requireRun(signArgs(ociAttestArgs(subject, "provenance.json"))...)
-	requireRun(signArgs(qualificationAttestArgs(subject, "qualification.json"))...)
+	requireRun(signArgs(exactAttestArgs(QualificationPredicateType, subject, "qualification.json"))...)
 	for _, predicate := range []string{CosignSignaturePredicateType, ProvenancePredicateType, QualificationPredicateType} {
 		bundles, err := decodeOCIBundles(requireRun(ociDownloadBundleArgs(subject, predicate)...))
 		if err != nil {

@@ -56,6 +56,14 @@ func githubRunEndSummary(expectedJobs int) githubStep {
 	}
 }
 
+// Collectors forward the original leaf result enums. Their own successful
+// reporting jobs are not producer successes; the summary remains diagnostic.
+func githubCollectedRunEndSummary(expectedJobs int) githubStep {
+	step := githubRunEndSummary(expectedJobs)
+	step.Env["NVKR_JOB_RESULTS"] = "${{ join(needs.*.outputs.statuses, ' ') }}"
+	return step
+}
+
 func writeGitHubRunSummary(out *bytes.Buffer, step githubStep) {
 	fmt.Fprintf(out, "      - name: %s\n        id: %s\n        if: %s\n        continue-on-error: true\n", step.Name, step.ID, step.If)
 	if len(step.Env) > 0 {

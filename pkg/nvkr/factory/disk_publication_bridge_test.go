@@ -6,6 +6,7 @@ package factory
 import (
 	"context"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -191,102 +192,115 @@ func TestCompileProductionDiskPreservesRawRootAndAllEvidence(t *testing.T) {
 
 func TestObserveProductionDiskKeepsManifestAndRawDigestsSeparate(t *testing.T) {
 	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
-		for _, condition := range []string{"valid", "manifest substituted for raw", "wrong size", "wrong wrapper platform", "canceled",
-			"missing raw", "wrong raw producer", "missing wrapper", "wrong wrapper producer", "missing record", "wrong record component", "wrong frozen output"} {
-			t.Run(platform+"/"+condition, func(t *testing.T) {
-				plan := diskPublicationPlanFixture(t, platform)
-				expected := plan.LifecycleOutputs[0]
-				_, artifacts := planIndex(plan)
-				raw := testQCOW2HeaderPayload()
-				path := filepath.Join(t.TempDir(), "disk.qcow2")
-				if err := os.WriteFile(path, raw, 0o600); err != nil {
-					t.Fatal(err)
-				}
-				wrapper := artifacts["package/"+expected.Name]
-				wrapperPlatform := platform
-				if condition == "wrong wrapper platform" {
-					wrapperPlatform = "linux/amd64"
-					if platform == wrapperPlatform {
-						wrapperPlatform = "linux/arm64"
-					}
-				}
-				_, err := delivery.BuildDiskArtifact(t.Context(), wrapper.Path, delivery.DiskArtifactRequest{
+		t.Run(platform, func(t *testing.T) {
+			plan := diskPublicationPlanFixture(t, platform)
+			_, baseArtifacts := planIndex(plan)
+			raw := testQCOW2HeaderPayload()
+			path := filepath.Join(t.TempDir(), "disk.qcow2")
+			if err := os.WriteFile(path, raw, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			// Observation is read-only. Each row gets its own descriptions and
+			// producer record while sharing these immutable wrapper bytes.
+			wrappers := make(map[string]Artifact)
+			for _, wrapperPlatform := range []string{"linux/amd64", "linux/arm64"} {
+				wrapper := baseArtifacts["package/"+plan.LifecycleOutputs[0].Name]
+				wrapper.Path = filepath.Join(t.TempDir(), "wrapper")
+				if _, err := delivery.BuildDiskArtifact(t.Context(), wrapper.Path, delivery.DiskArtifactRequest{
 					Path: path, Digest: pipeline.FileDigest(raw), Size: int64(len(raw)), Platform: wrapperPlatform,
 					Format: "qcow2", Encryption: "none", ArtifactType: wrapper.MediaType,
-				})
-				if err != nil {
+				}); err != nil {
 					t.Fatal(err)
 				}
-				descriptor, err := delivery.PayloadDescriptor(t.Context(), wrapper.Path)
-				if err != nil {
-					t.Fatal(err)
-				}
-				record := artifacts["result/"+expected.Name+"/image"]
-				observed := pipeline.ArtifactResult{Component: "image", OutputType: PackageDiskImage,
-					SHA256: pipeline.FileDigest(raw), Size: int64(len(raw))}
-				if condition == "manifest substituted for raw" {
-					observed.SHA256 = descriptor.Digest
-				}
-				if condition == "wrong size" {
-					observed.Size++
-				}
-				encoded, err := canonical.Marshal(observed)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := writeFactoryFile(t.Context(), record.Path, encoded, 0o600); err != nil {
-					t.Fatal(err)
-				}
-				want := e.CodeVerifyFailed
-				switch condition {
-				case "missing raw":
-					delete(artifacts, expected.ArtifactID)
-					want = e.CodeReleaseIncomplete
-				case "wrong raw producer":
-					changed := artifacts[expected.ArtifactID]
-					changed.Producer = "sibling/build-image"
-					artifacts[expected.ArtifactID] = changed
-					want = e.CodeReleaseIncomplete
-				case "missing wrapper":
-					delete(artifacts, wrapper.ID)
-					want = e.CodeReleaseIncomplete
-				case "wrong wrapper producer":
-					wrapper.Producer = "sibling/package-image"
+				wrappers[wrapperPlatform] = wrapper
+			}
+			descriptor, err := delivery.PayloadDescriptor(t.Context(), wrappers[platform].Path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, condition := range []string{"valid", "manifest substituted for raw", "wrong size", "wrong wrapper platform", "canceled",
+				"missing raw", "wrong raw producer", "missing wrapper", "wrong wrapper producer", "missing record", "wrong record component", "wrong frozen output"} {
+				t.Run(condition, func(t *testing.T) {
+					expected := plan.LifecycleOutputs[0]
+					artifacts := maps.Clone(baseArtifacts)
+					wrapperPlatform := platform
+					if condition == "wrong wrapper platform" {
+						wrapperPlatform = "linux/amd64"
+						if platform == wrapperPlatform {
+							wrapperPlatform = "linux/arm64"
+						}
+					}
+					wrapper := wrappers[wrapperPlatform]
 					artifacts[wrapper.ID] = wrapper
-					want = e.CodeReleaseIncomplete
-				case "missing record":
-					delete(artifacts, record.ID)
-					want = e.CodeProvenanceMissing
-				case "wrong record component":
-					record.Component = "sibling"
+					record := artifacts["result/"+expected.Name+"/image"]
+					record.Path = filepath.Join(t.TempDir(), "result.json")
 					artifacts[record.ID] = record
-					want = e.CodeProvenanceMissing
-				case "wrong frozen output":
-					expected.BuildDigest = "sha256:" + strings.Repeat("9", 64)
-					want = e.CodePipelineDrift
-				case "canceled":
-					want = e.CodeTimeout
-				}
-				ctx, cancel := context.WithCancel(t.Context())
-				defer cancel()
-				if condition == "canceled" {
-					cancel()
-				}
-				result, err := ObserveDiskPublicationPayload(ctx, plan, expected, artifacts)
-				if condition != "valid" {
-					if factoryErrorCode(err) != want || !reflect.DeepEqual(result, delivery.Output{}) {
-						t.Fatalf("invalid projection = %+v, %v", result, err)
+					observed := pipeline.ArtifactResult{Component: "image", OutputType: PackageDiskImage,
+						SHA256: pipeline.FileDigest(raw), Size: int64(len(raw))}
+					if condition == "manifest substituted for raw" {
+						observed.SHA256 = descriptor.Digest
 					}
-					if condition == "canceled" && (!errors.Is(err, context.Canceled) || factoryErrorCode(err) != e.CodeTimeout) {
-						t.Fatalf("cancellation = %v", err)
+					if condition == "wrong size" {
+						observed.Size++
 					}
-					return
-				}
-				if err != nil || result.Digest != descriptor.Digest || result.Disk == nil || result.Disk.PayloadDigest != observed.SHA256 || result.Digest == result.Disk.PayloadDigest {
-					t.Fatalf("projection = %+v, %v", result, err)
-				}
-			})
-		}
+					encoded, err := canonical.Marshal(observed)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(record.Path, encoded, 0o600); err != nil {
+						t.Fatal(err)
+					}
+					want := e.CodeVerifyFailed
+					switch condition {
+					case "missing raw":
+						delete(artifacts, expected.ArtifactID)
+						want = e.CodeReleaseIncomplete
+					case "wrong raw producer":
+						changed := artifacts[expected.ArtifactID]
+						changed.Producer = "sibling/build-image"
+						artifacts[expected.ArtifactID] = changed
+						want = e.CodeReleaseIncomplete
+					case "missing wrapper":
+						delete(artifacts, wrapper.ID)
+						want = e.CodeReleaseIncomplete
+					case "wrong wrapper producer":
+						wrapper.Producer = "sibling/package-image"
+						artifacts[wrapper.ID] = wrapper
+						want = e.CodeReleaseIncomplete
+					case "missing record":
+						delete(artifacts, record.ID)
+						want = e.CodeProvenanceMissing
+					case "wrong record component":
+						record.Component = "sibling"
+						artifacts[record.ID] = record
+						want = e.CodeProvenanceMissing
+					case "wrong frozen output":
+						expected.BuildDigest = "sha256:" + strings.Repeat("9", 64)
+						want = e.CodePipelineDrift
+					case "canceled":
+						want = e.CodeTimeout
+					}
+					ctx, cancel := context.WithCancel(t.Context())
+					defer cancel()
+					if condition == "canceled" {
+						cancel()
+					}
+					result, err := ObserveDiskPublicationPayload(ctx, plan, expected, artifacts)
+					if condition != "valid" {
+						if factoryErrorCode(err) != want || !reflect.DeepEqual(result, delivery.Output{}) {
+							t.Fatalf("invalid projection = %+v, %v", result, err)
+						}
+						if condition == "canceled" && (!errors.Is(err, context.Canceled) || factoryErrorCode(err) != e.CodeTimeout) {
+							t.Fatalf("cancellation = %v", err)
+						}
+						return
+					}
+					if err != nil || result.Digest != descriptor.Digest || result.Disk == nil || result.Disk.PayloadDigest != observed.SHA256 || result.Digest == result.Disk.PayloadDigest {
+						t.Fatalf("projection = %+v, %v", result, err)
+					}
+				})
+			}
+		})
 	}
 }
 

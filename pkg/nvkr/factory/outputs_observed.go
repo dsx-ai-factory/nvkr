@@ -250,12 +250,16 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 }
 
 func lifecyclePublicationOutputs(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact) ([]delivery.Output, error) {
+	return lifecyclePublicationOutputsForSelection(ctx, plan, node, artifacts, selectedPublicationOutputs(plan, node))
+}
+
+func lifecyclePublicationOutputsForSelection(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, selected []LifecycleOutputPlan) ([]delivery.Output, error) {
 	declared := make(map[string]bool, len(node.Inputs))
 	for _, input := range node.Inputs {
 		declared[input] = true
 	}
 	var outputs []delivery.Output
-	for _, expected := range selectedPublicationOutputs(plan, node) {
+	for _, expected := range selected {
 		if expected.Kind == PackageDiskImage {
 			if !declared["package/"+expected.Name] || !declared[expected.ArtifactID] {
 				return nil, e.New(e.CodeReleaseIncomplete, "publication omits exact disk wrapper and raw subject")
@@ -290,7 +294,7 @@ func lifecyclePublicationOutputs(ctx context.Context, plan *Plan, node Node, art
 		outputs = append(outputs, bound)
 	}
 	sort.Slice(outputs, func(i, j int) bool { return outputs[i].Name < outputs[j].Name })
-	if err := ValidateLifecycleOutputs(selectedPublicationOutputs(plan, node), outputs); err != nil {
+	if err := ValidateLifecycleOutputs(selected, outputs); err != nil {
 		return nil, err
 	}
 	return outputs, nil

@@ -44,8 +44,8 @@ func TestPublicCommandPresentationCoverage(t *testing.T) {
 					flags[name] = true
 				}
 			}
-			if name == "run check-artifacts" || name == "run qualify" {
-				// Qualification diagnostics retain their canonical JSON contract.
+			if name == "run check-artifacts" || name == "run qualify" || name == "run qualify-local" || name == "validate" {
+				// Qualification and validation diagnostics retain their canonical JSON contracts.
 				canonicalDiagnostics++
 				if flags["ui"] || flags["no-color"] {
 					t.Errorf("canonical diagnostic command %s unexpectedly offers presentation flags", name)
@@ -56,7 +56,7 @@ func TestPublicCommandPresentationCoverage(t *testing.T) {
 		}
 	}
 	visit(newApp().Commands, "")
-	if len(leaves) != 25 || canonicalDiagnostics != 2 {
+	if len(leaves) != 27 || canonicalDiagnostics != 4 {
 		t.Fatalf("public coverage changed: %d leaves, %d canonical diagnostic commands: %v", len(leaves), canonicalDiagnostics, leaves)
 	}
 }
@@ -216,8 +216,8 @@ func TestGraphAndComparisonProjectionExcludeTransportAndRawValues(t *testing.T) 
 func TestRootCommandTypedResultsAndDefaultBytes(t *testing.T) {
 	lifecycleCommandRepo(t)
 	for _, args := range [][]string{
-		{"definition", "validate", "--definition", "definitions/nvke-v1/definition.yaml"},
-		{"definition", "inspect", "--definition", "definitions/nvke-v1/definition.yaml"},
+		{"definition", "validate", "--definition", "docs/examples/nvke-tutorial/definition.yaml"},
+		{"definition", "inspect", "--definition", "docs/examples/nvke-tutorial/definition.yaml"},
 		{"run", "graph", "--plan", ".github/nvkr-run/plan.json", "--view", "producers"},
 		{"run", "diff", "--before", ".github/nvkr-run/plan.json", "--after", ".github/nvkr-run/plan.json", "--exit-code"},
 		{"resolve", "--data", "testdata/catalogs/kubernetes-layered", "--component", "kubectl", "--platform", "linux/amd64"},

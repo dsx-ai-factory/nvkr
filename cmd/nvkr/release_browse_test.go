@@ -173,8 +173,8 @@ func TestReleaseVerifyForwardsCompleteExactInputsToLifecycleUseCase(t *testing.T
 		"--reference", reference,
 		"--lane", "pipeline-attested", "--scope", "artifact-publication",
 		"--identity", "^builder$", "--issuer", "issuer", "--anonymous",
-		"--definition", "definitions/nvke-m2/definition.yaml",
-		"--environment", "definitions/nvke-m2/environment-github.yaml",
+		"--definition", "inputs/definitions/nvke/definition.yaml",
+		"--environment", "inputs/environments/github-release.yaml",
 		"--plan", ".github/nvkr-run/plan.json",
 	}
 	app := &cli.App{Commands: []*cli.Command{cmdReleaseWithVerify(verify)}}
@@ -213,8 +213,8 @@ func TestReleaseVerifyForwardsDiskEvidencePolicyWithExactInputs(t *testing.T) {
 				"--reference", "registry.example.test/releases@sha256:" + strings.Repeat("a", 64),
 				"--lane", "pipeline-attested", "--scope", "artifact-publication",
 				"--identity", "^builder$", "--issuer", "issuer",
-				"--definition", "definitions/nvke-m2/definition.yaml",
-				"--environment", "definitions/nvke-m2/environment-github.yaml",
+				"--definition", "inputs/definitions/nvke/definition.yaml",
+				"--environment", "inputs/environments/github-release.yaml",
 				"--plan", ".github/nvkr-run/plan.json",
 			}
 			if minimum != "" {

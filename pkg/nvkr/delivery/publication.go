@@ -250,6 +250,21 @@ func (publication *Publication) Close() error {
 	return nil
 }
 
+// Outputs describes the held output set without assigning registry locations.
+// Its defensive copy grants no signature or release authority. Closing any
+// shared handle revokes access to this description and the underlying bytes.
+func (publication *Publication) Outputs() ([]Output, error) {
+	if publication == nil || publication.publicationState == nil {
+		return nil, e.New(e.CodeGateUnmet, "publication is not open")
+	}
+	publication.mu.RLock()
+	defer publication.mu.RUnlock()
+	if publication.closed || publication.inspection.Root.Release == nil {
+		return nil, e.New(e.CodeGateUnmet, "publication is not open")
+	}
+	return cloneOutputs(publication.outputs), nil
+}
+
 // Artifacts projects exact named outputs, binding their transport references to
 // this root. The content subject never includes those repository locators.
 func (publication *Publication) Artifacts(reference string) ([]Output, string, error) {

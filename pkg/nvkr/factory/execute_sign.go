@@ -139,7 +139,14 @@ func executeSign(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 	if err != nil {
 		return err
 	}
-	layoutArtifact, err := signNodePackageInput(node, artifacts)
+	metadataOnly := PerOutputPublication(plan) && node.Target != "release"
+	selectLayout := signNodePackageInput
+	if metadataOnly {
+		selectLayout = func(node Node, artifacts map[string]Artifact) (Artifact, error) {
+			return signNodeInput(node, artifacts, ArtifactSigningMetadata)
+		}
+	}
+	layoutArtifact, err := selectLayout(node, artifacts)
 	if err != nil {
 		return err
 	}
@@ -158,12 +165,11 @@ func executeSign(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 	if err := admitDevelopmentSubject(plan, node.Target, subject); err != nil {
 		return err
 	}
-	// The reference file says WHAT was published; the routed layout is the bytes we
-	// believe were published. Re-deriving the index digest from the layout and
-	// refusing any disagreement is what keeps a signature from binding an identity
-	// nobody in this run actually produced.
+	// Re-derive the root and every signing subject from validated control bytes.
+	// Output-local signing metadata is a description; independent remote
+	// verification still authenticates the complete published payload closure.
 	inspect := delivery.Inspect
-	if PerOutputPublication(plan) && node.Target == "release" {
+	if PerOutputPublication(plan) {
 		inspect = delivery.InspectMetadata
 	}
 	inspection, err := inspect(ctx, layoutArtifact.Path)
@@ -177,6 +183,11 @@ func executeSign(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 	}
 	if err := admitDevelopmentMetadata(plan, inspection); err != nil {
 		return err
+	}
+	if metadataOnly {
+		if err := admitSigningMetadata(plan, node, subject, inspection); err != nil {
+			return err
+		}
 	}
 	if signing.Mode == SigningModeCosign && inspection.Root.Release != nil {
 		if err := delivery.RequireAttestedEvidence(inspection); err != nil {
@@ -201,6 +212,11 @@ func executeSign(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 	}
 	if signer == nil {
 		return e.New(e.CodeInternal, "factory sign node %q resolved no signing adapter", node.ID)
+	}
+	if metadataOnly && signing.Mode == SigningModeCosign {
+		if err := verifyMetadataSBOMs(ctx, signer, layoutArtifact.Path, inspection); err != nil {
+			return err
+		}
 	}
 	// Each output is independently consumable from its own repository. Derive all
 	// subjects from the inspected closure before the first signing side effect.

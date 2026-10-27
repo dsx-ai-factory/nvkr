@@ -31,8 +31,20 @@ func executePublicationPackage(ctx context.Context, plan *Plan, node Node, outpu
 	if err != nil {
 		return err
 	}
-	_, err = delivery.BuildPublicationRoot(ctx, output.Path, delivery.PublicationRequest{Release: metadata, Objects: objects})
-	return err
+	result, err := delivery.BuildPublicationRoot(ctx, output.Path, delivery.PublicationRequest{Release: metadata, Objects: objects})
+	if err != nil {
+		return err
+	}
+	for _, id := range node.Outputs {
+		controls := artifacts[id]
+		if controls.Kind != ArtifactPreparedEvidenceMetadata {
+			continue
+		}
+		if _, err := delivery.ExportMetadataWithExpectedRoot(ctx, output.Path, controls.Path, result.RootDigest); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func publicationEvidenceObjects(ctx context.Context, plan *Plan, node Node, inputs []Artifact, artifacts map[string]Artifact) ([]delivery.ObjectInput, error) {
@@ -210,35 +222,44 @@ func bindPublicationMetadata(ctx context.Context, plan *Plan, node Node, artifac
 			}
 			metadata.InvocationID = run.InvocationID()
 		}
-		outputByName := make(map[string]delivery.Output, len(outputs))
-		transportPaths := make(map[string]string, len(outputs))
-		for _, output := range outputs {
-			outputByName[output.Name] = output
-		}
-		for _, expected := range plan.LifecycleOutputs {
-			transportPaths[expected.Name] = artifacts[expected.ArtifactID].Path
-		}
-		for i := range objects {
-			output, found := outputByName[objects[i].Name]
-			if !found {
-				continue
-			}
-			var subjects []delivery.BuildSubject
-			if output.ImageIndex == nil {
-				var err error
-				subjects, err = publicationBuildSubjects(ctx, output, node.Inputs, artifacts)
-				if err != nil {
-					return nil, err
-				}
-			}
-			objects[i].Output = &delivery.OutputBinding{Repository: output.Name, Format: output.Kind,
-				BuildDigest: output.BuildDigest, Components: output.Components, BuildSubjects: subjects, Disk: output.Disk, ImageIndex: output.ImageIndex.Clone()}
-			if output.Kind == PackageAPT {
-				objects[i].Output.TransportPath = transportPaths[output.Name]
-			}
+		if err := bindPublicationOutputObjects(ctx, plan, node, artifacts, objects, outputs); err != nil {
+			return nil, err
 		}
 	}
 	return metadata, nil
+}
+
+// bindPublicationOutputObjects shares exact producer/output metadata between
+// ordinary retained capture and generated publication. It grants no authority.
+func bindPublicationOutputObjects(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, objects []delivery.ObjectInput, outputs []delivery.Output) error {
+	outputByName := make(map[string]delivery.Output, len(outputs))
+	transportPaths := make(map[string]string, len(outputs))
+	for _, output := range outputs {
+		outputByName[output.Name] = output
+	}
+	for _, expected := range plan.LifecycleOutputs {
+		transportPaths[expected.Name] = artifacts[expected.ArtifactID].Path
+	}
+	for i := range objects {
+		output, found := outputByName[objects[i].Name]
+		if !found {
+			continue
+		}
+		var subjects []delivery.BuildSubject
+		if output.ImageIndex == nil {
+			var err error
+			subjects, err = publicationBuildSubjects(ctx, output, node.Inputs, artifacts)
+			if err != nil {
+				return err
+			}
+		}
+		objects[i].Output = &delivery.OutputBinding{Repository: output.Name, Format: output.Kind,
+			BuildDigest: output.BuildDigest, Components: output.Components, BuildSubjects: subjects, Disk: output.Disk, ImageIndex: output.ImageIndex.Clone()}
+		if output.Kind == PackageAPT {
+			objects[i].Output.TransportPath = transportPaths[output.Name]
+		}
+	}
+	return nil
 }
 
 // The exact Plan-to-observation join is complete before this projection. Bind

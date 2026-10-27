@@ -24,6 +24,10 @@ import (
 // declared output packages and validated producer inventories. There is no caller
 // switch to waive evidence. Packaging and finalization use this same join.
 func releaseEvidenceObjects(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact) ([]delivery.ObjectInput, error) {
+	return releaseEvidenceObjectsForOutputs(ctx, plan, node, artifacts, selectedPublicationOutputs(plan, node))
+}
+
+func releaseEvidenceObjectsForOutputs(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, outputs []LifecycleOutputPlan) ([]delivery.ObjectInput, error) {
 	boms := map[string]*sbom.BOM{}
 	for _, id := range node.Inputs {
 		artifact := artifacts[id]
@@ -77,7 +81,7 @@ func releaseEvidenceObjects(ctx context.Context, plan *Plan, node Node, artifact
 			Evidence: &delivery.EvidenceBinding{Platform: platform, Outputs: []string{output}, Component: component, Stage: stage, SubjectKind: kind, SubjectDigest: subject, InspectionInputDigest: inspected}})
 		return nil
 	}
-	for _, output := range selectedPublicationOutputs(plan, node) {
+	for _, output := range outputs {
 		artifact, ok := artifacts[output.ArtifactID]
 		if !ok || !containsString(node.Inputs, artifact.ID) {
 			return nil, e.New(e.CodeProvenanceMissing, "release omits output %q", output.Name)

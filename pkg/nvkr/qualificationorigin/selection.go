@@ -22,6 +22,7 @@ type RunLocator struct {
 // SourcePolicy is selected independently of a candidate. Provider discovery can
 // supply a commit, but cannot choose which repository, workflow or branch to trust.
 type SourcePolicy struct {
+	Development   bool   `json:"development,omitempty"`
 	Repository    string `json:"repository"`
 	Workflow      string `json:"workflow"`
 	DefaultBranch string `json:"defaultBranch"`
@@ -86,13 +87,31 @@ func (g *GitHub) AuthenticateRun(ctx context.Context, locator RunLocator, policy
 	defer cancel()
 	request := SourceRequest{Repository: policy.Repository, RunID: locator.RunID, Attempt: locator.Attempt,
 		Workflow: policy.Workflow, DefaultBranch: policy.DefaultBranch}
+	if policy.Development {
+		_, err := developmentBranch(policy)
+		if err != nil {
+			return nil, err
+		}
+	}
 	repository, run, err := g.lookup(ctx, request)
 	if err != nil {
 		return nil, err
 	}
+	if policy.Development {
+		request.Branch = run.HeadBranch
+		if request.Branch == "" || request.Branch == policy.DefaultBranch {
+			return nil, e.New(e.CodeVerifyFailed, "development source requires a nondefault branch")
+		}
+	}
 	request.Commit = run.HeadSHA
 	if !commitPattern.MatchString(request.Commit) {
 		return nil, e.New(e.CodeVerifyFailed, "GitHub source attempt does not identify an exact commit")
+	}
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+	if policy.Development && run.Event != "workflow_dispatch" {
+		return nil, e.New(e.CodeVerifyFailed, "development qualification requires a manually dispatched source")
 	}
 	return authenticateSourceResponse(ctx, request, repository, run)
 }

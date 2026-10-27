@@ -34,7 +34,7 @@ func invokeLifecycleCLI(t *testing.T, args ...string) (string, error) {
 
 func TestPublicDefinitionCommandsPreserveIdentity(t *testing.T) {
 	lifecycleCommandRepo(t)
-	const path = "definitions/nvke-v1/definition.yaml"
+	const path = "docs/examples/nvke-tutorial/definition.yaml"
 	want, err := lifecycle.LoadDefinition(context.Background(), path)
 	if err != nil {
 		t.Fatal(err)
@@ -69,7 +69,7 @@ func TestPublicDefinitionCommandsPreserveIdentity(t *testing.T) {
 
 func TestRunCommandsPlanGenerateAndCheckDrift(t *testing.T) {
 	lifecycleCommandRepo(t)
-	inputs := []string{"--definition", "definitions/nvke-v1/definition.yaml", "--environment", "definitions/nvke-v1/environment-github.yaml"}
+	inputs := []string{"--definition", "docs/examples/nvke-tutorial/definition.yaml", "--environment", "docs/examples/nvke-tutorial/environment-github.yaml"}
 	for _, asJSON := range []bool{false, true} {
 		args := append([]string{"run", "plan"}, inputs...)
 		if asJSON {
@@ -119,8 +119,8 @@ func TestLocalRunDryRunDoesNotCreateAttempt(t *testing.T) {
 	lifecycleCommandRepo(t)
 	root := filepath.Join(".nvkr", filepath.Base(filepath.Dir(t.TempDir())))
 	t.Cleanup(func() { _ = os.RemoveAll(root) })
-	output, err := invokeLifecycleCLI(t, "run", "local", "--definition", "definitions/nvke-v1/definition.yaml",
-		"--environment", "definitions/nvke-v1/environment-local.yaml", "--attempt", "test-dry-run", "--attempts-root", root, "--dry-run")
+	output, err := invokeLifecycleCLI(t, "run", "local", "--definition", "docs/examples/nvke-tutorial/definition.yaml",
+		"--environment", "docs/examples/nvke-tutorial/environment-local.yaml", "--attempt", "test-dry-run", "--attempts-root", root, "--dry-run")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,9 +142,9 @@ func TestLifecycleCommandsRejectInvalidInputs(t *testing.T) {
 		{"missing definition", []string{"definition", "validate", "--definition", "missing.yaml"}, e.CodeInvalidCatalog},
 		{"missing inspection", []string{"definition", "inspect", "--definition", "missing.yaml"}, e.CodeInvalidCatalog},
 		{"missing plan", []string{"run", "plan", "--definition", "missing.yaml", "--environment", "missing.yaml"}, e.CodeInvalidCatalog},
-		{"missing environment", []string{"run", "plan", "--definition", "definitions/nvke-v1/definition.yaml", "--environment", "missing.yaml"}, e.CodeInvalidCatalog},
+		{"missing environment", []string{"run", "plan", "--definition", "docs/examples/nvke-tutorial/definition.yaml", "--environment", "missing.yaml"}, e.CodeInvalidCatalog},
 		{"unsupported engine", []string{"run", "generate", "--definition", "missing.yaml", "--environment", "missing.yaml", "--engine", "tekton"}, e.CodeEngineCapability},
-		{"invalid attempt", []string{"run", "local", "--definition", "definitions/nvke-v1/definition.yaml", "--environment", "definitions/nvke-v1/environment-local.yaml", "--attempt", "../escape", "--dry-run"}, e.CodeUsage},
+		{"invalid attempt", []string{"run", "local", "--definition", "docs/examples/nvke-tutorial/definition.yaml", "--environment", "docs/examples/nvke-tutorial/environment-local.yaml", "--attempt", "../escape", "--dry-run"}, e.CodeUsage},
 		{"missing finalizer inputs", []string{"run", "finalize", "--definition", "missing.yaml", "--environment", "missing.yaml", "--plan", "missing.json", "--attempt", "test-run"}, e.CodeInvalidCatalog},
 		{"wrong factory workspace", []string{"factory", "execute-node", "--plan", "missing.json", "--node", "missing", "--workspace", "wrong"}, e.CodeUsage},
 	} {

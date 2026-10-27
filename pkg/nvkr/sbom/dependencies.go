@@ -4,6 +4,7 @@
 package sbom
 
 import (
+	"archive/tar"
 	"net/url"
 	"slices"
 	"sort"
@@ -34,6 +35,9 @@ func WithDependencies(bom *BOM, components []Component, method, scannerDigest st
 		return nil, e.New(e.CodeProvenanceMissing, "dependency inspection returned no components for %q", bom.Metadata.Component.Name)
 	}
 	result := cloneBOM(bom)
+	if method == archiveContentMethod {
+		result.Metadata.Component.Type = "file"
+	}
 	result.Components = nil
 	byRef := map[string]Component{}
 	for _, component := range components {
@@ -105,6 +109,23 @@ func validateInventorySemantics(bom *BOM, artifact string) error {
 		}
 	}
 	diskInventory := method == "disk-content/v1" || method == "disk-reconciled/v1"
+	archiveInventory := method == archiveContentMethod
+	if archiveInventory {
+		outputType := ""
+		for _, property := range bom.Metadata.Component.Properties {
+			if property.Name == "nvkr:outputType" {
+				outputType = property.Value
+			}
+		}
+		if artifact == "" || bom.Metadata.Component.Type != "file" || outputType != "tarball" {
+			return e.New(e.CodeVerifyFailed, "archive content inventory requires an exact per-artifact tarball file subject")
+		}
+		for _, property := range bom.Metadata.Props {
+			if property.Name == "nvkr:dependencyScannerDigest" {
+				return e.New(e.CodeVerifyFailed, "archive content inventory cannot claim an external package scanner")
+			}
+		}
+	}
 	if diskInventory && artifact == "" {
 		return e.New(e.CodeVerifyFailed, "disk inventory requires an exact per-artifact subject")
 	}
@@ -114,14 +135,24 @@ func validateInventorySemantics(bom *BOM, artifact string) error {
 	if method == BundleFilesMethod && artifact == "" {
 		return e.New(e.CodeVerifyFailed, "bundle inventory requires an exact per-artifact subject")
 	}
+	archivePaths := map[string]byte{}
 	for _, component := range bom.Components {
+		if archiveInventory && (component.Type != "file" || !archiveMemberPath(component.Name) || component.Version != "" || component.PURL != "" || len(component.Properties) != 0) {
+			return e.New(e.CodeVerifyFailed, "archive content inventory admits only member paths and exact file hashes")
+		}
 		if method == BundleFilesMethod {
 			if err := validateBundleFileComponent(component); err != nil {
 				return err
 			}
-		} else if component.Type == "file" && !diskInventory {
+		} else if component.Type == "file" && !diskInventory && !archiveInventory {
 			return e.New(e.CodeVerifyFailed, "file inventory requires its descriptive disk-content or reconciled disk method")
 		}
+		if archiveInventory {
+			archivePaths[component.Name] = tar.TypeReg
+		}
+	}
+	if archiveInventory && archivePathConflict(archivePaths) {
+		return e.New(e.CodeVerifyFailed, "archive content inventory has conflicting file and directory paths")
 	}
 	return nil
 }
@@ -169,9 +200,9 @@ func validateDependencies(bom *BOM) error {
 }
 
 func supportedDependencyMethod(method string) bool {
-	return method == "helm-manifests/v1" || method == "syft-cyclonedx/v1" || method == "disk-reconciled/v1" || method == "disk-content/v1" || method == BundleFilesMethod
+	return method == "helm-manifests/v1" || method == "syft-cyclonedx/v1" || method == "disk-reconciled/v1" || method == "disk-content/v1" || method == archiveContentMethod || method == BundleFilesMethod
 }
 
 func dependencyMethodNeedsScanner(method string) bool {
-	return method != "helm-manifests/v1" && method != BundleFilesMethod
+	return method != "helm-manifests/v1" && method != archiveContentMethod && method != BundleFilesMethod
 }

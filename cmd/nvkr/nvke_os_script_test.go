@@ -188,10 +188,10 @@ func nvkeOSScriptPlan(t *testing.T, arch string) ([]byte, *factory.Plan) {
 	t.Helper()
 	root := filepath.Dir(filepath.Dir(demoScript(t, "nvke-os-local.sh")))
 	t.Chdir(root)
-	input := filepath.Join("definitions", "nvke-os")
+	input := "inputs"
 	raw, err := runCLIWithCapturedStdout(t, newApp(), "nvkr", "run", "plan",
-		"--definition", filepath.Join(input, "definition-"+arch+"-kvm.yaml"),
-		"--environment", filepath.Join(input, "environment-local-linux-"+arch+"-docker.yaml"), "--json")
+		"--definition", filepath.Join(input, "definitions/diagnostics/os-"+arch+".yaml"),
+		"--environment", filepath.Join(input, "environments/local-linux-"+arch+"-kvm.yaml"), "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,9 +252,9 @@ func TestOSDockerBootstrapUsesPrivateSharedTemporaryDirectory(t *testing.T) {
 				t.Fatal(err)
 			}
 			files := map[string]string{
-				"scripts/nvke-os-local.sh":                                             string(source),
-				"definitions/nvke-os/definition-" + arch + "-kvm.yaml":                 "fixture",
-				"definitions/nvke-os/environment-local-linux-" + arch + "-docker.yaml": "fixture",
+				"scripts/nvke-os-local.sh":                              string(source),
+				"inputs/definitions/diagnostics/os-" + arch + ".yaml":   "fixture",
+				"inputs/environments/local-linux-" + arch + "-kvm.yaml": "fixture",
 				"bin/docker":                      "#!/bin/sh\nexit 99\n",
 				"bin/uname":                       "#!/bin/sh\ncase \"$1\" in -s) echo Linux;; -m) echo \"$TEST_MACHINE\";; *) exit 99;; esac\n",
 				"toolchains/nvkr-packer/build.sh": "#!/bin/sh\nprintf '%s' \"$TMPDIR\" >\"$TEST_TMP_RECORD\"\nexit 42\n",

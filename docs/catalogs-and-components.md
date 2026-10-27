@@ -136,11 +136,11 @@ still apply; [ADR-10](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/
 
 A **toolchain substitution** changes the build container for explicitly named components and an architecture,
 checking the expected old digest. It keeps the existing source and command declarations. The
-[maintained OS overlay](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/native-toolchains.yaml) shows the exact `from`, `to`, and
+[maintained OS overlay](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/node-images/variants/native-toolchains.yaml) shows the exact `from`, `to`, and
 `components` fields. This differs from replacing the complete producer.
 
 **Version stamps** render source-pin values into build environment variables. This excerpt from the
-[NVKE CLI producer](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-v1/catalog/registry.yaml) embeds its commit and module tag:
+[NVKE CLI producer](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/nvke/module-tags/registry.yaml) embeds its commit and module tag:
 
 ```yaml
 versionStamp:

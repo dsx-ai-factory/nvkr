@@ -42,15 +42,15 @@ The document appears only inside that signed statement; raw SBOM files remain pr
 covered stage, raw document digest, typed document identity and output membership. Build-time per-build
 indexes remain internal handoffs. Packaging verifies their output/build/producer/scanner bindings, transforms the
 documents to explicit stage subjects, and adds the final Helm packaging inventory. Before publication a
-separate stage creates and verifies subject-bound Sigstore bundles, then derives the final release index. The native CWE
+separate stage creates and verifies subject-bound Sigstore bundles, then derives the final release index. The native management-plane image
 SBOM targets the delivered image manifest and records the scanned export digest. Signing the release index
 covers all these exact bytes recursively. Source-archive evidence is never relabeled as final-chart evidence.
 See [the registry graph](publication-architecture.md) for every remaining manifest and attachment.
 
 Current contract coverage and hosted publication evidence are recorded in
-[reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md). Signed producer evidence in the M2 disk mode explicitly records
+[reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md). Signed producer evidence in the producer-only disk mode explicitly records
 deferred inspection; it is not the dependency inventory described for binaries, images and charts above.
-The M3 MVP preserves producer-only disk evidence. Strict disk inventory/reconciliation is separate deferred
+The current qualification workflow preserves producer-only disk evidence. Strict disk inventory/reconciliation is separate deferred
 hardening; qualification of source metadata does not prove installed disk contents.
 
 ## Verification on real outputs

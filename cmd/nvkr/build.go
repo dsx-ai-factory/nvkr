@@ -69,18 +69,11 @@ func runLocalBuild(c *cli.Context) (*pipeline.Report, error) {
 // implementation. Its Report is deliberately unqualified and cannot feed
 // attest/release authority.
 func runLocalBuildAt(c *cli.Context, sourceRoot string) (*pipeline.Report, error) {
-	res, _, err := resolveBuild(c)
+	resolution, err := resolveBuildResult(c)
 	if err != nil {
 		return nil, err
 	}
-	g, err := buildgraph.Compile(res)
-	if err != nil {
-		return nil, err
-	}
-	digest, err := g.Digest()
-	if err != nil {
-		return nil, err
-	}
+	res := resolution.Resolved
 	if buildHasSource(res) {
 		prof, _, _, err := preflightGate(c, target.Arch(res.Platform))
 		if err != nil {
@@ -96,7 +89,7 @@ func runLocalBuildAt(c *cli.Context, sourceRoot string) (*pipeline.Report, error
 		fmt.Fprintf(os.Stderr, "building with up to %d parallel job(s)\n", c.Int("jobs"))
 	}
 	only := selectedComponents(c)
-	return pipeline.Local{}.Run(g, digest, pipeline.RunOptions{
+	return pipeline.Local{}.Run(resolution.Graph, resolution.BuildDigest, pipeline.RunOptions{
 		Ctx:        c.Context,
 		SourceRoot: sourceRoot,
 		Only:       only,
@@ -158,15 +151,7 @@ func cmdFetch() *cli.Command {
 			&cli.BoolFlag{Name: "dry-run", Usage: "print the acquisition plan without downloading"},
 		),
 		Action: func(c *cli.Context) error {
-			res, _, err := resolveBuild(c)
-			if err != nil {
-				return err
-			}
-			g, err := buildgraph.Compile(res)
-			if err != nil {
-				return err
-			}
-			digest, err := g.Digest()
+			resolution, err := resolveBuildResult(c)
 			if err != nil {
 				return err
 			}
@@ -176,7 +161,7 @@ func cmdFetch() *cli.Command {
 			// preflight); a bare invocation defaults to every prebuilt component, leaving
 			// from-source ones to `build`.
 			prebuilt := map[string]bool{}
-			for _, nc := range res.Components {
+			for _, nc := range resolution.Resolved.Components {
 				if nc.Prebuilt != nil {
 					prebuilt[nc.Name] = true
 				}
@@ -199,7 +184,7 @@ func cmdFetch() *cli.Command {
 				return e.New(e.CodeUnsupported,
 					"selected build has no prebuilt components — use `nvkr build` for the from-source lane")
 			}
-			rep, err := pipeline.Local{}.Run(g, digest, pipeline.RunOptions{
+			rep, err := pipeline.Local{}.Run(resolution.Graph, resolution.BuildDigest, pipeline.RunOptions{
 				Ctx:        c.Context,
 				SourceRoot: c.String("source-root"),
 				Only:       only,

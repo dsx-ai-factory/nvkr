@@ -30,8 +30,8 @@ func TestLaptopNKTPDependencyArchiveChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(root)
-	definitionPath := filepath.Join("definitions", "nvke-local-dev-arm64", "definition-site.json")
-	environmentPath := filepath.Join(filepath.Dir(definitionPath), "environment-local-docker.json")
+	definitionPath := filepath.Join("inputs", "definitions", "diagnostics", "demo-arm64", "site.json")
+	environmentPath := "inputs/environments/local-arm64-tcg.json"
 	doc, err := definition.LoadDefinition(t.Context(), definitionPath)
 	if err != nil {
 		t.Fatal(err)
@@ -130,7 +130,7 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(root)
-	definitionPath := filepath.Join("definitions", "nvke-local-dev-arm64", "definition-site.json")
+	definitionPath := filepath.Join("inputs", "definitions", "diagnostics", "demo-arm64", "site.json")
 	for _, tc := range []struct {
 		name             string
 		foreign, unbound bool
@@ -145,7 +145,7 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			environmentPath := filepath.Join(filepath.Dir(definitionPath), "environment-local-docker.json")
+			environmentPath := "inputs/environments/local-arm64-tcg.json"
 			env, err := definition.LoadEnvironment(t.Context(), environmentPath)
 			if err != nil {
 				t.Fatal(err)

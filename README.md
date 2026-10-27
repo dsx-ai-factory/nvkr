@@ -1,119 +1,141 @@
-# NVKR
+# NVIDIA Kubernetes® Recipes (NVKR)
 
-NVKR turns pinned NVKE and AICR components into traceable, signed software releases. Its goal is to bring
-CLIs, container images, Helm charts, deployment bundles, operator tools, and node images into one declarative build and
-delivery workflow, connecting the delivered bytes to their inputs and evidence.
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.27.2-00ADD8.svg)](.go-version)
 
-The **`nvkr`** CLI exposes the build and release engine, alongside reusable NVKE and AICR catalogs and product
-Definitions. Release engineers declare what to ship; NVKR derives the
-dependency graphs and generates the pipelines that build or acquire, package, sign, and publish it.
-Consumers can navigate a release's artifacts and evidence, then verify a supported claim against their
-own policy. NVKE and downstream systems own installation and deployment.
+**Build NVKE and AICR artifacts from pinned inputs and trace releases back to their sources.**
+NVKR gives release engineers a CLI, reusable component catalogs and declarative
+Definitions for NVIDIA Kubernetes Engine (NVKE) and AI Cluster Runtime (AICR).
+Select the executables, container images, Helm charts, deployment bundles or node
+images to produce; NVKR derives the dependency graph
+and runs local builds or generates GitHub Actions workflows. The hosted workflows
+build, sign and publish releases with evidence consumers can verify against their
+own policy.
+
+[NVKE](https://github.com/dsx-ai-factory/nvke) installs and operates clusters.
+NVKR owns the build and release workflow that supplies their artifacts.
+
+> **Preview:** NVKR is available as a preview. Commands, input schemas and behavior can change between releases, and we do not recommend NVKR for production use. See [Preview status and known limitations](docs/overview/preview-status.md).
+
+[Try it](#build-your-first-artifact) · [Documentation](docs/README.md) ·
+[Contribute](CONTRIBUTING.md) · [Get help](SUPPORT.md)
+
+## Build your first artifact
+
+Start with a small greeting executable. You need **Git 2.38 or later, Make,
+Python 3, running Docker, and the exact Go version in [.go-version](.go-version)**.
+No NVKE checkout or registry credentials are needed. The first run downloads Go
+modules and a pinned Alpine image. On Apple Silicon, Docker needs Linux AMD64
+emulation for this example.
+
+```sh
+git clone https://github.com/dsx-ai-factory/nvkr.git
+cd nvkr
+GOTOOLCHAIN=local make build
+bash demos/demo-local.sh
+```
+
+The demo pins a local source repository, generates a Plan, builds in a container,
+checks the artifact against its software bill of materials (SBOM), and runs it.
+Look for these lines in the output:
+
+```text
+Run: complete | output: hello | lane: unqualified-local-execution
+Artifact bytes match the recorded SBOM subject.
+Hello, team! This is hello v1.0.0, built by NVKR.
+```
+
+This is a real local build; it does not sign or publish anything. The demo prints
+the directory containing its inputs, Plan, Run record and artifact. Follow the
+[quickstart](docs/quickstart.md) to change the source version and explore NVKE
+outputs. Without Docker, use the [planning preview](docs/quickstart.md#preview-the-nvke-outputs).
 
 ## From components to releases
 
 The public lifecycle is **Definition → Run → Release**:
 
-1. **Define the deliverables.** Catalogs describe reusable component producers and pinned sources,
-   artifacts, and tools. A Definition selects the components, platform, and format for each named output.
-   Overlays replace producers or substitute toolchains for a chosen scope. An Environment supplies
-   execution, registry, and signing settings.
-2. **Review and run the pipeline.** Inspect the generated Plan, visualize producer and artifact graphs,
-   and compare changes before execution. Run locally or generate GitHub Actions from those inputs.
-   Each Run records its required outputs, observed artifacts, evidence, and failures.
-3. **Publish and consume a release.** One digest-pinned OCI reference connects the published outputs
-   to their SBOMs and provenance. Browse the release to find an output and follow its evidence;
-   apply a Verification Policy to authenticate the supported artifact and build-evidence claim.
+1. **Define the deliverables.** A Definition selects named outputs, their
+   components, platforms and formats. Catalogs supply pinned sources, artifacts
+   and tools; an Environment supplies execution, registry and signing settings.
+2. **Inspect and run.** NVKR generates a Plan and dependency graphs you can
+   review before execution. Run locally or generate GitHub Actions. Each Run
+   records its required outputs, observed artifacts, evidence and failures.
+3. **Publish and verify.** A digest-pinned OCI registry reference connects a
+   Release's outputs to their SBOMs and provenance. Consumers choose a
+   Verification Policy and authenticate the supported claims before using the artifacts.
 
-## What signed attestations do
+Start with the [tutorial Definition](docs/examples/nvke-tutorial/README.md),
+which selects the NVKE CLI, management-plane image and Helm bundle. The
+[combined NVKE candidate](inputs/definitions/nvke/README.md) expands that selection
+to container and node images for AMD64 and ARM64. The [input index](inputs/README.md)
+explains the available Definitions, catalogs and execution settings.
 
-An **attestation** is a statement about a specific artifact, bound to its digest: a fingerprint of its
-content. For signed GitHub releases, NVKR signs production provenance recording the Run, selected inputs,
-and producing workflow. Signed SBOMs state their evidence scope: inspected composition where supported,
-or, for M2 disks, exact producer/material subjects with disk inspection explicitly marked `not-performed`.
-Uninspected producer evidence does not establish installed disk contents. NVKR also signs
-the published artifacts and release root. These signatures let a verifier authenticate the signer and
-detect changes to the signed statements; the digest binds each claim to its intended artifact.
+## Understand the evidence
 
-Signing an artifact or its attestations does **not claim ownership** of the software or its included
-components. It identifies the signer making the recorded production or publication claim.
+A signature authenticates who made a statement about an artifact; a digest binds
+that statement to specific bytes. Your Verification Policy chooses the accepted
+workflow identity and issuer. Signing does not claim ownership of the included
+software, and a valid signature alone does not establish deployment readiness.
 
-The consumer still chooses whom to trust. A Verification Policy supplies the accepted workflow identity
-and **issuer**, the service that issued that identity; verification also requires a pinned verifier.
-NVKR checks the required signatures and production attestations against that policy, then checks the
-referenced artifact and evidence bytes. Missing evidence, mismatched digests, or an unaccepted signer
-fail verification. A valid signature authenticates a claim; it does not establish complete inspection,
-freedom from vulnerabilities, independent reproduction, qualification, or deployment readiness.
-See the [release quickstart](docs/release-quickstart.md) to apply your policy.
+| Operation | What it establishes |
+|---|---|
+| Browse a Release | Inspects metadata; does not verify signatures or download artifact payloads. |
+| Pull an output | Retrieves and checks that output's payload integrity; does not verify signatures or consumer policy. |
+| Verify `authenticity` | Authenticates signatures and evidence under your policy without downloading artifact payloads. |
+| Verify `artifact-publication` | Authenticates the publication claim under your policy and checks the referenced artifact payloads. |
 
-## Start here
+Both verification scopes use the `pipeline-attested` lane. Verification requires
+Linux, pinned tools and an explicit policy; the [release quickstart](docs/release-quickstart.md)
+walks through the commands and Docker-based verification from macOS.
 
-Follow the [quickstart](docs/quickstart.md) from the core ideas to a tiny local build, then extend the
-workflow into the NVKE tenant demo. For the first artifact, you need Git, Make, Python 3, Docker,
-and the Go version in [.go-version](.go-version). From the repository root:
+**No NVKR Release is qualified at preview.** Supported verification does not
+establish exact-byte reproduction, freedom from vulnerabilities or deployment
+readiness. The maintained node-image SBOMs record producer and material subjects;
+they do not inspect installed disk contents. See the
+[implementation and evidence record](docs/adr/reconciliation.md) for recorded
+Runs and the limits of what each establishes.
 
-```sh
-GOTOOLCHAIN=local make build
-bash demos/demo-local.sh
-```
-
-The script builds and runs a greeting executable; it does not sign or publish it. Without Docker,
-use the quickstart's [NVKE planning preview](docs/quickstart.md#preview-the-nvke-outputs).
-The [documentation map](docs/README.md) connects the next steps:
+## Choose your next step
 
 | Task | Guide |
 |---|---|
-| Select components, pins, and overlays | [Catalogs and components](docs/catalogs-and-components.md) |
-| Visualize dependencies and generate GitHub Actions | [Pipeline generation](docs/generate-pipeline.md) |
-| Understand node-image materials and execution | [Node images](docs/node-images.md) |
-| Build AICR bundles for GB300 and preview VR200 recipes | [AICR inputs and hardware limits](definitions/aicr/README.md) |
-| Find outputs and verify a published claim | [Release quickstart](docs/release-quickstart.md) |
-| Look up terminology and features | [Concept reference](docs/user-concepts.md) |
+| Select components, pins and overlays | [Catalogs and components](docs/catalogs-and-components.md) |
+| Inspect Plans, graphs and changes | [Plan and graph inspection](docs/plan-and-graph-inspection.md) |
+| Generate a hosted build and publication workflow | [Pipeline generation](docs/generate-pipeline.md) |
+| Build AICR deployment bundles | [AICR inputs and hardware limits](inputs/definitions/aicr/README.md) |
+| Build NVKE node images | [Node images](docs/node-images.md) |
+| Browse, pull or verify a published Release | [Release quickstart](docs/release-quickstart.md) |
+| Work with an AI agent | [Use NVKR with your AI agent](docs/use-with-agents.md) and the [operator skill](.agents/skills/nvkr-operator/SKILL.md) |
+| Look up terminology | [Concept reference](docs/user-concepts.md) |
 
-The [tutorial Definition](definitions/nvke-v1/README.md) selects the CLI, CWE image, and Helm bundle.
-The [combined NVKE candidate](definitions/nvke-m2/README.md) selects 34 outputs, including AMD64 and ARM64
-container and node images, and supplies the repository's generated GitHub workflow.
+GitHub Actions is the maintained hosted generator and signing/publication provider.
+Builds require their declared runtime and source access. Hosted node-image disk
+jobs additionally need the explicit native Linux KVM runner routes described in
+the [preview limitations](docs/overview/preview-status.md).
+The [documentation map](docs/README.md) and [demo index](demos/README.md) connect
+all the guides and examples.
 
-## Use NVKR with your AI agent
+## Contributing and support
 
-See [Use NVKR with Your AI Agent](docs/use-with-agents.md) for copyable prompts and supported setup.
+Contributions, bug reports and documentation improvements are welcome.
+[DEVELOPMENT.md](DEVELOPMENT.md) covers setup and `make check`;
+[CONTRIBUTING.md](CONTRIBUTING.md) explains contribution and review requirements.
 
-The [NVKR operator skill](.agents/skills/nvkr-operator/SKILL.md) supplies the agent instructions.
-Point your agent at it directly if it does not discover the skill.
-
-## Current scope
-
-GitHub is the maintained hosted generator and signing/publication provider. Actual builds require their
-declared runtime, source access, and capabilities; the combined candidate's hosted disk jobs use explicit
-KVM routes. Consumer verification requires Linux, pinned tools, and an explicit identity and issuer policy.
-
-The [October 6 candidate Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/37533806963) completed all 34 outputs,
-publication, keyless signing, workflow verification, and Run finalization, including both disk images.
-The record covers that validation branch and does not establish independent full-payload consumer
-acceptance or general production readiness.
-
-Release browsing inspects metadata without downloading payloads or verifying signatures. The supported
-consumer claim is `pipeline-attested` / `artifact-publication`. It does not establish exact-byte reproduction,
-full disk inventory, or deployment readiness; full release qualification remains unavailable. See the
-[implementation and evidence record](docs/adr/reconciliation.md) for current boundaries.
-
-## Contribute
-
-See [DEVELOPMENT.md](DEVELOPMENT.md) for setup and `make check`, and
-[CONTRIBUTING.md](CONTRIBUTING.md) for contribution rules.
-
-The [documentation map](docs/README.md) connects architecture, engineering decisions, and evidence.
-The [demo index](demos/README.md) provides presentations and runnable walkthroughs.
-[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) covers community expectations.
-
-## Support
-
-Use [GitHub Discussions](https://github.com/dsx-ai-factory/nvkr/discussions/categories/q-a) for usage
-questions and [GitHub Issues](https://github.com/dsx-ai-factory/nvkr/issues) for reproducible bugs,
-feature requests, and documentation gaps. See [SUPPORT.md](SUPPORT.md) for support channels. Report
-security vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+- **Questions:** [GitHub Discussions](https://github.com/dsx-ai-factory/nvkr/discussions/categories/q-a).
+- **Bugs and feature requests:** [GitHub Issues](https://github.com/dsx-ai-factory/nvkr/issues).
+- **Security vulnerabilities:** follow [SECURITY.md](SECURITY.md) and report privately.
+- **Community:** [Code of Conduct](CODE_OF_CONDUCT.md), [Governance](GOVERNANCE.md),
+  [Maintainers](MAINTAINERS.md) and [Support](SUPPORT.md).
+- **Source releases:** [Release process](RELEASE.md), including approval and recovery.
 
 ## License
 
-NVKR is licensed under the Apache License 2.0. See [LICENSE](LICENSE), [NOTICE](NOTICE), and
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+NVKR is licensed under the Apache License 2.0. See [LICENSE](LICENSE), [NOTICE](NOTICE),
+and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Trademarks
+
+Kubernetes® is a registered trademark of The Linux Foundation in the United States and other countries.
+NVIDIA and the NVIDIA logo are trademarks and/or registered trademarks of NVIDIA Corporation in the U.S. and
+other countries. Other company and product names may be trademarks of the respective companies with which
+they are associated.

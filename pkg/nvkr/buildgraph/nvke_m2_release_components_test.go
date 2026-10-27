@@ -20,8 +20,8 @@ import (
 // These are maintained-input regression tests, not special engine requirements
 // for CAPNICo, NKTP, profiles or customer catalogs. Producers use generic routes.
 func TestMaintainedM2AdditionalReleaseComponents(t *testing.T) {
-	const root = "../../../definitions/nvke-m2"
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(root, "release-catalog")))
+	const root = "../../../inputs/definitions/nvke"
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(root, "../../catalogs/nvke/release-components")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestMaintainedM2AdditionalReleaseComponents(t *testing.T) {
 	for _, row := range rows {
 		t.Run(row.output, func(t *testing.T) {
 			output, ok := outputs[row.output]
-			if !ok || output.Catalog == nil || output.Catalog.Base != "./release-catalog" ||
+			if !ok || output.Catalog == nil || output.Catalog.Base != "../../catalogs/nvke/release-components" ||
 				!slices.Equal(output.Components, []string{row.component}) {
 				t.Fatal("maintained output does not select its exact producer")
 			}
@@ -72,7 +72,7 @@ func TestMaintainedM2AdditionalReleaseComponents(t *testing.T) {
 				arm, ok := outputs[row.output+"-arm64"]
 				if !ok || output.Format != definition.OutputOCI || output.Platform != "linux/amd64" ||
 					arm.Format != definition.OutputOCI || arm.Platform != "linux/arm64" || arm.Catalog == nil ||
-					arm.Catalog.Base != "./release-catalog" || !slices.Equal(arm.Components, output.Components) {
+					arm.Catalog.Base != "../../catalogs/nvke/release-components" || !slices.Equal(arm.Components, output.Components) {
 					t.Fatal("acquired image must retain separately named AMD64 and ARM64 outputs")
 				}
 			} else if output.Format != definition.OutputOCI ||
@@ -114,13 +114,13 @@ func TestMaintainedM2AdditionalReleaseComponents(t *testing.T) {
 	if _, exists := outputs["controller-profiles"]; exists {
 		t.Fatal("reference fixtures must not use the production/demo controller-profiles output name")
 	}
-	if provisioned.Catalog == nil || provisioned.Catalog.Base != "../nvke-controller/catalog" ||
+	if provisioned.Catalog == nil || provisioned.Catalog.Base != "../../catalogs/nvke/release" ||
 		!slices.Equal(provisioned.Components, []string{"cluster-api-provider-provisioned"}) ||
 		!slices.Equal(provisioned.Platforms, []string{"linux/amd64", "linux/arm64"}) {
 		t.Fatal("provisioned infrastructure provider must retain its existing independent producer")
 	}
 
-	baselineBytes, err := os.ReadFile(filepath.Join(root, "../nvke-controller/catalog/pins.lock.yaml"))
+	baselineBytes, err := os.ReadFile(filepath.Join(root, "../../catalogs/nvke/release/pins.lock.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}

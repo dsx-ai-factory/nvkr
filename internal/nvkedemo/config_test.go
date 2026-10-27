@@ -65,7 +65,7 @@ func TestDemoFileTypedConversion(t *testing.T) {
 	}
 	var progress bytes.Buffer
 	build, err := file.BuildConfig(&progress)
-	if err != nil || build != (BuildConfig{Repository: "/native/nvkr", NVKEClone: "/native/nvke-source", AttemptPrefix: "example-01", Jobs: 2, Progress: &progress}) {
+	if err != nil || build != (BuildConfig{Repository: "/native/nvkr", NVKEClone: "/native/nvke-source", AttemptPrefix: "example-01", Jobs: 2, Progress: &progress, Network: "ovn"}) {
 		t.Fatalf("build=%+v error=%v", build, err)
 	}
 	run, err := file.RunConfig(&progress)

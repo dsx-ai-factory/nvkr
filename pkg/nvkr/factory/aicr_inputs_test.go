@@ -26,7 +26,7 @@ func TestMaintainedAICRBundleInputs(t *testing.T) {
 		{"definition-gb200-eks-reference.yaml", "eks", "gb200"},
 	} {
 		t.Run(test.file, func(t *testing.T) {
-			plan := compileAICRInput(t, test.file, "environment-github.yaml")
+			plan := compileAICRInput(t, test.file, "aicr-github.yaml")
 			if len(plan.Definition.Outputs) != 6 || len(plan.Builds) != 6 || len(plan.LifecycleOutputs) != 6 {
 				t.Fatal("maintained AICR selection must retain all six independent renderer outputs")
 			}
@@ -124,13 +124,13 @@ func assertAICRSourceProducer(t *testing.T, producer, fetch ir.Node) {
 
 func TestMaintainedAICRBuildOnlyEnvironments(t *testing.T) {
 	aicrInputTestRoot(t)
-	for _, environment := range []string{"environment-local-arm64.yaml", "environment-github-dev.yaml"} {
+	for _, environment := range []string{"aicr-local-arm64.yaml", "aicr-github-dev.yaml"} {
 		t.Run(environment, func(t *testing.T) {
 			plan := compileAICRInput(t, "definition.yaml", environment)
 			if plan.Environment.Publication != nil || plan.Environment.Signing != nil || len(plan.LifecycleOutputs) != 6 {
 				t.Fatal("build-only AICR environment changed its lifecycle scope")
 			}
-			if environment == "environment-github-dev.yaml" {
+			if environment == "aicr-github-dev.yaml" {
 				if _, err := RenderGitHub(t.Context(), plan); err != nil {
 					t.Fatal(err)
 				}
@@ -141,7 +141,7 @@ func TestMaintainedAICRBuildOnlyEnvironments(t *testing.T) {
 
 func TestMaintainedAICRNativeHelmInput(t *testing.T) {
 	aicrInputTestRoot(t)
-	plan := compileAICRInput(t, "definition-native-helm.yaml", "environment-github.yaml")
+	plan := compileAICRInput(t, "definition-native-helm.yaml", "aicr-github.yaml")
 	if len(plan.Definition.Outputs) != 1 || len(plan.Builds) != 1 {
 		t.Fatal("native Helm selection must carry one genuine Argo CD chart")
 	}
@@ -180,8 +180,8 @@ func aicrInputTestRoot(t *testing.T) {
 
 func compileAICRInput(t *testing.T, file, environment string) *Plan {
 	t.Helper()
-	definitionPath := filepath.Join("definitions/aicr", file)
-	environmentPath := filepath.Join("definitions/aicr", environment)
+	definitionPath := filepath.Join("inputs/definitions/aicr", file)
+	environmentPath := filepath.Join("inputs/environments", environment)
 	authored, err := definition.LoadDefinition(t.Context(), definitionPath)
 	if err != nil {
 		t.Fatal(err)

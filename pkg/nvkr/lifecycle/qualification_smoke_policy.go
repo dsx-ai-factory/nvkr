@@ -21,7 +21,19 @@ type QualificationSmokePolicy struct {
 	Images         map[string]string            `json:"images"`
 	Tools          map[string]string            `json:"tools"`
 	NonToolOutputs []QualificationNonToolOutput `json:"nonToolOutputs,omitempty"`
+	NonToolMembers []QualificationNonToolMember `json:"nonToolMembers,omitempty"`
 }
+
+// QualificationNonToolMember selects one data archive in a mixed executable
+// bundle. The Plan must declare a tarball producer and the delivered member must
+// be non-executable. This does not exempt sibling executables or archive checks.
+type QualificationNonToolMember struct {
+	Output string `json:"output"`
+	Member string `json:"member"`
+	Reason string `json:"reason"`
+}
+
+func (rule QualificationNonToolMember) key() string { return rule.Output + "\x00" + rule.Member }
 
 // QualificationNonToolOutput explicitly scopes one exact OCI/APT output outside
 // delivered loose-tool smoke. Deployment images may contain tools; this rule
@@ -90,6 +102,23 @@ func (smoke QualificationSmokePolicy) validate(policy QualificationPolicy) error
 	if policy.QualificationWorkflow == "" || smoke.Workflow == policy.Source.Workflow || smoke.Workflow == policy.QualificationWorkflow {
 		return e.New(e.CodeTrustPolicyMissing, "smoke requires a same-repository workflow distinct from builder and qualification signer")
 	}
+	if err := smoke.validateExecution(); err != nil {
+		return err
+	}
+	for platform := range smoke.Images {
+		if _, err := policy.Cosign.ExecutableDigest(platform); err != nil {
+			return err
+		}
+	}
+	if len(smoke.Images) > 1 && len(policy.Cosign.PlatformDigests) == 0 {
+		return e.New(e.CodeUnpinnedInput, "multi-platform smoke requires native cosign executable pins for every platform")
+	}
+	return nil
+}
+
+// validateExecution admits only execution scope. Hosted identity and signing
+// admission remain in validate; local rehearsal must not invent GitHub facts.
+func (smoke QualificationSmokePolicy) validateExecution() error {
 	if len(smoke.Images) == 0 || len(smoke.Images) > 2 {
 		return e.New(e.CodeTrustPolicyMissing, "smoke requires independently pinned native execution images")
 	}
@@ -101,25 +130,25 @@ func (smoke QualificationSmokePolicy) validate(policy QualificationPolicy) error
 		if err != nil || ref.Name() != image || !canonical.IsDigest(ref.DigestStr()) {
 			return e.New(e.CodeUnpinnedInput, "smoke image requires a canonical registry reference pinned by digest")
 		}
-		if _, err := policy.Cosign.ExecutableDigest(platform); err != nil {
-			return err
-		}
 	}
-	if len(smoke.Images) > 1 && len(policy.Cosign.PlatformDigests) == 0 {
-		return e.New(e.CodeUnpinnedInput, "multi-platform smoke requires native cosign executable pins for every platform")
-	}
-	if len(smoke.Tools) == 0 || len(smoke.Tools) > 1024 || len(smoke.NonToolOutputs) > 1024 {
+	if len(smoke.Tools) == 0 || len(smoke.Tools) > 1024 || len(smoke.NonToolOutputs) > 1024 || len(smoke.NonToolMembers) > 4096 {
 		return e.New(e.CodeTrustPolicyMissing, "smoke tool and output policy exceeds its supported bounds or has no tools")
 	}
 	for component, profile := range smoke.Tools {
 		if !qualificationSmokeName.MatchString(component) {
 			return e.New(e.CodeTrustPolicyMissing, "smoke component names must be exact canonical names")
 		}
-		switch profile {
-		case "nvkectl-version-json", "helm-version", "kubectl-client-version-json":
-		default:
-			return e.New(e.CodeEngineCapability, "smoke profile %q is unsupported", profile)
+		if _, err := nativeSmokeProfile(profile); err != nil {
+			return err
 		}
+	}
+	seenMembers := make(map[string]bool, len(smoke.NonToolMembers))
+	for _, rule := range smoke.NonToolMembers {
+		_, tool := smoke.Tools[rule.Member]
+		if !qualificationSmokeName.MatchString(rule.Output) || !qualificationSmokeName.MatchString(rule.Member) || rule.Reason != "runtime-assets-archive" || seenMembers[rule.key()] || tool {
+			return e.New(e.CodeTrustPolicyMissing, "non-tool members require unique exact output/member archive roles disjoint from tools")
+		}
+		seenMembers[rule.key()] = true
 	}
 	seen := make(map[string]bool, len(smoke.NonToolOutputs))
 	for _, output := range smoke.NonToolOutputs {
@@ -160,6 +189,9 @@ func (policy QualificationPolicy) Digest() (string, error) {
 	sort.Strings(frozen.OutsideMVPSuites)
 	sort.Strings(frozen.RequiredSuites)
 	if frozen.Smoke != nil {
+		sort.Slice(frozen.Smoke.NonToolMembers, func(i, j int) bool {
+			return frozen.Smoke.NonToolMembers[i].key() < frozen.Smoke.NonToolMembers[j].key()
+		})
 		sort.Slice(frozen.Smoke.NonToolOutputs, func(i, j int) bool {
 			return frozen.Smoke.NonToolOutputs[i].Output < frozen.Smoke.NonToolOutputs[j].Output
 		})

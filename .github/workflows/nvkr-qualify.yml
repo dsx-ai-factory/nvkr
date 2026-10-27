@@ -19,10 +19,11 @@ jobs:
     permissions:
       contents: read
       actions: read
-      packages: read
       id-token: write
     secrets:
+      NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       NKE_SOURCE_TOKEN: ${{ secrets.NKE_SOURCE_TOKEN }}
+      NVKR_REGISTRY_READ: ${{ secrets.NVKR_REGISTRY_READ }}
   qualify:
     name: Qualify complete artifact set
     needs: [native-smoke]
@@ -32,8 +33,8 @@ jobs:
     permissions:
       contents: read
       actions: read
-      packages: write
       id-token: write
+    environment: nvkr-release
     steps:
       - name: Admit trusted same-commit workflow
         timeout-minutes: 1
@@ -76,8 +77,10 @@ jobs:
         env:
           NVKR_GITHUB_TOKEN: ${{ github.token }}
           NVKR_REGISTRY: ghcr.io
-          NVKR_REGISTRY_USER: ${{ github.actor }}
-          NVKR_REGISTRY_PASSWORD: ${{ github.token }}
+          NVKR_REGISTRY_USER: ${{ vars.NVKR_REGISTRY_WRITE_USER }}
+          NVKR_REGISTRY_PASSWORD: ${{ secrets.NVKR_REGISTRY_WRITE }}
+          NVKR_CI_STORAGE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          NVKR_CI_STORAGE_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
           GIT_CONFIG_COUNT: '4'
           GIT_CONFIG_GLOBAL: '/dev/null'
           GIT_CONFIG_KEY_0: 'credential.helper'
@@ -94,4 +97,4 @@ jobs:
         run: |
           set -euo pipefail
           [ -n "${NVKR_PIN_SOURCE_TOKEN_0:-}" ] || { printf '%s\n' 'nvkr: [NVKR-E-FETCH-FAILED] source credential is empty' >&2; exit 20; }
-          ./nvkr-exec run qualify --policy 'definitions/nvke-m2/qualification.yaml'
+          ./nvkr-exec run qualify --policy 'inputs/policies/nvke-qualification.yaml'

@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+kind: Definition
+metadata:
+  name: aicr-gb300-native-helm
+  description: Native Helm OCI chart for the AICR GB300 generic Ubuntu training Argo CD app-of-apps.
+catalog:
+  base: ../../catalogs/nvke/module-tags
+cosignTool: cosign
+outputs:
+  # Helm OCI requires the repository basename to match the upstream chart name.
+  - name: aicr-bundle
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/aicr
+    format: helm-oci
+    components: [aicr-gb300-generic-training-native-helm]

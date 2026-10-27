@@ -16,7 +16,7 @@ import (
 )
 
 func TestLaptopARM64DefinitionMembership(t *testing.T) {
-	root, err := filepath.Abs(filepath.Join("..", "..", "..", "definitions", "nvke-local-dev-arm64"))
+	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,14 +46,14 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 		count int
 		disk  bool
 	}{
-		{"definition.json", 29, true},
-		{"definition-components.json", 22, false},
-		{"definition-os.json", 1, true},
-		{"definition-simulator.json", 1, false},
-		{"definition-tools.json", 1, false},
-		{"definition-profiles.json", 1, false},
+		{"inputs/definitions/demo/arm64-nvidia-tcg.json", 29, true},
+		{"inputs/definitions/diagnostics/demo-arm64/components.json", 22, false},
+		{"inputs/definitions/diagnostics/demo-arm64/os.json", 1, true},
+		{"inputs/definitions/diagnostics/demo-arm64/simulator.json", 1, false},
+		{"inputs/definitions/diagnostics/demo-arm64/tools.json", 1, false},
+		{"inputs/definitions/diagnostics/demo-arm64/profiles.json", 1, false},
 		// Installer-aligned selections replace the three older component slots.
-		{"definition-site.json", 5, false},
+		{"inputs/definitions/diagnostics/demo-arm64/site.json", 5, false},
 	} {
 		t.Run(tc.file, func(t *testing.T) {
 			d, err := authored.LoadDefinition(t.Context(), filepath.Join(root, tc.file))
@@ -71,18 +71,18 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 				if output.Format == authored.OutputDiskImage {
 					hasDisk = true
 				}
-				output = normalize(output, d.Catalog, root)
-				if tc.file == "definition.json" {
+				output = normalize(output, d.Catalog, filepath.Dir(filepath.Join(root, tc.file)))
+				if tc.file == "inputs/definitions/demo/arm64-nvidia-tcg.json" {
 					all[output.Name] = output
 				} else {
 					if _, exists := parts[output.Name]; exists {
-						if tc.file == "definition-site.json" && output.Name == "controller-profiles" {
+						if tc.file == "inputs/definitions/diagnostics/demo-arm64/site.json" && output.Name == "controller-profiles" {
 							if !reflect.DeepEqual(parts[output.Name], output) {
 								t.Fatal("site profile differs from the standalone diagnostic profile")
 							}
 							continue
 						}
-						if tc.file != "definition-site.json" || (output.Name != "cwe" && output.Name != "controller-chart" && output.Name != "nvkectl") {
+						if tc.file != "inputs/definitions/diagnostics/demo-arm64/site.json" || (output.Name != "cwe" && output.Name != "controller-chart" && output.Name != "nvkectl") {
 							t.Fatalf("unexpected duplicate split output %s", output.Name)
 						}
 						replaced[output.Name] = true
@@ -98,7 +98,7 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 	if len(replaced) != 3 {
 		t.Fatal("site selections must replace exactly the controller, CLI and controller chart slots")
 	}
-	forkPath := filepath.Join(root, "..", "nvke-ovn-source", "definition.yaml")
+	forkPath := filepath.Join(root, "inputs/definitions/diagnostics/ovn.yaml")
 	fork, err := authored.LoadDefinition(t.Context(), forkPath)
 	if err != nil {
 		t.Fatal(err)
@@ -134,7 +134,7 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 	if !reflect.DeepEqual(all, parts) {
 		t.Fatal("combined selection differs from the exact six-group union plus standalone fork outputs")
 	}
-	providers, err := authored.LoadDefinition(t.Context(), filepath.Join(root, "definition-providers.json"))
+	providers, err := authored.LoadDefinition(t.Context(), filepath.Join(root, "inputs/definitions/diagnostics/demo-arm64/providers.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,12 +146,12 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 		if !ok {
 			t.Fatalf("provider %s omitted from combined selection", output.Name)
 		}
-		output = normalize(output, providers.Catalog, root)
+		output = normalize(output, providers.Catalog, filepath.Join(root, "inputs/definitions/diagnostics/demo-arm64"))
 		if !reflect.DeepEqual(output, combined) {
 			t.Fatalf("provider loop diverges from combined selection: %s", output.Name)
 		}
 	}
-	env, err := authored.LoadEnvironment(t.Context(), filepath.Join(root, "environment-local-docker.json"))
+	env, err := authored.LoadEnvironment(t.Context(), filepath.Join(root, "inputs/environments/local-arm64-tcg.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,8 +165,7 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 // membership is checked above; this one-output test is not full-provider proof.
 func TestLaptopARM64CAPNICoCatalogCompilation(t *testing.T) {
 	t.Chdir("../../..")
-	root := filepath.Join("definitions", "nvke-local-dev-arm64")
-	path := filepath.Join(root, "definition-providers.json")
+	path := "inputs/definitions/diagnostics/demo-arm64/providers.json"
 	doc, err := authored.LoadDefinition(t.Context(), path)
 	if err != nil {
 		t.Fatal(err)
@@ -175,7 +174,7 @@ func TestLaptopARM64CAPNICoCatalogCompilation(t *testing.T) {
 		t.Fatal("provider Definition no longer starts with the catalog-local CAPNICo output")
 	}
 	doc.Outputs = doc.Outputs[:1]
-	envPath := filepath.Join(root, "environment-local-docker.json")
+	envPath := "inputs/environments/local-arm64-tcg.json"
 	env, err := authored.LoadEnvironment(t.Context(), envPath)
 	if err != nil {
 		t.Fatal(err)
@@ -200,22 +199,21 @@ func TestLaptopARM64CAPNICoCatalogCompilation(t *testing.T) {
 func TestLaptopARM64CatalogCompilation(t *testing.T) {
 	testutil.RequireExtended(t)
 	t.Chdir("../../..")
-	root := filepath.Join("definitions", "nvke-local-dev-arm64")
 	for _, tc := range []struct {
 		file    string
 		outputs int
 	}{
-		{"definition-providers.json", 2},
-		{"definition-components.json", 22},
-		{"definition.json", 29},
+		{"inputs/definitions/diagnostics/demo-arm64/providers.json", 2},
+		{"inputs/definitions/diagnostics/demo-arm64/components.json", 22},
+		{"inputs/definitions/demo/arm64-nvidia-tcg.json", 29},
 	} {
 		t.Run(tc.file, func(t *testing.T) {
-			path := filepath.Join(root, tc.file)
+			path := tc.file
 			doc, err := authored.LoadDefinition(t.Context(), path)
 			if err != nil {
 				t.Fatal(err)
 			}
-			envPath := filepath.Join(root, "environment-local-docker.json")
+			envPath := "inputs/environments/local-arm64-tcg.json"
 			env, err := authored.LoadEnvironment(t.Context(), envPath)
 			if err != nil {
 				t.Fatal(err)
@@ -230,19 +228,56 @@ func TestLaptopARM64CatalogCompilation(t *testing.T) {
 			if len(plan.LifecycleOutputs) != tc.outputs || plan.Qualification != factory.TierStaticUnqualified {
 				t.Fatalf("unexpected compiled membership/tier: %d %s", len(plan.LifecycleOutputs), plan.Qualification)
 			}
+			if tc.outputs == 29 {
+				assertLaptopCompleteSmokeScope(t, plan)
+			}
 		})
+	}
+}
+
+// Exercise the real maintained producers, including raw tools and the
+// commit-version CLI. Handwritten producer fixtures cannot detect this drift.
+func assertLaptopCompleteSmokeScope(t *testing.T, plan *factory.Plan) {
+	t.Helper()
+	policy := QualificationSmokePolicy{
+		Images: map[string]string{"linux/arm64": "registry.example.test/smoke@" + nativeSmokeTestDigest("1")},
+		Tools: map[string]string{
+			"nvkectl": "nvkectl-version-json", "helm": "helm-version", "kubectl": "kubectl-client-version-json",
+			"clusterctl": "clusterctl-version-json", "kind": "kind-version", "oras": "oras-version",
+			"nico-sim": "nicosim-patched-version-json", "nico-simctl": "nicosim-patched-version-json",
+		},
+		NonToolMembers: []QualificationNonToolMember{{Output: "nicosim-tools-arm64", Member: "nico-sim-runtime-assets", Reason: "runtime-assets-archive"}},
+	}
+	for _, output := range plan.LifecycleOutputs {
+		if output.Kind == OutputOCI {
+			policy.NonToolOutputs = append(policy.NonToolOutputs, QualificationNonToolOutput{Output: output.Name, Kind: output.Kind, Components: output.Components, Reason: "deployment-image"})
+		}
+	}
+	scope, err := toolSmokePlanScope(plan, policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tools := 0
+	for _, output := range scope {
+		for _, member := range output.members {
+			if member.nonToolReason == "" {
+				tools++
+			}
+		}
+	}
+	if len(scope) != 29 || tools != 10 || len(policy.NonToolOutputs) != 17 {
+		t.Fatalf("incomplete demo smoke scope: outputs=%d tools=%d deployment images=%d", len(scope), tools, len(policy.NonToolOutputs))
 	}
 }
 
 func TestLaptopARM64OSExecutionClassAdmission(t *testing.T) {
 	t.Chdir("../../..")
-	root := filepath.Join("definitions", "nvke-local-dev-arm64")
-	definitionPath := filepath.Join(root, "definition-os.json")
+	definitionPath := "inputs/definitions/diagnostics/demo-arm64/os.json"
 	d, err := authored.LoadDefinition(t.Context(), definitionPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	environmentPath := filepath.Join(root, "environment-local-docker.json")
+	environmentPath := "inputs/environments/local-arm64-tcg.json"
 	env, err := authored.LoadEnvironment(t.Context(), environmentPath)
 	if err != nil {
 		t.Fatal(err)
