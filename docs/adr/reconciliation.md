@@ -1538,7 +1538,10 @@ selection and payload-substitution fixtures cover these boundaries, not a fresh 
 build/deployment. Source host-policy decoding is local and uses the existing
 strict YAML admission; CRD schema validation remains at the server create.
 After deployment and before temporary bootstrap teardown, it imports
-the original host policy without replacement, checks the controller/CSI context,
+the original host policy once without replacement, using the caller's work deadline
+for API discovery, schema validation and creation. Private identity diagnostics
+retain the underlying command failure before the public error is redacted.
+It checks the controller/CSI context,
 permanent registration, derived TPM allowlist, new TPM agent and renewed
 same-boot host certificate, then issues its private completion receipt. Joined
 site-stage failures retain their resources under the independent owner while the

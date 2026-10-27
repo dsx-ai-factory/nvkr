@@ -513,6 +513,13 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if resultErr != nil {
+			raw := []byte(resultErr.Error())
+			raw = append(raw[:min(len(raw), 1<<20)], '\n')
+			resultErr = errors.Join(resultErr, privateWrite(filepath.Join(private.Work, "failure.log"), raw))
+		}
+	}()
 	k := nativeIdentityCommands{runner: private, kubectl: filepath.Join(s.assets.HostTools, "kubectl"), kubeconfig: filepath.Join(out, "site.kubeconfig")}
 	raw, err := readRunFile(ctx, out, "site-prepared.json", 16<<10)
 	if err != nil {
@@ -602,7 +609,13 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	if _, err := original.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
-	createdRaw, err := k.capture(ctx, "import-source-policy", 20*time.Second, original, "create", "-f", "-", "-o", "json")
+	// First create can require cold API discovery and OpenAPI schema loading.
+	// Keep this one mutation within the caller's work deadline, without retry.
+	policyBudget, err := remainingWork(ctx)
+	if err != nil {
+		return nil, err
+	}
+	createdRaw, err := k.capture(ctx, "import-source-policy", policyBudget, original, "create", "-f", "-", "-o", "json")
 	if err != nil {
 		return nil, err
 	}

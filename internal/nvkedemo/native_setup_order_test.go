@@ -6,6 +6,7 @@ package nvkedemo
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -16,10 +17,10 @@ import (
 
 func TestNativeSharedSetupPrecedesOrdinaryTenantAndStopsDiagnostic(t *testing.T) {
 	for _, tc := range []struct {
-		name     string
-		ordinary bool
+		name                    string
+		ordinary, importFailure bool
 	}{
-		{"site", false}, {"tenant", true},
+		{"site", false, false}, {"tenant", true, false}, {"policy import failure", false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ordinary := tc.ordinary
@@ -114,10 +115,34 @@ esac
 			server := &OwnedProcess{done: make(chan struct{})}
 			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 			defer cancel()
+			deadline, _ := ctx.Deadline()
+			runner.Env = SetEnv(runner.Env, map[string]string{"EXPECTED_IDENTITY_DEADLINE": deadline.UTC().Format(time.RFC3339Nano)})
+			if tc.importFailure {
+				runner.Env = SetEnv(runner.Env, map[string]string{"IDENTITY_IMPORT_FAILURE": "1"})
+			}
 			if ordinary {
 				err = attempt.ready(ctx, runner, row, tools, root, server)
 			} else {
 				_, err = attempt.setup(ctx, runner, row, tools, root, server)
+			}
+			if tc.importFailure {
+				var failure *nativeSiteIdentityFailure
+				if !errors.As(err, &failure) || CommandExitCode(err) != 17 || strings.Contains(err.Error(), "import-source-policy") {
+					t.Fatalf("private import failure crossed its public boundary: %v", err)
+				}
+				logs, readErr := filepath.Glob(filepath.Join(root, "site-identity-*", "failure.log"))
+				if readErr != nil || len(logs) != 1 {
+					t.Fatal("missing private identity failure", logs, readErr)
+				}
+				private, readErr := os.ReadFile(logs[0])
+				if readErr != nil || !strings.Contains(string(private), "import-source-policy: command failed (exit 17)") {
+					t.Fatalf("underlying private failure not retained: %q, %v", private, readErr)
+				}
+				raw, readErr := os.ReadFile(events)
+				if readErr != nil || strings.Count(string(raw), "identity-import\n") != 1 || strings.Contains(string(raw), "identity-handoff") {
+					t.Fatalf("failed policy creation retried or dispatched handoff: %q, %v", raw, readErr)
+				}
+				return
 			}
 			if ordinary && CommandExitCode(err) != 7 || !ordinary && err != nil {
 				t.Fatalf("unexpected consumer outcome: %v", err)

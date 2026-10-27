@@ -97,9 +97,15 @@ set -eu
 case "$*" in
  *"--dry-run=client"*) printf 'source description must be offline\n' >&2; exit 64;;
  *"create -f - -o json"*)
+  if test -n "${EXPECTED_IDENTITY_DEADLINE:-}"; then
+   test "$NVKR_WORK_DEADLINE" = "$EXPECTED_IDENTITY_DEADLINE"
+  fi
   test ! -e "$FIXTURE/identity-imported"
   cmp - "$FIXTURE/clusterstaticentries.yaml"
   printf 'identity-import\n' >> "$EVENTS"
+  if test "${IDENTITY_IMPORT_FAILURE:-}" = 1; then
+   printf 'synthetic-private-policy-error\n' >&2; exit 17
+  fi
   touch "$FIXTURE/identity-imported"
   cat "$FIXTURE/identity-created.json"; exit;;
  *"get pods --all-namespaces"*) cat "$FIXTURE/identity-pods.json"; exit;;
