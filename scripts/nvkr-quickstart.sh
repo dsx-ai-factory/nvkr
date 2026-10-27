@@ -24,9 +24,9 @@ confirm() {
   read -r answer || return 1
   [[ "${answer}" == y || "${answer}" == Y || "${answer}" == yes ]]
 }
-# Show the supported package-manager action and run it only after consent.
-install_package() {
-  local package="$1"
+# Show the supported Docker installation action and run it only after consent.
+install_docker() {
+  local package=docker.io
   local -a privilege=()
   if command -v apt-get >/dev/null; then
     if [[ "$(id -u)" != 0 ]]; then
@@ -38,15 +38,9 @@ install_package() {
     "${privilege[@]}" apt-get update
     "${privilege[@]}" apt-get install -y "${package}"
   elif command -v brew >/dev/null; then
-    if [[ "${package}" == docker.io ]]; then
-      echo 'Proposed install: brew install --cask docker' >&2
-      confirm 'Install Docker Desktop?' || return 1
-      brew install --cask docker
-    else
-      printf 'Proposed install: brew install %s\n' "${package}" >&2
-      confirm "Install ${package}?" || return 1
-      brew install "${package}"
-    fi
+    echo 'Proposed install: brew install --cask docker' >&2
+    confirm 'Install Docker Desktop?' || return 1
+    brew install --cask docker
   else
     echo 'Install the missing tool with your system package manager, then rerun.' >&2
     return 1
@@ -67,7 +61,7 @@ git ls-files --format='%(path)' -- . >/dev/null || {
   echo 'The quickstart requires Git 2.38 or later in an NVKR checkout.' >&2
   exit 1
 }
-if ! command -v docker >/dev/null; then install_package docker.io; fi
+if ! command -v docker >/dev/null; then install_docker; fi
 if ! docker info >/dev/null; then
   echo 'Docker is not ready. Start Docker and grant your user daemon access, then rerun.' >&2
   exit 1

@@ -5,8 +5,9 @@
 Build NVKR from source, then use it to build the NVKE CLI, controller container image and Helm chart.
 All three artifacts and their dependency SBOMs stay on your machine.
 
-**NVKR runs on Apple Silicon macOS or Linux. The NVKE CLI and container image produced here target Linux.**
-The commands select ARM64 on Apple Silicon and ARM64 Linux, or AMD64 on AMD64 Linux.
+**The NVKR CLI runs on macOS or Linux. The NVKE CLI and container image produced here target Linux.**
+The guided artifact build has been exercised on Apple Silicon macOS and Ubuntu ARM64/AMD64.
+Intel Mac artifact execution remains unverified; CLI-only setup and planning are separate routes.
 
 ## Before you start
 
