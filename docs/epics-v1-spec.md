@@ -443,9 +443,10 @@ verification, vulnerability scanning, deployment topology, cluster E2E qualifica
 builder-profile reproduction and byte-identity guarantees. GitHub is the sole hosted workflow,
 publication and signing provider. Per-built-artifact SBOM composition remains in scope.
 
-The proposed S3 boot and package delivery extension has a specified engineering contract; implementation
-and operational acceptance remain outstanding. It requires the complete selected artifact set for both
-supported native architectures: disk images, compatible EFI imagers, iPXE assets and original Debian packages,
+The proposed S3 boot and package delivery extension remains outside current v1 scope pending scope
+ratification. It is not part of completed v1 acceptance; implementation and operational acceptance remain
+outstanding. Its contract requires the complete selected artifact set for both supported native
+architectures: disk images, compatible EFI imagers, iPXE assets and original Debian packages,
 together with their authenticated provenance and required inventories. Installer kernels, initial RAM
 filesystems and media belong to the set when the selected boot method needs them. Deployment owns
 machine-specific configuration, network services, firmware and instance metadata; those prerequisites must
@@ -458,6 +459,8 @@ Acceptance of this extension requires:
 2. Actual boot clients retrieve assets from immutable boot URLs, chainload the compatible EFI, reject a
    wrong image digest, install to the intended disposable disk, reboot and complete first-boot services.
    Direct VM boot of the delivered disk is exercised separately on each supported architecture and profile.
+   Executed boot scripts and imagers are bound to authenticated assets; substitution of either after
+   verification must be rejected.
 3. Each delivered package is installed on a matching clean system with dependency and runtime checks.
    Mutually exclusive package versions are tested as alternatives. A list of package metadata or files
    cannot replace evidence covering the actual package payload.

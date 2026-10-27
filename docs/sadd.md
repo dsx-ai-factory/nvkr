@@ -535,8 +535,11 @@ The current publication input owner admits omitted or explicit OCI selection and
 combined APT/OCI selection before catalog, generation or execution work. Required selections never fall back
 to another transport; a direct APT publisher and its service/signing contract remain deferred (ADR-20 §2).
 
-The file-delivery contract reserves Definition v6 `file` outputs, Environment v2
-`publication.fileTargets` and Run Plan v6. Its new native-file and delivery-root families are distinct from
+The file-delivery contract reserves Definition v6 `file` outputs, Environment v2 `publication.fileTargets`,
+Run Plan/artifact-graph v6, PublicationRoot v5 native-file membership and Run v5 requirements/completion.
+Release v4 remains the unchanged OCI source view; S3 coordinates, selected delivery completion and separate
+effective policies belong to generated delivery records and receipts. The extension's new native-file and
+delivery-root families are distinct from
 Build, payload and OCI wrapper identity. A lifecycle selection receipt retains selected complete output-local
 publications and actual source proof bytes; it does not relax whole-Plan completeness. Separate caller policies
 authenticate source and delivery roles. Transfer uses conditional writes and full read-back; detached completion

@@ -205,7 +205,7 @@ _Avoid_: APT repository, installed package, builder type
 The Artifact representation specified in ADR-20 for unchanged producer-created Debian packages, EFI/iPXE
 files and installer assets. All regular files in an archive retain the parent archive identity, canonical
 member name, digest, size, mode and declared kind. File integrity is distinct from package dependencies and
-boot readiness.
+boot readiness. Implementation remains outstanding under the ADR-20 contract.
 _Avoid_: Reconstructed package, executable tool, installed inventory
 
 **File-delivery root**:
@@ -219,6 +219,7 @@ _Avoid_: Authored lifecycle object, replacement source release, successful uploa
 Caller-pinned transport coordinates and raw hashes/sizes for the delivery document and detached bundle.
 It locates proof; independent consumer policy and complete-byte checks establish acceptance. A final commit
 may exist after lost acknowledgement, so an indeterminate producer result requires independent reconciliation.
+Implementation remains outstanding under the ADR-20 contract.
 _Avoid_: Trusted policy, mutable release name, atomic bucket transaction
 
 ## Evidence and authority

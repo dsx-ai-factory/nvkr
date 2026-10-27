@@ -424,8 +424,9 @@ and actual payload dependencies are distinct claims. No source pathname, filenam
 `archive-content/v1` inventory or `deb-archive-metadata/v1` diagnostic may satisfy the payload-evidence gate.
 Every selected package/member and architecture needs its own exact subject and output membership; variants
 that intentionally conflict use separate installation cases. Merely exposing current disk materials as
-files does not complete this evidence path. Implementation must satisfy its native package and independent
-consumer contracts and record operational acceptance before use.
+files does not complete this evidence path. Native file delivery remains unadmitted until implementation
+satisfies its native package and independent consumer contracts and operational acceptance is recorded
+in reconciliation.
 
 For `efi`, `ipxe`, `kernel`, `initrd` and `iso` files, preserve the actual source/material and exact-byte
 subjects. An inventory of archive members establishes those bytes, not boot compatibility, installed

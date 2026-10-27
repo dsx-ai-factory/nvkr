@@ -1558,8 +1558,9 @@ cannot replace the authenticated result.
 
 Source, build and ARC jobs must receive no S3 credentials. Only admitted transfer and completion operations
 may resolve writer credential references or obtain federated write credentials; verifier access must be
-independently scoped to read-only operations. A new S3 OIDC consumer requires explicit renderer and
-bundle-validator admission, not removal of existing signing-only token checks. No OIDC or storage
+independently scoped to read-only operations. Writer credentials must be limited to the configured target
+bucket, key prefix and required write and cleanup operations. A new S3 OIDC consumer requires explicit
+renderer and bundle-validator admission, not removal of existing signing-only token checks. No OIDC or storage
 credentials are available to arbitrary jobs, PRs or forks. The consumer selects its own read identity and
 policies. Secret references may be recorded; secret values cannot be
 transported in plans, command arguments, boot scripts, artifacts or logs. Referenced authentication and

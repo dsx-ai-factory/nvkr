@@ -82,7 +82,10 @@ Environment separately supplies runtime, runner, publication namespace, credenti
 Changing transport or signing configuration cannot silently change logical Build identity.
 
 ADR-20 reserves, without implementing them, Definition v6 native `file` outputs, Environment v2 typed
-`publication.fileTargets`, and Run Plan v6 delivery edges. Current schema constants and input behavior stay
+`publication.fileTargets`, Run Plan/artifact-graph v6 delivery edges, PublicationRoot v5 native-file
+membership and Run v5 requirements/completion. Release v4 retains the unchanged OCI source view; S3
+coordinates, selected delivery completion and separate source/delivery policies remain generated records
+and receipt bindings, not repurposed Release fields. Current schema constants and input behavior stay
 unchanged. Source-created DEBs, EFI and iPXE files are not executable-tool bundles or reconstructed APT
 packages. The six public lifecycle objects remain unchanged; native manifests, selection receipts, delivery
 roots and locators are generated/authenticated internals rather than independently authored lifecycle inputs.

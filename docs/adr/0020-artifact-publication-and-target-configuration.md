@@ -194,8 +194,9 @@ policy is implied by accepting a disk. The separate raw diagnostic route remains
 
 This section freezes the proposed engineering contract for customer-controlled S3 delivery of the complete
 selected artifact set: QCOW2 disk images for VM boot and imaging, compatible EFI and iPXE assets, and Debian
-packages. Implementations must support that complete selected set. This documentation change specifies
-the contract; the S3 adapter, native-file codecs and decoders remain implementation work. Ratification by
+packages. Implementations must support that complete selected set. This section specifies the contract;
+the S3 adapter, native-file codecs and decoders remain implementation work, tracked in
+[reconciliation](reconciliation.md#s3-boot-and-package-delivery-contract). Ratification by
 the named deciders, provider acceptance and boot acceptance remain outstanding. Existing OCI behavior and
 existing schema readers are unchanged.
 
@@ -204,12 +205,24 @@ repository serving, other repository managers, arbitrary upload scripts and lega
 are not admitted by this contract. A new adapter must satisfy the same ownership and acceptance boundary.
 
 **Authored inputs and versions.** Reserve `nvkr.dev/definition/v6` for the native `file` output below,
-`nvkr.dev/environment/v2` for `publication.fileTargets`, and `nvkr.dev/run-plan/v6` for their derived graph.
-This contract reserves those versions; runtime decoders do not yet accept them. Existing v5 Definitions
-and v1 Environments remain valid under their current contracts; new fields or formats must never be silently
-interpreted under an older schema. Omitting file targets must preserve existing OCI behavior; admission
-must reject unknown or mixed fields. No current schema constant, catalog pin, generated workflow or
-executable capability changes in this freeze.
+`nvkr.dev/environment/v2` for `publication.fileTargets`, and `nvkr.dev/run-plan/v6` plus
+`nvkr.dev/artifact-graph/v6` for their derived graph and delivery operations. Native-file-aware publication
+uses the reserved `nvkr.dev/publication-root/v5`, `application/vnd.nvkr.publication-root.v5` and
+`application/vnd.nvkr.publication-root.config.v5+json`. Reserve `nvkr.dev/run/v5` for native-file requirements
+and required delivery completion. Their older versions retain their existing fields, closed vocabularies
+and completion rules; they must never silently interpret native-file or S3 delivery semantics. Existing
+source publications remain immutable and are authenticated under their original versioned contracts.
+
+The `nvkr.dev/release/v4` public view retains its OCI source subject, artifact references, content subject
+and single effective source-policy digest. Native-file details remain bound by the new manifest and OCI
+wrapper. The S3 locator, selected delivery completion and separate effective source/delivery policies
+belong to the delivery receipt and generated records; existing Release fields must not be repurposed to
+carry them. No Release version change is reserved for that unchanged source view.
+
+These are contract reservations; runtime decoders do not yet accept the new versions. Existing v5
+Definitions and v1 Environments remain valid under their current contracts. Omitting file targets must
+preserve existing OCI behavior; admission must reject unknown or mixed fields. No current schema constant,
+catalog pin, generated workflow or executable capability changes in this freeze.
 
 Each `publication.fileTargets` entry has the closed shape below. The list is sorted by `name`, and names
 must be unique. Every configured target is required for Run success. There is no best-effort target or
@@ -335,13 +348,20 @@ publisher-policy digests in the root are descriptive. Consumer receipts bind the
 The root cannot nominate its trusted signer, weaken disk evidence, or upgrade the lane or acceptance scope.
 Full Release qualification, revocation and offline acceptance remain outside this artifact-publication contract.
 
-**Transfer, commit and interruption.** Use conditional creation for PUT and multipart completion. A `412`
-requires full GET/digest/size reconciliation before reuse. A multipart `409` requires key reconciliation and,
-only on authenticated absence and within the bounded attempt budget, a new multipart upload. Access denied
-does not prove absence. Lost PUT/completion responses require the same reconciliation; status codes, ETags
-and provider checksum metadata are not payload identity. Use exact version reads where supported; otherwise
-admit explicit ETag-conditional reads with full rehash. A provider unable to meet a selected requirement fails
-admission, not a silent safety downgrade.
+**Transfer, commit and interruption.** Use conditional creation (`If-None-Match: *`) for PUT and multipart
+completion. A `412` requires authenticated full GET/digest/size reconciliation before equal bytes may be
+reused; conflicting bytes fail. A `409` from either operation requires the same key reconciliation. Reuse
+equal bytes, fail on conflicting bytes, and retry only on authenticated absence within `maxRequestAttempts`,
+`maxUploadAttempts` and the unchanged operation deadline. For PUT, retry the same held bytes with the same
+conditional creation. For multipart completion, clean up the abandoned owned upload as specified below,
+then initiate a fresh multipart upload and upload every part again; do not retry completion using the
+previous upload ID. SDK retries must not bypass these reconciliation transitions. Access denied does not
+prove absence. Lost PUT/completion responses require the same reconciliation; status codes, ETags and
+provider checksum metadata are not payload identity. Use exact version reads where supported; otherwise
+admit explicit ETag-conditional reads with full rehash. A provider unable to meet a selected requirement
+fails admission, not a silent safety downgrade. The PUT/multipart retry distinction follows
+[AWS conditional-write behavior](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html);
+mandatory full-byte reconciliation is this contract's requirement for every admitted provider.
 
 The state order is source authentication → upload payloads and proofs → verify every required storage object
 and boot URL → generate canonical root → detached signing → root upload and read-back → conditional bundle
@@ -353,12 +373,21 @@ report the exact attempted locator as indeterminate. An independent consumer may
 signature, policy and required-closure checks pass. Do not promise rollback, absence of a valid remote commit
 after an error, or an atomic transaction across objects or targets. Every consumer checks the closure anew.
 
-Cancellation stops and joins transfer workers, then aborts only owned incomplete upload IDs under a separate
-bounded cleanup context and verifies cleanup. Cleanup errors remain visible. Process death requires an
-operator-owned incomplete-upload expiration policy; immediate cleanup or durable multipart resume is not
-promised. Never prune unrelated bucket objects. Failure or an indeterminate result for a required target
-prevents Run success without invalidating completed OCI publication or claiming that another target was
-rolled back.
+Before abandoning or restarting a multipart attempt, and on every operation exit, stop and join its
+transfer workers. This includes equal-object reuse, non-cancellation failure, deadline expiration and
+cancellation. Under a fresh context bounded by `cleanupTimeoutSeconds`, abort every remaining owned
+incomplete upload ID and verify that its parts are gone, repeating bounded abort/list operations when
+necessary. Never abort a known completed upload or delete a completed object. An absent upload ID does not
+establish whether completion succeeded: reconcile ambiguous completion against the exact object key,
+preserving any completed objects and the attempted locator. Cleanup must not invalidate a valid remote
+completion or turn an indeterminate result into success. Cleanup errors remain visible alongside the
+primary result. The [AWS abort API guidance](https://docs.aws.amazon.com/AmazonS3/latest/API/API_AbortMultipartUpload.html)
+describes verification through `ListParts`; [completion may also retire an upload ID](https://docs.aws.amazon.com/AmazonS3/latest/API/API_CompleteMultipartUpload.html).
+Process death or a lost initiation response can leave an upload whose ID the owner never obtained;
+an operator-owned incomplete-upload expiration policy is required for such cases. Immediate cleanup of
+unidentified uploads and durable multipart resume are not promised. Never prune unrelated bucket objects.
+Failure or an indeterminate result for a required target prevents Run success without invalidating
+completed OCI publication or claiming that another target was rolled back.
 
 **Boot and package acceptance.** All selected AMD64/ARM64 QCOW2, EFI, iPXE and DEB outputs are required
 parts of the complete customer path. Source templates retain their own identities; destination- or

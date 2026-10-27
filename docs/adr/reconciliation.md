@@ -1231,9 +1231,11 @@ No code schema constant, decoder, credential, dependency, catalog pin or generat
 Current object routes still fail `CodeEngineCapability`, and Definition accepts no native `file` output.
 The current whole-Plan exact-input receipt cannot authorize selected-output projection. Signature/provenance
 verification records do not retain portable source bundles; proof capture and supplied-bundle verification
-remain implementation work. The new Definition/Environment/Plan versions and identity families are documentary
-reservations, not runtime registrations or accepted wire schemas. Existing native package metadata diagnostics
-and archive inventories cannot satisfy package payload dependency evidence.
+remain implementation work. Definition v6, Environment v2, Run Plan/artifact-graph v6, PublicationRoot v5
+with matching media types, Run v5 and the new identity families are contract reservations, not runtime
+registrations or accepted wire schemas. Release v4 keeps its unchanged OCI source view; S3 coordinates,
+selected completion and separate policies belong to generated delivery records and receipts. Existing native
+package metadata diagnostics and archive inventories cannot satisfy package payload dependency evidence.
 
 The required supported set includes selected AMD64/ARM64 QCOW2, compatible EFI/iPXE assets and original
 Debian packages. The pinned NVKE source [documents](https://github.com/dsx-ai-factory/nvke/blob/ff21ba8c07cafff74b68e238a8876af11e5beded/os-image/efi/README.md#L36)
