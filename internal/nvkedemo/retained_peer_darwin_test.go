@@ -87,7 +87,7 @@ func TestDarwinRetainedOriginalGenerationExitAndTransport(t *testing.T) {
 	if err := checkRetainedPeerCapability(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	for _, mode := range []string{"detach and exit", "transport closes first", "close observation"} {
+	for _, mode := range []string{"detach and exit", "starts independent", "transport closes first", "close observation"} {
 		t.Run(mode, func(t *testing.T) {
 			dir, err := os.MkdirTemp("/private/tmp", "nvkr-peer-fixture-")
 			if err != nil {
@@ -98,6 +98,7 @@ func TestDarwinRetainedOriginalGenerationExitAndTransport(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestDarwinRetainedPeerHelper$", "-test.count=1")
+			isolateRetainedCommand(cmd, mode != "starts independent")
 			cmd.Env = append(os.Environ(), "NVKR_TEST_DARWIN_PEER="+address)
 			cmd.WaitDelay = time.Second
 			var diagnostic bytes.Buffer
@@ -129,6 +130,10 @@ func TestDarwinRetainedOriginalGenerationExitAndTransport(t *testing.T) {
 			}
 			if err := json.NewDecoder(bufio.NewReader(stdout)).Decode(&description); err != nil || description.PID != cmd.Process.Pid {
 				t.Fatal("original selector differs from the actual unreaped child", err)
+			}
+			sid, err := unix.Getsid(description.PID)
+			if err != nil || (sid == description.PID) != (mode == "starts independent") {
+				t.Fatal("owner session does not match terminal-authentication requirement", sid, err)
 			}
 			dialed, err := (&net.Dialer{}).DialContext(ctx, "unix", address)
 			if err != nil {

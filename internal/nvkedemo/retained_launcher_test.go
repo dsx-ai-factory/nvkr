@@ -51,7 +51,7 @@ func TestRetainedNativeLauncherChild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !launch.CachedSudo {
+	if launch.CachedSudo != (launch.Config.Network != "unattended") {
 		t.Fatal("foreground authentication selection was lost")
 	}
 	if launch.Config.Network == "unpublished" {
@@ -197,13 +197,15 @@ func TestRetainedNativeLauncherReturnsOnlyAfterDetachedReady(t *testing.T) {
 	for _, test := range []struct {
 		name string
 		code nvkrerr.Code
+		auth int
 	}{
-		{"ready", ""},
-		{"production-owner", ""},
-		{"partial", nvkrerr.CodeVerifyFailed},
-		{"ready-failure", nvkrerr.CodeVerifyFailed},
-		{"cancel", nvkrerr.CodeTimeout},
-		{"detach-refused", nvkrerr.CodePreflightFailed},
+		{"ready", "", 1},
+		{"unattended", "", 0},
+		{"production-owner", "", 1},
+		{"partial", nvkrerr.CodeVerifyFailed, 1},
+		{"ready-failure", nvkrerr.CodeVerifyFailed, 1},
+		{"cancel", nvkrerr.CodeTimeout, 1},
+		{"detach-refused", nvkrerr.CodePreflightFailed, 1},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := privateTestDir(t)
@@ -214,6 +216,9 @@ func TestRetainedNativeLauncherReturnsOnlyAfterDetachedReady(t *testing.T) {
 				out.cancel = cancel
 			}
 			cfg := Config{Out: filepath.Join(root, "deployment"), DemoExecutable: os.Args[0], Network: test.name, Progress: out}
+			if test.auth == 0 {
+				cfg.Progress = &out.Buffer
+			}
 			if test.name == "production-owner" {
 				cfg.TenantWorkers = 2
 			}
@@ -244,7 +249,7 @@ func TestRetainedNativeLauncherReturnsOnlyAfterDetachedReady(t *testing.T) {
 					t.Fatal("non-Ready owner claimed success or lost ownership classification", err, out.String())
 				}
 			}
-			if out.auth != 1 || strings.Count(out.String(), "Retained session:") != 1 || !strings.Contains(out.String(), " status --session ") || !strings.Contains(out.String(), " cleanup --session ") {
+			if out.auth != test.auth || strings.Count(out.String(), "Retained session:") != 1 || !strings.Contains(out.String(), " status --session ") || !strings.Contains(out.String(), " cleanup --session ") {
 				t.Fatal("authentication or original session instructions lost", out.auth, out.String())
 			}
 			if _, err := os.Stat(filepath.Join(selector, "fixture-started")); err != nil {

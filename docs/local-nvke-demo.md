@@ -581,8 +581,11 @@ The Linux owner is authenticated using its connected kernel pidfd. macOS uses
 its original process audit token and a kernel exit observation; this requires a
 CGO build with the public macOS SDK. Unsupported builds fail before deployment
 work. Session JSON is a locator and cannot authorize process adoption or signaling.
-The CLI keeps its original terminal context during startup privilege admission,
-then acknowledges independent ownership before successful return.
+With interactive authentication, the owner keeps its original terminal context
+through startup privilege admission. An unattended owner starts in an independent
+process session so loss of the frontend process group cannot terminate it during
+startup. Both paths require the authenticated held-state handoff before the CLI
+returns successfully; process independence does not establish cluster readiness.
 
 New demos issue their shared bootstrap/SPIRE upstream CA for 3,650 days, following
 NVKE's local E2E CA convention. This finite lifetime has no automatic root renewal.

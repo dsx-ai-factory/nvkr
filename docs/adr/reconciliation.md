@@ -1467,8 +1467,9 @@ production action. Build prepares native tools through NVKR and selects the comp
 closure. Default native `run` and `e2e` now launch the fixed retained service owner: successful
 checks return to the shell while the native resource stack stays held until explicit
 `cleanup --session`. Presenter cancellation stops work without requesting deletion.
-The owner keeps terminal context through startup privilege checks and acknowledges
-detachment before successful return. Linux binds its control to SO_PEERPIDFD;
+Interactive authentication keeps terminal context through startup privilege
+checks. An unattended owner starts in an independent process session; both paths
+acknowledge the authenticated held-state handoff before successful return. Linux binds its control to SO_PEERPIDFD;
 macOS binds it to the originally captured process audit token and a kqueue exit
 observation, requiring CGO/public SDK support. The generic Darwin peer API remains
 refused. Controlled launcher/native-scope tests exercise retention and joined

@@ -87,6 +87,7 @@ func launchRetainedNativeWithCommand(ctx context.Context, cfg Config, commandFor
 		}
 	}()
 	command := commandFor(executable, root, NativeEnvironment())
+	isolateRetainedCommand(command, cached)
 	command.Stdin = nil
 	command.Stdout, command.Stderr = log, log // Direct files; no copy or Wait goroutine survives this frontend.
 	if err := command.Start(); err != nil {
@@ -138,8 +139,8 @@ func launchRetainedNativeWithCommand(ctx context.Context, cfg Config, commandFor
 	started = true
 	state, err := session.request(ctx, http.MethodPost, "/start")
 	if err == nil {
-		// Keep the original terminal/session context through privileged startup.
-		// Detaching before network admission would invalidate tty-scoped sudo.
+		// Interactive authentication keeps its terminal through privileged
+		// startup; unattended owners already have an independent session.
 		_, err = awaitRetainedNativeHeld(ctx, cfg.Progress, session, state)
 	}
 	if err != nil {
