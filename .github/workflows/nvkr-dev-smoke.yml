@@ -131,7 +131,7 @@ jobs:
           [ -n "${NVKR_PIN_SOURCE_TOKEN_0:-}" ] || { printf '%s\n' 'nvkr: [NVKR-E-FETCH-FAILED] source credential is empty' >&2; exit 20; }
           exec ./nvkr-exec run smoke-worker --policy 'inputs/policies/nvke-development-qualification.yaml'
       - name: Upload signed native smoke evidence
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         timeout-minutes: 5
         with:
           name: nvkr-smoke-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.arch }}
