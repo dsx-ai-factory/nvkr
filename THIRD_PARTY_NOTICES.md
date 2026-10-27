@@ -55,7 +55,7 @@ Regenerate with `make notices`.
 | `google.golang.org/genproto/googleapis/rpc` | v0.0.0-20261005182115-fad411399dd8 | Apache-2.0 |
 | `google.golang.org/grpc` | v1.84.0 | Apache-2.0 |
 | `google.golang.org/protobuf` | v1.36.12 | BSD-3-Clause |
-| `oras.land/oras-go/v2` | v2.6.4 | Apache-2.0 |
+| `oras.land/oras-go/v2` | v2.7.0 | Apache-2.0 |
 | `sigs.k8s.io/yaml` | v1.6.0 | MIT |
 
 ---
@@ -3938,7 +3938,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## oras.land/oras-go/v2
 
-Version: v2.6.4
+Version: v2.7.0
 
 ```
 Apache License
