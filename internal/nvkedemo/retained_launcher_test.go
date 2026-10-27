@@ -54,6 +54,10 @@ func TestRetainedNativeLauncherChild(t *testing.T) {
 	if !launch.CachedSudo {
 		t.Fatal("foreground authentication selection was lost")
 	}
+	if launch.Config.Network == "unpublished" {
+		time.Sleep(time.Minute)
+		return
+	}
 	if launch.Config.Network == "production-owner" {
 		if err := serveRetained(t.Context(), root, launch, func(ctx context.Context, cfg Config) error {
 			nodes, err := selectedNativeTenantNodes(cfg.TenantWorkers, cfg.Conformance)
@@ -261,26 +265,38 @@ func TestRetainedNativeLauncherReturnsOnlyAfterDetachedReady(t *testing.T) {
 	}
 }
 
-func TestRetainedNativeLauncherRejectsDifferentChildBeforeStartAndReapsIt(t *testing.T) {
+func TestRetainedNativeLauncherRejectsUnstartedChildAndReapsIt(t *testing.T) {
 	if err := checkRetainedPeerCapability(t.Context()); err != nil {
 		t.Skipf("native connected-peer capability unavailable: %v", err)
 	}
-	root := privateTestDir(t)
-	var command *exec.Cmd
-	var selector string
-	out := &retainedLauncherOutput{}
-	err := launchRetainedNativeWithCommand(t.Context(), Config{Out: filepath.Join(root, "deployment"), DemoExecutable: os.Args[0], Network: "wrong-pid", Progress: out}, func(executable, session string, environment []string) *exec.Cmd {
-		selector = session
-		command = exec.Command(executable, "-test.run=^TestRetainedNativeLauncherChild$", "-test.count=1", "-test.timeout=45s")
-		command.Env = append(environment, "NVKR_TEST_RETAINED_LAUNCHER="+session)
-		return command
-	})
-	var coded *nvkrerr.Error
-	if !errors.As(err, &coded) || coded.Code != nvkrerr.CodePreflightFailed || errors.Is(err, ErrRetainedControls) || command == nil || command.ProcessState == nil {
-		t.Fatal("unstarted child was adopted or not reaped", err)
-	}
-	if _, err := os.Stat(filepath.Join(selector, "fixture-started")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatal("unbound owner admitted service work", err)
+	for _, tc := range []struct {
+		name string
+		code nvkrerr.Code
+	}{{"wrong-pid", nvkrerr.CodePreflightFailed}, {"unpublished", nvkrerr.CodeTimeout}} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := privateTestDir(t)
+			var command *exec.Cmd
+			var selector string
+			out := &retainedLauncherOutput{}
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			err := launchRetainedNativeWithCommand(ctx, Config{Out: filepath.Join(root, "deployment"), DemoExecutable: os.Args[0], Network: tc.name, Progress: out}, func(executable, session string, environment []string) *exec.Cmd {
+				selector = session
+				command = exec.Command(executable, "-test.run=^TestRetainedNativeLauncherChild$", "-test.count=1", "-test.timeout=45s")
+				command.Env = append(environment, "NVKR_TEST_RETAINED_LAUNCHER="+session)
+				return command
+			})
+			var coded *nvkrerr.Error
+			if !errors.As(err, &coded) || coded.Code != tc.code || errors.Is(err, ErrRetainedControls) || command == nil || command.ProcessState == nil {
+				t.Fatal("unstarted child was adopted or not reaped", err)
+			}
+			if _, err := os.Stat(filepath.Join(selector, "fixture-started")); !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("unbound owner admitted service work", err)
+			}
+			if strings.Contains(out.String(), "Retained session:") || strings.Contains(out.String(), " --session ") {
+				t.Fatal("unstarted child exposed unusable session commands", out.String())
+			}
+		})
 	}
 }
 

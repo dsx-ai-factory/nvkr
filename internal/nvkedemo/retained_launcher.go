@@ -94,8 +94,11 @@ func launchRetainedNativeWithCommand(ctx context.Context, cfg Config, commandFor
 	}
 	var access OperatorAccess
 	defer func() {
+		if !started {
+			return
+		}
 		result = errors.Join(result, writeRetainedNativeInstructions(cfg.Progress, executable, root, access))
-		if started && result != nil {
+		if result != nil {
 			result = errors.Join(result, ErrRetainedControls)
 		}
 	}()

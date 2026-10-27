@@ -666,8 +666,12 @@ func TestProductionRunCannotSelectKindSiteWorkflow(t *testing.T) {
 		// The real native capacity boundary can reject a constrained test host
 		// before artifact selection; it must not dispatch another backend.
 		assertCode(t, err, nvkrerr.CodeEngineCapability)
-	} else if strings.Contains(err.Error(), "native deployment requires usable KVM") {
+	} else if admissionErr := nvkedemo.AdmitNativeDeployment(t.Context(), ""); admissionErr != nil {
 		assertCode(t, err, nvkrerr.CodeEngineCapability)
+		assertCode(t, admissionErr, nvkrerr.CodeEngineCapability)
+		if err.Error() != admissionErr.Error() {
+			t.Fatalf("run lost its native capability refusal: %v; admission: %v", err, admissionErr)
+		}
 	} else {
 		assertCode(t, err, nvkrerr.CodePreflightFailed)
 		if !strings.Contains(err.Error(), "select native deployment from NVKR outputs") {

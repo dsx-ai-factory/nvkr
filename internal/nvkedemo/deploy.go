@@ -41,9 +41,6 @@ func AdmitDemoDeployment(ctx context.Context, cfg Config) error {
 	if _, err := nativeAccelerator(runtime.GOOS+"/"+runtime.GOARCH, cfg.Accelerator); err != nil {
 		return err
 	}
-	if err := admitNativeSeedISO(ctx, runtime.GOOS, NativeEnvironment()); err != nil {
-		return err
-	}
 	if err := AdmitNativeDeployment(ctx, cfg.Accelerator); err != nil {
 		return err
 	}
@@ -78,6 +75,9 @@ func AdmitNativeDeployment(ctx context.Context, accelerator string) error {
 		return nvkrerr.Wrap(nvkrerr.CodeTimeout, err, "native deployment admission")
 	}
 	if _, err := nativeAccelerator(runtime.GOOS+"/"+runtime.GOARCH, accelerator); err != nil {
+		return err
+	}
+	if err := admitNativeSeedISO(ctx, runtime.GOOS, NativeEnvironment()); err != nil {
 		return err
 	}
 	if runtime.GOOS == "darwin" {

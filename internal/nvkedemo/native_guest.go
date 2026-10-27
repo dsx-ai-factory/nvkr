@@ -484,6 +484,9 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 	defer stop()
 	for {
 		raw, err := nativeReadinessObservation(budget, cfg.Progress, func(ctx context.Context) ([]byte, error) {
+			if exited, err := server.Exited(); exited {
+				return nil, errors.Join(errSimulatorExited, err)
+			}
 			return call(ctx, "readiness", "instance", "list")
 		})
 		if err != nil {
@@ -605,10 +608,13 @@ func nativePrimaryAddress(row nativeInstance, network nativeBridgeConfig) (strin
 	return row.Interfaces[0].IPAddresses[0], nil
 }
 
+var errSimulatorExited = errors.New("native NICo exited during readiness; inspect the private native-nico log")
+
 // A joined read-only CLI failure is not a guest state observation. Retry it
 // within the original readiness budget, requiring a successful response before
 // interpreting state. The caller's original deadline bounds the observation;
-// cancellation, timeout, unsafe ownership and other exit codes are never retried.
+// cancellation, timeout, an exited simulator, unsafe ownership and other exit
+// codes are never retried.
 func nativeReadinessObservation(ctx context.Context, progress io.Writer, observe func(context.Context) ([]byte, error)) ([]byte, error) {
 	if _, err := remainingWork(ctx); err != nil {
 		return nil, err
@@ -621,7 +627,7 @@ func nativeReadinessObservation(ctx context.Context, progress io.Writer, observe
 		if canceled := ctx.Err(); canceled != nil {
 			return nil, errors.Join(err, canceled)
 		}
-		if err == nil || CommandExitCode(err) != 1 {
+		if err == nil || errors.Is(err, errSimulatorExited) || CommandExitCode(err) != 1 {
 			return raw, err
 		}
 		if progress != nil {

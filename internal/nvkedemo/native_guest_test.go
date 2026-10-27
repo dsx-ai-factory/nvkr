@@ -281,6 +281,8 @@ func TestNativeReadinessObservation(t *testing.T) {
 		{"success", nil, 1, nil},
 		{"transient observation failure", []error{joined}, 2, nil},
 		{"recovers after four failures", []error{joined, joined, joined, joined}, 5, nil},
+		{"simulator exit is terminal", []error{errSimulatorExited}, 1, errSimulatorExited},
+		{"simulator exit cannot be hidden by exit one", []error{errors.Join(errSimulatorExited, joined)}, 1, errSimulatorExited},
 		{"other exit", []error{&CommandError{ExitCode: 2, Cause: failure}}, 1, failure},
 		{"cancellation", []error{errors.Join(joined, context.Canceled)}, 1, context.Canceled},
 		{"deadline", []error{errors.Join(joined, context.DeadlineExceeded)}, 1, context.DeadlineExceeded},

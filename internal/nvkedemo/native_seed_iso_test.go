@@ -93,7 +93,7 @@ func TestMissingNativeSeedISORejectsBeforeOutputOrCommands(t *testing.T) {
 	if runtime.GOARCH != "arm64" || runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
 		t.Skip("native demo requires Darwin or Linux ARM64")
 	}
-	for _, boundary := range []string{"deployment", "guest", "site"} {
+	for _, boundary := range []string{"native admission", "deployment", "guest", "site"} {
 		t.Run(boundary, func(t *testing.T) {
 			root := t.TempDir()
 			marker := filepath.Join(root, "command-started")
@@ -106,6 +106,8 @@ func TestMissingNativeSeedISORejectsBeforeOutputOrCommands(t *testing.T) {
 			out := filepath.Join(root, "must-not-exist")
 			var err error
 			switch boundary {
+			case "native admission":
+				err = AdmitNativeDeployment(t.Context(), accelerator)
 			case "deployment":
 				err = AdmitDemoDeployment(t.Context(), Config{Accelerator: accelerator, Cleanup: true, Out: out})
 			case "guest":
@@ -114,7 +116,7 @@ func TestMissingNativeSeedISORejectsBeforeOutputOrCommands(t *testing.T) {
 				err = RunNative(t.Context(), NativeConfig{Accelerator: accelerator, DemoExecutable: "/not-opened/nvke-demo", Out: out})
 			}
 			code := nvkrerr.CodePreflightFailed
-			if boundary == "deployment" {
+			if boundary == "deployment" || boundary == "native admission" {
 				code = nvkrerr.CodeEngineCapability
 			}
 			var coded *nvkrerr.Error
