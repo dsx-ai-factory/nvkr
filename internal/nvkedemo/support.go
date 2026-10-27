@@ -32,6 +32,10 @@ const diagnosticLimit = 8 << 20
 // ErrUnjoined requires retaining controls depended on by possibly live work.
 var ErrUnjoined = errors.New("owned process group did not join")
 
+// Issued only after a bounded command joins without output failures while its
+// caller remains active. Read-only observers may retry; mutations must not.
+var errCommandDeadline = errors.New("joined command exceeded its independent deadline")
+
 // CommandError preserves the command's exit status and original cause without
 // printing its arguments, environment, or potentially sensitive output.
 type CommandError struct {
@@ -766,6 +770,7 @@ func (r Runner) execute(ctx context.Context, args []string, phase string, timeou
 	if timeout < 0 || timeout == 0 && ctx.Done() == nil {
 		return nil, errors.New("command requires a positive timeout or cancelable caller context")
 	}
+	caller := ctx
 	if timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
@@ -795,6 +800,9 @@ func (r Runner) execute(ctx context.Context, args []string, phase string, timeou
 		return raw, errors.Join(joinErr, waitErr, ctx.Err(), outErr, stderrErr, outputErr)
 	}
 	if err := errors.Join(waitErr, ctx.Err(), outErr, stderrErr, outputErr); err != nil {
+		if timeout > 0 && ctx.Err() == context.DeadlineExceeded && caller.Err() == nil && outErr == nil && stderrErr == nil && outputErr == nil {
+			err = errors.Join(err, errCommandDeadline)
+		}
 		code := -1
 		var exit *exec.ExitError
 		if outErr == nil && stderrErr == nil && outputErr == nil && errors.As(waitErr, &exit) {

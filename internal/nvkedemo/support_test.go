@@ -468,9 +468,11 @@ func TestRunnerInheritsCallerWorkCancellation(t *testing.T) {
 	for _, tc := range []struct {
 		name, script string
 		deadline     bool
+		control      time.Duration
 	}{
-		{"completed work", "printf completed", false},
-		{"deadline joins child", "exec sleep 60", true},
+		{"completed work", "printf completed", false, 0},
+		{"deadline joins child", "exec sleep 60", true, 0},
+		{"caller expires before control deadline", "exec sleep 60", true, time.Minute},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			duration := time.Minute
@@ -479,7 +481,10 @@ func TestRunnerInheritsCallerWorkCancellation(t *testing.T) {
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), duration)
 			defer cancel()
-			raw, err := (Runner{Env: []string{"PATH=/usr/bin:/bin"}}).Capture(ctx, []string{"/bin/sh", "-ec", tc.script}, "caller-budget", 0)
+			raw, err := (Runner{Env: []string{"PATH=/usr/bin:/bin"}}).Capture(ctx, []string{"/bin/sh", "-ec", tc.script}, "caller-budget", tc.control)
+			if errors.Is(err, errCommandDeadline) {
+				t.Fatal("caller expiry was classified as a retryable command deadline")
+			}
 			if tc.deadline {
 				if !errors.Is(err, context.DeadlineExceeded) || errors.Is(err, ErrUnjoined) {
 					t.Fatalf("caller deadline lost or work left unjoined: %v", err)

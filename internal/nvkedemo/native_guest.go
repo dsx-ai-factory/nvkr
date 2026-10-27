@@ -612,9 +612,10 @@ var errSimulatorExited = errors.New("native NICo exited during readiness; inspec
 
 // A joined read-only CLI failure is not a guest state observation. Retry it
 // within the original readiness budget, requiring a successful response before
-// interpreting state. The caller's original deadline bounds the observation;
-// cancellation, timeout, an exited simulator, unsafe ownership and other exit
-// codes are never retried.
+// interpreting state. The caller's original deadline bounds the observation.
+// A command's independent timeout may retry only after its owner confirms join.
+// Caller cancellation/expiry, an exited simulator, unsafe ownership and other
+// exit codes are never retried.
 func nativeReadinessObservation(ctx context.Context, progress io.Writer, observe func(context.Context) ([]byte, error)) ([]byte, error) {
 	if _, err := remainingWork(ctx); err != nil {
 		return nil, err
@@ -627,7 +628,8 @@ func nativeReadinessObservation(ctx context.Context, progress io.Writer, observe
 		if canceled := ctx.Err(); canceled != nil {
 			return nil, errors.Join(err, canceled)
 		}
-		if err == nil || errors.Is(err, errSimulatorExited) || CommandExitCode(err) != 1 {
+		if err == nil || errors.Is(err, errSimulatorExited) || errors.Is(err, ErrUnjoined) || errors.Is(err, context.Canceled) ||
+			CommandExitCode(err) != 1 && !errors.Is(err, errCommandDeadline) {
 			return raw, err
 		}
 		if progress != nil {

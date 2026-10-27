@@ -272,6 +272,7 @@ func TestMacTCGWithoutAdapterRejectsBeforeArtifactOrOutputWork(t *testing.T) {
 func TestNativeReadinessObservation(t *testing.T) {
 	failure := errors.New("read failed")
 	joined := &CommandError{ExitCode: 1, Cause: failure}
+	queryTimeout := &CommandError{ExitCode: 143, Cause: errors.Join(context.DeadlineExceeded, errCommandDeadline)}
 	for _, tc := range []struct {
 		name   string
 		errors []error
@@ -286,6 +287,10 @@ func TestNativeReadinessObservation(t *testing.T) {
 		{"other exit", []error{&CommandError{ExitCode: 2, Cause: failure}}, 1, failure},
 		{"cancellation", []error{errors.Join(joined, context.Canceled)}, 1, context.Canceled},
 		{"deadline", []error{errors.Join(joined, context.DeadlineExceeded)}, 1, context.DeadlineExceeded},
+		{"joined query deadline", []error{queryTimeout}, 2, nil},
+		{"query deadline with unjoined process", []error{errors.Join(queryTimeout, ErrUnjoined)}, 1, ErrUnjoined},
+		{"query deadline with cancellation", []error{errors.Join(queryTimeout, context.Canceled)}, 1, context.Canceled},
+		{"query deadline with simulator exit", []error{errors.Join(queryTimeout, errSimulatorExited)}, 1, errSimulatorExited},
 		{"unjoined process", []error{errors.Join(joined, ErrUnjoined)}, 1, ErrUnjoined},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -303,6 +308,31 @@ func TestNativeReadinessObservation(t *testing.T) {
 				t.Fatalf("calls=%d raw=%q err=%v", calls, raw, err)
 			}
 		})
+	}
+}
+
+func TestNativeReadinessRecoversAfterJoinedCommandDeadline(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	deadline, _ := ctx.Deadline()
+	runner := Runner{Work: privateTestDir(t), Env: []string{"PATH=/usr/bin:/bin"}}
+	calls := 0
+	raw, err := nativeReadinessObservation(ctx, nil, func(ctx context.Context) ([]byte, error) {
+		calls++
+		if got, _ := ctx.Deadline(); got != deadline {
+			t.Fatal("observation replaced the original deployment deadline")
+		}
+		if calls == 1 {
+			partial, err := runner.Capture(ctx, []string{"/bin/sh", "-c", "printf incomplete; exec sleep 60"}, "read-timeout", 100*time.Millisecond)
+			if !errors.Is(err, errCommandDeadline) || !errors.Is(err, context.DeadlineExceeded) || errors.Is(err, ErrUnjoined) {
+				t.Fatalf("query did not return a joined independent timeout: %v", err)
+			}
+			return partial, err
+		}
+		return runner.Capture(ctx, []string{"/bin/sh", "-c", "printf observed"}, "read-success", time.Second)
+	})
+	if calls != 2 || err != nil || string(raw) != "observed" {
+		t.Fatalf("calls=%d raw=%q err=%v", calls, raw, err)
 	}
 }
 

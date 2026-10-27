@@ -2054,6 +2054,14 @@ deadline propagation, cancellation and joining; these do not establish a fresh
 E2E or conformance result. Connection/probe bounds, identity validity, independent
 cleanup and authored/upstream producer policies remain separate.
 
+Read-only native readiness queries retry an independently bounded command timeout
+only after the command owner confirms joined execution and successful diagnostic
+drains, while the original deployment deadline remains active. Partial timed-out
+responses cannot establish readiness. Caller expiry/cancellation, unjoined work,
+simulator exit and changed ownership still stop the attempt; mutation commands are
+never replayed. Controlled real-subprocess tests cover timeout recovery and caller
+deadline precedence on both hosts; fresh runtime acceptance remains separate.
+
 Site installation uses the selected NVKE installer's existing Helm post-renderer
 handoff. A private Helm subprocess plugin delegates YAML transformation to the
 selected kubectl's Kustomize, targeting only the site controller Deployment and
