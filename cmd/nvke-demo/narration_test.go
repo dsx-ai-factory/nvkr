@@ -5,9 +5,10 @@ package main
 
 import (
 	"bytes"
-	"github.com/dsx-ai-factory/nvkr/internal/nvkedemo"
 	"strings"
 	"testing"
+
+	"github.com/dsx-ai-factory/nvkr/internal/nvkedemo"
 )
 
 func TestDemoNarrationQualificationSelection(t *testing.T) {

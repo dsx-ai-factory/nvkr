@@ -71,9 +71,9 @@ type Runner struct {
 	output io.Writer
 	// Opted in only for the directly executed final nvkr local Run. Bootstrap
 	// shells and every source/utility command receive no inherited activity FD.
+	buildActivity bool
 	// Only the owned qualify-local child receives this isolated metadata pipe.
 	qualificationProgress bool
-	buildActivity         bool
 	directory             string     // Command cwd, independent of private diagnostic storage.
 	extraFiles            []*os.File // Explicitly owned local helper descriptors; never ambient FDs.
 	input                 *os.File   // Private held regular input; lifetime stays with the caller through join.

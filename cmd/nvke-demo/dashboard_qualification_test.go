@@ -206,3 +206,32 @@ func TestQualificationCancellationNamesCurrentWork(t *testing.T) {
 		t.Fatal("cancellation claimed success")
 	}
 }
+
+func TestQualificationYieldsToSubsequentNativeToolBuild(t *testing.T) {
+	for _, outcome := range []string{nvkedemo.LaneFinished, nvkedemo.LaneFailed} {
+		t.Run(outcome, func(t *testing.T) {
+			d := newDashboard()
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.LaneStarted, Name: "artifacts"})
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.LaneFinished, Name: "artifacts"})
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.LaneStarted, Name: "qualification"})
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.LaneFinished, Name: "qualification"})
+			if !dashboardQualificationActive(d.snapshot()) {
+				t.Fatal("qualification result is not visible before subsequent work")
+			}
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.LaneStarted, Name: "artifacts"})
+			if dashboardQualificationActive(d.snapshot()) {
+				t.Fatal("qualification result hides the native tool build")
+			}
+			d.Report(nvkedemo.ProgressEvent{Kind: outcome, Name: "artifacts"})
+			snapshot := d.snapshot()
+			if dashboardQualificationActive(snapshot) || snapshot.qualification.state != "complete" {
+				t.Fatal("native tool outcome revived the qualification page or changed its historical result")
+			}
+			screen := dashboardScreen(t, 150)
+			d.draw(screen, time.Now(), false)
+			if strings.Contains(dashboardText(screen), "End follow live") {
+				t.Fatal("render still shows the qualification page after native tools")
+			}
+		})
+	}
+}

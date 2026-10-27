@@ -51,6 +51,7 @@ type qualificationStage struct {
 
 type dashboardQualification struct {
 	state             string
+	visible           bool
 	started, updated  time.Time
 	current, selected int
 	inspecting        bool
@@ -65,11 +66,14 @@ func qualificationStageIndex(stage string) int {
 // final outcome; subprocess events and stale records cannot turn failure green.
 func (d *dashboard) observeQualification(event nvkedemo.ProgressEvent) bool {
 	q := &d.qualification
+	if event.Name == "artifacts" && event.Kind == nvkedemo.LaneStarted {
+		q.visible = false
+	}
 	if event.Name == "qualification" {
 		switch event.Kind {
 		case nvkedemo.LaneStarted:
 			if q.state == "" {
-				*q = dashboardQualification{state: "running", started: time.Now(), current: 0}
+				*q = dashboardQualification{state: "running", visible: true, started: time.Now(), current: 0}
 				d.current = "Qualification: waiting for progress"
 				d.currentStarted = time.Time{}
 			}
@@ -154,7 +158,7 @@ func (d *dashboard) observeQualification(event nvkedemo.ProgressEvent) bool {
 }
 
 func dashboardQualificationActive(s dashboardSnapshot) bool {
-	return s.qualification.state != "" && s.phases[2].state == "pending" && s.tenantStage == ""
+	return s.qualification.visible && s.phases[2].state == "pending" && s.tenantStage == ""
 }
 
 func (d *dashboard) qualificationInput(event *tcell.EventKey) bool {
