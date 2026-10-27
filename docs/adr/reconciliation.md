@@ -44,16 +44,15 @@ mount for the non-root producer. The declared export returns through the bounded
 collection. Controlled tests and a targeted native probe are distinct from the complete fresh NVKE acceptance
 run; the earlier UID-mismatched bind-mount failure produced no accepted OS image.
 
-BuildKit preparation and export now inherit the caller's work deadline and cancellation, replacing hidden
-five-minute staging and two-minute completion limits. The fixed offline helper reports verification,
-extraction, ownership and ready phases; a joined observer samples its latest report during the explicit exit
-wait. Only those fixed reports reach public progress. Observation failure or silence does not fail the work,
-extend its deadline or authenticate completion. Failure diagnostics and owned cleanup remain independently
-bounded. Controlled-clock regressions cover slow work, caller deadlines/cancellation, late nominal success,
-strict exit status, private-output exclusion and observer joining. Measured archive sizes, phase observations
-and caller time remaining are diagnostics, not authority. The causal batch-error regression continues to
-preserve the initiating failure before canceling siblings. The underlying runtime latency remains unverified;
-these changes do not prove a complete fresh NVIDIA OVN demo or conformance run.
+BuildKit preparation and export inherit the caller's work deadline and cancellation. If the caller has
+no deadline, each transport operation receives a single twenty-minute fallback budget, shared across
+its staging or export steps. No shorter per-step limit replaces an explicit caller budget. Failure
+diagnostics and owned cleanup remain independently bounded. Completion requires the actual helper exit;
+there is no progress-only polling subprocess or goroutine. Controlled-clock regressions cover inherited
+and fallback deadlines, slow work, cancellation, late nominal success and strict exit status. Measured
+archive sizes and caller time remaining are diagnostics, not authority. The causal batch-error regression
+preserves the initiating failure before canceling siblings. These contracts do not establish a complete
+fresh NVIDIA OVN demo or conformance run.
 
 Local unencrypted direct-Packer execution retains an exact held QCOW2, observes its bytes and commits the
 disk with its immutable Run record. Ordinary local disk publication remains closed. The explicit native
@@ -176,7 +175,7 @@ filesystem; each runtime image path follows its completed move, including partia
 provider stays outside the serving directory, and guest tools/CA retain their required source copies.
 Archive/HTTP fixtures cover inode and byte preservation, occupied/linked input refusal, partial paths and
 provider exclusion. Original Runs are untouched; no live time or space improvement is established.
-The matched Mac vmnet client/helper passed an actual temporary-interface start/stop test. The native Mac TPM adapter uses the supported simulator QEMU override and standard installed QEMU/swtpm, preserving the inherited network descriptor and process group. An October 19 installed QEMU/swtpm probe explicitly selected TCG and the `max` CPU on a paused 64 MiB machine without an OS disk or network; startup, shared process ownership and joined cancellation passed. This bounded device probe does not establish boot of the selected 64K guest, guest TPM discovery, site attestation or complete native deployment/conformance.
+The native Mac TPM adapter uses the supported simulator QEMU override and installed QEMU/swtpm, preserving the inherited network descriptor and process group. Earlier interface and paused-device observations have no recorded attempt/source bindings here and are not acceptance evidence. Guest TPM discovery, site attestation and complete native runtime acceptance require an identified Run.
 
 ## External test output and local diagnostic boundary
 
@@ -201,8 +200,8 @@ matching suite/tool outputs from the same fresh artifact Run. The shared native
 startup imports the ordinary named OVN image under its exact native digest and
 projects matching chart values after package installation and before agent startup;
 the OS package's independently built image is not treated as the named output.
-The shared site startup imports each selected image through containerd's local manifest importer, preserving its repository alias and checking that exact reference through CRI before bootstrap. CRI owns the managed label: pre-setting it skips the config-ID alias required by image-volume mounts. An isolated exact-image check reproduced this distinction. A subsequent private Ubuntu VM-stage diagnostic consumed completed 38-output artifact and two-output tool Runs, reached a Ready Kubernetes 1.36.3 site, and successfully mounted the exact previously failing plugin image in all three CAPI init containers. It also reached two Ready 1.36.3 tenant nodes. That diagnostic used the earlier two-node tenant; it does not establish the current one-control-plane/two-worker conformance topology, its three-node cloud-init/OVN checks or the four-guest lifecycle. This retained-artifact check is not a fresh complete build/deployment acceptance.
-The native adapter projects Kubernetes version from the selected NVKE installer's shipped site-spec template, rechecking those verified payload bytes at execution boundaries. Site packages, bootstrap, tenant requests, readiness and optional conformance share that source-selected version; current authored conformance inputs select 1.36.3. The private retained-artifact diagnostic observed that version on the actual site and both tenant nodes; full fresh Mac/Linux conformance remains unverified.
+The shared site startup imports each selected image through containerd's local manifest importer, preserving its repository alias and checking that exact reference through CRI before bootstrap. CRI owns the managed label: pre-setting it skips the config-ID alias required by image-volume mounts. Runtime evidence is limited to the identified Runs in [Local ARM64 demo presentation](#local-arm64-demo-presentation).
+The native adapter projects Kubernetes version from the selected NVKE installer's shipped site-spec template, rechecking those verified payload bytes at execution boundaries. Site packages, bootstrap, tenant requests, readiness and optional conformance share that source-selected version; current authored conformance inputs select 1.36.3.
 Tenant waiting now refreshes the exact owned NVKE tenant and worker topology through the existing
 consumer owner before each kubeconfig/node observation. It publishes only the existing typed conditions
 and refuses NVKE's exact `Provisioning=False` / `Provisioned=False` failure predicate; missing or Unknown
@@ -210,7 +209,7 @@ conditions do not prove failure. API progress advances only after a successful d
 controller Provisioned does not replace the separate node, cloud-init, DNS or workload gates. Owned
 subprocess fixtures cover condition transitions, transient reads, replaced identity, stage ordering and
 retained resources. These contracts do not establish fresh runtime acceptance of this change.
-Native tenants use NVKE's generic CAPI NicoCluster/NicoMachineTemplate input with source-generated join-token bootstrap and retained mTLS. NVKR supplies package installation and exact local image imports as pre-kubeadm commands; NVKE owns credentials and its final agent restart. Because commit-string agent versions can bypass the controller's semver-gated cloud-init check, the adapter independently observes each fresh Ready node's actual host cloud-init status without wait mode through a temporary Pod with a recursively read-only host mount. Both actual status commands completed cleanly with exit zero and zero restarts in the private Ubuntu VM-stage diagnostic; the workload/DNS pass marker was captured. Conformance then stopped before the harness: local Run disk capture rejected the host's memory-backed default temporary directory. The shared native invocation now selects an attempt-owned scratch directory on its output filesystem, retaining the factory's disk-backing/headroom checks. Corrected conformance execution and full fresh acceptance remain unverified. The old native Release-template rewriting and compiled template-hash lists remain removed.
+Native tenants use NVKE's generic CAPI NicoCluster/NicoMachineTemplate input with source-generated join-token bootstrap and retained mTLS. NVKR supplies package installation and exact local image imports as pre-kubeadm commands; NVKE owns credentials and its final agent restart. Because commit-string agent versions can bypass the controller's semver-gated cloud-init check, the adapter independently observes each fresh Ready node's actual host cloud-init status without wait mode through a temporary Pod with a recursively read-only host mount. The shared conformance invocation selects an attempt-owned scratch directory on its output filesystem, retaining the factory's disk-backing/headroom checks. Recorded runtime evidence and its consumer/artifact revisions appear in [Local ARM64 demo presentation](#local-arm64-demo-presentation). The old native Release-template rewriting and compiled template-hash lists remain removed.
 The site-create request carries the source-selected MachineImage boot script,
 rendered with the existing NVKE disk-policy template and current local disk URL.
 Its admitted iPXE selection also supplies DHCP address mode to both site readiness
@@ -1157,7 +1156,7 @@ hosted build with the replacement remains pending.
 
 The current candidate selects stock NVKE `v0.22.0` at
 [`400c24fb6465b042be883d6b62472528520d6291`](https://github.com/dsx-ai-factory/nvke/commit/400c24fb6465b042be883d6b62472528520d6291)
-through `catalog pin --tag` for all 43 maintained NVKE product-build source roles,
+through `catalog pin --tag` for all maintained NVKE product-build source roles,
 including SPIRE packaging. Chart versions, native demo source admission and catalog
 overlay bindings follow that same release. The two independent nightly
 test-harness selections retain `b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8` because the
@@ -1914,6 +1913,17 @@ The foreground command's exit was not captured independently. Subsequent invento
 and the original CLI's network recovery confirmed no session VMs remaining and
 restored network controls on 2026-10-26. This result does not validate later
 consumer revisions or the startup configuration below.
+
+The later private Ubuntu deployment attempt `ubuntu-startup-01` on 2026-10-26 used consumer
+`453ec2a4fe961c37e4bcebeac793fdbe76c0443c` and reused the completed artifact/tool Runs
+`ubuntu-9905-e2e-02` from the earlier source checkout; it was not a cold artifact build of that consumer.
+Its original owner `128715751` reached `retained-ready` with one Ready site node and three Ready tenant
+nodes at Kubernetes 1.36.3, after the native node, cloud-init and workload/DNS gates. Conformance capture
+`nvkr-conformance-2646420987` completed with harness exit 0: 446 passed, zero failed or pending and 7,133
+skipped in 7,577.002 seconds. The original JUnit SHA-256 is
+`0f3a66ad97caf60347adc56d1e20a4e71fa881d6ddabc72cc100f8197bd389e0`.
+This private diagnostic uses the stock NVKE source and Hydrophone patch identified above. The foreground
+exit code was not captured independently. It does not establish a fresh Mac build or later consumer acceptance.
 
 The private Mac attempt `mac-readiness-01` at consumer
 `8e432f23a47f9934fcff7be523c942aa2742635b` used the same stock NVKE source,
