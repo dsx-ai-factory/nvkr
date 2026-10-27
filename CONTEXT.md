@@ -21,7 +21,8 @@ or prove provider allocation. Tool releases are catalog-owned dependencies selec
 are also catalog dependencies; the workflow adapter consumes their locked commits.
 An explicit GitHub development setting selects branch dispatch. Signed development uses the same admitted
 native disk and pipeline-attested stages with separate signer policy, credentials and disposable run-attempt
-registry namespaces. Unsigned development remains static-unqualified. Neither setting grants production
+registry namespaces. Cleanup admits only internal-visibility packages in those namespaces.
+Unsigned development remains static-unqualified. Neither setting grants production
 acceptance, provider access or qualified evidence.
 _Avoid_: Delivery profile, component catalog, build identity
 

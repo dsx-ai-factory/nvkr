@@ -632,7 +632,7 @@ jobs:
             exit 1
           fi
 
-      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         env:
           CODEQL_OVERLAY_DATABASE_MODE: none
         with:
@@ -643,7 +643,7 @@ jobs:
 
       - run: go build ./...
 
-      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           upload-database: false
 

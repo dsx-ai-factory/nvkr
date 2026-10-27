@@ -42,6 +42,9 @@ type Field struct{ Label, Value string }
 // State, Fields, or Dependencies can restore an executable or verified receipt.
 type Item struct {
 	ID, Name, Kind, State string
+	// Summary is optional compact public metadata for the list row. Owners
+	// must also project its facts through Kind or Fields for narrow terminals.
+	Summary string
 	// Primary marks an overview entry. All entries remain descriptive and
 	// available for search and exact dependency navigation.
 	Primary      bool

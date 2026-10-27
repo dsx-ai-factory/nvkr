@@ -5,33 +5,30 @@ instances:
   - url: nvidia-nvkr.docs.buildwithfern.com/nvke/nvkr
     custom-domain: docs.nvidia.com/nvke/nvkr
     multi-source: true
-
 redirects:
   - source: /nvke/nvkr/index.html
     destination: /nvke/nvkr
   - source: /nvke/nvkr/catalogs-and-components/m-2-inputs-and-customer-choices
     destination: /nvke/nvkr/catalogs-and-components/nvke-inputs-and-customer-choices
-
 title: NVIDIA Kubernetes Recipes
-
 announcement:
   message: "Preview: NVKR is available as a preview. Commands, input schemas and behavior can change between releases, and we do not recommend NVKR for production use. See [Preview status and known limitations](/nvke/nvkr/overview/preview-status)."
-
 global-theme: nvidia
-
 logo:
   href: /nvke/nvkr
   right-text: NVKR
-
 navbar-links:
   - type: github
     value: https://github.com/dsx-ai-factory/nvkr
-
 check:
   rules:
     broken-links: error
-
 products:
   - display-name: NVIDIA Kubernetes Recipes
     path: ../docs/index.yml
     slug: /
+    versions:
+      - display-name: v0.1.0
+        path: versions/v0.1.0.yml
+        slug: v0.1.0
+        availability: stable

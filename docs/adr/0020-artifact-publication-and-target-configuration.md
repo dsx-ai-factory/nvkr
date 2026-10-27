@@ -693,10 +693,12 @@ does not reserve a namespace against cleanup: run while source packages and prov
 available. Concurrent cleanup or expired inputs cause failure, not a bypass or a rebuild.
 
 The development cleanup owner supports read-only preview by default and explicit apply. It inventories
-private GHCR container packages under only the exact reserved namespace, authenticates account/package identity
+internal GHCR container packages under only the exact reserved namespace, authenticates account/package identity
 and the matching `nvkr-dev.yml` manual-dispatch attempt, and requires completion plus at least 24 hours
 of age for that attempt, the latest attempt of the same run, its package and every version. Source-repository linkage on package metadata is
 not proof of ownership and is not required: preserved native images can carry upstream annotations.
+Private, public, missing/empty and unknown visibility are rejected during inventory and again immediately before deletion.
+Internal visibility permits enterprise-wide reading; deletion still requires package-admin authority.
 The reserved namespace policy plus authenticated provider account, package and attempt checks determine
 cleanup scope. Ambiguous names, malformed/unknown run records, incomplete inventories or API errors fail
 closed. An active or young latest attempt retains all original packages of that run. All candidate admission precedes deletion; each candidate's

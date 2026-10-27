@@ -1288,7 +1288,7 @@ selects bounded provider-authenticated metadata candidates and rechecks the full
 The retry regression suite and complete repository gate passed in [Merge Gate 39327338735](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327338735) at `92ce9fc65182a965f94ffa8a527828a971e9fc45`. Local test execution was skipped at the user's request. Live partial retry and independent qualification remain pending. Signed-development helpers/carriers and all final Run records retain
 seven days; disk diagnostics retain one day. Full signed development is non-canceling.
 
-The development cleanup module inventories only private packages in that reserved attempt namespace.
+The development cleanup module inventories only internal packages in that reserved attempt namespace.
 It authenticates account, package and exact completed workflow-attempt metadata; package, version and
 original and latest attempt timestamps must all be at least 24 hours old. It rechecks before whole-package deletion, fails
 closed on unknown/ambiguous/API state, and records confirmed partial progress without retrying ambiguous
@@ -1298,7 +1298,8 @@ older unscoped packages remain outside this protocol.
 
 Definition/factory contracts cover admission, identity, complete M2 graph retention, exact rendering,
 credential/environment scope, retention, runtime namespace projection and same-run retry admission.
-Cleanup API fixtures cover eligibility, authentication errors, pagination, races and mutation failures;
+Cleanup API fixtures cover internal visibility, rejection of private/public/missing/empty/unknown visibility at inventory
+and deletion recheck, eligibility, authentication errors, pagination, races and mutation failures;
 workflow contracts enforce default-branch scheduling and secret scope. The dispatch helper retains its
 clean/current pushed-commit preflight. These tests do not establish live GitHub execution, actual credential
 scope, ephemeral runner isolation, successful keyless services, GHCR deletion or physical storage reclaim.
@@ -1838,6 +1839,15 @@ live telemetry from its returned Run/error; complete output retention and a code
 cleanup failure remain distinct. Safe panes exclude raw diagnostic and private
 transport/path data. Command results are detached descriptions within progress;
 the SDK inspection DTO has no terminal snapshot method.
+
+The opt-in release browser shares the export description projection for chart versions, native image
+children, component build subjects, declared disk metadata and complete evidence memberships. Compact
+row summaries hide when they would crowd names. Command-item search includes projected kinds and fields,
+including platforms and digests; exact dependency links remain usable outside search results. Explicit
+JSON and Mermaid output retain their plain bytes in auto mode and reject explicit TUI before acquisition.
+Controlled projection, terminal simulation and loopback-registry tests cover these behaviors, including
+zero payload-layer requests and rejection of corrupt unselected metadata. These are contract fixtures;
+they establish neither external Release acceptance nor human usability validation.
 
 The authenticity verification result browser projects the owning consumer's
 detached description and labels payload integrity as unchecked. It neither

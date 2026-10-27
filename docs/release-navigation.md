@@ -37,6 +37,38 @@ and bounded evidence documents from their derived sibling repositories. It check
 sizes, schemas and memberships. Artifact payload layers, including container layers, executable archives and
 disk images, are not downloaded.
 
+## Browse interactively
+
+Opt into the read-only terminal browser from an interactive terminal:
+
+```sh
+bin/nvkr release browse --reference "$RELEASE_REF" --ui=tui
+```
+
+The browser opens after the complete metadata inspection and starts with named outputs. Rows show the
+artifact kind, recorded platforms or chart version when space permits. Details retain the complete values,
+including component build subjects, aggregate image children and declared disk metadata. The metadata-only
+scope stays visible; publisher declarations are not verification results.
+
+- Use Up/Down to select an output and Enter to open Details.
+- Press `/`, type a name, kind, platform, component, version or digest, then Enter to search the supplied
+  outputs and evidence. Search is case-insensitive and matches a substring; for example, `linux/arm64`.
+- Press `g` to switch between the output overview and all supplied entries when evidence is present.
+- In Details, use Up/Down to select an evidence link and Enter to follow it. Esc returns to the previous
+  selection. Shared evidence lists every bound output; links target only outputs included in the view.
+- Press `?` for help, `q` then `y` to close, or Ctrl+C to close immediately. Closing preserves the command's
+  result and performs no download, verification or publication action.
+
+`--output` can restrict the supplied view to one exact output and its evidence. Interactive search and
+navigation cannot widen that selection. `--layout` works with the same browser for a local OCI layout.
+At least 40 columns and 12 rows are needed; smaller terminals pause browsing until resized. Add `--no-color`
+or set `NO_COLOR` to disable colors.
+
+Plain output remains the default. `--ui=auto` selects the browser only with eligible interactive input/output
+and an empty `CI` environment variable. Explicit `--format json` or `--format mermaid` keeps its output in
+auto mode and conflicts with `--ui=tui`. Unsupported terminal or conflicting explicit TUI requests fail
+before inspection. See [command result navigation](lifecycle.md#browse-public-command-results) for shared keys.
+
 ## Focus on one output
 
 ```sh

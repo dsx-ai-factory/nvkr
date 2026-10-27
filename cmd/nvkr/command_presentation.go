@@ -39,20 +39,20 @@ func commandServices(c *cli.Context) runPresentationServices {
 }
 
 // Selection precedes loaders, resolution, transactions, and verification. An
-// explicitly requested JSON format keeps its stdout contract and conflicts with
+// explicitly requested serialized format keeps its stdout contract and conflicts with
 // explicit TUI; implicit default machine formats may be viewed with --ui=tui.
 func selectCommandPresentation(c *cli.Context) (runPresentation, error) {
 	view, err := selectRunPresentationWithEligibility(c, true, commandServices(c).eligible)
 	if err != nil {
 		return view, err
 	}
-	explicitJSON := c.IsSet("format") && c.String("format") == "json"
+	explicitFormat := c.IsSet("format") && (c.String("format") == "json" || c.String("format") == "mermaid")
 	if c.Command.Name == "resolve" && c.IsSet("output") && (c.String("output") == "canonical" || c.String("output") == "nodes") {
-		explicitJSON = true
+		explicitFormat = true
 	}
-	if explicitJSON {
+	if explicitFormat {
 		if c.String("ui") == "tui" {
-			return runPresentation{}, e.New(e.CodeUsage, "--ui=tui cannot be combined with explicit JSON output")
+			return runPresentation{}, e.New(e.CodeUsage, "--ui=tui cannot be combined with explicit JSON or Mermaid output")
 		}
 		view.tui = false
 	}

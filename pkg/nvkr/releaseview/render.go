@@ -48,27 +48,9 @@ type view struct {
 // caller-composed values. JSON follows DescriptionSchemaVersion and is readable
 // presentation, not canonical identity input or a receipt.
 func Render(description delivery.PublicationDescription, options Options) ([]byte, error) {
-	if err := options.Validate(); err != nil {
+	selected, err := selectView(description, options)
+	if err != nil {
 		return nil, err
-	}
-	selected := view{Inspection: "metadata inspection; payloads, signatures and policy not verified", SelectedOutput: options.Output,
-		TotalOutputs: len(description.Outputs), PublicationDescription: description}
-	if options.Output != "" {
-		selected.Outputs = nil
-		selected.Evidence = []delivery.PublicationEvidence{}
-		for _, output := range description.Outputs {
-			if output.Name == options.Output {
-				selected.Outputs = append(selected.Outputs, output)
-			}
-		}
-		if len(selected.Outputs) != 1 {
-			return nil, e.New(e.CodeUsage, "release has no unique output %q", options.Output)
-		}
-		for _, evidence := range description.Evidence {
-			if slices.Contains(evidence.Binding.Outputs, options.Output) {
-				selected.Evidence = append(selected.Evidence, evidence)
-			}
-		}
 	}
 	switch options.Format {
 	case "json":
@@ -82,6 +64,32 @@ func Render(description delivery.PublicationDescription, options Options) ([]byt
 	default:
 		return []byte(renderText(selected)), nil
 	}
+}
+
+func selectView(description delivery.PublicationDescription, options Options) (view, error) {
+	if err := options.Validate(); err != nil {
+		return view{}, err
+	}
+	selected := view{Inspection: "metadata inspection; payloads, signatures and policy not verified", SelectedOutput: options.Output,
+		TotalOutputs: len(description.Outputs), PublicationDescription: description}
+	if options.Output != "" {
+		selected.Outputs = nil
+		selected.Evidence = []delivery.PublicationEvidence{}
+		for _, output := range description.Outputs {
+			if output.Name == options.Output {
+				selected.Outputs = append(selected.Outputs, output)
+			}
+		}
+		if len(selected.Outputs) != 1 {
+			return view{}, e.New(e.CodeUsage, "release has no unique output %q", options.Output)
+		}
+		for _, evidence := range description.Evidence {
+			if slices.Contains(evidence.Binding.Outputs, options.Output) {
+				selected.Evidence = append(selected.Evidence, evidence)
+			}
+		}
+	}
+	return selected, nil
 }
 
 func renderText(selected view) string {
