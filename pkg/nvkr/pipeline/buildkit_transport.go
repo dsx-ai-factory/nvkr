@@ -25,16 +25,12 @@ import (
 // Only package-produced tar bytes enter this offline stage. Neither a host bind
 // mount nor a source-owned command is present. Ownership changes are confined to
 // fresh volumes; source modes and the authenticated input digest are unchanged.
-const buildKitExtractScript = `printf 'verify archive\n'
-exec 3</nvkr/output/input.tar
+const buildKitExtractScript = `exec 3</nvkr/output/input.tar
 printf '%s  %s\n' "$1" /proc/self/fd/3 | sha256sum -c - >/dev/null
-printf 'extract archive\n'
 tar -xpf /proc/self/fd/3 --strip-components=1 -C /nvkr/source "$2"
 rm /nvkr/output/input.tar
-printf 'set ownership\n'
 chmod 0700 /nvkr/source /nvkr/output
-chown -hR 1000:1000 /nvkr/source /nvkr/output
-printf 'ready\n'`
+chown -hR 1000:1000 /nvkr/source /nvkr/output`
 
 // This adapter retains the ordinary unqualified Local subprocess boundary. It
 // implements the existing resource owner's IO interface, not VM admission.
@@ -74,6 +70,11 @@ func prepareBuildKitTransport(ctx context.Context, n ir.Node, opts RunOptions, s
 	if err := ctx.Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "BuildKit transport canceled")
 	}
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 20*time.Minute)
+		defer cancel()
+	}
 	callerCtx := ctx
 	started := time.Now()
 	step := 0
@@ -81,9 +82,9 @@ func prepareBuildKitTransport(ctx context.Context, n ir.Node, opts RunOptions, s
 		opts.progress.printf("[transport] build %s — finished; steps=%d elapsed=%s failed=%t\n", n.Component,
 			step, time.Since(started).Round(time.Millisecond), returnErr != nil)
 	}()
-	// The caller owns the work budget. Host speed and runtime load do not justify
-	// shorter hidden limits on packing, transfer or helper completion. Failure
-	// diagnostics and owned teardown retain their independent cancellation bounds.
+	// An explicit caller budget wins; otherwise this transport has one fallback
+	// deadline across staging and completion. Never reset it per operation.
+	// Failure diagnostics and owned teardown retain independent cancellation bounds.
 	operation := func(label string, failureCode e.Code, run func(context.Context) error) error {
 		operationCtx := callerCtx
 		step++
@@ -251,7 +252,7 @@ func prepareBuildKitTransport(ctx context.Context, n ir.Node, opts RunOptions, s
 			return nil
 		})
 	}
-	// Observe the explicit exit independently of diagnostic phase reports.
+	// Observe the explicit helper exit before collecting or removing it.
 	if err = completion("start preparation container", e.CodeBuildFailed, func(operation context.Context) error {
 		return runtime.Run(operation, nil, io.Discard, opts.Stderr, "start", prep)
 	}); err != nil {
@@ -260,7 +261,7 @@ func prepareBuildKitTransport(ctx context.Context, n ir.Node, opts RunOptions, s
 	var status bytes.Buffer
 	statusOutput := &packerContainerLimitWriter{writer: &status, remaining: 32}
 	if err = completion("wait for preparation exit", e.CodeBuildFailed, func(operation context.Context) error {
-		return waitBuildKitPreparation(operation, runtime, prep, n.Component, opts, statusOutput)
+		return runtime.Run(operation, nil, statusOutput, opts.Stderr, "wait", prep)
 	}); err != nil {
 		return nil, err
 	}
@@ -304,57 +305,17 @@ func buildKitVolumeArgs(runtime, volume, destination string, readOnly bool) []st
 	return []string{"--mount", options}
 }
 
-// Phase reports describe the fixed offline helper, never producer output. They
-// do not prove health or completion and cannot extend the caller's deadline.
-// The observer is canceled and joined before returning, including a slow logs RPC.
-func waitBuildKitPreparation(ctx context.Context, runtime packerContainerRuntime, name, component string, opts RunOptions, status io.Writer) error {
-	if opts.progress == nil || opts.progress.w == nil {
-		return runtime.Run(ctx, nil, status, opts.Stderr, "wait", name)
-	}
-	observation, stop := context.WithCancel(ctx)
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		started := time.Now()
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-observation.Done():
-				return
-			case <-ticker.C:
-				opts.progress.printf("[transport] build %s — waiting for preparation exit; elapsed=%s; requesting phase observation\n", component, time.Since(started).Round(time.Second))
-				var output bytes.Buffer
-				limit := &packerContainerLimitWriter{writer: &output, remaining: 1024}
-				err := runtime.Run(observation, nil, limit, io.Discard, "logs", "--tail", "1", name)
-				if observation.Err() != nil {
-					return
-				}
-				phase := strings.TrimSpace(output.String())
-				switch phase {
-				case "verify archive", "extract archive", "set ownership", "ready":
-				default:
-					phase = "unavailable"
-				}
-				if err != nil {
-					phase = "unavailable"
-				}
-				opts.progress.printf("[transport] build %s — last reported preparation phase: %s; completion still requires exit status\n", component, phase)
-			}
-		}
-	}()
-	err := runtime.Run(ctx, nil, status, opts.Stderr, "wait", name)
-	stop()
-	<-done
-	return err
-}
-
 func (t *buildKitTransport) collect(ctx context.Context, opts RunOptions, n ir.Node, container string) (returnErr error) {
 	if err := requireRunContext(ctx, "BuildKit export transport"); err != nil {
 		return err
 	}
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "BuildKit export canceled")
+	}
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 20*time.Minute)
+		defer cancel()
 	}
 	defer func() {
 		var coded *e.Error
