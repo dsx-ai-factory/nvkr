@@ -69,9 +69,12 @@ func InspectRestoredSource(ctx context.Context, plan *Plan, nodeID string) (Rest
 	if err := admitSourceFetchPath(ctx, receipt.Path, false); err != nil {
 		return RestoredSourceDescription{}, err
 	}
-	bounded, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
-	digest, err := pipeline.InspectRestoredSource(bounded, instruction, sourceRoot)
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 5*time.Minute)
+		defer cancel()
+	}
+	digest, err := pipeline.InspectRestoredSource(ctx, instruction, sourceRoot)
 	if err != nil {
 		return RestoredSourceDescription{}, err
 	}

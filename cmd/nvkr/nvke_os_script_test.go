@@ -508,17 +508,8 @@ exec "$NVKR_AUTHORING_TEST_EXE" -test.run='^TestAuthoringLabCLIProcess$' -- "$@"
 					if !strings.Contains(build.Name, "ubuntu24") || agent == image || !strings.HasPrefix(agent, "docker.io/library/golang@sha256:") {
 						t.Fatalf("Ubuntu 24 selection lost its compatible agent toolchain: output=%s, agent=%s", build.Name, agent)
 					}
-					patch := "patches/capture-schema.patch"
-					sourcePatch, err := os.ReadFile(filepath.Join(repository, "inputs/catalogs/node-images/release", patch))
-					if err != nil {
-						t.Fatal(err)
-					}
-					frozenPatch, err := os.ReadFile(filepath.Join(root, ".nvkr/inputs/test-attempt/catalog", patch))
-					if err != nil {
-						t.Fatal(err)
-					}
-					if !bytes.Equal(sourcePatch, frozenPatch) {
-						t.Fatal("frozen catalog lost the exact source patch")
+					if len(build.CatalogSnapshot.Components[diskRoot].Patches) != 0 {
+						t.Fatal("frozen disk must preserve stock upstream source")
 					}
 					for _, name := range []string{"native-toolchains.yaml", "ubuntu24.json"} {
 						if _, err := os.Stat(filepath.Join(root, ".nvkr/inputs/test-attempt", name)); err != nil {

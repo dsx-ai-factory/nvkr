@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-nightly-upstream-ovn",
-  "requiresCatalogDigest": "sha256:4180dd840d2391ec66a23508957b26fc07d626047c18eba29b9b1b7f1baecbd9",
+  "requiresCatalogDigest": "sha256:e084aee846710d446adb0ae673ab2b3fd8a3d1d0643dcd300b4a3bc1e2484175",
   "components": {
     "nvke-cni-ovn": {
       "component": {

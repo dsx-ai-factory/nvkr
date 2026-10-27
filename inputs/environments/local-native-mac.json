@@ -4,7 +4,7 @@
   "metadata": {
     "name": "nvke-native-mac-source-local"
   },
-  "utilityContainer": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c",
+  "utilityContainer": "golang@sha256:f20d83a83e18dbd2a4714b8ffd4b30b287b6243962dd75608e86abcc63ba4efc",
   "utilityPlatform": "linux/arm64",
   "executionClasses": [
     {
@@ -12,6 +12,17 @@
       "runsOn": "local-mac-hvf",
       "hostPlatform": "darwin/arm64",
       "capabilities": ["hvf"],
+      "resources": {
+        "cpuMillis": 8000,
+        "memoryMiB": 10240,
+        "ephemeralStorageMiB": 65536
+      },
+      "maxTimeoutSeconds": 21600
+    },
+    {
+      "name": "native-mac-tcg",
+      "runsOn": "local-mac-tcg",
+      "hostPlatform": "darwin/arm64",
       "resources": {
         "cpuMillis": 8000,
         "memoryMiB": 10240,

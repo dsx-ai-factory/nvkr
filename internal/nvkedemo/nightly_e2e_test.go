@@ -404,7 +404,7 @@ func nightlyMaterials(ctx context.Context, runner Runner, profile NightlyProfile
 	if err = nightlyProfileResources(ctx, profile, release, profileDirectory, releases); err != nil {
 		return nil, err
 	}
-	values, err := nightlyRuntimeValues(release)
+	values, err := nightlyRuntimeValues(plan, release)
 	if err != nil {
 		return nil, err
 	}
@@ -489,7 +489,7 @@ func nightlyProfiles(ctx context.Context, publication *delivery.Publication, rel
 	return destination, nil
 }
 
-func nightlyRuntimeValues(release lifecycle.Release) (map[string]any, error) {
+func nightlyRuntimeValues(plan *factory.Plan, release lifecycle.Release) (map[string]any, error) {
 	outputs := make(map[string]SelectedOutput)
 	references := make(map[string]name.Digest)
 	for _, key := range runtimeImages {
@@ -504,7 +504,14 @@ func nightlyRuntimeValues(release lifecycle.Release) (map[string]any, error) {
 			if err != nil || reference.DigestStr() != artifact.Digest {
 				return nil, e.New(e.CodeVerifyFailed, "runtime image has no exact immutable reference")
 			}
-			outputs["runtime-"+key] = SelectedOutput{Observation: artifact}
+			output := SelectedOutput{Observation: artifact}
+			if strings.HasPrefix(key, "temporal-") {
+				output.imageTag, err = runtimeImageTag(plan, artifact)
+				if err != nil {
+					return nil, err
+				}
+			}
+			outputs["runtime-"+key] = output
 			references[key] = reference
 		}
 		if _, ok := references[key]; !ok {

@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"strings"
@@ -53,11 +54,11 @@ func TestDashboardTenantReadinessIsNotWorkloadCompletion(t *testing.T) {
 			d := newDashboard()
 			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: tc.name})
 			s := d.snapshot()
-			if s.phases[4].state != "running" || s.current != tc.label || s.tenantStages[3].states[0] == "observed" {
+			if s.phases[4].state != "running" || s.current != tc.label || s.tenantStages[3].state == "observed" {
 				t.Fatal("readiness admission hidden or incorrectly advanced workload completion")
 			}
 			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: tc.name})
-			if d.snapshot().phases[4].state == "complete" || d.snapshot().tenantStages[3].states[0] == "observed" {
+			if d.snapshot().phases[4].state == "complete" || d.snapshot().tenantStages[3].state == "observed" {
 				t.Fatal("readiness rollout became E2E workload/DNS completion")
 			}
 		})
@@ -289,73 +290,25 @@ func TestDashboardStaleObservationIsNotFailure(t *testing.T) {
 	}
 }
 
-func TestDashboardSiteStageObservations(t *testing.T) {
-	for _, stage := range dashboardSiteStages {
-		for _, name := range stage.operations {
-			if name == "" {
-				continue
-			}
-			if phase, _ := dashboardOperation(name); phase != 2 {
-				t.Fatalf("site checklist operation %q has no site observation mapping", name)
-			}
-		}
-	}
-	for _, tc := range []struct {
-		name   string
-		events []nvkedemo.ProgressEvent
-		state  string
-		done   int
-	}{
-		{"pending", nil, "pending", 0},
-		{"running", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseStarted, Name: "site-client-policy"}}, "running", 0},
-		{"run does not complete check", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseFinished, Name: "site-client-policy"}}, "pending", 1},
-		{"check running", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseFinished, Name: "site-client-policy"}, {Kind: nvkedemo.PhaseStarted, Name: "site-register"}}, "running", 1},
-		{"check without run", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseFinished, Name: "site-register"}}, "pending", 1},
-		{"observed", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseFinished, Name: "site-client-policy"}, {Kind: nvkedemo.PhaseFinished, Name: "site-register"}}, "observed", 2},
-		{"failed check", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseFinished, Name: "site-client-policy"}, {Kind: nvkedemo.PhaseFailed, Name: "site-register"}, {Kind: nvkedemo.PhaseFinished, Name: "site-register"}}, "failed", 1},
-		{"unknown", []nvkedemo.ProgressEvent{{Kind: nvkedemo.PhaseFinished, Name: "private-stage-success"}}, "pending", 0},
-		{"wrong family", []nvkedemo.ProgressEvent{{Kind: nvkedemo.DeploymentFinished, Name: "site-client-policy"}}, "pending", 0},
-		{"owning demo cannot invent substeps", []nvkedemo.ProgressEvent{{Kind: nvkedemo.DeploymentFinished, Name: "local-demo"}}, "pending", 0},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			d := newDashboard()
-			_, _ = io.WriteString(d, "[done] site-client-policy\n[done] site-register\n")
-			for _, event := range tc.events {
-				d.Report(event)
-			}
-			state, done, _ := d.snapshot().siteStages[10].status(2)
-			if state != tc.state || done != tc.done {
-				t.Fatalf("state=%q observed=%d want %q/%d", state, done, tc.state, tc.done)
-			}
-			if got := d.snapshot().phases[1].state; got != "pending" {
-				t.Fatalf("replay fabricated artifact completion: %s", got)
-			}
-		})
-	}
-}
-
 func TestDashboardFillingSiteChecklist(t *testing.T) {
 	for _, width := range []int{80, 160} {
 		t.Run(fmt.Sprint(width), func(t *testing.T) {
 			d := newDashboard()
-			for _, index := range []int{4, 5, 6, 7, 8, 9} {
-				for _, name := range dashboardSiteStages[index].operations {
-					if name != "" {
-						d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: name})
-					}
-				}
+			active := len(dashboardSiteStages) - 2
+			for _, stage := range dashboardSiteStages[:active] {
+				d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: stage.operation})
 			}
-			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: "site-client-policy"})
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: dashboardSiteStages[active].operation})
 			s := d.snapshot()
-			now := s.siteStages[10].started[0].Add(75 * time.Second)
-			if checklist, _ := dashboardChecklist(s, now); !strings.Contains(checklist, "0/2 · 1m15s") {
+			now := s.siteStages[active].started.Add(75 * time.Second)
+			if checklist, _ := dashboardChecklist(s, now); !strings.Contains(checklist, "1m15s") {
 				t.Fatalf("active substep elapsed missing: %s", checklist)
 			}
 			screen := dashboardScreen(t, width)
 			screen.SetSize(width, 42)
 			d.draw(screen, now, false)
 			text := dashboardText(screen)
-			for _, want := range []string{"Site stages · 6/11 checked", "Install Cluster API", "Check Cluster API", "Readiness", "Configure cluster identity", "Install NVKE stack", "1m15s", "Secure and register", "Tenant stages · 0/4 checked", "Tenant kubeconfig", "Tenant API query", "Both nodes Ready", "Workload and DNS", "pending", "observed", "ETA unknown", "Activity"} {
+			for _, want := range []string{fmt.Sprintf("Native site stages · %d/%d checked", active, len(dashboardSiteStages)), dashboardSiteStages[active].label, "1m15s", "Tenant stages · 0/4 checked", "Tenant kubeconfig", "Tenant API query", "Nodes Ready", "Workload and DNS", "pending", "ETA unknown", "Activity"} {
 				if !strings.Contains(text, want) {
 					t.Fatalf("missing %q in %d-column checklist:\n%s", want, width, text)
 				}
@@ -387,7 +340,7 @@ func TestDashboardTenantStagesDoNotInventObservations(t *testing.T) {
 				d.Report(event)
 			}
 			for index, stage := range d.snapshot().tenantStages {
-				if state, _, _ := stage.status(1); state != tc.states[index] {
+				if state := stage.status(); state != tc.states[index] {
 					t.Fatalf("stage %d=%s want %s", index, state, tc.states[index])
 				}
 			}
@@ -407,11 +360,14 @@ func TestDashboardObservationBoundaries(t *testing.T) {
 		{"installer substep is not whole preparation", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "installer-fetch"}, 0, "observed"},
 		{"installer owner completed", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "installer-preparation"}, 0, "complete"},
 		{"network restore is not whole cleanup", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "network-cleanup"}, 5, "observed"},
-		{"OVS readiness is not whole site completion", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "site-ovs-ready"}, 2, "observed"},
-		{"OVN install is not whole site completion", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "site-ovn-install"}, 2, "observed"},
-		{"OVN readiness failure stays visible", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFailed, Name: "site-ovn-node-ready"}, 2, "failed"},
-		{"CAPI waits for site networking", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: "site-cluster-api"}, 2, "running"},
+		{"site substep is not whole site completion", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "host-site-capi"}, 2, "running"},
+		{"site readiness failure stays visible", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFailed, Name: "native-site-guest"}, 2, "failed"},
+		{"old Kind operation is ignored", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "create-management"}, 2, "pending"},
+		{"wrong site event family", nvkedemo.ProgressEvent{Kind: nvkedemo.DeploymentFinished, Name: "host-site-capi"}, 2, "pending"},
+		{"old demo completion is ignored", nvkedemo.ProgressEvent{Kind: nvkedemo.DeploymentFinished, Name: "local-demo"}, 2, "pending"},
+		{"obsolete hold event is ignored", nvkedemo.ProgressEvent{Kind: "native-retained", Status: "private-status"}, 2, "pending"},
 		{"wrong event family", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "artifacts"}, 1, "pending"},
+		{"wrong conformance event family", nvkedemo.ProgressEvent{Kind: nvkedemo.LaneFinished, Name: "native-conformance"}, dashboardConformancePhase, "pending"},
 		{"unknown event", nvkedemo.ProgressEvent{Kind: "caller-success", Name: "artifacts"}, 1, "pending"},
 		{"private name", nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFailed, Name: "private-node-name"}, 3, "pending"},
 		{"ready nodes are not workload success", nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-nodes", RegisteredNodes: 2, ReadyNodes: 2}, 4, "pending"},
@@ -434,90 +390,6 @@ func TestDashboardObservationBoundaries(t *testing.T) {
 	}
 }
 
-func TestDashboardFailureStopsUnfinishedPhases(t *testing.T) {
-	for _, tc := range []struct {
-		name   string
-		events []nvkedemo.ProgressEvent
-		states [6]string
-	}{
-		{
-			name: "workload stops when its tenant owner fails",
-			events: []nvkedemo.ProgressEvent{
-				{Kind: nvkedemo.TenantWaiting, Name: "tenant-workload", RegisteredNodes: 2, ReadyNodes: 2},
-				{Kind: nvkedemo.DeploymentFailed, Name: "tenant-provisioning"},
-			},
-			states: [6]string{"pending", "pending", "pending", "failed", "stopped", "pending"},
-		},
-		{
-			name: "deployment failure stops active site and cleanup",
-			events: []nvkedemo.ProgressEvent{
-				{Kind: nvkedemo.PhaseStarted, Name: "create-management"},
-				{Kind: nvkedemo.PhaseStarted, Name: "network-cleanup"},
-				{Kind: nvkedemo.DeploymentFailed, Name: "local-demo"},
-			},
-			states: [6]string{"pending", "pending", "stopped", "pending", "pending", "stopped"},
-		},
-		{
-			name: "observed substep is not owning site completion",
-			events: []nvkedemo.ProgressEvent{
-				{Kind: nvkedemo.PhaseFinished, Name: "create-management"},
-				{Kind: nvkedemo.DeploymentFailed, Name: "local-demo"},
-			},
-			states: [6]string{"pending", "pending", "stopped", "pending", "pending", "pending"},
-		},
-		{
-			name: "completed artifacts and failed cleanup remain explicit",
-			events: []nvkedemo.ProgressEvent{
-				{Kind: nvkedemo.LaneFinished, Name: "artifacts"},
-				{Kind: nvkedemo.PhaseFailed, Name: "network-cleanup"},
-				{Kind: nvkedemo.DeploymentFailed, Name: "local-demo"},
-			},
-			states: [6]string{"pending", "complete", "pending", "pending", "pending", "failed"},
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			d := newDashboard()
-			for _, event := range tc.events {
-				d.Report(event)
-			}
-			for index, phase := range d.snapshot().phases {
-				if phase.state != tc.states[index] {
-					t.Fatalf("phase %d: state=%q want=%q", index, phase.state, tc.states[index])
-				}
-			}
-		})
-	}
-}
-
-func TestDashboardCompletionDistinguishesRetentionFromCleanup(t *testing.T) {
-	for _, test := range []struct {
-		name, status, cleanup, current string
-	}{
-		{"retained", "retained", "pending", "Environment retained; not cleaned up"},
-		{"cleanup", "", "complete", "Deployment, tenant checks and owned cleanup completed"},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			d := newDashboard()
-			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.DeploymentFinished, Name: "local-demo", Status: test.status})
-			s := d.snapshot()
-			if s.current != test.current || s.phases[5].state != test.cleanup {
-				t.Fatalf("completion misrepresented retention/cleanup: current=%q cleanup=%q", s.current, s.phases[5].state)
-			}
-			for _, phase := range s.phases[2:5] {
-				if phase.state != "complete" {
-					t.Fatal("owning deployment completion did not finish its deployment phases")
-				}
-			}
-			screen := dashboardScreen(t, 140)
-			d.draw(screen, time.Now(), false)
-			text := dashboardText(screen)
-			if !strings.Contains(text, test.current) || test.status == "retained" && strings.Contains(text, "owned cleanup completed") {
-				t.Fatal("final dashboard frame disagrees with owning retention mode")
-			}
-		})
-	}
-}
-
 func TestDashboardBuildLogRecognizesNeutralAndHistoricalPrefixes(t *testing.T) {
 	for _, prefix := range []string{"[log +1s] ", "[build +1s] "} {
 		t.Run(prefix, func(t *testing.T) {
@@ -532,30 +404,13 @@ func TestDashboardBuildLogRecognizesNeutralAndHistoricalPrefixes(t *testing.T) {
 	}
 }
 
-func TestDashboardManagementReadinessUsesItsOwningStageLabel(t *testing.T) {
-	for _, operation := range []string{"create-management", "management-ready"} {
-		t.Run(operation, func(t *testing.T) {
-			phase, label := dashboardOperation(operation)
-			if phase != 2 {
-				t.Fatal("management observation left its Site phase")
-			}
-			if operation == "management-ready" && label != "Site nodes Ready" {
-				t.Fatalf("readiness mislabeled as another gate: %q", label)
-			}
-			if operation == "create-management" && label == "Site nodes Ready" {
-				t.Fatal("cluster creation implied node readiness")
-			}
-		})
-	}
-}
-
 func TestDashboardStoppedPhaseHasDistinctColor(t *testing.T) {
 	for _, width := range []int{80, 140} {
 		t.Run(fmt.Sprint(width), func(t *testing.T) {
 			d := newDashboard()
 			d.phases[2] = dashboardPhase{state: "observed"}
 			d.phases[3] = dashboardPhase{state: "stopped"}
-			d.tenantStages[0].states[0] = "stopped"
+			d.tenantStages[0].state = "stopped"
 			if checklist, _ := dashboardChecklist(d.snapshot(), time.Now()); !strings.Contains(checklist, "[lightsalmon]■") {
 				t.Fatal("stopped checkpoint reused the observation color")
 			}
@@ -622,9 +477,9 @@ func TestDashboardBoundsAndImmutableSnapshot(t *testing.T) {
 	}
 	snapshot.activity[0] = "mutated"
 	snapshot.phases[0].state = "complete"
-	snapshot.siteStages[0].states[0] = "observed"
-	snapshot.tenantStages[0].states[0] = "observed"
-	if got := d.snapshot(); got.activity[0] == "mutated" || got.phases[0].state == "complete" || got.siteStages[0].states[0] == "observed" || got.tenantStages[0].states[0] == "observed" {
+	snapshot.siteStages[0].state = "observed"
+	snapshot.tenantStages[0].state = "observed"
+	if got := d.snapshot(); got.activity[0] == "mutated" || got.phases[0].state == "complete" || got.siteStages[0].state == "observed" || got.tenantStages[0].state == "observed" {
 		t.Fatal("snapshot shares mutable model state")
 	}
 }
@@ -711,10 +566,9 @@ func TestDashboardTenantTerminationStopsUnfinishedChecks(t *testing.T) {
 			d := newDashboard()
 			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: name})
 			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.DeploymentFailed, Name: "tenant-provisioning"})
-			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.DeploymentFailed, Name: "local-demo"})
 			stopped := 0
 			for _, stage := range d.snapshot().tenantStages {
-				state, _, _ := stage.status(1)
+				state := stage.status()
 				if state == "failed" || state == "running" {
 					t.Fatalf("owner termination falsely attributed check state %s", state)
 				}
@@ -768,9 +622,9 @@ func TestDashboardConcurrentReportsAndDraw(t *testing.T) {
 }
 
 func dashboardGuestFixture() nvkedemo.ProgressEvent {
-	return nvkedemo.ProgressEvent{Kind: nvkedemo.TenantGuests, Guests: [2]nvkedemo.TenantGuestObservation{
-		{Role: nvkedemo.TenantGuestControlPlane, Available: true, Domain: nvkedemo.TenantDomainRunning, ProviderReady: nvkedemo.TenantConditionTrue, ConsoleKnown: true, ConsoleBytes: 12 * 1024, ConsoleChanged: true, ConsoleLastChange: 2 * time.Minute},
-		{Role: nvkedemo.TenantGuestWorker, Available: true, Domain: nvkedemo.TenantDomainPaused, ProviderReady: nvkedemo.TenantConditionFalse, ConsoleKnown: true, ConsoleBytes: 8 * 1024},
+	return nvkedemo.ProgressEvent{Kind: nvkedemo.TenantGuests, Name: "native", Guests: [3]nvkedemo.TenantGuestObservation{
+		{Role: nvkedemo.TenantGuestControlPlane, Available: true, Domain: nvkedemo.TenantDomainRunning, InstanceState: nvkedemo.TenantInstanceReady, ProviderReady: nvkedemo.TenantConditionTrue, ConsoleKnown: true, ConsoleBytes: 12 * 1024, ConsoleChanged: true, ConsoleLastChange: 2 * time.Minute},
+		{Role: nvkedemo.TenantGuestWorker, Available: true, Domain: nvkedemo.TenantDomainPaused, InstanceState: nvkedemo.TenantInstanceReady, ProviderReady: nvkedemo.TenantConditionFalse, ConsoleKnown: true, ConsoleBytes: 8 * 1024},
 	}}
 }
 
@@ -808,7 +662,7 @@ func TestDashboardTenantGuestLayout(t *testing.T) {
 			screen.SetSize(size[0], size[1])
 			d.draw(screen, s.guestsObservedAt.Add(time.Minute), false)
 			text := dashboardText(screen)
-			for _, want := range []string{"Waiting for both tenant nodes Ready", "Checks [##--] 2/4", "Control plane", "VM running", "Infra True", "console 12 KiB; growth age 2m0s", "Worker", "VM paused", "Infra False", "console 8 KiB; baseline", "not Kubernetes readiness", "1/2 registered", "0/2 Ready", "Guest snapshot: 1m0s old", "growth ages measured at snapshot", "Timeout remaining", "not an ETA", "latest public activity", "Cleanup"} {
+			for _, want := range []string{"Waiting for both tenant nodes Ready", "Checks [##--] 2/4", "Control plane", "NICo Ready", "VM running", "Infra Ready=True", "console 12 KiB", "Worker", "VM paused", "Infra Ready=False", "console 8 KiB", "Kubernetes node readiness is reported separately", "1/2 registered", "0/2 Ready", "Provider/VM snapshot: 1m0s old", "unknown fields remain unobserved", "Timeout remaining", "not an ETA", "latest public activity", "Cleanup"} {
 				if !strings.Contains(text, want) {
 					t.Fatalf("missing %q at %v:\n%s", want, size, text)
 				}
@@ -823,14 +677,14 @@ func TestDashboardTenantGuestLayout(t *testing.T) {
 func TestDashboardTenantGuestUnknownAndStale(t *testing.T) {
 	d := newDashboard()
 	d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-kubeconfig", Remaining: time.Hour})
-	event := nvkedemo.ProgressEvent{Kind: nvkedemo.TenantGuests, Guests: [2]nvkedemo.TenantGuestObservation{{Role: nvkedemo.TenantGuestControlPlane}, {Role: nvkedemo.TenantGuestWorker}}}
+	event := nvkedemo.ProgressEvent{Kind: nvkedemo.TenantGuests, Guests: [3]nvkedemo.TenantGuestObservation{{Role: nvkedemo.TenantGuestControlPlane}, {Role: nvkedemo.TenantGuestWorker}}}
 	d.Report(event)
 	s := d.snapshot()
 	now := s.guestsObservedAt.Add(5 * time.Minute)
 	screen := dashboardScreen(t, 140)
 	d.draw(screen, now, false)
 	text := dashboardText(screen)
-	for _, want := range []string{"Waiting for tenant kubeconfig", "Checks [----] 0/4", "Control plane", "Worker", "VM unavailable", "guest observation unknown", "Ready unknown", "Guest snapshot: 5m0s old"} {
+	for _, want := range []string{"Waiting for tenant kubeconfig", "Checks [----] 0/4", "Control plane", "Worker", "VM state unobserved", "provider observation unavailable", "Ready unknown", "Provider/VM snapshot: 5m0s old"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("missing truthful unknown/freshness %q: %s", want, text)
 		}
@@ -846,7 +700,7 @@ func TestDashboardTenantGuestWorstWidthLayout(t *testing.T) {
 			d := newDashboard()
 			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-nodes", Remaining: time.Hour})
 			event := dashboardGuestFixture()
-			for index := range event.Guests {
+			for index := range event.Guests[:2] {
 				event.Guests[index].Domain = state
 				event.Guests[index].ProviderReady = nvkedemo.TenantConditionUnknown
 				event.Guests[index].ConsoleBytes = 1023 << 20
@@ -861,12 +715,16 @@ func TestDashboardTenantGuestWorstWidthLayout(t *testing.T) {
 			d.draw(screen, s.guestsObservedAt, false)
 			text := dashboardText(screen)
 			for _, role := range []string{"Control plane", "Worker"} {
-				row := fmt.Sprintf("%-13s VM %-8s Infra Unknown console 1023 MiB; growth age 23h59m59s", role, state)
+				vm := string(state)
+				if state == nvkedemo.TenantDomainUnknown {
+					vm = "unobserved"
+				}
+				row := fmt.Sprintf("%-13s NICo Ready Infra Ready=Unknown; VM %s; console 1023 MiB", role, vm)
 				if !strings.Contains(text, row) {
 					t.Fatalf("guest row clipped at 80x24: %q\n%s", row, text)
 				}
 			}
-			for _, want := range []string{"○ Workload/DNS", "not Kubernetes readiness", "Guest snapshot", "growth ages measured at snapshot", "Timeout remaining", "not an ETA", "latest public activity", "Cleanup"} {
+			for _, want := range []string{"○ Workload/DNS", "Kubernetes node readiness is reported separately", "Provider/VM snapshot", "unknown fields remain unobserved", "Timeout remaining", "not an ETA", "latest public activity", "Cleanup"} {
 				if !strings.Contains(text, want) {
 					t.Fatalf("missing %q at 80x24:\n%s", want, text)
 				}
@@ -926,14 +784,14 @@ func TestDashboardTenantInstanceFailureIsVisibleWithoutVM(t *testing.T) {
 			d := newDashboard()
 			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-kubeconfig", Remaining: time.Hour})
 			before := d.snapshot()
-			event := nvkedemo.ProgressEvent{Kind: nvkedemo.TenantGuests, Guests: [2]nvkedemo.TenantGuestObservation{{Role: nvkedemo.TenantGuestControlPlane, Domain: nvkedemo.TenantDomainUnknown}, {Role: nvkedemo.TenantGuestWorker, Domain: nvkedemo.TenantDomainUnknown}}}
+			event := nvkedemo.ProgressEvent{Kind: nvkedemo.TenantGuests, Guests: [3]nvkedemo.TenantGuestObservation{{Role: nvkedemo.TenantGuestControlPlane, Domain: nvkedemo.TenantDomainUnknown}, {Role: nvkedemo.TenantGuestWorker, Domain: nvkedemo.TenantDomainUnknown}}}
 			event.Guests[index].ProvisioningFailure = nvkedemo.TenantInstanceCreateFailed
 			d.Report(event)
 			screen := dashboardScreen(t, 80)
 			screen.SetSize(80, 24)
 			d.draw(screen, time.Now(), false)
 			text := dashboardText(screen)
-			for _, want := range []string{role + ": instance lookup/create failed (provider report)", "instance lookup/create failed; VM observation unknown", "Checks [----] 0/4", "Ready unknown", "not Kubernetes readiness"} {
+			for _, want := range []string{role + ": instance lookup/create failed (provider report)", "instance lookup/create failed; VM observation unknown", "Checks [----] 0/4", "Ready unknown", "Kubernetes node readiness is reported separately"} {
 				if !strings.Contains(text, want) {
 					t.Fatalf("missing provider failure %q:\n%s", want, text)
 				}
@@ -987,21 +845,6 @@ func TestDashboardGuestPresentationBounds(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := dashboardConsoleSize(tc.bytes); got != tc.want {
 				t.Fatalf("console size=%q want %q", got, tc.want)
-			}
-		})
-	}
-	for _, tc := range []struct {
-		name, want string
-		age        time.Duration
-	}{
-		{"now", "0s", 0},
-		{"seconds", "2m1s", 121 * time.Second},
-		{"long", "over 24h", 24 * time.Hour},
-		{"maximum age", "over 24h", 1<<63 - 1},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := dashboardGuestAge(tc.age); got != tc.want {
-				t.Fatalf("console age=%q want %q", got, tc.want)
 			}
 		})
 	}
@@ -1074,5 +917,278 @@ func TestDashboardBuildLogBounds(t *testing.T) {
 	s := d.snapshot()
 	if len(s.buildSteps) != dashboardSteps || s.buildSteps[0].state != "done" || !strings.Contains(dashboardBuildRibbon(s, time.Now()), "counts incomplete") {
 		t.Fatal("unbounded listing, terminal log state regressed or truncation hidden")
+	}
+}
+
+func TestDashboardConformanceCountsEveryRequestedNode(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		count       int
+		conformance bool
+	}{
+		{"one worker", 2, false},
+		{"two workers without suite", 3, false},
+		{"two workers with suite", 3, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			count := tc.count
+			d := newDashboard()
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.NativeDeployment, Conformance: tc.conformance, ExpectedNodes: count})
+			if snapshot := d.snapshot(); snapshot.expectedNodes != count || snapshot.conformanceSelected != tc.conformance {
+				t.Fatal("deployment topology changed suite selection", snapshot.expectedNodes, snapshot.conformanceSelected)
+			}
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-nodes", ExpectedNodes: count, RegisteredNodes: count, ReadyNodes: count - 1, Remaining: time.Hour})
+			state := d.snapshot().tenantStages[2].status()
+			if state != "running" {
+				t.Fatal("missing requested worker was accepted")
+			}
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-nodes", ExpectedNodes: count, RegisteredNodes: count, ReadyNodes: count, Remaining: time.Hour})
+			snapshot := d.snapshot()
+			state = snapshot.tenantStages[2].status()
+			if state != "observed" || snapshot.ready != count || snapshot.expectedNodes != count {
+				t.Fatal("lost complete node observation")
+			}
+			screen := dashboardScreen(t, 160)
+			screen.SetSize(160, 48)
+			d.draw(screen, time.Now(), false)
+			text := dashboardText(screen)
+			if !strings.Contains(text, fmt.Sprintf("%d/%d Ready", count, count)) {
+				t.Fatalf("wrong node denominator: %s", text)
+			}
+			if count == 3 && (!strings.Contains(text, "Worker 1") || !strings.Contains(text, "Worker 2")) {
+				t.Fatalf("worker display is incomplete: %s", text)
+			}
+		})
+	}
+}
+
+func TestDashboardNativeChecklistUsesIndividualOwnerBoundaries(t *testing.T) {
+	for selected, stage := range dashboardSiteStages {
+		t.Run(stage.operation, func(t *testing.T) {
+			d := newDashboard()
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.NativeDeployment, Conformance: true, ExpectedNodes: 3})
+			// The former coarse event must not complete missing native stages.
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "site-05-install-site-controller"})
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: stage.operation})
+			if state := d.snapshot().siteStages[selected].status(); state != "running" {
+				t.Fatal("actual stage start missing", state)
+			}
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: stage.operation})
+			snapshot := d.snapshot()
+			for index, row := range snapshot.siteStages {
+				state := row.status()
+				if (state == "observed") != (index == selected) {
+					t.Fatalf("stage %d inferred another operation's result: %s", index, state)
+				}
+			}
+			checklist, _ := dashboardChecklist(snapshot, time.Now())
+			for _, forbidden := range []string{"Create Kind cluster", "Registry reachable", "Secure and register"} {
+				if strings.Contains(checklist, forbidden) {
+					t.Fatal("native view retained legacy stage", forbidden)
+				}
+			}
+			if !strings.Contains(checklist, fmt.Sprintf("Native site stages · 1/%d checked", len(dashboardSiteStages))) || snapshot.phases[2].state == "complete" {
+				t.Fatal("partial native stages incorrectly completed the site", checklist)
+			}
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "native-site-ready"})
+			if d.snapshot().phases[2].state != "complete" {
+				t.Fatal("owning site's successful outcome not shown")
+			}
+		})
+	}
+}
+
+func TestDashboardSiteFailureCannotBeOverwritten(t *testing.T) {
+	for index, stage := range dashboardSiteStages {
+		t.Run(stage.operation, func(t *testing.T) {
+			d := newDashboard()
+			_, _ = io.WriteString(d, "[done] "+stage.operation+"\n")
+			if d.snapshot().siteStages[index].status() != "pending" {
+				t.Fatal("log text invented an owned observation")
+			}
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: stage.operation})
+			started := d.snapshot().siteStages[index].started
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: stage.operation})
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFailed, Name: stage.operation})
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: stage.operation})
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "native-site-ready"})
+			snapshot := d.snapshot()
+			if snapshot.siteStages[index].status() != "failed" || !snapshot.siteStages[index].started.Equal(started) || snapshot.phases[2].state != "failed" {
+				t.Fatal("a later event hid failure or changed its original start")
+			}
+		})
+	}
+}
+
+func TestDashboardConformanceOutcomesAndReset(t *testing.T) {
+	for _, scenario := range []struct {
+		previous, kind, state string
+	}{
+		{"", nvkedemo.PhaseStarted, "running"},
+		{"", nvkedemo.PhaseFinished, "complete"},
+		{"", nvkedemo.PhaseFailed, "failed"},
+		{nvkedemo.PhaseFailed, nvkedemo.PhaseStarted, "running"},
+		{nvkedemo.PhaseFinished, nvkedemo.PhaseStarted, "running"},
+	} {
+		t.Run(scenario.state+"/after-"+scenario.previous, func(t *testing.T) {
+			d := newDashboard()
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.NativeDeployment, Conformance: true, ExpectedNodes: 3})
+			if d.snapshot().phases[dashboardConformancePhase].state != "pending" {
+				t.Fatal("requested conformance omitted before execution")
+			}
+			if scenario.previous != "" {
+				d.Report(nvkedemo.ProgressEvent{Kind: scenario.previous, Name: "native-conformance"})
+			}
+			d.Report(nvkedemo.ProgressEvent{Kind: scenario.kind, Name: "native-conformance"})
+			snapshot := d.snapshot()
+			phases := dashboardNamedPhases(snapshot)
+			if len(phases) != 7 || phases[5].name != "Conformance" || phases[5].phase.state != scenario.state || phases[6].name != "Cleanup" {
+				t.Fatal("conformance/lifetime phase order or outcome lost", phases)
+			}
+			if snapshot.phases[5].state != "pending" {
+				t.Fatal("suite outcome claimed cleanup", snapshot.phases[5])
+			}
+			if scenario.state == "running" && snapshot.currentStarted.IsZero() {
+				t.Fatal("explicit suite start lost its observation clock")
+			}
+		})
+	}
+}
+
+func TestDashboardNativeProviderStatusDoesNotClaimQEMULiveness(t *testing.T) {
+	d := newDashboard()
+	d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.NativeDeployment, Conformance: true, ExpectedNodes: 3})
+	d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-kubeconfig", ExpectedNodes: 3, Remaining: time.Hour})
+	guests := [3]nvkedemo.TenantGuestObservation{}
+	for index := range guests {
+		role := nvkedemo.TenantGuestWorker
+		if index == 0 {
+			role = nvkedemo.TenantGuestControlPlane
+		}
+		guests[index] = nvkedemo.TenantGuestObservation{Role: role, Available: true, Domain: nvkedemo.TenantDomainUnknown, ProviderReady: nvkedemo.TenantConditionTrue, InstanceState: nvkedemo.TenantInstanceReady}
+	}
+	d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantGuests, Name: "native", ExpectedNodes: 3, Guests: guests})
+	text := dashboardTenantSummary(d.snapshot(), time.Now())
+	for _, want := range []string{"Worker 1", "Worker 2", "NICo Ready", "Infra Ready=True", "VM unobserved", "Kubernetes: registered unknown", "Provider/VM snapshot:"} {
+		if !strings.Contains(text, want) {
+			t.Fatal("native observation missing", want, text)
+		}
+	}
+	if strings.Contains(text, "VM running") || strings.Contains(text, "VM unavailable") || d.snapshot().tenantStages[0].state != "running" {
+		t.Fatal("provider observation claimed VM or tenant readiness", text)
+	}
+	bad := guests
+	bad[0].InstanceState = "private-arbitrary-status"
+	d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantGuests, Guests: bad})
+	if d.snapshot().guests != guests {
+		t.Fatal("unmapped private provider status entered public model")
+	}
+}
+
+func TestCheckedWriterForwardsDeploymentConfiguration(t *testing.T) {
+	d := newDashboard()
+	writer := &checkedWriter{out: d, observer: d}
+	nativePresentation(writer, true)
+	if !d.snapshot().conformanceSelected {
+		t.Fatal("typed deployment configuration was dropped before dashboard")
+	}
+	var plain bytes.Buffer
+	writer = &checkedWriter{out: &plain}
+	writer.Report(nvkedemo.ProgressEvent{Kind: "native-retained", Status: "private-status"})
+	if plain.Len() != 0 {
+		t.Fatal("obsolete private lifetime status was exposed")
+	}
+}
+
+func TestDashboardNativeSequentialTenantStartsWithFreshObservations(t *testing.T) {
+	for _, outcome := range []string{nvkedemo.PhaseFinished, nvkedemo.PhaseFailed} {
+		t.Run(outcome, func(t *testing.T) {
+			d := newDashboard()
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.NativeDeployment, Conformance: true, ExpectedNodes: 3})
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "native-site-ready"})
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.DeploymentStarted, Name: "tenant-provisioning"})
+			for _, stage := range []string{"tenant-kubeconfig", "tenant-api", "tenant-nodes", "tenant-workload"} {
+				d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: stage, ExpectedNodes: 3, RegisteredNodes: 3, ReadyNodes: 3, Elapsed: time.Minute, Remaining: time.Hour})
+			}
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.DeploymentFinished, Name: "tenant-provisioning"})
+			d.Report(nvkedemo.ProgressEvent{Kind: outcome, Name: "native-conformance"})
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "tenant-cleanup"})
+			d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.DeploymentStarted, Name: "tenant-provisioning"})
+			snapshot := d.snapshot()
+			if snapshot.phases[2].state != "complete" || snapshot.phases[3].state != "running" || snapshot.phases[4].state != "pending" || snapshot.phases[5].state != "pending" || snapshot.phases[dashboardConformancePhase].state != "pending" {
+				t.Fatal("new tenant reused outcomes or reset the site", snapshot.phases)
+			}
+			if snapshot.nodesObserved || snapshot.registered != 0 || snapshot.ready != 0 || !snapshot.observedAt.IsZero() || !snapshot.deadline.IsZero() || !snapshot.guestsObservedAt.IsZero() {
+				t.Fatal("new tenant reused old observations")
+			}
+			for _, stage := range snapshot.tenantStages {
+				if state := stage.status(); state != "pending" {
+					t.Fatal("previous tenant checkmark survived", state)
+				}
+			}
+		})
+	}
+}
+
+func TestTenantCloudInitProgressIsVisibleInBothPresenters(t *testing.T) {
+	for _, mode := range []string{"plain", "dashboard"} {
+		t.Run(mode, func(t *testing.T) {
+			event := nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-cloud-init", ExpectedNodes: 3, RegisteredNodes: 3, ReadyNodes: 3, Remaining: time.Hour}
+			var text string
+			if mode == "plain" {
+				var output bytes.Buffer
+				writer := &checkedWriter{out: &output}
+				writer.Report(event)
+				text = output.String()
+			} else {
+				d := newDashboard()
+				d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.NativeDeployment, Conformance: true, ExpectedNodes: 3})
+				d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-nodes", ExpectedNodes: 3, RegisteredNodes: 3, ReadyNodes: 3})
+				d.Report(event)
+				text = dashboardTenantSummary(d.snapshot(), time.Now())
+				if d.snapshot().phases[4].state != "pending" || d.snapshot().phases[dashboardConformancePhase].state != "pending" {
+					t.Fatal("host cloud-init observation claimed workload or conformance completion")
+				}
+			}
+			if !strings.Contains(text, "cloud-init") {
+				t.Fatal("host cloud-init gate missing from presentation", text)
+			}
+		})
+	}
+}
+
+func TestIdentityFailureDoesNotCompleteTenant(t *testing.T) {
+	d := newDashboard()
+	d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.NativeDeployment, Conformance: true, ExpectedNodes: 3})
+	d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: "native-site-identity-handoff"})
+	if s := d.snapshot(); s.phases[2].state != "running" || s.current != "Site host identity handoff" {
+		t.Fatal("identity start is hidden", s.phases[2], s.current)
+	}
+	d.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFailed, Name: "native-site-identity-handoff"})
+	s := d.snapshot()
+	if s.phases[2].state != "failed" || s.current != "Site host identity handoff" {
+		t.Fatal("site failure was hidden", s.current, s.phases[2])
+	}
+	for _, i := range []int{3, 4, 5} {
+		if s.phases[i].state != "pending" {
+			t.Fatalf("unstarted phase %d claimed %s", i, s.phases[i].state)
+		}
+	}
+	if s.phases[dashboardConformancePhase].state != "pending" || strings.Contains(s.tenant, "completed") {
+		t.Fatal("site retention claimed tenant or suite completion", s.tenant, s.phases[dashboardConformancePhase])
+	}
+	for _, stage := range s.tenantStages {
+		if state := stage.status(); state != "pending" {
+			t.Fatal("tenant checks were inferred", state)
+		}
+	}
+	var plain bytes.Buffer
+	writer := &checkedWriter{out: &plain, started: time.Now(), phases: make(map[string]time.Time)}
+	writer.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: "native-site-identity-handoff"})
+	writer.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFailed, Name: "native-site-identity-handoff"})
+	for _, want := range []string{"[START ", "[FAIL ", "native-site-identity-handoff"} {
+		if !strings.Contains(plain.String(), want) {
+			t.Fatal("plain output omitted identity state", want, plain.String())
+		}
 	}
 }

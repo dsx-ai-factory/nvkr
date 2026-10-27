@@ -102,16 +102,15 @@ func (v *View) update(snapshot progress.Snapshot) {
 	appendVisible := func(output progress.Output) {
 		_, _, failed := v.outputSummary(output)
 		active := output.State != "observed" && !failed
-		searchName := output.Name
+		matches := query == "" || strings.Contains(strings.ToLower(output.Name), query)
 		if v.commandMode() {
 			if v.overview() && !v.commandItems[output.Name].Primary {
 				return
 			}
-			searchName = output.Stage + " " + output.Name
+			matches = commandMatches(v.commandItems[output.Name], query)
 			active = output.State == "changed" || output.State == "added" || output.State == "removed"
 		}
-		if v.filter == 1 && !active || v.filter == 2 && !failed ||
-			query != "" && !strings.Contains(strings.ToLower(searchName), query) {
+		if v.filter == 1 && !active || v.filter == 2 && !failed || !matches {
 			return
 		}
 		v.visible = append(v.visible, output)
@@ -718,7 +717,11 @@ func (v *View) helpLines() []string {
 		}
 		names = append(names, label)
 	}
-	lines := []string{"Help; Esc returns", quit, navigation, "Up/Down: select entry, dependency or scroll focused pane", "PgUp/PgDn: page focused pane", "Enter: inspect selected entry or follow dependency", "Esc: Back; in list clear search/filter", "/: name/identity search; printable q is query text"}
+	search := "/: name/identity search; printable q is query text"
+	if v.commandMode() {
+		search = "/: search names, kinds and metadata; printable q is query text"
+	}
+	lines := []string{"Help; Esc returns", quit, navigation, "Up/Down: select entry, dependency or scroll focused pane", "PgUp/PgDn: page focused pane", "Enter: inspect selected entry or follow dependency", "Esc: Back; in list clear search/filter", search}
 	if len(filters) > 1 {
 		lines = append(lines, "f: "+strings.Join(names, " / "))
 	}

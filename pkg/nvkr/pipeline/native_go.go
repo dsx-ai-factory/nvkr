@@ -171,8 +171,12 @@ func buildNativeGo(node ir.Node, options RunOptions) (*ArtifactResult, error) {
 		return nil, err
 	}
 	defer tool.mu.Unlock()
-	ctx, cancel := context.WithTimeout(options.ctx(), 20*time.Minute)
-	defer cancel()
+	ctx := options.ctx()
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 20*time.Minute)
+		defer cancel()
+	}
 	options.Ctx = ctx
 	check := func() error {
 		observed, err := CaptureNativeGo(ctx, tool.goRoot, tool.compiler)

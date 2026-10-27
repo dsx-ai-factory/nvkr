@@ -13,6 +13,10 @@ catalog's native-toolchain overlay. It selects pinned installers and a compatibl
 for the [Ubuntu 24 diagnostic inputs](../definitions/diagnostics/ubuntu24/README.md), retaining
 the release catalog's other materials, Packer pins and disk-root patches.
 
+The [native ARM64 SBOM tool](tools/sbom-arm64/README.md) supplies the scanner for the ARM64
+quickstart. Its tool pin is separate from the AMD64 scanner in the maintained release catalog;
+output-scoped selections retain the same NVKE release producers.
+
 ## Current-to-shared mapping
 
 Former paths below were relative to `definitions/` at upstream commit
@@ -71,16 +75,19 @@ dispositions, parity gaps, and acceptance checks.
 ## Native diagnostic additions
 
 The native demo uses `tools/native` for shared Darwin and Linux host tools.
-The local NVIDIA KVM Definitions additionally select three explicit native variants:
+The local NVIDIA KVM Definitions use the shared release node-image catalog with
+ordered NVIDIA and native KVM overlays. Their other selections are:
 
 | Catalog | Contract |
 |---|---|
-| [`node-images/native-arm64`](node-images/native-arm64/registry.yaml) | ARM64 disk and material producers using the renamed NVKE packages and Packer interface |
-| [`nvke/native-site-arm64`](nvke/native-site-arm64/registry.yaml) | Source-aligned CLI, controller, provisioned provider and chart producers |
+| [`node-images/variants/native-local-kvm.json`](node-images/variants/native-local-kvm.json) | Native demo selection over the shared release catalog: agent stamp, MAC-stable DHCP staging and native KVM settings |
+| [`nvke/native-site-arm64`](nvke/native-site-arm64/registry.yaml) | Source-aligned CLI, controller, provisioned provider and chart producers; acquired deployment charts derived from the same source pin set |
 | [`controller-profiles/native-nvidia-arm64`](controller-profiles/native-nvidia-arm64/registry.yaml) | Unchanged upstream config profiles and runbooks; releases are registered by the consumer |
+| [`runtime-dependencies`](runtime-dependencies/registry.yaml) | Shared release and native demo runtime acquisitions from the same NVKE deployment selection |
 
 [`node-images/variants/native-nvidia.json`](node-images/variants/native-nvidia.json)
-binds its complete producer replacements to the native catalog's exact predecessor.
-The separately selected release, upstream, TCG and hosted nightly inputs retain their
-existing baselines. Package metadata checks and Plan compilation establish input
+binds its complete producer replacements to the shared release catalog's exact
+snapshot. The native KVM overlay binds the resulting NVIDIA stack. The release,
+upstream, TCG and hosted nightly selections retain their source pin cohorts.
+Package metadata checks and Plan compilation establish input
 alignment; a fresh package/disk build and full native runtime acceptance remain required.

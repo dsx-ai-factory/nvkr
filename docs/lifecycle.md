@@ -1,7 +1,7 @@
 # Definition, Run, and Release workflow
 
 This reference covers output completeness, immutable attempts, release verification and SDK use.
-Start with the [quickstart](quickstart.md) for CLI setup and the [concept reference](user-concepts.md)
+Start with the [quickstart](quickstart.md#build-only-the-cli) for CLI setup and the [concept reference](user-concepts.md)
 for the six public objects. [ADR-17](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0017-cli-sdk-foundation-and-package-topology.md) owns the
 lifecycle contract; [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md) owns current implementation and evidence.
 
@@ -162,7 +162,7 @@ execution; producer resolution; all catalog inspection and maintenance commands;
 and Release inspection, browsing, export, pulling and verification. Other than the interactive
 local Run default described above, commands default to `--ui=plain` and keep their
 existing text, canonical JSON or diagram output. On commands with a result
-browser, `--ui=auto` selects it when the terminal is eligible. Explicit JSON output
+browser, `--ui=auto` selects it when the terminal is eligible. Explicit JSON or Mermaid output
 and `--ui=tui` are incompatible and fail before input, network or write work.
 `validate`, `run check-artifacts` and `run qualify` retain canonical machine-readable diagnostics and do not offer
 presentation flags.
@@ -177,11 +177,14 @@ Graph and release browsers start with an output overview when their supplied
 results also contain internal nodes or evidence entries. Press `g` to toggle all
 supplied entries; `/` searches the complete supplied set. Producer-only graph
 views keep their supplied producers. The default list uses one row per entry,
-with readable output names; repeated static states are omitted. Full digests and command context live in
+with readable output names; repeated static states are omitted. Release rows add compact kind/platform or
+chart-version summaries when the complete row fits. Full digests and command context live in
 Details.
 
 Results and Details show projected names, identities, counts and dependencies;
-`/` searches names and `f` cycles the available All, Changed and Failed filters.
+`/` searches result names, navigation identities, kinds and projected metadata fields, and `f` cycles the
+available All, Changed and Failed filters. Searches match a case-insensitive substring across the supplied
+entries; global command context is outside item search. Run progress keeps its output-name search.
 Static views offer Activity only when activity is supplied; live Runs retain it.
 Tab cycles the available panes, and 1/2/3 selects a pane when available.
 Details group navigable dependencies before item metadata and command context.

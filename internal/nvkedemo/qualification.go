@@ -51,15 +51,15 @@ func recheckPreparedQualificationPlan(ctx context.Context, runner Runner, cfg Bu
 // QualificationFile opts a build into the complete local rehearsal. These are
 // explicit locators, not trust receipts; nvkr owns all signing and verification.
 type QualificationFile struct {
-	BuilderKey   string `yaml:"builderKey" mapstructure:"builderKey"`
-	SmokeKey     string `yaml:"smokeKey" mapstructure:"smokeKey"`
-	QualifierKey string `yaml:"qualifierKey" mapstructure:"qualifierKey"`
-	Cosign       string `yaml:"cosign" mapstructure:"cosign"`
-	Repository   string `yaml:"repository" mapstructure:"repository"`
-	Scratch      string `yaml:"scratch" mapstructure:"scratch"`
-	EvidenceOut  string `yaml:"evidenceOut" mapstructure:"evidenceOut"`
-	PlainHTTP    bool   `yaml:"plainHTTP" mapstructure:"plainHTTP"`
-	Anonymous    bool   `yaml:"anonymous" mapstructure:"anonymous"`
+	BuilderKey   string `yaml:"builderKey"`
+	SmokeKey     string `yaml:"smokeKey"`
+	QualifierKey string `yaml:"qualifierKey"`
+	Cosign       string `yaml:"cosign"`
+	Repository   string `yaml:"repository"`
+	Scratch      string `yaml:"scratch"`
+	EvidenceOut  string `yaml:"evidenceOut"`
+	PlainHTTP    bool   `yaml:"plainHTTP"`
+	Anonymous    bool   `yaml:"anonymous"`
 }
 
 func (q QualificationFile) validate(policy string) error {
@@ -117,7 +117,7 @@ func qualifyBuiltArtifacts(ctx context.Context, cfg BuildConfig) error {
 	// Compiler replay authenticates upstream pin sets through sourcegit, which
 	// needs the same bounded developer transport settings as the build. The
 	// isolated smoke owner independently removes source and registry credentials.
-	env, err := localBuildEnvironment()
+	env, err := localBuildEnvironment(ctx)
 	if err != nil {
 		return nvkrerr.Wrap(nvkrerr.CodeBuildFailed, err, "invalid local qualification source transport environment")
 	}

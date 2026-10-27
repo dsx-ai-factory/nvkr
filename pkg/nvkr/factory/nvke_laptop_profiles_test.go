@@ -510,6 +510,11 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 			if err := plan.Validate(); err != nil {
 				t.Fatal(err)
 			}
+			profilesPin, err := plan.CatalogSnapshot.SourcePin("nvke-profiles")
+			if err != nil {
+				t.Fatal(err)
+			}
+			profilesRepository := plan.CatalogSnapshot.Sources["nvke-profiles"].Repo
 			if len(plan.Builds) != 1 || len(plan.LifecycleOutputs) != 1 || plan.LifecycleOutputs[0].Name != "controller-profiles" || plan.LifecycleOutputs[0].Kind != "oci" {
 				t.Fatal("profiles must remain a separate single-output selection")
 			}
@@ -520,7 +525,7 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 					t.Fatal("profiles must not fall back to an acquired fleet image")
 				case ir.KindFetch:
 					fetches++
-					if node.Commit != "400c24fb6465b042be883d6b62472528520d6291" || node.TreeHash != "f3afc02f5c92f4aacda3a1655836a91bef093bfe" {
+					if node.Repo != profilesRepository || node.Commit != profilesPin.Commit || node.TreeHash != profilesPin.TreeHash {
 						t.Fatal("profiles must use the staged-installer source")
 					}
 				case ir.KindBuild:

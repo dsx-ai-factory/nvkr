@@ -76,15 +76,9 @@ func requireBootstrapLima(ctx context.Context, runner Runner, platform string) (
 	}
 	limactl, _ := commandPath("limactl", runner.Env)
 	wrapper, _ := commandPath("nerdctl.lima", runner.Env)
-	// NativeEnvironment deliberately omits HOME. Lima needs it even for
-	// --version; bind it only to this prerequisite process without changing
-	// the caller or inheriting ambient Lima instance/target selection.
-	if environmentValue(runner.Env, "HOME") == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", "", e.Wrap(e.CodeEngineCapability, err, "resolve bootstrap tool home")
-		}
-		runner.Env = SetEnv(runner.Env, map[string]string{"HOME": home})
+	runner.Env, err = bootstrapAccountEnvironment(ctx, platform, runner.Env)
+	if err != nil {
+		return "", "", err
 	}
 	version, err := runner.Capture(ctx, []string{limactl, "--version"}, "bootstrap-lima-version", 15*time.Second)
 	if err != nil {
@@ -99,11 +93,35 @@ func requireBootstrapLima(ctx context.Context, runner Runner, platform string) (
 	return limactl, wrapper, nil
 }
 
+func bootstrapAccountEnvironment(ctx context.Context, platform string, env []string) ([]string, error) {
+	var cacheSuffix string
+	switch platform {
+	case "darwin":
+		cacheSuffix = filepath.Join("Library", "Caches")
+	case "linux":
+		cacheSuffix = ".cache"
+	default:
+		return nil, e.New(e.CodeEngineCapability, "unsupported bootstrap host %q", platform)
+	}
+	home, err := nativeAccountHome(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// Lima caches public downloads under os.UserCacheDir()/lima. Resolve the
+	// platform default from the owned account, independently of ambient HOME,
+	// USER and XDG settings. Explicit private instance/config bindings survive.
+	return SetEnv(env, map[string]string{"HOME": home, "XDG_CACHE_HOME": filepath.Join(home, cacheSuffix)}), nil
+}
+
 func prepareHostBootstrap(ctx context.Context, runner Runner, platform, shared, gateway string, images []string) (backend *hostBootstrap, result error) {
 	if err := requireContext(ctx); err != nil {
 		return nil, err
 	}
 	_, platformArgs, err := bootstrapLimaPlatform(platform)
+	if err != nil {
+		return nil, err
+	}
+	runner.Env, err = bootstrapAccountEnvironment(ctx, platform, runner.Env)
 	if err != nil {
 		return nil, err
 	}
@@ -157,28 +175,19 @@ func prepareHostBootstrap(ctx context.Context, runner Runner, platform, shared, 
 		return backend, err
 	}
 	backend.runner = backend.bind(runner)
-	// Lima's verified public download cache remains reusable. Instance state
-	// and SSH identities are still isolated by the explicit private LIMA_HOME.
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return backend, err
-	}
-	cache, err := os.UserCacheDir()
-	if err != nil {
-		return backend, err
-	}
-	backend.runner.Env = SetEnv(backend.runner.Env, map[string]string{"HOME": home, "XDG_CACHE_HOME": cache})
 	args := []string{limactl, "start", "--foreground", "--tty=false", "--name=bootstrap"}
 	args = append(args, platformArgs...)
+	timeout, err := remainingWork(ctx)
+	if err != nil {
+		return backend, err
+	}
 	args = append(args,
-		"--cpus=4", "--memory=6", "--disk=20", "--containerd=user", "--timeout=8m", "--mount-only="+mounts,
+		"--cpus=4", "--memory=6", "--disk=20", "--containerd=user", "--timeout="+timeout.String(), "--mount-only="+mounts,
 		"--set", fmt.Sprintf(`.portForwards = [{"guestPort":30081,"hostPort":30081,"hostIP":%q,"proto":"tcp"}]`, gateway), "template:default")
 	backend.process, err = backend.runner.Start(ctx, args, "bootstrap-lima-runtime")
 	if err != nil {
 		return backend, err
 	}
-	budget, cancel := context.WithTimeout(ctx, 8*time.Minute)
-	defer cancel()
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	probe := backend.runner
@@ -189,7 +198,7 @@ func prepareHostBootstrap(ctx context.Context, runner Runner, platform, shared, 
 		}
 		backend.sequence++
 		phase := fmt.Sprintf("bootstrap-lima-ready-%03d", backend.sequence)
-		probeErr := backend.checkReady(budget, probe, phase)
+		probeErr := backend.checkReady(ctx, probe, phase)
 		if probeErr == nil {
 			if exited, err := backend.process.Exited(); exited {
 				return backend, errors.Join(errors.New("temporary Lima backend exited during readiness"), err)
@@ -200,8 +209,8 @@ func prepareHostBootstrap(ctx context.Context, runner Runner, platform, shared, 
 			return backend, probeErr
 		}
 		select {
-		case <-budget.Done():
-			return backend, budget.Err()
+		case <-ctx.Done():
+			return backend, ctx.Err()
 		case <-tick.C:
 		}
 	}

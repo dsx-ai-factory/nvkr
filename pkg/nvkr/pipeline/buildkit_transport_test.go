@@ -56,6 +56,7 @@ func TestBuildKitPreparationBudgets(t *testing.T) {
 		cancelPhase string
 		latePhase   string
 		failPhase   string
+		stallPhase  string
 		want        e.Code
 		wantCalls   string
 		waitOutput  string
@@ -63,25 +64,22 @@ func TestBuildKitPreparationBudgets(t *testing.T) {
 	}{
 		{name: "observed staging and completion latency"},
 		{name: "actual 15a2 start and wait latency", copyDelay: 15174 * time.Millisecond, startDelay: 40413 * time.Millisecond, waitDelay: 95558483 * time.Microsecond},
-		{name: "each completion RPC owns its allowance", copyDelay: 15174 * time.Millisecond, startDelay: 40413 * time.Millisecond, waitDelay: 95558483 * time.Microsecond, logsDelay: 40 * time.Second, removeDelay: 40 * time.Second},
-		{name: "all RPCs near their own limit", startDelay: 119 * time.Second, waitDelay: 119 * time.Second, logsDelay: 119 * time.Second, removeDelay: 119 * time.Second},
+		{name: "slow completion obeys caller", parent: time.Hour, startDelay: 6 * time.Minute, waitDelay: 9 * time.Minute, logsDelay: 6 * time.Minute, removeDelay: 6 * time.Minute},
+		{name: "unbounded caller gets a staging deadline", stallPhase: "create", want: e.CodeTimeout, wantCalls: "volume,volume,create"},
+		{name: "unbounded caller gets a completion deadline", stallPhase: "wait", want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs"},
 		{name: "caller deadline during staging", parent: 4 * time.Minute, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,logs"},
 		{name: "caller deadline during completion", parent: 5 * time.Minute, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs"},
 		{name: "caller deadline during start", parent: 300 * time.Second, startDelay: 40 * time.Second, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,logs"},
 		{name: "caller deadline during logs", parent: 380 * time.Second, logsDelay: 40 * time.Second, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs"},
 		{name: "caller deadline during removal", parent: 380 * time.Second, removeDelay: 40 * time.Second, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs,rm"},
 		{name: "staging operations do not starve authenticated copy", copyDelay: 160 * time.Second},
-		{name: "each staging RPC owns its allowance", volumeDelay: 299 * time.Second, createDelay: 299 * time.Second, copyDelay: 299 * time.Second},
-		{name: "container creation remains bounded", createDelay: 301 * time.Second, want: e.CodeTimeout, wantCalls: "volume,volume,create"},
-		{name: "authenticated copy remains bounded", copyDelay: 301 * time.Second, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,logs"},
+		{name: "slow staging obeys caller", parent: time.Hour, volumeDelay: 6 * time.Minute, createDelay: 6 * time.Minute, copyDelay: 6 * time.Minute},
+		{name: "caller deadline during creation", parent: time.Minute, createDelay: 6 * time.Minute, want: e.CodeTimeout, wantCalls: "volume,volume,create"},
+		{name: "caller deadline during copying", parent: 4 * time.Minute, copyDelay: 6 * time.Minute, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,logs"},
 		{name: "caller cancellation during creation", cancelPhase: "create", want: e.CodeTimeout, wantCalls: "volume,volume,create"},
 		{name: "caller cancellation during copy", cancelPhase: "cp", want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,logs"},
 		{name: "late nil creation is rejected", latePhase: "create", want: e.CodeTimeout, wantCalls: "volume,volume,create,logs"},
 		{name: "late nil copy is rejected", latePhase: "cp", want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,logs"},
-		{name: "start remains bounded", startDelay: 121 * time.Second, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,logs"},
-		{name: "completion remains bounded", waitDelay: 121 * time.Second, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs"},
-		{name: "logs remain bounded", logsDelay: 121 * time.Second, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs"},
-		{name: "removal remains bounded", removeDelay: 121 * time.Second, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs,rm"},
 		{name: "caller cancellation during start", cancelPhase: "start", want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,logs"},
 		{name: "caller cancellation during wait", cancelPhase: "wait", want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs"},
 		{name: "caller cancellation during logs", cancelPhase: "logs", want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,start,wait,logs"},
@@ -95,7 +93,7 @@ func TestBuildKitPreparationBudgets(t *testing.T) {
 		{name: "multiple helper exits rejected", waitOutput: "0\n1\n", want: e.CodeBuildFailed, wantCalls: "volume,volume,create,cp,start,wait,logs"},
 		{name: "out of range helper exit rejected", waitOutput: "256\n", want: e.CodeBuildFailed, wantCalls: "volume,volume,create,cp,start,wait,logs"},
 		{name: "nonzero helper exit rejected", waitOutput: "7\n", want: e.CodeBuildFailed, wantCalls: "volume,volume,create,cp,start,wait,logs"},
-		{name: "copy deadline survives diagnostic failure", copyDelay: 301 * time.Second, failLogs: true, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,logs"},
+		{name: "copy deadline survives diagnostic failure", parent: 4 * time.Minute, copyDelay: 301 * time.Second, failLogs: true, want: e.CodeTimeout, wantCalls: "volume,volume,create,cp,logs"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
@@ -122,26 +120,35 @@ func TestBuildKitPreparationBudgets(t *testing.T) {
 				}
 				calls := map[string]int{}
 				var sequence []string
+				var preparationContext context.Context
 				runtime := &recordingPackerRuntime{runContext: func(operation context.Context, in io.Reader, out, _ io.Writer, args []string) error {
 					phase := args[0]
 					calls[phase]++
 					sequence = append(sequence, phase)
-					deadline, ok := operation.Deadline()
-					if !ok {
-						t.Fatal("unbounded preparation operation")
+					// Failure diagnostics have an independent teardown allowance.
+					if phase != "logs" || tc.want == "" {
+						if _, bounded := operation.Deadline(); !bounded {
+							return errors.New("preparation has no work deadline")
+						}
+						if _, bounded := ctx.Deadline(); bounded && operation != ctx {
+							t.Fatal("preparation replaced the caller's deadline")
+						}
+						if preparationContext == nil {
+							preparationContext = operation
+						} else if preparationContext != operation {
+							t.Fatal("preparation reset its work budget between operations")
+						}
 					}
-					if (phase == "start" || phase == "wait" || phase == "logs" || phase == "rm") && time.Until(deadline) > 2*time.Minute {
-						t.Fatal("completion exceeded its allowance")
-					}
-					if (phase == "volume" || phase == "create" || phase == "cp") && time.Until(deadline) > 5*time.Minute {
-						t.Fatal("staging operation exceeded its allowance")
+					if phase == tc.stallPhase {
+						<-operation.Done()
+						return operation.Err()
 					}
 					if phase == tc.cancelPhase {
 						cancel()
 						return operation.Err()
 					}
 					if phase == tc.latePhase {
-						<-operation.Done()
+						cancel()
 						return nil
 					}
 					if phase == tc.failPhase {
@@ -246,7 +253,7 @@ func TestBuildKitPreparationTelemetryUsesHeldCarrier(t *testing.T) {
 	}
 	for _, want := range []string{
 		fmt.Sprintf("source_archive_bytes=%d carrier_bytes=%d carrier_members=1", sourceBytes, carrierBytes),
-		"copy authenticated carrier; step=9 budget=5m0s", "start preparation container; step=10 budget=2m0s",
+		"copy authenticated carrier; step=9 elapsed=", "start preparation container; step=10 elapsed=", "caller_remaining=",
 	} {
 		if !strings.Contains(progress.String(), want) {
 			t.Fatalf("missing measured telemetry %q: %s", want, progress.String())
@@ -348,9 +355,6 @@ func TestBuildKitTransportFailureCleanup(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			runtime := &recordingPackerRuntime{runContext: func(ctx context.Context, in io.Reader, out, _ io.Writer, args []string) error {
-				if _, ok := ctx.Deadline(); !ok {
-					t.Fatal("unbounded transport phase")
-				}
 				if args[0] == "volume" {
 					_, err := io.WriteString(out, args[len(args)-1]+"\n")
 					return err
@@ -451,6 +455,39 @@ func TestBuildKitDeclaredExport(t *testing.T) {
 					t.Fatalf("partial artifact exposed: %v", err)
 				}
 			}
+		})
+	}
+}
+
+func TestBuildKitExportDeadline(t *testing.T) {
+	for _, parent := range []time.Duration{0, time.Hour} {
+		t.Run(parent.String(), func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				_, n, opts := buildKitPrivateFixture(t)
+				ctx := t.Context()
+				if parent != 0 {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithTimeout(ctx, parent)
+					defer cancel()
+				}
+				callerDeadline, callerBounded := ctx.Deadline()
+				runtime := &recordingPackerRuntime{runContext: func(operation context.Context, _ io.Reader, _, _ io.Writer, _ []string) error {
+					deadline, bounded := operation.Deadline()
+					if !bounded || callerBounded && !deadline.Equal(callerDeadline) {
+						return errors.New("export lost its deadline or replaced the caller's budget")
+					}
+					<-operation.Done()
+					return operation.Err()
+				}}
+				transport := &buildKitTransport{root: t.TempDir(), resources: &packerContainerResources{runtime: runtime}, limit: 1 << 20}
+				err := transport.collect(ctx, opts, n, "producer")
+				if code(err) != e.CodeTimeout || !errors.Is(err, context.DeadlineExceeded) {
+					t.Fatalf("export did not return a coded deadline: %v", err)
+				}
+				if !callerBounded && ctx.Err() != nil {
+					t.Fatal("fallback canceled its caller")
+				}
+			})
 		})
 	}
 }

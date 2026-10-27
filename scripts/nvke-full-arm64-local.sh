@@ -193,7 +193,7 @@ if [[ "${build_accelerator}" == tcg ]]; then environment="inputs/environments/lo
 # This is one narrow developer bootstrap, not an Environment validator. Admit
 # its exact reviewed bootstrap image/platform before creating storage or running
 # caller-edited inputs. The compiled runner owns complete document validation.
-utility='golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c'
+utility='golang@sha256:f20d83a83e18dbd2a4714b8ffd4b30b287b6243962dd75608e86abcc63ba4efc'
 if ! jq -e --arg image "${utility}" --arg runtime "${runtime}" '
   .utilityContainer == $image and .utilityPlatform == "linux/arm64" and
   .runtime.runtime == $runtime
@@ -320,26 +320,6 @@ fi
 selected_plan_command=("${runner}" run plan --definition "${definition}" --environment "${environment}" --json)
 print_nvkr_command "${selected_plan_command[@]}"
 "${selected_plan_command[@]}" >"${bootstrap}/selected-plan.json"
-selected_graph_command=("${runner}" run graph --plan "${bootstrap}/selected-plan.json" --view complete --format json)
-print_nvkr_command "${selected_graph_command[@]}"
-"${selected_graph_command[@]}" >"${bootstrap}/graph.json"
-# This bounded display projection describes the selected Plan, not execution or
-# verification. Preserve owner keys/edges; omit route refs and producer duplicates.
-jq -r '
-  [.vertices[] | select(.kind == "operation")] as $operations |
-  [.vertices[] | select(.kind == "artifact" or .kind == "output")] as $artifacts |
-  ($operations[:512] + $artifacts[:1024] |
-    map(select(([.key, .reference, (.build // "")] | all(type == "string" and length <= 256)) and
-      (.label | type == "string" and length <= 512)))) as $vertices |
-  ($vertices | map({key: .key, value: true}) | from_entries) as $keys |
-  [.edges[] | select($keys[.from] and $keys[.to])] as $displayEdges |
-  ($displayEdges | map(select(.relation | type == "string" and length <= 64))) as $edges |
-  ($vertices[] | "Build vertex: " + tojson),
-  ($edges[:4096][] | "Build edge: " + tojson),
-  "Build display: " + ({vertices: ($vertices | length), edges: ($edges[:4096] | length),
-    truncated: (($operations | length) + ($artifacts | length) > ($vertices | length) or
-      ($displayEdges | length) > ($edges | length) or ($edges | length) > 4096)} | tojson)
-' "${bootstrap}/graph.json" >&2
 preview_command=("${runner}" run local --definition "${definition}" --environment "${environment}" --attempt "${attempt}-preview" --capture-inputs-root=. --dry-run)
 print_nvkr_command "${preview_command[@]}"
 "${preview_command[@]}"

@@ -38,8 +38,9 @@ func captureLocalQualificationPayloads(ctx context.Context, workspace string, in
 }
 
 func captureLocalQualificationPayloadsWith(ctx context.Context, workspace string, inputs *localQualificationInputs, ordinary localOrdinaryCapture) (capture *localQualificationCapture, err error) {
-	// This checks every original Run slot and captures each retained disk before
-	// ordinary assembly. A subsequent failure must close the entire set.
+	// This checks original slot and outer-publication bindings and captures disks.
+	// Factory ordinary assembly verifies producer/package bytes before the held
+	// output comparison below. A subsequent failure must close the entire set.
 	disks, err := captureLocalQualificationDisks(ctx, workspace, inputs)
 	if err != nil {
 		return nil, err

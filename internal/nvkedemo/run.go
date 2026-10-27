@@ -5,14 +5,11 @@ package nvkedemo
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
-	"maps"
 	"net"
 	"net/http"
 	"net/netip"
@@ -26,6 +23,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
+	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
@@ -103,7 +101,9 @@ func startDiskServiceWithNightlyAlias(ctx context.Context, path, address, alias 
 		service.requests.Add(1)
 		http.ServeContent(writer, request, name, info.ModTime(), io.NewSectionReader(file, 0, info.Size()))
 	})
-	service.server = &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 5 * time.Second, WriteTimeout: 180 * time.Second, BaseContext: func(net.Listener) context.Context { return serveContext }}
+	// Payload transfers live for the owned service context. A whole-body write
+	// deadline would reject a valid large disk on a slower host or connection.
+	service.server = &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 5 * time.Second, BaseContext: func(net.Listener) context.Context { return serveContext }}
 	service.server.SetKeepAlivesEnabled(false)
 	go func() { service.done <- service.server.Serve(listener) }()
 	return service, nil
@@ -150,9 +150,7 @@ func verifyHTTPDisk(ctx context.Context, url string, image lifecycle.Artifact) e
 	if image.Disk == nil || image.Disk.Size <= 0 {
 		return errors.New("missing exact disk description")
 	}
-	budget, cancel := context.WithTimeout(ctx, 180*time.Second)
-	defer cancel()
-	request, err := http.NewRequestWithContext(budget, http.MethodGet, url, nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
@@ -177,7 +175,7 @@ func verifyHTTPDisk(ctx context.Context, url string, image lifecycle.Artifact) e
 	return nil
 }
 func copyPrivate(ctx context.Context, source, destination string, mode os.FileMode) error {
-	input, _, err := securepath.OpenRegular(source)
+	input, info, err := securepath.OpenRegular(source)
 	if err != nil {
 		return err
 	}
@@ -186,30 +184,17 @@ func copyPrivate(ctx context.Context, source, destination string, mode os.FileMo
 	if err != nil {
 		return err
 	}
-	buffer := make([]byte, 1<<20)
-	for {
-		if err = ctx.Err(); err != nil {
-			break
-		}
-		var n int
-		n, err = input.Read(buffer)
-		if n > 0 {
-			written, writeErr := output.Write(buffer[:n])
-			if writeErr != nil {
-				err = writeErr
-				break
-			}
-			if written != n {
-				err = io.ErrShortWrite
-				break
-			}
-		}
-		if err == io.EOF {
-			err = nil
-			break
-		}
-		if err != nil {
-			break
+	_, err = transportarchive.CopyExact(ctx, output, input, info.Size())
+	// Keep error mapping with the existing callers, as the private copy did
+	// before delegating transfer to the transport owner.
+	var copied *nvkrerr.Error
+	if errors.As(err, &copied) && copied.Err != nil {
+		err = copied.Err
+	}
+	if err == nil {
+		after, statErr := input.Stat()
+		if statErr != nil || !securepath.SameMetadata(info, after) {
+			err = errors.Join(statErr, errors.New("private copy source changed while reading"))
 		}
 	}
 	if err == nil {
@@ -232,454 +217,6 @@ func verifyDiskBytes(ctx context.Context, path string, image lifecycle.Artifact)
 	}
 	if digest != image.Digest {
 		return errors.New("disk bytes differ from completed Run")
-	}
-	return nil
-}
-
-type demoAdmission struct {
-	materials         *SiteMaterials
-	simulator, image  lifecycle.Artifact
-	disk, layout, out string
-	env               []string
-	binding           map[string]string
-}
-
-func admitDemo(ctx context.Context, cfg Config) (demoAdmission, error) {
-	var admitted demoAdmission
-	if cfg.Timeout < MinTenantTimeoutSeconds*time.Second || cfg.Timeout > MaxTenantTimeoutSeconds*time.Second {
-		return admitted, fmt.Errorf("tenant budget must be %d..%d seconds", MinTenantTimeoutSeconds, MaxTenantTimeoutSeconds)
-	}
-	diskOutput, err := selectedDiskOutput(cfg.Network)
-	if err != nil {
-		return admitted, err
-	}
-	if err := admitSimulatorEndpoint(ctx, Runner{Env: NativeEnvironment(), Progress: cfg.Progress}); err != nil {
-		return admitted, err
-	}
-	materials, err := AdmitSite(ctx, cfg)
-	if err != nil {
-		return admitted, err
-	}
-	env := NativeEnvironment()
-	for _, tool := range []string{"qemu-img", "qemu-io", "qemu-system-aarch64", "cloud-localds", "swtpm_setup", "certtool", "debugfs"} {
-		if _, err = commandPath(tool, env); err != nil {
-			return admitted, err
-		}
-	}
-	simulatorRoot, err := resolveExisting(cfg.Runs.Simulator)
-	if err != nil {
-		return admitted, err
-	}
-	osRoot, err := resolveExisting(cfg.Runs.OS)
-	if err != nil {
-		return admitted, err
-	}
-	out, err := freshDestination(cfg.Out)
-	if err != nil {
-		return admitted, err
-	}
-	for _, root := range []string{simulatorRoot, osRoot} {
-		if insidePath(out, root) {
-			return admitted, errors.New("demo output must be outside accepted attempts")
-		}
-	}
-	simulator, err := CompleteOutput(ctx, simulatorRoot, SimulatorBundle, "executable")
-	if err != nil {
-		return admitted, err
-	}
-	image, err := CompleteOutput(ctx, osRoot, diskOutput, "disk-image")
-	if err != nil {
-		return admitted, err
-	}
-	if image.Disk == nil || image.Disk.Format != "qcow2" || image.Disk.Encryption != "none" || image.Disk.Outcome != "succeeded" || image.Disk.PayloadDigest != image.Digest || image.Disk.Size <= 0 {
-		return admitted, errors.New("require successful observed plain QCOW2")
-	}
-	disk := filepath.Join(osRoot, "outputs", diskOutput+".qcow2")
-	if err = verifyDiskBytes(ctx, disk, image); err != nil {
-		return admitted, err
-	}
-	layout := filepath.Join(simulatorRoot, "packages", SimulatorBundle)
-	if err = diagnosticIndexMatches(layout, simulator.Digest); err != nil {
-		return admitted, err
-	}
-	parent, _, err := securepath.OpenDirectory(filepath.Dir(out))
-	if err != nil {
-		return admitted, err
-	}
-	free, err := securepath.AvailableDiskBackedBytes(ctx, parent)
-	_ = parent.Close()
-	if err != nil {
-		return admitted, err
-	}
-	if free < 30<<30 || free-(30<<30) < uint64(image.Disk.Size) {
-		return admitted, errors.New("need disk-copy bytes plus 30 GiB free for two-VM diagnostic")
-	}
-	runner := Runner{Env: env, Progress: cfg.Progress}
-	binding, err := admitLibvirtEnvironment(ctx, runner)
-	if err != nil {
-		return admitted, err
-	}
-	if err = admitSimulatorPort(ctx, materials.Gateway); err != nil {
-		return admitted, err
-	}
-	return demoAdmission{materials, simulator, image, disk, layout, out, env, binding}, nil
-}
-
-// Run deploys completed attempts through nvkr extraction and source-owned NVKE
-// interfaces. Success is a local diagnostic, not Release authorization. Every
-// daemon is joined before removing its shared networking controls.
-func Run(ctx context.Context, cfg Config) (result error) {
-	boundary := beginProgress(cfg.Progress, "local-demo", DeploymentStarted, DeploymentFinished, DeploymentFailed)
-	defer func() { boundary.finish(result) }()
-	mode, err := normalizeNetwork(cfg.Network)
-	if err != nil {
-		return err
-	}
-	cfg.Network = mode
-	err = run(ctx, cfg)
-	if err == nil {
-		if cfg.Progress != nil && runtimeRetention(ctx) == nil {
-			fmt.Fprintln(cfg.Progress, demoSuccessSummary(mode))
-		}
-		return nil
-	}
-	return localDemoError(err)
-}
-
-func localDemoError(err error) error {
-	if err == nil {
-		return nil
-	}
-	code := nvkrerr.CodePreflightFailed
-	var coded *nvkrerr.Error
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) ||
-		(errors.As(err, &coded) && coded.Code == nvkrerr.CodeTimeout) {
-		code = nvkrerr.CodeTimeout
-	}
-	return nvkrerr.Wrap(code, err, "local NVKE demo")
-}
-
-// This is emitted only after the deployment owner has joined cleanup. Naming
-// the selected network prevents an alternate diagnostic from claiming the
-// default NVIDIA OVN path was exercised.
-func demoSuccessSummary(mode string) string {
-	selection := "NVIDIA OVN"
-	switch mode {
-	case "upstream-ovn":
-		selection = "upstream OVN diagnostic; NVIDIA OVN not validated"
-	case "kind-calico":
-		selection = "Kind/Calico diagnostic; NVIDIA OVN not deployed"
-	}
-	return "PASS (" + selection + "): real ARM64 QCOW2 tenant, two ready nodes, workload/DNS, exact artifacts and owned cleanup.\nUnqualified local diagnostic, not a signed Release or complete source-built distribution."
-}
-
-func run(ctx context.Context, cfg Config) (result error) {
-	if err := requireContext(ctx); err != nil {
-		return err
-	}
-	if err := networkPlatform(); err != nil {
-		return err
-	}
-	probeExecutable, err := admitNetworkProbeExecutable(ctx, cfg.DemoExecutable)
-	if err != nil {
-		return err
-	}
-	admitted, err := admitDemo(ctx, cfg)
-	if err != nil {
-		return err
-	}
-	// Each subprocess executes from its private workspace, so relative caller
-	// locators must be resolved before any workspace is created.
-	cfg.NVKR, err = resolveExisting(cfg.NVKR)
-	if err != nil {
-		return err
-	}
-	if err = os.Mkdir(admitted.out, 0o700); err != nil {
-		return err
-	}
-	runner := Runner{Work: admitted.out, Env: SetEnv(admitted.env, admitted.binding), Progress: cfg.Progress}
-	guard, err := NewNetworkGuard(ctx, runner, admitted.materials.KindCIDR, probeExecutable)
-	if err != nil {
-		return err
-	}
-	noteRetainedNetworkStart(ctx) // Original journal now owns a restore obligation.
-	var simulator *OwnedProcess
-	var httpService *diskService
-	restore := true
-	domainRunner := runner
-	domainRunner.Work = ""
-	domainRunner.Env = SetEnv(admitted.env, admitted.binding)
-	privateDisk := ""
-	defer func() {
-		if holdErr := waitRetainedCleanup(ctx, result); holdErr != nil {
-			result = errors.Join(result, holdErr)
-			guard.releaseHandles()
-			return
-		}
-		if errors.Is(result, ErrUnjoined) || errors.Is(result, ErrRetainedControls) {
-			restore = false
-		}
-		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), retainedRuntimeCleanupTimeout)
-		defer cancel()
-		var cleanupErr error
-		if runtimeRetention(ctx) != nil {
-			if !restore {
-				cleanupErr = errors.Join(ErrRetainedControls, result)
-			} else {
-				cleanupErr = cleanupRetainedRuntime(cleanup, simulator, httpService, guard, admitted.out, domainRunner)
-			}
-		} else {
-			cleanupErr = cleanupRuntime(cleanup, simulator, httpService, guard, admitted.out, domainRunner, restore)
-		}
-		recordRetainedCleanup(ctx, cleanupErr)
-		result = errors.Join(result, cleanupErr)
-		guard.releaseHandles()
-		if result == nil {
-			result = errors.Join(verifyDiskBytes(cleanup, admitted.disk, admitted.image), verifyDiskBytes(cleanup, privateDisk, admitted.image))
-			recordRetainedCleanup(ctx, result)
-		}
-	}()
-	defer recoverRetainedPanic(ctx, &result)
-	simulatorWork := filepath.Join(admitted.out, "simulator")
-	if err = os.Mkdir(simulatorWork, 0o700); err != nil {
-		return err
-	}
-	publication := filepath.Join(admitted.out, "sim-publication")
-	if err = runner.Run(ctx, []string{cfg.NVKR, "publish", "root", "--bundle", SimulatorBundle + "=" + admitted.layout, "--out", publication}, "verify-simulator", 120*time.Second); err != nil {
-		return err
-	}
-	bundle := filepath.Join(simulatorWork, "bundle")
-	if err = runner.Run(ctx, []string{cfg.NVKR, "publish", "extract", "--layout", publication, "--bundle", SimulatorBundle, "--out", bundle}, "extract-simulator", 120*time.Second); err != nil {
-		return err
-	}
-	if err = verifyToolMembers(bundle, []string{"nico-sim", "nico-sim-runtime-assets", "nico-simctl"}); err != nil {
-		// Runtime assets are an archive, not an executable. Admit exact membership
-		// separately without weakening executable member checks.
-		rows, readErr := os.ReadDir(bundle)
-		if readErr != nil {
-			return readErr
-		}
-		var names []string
-		for _, row := range rows {
-			info, statErr := os.Lstat(filepath.Join(bundle, row.Name()))
-			if statErr != nil {
-				return statErr
-			}
-			if !info.Mode().IsRegular() {
-				return errors.New("simulator bundle contains nonregular member")
-			}
-			names = append(names, row.Name())
-		}
-		if !slices.Equal(names, []string{"nico-sim", "nico-sim-runtime-assets", "nico-simctl"}) {
-			return errors.New("require exactly three accepted simulator members")
-		}
-	}
-	if err = SafeExtractAssets(ctx, filepath.Join(bundle, "nico-sim-runtime-assets"), simulatorWork); err != nil {
-		return err
-	}
-	seed, err := projectSeed(ctx, simulatorWork)
-	if err != nil {
-		return err
-	}
-	binary := filepath.Join(admitted.out, "nico-sim")
-	if err = copyPrivate(ctx, filepath.Join(bundle, "nico-sim"), binary, 0o700); err != nil {
-		return err
-	}
-	serve := filepath.Join(admitted.out, "disk-http")
-	if err = os.Mkdir(serve, 0o700); err != nil {
-		return err
-	}
-	privateDisk = filepath.Join(serve, admitted.image.Name+".qcow2")
-	if err = copyPrivate(ctx, admitted.disk, privateDisk, 0o444); err != nil {
-		return err
-	}
-	if err = verifyDiskBytes(ctx, privateDisk, admitted.image); err != nil {
-		return err
-	}
-	info, err := captureJSON[struct {
-		Format  string
-		Backing string `json:"backing-filename"`
-		Size    int64  `json:"virtual-size"`
-	}](ctx, runner, []string{"qemu-img", "info", "--output=json", privateDisk}, "inspect-base-disk")
-	if err != nil {
-		return err
-	}
-	if info.Format != "qcow2" || info.Backing != "" || info.Size <= 0 || info.Size > 60<<30 {
-		return errors.New("require standalone QCOW2 fitting selected tenant instance")
-	}
-	if err = guard.Start(ctx); err != nil {
-		return err
-	}
-	if err = guard.AllowKindSimulator(ctx, admitted.materials.Gateway); err != nil {
-		return err
-	}
-	if err = guard.Grant(ctx, binary, "cap_net_admin=ep"); err != nil {
-		return err
-	}
-	httpService, err = startDiskService(ctx, privateDisk, net.JoinHostPort(GuestGateway, "18080"))
-	if err != nil {
-		return err
-	}
-	if err = verifyHTTPDisk(ctx, httpService.url, admitted.image); err != nil {
-		return err
-	}
-	var random [24]byte
-	if _, err = rand.Read(random[:]); err != nil {
-		return err
-	}
-	token := hex.EncodeToString(random[:])
-	if err = privateWrite(filepath.Join(admitted.out, "nico-api-header"), []byte("Authorization: Bearer "+token+"\n")); err != nil {
-		return err
-	}
-	binding, err := admitLibvirtEnvironment(ctx, runner)
-	if err != nil {
-		return err
-	}
-	if !maps.Equal(binding, admitted.binding) {
-		return errors.New("libvirt path binding changed during setup")
-	}
-	serverEnv, err := simulatorEnvironment(ctx, simulatorWork, privateDisk, admitted.out, admitted.materials.Gateway, binding)
-	if err != nil {
-		return err
-	}
-	serverRunner := runner
-	serverRunner.Work = simulatorWork
-	serverRunner.Env = serverEnv
-	guard.BGPIntent = true
-	if err = guard.Checkpoint(ctx); err != nil {
-		return err
-	}
-	simulator, err = serverRunner.Start(ctx, []string{binary}, "simulator")
-	if err != nil {
-		return err
-	}
-	endpoint := fmt.Sprintf("http://%s:%d", admitted.materials.Gateway, simulatorAPIPort)
-	startup, cancel := context.WithTimeout(ctx, 30*time.Second)
-	for {
-		if exited, _ := simulator.Exited(); exited {
-			cancel()
-			return errors.New("real VM-backed NICoSim startup failed; private log retained")
-		}
-		var health struct{ Status string }
-		err = localJSONRequest(startup, endpoint+"/healthz", 2*time.Second, &health)
-		if err == nil && health.Status == "ok" {
-			break
-		}
-		if err = pause(startup, 200*time.Millisecond); err != nil {
-			cancel()
-			return fmt.Errorf("simulator startup: %w", err)
-		}
-	}
-	cancel()
-	if err = privateJSON(filepath.Join(admitted.out, "demo-inputs.json"), struct {
-		Scope                             string
-		Network                           string
-		Simulator, Disk                   lifecycle.Artifact
-		HTTPReadback, WorkloadAcquisition string
-		Seed                              seedProjection
-		Outputs                           map[string]SelectedOutput
-	}{"unqualified-local-demo", cfg.Network, admitted.simulator, admitted.image, admitted.image.Digest, WorkloadImage, seed, admitted.materials.Outputs}); err != nil {
-		return err
-	}
-	cfg.Out = filepath.Join(admitted.out, "site")
-	if err = WithManagement(ctx, cfg, func(ctx context.Context, session ManagementSession) error {
-		return ConsumeSite(ctx, cfg, admitted.materials, SiteConnection{token, endpoint, OrgID}, session, func(ctx context.Context, session ManagementSession) error {
-			return consumeTenant(ctx, cfg, guard, session, simulator, admitted.image, domainRunner, endpoint)
-		})
-	}); err != nil {
-		return err
-	}
-	// The deferred cleanup and final rehash must finish before Run emits PASS.
-	return nil
-}
-
-type stopper interface{ Stop(context.Context) error }
-
-func joinRuntime(ctx context.Context, producers []stopper, stopDNS func(context.Context) error) error {
-	var failures []error
-	for _, producer := range producers {
-		if producer != nil {
-			if err := producer.Stop(ctx); err != nil {
-				failures = append(failures, err)
-			}
-		}
-	}
-	if err := stopDNS(ctx); err != nil {
-		failures = append(failures, err)
-	}
-	return errors.Join(failures...)
-}
-func cleanupRuntime(ctx context.Context, server *OwnedProcess, httpService *diskService, guard *NetworkGuard, work string, domains Runner, restore bool) error {
-	var producers []stopper
-	if server != nil {
-		producers = append(producers, server)
-	}
-	if httpService != nil {
-		producers = append(producers, httpService)
-	}
-	if err := joinRuntime(ctx, producers, guard.StopDNS); err != nil {
-		return fmt.Errorf("daemon cleanup failed; host controls retained: %w", err)
-	}
-	if !restore {
-		return nil
-	}
-	if server != nil {
-		if err := SweepOwnedDomains(ctx, domains, filepath.Join(work, "simulator")); err != nil {
-			return err
-		}
-	}
-	inventory, err := DomainInventory(ctx, domains)
-	if err != nil {
-		return err
-	}
-	if len(inventory) != 0 {
-		return errors.New("unknown/remaining domain; network retained")
-	}
-	if guard.BGPIntent {
-		if err = restoreBGP(ctx, guard); err != nil {
-			return err
-		}
-		guard.BGPIntent = false
-		guard.cleanupCheckpoint(ctx)
-	}
-	return guard.Close(ctx)
-}
-
-// The retained owner joins its actual producers and exact owned domains, but
-// deliberately leaves recorded privileged host controls for foreground Restore.
-// This is not full E2E cleanup and must never emit the full-cleanup PASS banner.
-func cleanupRetainedRuntime(ctx context.Context, server *OwnedProcess, httpService *diskService, guard *NetworkGuard, work string, domains Runner) error {
-	owner := runtimeRetention(ctx)
-	if !owner.issued() || guard == nil {
-		return nvkrerr.New(nvkrerr.CodeUsage, "retained service teardown requires its live owner and original network guard")
-	}
-	owner.mu.Lock()
-	requested := owner.snapshot.state == retainedCleanupRequested
-	owner.mu.Unlock()
-	if !requested {
-		return errors.Join(ErrRetainedControls, nvkrerr.New(nvkrerr.CodePreflightFailed, "service teardown requires explicit cleanup"))
-	}
-	var producers []stopper
-	if server != nil {
-		producers = append(producers, server)
-	}
-	if httpService != nil {
-		producers = append(producers, httpService)
-	}
-	if err := joinRuntime(ctx, producers, guard.StopDNS); err != nil {
-		return errors.Join(ErrRetainedControls, err)
-	}
-	if server != nil {
-		if err := SweepOwnedDomains(ctx, domains, filepath.Join(work, "simulator")); err != nil {
-			return errors.Join(ErrRetainedControls, err)
-		}
-	}
-	inventory, err := DomainInventory(ctx, domains)
-	if err != nil {
-		return errors.Join(ErrRetainedControls, err)
-	}
-	if len(inventory) != 0 {
-		return errors.Join(ErrRetainedControls, nvkrerr.New(nvkrerr.CodePreflightFailed, "remaining domains prevent retained owner completion"))
 	}
 	return nil
 }

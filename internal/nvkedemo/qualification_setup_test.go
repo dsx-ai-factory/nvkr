@@ -103,7 +103,7 @@ func TestQualificationSetupScopeMatchesMaintainedDefinitions(t *testing.T) {
 func TestQualificationSetupScopeRejectsConformanceDefinitions(t *testing.T) {
 	for _, network := range []string{"ovn", "upstream-ovn"} {
 		t.Run(network, func(t *testing.T) {
-			selected, _, err := LocalArtifactInputsFor(network, true)
+			selected, _, err := LocalArtifactInputsFor(network, true, "linux")
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -53,10 +53,10 @@ if test "$FAIL" != ''; then exit 9; fi
 				t.Fatal(err)
 			}
 			lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
-			if len(lines) != 8 || lines[0] != "nvke-api" || lines[1] != "nvke-api" || lines[7] != "bootstrap-delete" {
+			if len(lines) != 9 || lines[0] != "nvke-api" || lines[1] != "nvke-api" || lines[8] != "bootstrap-delete" {
 				t.Fatalf("diagnostics must follow restore failure and precede deletion: %s", raw)
 			}
-			for i, fragment := range []string{"get pods --all-namespaces -o json", "get services --all-namespaces -o json", "get endpointslices.discovery.k8s.io --all-namespaces -o json", "logs --selector=app.kubernetes.io/name=nke-controller,app.kubernetes.io/instance=nke-controller --container=nke-controller", "--previous=true"} {
+			for i, fragment := range []string{"get pods --all-namespaces -o json", "get events --all-namespaces -o json", "get services --all-namespaces -o json", "get endpointslices.discovery.k8s.io --all-namespaces -o json", "logs --selector=app.kubernetes.io/name=nke-controller,app.kubernetes.io/instance=nke-controller --container=nke-controller", "--previous=true"} {
 				if !strings.Contains(lines[i+2], fragment) {
 					t.Fatalf("missing exact bounded read-only diagnostic %q: %s", fragment, raw)
 				}
@@ -68,7 +68,7 @@ if test "$FAIL" != ''; then exit 9; fi
 			if err != nil || len(folders) != 1 {
 				t.Fatalf("missing unique private failure observation: %v %v", folders, err)
 			}
-			for _, phase := range []string{"site-pods", "site-services", "site-endpointslices", "controller-current", "controller-previous"} {
+			for _, phase := range []string{"site-pods", "site-events", "site-services", "site-endpointslices", "controller-current", "controller-previous"} {
 				log, err := os.ReadFile(filepath.Join(folders[0], phase+".log"))
 				if err != nil || !strings.Contains(string(log), "private-site-diagnostic") {
 					t.Fatalf("missing private diagnostic %s: %s %v", phase, log, err)

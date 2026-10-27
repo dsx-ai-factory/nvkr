@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -100,7 +101,7 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	} else if err := resolveSelectedBuild(ctx, repo, &cfg); err != nil {
 		return BuiltInputs{}, err
 	}
-	env, err := localBuildEnvironment()
+	env, err := localBuildEnvironment(ctx)
 	if err != nil {
 		return BuiltInputs{}, err
 	}
@@ -153,14 +154,15 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	if err != nil {
 		return BuiltInputs{}, err
 	}
-	if _, err := PrepareTools(ctx, ToolConfig{
+	toolsRun, err := buildTools(ctx, ToolConfig{
 		Repository: repo, NVKR: built.NVKR, NVKEClone: cfg.NVKEClone, Attempt: cfg.AttemptPrefix, Jobs: cfg.Jobs,
 		Out:      filepath.Join(repo, ".nvkr", "laptop-bootstrap", cfg.AttemptPrefix, "native-tools"),
 		Progress: cfg.Progress,
-	}); err != nil {
+	}, runtime.GOOS+"/"+runtime.GOARCH)
+	if err != nil {
 		return BuiltInputs{}, err
 	}
-	built.Runs.Tools = filepath.Join(repo, ".nvkr", "native-tools", "runs", cfg.AttemptPrefix)
+	built.Runs.Tools = toolsRun
 	return built, nil
 }
 
@@ -225,7 +227,14 @@ func builtInputs(repo, attempt string) BuiltInputs {
 // sourcegit owner narrows its own Git children to fetch-only credentials; this
 // does not isolate every launcher subprocess from the launcher environment.
 // Deployment uses a separate environment without ambient source credentials.
-func localBuildEnvironment() ([]string, error) {
+func localBuildEnvironment(ctx context.Context) ([]string, error) {
+	return localBuildEnvironmentFor(ctx, runtime.GOOS)
+}
+
+func localBuildEnvironmentFor(ctx context.Context, platform string) ([]string, error) {
+	if err := requireContext(ctx); err != nil {
+		return nil, nvkrerr.Wrap(nvkrerr.CodeTimeout, err, "local build environment")
+	}
 	redirects, err := sourcegit.LocalRedirectEnvironment(os.Environ())
 	if err != nil {
 		return nil, err
@@ -238,12 +247,51 @@ func localBuildEnvironment() ([]string, error) {
 			env = SetEnv(env, map[string]string{key: value})
 		}
 	}
-	return append(env, redirects...), nil
+	env = append(env, redirects...)
+	if platform != "darwin" {
+		return env, nil
+	}
+	// Docker owns context selection. Inspect with its developer selectors, then
+	// bind only the admitted local endpoint to build children. Deployment keeps
+	// the separate NativeEnvironment and Linux keeps its existing fixed socket.
+	probe := SetEnv(env, map[string]string{"DOCKER_HOST": ""})
+	for _, key := range []string{"DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG"} {
+		if value, ok := os.LookupEnv(key); ok {
+			probe = SetEnv(probe, map[string]string{key: value})
+		}
+	}
+	bounded, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	runner := Runner{Env: probe}
+	selected, err := runner.Capture(bounded, []string{"docker", "context", "show"}, "build-docker-context", 0)
+	if err == nil && strings.TrimSpace(string(selected)) == "" {
+		err = errors.New("no Docker context selected")
+	}
+	var endpoint []byte
+	if err == nil {
+		endpoint, err = runner.Capture(bounded, []string{"docker", "context", "inspect", "--format", "{{.Endpoints.docker.Host}}", "--", strings.TrimSpace(string(selected))}, "build-docker-endpoint", 0)
+	}
+	if err != nil {
+		if bounded.Err() != nil {
+			return nil, nvkrerr.Wrap(nvkrerr.CodeTimeout, errors.Join(err, bounded.Err()), "inspect local Docker endpoint")
+		}
+		return nil, nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "inspect local Docker endpoint")
+	}
+	host := strings.TrimSpace(string(endpoint))
+	parsed, err := url.Parse(host)
+	if err != nil || parsed.Scheme != "unix" || parsed.Host != "" || parsed.User != nil || parsed.Opaque != "" ||
+		!filepath.IsAbs(parsed.Path) || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" {
+		return nil, nvkrerr.New(nvkrerr.CodeEngineCapability, "native Mac builds require a Docker context with a local Unix socket")
+	}
+	return SetEnv(env, map[string]string{"DOCKER_HOST": host}), nil
 }
 
 func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg BuildConfig) (result error) {
-	ctx, cancel := context.WithTimeout(ctx, 6*time.Hour)
-	defer cancel()
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 6*time.Hour)
+		defer cancel()
+	}
 	boundary := beginProgress(runner.Progress, "artifacts", LaneStarted, LaneFinished, LaneFailed)
 	defer func() { boundary.finish(result) }()
 	if runner.Progress != nil {
@@ -256,6 +304,7 @@ func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg 
 			return err
 		}
 	}
+	plan, planErr := factory.LoadPlanContext(ctx, filepath.Join(cfg.Repository, ".nvkr/laptop-bootstrap", cfg.AttemptPrefix, "selected-plan.json"))
 	if cfg.QualificationPolicy != "" {
 		policy, err := lifecycle.LoadLocalQualificationPolicy(ctx, cfg.QualificationPolicy)
 		if err != nil {
@@ -264,9 +313,8 @@ func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg 
 		if policy.Platform != "linux/arm64" {
 			return nvkrerr.New(nvkrerr.CodeEngineCapability, "demo qualification policy requires linux/arm64")
 		}
-		plan, err := factory.LoadPlanContext(ctx, filepath.Join(cfg.Repository, ".nvkr/laptop-bootstrap", cfg.AttemptPrefix, "selected-plan.json"))
-		if err != nil {
-			return err
+		if planErr != nil {
+			return planErr
 		}
 		if err := policy.RequirePlan(plan); err != nil {
 			return err
@@ -293,7 +341,8 @@ func buildLocalArtifacts(ctx context.Context, runner Runner, script string, cfg 
 	if !filepath.IsAbs(args[0]) {
 		args[0] = filepath.Join(cfg.Repository, args[0])
 	}
-	return runner.Run(ctx, args, "build-all", 6*time.Hour)
+	reportBuildPlan(runner.Progress, plan, cfg.AttemptPrefix, "artifacts")
+	return runner.Run(ctx, args, "build-all", 0)
 }
 
 func buildSelectionFlags(cfg BuildConfig) ([]string, error) {
@@ -301,7 +350,7 @@ func buildSelectionFlags(cfg BuildConfig) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, _, err := LocalArtifactInputsFor(cfg.Network, cfg.Conformance); err != nil {
+	if _, _, err := LocalArtifactInputsFor(cfg.Network, cfg.Conformance, "linux"); err != nil {
 		return nil, err
 	}
 	if cfg.Conformance {
@@ -327,12 +376,13 @@ func buildNetworkFlags(network string) ([]string, error) {
 // artifact workflow. Guest deployment keeps its shared native KVM/HVF owner.
 // The TCG inputs remain explicit diagnostics; KVM never falls back to them.
 func LocalArtifactInputs(network string) (definition, environment string, err error) {
-	return LocalArtifactInputsFor(network, false)
+	return LocalArtifactInputsFor(network, false, "linux")
 }
 
-// LocalArtifactInputsFor adds version-matched diagnostic tools to the SAME Run
-// only when explicitly requested; ordinary demo selections stay unchanged.
-func LocalArtifactInputsFor(network string, conformance bool) (definition, environment string, err error) {
+// LocalArtifactInputsFor selects the shared product Definition and the host
+// Environment. Conformance adds version-matched diagnostic tools to the SAME Run.
+// Host architecture and execution capabilities remain admitted by the build owner.
+func LocalArtifactInputsFor(network string, conformance bool, hostOS string) (definition, environment string, err error) {
 	mode, err := normalizeNetwork(network)
 	if err != nil {
 		return "", "", err
@@ -347,7 +397,15 @@ func LocalArtifactInputsFor(network string, conformance bool) (definition, envir
 		}
 		definition = strings.TrimSuffix(definition, ".json") + "-conformance.json"
 	}
-	return definition, "inputs/environments/local-arm64-kvm.json", nil
+	switch hostOS {
+	case "linux":
+		environment = "inputs/environments/local-arm64-kvm.json"
+	case "darwin":
+		environment = "inputs/environments/local-native-mac.json"
+	default:
+		return "", "", nvkrerr.New(nvkrerr.CodeEngineCapability, "local demo input selection does not support host OS %q", hostOS)
+	}
+	return definition, environment, nil
 }
 
 func preparedBuildInvocation(cfg BuildConfig) ([]string, error) {
@@ -381,7 +439,7 @@ func preparedBuildInvocation(cfg BuildConfig) ([]string, error) {
 		return args, nil
 	}
 	definition := args[4]
-	authored, environment, err := LocalArtifactInputsFor(cfg.Network, cfg.Conformance)
+	authored, environment, err := LocalArtifactInputsFor(cfg.Network, cfg.Conformance, "linux")
 	if err != nil {
 		return nil, err
 	}
@@ -441,5 +499,5 @@ func prepareLocalArtifacts(ctx context.Context, runner Runner, script string, cf
 		return err
 	}
 	args := append([]string{"bash", script, "--prepare-only"}, flags...)
-	return runner.Run(ctx, append(args, cfg.AttemptPrefix, strconv.Itoa(cfg.Jobs), "all"), "build-prepare", 6*time.Hour)
+	return runner.Run(ctx, append(args, cfg.AttemptPrefix, strconv.Itoa(cfg.Jobs), "all"), "build-prepare", 0)
 }

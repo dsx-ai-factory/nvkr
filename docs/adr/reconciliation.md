@@ -44,27 +44,15 @@ mount for the non-root producer. The declared export returns through the bounded
 collection. Controlled tests and a targeted native probe are distinct from the complete fresh NVKE acceptance
 run; the earlier UID-mismatched bind-mount failure produced no accepted OS image.
 
-Each preparation staging operation now has an independent five-minute allowance; helper start, explicit wait,
-diagnostics and removal each retain their two-minute RPC allowance, all bounded by any earlier original
-caller deadline or cancellation. This permits longer aggregate staging than the former five-minute clock;
-it does not manufacture an admitted node budget. Controlled-clock regressions cover create/copy and
-start/wait composition, operation limits, earlier caller deadlines and cancellation, late nominal success,
-strict helper exit status, no later execution after failure, and joined cleanup without retries. Measured
-held-archive sizes and operation allowances are descriptive transport diagnostics, not authority.
-In the failed Linux ARM64 attempt at `b205340c`, the helper
-exited zero but Docker reported completion about 85 seconds later; staging had left only 17 seconds of the
-former shared budget. Historical host telemetry recorded substantial I/O pressure during that interval.
-The subsequent `15a2accd` attempt also failed: a roughly forty-second start response left only eighty
-seconds for delayed wait observation in the shared two-minute completion budget. Independent RPC budgets
-address that completion-accounting defect. The original Ubuntu `faa6c0bf` invocation subsequently failed
-naturally before helper start: creation took about 128 seconds and authenticated copying began with only
-140.520 seconds left on the shared staging clock. Its carrier byte size and first propagated error were
-not retained and cannot be reconstructed from the cleaned snapshots. Independent staging allowances
-address that shared-clock starvation; the causal batch-error regression preserves an initiating timeout
-instead of choosing a lexically earlier canceled sibling with the same code. Neither change has been
-exercised in another full transport or demo run. The underlying creation/copy latency remains unverified;
-these changes do not establish a particular writer or daemon lock, remove storage contention, or prove a
-complete fresh NVIDIA OVN demo or conformance run.
+BuildKit preparation and export inherit the caller's work deadline and cancellation. If the caller has
+no deadline, each transport operation receives a single twenty-minute fallback budget, shared across
+its staging or export steps. No shorter per-step limit replaces an explicit caller budget. Failure
+diagnostics and owned cleanup remain independently bounded. Completion requires the actual helper exit;
+there is no progress-only polling subprocess or goroutine. Controlled-clock regressions cover inherited
+and fallback deadlines, slow work, cancellation, late nominal success and strict exit status. Measured
+archive sizes and caller time remaining are diagnostics, not authority. The causal batch-error regression
+preserves the initiating failure before canceling siblings. These contracts do not establish a complete
+fresh NVIDIA OVN demo or conformance run.
 
 Local unencrypted direct-Packer execution retains an exact held QCOW2, observes its bytes and commits the
 disk with its immutable Run record. Ordinary local disk publication remains closed. The explicit native
@@ -176,6 +164,18 @@ Installed-SDK CGO tools and a real HVF guest have run separately. Apple system u
 root-owned protected paths with matching bundle bytes; other Mac tools use private snapshots. Actual native
 utility execution and incorrect-digest rejection are tested. No system security setting changes. Hosted
 rendering rejects native bundle locators, and qualified authority boundaries remain unchanged.
+The native installer source and CAPI version selection now comes from replayed captured tool-Run inputs, checked against the completed Plan and selected output. The producer emits the source Make value; executable and installer source bindings must agree. Packer discovery projects versions and plugin members from the shared catalog rather than a compiled version list. Contract and actual-source Make checks cover this selection; no complete new tool-Run or runtime acceptance is inferred.
+Temporal Helm image tags now project from each admitted output's resolved prebuilt declaration while
+retaining its observed child digest. The deployment and nightly consumers use that same projection.
+Compiler/save/reload, changed-tag and refusal contracts cover this descriptive selection; no fresh
+payload build or runtime acceptance is established.
+Prepared image carriers move from asset staging into the attempt's simulator serving directory through
+the existing descriptor-relative no-replace publisher. Both fresh private directories share the attempt
+filesystem; each runtime image path follows its completed move, including partial failure. The host-only
+provider stays outside the serving directory, and guest tools/CA retain their required source copies.
+Archive/HTTP fixtures cover inode and byte preservation, occupied/linked input refusal, partial paths and
+provider exclusion. Original Runs are untouched; no live time or space improvement is established.
+The native Mac TPM adapter uses the supported simulator QEMU override and installed QEMU/swtpm, preserving the inherited network descriptor and process group. Earlier interface and paused-device observations have no recorded attempt/source bindings here and are not acceptance evidence. Guest TPM discovery, site attestation and complete native runtime acceptance require an identified Run.
 
 ## External test output and local diagnostic boundary
 
@@ -205,9 +205,16 @@ matching suite/tool outputs from the same fresh artifact Run.
 The shared native startup imports the ordinary named OVN image under its exact native digest and
 projects matching chart values after package installation and before agent startup;
 the OS package's independently built image is not treated as the named output.
-Embedded JSON chart values separate closing braces to preserve the pinned NVKE
-release CRDs' template-delimiter admission rule; projected control-plane and worker
-templates exercise that rule and the standard Go renderer in contract tests.
+The shared site startup imports each selected image through containerd's local manifest importer, preserving its repository alias and checking that exact reference through CRI before bootstrap. CRI owns the managed label: pre-setting it skips the config-ID alias required by image-volume mounts. Runtime evidence is limited to the identified Runs in [Local ARM64 demo presentation](#local-arm64-demo-presentation).
+The native adapter projects Kubernetes version from the selected NVKE installer's shipped site-spec template, rechecking those verified payload bytes at execution boundaries. Site packages, bootstrap, tenant requests, readiness and optional conformance share that source-selected version; current authored conformance inputs select 1.36.3.
+Tenant waiting now refreshes the exact owned NVKE tenant and worker topology through the existing
+consumer owner before each kubeconfig/node observation. It publishes only the existing typed conditions
+and refuses NVKE's exact `Provisioning=False` / `Provisioned=False` failure predicate; missing or Unknown
+conditions do not prove failure. API progress advances only after a successful decoded node query, and
+controller Provisioned does not replace the separate node, cloud-init, DNS or workload gates. Owned
+subprocess fixtures cover condition transitions, transient reads, replaced identity, stage ordering and
+retained resources. These contracts do not establish fresh runtime acceptance of this change.
+Native tenants use NVKE's generic CAPI NicoCluster/NicoMachineTemplate input with source-generated join-token bootstrap and retained mTLS. NVKR supplies package installation and exact local image imports as pre-kubeadm commands; NVKE owns credentials and its final agent restart. Because commit-string agent versions can bypass the controller's semver-gated cloud-init check, the adapter independently observes each fresh Ready node's actual host cloud-init status without wait mode through a temporary Pod with a recursively read-only host mount. The shared conformance invocation selects an attempt-owned scratch directory on its output filesystem, retaining the factory's disk-backing/headroom checks. Recorded runtime evidence and its consumer/artifact revisions appear in [Local ARM64 demo presentation](#local-arm64-demo-presentation). The old native Release-template rewriting and compiled template-hash lists remain removed.
 The site-create request carries the source-selected MachineImage boot script,
 rendered with the existing NVKE disk-policy template and current local disk URL.
 Its admitted iPXE selection also supplies DHCP address mode to both site readiness
@@ -898,13 +905,18 @@ payload, then verifies it before commit. Host registry fixtures cover both suppo
 unpinned references, wrong platforms and insufficient payload bounds without output. Focused race checks
 pass. These use small opaque disk fixtures; production-sized disk capacity and external-registry acceptance
 remain unexercised. The caller must admit scratch/destination capacity before invoking this transport.
-The lifecycle disk-set owner now uses this capture through the same all-output checking operation
-as diagnostic payload checks. It matches each held disk to its exact named Run slot and checks
-transport/observation consistency before retaining it. Refusal closes captured handles, including
-a completed capture whose producer bytes differ from the original Run. Focused lifecycle and race
-tests cover that mismatch, late capture errors, cancellation, named ownership and source mutation
-after capture. This disk set alone is not a complete held publication or authenticated source receipt
-and cannot authorize signing.
+The lifecycle disk-set capture retains frozen output mappings and original outer-publication membership,
+matches each held disk to its exact named Run slot, and checks transport/observation consistency.
+Factory's ordinary publication capture owns ordinary producer verification and package reproduction once;
+the complete capture still compares every held ordinary output and the complete named set to the original Run.
+A captured-input mixed fixture restores ordinary producer/package paths only when real factory assembly
+starts; the prior lifecycle producer/package observation would reject that fixture. Outer-publication
+substitution, changed producers, missing packages and changed Run subjects still fail closed. No wall-clock
+improvement is established.
+Refusal closes captured handles, including a completed capture whose producer bytes differ from the original
+Run. Focused lifecycle and race tests cover that mismatch, late capture errors, cancellation, named ownership
+and source mutation after capture. This disk set alone is not a complete held publication or authenticated
+source receipt and cannot authorize signing.
 Factory now provides ordinary-output capture through the existing publication assembly and
 held-byte delivery owner. It derives every non-disk slot from the original Plan, rechecks producer
 payloads and required inventories, and binds the original Plan identity without a hosted invocation.
@@ -1120,11 +1132,11 @@ interruption demonstrations remain M4-D.
 | 15 Air gap | No mirror implementation or CLI retained; supported offline signature primitives remain | Air-gap product lifecycle and zero-egress acceptance require a new admitted design |
 | 16 Release gates | Inventory/ReleaseSet/PromotionPolicy documents, exact member completeness and signed diagnostics; M3-A Run/policy artifact checks, generated exact-attempt handoff and held complete-set receipts; M3-B isolated native tool smoke and authenticated complete-set receipts; M3-C policy-only orchestration, v2 qualification evidence, receipt-only publisher, complete pre-sign gates and failure diagnostics; M4-C release-manifest schema and receipt-gated issuance | Real candidate native smoke, hosted worker/qualifier identities, qualification signing/attachment and independent M3 consumer acceptance remain unexercised. M4 manifest issuance is invoked by `run qualify --issue-manifest` and the generated production qualifier, with local contract coverage only; hosted OIDC attestation, registry read-back and independent consumer verification remain unexercised. Qualified clearance, release-specific trusted time, M4 tags and revocation remain unimplemented |
 | 17 Public lifecycle | Compiler-owned output joins, immutable attempts, failure records, process-owned snapshots, exact observations, deterministic disk retention, diagnostic output pulling, bounded descriptive progress, typed result browsers for interactive commands, read-only stored Run inspection and SDK/CLI delegation; Linux M3-A Run/policy CLI, captured-input replay and retained file diagnostic orchestration; M3-C policy-only qualification orchestration with generated-policy admission | No general resume protocol or authority restored by serialization; actual M3 candidate/provider acceptance remains unexercised. Strict local publication, private-passphrase/strict FDE publication and qualified lifecycle remain unavailable. Fresh live dashboard Run, native Linux race acceptance and human usability validation remain unexercised |
-| 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub producer generation, exact optional publication-branch allowlist, separate full-development branch workflow, mode-specific concurrency and artifact retention, scoped credentials and unconditional finalization; inline named jobs with ancestor-preserving dependency reduction and bounded exact-result collectors with diagnostic hosted evidence; at most two optional summaries per attempt with operation details in logs; explicit native ARC disk grouping, raw build-only disk transport and optional native hosted platform maps (including separate CLI output slots); authenticated independent qualification invocation/source-event binding; generated fixed native worker and qualifier with separate credentials; separately authored downstream NVKE E2E adapter configured only for native ARM64 ARC, outside product execution | Production hosted qualification, retry qualification of the qualifier itself and independent-consumer acceptance remain unproved. The [development record](#feature-branch-pipeline-development) documents successful qualification of the earlier main-source candidate; beta.6 validation remains pending. The downstream adapter trusts privileged pinned NVKE code and yields unsigned diagnostics; its first scheduled attempt failed before runtime and no successful combined cycle is recorded. Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate |
+| 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub producer generation, exact optional publication-branch allowlist, separate full-development branch workflow, mode-specific concurrency and artifact retention, scoped credentials and unconditional finalization; inline named jobs with ancestor-preserving dependency reduction and bounded exact-result collectors with diagnostic hosted evidence; at most two optional summaries per attempt with operation details in logs; explicit native ARC disk grouping, raw build-only disk transport and optional native hosted platform maps (including separate CLI output slots); authenticated independent qualification invocation/source-event binding; generated fixed native worker and qualifier with separate credentials; separately authored downstream NVKE E2E adapter configured only for native ARM64 ARC, outside product execution | Production hosted qualification, retry qualification of the qualifier itself and independent-consumer acceptance remain unproved. The [development record](#feature-branch-pipeline-development) documents successful qualification of the earlier main-source candidate; hosted validation of the current v0.22.0 selection remains pending. The downstream adapter trusts privileged pinned NVKE code and yields unsigned diagnostics; its first scheduled attempt failed before runtime and no successful combined cycle is recorded. Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate |
 | 19 Downstream boundary | Exact required/observed output membership, component evidence joins and noncircular release-content identity | Downstream owners supply topology, placement, provisioning and runtime qualification; historical topology records grant no current authority |
 | 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects with consistent named-output aliases and independent evidence, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation, selected output payload-closure retrieval and per-output assembly/finalization; consumer held-closure export bound to exact-input receipts; candidate M2 hosted signing/publication completed; public-bootstrap FDE build-provenance publication supported; development attempt namespaces and scoped GHCR cleanup; hosted GHCR package privacy admission using metadata-derived destination references and an exact-root-bound push | Package admission has local contracts, not a hosted private-publication or public-source access proof; independent grants, historical provider payloads and future visibility changes remain operational obligations. Hosted GHCR legacy layouts without the metadata contract fail closed. Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and object-store/CDN transports remain unproved or unavailable; registration is deferred |
 | 21 Generation | Exact recorded input selection, independent fixed production/development layouts, manifest-owned semantic action interfaces and Plan-derived invocation data with expanded-step validation, output-local ordinary job membership with addition/removal and failure-accounting contracts, stable result-collector membership and exact retirement of legacy producer children, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows; separately owned qualification pair and runtime policy drift admission; optional named production namespaces independently own their manifest, lock, paths and retirement; opted-in named runtime Plans compile current source pins within the complete reviewed workflow/action and Environment contract and distribute frozen data through same-Run helpers; provider artifacts contain JSON locators while private CI carriers use a digest-bound GHCR transport with package visibility and linked-repository admission | Producer generation emits manual-dispatch workflows, not cron; optional qualification generation emits its fixed event/call pair. Authored downstream scheduling has separate ownership. Combining development with a nonempty named bundle is rejected before catalog resolution or generated-output work. The inline layout has guarded dispatch admission and isolated exact-result/failure diagnostics; complete production execution, automatic PR publication and scheduled/private-source service acceptance remain unexercised. The runtime Plan handoff and private CI carrier transport have local contracts; a hosted private-carrier producer-to-E2E cycle remains unexercised. Public-repository execution requires an independently admitted storage credential/access policy; public-linked storage fails closed. Historical Actions payloads and caches are not migrated by this implementation. The workflow `catalog update-ci` renders (installed as `catalog-refresh.yaml`) opens PRs with a GitHub App installation token minted in its `pull-request` job by the SHA-pinned `actions/create-github-app-token` action for this repository only, with contents, pull requests and workflows write, and revoked by the action when the job ends; the workflow token stays read-only (shape, action inputs, bot sign-off identity and step behavior contract-tested with a stubbed `gh`; a manual dispatch on 2026-10-16 failed at the earlier hand-rolled token step with an unattributed 404). No scheduled run, token exchange, push, PR, automatically started PR check, close or branch deletion has been exercised, so M4 acceptance item 1 is implemented but not demonstrated and M4 is not claimed. The review commit is created through the GitHub API with a DCO trailer for the App's bot user (contract-tested; GitHub signing and attribution not verified). Pin-only fixtures assert the production, development and qualification workflows stay identical; a topology, label, interface or action-pin change that regenerates a closure workflow is published in the same PR. One enrolled policy is supported until generated bundle roots are per-Definition. A branch that already holds the candidate is left alone, a closed unmerged PR whose head commit carries the same candidate stays closed even after its branch is deleted, fork PRs from a branch with the same name are ignored, a lookup page that could be truncated fails the step, and an unchanged Definition closes its stale PR and deletes its branch (contract-tested with a stubbed `gh` that applies each call's real filter). The ruleset, last-push approval and code-owner settings that protect the bot branch are repository settings that this workflow does not enforce; the release owner or an administrator must validate them before scheduled writes are relied on. The policy names the dependent development Run, qualification pair and additional named Runs (the two nightly bundles, checked and regenerated through the runtime-Plan owner because they compile current pins at dispatch); refresh admits each additional Run's catalogs before compiling it, and checks, regenerates and transports every member through its owner on an exact allowlist, refuses an unnamed committed bundle and a generator stamp that differs from the committed Plans (contract-tested with real local Git for the production and development bundles, and through the real qualification owner on a fixture with synthetic trust pins that contacts no GHCR or cosign; deployment-image selection is outside the closure and must be coordinated by hand before a moving release), and `make workflows-check` compares the installed workflow with `catalog update-ci` output (not exercised in the hosted gate). Producer matrices and general callable workflows remain deferred. Qualification generation does not make both owner writes one atomic transaction; lock and generated files are separate transactions; complete crash matrix remains |
-| 22 Pins | Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets including NVKE local-chart version omission, explicit reviewed chart names and descriptive artifact mappings, same-release maintenance groups, whole-producer overlays, exact toolchain substitutions and authored embedded-version metadata authentication | Pin-set loading needs pinned Git access. Curated graph/SBOM edges remain deferred. Optional metadata consistency is not disk-content inspection, external acquisition or production acceptance |
+| 22 Pins | Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets including NVKE beta local-chart version omission and descriptive artifact mappings, same-release maintenance groups, whole-producer overlays, exact toolchain substitutions and authored embedded-version metadata authentication | Pin-set loading needs pinned Git access. Curated graph/SBOM edges remain deferred. Optional metadata consistency is not disk-content inspection, external acquisition or production acceptance |
 | 23 Artifact test interfaces | Proposed ADR merged in PR #139; Go Plan helper merged in #156; #138 replaces its Python diagnostic with Go factory/source/execution owners; separate IV1 upstream bootstrap no-build interface candidate described in the [guide](../artifact-testing.md#bootstrap-e2e-interface-candidate-iv1-first-slice), without an NVKR bootstrap execution adapter | [Immutable interface source](https://github.com/dsx-ai-factory/nvke/commit/f33b7afb55d421958540589ca03d206531bfa16b) and its [Linux CLI job](https://github.com/dsx-ai-factory/nvke/actions/runs/39347477494/job/118383877388) record a passing bootstrap contract package within a failed aggregate run, not real bootstrap execution. No immutable real-bootstrap Run exists; the [guide](../artifact-testing.md#bootstrap-e2e-interface-candidate-iv1-first-slice) pins the reviewed follow-up source and local-check limits. [Implementation guide](../artifact-testing.md) separates the Go macOS ARM64/Docker fresh-build proof from historical Python native results. Upstream adoption, authenticated output membership, exhaustive suite acceptance, maintained-pin adoption, kind, CI and CAPD/CAPNICo acceptance remain outstanding; no conformance or qualification authority |
 | 24 Validator catalog | Provisional CLI discovery and local-plan profiles: strict bounded catalog/profile loading, deterministic discovery, registered `nvke-cli/v1`, complete local-plan admission and frozen dispatch through factory/sourcegit/pipeline | Discovery, refusal, snapshot edits, both suite/architecture bindings and mocked dispatch are contract-tested; [guide](../artifact-testing.md#provisional-validator-catalog) distinguishes this from actual upstream execution. Native AMD64/ARM64 catalog runtime acceptance, legacy-command migration, new-format published adapters, controller/chart and second-repository adoption remain outstanding. Existing published authentication/capture semantics, unknown exhaustive completeness, unauthenticated artifact membership and no qualification authority are preserved |
 
@@ -1144,15 +1156,20 @@ The separate fork at `8af51273d52dfa07454435d18d37230e582d797a` uses
 [Dockerfile.ubuntu.nv](https://github.com/dsx-ai-factory/ovn-kubernetes/blob/8af51273d52dfa07454435d18d37230e582d797a/dist/images/Dockerfile.ubuntu.nv),
 which hardcodes Go 1.26.9 at `sha256:37cfcca63222ec499bec5e8ad7aad52dbf7529db36d5812b8eae2f0621aa92d6`
 and ignores `BUILDER_IMAGE`; its unused argument is removed, not credited with a compiler repair.
-This updates a standard builder input, not the NVKE beta.6, SPIRE or harness source selections. A complete
+This builder correction does not itself change the NVKE, SPIRE or harness source selections. A complete
 hosted build with the replacement remains pending.
 
-The current candidate selects NVKE `v0.22.0` at
-`400c24fb6465b042be883d6b62472528520d6291` through `catalog pin --tag` for all maintained
-NVKE source roles, including the three SPIRE package roles. The nightly harness retains
-`b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8` because the product tag omits its candidate entrypoint.
-Chart versions, native demo source admission and catalog overlay bindings follow v0.22.0.
-Hosted validation of this selection is pending; the successful records below cover their recorded inputs.
+The current candidate selects stock NVKE `v0.22.0` at
+[`400c24fb6465b042be883d6b62472528520d6291`](https://github.com/dsx-ai-factory/nvke/commit/400c24fb6465b042be883d6b62472528520d6291)
+through `catalog pin --tag` for all maintained NVKE product-build source roles,
+including SPIRE packaging. Chart versions, native demo source admission and catalog
+overlay bindings follow that same release. The two independent nightly
+test-harness selections retain `b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8` because the
+release omits their reviewed candidate entrypoint; they are not product-build pins.
+The Packer toolchain lock's `validatedNVKE` record remains historical validation of
+`726f76944404e1106626b8333d3576bdf67b575b`, not evidence for the current release.
+Hosted validation and a complete fresh local E2E/conformance result for v0.22.0
+remain unrecorded here; the successful records below retain their original source scope.
 
 At NVKR `36dd99fe3aa0c7dc6cce72b272da93d6ab8ba355`,
 [development Run 39343181108, attempt 1](https://github.com/dsx-ai-factory/nvkr/actions/runs/39343181108/attempts/1)
@@ -1276,7 +1293,7 @@ selects bounded provider-authenticated metadata candidates and rechecks the full
 The retry regression suite and complete repository gate passed in [Merge Gate 39327338735](https://github.com/dsx-ai-factory/nvkr/actions/runs/39327338735) at `92ce9fc65182a965f94ffa8a527828a971e9fc45`. Local test execution was skipped at the user's request. Live partial retry and independent qualification remain pending. Signed-development helpers/carriers and all final Run records retain
 seven days; disk diagnostics retain one day. Full signed development is non-canceling.
 
-The development cleanup module inventories only private packages in that reserved attempt namespace.
+The development cleanup module inventories only internal packages in that reserved attempt namespace.
 It authenticates account, package and exact completed workflow-attempt metadata; package, version and
 original and latest attempt timestamps must all be at least 24 hours old. It rechecks before whole-package deletion, fails
 closed on unknown/ambiguous/API state, and records confirmed partial progress without retrying ambiguous
@@ -1286,7 +1303,8 @@ older unscoped packages remain outside this protocol.
 
 Definition/factory contracts cover admission, identity, complete M2 graph retention, exact rendering,
 credential/environment scope, retention, runtime namespace projection and same-run retry admission.
-Cleanup API fixtures cover eligibility, authentication errors, pagination, races and mutation failures;
+Cleanup API fixtures cover internal visibility, rejection of private/public/missing/empty/unknown visibility at inventory
+and deletion recheck, eligibility, authentication errors, pagination, races and mutation failures;
 workflow contracts enforce default-branch scheduling and secret scope. The dispatch helper retains its
 clean/current pushed-commit preflight. These tests do not establish live GitHub execution, actual credential
 scope, ephemeral runner isolation, successful keyless services, GHCR deletion or physical storage reclaim.
@@ -1312,8 +1330,8 @@ finalization retains its one-disk limit. The supplied Environments generate raw-
 M2 membership, and committed workflow bundles retain their existing selections.
 `pkg/nvkr/lifecycle/nvke_ubuntu24_test.go` covers compilation, exact closure/pins, changed
 Build identity, native KVM admission and deterministic generation. Script fixtures cover
-selection, frozen-input routing and retention of the shared release catalog’s exact
-`capture-schema.patch` bytes. The input-layout migration preserves the agent preparation
+selection and frozen-input routing through the shared release catalog. Disk producers
+retain stock NVKE capture source; the material owner accepts its original acquisition schema. The input-layout migration preserves the agent preparation
 and build recipe used in the package exercise below. This is contract evidence: no Ubuntu 24 KVM bake,
 guest boot, full acquired-payload ABI inspection, agent-start smoke, release publication
 or qualification is established by these tests. ADR-10/11/18/22 own the unchanged contracts.
@@ -1452,7 +1470,98 @@ its source-owned static Make build in the same catalog producer.
 The standard `run` and `e2e`
 entry points now select that same three-VM deployment owner; the old Kind-site path is no longer their
 production action. Build prepares native tools through NVKR and selects the complete local runtime image
-closure. The former detached retention behavior is not provided by this foreground path.
+closure. Default native `run` and `e2e` now launch the fixed retained service owner: successful
+checks return to the shell while the native resource stack stays held until explicit
+`cleanup --session`. Presenter cancellation stops work without requesting deletion.
+Interactive authentication keeps terminal context through startup privilege
+checks. An unattended owner starts in an independent process session; both paths
+acknowledge the authenticated held-state handoff before successful return. Linux binds its control to SO_PEERPIDFD;
+macOS binds it to the originally captured process audit token and a kqueue exit
+observation, requiring CGO/public SDK support. The generic Darwin peer API remains
+refused. Controlled launcher/native-scope tests exercise retention and joined
+cleanup; a fresh NVKE VM/conformance run of this lifecycle change is not yet recorded.
+Native presentation now uses individual guest/preparation/bootstrap/deployment
+boundaries instead of the legacy Kind-site checklist. Requested conformance has
+its own phase and failed-suite retention does not imply successful
+cleanup. Native tenant presentation joins the existing CAPI role/instance mapping
+to the private NICo inventory for both ordinary and conformance topologies, and
+uses the existing held-path console metadata reader for each exact instance.
+Native Linux reuses its admitted libvirt backend and existing held-domain
+observer. Mac process state remains unobserved rather than inferred from provider
+readiness. Generic CAPI observations use exact Cluster/Machine owner UID joins;
+legacy host-id/spec-label checks remain unchanged. Controlled
+subprocess and dashboard tests cover the model; a live display of this revision
+and complete Mac/Linux runtime acceptance remain unverified.
+
+The downstream Go owner exposes a callback-scoped native site and independently
+created/deleted tenants through the same native engine. The provisional
+`pkg/nvkr/demo.WithSite` facade and descriptive/opaque type aliases make that
+owner importable by separate NVKE or customer modules without another lifecycle
+or deployment engine. Independent external-module compile and nil/canceled/zero-handle
+admission coverage establish importability, not real VM acceptance. Existing matching
+`nvkr` and `nvke-demo` helpers and native host controls are still required. Go
+tests can reuse one site for sequential tenants and run conformance explicitly
+against a still-owned tenant, preserving each suite's original output in a fresh
+directory. Opaque handles expire at scope exit; cancellation joins active calls,
+and an unjoined outcome cannot be swallowed by a callback or lost during panic
+or test fatal exit. Controlled subprocess tests cover sequential tenants, failed
+validation retention, natural deletion and those ownership boundaries. These
+contracts do not establish a real site-reuse run or complete Mac/Linux acceptance.
+The same downstream owner accepts one or two tenant workers independently of
+suite selection through `run.tenantWorkers` or `Config.TenantWorkers`. Omission
+retains the ordinary one-worker or conformance two-worker default; conformance
+rejects an explicit one-worker selection before work. Controlled tests cover
+count propagation through capacity, tenant requests, readiness/cloud-init,
+inventory/cleanup and retained-child transport without changing artifact or
+source selection. Smaller-profile runtime acceptance remains unverified.
+
+A separate fixed site-identity helper now has one deep `pkg/nvkr/siteidentity`
+owner and a thin private Linux ARM64 build target. It reuses the upstream
+generated NodeAgent client and GoSPIFFE/gRPC, admits its bounded output before
+remote work, and distinguishes not-started, joined failure and unknown remote
+completion. Mutation now delegates to NVKE v0.22.0's `ReconfigureSpireAgent` and
+`GetSpireAgentStatus`; the duplicated guest shell rewrite and renderer producer
+are removed. Failed outcomes and missing responses remain unknown; client
+termination does not prove manager-job completion. The upstream Workload API
+picker retains the exact caller identity across updates.
+Fresh peer metadata requires operation-fresh issuance and remaining
+validity as well as unchanged boot/identity and a changed serial. Helper and
+native caller revalidate those descriptions with one shared predicate; endpoint
+authentication, the expected boot identity and source-owned TPM policy remain
+separate requirements. It issues no
+bootstrap-stop or release receipt. The native owner requires the shared
+helper startup member before guest launch or native network configuration and
+delegates captured completed-Run input replay to the lifecycle owner. All native demo
+output selection now uses that owner rather than a second Run decoder and membership
+validator. Artifact preparation reuses one descriptive Plan/Run per distinct selected
+Run within the operation, including installer and identity-source checks; tool
+preparation and conformance also reuse their inspected descriptions for sibling outputs.
+Every selected Run must retain its original captured compiler inputs and Plan; uncaptured,
+noncanonical, nonlocal and unfinished-commit records are refused. Disk selection and
+subsequent asset preparation retain separate replay boundaries. The owner checks every
+frozen Run binding; delivery payload acceptance remains separate. Controlled captured-input,
+selection and payload-substitution fixtures cover these boundaries, not a fresh native
+build/deployment. Source host-policy decoding is local and uses the existing
+strict YAML admission; CRD schema validation remains at the server create.
+After deployment and before temporary bootstrap teardown, it imports
+the original host policy once without replacement, using the caller's work deadline
+for API discovery, schema validation and creation. Private identity diagnostics
+retain the underlying command failure before the public error is redacted.
+It checks the controller/CSI context,
+permanent registration, derived TPM allowlist, new TPM agent and renewed
+same-boot host certificate, then issues its private completion receipt. Joined
+site-stage failures retain their resources under the independent owner while the
+foreground command returns; unknown completion keeps dependencies unsafe to tear down. The site-stage/retention presentation
+leaves tenant and conformance checks pending. Private Linux ARM64 Run
+`site-startup-tools-arm64-acceptance-20261021-02` built and verified the shared
+three-member output from public source pins for the preceding shell implementation,
+not the reduced RPC revision. The delivered helper passed an
+isolated invalid-request subprocess check; its command-owned inherited pipes
+are adopted before bounded I/O. This producer and command-boundary evidence
+does not establish an authenticated handoff through integrated startup, a fresh
+customer first run or complete current-source Mac/Linux runtime acceptance.
+The [local guide](../local-nvke-demo.md#private-site-identity-operation-helper)
+records that boundary.
 
 The Mac network owner now consumes the verified upstream vmnet helper's JSON report and holds its Unix
 datagram connection through joined guest/service cleanup. Gateway binding is observed before services
@@ -1491,8 +1600,8 @@ unsupported. Relocated image observation retains compiled Plan identity.
 use controlled OCI bytes and a descriptive, unexecuted VM; they do not prove
 a real joined bake or extend hosted, signing or qualification admission.
 
-The Go downstream consumer invokes `nvkr` for build, verification and
-extraction, and NVKE's pinned staged installer for deployment. Kind hosts
+The historical legacy Kind-site consumer invokes `nvkr` for build, verification
+and extraction, and NVKE's pinned staged installer for deployment. In that consumer, Kind hosts
 management services; CAPNICo/NICoSim provisions QCOW2 tenant VMs. Full E2E success
 requires two Ready nodes, workload/DNS checks, exact disk/artifact bindings and
 owned cleanup. The explicit `--cleanup` route retains that full acceptance
@@ -1507,7 +1616,12 @@ Live access presentation executes bounded read-only bundled kubectl API/node
 queries for the site and tenant and keeps raw responses private. Its focused
 tests do not establish real Ubuntu runtime acceptance. New retained work does
 not retroactively change the exact-revision complete recording below.
-Cobra/Viper configuration supplies descriptions, not receipts.
+The shared bootstrap/SPIRE upstream CA for new demos has a finite 3,650-day
+lifetime, matching NVKE's local E2E CA convention. The real certificate regression
+verifies trust after 48 hours and rejects expiry; it does not prove live SPIRE
+renewal or full retained runtime acceptance. Existing retained roots are unchanged,
+and automatic upstream-root renewal remains unavailable.
+Cobra flags and typed YAML configuration supply descriptions, not receipts.
 The combined build reuses bootstrap executables and the measured toolchain;
 catalog substitutions retain their own exact predecessor binding. `--jobs`
 bounds concurrent ready producer and packaging operations in the existing
@@ -1559,17 +1673,12 @@ cancellation and continued rejection of delegated configuration. Command admissi
 errors retain the failing phase without exposing arguments or source paths. These
 tests do not establish a completed Ubuntu site replay.
 
-The local demo now selects NVKE `v0.22.0` at
-`400c24fb6465b042be883d6b62472528520d6291`, including SPIRE packaging revision 4. Its adapter uses the source-owned site-spec renderer and
-deployment entrypoint with verified local chart archives and exact image references.
-The already admitted Kind configuration owns cluster networking; site-spec bootstrap
-fields are not executed. Before tenant creation, the adapter binds source-owned
-profile bytes to the live observed controller pod and creates MachineImage,
-ClusterRelease and NodePoolRelease resources for the selected plain ARM64 disk.
-On the preceding beta selection, focused resource, pod-binding, cancellation and profile tests passed, including
-targeted race checks. The actual beta CLI validated a diagnostic site spec and the
-source installer completed its dry-run with prepared chart paths. Those checks
-do not establish chart builds, cluster readiness, a completed tenant replay, or acceptance of the current v0.22.0 selection.
+The local demo now selects stock NVKE `v0.22.0` at
+`400c24fb6465b042be883d6b62472528520d6291`, including that release's public SPIRE
+packaging. The obsolete full Kind-site adapter and its typed NICo tenant-release
+workflow are removed. The maintained host workflow still uses NVKE's temporary
+Kind bootstrap. Earlier beta source-rendering and installer dry-run checks retain
+their historical scope and do not establish acceptance of the current host workflow.
 
 Maintained OS Definitions, catalog execution and Packer toolchain assembly select Docker.
 The older authored Podman Environment and its TCG Definition are removed; generic
@@ -1736,6 +1845,15 @@ cleanup failure remain distinct. Safe panes exclude raw diagnostic and private
 transport/path data. Command results are detached descriptions within progress;
 the SDK inspection DTO has no terminal snapshot method.
 
+The opt-in release browser shares the export description projection for chart versions, native image
+children, component build subjects, declared disk metadata and complete evidence memberships. Compact
+row summaries hide when they would crowd names. Command-item search includes projected kinds and fields,
+including platforms and digests; exact dependency links remain usable outside search results. Explicit
+JSON and Mermaid output retain their plain bytes in auto mode and reject explicit TUI before acquisition.
+Controlled projection, terminal simulation and loopback-registry tests cover these behaviors, including
+zero payload-layer requests and rejection of corrupt unselected metadata. These are contract fixtures;
+they establish neither external Release acceptance nor human usability validation.
+
 The authenticity verification result browser projects the owning consumer's
 detached description and labels payload integrity as unchecked. It neither
 invokes full-payload verification nor promotes authenticated metadata to payload
@@ -1772,27 +1890,106 @@ validation remain unexercised. Simulation screenshots establish presentation onl
 
 ## Local ARM64 demo presentation
 
-The local NVIDIA native KVM Definitions now select a coherent renamed NVKE source
-contract for agent, kubeadm, OS assembly, CLI, controller, provisioned provider and
-profiles at `69ef9924`. SPIRE packaging retains its explicit `726f7694` source;
-NVIDIA OVN image/chart producers retain `8af51273` / 2.4.2. The custom OVN Debian
+The local NVIDIA native KVM Definitions select stock NVKE `v0.22.0` at
+`400c24fb6465b042be883d6b62472528520d6291` for agent, kubeadm, OS assembly,
+CLI, controller, provisioned provider, profiles and SPIRE packaging. The release
+incorporates the public upstream SPIRE/TPM packaging fix and revision-4 package;
+there is no separate older SPIRE source selection. NVIDIA OVN image/chart producers
+retain `8af51273` / 2.4.2. The custom OVN Debian
 producer changes its actual package metadata and payload paths to `nvke-*` while
 retaining source-compatible virtual package aliases and bounded image import.
-Diagnostic commit version stamps do not claim a tagged agent release; the selected
-controller can still choose its source-owned legacy per-node compatibility form.
+Version stamps derive from the selected NVKE release tag and grant no NVKR Release
+authority; the selected controller retains its source-owned legacy per-node compatibility form.
 The owning catalogs inspect Debian package names and architectures before accepting
 outputs. The disk uses the renamed Packer build, artifact path and material schema.
 The 32-output demo and 38-output local conformance selections share the same deployment
-closure. These are native diagnostic input changes, with no release/nightly pin change
-or new Release authority. A fresh package/QCOW build, site/tenant runtime, conformance
-and joined cleanup still require external evidence; prior failed Runs remain failed.
+closure. The native site catalog derives its four acquired chart pins from that
+source's `deploy/nico/nvke-deploy.yaml`; source-local controller and NKTP chart
+names and versions come from their exact path-bound `Chart.yaml` bytes. An explicit accounted `chartName`
+binds a reviewed local chart rename; otherwise its name must match the release declaration. External member
+names and repositories must match their reviewed acquisition identities. Contract tests cover reviewed and
+unreviewed renames, unsafe metadata, exact path/version
+checks and unchanged external selections; they do not establish installation or fresh runtime acceptance.
+The native runtime-image variant
+keeps its separately authenticated images and binds their selection to the same NVKE
+source. Mac and Linux tools share the same NVKE source pins. Maintained release,
+native demo and nightly product-build selections use this release; the independently
+pinned nightly test harnesses retain their separate source exception. Selection grants
+no Release authority; prior failed Runs remain failed.
+
+The private Ubuntu attempt `ubuntu-9905-e2e-02` used consumer
+`990519c1a53335390ce9464c3eee3d8135076b51`, this stock NVKE source and NVIDIA
+OVN. Its recorded native result passed site/tenant readiness, per-node cloud-init
+and workload/DNS checks with one site and three tenant nodes. Original conformance
+capture completed with harness exit 0: 446 passed, zero failed or pending and
+7,133 skipped, in 7,416.042 seconds. The original JUnit SHA-256 is
+`f1a0ad57581388bdc770c0ed6a1b9cd9f96adc60f869f7194e78f7a319a5a909`;
+seven additional passing suite hooks explain its 7,586 XML testcase records.
+The frozen Plan includes the existing Hydrophone report-download patch,
+SHA-256 `d0014a0f2e39033d5a63a5938b46793e908ccf2cdc1282c8cba1cc7ffe85770b`.
+These are private diagnostic records, not published qualification evidence.
+The foreground command's exit was not captured independently. Subsequent inventory
+and the original CLI's network recovery confirmed no session VMs remaining and
+restored network controls on 2026-10-26. This result does not validate later
+consumer revisions or the startup configuration below.
+
+The later private Ubuntu deployment attempt `ubuntu-startup-01` on 2026-10-26 used consumer
+`453ec2a4fe961c37e4bcebeac793fdbe76c0443c` and reused the completed artifact/tool Runs
+`ubuntu-9905-e2e-02` from the earlier source checkout; it was not a cold artifact build of that consumer.
+Its original owner `128715751` reached `retained-ready` with one Ready site node and three Ready tenant
+nodes at Kubernetes 1.36.3, after the native node, cloud-init and workload/DNS gates. Conformance capture
+`nvkr-conformance-2646420987` completed with harness exit 0: 446 passed, zero failed or pending and 7,133
+skipped in 7,577.002 seconds. The original JUnit SHA-256 is
+`0f3a66ad97caf60347adc56d1e20a4e71fa881d6ddabc72cc100f8197bd389e0`.
+This private diagnostic uses the stock NVKE source and Hydrophone patch identified above. The foreground
+exit code was not captured independently. It does not establish a fresh Mac build or later consumer acceptance.
+
+The private Mac attempt `mac-readiness-01` at consumer
+`8e432f23a47f9934fcff7be523c942aa2742635b` used the same stock NVKE source,
+TCG, a 12-GiB site and two 6-GiB tenant selections. Its site API became Ready,
+but controller installation failed before tenant launch. The foreground exited
+17 at `host-nvke-deploy`; the retained owner reported `held-partial` with no
+completed Ready check. Kubernetes recorded a liveness-probe restart during the
+first controller startup, followed by persistent migration-lock conflicts.
+Read-only inspection found 35 of 71 ARM64 migrations applied; no database repair
+was performed. The original failed invocation remains failed. A fresh Mac
+site/tenant run is required to validate the startup configuration below.
+
+Default native Mac BUILD explicitly selects TCG and `cpu_model=max`. The source
+owns its ARM64 64-KiB kernel and image-composer network files; the native catalog
+adds no kernel override or duplicate network archive members. The existing HVF
+preparation remains available for separately selected compatible source inputs.
+Plan/capture contract tests do not establish a fresh QCOW build. Latest-source
+Mac simulator networking/TPM probes and adapter tests remain bounded checks;
+a complete selected-image guest boot, site/tenant deployment, conformance and
+joined cleanup remain unverified. BUILD does not start those deployment paths.
+An October 19 bounded GET for the preceding `8040adb` SPIRE package's exact
+ARM64 DSX IMDS binary returned HTTP 403. That remains historical evidence for
+that source selection. The current release's
+[SPIRE package](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/os-image/packages/spire-agent/Makefile)
+uses revision 4 and its
+[locked public SPIRE 1.14.1 and TPM plugin 1.9.0 archives](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/os-image/packages/spire-agent/lock/1.14.1%2Btpm1.9.0.lock).
+That default package does not acquire or provide the DSX IMDS plugin. Native tenants
+select join-token attestation and the site uses TPM. This is the selected release's
+packaging contract, not an older-source workaround or complete native runtime acceptance.
 
 The shared native host tools select kubectl 1.35.9 on both platforms. This is
 within one minor of the temporary Kind 1.36.1 bootstrap API and the permanent
-site/tenant 1.34.2 APIs; the separate conformance client remains 1.34.12. The
+site/tenant 1.36.3 APIs; the separate conformance client selects 1.36.3. The
 complete 32-output catalog smoke-policy fixture is explicitly deferred by a
 named skipped subtest. Full catalog compilation and production smoke admission
 remain required; no version stamps or smoke policy are weakened.
+
+The Mac address adapter reads actual kernel neighbor bindings for MACs in the
+fresh private NICo database and projects them through the backend's configured
+address-file interface. The existing pinned Go routing codec and system SQLite
+read-only CLI own their formats. No host DHCP change, simulator DB mutation or
+manual readiness update is used. Initial ambiguity is rejected; after NICo records
+its primary address, only that still-observed address is projected, without
+selecting another alias. Controlled tests cover binding scope, primary preservation,
+missing observations, ambiguity, cancellation and join; full native VM acceptance
+of this adapter remains pending.
+Linux keeps its existing owned dnsmasq path.
 
 Native cleanup retains the pinned backend's serial files before deleting its
 instance: Darwin's `console.log`, or Linux libvirt's `disk.qcow2.ttyS0.log` and
@@ -1860,6 +2057,38 @@ and [simulation-screen tests](../../cmd/nvke-demo/dashboard_view_test.go) exerci
 layout, bounded/sanitized snapshots, concurrent reports, cancellation joining and
 terminal failures. These are controlled presentation/race contracts, not a completed
 fresh E2E or live interruption acceptance for this candidate.
+
+The downstream demo propagates its work deadline through payload transfer,
+bundle verification/extraction, host compilation, site startup, DNS rollout,
+workload completion and the conformance wrapper. The retained launcher records
+that deadline as private scheduling data and its owner preserves it after
+detachment; it grants no persistent execution or ownership authority. Generated
+guest preparation enforces the absolute deadline through a process-group timeout
+with bounded termination grace. Context/transport and real-subprocess tests cover
+deadline propagation, cancellation and joining; these do not establish a fresh
+E2E or conformance result. Connection/probe bounds, identity validity, independent
+cleanup and authored/upstream producer policies remain separate.
+
+Read-only native readiness queries retry an independently bounded command timeout
+only after the command owner confirms joined execution and successful diagnostic
+drains, while the original deployment deadline remains active. Partial timed-out
+responses cannot establish readiness. Caller expiry/cancellation, unjoined work,
+simulator exit and changed ownership still stop the attempt; mutation commands are
+never replayed. Controlled real-subprocess tests cover timeout recovery and caller
+deadline precedence on both hosts; fresh runtime acceptance remains separate.
+
+Site installation uses the selected NVKE installer's existing Helm post-renderer
+handoff. A private Helm subprocess plugin delegates YAML transformation to the
+selected kubectl's Kustomize, targeting only the site controller Deployment and
+container. It adds a startup probe before the unchanged liveness/readiness
+probes and derives the startup allowance, Deployment progress deadline and Helm
+timeout from the caller's remaining work budget. The original process context
+still bounds the whole installation. This prevents the source controller's
+migrations from being interrupted by its HTTP liveness check before the HTTP
+listener starts; it neither changes NVKE source nor repairs an abandoned
+migration lock. The plugin uses private per-invocation scratch, removed after
+its joined subprocess returns. Contract coverage and offline rendered-resource
+comparison do not establish fresh Mac deployment acceptance.
 
 The interactive Linux CLI authenticates before opening the
 dashboard or starting work, then refresh its existing sudo session using bounded
@@ -2925,13 +3154,20 @@ Native children are locked separately from source-owned index parents, and mater
 membership. Controlled source/pin/image tests and exact-source approval do not prove external layer acquisition,
 scanner acceptance or complete production input approval. The
 [acquisition observations](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#temporary-spire-source-selection) retain the historical mixed-source candidate and HTTP-403 limits.
-Current OS assembly, agent, Calico, kubeadm, SPIRE and native Packer inputs select NVKE
-`v0.22.0` (`400c24fb6465b042be883d6b62472528520d6291`). SPIRE uses that release's source-owned
-acquisition and Debian revision 4 packaging, which omits DSX IMDS. The prior mixed-source exception
-is no longer selected. Current-source execution remains unverified until a complete recorded development
-attempt succeeds. No source admission, submodule rejection or security requirement is weakened.
-NVKE telemetry pipeline acquisition and offline Helm packaging were exercised for the earlier recorded
-inputs; no successful combined hosted Run of the v0.22.0 selection is claimed.
+The maintained release and native demo inputs now select the same stock NVKE `v0.22.0`
+source, `400c24fb6465b042be883d6b62472528520d6291`, for OS assembly, agent, Calico,
+kubeadm and SPIRE packaging, including the renamed Packer targets, disk filenames,
+material schema and required Ubuntu-series input. SPIRE uses that release's revision-4
+package and source-owned public acquisition/packaging commands; no pre-DSX source
+rollback is selected. The default package's removal of DSX IMDS is an upstream release
+contract, not a missing private dependency waived by NVKR. Historical DSX source,
+distribution and compatibility questions are recorded in
+[NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641); the older HTTP-403
+observations are not a current v0.22.0 build blocker. No source gate, submodule rejection
+or security requirement is weakened. Current-source execution remains unverified here
+until its own complete recorded attempt succeeds. Standalone plugin compilation does
+not establish native execution/boot acceptance. NVKE telemetry pipelines acquisition and
+offline Helm packaging were exercised locally; no successful combined hosted Run of these release additions is claimed.
 
 [Run `38809161348`](https://github.com/dsx-ai-factory/nvkr/actions/runs/38809161348) at
 `e3743a70b6e0bd19ccf53b7160ab0a5f276d0e66` failed during NVKE telemetry pipelines Helm extraction and the AMD64
@@ -3086,7 +3322,7 @@ The generated nightly source-fetch and native disk jobs prepare their selected p
 M2 toolchains through the existing read-only image-preparation owner. Temporary pull
 credentials are removed before source or producer execution; the nightly output
 namespace does not require republishing the existing pinned toolchains.
-The four CLI, controller and chart candidate sources now select NVKE
+The four CLI, controller and chart candidate sources now select stock NVKE
 `v0.22.0` at `400c24fb6465b042be883d6b62472528520d6291`.
 The nightly consumer projects authenticated profile bytes into the current resource
 API and supplies separate site and stack configuration, credentials through the child
@@ -3096,8 +3332,9 @@ checked against the exact selected Artifact. Focused contract and HTTP race test
 passed for the preceding beta selection, and that CLI validated and rendered the diagnostic site spec. Those checks do not validate the current v0.22.0 source.
 The user-approved test-only suite pin is `b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8`,
 a signed compatibility revision of the earlier `a3206710` suite, with beta.6 deployment
-templates and an explicit stack-config/credential/telemetry handoff. It retains the
-candidate entrypoint omitted from the selected product source. The [hosted source-contract Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/39487106857/attempts/1)
+templates and an explicit stack-config/credential/telemetry handoff. Both independently
+authored nightly profiles retain this harness pin and its candidate entrypoint, which
+is absent from the selected v0.22.0 product source. The [hosted source-contract Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/39487106857/attempts/1)
 on NVKR `8df540b83aeaec5e27b865dcd65887882699755b` passed the actual
 candidate render function with the beta.6 CLI and the hook argv/environment
 regression. This source-contract-only dispatch skipped the ordinary selection,
@@ -3105,7 +3342,9 @@ build, runtime selection and runtime-test jobs. The later workflow selector corr
 is covered separately by the shell-versus-Go parity test in the successful
 [Merge Gate on `caf85b27`](https://github.com/dsx-ai-factory/nvkr/actions/runs/39487820535).
 This verifies configuration composition, not published-artifact or VM
-runtime acceptance; full runtime validation of this revision remains unverified. Product sources, including SPIRE, select v0.22.0. This diagnostic selection is an exception to
+runtime acceptance; full runtime validation of the current selection remains unverified.
+Product sources, including SPIRE packaging, select v0.22.0; the test harness retains
+its independent pinned revision. This diagnostic selection is an exception to
 ADR-23's proposed matching-revision rule, not adoption of that proposal. Missing
 candidate hooks still fail admission; the generic rebuilding suite is no fallback.
 These source and adapter checks do not establish overall interface adoption or runtime acceptance.
@@ -3157,19 +3396,3 @@ payloads. Its description reports `payloadIntegrityVerified: false`; it grants n
 exact-input receipt, qualification or revocation acceptance. Contract fixtures cover rejected signatures,
 missing or substituted evidence, whole-release membership, policy enforcement, capability separation and
 zero payload-layer retrieval. These are controlled contracts, not a recorded external authenticity run.
-
-## NVKE v0.22.0 input alignment
-
-All NVKE source roles under `inputs/catalogs` select tag `v0.22.0`, commit
-`400c24fb6465b042be883d6b62472528520d6291`, including SPIRE OS-agent packaging revision 4. Complete producer replacements in node-image overlays
-carry the same source identity.
-The deployment manifest moved to `deploy/nico/nvke-deploy.yaml`; controller and NKTP packages
-explicitly select version `0.22.0`. External chart versions and archive digests are unchanged. CAPI `v1.13.6`, cert-manager `v1.21.1`
-and the NKTP collector `0.162.0` follow the pinned source's tool versions and chart values.
-The pin operation verified those acquired chart bytes. These are input and static-contract changes,
-not an NVKE build, runtime observation, signed release or qualification. The beta migration's published
-Go 1.27.3 native toolchain images are preserved. The Ubuntu 24 agent retains a checksum-pinned Go 1.27.3
-compiler while preserving its Bookworm libc ABI builder.
-Native disk execution with this updated closure remains unexercised.
-The beta.6 migration's installer adapter is retained and its source selection advances to v0.22.0;
-there is no remaining legacy staged-installer exception. Contract checks do not establish live deployment.

@@ -6,6 +6,7 @@ package nvkedemo
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"strings"
@@ -14,8 +15,6 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/go-viper/mapstructure/v2"
-	"github.com/spf13/viper"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -31,59 +30,61 @@ const (
 // DemoFile is downstream deployment intent, not an NVKR Definition or receipt.
 // Loading descriptions never builds, deploys, restores, or writes configuration.
 type DemoFile struct {
-	Version int         `yaml:"version" mapstructure:"version"`
-	Build   BuildFile   `yaml:"build" mapstructure:"build"`
-	Run     RunFile     `yaml:"run" mapstructure:"run"`
-	Restore RestoreFile `yaml:"restore" mapstructure:"restore"`
+	Version int         `yaml:"version"`
+	Build   BuildFile   `yaml:"build"`
+	Run     RunFile     `yaml:"run"`
+	Restore RestoreFile `yaml:"restore"`
 }
 
 type BuildFile struct {
-	QualifyLocal        bool              `yaml:"qualifyLocal" mapstructure:"qualifyLocal"`
-	Prepared            bool              `yaml:"prepared" mapstructure:"prepared"`
-	Qualification       QualificationFile `yaml:"qualification" mapstructure:"qualification"`
-	QualificationPolicy string            `yaml:"qualificationPolicy" mapstructure:"qualificationPolicy"`
-	Repo                string            `yaml:"repo" mapstructure:"repo"`
-	NVKEClone           string            `yaml:"nvkeClone" mapstructure:"nvkeClone"`
-	Definition          string            `yaml:"definition" mapstructure:"definition"`
-	Environment         string            `yaml:"environment" mapstructure:"environment"`
-	NVKR                string            `yaml:"nvkr" mapstructure:"nvkr"`
-	Attempt             string            `yaml:"attempt" mapstructure:"attempt"`
-	Jobs                int               `yaml:"jobs" mapstructure:"jobs"`
+	QualifyLocal        bool              `yaml:"qualifyLocal"`
+	Prepared            bool              `yaml:"prepared"`
+	Qualification       QualificationFile `yaml:"qualification"`
+	QualificationPolicy string            `yaml:"qualificationPolicy"`
+	Repo                string            `yaml:"repo"`
+	NVKEClone           string            `yaml:"nvkeClone"`
+	Definition          string            `yaml:"definition"`
+	Environment         string            `yaml:"environment"`
+	NVKR                string            `yaml:"nvkr"`
+	Attempt             string            `yaml:"attempt"`
+	Jobs                int               `yaml:"jobs"`
 }
 
 type RunFile struct {
-	Accelerator    string        `yaml:"accelerator" mapstructure:"accelerator"`
-	Cleanup        bool          `yaml:"cleanup" mapstructure:"cleanup"`
-	Walkthrough    bool          `yaml:"walkthrough" mapstructure:"walkthrough"`
-	Conformance    bool          `yaml:"conformance" mapstructure:"conformance"`
-	Repo           string        `yaml:"repo" mapstructure:"repo"`
-	Network        string        `yaml:"network" mapstructure:"network"`
-	NVKECheckout   string        `yaml:"nvkeCheckout" mapstructure:"nvkeCheckout"`
-	NVKR           string        `yaml:"nvkr" mapstructure:"nvkr"`
-	Runs           RunFileInputs `yaml:"runs" mapstructure:"runs"`
-	Out            string        `yaml:"out" mapstructure:"out"`
-	TimeoutSeconds int           `yaml:"timeoutSeconds" mapstructure:"timeoutSeconds"`
+	Resources      NativeResources `yaml:"resources"`
+	TenantWorkers  int             `yaml:"tenantWorkers"`
+	Accelerator    string          `yaml:"accelerator"`
+	Cleanup        bool            `yaml:"cleanup"`
+	Walkthrough    bool            `yaml:"walkthrough"`
+	Conformance    bool            `yaml:"conformance"`
+	Repo           string          `yaml:"repo"`
+	Network        string          `yaml:"network"`
+	NVKECheckout   string          `yaml:"nvkeCheckout"`
+	NVKR           string          `yaml:"nvkr"`
+	Runs           RunFileInputs   `yaml:"runs"`
+	Out            string          `yaml:"out"`
+	TimeoutSeconds int             `yaml:"timeoutSeconds"`
 }
 
 type RunFileInputs struct {
-	Artifacts  string `yaml:"artifacts" mapstructure:"artifacts"`
-	HostTools  string `yaml:"hostTools" mapstructure:"hostTools"`
-	Runtime    string `yaml:"runtime" mapstructure:"runtime"`
-	OS         string `yaml:"os" mapstructure:"os"`
-	Components string `yaml:"components" mapstructure:"components"`
-	Providers  string `yaml:"providers" mapstructure:"providers"`
-	Site       string `yaml:"site" mapstructure:"site"`
-	Tools      string `yaml:"tools" mapstructure:"tools"`
-	Profiles   string `yaml:"profiles" mapstructure:"profiles"`
-	Simulator  string `yaml:"simulator" mapstructure:"simulator"`
+	Artifacts  string `yaml:"artifacts"`
+	HostTools  string `yaml:"hostTools"`
+	Runtime    string `yaml:"runtime"`
+	OS         string `yaml:"os"`
+	Components string `yaml:"components"`
+	Providers  string `yaml:"providers"`
+	Site       string `yaml:"site"`
+	Tools      string `yaml:"tools"`
+	Profiles   string `yaml:"profiles"`
+	Simulator  string `yaml:"simulator"`
 }
 
 type RestoreFile struct {
-	Work string `yaml:"work" mapstructure:"work"`
+	Work string `yaml:"work"`
 }
 
-// LoadDemoFile uses only the explicitly selected regular file and an independent
-// Viper instance. There is no config search, environment binding, watcher,
+// LoadDemoFile uses only the explicitly selected regular YAML file.
+// There is no config search, environment binding, watcher,
 // remote provider, or configuration writer. Paths stay descriptions until the
 // selected operation's existing admission checks validate them.
 func LoadDemoFile(ctx context.Context, path string) (DemoFile, error) {
@@ -132,18 +133,21 @@ func LoadDemoFile(ctx context.Context, path string) (DemoFile, error) {
 	if described.Version != 1 || (described.Build == (BuildFile{}) && described.Run == (RunFile{}) && described.Restore == (RestoreFile{})) {
 		return result, configUsage("require version 1 and a nonempty build, run or restore section")
 	}
-	loader := viper.New()
-	loader.SetConfigType("yaml")
-	loader.SetDefault("build.jobs", 1)
-	loader.SetDefault("run.network", "ovn")
-	loader.SetDefault("run.timeoutSeconds", DefaultTenantTimeoutSeconds)
-	if err = loader.ReadConfig(bytes.NewReader(raw)); err != nil {
+	var values map[string]any
+	if err = document.Decode(&values); err != nil {
 		return result, configUsage("cannot decode demo configuration")
 	}
-	if err = loader.UnmarshalExact(&result, func(cfg *mapstructure.DecoderConfig) {
-		cfg.WeaklyTypedInput = false
-		cfg.DecodeHook = nil
-	}); err != nil {
+	encoded, err := json.Marshal(values)
+	if err != nil {
+		return result, configUsage("cannot decode demo configuration")
+	}
+	result = DemoFile{Build: BuildFile{Jobs: 1}, Run: RunFile{Network: "ovn", TimeoutSeconds: DefaultTenantTimeoutSeconds}}
+	// JSON's typed assignment rejects YAML's implicit scalar conversions while
+	// preserving defaults only for omitted fields. The YAML owner above admits
+	// the exact schema, key spelling, tags and single-document boundary.
+	typed := json.NewDecoder(bytes.NewReader(encoded))
+	typed.DisallowUnknownFields()
+	if err = typed.Decode(&result); err != nil {
 		return DemoFile{}, configUsage("invalid demo configuration schema or types")
 	}
 	if err = requireContext(ctx); err != nil {
@@ -209,6 +213,12 @@ func (file DemoFile) BuildConfig(progress io.Writer) (BuildConfig, error) {
 
 func (file DemoFile) runDescription(progress io.Writer) (Config, error) {
 	run := file.Run
+	if _, err := selectedNativeTenantNodes(run.TenantWorkers, run.Conformance); err != nil {
+		return Config{}, err
+	}
+	if _, err := selectedNativeResources(run.Resources); err != nil {
+		return Config{}, err
+	}
 	if run.Runs.Artifacts != "" {
 		if !configString(run.Runs.Artifacts) {
 			return Config{}, configUsage("artifacts Run path must be explicit")
@@ -231,7 +241,7 @@ func (file DemoFile) runDescription(progress io.Writer) (Config, error) {
 	if file.Version != 1 || (run.NVKECheckout != "" && !configString(run.NVKECheckout)) || !configString(run.Out) || run.TimeoutSeconds < MinTenantTimeoutSeconds || run.TimeoutSeconds > MaxTenantTimeoutSeconds {
 		return Config{}, nvkrerr.New(nvkrerr.CodeUsage, "run requires version 1, out, valid optional nvkeCheckout and timeoutSeconds from %d to %d", MinTenantTimeoutSeconds, MaxTenantTimeoutSeconds)
 	}
-	return Config{Accelerator: run.Accelerator, Cleanup: run.Cleanup, Walkthrough: run.Walkthrough, Conformance: run.Conformance, Repository: run.Repo, Network: network, NVKECheckout: run.NVKECheckout, NVKR: run.NVKR, Out: run.Out, Timeout: time.Duration(run.TimeoutSeconds) * time.Second, Progress: progress,
+	return Config{Accelerator: run.Accelerator, Cleanup: run.Cleanup, Walkthrough: run.Walkthrough, Conformance: run.Conformance, TenantWorkers: run.TenantWorkers, Resources: run.Resources, Repository: run.Repo, Network: network, NVKECheckout: run.NVKECheckout, NVKR: run.NVKR, Out: run.Out, Timeout: time.Duration(run.TimeoutSeconds) * time.Second, Progress: progress,
 		Runs: RunInputs{HostTools: run.Runs.HostTools, Runtime: run.Runs.Runtime, OS: run.Runs.OS, Components: run.Runs.Components, Providers: run.Runs.Providers, Site: run.Runs.Site, Tools: run.Runs.Tools, Profiles: run.Runs.Profiles, Simulator: run.Runs.Simulator}}, nil
 }
 

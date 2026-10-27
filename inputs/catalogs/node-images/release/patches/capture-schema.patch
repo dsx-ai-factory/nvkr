@@ -1,8 +1,0 @@
---- a/os-image/packer/scripts/capture-apt-acquisitions.py
-+++ b/os-image/packer/scripts/capture-apt-acquisitions.py
-@@ -26,4 +26,4 @@
--SCHEMA = "nkd.dev/package-acquisitions/v1"
-+SCHEMA = "nvkr.dev/package-acquisitions/v1"
- MAX_PACKAGES = 16384
- MAX_PACKAGE_BYTES = 1 << 30
- MAX_TOTAL_BYTES = 7 << 30

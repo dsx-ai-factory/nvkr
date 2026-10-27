@@ -8,10 +8,13 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
+	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/testresults"
 )
 
@@ -55,19 +58,41 @@ func TestNativeConformanceUsesOneRepositoryRun(t *testing.T) {
 }
 
 func TestNativeConformanceAliasSelectionIsExact(t *testing.T) {
-	for _, row := range []struct {
-		name, raw string
-		want      bool
-	}{
-		{"same alias", `{"items":[{"spec":{"containers":[{"name":"ovnkube-controller","image":"registry.example.test/ovn:demo"}]}},{"spec":{"containers":[{"name":"ovnkube-controller","image":"registry.example.test/ovn:demo"}]}}]}`, true},
-		{"one node", `{"items":[{"spec":{"containers":[{"name":"ovnkube-controller","image":"registry.example.test/ovn:demo"}]}}]}`, false},
-		{"different aliases", `{"items":[{"spec":{"containers":[{"name":"ovnkube-controller","image":"registry.example.test/ovn:first"}]}},{"spec":{"containers":[{"name":"ovnkube-controller","image":"registry.example.test/ovn:other"}]}}]}`, false},
-		{"missing controller", `{"items":[{"spec":{"containers":[]}},{"spec":{"containers":[]}}]}`, false},
-		{"ambiguous JSON", `{"items":[],"items":[]}`, false},
-	} {
-		t.Run(row.name, func(t *testing.T) {
-			alias, err := conformanceOVNAlias([]byte(row.raw))
-			if row.want && (err != nil || alias != "registry.example.test/ovn:demo") || !row.want && err == nil {
+	for _, mode := range []string{"exact", "missing pod", "extra pod", "duplicate pod node", "unrelated node", "duplicate expected node", "different alias", "missing controller", "duplicate controller", "ambiguous JSON"} {
+		t.Run(mode, func(t *testing.T) {
+			nodes := nativeTopologyNodes(3)
+			pods := []map[string]any{}
+			for _, node := range nodes {
+				pods = append(pods, map[string]any{"spec": map[string]any{"nodeName": node.Metadata.Name, "containers": []map[string]string{{"name": "ovnkube-controller", "image": "registry.example.test/ovn:demo"}}}})
+			}
+			spec := func(i int) map[string]any { return pods[i]["spec"].(map[string]any) }
+			switch mode {
+			case "missing pod":
+				pods = pods[:2]
+			case "extra pod":
+				pods = append(pods, pods[0])
+			case "duplicate pod node":
+				spec(2)["nodeName"] = nodes[1].Metadata.Name
+			case "unrelated node":
+				spec(2)["nodeName"] = "foreign"
+			case "duplicate expected node":
+				nodes[2].Metadata.Name = nodes[1].Metadata.Name
+			case "different alias":
+				spec(2)["containers"] = []map[string]string{{"name": "ovnkube-controller", "image": "registry.example.test/ovn:other"}}
+			case "missing controller":
+				spec(2)["containers"] = []map[string]string{}
+			case "duplicate controller":
+				spec(2)["containers"] = append(spec(2)["containers"].([]map[string]string), map[string]string{"name": "ovnkube-controller", "image": "registry.example.test/ovn:demo"})
+			}
+			raw, err := json.Marshal(map[string]any{"items": pods})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mode == "ambiguous JSON" {
+				raw = []byte("{\"items\":[],\"items\":[]}")
+			}
+			alias, err := conformanceOVNAlias(raw, nodes)
+			if mode == "exact" && (err != nil || alias != "registry.example.test/ovn:demo") || mode != "exact" && err == nil {
 				t.Fatalf("alias=%q err=%v", alias, err)
 			}
 		})
@@ -110,18 +135,31 @@ func TestNativeConformanceRequiresCompleteOriginalCaptureAndNaturalZero(t *testi
 }
 
 func TestConformanceDefinitionSelectionIsExplicit(t *testing.T) {
-	for _, network := range []string{"ovn", "upstream-ovn"} {
-		ordinary, env, err := LocalArtifactInputs(network)
-		if err != nil {
-			t.Fatal(err)
+	for _, host := range []struct{ os, environment string }{
+		{"linux", "inputs/environments/local-arm64-kvm.json"},
+		{"darwin", "inputs/environments/local-native-mac.json"},
+	} {
+		for _, network := range []string{"ovn", "upstream-ovn"} {
+			t.Run(host.os+"/"+network, func(t *testing.T) {
+				ordinary, linuxEnv, err := LocalArtifactInputs(network)
+				if err != nil || linuxEnv != "inputs/environments/local-arm64-kvm.json" {
+					t.Fatalf("Linux wrapper changed: %s %s %v", ordinary, linuxEnv, err)
+				}
+				selectedOrdinary, env, err := LocalArtifactInputsFor(network, false, host.os)
+				if err != nil || selectedOrdinary != ordinary || env != host.environment {
+					t.Fatalf("ordinary=%s env=%s err=%v", selectedOrdinary, env, err)
+				}
+				selected, selectedEnv, err := LocalArtifactInputsFor(network, true, host.os)
+				if err != nil || selected != strings.TrimSuffix(ordinary, ".json")+"-conformance.json" || selectedEnv != host.environment {
+					t.Fatalf("selected=%s env=%s err=%v", selected, selectedEnv, err)
+				}
+			})
 		}
-		selected, selectedEnv, err := LocalArtifactInputsFor(network, true)
-		if err != nil || selected != strings.TrimSuffix(ordinary, ".json")+"-conformance.json" || env != selectedEnv {
-			t.Fatalf("selected=%s env=%s err=%v", selected, selectedEnv, err)
-		}
+		_, _, err := LocalArtifactInputsFor("kind-calico", true, host.os)
+		assertConfigUsage(t, err)
 	}
-	_, _, err := LocalArtifactInputsFor("kind-calico", true)
-	assertConfigUsage(t, err)
+	_, _, err := LocalArtifactInputsFor("ovn", false, "unsupported")
+	assertNightlyCode(t, err, nvkrerr.CodeEngineCapability)
 }
 
 func TestConformanceDefinitionsPreserveOrdinaryDeploymentOutputs(t *testing.T) {
@@ -130,7 +168,7 @@ func TestConformanceDefinitionsPreserveOrdinaryDeploymentOutputs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		selected, _, err := LocalArtifactInputsFor(network, true)
+		selected, _, err := LocalArtifactInputsFor(network, true, "linux")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -160,4 +198,80 @@ func TestConformanceDefinitionsPreserveOrdinaryDeploymentOutputs(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestNativeConformanceChildUsesAttemptScratch(t *testing.T) {
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Skip("native conformance requires a Unix host")
+	}
+	program, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []string{"unset", "other directory", "not a directory"} {
+		t.Run(mode, func(t *testing.T) {
+			work := privateTestDir(t)
+			repository, scratch := filepath.Join(work, "repository"), filepath.Join(work, "capture-scratch")
+			for _, directory := range []string{repository, scratch} {
+				if err := os.Mkdir(directory, 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			env := []string{"NVKR_TEST_CONFORMANCE_SCRATCH=1"}
+			if mode != "unset" {
+				ambient := filepath.Join(work, "ambient")
+				if mode == "not a directory" {
+					err = os.WriteFile(ambient, nil, 0600)
+				} else {
+					err = os.Mkdir(ambient, 0700)
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				env = append(env, "TMPDIR="+ambient)
+			}
+			runner := Runner{Work: work, Env: env, directory: work}
+			original := append([]string(nil), runner.Env...)
+			invocation := nativeConformanceInvocation(runner, repository, scratch)
+			raw, err := invocation.Capture(t.Context(), []string{program, "-test.run=^TestNativeConformanceScratchHelper$"}, "capture-temp", 10*time.Second)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got struct {
+				Directory, WorkingDirectory string
+				Mode                        uint32
+			}
+			if err := json.Unmarshal(raw, &got); err != nil {
+				t.Fatal(err)
+			}
+			if got.Directory != scratch || got.WorkingDirectory != repository || got.Mode != 0600 {
+				t.Fatalf("child scratch observation: %+v", got)
+			}
+			if !reflect.DeepEqual(runner.Env, original) || runner.directory != work {
+				t.Fatal("conformance invocation mutated its caller")
+			}
+		})
+	}
+}
+
+func TestNativeConformanceScratchHelper(t *testing.T) {
+	if os.Getenv("NVKR_TEST_CONFORMANCE_SCRATCH") != "1" {
+		return
+	}
+	file, err := os.CreateTemp("", "nvkr-capture-")
+	if err != nil {
+		os.Exit(2)
+	}
+	info, statErr := file.Stat()
+	cwd, cwdErr := os.Getwd()
+	if statErr != nil || cwdErr != nil || file.Close() != nil || os.Remove(file.Name()) != nil {
+		os.Exit(3)
+	}
+	if err := json.NewEncoder(os.Stdout).Encode(struct {
+		Directory, WorkingDirectory string
+		Mode                        uint32
+	}{filepath.Dir(file.Name()), cwd, uint32(info.Mode().Perm())}); err != nil {
+		os.Exit(4)
+	}
+	os.Exit(0)
 }

@@ -49,7 +49,7 @@ Choose a [task guide](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/READ
 
 | Concept | Meaning | Read more |
 |---|---|---|
-| Plan | The generated, canonical record of selected inputs, operations, artifacts, and required outputs. It describes work rather than proving execution. | [Quickstart](quickstart.md) |
+| Plan | The generated, canonical record of selected inputs, operations, artifacts, and required outputs. It describes work rather than proving execution. | [Plan inspection](plan-and-graph-inspection.md) |
 | Plan graph views | `producers` shows producer dependencies; `artifacts` shows operation inputs and results; `complete` joins both views. | [Graph inspection](plan-and-graph-inspection.md) |
 | Plan comparison | Compare saved canonical Plans to explain changed outputs and settings. A changed registry destination can change the Plan without changing build identity. | [Plan comparison](plan-and-graph-inspection.md) |
 | Generator adapters | Translate the planned workflow into provider files. GitHub is the maintained hosted target; unsupported providers are rejected. | [Pipeline generation](generate-pipeline.md) |

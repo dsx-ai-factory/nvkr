@@ -1,9 +1,10 @@
 # Documentation
 
-Start with the [quickstart](quickstart.md): learn the workflow, build a tiny local artifact, change its
-version, and extend the same ideas into the NVKE tenant demo. It also includes a planning preview
-without Docker. The [34-concept reference](user-concepts.md) explains the vocabulary and connects
-each concept to a worked example.
+Start with the [quickstart](quickstart.md): copy one block to build NVKR from source and produce
+the NVKE CLI, controller image, Helm chart and dependency SBOMs locally on macOS or Linux.
+The guide shows the resulting files and links to larger builds, publication and deployment.
+For a preview without Docker, see the [tutorial inputs](examples/nvke-tutorial/README.md#preview-the-native-build).
+The [34-concept reference](user-concepts.md) explains the vocabulary and connects each concept to a worked example.
 
 ## User tasks
 
@@ -11,11 +12,12 @@ each concept to a worked example.
 |---|---|
 | Ask an AI agent to acquire the CLI, author inputs, and operate NVKR | [Use NVKR with Your AI Agent](use-with-agents.md), [operator skill](../.agents/skills/nvkr-operator/SKILL.md) |
 | Understand NVKR and try my first local artifact | [Quickstart](quickstart.md) |
+| Build only the CLI for planning and inspection | [CLI setup](quickstart.md#build-only-the-cli) |
 | Present catalog → build → publication → NVKE through the Go CLIs | [Runnable commands](nvkr-demo.md) |
 | Start local Linux ARM64 NVKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../inputs/definitions/demo/README.md) |
 | Build and run the native Ubuntu ARM64 or Mac demo | [Shared build-and-demo guide and validation limits](local-nvke-demo.md) |
 | Understand native Linux/Mac execution with one QEMU site and two tenant guests | [Shared native topology and validation scope](local-nvke-demo.md#native-linux-and-mac-path) |
-| Inspect my first Plan | [Quickstart](quickstart.md) |
+| Inspect my first Plan | [Plan and graph inspection](plan-and-graph-inspection.md) |
 | Browse public command results | [Command result browser](lifecycle.md#browse-public-command-results) |
 | Watch a local Run or inspect its recorded outcome | [Lifecycle dashboard and read-only inspection](lifecycle.md#choose-local-run-presentation) |
 | Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |

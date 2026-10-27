@@ -6,7 +6,7 @@ neither a registry nor a source checkout. Linux is required for held-executable 
 macOS supports development, planning and contract tests.
 
 The ordinary test gate (`go test ./...`, `make test`, and `make check`) also requires Bash 3.2 or later,
-Git 2.38 or later, `jq`, GNU coreutils `timeout` or `gtimeout`, and a SHA-256 utility (`sha256sum` or `shasum`) on `PATH`.
+Git 2.38 or later, `jq`, `sha256sum`, and `timeout` or `gtimeout` on `PATH`.
 The catalog maintenance tests also run the rendered workflow steps with `yq` v4. Those tests skip locally when
 one of these tools is missing; with `NVKR_REQUIRE_SHELL_TOOLS=1` or `CI` set they fail instead, and the merge gate
 sets the variable.
@@ -24,7 +24,8 @@ On macOS with Homebrew, install the additional JSON, timeout, and Python tools w
 brew install jq yq coreutils python
 ```
 
-The lab discovers `gtimeout` directly on macOS; no `timeout` alias or unprefixed coreutils setup is needed.
+The checksum contract tests execute `sha256sum`, supplied by macOS (including `/sbin/sha256sum` on macOS 26)
+or GNU coreutils. The lab discovers `timeout` or `gtimeout` directly; a shell-wide `gnubin` override is unnecessary.
 
 ```sh
 make build

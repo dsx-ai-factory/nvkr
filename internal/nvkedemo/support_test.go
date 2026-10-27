@@ -412,7 +412,7 @@ func TestRunnerCaptureContracts(t *testing.T) {
 }
 
 func TestRunnerRejectsBeforeProcessWork(t *testing.T) {
-	for _, name := range []string{"nil context", "canceled", "nil environment", "phase traversal", "workspace symlink", "workspace public", "existing log", "empty command", "zero timeout"} {
+	for _, name := range []string{"nil context", "canceled", "nil environment", "phase traversal", "workspace symlink", "workspace public", "existing log", "empty command", "negative timeout", "unbounded zero timeout"} {
 		t.Run(name, func(t *testing.T) {
 			work := privateTestDir(t)
 			marker := filepath.Join(work, "started")
@@ -448,7 +448,10 @@ func TestRunnerRejectsBeforeProcessWork(t *testing.T) {
 				}
 			case "empty command":
 				args = nil
-			case "zero timeout":
+			case "negative timeout":
+				timeout = -time.Second
+			case "unbounded zero timeout":
+				ctx = context.Background()
 				timeout = 0
 			}
 			if err := runner.Run(ctx, args, phase, timeout); err == nil {
@@ -456,6 +459,64 @@ func TestRunnerRejectsBeforeProcessWork(t *testing.T) {
 			}
 			if _, err := os.Stat(marker); !os.IsNotExist(err) {
 				t.Fatal("producer ran before admission")
+			}
+		})
+	}
+}
+
+func TestRunnerInheritsCallerWorkCancellation(t *testing.T) {
+	for _, tc := range []struct {
+		name, script string
+		deadline     bool
+		control      time.Duration
+	}{
+		{"completed work", "printf completed", false, 0},
+		{"deadline joins child", "exec sleep 60", true, 0},
+		{"caller expires before control deadline", "exec sleep 60", true, time.Minute},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			duration := time.Minute
+			if tc.deadline {
+				duration = 200 * time.Millisecond
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), duration)
+			defer cancel()
+			raw, err := (Runner{Env: []string{"PATH=/usr/bin:/bin"}}).Capture(ctx, []string{"/bin/sh", "-ec", tc.script}, "caller-budget", tc.control)
+			if errors.Is(err, errCommandDeadline) {
+				t.Fatal("caller expiry was classified as a retryable command deadline")
+			}
+			if tc.deadline {
+				if !errors.Is(err, context.DeadlineExceeded) || errors.Is(err, ErrUnjoined) {
+					t.Fatalf("caller deadline lost or work left unjoined: %v", err)
+				}
+			} else if err != nil || string(raw) != "completed" {
+				t.Fatalf("work completion: %s %v", raw, err)
+			}
+		})
+	}
+}
+
+func TestRunnerPassesDeadlineOnlyToWorkChildren(t *testing.T) {
+	for _, owned := range []bool{false, true} {
+		t.Run(fmt.Sprint("service=", owned), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+			defer cancel()
+			deadline, _ := ctx.Deadline()
+			runner := Runner{Env: []string{"PATH=/usr/bin:/bin"}}
+			child, err := runner.start(ctx, []string{"/bin/sh", "-ec", `printf '%s' "${NVKR_WORK_DEADLINE-unset}"`}, "deadline-handoff", true, owned)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := child.waitOwned(ctx); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := child.stdout.result()
+			want := deadline.UTC().Format(time.RFC3339Nano)
+			if owned {
+				want = "unset"
+			}
+			if err != nil || string(raw) != want {
+				t.Fatalf("child deadline=%q, want %q: %v", raw, want, err)
 			}
 		})
 	}

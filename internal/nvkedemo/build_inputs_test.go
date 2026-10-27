@@ -39,7 +39,13 @@ func TestLocalKVMInputsPreserveSelectedOutputsAndSources(t *testing.T) {
 				"cwe":                                    {Base: "../../catalogs/nvke/native-site-arm64"},
 				"nktp":                                   {Base: "../../catalogs/nvke/native-site-arm64"},
 				"nvkectl":                                {Base: "../../catalogs/nvke/native-site-arm64"},
-				"nvke-node-image-arm64":                  {Base: "../../catalogs/node-images/native-arm64", Overlays: []string{"../../catalogs/node-images/variants/native-nvidia.json"}},
+				"nvke-node-image-arm64":                  {Base: "../../catalogs/node-images/release", Overlays: []string{"../../catalogs/node-images/variants/native-nvidia.json", "../../catalogs/node-images/variants/native-local-kvm.json"}},
+			}
+			for _, name := range []string{"postgresql", "spire", "spire-crds", "temporal"} {
+				modern[name] = definition.Catalog{Base: "../../catalogs/nvke/native-site-arm64"}
+			}
+			for _, name := range []string{"csi-node-driver-registrar", "postgresql", "spiffe-csi", "spire-agent", "spire-bash", "spire-controller-manager", "spire-oidc", "spire-server", "spire-tpm-server", "temporal-admin-tools", "temporal-server", "temporal-ui"} {
+				modern[name+"-image-arm64"] = definition.Catalog{Base: "../../catalogs/runtime-dependencies"}
 			}
 			for i, original := range before.Outputs {
 				selected := after.Outputs[i]

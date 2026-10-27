@@ -1,7 +1,7 @@
 # Catalogs and components
 
 A catalog defines reusable components and how to build or acquire them. A Definition chooses which
-components belong in each required output. Start with the [quickstart](quickstart.md) for CLI setup;
+components belong in each required output. Start with the [quickstart](quickstart.md#build-only-the-cli) for CLI setup;
 the [concept reference](user-concepts.md) explains the broader lifecycle.
 
 Adding a catalog with existing NVKR capabilities requires declarations and pins, not Go code or

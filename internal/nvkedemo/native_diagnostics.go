@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -94,6 +95,7 @@ func retainNativeSiteFailure(ctx context.Context, runner Runner, tools, kubeconf
 		args  []string
 	}{
 		{"site-pods", []string{"get", "pods", "--all-namespaces", "-o", "json"}},
+		{"site-events", []string{"get", "events", "--all-namespaces", "-o", "json"}},
 		{"site-services", []string{"get", "services", "--all-namespaces", "-o", "json"}},
 		{"site-endpointslices", []string{"get", "endpointslices.discovery.k8s.io", "--all-namespaces", "-o", "json"}},
 	}
@@ -177,12 +179,14 @@ func retainNativeInstanceFiles(ctx context.Context, simdir, instanceRoot, out, i
 		}
 		if err == nil {
 			var raw bytes.Buffer
-			if !currentOwner(info) || info.Size() < 0 || info.Size() > 8<<20 {
-				err = errors.New("native console must be owned and within the diagnostic byte bound")
+			if !currentOwner(info) || info.Size() < 0 {
+				err = errors.New("native console must be owned and have a valid size")
 			} else {
-				// Logs may append while the guest is alive. Capture only the
-				// observed prefix; this is not immutable artifact evidence.
-				_, err = transportarchive.CopyExact(ctx, &raw, file, info.Size())
+				// Logs may append while the guest is alive. Capture at most the
+				// last 8 MiB observed; this is not immutable artifact evidence.
+				size := min(info.Size(), 8<<20)
+				reader := io.NewSectionReader(file, info.Size()-size, size)
+				_, err = transportarchive.CopyExact(ctx, &raw, reader, size)
 			}
 			err = errors.Join(err, file.Close())
 			if err == nil {

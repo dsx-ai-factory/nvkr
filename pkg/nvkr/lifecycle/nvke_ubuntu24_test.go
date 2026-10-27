@@ -83,6 +83,10 @@ func TestNVKEUbuntu24NativeDiskSelections(t *testing.T) {
 						t.Fatalf("Ubuntu selection unexpectedly changed unrelated producer %s", component)
 					}
 				}
+				sourcePin, err := build.CatalogSnapshot.SourcePin("nvke-os")
+				if err != nil {
+					t.Fatal(err)
+				}
 				roots := 0
 				for _, node := range build.Graph.Nodes {
 					if node.Kind == ir.KindPull && node.Component == tc.installer && node.Digest != tc.isoDigest {
@@ -92,7 +96,7 @@ func TestNVKEUbuntu24NativeDiskSelections(t *testing.T) {
 						continue
 					}
 					roots++
-					if node.Component != root || node.SourceCommit != "400c24fb6465b042be883d6b62472528520d6291" || node.Packer == nil ||
+					if node.Component != root || node.SourceCommit != sourcePin.Commit || node.SourceTreeHash != sourcePin.TreeHash || node.Packer == nil ||
 						node.Disk == nil || node.ExecutionBinding == nil || node.Requirements == nil {
 						t.Fatal("Ubuntu 24 disk lost its source-owned native Packer contract")
 					}

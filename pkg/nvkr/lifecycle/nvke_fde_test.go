@@ -37,6 +37,10 @@ func TestNVKEFDEOnlyGeneratedSelection(t *testing.T) {
 	if len(plan.Environment.GitHubDispatchBranches) != 1 || plan.Environment.GitHubDispatchBranches[0] != "codex/fde-image-pipeline" {
 		t.Fatal("FDE iteration lost its exact feature-branch dispatch policy")
 	}
+	sourcePin, err := plan.Builds[0].CatalogSnapshot.SourcePin("nvke-os")
+	if err != nil {
+		t.Fatal(err)
+	}
 	roots := 0
 	for _, node := range plan.Builds[0].Graph.Nodes {
 		if node.BuilderType != ir.BuilderVMImage {
@@ -44,7 +48,7 @@ func TestNVKEFDEOnlyGeneratedSelection(t *testing.T) {
 		}
 		roots++
 		if node.Component != "nvke-node-fde-amd64" || node.Disk.Encryption != "luks2" || node.ArtifactPath != "fde/nvke-node.qcow2" ||
-			node.Packer.BuildName != "nvke-node-fde.qemu.nvke-fde" || node.SourceCommit != "400c24fb6465b042be883d6b62472528520d6291" {
+			node.Packer.BuildName != "nvke-node-fde.qemu.nvke-fde" || node.SourceCommit != sourcePin.Commit || node.SourceTreeHash != sourcePin.TreeHash {
 			t.Fatal("FDE producer no longer selects the audited source contract")
 		}
 		if err := pipeline.ValidateVMImagePackerDiskExecution(node); err != nil {
@@ -158,6 +162,10 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 			if build.Platform != "linux/"+tc.arch || !slices.Equal(build.Components, wantComponents) || len(build.ResolvedComponents) != len(wantComponents) {
 				t.Fatalf("unexpected native FDE closure: platform=%s components=%v", build.Platform, build.Components)
 			}
+			sourcePin, err := build.CatalogSnapshot.SourcePin("nvke-os")
+			if err != nil {
+				t.Fatal(err)
+			}
 			roots := 0
 			for _, node := range build.Graph.Nodes {
 				if node.BuilderType != ir.BuilderVMImage {
@@ -167,7 +175,7 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 				if node.Component != name || node.Disk == nil || node.Packer == nil || node.ExecutionBinding == nil || node.Requirements == nil {
 					t.Fatal("incomplete native FDE producer")
 				}
-				if node.SourceCommit != "400c24fb6465b042be883d6b62472528520d6291" || node.Toolchain != tc.toolchain ||
+				if node.SourceCommit != sourcePin.Commit || node.SourceTreeHash != sourcePin.TreeHash || node.Toolchain != tc.toolchain ||
 					node.ToolchainPlatform != build.Platform || node.Disk.Format != "qcow2" || node.Disk.Encryption != "luks2" ||
 					node.ArtifactPath != "fde/nvke-node.qcow2" || node.Packer.BuildName != "nvke-node-fde.qemu.nvke-fde" ||
 					node.Packer.AcquisitionArchive != "fde/apt-acquisitions.tar" {

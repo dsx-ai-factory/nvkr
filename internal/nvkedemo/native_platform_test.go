@@ -15,7 +15,7 @@ func TestNativeHostRejectsUnsupportedBackendBeforeWork(t *testing.T) {
 		platform, accelerator string
 		accepted              bool
 	}{
-		{"darwin/arm64", "hvf", true}, {"darwin/arm64", "tcg", false}, {"linux/arm64", "kvm", true},
+		{"darwin/arm64", "hvf", true}, {"darwin/arm64", "tcg", true}, {"linux/arm64", "kvm", true},
 		{"linux/arm64", "hvf", false}, {"linux/arm64", "tcg", false}, {"darwin/arm64", "kvm", false},
 		{"linux/amd64", "kvm", false}, {"windows/arm64", "kvm", false}, {"linux/arm64", "", false},
 	} {
@@ -30,6 +30,34 @@ func TestNativeHostRejectsUnsupportedBackendBeforeWork(t *testing.T) {
 			var coded *nvkrerr.Error
 			if !errors.As(err, &coded) || coded.Code != nvkrerr.CodeEngineCapability {
 				t.Fatalf("unsupported backend accepted: %v", err)
+			}
+		})
+	}
+}
+
+func TestNativeTCGRequiresAdapterExecutableBeforeWork(t *testing.T) {
+	for _, tc := range []struct {
+		platform, accelerator, executable string
+		site, accepted                    bool
+	}{
+		{"darwin/arm64", "tcg", "", false, false},
+		{"darwin/arm64", "tcg", "relative-demo", false, false},
+		{"darwin/arm64", "tcg", "/local/bin/nvke-demo", false, true},
+		{"darwin/arm64", "hvf", "", false, true},
+		{"darwin/arm64", "hvf", "", true, false},
+		{"darwin/arm64", "hvf", "/local/bin/nvke-demo", true, true},
+		{"linux/arm64", "kvm", "", true, true},
+	} {
+		t.Run(tc.platform+tc.accelerator+tc.executable+map[bool]string{true: "site", false: "guest"}[tc.site], func(t *testing.T) {
+			err := admitNativeQEMUAdapter(tc.platform, tc.accelerator, tc.executable, tc.site)
+			if (err == nil) != tc.accepted {
+				t.Fatal(err)
+			}
+			if !tc.accepted {
+				var coded *nvkrerr.Error
+				if !errors.As(err, &coded) || coded.Code != nvkrerr.CodeEngineCapability {
+					t.Fatal("uncoded adapter refusal", err)
+				}
 			}
 		})
 	}

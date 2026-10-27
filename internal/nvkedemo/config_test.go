@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -121,11 +122,46 @@ func TestDemoNetworkSelection(t *testing.T) {
 	}
 }
 
+func TestDemoTenantWorkersSelection(t *testing.T) {
+	for _, tc := range []struct {
+		value       string
+		conformance bool
+		workers     int
+		fail        bool
+	}{
+		{"0", false, 0, false}, {"1", false, 1, false}, {"2", false, 2, false},
+		{"0", true, 0, false}, {"2", true, 2, false}, {"1", true, 0, true},
+		{"-1", false, 0, true}, {"3", false, 0, true},
+		{"1.5", false, 0, true}, {"'2'", false, 0, true}, {"true", false, 0, true},
+	} {
+		t.Run(tc.value+fmt.Sprint(tc.conformance), func(t *testing.T) {
+			contents := strings.Replace(fullDemoYAML, "run:\n", fmt.Sprintf("run:\n  tenantWorkers: %s\n  conformance: %t\n", tc.value, tc.conformance), 1)
+			file, err := LoadDemoFile(t.Context(), demoConfigPath(t, contents))
+			var cfg Config
+			if err == nil {
+				cfg, err = file.RunConfig(nil)
+			}
+			if tc.fail {
+				assertConfigUsage(t, err)
+				return
+			}
+			if err != nil || cfg.TenantWorkers != tc.workers || cfg.Conformance != tc.conformance {
+				t.Fatalf("worker selection lost: %+v %v", cfg, err)
+			}
+			file.Run.NVKR, file.Run.Runs = "", RunFileInputs{}
+			build, run, err := file.E2EConfig(nil)
+			if err != nil || run.TenantWorkers != tc.workers || run.Conformance != tc.conformance || build.Conformance != tc.conformance {
+				t.Fatalf("E2E selection changed worker or suite intent: %+v %+v %v", build, run, err)
+			}
+		})
+	}
+}
+
 func TestDemoCleanupRequiresStrictBoolean(t *testing.T) {
 	for _, test := range []struct {
 		value          string
 		valid, cleanup bool
-	}{{"false", true, false}, {"true", true, true}, {"'true'", false, false}, {"1", false, false}, {"null", false, false}, {"[]", false, false}} {
+	}{{"false", true, false}, {"true", true, true}, {"'true'", false, false}, {"yes", false, false}, {"on", false, false}, {"1", false, false}, {"null", false, false}, {"[]", false, false}} {
 		t.Run(test.value, func(t *testing.T) {
 			contents := strings.Replace(fullDemoYAML, "run:\n", "run:\n  cleanup: "+test.value+"\n", 1)
 			file, err := LoadDemoFile(t.Context(), demoConfigPath(t, contents))

@@ -26,6 +26,11 @@ func ImportLocal(ctx context.Context, environment []string, directory, repositor
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "source import canceled")
 	}
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 30*time.Minute)
+		defer cancel()
+	}
 	// LocalCommand deliberately rejects Git search-path separators in its
 	// explicit directory. Prefer private scratch on the workspace filesystem,
 	// using its closest ancestor without a separator when the path has colons.
@@ -45,17 +50,15 @@ func ImportLocal(ctx context.Context, environment []string, directory, repositor
 		return e.Wrap(e.CodeFetchFailed, err, "creating diagnostic source checkout")
 	}
 	query := func(args ...string) (string, error) {
-		bounded, cancel := context.WithTimeout(ctx, 30*time.Minute)
-		defer cancel()
-		cmd, err := LocalCommand(bounded, environment, checkout, args...)
+		cmd, err := LocalCommand(ctx, environment, checkout, args...)
 		if err != nil {
 			return "", err // Preserve the source owner's capability/admission code.
 		}
 		var output bytes.Buffer
 		cmd.Stdout, cmd.Stderr = &output, stderr
-		if err := ownedcmd.Run(bounded, cmd); err != nil {
-			if bounded.Err() != nil {
-				return "", e.Wrap(e.CodeTimeout, bounded.Err(), "diagnostic source command canceled")
+		if err := ownedcmd.Run(ctx, cmd); err != nil {
+			if ctx.Err() != nil {
+				return "", e.Wrap(e.CodeTimeout, ctx.Err(), "diagnostic source command canceled")
 			}
 			return "", e.Wrap(e.CodeFetchFailed, err, "importing diagnostic source")
 		}

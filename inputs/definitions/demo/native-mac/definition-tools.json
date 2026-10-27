@@ -20,8 +20,8 @@
         "nvke-installer-sources",
         "nvkectl",
         "oras",
-        "vmnet-helper",
-        "vmnet-run"
+        "vmnet-client",
+        "vmnet-helper"
       ],
       "format": "executable",
       "name": "native-tools-darwin-arm64",
@@ -29,7 +29,8 @@
     },
     {
       "components": [
-        "nerdctl"
+        "nerdctl",
+        "nvkr-site-identity-helper"
       ],
       "format": "executable",
       "name": "site-startup-tools-arm64",

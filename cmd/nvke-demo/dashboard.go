@@ -302,7 +302,7 @@ func dashboardLoopWithCleanupNotice(ctx context.Context, cancel context.CancelFu
 			return nil
 		}
 		noticeWritten = true
-		message := "Terminal display failed; waiting for owned cleanup."
+		message := "Terminal display failed; waiting for the work owner to return. Retained resources require explicit cleanup."
 		if view.recoveryWork != "" {
 			message += " Recovery workspace (configured, escaped): " + terminalText(view.recoveryWork)
 		}

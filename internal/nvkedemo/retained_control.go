@@ -29,12 +29,13 @@ const retainedControlLimit = 64 << 10
 // authorize a signal, a root operation, artifact verification or a Release.
 // The live server and connected kernel peer must authenticate every request.
 type retainedControlDescription struct {
-	Version  int    `json:"version"`
-	Work     string `json:"work"`
-	Selector string `json:"selector"`
-	Socket   string `json:"socket"`
-	Token    string `json:"token"`
-	PID      int    `json:"pid"`
+	Version        int    `json:"version"`
+	Work           string `json:"work"`
+	Selector       string `json:"selector"`
+	Socket         string `json:"socket"`
+	Token          string `json:"token"`
+	PID            int    `json:"pid"`
+	PeerGeneration string `json:"peerGeneration,omitempty"`
 }
 
 type retainedAccessDescription struct {
@@ -42,6 +43,7 @@ type retainedAccessDescription struct {
 	UIService             string
 	UIPort                int
 	UIHTTPObserved        bool
+	SiteQCOW              bool
 }
 
 type retainedControlSnapshot struct {
@@ -65,24 +67,27 @@ type retainedControlSnapshot struct {
 // restoration remains in a fresh foreground command using the network owner.
 // Neither a JSON request nor process existence is a joined-cleanup receipt.
 type retainedControl struct {
-	mu           sync.Mutex
-	owner        *retainedRuntime
-	description  retainedControlDescription
-	server       *http.Server
-	listener     *net.UnixListener
-	done         chan struct{}
-	serveErr     error
-	handlers     sync.WaitGroup
-	handlersDone chan struct{}
-	closing      bool
-	finish       chan struct{}
-	start        chan struct{}
-	started      bool
-	progress     *retainedProgress
-	detached     bool
-	joined       bool
-	finishing    bool
-	detach       func() error
+	mu                  sync.Mutex
+	owner               *retainedRuntime
+	description         retainedControlDescription
+	server              *http.Server
+	listener            *net.UnixListener
+	done                chan struct{}
+	serveErr            error
+	handlers            sync.WaitGroup
+	handlersDone        chan struct{}
+	closing             bool
+	finish              chan struct{}
+	start               chan struct{}
+	started             bool
+	progress            *retainedProgress
+	detached            bool
+	joined              bool
+	finishing           bool
+	detach              func() error
+	endpointCleanup     func() error
+	endpointCleanupOnce sync.Once
+	endpointCleanupErr  error
 }
 
 type retainedRequesterKey struct{}
@@ -95,7 +100,7 @@ func newRetainedControlWithProgress(ctx context.Context, owner *retainedRuntime,
 	if ctx == nil || !owner.issued() || !filepath.IsAbs(work) || filepath.Clean(work) != work || !operatorArgument(work) || detach == nil {
 		return nil, nvkrerr.New(nvkrerr.CodeUsage, "retained control requires its live owner and exact workspace")
 	}
-	if err := CheckSupervisorPeerCapability(ctx); err != nil {
+	if err := checkRetainedPeerCapability(ctx); err != nil {
 		return nil, err
 	}
 	if !filepath.IsAbs(selector) || filepath.Clean(selector) != selector || !operatorArgument(selector) {
@@ -106,13 +111,17 @@ func newRetainedControlWithProgress(ctx context.Context, owner *retainedRuntime,
 		return nil, nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "allocate private retained session")
 	}
 	token := hex.EncodeToString(random[:])
-	listener, err := net.ListenUnix("unix", &net.UnixAddr{Net: "unix", Name: "@nvke-retained-" + token[:32]})
+	generation, err := retainedPeerGeneration(ctx)
 	if err != nil {
-		return nil, nvkrerr.New(nvkrerr.CodeEngineCapability, "native retained control could not open; no service work started")
+		return nil, err
+	}
+	listener, endpointCleanup, err := listenRetainedEndpoint(ctx, token)
+	if err != nil {
+		return nil, err
 	}
 	control := &retainedControl{
-		owner: owner, listener: listener, done: make(chan struct{}), finish: make(chan struct{}), start: make(chan struct{}), detach: detach, progress: progress,
-		description: retainedControlDescription{Version: 1, Work: work, Selector: selector, Socket: listener.Addr().String(), Token: token, PID: os.Getpid()},
+		owner: owner, listener: listener, done: make(chan struct{}), finish: make(chan struct{}), start: make(chan struct{}), detach: detach, progress: progress, endpointCleanup: endpointCleanup,
+		description: retainedControlDescription{Version: 1, Work: work, Selector: selector, Socket: listener.Addr().String(), Token: token, PID: os.Getpid(), PeerGeneration: generation},
 	}
 	control.server = &http.Server{
 		Handler: http.HandlerFunc(control.handle), ReadHeaderTimeout: 5 * time.Second,
@@ -157,7 +166,7 @@ func (control *retainedControl) snapshot(ctx context.Context) (retainedControlSn
 		frames = control.progress.frames()
 	}
 	return retainedControlSnapshot{Version: 1, Work: control.description.Work, Selector: control.description.Selector, State: state.state, CheckedAt: state.checkedAt,
-		Access: retainedAccessDescription{access.kubectl, access.site, access.tenant, access.uiService, access.uiPort, access.uiHTTPObserved}, Detached: detached, Joined: joined, Progress: frames, NetworkStarted: networkStarted,
+		Access: retainedAccessDescription{access.kubectl, access.site, access.tenant, access.uiService, access.uiPort, access.uiHTTPObserved, access.siteQCOW}, Detached: detached, Joined: joined, Progress: frames, NetworkStarted: networkStarted,
 		TeardownReturned: returned, CleanupFailed: returned && cleanupErr != nil, OwnerExitSafe: returned && !errors.Is(cleanupErr, ErrUnjoined) && !errors.Is(cleanupErr, ErrRetainedControls), FailureCode: failureCode}, nil
 }
 
@@ -254,11 +263,8 @@ func (control *retainedControl) detachOwner(ctx context.Context) error {
 	control.owner.mu.Lock()
 	defer control.owner.mu.Unlock()
 	state := control.owner.snapshot.state
-	if state != retainedReady && state != retainedPartial {
-		return nvkrerr.New(nvkrerr.CodePreflightFailed, "only a held owner can acknowledge detachment")
-	}
 	control.mu.Lock()
-	if control.closing {
+	if control.closing || state != retainedReady && state != retainedPartial {
 		control.mu.Unlock()
 		return nvkrerr.New(nvkrerr.CodePreflightFailed, "closing retained owner cannot acknowledge detachment")
 	}
@@ -323,7 +329,12 @@ func (control *retainedControl) close(ctx context.Context) error {
 		}
 		select {
 		case <-handlersDone:
-			return errors.Join(err, serveErr)
+			control.endpointCleanupOnce.Do(func() {
+				if control.endpointCleanup != nil {
+					control.endpointCleanupErr = control.endpointCleanup()
+				}
+			})
+			return errors.Join(err, serveErr, control.endpointCleanupErr)
 		case <-ctx.Done():
 			return errors.Join(ErrUnjoined, err, serveErr, ctx.Err())
 		}
@@ -344,14 +355,14 @@ type retainedConnection struct {
 
 func connectRetained(ctx context.Context, description retainedControlDescription) (*retainedConnection, error) {
 	if ctx == nil || description.Version != 1 || !filepath.IsAbs(description.Work) || filepath.Clean(description.Work) != description.Work ||
-		!operatorArgument(description.Work) || !filepath.IsAbs(description.Selector) || filepath.Clean(description.Selector) != description.Selector || !operatorArgument(description.Selector) || description.PID <= 0 || len(description.Token) != 64 || description.Socket != "@nvke-retained-"+description.Token[:32] {
+		!operatorArgument(description.Work) || !filepath.IsAbs(description.Selector) || filepath.Clean(description.Selector) != description.Selector || !operatorArgument(description.Selector) || description.PID <= 0 || len(description.Token) != 64 || !validRetainedEndpoint(description.Socket, description.Token) {
 		return nil, nvkrerr.New(nvkrerr.CodeUsage, "retained connection requires an exact session description")
-	}
-	if _, err := hex.DecodeString(description.Token); err != nil {
-		return nil, nvkrerr.New(nvkrerr.CodeUsage, "retained session token description is invalid")
 	}
 	if _, bounded := ctx.Deadline(); !bounded {
 		return nil, nvkrerr.New(nvkrerr.CodeUsage, "retained connection requires a deadline")
+	}
+	if err := checkRetainedPeerCapability(ctx); err != nil {
+		return nil, err
 	}
 	dialed, err := (&net.Dialer{}).DialContext(ctx, "unix", description.Socket)
 	if err != nil {
@@ -361,7 +372,7 @@ func connectRetained(ctx context.Context, description retainedControlDescription
 		return nil, nvkrerr.New(nvkrerr.CodePreflightFailed, "selected retained owner is unavailable; no resource adoption attempted")
 	}
 	connection := dialed.(*net.UnixConn)
-	peer, err := ObserveSupervisorPeer(ctx, connection, description.PID)
+	peer, err := observeRetainedPeer(ctx, connection, description.PID, description.PeerGeneration)
 	if err != nil {
 		_ = connection.Close()
 		return nil, err

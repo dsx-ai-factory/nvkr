@@ -4,6 +4,7 @@
 package nvkedemo
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -49,7 +50,7 @@ printf 'private-diagnostic\n'
 				t.Fatalf("ordinary early diagnostic loss blocked cleanup: %v", err)
 			}
 			raw, err := os.ReadFile(events)
-			want := strings.Repeat("capture\n", 5) + "kind-delete\n"
+			want := strings.Repeat("capture\n", 6) + "kind-delete\n"
 			if mode == "missing kubeconfig" {
 				want = "kind-delete\n"
 			}
@@ -200,35 +201,50 @@ func TestNativeConsoleRetentionMatchesPinnedBackend(t *testing.T) {
 			"native-console-owned-instance-ttyS1.log": "disk.qcow2.ttyS1.log",
 		}},
 	} {
-		t.Run(row.layout, func(t *testing.T) {
-			simdir, out := privateTestDir(t), privateTestDir(t)
-			if err := os.MkdirAll(filepath.Join(simdir, row.layout, "owned-instance"), 0o700); err != nil {
-				t.Fatal(err)
-			}
-			for _, name := range []string{"console.log", "disk.qcow2.ttyS0.log", "disk.qcow2.ttyS1.log"} {
-				writeTenantFixture(t, filepath.Join(simdir, row.layout, "owned-instance", name), []byte("private-"+name), 0o600)
-			}
-			if err := retainNativeInstanceFiles(t.Context(), simdir, row.layout, out, "owned-instance"); err != nil {
-				t.Fatal(err)
-			}
-			entries, err := os.ReadDir(out)
-			if err != nil || len(entries) != len(row.want) {
-				t.Fatalf("unexpected backend console membership: %v %v", entries, err)
-			}
-			for name, source := range row.want {
-				path := filepath.Join(out, name)
-				raw, err := os.ReadFile(path)
-				info, statErr := os.Stat(path)
-				if err != nil || statErr != nil || string(raw) != "private-"+source || info.Mode().Perm() != 0o600 {
-					t.Fatalf("backend serial evidence not private and exact: %q %v %v", name, err, statErr)
+		for _, mode := range []string{"small", "at limit", "oversized"} {
+			t.Run(row.layout+"/"+mode, func(t *testing.T) {
+				simdir, out := privateTestDir(t), privateTestDir(t)
+				if err := os.MkdirAll(filepath.Join(simdir, row.layout, "owned-instance"), 0o700); err != nil {
+					t.Fatal(err)
 				}
-			}
-		})
+				contents := make(map[string][]byte)
+				for _, name := range []string{"console.log", "disk.qcow2.ttyS0.log", "disk.qcow2.ttyS1.log"} {
+					want := []byte("private-" + name)
+					if mode != "small" {
+						want = bytes.Repeat([]byte("."), 8<<20)
+						copy(want, "retained-beginning-"+name)
+						last := "latest-" + name
+						copy(want[len(want)-len(last):], last)
+					}
+					contents[name] = want
+					raw := want
+					if mode == "oversized" {
+						raw = append([]byte("discarded-prefix-"+name), want...)
+					}
+					writeTenantFixture(t, filepath.Join(simdir, row.layout, "owned-instance", name), raw, 0o600)
+				}
+				if err := retainNativeInstanceFiles(t.Context(), simdir, row.layout, out, "owned-instance"); err != nil {
+					t.Fatal(err)
+				}
+				entries, err := os.ReadDir(out)
+				if err != nil || len(entries) != len(row.want) {
+					t.Fatalf("unexpected backend console membership: %v %v", entries, err)
+				}
+				for name, source := range row.want {
+					path := filepath.Join(out, name)
+					raw, err := os.ReadFile(path)
+					info, statErr := os.Stat(path)
+					if err != nil || statErr != nil || !bytes.Equal(raw, contents[source]) || info.Mode().Perm() != 0o600 {
+						t.Fatalf("backend serial evidence not private and exact: %q %v %v", name, err, statErr)
+					}
+				}
+			})
+		}
 	}
 }
 
 func TestNativeSerialRetentionFailurePreservesOtherConsole(t *testing.T) {
-	for _, mode := range []string{"missing", "symlink", "oversized", "already retained", "canceled"} {
+	for _, mode := range []string{"missing", "symlink", "already retained", "canceled"} {
 		t.Run(mode, func(t *testing.T) {
 			simdir, out := privateTestDir(t), privateTestDir(t)
 			first := filepath.Join(simdir, "var/instances/owned-instance/disk.qcow2.ttyS0.log")
@@ -247,10 +263,6 @@ func TestNativeSerialRetentionFailurePreservesOtherConsole(t *testing.T) {
 					t.Fatal(err)
 				}
 				if err := os.Symlink(first+".original", first); err != nil {
-					t.Fatal(err)
-				}
-			case "oversized":
-				if err := os.Truncate(first, 8<<20+1); err != nil {
 					t.Fatal(err)
 				}
 			case "already retained":

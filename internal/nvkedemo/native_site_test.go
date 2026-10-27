@@ -202,7 +202,7 @@ instance_types:
 			if err := os.WriteFile(source, raw, 0o600); err != nil {
 				t.Fatal(err)
 			}
-			path, err := nativeSiteSeed(t.Context(), source, dir)
+			path, err := nativeSiteSeed(t.Context(), source, dir, NativeResources{})
 			original, readErr := os.ReadFile(source)
 			if readErr != nil || !bytes.Equal(original, raw) {
 				t.Fatal("source seed changed")
@@ -229,17 +229,11 @@ instance_types:
 			}
 			items := expected["instance_types"].([]any)
 			site := items[0].(map[string]any)
-			site["name"], site["cpu_count"], site["memory_gib"] = "native-site-cpu4-mem12gb-disk60gb", 4, 12
+			site["name"], site["memory_gib"] = "native-site-cpu6-mem12gb-disk60gb", 12
 			tenant := items[1].(map[string]any)
 			tenant["name"], tenant["cpu_count"], tenant["memory_gib"] = "cpu6-mem12gb-disk60gb", 6, 12
 			if !reflect.DeepEqual(actual, expected) {
 				t.Fatalf("runtime seed changed fields outside selected sizing: got=%v want=%v", actual, expected)
-			}
-			for _, network := range []string{"ovn", "upstream-ovn"} {
-				request, err := newTenantRequest("native-demo-tenant", network)
-				if err != nil || !reflect.DeepEqual(request.ControlPlane.NICo.Types, []string{tenant["id"].(string)}) || len(request.NodePools) != 1 || request.NodePools[0].NICo.Type != tenant["id"] {
-					t.Fatalf("control plane and worker must select the projected 6 CPU / 12 GiB type: %+v; %v", request, err)
-				}
 			}
 			legacy := []byte(fmt.Sprintf("  - id: %q\n    name: \"cpu4-mem6gb-disk60gb\"\n    site_id: %q\n    gpu_count: 0\n    cpu_count: 4\n    memory_gib: 6\n    disk_gib: 60\n", TenantInstanceType, SiteID))
 			projected, err := projectSeedFixture(legacy, plainSHA(legacy))
@@ -253,7 +247,7 @@ instance_types:
 func TestNativeSiteStartupNeverCopiesOrRunsHostCLI(t *testing.T) {
 	cfg := startupDescription()
 	cfg.Deployment = &NativeSiteDeployment{NicoURL: "http://172.30.0.1:18080", ImageURL: "http://172.30.0.1:18081/local.qcow2", ProfilesImage: "docker.io/library/cwe-profiles:local"}
-	data, err := SiteStartupUserData(t.Context(), cfg)
+	data, err := SiteStartupUserData(startupTestContext(t), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,152 +256,12 @@ func TestNativeSiteStartupNeverCopiesOrRunsHostCLI(t *testing.T) {
 		t.Fatal(err)
 	}
 	script := decoded.WriteFiles[0].Content
-	for _, forbidden := range []string{"nvkectl", "kind", "docker", "--disable-mtls"} {
+	for _, forbidden := range []string{"nvkectl", "kind create", "\ndocker ", "--disable-mtls"} {
 		if strings.Contains(script, forbidden) {
 			t.Fatalf("host control entered guest startup: %s", forbidden)
 		}
 	}
-	if !strings.Contains(script, "nerdctl --namespace k8s.io load") {
+	if !strings.Contains(script, "images import --local --digests --base-name ") {
 		t.Fatal("guest must import local runtime images")
-	}
-}
-
-func TestNativeDemoPackagePolicyPreservesCurrentSourceTemplate(t *testing.T) {
-	const tail = "\nruncmd:\n  - apt-get install -y nvke-agent nvke-kubeadm-distro-{{ trimPrefix .KubernetesVersion \"v\" }}\n"
-	for _, tc := range []struct {
-		name, data string
-		valid      bool
-	}{
-		{"source refresh enabled", "#cloud-config\npackage_update: true\npackage_upgrade: false\n" + tail, true},
-		{"already disabled", "#cloud-config\npackage_update: false\npackage_upgrade: false\n" + tail, true},
-		{"missing", "#cloud-config\npackage_upgrade: false\n", false},
-		{"duplicate", "#cloud-config\npackage_update: true\npackage_update: false\npackage_upgrade: false\n", false},
-		{"upgrades enabled", "#cloud-config\npackage_update: true\npackage_upgrade: true\n", false},
-		{"other format", "#!/bin/sh\npackage_update: true\npackage_upgrade: false\n", false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			init := map[string]any{"userDataTemplate": tc.data}
-			err := nativeDemoPackagePolicy(map[string]any{"machineInit": init})
-			if (err == nil) != tc.valid {
-				t.Fatalf("policy error=%v; valid=%v", err, tc.valid)
-			}
-			want := tc.data
-			if tc.valid {
-				want = strings.Replace(want, "\npackage_update: true\n", "\npackage_update: false\n", 1)
-			}
-			if init["userDataTemplate"] != want {
-				t.Fatal("startup policy changed unrelated source commands or a rejected template")
-			}
-		})
-	}
-}
-
-func TestNativeReleaseAppliesDemoPolicyToControlPlaneAndWorker(t *testing.T) {
-	for _, network := range []string{"", "ovn", "upstream-ovn"} {
-		for _, preload := range []bool{false, true} {
-			for _, sourceVersion := range []string{"1.4.0", "1.6.0"} {
-				t.Run(fmt.Sprintf("%s/preload=%t/source=%s", network, preload, sourceVersion), func(t *testing.T) {
-					testNativeReleasePolicies(t, network, preload, sourceVersion)
-				})
-			}
-		}
-	}
-}
-
-func testNativeReleasePolicies(t *testing.T, network string, preload bool, sourceVersion string) {
-	t.Helper()
-	installer, out := t.TempDir(), t.TempDir()
-	root := filepath.Join(installer, "controller/test/fixtures/releases")
-	if err := os.MkdirAll(root, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	template := "#cloud-config\npackage_update: true\npackage_upgrade: false\n" + strings.ReplaceAll(nativeWorkloadSourceRuncmd, "1.4.0", sourceVersion) + "\nphone_home:\n  post: all\n"
-	sources := make(map[string][]byte)
-	for _, kind := range []string{"machineimage", "clusterrelease", "nodepoolrelease"} {
-		spec := map[string]any{"machineImageRef": map[string]any{"name": "original"}, "machineInit": map[string]any{"userDataTemplate": template}}
-		if kind == "machineimage" {
-			spec = map[string]any{"operatingSystem": map[string]any{"version": "24.04"}, "nico": map[string]any{"ipxeScript": nativeMachineImageBootTemplate}}
-		}
-		raw, err := yaml.Marshal(map[string]any{"metadata": map[string]any{"name": "original"}, "spec": spec})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(root, "nvke-nico-vms-24.04-arm64-fde-"+kind+".yaml"), raw, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		sources[kind] = raw
-	}
-	attempt := nativeSiteAttempt{assets: NativeAssets{Installer: installer}, network: network}
-	if preload {
-		workload := filepath.Join(t.TempDir(), "workload.tar")
-		if err := os.WriteFile(workload, []byte("local transport fixture\n"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		ovnDigest := "sha256:" + strings.Repeat("b", 64)
-		attempt.assets.Images = map[string]NativeImageAsset{
-			"workload": {File: workload},
-			"ovn":      {File: workload, ManifestDigest: ovnDigest, Reference: "localhost/nvke/ovn-kubernetes@" + ovnDigest},
-		}
-	}
-	if err := attempt.releases(t.Context(), "http://172.30.0.1:8080/local.qcow2", "http://172.30.0.1:18080", out); err != nil {
-		t.Fatal(err)
-	}
-	request, err := newTenantRequest("native-demo-tenant", network)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, kind := range []string{"clusterrelease", "nodepoolrelease"} {
-		raw, err := os.ReadFile(filepath.Join(out, kind+".yaml"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		var doc map[string]any
-		if err := yaml.Unmarshal(raw, &doc); err != nil {
-			t.Fatal(err)
-		}
-		spec := doc["spec"].(map[string]any)
-		got := spec["machineInit"].(map[string]any)["userDataTemplate"].(string)
-		// NVKE 69ef9924's release CRDs admit equal counts of {{ and }}.
-		// Check the complete projected template, including the OVN chart values.
-		if strings.Count(got, "{{") != strings.Count(got, "}}") {
-			t.Fatalf("%s violates the pinned NVKE template-delimiter admission rule", kind)
-		}
-		if spec["machineImageRef"].(map[string]any)["name"] != TenantProfile || !strings.Contains(got, "\npackage_update: false\n") {
-			t.Fatalf("%s lost the selected image or package header", kind)
-		}
-		wantCommand := "DEBIAN_FRONTEND=noninteractive apt-get install -y -o DPkg::Lock::Timeout=600 nvke-cni-ovn-images-" + request.CNIVersion + " nvke-cni-ovn-charts-" + request.CNIVersion
-		var matches int
-		for _, command := range nativeWorkloadRenderedCommands(t, got, true) {
-			switch value := command.(type) {
-			case string:
-				if value == wantCommand {
-					matches++
-				}
-			case []any:
-				if len(value) == 3 && strings.Contains(value[2].(string), wantCommand+"\n") {
-					matches++
-				}
-			}
-		}
-		if matches != 1 {
-			t.Fatalf("%s did not render exactly one matched OVN package command", kind)
-		}
-		if preload {
-			if !strings.Contains(got, "NVKE_AGENT_SKIP_START=1") || !strings.Contains(got, "inspecti --quiet") {
-				t.Fatalf("%s did not apply the workload handoff before network projection", kind)
-			}
-		} else {
-			want := strings.Replace(template, "package_update: true", "package_update: false", 1)
-			want = strings.NewReplacer("nvke-cni-ovn-images-"+sourceVersion, "nvke-cni-ovn-images-"+request.CNIVersion, "nvke-cni-ovn-charts-"+sourceVersion, "nvke-cni-ovn-charts-"+request.CNIVersion).Replace(want)
-			if got != want {
-				t.Fatalf("%s changed unrelated source commands", kind)
-			}
-		}
-	}
-	for kind, before := range sources {
-		after, err := os.ReadFile(filepath.Join(root, "nvke-nico-vms-24.04-arm64-fde-"+kind+".yaml"))
-		if err != nil || !bytes.Equal(before, after) {
-			t.Fatalf("%s source fixture was changed: %v", kind, err)
-		}
 	}
 }

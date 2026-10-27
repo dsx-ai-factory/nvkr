@@ -14,11 +14,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
-	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -85,7 +85,7 @@ func TestProgressRunnerObservedBoundaries(t *testing.T) {
 			case "invalid phase":
 				phase = "../secret-progress-sentinel"
 			case "invalid timeout":
-				timeout = 0
+				timeout = -time.Second
 			case "storage failure":
 				if err := os.Chmod(work, 0o755); err != nil {
 					t.Fatal(err)
@@ -335,7 +335,12 @@ func TestProgressCombinedBuildOrdering(t *testing.T) {
 					ProgressEvent{Kind: ProcessExited, Name: "build-all", Status: "exited"}, phases[1])
 			}
 			want = append(want, ProgressEvent{Kind: laneLast, Name: "artifacts", Status: status})
-			if !reflect.DeepEqual(writer.events, want) {
+			selected := slices.IndexFunc(writer.events, func(event ProgressEvent) bool { return event.Kind == BuildPlanSelected })
+			if failLane == "prepare" && selected >= 0 || failLane != "prepare" && (selected < 0 || writer.events[selected].BuildPlan != nil) {
+				t.Fatal("missing fixture Plan did not preserve the presentation-only fallback")
+			}
+			boundaries := slices.DeleteFunc(slices.Clone(writer.events), func(event ProgressEvent) bool { return event.Kind == BuildPlanSelected })
+			if !reflect.DeepEqual(boundaries, want) {
 				t.Fatalf("events=%+v want=%+v", writer.events, want)
 			}
 		})
@@ -357,58 +362,6 @@ func TestProgressPlainWriterAndPresenterFailure(t *testing.T) {
 		if !reflect.DeepEqual(writer.events, phaseEvents("preflight-os", PhaseFinished)) {
 			t.Fatal(writer.events)
 		}
-	}
-}
-
-func TestProgressDeploymentFailureAndCleanupOrdering(t *testing.T) {
-	writer := &recordedProgress{}
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
-	if err := Run(ctx, Config{Progress: writer}); err == nil {
-		t.Fatal("invalid deployment succeeded")
-	}
-	want := []ProgressEvent{{Kind: DeploymentStarted, Name: "local-demo", Status: "started"}, {Kind: DeploymentFailed, Name: "local-demo", Status: "failed"}}
-	if !reflect.DeepEqual(writer.events, want) {
-		t.Fatal(writer.events)
-	}
-	// Model the wrapper's deferred boundary around an operation with deferred
-	// cleanup. Success presentation cannot run until cleanup has returned.
-	writer = &recordedProgress{}
-	cleaned := false
-	operation := func() (result error) {
-		boundary := beginProgress(writer, "local-demo", DeploymentStarted, DeploymentFinished, DeploymentFailed)
-		defer func() { boundary.finish(result) }()
-		defer func() { cleaned = true; result = errors.New("cleanup failed") }()
-		if len(writer.events) != 1 {
-			t.Fatal("premature deployment terminal event")
-		}
-		return nil
-	}
-	if operation() == nil || !cleaned || !reflect.DeepEqual(writer.events, want) {
-		t.Fatal("cleanup failure reported success")
-	}
-}
-
-func TestProgressInstallerAdmissionFailure(t *testing.T) {
-	t.Setenv("GIT_CONFIG_COUNT", "0")
-	for _, canceled := range []bool{false, true} {
-		t.Run(fmt.Sprint(canceled), func(t *testing.T) {
-			ctx, cancel := context.WithCancel(t.Context())
-			defer cancel()
-			code := nvkrerr.CodePreflightFailed
-			want := phaseEvents("installer-preparation", PhaseFailed)
-			if canceled {
-				cancel()
-				code = nvkrerr.CodeTimeout
-				want = nil // canceled before platform/environment/work admission
-			}
-			writer := &recordedProgress{}
-			_, err := prepareInstallerOnPlatform(ctx, BuildConfig{}, Config{Progress: writer}, "linux", "arm64")
-			var coded *nvkrerr.Error
-			if !errors.As(err, &coded) || coded.Code != code || !reflect.DeepEqual(writer.events, want) || canceled && !errors.Is(err, context.Canceled) {
-				t.Fatalf("installer admission lost owner failure: events=%+v err=%v", writer.events, err)
-			}
-		})
 	}
 }
 
@@ -503,46 +456,64 @@ func TestTenantPollingKeepsPrivateLogWithoutSuccessSpam(t *testing.T) {
 }
 
 func TestTenantCleanupReportsBalancedPrivateOperations(t *testing.T) {
-	for _, scenario := range []string{"deleted", "no-intent", "absent", "diagnostics-failed", "inventory-failed", "delete-failed", "wait-failed", "canceled"} {
+	for _, scenario := range []string{"deleted", "no-intent", "absent", "inventory-failed", "delete-failed", "wait-failed", "canceled"} {
 		t.Run(scenario, func(t *testing.T) {
 			work := privateTestDir(t)
 			cliDir := filepath.Join(work, "cli")
 			if err := os.Mkdir(cliDir, 0o700); err != nil {
 				t.Fatal(err)
 			}
-			row := tenantRow{Name: "private-tenant", ID: "private-owned-id", NICo: TenantProvider{OrgID, SiteID, VPCID}}
+			attempt := nativeCAPITenantFixture(t, GuestCIDR, "ovn")
+			request, err := attempt.namedTenantRequest(t.Context(), "private-tenant")
+			if err != nil {
+				t.Fatal(err)
+			}
+			ownership, err := newNativeCAPITenantOwnership(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			row := tenantRow{Name: request.Name, ID: "private-owned-id", Infra: request.Infra, ControlPlane: &request.ControlPlane}
 			encoded, err := json.Marshal([]tenantRow{row})
 			if err != nil {
 				t.Fatal(err)
 			}
+			pools, err := json.Marshal([]map[string]any{{"id": "private-worker-id", "name": request.NodePools[0].Name, "clusterID": row.ID, "infra": request.NodePools[0].Infra, "desiredNodeCount": request.NodePools[0].Count}})
+			if err != nil {
+				t.Fatal(err)
+			}
 			state := filepath.Join(work, "state")
-			script := "#!/bin/sh\nset -eu\ncase \"$1:$2\" in\n get:clusters)\n  [ \"$SCENARIO\" != inventory-failed ] || exit 7\n  if [ -f \"$STATE\" ]; then\n   [ \"$SCENARIO\" != wait-failed ] || exit 7\n   printf '[]'\n  elif [ \"$SCENARIO\" = absent ]; then printf '[]'; else printf '%s' \"$ROW\"; fi;;\n delete:cluster) [ \"$SCENARIO\" != delete-failed ] || exit 7; touch \"$STATE\";;\n *) exit 42;;\nesac\n"
+			script := `#!/bin/sh
+set -eu
+case "$1:$2" in
+ get:clusters)
+  [ "$SCENARIO" != inventory-failed ] || exit 7
+  if [ -f "$STATE" ]; then
+   [ "$SCENARIO" != wait-failed ] || exit 7
+   printf '[]'
+  elif [ "$SCENARIO" = absent ]; then printf '[]'; else printf '%s' "$ROW"; fi;;
+ get:nodepools) printf '%s' "$POOLS";;
+ delete:cluster) [ "$SCENARIO" != delete-failed ] || exit 7; touch "$STATE";;
+ *) exit 42;;
+esac
+`
 			if err = os.WriteFile(filepath.Join(cliDir, "nvkectl"), []byte(script), 0o700); err != nil {
 				t.Fatal(err)
 			}
-			if err = os.WriteFile(filepath.Join(work, "virsh"), []byte("#!/bin/sh\n[ \"$SCENARIO\" != diagnostics-failed ]\n"), 0o700); err != nil {
-				t.Fatal(err)
-			}
 			writer := &recordedProgress{}
-			env := []string{"PATH=" + work + ":/usr/bin:/bin", "SCENARIO=" + scenario, "STATE=" + state, "ROW=" + string(encoded)}
-			selected := tenant{name: row.Name, id: row.ID, intent: scenario != "no-intent", session: ManagementSession{Work: work, Runner: Runner{Work: work, Env: env, Progress: writer}}, domains: Runner{Env: env}}
+			env := []string{"PATH=/usr/bin:/bin", "SCENARIO=" + scenario, "STATE=" + state, "ROW=" + string(encoded), "POOLS=" + string(pools)}
+			selected := tenant{name: row.Name, id: row.ID, intent: scenario != "no-intent", session: ManagementSession{Work: work, Runner: Runner{Work: work, Env: env, Progress: writer}}, nativeCAPI: ownership}
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			if scenario == "canceled" {
 				cancel()
 			}
-			err = selected.close(ctx)
+			err = selected.restore(ctx)
 			wantFailure := scenario == "inventory-failed" || scenario == "delete-failed" || scenario == "wait-failed" || scenario == "canceled"
 			if (err != nil) != wantFailure {
 				t.Fatalf("cleanup policy changed: %v", err)
 			}
-			want := []ProgressEvent{{Kind: PhaseStarted, Name: "tenant-cleanup", Status: "started"}}
-			diagnosticLast := PhaseFinished
-			if scenario == "diagnostics-failed" || scenario == "canceled" {
-				diagnosticLast = PhaseFailed
-			}
-			want = append(want, phaseEvents("tenant-diagnostics", diagnosticLast)...)
-			if scenario == "deleted" || scenario == "diagnostics-failed" || scenario == "delete-failed" || scenario == "wait-failed" {
+			var want []ProgressEvent
+			if scenario == "deleted" || scenario == "delete-failed" || scenario == "wait-failed" {
 				deleteLast := PhaseFinished
 				if scenario == "delete-failed" {
 					deleteLast = PhaseFailed
@@ -556,11 +527,6 @@ func TestTenantCleanupReportsBalancedPrivateOperations(t *testing.T) {
 					want = append(want, phaseEvents("tenant-deletion-wait", waitLast)...)
 				}
 			}
-			cleanupLast := phaseEvents("tenant-cleanup", PhaseFinished)[1]
-			if wantFailure {
-				cleanupLast = phaseEvents("tenant-cleanup", PhaseFailed)[1]
-			}
-			want = append(want, cleanupLast)
 			if !reflect.DeepEqual(writer.events, want) {
 				t.Fatalf("unbalanced cleanup observations: %+v want %+v", writer.events, want)
 			}

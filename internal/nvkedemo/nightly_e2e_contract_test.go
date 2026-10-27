@@ -329,16 +329,26 @@ func nightlyRuntimeRelease() lifecycle.Release {
 	release := lifecycle.Release{}
 	for _, role := range runtimeImages {
 		digest := "sha256:" + strings.Repeat("a", 64)
-		release.Artifacts = append(release.Artifacts, lifecycle.Artifact{Name: role + "-image-arm64", Kind: lifecycle.OutputOCI, Digest: digest, Reference: "registry.example:5000/team/" + role + "@" + digest})
+		release.Artifacts = append(release.Artifacts, lifecycle.Artifact{Name: role + "-image-arm64", Kind: lifecycle.OutputOCI, Digest: digest, Reference: "registry.example:5000/team/" + role + "@" + digest, Components: []string{role + "-image"}})
 	}
 	return release
 }
 
 func TestNightlyRuntimeImageRolesPreserveExactRegistryAndDigest(t *testing.T) {
+	plan, _ := runtimeValueInputs(t)
+	for i := range plan.Builds {
+		if plan.Builds[i].Name == "temporal-server-image-arm64" {
+			plan.Builds[i].ResolvedComponents[0].Prebuilt.Image = "temporalio/server:9.4.2"
+		}
+	}
 	release := nightlyRuntimeRelease()
-	values, err := nightlyRuntimeValues(release)
+	values, err := nightlyRuntimeValues(plan, release)
 	if err != nil {
 		t.Fatal(err)
+	}
+	image := values["temporal"].(map[string]any)["server"].(map[string]any)["image"].(map[string]any)
+	if image["tag"] != "9.4.2@sha256:"+strings.Repeat("a", 64) {
+		t.Fatal("nightly ignored its selected producer tag", image)
 	}
 	seen := map[string]int{}
 	var walk func(map[string]any)
@@ -387,7 +397,7 @@ func TestNightlyRuntimeImageRolesPreserveExactRegistryAndDigest(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			changed := nightlyRuntimeRelease()
 			test.change(&changed)
-			_, err := nightlyRuntimeValues(changed)
+			_, err := nightlyRuntimeValues(plan, changed)
 			assertNightlyCode(t, err, e.CodeVerifyFailed)
 		})
 	}

@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
@@ -307,8 +308,14 @@ func TestNightlyBetaSiteSourceContract(t *testing.T) {
 		if err := nightlySource(t.Context(), runner, source, profile.HarnessCommit); err != nil {
 			t.Fatal(err)
 		}
-	} else if err := verifyInstaller(t.Context(), runner, source); err != nil {
-		t.Fatal(err)
+	} else {
+		selected, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "inputs/catalogs/tools/native")))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := nightlySource(t.Context(), runner, source, selected.Components["nvke-installer-sources"].Commit); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := bootstrapCA(t.Context(), ManagementSession{Work: work, Runner: runner}); err != nil {
 		t.Fatal(err)

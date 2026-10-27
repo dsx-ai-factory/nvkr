@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
@@ -38,6 +39,7 @@ func main() {
 }
 
 func newApp() *cli.App {
+	var workCancel context.CancelFunc
 	app := &cli.App{
 		Name:                 "nvkr",
 		Usage:                "define, run, and verify immutable release workflows",
@@ -45,6 +47,33 @@ func newApp() *cli.App {
 		HideHelpCommand:      true,
 		EnableBashCompletion: true,
 		OnUsageError:         codedUsageError,
+		// A downstream process owner passes scheduling data separately from
+		// authored inputs. WithDeadline preserves any earlier caller deadline.
+		Flags: []cli.Flag{&cli.StringFlag{Name: "work-deadline", Hidden: true, EnvVars: []string{"NVKR_WORK_DEADLINE"}}},
+		Before: func(c *cli.Context) error {
+			value := c.String("work-deadline")
+			if value == "" {
+				return nil
+			}
+			deadline, err := time.Parse(time.RFC3339Nano, value)
+			if err != nil {
+				return nvkrerr.Wrap(nvkrerr.CodeUsage, err, "work deadline must be RFC3339")
+			}
+			if !deadline.After(time.Now()) {
+				return nvkrerr.New(nvkrerr.CodeTimeout, "work deadline has expired")
+			}
+			c.Context, workCancel = context.WithDeadline(c.Context, deadline)
+			if err := c.Err(); err != nil {
+				return nvkrerr.Wrap(nvkrerr.CodeTimeout, err, "work canceled before command execution")
+			}
+			return nil
+		},
+		After: func(_ *cli.Context) error {
+			if workCancel != nil {
+				workCancel()
+			}
+			return nil
+		},
 		Action: func(c *cli.Context) error {
 			if c.Args().Present() {
 				return nvkrerr.New(nvkrerr.CodeUsage, "unknown command %q", c.Args().First())

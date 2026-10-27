@@ -184,6 +184,22 @@ components:
             - linux/arm64
         source: nvke-nicosim
         writeDir: controller/nico-sim/bin
+    nvkr-site-identity-helper:
+        artifactPath: bin/nvkr-site-identity-helper
+        buildCommand:
+            - bash
+            - -euc
+            - |
+              export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+              test "$(go env GOVERSION)" = "go$(cat .go-version)"
+              go build -trimpath -buildvcs=false -o bin/nvkr-site-identity-helper ./cmd/nvkr-site-identity-helper
+        cgo: false
+        fromSource: true
+        outputType: host-package
+        platforms:
+            - linux/arm64
+        source: nvkr-site-identity
+        writeDir: bin
     nvke-installer-sources:
         artifactPath: bin/nvke-installer-sources.tar.gz
         buildCommand:
@@ -192,15 +208,20 @@ components:
             - |
               set -o pipefail
               printf '%s\n' "${NKECTL_COMMIT:?}" > bin/SOURCE_COMMIT
+              unset CAPI_VERSION
+              make --no-print-directory -s -f make/tool-versions.mk \
+                --eval='nvkr-capi-version: ; @printf "%s\n" "$(CAPI_VERSION)"' \
+                nvkr-capi-version > bin/CAPI_VERSION
               tar --sort=name --format=ustar --mtime="@${SOURCE_DATE_EPOCH:?}" \
                 --owner=0 --group=0 --numeric-owner --mode=u=rwX,go=rX \
                 -cf - make/tool-versions.mk deploy/nvke-deploy.sh deploy/lib deploy/nico \
+                cli/internal/bootstrap/sitespec/template.yaml \
                 controller/deploy/charts/controller nktp/deploy/charts/nktp \
                 controller/hack/apply-capi-spiffe-exec-auth.sh \
                 controller/deploy/k8s/capi-spiffe-exec-auth \
                 controller/test/fixtures/releases \
                 controller/nico-sim/internal/seed/default-seed.yaml controller/nico-sim/ui \
-                -C bin SOURCE_COMMIT | gzip -n > bin/nvke-installer-sources.tar.gz
+                -C bin SOURCE_COMMIT CAPI_VERSION | gzip -n > bin/nvke-installer-sources.tar.gz
         cgo: false
         fromSource: true
         outputType: tarball
@@ -298,7 +319,7 @@ components:
                 none: true
             releaseExecutable: true
         source: vmnet-helper
-    vmnet-run:
+    vmnet-client:
         outputType: host-package
         platforms:
             - darwin/arm64
@@ -306,11 +327,27 @@ components:
             evidence:
                 none: true
             releaseExecutable: true
-        source: vmnet-run
+        source: vmnet-client
 kind: SourceBuildRegistry
 metadata:
     name: nvke-native-tools
 sources:
+    nvkr-site-identity:
+        constraint: '*'
+        repo: https://github.com/dsx-ai-factory/nvkr.git
+        toolchainImagesByArch:
+            arm64: golang@sha256:288557fbc328e4ef9a78bae2eb44f24447029ff08667be883d79eeaa9029cf0c
+        vendorCommand:
+            - bash
+            - -euc
+            - |
+              export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+              pins="$(sha256sum go.mod go.sum)"
+              timeout --kill-after=10s 540s go mod download
+              printf '%s\n' "$pins" | sha256sum --quiet -c -
+              GOPROXY=off timeout --kill-after=10s 60s go mod verify
+              GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+              printf '%s\n' "$pins" | sha256sum --quiet -c -
     packer:
         constraint: 1.15.4
         repo: https://github.com/hashicorp/packer
@@ -479,18 +516,20 @@ sources:
             platform: linux/arm64
             url: https://github.com/oras-project/oras/releases/download/{{.Tag}}/oras_{{.Version}}_linux_arm64.tar.gz
     vmnet-helper:
-        constraint: 0.13.0
+        constraint: 0.10.0
         repo: https://github.com/nirs/vmnet-helper
         tool:
             executablePath: opt/vmnet-helper/bin/vmnet-helper
             format: tar-gzip
             platform: darwin/arm64
             url: https://github.com/nirs/vmnet-helper/releases/download/{{.Tag}}/vmnet-helper.tar.gz
-    vmnet-run:
-        constraint: 0.13.0
+    # The selected NICoSim uses vmnet-client's --unprivileged contract.
+    # Upstream v0.11 renamed the command and removed that flag.
+    vmnet-client:
+        constraint: 0.10.0
         repo: https://github.com/nirs/vmnet-helper
         tool:
-            executablePath: opt/vmnet-helper/bin/vmnet-run
+            executablePath: opt/vmnet-helper/bin/vmnet-client
             format: tar-gzip
             platform: darwin/arm64
             url: https://github.com/nirs/vmnet-helper/releases/download/{{.Tag}}/vmnet-helper.tar.gz

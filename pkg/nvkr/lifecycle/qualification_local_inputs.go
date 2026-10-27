@@ -27,6 +27,18 @@ type localQualificationInputs struct {
 	planBytes, runBytes, inputBytes []byte
 }
 
+// InspectLocalRunInputs rederives a completed local Run's frozen metadata from
+// its captured compiler inputs. The returned Plan and Run are detached,
+// descriptive values, not receipts. No payload is opened or accepted; consumers
+// must still verify the selected artifact bytes through the owning modules.
+func InspectLocalRunInputs(ctx context.Context, attemptDirectory string) (*factory.Plan, Run, error) {
+	inputs, err := loadLocalQualificationInputs(ctx, attemptDirectory)
+	if err != nil {
+		return nil, Run{}, err
+	}
+	return inputs.plan, inputs.run, nil
+}
+
 // loadLocalQualificationInputs snapshots metadata under one held attempt
 // directory, rejects an incomplete commit, and rederives every required slot
 // from the original compiler reads. It never consults the current checkout.

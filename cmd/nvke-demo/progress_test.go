@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -19,6 +20,29 @@ import (
 )
 
 type failedProgressWriter struct{ short bool }
+
+func TestRetainedInstructionsSurviveFailedTerminalExit(t *testing.T) {
+	const instructions = "SESSION='/private/fixture'\nDEMO='/private/demo'\n\"$DEMO\" status --session \"$SESSION\"\n\"$DEMO\" cleanup --session \"$SESSION\"\n"
+	for _, success := range []bool{false, true} {
+		t.Run(fmt.Sprint(success), func(t *testing.T) {
+			var out bytes.Buffer
+			writer := &checkedWriter{out: &out, retainedInstructions: instructions}
+			writer.retainResult("PASS (retained): synthetic successful observation")
+			writer.replayResults(success)
+			if !strings.Contains(out.String(), instructions) || strings.Contains(out.String(), "PASS (retained):") != success {
+				t.Fatal("terminal exit lost recovery commands or invented success", out.String())
+			}
+		})
+	}
+}
+
+func TestRetainedInstructionsRejectUnissuedPresentation(t *testing.T) {
+	var out bytes.Buffer
+	writer := &checkedWriter{out: &out, cancel: func() {}}
+	if err := writer.WriteRetainedInstructions(nvkedemo.RetainedInstructions{}); err == nil {
+		t.Fatal("unissued instructions crossed presentation boundary")
+	}
+}
 
 func TestBuildRunLocatorsSurviveConciseOutputAndReplay(t *testing.T) {
 	const locators = "Artifacts Run: /workspace/.nvkr/runs/artifacts-001\nNative tools Run: /workspace/.nvkr/native-tools/runs/tools-001\n"
@@ -270,8 +294,8 @@ func TestDashboardProgressOmitsMechanicalTraceButKeepsFailures(t *testing.T) {
 				view = newDashboard()
 				w.observer = view
 			}
-			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: "create-management"})
-			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "create-management"})
+			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseStarted, Name: "native-site-guest"})
+			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.PhaseFinished, Name: "native-site-guest"})
 			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-kubeconfig", Elapsed: time.Minute, Remaining: 59 * time.Minute})
 			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.DeploymentFailed, Name: "private-check"})
 			if !strings.Contains(out.String(), "[FAIL 0s] private-check") || w.failedPhase != "private-check" {
@@ -282,7 +306,7 @@ func TestDashboardProgressOmitsMechanicalTraceButKeepsFailures(t *testing.T) {
 					t.Fatalf("unexpected mechanical trace for dashboard=%v: %q", dashboardMode, out.String())
 				}
 			}
-			if dashboardMode && (view.siteStages[0].states[0] != "observed" || view.tenantStages[0].states[0] != "running") {
+			if dashboardMode && (view.siteStages[0].state != "observed" || view.tenantStages[0].state != "running") {
 				t.Fatal("suppressed trace lost typed checklist observations")
 			}
 		})
@@ -308,7 +332,7 @@ func TestProgressGuestDescriptionsUseClosedPublicFieldsOnly(t *testing.T) {
 					t.Fatal("guest event was not routed directly to dashboard")
 				}
 			} else {
-				for _, want := range []string{"Control plane: VM running", "Worker: VM paused", "infrastructure Ready=True (not Kubernetes Ready)", "console observed=true"} {
+				for _, want := range []string{"Control plane: NICo Ready", "Worker: NICo Ready", "Infra Ready=True; VM running", "console observed=true (not Kubernetes Ready)"} {
 					if !strings.Contains(out.String(), want) {
 						t.Fatalf("missing closed public description %q: %s", want, out.String())
 					}
@@ -333,7 +357,7 @@ func TestProgressGuestProviderFailureWithoutInstance(t *testing.T) {
 	_, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	writer := &checkedWriter{out: &out, started: time.Now(), cancel: cancel}
-	writer.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantGuests, Name: "private-id", Status: "private-error", Guests: [2]nvkedemo.TenantGuestObservation{
+	writer.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantGuests, Name: "private-id", Status: "private-error", Guests: [3]nvkedemo.TenantGuestObservation{
 		{Role: nvkedemo.TenantGuestControlPlane},
 		{Role: nvkedemo.TenantGuestWorker, ProvisioningFailure: nvkedemo.TenantInstanceCreateFailed},
 	}})
@@ -394,6 +418,19 @@ func TestProgressGuestsEmitOnlyChangesOrObservedGrowth(t *testing.T) {
 			writer.Report(event)
 			if out.Len() != 0 {
 				t.Fatal("unchanged snapshot repeated its role rows")
+			}
+		})
+	}
+}
+
+func TestProgressReportsConformanceThreeNodeDenominator(t *testing.T) {
+	for _, expected := range []int{2, 3} {
+		t.Run(fmt.Sprint(expected), func(t *testing.T) {
+			var out bytes.Buffer
+			w := &checkedWriter{out: &out, started: time.Now()}
+			w.Report(nvkedemo.ProgressEvent{Kind: nvkedemo.TenantWaiting, Name: "tenant-nodes", ExpectedNodes: expected, RegisteredNodes: expected, ReadyNodes: expected, Remaining: time.Hour})
+			if !strings.Contains(out.String(), fmt.Sprintf("%d/%d Ready", expected, expected)) {
+				t.Fatalf("wrong node denominator: %s", out.String())
 			}
 		})
 	}

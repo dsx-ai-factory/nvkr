@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+kind: Definition
+metadata:
+  name: nvke-tutorial-amd64
+  description: Build the Linux amd64 NVKE CLI, controller image and image-bound controller chart from pinned source.
+catalog:
+  base: ../../../inputs/catalogs/nvke/release
+sbomTool: syft
+cosignTool: cosign
+outputs:
+  - name: nvke-controller
+    platform: linux/amd64
+    format: oci
+    components: [nvke-controller]
+  - name: nvke-controller-chart
+    platform: linux/amd64
+    format: helm-oci
+    components: [nvke-controller-chart]
+    helm:
+      images:
+        controller: nvke-controller
+  - name: nvkectl
+    platform: linux/amd64
+    format: executable
+    components: [nvkectl]
