@@ -1,0 +1,42 @@
+name: Partition result diagnostic worker
+on:
+  workflow_call:
+    inputs:
+      mode:
+        type: string
+        required: true
+    outputs:
+      results:
+        value: ${{ jobs.report.outputs.results }}
+permissions: {}
+jobs:
+  producer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - env:
+          MODE: ${{ inputs.mode }}
+        run: |
+          case "$MODE" in
+            success) exit 0 ;;
+            failure) exit 1 ;;
+            cancel) sleep 90 ;;
+            *) exit 2 ;;
+          esac
+  independent:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - run: ':'
+  report:
+    needs: [producer, independent]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions: {}
+    outputs:
+      results: ${{ toJSON(needs) }}
+    steps:
+      - run: ':'
