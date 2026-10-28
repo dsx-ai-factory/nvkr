@@ -71,7 +71,7 @@ resolved distribution/platform route (ADR-12). Factory snapshots the full author
 rederives its complete graph. Local Run execution now joins original producer bytes, retained-content SBOM,
 terminal observation and unsigned local provenance on a matching native Linux host. It requires a bounded
 context, complete private-volume inspection profile and exact selected scanner pin. The local CLI supplies
-that deadline through its positive `--timeout` option (default one hour), preserving earlier caller deadlines. Static profile/target
+an optional positive `--timeout` deadline, preserving earlier caller deadlines. Its default zero leaves existing local lanes unbounded at the CLI; native Debian execution still requires a bounded caller context or explicit timeout. Static profile/target
 admission precedes attempt reservation; factory producer admission precedes its workspace preparation,
 and workspace-bound inspector/capacity admission precedes source/production. Direct-node, GitHub,
 whole-pipeline, signing and publication paths

@@ -156,6 +156,11 @@ func AdmitLocal(ctx context.Context, plan *Plan, options LocalRunOptions) error 
 	if err := validateLocalWorkspace(options.Workspace, plan); err != nil {
 		return err
 	}
+	if !options.DryRun {
+		if err := admitLocalDebianHost(ctx, plan); err != nil {
+			return err
+		}
+	}
 	if err := requireLocalDebianRuntimeOption(plan, options); err != nil {
 		return err
 	}
@@ -241,22 +246,21 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	result *LocalRunResult,
 	returnErr error,
 ) {
-	if hasLocalDebianBuild(plan) {
-		raw, err := canonical.Marshal(plan)
-		if err != nil {
-			return nil, err
-		}
-		var frozen Plan
-		if err := canonical.UnmarshalExact(raw, &frozen); err != nil {
-			return nil, err
-		}
-		plan = &frozen
+	var freezeErr error
+	plan, freezeErr = freezeLocalDebianPlan(plan)
+	if freezeErr != nil {
+		return nil, freezeErr
 	}
 	if err := admitLocalPlanBase(ctx, plan); err != nil {
 		return nil, err
 	}
 	if err := validateLocalWorkspace(options.Workspace, plan); err != nil {
 		return nil, err
+	}
+	if !options.DryRun {
+		if err := admitLocalDebianHost(ctx, plan); err != nil {
+			return nil, err
+		}
 	}
 	if err := requireLocalDebianRuntimeOption(plan, options); err != nil {
 		return nil, err

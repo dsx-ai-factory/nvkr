@@ -38,19 +38,10 @@ func admitLocalDebianPlan(ctx context.Context, plan *Plan) error {
 	if !hasLocalDebianBuild(plan) {
 		return nil
 	}
-	if runtime.GOOS != "linux" {
-		return e.New(e.CodeEngineCapability, "native package execution requires Linux")
-	}
-	if _, ok := ctx.Deadline(); !ok {
-		return e.New(e.CodeEngineCapability, "native package execution requires bounded context")
-	}
 	if len(plan.Builds) != 1 || len(plan.LifecycleOutputs) != 1 || plan.LifecycleOutputs[0].Kind != authored.OutputDebianPackage || plan.Definition.SBOMTool == "" {
 		return e.New(e.CodeEngineCapability, "local native package execution requires one standalone inspected Debian output")
 	}
 	build := plan.Builds[0]
-	if build.Platform != "linux/"+runtime.GOARCH {
-		return e.New(e.CodeEngineCapability, "native package target must match execution host")
-	}
 	scanner, ok := plan.CatalogSnapshot.Tools[plan.Definition.SBOMTool]
 	if !ok {
 		return e.New(e.CodeProvenanceMissing, "native package requires selected catalog scanner")
@@ -71,6 +62,23 @@ func admitLocalDebianPlan(ctx context.Context, plan *Plan) error {
 		default:
 			return e.New(e.CodeEngineCapability, "native package graph contains unsupported operation %s", node.Kind)
 		}
+	}
+	return nil
+}
+
+func admitLocalDebianHost(ctx context.Context, plan *Plan) error {
+	if !hasLocalDebianBuild(plan) {
+		return nil
+	}
+	if runtime.GOOS != "linux" {
+		return e.New(e.CodeEngineCapability, "native package execution requires Linux")
+	}
+	if _, ok := ctx.Deadline(); !ok {
+		return e.New(e.CodeEngineCapability, "native package execution requires bounded context")
+	}
+	build := plan.Builds[0]
+	if build.Platform != "linux/"+runtime.GOARCH {
+		return e.New(e.CodeEngineCapability, "native package target must match execution host")
 	}
 	return nil
 }

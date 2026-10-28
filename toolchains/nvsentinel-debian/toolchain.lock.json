@@ -7,28 +7,32 @@
       "platform": "linux/amd64",
       "goImage": "docker.io/library/golang@sha256:eef6a67266eeed3c86dd47fd01b32faa8bf0229eb83eb3d4d466e80391bd3820",
       "ubuntuImage": "docker.io/library/ubuntu@sha256:f610ab94648195aa356059f5b41d6085c9d4d903c072430cdd1af7bdb646106b",
-      "localImageID": "sha256:9052022d36321b194f22be6559fc6f6aaba1dc7fb0e6ce096a54cad7a1e2a4b4"
+      "localImageID": "sha256:9052022d36321b194f22be6559fc6f6aaba1dc7fb0e6ce096a54cad7a1e2a4b4",
+      "localRepositoryDigest": "docker.io/library/nvkr-nvsentinel-ubuntu-24.04-amd64@sha256:1899450dc69deea10ed06d07de70fd2bf6b4d3cb6952c679d359cdcd6b6376e7"
     },
     {
       "distribution": "ubuntu-24.04",
       "platform": "linux/arm64",
       "goImage": "docker.io/library/golang@sha256:6c83d163c89d1dbe66f8fc466870d66fe6325d15bb5ad1730cdc0b482fab1eec",
       "ubuntuImage": "docker.io/library/ubuntu@sha256:08571ca13e00ca07a2a84eab83a959b4242e22cceb16486a11bef1428c9e93a7",
-      "localImageID": "sha256:43c86eb0e5c137f17491712db11829b971e291fbce2dc41ab70d25dece131c78"
+      "localImageID": "sha256:43c86eb0e5c137f17491712db11829b971e291fbce2dc41ab70d25dece131c78",
+      "localRepositoryDigest": "docker.io/library/nvkr-nvsentinel-ubuntu-24.04-arm64@sha256:3ebca79a900100ed1ef6ee9903b7d26a0ee45320a9dff49f91610142d8d11581"
     },
     {
       "distribution": "ubuntu-26.04",
       "platform": "linux/amd64",
       "goImage": "docker.io/library/golang@sha256:eef6a67266eeed3c86dd47fd01b32faa8bf0229eb83eb3d4d466e80391bd3820",
       "ubuntuImage": "docker.io/library/ubuntu@sha256:88a381d5b5eeb2b35d3ad70925a362c37ce569daf43ede89ff818ec20e4d3794",
-      "localImageID": "sha256:9c87fbc5a479e56211f40c8ff294da9558636f4ab12116dfeb66b02fc3e4763e"
+      "localImageID": "sha256:9c87fbc5a479e56211f40c8ff294da9558636f4ab12116dfeb66b02fc3e4763e",
+      "localRepositoryDigest": "docker.io/library/nvkr-nvsentinel-ubuntu-26.04-amd64@sha256:fb19d5e7aa08d6d870eabff80fb012d6edf1c73cebad636f3d977bbbc7ad5eb8"
     },
     {
       "distribution": "ubuntu-26.04",
       "platform": "linux/arm64",
       "goImage": "docker.io/library/golang@sha256:6c83d163c89d1dbe66f8fc466870d66fe6325d15bb5ad1730cdc0b482fab1eec",
       "ubuntuImage": "docker.io/library/ubuntu@sha256:3ad1c71aa6b7e477f7aa91445a5442fbb163742849393b511661a88081c3d7a2",
-      "localImageID": "sha256:a9d6d674f464ee81202fae2c6ed62597109c1248e59a07753a45948c8f2804a8"
+      "localImageID": "sha256:a9d6d674f464ee81202fae2c6ed62597109c1248e59a07753a45948c8f2804a8",
+      "localRepositoryDigest": "docker.io/library/nvkr-nvsentinel-ubuntu-26.04-arm64@sha256:257df633515584e9d56f9679042afb9f2ef2cd0c6c2d9d6f2691a6bbb31effcf"
     }
   ]
 }

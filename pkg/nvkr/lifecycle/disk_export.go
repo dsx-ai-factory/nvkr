@@ -4,6 +4,7 @@
 package lifecycle
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -12,8 +13,12 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 	"golang.org/x/sys/unix"
 )
 
@@ -404,6 +409,24 @@ func (transaction *diskExportTransaction) observeDebian(ctx context.Context, slo
 	if len(slot.Components) != 1 || observation.Component != slot.Components[0] || observation.Subject != slot.MemberArtifactID || observation.BuildDigest != slot.BuildDigest {
 		return Artifact{}, e.New(e.CodeVerifyFailed, "native package staging changes original named output")
 	}
+	if len(document) == 0 || len(predicate) == 0 {
+		return Artifact{}, e.New(e.CodeProvenanceMissing, "native package staging has incomplete evidence")
+	}
+	// The original exporter owns semantic inspection and receipt authentication.
+	// Recompute the existing typed document identity at the durable-copy boundary
+	// so sidecar bytes cannot silently differ from that terminal observation.
+	var bom sbom.BOM
+	if err := canonical.UnmarshalExact(document, &bom); err != nil {
+		return Artifact{}, e.Wrap(e.CodeVerifyFailed, err, "decoding staged Debian document")
+	}
+	encoded, err := canonical.Marshal(bom)
+	if err != nil {
+		return Artifact{}, e.Wrap(e.CodeVerifyFailed, err, "encoding staged Debian document")
+	}
+	digest, err := canonical.Digest(canonical.KindSBOM, bom)
+	if err != nil || digest != observation.SBOMDigest || !bytes.Equal(encoded, document) {
+		return Artifact{}, e.Wrap(e.CodeVerifyFailed, err, "staged Debian document differs from terminal SBOM binding")
+	}
 	for _, item := range []struct {
 		suffix string
 		data   []byte
@@ -431,7 +454,14 @@ func (transaction *diskExportTransaction) observeDebian(ctx context.Context, slo
 			return Artifact{}, e.Wrap(e.CodeVerifyFailed, writeErr, "staging native package evidence")
 		}
 	}
-	return Artifact{Name: slot.Name, Kind: slot.Kind, Digest: observation.Digest, BuildDigest: observation.BuildDigest, Components: append([]string(nil), slot.Components...), Reference: path}, nil
+	artifact := Artifact{Name: slot.Name, Kind: slot.Kind, Digest: observation.Digest, BuildDigest: observation.BuildDigest, Components: append([]string(nil), slot.Components...), Reference: path,
+		Debian: &delivery.DebianOutput{PlanDigest: observation.PlanDigest, Subject: observation.Subject,
+			Component: observation.Component, InputDigest: observation.InputDigest, Target: observation.Target,
+			Size: observation.Size, SBOMDigest: observation.SBOMDigest, PredicateDigest: pipeline.FileDigest(predicate)}}
+	if err := artifact.Validate(); err != nil {
+		return Artifact{}, err
+	}
+	return artifact, nil
 }
 
 func finishNativeStage(file *os.File) error {

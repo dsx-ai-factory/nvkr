@@ -118,7 +118,9 @@ observation separately identifies the exact archive, named Build/target and insp
 fields, ambient GitHub variables and a replaced receipt facade cannot select another invocation.
 Missing or reversed original times, cancellation and closed owners return no evidence. These are unsigned
 local descriptions, not a hosted or qualified claim, signer receipt or publication authorization. Controlled
-native fixtures establish ownership and serialization only; real package execution remains unexercised.
+native fixtures establish ownership and serialization only. Historical developer-local ARM64 package
+execution and install/help/remove observations are recorded in [reconciliation](reconciliation.md); their
+original payloads are unretained. Native AMD64, live-service, upgrade and qualified acceptance remain deferred.
 
 ADR-20's pipeline-attested partial-retry admission preserves each exact signed predicate and its original
 attempt identity. A later attempt of the same GitHub run may consume it only after authenticating the

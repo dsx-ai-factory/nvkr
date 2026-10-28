@@ -406,3 +406,84 @@ func TestDebianArchiveOwnerInputAdmission(t *testing.T) {
 		})
 	}
 }
+
+func TestDebianArchiveOneShotGuards(t *testing.T) {
+	for _, mode := range []string{"unfrozen", "prepare twice", "read before capture", "second producer", "replay capture", "wrong path", "changed instruction", "closed"} {
+		t.Run(mode, func(t *testing.T) {
+			owner := archiveTestOwner(t, 64)
+			lease, err := owner.reserve(t.Context(), 64)
+			if err != nil {
+				t.Fatal(err)
+			}
+			node := debianArchiveNode()
+			if mode != "unfrozen" {
+				node, err = lease.prepare(t.Context(), node)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			want := e.CodeVerifyFailed
+			var archive *DebianProducerArchive
+			switch mode {
+			case "unfrozen":
+				_, finish, got := lease.begin(t.Context(), debianProduce)
+				err = got
+				if finish != nil {
+					finish()
+				}
+				want = e.CodeProvenanceMissing
+			case "prepare twice":
+				_, err = lease.prepare(t.Context(), node)
+				want = e.CodeEngineCapability
+			case "read before capture":
+				_, finish, got := lease.begin(t.Context(), debianRead)
+				err = got
+				if finish != nil {
+					finish()
+				}
+				want = e.CodeProvenanceMissing
+			case "second producer":
+				_, finish, got := lease.begin(t.Context(), debianProduce)
+				if got != nil {
+					t.Fatal(got)
+				}
+				defer finish()
+				_, other, got := lease.begin(t.Context(), debianProduce)
+				err = got
+				if other != nil {
+					other()
+				}
+			default:
+				root := t.TempDir()
+				if err := os.WriteFile(filepath.Join(root, "package.deb"), []byte("bytes"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				source := &materializedSource{Dir: root, InputDigest: "sha256:" + strings.Repeat("a", 64)}
+				path := "package.deb"
+				if mode == "replay capture" {
+					_, err = collectDebianProducerArchive(t.Context(), node, source, root, path, lease)
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				if mode == "wrong path" {
+					path = "other.deb"
+				}
+				if mode == "changed instruction" {
+					node.Command = append([]string(nil), node.Command...)
+					node.Command[0] = "changed"
+				}
+				if mode == "closed" {
+					if err := lease.Close(); err != nil {
+						t.Fatal(err)
+					}
+					want = e.CodeEngineCapability
+				}
+				archive, err = collectDebianProducerArchive(t.Context(), node, source, root, path, lease)
+			}
+			if code(err) != want || archive != nil {
+				t.Fatalf("guard returned archive=%v err=%v, want %s", archive, err, want)
+			}
+		})
+	}
+}

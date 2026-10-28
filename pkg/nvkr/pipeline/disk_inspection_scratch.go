@@ -100,8 +100,12 @@ func openDiskInspectionScratch(ctx context.Context, runtime packerContainerRunti
 	if diagnostic.Len() != 0 || !canonical.IsDigest("sha256:"+strings.TrimSpace(output.String())) {
 		return nil, e.New(e.CodeEngineCapability, "inspection scratch preparation returned no exact container identity or unsupported limits")
 	}
+	createdID := strings.TrimSpace(output.String())
+	if err := observeDiskInspectionImage(ctx, runtime, selection, createdID, imageID); err != nil {
+		return nil, err
+	}
 	output.Reset()
-	if err := adapter.Run(ctx, nil, &output, &diagnostic, "start", "--attach", name); err != nil {
+	if err := adapter.Run(ctx, nil, &output, &diagnostic, "start", "--attach", createdID); err != nil {
 		return nil, runtimeCommandError(ctx, err, diskInspectionDiagnostic(diagnostic.Bytes()), e.CodeEngineCapability, "preparing inspection scratch")
 	}
 	if diagnostic.Len() != 0 {

@@ -11,6 +11,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/versionpolicy"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 // Output describes one observed deliverable. Reference is a transport locator;
@@ -27,8 +28,23 @@ type Output struct {
 	ChartVersion string             `json:"chartVersion,omitempty"`
 	BuildDigest  string             `json:"buildDigest"`
 	Components   []string           `json:"components,omitempty"`
+	Debian       *DebianOutput      `json:"debian,omitempty"`
 	Disk         *DiskOutput        `json:"disk,omitempty"`
 	ImageIndex   *ImageIndexBinding `json:"imageIndex,omitempty"`
+}
+
+// DebianOutput retains the original local Run's descriptive byte, target and
+// evidence bindings. Serialized metadata cannot restore a producer receipt or
+// grant signing, qualification or publication authority.
+type DebianOutput struct {
+	PlanDigest      string        `json:"planDigest"`
+	Subject         string        `json:"subject"`
+	Component       string        `json:"component"`
+	InputDigest     string        `json:"inputDigest"`
+	Target          target.Debian `json:"target"`
+	Size            int64         `json:"size"`
+	SBOMDigest      string        `json:"sbomDigest"`
+	PredicateDigest string        `json:"predicateDigest"`
 }
 
 // DiskOutput is the descriptive copy of a binding established by factory's held
@@ -85,6 +101,15 @@ func (output Output) Validate() error {
 			return e.New(e.CodeVerifyFailed, "artifact %q components must be canonical, sorted and unique", output.Name)
 		}
 		previous = component
+	}
+	if debian := output.Debian; debian != nil {
+		if output.Kind != "debian-package" || len(output.Components) != 1 ||
+			debian.Component != output.Components[0] || debian.Subject == "" || debian.Size <= 0 ||
+			!canonical.IsDigest(output.BuildDigest) || !canonical.IsDigest(debian.PlanDigest) ||
+			!canonical.IsDigest(debian.InputDigest) || !canonical.IsDigest(debian.SBOMDigest) ||
+			!canonical.IsDigest(debian.PredicateDigest) || debian.Target.Validate() != nil {
+			return e.New(e.CodeVerifyFailed, "Debian artifact %q lacks its original target and evidence bindings", output.Name)
+		}
 	}
 	if output.ImageIndex != nil {
 		if output.Kind != "oci" || len(output.Components) != 1 || output.OS != "" || output.Arch != "" {
@@ -170,6 +195,10 @@ func cloneOutputs(source []Output) []Output {
 	for i := range result {
 		result[i].Components = append([]string(nil), source[i].Components...)
 		result[i].Disk = cloneDiskOutput(source[i].Disk)
+		if source[i].Debian != nil {
+			debian := *source[i].Debian
+			result[i].Debian = &debian
+		}
 		result[i].ImageIndex = source[i].ImageIndex.Clone()
 	}
 	return result

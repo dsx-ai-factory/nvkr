@@ -105,28 +105,9 @@ _Avoid_: Host platform, query criterion
 
 **Debian target description**:
 An exact source-owned distribution/ABI profile key paired with a concrete artifact platform. Standalone
-omissions resolve to `ubuntu-24.04` and `linux/amd64` only when the exact route exists; consumer descriptions
-inherit the complete OS/image target and reject conflicts. Explicit source routes and Definition/Plan
-compilation bind that resolved target into Build identity and rederive the full selection/catalog graph.
-An actual authenticated OS consumer/material join and ABI compatibility remain deferred.
-
-Local standalone execution requires a matching native Linux host, bounded context, complete private-volume
-inspection profile and selected catalog scanner. The original session and Run own authenticated prepared
-source, held runtime/toolchain observations, exclusive named invocation, bounded sealed archive bytes and
-checked cleanup. Inspection precedes terminal observation, which binds the exact archive and inspected
-SBOM to the original Plan/Build/target/output. Descriptions and equal-byte siblings cannot restore those
-owners; Run close cancels and joins all producer, inspection and export work before releasing handles.
-
-Lifecycle retains the raw package, inspected document and unsigned local predicate through its existing
-output/record transaction after successful original Run cleanup. This artifact is unqualified, without
-authenticated production provenance or release authority. Direct-node/hosted execution, ordinary path-based
-SBOM work, signing and publication remain gated. Controlled native fixtures prove ownership, bytes and
-cleanup, not real Debian/NVSentinel installation or native AMD64 acceptance.
-
-The selected NVSentinel integration keeps image, Helm and Debian producers separately selectable, with
-coordinated source pins and planned OS-recipe consumption. A platform-connectors candidate compiles four
-Ubuntu 24.04/26.04 × AMD64/ARM64 selections; actual package metadata, complete execution/installation,
-remaining producers and consumer integration remain unfinished.
+omissions use the declared `ubuntu-24.04`/`linux/amd64` compatibility baseline; consumer inheritance is a
+value description. Neither proves an authenticated consumer join or ABI compatibility. See ADR-12 section 2
+for the contract and [reconciliation](docs/adr/reconciliation.md) for implementation and evidence.
 _Avoid_: APT suite, toolchain tag, package version, ABI proof
 
 **Execution plan**:

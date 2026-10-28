@@ -13,11 +13,11 @@ for target in ubuntu-24.04-amd64 ubuntu-24.04-arm64 ubuntu-26.04-amd64 ubuntu-26
 done
 ```
 
-The four measured local repository digest references select the Ubuntu toolchains built from the exact native Ubuntu base and official Go SDK manifests in `toolchains/nvsentinel-debian/toolchain.lock.json`. Go 1.27.0 comes from the pinned NVSentinel `.versions.yaml`. The SDK is copied into the selected Ubuntu base; dpkg and system tools come from Ubuntu. The toolchain build checks the exact Ubuntu version, architecture, Go version and required tools with networking disabled. ARM64 image probes run on ARM64; AMD64 image probes on the current host use emulation, which does not establish native AMD64 package acceptance. These local repository digest references require the matching images on the execution daemon; they are not published registry manifests or portable hosted pins. See the toolchain README for reconstruction.
+The four measured local repository digest references select the Ubuntu toolchains built from the exact native Ubuntu base and official Go SDK manifests in `toolchains/nvsentinel-debian/toolchain.lock.json`. Go 1.27.0 comes from the pinned NVSentinel `.versions.yaml`. The SDK is copied into the selected Ubuntu base; dpkg and system tools come from Ubuntu. The toolchain build checks the exact Ubuntu version, architecture, Go version and required tools with networking disabled. ARM64 image probes run on ARM64; historical AMD64 image probes on an ARM64 host used emulation, which does not establish native AMD64 package acceptance. These local repository digest references require the matching images on the execution daemon; they are not published registry manifests or portable hosted pins. See the toolchain README for reconstruction.
 
 Fetch-time vendoring uses the existing authenticated source-closure owner. The producer builds offline from that prepared closure and creates the final archive with Ubuntu's dpkg-deb. Its exact route argv checks the expected Ubuntu distribution before Go or package output work. Ubuntu distribution, package Version and package Maintainer are independent inputs; no package version or contact is inferred from an OS release.
 
-The digest-pinned patch adds the packaging recipe, a stopped-by-default systemd unit and native control
+The digest-pinned patch adds the packaging recipe, a systemd unit without start/enable maintainer scripts and native control
 files for both architectures. It does not modify the inspected upstream checkout. The human selected
 `Maintainer: Ilya Kislenko <ikislenko@nvidia.com>` and `Version: 0~git20261013.c159347735` for this local
 development package. These are local packaging metadata, not an upstream release or maintainer claim.
@@ -25,18 +25,24 @@ The Version is an explicit candidate policy and stays distinct from the Ubuntu r
 metadata. Editing the recipe or controls requires updating the catalog patch digest; prepared-source and
 Build identities change with those bytes. The `.in` files remain examples for other package policies.
 
-The proposed package stages the platform-connectors executable and its unit. It supplies no credentials, node identity or runtime configuration, and has no maintainer scripts that start or enable the service. The proposed unit needs operator-provisioned `/etc/nvsentinel/node.env`, component configuration and an authenticated API kubeconfig before starting. This does not prove readiness, healthy-node behavior, least privilege or upgrades. The installation/removal checks below have narrower scope. Preserve node-local socket authentication and the existing datastore/API contracts.
+The proposed package stages the platform-connectors executable and its unit. It supplies no credentials, node identity or runtime configuration, and has no maintainer scripts that start or enable the service. The proposed unit needs operator-provisioned `/etc/nvsentinel/node.env`, component configuration and an authenticated API kubeconfig before starting. This does not prove readiness, healthy-node behavior, least privilege or upgrades. The installation/removal checks below have narrower scope. Preserve node-local socket authentication and the existing datastore/API contracts. The candidate
+unit retains `WantedBy=multi-user.target` and has no package-owned disable preset or baseline sandbox.
+A later blanket systemd preset can enable it once its configuration conditions are met. First-boot preset,
+least-privilege and live-service validation remain open; the installation checks establish only the
+observed dpkg-install behavior.
 
 This first component is not the complete node bundle: metadata collector, syslog and GPU monitor still need their native tool/library and Python/DCGM dependency contracts. Source `make lint-test-all`, native AMD64 execution, live service behavior and remaining component runs remain acceptance gates. Host-service chart/RBAC migration, authenticated OS-recipe materials and ABI binding, exact-byte OCI/APT publication and service-owned signing remain unfinished.
 
 The local standalone scheduler now connects the original catalog producer to retained-content inspection,
 terminal evidence and transactional package/evidence retention. Both architecture Environments select measured,
 digest-pinned inspection images and matching catalog-pinned Syft scanners. Their private-volume profile bounds extracted content to 256 MiB and
-requires 12 GiB memory and 8 GiB scratch, independently admitted before production. AMD64 image probes on
-the current ARM64 host use emulation and do not establish native AMD64 package execution. All four
+requires 12 GiB memory and 8 GiB scratch, independently admitted before production. Historical AMD64 image probes on
+an ARM64 host used emulation and do not establish native AMD64 package execution. All four
 explicitly select Docker; local control fields are supplied. Plans remain distinct from execution.
 
-The catalog/Definition Runs `ubuntu24-arm64-local6` and `ubuntu26-arm64-local1` completed on native Linux
+Historical developer-local observations (the original standalone payloads and staged copies are no longer retained):
+
+the catalog/Definition Runs `ubuntu24-arm64-local6` and `ubuntu26-arm64-local1` completed on native Linux
 ARM64 for Ubuntu 24.04 and 26.04 respectively. Each retained its source-created package (33,924,156 bytes,
 SHA-256 `b2525c4c0ddd895cbb0a0acf1a153e1a7ff90838b79a894239a6f2770d86e8b2`), a pinned-reader/Syft
 CycloneDX content document containing 103 components, and unsigned local provenance. Their producer
@@ -76,7 +82,10 @@ The four `nvsentinel-platform-connectors-os-ubuntu2404-{amd64,arm64}` and
 NVSentinel Debian recipe with its explicit Ubuntu target and toolchain. Select the
 matching component as the existing `nvke-image-inputs` producer's `nvsentinel`
 material; it supplies the raw `.deb` through the existing held material transfer.
-No new scheduler, disk lifecycle or publication path is required.
+No new scheduler, disk lifecycle or publication path is required. This is a separate ordinary
+host-package build, not reuse of a standalone Debian Run or its receipt, SBOM or predicate.
+The later installed-byte comparison proves only the recorded local bake's bytes.
+An authenticated general consumer target/evidence join remains deferred.
 
 [The source patch](nvke-os-package-input.patch), based on NVKE development commit
 `115d07c8bf671f8e8f9c8e630fb02c8d0ffcfb17`, adds one optional composer argument:
@@ -88,7 +97,7 @@ No new scheduler, disk lifecycle or publication path is required.
 The existing composer copies those exact bytes into
 `debs/nvsentinel-platform-connectors.deb`, checks architecture and applies its
 existing package byte limits and local APT indexing. The existing guest provisioner
-installs that file during the bake. Package-owned units remain stopped by default.
+installs that file during the bake. This provisioner does not start or enable package-owned units.
 The composer also includes the source-owned cloud-init network override and netplan
 DHCP configuration required by that provisioner, preserving their bytes and modes.
 Missing either configuration fails composition before replacing an existing archive.

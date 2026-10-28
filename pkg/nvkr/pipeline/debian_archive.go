@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
@@ -226,7 +227,7 @@ func (owner *debianArchiveOwner) cancelOperations() {
 }
 
 func validateDebianArchiveProducer(node ir.Node) error {
-	if node.Kind != ir.KindBuild || node.OutputType != "debian-package" || node.BuilderType != ir.BuilderOCIHermetic ||
+	if node.Kind != ir.KindBuild || node.OutputType != catalog.OutputDebianPackage || node.BuilderType != ir.BuilderOCIHermetic ||
 		node.Debian == nil || !node.SourceReadOnly || node.WriteDir == "" || node.Requirements != nil || node.ExecutionBinding != nil {
 		return e.New(e.CodeEngineCapability, "retained Debian archive requires an isolated explicit source producer")
 	}

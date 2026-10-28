@@ -142,7 +142,11 @@ func TestDebianInspectionPlanBindsScannerProfile(t *testing.T) {
 							node.Inputs = inputs
 						}
 					}
-					if err := changed.Validate(); err == nil || factoryErrorCode(err) == "" {
+					want := e.CodeEngineCapability
+					if mutation == "terminal" {
+						want = e.CodeProvenanceMissing
+					}
+					if err := changed.Validate(); factoryErrorCode(err) != want {
 						t.Fatal("changed complete compiled evidence Plan admitted", err)
 					}
 				})
@@ -168,6 +172,44 @@ func TestDebianInspectionRejectsTargetBeforeCatalog(t *testing.T) {
 			plan, err := CompileDocuments(t.Context(), "definition.yaml", d, "environment.yaml", env, "test")
 			if plan != nil || factoryErrorCode(err) != e.CodeEngineCapability {
 				t.Fatal("target conflict reached catalog work", err)
+			}
+		})
+	}
+}
+
+func TestDebianInspectionProfileAdmissionCodes(t *testing.T) {
+	for _, mode := range []string{"missing profile", "invalid profile", "memory scratch", "wrong platform", "wrong scanner"} {
+		t.Run(mode, func(t *testing.T) {
+			pin := "sha256:" + strings.Repeat("d", 64)
+			profile := definition.DiskInspectionProfile{Image: "example.test/inspection@" + pin, InspectorDigest: pin, CodecDigest: pin, GuestfishDigest: pin, ScannerDigest: pin, PackageReaderDigest: pin, Resources: execution.ResourceRequest{CPUMillis: 1000, MemoryMiB: 9000, EphemeralStorageMiB: 4096}, TimeoutSeconds: 30, MaxFilesystemBytes: 1 << 20, ScratchStorage: "private-volume"}
+			d, env, stack := debianFactoryInputs(t)
+			plan, err := Compile(t.Context(), d, env, stack, "test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			scanner := catalog.ToolPin{Platform: "linux/amd64", ExecutableDigest: pin}
+			want := e.CodeEngineCapability
+			if mode == "invalid profile" {
+				profile.Image = "mutable:latest"
+				want = e.CodeUnpinnedInput
+			}
+			if mode == "memory scratch" {
+				profile.ScratchStorage = "memory"
+			}
+			if mode == "wrong platform" {
+				env.UtilityPlatform = "linux/arm64"
+			}
+			if mode == "wrong scanner" {
+				scanner.ExecutableDigest = "sha256:" + strings.Repeat("e", 64)
+				want = e.CodeVerifyFailed
+			}
+			env.DiskInspectionProfiles = map[string]definition.DiskInspectionProfile{"linux/amd64": profile}
+			if mode == "missing profile" {
+				env.DiskInspectionProfiles = nil
+			}
+			_, err = debianInspectionProfile(plan.Builds[0], env, scanner)
+			if factoryErrorCode(err) != want {
+				t.Fatalf("got %v, want %s", err, want)
 			}
 		})
 	}

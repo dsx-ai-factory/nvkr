@@ -13,8 +13,10 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 func inspectionDirectory(t *testing.T) string {
@@ -41,6 +43,30 @@ func inspectionCompleteRun(t *testing.T) *Run {
 	return run
 }
 
+func inspectionDebianRun(t *testing.T, status string) *Run {
+	t.Helper()
+	run := testRun()
+	run.Expected[0].Kind = OutputDebianPackage
+	if status == RunFailed {
+		return failedRun(run, e.New(e.CodeBuildFailed, "fixture failed"))
+	}
+	if status == RunComplete {
+		complete := inspectionCompleteRun(t)
+		complete.Expected[0].Kind = OutputDebianPackage
+		complete.Observed[0].Kind = OutputDebianPackage
+		complete.Observed[0].Debian = &delivery.DebianOutput{PlanDigest: complete.PlanDigest, Subject: complete.Expected[0].MemberArtifactID, Component: "kubectl", InputDigest: complete.PlanDigest, Size: 1, SBOMDigest: complete.PlanDigest, PredicateDigest: complete.PlanDigest, Target: target.Debian{Distribution: "ubuntu-24.04", Platform: "linux/amd64"}}
+		return complete
+	}
+	return run
+}
+
+func inspectionLegacyDebianRun(t *testing.T) *Run {
+	t.Helper()
+	run := inspectionDebianRun(t, RunComplete)
+	run.Observed[0].Debian = nil
+	return run
+}
+
 func TestInspectRunMetadataAndMissingRecordRefusal(t *testing.T) {
 	for _, test := range []struct {
 		name    string
@@ -49,6 +75,10 @@ func TestInspectRunMetadataAndMissingRecordRefusal(t *testing.T) {
 		missing bool
 	}{
 		{"pending", testRun(), false, false},
+		{"Debian pending", inspectionDebianRun(t, RunPending), false, false},
+		{"Debian complete", inspectionDebianRun(t, RunComplete), false, false},
+		{"legacy Debian complete description", inspectionLegacyDebianRun(t), false, false},
+		{"Debian failed", inspectionDebianRun(t, RunFailed), false, false},
 		{"complete", inspectionCompleteRun(t), false, false},
 		{"complete with cleanup", inspectionCompleteRun(t), true, false},
 		{"failed", failedRun(testRun(), e.New(e.CodeBuildFailed, "private-provider /private/secret token")), false, false},

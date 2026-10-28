@@ -121,7 +121,7 @@ func TestDebianGraphRejectsAmbiguousAndUnjoinedInputs(t *testing.T) {
 	} {
 		r := resolveDebianFixture(t, debianCatalogFixture(), nil)
 		mutate(r)
-		if graph, err := Compile(r); err == nil || graph != nil {
+		if graph, err := Compile(r); code(err) != e.CodeInvalidCatalog || graph != nil {
 			t.Fatal("mutated resolution compiled")
 		}
 	}
@@ -148,5 +148,27 @@ func TestDebianExecutionWaitsForFinalByteEvidenceJoin(t *testing.T) {
 	}
 	if _, err := os.Stat(root); !os.IsNotExist(err) {
 		t.Fatal("closed lane performed workspace I/O")
+	}
+}
+
+func TestSelectedDebianRouteGuards(t *testing.T) {
+	for _, mode := range []string{"missing selection", "missing declaration", "no matching route"} {
+		t.Run(mode, func(t *testing.T) {
+			component := catalog.NamedComponent{Name: "agent", Component: debianCatalogFixture().Components["agent"]}
+			selected := &target.Debian{Distribution: "ubuntu-24.04", Platform: "linux/amd64"}
+			if mode == "missing selection" {
+				selected = nil
+			}
+			if mode == "missing declaration" {
+				component.Debian = nil
+			}
+			if mode == "no matching route" {
+				selected.Distribution = "unknown"
+			}
+			_, err := selectedDebianRoute(component, selected)
+			if code(err) != e.CodeInvalidCatalog {
+				t.Fatal(err)
+			}
+		})
 	}
 }

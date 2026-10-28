@@ -473,7 +473,11 @@ declarations. These are source/recipe descriptions, not observed Debian control 
 or dependency discovery. In particular its source-tag version does not supply the Debian package Version.
 The existing `WithSourceSubject` composition can retain that description only when the exact archive subject
 and Build agree with an issued content document. The private original-Run operation now checks this join;
-local scheduling uses these original joins; real package acceptance remains unexercised.
+local scheduling uses these original joins. Historical developer-local Ubuntu 24.04/26.04 ARM64 package
+production, pinned content inspection and install/help/remove observations are recorded in
+[reconciliation](reconciliation.md); their original standalone payloads are unretained. These observations
+cover no live service/API/GPU operation, upgrades, native AMD64, qualified reproduction or publication.
+The controlled fixtures above establish API contracts independently of those limited external observations.
 
 The ordinary path-based `InspectDependencies` and held-only
 `InspectHeldDependencies` APIs retain hint-free host-file scanning; OCI scanning is unaffected.

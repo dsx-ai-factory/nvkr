@@ -92,7 +92,7 @@ bin/nvkr run local \
 
 The dry-run remains pending with no observed outputs. Actual execution uses an explicit attempt name under the
 selected attempts root; the default root is `.nvkr/runs`. `--timeout` bounds preparation, execution and
-output observation (default one hour); an earlier caller deadline remains in force. The attempts root must be a clean repository-relative
+output observation when positive; the default zero adds no deadline and preserves the caller deadline. Native Debian execution requires a bounded caller context or an explicit positive `--timeout`. The attempts root must be a clean repository-relative
 path under `.nvkr`. Publication is a separately enabled operation. The
 implementation record distinguishes contract tests from external execution.
 

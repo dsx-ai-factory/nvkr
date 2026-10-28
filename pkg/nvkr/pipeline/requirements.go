@@ -4,6 +4,7 @@
 package pipeline
 
 import (
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
@@ -27,7 +28,7 @@ func rejectUnsupportedExecutionRequirements(nodes []ir.Node, adapter string) err
 
 func rejectUnjoinedDebian(nodes []ir.Node, adapter string) error {
 	for _, node := range nodes {
-		if node.OutputType == "debian-package" {
+		if node.OutputType == catalog.OutputDebianPackage {
 			return e.New(e.CodeEngineCapability, "%s cannot yet join standalone Debian build, inspection and final-byte evidence for node %q", adapter, node.ID)
 		}
 	}

@@ -133,6 +133,8 @@ func (runtime *scratchTestRuntime) Run(_ context.Context, _ io.Reader, output, d
 		if runtime.warning {
 			_, _ = io.WriteString(diagnostic, "ignored memory limit")
 		}
+	case "container":
+		_, _ = fmt.Fprintf(output, `{"Id":%q,"Image":%q}`, strings.Repeat("a", 64), "sha256:"+strings.Repeat("a", 64))
 	case "start":
 		_, _ = io.WriteString(output, runtime.capacity)
 	}

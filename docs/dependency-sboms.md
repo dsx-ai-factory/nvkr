@@ -11,7 +11,7 @@ payloads plus their producer records. The implementation is selected by artifact
 | Helm source archive | NVKR reads Helm/AICR manifests | Source-build stage: bundled charts, chart dependencies/locks and declared external chart references |
 | Bound Helm package | NVKR re-inspects the final archive after image binding | Packaging stage: chart declarations/references in the exact delivered bytes |
 | Separate Debian archive metadata diagnostic | `InspectDebianArchiveMetadata` uses Syft v1.51.1 with the fixed private name `subject.deb`, independent of the caller's filename | Package identity only; `syft-debian-archive-metadata/v1` is rejected by dependency SBOM attachment and serialized BOM validation; no maintained factory output invokes this diagnostic |
-| Standalone Debian content operation | `DiskInspectionRuntime.InspectDebianPackageContent` captures exact package bytes and reuses the complete admitted Linux runtime and pinned `dpkg-deb` data-filesystem reader | Architecture validation, recognized payload components and file hashes through the existing immutable observation; controlled contract tests; local scheduling uses original retained producer bytes, while real package/install acceptance remains unexercised |
+| Standalone Debian content operation | `DiskInspectionRuntime.InspectDebianPackageContent` captures exact package bytes and reuses the complete admitted Linux runtime and pinned `dpkg-deb` data-filesystem reader | Architecture validation, recognized payload components and file hashes through the existing immutable observation; controlled contract tests; local scheduling uses original retained producer bytes, historical developer-local ARM64 package checks are recorded in [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md); broader operational acceptance remains deferred |
 
 Ordinary `InspectDependencies` and held-only `InspectHeldDependencies` retain hint-free host-file scanning;
 factory callers use those dependency APIs. The separate diagnostic's private `.deb` discovery hint supplies
@@ -47,7 +47,10 @@ the inspected inventory with the Build-rederived source subject and stores bound
 The recipe version and observed Debian package Version stay distinct. Controlled native fixtures cover this
 join, substitution, cancellation, checked cleanup, mutation isolation and complete-document size rejection.
 The local scheduler consumes these original joins before terminal observation; the description alone is
-not a terminal or release receipt. Real package scanning and installation remain unexercised.
+not a terminal or release receipt. Historical developer-local Ubuntu 24.04/26.04 ARM64 Runs and
+install/help/remove checks are recorded in [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md).
+Their original standalone payloads are unretained; native AMD64, live service/API/GPU behavior, upgrades,
+qualification and publication remain unverified. The controlled fixtures prove their own contract scope.
 
 The separate private terminal operation can now issue a process-local receipt after independently
 rechecking original producer/profile/document bindings and the complete archive bytes. Description and

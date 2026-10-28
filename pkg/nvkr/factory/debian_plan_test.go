@@ -14,6 +14,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
@@ -122,7 +123,9 @@ func TestDebianFactoryRederivesAuthoredTargetAndRejectsExecution(t *testing.T) {
 		func(d *authored.Definition, env *authored.Environment) {
 			env.Publication = &authored.Publication{RepositoryPrefix: "example.test/release", Anonymous: true}
 		},
-		func(d *authored.Definition, env *authored.Environment) { d.SBOMTool = "syft" },
+		func(d *authored.Definition, env *authored.Environment) {
+			d.SBOMTool = "syft"
+		},
 	} {
 		request, settings := d.Clone(), env.Clone()
 		edit(&request, &settings)
@@ -144,4 +147,35 @@ func cloneDebianTestPlan(t *testing.T, input *Plan) *Plan {
 		t.Fatal(err)
 	}
 	return &copy
+}
+
+func TestDebianDryRunAdmitsForeignPlatformWithoutHostWork(t *testing.T) {
+	d, env, stack := debianFactoryInputs(t)
+	env.Runtime.Runtime = "docker"
+	d.SBOMTool = "syft"
+	pin := "sha256:" + strings.Repeat("c", 64)
+	stack.Catalog.Tools = map[string]catalog.ToolPin{"syft": {Format: "raw", URL: "https://example.test/syft", Platform: "linux/amd64", ExecutablePath: "syft", ArchiveDigest: pin, ExecutableDigest: pin}}
+	var err error
+	stack, err = catalog.ApplyStack(stack.Catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	env.DiskInspectionProfiles = map[string]authored.DiskInspectionProfile{"linux/amd64": {Image: "example.test/inspect@" + pin, InspectorDigest: pin, CodecDigest: pin, GuestfishDigest: pin, ScannerDigest: pin, PackageReaderDigest: pin, Resources: execution.ResourceRequest{CPUMillis: 1000, MemoryMiB: 9000, EphemeralStorageMiB: 4096}, TimeoutSeconds: 30, MaxFilesystemBytes: 1 << 20, ScratchStorage: "private-volume"}}
+	plan, err := Compile(t.Context(), d, env, stack, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := AdmitLocalPlan(t.Context(), plan); err != nil {
+		t.Fatal("static admission probed execution host", err)
+	}
+	root := t.TempDir()
+	t.Chdir(root)
+	result, err := RunLocal(t.Context(), plan, LocalRunOptions{DryRun: true, Stdout: io.Discard, Stderr: io.Discard})
+	if err != nil || result == nil {
+		t.Fatal("static dry run required a native execution host/deadline", err)
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil || len(entries) != 0 {
+		t.Fatal("dry run wrote workspace", err)
+	}
 }

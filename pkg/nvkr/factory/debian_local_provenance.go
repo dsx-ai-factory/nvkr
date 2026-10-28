@@ -47,7 +47,14 @@ func (receipt *DebianOutputReceipt) localProducerProvenance(ctx context.Context)
 	if !exists {
 		return nil, zero, e.New(e.CodeProvenanceMissing, "local Debian provenance has no original producer completion")
 	}
-	run, err := provenance.NewLocalRunContext(observation.PlanDigest, completion.startedOn, completion.finishedOn)
+	identity, err := plan.IdentityDigest()
+	if err != nil {
+		return nil, zero, err
+	}
+	if identity != observation.PlanDigest {
+		return nil, zero, e.New(e.CodeVerifyFailed, "local Debian provenance changes original Plan identity")
+	}
+	run, err := provenance.NewLocalRunContext(identity, completion.startedOn, completion.finishedOn)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -56,14 +63,13 @@ func (receipt *DebianOutputReceipt) localProducerProvenance(ctx context.Context)
 		Digest: map[string]string{"sha256": strings.TrimPrefix(observation.InputDigest, "sha256:")}})
 	// The complete Plan remains the invocation identity and retains ADR-09's
 	// weakest aggregate build type. Exact named output membership is separate.
-	selected := plan
-	selected.Builds = nil
+	selectedBuilds := 0
 	for _, build := range plan.Builds {
 		if build.Name == output.Name && build.BuildDigest == output.BuildDigest {
-			selected.Builds = append(selected.Builds, build)
+			selectedBuilds++
 		}
 	}
-	if len(selected.Builds) != 1 {
+	if selectedBuilds != 1 {
 		return nil, zero, e.New(e.CodeVerifyFailed, "local Debian provenance changes its named Build")
 	}
 	predicate := provenance.ProductionPredicate(run, provenance.ProductionInputs{

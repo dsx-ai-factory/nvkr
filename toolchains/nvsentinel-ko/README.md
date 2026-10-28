@@ -4,7 +4,7 @@ This supporting image supplies ko, the source-required Go 1.27.0 compiler and a 
 cache to the NVSentinel catalog. NVSentinel is built by ko through NVKR; the Dockerfile assembles tools
 and cached inputs, and does not replace the component's Go image recipe. The image contains no registry
 credentials or runtime socket. Both architectures are assembled locally; AMD64 assembly probes on the
-current ARM64 machine use emulation.
+recorded ARM64 machine used emulation.
 
 NVSentinel's pinned `.versions.yaml` declares ko v0.18.0. That release's official ARM64 binary failed
 the repository-pinned binary vulnerability check. This **local development candidate** instead selects
@@ -14,9 +14,10 @@ organizational toolchain. NVSentinel's source version file is unchanged. The bui
 compiled with Go 1.27.2; the compiler used for NVSentinel remains Go 1.27.0.
 
 Both compiled ko binaries passed `govulncheck -mode=binary` on October 14, 2026 with no affected symbols.
-The scan also reported one module-level advisory outside the called-symbol findings. This result does
-not replace future security checks or establish security of the NVSentinel artifact. The original
-v0.18.0 findings remain recorded separately. `go mod verify` passed on the selected patched tool source.
+The historical scan transcript and its module-level advisory identity are not retained here, so that
+advisory cannot be independently identified from this checkout. The no-affected-symbol observation is
+not current security acceptance and does not establish security of NVSentinel; a fresh pinned scan and
+retained advisory identifiers are required before security approval. `go mod verify` passed on the selected patched tool source.
 
 The license report identifies Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause and MPL-2.0 dependencies.
 The classifier did not identify three modules' short license notices; their exact source `LICENSE`

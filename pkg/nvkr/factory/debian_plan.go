@@ -30,7 +30,7 @@ func cloneDebianTarget(value *target.Debian) *target.Debian {
 func rejectUnjoinedDebianPlan(plan *Plan, adapter string) error {
 	for _, output := range plan.Definition.Outputs {
 		if output.Format == authored.OutputDebianPackage {
-			return e.New(e.CodeEngineCapability, "%s cannot yet join Debian archive inspection and final-byte producer/output evidence", adapter)
+			return e.New(e.CodeEngineCapability, "%s does not admit Debian execution outside the original standalone local Run", adapter)
 		}
 	}
 	return nil

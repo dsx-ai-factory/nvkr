@@ -18,8 +18,8 @@ import (
 
 // DebianProducerExecutor binds exact selected instructions and their separate
 // invocation subjects to one original session. The native producer adapter
-// supplies unqualified byte retention; public lifecycle execution remains gated
-// pending the complete content/final-output evidence join.
+// supplies unqualified byte retention to the original standalone local Run.
+// Direct-node and hosted execution remain gated.
 // No path, decoded result or matching Build digest can restore this capability.
 type DebianProducerExecutor struct{ state *debianProducerExecutorState }
 

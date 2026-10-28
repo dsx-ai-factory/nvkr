@@ -270,7 +270,9 @@ func TestLocalRunCLIProvidesOwnedDeadline(t *testing.T) {
 		parent  time.Duration
 		maximum time.Duration
 	}{
-		{"default", "", 0, time.Hour},
+		{"default", "", 0, 0},
+		{"explicit zero", "0", 0, 0},
+		{"disk default", "", 0, 0},
 		{"explicit", "1m", 0, time.Minute},
 		{"earlier parent", "1m", 15 * time.Second, 15 * time.Second},
 	} {
@@ -288,12 +290,16 @@ func TestLocalRunCLIProvidesOwnedDeadline(t *testing.T) {
 				received = ctx
 				deadline, ok := ctx.Deadline()
 				remaining := time.Until(deadline)
-				if !ok || remaining <= 0 || remaining > tc.maximum {
+				if ok != (tc.maximum > 0) || ok && (remaining <= 0 || remaining > tc.maximum) {
 					t.Fatalf("deadline = %v, remaining = %v, maximum = %v", ok, remaining, tc.maximum)
 				}
 				return nil, e.New(e.CodeUnavailable, "test executor reached")
 			}
 			args := []string{"nvkr", "run", "local", "--definition", "docs/examples/nvke-tutorial/definition.yaml", "--environment", "docs/examples/nvke-tutorial/environment-local.yaml", "--attempt", "bounded-cli-test"}
+			if tc.name == "disk default" {
+				args[4] = "definitions/nvsentinel/os-ubuntu2604-arm64.yaml"
+				args[6] = "definitions/nvsentinel/environment-os-arm64.yaml"
+			}
 			if tc.flag != "" {
 				args = append(args, "--timeout", tc.flag)
 			}
@@ -308,7 +314,7 @@ func TestLocalRunCLIProvidesOwnedDeadline(t *testing.T) {
 }
 
 func TestLocalRunCLIRejectsInvalidTimeoutBeforeInputIO(t *testing.T) {
-	for _, timeout := range []string{"0", "-1s"} {
+	for _, timeout := range []string{"-1s"} {
 		t.Run(timeout, func(t *testing.T) {
 			_, err := invokeLifecycleCLI(t, "run", "local", "--definition", "missing.yaml", "--environment", "missing.yaml", "--attempt", "timeout-test", "--timeout", timeout)
 			assertLifecycleCommandCode(t, err, e.CodeUsage)

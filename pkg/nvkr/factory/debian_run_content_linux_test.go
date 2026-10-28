@@ -54,9 +54,6 @@ func debianRunContentFixture(t *testing.T, ctx context.Context, mode string) (*P
 		`kind=="disk-image"||kind=="installer-iso"||kind=="apt-acquisition"||kind=="host-package"`, 1)
 	controlled = strings.Replace(controlled, `case "image":ref:=`,
 		`case "image":if mode=="terminal barrier"{f,err:=os.OpenFile(filepath.Join(fixtureRoot,"terminal-image-calls"),os.O_CREATE|os.O_WRONLY|os.O_APPEND,0600);fail(err);_,err=f.WriteString("image\n");fail(err);fail(f.Close());fail(os.WriteFile(filepath.Join(fixtureRoot,"terminal-started"),nil,0600));for{if _,err:=os.Stat(filepath.Join(fixtureRoot,"release-terminal"));err==nil{break};time.Sleep(time.Millisecond)}};ref:=`, 1)
-	controlled = strings.ReplaceAll(controlled, `"nvkr:diskContentClass"`, `"nkd:diskContentClass"`)
-	controlled = strings.ReplaceAll(controlled, `"nvkr:packageArchitecture"`, `"nkd:packageArchitecture"`)
-	controlled = strings.ReplaceAll(controlled, `"nvkr:packageFormat"`, `"nkd:packageFormat"`)
 	controlled = strings.Replace(controlled, `if kind=="apt-acquisition"{`, `if kind=="apt-acquisition"||kind=="host-package"{`, 1)
 	controlled = strings.Replace(controlled, `case "rm":for _,target`, `case "rm":if mode=="cleanup-failure"{os.Exit(7)};if mode=="close during scan"{if _,err:=os.Stat(filepath.Join(fixtureRoot,"scan-started"));err==nil{fail(os.WriteFile(filepath.Join(fixtureRoot,"cleanup-started"),nil,0600));for{if _,err:=os.Stat(filepath.Join(fixtureRoot,"release-cleanup"));err==nil{break};time.Sleep(time.Millisecond)}}};for _,target`, 1)
 	controlled = strings.Replace(controlled, `mode=="cancel during root scan"`, `mode=="cancel during root scan"||mode=="close during scan"`, 1)

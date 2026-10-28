@@ -195,13 +195,11 @@ not build or deploy the Kubernetes outputs implicitly. Image and chart producers
 commands, dependency pins and image-slot contracts. Their schema names do not establish working NVSentinel
 builds, and a source-created Debian archive is not an image or a chart.
 
-The planned OS-recipe route consumes that Debian archive as an explicit material. Its complete compiled
-consumer target supplies distribution and architecture; conflicts fail before work. The image recipe owns
-installation, runtime configuration and the transition from DaemonSets to host services. The package's exact
-bytes and evidence must remain bound through consumption. A platform-connectors candidate catalog now
-compiles four Ubuntu 24.04/26.04 and AMD64/ARM64 selections through NVKR with local toolchain image
-IDs. Package metadata and execution, remaining image/Helm producers, authenticated consumer
-target/material joins and real source/package/image acceptance remain unfinished.
+The NVSentinel OS selections separately build an ordinary `host-package` material through the same source
+recipe and hand its raw archive to the existing composer and Packer provisioner. This route does not consume
+the standalone Debian receipt, content document or predicate. Authenticated consumer target/evidence joins
+and general ABI acceptance remain deferred. The [example](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvsentinel/README.md)
+and [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md) own dated results and remaining limits.
 
 ## Run the local lab
 

@@ -282,13 +282,11 @@ native ARM64 scheduler and transaction fixtures establish ownership/bytes/cancel
 not a real Debian/NVSentinel package, daemon or installation, native AMD64 acceptance, authenticated
 production provenance or OS consumer/material/ABI compatibility.
 
-The selected NVSentinel integration keeps image, Helm and native Debian producers separately selectable in
-a reusable catalog with coordinated source pins. The planned OS-recipe route consumes the exact Debian
-output under the original compiled consumer target. Source-owned builds, installation/host-service migration
-and authenticated material/evidence joins remain required. The platform-connectors candidate catalog
-now compiles Ubuntu 24.04/26.04 selections for AMD64/ARM64 through NVKR with local toolchain image IDs;
-package metadata, actual package execution, remaining image/Helm producers and real image acceptance
-remain unfinished.
+The selected NVSentinel inputs keep image, Helm and Debian producers separately selectable with
+coordinated source pins. The OS route separately builds an ordinary host-package material for the existing
+composer/Packer path. It does not consume the standalone Debian output receipt or its inspected evidence.
+[Reconciliation](adr/reconciliation.md) owns dated execution results and deferred acceptance; the
+[example](../definitions/nvsentinel/README.md) owns commands and exact local artifact identities.
 
 A `disk-image` named output explicitly selects one root producer with validated disk-image metadata and every
 component in that root's transitive material closure. Resolution rejects a missing or second disk root, an

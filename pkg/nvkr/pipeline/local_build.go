@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/assemble"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/profile"
@@ -27,7 +28,7 @@ import (
 func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, returnErr error) {
 	var debianLease *debianArchiveLease
 	var debianArchive *DebianProducerArchive
-	if n.OutputType == "debian-package" {
+	if n.OutputType == catalog.OutputDebianPackage {
 		if err := validateDebianArchiveProducer(n); err != nil {
 			return nil, err
 		}

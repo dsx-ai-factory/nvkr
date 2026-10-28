@@ -430,7 +430,7 @@ remain follow-ups owned by ADR-11/13; this pinning contract does not implement t
 - **ADR-21:** `catalog bump` → regen; the `--check` dry-run; the definition/environment boundary vs.
   `profile repin`.
 - **ADR-11 (deferred):** define `curatedBy` graph binding and its identity/conflict rules.
-- **ADR-12 §3:** a future curated set can inform explicit output membership; it must not introduce a selector
+- **ADR-12 §1:** a future curated set can inform explicit output membership; it must not introduce a selector
   axis, deployment topology or reusable recipe group.
 - **ADR-13 (deferred):** define aggregate SBOM curation edges from an umbrella to its members.
 - **ADR-10:** bind any explicitly authored `embeds` to its exact pinned upstream declaration;

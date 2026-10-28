@@ -43,9 +43,6 @@ func debianSchedulerNativeFixture(t *testing.T, ctx context.Context) (*Plan, str
 	controlled := strings.Replace(publicDiskEvidenceRuntimeSource,
 		`kind=="disk-image"||kind=="installer-iso"||kind=="apt-acquisition"`,
 		`kind=="disk-image"||kind=="installer-iso"||kind=="apt-acquisition"||kind=="host-package"`, 1)
-	controlled = strings.ReplaceAll(controlled, `"nvkr:diskContentClass"`, `"nkd:diskContentClass"`)
-	controlled = strings.ReplaceAll(controlled, `"nvkr:packageArchitecture"`, `"nkd:packageArchitecture"`)
-	controlled = strings.ReplaceAll(controlled, `"nvkr:packageFormat"`, `"nkd:packageFormat"`)
 	controlled = strings.Replace(controlled, `if kind=="apt-acquisition"{`, `if kind=="apt-acquisition"||kind=="host-package"{`, 1)
 	controlled = strings.Replace(controlled, "\ncase \"create\":", `
 case "run":name:=value(a,"--name");put("container-"+name,a);put("container-"+id(name),a);out:="";for i,arg:=range a {if arg=="-v"&&i+1<len(a)&&strings.HasSuffix(a[i+1],":/src/out"){out=strings.TrimSuffix(a[i+1],":/src/out")}};if out==""{os.Exit(96)};fail(os.WriteFile(filepath.Join(out,"agent-"+runtime.GOARCH+".deb"),[]byte("controlled final archive"),0600))
