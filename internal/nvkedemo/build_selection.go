@@ -69,6 +69,36 @@ func resolveSelectedBuild(ctx context.Context, repo string, cfg *BuildConfig) er
 	return nil
 }
 
+func definitionIncludesNativeTools(definition authored.Definition, platform string) bool {
+	_, _, host, _, err := nativeToolSelection(platform)
+	if err != nil {
+		return false
+	}
+	want := map[string]bool{host: false}
+	for _, companion := range siteStartupToolBundles(platform) {
+		want[companion.name] = false
+	}
+	for _, output := range definition.Outputs {
+		if _, needed := want[output.Name]; needed && output.Platform == platform && output.Format == authored.OutputExecutable {
+			want[output.Name] = true
+		}
+	}
+	for _, found := range want {
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+func selectedBuildIncludesNativeTools(ctx context.Context, cfg BuildConfig, platform string) (bool, error) {
+	definition, err := authored.LoadDefinition(ctx, filepath.Join(cfg.Repository, cfg.Definition))
+	if err != nil {
+		return false, err
+	}
+	return definitionIncludesNativeTools(definition, platform), nil
+}
+
 func selectedBuildInvocation(cfg BuildConfig) []string {
 	return []string{cfg.NVKR, "run", "local", "--definition", cfg.Definition,
 		"--environment", cfg.Environment, "--attempt", cfg.AttemptPrefix,

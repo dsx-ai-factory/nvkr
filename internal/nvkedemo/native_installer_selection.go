@@ -22,6 +22,7 @@ import (
 type nativeInstallerSelection struct {
 	repo, commit, capiVersion, versionsDigest, siteSpecDigest string
 	sourceDate                                                int64
+	arch                                                      string
 }
 
 func nativeInstallerSelectionFromRun(ctx context.Context, root, bundle string) (*nativeInstallerSelection, error) {
@@ -40,6 +41,15 @@ func nativeInstallerSelectionFromPlan(plan *factory.Plan, bundle, buildDigest st
 		if build.BuildDigest != buildDigest {
 			return nil, errors.New("native tool output differs from its selected source build")
 		}
+		var arch string
+		switch build.Platform {
+		case "darwin/arm64", "linux/arm64":
+			arch = "arm64"
+		case "linux/amd64":
+			arch = "amd64"
+		default:
+			return nil, errors.New("native tool output requires an admitted host platform")
+		}
 		components := make(map[string]catalog.Component, len(build.ResolvedComponents))
 		for _, item := range build.ResolvedComponents {
 			components[item.Name] = item.Component
@@ -55,7 +65,7 @@ func nativeInstallerSelectionFromPlan(plan *factory.Plan, bundle, buildDigest st
 			}
 		}
 		var version string
-		for _, name := range []string{"clusterctl", "clusterctl-linux"} {
+		for _, name := range []string{"clusterctl", "clusterctl-linux", "clusterctl-linux-amd64"} {
 			if component, ok := components[name]; ok {
 				if version != "" {
 					return nil, errors.New("native tool Run selects ambiguous clusterctl versions")
@@ -67,7 +77,7 @@ func nativeInstallerSelectionFromPlan(plan *factory.Plan, bundle, buildDigest st
 		if err != nil || version != "v"+parsed.String() || parsed.Prerelease() != "" || parsed.Metadata() != "" {
 			return nil, errors.New("native tool Run requires an exact stable CAPI provider version")
 		}
-		return &nativeInstallerSelection{repo: installer.Repo, commit: installer.Commit, sourceDate: installer.SourceDate, capiVersion: version}, nil
+		return &nativeInstallerSelection{repo: installer.Repo, commit: installer.Commit, sourceDate: installer.SourceDate, capiVersion: version, arch: arch}, nil
 	}
 	return nil, errors.New("native tool Run omits the selected host bundle build")
 }

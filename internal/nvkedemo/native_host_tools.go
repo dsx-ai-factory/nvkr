@@ -87,7 +87,13 @@ func nativeHostToolBindings(bundle delivery.BinaryBundle, platform string, membe
 	bindings := make(map[string]delivery.BinaryEntry, len(members))
 	for _, entry := range bundle.Entries {
 		member := entry.Name
-		if platform == "linux/arm64" {
+		if platform == "linux/amd64" {
+			switch member {
+			case "clusterctl-linux-amd64", "helm-linux-amd64", "kind-linux-amd64", "kubectl-linux-amd64", "oras-linux-amd64":
+				member = member[:len(member)-len("-linux-amd64")]
+			}
+		}
+		if platform == "linux/arm64" || platform == "linux/amd64" {
 			switch member {
 			case "clusterctl-linux", "helm-linux", "kind-linux", "kubectl-linux", "oras-linux":
 				member = member[:len(member)-len("-linux")]

@@ -304,7 +304,7 @@ func TestSimulatorToolchainScope(t *testing.T) {
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
-			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", `include "nvke-os-plan"; simulator_toolchain_scope | toolchain_overlay("arm64"; .pin; "fresh"; .catalogDigest; .components)`)
+			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", `include "nvke-os-plan"; simulator_toolchain_scope("arm64") | toolchain_overlay("arm64"; .pin; "fresh"; .catalogDigest; .components)`)
 			cmd.Stdin = strings.NewReader(`{"builds":` + builds + `}`)
 			out, err := cmd.CombinedOutput()
 			if (err != nil) != tc.fail || !strings.Contains(string(out), tc.want) {
@@ -350,7 +350,7 @@ func TestSiteHelmToolchainScope(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
-			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", `include "nvke-os-plan"; site_helm_toolchain_scope | toolchain_overlay("arm64"; .pin; "fresh"; .catalogDigest; .components)`)
+			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", `include "nvke-os-plan"; site_helm_toolchain_scope("arm64") | toolchain_overlay("arm64"; .pin; "fresh"; .catalogDigest; .components)`)
 			cmd.Stdin = strings.NewReader(tc.input)
 			out, err := cmd.CombinedOutput()
 			if (err != nil) != tc.fail || !strings.Contains(string(out), tc.want) {
@@ -389,13 +389,19 @@ func TestAllLocalToolchainScopes(t *testing.T) {
 		fail              bool
 	}{
 		{"all three catalog predecessors", plan, "", false},
+		{"shared toolchain image", strings.ReplaceAll(plan, `"toolchainImages":{"arm64":"helm"}`, `"toolchainImage":"helm"`), "", false},
+		{"AMD64", strings.ReplaceAll(plan, "arm64", "amd64"), "", false},
 		{"overlapping catalogs rejected", strings.ReplaceAll(plan, `"catalogDigest":"simulator"`, `"catalogDigest":"os"`), "distinct catalogs", true},
 		{"missing simulator rejected", strings.ReplaceAll(plan, `"name":"nicosim-tools-arm64"`, `"name":"other"`), "expected one simulator tools build", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			arch := "arm64"
+			if tc.name == "AMD64" {
+				arch = "amd64"
+			}
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
-			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", `include "nvke-os-plan"; local_toolchain_scopes("all")`)
+			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", "--arg", "arch", arch, `include "nvke-os-plan"; local_toolchain_scopes("all"; $arch)`)
 			cmd.Stdin = strings.NewReader(tc.input)
 			out, err := cmd.CombinedOutput()
 			if (err != nil) != tc.fail || !strings.Contains(string(out), tc.want) {
@@ -413,8 +419,8 @@ func TestAllLocalToolchainScopes(t *testing.T) {
 			}
 			if len(scopes) != 3 || scopes[0].Pin != "packer" || scopes[1].Pin != "gcc" || scopes[2].Pin != "helm" ||
 				!slices.Equal(scopes[0].Components, []string{"nvke-node-image"}) ||
-				!slices.Equal(scopes[0].Outputs, []string{"nvke-node-image-arm64"}) ||
-				!slices.Equal(scopes[1].Outputs, []string{"nicosim-tools-arm64"}) ||
+				!slices.Equal(scopes[0].Outputs, []string{"nvke-node-image-" + arch}) ||
+				!slices.Equal(scopes[1].Outputs, []string{"nicosim-tools-" + arch}) ||
 				!slices.Equal(scopes[2].Outputs, []string{"controller-chart", "cwe", "nktp"}) {
 				t.Fatalf("unexpected catalog-scoped selection: %+v", scopes)
 			}

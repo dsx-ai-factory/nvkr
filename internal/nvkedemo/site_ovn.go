@@ -14,28 +14,42 @@ const upstreamSiteOVNVersion = "1.4.0"
 // Distinct completed output names prevent a baseline Run from being replayed
 // as the explicitly selected upstream diagnostic (including its baked disk).
 func selectedOVNOutputs(network string) (version, image, chart string, err error) {
+	return selectedOVNOutputsForArchitecture(network, "arm64")
+}
+
+func selectedOVNOutputsForArchitecture(network, arch string) (version, image, chart string, err error) {
+	if _, err := nativeQEMUArchitecture(arch); err != nil {
+		return "", "", "", err
+	}
 	mode, err := normalizeNetwork(network)
 	if err != nil {
 		return "", "", "", err
 	}
 	if mode == "upstream-ovn" {
-		return upstreamSiteOVNVersion, "upstream-ovn-image-arm64", "upstream-ovn-chart-arm64", nil
+		return upstreamSiteOVNVersion, "upstream-ovn-image-" + arch, "upstream-ovn-chart-" + arch, nil
 	}
 	if mode == "ovn" {
-		return siteOVNVersion, "ovn-image-arm64", "ovn-chart-arm64", nil
+		return siteOVNVersion, "ovn-image-" + arch, "ovn-chart-" + arch, nil
 	}
 	return "", "", "", configUsage("selected network has no OVN outputs")
 }
 
 func selectedDiskOutput(network string) (string, error) {
+	return selectedDiskOutputForArchitecture(network, "arm64")
+}
+
+func selectedDiskOutputForArchitecture(network, arch string) (string, error) {
+	if _, err := nativeQEMUArchitecture(arch); err != nil {
+		return "", err
+	}
 	mode, err := normalizeNetwork(network)
 	if err != nil {
 		return "", err
 	}
 	if mode == "upstream-ovn" {
-		return "nvke-node-image-upstream-ovn-arm64", nil
+		return "nvke-node-image-upstream-ovn-" + arch, nil
 	}
-	return DiskOutputName, nil
+	return "nvke-node-image-" + arch, nil
 }
 
 func selectedProfilesOutput(network string) (string, error) {

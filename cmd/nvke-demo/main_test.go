@@ -657,7 +657,7 @@ func TestProductionRunCannotSelectKindSiteWorkflow(t *testing.T) {
 		t.Fatal("missing artifacts unexpectedly started deployment")
 	}
 	platform := runtime.GOOS + "/" + runtime.GOARCH
-	if platform != "darwin/arm64" && platform != "linux/arm64" {
+	if platform != "darwin/arm64" && platform != "linux/arm64" && platform != "linux/amd64" {
 		assertCode(t, err, nvkrerr.CodeEngineCapability)
 		if !strings.Contains(err.Error(), "native demo does not support host") {
 			t.Fatalf("unsupported host selected another deployment owner: %v", err)
@@ -780,10 +780,12 @@ func narrationRepository(t *testing.T) string {
 	repo := t.TempDir()
 	for _, relative := range []string{
 		"inputs/definitions/demo/arm64-nvidia-local-kvm.json",
+		"inputs/definitions/demo/amd64-nvidia-local-kvm.json",
 		"inputs/definitions/demo/arm64-upstream-local-kvm.json",
 		"inputs/definitions/demo/arm64-nvidia-local-kvm-conformance.json",
 		"inputs/definitions/demo/arm64-upstream-local-kvm-conformance.json",
 		"inputs/environments/local-arm64-kvm.json",
+		"inputs/environments/local-amd64-kvm.json",
 		"inputs/environments/local-native-mac.json",
 	} {
 		if err := os.MkdirAll(filepath.Dir(filepath.Join(repo, relative)), 0o700); err != nil {
@@ -832,11 +834,11 @@ func TestDemoNarrationFailuresBeforeExecution(t *testing.T) {
 }
 
 func TestDemoNarrationInvalidAuthoredInputsEmitNothing(t *testing.T) {
-	environment := "inputs/environments/local-arm64-kvm.json"
-	if runtime.GOOS == "darwin" {
-		environment = "inputs/environments/local-native-mac.json"
+	selected, environment, err := nvkedemo.LocalArtifactInputsForPlatform("ovn", false, runtime.GOOS+"/"+runtime.GOARCH)
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, name := range []string{"inputs/definitions/demo/arm64-nvidia-local-kvm.json", environment} {
+	for _, name := range []string{selected, environment} {
 		t.Run(name, func(t *testing.T) {
 			repo := narrationRepository(t)
 			if err := os.WriteFile(filepath.Join(repo, name), []byte(`{"unknown":"rejected"}`), 0o600); err != nil {
@@ -866,6 +868,11 @@ func TestE2EWalkthroughIntroductionAdmissionAndOrder(t *testing.T) {
 		{name: "output failure", outputFailure: true},
 	} {
 		t.Run(row.name, func(t *testing.T) {
+			amd := runtime.GOOS == "linux" && runtime.GOARCH == "amd64"
+			unsupported := amd && !row.explicit && (row.network == "upstream-ovn" || row.conformance)
+			if amd && !row.explicit && !unsupported {
+				row.definition = "amd64-nvidia-local-kvm.json"
+			}
 			var out bytes.Buffer
 			var writer io.Writer = &out
 			if row.outputFailure {
@@ -881,6 +888,9 @@ func TestE2EWalkthroughIntroductionAdmissionAndOrder(t *testing.T) {
 				environment := "inputs/environments/local-arm64-kvm.json"
 				if runtime.GOOS == "darwin" {
 					environment = "inputs/environments/local-native-mac.json"
+				}
+				if amd {
+					environment = "inputs/environments/local-amd64-kvm.json"
 				}
 				if row.explicit {
 					if cfg.Definition != definition || cfg.Environment != "inputs/environments/local-arm64-kvm.json" || cfg.NVKR != "/explicit/nvkr" {
@@ -916,7 +926,7 @@ func TestE2EWalkthroughIntroductionAdmissionAndOrder(t *testing.T) {
 				want = nvkrerr.CodePreflightFailed
 			}
 			assertCode(t, err, want)
-			if calls != map[bool]int{true: 0, false: 1}[row.invalid || row.outputFailure] {
+			if calls != map[bool]int{true: 0, false: 1}[row.invalid || row.outputFailure || unsupported] {
 				t.Fatal("unexpected execution", calls)
 			}
 			if row.invalid && out.Len() != 0 {

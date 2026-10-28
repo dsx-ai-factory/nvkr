@@ -12,8 +12,66 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
+
+func nativeCapturedBuildPlanFixture(t *testing.T) *factory.Plan {
+	t.Helper()
+	plan, _ := capturedArtifactRunFixture(t, filepath.Join(privateTestDir(t), "fixture-run"), []lifecycle.DefinitionOutput{
+		{Name: "tools", Platform: "linux/arm64", Components: []string{"tool"}, Format: definition.OutputExecutable},
+	}, nil)
+	return plan
+}
+
+func TestNativeBuildHostAdmission(t *testing.T) {
+	for _, row := range []struct {
+		platform string
+		valid    bool
+	}{
+		{"linux/arm64", true}, {"darwin/arm64", true},
+		{"linux/amd64", true},
+		{"darwin/amd64", false}, {"windows/arm64", false},
+	} {
+		t.Run(row.platform, func(t *testing.T) {
+			err := admitNativeBuildHost(row.platform)
+			if (err == nil) != row.valid {
+				t.Fatalf("error=%v", err)
+			}
+			if err != nil {
+				var coded *e.Error
+				if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
+					t.Fatalf("expected engine-capability, got %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestSelectedBuildReusesOnlyCompleteNativeToolOutputs(t *testing.T) {
+	for _, row := range []struct {
+		name, hostPlatform, sitePlatform, format string
+		site, valid                              bool
+	}{
+		{"complete", "linux/amd64", "linux/amd64", definition.OutputExecutable, true, true},
+		{"missing site", "linux/amd64", "linux/amd64", definition.OutputExecutable, false, false},
+		{"foreign host", "linux/arm64", "linux/amd64", definition.OutputExecutable, true, false},
+		{"foreign site", "linux/amd64", "linux/arm64", definition.OutputExecutable, true, false},
+		{"wrong envelope", "linux/amd64", "linux/amd64", definition.OutputOCI, true, false},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			doc := definition.Definition{Outputs: []definition.DefinitionOutput{{Name: "native-tools-linux-amd64", Platform: row.hostPlatform, Format: row.format}}}
+			if row.site {
+				doc.Outputs = append(doc.Outputs, definition.DefinitionOutput{Name: "site-startup-tools-amd64", Platform: row.sitePlatform, Format: definition.OutputExecutable})
+			}
+			if got := definitionIncludesNativeTools(doc, "linux/amd64"); got != row.valid {
+				t.Fatalf("reuse=%v, want %v", got, row.valid)
+			}
+		})
+	}
+}
 
 func TestSelectedBuildRequiresCompleteLocalSelection(t *testing.T) {
 	for _, row := range []struct {
@@ -44,8 +102,7 @@ func TestSelectedBuildRequiresCompleteLocalSelection(t *testing.T) {
 }
 
 func TestSelectedBuildBindsCloneBeforePlanAndCapturesExecutionInputs(t *testing.T) {
-	profile, build := nightlyIdentityFixture()
-	plan, _ := nightlyCompiledFixture(t, profile, build)
+	plan := nativeCapturedBuildPlanFixture(t)
 	raw, err := canonical.Marshal(plan)
 	if err != nil {
 		t.Fatal(err)
@@ -102,8 +159,7 @@ esac
 }
 
 func TestSelectedBuildUsesPlanOwnerAndExactInvocation(t *testing.T) {
-	profile, build := nightlyIdentityFixture()
-	plan, _ := nightlyCompiledFixture(t, profile, build)
+	plan := nativeCapturedBuildPlanFixture(t)
 	raw, err := canonical.Marshal(plan)
 	if err != nil {
 		t.Fatal(err)

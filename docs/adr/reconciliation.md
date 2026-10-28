@@ -202,6 +202,17 @@ Round-trip and rejection contracts cover this case; they do not prove a full nat
 The shared native demo has an opt-in Mac/Linux ARM64 conformance hook using
 matching suite/tool outputs from the same fresh artifact Run.
 
+The ordinary local demo also admits Linux AMD64 KVM. Default AMD64 input selection
+uses the shared catalogs with architecture-specific acquired binaries and disk
+firmware. Host/site tools are selected in the artifact Run and reused without a
+second build. Default AMD64 and Mac preparation share the existing local
+toolchain bootstrap and catalog-scoped substitutions; only Mac binds installed
+native Packer dependencies. The consumer binds each disk, image and executable bundle to its
+replayed Plan platform; bootstrap, imports, identity inputs and readiness use the
+same architecture. AMD64 conformance and local qualification remain unsupported.
+Contract tests and compiled input validation are distinct from a real AMD64 KVM
+build/deployment result, which is not yet recorded.
+
 The shared native startup imports the ordinary named OVN image under its exact native digest and
 projects matching chart values after package installation and before agent startup;
 the OS package's independently built image is not treated as the named output.

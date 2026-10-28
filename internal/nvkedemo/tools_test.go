@@ -33,7 +33,7 @@ import (
 func TestNativeToolSelectionKeepsExplicitOSBundles(t *testing.T) {
 	for _, tc := range []struct{ platform, bundle string }{
 		{"darwin/arm64", "native-tools-darwin-arm64"}, {"linux/arm64", "native-tools-linux-arm64"},
-		{"linux/amd64", ""}, {"windows/arm64", ""}, {"", ""},
+		{"linux/amd64", "native-tools-linux-amd64"}, {"windows/arm64", ""}, {"", ""},
 	} {
 		t.Run(tc.platform, func(t *testing.T) {
 			definition, environment, bundle, members, err := nativeToolSelection(tc.platform)

@@ -287,7 +287,7 @@ func TestNativeLinuxVMEvidenceRejectsSubstitution(t *testing.T) {
 				digest = "sha256:" + strings.Repeat("0", 64)
 			}
 			writeTenantFixture(t, xmlFile, raw, 0o600)
-			observed, err := nativeLinuxVMEvidence(t.Context(), runner, work, digest, 3)
+			observed, err := nativeLinuxVMEvidenceForArchitecture(t.Context(), runner, work, digest, 3, "arm64")
 			if tc.name == "exact" {
 				if err != nil || len(observed) != 3 {
 					t.Fatalf("exact site and tenant observation rejected: %v %v", observed, err)

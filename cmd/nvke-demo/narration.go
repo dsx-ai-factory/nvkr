@@ -26,9 +26,13 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 	if ctx == nil || out == nil {
 		return nvkrerr.New(nvkrerr.CodeUsage, "walkthrough introduction requires a context and writer")
 	}
-	definitionName, environmentName, err := nvkedemo.LocalArtifactInputsFor(cfg.Network, cfg.Conformance, runtime.GOOS)
-	if err != nil {
-		return err
+	definitionName, environmentName := cfg.Definition, cfg.Environment
+	if definitionName == "" {
+		var err error
+		definitionName, environmentName, err = nvkedemo.LocalArtifactInputsForPlatform(cfg.Network, cfg.Conformance, runtime.GOOS+"/"+runtime.GOARCH)
+		if err != nil {
+			return err
+		}
 	}
 	selected := filepath.Base(definitionName)
 	network := "NVIDIA OVN (default)"

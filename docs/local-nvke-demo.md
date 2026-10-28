@@ -37,6 +37,7 @@ flowchart TD
 | Host | CLI and simulator | Kubernetes guest runtime |
 | --- | --- | --- |
 | Ubuntu ARM64 | Native Linux executables | QEMU/KVM through session libvirt |
+| Ubuntu AMD64 | Native Linux executables | QEMU/KVM through session libvirt |
 | Apple Silicon Mac | Native Darwin executables | Host QEMU with explicit TCG for the selected 64K image, and vmnet |
 
 Both hosts use Docker for artifact builds and a separate private Lima
@@ -48,7 +49,9 @@ forwards SPIRE port 30081 to the observed demo gateway, and removes that backend
 before provisioning tenant guests. It does not adopt existing instances or mount
 the simulator state/QCOW directory into Lima.
 
-`build` creates an artifact Run and native-tool Run. `run` consumes explicitly
+`build` creates an artifact Run and, when not already included in that Definition,
+a native-tool Run. The default AMD64 Definition includes both host and site tools,
+so they are built once in the artifact Run. `run` consumes explicitly
 selected completed Runs. `e2e` calls those same stages in sequence. NVKR owns
 builds, acquisition, observation and artifact verification; NVKE owns bootstrap,
 site deployment and tenant operations. Both hosts derive the Kubernetes version
@@ -63,13 +66,23 @@ Its allowance follows the remaining operation budget; see the
 [implementation and evidence limits](adr/reconciliation.md#local-arm64-demo-presentation).
 
 The native path remains a local diagnostic.
+On Linux AMD64, ordinary `build` and `e2e` automatically select the AMD64
+Definition and Environment and the `nvkr` executable beside `nvke-demo`.
+Its images, QCOW2, tool bundles, bootstrap backend and node checks use AMD64
+through the same deployment owner. Default AMD64 preparation builds and validates
+the local Packer toolchain, then binds its exact image ID through the existing
+catalog overlays; it does not require access to the older published toolchain.
+AMD64's default inputs currently cover NVIDIA
+OVN without conformance; upstream OVN and local qualification remain separate
+unsupported selections. Architecture contract tests and Plan compilation do not
+establish a completed AMD64 KVM deployment.
 A complete fresh Mac/Linux build, deployment and cleanup result has not yet been
 established for this candidate. See [current implementation and evidence](adr/reconciliation.md)
 and [remaining source-build gaps](full-nvke-source-build.md).
 
 ## 1. Choose your Linux execution host
 
-Use a dedicated trusted Ubuntu ARM64 host with usable KVM and sufficient native
+Use a dedicated trusted Ubuntu ARM64 or AMD64 host with usable KVM and sufficient native
 storage for source builds, OCI outputs, the QCOW2 and guest overlays. The native
 workflow allocates **6 CPUs / 12 GiB to the site and 6 CPUs / 12 GiB to each
 tenant**: 36 GiB with one tenant worker or 48 GiB with two workers, before host,
@@ -155,15 +168,25 @@ prerequisite package selection is:
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends \
   git make gcc libc6-dev jq coreutils python3 openssh-client bash curl openssl \
-  libvirt-daemon-system libvirt-clients qemu-system-arm qemu-utils \
-  qemu-efi-aarch64 cloud-image-utils swtpm swtpm-tools gnutls-bin ipxe-qemu \
+  libvirt-daemon-system libvirt-clients qemu-utils \
+  cloud-image-utils swtpm swtpm-tools gnutls-bin ipxe-qemu \
   dnsmasq-base iptables iproute2 libcap2-bin e2fsprogs kmod
+```
+
+Install firmware and the QEMU system executable for the host architecture:
+
+```sh
+case "$(uname -m)" in
+  aarch64) sudo apt-get install -y qemu-system-arm qemu-efi-aarch64 ;;
+  x86_64) sudo apt-get install -y qemu-system-x86 ovmf ;;
+  *) echo 'Unsupported demo host architecture' >&2; exit 1 ;;
+esac
 ```
 
 The CLI refuses conflicting resources and overlapping networks; it does not
 install those packages or delete an existing libvirt session. Linux bootstrap
 additionally requires the source-built Lima `f47461e` distribution and matched
-helpers. Follow the [public source installation procedure](native-linux-bootstrap.md#install-from-public-source-on-ubuntu-arm64)
+helpers. Follow the [public source installation procedure](native-linux-bootstrap.md#install-from-public-source-on-ubuntu-arm64-or-amd64)
 once, keeping its installation directory on `PATH` in the terminal used below.
 That candidate's binary vulnerability findings and bounded pilot scope remain
 visible there; a backend-only pilot is not full native runtime acceptance.

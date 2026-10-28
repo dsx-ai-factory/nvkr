@@ -12,6 +12,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 func TestLaptopNICoSimSourceBuild(t *testing.T) {
@@ -40,11 +41,15 @@ func testNICoSimSourceBuild(t *testing.T, directory string, patched bool) {
 		{"self-contained simulator selection", "linux/arm64", []string{"nico-sim", "nico-sim-runtime-assets", "nico-simctl"}, ""},
 		{"Mac simulator requires an admitted CGO toolchain", "darwin/arm64", []string{"nico-sim"}, e.CodeEngineCapability},
 		{"Mac API CLI remains cross-buildable", "darwin/arm64", []string{"nico-simctl"}, ""},
-		{"foreign platform fails closed", "linux/amd64", []string{"nico-sim"}, e.CodeEngineCapability},
+		{"AMD64 server", "linux/amd64", []string{"nico-sim"}, ""},
+		{"AMD64 CLI", "linux/amd64", []string{"nico-simctl"}, ""},
+		{"AMD64 runtime assets", "linux/amd64", []string{"nico-sim-runtime-assets"}, ""},
+		{"AMD64 tools share one prepared source", "linux/amd64", []string{"nico-sim", "nico-sim-runtime-assets", "nico-simctl"}, ""},
+		{"unsupported architecture fails closed", "linux/riscv64", []string{"nico-sim"}, e.CodeInvalidCatalog},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			wantCode := tc.wantCode
-			if patched && tc.platform == "darwin/arm64" {
+			if patched && (tc.platform == "darwin/arm64" || tc.platform == "linux/amd64") {
 				wantCode = e.CodeEngineCapability
 			}
 			resolved, err := Resolve(cat, Selection{Components: tc.components, Platform: tc.platform, OutputFormat: "executable"})
@@ -76,10 +81,17 @@ func testNICoSimSourceBuild(t *testing.T, directory string, patched bool) {
 						t.Fatalf("pinned offline source producer changed: %+v", node)
 					}
 					cgo := false
+					arch := ""
 					for _, variable := range node.Env {
 						if variable.Name == "CGO_ENABLED" && variable.Value == "1" {
 							cgo = true
 						}
+						if variable.Name == "GOARCH" {
+							arch = variable.Value
+						}
+					}
+					if node.Platform != tc.platform || arch != target.ExecutableArch(tc.platform) {
+						t.Fatalf("simulator build target differs from selection: platform=%s GOARCH=%s", node.Platform, arch)
 					}
 					wantCGO := node.Component == "nico-sim" || (patched && node.Component == "nico-simctl")
 					if cgo != wantCGO {

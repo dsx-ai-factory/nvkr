@@ -132,53 +132,78 @@ func TestNativeAssetsCanceledBeforeInputIO(t *testing.T) {
 	}
 }
 
-func TestNativeAcquiredImageRequiresSelectedSourceAndChild(t *testing.T) {
-	for _, role := range []string{"workload", "capi-exec-init", "capi-exec-plugin"} {
-		for _, scenario := range []string{"selected", "updated source", "wrong source", "wrong repository", "wrong epoch", "wrong child", "wrong parent", "wrong build", "wrong platform", "missing producer", "duplicate producer"} {
-			t.Run(role+"/"+scenario, func(t *testing.T) {
-				installer := &nativeInstallerSelection{repo: "https://example.invalid/nvke.git", commit: strings.Repeat("a", 40), sourceDate: 1}
-				if scenario == "updated source" {
-					installer.commit, installer.sourceDate = strings.Repeat("b", 40), 2
-				}
-				parent, child := "sha256:"+strings.Repeat("c", 64), "sha256:"+strings.Repeat("d", 64)
-				if scenario == "updated source" {
-					parent, child = "sha256:"+strings.Repeat("e", 64), "sha256:"+strings.Repeat("f", 64)
-				}
-				component := catalog.Component{Repo: installer.repo, Commit: installer.commit, SourceDate: installer.sourceDate, Prebuilt: &catalog.Prebuilt{
-					Image: "example.invalid/" + role + "@" + parent, ImageParentDigest: parent, Digests: map[string]string{"arm64": child},
-				}}
-				selected := nativeImageSelection{role: role, output: role + "-image-arm64", observed: lifecycle.Artifact{Digest: child, BuildDigest: "build"}}
-				build := factory.BuildPlan{Name: selected.output, Platform: "linux/arm64", BuildDigest: selected.observed.BuildDigest}
+func TestNativeOutputPlatformUsesExactReplayedBuild(t *testing.T) {
+	for _, arch := range []string{"arm64", "amd64"} {
+		for _, scenario := range []string{"selected", "sibling name", "wrong build", "wrong components", "foreign platform"} {
+			t.Run(arch+"/"+scenario, func(t *testing.T) {
+				output := lifecycle.Artifact{Name: "selected", BuildDigest: "build", Components: []string{"component"}}
+				build := factory.BuildPlan{Name: output.Name, BuildDigest: output.BuildDigest, Components: output.Components, Platform: "linux/" + arch}
 				switch scenario {
-				case "wrong source":
-					component.Commit = strings.Repeat("f", 40)
-				case "wrong repository":
-					component.Repo = "https://example.invalid/other.git"
-				case "wrong epoch":
-					component.SourceDate++
-				case "wrong child":
-					selected.observed.Digest = parent
-				case "wrong parent":
-					component.Prebuilt.ImageParentDigest = child
+				case "sibling name":
+					build.Name = "sibling"
 				case "wrong build":
 					build.BuildDigest = "other"
-				case "wrong platform":
-					build.Platform = "linux/amd64"
+				case "wrong components":
+					build.Components = []string{"other"}
+				case "foreign platform":
+					build.Platform = "darwin/" + arch
 				}
-				name := "native-" + role + "-image"
-				if scenario == "missing producer" {
-					name = "unselected"
-				}
-				build.ResolvedComponents = []catalog.NamedComponent{{Name: name, Component: component}}
-				if scenario == "duplicate producer" {
-					build.ResolvedComponents = append(build.ResolvedComponents, build.ResolvedComponents[0])
-				}
-				ref, err := nativeAcquiredImage(&factory.Plan{Builds: []factory.BuildPlan{build}}, selected, installer)
-				accepted := scenario == "selected" || scenario == "updated source"
-				if (err == nil) != accepted || accepted && ref.String() != component.Prebuilt.Image {
-					t.Fatalf("source/child selection: ref=%s err=%v", ref, err)
+				err := nativeOutputPlatform(&factory.Plan{Builds: []factory.BuildPlan{build}}, output, "linux/"+arch)
+				if scenario == "selected" {
+					if err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					assertNightlyCode(t, err, nvkrerr.CodeVerifyFailed)
 				}
 			})
+		}
+	}
+}
+
+func TestNativeAcquiredImageRequiresSelectedNativeChild(t *testing.T) {
+	for _, role := range []string{"workload", "capi-exec-init", "capi-exec-plugin"} {
+		for _, arch := range []string{"arm64", "amd64"} {
+			for _, scenario := range []string{"selected", "independent source", "source build", "wrong child", "wrong parent", "wrong build", "wrong platform", "missing producer", "duplicate producer"} {
+				t.Run(role+"/"+arch+"/"+scenario, func(t *testing.T) {
+					installer := &nativeInstallerSelection{repo: "https://example.invalid/nvke.git", commit: strings.Repeat("a", 40), sourceDate: 1}
+					parent, child := "sha256:"+strings.Repeat("c", 64), "sha256:"+strings.Repeat("d", 64)
+					component := catalog.Component{Repo: installer.repo, Commit: installer.commit, SourceDate: installer.sourceDate, Prebuilt: &catalog.Prebuilt{
+						Image: "example.invalid/" + role + "@" + parent, ImageParentDigest: parent, Digests: map[string]string{arch: child},
+					}}
+					selected := nativeImageSelection{role: role, output: role + "-image-" + arch, platform: "linux/" + arch, observed: lifecycle.Artifact{Digest: child, BuildDigest: "build"}}
+					build := factory.BuildPlan{Name: selected.output, Platform: "linux/" + arch, BuildDigest: selected.observed.BuildDigest}
+					switch scenario {
+					case "independent source":
+						component.Commit = strings.Repeat("f", 40)
+						component.Repo = "https://example.invalid/other.git"
+						component.SourceDate++
+					case "source build":
+						component.FromSource = true
+					case "wrong child":
+						selected.observed.Digest = parent
+					case "wrong parent":
+						component.Prebuilt.ImageParentDigest = child
+					case "wrong build":
+						build.BuildDigest = "other"
+					case "wrong platform":
+						build.Platform = "linux/" + map[string]string{"arm64": "amd64", "amd64": "arm64"}[arch]
+					}
+					name := "native-" + role + "-image"
+					if scenario == "missing producer" {
+						name = "unselected"
+					}
+					build.ResolvedComponents = []catalog.NamedComponent{{Name: name, Component: component}}
+					if scenario == "duplicate producer" {
+						build.ResolvedComponents = append(build.ResolvedComponents, build.ResolvedComponents[0])
+					}
+					ref, err := nativeAcquiredImage(&factory.Plan{Builds: []factory.BuildPlan{build}}, selected)
+					accepted := scenario == "selected" || scenario == "independent source"
+					if (err == nil) != accepted || accepted && ref.String() != component.Prebuilt.Image {
+						t.Fatalf("source/child selection: ref=%s err=%v", ref, err)
+					}
+				})
+			}
 		}
 	}
 }

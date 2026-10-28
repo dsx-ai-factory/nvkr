@@ -16,20 +16,25 @@ import (
 
 // NativeResources describes downstream guest sizing and additional host/QEMU
 // headroom. It changes neither selected artifact bytes nor their build identity.
-// Zero selects the existing shared defaults; an override must be complete.
+// Zero selects the existing shared defaults; a memory/headroom override must be
+// complete. Zero VCPUs preserves the existing six-vCPU site and tenant shape.
 type NativeResources struct {
-	SiteMemoryGiB   int `yaml:"siteMemoryGiB"`
-	TenantMemoryGiB int `yaml:"tenantMemoryGiB"`
-	HeadroomMiB     int `yaml:"headroomMiB"`
+	SiteMemoryGiB   int `yaml:"siteMemoryGiB" json:"siteMemoryGiB"`
+	TenantMemoryGiB int `yaml:"tenantMemoryGiB" json:"tenantMemoryGiB"`
+	HeadroomMiB     int `yaml:"headroomMiB" json:"headroomMiB"`
+	VCPUs           int `yaml:"vcpus,omitempty" json:"vcpus,omitempty"`
 }
 
 func selectedNativeResources(value NativeResources) (NativeResources, error) {
 	if value == (NativeResources{}) {
 		value = NativeResources{SiteMemoryGiB: 12, TenantMemoryGiB: tenantDemoMemoryGiB, HeadroomMiB: 4096}
 	}
+	if value.VCPUs == 0 {
+		value.VCPUs = tenantDemoVCPUs
+	}
 	// Bound descriptive arithmetic before converting to unsigned capacity units.
-	if value.SiteMemoryGiB < 1 || value.SiteMemoryGiB > 1<<20 || value.TenantMemoryGiB < 1 || value.TenantMemoryGiB > 1<<20 || value.HeadroomMiB < 1 || value.HeadroomMiB > 1<<30 {
-		return NativeResources{}, configUsage("native resources require positive bounded siteMemoryGiB, tenantMemoryGiB and headroomMiB")
+	if value.SiteMemoryGiB < 1 || value.SiteMemoryGiB > 1<<20 || value.TenantMemoryGiB < 1 || value.TenantMemoryGiB > 1<<20 || value.HeadroomMiB < 1 || value.HeadroomMiB > 1<<30 || value.VCPUs < 1 || value.VCPUs > 1<<20 {
+		return NativeResources{}, configUsage("native resources require positive bounded siteMemoryGiB, tenantMemoryGiB, headroomMiB and vcpus")
 	}
 	return value, nil
 }
@@ -83,11 +88,15 @@ func (admission nativeResourceAdmission) check(ctx context.Context, work string,
 	}
 	needed += uint64(resources.HeadroomMiB)
 	// vCPUs are time-shared: admit the largest VM, not the sum of all vCPUs.
-	if actual.CPUMillis < tenantDemoVCPUs*1000 || actual.MemoryMiB < needed {
-		return nvkrerr.New(nvkrerr.CodeEngineCapability, "native guests require %d available MiB including host/QEMU headroom and %d host CPUs; observed %d MiB and %d CPU milliunits; observation reserves nothing", needed, tenantDemoVCPUs, actual.MemoryMiB, actual.CPUMillis)
+	largest := resources.VCPUs
+	if !tenantOnly {
+		largest = max(largest, 4) // The separately joined bootstrap backend uses four CPUs.
+	}
+	if actual.CPUMillis < uint64(largest)*1000 || actual.MemoryMiB < needed {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "native guests require %d available MiB including host/QEMU headroom and %d host CPUs; observed %d MiB and %d CPU milliunits; observation reserves nothing", needed, largest, actual.MemoryMiB, actual.CPUMillis)
 	}
 	if output != nil {
-		_, err = fmt.Fprintf(output, "Native guest capacity: available memory %d/%d MiB; largest VM %d CPUs. Not reserved.\n", actual.MemoryMiB, needed, tenantDemoVCPUs)
+		_, err = fmt.Fprintf(output, "Native guest capacity: available memory %d/%d MiB; largest VM %d CPUs. Not reserved.\n", actual.MemoryMiB, needed, largest)
 	}
 	return err
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -130,6 +131,28 @@ func TestNativeInstallerSelectionReplaysCapturedRun(t *testing.T) {
 		if build.Name == bundle {
 			buildDigest = build.BuildDigest
 		}
+	}
+	for _, platform := range []string{"darwin/arm64", "linux/arm64", "linux/amd64", "linux/386"} {
+		t.Run(platform, func(t *testing.T) {
+			changed := *plan
+			changed.Builds = slices.Clone(plan.Builds)
+			for i := range changed.Builds {
+				if changed.Builds[i].Name == bundle {
+					changed.Builds[i].Platform = platform
+				}
+			}
+			got, err := nativeInstallerSelectionFromPlan(&changed, bundle, buildDigest)
+			if platform == "linux/386" {
+				if err == nil {
+					t.Fatal("unsupported installer architecture accepted")
+				}
+				return
+			}
+			_, arch, _ := strings.Cut(platform, "/")
+			if err != nil || got.arch != arch {
+				t.Fatalf("source installer platform: %+v %v", got, err)
+			}
+		})
 	}
 	for _, name := range []string{"wrong build", "different executable source", "missing installer", "ambiguous clusterctl", "unstable clusterctl"} {
 		t.Run(name, func(t *testing.T) {

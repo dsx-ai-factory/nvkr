@@ -21,16 +21,16 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// Only the default Mac BUILD supplies these installed dependencies. Explicit
-// customer-selected Definition/Environment inputs retain their existing meaning.
-func defaultMacBuild(cfg *BuildConfig, platform, executable string) (bool, error) {
-	if platform != "darwin/arm64" || cfg.Definition != "" || cfg.Environment != "" || cfg.NVKR != "" {
+// Select authored inputs and the adjacent NVKR distribution. Explicit customer
+// inputs retain their meaning; only Mac subsequently binds installed Packer tools.
+func defaultNativeBuild(cfg *BuildConfig, platform, executable string) (bool, error) {
+	if (platform != "darwin/arm64" && platform != "linux/amd64") || cfg.Definition != "" || cfg.Environment != "" || cfg.NVKR != "" {
 		return false, nil
 	}
 	if cfg.Prepared || cfg.QualifyLocal || cfg.QualificationPolicy != "" {
-		return false, e.New(e.CodeEngineCapability, "default Mac BUILD supports unsigned local execution")
+		return false, e.New(e.CodeEngineCapability, "default native BUILD supports unsigned local execution")
 	}
-	definition, environment, err := LocalArtifactInputsFor(cfg.Network, cfg.Conformance, "darwin")
+	definition, environment, err := LocalArtifactInputsForPlatform(cfg.Network, cfg.Conformance, platform)
 	if err != nil {
 		return false, err
 	}
@@ -209,7 +209,11 @@ func admitMacBuildPrerequisites(ctx context.Context, runner Runner, repository s
 	return nil
 }
 
-func prepareDefaultMacBuild(ctx context.Context, runner Runner, cfg *BuildConfig) error {
+func prepareDefaultNativeBuild(ctx context.Context, runner Runner, cfg *BuildConfig, platform string) error {
+	if platform != "darwin/arm64" && platform != "linux/amd64" {
+		return e.New(e.CodeEngineCapability, "unsupported default native preparation host %q", platform)
+	}
+	_, arch, _ := strings.Cut(platform, "/")
 	runner.directory = cfg.Repository
 	env, err := localBuildSourceEnvironment(runner.Env, environmentValue(runner.Env, "NVKE_LOCAL_CLONE"))
 	if err != nil {
@@ -217,14 +221,20 @@ func prepareDefaultMacBuild(ctx context.Context, runner Runner, cfg *BuildConfig
 	}
 	runner.Env = env
 	runner.Env = SetEnv(runner.Env, map[string]string{"CHECKPOINT_DISABLE": "1"})
-	if err := admitMacBuildPrerequisites(ctx, runner, cfg.Repository); err != nil {
-		return err
-	}
-	request, err := discoverMacPackerFiles(ctx, runner, cfg.Repository)
-	if err != nil {
-		return err
+	var request delivery.BinaryBundleRequest
+	if platform == "darwin/arm64" {
+		if err := admitMacBuildPrerequisites(ctx, runner, cfg.Repository); err != nil {
+			return err
+		}
+		request, err = discoverMacPackerFiles(ctx, runner, cfg.Repository)
+		if err != nil {
+			return err
+		}
 	}
 	root := filepath.Join(".nvkr", "mac-build", cfg.AttemptPrefix)
+	if platform == "linux/amd64" {
+		root = filepath.Join(".nvkr", "native-build", cfg.AttemptPrefix)
+	}
 	absolute := filepath.Join(cfg.Repository, root)
 	parent, leaf, err := securepath.CreateParentBeneath(cfg.Repository, root)
 	if err != nil {
@@ -237,10 +247,6 @@ func prepareDefaultMacBuild(ctx context.Context, runner Runner, cfg *BuildConfig
 	runner.Work = absolute
 	// Keep bootstrap bind sources inside the attempt's repository workspace.
 	runner.Env = SetEnv(runner.Env, map[string]string{"TMPDIR": runner.Work})
-	manifest := filepath.Join(root, "native-packer-files.json")
-	if err := privateJSON(filepath.Join(cfg.Repository, manifest), request); err != nil {
-		return err
-	}
 	invoke := func(args []string, phase string, timeout time.Duration, into any) error {
 		raw, err := runner.Capture(ctx, args, phase, timeout)
 		if err != nil {
@@ -248,17 +254,24 @@ func prepareDefaultMacBuild(ctx context.Context, runner Runner, cfg *BuildConfig
 		}
 		return json.Unmarshal(raw, into)
 	}
-	var bundle factory.NativePackerPreparation
-	if err := invoke([]string{cfg.NVKR, "factory", "prepare-native-packer", "--manifest", manifest, "--out", filepath.Join(root, "toolchain")}, "native-packer-dependency-preparation", 0, &bundle); err != nil {
-		return err
+	prepared := factory.NativeBuildPreparation{Definition: cfg.Definition, Environment: cfg.Environment}
+	if platform == "darwin/arm64" {
+		manifest := filepath.Join(root, "native-packer-files.json")
+		if err := privateJSON(filepath.Join(cfg.Repository, manifest), request); err != nil {
+			return err
+		}
+		var bundle factory.NativePackerPreparation
+		if err := invoke([]string{cfg.NVKR, "factory", "prepare-native-packer", "--manifest", manifest, "--out", filepath.Join(root, "toolchain")}, "native-packer-dependency-preparation", 0, &bundle); err != nil {
+			return err
+		}
+		if err := invoke([]string{cfg.NVKR, "factory", "prepare-native-packer-inputs", "--definition", cfg.Definition, "--environment", cfg.Environment,
+			"--layout", bundle.Layout, "--bundle", bundle.Bundle, "--toolchain", bundle.Toolchain, "--out", filepath.Join(root, "packer-inputs"),
+			"--accelerator", "tcg", "--variable", "cpu_model=max", "--variable", "ssh_timeout=180m", "--variable", "efi_firmware_code=/nvkr/toolchain/firmware/code.fd", "--variable", "efi_firmware_vars=/nvkr/toolchain/firmware/vars.fd"}, "native-packer-input-preparation", 0, &prepared); err != nil {
+			return err
+		}
 	}
-	var prepared factory.NativeBuildPreparation
-	if err := invoke([]string{cfg.NVKR, "factory", "prepare-native-packer-inputs", "--definition", cfg.Definition, "--environment", cfg.Environment,
-		"--layout", bundle.Layout, "--bundle", bundle.Bundle, "--toolchain", bundle.Toolchain, "--out", filepath.Join(root, "packer-inputs"),
-		"--accelerator", "tcg", "--variable", "cpu_model=max", "--variable", "ssh_timeout=180m", "--variable", "efi_firmware_code=/nvkr/toolchain/firmware/code.fd", "--variable", "efi_firmware_vars=/nvkr/toolchain/firmware/vars.fd"}, "native-packer-input-preparation", 0, &prepared); err != nil {
-		return err
-	}
-	// The Linux vendoring image and Darwin execution bundle retain separate pins.
+	// Linux builds the native toolchain; Darwin additionally binds its execution
+	// bundle. Both paths derive substitutions from the admitted Plan.
 	// Follow the same admitted Plan scopes as the Linux launcher's shared jq owner.
 	baseline, err := runner.Capture(ctx, []string{cfg.NVKR, "run", "plan", "--definition", prepared.Definition, "--environment", prepared.Environment, "--json"}, "native-build-baseline", 2*time.Minute)
 	if err != nil {
@@ -271,11 +284,11 @@ func prepareDefaultMacBuild(ctx context.Context, runner Runner, cfg *BuildConfig
 	if _, err := factory.LoadPlanContext(ctx, filepath.Join(cfg.Repository, plan)); err != nil {
 		return err
 	}
-	scopes, err := runner.Capture(ctx, []string{"jq", "-L", "scripts", "-e", `include "nvke-os-plan"; local_toolchain_scopes("all")`, plan}, "native-build-toolchain-scopes", time.Minute)
+	scopes, err := runner.Capture(ctx, []string{"jq", "-L", "scripts", "-e", "--arg", "arch", arch, `include "nvke-os-plan"; local_toolchain_scopes("all"; $arch)`, plan}, "native-build-toolchain-scopes", time.Minute)
 	if err != nil {
 		return err
 	}
-	image, err := runner.Capture(ctx, []string{"bash", "toolchains/nvkr-packer/build.sh", "--arch", "arm64", "--diagnostic-local", "--print-validated-image-id", "--tag", "localhost/nvkr-packer-toolchain:laptop-" + cfg.AttemptPrefix}, "native-build-utility-bootstrap", 6*time.Hour)
+	image, err := runner.Capture(ctx, []string{"bash", "toolchains/nvkr-packer/build.sh", "--arch", arch, "--diagnostic-local", "--print-validated-image-id", "--tag", "localhost/nvkr-packer-toolchain:laptop-" + cfg.AttemptPrefix}, "native-build-utility-bootstrap", 6*time.Hour)
 	if err != nil {
 		return err
 	}
@@ -309,8 +322,8 @@ func prepareDefaultMacBuild(ctx context.Context, runner Runner, cfg *BuildConfig
 		if index != 0 {
 			name = fmt.Sprintf("toolchain-attempt-%d.json", index)
 		}
-		raw, err := runner.Capture(ctx, []string{"jq", "-L", "scripts", "-e", "--argjson", "index", fmt.Sprint(index), "--arg", "to", pin,
-			`include "nvke-os-plan"; .[$index] | toolchain_overlay("arm64"; .pin; $to; .catalogDigest; .components)`, scopePath}, fmt.Sprintf("native-build-toolchain-overlay-%d", index), time.Minute)
+		raw, err := runner.Capture(ctx, []string{"jq", "-L", "scripts", "-e", "--argjson", "index", fmt.Sprint(index), "--arg", "to", pin, "--arg", "arch", arch,
+			`include "nvke-os-plan"; .[$index] | toolchain_overlay($arch; .pin; $to; .catalogDigest; .components)`, scopePath}, fmt.Sprintf("native-build-toolchain-overlay-%d", index), time.Minute)
 		if err != nil {
 			return err
 		}

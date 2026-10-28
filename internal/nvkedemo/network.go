@@ -145,8 +145,12 @@ type NetworkGuard struct {
 }
 
 func networkPlatform() error {
-	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
-		return nvkrerr.New(nvkrerr.CodeEngineCapability, "local networking requires dedicated ARM64 Linux/Colima")
+	return admitNetworkPlatform(runtime.GOOS, runtime.GOARCH)
+}
+
+func admitNetworkPlatform(goos, goarch string) error {
+	if goos != "linux" || (goarch != "arm64" && goarch != "amd64") {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "local networking requires native ARM64 or AMD64 Linux")
 	}
 	return nil
 }

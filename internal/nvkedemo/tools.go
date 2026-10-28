@@ -65,9 +65,16 @@ func nativeToolSelection(platform string) (definition, environment, bundle strin
 		return "inputs/definitions/demo/native-mac/definition-tools.json", "inputs/environments/local-native-mac.json", "native-tools-darwin-arm64", []string{"clusterctl", "helm", "kind", "kubectl", "nerdctl", "nico-sim", "nico-simctl", "nvke-installer-sources", "nvkectl", "oras", "vmnet-client", "vmnet-helper"}, nil
 	case "linux/arm64":
 		return "inputs/definitions/demo/native-linux/definition-tools.json", "inputs/environments/local-native-linux.json", "native-tools-linux-arm64", []string{"clusterctl", "helm", "kind", "kubectl", "nerdctl", "nico-sim", "nico-simctl", "nvke-installer-sources", "nvkectl", "oras"}, nil
+	case "linux/amd64":
+		return "inputs/definitions/demo/native-linux-amd64/definition-tools.json", "inputs/environments/local-amd64-kvm.json", "native-tools-linux-amd64", []string{"clusterctl", "helm", "kind", "kubectl", "nerdctl", "nico-sim", "nico-simctl", "nvke-installer-sources", "nvkectl", "oras"}, nil
 	default:
 		return "", "", "", nil, nvkrerr.New(nvkrerr.CodeEngineCapability, "native demo tools do not support host %q", platform)
 	}
+}
+
+func nativeRuntimeToolMembers(platform string) ([]string, error) {
+	_, _, _, members, err := nativeToolSelection(platform)
+	return members, err
 }
 
 type companionToolBundle struct {
@@ -76,11 +83,11 @@ type companionToolBundle struct {
 }
 
 func siteStartupToolBundles(platform string) []companionToolBundle {
-	if platform != "darwin/arm64" && platform != "linux/arm64" {
+	if platform != "darwin/arm64" && platform != "linux/arm64" && platform != "linux/amd64" {
 		return nil
 	}
 	return []companionToolBundle{
-		{"site-startup-tools-arm64", "bin", []string{"nerdctl", nativeIdentityHelper}},
+		{"site-startup-tools-" + strings.Split(platform, "/")[1], "bin", []string{"nerdctl", nativeIdentityHelper}},
 	}
 }
 
@@ -273,7 +280,7 @@ func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string,
 			return "", err
 		}
 	}
-	if platform == "darwin/arm64" || platform == "linux/arm64" {
+	if platform == "darwin/arm64" || platform == "linux/arm64" || platform == "linux/amd64" {
 		installer := filepath.Join(out, "installer")
 		if err := os.Mkdir(installer, 0o700); err != nil {
 			return "", err

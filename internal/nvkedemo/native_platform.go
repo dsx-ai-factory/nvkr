@@ -27,12 +27,23 @@ func admitNativeHost(platform, accelerator string) error {
 		if accelerator == "hvf" || accelerator == "tcg" {
 			return nil
 		}
-	case "linux/arm64":
+	case "linux/arm64", "linux/amd64":
 		if accelerator == "kvm" {
 			return nil
 		}
 	}
 	return nvkrerr.New(nvkrerr.CodeEngineCapability, "native demo does not support host %q with accelerator %q", platform, accelerator)
+}
+
+func nativeQEMUArchitecture(arch string) (string, error) {
+	switch arch {
+	case "arm64":
+		return "aarch64", nil
+	case "amd64":
+		return "x86_64", nil
+	default:
+		return "", nvkrerr.New(nvkrerr.CodeEngineCapability, "unsupported native guest architecture %q", arch)
+	}
 }
 
 // NICo creates each guest's NoCloud seed before launch. Its Darwin builder can
@@ -208,8 +219,15 @@ func (g *NetworkGuard) allowNativeBootstrap(ctx context.Context, site bool) erro
 // nativeLinuxVMEvidence checks local VM bindings through libvirt's own
 // XML/UUID observations and the existing private-domain owner. This diagnostic
 // checks each requested guest against the same selected standalone QCOW bytes.
-func nativeLinuxVMEvidence(ctx context.Context, runner Runner, work, digest string, expected int) ([]domainEvidence, error) {
-	if expected != 1+nativeTenantNodeCount(false) && expected != 1+nativeTenantNodeCount(true) {
+func nativeLinuxVMEvidenceForArchitecture(ctx context.Context, runner Runner, work, digest string, expected int, arch string) ([]domainEvidence, error) {
+	return nativeLinuxVMEvidenceForResources(ctx, runner, work, digest, expected, arch, 0)
+}
+
+func nativeLinuxVMEvidenceForResources(ctx context.Context, runner Runner, work, digest string, expected int, arch string, vcpus int) ([]domainEvidence, error) {
+	if _, err := nativeQEMUArchitecture(arch); err != nil {
+		return nil, err
+	}
+	if expected != 1 && expected != 1+nativeTenantNodeCount(false) && expected != 1+nativeTenantNodeCount(true) {
 		return nil, errors.New("unsupported native VM topology")
 	}
 	runner.Work = ""
@@ -218,7 +236,7 @@ func nativeLinuxVMEvidence(ctx context.Context, runner Runner, work, digest stri
 		return nil, err
 	}
 	if len(names) != expected {
-		return nil, fmt.Errorf("require exactly %d real simulator-owned site and tenant libvirt domains", expected)
+		return nil, fmt.Errorf("require exactly %d real simulator-owned libvirt domains for the selected site/tenant topology", expected)
 	}
 	slices.Sort(names)
 	var observed []domainEvidence
@@ -230,20 +248,8 @@ func nativeLinuxVMEvidence(ctx context.Context, runner Runner, work, digest stri
 		if binding == nil {
 			return nil, errors.New("native guest domain is outside this private simulator")
 		}
-		var domain struct {
-			Type string     `xml:"type,attr"`
-			TPM  []struct{} `xml:"devices>tpm"`
-			OS   struct {
-				Type struct {
-					Arch string `xml:"arch,attr"`
-				} `xml:"type"`
-			} `xml:"os"`
-		}
-		if err := xml.Unmarshal([]byte(binding.XML), &domain); err != nil {
+		if err := nativeLinuxDomainResources(binding.XML, arch, vcpus); err != nil {
 			return nil, err
-		}
-		if domain.Type != "kvm" || domain.OS.Type.Arch != "aarch64" || len(domain.TPM) != 1 {
-			return nil, errors.New("native guest lacks its real ARM64 KVM/TPM configuration")
 		}
 		disk := filepath.Join(work, "var", "instances", strings.TrimPrefix(name, "nico-vm-"), "disk.qcow2")
 		raw, err := runner.Capture(ctx, []string{"qemu-img", "info", "--force-share", "--output=json", disk}, "native-disk-observation", 30*time.Second)
@@ -269,4 +275,38 @@ func nativeLinuxVMEvidence(ctx context.Context, runner Runner, work, digest stri
 		observed = append(observed, domainEvidence{name, binding.UUID, actual, raw})
 	}
 	return observed, nil
+}
+
+func nativeLinuxDomainPlatform(raw, arch string) error {
+	return nativeLinuxDomainResources(raw, arch, 0)
+}
+
+func nativeLinuxDomainResources(raw, arch string, vcpus int) error {
+	expected, err := nativeQEMUArchitecture(arch)
+	if err != nil {
+		return err
+	}
+	var domain struct {
+		Type string     `xml:"type,attr"`
+		TPM  []struct{} `xml:"devices>tpm"`
+		VCPU struct {
+			Count   int `xml:",chardata"`
+			Current int `xml:"current,attr"`
+		} `xml:"vcpu"`
+		OS struct {
+			Type struct {
+				Arch string `xml:"arch,attr"`
+			} `xml:"type"`
+		} `xml:"os"`
+	}
+	if err := xml.Unmarshal([]byte(raw), &domain); err != nil {
+		return nvkrerr.Wrap(nvkrerr.CodeVerifyFailed, err, "reading owned native domain platform")
+	}
+	if domain.Type != "kvm" || domain.OS.Type.Arch != expected || len(domain.TPM) != 1 {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "native guest lacks its real %s KVM/TPM configuration", arch)
+	}
+	if vcpus < 0 || (vcpus > 0 && (domain.VCPU.Count != vcpus || (domain.VCPU.Current != 0 && domain.VCPU.Current != vcpus))) {
+		return nvkrerr.New(nvkrerr.CodeVerifyFailed, "native guest vCPU observation differs from selected %d vCPUs", vcpus)
+	}
+	return nil
 }

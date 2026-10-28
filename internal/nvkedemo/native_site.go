@@ -200,8 +200,8 @@ func nativeSiteSeed(ctx context.Context, source, out string, resources NativeRes
 	}
 	// Change only runtime sizing after both selected source rows are admitted.
 	// Source artifacts remain untouched, and tenant CNI requests remain intact.
-	site["name"], site["memory_gib"] = fmt.Sprintf("native-site-cpu%d-mem%dgb-disk60gb", site["cpu_count"], resources.SiteMemoryGiB), resources.SiteMemoryGiB
-	tenant["name"], tenant["cpu_count"], tenant["memory_gib"] = fmt.Sprintf("cpu%d-mem%dgb-disk60gb", tenantDemoVCPUs, resources.TenantMemoryGiB), tenantDemoVCPUs, resources.TenantMemoryGiB
+	site["name"], site["cpu_count"], site["memory_gib"] = fmt.Sprintf("native-site-cpu%d-mem%dgb-disk60gb", resources.VCPUs, resources.SiteMemoryGiB), resources.VCPUs, resources.SiteMemoryGiB
+	tenant["name"], tenant["cpu_count"], tenant["memory_gib"] = fmt.Sprintf("cpu%d-mem%dgb-disk60gb", resources.VCPUs, resources.TenantMemoryGiB), resources.VCPUs, resources.TenantMemoryGiB
 	raw, err = yaml.Marshal(doc)
 	if err != nil {
 		return "", err
@@ -305,6 +305,7 @@ func (s *nativeSiteAttempt) startup(ctx context.Context, api, diskURL, out strin
 		ControllerImage: s.assets.Images["controller"].Reference, ProviderImage: s.assets.Images["provisioned-provider"].Reference,
 		HandoffURL: handoff.URL, HandoffToken: handoff.Token, HandoffCertificate: handoff.Certificate,
 		Deployment: &NativeSiteDeployment{NicoURL: api, ImageURL: diskURL, ProfilesImage: s.assets.Images["profiles"].Reference},
+		arch:       s.assets.arch, imageTags: s.assets.importTags,
 	}
 	cfg.ImageImports = make(map[string]string)
 	for role, image := range s.assets.Images {
@@ -453,12 +454,9 @@ func runNativeDemo(ctx context.Context, site *NativeSite) error {
 			return err
 		}
 	}
-	var domains []domainEvidence
-	if s.guard != nil {
-		domains, err = nativeLinuxVMEvidence(ctx, runner, s.simulatorWork, s.diskDigest, 1+s.tenantNodeCount())
-		if err != nil {
-			return err
-		}
+	domains, err := s.observeGuestDomains(ctx, runner)
+	if err != nil {
+		return err
 	}
 	if err := privateJSON(filepath.Join(out, "native-result.json"), struct {
 		Scope, Network, ImageDigest string
@@ -526,7 +524,14 @@ func (s *nativeSiteAttempt) prepareBoot(ctx context.Context, imageURL, api strin
 	if err := requireContext(ctx); err != nil {
 		return err
 	}
-	path := filepath.Join(s.assets.Installer, "controller", "test", "fixtures", "releases", "nvke-nico-vms-24.04-arm64-fde-machineimage.yaml")
+	arch := s.assets.arch
+	if arch == "" {
+		arch = "arm64"
+	}
+	if _, err := nativeQEMUArchitecture(arch); err != nil {
+		return err
+	}
+	path := filepath.Join(s.assets.Installer, "controller", "test", "fixtures", "releases", "nvke-nico-vms-24.04-"+arch+"-fde-machineimage.yaml")
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -582,7 +587,26 @@ func (s *nativeSiteAttempt) tenantNodeCount() int {
 // Native acceptance binds every requested Kubernetes node to a distinct VM boot.
 // The legacy diagnostic owner has a separate observation contract.
 func readyNativeTenantNodes(nodes []tenantNode, version string, expected int) (bool, error) {
-	ready, err := readyNodesForCountVersion(nodes, version, expected)
+	return readyNativeTenantNodesForArchitecture(nodes, version, expected, "arm64")
+}
+
+func (s *nativeSiteAttempt) observeGuestDomains(ctx context.Context, runner Runner) ([]domainEvidence, error) {
+	if s.guard == nil {
+		return nil, nil // Mac observations remain with the native QEMU owner.
+	}
+	arch := s.assets.arch
+	if arch == "" {
+		arch = "arm64"
+	}
+	resources, err := selectedNativeResources(s.resources)
+	if err != nil {
+		return nil, err
+	}
+	return nativeLinuxVMEvidenceForResources(ctx, runner, s.simulatorWork, s.diskDigest, 1+s.tenantNodeCount(), arch, resources.VCPUs)
+}
+
+func readyNativeTenantNodesForArchitecture(nodes []tenantNode, version string, expected int, arch string) (bool, error) {
+	ready, err := readyNodesForCountVersionArchitecture(nodes, version, expected, arch)
 	if err != nil || !ready {
 		return ready, err
 	}
@@ -758,7 +782,11 @@ func (s *nativeSiteAttempt) runTenantRequest(ctx context.Context, runner Runner,
 				return err
 			}
 			observed = nodes.Items
-			ready, err := readyNativeTenantNodes(nodes.Items, request.Kubernetes, s.tenantNodeCount())
+			arch := s.assets.arch
+			if arch == "" {
+				arch = "arm64"
+			}
+			ready, err := readyNativeTenantNodesForArchitecture(nodes.Items, request.Kubernetes, s.tenantNodeCount(), arch)
 			if err != nil {
 				return err
 			}
@@ -779,7 +807,11 @@ func (s *nativeSiteAttempt) runTenantRequest(ctx context.Context, runner Runner,
 		return err
 	}
 	progress.update(time.Now(), "tenant-cloud-init", observed)
-	if err := runNativeCloudInit(budget, out, tenantConfig, kubectl, request.Kubernetes, workloadImage, s.tenantNodeCount(), observed, capture); err != nil {
+	arch := s.assets.arch
+	if arch == "" {
+		arch = "arm64"
+	}
+	if err := runNativeCloudInitForArchitecture(budget, out, tenantConfig, kubectl, request.Kubernetes, workloadImage, s.tenantNodeCount(), observed, arch, capture); err != nil {
 		return err
 	}
 	if err := waitTenantDNS(budget, tenantConfig, kubectl, runner.Progress, capture); err != nil {
@@ -787,8 +819,15 @@ func (s *nativeSiteAttempt) runTenantRequest(ctx context.Context, runner Runner,
 	}
 	progress.update(time.Now(), "tenant-workload", observed)
 	s.nodes = observed
-	s.workload, err = runTenantWorkload(budget, out, tenantConfig, kubectl, workloadImage, capture)
-	return err
+	s.workload, err = runTenantWorkloadForArchitecture(budget, out, tenantConfig, kubectl, workloadImage, arch, capture)
+	if err != nil {
+		return err
+	}
+	domains, err := s.observeGuestDomains(budget, runner)
+	if err != nil || domains == nil {
+		return err
+	}
+	return privateJSON(filepath.Join(out, "native-domains.json"), domains)
 }
 
 // The source-owned controller chart admits API ingress from cluster pods.

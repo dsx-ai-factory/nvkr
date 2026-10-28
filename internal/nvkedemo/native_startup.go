@@ -34,6 +34,8 @@ type StartupAsset struct {
 // NVKE still owns site-spec generation, bootstrap, rendering and deployment.
 // This adapter adds no alternative Kubernetes installer or remote shell.
 type NativeSiteStartup struct {
+	arch                                          string
+	imageTags                                     map[string]string
 	Name, Gateway, ControllerImage, ProviderImage string
 	OVNVersion, OVNImage, KubernetesVersion       string
 	Assets                                        []StartupAsset
@@ -84,13 +86,19 @@ func SiteStartupUserData(ctx context.Context, cfg NativeSiteStartup) (string, er
 	if err := requireContext(ctx); err != nil {
 		return "", nvkrerr.Wrap(nvkrerr.CodeUsage, err, "site startup context")
 	}
+	if cfg.arch == "" {
+		cfg.arch = "arm64"
+	}
+	if _, err := nativeQEMUArchitecture(cfg.arch); err != nil {
+		return "", err
+	}
 	if cfg.OVNVersion == "" {
 		cfg.OVNVersion = siteOVNVersion
 	}
 	if err := validateSiteStartup(cfg); err != nil {
 		return "", nvkrerr.Wrap(nvkrerr.CodeUsage, err, "site startup configuration")
 	}
-	importOVN, err := nativeImageImportScript("downloads/ovn.tar", cfg.OVNImage)
+	importOVN, err := nativeImageImportScriptForArchitecture("downloads/ovn.tar", cfg.OVNImage, cfg.arch)
 	if err != nil {
 		return "", nvkrerr.Wrap(nvkrerr.CodeUsage, err, "site OVN import")
 	}
@@ -108,8 +116,16 @@ func SiteStartupUserData(ctx context.Context, cfg NativeSiteStartup) (string, er
 		"spireEnvironment": func(cfg NativeSiteStartup) string { return string(nativeBootstrapSpireEnvironment(cfg)) },
 		"prepareOVN":       func() string { return importOVN + "; " + valuesOVN },
 		"sha":              func(value string) string { return strings.TrimPrefix(value, "sha256:") },
-		"importImage":      nativeImageImportScript,
-		"json":             func(value string) (string, error) { raw, err := json.Marshal(value); return string(raw), err },
+		"importImage": func(file, reference string) (string, error) {
+			return nativeImageImportScriptForArchitecture(file, reference, cfg.arch)
+		},
+		"tagImage": func(role, reference string) (string, error) {
+			if alias := cfg.imageTags[role]; alias != "" {
+				return nativeImageTagScriptForArchitecture(reference, alias, cfg.arch)
+			}
+			return "", nil
+		},
+		"json": func(value string) (string, error) { raw, err := json.Marshal(value); return string(raw), err },
 	}).Parse(hostSitePreparationScript)).Execute(&script, cfg); err != nil {
 		return "", nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "render site startup handoff")
 	}
@@ -146,6 +162,9 @@ func SiteStartupUserData(ctx context.Context, cfg NativeSiteStartup) (string, er
 }
 
 func validateSiteStartup(cfg NativeSiteStartup) error {
+	if cfg.arch == "" {
+		cfg.arch = "arm64"
+	}
 	if !stableKubernetesVersion(cfg.KubernetesVersion) {
 		return fmt.Errorf("require an exact stable Kubernetes version selected by NVKE")
 	}
@@ -180,13 +199,21 @@ func validateSiteStartup(cfg NativeSiteStartup) error {
 	}
 	for _, role := range roles {
 		reference := cfg.ImageImports[role]
-		if _, err := nativeImageImportScript("downloads/"+role+".tar", reference); err != nil {
+		if _, err := nativeImageImportScriptForArchitecture("downloads/"+role+".tar", reference, cfg.arch); err != nil {
 			return fmt.Errorf("site image %s: %w", role, err)
 		}
 		if strings.HasPrefix(role, "runtime-") || strings.HasPrefix(role, "capi-exec-") {
 			if !strings.HasPrefix(reference, "docker.io/nvkr-local/"+strings.TrimPrefix(role, "runtime-")+"@") {
 				return fmt.Errorf("site runtime image %s differs from its selected local alias", role)
 			}
+		}
+	}
+	for role, alias := range cfg.imageTags {
+		if role != "capnico" || cfg.ImageImports[role] == "" {
+			return errors.New("site source tag is outside the selected provider image")
+		}
+		if _, err := nativeImageTagScriptForArchitecture(cfg.ImageImports[role], alias, cfg.arch); err != nil {
+			return err
 		}
 	}
 

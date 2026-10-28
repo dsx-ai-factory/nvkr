@@ -19,11 +19,12 @@ import (
 )
 
 func TestDeploymentSelectsSameNativeWorkflowOnBothHosts(t *testing.T) {
-	for _, platform := range []string{"darwin/arm64", "linux/arm64"} {
+	for _, platform := range []string{"darwin/arm64", "linux/arm64", "linux/amd64"} {
 		for _, network := range []string{"ovn", "upstream-ovn"} {
 			t.Run(platform+"/"+network, func(t *testing.T) {
 				root := filepath.Join(privateTestDir(t), "disk-run")
-				name, err := selectedDiskOutput(network)
+				_, arch, _ := strings.Cut(platform, "/")
+				name, err := selectedDiskOutputForArchitecture(network, arch)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -39,14 +40,14 @@ func TestDeploymentSelectsSameNativeWorkflowOnBothHosts(t *testing.T) {
 					t.Fatal(err)
 				}
 				capturedArtifactRunFixture(t, root, []lifecycle.DefinitionOutput{
-					{Name: name, Platform: "linux/arm64", Format: "disk-image", Components: []string{"disk"}},
+					{Name: name, Platform: "linux/" + arch, Format: "disk-image", Components: []string{"disk"}},
 				}, map[string]lifecycle.Artifact{name: {Digest: digest,
 					Disk: &delivery.DiskOutput{PayloadDigest: digest, Producer: "build-disk", Component: "disk", Format: "qcow2", Encryption: "none", Size: int64(len("observed disk fixture")), Outcome: "succeeded"},
 				}})
 				cfg := Config{TenantWorkers: 2, Walkthrough: network == "ovn", Network: network, NVKR: "nvkr", Out: filepath.Join(root, "deploy"), DemoExecutable: "demo", Cleanup: true, Runs: RunInputs{OS: root, Components: "components", Providers: "providers", Site: "site", Tools: "tools", Profiles: "profiles", Runtime: "runtime", HostTools: "host"}}
 				selected, err := nativeDeploymentConfig(t.Context(), cfg, platform)
 				want := "hvf"
-				if platform == "linux/arm64" {
+				if strings.HasPrefix(platform, "linux/") {
 					want = "kvm"
 				}
 				if err != nil || selected.Image != disk || selected.Accelerator != want || selected.Network != network || !selected.Cleanup || selected.DemoExecutable != cfg.DemoExecutable || selected.Walkthrough != cfg.Walkthrough || selected.TenantWorkers != 2 || selected.conformance != nil {

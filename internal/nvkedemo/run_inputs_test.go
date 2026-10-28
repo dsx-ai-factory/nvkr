@@ -31,17 +31,21 @@ func writeCanonicalRunFixture(t *testing.T, path string, value any) {
 func capturedArtifactRunFixture(t *testing.T, root string, outputs []lifecycle.DefinitionOutput, observed map[string]lifecycle.Artifact) (*factory.Plan, lifecycle.Run) {
 	t.Helper()
 	inputsRoot := privateTestDir(t)
+	host := execution.HostPlatformLinuxARM64
+	if len(outputs) > 0 && outputs[0].Platform == "linux/amd64" {
+		host = execution.HostPlatformLinuxAMD64
+	}
 	components := map[string]any{
 		"tool": map[string]any{"source": "fixture", "platforms": []string{"linux/arm64"}, "fromSource": true,
 			"outputType": "host-package", "buildCommand": []string{"make", "tool"}, "artifactPath": "out/tool", "writeDir": "out"},
 		"image": map[string]any{"source": "fixture", "platforms": []string{"linux/arm64"}, "fromSource": true,
 			"outputType": "oci-image", "buildCommand": []string{"make", "image"}, "artifactPath": "out/image", "writeDir": "out"},
-		"disk": map[string]any{"source": "fixture", "platforms": []string{"linux/arm64"}, "fromSource": true,
+		"disk": map[string]any{"source": "fixture", "platforms": []string{"linux/amd64", "linux/arm64"}, "fromSource": true,
 			"builderType": catalog.BuilderVMImage, "outputType": "disk-image", "disk": catalog.DiskSpec{Format: "qcow2", Encryption: "none"},
 			"buildCommand": []string{"make", "disk"}, "artifactPath": "out/disk.qcow2",
 			"buildRequirements": execution.Requirements{
 				Resources:            &execution.ResourceRequest{CPUMillis: 4000, MemoryMiB: 8192, EphemeralStorageMiB: 32768},
-				AllowedHostPlatforms: []execution.HostPlatform{execution.HostPlatformLinuxARM64},
+				AllowedHostPlatforms: []execution.HostPlatform{execution.HostPlatformLinuxAMD64, execution.HostPlatformLinuxARM64},
 				Capabilities:         []execution.CapabilityRequirement{{Name: execution.CapabilityKVM, Policy: execution.CapabilityRequired}},
 				TimeoutSeconds:       7200,
 			}},
@@ -52,7 +56,7 @@ func capturedArtifactRunFixture(t *testing.T, root string, outputs []lifecycle.D
 	writeCanonicalRunFixture(t, filepath.Join(inputsRoot, "catalog", "registry.yaml"), map[string]any{
 		"apiVersion": "nvkr.dev/catalog/v3", "kind": "SourceBuildRegistry", "components": components,
 		"sources": map[string]catalog.Source{"fixture": {Repo: "https://example.invalid/fixture",
-			ToolchainImagesByArch: map[string]string{"arm64": "example.invalid/compiler@sha256:" + strings.Repeat("c", 64)}}},
+			ToolchainImagesByArch: map[string]string{"amd64": "example.invalid/compiler@sha256:" + strings.Repeat("c", 64), "arm64": "example.invalid/compiler@sha256:" + strings.Repeat("c", 64)}}},
 	})
 	writeCanonicalRunFixture(t, filepath.Join(inputsRoot, "catalog", "pins.lock.yaml"), catalog.PinLock{
 		APIVersion: "nvkr.dev/lock/v1", Kind: "PinLock", Pins: map[string]catalog.Pin{
@@ -65,8 +69,8 @@ func capturedArtifactRunFixture(t *testing.T, root string, outputs []lifecycle.D
 	})
 	writeCanonicalRunFixture(t, filepath.Join(inputsRoot, "environment.json"), lifecycle.Environment{
 		APIVersion: lifecycle.EnvironmentAPIVersion, Kind: lifecycle.EnvironmentKind, Metadata: lifecycle.Metadata{Name: "fixture"},
-		UtilityContainer: "example.invalid/compiler@sha256:" + strings.Repeat("c", 64), UtilityPlatform: "linux/arm64",
-		ExecutionClasses: []execution.Class{{Name: "arm64-kvm", RunsOn: "linux-arm64-cpu16", HostPlatform: execution.HostPlatformLinuxARM64,
+		UtilityContainer: "example.invalid/compiler@sha256:" + strings.Repeat("c", 64), UtilityPlatform: string(host),
+		ExecutionClasses: []execution.Class{{Name: "native-kvm", RunsOn: "fixture-local", HostPlatform: host,
 			Resources:    execution.ResourceCapacity{CPUMillis: 8000, MemoryMiB: 16384, EphemeralStorageMiB: 65536},
 			Capabilities: []execution.CapabilityName{execution.CapabilityKVM}, MaxTimeoutSeconds: 10800}},
 	})

@@ -1,0 +1,433 @@
+{
+  "apiVersion": "nvkr.dev/definition/v5",
+  "kind": "Definition",
+  "metadata": {
+    "name": "nvke-local-dev-amd64-kvm",
+    "description": "Native AMD64 KVM site bootstrap inputs using the shared NVKE, native tools and NVIDIA OVN producers. Local diagnostic build and deployment; no publication or signing."
+  },
+  "catalog": {
+    "base": "../../catalogs/nvke/module-cli-arm64"
+  },
+  "outputs": [
+    {
+      "name": "capi-exec-init-image-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/tools/native"
+      },
+      "components": [
+        "native-capi-exec-init-image"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "capi-exec-plugin-image-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/tools/native"
+      },
+      "components": [
+        "native-capi-exec-plugin-image"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "capnico-controller-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/capnico/local-arm64"
+      },
+      "components": [
+        "capnico-controller"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "cluster-api-provider-provisioned-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/nvke/native-site-arm64"
+      },
+      "components": [
+        "cluster-api-provider-provisioned"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "controller-chart",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/nvke/native-site-arm64"
+      },
+      "components": [
+        "nvke-controller-chart"
+      ],
+      "format": "helm-oci",
+      "helm": {
+        "images": {
+          "controller": "cwe"
+        }
+      }
+    },
+    {
+      "name": "controller-profiles",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/controller-profiles/native-nvidia-arm64"
+      },
+      "components": [
+        "nvke-local-profiles"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "csi-node-driver-registrar-image-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "csi-node-driver-registrar-image"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "cwe",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/nvke/native-site-arm64"
+      },
+      "components": [
+        "nvke-controller"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "installer-tools-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/tools/native"
+      },
+      "components": [
+        "clusterctl-linux-amd64",
+        "helm-linux-amd64",
+        "kind-linux-amd64",
+        "kubectl-linux-amd64",
+        "oras-linux-amd64"
+      ],
+      "format": "executable"
+    },
+    {
+      "name": "native-tools-linux-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/tools/native"
+      },
+      "components": [
+        "clusterctl-linux-amd64",
+        "helm-linux-amd64",
+        "kind-linux-amd64",
+        "kubectl-linux-amd64",
+        "nerdctl",
+        "nico-sim",
+        "nico-simctl",
+        "nvke-installer-sources",
+        "nvkectl",
+        "oras-linux-amd64"
+      ],
+      "format": "executable"
+    },
+    {
+      "name": "nicosim-tools-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/tools/native"
+      },
+      "components": [
+        "nico-sim",
+        "nico-sim-runtime-assets",
+        "nico-simctl"
+      ],
+      "format": "executable"
+    },
+    {
+      "name": "nktp",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/nvke/native-site-arm64"
+      },
+      "components": [
+        "nktp-chart"
+      ],
+      "format": "helm-oci"
+    },
+    {
+      "name": "nvke-node-image-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/node-images/release",
+        "overlays": [
+          "../../catalogs/node-images/variants/native-nvidia.json",
+          "../../catalogs/node-images/variants/nvidia-amd64-kvm.json"
+        ]
+      },
+      "components": [
+        "nvke-agent",
+        "nvke-cni-calico",
+        "nvke-cni-ovn",
+        "nvke-image-inputs",
+        "nvke-kubeadm-distro",
+        "nvke-node-image-amd64",
+        "nvke-patched-installer-iso-amd64",
+        "nvke-spire-agent",
+        "ovn-kube-ubuntu",
+        "ovn-kubernetes-chart",
+        "ubuntu-installer-iso-amd64"
+      ],
+      "format": "disk-image"
+    },
+    {
+      "name": "nvkectl",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/nvke/native-site-arm64"
+      },
+      "components": [
+        "nvkectl"
+      ],
+      "format": "executable"
+    },
+    {
+      "name": "operator-tools",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/tools/operator-amd64"
+      },
+      "components": [
+        "helm",
+        "kubectl"
+      ],
+      "format": "executable"
+    },
+    {
+      "name": "ovn-chart-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/ovn-nvidia"
+      },
+      "components": [
+        "ovn-kubernetes-chart"
+      ],
+      "format": "helm-oci",
+      "helm": {
+        "images": {
+          "control-plane": "ovn-image-amd64",
+          "nbdb": "ovn-image-amd64",
+          "node": "ovn-image-amd64",
+          "northd": "ovn-image-amd64",
+          "ovn-host": "ovn-image-amd64",
+          "sbdb": "ovn-image-amd64"
+        }
+      }
+    },
+    {
+      "name": "ovn-image-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/ovn-nvidia"
+      },
+      "components": [
+        "ovn-kube-ubuntu"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "postgresql",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/nvke/native-site-arm64"
+      },
+      "components": [
+        "postgresql-chart"
+      ],
+      "format": "helm-oci"
+    },
+    {
+      "name": "postgresql-image-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "postgresql-image"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "site-startup-tools-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/tools/native"
+      },
+      "components": [
+        "nerdctl",
+        "nvkr-site-identity-helper"
+      ],
+      "format": "executable"
+    },
+    {
+      "name": "spiffe-csi-image-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "spiffe-csi-image"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "spire",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/nvke/native-site-arm64"
+      },
+      "components": [
+        "spire-chart"
+      ],
+      "format": "helm-oci"
+    },
+    {
+      "name": "spire-agent-image-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "spire-agent-image"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "spire-bash-image-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "spire-bash-image"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "spire-controller-manager-image-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "spire-controller-manager-image"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "spire-crds",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/nvke/native-site-arm64"
+      },
+      "components": [
+        "spire-crds-chart"
+      ],
+      "format": "helm-oci"
+    },
+    {
+      "name": "spire-oidc-image-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "spire-oidc-image"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "spire-server-image-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "spire-server-image"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "spire-tpm-server-image-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "spire-tpm-server-image"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "temporal",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/nvke/native-site-arm64"
+      },
+      "components": [
+        "temporal-chart"
+      ],
+      "format": "helm-oci"
+    },
+    {
+      "name": "temporal-admin-tools-image-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "temporal-admin-tools-image"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "temporal-server-image-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "temporal-server-image"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "temporal-ui-image-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/runtime-dependencies"
+      },
+      "components": [
+        "temporal-ui-image"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "workload-image-amd64",
+      "platform": "linux/amd64",
+      "catalog": {
+        "base": "../../catalogs/tools/native"
+      },
+      "components": [
+        "native-workload-image"
+      ],
+      "format": "oci"
+    }
+  ]
+}

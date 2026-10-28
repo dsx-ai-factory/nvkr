@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
@@ -102,7 +103,7 @@ func nativeAccelerator(platform, requested string) (string, error) {
 		switch platform {
 		case "darwin/arm64":
 			requested = "hvf"
-		case "linux/arm64":
+		case "linux/arm64", "linux/amd64":
 			requested = "kvm"
 		}
 	}
@@ -157,7 +158,8 @@ func nativeDeploymentConfig(ctx context.Context, cfg Config, platform string) (N
 	if cfg.Runs.OS == "" {
 		return NativeConfig{}, nvkrerr.New(nvkrerr.CodeUsage, "deployment requires a completed OS Run")
 	}
-	name, err := selectedDiskOutput(cfg.Network)
+	_, arch, _ := strings.Cut(platform, "/")
+	name, err := selectedDiskOutputForArchitecture(cfg.Network, arch)
 	if err != nil {
 		return NativeConfig{}, err
 	}
@@ -165,8 +167,11 @@ func nativeDeploymentConfig(ctx context.Context, cfg Config, platform string) (N
 	if err != nil {
 		return NativeConfig{}, err
 	}
-	_, image, err := nativeSelectedRunPlan(ctx, root, name, "disk-image")
+	plan, image, err := nativeSelectedRunPlan(ctx, root, name, "disk-image")
 	if err != nil {
+		return NativeConfig{}, err
+	}
+	if err := nativeOutputPlatform(plan, image, "linux/"+arch); err != nil {
 		return NativeConfig{}, err
 	}
 	if image.Disk == nil || image.Disk.Format != "qcow2" || image.Disk.Encryption != "none" || image.Disk.Outcome != "succeeded" || image.Disk.PayloadDigest != image.Digest || image.Disk.Size <= 0 {
