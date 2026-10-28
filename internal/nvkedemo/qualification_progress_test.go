@@ -4,6 +4,7 @@
 package nvkedemo
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"strings"
@@ -13,6 +14,18 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/qualificationprogress"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 )
+
+type cancelQualificationPresenter struct {
+	*buildActivityPresenter
+	cancel context.CancelFunc
+}
+
+func (p cancelQualificationPresenter) Report(event ProgressEvent) {
+	p.buildActivityPresenter.Report(event)
+	if event.Kind == QualificationProgress && event.Qualification.State == qualificationprogress.StateCompleted {
+		p.cancel()
+	}
+}
 
 func TestRunnerQualificationProgressIsPrivateAndJoined(t *testing.T) {
 	program, err := os.Executable()
@@ -29,11 +42,12 @@ func TestRunnerQualificationProgressIsPrivateAndJoined(t *testing.T) {
 			if mode == "no opt in" {
 				raw, err = runner.Capture(t.Context(), args, "qualify-local", 5*time.Second)
 			} else {
-				timeout := 5 * time.Second
+				ctx, cancel := context.WithCancel(t.Context())
+				defer cancel()
 				if mode == "cancel" {
-					timeout = 300 * time.Millisecond
+					runner.Progress = cancelQualificationPresenter{presenter, cancel}
 				}
-				raw, err = runner.CaptureQualification(t.Context(), args, timeout)
+				raw, err = runner.CaptureQualification(ctx, args, 5*time.Second)
 			}
 			if mode == "failed" {
 				if CommandExitCode(err) != 17 {

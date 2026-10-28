@@ -49,6 +49,15 @@ type qualificationStage struct {
 	items             []qualificationItem
 }
 
+// Lost terminal telemetry cannot establish an individual item's outcome.
+func (s *qualificationStage) stopRunningItems() {
+	for i := range s.items {
+		if s.items[i].state == qp.StateRunning {
+			s.items[i].state = "stopped"
+		}
+	}
+}
+
 type dashboardQualification struct {
 	state             string
 	visible           bool
@@ -88,6 +97,7 @@ func (d *dashboard) observeQualification(event nvkedemo.ProgressEvent) bool {
 			d.current = "Qualification " + q.state
 			d.currentStarted = time.Time{}
 			for i := range q.stages {
+				q.stages[i].stopRunningItems()
 				if q.stages[i].state == qp.StateRunning {
 					q.stages[i].state = "stopped"
 					q.stages[i].finished = time.Now()
@@ -125,6 +135,7 @@ func (d *dashboard) observeQualification(event nvkedemo.ProgressEvent) bool {
 		}
 		if record.State != qp.StateRunning {
 			stage.finished = now
+			stage.stopRunningItems()
 		}
 		d.appendActivity("Qualification " + record.State + ": " + qualificationStages[index].label)
 	} else {

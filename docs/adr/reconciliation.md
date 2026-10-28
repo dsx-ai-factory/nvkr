@@ -629,6 +629,10 @@ subject remained
 `localhost:32774/local-m3/evidence@sha256:0d424cd0342e565d1dcba3ecd850f7f7559e1ac618e0b56fb70add8b6c724cd8`.
 The retained canonical result has exact-byte SHA-256
 `1086398389995fc40c5cbeb5a3211b23f629138e60fa7403e2c365dc8d50e20f`.
+The recording and canonical result are retained locally/private to the operator; no
+durable shared download is published. The loopback registry reference is not remotely
+retrievable, and the hashes identify bytes rather than provide access. Reviewers need
+an operator-provided permitted copy to independently inspect this run.
 This records local operator trust and `unqualified-local-execution`; it did not rebuild
 producers, exercise hosted signing or deploy a cluster.
 

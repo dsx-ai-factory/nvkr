@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -231,6 +232,89 @@ func TestQualificationYieldsToSubsequentNativeToolBuild(t *testing.T) {
 			d.draw(screen, time.Now(), false)
 			if strings.Contains(dashboardText(screen), "End follow live") {
 				t.Fatal("render still shows the qualification page after native tools")
+			}
+		})
+	}
+}
+
+func TestQualificationTerminalStopsUnfinishedItems(t *testing.T) {
+	for _, terminal := range []string{nvkedemo.LaneFinished, nvkedemo.LaneFailed, qp.StateCompleted, qp.StateFailed} {
+		t.Run(terminal, func(t *testing.T) {
+			d := qualificationDashboardFixture()
+			qualificationReport(d, qp.KindItem, qp.StageSmoke, qp.StateFailed, "failed-tool", 4, 10)
+			before := d.snapshot()
+			if terminal == nvkedemo.LaneFinished || terminal == nvkedemo.LaneFailed {
+				d.Report(nvkedemo.ProgressEvent{Kind: terminal, Name: "qualification"})
+			} else {
+				qualificationReport(d, qp.KindStage, qp.StageSmoke, terminal, "", 0, 0)
+			}
+			after := d.snapshot()
+			stage := after.qualification.stages[2]
+			if stage.items[0].state != qp.StateCompleted || stage.items[1].state != "stopped" || stage.items[2].state != qp.StateFailed {
+				t.Fatalf("terminal event invented or retained a running outcome: %+v", stage.items)
+			}
+			if stage.completed != 4 || stage.total != 10 || after.phases != before.phases {
+				t.Fatal("terminal telemetry changed counts or execution")
+			}
+		})
+	}
+}
+
+func TestQualificationCountsDoNotRegress(t *testing.T) {
+	for _, kind := range []string{qp.KindStage, qp.KindItem} {
+		t.Run(kind, func(t *testing.T) {
+			d := qualificationDashboardFixture()
+			item := ""
+			if kind == qp.KindItem {
+				item = "helm"
+			}
+			qualificationReport(d, kind, qp.StageSmoke, qp.StateRunning, item, 3, 8)
+			stage := d.snapshot().qualification.stages[2]
+			if stage.completed != 4 || stage.total != 10 {
+				t.Fatalf("counts regressed: %d/%d", stage.completed, stage.total)
+			}
+		})
+	}
+}
+
+func TestQualificationNavigationKeys(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		key      tcell.Key
+		rune     rune
+		selected int
+		confirm  bool
+		want     int
+		inspect  bool
+	}{
+		{"up", tcell.KeyUp, 0, 2, false, 1, true},
+		{"first clamp", tcell.KeyUp, 0, 0, false, 0, true},
+		{"last clamp", tcell.KeyDown, 0, 5, false, 5, true},
+		{"escape", tcell.KeyEscape, 0, 0, false, 2, false},
+		{"a", tcell.KeyRune, 'a', 0, false, 2, false},
+		{"end", tcell.KeyEnd, 0, 0, false, 2, false},
+		{"escape confirmation", tcell.KeyEscape, 0, 0, true, 0, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := qualificationDashboardFixture()
+			d.qualification.inspecting, d.qualification.selected = true, tc.selected
+			if tc.confirm {
+				d.input(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModNone))
+			}
+			before := d.snapshot()
+			if d.input(tcell.NewEventKey(tc.key, tc.rune, tcell.ModNone)) {
+				t.Fatal("navigation canceled work")
+			}
+			after := d.snapshot()
+			q := after.qualification
+			if q.inspecting != tc.inspect || qualificationSelection(q) != tc.want || after.confirmCancel {
+				t.Fatalf("unexpected navigation: %+v", q)
+			}
+			after.qualification.inspecting = before.qualification.inspecting
+			after.qualification.selected = before.qualification.selected
+			after.confirmCancel = before.confirmCancel
+			if !reflect.DeepEqual(after, before) {
+				t.Fatal("inspection changed work state")
 			}
 		})
 	}

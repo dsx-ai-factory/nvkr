@@ -103,8 +103,8 @@ On native Linux, `run qualify-local` verifies every output of a completed captur
 its build evidence, and checks each selected native tool's version in isolation. Separate keys sign the
 tool-check report and qualification statement. It then publishes artifacts and signed evidence, downloads
 the complete set again and independently verifies the bytes, saved inputs and signatures.
-Its result remains `unqualified-local-execution`. Qualification has passed for the native ARM64 demo's
-29 outputs and all 10 delivered tools. Exact artifact references and remaining checks are tracked in
+Its result remains `unqualified-local-execution`. A recorded 2026-10-16 native ARM64 run passed for
+29 outputs and 10 delivered tools. Exact artifact references and remaining checks are tracked in
 [reconciliation](adr/reconciliation.md#local-qualification-demo).
 
 For a new complete demo, add `--qualify-local` to the normal native Linux ARM64 command:
