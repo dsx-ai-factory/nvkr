@@ -59,15 +59,38 @@ type githubStep struct {
 // contact GitHub. The checks tie every job dependency back to an artifact producer,
 // enforce pinned actions and offline build commands, and verify all generated inputs.
 func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBundle) error {
+	if plan == nil || !plan.Environment.GitHubExecutionPartitions {
+		return validateGitHubBundleFlat(ctx, plan, bundle)
+	}
+	if _, err := validateGeneratedInputs(ctx, plan, bundle); err != nil {
+		return err
+	}
+	expected, err := renderGitHub(ctx, plan, false)
+	if err != nil {
+		return err
+	}
+	if err := validateGitHubExactMembers(bundle, expected); err != nil {
+		return err
+	}
+	flat, err := renderGitHubFlat(ctx, plan, false)
+	if err != nil {
+		return err
+	}
+	return validateGitHubBundleFlat(ctx, plan, flat)
+}
+
+func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *GeneratedBundle) error {
 	workflow, err := validateGeneratedInputs(ctx, plan, bundle)
 	if err != nil {
 		return err
 	}
 
-	if err := validateGitHubWorkflowSize(workflow); err != nil {
-		return err
+	if !plan.Environment.GitHubExecutionPartitions {
+		if err := validateGitHubWorkflowSize(workflow); err != nil {
+			return err
+		}
 	}
-	expected, err := renderGitHub(ctx, plan, false)
+	expected, err := renderGitHubFlat(ctx, plan, false)
 	if err != nil {
 		return err
 	}
@@ -512,6 +535,10 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	// Semantic checks above produce useful coded diagnostics. Exact regeneration
 	// additionally rejects unrecognized steps, appended shell commands and ambient
 	// authority on any job; substring checks alone cannot authorize an entire job.
+	return validateGitHubExactMembers(bundle, expected)
+}
+
+func validateGitHubExactMembers(bundle, expected *GeneratedBundle) error {
 	if len(bundle.Files) != len(expected.Files) {
 		return e.New(e.CodePipelineDrift, "GitHub bundle member set differs from its admitted rendering")
 	}

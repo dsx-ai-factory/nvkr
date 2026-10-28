@@ -76,6 +76,31 @@ func RenderGitHub(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 
 // validate=false is private to the validator's exact regeneration comparison.
 func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBundle, error) {
+	bundle, err := renderGitHubFlat(ctx, plan, false)
+	if err != nil {
+		return nil, err
+	}
+	if plan.Environment.GitHubExecutionPartitions {
+		entry, workers, err := lowerGitHubPartitions(ctx, plan, bundle.Files[bundle.WorkflowPath])
+		if err != nil {
+			return nil, err
+		}
+		for path, raw := range workers {
+			bundle.Files[path] = raw
+		}
+		bundle.Files[bundle.WorkflowPath] = entry
+		bundle = newGeneratedBundle(EngineGitHub, githubLayoutFor(plan), bundle.Files, bundle.PlanDigest)
+	}
+	if validate {
+		if err := ValidateGitHubBundle(ctx, plan, bundle); err != nil {
+			return nil, err
+		}
+	}
+	return bundle, nil
+}
+
+// The flat rendering is the semantic reference for exact partition projection.
+func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*GeneratedBundle, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "GitHub factory rendering requires a context")
 	}
@@ -419,13 +444,15 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	for name, raw := range actionFiles {
 		files[name] = raw
 	}
-	if err := validateGitHubWorkflowSize(workflow); err != nil {
-		return nil, err
+	if !plan.Environment.GitHubExecutionPartitions {
+		if err := validateGitHubWorkflowSize(workflow); err != nil {
+			return nil, err
+		}
 	}
 	files[layout.workflowPath] = append([]byte(nil), workflow...)
 	bundle := newGeneratedBundle(EngineGitHub, layout, files, planDigest)
 	if validate {
-		if err := ValidateGitHubBundle(ctx, plan, bundle); err != nil {
+		if err := validateGitHubBundleFlat(ctx, plan, bundle); err != nil {
 			return nil, err
 		}
 	}

@@ -117,11 +117,16 @@ byte-exact drift gate. Actions expose fixed semantic interfaces for Plan operati
 interfaces without generating group-size or output-count variants. Named invocation parameters are recomputed
 from the admitted Plan at runtime. Identical admitted step sequences can share descriptive YAML aliases;
 expansion preserves independent job parameters, policies and exact result membership. Every job retains its
-ID, runner, timeout, permissions and condition in the entry workflow. Redundant scheduling edges may be
+ID, runner, timeout, permissions and condition in the default entry workflow. Redundant scheduling edges may be
 removed while preserving the prerequisite closure.
 Large finalizers collect the exact original per-job results through fixed, bounded diagnostic buckets;
 collector success never substitutes for producer success. Neither scripts supplied as data nor separately
 authored lifecycle inputs are admitted.
+Opt-in execution partitioning moves original jobs into bounded same-commit worker workflows under the same
+manifest; OIDC-signing jobs remain in the entry to preserve signer identity. A partition is generated
+scheduling structure, not a Definition, Run or Release. It forwards original
+job results to the single finalizer; it does not authorize artifact acceptance. The complete Plan and required
+output set remain shared. Local generation is implemented; hosted acceptance remains unrecorded.
 Production and development partial retries may transport retained same-Run artifacts from earlier attempts while preserving
 their original source bindings. Same-name candidates are bounded and authenticated before selecting the
 newest source attempt, with ties rejected. Transport admission does not replace consumer evidence or completeness checks;

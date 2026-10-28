@@ -1,0 +1,71 @@
+name: NVKR execution partition
+'on':
+  workflow_call:
+    inputs:
+      dependencies:
+        type: string
+        required: true
+    outputs:
+      results:
+        value: ${{ jobs.nvkr-partition-results.outputs.results }}
+      statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
+    secrets:
+      NVKR_CI_STORAGE_READ_TOKEN:
+        required: true
+      NVKR_CI_STORAGE_WRITE_TOKEN:
+        required: true
+      NVKR_DEV_REGISTRY_READ:
+        required: true
+permissions:
+  contents: read
+jobs:
+  nvkr-package-release:
+    name: 'Assemble release from verified output references'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-capi-contr-a309e0dde6c8'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-capi-controller-image'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-capi-kubea-400c7177454b'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-capi-kubea-459a501ddf86'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-capi-kubea-8c536327dae9'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-capi-kubea-a1d9f5feb0f6'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-capnico-controller'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-cert-manag-02f76d39d687'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-cert-manag-9a8734354915'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-cert-manag-b56eb8b59b49'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-cert-manag-d72fce3ac728'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-cert-manag-eecf216a547d'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-cert-manag-f1997a85223a'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-cluster-ap-5fb4884131f8'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-controller-chart'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-csi-node-d-914d7376ead0'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-csi-node-d-ed501e7759bf'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-cwe'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nico-refer-768f0a1fbfbe'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nktp'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nktp-colle-3037712057c4'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nktp-collector-image'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nktp-kube-59673e96b3e2'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nktp-kube-8edb2f9f5644'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nktp-kubec-58bc88c11e26'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nktp-kubectl-image'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nktp-lgtm-image'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nktp-lgtm-image-arm64'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nktp-metri-4773ec2231a9'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nktp-metri-72d2044749d1'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nktp-node-308c6a04d0d9'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nktp-node-89687b0a3b8b'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nktp-opera-e8ca29886a10'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nktp-operator-image'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nktp-targe-83f6218e2759'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nktp-targe-c21c44003a70'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nvke-node-fde-amd64'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nvke-node-fde-arm64'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nvke-node-image-amd64'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nvke-node-image-arm64'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nvkectl'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-nvkectl-linux-arm64'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-operator-tools'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-postgresql'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-postgresql-image'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-postgresql-image-arm64'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-spiffe-csi-image'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-spiffe-csi-image-arm64'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-spire'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-spire-agen-690d58615fef'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-spire-agent-image'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-spire-bash-image'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-spire-bash-image-arm64'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-spire-cont-81ba1c1e8041'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-spire-crds'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-spire-oidc-image'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-spire-oidc-image-arm64'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-spire-serv-2ffabff52266'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-spire-server-image'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-spire-tpm-fdd5a5adf925'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-spire-tpm-server-image'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-temporal'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-temporal-a-325229721989'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-temporal-a-9109bef2fded'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-temporal-s-030929bd4981'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-temporal-server-image'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-verify-publication-output-temporal-ui-image'].result == 'success' }}
+    environment: 'nvkr-dev-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_READ_USER }}'
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+  nvkr-partition-results:
+    name: 'Collect provider results: nvkr-partition-results'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs: [nvkr-package-release]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    permissions: {}
+    outputs:
+      results: ${{ toJSON(needs) }}
+      statuses: ${{ join(needs.*.result, ' ') }}
+    steps:
+      - name: Forward provider results
+        run: ':'
+env:
+  NVKR_CI_STORAGE_READ_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
+  NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}

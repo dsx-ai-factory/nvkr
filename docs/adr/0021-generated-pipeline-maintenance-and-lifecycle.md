@@ -55,7 +55,15 @@ Plan path; validation rejects a bundle whose paths differ from the admitted Envi
 Signing identity and issuer remain explicit Environment policy and are never rewritten
 to accommodate a selected workflow filename. Operators must select the matching policy.
 Producer generation emits independent bundles whose entrypoints support manual dispatch, with no cron or
-callable trigger. Every producer job remains in its bundle's entry workflow. Optional qualification
+callable trigger. By default every producer job remains in its bundle's entry workflow. The opt-in
+`githubExecutionPartitions` projection also owns up to 50 same-commit sibling workers named
+`<entry-stem>__partition-00.yml` through `<entry-stem>__partition-49.yml`. Only those exact sibling names
+belong to this entry's current manifest; arbitrary reusable workflows and another owner's siblings remain
+outside its namespace. Every worker receives the same per-file size and parsing bounds as the entry.
+The root manifest binds every worker's exact bytes. Regeneration checks and retirement cover the complete
+worker inventory, including changed or unowned leftovers. Workers share one complete Plan and do not add
+an authored lifecycle object or a child Release. ADR-18 owns scheduling and result propagation; hosted
+acceptance of this opt-in topology remains unrecorded. Optional qualification
 generation separately emits the admitted `workflow_run` qualifier and fixed `workflow_call` smoke pair (§4).
 That pair currently admits the default producer workflow only; named producer
 qualification is not part of this namespace contract.

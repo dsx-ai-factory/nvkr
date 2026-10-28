@@ -2824,6 +2824,26 @@ requires successful collectors, their exact Plan-derived partition and strict bo
 The closing summary counts original outcomes, not collector success. Local contracts cover duplicate,
 missing, extra, failed, skipped, canceled, oversized and inconsistent reports, including build-only Plans.
 
+An opt-in `githubExecutionPartitions` projection now generates bounded same-commit workers beneath one
+Definition/Plan/Run/Release. Focused local tests cover deterministic grouping, original job membership,
+worker/caller generation, exact-member tamper refusal and manifest retirement. The maintained 580-job
+input projects to 21 workers with a 374,795-byte entry. OIDC-signing jobs remain inline to preserve the
+entry certificate identity; generated caller/workers pass actionlint. These are
+local generation measurements, not product execution evidence. A separate minimal diagnostic at commit
+`902f3febd10cd61abecb82571f66283857169851` observed successful result forwarding on
+[success](https://github.com/dsx-ai-factory/nvkr/actions/runs/40606449617),
+[intentional failure](https://github.com/dsx-ai-factory/nvkr/actions/runs/40606454753), and
+[cancellation](https://github.com/dsx-ai-factory/nvkr/actions/runs/40606620670).
+The cancellation report reached the finalizer intact; its diagnostic assertion failed because the dependent
+was cancelled rather than skipped. The failure run also showed that an ordinary descendant remains skipped
+after a successful unconditional recovery of a failed ancestor. The projection now carries those ancestor
+results through recovery boundaries; focused contracts, actionlint, yamllint and package lint pass.
+The full local gate, build, diff checks and all-owner workflow regeneration checks pass on Go 1.27.3
+Darwin ARM64. Earlier attempts encountered Helm cancellation cleanup failure and pinned catalog fetch
+timeouts; unchanged reruns passed after transport recovered, without increasing timeouts or weakening
+authentication. Full generated-bundle hosted execution, signing identity and qualification remain
+unverified; the checked-in flat production path is retained pending operational validation.
+
 The combined production/development layout has 564 original jobs and 16 collectors, down from
 596 original jobs and 16 collectors in the private-storage draft based on the same upstream code.
 The production dependency graph has 1,375 edges, down from 1,438. Logical Plan identity and original

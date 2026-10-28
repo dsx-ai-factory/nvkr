@@ -617,13 +617,19 @@ a bounded two-hour budget for setup, transport, authentication and final record 
 Carrier and GHCR publication admission use the automatic repository token for source metadata, separately
 from the credential that accesses package metadata and registry bytes. Producers receive neither through
 these admission paths.
-Admission bounds expanded YAML parsing events as well as file bytes. No producer acquires a new cross-output barrier. Redundant dependency edges are removed only with the full
+Admission bounds expanded YAML parsing events as well as file bytes. The default flat projection adds no cross-output barrier. Redundant dependency edges are removed only with the full
 prerequisite closure preserved; authored setup, runtime variables, images or services that mention the
 direct dependency context retain the original lists.
 Large finalizers receive exact original job results through fixed, bounded collectors. A collector must
 succeed and report its complete Plan-derived membership before recovery; its aggregate status never replaces
-individual producer outcomes. Producer matrix and reusable callable scheduling remain deferred
-(ADR-18 §8); ADR-21 separately admits the fixed native qualification worker and its selected-platform matrix.
+individual producer outcomes. Opt-in execution partitioning groups dependency layers into same-commit callable
+workers, with original job IDs and per-job controls. OIDC-signing jobs stay in the entry workflow to preserve
+the authored signer identity policy. Partitions may delay independent work behind an earlier
+group, but original prerequisite results govern ordinary job admission. One complete Plan and one finalizer
+retain the Run and Release boundary. Exact regeneration admits every worker and caller connection under the
+same ownership manifest. Local generation contracts are implemented; hosted failure/cancellation behavior,
+signing and qualification remain unexercised (ADR-18 §8). Producer matrices remain deferred; ADR-21 separately
+admits the fixed native qualification worker and its selected-platform matrix.
 
 An explicit GitHub development Environment selects a separate fixed bundle. It shares the
 compiler, helper and complete output checks with production, while keeping its Plan, workflow and

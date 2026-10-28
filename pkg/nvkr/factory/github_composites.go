@@ -191,6 +191,9 @@ func anchorGitHubPreflight(plan *Plan, jobs *yamlv3.Node, actions githubActionRe
 	first := map[string]*yamlv3.Node{}
 	for index := 1; index < len(jobs.Content); index += 2 {
 		steps := githubYAMLField(jobs.Content[index], "steps")
+		if steps == nil {
+			continue // Reusable-workflow callers have no local steps.
+		}
 		for position, step := range steps.Content {
 			if step.Kind == yamlv3.AliasNode {
 				continue

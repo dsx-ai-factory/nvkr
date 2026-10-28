@@ -1388,13 +1388,33 @@ Local expansion is contract evidence; provider dispatch and result propagation r
 hosted evidence. GitHub's internal graph-processing limits are not inferred as a numerical contract from
 successful diagnostic dispatches.
 
-Producer matrix scheduling and reusable `workflow_call` pipelines remain deferred. The separately
-owned fixed native qualification worker and its exact selected-platform matrix are admitted by ADR-21 §4;
-that exception does not admit arbitrary producer scheduling. A producer matrix changes dependency
-barriers and the provider-result shape used by finalization; a callable workflow adds execution-context,
-credential and identity contracts. Neither is a presentation-only substitution for the current exact named
-jobs. Future admission must preserve each named output's execution/evidence slots, failure behavior and
-complete result accounting before either form is emitted.
+The opt-in Environment setting `githubExecutionPartitions: true` projects producer jobs into generated
+same-commit `workflow_call` workers. This is one Definition, complete Plan, provider Run and final Release;
+workers do not publish independent family Releases. Local generation contracts are implemented. A minimal
+hosted diagnostic exercised result forwarding on success, failure and cancellation; full generated-bundle
+execution, signing identity and qualification remain unexercised for this topology. The retained flat mode
+remains the default.
+
+The compiler groups lexically ordered jobs by dependency depth, with at most 64 original jobs per worker
+and at most 50 workers. Jobs requesting `id-token: write` remain in the entry workflow: Fulcio uses the
+reusable workflow path for the certificate signer identity, so moving them would change the authored signer
+policy. Dependencies and result reports project both inline jobs and worker jobs without widening that policy.
+Original job IDs, operations, runner admission, per-job permissions and output slots
+remain intact. A partition may wait for unrelated jobs sharing an earlier partition; it must not turn their
+failure into a false prerequisite failure. Ordinary jobs require `!cancelled()` and check their original
+prerequisites' reported success, including ancestors reached through `always()` recovery jobs. A successful
+recovery must not hide an earlier failure from an ordinary descendant. Jobs with the admitted `always()`
+policy retain that policy. Arbitrary authored `needs` observations are
+refused until their context can be projected exactly. Matrix scheduling remains deferred.
+
+Workers have no concurrency group competing with the entry workflow. Callers pass explicit required
+secrets and sufficient permissions; individual jobs retain their original narrower permissions. Secret references
+must name a static secret through dot or quoted bracket syntax; dynamic selection is refused before emission. Each worker
+has a credential-free, unconditional result collector. The entry reconstructs the original collector reports
+from those exact job results, retaining failure, cancellation and skipping. Missing or malformed reports
+cannot authorize publication. The original finalizer, complete Plan, same-Run transfer authentication and
+artifact/evidence acceptance gates remain unchanged. Generated worker membership and caller wiring must
+match deterministic regeneration exactly before the existing flat semantic validator admits the logical graph.
 
 Every generated run script, including scripts inside composite actions, remains checked against GitHub's
 21,000-character ceiling, conservatively measured as UTF-8 bytes, including explicit operator setup and

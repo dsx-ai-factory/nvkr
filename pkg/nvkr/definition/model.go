@@ -96,6 +96,9 @@ type Environment struct {
 	// GitHubRuntimePlan compiles current catalog pins at dispatch while retaining
 	// the reviewed named production workflow and its complete execution policy.
 	GitHubRuntimePlan bool `json:"githubRuntimePlan,omitempty"`
+	// GitHubExecutionPartitions distributes one Run across same-commit worker
+	// workflows while preserving the Definition's single release boundary.
+	GitHubExecutionPartitions bool `json:"githubExecutionPartitions,omitempty"`
 	// GitHubDevelopment admits branch-dispatched hosted builds and, when explicitly
 	// configured, isolated signed publications under a disposable attempt namespace.
 	GitHubDevelopment bool `json:"githubDevelopment,omitempty"`
