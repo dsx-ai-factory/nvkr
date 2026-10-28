@@ -349,13 +349,13 @@ An opted-in run fails on inadequate capacity rather than skipping its positive c
 owner/receipt/export boundaries, without executing Docker, Packer, guestfish, Syft or a real NVKE image.
 Actual native disk build/inspection evidence remains separately scoped in the evidence index.
 
-The native Debian factory contracts are required by Merge Gate's `debian-native` job on a standard
+The Debian factory contracts are required by Merge Gate's `debian-contracts` job on a standard
 Linux runner. They use controlled ELF daemon/scanner reports and arbitrary archive bytes, not Docker
 or a real package build. Run them on native Linux AMD64 or ARM64 with sufficient observed composition
 capacity (the profile requests 9000 MiB memory and 4096 MiB disk scratch):
 
 ```sh
-make test-debian-native
+make test-debian-contracts
 ```
 
 This target sets `NVKR_TEST_DEBIAN_CONTENT_RUNTIME=1` and `NVKR_TEST_DEBIAN_DOCUMENT_LIMIT=1`,

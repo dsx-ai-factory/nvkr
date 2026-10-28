@@ -18,6 +18,15 @@ The engineering contracts remain [ADR-19](adr/0019-clusterdefinition-and-provisi
 owns current implementation and external evidence. Product source, output membership and publication
 policy changes require their own explicit review, even when performed during this migration.
 
+## Retained candidate exception
+
+The [NVSentinel candidate](../definitions/nvsentinel/README.md) intentionally remains at
+`definitions/nvsentinel/` with its catalog, overlays, Environments and source patches together. It is a
+pre-migration local packaging experiment outside the maintained release/demo selections and the counts
+recorded for the relocation above. This exception preserves its reviewed paths and historical observations;
+it does not establish a preferred layout for new inputs. A later move to `inputs/experiments/` must update
+all references and rederive authored identities while preserving producer pins and output membership.
+
 ## Conditional supported target inputs
 
 All Definition paths below are relative to `inputs/definitions/`. These are the intended final entry points;

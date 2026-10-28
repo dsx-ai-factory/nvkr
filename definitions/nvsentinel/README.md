@@ -101,6 +101,12 @@ installs that file during the bake. This provisioner does not start or enable pa
 The composer also includes the source-owned cloud-init network override and netplan
 DHCP configuration required by that provisioner, preserving their bytes and modes.
 Missing either configuration fails composition before replacing an existing archive.
+This compensates for missing inputs at the retained NVKE `115d07c8` pin. Upstream fixed the same omission
+in [NVKE #1780](https://github.com/dsx-ai-factory/nvke/commit/1038286bd9b44489812f21572b201cc22d29c437).
+The local patch retains archive mode `0600` for netplan, whereas that upstream change uses `0644`;
+both provisioners install the guest file as `0600`. These candidates preserve their recorded local
+source/material contract. Repinning to that upstream correction and removing the local network hunks
+remain follow-up work; no upstream-byte-equivalence or fresh bake is claimed here.
 The patch is not an adopted NVKE release or proof of a completed OS build.
 
 The `os-ubuntu2404-{amd64,arm64}.yaml` and `os-ubuntu2604-{amd64,arm64}.yaml`
@@ -126,13 +132,15 @@ bin/nvkr run plan --definition definitions/nvsentinel/os-ubuntu2604-arm64.yaml \
 ```
 
 All four OS selections compile. Local native ARM64 Run `ubuntu26-arm64-native6`
-completed the Ubuntu 26.04 bake using the existing toolchain substitution overlays
-for the measured local Packer and matching Ubuntu SDK images. It retained a
+completed the Ubuntu 26.04 bake using an uncommitted developer-local toolchain-substitution overlay
+for measured local Packer and matching Ubuntu SDK images. That overlay is not retained in this checkout. It retained a
 2,885,085,696-byte QCOW2 with SHA-256
 `4600f8364d75f0869ea0c94e067a685f26067da99266346944576e0145aee807`;
 its independent hash and length match the completed lifecycle's observed disk.
 The Run's Plan digest is
 `8bf4f5c0741835e5f7778076340d7a7886bc3bae8a9fd0f44bcca737d9dcb96e`.
+The checked-in Definition/Environment and the example compile command above do not reproduce that
+historical Plan digest; it is recorded local evidence, not a reproducible checked-in input selection.
 Read-only libguestfs inspection and Debian's package reader independently confirmed
 `nvsentinel-platform-connectors` version `0~git20261013.c159347735`, architecture
 `arm64`, with status `install ok installed`. The installed binary and unit match

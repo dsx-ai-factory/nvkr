@@ -65,6 +65,11 @@ and remain build-only; they do not change maintained release membership or Ubunt
 
 ## Focused inputs and examples
 
+The [NVSentinel candidate](../definitions/nvsentinel/README.md) is an intentional retained exception at
+`definitions/nvsentinel/`, outside the maintained release/demo inputs. The
+[migration exception](../docs/input-layout-migration.md#retained-candidate-exception) records its scope
+and the requirements for a later move into `inputs/experiments/`.
+
 `definitions/diagnostics/demo-arm64/` retains the existing components, OS, profiles, providers,
 simulator, site and installer-tool loops used by the local launcher. Additional controller and OVN
 Definitions retain focused producer/packaging contracts. The standalone OVN diagnostic keeps its

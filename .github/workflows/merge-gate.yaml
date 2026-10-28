@@ -509,7 +509,7 @@ jobs:
         run: echo "No pipeline inputs changed — regeneration check not required"
 
   # ---------------------------------------------------------------------------
-  debian-native:
+  debian-contracts:
     needs: [check-paths]
     if: needs.check-paths.outputs.code == 'true'
     runs-on: ubuntu-24.04
@@ -522,19 +522,19 @@ jobs:
         with:
           go-version-file: .go-version
           cache: false
-      - name: Test native Debian ownership and content contracts
+      - name: Test Debian ownership and content contracts
         env:
           TMPDIR: ${{ runner.temp }}
           NVKR_TEST_DEBIAN_DISK_SCRATCH: ${{ runner.temp }}
-        run: make test-debian-native
+        run: make test-debian-contracts
 
-  debian-native-skip:
+  debian-contracts-skip:
     needs: [check-paths]
     if: needs.check-paths.outputs.code != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
-      - run: echo "No code inputs changed; native Debian contracts not required"
+      - run: echo "No code inputs changed; Debian contracts not required"
 
   # Third-party notices drift — THIRD_PARTY_NOTICES.md must regenerate
   # byte-for-byte from the linked module set, the same "local equals CI" and
@@ -685,8 +685,8 @@ jobs:
       - lint
       - vulnerabilities
       - tests
-      - debian-native
-      - debian-native-skip
+      - debian-contracts
+      - debian-contracts-skip
       - check-skip
       - actionlint
       - actionlint-skip
@@ -720,10 +720,10 @@ jobs:
           # skipped code job as success when the classifier required it.
           if [ "${{ needs.check-paths.outputs.code }}" = 'true' ]; then
             echo '${{ toJSON(needs) }}' | jq -e \
-              '[.check, .lint, .vulnerabilities, .tests, .["debian-native"]] | all(.result == "success")' >/dev/null
+              '[.check, .lint, .vulnerabilities, .tests, .["debian-contracts"]] | all(.result == "success")' >/dev/null
           elif [ "${{ needs.check-paths.outputs.code }}" = 'false' ]; then
             echo '${{ toJSON(needs) }}' | jq -e \
-              '.["check-skip"].result == "success" and .["debian-native-skip"].result == "success" and ([.check, .lint, .vulnerabilities, .tests, .["debian-native"]] | all(.result == "skipped"))' >/dev/null
+              '.["check-skip"].result == "success" and .["debian-contracts-skip"].result == "success" and ([.check, .lint, .vulnerabilities, .tests, .["debian-contracts"]] | all(.result == "skipped"))' >/dev/null
           else
             echo '::error::Code classification must be true or false'
             exit 1
