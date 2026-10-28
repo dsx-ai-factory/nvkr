@@ -48,8 +48,6 @@ info: ## Print version / toolchain info.
 	@echo "go:          $(GO_VERSION)"
 	@echo "gotoolchain: $(GOTOOLCHAIN)"
 
-# --- build ------------------------------------------------------------------
-
 .PHONY: build
 build: go-version-check ## Compile the nvkr binary.
 	go build -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/nvkr
@@ -70,8 +68,6 @@ install: ## Install nvkr into $$(go env GOBIN).
 .PHONY: nvkr-exec-helper
 nvkr-exec-helper: ## Reproducibly build the ADR-18 nvkr-exec helper binaries + write the lock (ARGS=--image also assembles the image).
 	@bash toolchains/nvkr-exec/build-nvkr-exec.sh $(ARGS)
-
-# --- quality ----------------------------------------------------------------
 
 .PHONY: go-version-check
 go-version-check: ## Require the exact Go patch pinned in .go-version.
@@ -315,8 +311,6 @@ pipeline-dev-run: pipeline-dev-check ## Dispatch the clean, pushed current branc
 
 .PHONY: check
 check: go-version-check fmt-check license-header-check vet lint shellcheck test-ci-tools test vulncheck ## Full local gate — run before pushing.
-
-# --- housekeeping -----------------------------------------------------------
 
 .PHONY: clean
 clean: ## Remove build output, coverage, and the local engine workspace.
