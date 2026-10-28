@@ -157,10 +157,10 @@ func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
 		expected := map[string]string{"nvke-node-image-arm64": "inputs/catalogs/node-images/release", "cwe": "inputs/catalogs/nvke/native-site-arm64", "nvkectl": "inputs/catalogs/nvke/native-site-arm64", "controller-chart": "inputs/catalogs/nvke/native-site-arm64", "controller-profiles": "inputs/catalogs/controller-profiles/native-nvidia-arm64"}
 		hostPlatforms := map[string]string{}
 		if conformance {
-			expected["conformance-image-arm64"] = "definitions/kubernetes-conformance-arm64/demo-1.36/image-catalog"
+			expected["conformance-image-arm64"] = "inputs/catalogs/kubernetes-conformance/images-1.36"
 			for _, host := range []struct{ suffix, platform string }{{"arm64", "linux/arm64"}, {"darwin-arm64", "darwin/arm64"}} {
-				expected["hydrophone-"+host.suffix] = "definitions/kubernetes-conformance-arm64/hydrophone-catalog"
-				expected["kubectl-"+host.suffix] = "definitions/kubernetes-conformance-arm64/kubectl-catalog"
+				expected["hydrophone-"+host.suffix] = "inputs/catalogs/kubernetes-conformance/hydrophone"
+				expected["kubectl-"+host.suffix] = "inputs/catalogs/kubernetes-conformance/kubectl"
 				hostPlatforms["hydrophone-"+host.suffix] = host.platform
 				hostPlatforms["kubectl-"+host.suffix] = host.platform
 			}

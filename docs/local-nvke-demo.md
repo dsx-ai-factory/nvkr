@@ -432,7 +432,7 @@ Hydrophone/kubectl outputs, the matching Linux ARM64 Kubernetes v1.36.3
 conformance image and BusyBox. Each host executes its native tools; the suite
 pods run in the same fresh Linux tenant. The kubectl source is v1.36.3 with the
 catalog's declared dependency updates, built using Go 1.27.2. It reports
-`v1.36.3-dirty`; see the [conformance producer](../definitions/kubernetes-conformance-arm64/README.md)
+`v1.36.3-dirty`; see the [conformance producer](../inputs/definitions/kubernetes-conformance-arm64/README.md)
 for the exact source and dependency transformations.
 
 Conformance requires exactly one Ready control plane and two Ready schedulable

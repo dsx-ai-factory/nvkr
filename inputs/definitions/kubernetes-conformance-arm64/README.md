@@ -41,7 +41,7 @@ when a source, patch, dependency or toolchain pin changes. The commands below ar
 reproduction procedures, not a recorded acceptance result for either architecture
 or for hosted publication.
 
-The shared native demo selects `demo-1.36/image-catalog` for its Kubernetes 1.36.3 suite image and the root `kubectl-catalog` for matching source-built clients on both hosts. Its site and tenant version comes from the selected NVKE installer template. The older `demo-1.34` selection and the root image catalog retain their original diagnostic scope; they do not establish a match for the current native demo.
+The shared native demo selects the `kubernetes-conformance/images-1.36` catalog for its Kubernetes 1.36.3 suite image and `kubernetes-conformance/kubectl` for matching source-built clients on both hosts. Its site and tenant version comes from the selected NVKE installer template. The older `demo-1.34` selection and the `kubernetes-conformance/images` catalog retain their original diagnostic scope; they do not establish a match for the current native demo.
 
 The image references preserve the original local diagnostic suite selection.
 They are acquired without upstream evidence (`evidence: none`) and retain their
@@ -52,14 +52,14 @@ not an upstream build/signature claim for those images.
 
 ```sh
 bin/nvkr definition validate \
-  --definition definitions/kubernetes-conformance-arm64/definition.yaml
+  --definition inputs/definitions/kubernetes-conformance-arm64/definition.yaml
 bin/nvkr run plan \
-  --definition definitions/kubernetes-conformance-arm64/definition.yaml \
-  --environment definitions/kubernetes-conformance-arm64/environment-local-docker.yaml \
+  --definition inputs/definitions/kubernetes-conformance-arm64/definition.yaml \
+  --environment inputs/environments/local-conformance-tools-arm64.yaml \
   --json
 bin/nvkr run local \
-  --definition definitions/kubernetes-conformance-arm64/definition.yaml \
-  --environment definitions/kubernetes-conformance-arm64/environment-local-docker.yaml \
+  --definition inputs/definitions/kubernetes-conformance-arm64/definition.yaml \
+  --environment inputs/environments/local-conformance-tools-arm64.yaml \
   --attempt conformance-tools-arm64-01
 ```
 

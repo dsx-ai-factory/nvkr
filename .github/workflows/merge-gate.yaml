@@ -132,6 +132,8 @@ jobs:
               - 'internal/**'
               - 'pkg/**'
               - 'inputs/**'
+              # Watched so definitions-location-check runs on any re-addition.
+              - 'definitions/**'
               - 'docs/examples/**'
               - 'scripts/**'
               - 'demos/**'
@@ -234,6 +236,9 @@ jobs:
 
       - name: fmt-check
         run: make fmt-check
+
+      - name: definitions-location-check
+        run: make definitions-location-check
 
       - name: license-header-check
         run: make license-header-check

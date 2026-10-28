@@ -42,6 +42,7 @@ the move preserves each file's existing format.
 | [`definitions/diagnostics/os-amd64.yaml`](definitions/diagnostics/os-amd64.yaml) | [`environments/local-linux-amd64-kvm.yaml`](environments/local-linux-amd64-kvm.yaml) | Native AMD64 plain-disk diagnostic |
 | [`definitions/diagnostics/os-arm64.yaml`](definitions/diagnostics/os-arm64.yaml) | [`environments/local-linux-arm64-kvm.yaml`](environments/local-linux-arm64-kvm.yaml) | Native ARM64 plain-disk diagnostic |
 | [`definitions/diagnostics/fde-amd64.yaml`](definitions/diagnostics/fde-amd64.yaml) | [`environments/github-diagnostics.yaml`](environments/github-diagnostics.yaml) | Build-only public-bootstrap FDE diagnostic; existing branch allowlist |
+| [`definitions/kubernetes-conformance-arm64/definition.yaml`](definitions/kubernetes-conformance-arm64/definition.yaml) | [`environments/local-conformance-tools-arm64.yaml`](environments/local-conformance-tools-arm64.yaml) | Local four-output ARM64 Kubernetes conformance tools; [1.34 variant](definitions/kubernetes-conformance-arm64/demo-1.34/README.md) uses the same Environment |
 
 The native local KVM Environments retain their existing diagnostic capacity and utility pins. The
 table does not imply that they can run the complete nightly demo unchanged. TCG/KVM differences affect

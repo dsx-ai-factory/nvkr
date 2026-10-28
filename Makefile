@@ -200,6 +200,12 @@ LICENSE_FILES := git ls-files -z --cached --others --exclude-standard
 license: ## Add the SPDX license header to source files that lack one.
 	$(LICENSE_FILES) | xargs -0 $(ADDLICENSE) -f scripts/license-header.tmpl -c "$(LICENSE_HOLDER)" $(LICENSE_IGNORES)
 
+.PHONY: definitions-location-check
+definitions-location-check: ## Fail when a file is tracked under the retired top-level definitions/ directory.
+	@files=$$(git ls-files -- ':/definitions') || exit 1; \
+	if [ -n "$$files" ]; then printf '%s\n' "$$files" >&2; \
+		echo "ERROR: authored Definitions belong under inputs/ (see inputs/README.md), not top-level definitions/" >&2; exit 1; fi
+
 .PHONY: license-header-check
 license-header-check: ## Fail when a source file has no license header.
 	@$(LICENSE_FILES) | xargs -0 $(ADDLICENSE) -check -f scripts/license-header.tmpl -c "$(LICENSE_HOLDER)" $(LICENSE_IGNORES) \
@@ -314,7 +320,7 @@ pipeline-dev-run: pipeline-dev-check ## Dispatch the clean, pushed current branc
 	python3 scripts/pipeline-dev.py --repo "$$PIPELINE_DEV_REPO"
 
 .PHONY: check
-check: go-version-check fmt-check license-header-check vet lint shellcheck test-ci-tools test vulncheck ## Full local gate — run before pushing.
+check: go-version-check fmt-check definitions-location-check license-header-check vet lint shellcheck test-ci-tools test vulncheck ## Full local gate — run before pushing.
 
 # --- housekeeping -----------------------------------------------------------
 
