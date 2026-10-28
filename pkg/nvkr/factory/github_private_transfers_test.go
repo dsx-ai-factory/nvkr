@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -55,6 +56,7 @@ func TestGitHubPrivateBootstrapOwnsAndDiscardsItsCaches(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			writeRunnerSourceMarker(t, root)
 			fakeGo := "#!/bin/sh\nexec " + shellQuote(python) + " -I - \"$@\" <<'PY'\n" + `import json, os, pathlib, signal, sys, time
 for key in ("NVKR_CREDENTIAL", "NVKR_CI_STORAGE_TOKEN", "ACTIONS_ID_TOKEN_REQUEST_TOKEN"):
     assert key not in os.environ
@@ -135,7 +137,11 @@ PY
 			if err != nil || json.Unmarshal(raw, &observed) != nil {
 				t.Fatalf("missing bootstrap process observation: %v", err)
 			}
-			wantArgs := "build|-mod=readonly|-modfile=" + filepath.Join(observed.Cache, "inputs", "go.mod") + "|-trimpath|-ldflags|-X main.version=fixture|-o|.nvkr/ci-bootstrap/nvkr-exec|./cmd/nvkr"
+			resolvedRoot, err := filepath.EvalSymlinks(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantArgs := "build|-mod=readonly|-modfile=" + filepath.Join(observed.Cache, "inputs", "go.mod") + "|-trimpath|-ldflags|-X main.version=fixture|-o|" + filepath.Join(resolvedRoot, ".nvkr/ci-bootstrap/nvkr-exec") + "|./cmd/nvkr"
 			if filepath.Dir(observed.Cache) != runnerTemp || !strings.HasPrefix(filepath.Base(observed.Cache), "nvkr-ci-bootstrap-") || strings.Join(observed.Args, "|") != wantArgs {
 				t.Fatal("bootstrap escaped its owned caches or fixed build arguments")
 			}
@@ -200,6 +206,7 @@ func TestGitHubPrivateBootstrapRetriesOnlyAdmittedModuleBodyFailure(t *testing.T
 					t.Fatal(err)
 				}
 			}
+			writeRunnerSourceMarker(t, root)
 			fakeGo := "#!/bin/sh\nexec " + shellQuote(python) + " -I - \"$@\" <<'PY'\n" + `import json, os, pathlib, signal, sys, time
 mode = ` + strconv.Quote(test.name) + `
 kind = "download" if sys.argv[1:4] == ["mod", "download", "-json"] else "build"
@@ -389,7 +396,8 @@ func TestGitHubPrivateTransfersExposeOnlyLocatorsToActions(t *testing.T) {
 					case actions.SetupGo:
 						if name == githubCITransferPath(plan, "bootstrap-download")+"/action.yml" {
 							builds++
-							if githubYAMLValue(with, "cache") != "false" || githubYAMLValue(with, "go-version-file") != ".go-version" {
+							versionFile, version := githubSetupGoWith(strings.TrimPrefix(runtime.Version(), "go"))
+							if githubYAMLValue(with, "cache") != "false" || githubYAMLValue(with, "go-version-file") != versionFile || githubYAMLValue(with, "go-version") != version {
 								t.Fatal("private helper bootstrap does not provision the pinned toolchain")
 							}
 						}
@@ -745,6 +753,98 @@ func TestPrivateTransferRetryPolicyAtInvocation(t *testing.T) {
 						}
 					}
 				}
+			}
+		})
+	}
+}
+
+// writeRunnerSourceMarker makes root an NVKR source checkout, so bootstraps
+// build its source instead of the published release.
+func writeRunnerSourceMarker(t *testing.T, root string) {
+	t.Helper()
+	marker := filepath.Join(root, filepath.FromSlash(githubRunnerSourceMarker))
+	if err := os.MkdirAll(filepath.Dir(marker), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(marker, []byte("package main\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A checkout without NVKR source, such as a recipes repository, builds the
+// latest published release from a private copy of the downloaded module and
+// leaves the module cache and the checkout's own files untouched.
+func TestGitHubPrivateBootstrapBuildsPublishedReleaseWithoutSource(t *testing.T) {
+	python, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("Python 3 is required to exercise the hosted bootstrap owner")
+	}
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("Bash is required to exercise the hosted bootstrap owner")
+	}
+	module := strings.TrimSuffix(nvkrRunnerPackage, "/cmd/nvkr")
+	for _, test := range []struct {
+		name, path string
+		code       e.Code
+	}{
+		{name: "published release", path: module},
+		{name: "unexpected module", path: "example.com/other", code: e.CodeBuildFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root, runnerTemp, published := t.TempDir(), t.TempDir(), t.TempDir()
+			for _, name := range []string{"go.mod", "go.sum"} {
+				if err := os.WriteFile(filepath.Join(published, name), []byte("published "+name), 0o400); err != nil {
+					t.Fatal(err)
+				}
+			}
+			fakeGo := "#!/bin/sh\nexec " + shellQuote(python) + " -I - \"$@\" <<'PY'\n" + `import json, os, pathlib, sys
+published, module, workspace = ` + strconv.Quote(published) + `, ` + strconv.Quote(test.path) + `, ` + strconv.Quote(root) + `
+cache = pathlib.Path(os.environ["GOCACHE"]).parent
+source = cache / "source"
+if sys.argv[1:] == ["mod", "download", "-json", ` + strconv.Quote(module+"@latest") + `]:
+    assert "GOPROXY" not in os.environ and os.path.realpath(os.getcwd()) == os.path.realpath(workspace)
+    print(json.dumps({"Path": module, "Version": "v1.2.3", "Dir": published}))
+    sys.exit(0)
+assert os.path.realpath(os.getcwd()) == os.path.realpath(source)
+modfile = pathlib.Path(next(value.removeprefix("-modfile=") for value in sys.argv if value.startswith("-modfile=")))
+assert modfile.parent == cache / "inputs" and modfile.read_text() == "published go.mod"
+if sys.argv[1:4] == ["mod", "download", "-json"]:
+    print(json.dumps({"Path": "example.com/dependency", "Version": "v1.0.0"}))
+    sys.exit(0)
+assert sys.argv[1] == "build" and os.environ["GOPROXY"] == "off" and sys.argv[-1] == "./cmd/nvkr"
+output = pathlib.Path(sys.argv[sys.argv.index("-o") + 1])
+assert output.is_absolute() and os.path.realpath(output.parent.parent.parent) == os.path.realpath(workspace)
+output.write_text("published helper")
+PY
+`
+			if err := os.WriteFile(filepath.Join(root, "go"), []byte(fakeGo), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			command := exec.CommandContext(ctx, bash, "-c", githubCIBootstrapBuildCommand("-X main.version=fixture"))
+			command.Dir = root
+			command.Env = append(os.Environ(), "PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"), "RUNNER_TEMP="+runnerTemp)
+			output, runErr := command.CombinedOutput()
+			helper, readErr := os.ReadFile(filepath.Join(root, ".nvkr/ci-bootstrap/nvkr-exec"))
+			if test.code == "" {
+				if runErr != nil || readErr != nil || string(helper) != "published helper" {
+					t.Fatalf("published bootstrap failed: %v %v\n%s", runErr, readErr, output)
+				}
+			} else {
+				var exit *exec.ExitError
+				if !errors.As(runErr, &exit) || exit.ExitCode() != e.ExitCode(e.New(test.code, "")) || readErr == nil {
+					t.Fatalf("unexpected module was not refused with %s: %v\n%s", test.code, runErr, output)
+				}
+			}
+			for _, name := range []string{"go.mod", "go.sum"} {
+				if raw, err := os.ReadFile(filepath.Join(published, name)); err != nil || string(raw) != "published "+name {
+					t.Fatalf("bootstrap changed the published module's %s: %v", name, err)
+				}
+			}
+			if entries, err := os.ReadDir(runnerTemp); err != nil || len(entries) != 0 {
+				t.Fatalf("bootstrap left disposable caches behind: %v / %v", entries, err)
 			}
 		})
 	}

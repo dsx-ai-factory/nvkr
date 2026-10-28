@@ -210,10 +210,10 @@ def stop_child(child):
         print("%[4]s: private bootstrap child did not stop", file=sys.stderr, flush=True)
         os._exit(%[5]d)
 
-def run(args, env, deadline, capture=False):
+def run(args, env, deadline, capture=False, cwd=None):
     check_deadline(deadline)
     output = [bytearray(), bytearray()]
-    child = subprocess.Popen(args, env=env, stdin=subprocess.DEVNULL,
+    child = subprocess.Popen(args, env=env, cwd=cwd, stdin=subprocess.DEVNULL,
                              stdout=subprocess.PIPE if capture else None,
                              stderr=subprocess.PIPE if capture else None, start_new_session=True)
     joined = False
@@ -297,29 +297,13 @@ def module_errors(raw):
         raise ValueError("module acquisition omitted its results")
     return errors
 
-def build(cache):
-    # Never pass repository, registry or OIDC credentials to either Go process.
-    env = {key: os.environ[key] for key in ("PATH", "HOME", "TMPDIR", "GOROOT") if key in os.environ}
-    env.update(CGO_ENABLED="0", GOTOOLCHAIN="local", GOENV="off", GOWORK="off",
-               GOCACHE=os.path.join(cache, "build"), GOMODCACHE=os.path.join(cache, "modules"))
-    deadline = time.monotonic() + 900
-    check_deadline(deadline)
-    original = manifests()
-    # Go may normalize module manifests. Private copies keep the checked-out
-    # source untouched; both must remain byte-exact through download and build.
-    inputs = os.path.join(cache, "inputs")
-    os.mkdir(inputs)
-    for name, raw in zip(("go.mod", "go.sum"), original):
-        with open(os.path.join(inputs, name), "xb") as destination:
-            destination.write(raw)
-    modfile = "-modfile=" + os.path.join(inputs, "go.mod")
+def download(args, env, deadline, cwd, check):
     for attempt in range(3):
-        result, stdout, stderr = run(["go", "mod", "download", "-json", modfile], env, deadline, capture=True)
-        if manifests() != original or manifests(inputs) != original:
-            raise ValueError("module acquisition changed source manifests")
+        result, stdout, stderr = run(["go", "mod", "download", "-json"] + args, env, deadline, capture=True, cwd=cwd)
+        check()
         errors = module_errors(stdout)
         if result == 0 and not errors and not stderr.strip():
-            break
+            return stdout
         if result != 1 or not errors or not all(errors) or stderr.strip() or attempt == 2:
             raise ValueError("module acquisition failed")
         print("Retrying public Go module acquisition after an HTTP/2 peer error", file=sys.stderr)
@@ -327,13 +311,53 @@ def build(cache):
         while time.monotonic() < until:
             check_deadline(deadline)
             time.sleep(min(0.2, max(0, until - time.monotonic())))
+
+def published_source(cache, env, deadline):
+    # A checkout without NVKR source builds the latest published release. Go
+    # ignores go.mod beneath the module cache, so build from a private copy.
+    raw = download(["%[8]s@latest"], env, deadline, None, lambda: None)
+    decoder = json.JSONDecoder(object_pairs_hook=unique_object, parse_constant=invalid_constant)
+    item = decoder.decode(raw.decode("utf-8"))
+    if not isinstance(item, dict):
+        raise ValueError("invalid published runner module")
+    directory = item.get("Dir")
+    if item.get("Path") != "%[8]s" or not isinstance(directory, str) or not os.path.isabs(directory):
+        raise ValueError("invalid published runner module")
+    source = os.path.join(cache, "source")
+    shutil.copytree(directory, source, symlinks=True)
+    return source
+
+def build(cache):
+    # Never pass repository, registry or OIDC credentials to either Go process.
+    env = {key: os.environ[key] for key in ("PATH", "HOME", "TMPDIR", "GOROOT") if key in os.environ}
+    env.update(CGO_ENABLED="0", GOTOOLCHAIN="local", GOENV="off", GOWORK="off",
+               GOCACHE=os.path.join(cache, "build"), GOMODCACHE=os.path.join(cache, "modules"))
+    deadline = time.monotonic() + 900
+    check_deadline(deadline)
+    source = "." if os.path.isfile("%[9]s") else published_source(cache, env, deadline)
+    original = manifests(source)
+    # Go may normalize module manifests. Private copies keep the source
+    # untouched; both must remain byte-exact through download and build.
+    inputs = os.path.join(cache, "inputs")
+    os.mkdir(inputs)
+    for name, raw in zip(("go.mod", "go.sum"), original):
+        with open(os.path.join(inputs, name), "xb") as destination:
+            destination.write(raw)
+    modfile = "-modfile=" + os.path.join(inputs, "go.mod")
+
+    def unchanged():
+        if manifests(source) != original or manifests(inputs) != original:
+            raise ValueError("module acquisition changed source manifests")
+
+    download([modfile], env, deadline, source, unchanged)
     # All module bytes were acquired and checked first. Compilation is attempted
     # once, with proxy and checksum-database network access disabled.
     env.update(GOPROXY="off", GOSUMDB="off")
     os.makedirs(".nvkr/ci-bootstrap", exist_ok=True)
+    output = os.path.abspath(".nvkr/ci-bootstrap/nvkr-exec")
     result, _stdout, _stderr = run(["go", "build", "-mod=readonly", modfile, "-trimpath", "-ldflags", sys.argv[1],
-                                  "-o", ".nvkr/ci-bootstrap/nvkr-exec", "./cmd/nvkr"], env, deadline)
-    if manifests() != original or manifests(inputs) != original or result != 0:
+                                  "-o", output, "./cmd/nvkr"], env, deadline, cwd=source)
+    if manifests(source) != original or manifests(inputs) != original or result != 0:
         raise ValueError("private bootstrap compilation failed or changed source manifests")
     return 0
 
@@ -355,11 +379,16 @@ if canceled and result != %[5]d:
     result = %[5]d
 sys.exit(result)
 PY`, e.CodeEngineCapability, e.ExitCode(e.New(e.CodeEngineCapability, "")), shellQuote(linker),
-		e.CodeTimeout, e.ExitCode(e.New(e.CodeTimeout, "")), e.CodeBuildFailed, e.ExitCode(e.New(e.CodeBuildFailed, "")))
+		e.CodeTimeout, e.ExitCode(e.New(e.CodeTimeout, "")), e.CodeBuildFailed, e.ExitCode(e.New(e.CodeBuildFailed, "")),
+		strings.TrimSuffix(nvkrRunnerPackage, "/cmd/nvkr"), githubRunnerSourceMarker)
 }
 
 func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string][]byte, error) {
 	linker, err := generatorLinkerFlags(plan.GeneratorVersion)
+	if err != nil {
+		return nil, err
+	}
+	goVersion, err := githubPublishedRunnerGoVersion()
 	if err != nil {
 		return nil, err
 	}
@@ -382,9 +411,10 @@ func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string
 		}
 		steps := &yamlv3.Node{Kind: yamlv3.SequenceNode, Tag: "!!seq"}
 		if mode == "bootstrap-download" {
+			versionFile, version := githubSetupGoWith(goVersion)
 			steps.Content = append(steps.Content,
-				githubYAMLMap("name", githubYAMLString("Provision the pinned Go bootstrap"), "uses", githubYAMLString(actions.SetupGo), "with", githubYAMLMap("go-version-file", githubYAMLString(".go-version"), "cache", githubYAMLString("false"))),
-				githubYAMLMap("name", githubYAMLString("Build private transport helper from this checkout"), "shell", githubYAMLString("bash"), "env", githubYAMLMap("GOTOOLCHAIN", githubYAMLString("local")), "run", githubYAMLString(githubCIBootstrapBuildCommand(linker))))
+				githubYAMLMap("name", githubYAMLString("Provision the pinned Go bootstrap"), "uses", githubYAMLString(actions.SetupGo), "with", githubYAMLMap("go-version-file", githubYAMLString(versionFile), "go-version", githubYAMLString(version), "cache", githubYAMLString("false"))),
+				githubYAMLMap("name", githubYAMLString("Build private transport helper"), "shell", githubYAMLString("bash"), "env", githubYAMLMap("GOTOOLCHAIN", githubYAMLString("local")), "run", githubYAMLString(githubCIBootstrapBuildCommand(linker))))
 		}
 		steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Create a fresh locator directory"), "id", githubYAMLString("directory"), "shell", githubYAMLString("bash"), "run", githubYAMLString("set -eu\ndirectory=$(mktemp -d \"$RUNNER_TEMP/nvkr-ci-index.XXXXXX\")\nprintf 'path=%s\\n' \"$directory\" >> \"$GITHUB_OUTPUT\"")))
 		username := "${{ env.NVKR_CI_STORAGE_READ_USER }}"

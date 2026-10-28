@@ -334,18 +334,23 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q is incomplete", jobID)
 		}
 		// The bootstrap must provision the Go toolchain via the pinned setup-go action rather
-		// than assume a preinstalled Go, and pin the version to the repo's .go-version so the
-		// toolchain and setup-go cannot drift.
-		if job.Steps[1].Uses != actions.SetupGo || job.Steps[1].With["go-version-file"] != ".go-version" ||
-			job.Steps[1].With["cache"] != "false" {
-			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q does not provision the pinned Go toolchain from .go-version", jobID)
+		// than assume a preinstalled Go: an NVKR source checkout's .go-version, otherwise the
+		// generator's Go release for the published runner.
+		goVersion, err := githubPublishedRunnerGoVersion()
+		if err != nil {
+			return err
+		}
+		versionFile, version := githubSetupGoWith(goVersion)
+		if job.Steps[1].Uses != actions.SetupGo || job.Steps[1].With["go-version-file"] != versionFile ||
+			job.Steps[1].With["go-version"] != version || job.Steps[1].With["cache"] != "false" {
+			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q does not provision the pinned Go toolchain", jobID)
 		}
 		bootstrapRuns := joinRuns(job.Steps)
 		linkerFlags, err := generatorLinkerFlags(plan.GeneratorVersion)
 		if err != nil {
 			return err
 		}
-		if !stepUses(job.Steps, actions.Upload) || !strings.Contains(bootstrapRuns, "go build -trimpath") ||
+		if !stepUses(job.Steps, actions.Upload) || !strings.Contains(bootstrapRuns, "go install -trimpath") ||
 			!strings.Contains(bootstrapRuns, "-ldflags "+shellQuote(linkerFlags)) ||
 			!strings.Contains(bootstrapRuns, command) {
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q does not build and transport the runner", jobID)

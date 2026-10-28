@@ -32,7 +32,11 @@ implementation of rendered strings that must be kept in sync.
 The maintained GitHub adapter and local runner use the same producer IR. GitLab, Tekton and Argo generation
 are unavailable; their unused adapters are removed, as are the separate qualified GitHub/GitLab renderers.
 The former GitLab-only `runtime.builderImage` schema field has no retained adapter and any nonempty value
-fails capability admission. GitHub uses its pinned setup-go action for source bootstrap.
+fails capability admission. GitHub uses its pinned setup-go action for source bootstrap. A checkout
+containing NVKR source (`cmd/nvkr/main.go`) installs the runner from that source with its `.go-version`;
+any other repository, such as a customer recipes repository, installs the latest published NVKR release
+with the generator's Go release. That fallback is not pinned: each bootstrap resolves `@latest` itself, and
+the committed-generation check fails closed unless that release renders the committed files byte-identically.
 A future provider must satisfy its evidence admission before receiving an implementation. Adapters map **job/step
 topology and artifact transport only**, never build semantics. Adding an engine is one thin adapter; adding a
 component is one catalog entry and no code. Definition v5 names each output and its exact catalog producers.
@@ -183,14 +187,15 @@ redirect and have no generic retry. Ambiguous selections, malformed metadata and
 failures fail closed. This replaces eager concurrent locator downloads without adding jobs or payload
 copies; private GHCR authentication and payload restoration are unchanged. Missing required inputs still
 fail closed during restoration and completeness checking. A helper is
-built from the exact checkout with the pinned Go toolchain before private downloads, so bootstrap needs no
+built from the exact checkout with the pinned Go toolchain before private downloads, or, in a checkout
+without NVKR source, from a private copy of the latest published NVKR module, so bootstrap needs no
 public binary delivery. The source bootstrap owns fresh Go build and module caches beneath the runner's
 temporary directory. A fixed Python 3 supervisor gives dependency acquisition and compilation one
 900-second deadline. Public module acquisition may retry at most three times, with one- and two-second
 cancellable waits, only when every reported failure is the admitted `proxy.golang.org` module ZIP's
 HTTP/2 `INTERNAL_ERROR` received from its peer. Unknown, malformed, checksum, certificate and other
 download failures stop. The two small dependency manifests are copied into the disposable directory so
-Go cannot normalize the checkout; their exact bytes must remain unchanged. Compilation runs once with
+Go cannot normalize the checkout or published module copy; their exact bytes must remain unchanged. Compilation runs once with
 read-only module metadata and proxy/checksum-database networking disabled. No producer, signing,
 verification or publication operation is retried by this bootstrap policy. The supervisor stops and joins
 each child before retry or cache cleanup, and completes cleanup before private downloads.
@@ -491,7 +496,8 @@ and a different branch-authored workflow can omit the check. The repository-scop
 not restricted to this workflow. Restricting runner-group access to selected workflows/refs and moving the
 secret into a main-restricted environment remain separate provider and repository configuration follow-ups.
 
-Helper delivery can use pinned source bootstrap or a pinned helper image. Delivery identity is not qualified
+Helper delivery can use pinned source bootstrap, the unpinned latest-release fallback above, or a pinned
+helper image. Delivery identity is not qualified
 execution authority: a qualified claim still needs exact helper bytes and the ADR-07 runtime observation.
 Prebuilt helper-image qualification stays disabled until that admission contract exists. Runtime/helper changes
 belong to Environment/profile configuration; component toolchains remain producer inputs.

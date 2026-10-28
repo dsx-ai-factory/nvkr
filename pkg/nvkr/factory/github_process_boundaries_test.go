@@ -41,6 +41,7 @@ func TestGitHubBootstrapStopsDescendantHoldingCapturedPipe(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			writeRunnerSourceMarker(t, root)
 			script := "#!/bin/sh\nexec " + shellQuote(python) + " -I - \"$@\" <<'PY'\n" + `import json, os, pathlib, subprocess, sys, time
 if sys.argv[1:4] == ["mod", "download", "-json"]:
     pid = os.fork()

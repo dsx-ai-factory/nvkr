@@ -37,17 +37,17 @@ func shareGitHubBootstrap(plan *Plan, files map[string][]byte, oldPath string, c
 	var artifact *yamlv3.Node
 	for _, step := range steps.Content {
 		switch githubYAMLValue(step, "name") {
-		case "Build runner from this checkout":
+		case githubRunnerInstallStep:
 			if variant != "" {
 				return e.New(e.CodePipelineDrift, "generated bootstrap action repeats its runner build")
 			}
 			command := githubYAMLValue(step, "run")
 			switch {
-			case strings.HasPrefix(command, "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build "):
+			case strings.HasPrefix(command, "set -eu\nexport CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOBIN="):
 				variant = "linux-amd64"
-			case strings.HasPrefix(command, "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build "):
+			case strings.HasPrefix(command, "set -eu\nexport CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOBIN="):
 				variant = "linux-arm64"
-			case strings.HasPrefix(command, "CGO_ENABLED=0 go build "):
+			case strings.HasPrefix(command, "set -eu\nexport CGO_ENABLED=0 GOBIN="):
 				variant = "native"
 			default:
 				return e.New(e.CodeEngineCapability, "generated bootstrap action has an unsupported runner build command")
