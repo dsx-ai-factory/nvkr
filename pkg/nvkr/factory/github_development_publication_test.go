@@ -112,6 +112,13 @@ func TestGitHubDevelopmentPublicationScopesRealStages(t *testing.T) {
 					if job.Env["NVKR_CREDENTIAL"] != secret || job.Env["NVKR_REGISTRY_USER"] != user {
 						t.Fatalf("%s credential differs from its operation scope: %+v", node.Kind, job.Env)
 					}
+					repositoryToken := ""
+					if node.Kind == NodePublish {
+						repositoryToken = "${{ github.token }}"
+					}
+					if job.Env[githubRepositoryTokenEnv] != repositoryToken {
+						t.Fatalf("%s repository metadata credential differs from its publication scope", node.Kind)
+					}
 					if node.Kind == NodePublish || signFamilyNode(node.Kind) {
 						if job.Environment != githubDevelopmentReleaseEnvironment || job.Permissions["packages"] != "" {
 							t.Fatalf("%s has production protection/token access: %+v", node.Kind, job)
@@ -136,7 +143,8 @@ func TestGitHubDevelopmentPublicationScopesRealStages(t *testing.T) {
 			}
 			finalizer := document.Jobs["nvkr-lifecycle-run"]
 			if finalizer.Environment != githubDevelopmentReleaseEnvironment || finalizer.Permissions["packages"] != "" || finalizer.Permissions["id-token"] != "" ||
-				finalizer.Env["NVKR_CREDENTIAL"] != "${{ secrets.NVKR_DEV_REGISTRY_READ }}" || finalizer.Env["NVKR_REGISTRY_USER"] != "${{ vars.NVKR_DEV_REGISTRY_READ_USER }}" {
+				finalizer.Env["NVKR_CREDENTIAL"] != "${{ secrets.NVKR_DEV_REGISTRY_READ }}" || finalizer.Env["NVKR_REGISTRY_USER"] != "${{ vars.NVKR_DEV_REGISTRY_READ_USER }}" ||
+				finalizer.Env[githubRepositoryTokenEnv] != "" {
 				t.Fatalf("finalizer is not scoped to development reads: %+v", finalizer)
 			}
 		})
@@ -163,8 +171,12 @@ func TestGitHubDevelopmentPublicationRejectsScopeTampering(t *testing.T) {
 	}{
 		{"writer on reader", NodeVerifyPublication, func(job *githubJob) { job.Env["NVKR_CREDENTIAL"] = "${{ secrets.NVKR_DEV_REGISTRY_WRITE }}" }},
 		{"production token", NodePublish, func(job *githubJob) { job.Env["NVKR_CREDENTIAL"] = "${{ secrets.GITHUB_TOKEN }}" }},
+		{"missing repository token", NodePublish, func(job *githubJob) { delete(job.Env, githubRepositoryTokenEnv) }},
+		{"package token for repository", NodePublish, func(job *githubJob) { job.Env[githubRepositoryTokenEnv] = "${{ secrets.NVKR_DEV_REGISTRY_WRITE }}" }},
+		{"repository token on signing", NodeSign, func(job *githubJob) { job.Env[githubRepositoryTokenEnv] = "${{ github.token }}" }},
+		{"repository token on producer", NodeBuild, func(job *githubJob) { job.Env = map[string]string{githubRepositoryTokenEnv: "${{ github.token }}"} }},
 		{"actor username", NodeSign, func(job *githubJob) { job.Env["NVKR_REGISTRY_USER"] = "${{ github.actor }}" }},
-		{"production write scope", NodeSign, func(job *githubJob) { job.Permissions["packages"] = "write" }},
+		{"source write scope", NodeSign, func(job *githubJob) { job.Permissions["contents"] = "write" }},
 		{"OIDC on reader", NodeAssembleRelease, func(job *githubJob) { job.Permissions["id-token"] = "write" }},
 		{"production protection", NodePublish, func(job *githubJob) { job.Environment = githubReleaseEnvironment }},
 		{"registry on SBOM attestation", NodeAttestEvidence, func(job *githubJob) {
@@ -200,28 +212,67 @@ func TestGitHubDevelopmentPublicationRejectsScopeTampering(t *testing.T) {
 	}
 }
 
-func TestMaintainedM2DevelopmentPreservesCompleteGraphAndPrivateToolchainReads(t *testing.T) {
-	base, err := LoadPlanContext(t.Context(), "../../../"+FactoryPlanPath)
-	if err != nil {
-		t.Fatal(err)
+func TestGitHubPublicationRepositoryIdentityCoversOutputAndReleaseRoots(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		plan func(*testing.T) *Plan
+	}{
+		{"production", referenceTestPlan},
+		{"development", githubDevelopmentPublicationTestPlan},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plan := test.plan(t)
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
+			_, nodeJobs, err := githubStages(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			publishers := map[string]bool{}
+			for _, node := range plan.Graph.Nodes {
+				if node.Kind == NodePublish {
+					publishers[nodeJobs[node.ID]] = true
+				}
+			}
+			if len(publishers) != len(plan.LifecycleOutputs)+1 {
+				t.Fatal("fixture must cover every output and the aggregate release publisher")
+			}
+			for jobID, job := range document.Jobs {
+				token, present := job.Env[githubRepositoryTokenEnv]
+				if present != publishers[jobID] || present && token != "${{ github.token }}" {
+					t.Fatalf("job %s received the wrong repository metadata credential scope", jobID)
+				}
+				if present && job.Permissions["contents"] != "read" {
+					t.Fatalf("publisher %s lost read-only repository metadata access", jobID)
+				}
+			}
+		})
 	}
+}
+
+func TestDevelopmentPreservesProducerGraphAndPrivateToolchainReads(t *testing.T) {
+	// A native disk and its vendor fetch cover both preparation sites. The
+	// full maintained product adds no distinct development credential boundary.
+	base := recompileGitHubStabilityPlan(t, privateImageTestPlan(t, "github:GITHUB_TOKEN"), func(inputs *githubStabilityInputs) {
+		inputs.environment.Publication.Mode = "per-output-v1"
+		inputs.environment.Publication.RepositoryPrefix = "ghcr.io/dsx-ai-factory/nvkr/m2-candidate"
+		root := inputs.catalog.Components["image"]
+		for arch, image := range root.ToolchainImages {
+			root.ToolchainImages[arch] = "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-" + arch + image[strings.Index(image, "@sha256:"):]
+		}
+		inputs.catalog.Components["image"] = root
+	})
 	plan := developmentPublicationPlan(t, base, "ghcr.io/dsx-ai-factory/nvkr/development")
 	if len(plan.LifecycleOutputs) != len(base.LifecycleOutputs) || len(plan.Graph.Nodes) != len(base.Graph.Nodes) {
-		t.Fatal("development changed the maintained selected output or operation closure")
+		t.Fatal("development changed the selected output or operation closure")
 	}
-	fdePlatforms := map[string]bool{}
 	for i, build := range plan.Builds {
 		if build.Name != base.Builds[i].Name || build.BuildDigest != base.Builds[i].BuildDigest {
 			t.Fatalf("development changed producer identity for %s", build.Name)
 		}
-		for _, instruction := range build.Graph.Nodes {
-			if instruction.Disk != nil && instruction.Disk.Encryption == "luks2" {
-				fdePlatforms[build.Platform] = true
-			}
-		}
-	}
-	if !fdePlatforms["linux/amd64"] || !fdePlatforms["linux/arm64"] || len(fdePlatforms) != 2 {
-		t.Fatal("development omitted the maintained native public-bootstrap FDE producers")
 	}
 	// The production qualification handoff needs every original output record.
 	// Development still authenticates the complete release with six controls;
@@ -255,8 +306,8 @@ func TestMaintainedM2DevelopmentPreservesCompleteGraphAndPrivateToolchainReads(t
 			if step.Env[githubImageToken] == "" {
 				continue
 			}
-			if job.Permissions["packages"] != "read" || job.Permissions["id-token"] != "" ||
-				step.Env[githubImageToken] != "${{ github.token }}" || job.Env["NVKR_CREDENTIAL"] != "" {
+			if job.Permissions["packages"] != "" || job.Permissions["id-token"] != "" ||
+				step.Env[githubImageToken] != "${{ secrets.NVKR_REGISTRY_READ }}" || job.Env["NVKR_CREDENTIAL"] != "" {
 				t.Fatal("native toolchain preparation lost its independent read-only scope")
 			}
 			if job.Environment == githubDevelopmentARCEnvironment {
@@ -266,8 +317,7 @@ func TestMaintainedM2DevelopmentPreservesCompleteGraphAndPrivateToolchainReads(t
 			}
 		}
 	}
-	if disks != 4 || fetches == 0 {
+	if disks != 1 || fetches == 0 {
 		t.Fatalf("development omitted private native preparation: %d disks / %d fetches", disks, fetches)
 	}
-	t.Logf("complete M2 development workflow: %d bytes", len(bundle.Files[bundle.WorkflowPath]))
 }

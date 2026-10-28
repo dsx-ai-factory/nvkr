@@ -3,8 +3,8 @@
 
 package factory
 
-// execute_sbom.go owns the per-build SBOM node. ADR-13 §1 (re-entered into v1
-// by ADR-13) requires a deterministic CycloneDX SBOM per built artifact plus
+// execute_sbom.go owns the per-build SBOM node. ADR-13 §1 requires a
+// deterministic CycloneDX SBOM per built artifact plus
 // an aggregate index. pkg/nvkr/sbom owns the document shape and its validation;
 // what this file owns is the JOIN: reading each built component's observed digest
 // from the producer-result this build already wrote, pairing it with the plan's
@@ -230,7 +230,7 @@ func (plan *Plan) validateSBOMGraph() error {
 					if err != nil {
 						return err
 					}
-					if kind != "host-package" && kind != "oci-image" && kind != "tarball" {
+					if kind != "host-package" && kind != "oci-image" && kind != "tarball" && kind != "file-archive" {
 						return e.New(e.CodeEngineCapability, "SBOM dependency inspection does not support %q", candidate.Kind)
 					}
 					matches++
@@ -310,9 +310,37 @@ func readProducerResult(ctx context.Context, path string) (pipeline.ArtifactResu
 	return result, nil
 }
 
-// sbomPayloadKind admits raw bytes to the Helm metadata reader only when the
-// complete plan selects that exact acquired component as a Helm output.
+// sbomPayloadKind preserves the strict Helm reader and admits generic archive
+// contents only for an exact tarball component selected in an executable bundle.
+// Other wrappers can carry charts without Helm image mappings; their existing
+// interpretation cannot be downgraded by a filename or a failed Helm parse.
 func (plan *Plan) sbomPayloadKind(payload Artifact) (string, error) {
+	if payload.Kind == "tarball" {
+		for _, output := range plan.Definition.Outputs {
+			if output.Name != payload.BuildTarget || output.Format != authored.OutputExecutable || !containsString(output.Components, payload.Component) {
+				continue
+			}
+			for _, build := range plan.Builds {
+				if build.Name != payload.BuildTarget {
+					continue
+				}
+				for _, component := range build.ResolvedComponents {
+					if component.Name != payload.Component {
+						continue
+					}
+					if component.Helm != nil {
+						return "tarball", nil
+					}
+					for _, producer := range plan.Graph.Nodes {
+						if component.FromSource && component.OutputType == "tarball" && producer.ID == payload.Producer && producer.Kind == NodeBuild && producer.BuildTarget == payload.BuildTarget && containsString(producer.Outputs, payload.ID) {
+							return "file-archive", nil
+						}
+					}
+				}
+			}
+			return "", e.New(e.CodeEngineCapability, "archive SBOM payload %q is not an exact source-built executable bundle member", payload.ID)
+		}
+	}
 	if payload.Kind != "raw" {
 		return payload.Kind, nil
 	}

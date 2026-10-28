@@ -70,6 +70,21 @@ failed cleanup and close revocation. Transaction fixtures cover exact-byte stagi
 not establish a real daemon, complete Debian inventory, NVSentinel package, installation or native AMD64
 acceptance. Actual package source/tool/ABI/install contracts and OS consumer/material joins remain required.
 
+Local executable diagnostics may cross-compile CGO-free Darwin ARM64 host packages and tarballs in an
+explicitly recorded Linux ARM64 OCI toolchain. Payload and toolchain platforms remain separate identity
+fields (ADR-12). This does not admit Darwin images, disks, hosted execution, signing or qualified authority.
+
+The explicit `native-go` local diagnostic builder instead uses an already installed host Go SDK and C
+compiler. Preparation records the complete SDK tree and compiler byte digests in a canonical, typed
+toolchain manifest. Its Environment locators are descriptions; local admission independently remeasures
+the installed bytes before workspace creation, and execution checks them before and after compilation.
+Vendoring retains its independently pinned Linux OCI image and authenticated source receipt. Compilation
+uses a private source copy, private caches, no inherited credentials, and disabled Go dependency downloads.
+It declares host networking rather than claiming an enforced network sandbox. System libraries and the
+Apple SDK remain host dependencies. This route is unqualified, local only, and rejects signing/publication;
+it does not provide hostile-same-UID protection or sealed-descriptor execution. It downloads no compiler.
+An output-scoped catalog overlay binds the measured toolchain without changing source pins or source bytes.
+
 Adopt a **builder abstraction**: one intermediate representation (IR), many builder types — the build-execution
 analogue of "one IR, many CI adapters." Nix is **orchestrated as a subprocess** inside a pinned container, never
 linked into the core, exactly as other external tools are treated. That satisfies the Apache-2.0 linkage
@@ -77,7 +92,8 @@ constraint, and Nix can enter the reproducibility boundary only after its execut
 
 1. **Taxonomy (two axes).** An acquisition **lane** — `from-source` XOR `prebuilt` XOR `exclusion` — remains the
    top-level discriminator. A **builder type** refines *from-source only*:
-   `builderType ∈ {oci-hermetic, nix, buildkit-rootless, vm-image}`.
+   `builderType ∈ {oci-hermetic, nix, buildkit-rootless, vm-image, native-go}`; `native-go` is restricted to
+   the local diagnostic contract above and cannot enter qualified execution.
    The `prebuilt` lane is restricted to byte-preserving fetch plus digest verification. Repackaging,
    normalization, conversion, patching, or any other byte transformation is a build node with a builder type,
    pinned transformation inputs, and profile-bound output (ADR-07); it cannot be hidden inside `prebuilt`
@@ -172,10 +188,18 @@ invocation mechanism, not a builder type or an output semantic:
   of the pre-realized toolchain closure, not downloads discovered during image construction. The Packer
   executable and every host executable that Packer or a plugin resolves through `PATH` are exact-digest inputs;
   admitted execution constructs `PATH` only from that held closure and never exposes the ambient host path.
-  The held-executable boundary admits only Linux ELF files. Scripts and other binfmt-dispatched formats fail
+  The Linux held-executable boundary admits only ELF files. Scripts and other binfmt-dispatched formats fail
   capability admission because holding their bytes does not authenticate the selected host interpreter. The
   outer realized-runtime adapter must additionally authenticate the ELF dynamic loader and shared-library
   closure; a future script lane must bind its interpreter in that same closure.
+  The separate local Mac diagnostic uses native Mach-O snapshots. Apple's system utilities execute at their
+  exact protected regular-file paths under `/bin` or `/usr/bin`, with root ownership, non-writable parent
+  checks and matching bundle digests before and after execution. Private `PATH` aliases retain their declared
+  command names, including `tar` resolving to `bsdtar`. This changes no system signature or security policy.
+  Native firmware data belongs to the selected binary bundle. Stable `/nvkr/toolchain/` file references
+  resolve only through that bundle's captured private file closure; physical paths never replace them in
+  the logical graph. Installed dynamic libraries and system interpreters remain host dependencies of this
+  unqualified lane; these checks do not provide Linux's sealed-executable guarantee or qualified runtime closure.
 
 The direct-Packer authoring form names the stable boundary that compilation records and future execution must
 enforce. The concrete projection values below match the source-owned
@@ -361,7 +385,7 @@ remain closed; publication authenticates production and exact delivery bytes, no
 
 The public bootstrap disk makes no confidentiality claim, including after TPM enrollment: cloning its
 LUKS payload preserves the volume key, and changing unlock slots does not rotate that key. The source audit
-beside `definitions/nvke-fde` records retained bootstrap files, SSH key distinctions and firstboot limitations.
+at `inputs/definitions/diagnostics/fde-audit.md` records retained bootstrap files, SSH key distinctions and firstboot limitations.
 Secret-valued FDE still requires an authenticated file-path handoff and source-owned lifetime/retention
 contract; injecting a GitHub secret cannot protect a value that upstream writes into GRUB and guest files.
 

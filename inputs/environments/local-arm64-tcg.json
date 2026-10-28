@@ -1,0 +1,27 @@
+{
+  "apiVersion": "nvkr.dev/environment/v1",
+  "kind": "Environment",
+  "metadata": {
+    "name": "nvke-local-dev-arm64-docker",
+    "description": "Native Linux ARM64 Docker developer execution; TCG disk, no publication or signing. Docker daemon is operator-trusted."
+  },
+  "utilityContainer": "golang@sha256:f20d83a83e18dbd2a4714b8ffd4b30b287b6243962dd75608e86abcc63ba4efc",
+  "utilityPlatform": "linux/arm64",
+  "executionClasses": [
+    {
+      "name": "linux-arm64-tcg-local-docker",
+      "runsOn": "local-linux-arm64-docker-tcg",
+      "hostPlatform": "linux/arm64",
+      "resources": {
+        "cpuMillis": 8000,
+        "memoryMiB": 10240,
+        "ephemeralStorageMiB": 65536
+      },
+      "maxTimeoutSeconds": 21600
+    }
+  ],
+  "runtime": {
+    "runtime": "docker",
+    "buildNetworkPolicy": "producer-declared"
+  }
+}

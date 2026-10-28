@@ -36,14 +36,50 @@ func writeGitHubStageInputSteps(out *bytes.Buffer, plan *Plan, stage githubStage
 	return nil
 }
 
-func writeGitHubOutputSteps(out *bytes.Buffer, plan *Plan, node Node, artifacts map[string]Artifact, actions githubActionRefs) {
-	if len(node.Outputs) == 0 {
+func writeGitHubOutputSteps(out *bytes.Buffer, plan *Plan, node Node, artifacts map[string]Artifact, nodeJobs map[string]string, actions githubActionRefs) {
+	outputs := githubCarrierOutputs(plan, node, artifacts, nodeJobs)
+	if len(outputs) == 0 {
 		return
 	}
 	writeGitHubShellStep(out, "Prepare output carriers: "+githubNodeLabel(plan, node), []string{githubRunnerCommand(plan, "pack-outputs", "node", node.ID)})
-	for _, output := range node.Outputs {
+	for _, output := range outputs {
 		actions.writeUploadStep(out, plan, githubArtifactLabel(plan, artifacts[output]), githubArtifactName(output), carrierPath(output))
 	}
+}
+
+// Carrier selection does not remove logical outputs or their verification. A
+// payload used only in its producer's stage needs no archive or registry upload.
+// Keep metadata, unknown kinds and every finalizer input conservatively.
+func githubCarrierOutputs(plan *Plan, node Node, artifacts map[string]Artifact, nodeJobs map[string]string) []string {
+	var outputs []string
+	for _, id := range node.Outputs {
+		if githubArtifactNeedsCarrier(plan, artifacts[id], nodeJobs) {
+			outputs = append(outputs, id)
+		}
+	}
+	return uniqueSorted(outputs)
+}
+
+func githubArtifactNeedsCarrier(plan *Plan, artifact Artifact, nodeJobs map[string]string) bool {
+	if finalizerArtifact(plan, artifact) {
+		return true
+	}
+	switch artifact.Kind {
+	case PackageOCI, PackageDiskImage, PackageImage, PackageBinaryBundle, PackageHelm, PackageAPT,
+		"oci-image", "raw", "tarball", "host-package", "source-closure", "pipeline-tool":
+	default:
+		return true
+	}
+	producer := nodeJobs[artifact.Producer]
+	if producer == "" {
+		return true
+	}
+	for _, consumer := range plan.Graph.Nodes {
+		if containsString(consumer.Inputs, artifact.ID) && nodeJobs[consumer.ID] != producer {
+			return true
+		}
+	}
+	return false
 }
 
 func writeGitHubShellStep(out *bytes.Buffer, label string, commands []string) {

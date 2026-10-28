@@ -1,0 +1,16 @@
+# Machine-managed by `nvkr catalog pin` / `nvkr catalog bump`. Do not hand-edit.
+apiVersion: nvkr.dev/lock/v1
+kind: PinLock
+pins:
+  syft:
+    commit: 91a0032987d91b7411b52f6f5c185c5e7f775495
+    sourceDateEpoch: 1787847909
+    tag: v1.51.1
+    tool:
+      archiveDigest: sha256:a7fd2b784e6664acd44719270574f6cd8c6864fc2b1700bf9099bd1cccda7d7f
+      executableDigest: sha256:617cef943234e0cae184b4901414ca4059ad6c6923a9c9decb46f49f6a2c6573
+      executablePath: syft
+      format: tar-gzip
+      platform: linux/arm64
+      url: https://github.com/anchore/syft/releases/download/v1.51.1/syft_1.51.1_linux_arm64.tar.gz
+    treeHash: 37195e8547eb35809f35230ad15c10d29cc1f8db

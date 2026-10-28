@@ -6,7 +6,10 @@ neither a registry nor a source checkout. Linux is required for held-executable 
 macOS supports development, planning and contract tests.
 
 The ordinary test gate (`go test ./...`, `make test`, and `make check`) also requires Bash 3.2 or later,
-Git 2.38 or later, `jq`, GNU coreutils `timeout` or `gtimeout`, and a SHA-256 utility (`sha256sum` or `shasum`) on `PATH`.
+Git 2.38 or later, `jq`, `sha256sum`, and `timeout` or `gtimeout` on `PATH`.
+The catalog maintenance tests also run the rendered workflow steps with `yq` v4. Those tests skip locally when
+one of these tools is missing; with `NVKR_REQUIRE_SHELL_TOOLS=1` or `CI` set they fail instead, and the merge gate
+sets the variable.
 Ordinary local source admission uses Git's bounded `ls-files --format` query to reject indexed gitlinks;
 an unsupported query fails with a coded diagnostic naming this Git version floor.
 The required [authoring lab regression](docs/examples/authoring-lab/README.md) uses these tools and fails
@@ -18,10 +21,11 @@ runs every suite independently, so a Go-only test pass cannot stand in for the c
 On macOS with Homebrew, install the additional JSON, timeout, and Python tools with:
 
 ```sh
-brew install jq coreutils python
+brew install jq yq coreutils python
 ```
 
-The lab discovers `gtimeout` directly on macOS; no `timeout` alias or unprefixed coreutils setup is needed.
+The checksum contract tests execute `sha256sum`, supplied by macOS (including `/sbin/sha256sum` on macOS 26)
+or GNU coreutils. The lab discovers `timeout` or `gtimeout` directly; a shell-wide `gnubin` override is unnecessary.
 
 ```sh
 make build
@@ -61,18 +65,18 @@ resume capabilities. The [demo index](demos/README.md) provides bounded generati
 journeys with their prerequisites.
 
 The bundle records its selected Definition and Environment in `.github/nvkr-run/plan.json`.
-The maintained release selection is the 37-output [M2 candidate](definitions/nvke-m2/README.md), including
+The maintained release selection is the 69-output [M2 candidate](inputs/definitions/nvke/README.md), including
 plain and public-bootstrap FDE disks for both native architectures. The separate
-[FDE diagnostic workflow](definitions/nvke-fde/README.md) selects one build-only disk for branch iteration.
+[FDE diagnostic workflow](inputs/definitions/diagnostics/fde.md) selects one build-only disk for branch iteration.
 Regenerate with the intended selection after changing its inputs or generator code:
 
 ```sh
 go run ./cmd/nvkr run generate \
-  --definition definitions/nvke-m2/definition.yaml \
-  --environment definitions/nvke-m2/environment-github.yaml --engine github --root .
+  --definition inputs/definitions/nvke/definition.yaml \
+  --environment inputs/environments/github-release.yaml --engine github --root .
 go run ./cmd/nvkr run generate \
-  --definition definitions/nvke-m2/definition.yaml \
-  --environment definitions/nvke-m2/environment-github.yaml --engine github --root . --check
+  --definition inputs/definitions/nvke/definition.yaml \
+  --environment inputs/environments/github-release.yaml --engine github --root . --check
 ```
 
 Use the same generator version and input selection for generation and checking. Generated files are owned by
@@ -84,14 +88,23 @@ Definition/Environment paths recorded in the committed Plan. A `make build` CLI 
 Use [scratch generation](docs/generate-pipeline.md) for v1, deploy, or other examples; generating them with
 `--root .` would replace the M2 workflow.
 
+The [NVKE family selections](inputs/definitions/nvke/README.md) split the same outputs into core, services,
+telemetry and disks. Each uses its own named production bundle and publication prefix. Regenerate or
+check just these bundles with `make nvke-split-generate` and `make nvke-split-check`; the full
+`workflows-generate` and `workflows-check` targets include them. Shared catalog maintenance enrolls all four
+pairs so a pin update regenerates every affected bundle in the same refresh. The combined selection remains the
+qualification and development baseline until named qualification is supported and independently exercised.
+
 ## Test pipeline changes on a feature branch
 
-The committed `nvkr-dev.yml` runs the **same 37-output M2 Definition** as the maintained production
+The committed `nvkr-dev.yml` runs the **same 69-output M2 Definition** as the maintained production
 workflow, including native AMD64/ARM64 plain and public-bootstrap FDE disks, SBOM attestation, per-output publication, cosign signing,
 verification and finalization. Its generator and helper come from the dispatched branch. The separate
-`definitions/nvke-m2/environment-github-dev.yaml` selects development credentials, protected environments,
+`inputs/environments/github-development.yaml` selects development credentials, protected environments,
 signer policy and disposable registry destinations. Its Plan and manifest live beneath `.github/nvkr-dev/`.
 The production bundle remains independently owned and checked.
+
+Private-helper compilation uses disposable Go caches that are removed before carrier restoration.
 
 ```sh
 # After editing generator code or authored inputs, regenerate and inspect both bundles.
@@ -110,9 +123,25 @@ dispatch, use `python3 scripts/pipeline-dev.py --repo dsx-ai-factory/nvkr --chec
 
 ### One-time operator setup
 
-Merge the development and cleanup workflows onto the default branch before dispatching them. GitHub's
+Merge the development producer, qualifier, smoke worker and cleanup workflows onto the default branch before dispatching them. GitHub's
 [manual-dispatch registration](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)
 requires that default-branch presence. Keep the generated development bundle on each tested branch.
+
+Configure repository secrets `NVKR_CI_STORAGE_READ_TOKEN` and `NVKR_CI_STORAGE_WRITE_TOKEN`, plus
+repository variables `NVKR_CI_STORAGE_READ_USER` and `NVKR_CI_STORAGE_WRITE_USER`. These are the package
+credentials and corresponding GitHub usernames for the separate
+`ghcr.io/dsx-ai-factory/nvkr/ci-artifacts` transport package. It must be private/internal and unlinked from
+any repository. A writer allowed to create packages can seed it with metadata only; the reader must then
+have access before consumer jobs start. Use separate read/write token scopes and verify actual account
+permissions; a token name or package prefix does not restrict its authority. See
+[private CI transport](docs/generate-pipeline.md) for privacy and retention requirements.
+
+Allow API quota headroom for the full build. Package privacy checks use the token owner's
+[GitHub REST quota](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api);
+separate PATs from one account share that quota. Conditional metadata revalidation reduces usage
+only when GitHub returns an unchanged response. Avoid back-to-back full Runs on a temporary personal
+account, and honor the `x-ratelimit-reset` time after exhaustion. Use distinct CI-storage and development
+publishing service accounts for sustained operation; never disable privacy checks to bypass a quota failure.
 
 Configure these **separate development environments**, retaining the existing production environments:
 
@@ -133,9 +162,18 @@ and [package deletion requirements](https://docs.github.com/en/packages/learn-gi
 Do not use a production administrator's token for these secrets. The generated development jobs grant
 no package-write permission to their repository `GITHUB_TOKEN`; verification, assembly and finalization
 receive only the dedicated read credential. Only artifact signing and SBOM attestation receive OIDC.
+GHCR publication jobs use the automatic repository token separately for source-repository metadata checks;
+the development publishing token does not need repository scope for that lookup.
 
-Keep `NKE_SOURCE_TOKEN` available to the fixed source-fetch/catalog-validation steps. Grant the workflow
-repository read access to the retained private native toolchain packages. Their temporary read credential
+Configure repository secret `NVKR_REGISTRY_READ` and variable `NVKR_REGISTRY_READ_USER` for the
+shared private toolchain and smoke images as well. These are additional prerequisites to the development
+output credentials above; see [registry reader setup](docs/generate-pipeline.md) for scopes and package
+access requirements.
+
+Keep `NKE_SOURCE_TOKEN` available to the fixed source-fetch/catalog-validation steps. Verify that the
+`NVKR_REGISTRY_READ_USER` account can read the retained native Packer toolchain package. Do not grant the
+source repository Actions access to that package; see [registry reader setup](docs/generate-pipeline.md).
+The temporary toolchain read credential
 is removed before producer execution. Branch code participates in these operations, so run reviewed branches;
 the workflow is not an untrusted-code sandbox. The generator does not provision or attest provider access policy.
 
@@ -147,15 +185,18 @@ Keyless signatures use the existing transparency services, whose records are not
 
 ### Inspect results and repeat
 
-The helper prints a commit-filtered command for finding the Run. Inspect its head SHA, completion and final
-record before using any outputs:
+The helper prints a commit-filtered command for finding the Run. Inspect its head SHA, completion and
+Actions summary:
 
 ```sh
 gh run watch RUN_ID --repo dsx-ai-factory/nvkr --exit-status
 gh run view RUN_ID --repo dsx-ai-factory/nvkr --log-failed
-gh run download RUN_ID --repo dsx-ai-factory/nvkr \
-  --name nvkr-lifecycle-run --dir /tmp/nvkr-dev-record-RUN_ID
 ```
+
+The `nvkr-lifecycle-run` Actions attachment now contains only locator JSON. `gh run download` does not
+restore `run.json` by itself. The Run payload remains in private GHCR and requires an authorized consumer
+with the storage reader, matching repository/Run/attempt context and the private transfer helper. Verify
+that final record before treating its published references as a completed Run.
 
 Each attempt publishes into
 `ghcr.io/dsx-ai-factory/nvkr/development/runs/RUN_ID/attempts/ATTEMPT/`.
@@ -168,8 +209,35 @@ repository, workflow, run and attempt without changing logical Build identity or
 Signed development Runs are non-canceling. To retry, dispatch a complete new Run (or rerun **all** jobs).
 Failed-job-only reruns cannot reuse publications from an earlier attempt's disposable namespace. A cancelled
 Run can leave partial publications and may have no final record; cleanup discovers packages independently
-of successful finalization. CI helpers/carriers and final Run records retain seven days; disk diagnostics
-retain one day. After CI transfers expire, start a complete new Run.
+of successful finalization. Actions locators for CI helpers/carriers and final Run records retain seven
+days; disk diagnostic locators retain one day. GHCR carrier blobs require separate retention management.
+After locator transfers expire, start a complete new Run.
+
+### Qualify an existing development Run
+
+`make pipeline-dev-generate` also generates the development qualifier and native smoke worker from
+`inputs/policies/nvke-development-qualification.yaml`. Install those workflows on the default branch once,
+then dispatch a reviewed nondefault branch that contains the generated pair:
+
+```sh
+gh workflow run nvkr-dev-qualify.yml --repo dsx-ai-factory/nvkr \
+  --ref YOUR_QUALIFIER_BRANCH \
+  -f source_run_url=https://github.com/dsx-ai-factory/nvkr/actions/runs/RUN_ID/attempts/ATTEMPT
+```
+
+The source must be a successful manual `nvkr-dev.yml` attempt from this repository on a nondefault
+branch. It may come from a different branch or an older commit. The qualifier authenticates the original
+attempt, restores its retained metadata, reproduces its Plan from the exact source inputs, verifies all
+artifacts, runs the native tool smoke profiles, signs development qualification evidence and reads each
+attachment back. It does not rebuild the artifacts. Runs with the public metadata transport can be selected
+even when their finalizer emitted no production qualification handoff.
+
+Use the existing `nvkr-dev-release` environment and dedicated development reader/writer credentials.
+The native worker receives the reader; only the final qualifier receives the writer. Run before provider
+metadata expires or development cleanup deletes the source packages. Qualification does not suspend cleanup.
+Missing inputs or failed checks fail the run. Evidence uses a separate development predicate and cannot
+satisfy production qualification. Disks retain producer-only scope and external suites remain outside MVP.
+The full hosted flow still requires a recorded acceptance run; rendering and local tests alone do not prove it.
 
 ### Disposable registry cleanup
 
@@ -193,7 +261,7 @@ The cleanup report records candidates and API-confirmed deletions, including par
 failure. Its CI artifact retains seven days. A timed-out deletion has an unknown outcome and is not retried
 within the command. Inspect the next preview before retrying.
 
-The three-output unsigned Environment in `definitions/nvke-v1/environment-github-dev.yaml` remains a
+The three-output unsigned Environment in `docs/examples/nvke-tutorial/environment-github-dev.yaml` remains a
 smaller scratch-generation example. It uses one-day transfers, automatic cancellation and no publication.
 It does not supply the committed full-development bundle. Hosted execution, credential/pool setup and
 actual registry deletion still need a recorded external Run; local contract tests establish none of those.
@@ -215,10 +283,19 @@ exceptions and completed Runs are scoped in [reconciliation](docs/adr/reconcilia
 
 ## Test timing and cache use
 
-Use `make test GO_TEST_FLAGS="-json -count=1"` to capture uncached ordinary test events. CI retains the
-event stream for seven days and summarizes slow packages/tests, including failures. Its check
-cache is scoped by platform, exact Go version, dependencies, and commit; a compatible prior check cache is
-restored and an updated cache saved only after successful checks. Other jobs cannot populate that key.
+Use `make test GO_TEST_FLAGS="-json -count=1"` to capture uncached ordinary test events. CI runs the same
+ordinary suite in eleven shards: four divide factory tests, two divide lifecycle tests, and five divide
+the remaining packages. Heavy-package selections come from Go's compiled test inventory, including
+examples and fuzz seeds; all other packages run whole. New packages and tests are assigned automatically.
+Each test runs in one shard, and the gate requires every shard plus the independent static, lint and
+vulnerability checks to succeed. `make test` and `make check` retain the complete local suite.
+
+Reproduce a shard with `make test-shard TEST_SHARD_GROUP=factory TEST_SHARD_INDEX=0`; group/index values
+match the workflow matrix. CI retains each shard's event stream for seven days and summarizes slow
+packages/tests, including failures. Compiled-output and lint caches remain disabled under the repository's
+private-storage policy. Local build caching still works normally. Five minutes is the job budget for these
+repository checks; end-to-end hosted performance, including runner queues and cold compilation, must be
+measured in an actual Run.
 
 [CI test performance](docs/ci-test-performance.md) owns the measured Merge Gate follow-up and focused
 profiling commands.
@@ -301,7 +378,8 @@ Syft pin in `toolchains/nvkr-disk-inspect`; record which selected native executa
 
 ## Repository layout
 
-- `definitions/`: tutorial, deploy, combined candidate, and OS-image Definitions, Environments, and catalogs.
+- `inputs/`: distribution, demo and diagnostic Definitions, shared catalogs, Environments, policies and nightly configuration; start with the [input index](inputs/README.md).
+- `docs/examples/`: retained tutorial and deploy inputs, alongside the authoring lab.
 - `testdata/examples/`: multi-output, worker, and catalog contract fixtures.
 - `pkg/nvkr/definition/`: authored inputs, admission and identity.
 - `pkg/nvkr/factory/`: complete compilation, Run operations and provider generation.
@@ -323,6 +401,8 @@ Catalog resolution, pin maintenance, and producer admission have distinct files 
 | Complete compilation, output joins, scheduling, packaging and provider generation | `pkg/nvkr/factory` |
 | Catalog/pins, resolution and canonical identity | `catalog`, `buildgraph`, `target`, `ir`, `canonical` |
 | Producer execution, observations and qualified receipts | `pipeline`, `profile` |
+| External test output descriptions, wrapper validation and deterministic serialization (no execution or authority) | `pkg/nvkr/testresults` |
+| Configured diagnostic check selection and local upstream conformance execution | `validation`, `conformance` — delegate product/tool publication authentication and exact executable-member export to `lifecycle` |
 | Bounded archive transport and descriptor-safe paths | `internal/transportarchive`, `internal/securepath` |
 | Subject-bound evidence and verification | `attest`, `sbom`, `provenance`, `trust`, `sign` |
 | Release authority and delivery | `release`, `status`, `delivery` |

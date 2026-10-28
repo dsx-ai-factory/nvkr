@@ -23,7 +23,8 @@ or prove provider allocation. Tool releases are catalog-owned dependencies selec
 are also catalog dependencies; the workflow adapter consumes their locked commits.
 An explicit GitHub development setting selects branch dispatch. Signed development uses the same admitted
 native disk and pipeline-attested stages with separate signer policy, credentials and disposable run-attempt
-registry namespaces. Unsigned development remains static-unqualified. Neither setting grants production
+registry namespaces. Cleanup admits only internal-visibility packages in those namespaces.
+Unsigned development remains static-unqualified. Neither setting grants production
 acceptance, provider access or qualified evidence.
 _Avoid_: Delivery profile, component catalog, build identity
 
@@ -42,6 +43,8 @@ _Avoid_: Producer, expected output, release
 An immutable selection of artifacts and evidence accessible through one pinned reference, with an explicit evidence lane. Acceptance depends on the consumer's Verification Policy.
 Metadata inspection can expose checked artifact/evidence membership without establishing payload integrity,
 signature or policy acceptance.
+Diagnostic output pulling additionally checks one selected output's complete payload closure and byte integrity
+without establishing signature or policy acceptance.
 A release description is a versioned, detached metadata view derived solely from a pinned publication;
 it is not another lifecycle object or a verified Release. It retains every named artifact, platform and
 bound source/evidence record, including aggregate image-index children. Source repository/commit belongs
@@ -137,13 +140,36 @@ _Avoid_: Authored definition, execution observation
 **Generated execution bundle**:
 The exact generated files and commit manifest that carry an execution plan to a selected execution engine.
 The maintained hosted engine is GitHub; no separate qualified renderer or authored transport-plan model is retained.
-Its workflow, shared composite templates and generated invocation data share one ownership manifest and
+Its entry workflow, shared composite templates and generated invocation data share one ownership manifest and
 byte-exact drift gate. Actions expose fixed semantic interfaces for Plan operations; grouped work repeats those
 interfaces without generating group-size or output-count variants. Named invocation parameters are recomputed
-from the admitted Plan at runtime. Neither scripts supplied as data nor separately authored lifecycle inputs are admitted.
+from the admitted Plan at runtime. Identical admitted step sequences can share descriptive YAML aliases;
+expansion preserves independent job parameters, policies and exact result membership. Every job retains its
+ID, runner, timeout, permissions and condition in the entry workflow. Redundant scheduling edges may be
+removed while preserving the prerequisite closure.
+Large finalizers collect the exact original per-job results through fixed, bounded diagnostic buckets;
+collector success never substitutes for producer success. Neither scripts supplied as data nor separately
+authored lifecycle inputs are admitted.
+Production and development partial retries may transport retained same-Run artifacts from earlier attempts while preserving
+their original source bindings. Same-name candidates are bounded and authenticated before selecting the
+newest source attempt, with ties rejected. Transport admission does not replace consumer evidence or completeness checks;
+explicit cross-Run transfers remain exact-attempt. Qualification independently checks original source attempts.
 The workflow can remain byte-identical across routine pin updates when scheduling, labels/interfaces and
 visible policy and required inline action pins stay unchanged. Stable provider scheduling keys do not replace exact executable Plan IDs;
 the complete bundle still requires regeneration and checking.
+Edit locality additionally preserves existing output jobs when an independent output is added. Ordinary
+grouping can append offline observation, SBOM and packaging to a producer when that one stage owns all
+inputs and runtime/target constraints agree; otherwise one BuildTarget's observation and SBOM may pair.
+Other nodes keep separate jobs. Signing, publication and remote verification retain their boundaries. A shared pinned root tool may be an additional prerequisite for the pair,
+which waits for its acquisition and restoration before observation. Required aggregate accounting changes,
+and an identical YAML anchor may gain an earlier owner without changing expanded execution. The current Plan determines this projection; previous
+generated files do not supply scheduling state.
+Payload carriers use an unlinked private/internal GHCR package with separate storage credentials.
+Actions stores their JSON locators and separately validated metadata records with exact schemas and file
+inventories. Metadata delivery uses workflow identity, preserves exact bytes and grants no release authority.
+Unknown/mixed contents remain private; control layouts cannot carry output payload blobs.
+Carrier and GHCR publication admission use the automatic repository token for source metadata separately
+from package credentials; that token is not added to producer execution.
 Native build-only disk bundles can retain raw outputs and a static-unqualified Run without producing a Release.
 Development and production use separate fixed bundle layouts selected by their Environment, with the same
 compiler and independent ownership manifests. A development bundle is not a release authorization.
@@ -168,6 +194,30 @@ An Artifact format containing exact executable files and their installation meta
 _Avoid_: Release, arbitrary archive
 
 ## Evidence and authority
+
+**External test producer**:
+An external implementation or NVKR-supplied diagnostic adapter providing original reports and descriptive
+metadata, distinct from a Component producer that builds delivery artifacts. Lane: none (descriptive); [ADR-16 §6](docs/adr/0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
+owns its execution and authority boundary.
+_Avoid_: Component producer, qualified verifier, conformance receipt
+
+**Validation profile**:
+Explicit diagnostic configuration selecting a product publication and named check instances with
+separate suite/harness protocols and configuration. Tools are independently selected exact members
+of authenticated catalog-produced executable outputs. Its source and tools policy paths reference the existing
+qualification-policy format for artifact authentication; the profile does not replace those policies.
+Top-level `validate` runs diagnostics, whereas `definition validate` checks static authored-input shape.
+Outputs remain descriptive and cannot authorize qualification or promotion.
+_Avoid_: Recipe, test dispatcher framework, verification policy
+
+**Validator catalog (proposed)**:
+An explicit index of reusable diagnostic validator entries, organized by project, artifact and suite.
+Proposed [ADR-24](docs/adr/0024-imported-validator-catalog.md) separates entries from profiles selecting named
+instances and artifact-role bindings. The provisional CLI slice implements strict discovery, local-plan
+admission and frozen dispatch for the existing process-contract and mixed CLI suites. Shared schemas remain
+provisional; published adapters, controller/chart checks and broader migration are deferred. Existing legacy
+validation routes retain their separate admission and capture contracts.
+_Avoid_: Producer catalog, upstream test implementation, executable plugin, qualification policy
 
 **Release authenticity**:
 Acceptance of a Release's signed membership, each named output's signatures and production provenance, and required inventories under consumer policy, without checking artifact payload bytes. It establishes neither payload integrity nor release qualification.
@@ -211,21 +261,49 @@ Historical signed `deferred-m3` documents retain their original bytes and uninsp
 _Avoid_: Milestone verdict, declaration-only inventory, inferred inspection
 
 **Build/evidence qualification**:
-Checks for the complete selected artifact set against its exact producing Run, attempt, commit and inputs,
+Checks for the complete selected artifact set against its producing Run, original attempt identities, commit and inputs,
 including schema, pin, source, signature/provenance and applicable delivered-tool smoke results. Every output
 has a pass or fail verdict. Independent qualification evidence is issued only after all required results pass;
-the authenticated check receipt itself grants no signing authority. Artifact checking selects one exact Run
-attempt and an independent consumer policy. The generated handoff carries original inputs and evidence for
+the authenticated check receipt itself grants no signing authority. Artifact checking selects one exact
+successful completion attempt of a Run and an independent consumer policy. Production and development outputs may retain authenticated earlier
+attempts of that same workflow run when their exact inputs and original evidence remain bound; retrying does
+not relabel production. Development publications retain each original attempt namespace within the same source run.
+The generated handoff carries original inputs and evidence for
 recompilation and verification; it is descriptive transport, not a new authored lifecycle object or trust policy.
-The check receipt retains the verified publication and frozen Plan until closure revokes copies, cancels and
-joins registered operations, then releases the held bytes. This lifetime grants no smoke-execution authority.
+Hosted checks verify all payloads sequentially and release non-executable scratch after each output. The check
+receipt retains verified controls, evidence, exact executable bundle bytes and the frozen Plan until closure revokes
+copies, cancels and joins registered operations, then releases held bytes. It cannot export discarded payloads.
+This lifetime grants no smoke-execution authority.
 Native workers exercise every selected delivered tool with fixed version checks in isolated containers and
 sign exact member observations. The final qualifier authenticates complete native coverage under the same
-independent policy and exact hosted invocation before signing. Worker reports remain generated transport;
+independent policy before signing. A successful worker from an earlier attempt of that same qualification
+run may be reused with its original authenticated invocation, unchanged inputs and policy; a later failed
+worker prevents fallback to its earlier success. Worker reports remain generated transport;
 they are not caller-authored pass records or release authorization.
+An exact runtime-assets archive member may be outside version smoke only when the Plan declares a
+source-built tarball and the delivered member is non-executable. Its artifact checks remain required;
+the rule does not exempt sibling tools or classify the archive's internal contents.
+The local qualification rehearsal specified in ADR-16 exercises the same
+build/evidence checks with explicit local origins and distinct local signing roles. Its results retain
+the unqualified local lane and cannot replace authenticated hosted acceptance or grant release authority.
+`run qualify-local` owns the retained-attempt rehearsal through independent registry read-back; its
+canonical result describes that local check only. An explicitly configured demo gates deployment inputs
+on successful qualification of its built attempt. The demo’s explicit `qualifyLocal` opt-in owns preparation and registry shutdown around qualification.
+Explicit demo setup can also generate disposable local keys
+and a Plan-bound policy from the maintained complete demo scope; this is local operator trust, not
+independent organizational approval. Setup files grant no verification receipt. Reconciliation records actual demo-tool execution,
+consumer verification, negative cases and the scope of deployment-gate testing separately.
 External suites outside the MVP are reported as not evaluated, never passed; a required suite needs authenticated
 subject-bound evidence.
 _Avoid_: Qualified reproduction, disk-content inspection, cluster conformance, build success
+
+**Release manifest**:
+The pipeline-attested document naming one Run's complete qualified artifact set: the Definition and exact
+inputs, originating Run, each member's exact digest, source lane and verified build provenance, and the exact
+qualification evidence. It is issued only after that evidence is authenticated on every member under the
+independently selected qualification identity, and is attested to the publication root under that identity.
+A manifest attachment alone is not a published release; tags, channels and revocation are separate.
+_Avoid_: Release clearance, ReleaseSet, qualified release, tag
 
 **Inventory**:
 The internal qualified-lane declaration of required component membership, exact artifact identities, and compatibility requirements.
@@ -239,6 +317,15 @@ _Avoid_: Public Release synonym, output list, binary bundle
 Distinct independently authenticated release claims covering exact reproduction, compatibility requirements, and runtime behavior for their bound subjects.
 Qualified release-gate acceptance is deferred; no retained clearance implementation consumes these claims.
 _Avoid_: Generic pass result, cluster qualification
+
+**Downstream test coordinator**:
+A separately authored repository CI adapter outside the NVKR product lifecycle
+that joins exact project producer Runs, consumes authenticated publication bytes
+and invokes NVKE's suite in a separate job. NVKE owns guest/cluster provisioning,
+assertions and teardown; the parent harness owns host admission, outer leases,
+disk service and network-control restoration. Its unsigned reports are diagnostics,
+not qualified conformance receipts or a seventh public lifecycle object (ADR-16/18).
+_Avoid_: Nightly qualification, qualified runtime, product fleet operator
 
 **Clearance**:
 Authenticated authorization for one exact qualified ReleaseSet after its required evidence, policy, and lifecycle checks pass.
@@ -278,6 +365,8 @@ _Avoid_: Output selection group, mixin, deployment topology
 An explicit catalog mapping from one pinned upstream declaration to source or acquired-artifact versions.
 Re-pinning the umbrella updates its members atomically. Loading re-derives their versions from the pinned tree;
 unknown or missing members in selected collections fail closed. This checks declared version agreement.
+Local chart versions come from pinned source metadata when the deployment declaration omits them.
+Published package versions remain explicit producer inputs; neither is a release-acceptance claim.
 _Avoid_: Dynamic output selection, qualification record, independently bumpable member
 
 **Execution requirements**:

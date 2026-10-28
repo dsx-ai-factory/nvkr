@@ -1,0 +1,24 @@
+{
+  "apiVersion": "nvkr.dev/definition/v5",
+  "catalog": {"base": "../../../catalogs/capnico/local-arm64"},
+  "kind": "Definition",
+  "metadata": {
+    "name": "nvke-local-dev-arm64-providers",
+    "description": "Compile CAPNICo and the provisioned provider from pinned Git; build-only development loop, not a full NVKE build."
+  },
+  "outputs": [
+    {
+      "components": ["capnico-controller"],
+      "format": "oci",
+      "name": "capnico-controller-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {"base": "../../../catalogs/nvke/release"},
+      "components": ["cluster-api-provider-provisioned"],
+      "format": "oci",
+      "name": "cluster-api-provider-provisioned-arm64",
+      "platform": "linux/arm64"
+    }
+  ]
+}

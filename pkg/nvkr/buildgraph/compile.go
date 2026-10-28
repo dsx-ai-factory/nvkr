@@ -98,7 +98,7 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 		// artifact — no fetch, no toolchain, no build. Its Digest is the reproducibility
 		// pin (part of buildDigest); the runner verifies the acquired bytes against it.
 		if nc.Prebuilt != nil {
-			arch := target.Arch(r.Platform)
+			arch := target.ExecutableArch(r.Platform)
 			ref := nc.Prebuilt.URL
 			if nc.Prebuilt.OCIArchive != "" {
 				ref = ir.OCIBlobScheme + nc.Prebuilt.OCIArchive
@@ -128,16 +128,25 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 				Artifact:          renderArch(ref, arch),
 				Digest:            nc.Prebuilt.Digests[arch],
 				ImageParentDigest: nc.Prebuilt.ImageParentDigest,
-				Platform:          "linux/" + arch,
+				Platform:          r.Platform,
 				Network:           ir.NetworkDefault,
 				Env:               pullEnv(nc),
 				OutputType:        nc.OutputType,
 				ArtifactPath:      prebuiltArtifactName(nc),
 				Version:           catalog.NormalizeVersion(nc.Tag),
 			})
-			if tool := nc.Prebuilt.Executable; tool != nil && tool.Format == "tar-gzip" {
-				g.Nodes[len(g.Nodes)-1].ExecutableArchive = &ir.ExecutableArchive{
-					Digest: tool.ArchiveDigest, Member: tool.ExecutablePath,
+			if tool := nc.Prebuilt.Executable; tool != nil {
+				switch tool.Format {
+				case "raw":
+				case "tar-gzip", "zip":
+					g.Nodes[len(g.Nodes)-1].ExecutableArchive = &ir.ExecutableArchive{
+						Digest: tool.ArchiveDigest, Member: tool.ExecutablePath,
+					}
+					if tool.Format == "zip" {
+						g.Nodes[len(g.Nodes)-1].ExecutableArchive.Format = tool.Format
+					}
+				default:
+					return nil, e.New(e.CodeInvalidCatalog, "unsupported tool archive format %q", tool.Format)
 				}
 			}
 			continue
@@ -145,11 +154,14 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 		if !nc.FromSource {
 			continue
 		}
-		arch := target.Arch(r.Platform)
+		arch := target.ExecutableArch(r.Platform)
 		// Select the same native image for vendoring and compilation. The fetch receipt
 		// binds this exact image+command declaration to the resulting dependency closure.
 		toolchainArch := arch
 		toolchainPlatform := ""
+		if r.Platform == "darwin/arm64" {
+			toolchainPlatform = "linux/arm64"
+		}
 		if nc.BuilderType == catalog.BuilderVMImage {
 			host, ok := vmHosts[nc.Name]
 			if !ok {
@@ -164,7 +176,7 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 				return nil, e.New(e.CodeEngineCapability,
 					"VM component %q requires guest-matching KVM host platform %q", nc.Name, r.Platform)
 			}
-			toolchainArch = target.Arch(string(host))
+			toolchainArch = target.ExecutableArch(string(host))
 			toolchainPlatform = string(host)
 		}
 		vendorImage := nc.ToolchainImage
@@ -235,6 +247,15 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 		if builderType == "" {
 			builderType = ir.BuilderOCIHermetic
 		}
+		if builderType == ir.BuilderNativeGo || builderType == ir.BuilderVMImage && strings.HasPrefix(toolchainPlatform, "darwin/") {
+			if !canonical.IsDigest(nc.ToolchainImage) {
+				return nil, e.New(e.CodeUnpinnedSource, "native producer %q requires its exact local toolchain digest separately from the vendoring image", nc.Name)
+			}
+			toolchain = nc.ToolchainImage
+		}
+		if builderType == ir.BuilderNativeGo {
+			toolchain, toolchainPlatform = nc.ToolchainImage, r.Platform
+		}
 		var flakeRef, flakeOutput, flakeLock string
 		buildNetwork := ir.NetworkNone
 		if builderType == ir.BuilderBuildKit || nc.BuildNetwork == ir.NetworkDefault {
@@ -251,9 +272,15 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 		for _, binding := range materials {
 			needs = append(needs, binding.Producer)
 		}
-		env := buildEnv(nc, target.Arch(r.Platform))
+		env := buildEnv(nc, r.Platform)
 		command := renderArchAll(nc.BuildCommand, arch)
+		if selected, ok := nc.BuildCommandByPlatform[r.Platform]; ok {
+			command = renderArchAll(selected, arch)
+		}
 		workdir, sourceReadOnly, writeDir := "/src", nc.WriteDir != "", nc.WriteDir
+		if builderType == ir.BuilderNativeGo {
+			sourceReadOnly = false // Native builds get their own authenticated source copy.
+		}
 		var disk *ir.DiskSpec
 		var packer *ir.PackerConfig
 		if builderType == catalog.BuilderVMImage {
@@ -274,7 +301,7 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 			FlakeLockDigest:   flakeLock,
 			Toolchain:         toolchain,
 			ToolchainPlatform: toolchainPlatform,
-			Platform:          "linux/" + arch,
+			Platform:          r.Platform,
 			Network:           buildNetwork,
 			Env:               env,
 			Patches:           patchRefs(nc.Patches),
@@ -410,7 +437,8 @@ func prebuiltArtifactName(nc catalog.NamedComponent) string {
 // buildEnv assembles the pinned, allowlisted environment for a build node: the
 // reproducibility base plus the component's deterministic version stamps
 // (NVKR-FR-BLD-012/023). The runc lane is the only CGO case (NVKR-FR-BLD-025).
-func buildEnv(nc catalog.NamedComponent, arch string) []ir.EnvVar {
+func buildEnv(nc catalog.NamedComponent, platform string) []ir.EnvVar {
+	osName, arch, _ := strings.Cut(platform, "/")
 	cgo := "0"
 	if nc.CGO {
 		cgo = "1"
@@ -428,7 +456,7 @@ func buildEnv(nc catalog.NamedComponent, arch string) []ir.EnvVar {
 		"TZ":                "UTC",
 		"LC_ALL":            "C",
 		"GOTOOLCHAIN":       "local",
-		"GOOS":              "linux",
+		"GOOS":              osName,
 		"GOARCH":            arch,
 		"CGO_ENABLED":       cgo,
 		// The reproducibility flag discipline (NVKR-FR-BLD-023, NVKR-FR-REP-004,

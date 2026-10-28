@@ -150,6 +150,7 @@ func TestReleaseVerifyForwardsCompleteExactInputsToLifecycleUseCase(t *testing.T
 	called := false
 	verify := func(_ context.Context, gotReference string, policy lifecycle.VerificationPolicy,
 		options lifecycle.ConsumerOptions, expectation *lifecycle.ExactInputExpectation,
+		_ releaseExportOptions,
 	) (releaseVerificationResult, error) {
 		called = true
 		if gotReference != reference || policy.Lane != lifecycle.LanePipeline ||
@@ -172,8 +173,8 @@ func TestReleaseVerifyForwardsCompleteExactInputsToLifecycleUseCase(t *testing.T
 		"--reference", reference,
 		"--lane", "pipeline-attested", "--scope", "artifact-publication",
 		"--identity", "^builder$", "--issuer", "issuer", "--anonymous",
-		"--definition", "definitions/nvke-m2/definition.yaml",
-		"--environment", "definitions/nvke-m2/environment-github.yaml",
+		"--definition", "inputs/definitions/nvke/definition.yaml",
+		"--environment", "inputs/environments/github-release.yaml",
 		"--plan", ".github/nvkr-run/plan.json",
 	}
 	app := &cli.App{Commands: []*cli.Command{cmdReleaseWithVerify(verify)}}
@@ -200,6 +201,7 @@ func TestReleaseVerifyForwardsDiskEvidencePolicyWithExactInputs(t *testing.T) {
 			called := false
 			verify := func(_ context.Context, _ string, policy lifecycle.VerificationPolicy,
 				_ lifecycle.ConsumerOptions, expectation *lifecycle.ExactInputExpectation,
+				_ releaseExportOptions,
 			) (releaseVerificationResult, error) {
 				called = true
 				if expectation == nil || policy.Lane != lifecycle.LanePipeline || policy.Scope != lifecycle.ScopeArtifactPublication || policy.MinimumDiskEvidence != minimum {
@@ -211,8 +213,8 @@ func TestReleaseVerifyForwardsDiskEvidencePolicyWithExactInputs(t *testing.T) {
 				"--reference", "registry.example.test/releases@sha256:" + strings.Repeat("a", 64),
 				"--lane", "pipeline-attested", "--scope", "artifact-publication",
 				"--identity", "^builder$", "--issuer", "issuer",
-				"--definition", "definitions/nvke-m2/definition.yaml",
-				"--environment", "definitions/nvke-m2/environment-github.yaml",
+				"--definition", "inputs/definitions/nvke/definition.yaml",
+				"--environment", "inputs/environments/github-release.yaml",
 				"--plan", ".github/nvkr-run/plan.json",
 			}
 			if minimum != "" {

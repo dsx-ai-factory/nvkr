@@ -82,6 +82,9 @@ type RunOptions struct {
 	// producer bytes selected by the factory Plan. It is required for a build node
 	// with material bindings and rejected by every other node.
 	BuildMaterials *BuildMaterials
+	// NativeGo is a process-local receipt over installed SDK/compiler bytes.
+	// It admits only explicitly declared local native-go producers.
+	NativeGo *NativeGoToolchain
 	// Qualification is required for a from-source run whose report may back a signed
 	// validation vector or a Reproduced/ValidatedVariant claim. Nil permits an
 	// unqualified from-source development run or a profile-free, terminally verified

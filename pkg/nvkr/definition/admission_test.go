@@ -26,7 +26,7 @@ func TestAdmissionPreservesAuthoredIdentityAndRejectsUnknownInputs(t *testing.T)
 		code e.Code
 	}{
 		{"exact document", raw, ""},
-		{"pre-rename namespace", []byte(strings.Replace(string(raw), DefinitionAPIVersion, "nkd.dev/definition/v5", 1)), e.CodeInvalidCatalog},
+		{"unsupported namespace", []byte(strings.Replace(string(raw), DefinitionAPIVersion, "unsupported.dev/definition/v5", 1)), e.CodeInvalidCatalog},
 		{"old version", []byte(strings.Replace(string(raw), DefinitionAPIVersion, "nvkr.dev/definition/v3", 1)), e.CodeInvalidCatalog},
 		{"unknown field", []byte(strings.Replace(string(raw), `"outputs":`, `"clusters":[],"outputs":`, 1)), e.CodeInvalidCatalog},
 	} {
@@ -217,5 +217,40 @@ func TestPerOutputPublicationAdmission(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestNativeToolchainLocatorsAreBoundedAndOwned(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("a", 64)
+	for _, row := range []struct {
+		name, digest, layout, bundle string
+		valid                        bool
+	}{
+		{"exact local layout", digest, ".nvkr/tools", "packer-tools", true},
+		{"unpinned", "latest", ".nvkr/tools", "packer-tools", false},
+		{"missing layout", digest, "", "packer-tools", false},
+		{"unsafe layout", digest, "layout\nother", "packer-tools", false},
+		{"unsafe bundle", digest, ".nvkr/tools", "../other", false},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			input := Runtime{NativeToolchains: map[string]NativeToolchain{row.digest: {Layout: row.layout, Bundle: row.bundle}}}
+			err := input.validate()
+			if row.valid {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			var coded *e.Error
+			if !errors.As(err, &coded) || coded.Code != e.CodeInvalidCatalog {
+				t.Fatalf("invalid native locator: %v", err)
+			}
+		})
+	}
+	input := Environment{Runtime: Runtime{NativeToolchains: map[string]NativeToolchain{digest: {Layout: ".nvkr/tools", Bundle: "packer-tools"}}}}
+	copy := input.Clone()
+	copy.Runtime.NativeToolchains[digest] = NativeToolchain{Layout: "other", Bundle: "other"}
+	if input.Runtime.NativeToolchains[digest].Layout != ".nvkr/tools" {
+		t.Fatal("Environment clone aliases native toolchain locators")
 	}
 }

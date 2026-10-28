@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/cistore"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
@@ -195,14 +196,14 @@ func TestDevelopmentRejectsForeignSubjectsBeforeSigningOrRegistryReads(t *testin
 	}
 }
 
-func TestDevelopmentMetadataAuthenticatesOnlyItsExactAttempt(t *testing.T) {
+func TestDevelopmentMetadataAuthenticatesSameRunAttempts(t *testing.T) {
 	plan, artifacts, signer := referenceMetadataFixtureForPlan(t, githubDevelopmentPublicationTestPlan(t))
 	for _, test := range []struct {
 		name, key, value string
 		valid            bool
 	}{
 		{"same attempt", "GITHUB_RUN_ATTEMPT", "1", true},
-		{"earlier attempt", "GITHUB_RUN_ATTEMPT", "2", false},
+		{"earlier attempt", "GITHUB_RUN_ATTEMPT", "2", true},
 		{"other run", "GITHUB_RUN_ID", "12346", false},
 		{"other branch", "GITHUB_WORKFLOW_REF", "example/nvkr/.github/workflows/nvkr-dev.yml@refs/heads/other", false},
 	} {
@@ -242,16 +243,17 @@ func TestDevelopmentMetadataAuthenticatesOnlyItsExactAttempt(t *testing.T) {
 			}
 		})
 	}
-	t.Run("stale metadata before publication", func(t *testing.T) {
-		assertDevelopmentRejectsStaleMetadataBeforePublication(t, plan, artifacts)
+	t.Run("foreign metadata before publication", func(t *testing.T) {
+		assertDevelopmentRejectsForeignMetadataBeforePublication(t, plan, artifacts)
 	})
 }
 
-func assertDevelopmentRejectsStaleMetadataBeforePublication(t *testing.T, plan *Plan, artifacts map[string]Artifact) {
+func assertDevelopmentRejectsForeignMetadataBeforePublication(t *testing.T, plan *Plan, artifacts map[string]Artifact) {
 	t.Helper()
-	t.Setenv("GITHUB_RUN_ATTEMPT", "2")
+	t.Setenv("GITHUB_RUN_ID", "54321")
 	t.Setenv("NVKR_REGISTRY_USER", "dev-user")
 	t.Setenv("NVKR_CREDENTIAL", "dev-credential")
+	t.Setenv(githubRepositoryTokenEnv, "repository-credential")
 	route := outputPublicationRoute(plan.LifecycleOutputs[0].Name)
 	node := planNode(plan, NodePublish+"/"+route)
 	calls := 0
@@ -261,7 +263,8 @@ func assertDevelopmentRejectsStaleMetadataBeforePublication(t *testing.T, plan *
 		return nil, context.Canceled
 	})
 	t.Cleanup(func() { remote.DefaultTransport = original })
-	err := executePublish(t.Context(), plan, node, artifacts, io.Discard)
+	err := executePublishWithAdmission(t.Context(), plan, node, artifacts, io.Discard,
+		func(context.Context, string, []string, cistore.Options) error { return nil })
 	assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
 	if calls != 0 {
 		t.Fatal("stale development metadata reached registry")
@@ -295,6 +298,72 @@ func TestDevelopmentUtilityCarriesDispatchContextWithoutCredentials(t *testing.T
 	for _, forbidden := range []string{"GITHUB_TOKEN", "ACTIONS_ID_TOKEN", sourceTokenEnv, "NVKR_CREDENTIAL", "must-not-cross"} {
 		if strings.Contains(string(raw), forbidden) {
 			t.Fatalf("credential crossed utility boundary: %s", forbidden)
+		}
+	}
+}
+
+// Exercise the failed-signing retry shape: publication remains in attempt 1,
+// signing runs in attempt 3, and assembly also consumes attempt-2 outputs.
+func TestDevelopmentRetrySignsOriginalPublicationAndAssemblesMixedOrigins(t *testing.T) {
+	plan, artifacts, verifier := referenceMetadataFixtureForPlan(t, githubDevelopmentPublicationTestPlan(t), "1", "2")
+	route := outputPublicationRoute(plan.LifecycleOutputs[0].Name)
+	node := planNode(plan, NodeSign+"/"+route)
+	original, err := readPublicationSubject(t.Context(), artifacts["publication/"+route].Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GITHUB_RUN_ATTEMPT", "3")
+	for _, id := range node.Outputs {
+		a := artifacts[id]
+		a.Path = filepath.Join(t.TempDir(), "result.json")
+		artifacts[id] = a
+	}
+	adapter := &metadataSigningAdapter{}
+	adapter.identity, adapter.issuer = plan.Environment.Signing.Identity, plan.Environment.Signing.Issuer
+	newSigner := func(context.Context, *Plan, Node, map[string]Artifact) (sign.OCISigner, error) { return adapter, nil }
+	if err := executeSign(t.Context(), plan, node, artifacts, newSigner, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if adapter.verifiedSBOMs == 0 || adapter.signedSubject != original {
+		t.Fatal("retry did not verify evidence or preserve the original subject")
+	}
+	if err := executeReferenceRelease(t.Context(), plan, planNode(plan, "package/release"), artifacts, referenceSignerFactory(verifier)); err != nil {
+		t.Fatal(err)
+	}
+	result, err := delivery.InspectMetadata(t.Context(), artifacts["package/release"].Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const invocation = "https://github.com/example/nvkr/actions/runs/12345/attempts/"
+	if result.Root.Release.InvocationID != invocation+"3" {
+		t.Fatal("assembly lost current invocation")
+	}
+	target, err := runtimeTarget(plan, "release")
+	if err != nil {
+		t.Fatal(err)
+	}
+	refs, err := delivery.OutputReferences(target.Ref+"@"+result.RootDigest, result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, object := range result.Root.Objects {
+		if object.Output == nil {
+			continue
+		}
+		origin := object.Output.Publication
+		if origin == nil {
+			t.Fatal("assembly lost original publication")
+		}
+		parent := origin.Ref[:strings.LastIndexByte(origin.Ref, '/')+1]
+		if refs[object.Name] != parent+object.Output.Repository+"@"+object.DescriptorDigest {
+			t.Fatalf("assembled output reference changed original namespace: %s", refs[object.Name])
+		}
+		if object.Name == plan.LifecycleOutputs[0].Name {
+			if origin.Ref != original.Ref || origin.PreparedInvocationID != invocation+"1" || origin.SignedInvocationID != invocation+"3" {
+				t.Fatalf("retry changed origin: %+v", origin)
+			}
+		} else if origin.PreparedInvocationID != invocation+"2" || origin.SignedInvocationID != invocation+"2" {
+			t.Fatalf("retained output changed origin: %+v", origin)
 		}
 	}
 }

@@ -4,6 +4,8 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +14,86 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/sourcegit"
 )
+
+func TestM1RejectsOccupiedRegistryEndpointBeforeBuilding(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		running  string
+		response int
+		wantExit int
+	}{
+		{"another registry", "missing", http.StatusOK, 2},
+		{"different running container", "other", http.StatusOK, 2},
+		{"similar running container name", "similar", http.StatusOK, 2},
+		{"stopped selected container", "false", http.StatusOK, 2},
+		{"authenticated service", "missing", http.StatusUnauthorized, 2},
+		{"unhealthy service", "missing", http.StatusServiceUnavailable, 2},
+		{"selected running container", "true", http.StatusOK, 42},
+		{"no HTTP response", "missing", 0, 42},
+		{"Docker query failed", "error", 0, 2},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if test.response == 0 {
+					conn, _, err := w.(http.Hijacker).Hijack()
+					if err == nil {
+						_ = conn.Close()
+					}
+					return
+				}
+				w.WriteHeader(test.response)
+			}))
+			defer server.Close()
+			root := t.TempDir()
+			scripts := filepath.Join(root, "scripts")
+			if err := os.Mkdir(scripts, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			for _, name := range []string{"demo-m1-local.sh", "_demo-common.sh"} {
+				raw, err := os.ReadFile(demoScript(t, name))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(scripts, name), raw, 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			tools := filepath.Join(root, "tools")
+			if err := os.Mkdir(tools, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			for name, source := range map[string]string{
+				"docker": "#!/bin/sh\ncase \"$1:$2\" in info:) exit 0;; container:ls) case \"$REGISTRY_STATE\" in error) exit 55;; true) printf '%s\\n' nvkr-m1-registry;; other) printf '%s\\n' other-registry;; similar) printf '%s\\n' nvkr-m1-registry-other;; esac;; *) exit 99;; esac\n",
+				"make":   "#!/bin/sh\nprintf build > \"$BUILD_MARKER\"\nexit 42\n",
+			} {
+				if err := os.WriteFile(filepath.Join(tools, name), []byte(source), 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			marker := filepath.Join(root, "build-started")
+			cmd := exec.CommandContext(t.Context(), "bash", filepath.Join(scripts, "demo-m1-local.sh"))
+			cmd.Env = []string{"PATH=" + tools + string(os.PathListSeparator) + os.Getenv("PATH"),
+				"REGISTRY_STATE=" + test.running, "BUILD_MARKER=" + marker,
+				"REGISTRY_HOSTPORT=" + strings.TrimPrefix(server.URL, "http://")}
+			output, err := cmd.CombinedOutput()
+			if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != test.wantExit {
+				t.Fatalf("exit=%v, want %d: %s", err, test.wantExit, output)
+			}
+			_, statErr := os.Stat(marker)
+			if test.wantExit == 2 {
+				wantDiagnostic := "already in use"
+				if test.running == "error" {
+					wantDiagnostic = "cannot read running registry containers"
+				}
+				if !os.IsNotExist(statErr) || !strings.Contains(string(output), wantDiagnostic) {
+					t.Fatalf("occupied endpoint reached the build or lacked a diagnostic: %v %s", statErr, output)
+				}
+			} else if statErr != nil {
+				t.Fatalf("permitted endpoint did not reach the build: %v %s", statErr, output)
+			}
+		})
+	}
+}
 
 func TestCatalogChangeScriptEmitsAdmittedAbsoluteSourceRedirect(t *testing.T) {
 	temp := t.TempDir()
@@ -63,43 +145,6 @@ func TestMaintainedDemoScriptsAdvertiseRunnableHonestJourneys(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestM1DemoRejectsLegacyConfigurationBeforeExecution(t *testing.T) {
-	for _, variable := range []struct{ old, replacement string }{
-		{"NKE_LOCAL_CLONE", "NVKE_LOCAL_CLONE"},
-		{"NKDCTL_BIN", "NVKR_BIN"},
-	} {
-		t.Run(variable.old, func(t *testing.T) {
-			cmd := exec.CommandContext(t.Context(), "bash", demoScript(t, "demo-m1-local.sh"))
-			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), variable.old + "=/legacy"}
-			output, err := cmd.CombinedOutput()
-			if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 2 ||
-				!strings.Contains(string(output), variable.old+" was renamed to "+variable.replacement) {
-				t.Fatalf("legacy variable was not rejected with migration guidance: %v\n%s", err, output)
-			}
-		})
-	}
-}
-
-func TestM1DemoRejectsLegacyRegistryWithoutMutatingIt(t *testing.T) {
-	temp := t.TempDir()
-	calls := filepath.Join(temp, "calls")
-	docker := filepath.Join(temp, "docker")
-	if err := os.WriteFile(docker, []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$CAPTURE_CALLS\"\ncase \"$*\" in\n  info|'container inspect nkd-m1-registry') exit 0 ;;\n  *) exit 99 ;;\nesac\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	cmd := exec.CommandContext(t.Context(), "bash", demoScript(t, "demo-m1-local.sh"))
-	cmd.Env = []string{"PATH=" + temp + string(os.PathListSeparator) + os.Getenv("PATH"), "CAPTURE_CALLS=" + calls}
-	output, err := cmd.CombinedOutput()
-	if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 2 ||
-		!strings.Contains(string(output), "legacy nkd-m1-registry container exists; inspect and stop/remove it explicitly") {
-		t.Fatalf("legacy registry was not rejected with migration guidance: %v\n%s", err, output)
-	}
-	raw, err := os.ReadFile(calls)
-	if err != nil || string(raw) != "info\ncontainer inspect nkd-m1-registry\n" {
-		t.Fatalf("launcher performed unexpected Docker operations: %q %v", raw, err)
 	}
 }
 

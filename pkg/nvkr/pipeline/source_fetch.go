@@ -203,27 +203,13 @@ func (l Local) vendor(n ir.Node, dir string, opts RunOptions) error {
 }
 
 func (l Local) verifyTree(dir string, n ir.Node, opts RunOptions) error {
-	head, err := sourceFetchGitOut(opts, dir, "rev-parse", "HEAD")
-	if err != nil {
-		if opts.ctx().Err() != nil || sourceGitBoundaryError(err) {
-			return err
+	return sourcegit.VerifyRevision(func(args ...string) (string, error) {
+		value, err := sourceFetchGitOut(opts, dir, args...)
+		if err != nil && opts.ctx().Err() == nil && !sourceGitBoundaryError(err) {
+			return "", e.Wrap(e.CodeFetchFailed, err, "resolving source revision in %s", dir)
 		}
-		return e.Wrap(e.CodeFetchFailed, err, "resolving HEAD in %s", dir)
-	}
-	if head != n.Commit {
-		return e.New(e.CodeFetchFailed, "commit mismatch in %s: got %s want %s", dir, head, n.Commit)
-	}
-	tree, err := sourceFetchGitOut(opts, dir, "rev-parse", "HEAD^{tree}")
-	if err != nil {
-		if opts.ctx().Err() != nil || sourceGitBoundaryError(err) {
-			return err
-		}
-		return e.Wrap(e.CodeFetchFailed, err, "resolving tree in %s", dir)
-	}
-	if tree != n.TreeHash {
-		return e.New(e.CodeFetchFailed, "tree-hash mismatch in %s: got %s want %s", dir, tree, n.TreeHash)
-	}
-	return nil
+		return value, err
+	}, dir, n.Commit, n.TreeHash)
 }
 
 // Admission and bounded-query failures are not an ordinary Git exit. Preserve

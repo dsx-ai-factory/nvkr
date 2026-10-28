@@ -20,6 +20,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
@@ -182,6 +183,36 @@ func TestAcquiredHelmPackagesExactPinnedBytes(t *testing.T) {
 			record, err := readProducerResult(t.Context(), artifacts["result/charts/chart"].Path)
 			if err != nil || record.EngineClass != "prebuilt-acquire" || record.SHA256 != digest.String() {
 				t.Fatalf("acquisition identity lost: %+v %v", record, err)
+			}
+			for _, workspace := range []string{".nvkr/factory", ".nvkr/relocated-charts"} {
+				t.Run(workspace, func(t *testing.T) {
+					if workspace != ".nvkr/factory" {
+						if err := os.Rename(".nvkr/factory", workspace); err != nil {
+							t.Fatal(err)
+						}
+					}
+					held, root, err := CaptureWorkspaceOrdinaryPublication(t.Context(), plan, workspace)
+					if err != nil {
+						t.Fatal(err)
+					}
+					t.Cleanup(func() { _ = held.Close() })
+					outputs, err := held.Outputs()
+					if err != nil || len(outputs) != 1 || outputs[0].Digest != observed.Digest || outputs[0].ChartVersion != "1.2.3" {
+						t.Fatalf("retained chart identity changed: %+v, %v", outputs, err)
+					}
+					exported := filepath.Join(t.TempDir(), "publication")
+					if err := held.WriteLayout(t.Context(), exported); err != nil {
+						t.Fatal(err)
+					}
+					inspection, err := delivery.Inspect(t.Context(), exported)
+					if err != nil || inspection.RootDigest != root {
+						t.Fatalf("held publication export changed: %v", err)
+					}
+					_, payload, err := delivery.ReadObject(t.Context(), exported, "charts")
+					if err != nil || !bytes.Equal(payload, body) {
+						t.Fatalf("held chart bytes differ: %v", err)
+					}
+				})
 			}
 		})
 	}

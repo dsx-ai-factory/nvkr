@@ -73,6 +73,9 @@ func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 			result.debian = debianArchive
 		}()
 	}
+	if n.BuilderType == ir.BuilderNativeGo {
+		return buildNativeGo(n, opts)
+	}
 	if err := admitBuildKit(n, opts); err != nil {
 		return nil, err
 	}
@@ -176,8 +179,8 @@ func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 	// Run the toolchain on the build's target platform (model B): forces the native
 	// arch variant of a multi-arch toolchain — or emulation on a foreign host — so
 	// GOARCH compilation is native, never a cross-compile. Derived from the IR's arch.
-	if n.Platform != "" {
-		args = append(args, "--platform", n.Platform)
+	if platform := localToolchainPlatform(n); platform != "" {
+		args = append(args, "--platform", platform)
 	}
 	if n.Network != "" {
 		args = append(args, "--network="+n.Network)

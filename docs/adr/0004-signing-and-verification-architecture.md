@@ -54,7 +54,10 @@ qualified contract. The mechanisms below have separate claims and admission requ
   and returns an opaque receipt bound to the subject digest. The production signer requires an explicit expected
   OIDC identity and issuer, passes the issuer as a qualified argument, extracts the issued certificate claims,
   and refuses a mismatch before returning the receipt. Cosign/Sigstore/TUF and loader environment overrides are
-  scrubbed for signing as well as verifying.
+  scrubbed for signing as well as verifying. The pinned Cosign 3 invocation explicitly selects detached
+  output compatibility (`--use-signing-config=false`, `--new-bundle-format=false`, `--b64=false`), producing
+  a raw signature, PEM certificate and optional legacy bundle. Public transparency submission remains
+  explicitly enabled; certificate issuer and identity checks still gate the receipt.
 - **Publication binding.** Publication rebinds that receipt immediately before writing any public document or
   sidecar; cosign never receives a named subject or a public output pathname. The complete signed set is staged
   and synced under a cross-process lock, then published with a durable journal plus no-replace links, so
@@ -62,6 +65,23 @@ qualified contract. The mechanisms below have separate claims and admission requ
 - **Injected runners.** Custom injected runners use a separate private-path diagnostic protocol and are
   explicitly part of the embedding caller's TCB.
 - **Keyed / KMS mode** is an optional operator fallback, not the default.
+
+The local M3 rehearsal uses a separate `LocalCosign` detached-document adapter with explicit
+passwordless demo keys. It holds the pinned static Linux executable, private/public key material and
+signature descriptors, bounds execution and output, removes ambient signing configuration, and verifies
+each newly signed document under the independently supplied public key before issuing its local receipt.
+Local signing explicitly disables public transparency submission; verification is offline under that key.
+The receipt binds exact document and public-key bytes and cannot be used as a keyless `SignedDocument`,
+hosted workflow identity or qualification verdict. The local qualification owner must independently
+enforce signer roles, complete artifact/input membership and all gates before invoking it. This is an
+explicit local rehearsal adapter, never a fallback when hosted signing fails. Reconciliation records
+real-key interoperability and the remaining end-to-end work separately.
+
+Local rehearsal key admission currently supports one P-256 PKIX `PUBLIC KEY` PEM block per role,
+matching the local cosign key-generation path. Parsing rejects other curves, malformed points,
+PEM headers, private-key labels, extra blocks and non-whitespace surrounding material. Canonical
+public-key encoding removes PEM presentation differences before checking that builder, smoke and
+qualifier keys are distinct. Role assignment remains part of the independently selected policy identity.
 
 ### 2. Trust store and resolution precedence
 
@@ -109,15 +129,28 @@ provenance and CycloneDX SBOMs all use standard Sigstore v0.3 DSSE bundles publi
 The signature predicate is `https://sigstore.dev/cosign/sign/v1`; SLSA and CycloneDX retain their distinct
 standard predicate types. One evidence class cannot satisfy another.
 
-Verification downloads only the required signature/provenance bundles using cosign's predicate-filtered
-`download attestation`, then verifies their exact bytes with `verify-blob-attestation`, the expected digest,
-identity and issuer. It reads observed identity/issuer from the embedded certificate in those same verified
-bytes, never from cosign's presentation output or statement annotations. Legacy reports and public-key
-bundles cannot satisfy this keyless policy. Registry order is normalized; bounded candidates are checked
-against the externally selected policy, and success requires an authenticated bundle for each required type.
-The adapter bounds download output, candidate count and verification duration, uses private temporary bundle
-files, checks them for mutation and removes them on success or failure. It does not download artifact payloads
-or use a local-image snapshot. Missing evidence fails without a partial successful record or legacy fallback.
+Verification discovers standard OCI bundle referrers once per operation and fetches candidates lazily,
+reusing their exact bytes while checking the separately required signature and provenance. Descriptor
+digests normalize registry ordering; predicate annotations only prioritize candidates and cannot authorize
+or exclude evidence. Each fetched manifest and bundle must match its declared size, digest, subject and
+standard profile. Candidate bytes then pass the existing exact statement, predicate and certificate checks
+and pinned `verify-blob-attestation` with the independently selected digest, identity and issuer. Observed
+identity/issuer comes from the embedded certificate in those same verified bytes, never from cosign's
+presentation output or statement annotations. Legacy reports and public-key bundles cannot satisfy this
+keyless policy. Failed candidates cannot establish success; each required evidence type must authenticate.
+
+Discovery admits at most 256 descriptors in a 4 MiB index, with a 1 MiB manifest bound and a 64 MiB total
+HTTP response-body budget that includes failed candidates. Each required predicate has a separate search
+budget of 32 candidates and 8 MiB; an individual bundle is also bounded to 8 MiB. Standard OCI referrers
+tag-schema fallback is supported; legacy `.sig` and `.att` attachment lookup is not.
+Paginated discovery is refused until the adapter can read all pages within its bounds. Explicit
+credentials are confined to the selected registry, and an empty credential uses anonymous access rather
+than an ambient keychain. The existing operation deadline covers transport and cryptographic verification.
+Private temporary bundle files are checked for mutation and removed on success or failure. Unfetched
+historical or unrelated candidates are not claimed to be valid: this discovery requires an authenticated
+bundle for each required type, not validation of every registry referrer. Complete release payload and
+required SBOM membership checks remain separate and mandatory. The adapter does not download artifact
+payloads or use a local-image snapshot. Missing evidence fails without a partial successful record.
 Previously published legacy signature/provenance attachments must be reissued as bundles.
 
 The adapter is keyless only; the keyed/KMS fallback in §1 applies solely to detached qualified documents.
@@ -132,14 +165,38 @@ Independent cosign consumption authenticates that artifact; release membership a
 still require the signed release index (ADR-20). No extra payload publication is introduced.
 
 SBOMs use a distinct standard CycloneDX predicate. Before publication the pinned signer creates a Sigstore
-v0.3 attestation bundle using `attest-blob --hash` for the exact already-inspected subject, then verifies it
+v0.3 attestation bundle using `attest-blob --hash` for the exact preparation-bound subject, then verifies it
 with `verify-blob-attestation` under the expected identity, issuer and normal transparency checks. The bundle
 must contain the exact canonical SBOM and one matching statement subject. Registry discovery uses an OCI
 referrer manifest beside the associated deliverable; source evidence retains its original source subject.
 Hosted pull-back verification independently checks every bundle. Keyless creation/verification remains
 Linux-only and raw preparation layouts cannot satisfy authenticated release consumption.
 
-The signer re-derives the subject from held artifact bytes and requires equality with the Run's observed subject.
+In GitHub `per-output-v1`, the preparation producer inspects the complete payload. The separate SBOM job
+receives only its bounded metadata and canonical documents, with exact subject, membership, Plan and Run
+bindings; it does not independently inspect payload bytes. The publisher combines the resulting bundles
+with the original preparation only after verifying the bundles, unchanged subjects and metadata, and exact
+decoded document equality. It then checks the complete final payload before publication. Metadata alone
+grants no payload-integrity capability. The full-layout attestation path retains its existing complete-byte
+checks. This separation removes the unchanged payload's SBOM round trip while preserving OIDC isolation.
+
+SBOM bundle creation permits at most three fresh keyless invocations within one three-minute deadline,
+with cancellation-aware one- and two-second delays, only when Rekor v1 reports its explicit HTTP 409
+`createLogEntryConflict` failure. Each attempt retains the same frozen predicate and exact subject and uses
+a separate private bundle output. A conflict is never accepted as evidence: only a successful invocation
+followed by the unchanged predicate, identity, issuer and transparency checks can return a bundle. Other
+failures, output overflow and verification failures are not retried. This compensates for the conflict-recovery
+gap in the pinned Cosign dependency, addressed upstream in
+[sigstore-go PR 647](https://github.com/sigstore/sigstore-go/pull/647). Fresh signatures can leave unused
+transparency entries. This policy does not add retries to OCI release signing or qualification attestation.
+
+The signer re-derives each subject and requires equality with the Run's publication binding. In GitHub
+`per-output-v1`, the publisher exports bounded metadata bound to the exact root it pushed. The signer
+re-derives the root and sibling subjects from that metadata, checks the exact output/Plan/Run bindings and
+cryptographically verifies required SBOM bundles before signing. It does not download or independently
+check payload bytes; complete-byte checks remain in preparation, publication and independent remote
+verification. Legacy signing retains its full-layout inspection. No caller-supplied digest or successful
+job-status description substitutes for these checks.
 The subsequent verifier re-resolves the registry reference, recomputes the served manifest digest, and verifies
 both signature and subject-bound production provenance (ADR-09). A mismatch fails the Run and returns no
 successful signing or verification record. Registry credentials use a private restrictive-mode `DOCKER_CONFIG`,
@@ -259,9 +316,18 @@ no-replace publication, subprocess-crash recovery from a partial signed set, and
 rename-and-restore. The qualified signer returns an opaque receipt bound to the exact signed subject; retained
 legacy signer/verifier surfaces are explicitly unqualified.
 
-This evidence does not exercise a public keyless service, trusted-root rotation, or a separately linked verifier
-binary. The stock signing subprocess is an operational producer tool, not consumer trust authority; its output
-remains untrusted until this independently pinned verification path authenticates it.
+OCI discovery contracts in `pkg/nvkr/sign/oci_registry_bundle_test.go` and
+`pkg/nvkr/sign/oci_bundle_runtime_test.go` count registry reads across mixed publication history, require
+exact provenance despite stale candidates or misleading annotations, and exercise response integrity,
+credential scope, search limits, cancellation and cleanup-error refusal. A negative overlay restoring eager
+fetching fails the historical-referrer request-count regression. `pkg/nvkr/sign/oci_interop_test.go` compares
+the reader's bytes with independent pinned cosign discovery and verifies those bytes using explicit local-key
+fixture trust. That fixture does not establish hosted keyless acceptance; the bounded real keyless replays
+and their limits are recorded in reconciliation.
+
+The contract and local-key suites do not exercise a public keyless service, trusted-root rotation, or a separately
+linked verifier binary. The stock signing subprocess is an operational producer tool, not consumer trust
+authority; its output remains untrusted until this independently pinned verification path authenticates it.
 
 End-to-end acceptance requires the fake, local-key, and gated keyless tiers named above; an egress-blocked
 offline round trip using a rotated mirrored root; and a dependency/binary inspection proving the high-assurance

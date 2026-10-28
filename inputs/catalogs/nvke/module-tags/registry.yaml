@@ -1,0 +1,122 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog/v3
+components:
+  cwe:
+    artifactPath: bin/cwe.oci.tar
+    buildCommand:
+    - sh
+    - -ec
+    - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src --local
+      dockerfile=/src/controller --opt platform=linux/amd64 --opt "build-arg:BUILD_VERSION=$BUILD_VERSION"
+      --opt "build-arg:GIT_VERSION=$GIT_VERSION" --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
+      --output type=oci,dest=/src/bin/cwe.oci.tar,oci-mediatypes=true
+    builderType: buildkit-rootless
+    fromSource: true
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    source: nvke-controller
+    toolchainImage: moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef
+    versionStamp:
+      BUILD_VERSION: '{{.ModuleTag}}'
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: bin
+  nvke-helm:
+    helm:
+      chart: .
+      images:
+        controller:
+          values:
+            digest: image.digest
+    artifactPath: bin/nvke-helm.tar
+    buildCommand:
+    - sh
+    - -ec
+    - tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owner
+      -C /src/controller/deploy/charts -cf /src/bin/nvke-helm.tar controller
+    fromSource: true
+    outputType: tarball
+    platforms:
+    - linux/amd64
+    source: nvke-controller
+    writeDir: bin
+  nvkectl:
+    fromSource: true
+    source: nvke
+    cgo: false
+    platforms: [linux/amd64, linux/arm64]
+    outputType: host-package
+    artifactPath: cli/bin/nvkectl
+    writeDir: cli/bin
+    versionStamp:
+      NVKECTL_VERSION: '{{.ModuleTag}}'
+      NVKECTL_COMMIT: '{{.Commit}}'
+      NVKECTL_DATE: '{{.Date}}'
+    buildCommand:
+      - bash
+      - -euc
+      - |
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+        make -C cli build NVKECTL_TREE=clean
+kind: SourceBuildRegistry
+metadata:
+  description: NVKE components from the release v0.22.0 at 400c24fb6465b042be883d6b62472528520d6291. The CLI uses an offline Go build; CWE wraps the upstream Dockerfile in digest-pinned
+    rootless BuildKit.
+  name: nvke-v1
+sources:
+  checkout:
+    constraint: 7.x
+    kind: github-action
+    repo: https://github.com/actions/checkout
+  cosign:
+    constraint: 3.1.x
+    repo: https://github.com/sigstore/cosign
+    tool:
+      executablePath: cosign-linux-amd64
+      format: raw
+      platform: linux/amd64
+      url: https://github.com/sigstore/cosign/releases/download/{{.Tag}}/cosign-linux-amd64
+  download-artifact:
+    constraint: 8.x
+    kind: github-action
+    repo: https://github.com/actions/download-artifact
+  nvke:
+    repo: https://github.com/dsx-ai-factory/nvke
+    constraint: v0.22.0
+    toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+    vendorCommand:
+      - bash
+      - -euc
+      - |
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+        test ! -e controller/deploy/charts/go.sum
+        pins="$(sha256sum cli/go.mod cli/go.sum controller/api/go.mod controller/api/go.sum controller/deploy/charts/go.mod management-engine/go.mod management-engine/go.sum)"
+        cd cli
+        timeout --kill-after=10s 540s go mod download
+        GOPROXY=off timeout --kill-after=10s 60s go mod verify
+        GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+        cd ..
+        printf '%s\n' "$pins" | sha256sum --quiet -c -
+        test ! -e controller/deploy/charts/go.sum
+  nvke-controller:
+    constraint: v0.22.0
+    repo: https://github.com/dsx-ai-factory/nvke
+    toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+  setup-go:
+    constraint: 7.x
+    kind: github-action
+    repo: https://github.com/actions/setup-go
+  syft:
+    constraint: 1.51.x
+    repo: https://github.com/anchore/syft
+    tool:
+      executablePath: syft
+      format: tar-gzip
+      platform: linux/amd64
+      url: https://github.com/anchore/syft/releases/download/{{.Tag}}/syft_{{.Version}}_linux_amd64.tar.gz
+  upload-artifact:
+    constraint: 7.x
+    kind: github-action
+    repo: https://github.com/actions/upload-artifact

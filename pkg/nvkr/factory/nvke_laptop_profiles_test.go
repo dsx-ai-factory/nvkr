@@ -24,13 +24,13 @@ import (
 // Apply the authenticated patch with Git, not a second patch interpreter.
 // The overlay adds local profile data without modifying upstream NVKE files.
 func laptopProfilesPatchedFixture(t *testing.T) string {
-	return laptopProfilesPatchedFixtureCatalog(t, "profiles-catalog")
+	return laptopProfilesPatchedFixtureCatalog(t, "nvidia-arm64")
 }
 
 func laptopProfilesPatchedFixtureCatalog(t *testing.T, catalogName string) string {
 	t.Helper()
 	root := t.TempDir()
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "definitions", "nvke-local-dev-arm64", catalogName)))
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "inputs/catalogs/controller-profiles", catalogName)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,9 +202,9 @@ func TestLaptopProfilesLocalAPTProjection(t *testing.T) {
 	}
 	packages := []string{
 		"teleport-ent=18.6.4",
-		"nke-agent nke-kubeadm-distro-{{ trimPrefix .KubernetesVersion \"v\" }} spire-agent",
-		"nke-cni-calico-images-3.30.1 nke-cni-calico-manifests-3.30.1",
-		"nke-cni-ovn-images-2.4.0 nke-cni-ovn-charts-2.4.0",
+		"nvke-agent nvke-kubeadm-distro-{{ trimPrefix .KubernetesVersion \"v\" }} spire-agent",
+		"nvke-cni-calico-images-3.30.1 nvke-cni-calico-manifests-3.30.1",
+		"nke-cni-ovn-images-2.4.2 nke-cni-ovn-charts-2.4.2",
 	}
 	if len(commands) != len(packages) {
 		t.Fatal("source-owned package selection changed")
@@ -245,7 +245,7 @@ func TestLaptopProfilesLocalAPTProjection(t *testing.T) {
 
 func TestLaptopProfilesRejectTamperedPatch(t *testing.T) {
 	dir := t.TempDir()
-	source := filepath.Join("..", "..", "..", "definitions", "nvke-local-dev-arm64", "profiles-catalog")
+	source := filepath.Join("..", "..", "..", "inputs/catalogs/controller-profiles/nvidia-arm64")
 	for _, name := range []string{"registry.yaml", "pins.lock.yaml", "patches/local-profile.patch"} {
 		data, err := os.ReadFile(filepath.Join(source, name))
 		if err != nil {
@@ -268,12 +268,12 @@ func TestLaptopProfilesRejectTamperedPatch(t *testing.T) {
 
 // Execute the authored staging command; BuildKit itself is an external gate.
 func TestLaptopProfilesImageContext(t *testing.T) {
-	for _, catalogName := range []string{"profiles-catalog", "upstream-ovn-profiles-catalog"} {
+	for _, catalogName := range []string{"nvidia-arm64", "upstream-arm64"} {
 		t.Run(catalogName, func(t *testing.T) { testLaptopProfilesImageContext(t, catalogName) })
 	}
 }
 
-// Exact bytes from NVKE 8fb2d53368823bd386b4fbd55b4ab6d3c0931345, not a
+// Exact bytes from NVKE 8db5721ae3031bdcd945e559153a740d46ea209e, not a
 // Dockerfile grammar or semantic validator. BuildKit owns that interpretation.
 const laptopProfilesDockerfile = `# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
@@ -289,7 +289,7 @@ COPY runbooks/ /profiles/runbooks/
 
 func testLaptopProfilesImageContext(t *testing.T, catalogName string) {
 	t.Helper()
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "definitions", "nvke-local-dev-arm64", catalogName)))
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "inputs/catalogs/controller-profiles", catalogName)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -419,15 +419,15 @@ func TestLaptopProfilesDockerfileAdmissionChangesBuildIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(root)
-	path := filepath.Join("definitions", "nvke-local-dev-arm64", "definition-profiles.json")
-	envPath := filepath.Join(filepath.Dir(path), "environment-local-docker.json")
-	for _, catalogName := range []string{"profiles-catalog", "upstream-ovn-profiles-catalog"} {
+	path := filepath.Join("inputs", "definitions", "diagnostics", "demo-arm64", "profiles.json")
+	envPath := "inputs/environments/local-arm64-tcg.json"
+	for _, catalogName := range []string{"nvidia-arm64", "upstream-arm64"} {
 		t.Run(catalogName, func(t *testing.T) {
 			doc, err := definition.LoadDefinition(t.Context(), path)
 			if err != nil {
 				t.Fatal(err)
 			}
-			doc.Catalog.Base = "./" + catalogName
+			doc.Catalog.Base = "../../../catalogs/controller-profiles/" + catalogName
 			env, err := definition.LoadEnvironment(t.Context(), envPath)
 			if err != nil {
 				t.Fatal(err)
@@ -474,7 +474,7 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(root)
-	path := filepath.Join("definitions", "nvke-local-dev-arm64", "definition-profiles.json")
+	path := filepath.Join("inputs", "definitions", "diagnostics", "demo-arm64", "profiles.json")
 	for _, tc := range []struct {
 		name     string
 		foreign  bool
@@ -488,7 +488,7 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			envPath := filepath.Join(filepath.Dir(path), "environment-local-docker.json")
+			envPath := "inputs/environments/local-arm64-tcg.json"
 			env, err := definition.LoadEnvironment(t.Context(), envPath)
 			if err != nil {
 				t.Fatal(err)
@@ -510,6 +510,11 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 			if err := plan.Validate(); err != nil {
 				t.Fatal(err)
 			}
+			profilesPin, err := plan.CatalogSnapshot.SourcePin("nvke-profiles")
+			if err != nil {
+				t.Fatal(err)
+			}
+			profilesRepository := plan.CatalogSnapshot.Sources["nvke-profiles"].Repo
 			if len(plan.Builds) != 1 || len(plan.LifecycleOutputs) != 1 || plan.LifecycleOutputs[0].Name != "controller-profiles" || plan.LifecycleOutputs[0].Kind != "oci" {
 				t.Fatal("profiles must remain a separate single-output selection")
 			}
@@ -520,7 +525,7 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 					t.Fatal("profiles must not fall back to an acquired fleet image")
 				case ir.KindFetch:
 					fetches++
-					if node.Commit != "8fb2d53368823bd386b4fbd55b4ab6d3c0931345" || node.TreeHash != "36569cf4ec0e2360ee023cd7e53da65b96ce770d" {
+					if node.Repo != profilesRepository || node.Commit != profilesPin.Commit || node.TreeHash != profilesPin.TreeHash {
 						t.Fatal("profiles must use the staged-installer source")
 					}
 				case ir.KindBuild:
@@ -547,7 +552,7 @@ func TestLaptopProfilesArtifactContract(t *testing.T) {
 						}
 					}
 					if len(node.Patches) != 1 || node.Patches[0].Name != "patches/local-profile.patch" ||
-						node.Patches[0].SHA256 != "sha256:6cbf4dd9524fed1533c25d470e44504532e709fa24f4536e6538a1644777c0fd" {
+						node.Patches[0].SHA256 != "sha256:3928811f56ba0a47011afd16dc066c54189be06c238da43d801e92ae3fd02e22" {
 						t.Fatal("Plan must retain the exact authenticated source patch")
 					}
 					command := node.Patches[0].Content

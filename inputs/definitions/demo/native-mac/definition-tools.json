@@ -1,0 +1,40 @@
+{
+  "apiVersion": "nvkr.dev/definition/v5",
+  "catalog": {
+    "base": "../../../catalogs/tools/native"
+  },
+  "kind": "Definition",
+  "metadata": {
+    "name": "nvke-native-mac-tools-complete"
+  },
+  "outputs": [
+    {
+      "components": [
+        "clusterctl",
+        "helm",
+        "kind",
+        "kubectl",
+        "nerdctl",
+        "nico-sim",
+        "nico-simctl",
+        "nvke-installer-sources",
+        "nvkectl",
+        "oras",
+        "vmnet-client",
+        "vmnet-helper"
+      ],
+      "format": "executable",
+      "name": "native-tools-darwin-arm64",
+      "platform": "darwin/arm64"
+    },
+    {
+      "components": [
+        "nerdctl",
+        "nvkr-site-identity-helper"
+      ],
+      "format": "executable",
+      "name": "site-startup-tools-arm64",
+      "platform": "linux/arm64"
+    }
+  ]
+}

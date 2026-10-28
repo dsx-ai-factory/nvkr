@@ -30,7 +30,7 @@ const (
 	packerContainerBuildLogPath = packerContainerWorkRoot + "/build-logs"
 	packerContainerHTTPPath     = packerContainerWorkRoot + "/http-data"
 	// In-image ABI of the digest-pinned closure, not a caller namespace alias.
-	packerContainerPluginPath = "/nkd/toolchain/packer/plugins"
+	packerContainerPluginPath = "/nvkr/toolchain/packer/plugins"
 	packerContainerPATH       = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 	// Open the transported tar once, authenticate that held inode, then extract
 	// the same inode. The fixed script is part of NVKR's runtime contract; only
@@ -362,11 +362,10 @@ func observeLocalContainerImage(ctx context.Context, runtime packerContainerRunt
 		}
 	}
 	var stdout, stderr bytes.Buffer
-	args := []string{"image", "inspect"}
-	if named, ok := runtime.(interface{ RuntimeName() string }); !ok || named.RuntimeName() != "podman" {
-		args = append(args, "--platform", platform)
-	}
-	args = append(args, "--format", "{{json .}}", image)
+	// Inspect the already-local exact pin with the portable CLI surface. Docker's
+	// inspect --platform requires API 1.49; the returned platform and identity
+	// are checked below even when a runtime selects an unexpected local variant.
+	args := []string{"image", "inspect", "--format", "{{json .}}", image}
 	if err := runtime.Run(ctx, nil, &stdout, &stderr, args...); err != nil {
 		return nil, runtimeCommandError(ctx, err, stderr.String(), e.CodeEngineCapability, "inspecting %s", label)
 	}

@@ -13,6 +13,12 @@ import (
 
 const githubDiskBuildFinalizerTimeoutMinutes = 120
 
+// Finalization includes bootstrap, bounded carrier acquisition/restoration and
+// authentication of the complete release. It cannot share the 15-minute utility
+// budget: acquisition alone permits twenty minutes. Keep a bounded job lifetime
+// with room for release verification and the final Run/handoff uploads.
+const githubReleaseFinalizerTimeoutMinutes = 120
+
 // Build-only finalization restores the complete raw disk/material/source closure.
 // Keep its storage on the one disk output's explicitly selected ARC pool. A
 // mixed-output closure has no admitted aggregate scratch-capacity contract.
@@ -41,14 +47,13 @@ func githubFinalizerTimeoutMinutes(plan *Plan) int {
 	if GitHubDiskBuildOnly(plan) {
 		return githubDiskBuildFinalizerTimeoutMinutes
 	}
-	return githubSupportJobTimeoutMinutes
+	return githubReleaseFinalizerTimeoutMinutes
 }
 
 // writeGitHubFinalizerRestoreSteps emits the complete carrier download and restore
-// sequence for the lifecycle finalizer. actions/download-artifact v8.0.1 expands
-// the exact minimatch brace set, downloads up to five artifacts concurrently, and
-// merges their uniquely named carrier files into one directory. The action succeeds
-// when the pattern matches no artifacts, so every expected artifact still reaches
+// sequence for the lifecycle finalizer. The private transport projection fetches
+// the exact brace set serially and merges uniquely named carrier files into one
+// directory. Missing pattern members are left for recovery, so every expected artifact reaches
 // the per-producer status logic and the finalizer can persist a failed Run.
 func writeGitHubFinalizerRestoreSteps(out *bytes.Buffer, plan *Plan, nodeJobs map[string]string) error {
 	if out == nil || plan == nil {

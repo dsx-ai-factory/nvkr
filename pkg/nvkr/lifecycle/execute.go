@@ -122,7 +122,8 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 	workspace := filepath.ToSlash(filepath.Join(root, prepared.run.Attempt))
 	recordPath := filepath.Join(workspace, "lifecycle.json")
 	factoryOptions := factory.LocalRunOptions{Workspace: workspace, RunnerSource: options.RunnerSource,
-		Jobs: options.Jobs, Runtime: options.Runtime, Go: options.Go, Publish: options.Publish,
+		CompileInputs: prepared.inputs,
+		Jobs:          options.Jobs, Runtime: options.Runtime, Go: options.Go, Publish: options.Publish,
 		DryRun: options.DryRun, Stdout: options.Stdout, Stderr: options.Stderr, Activity: options.Activity, Progress: options.Progress}
 	// Workspace-independent admission always precedes immutable attempt
 	// reservation. RunLocal owns only the later held-workspace, capacity, and
@@ -200,6 +201,13 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 	runForObservation := prepared.Description()
 	runForObservation.Lane = result.QualificationLane()
 	options.Progress.SetPhase("observation")
+	if prepared.inputs != "" {
+		if err := retainLocalDiskMaterials(ctx, workspace, prepared, result); err != nil {
+			cause := closeLocalExecutionResult(result, err)
+			return recordRunFailure(ctx, recordPath, &runForObservation, cause,
+				"recording failed Run after live material retention")
+		}
+	}
 	if options.DiskInspection != nil {
 		installed, err := deps.inspectDisks(ctx, prepared.plan, result, options.DiskInspection)
 		if err == nil && len(installed) == 0 {

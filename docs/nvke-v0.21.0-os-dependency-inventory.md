@@ -2,7 +2,7 @@
 
 Reviewed 2026-10-07 against the exact published release asset, not NVKE main.
 This document inventories the release and the remaining source-build migration.
-The experimental [public-source catalog](../definitions/nvke-os-source/README.md) adds 14 binary producers from 13 pinned Git sources, separate from the maintained M2 inputs.
+The experimental [public-source catalog](../inputs/experiments/public-os-sources/README.md) adds 14 binary producers from 13 pinned Git sources, separate from the maintained M2 inputs.
 The experimental catalog does not establish a complete OS-image migration or release qualification.
 
 ## Authoritative inputs
@@ -65,11 +65,11 @@ Use ADR-22 catalog pinning to record commit, tree and source epoch once producer
 
 ## Current NVKR comparison
 
-Current M2 uses NVKE `ff21ba8c07cafff74b68e238a8876af11e5beded` for most image preparation.
-SPIRE alone uses `726f76944404e1106626b8333d3576bdf67b575b`, which omits the DSX plugin.
+Current M2 uses NVKE `v0.22.0` at `400c24fb6465b042be883d6b62472528520d6291` for image preparation, including SPIRE.
+The v0.22.0 SPIRE package omits the DSX plugin.
 Those are not the release source `33fb71b2f4224b470ebc628a9165fc4b92870406`.
 NVKR compiles the NVKE agent and builds the upstream OVN image, but other OS-package producers currently invoke NVKE package preparation or packaging.
-Retaining the current older SPIRE pin is not complete v0.21.0 membership.
+The current selection does not claim v0.21.0 membership.
 
 The native-toolchain overlay is digest-bound to the current catalog and an exact producer list.
 Changing that catalog requires recomputing the overlay and regenerating generated inputs through their owning commands, not hand-patching generated workflows.

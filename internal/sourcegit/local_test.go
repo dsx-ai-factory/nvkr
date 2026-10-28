@@ -63,6 +63,122 @@ func runLocalFixture(t *testing.T, environment []string, dir string, args ...str
 	return output.Bytes()
 }
 
+func TestLocalGitStatusDoesNotRewriteRestoredIndex(t *testing.T) {
+	source, _ := localFixtureRepository(t)
+	// Force Git to recheck clean content whose cached stat information changed.
+	old := time.Unix(1, 0)
+	if err := os.Chtimes(filepath.Join(source, "input.txt"), old, old); err != nil {
+		t.Fatal(err)
+	}
+	index := filepath.Join(source, ".git", "index")
+	before, err := os.ReadFile(index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := runLocalFixture(t, []string{"PATH=" + os.Getenv("PATH")}, source, "status", "--porcelain=v1", "--untracked-files=no")
+	if len(output) != 0 {
+		t.Fatalf("clean content reported as changed: %s", output)
+	}
+	after, err := os.ReadFile(index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current, err := os.Stat(index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) || !info.ModTime().Equal(current.ModTime()) {
+		t.Fatal("diagnostic status rewrote the restored index")
+	}
+}
+
+func TestCheckWorktreeIndexRecords(t *testing.T) {
+	for _, test := range []struct {
+		name, records string
+		limit         int
+		want          e.Code
+	}{
+		{name: "empty index", limit: 2},
+		{name: "ordinary", records: "H input.txt\x00H .gitattributes\x00", limit: 2},
+		{name: "literal newline tags and whitespace", records: "H name\nh hidden\nS skipped\t \x00", limit: 1},
+		{name: "distinct raw names", records: "H name\x00H name \x00", limit: 2},
+		{name: "assume unchanged", records: "h input.txt\x00", limit: 2, want: e.CodeFetchFailed},
+		{name: "skip worktree", records: "S input.txt\x00", limit: 2, want: e.CodeFetchFailed},
+		{name: "combined flags", records: "s input.txt\x00", limit: 2, want: e.CodeFetchFailed},
+		{name: "unmerged", records: "M input.txt\x00", limit: 2, want: e.CodeFetchFailed},
+		{name: "unknown tag", records: "X input.txt\x00", limit: 2, want: e.CodeFetchFailed},
+		{name: "missing delimiter", records: "H input.txt", limit: 2, want: e.CodeFetchFailed},
+		{name: "newline instead of NUL", records: "H input.txt\n", limit: 2, want: e.CodeFetchFailed},
+		{name: "empty name", records: "H \x00", limit: 2, want: e.CodeFetchFailed},
+		{name: "wrong separator", records: "H\tinput.txt\x00", limit: 2, want: e.CodeFetchFailed},
+		{name: "empty record", records: "H input.txt\x00\x00", limit: 2, want: e.CodeFetchFailed},
+		{name: "duplicate", records: "H input.txt\x00H input.txt\x00", limit: 2, want: e.CodeFetchFailed},
+		{name: "entry limit", records: "H input.txt\x00H other.txt\x00", limit: 1, want: e.CodeFetchFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := checkWorktreeIndexRecords([]byte(test.records), test.limit)
+			if got := errorCode(err); got != test.want {
+				t.Fatalf("index status error=%v, want code %s", err, test.want)
+			}
+		})
+	}
+}
+
+func TestCheckWorktreeIndexAdmission(t *testing.T) {
+	for _, scenario := range []string{"valid", "newline path", "assume-unchanged", "skip-worktree", "combined flags", "entry bound", "canceled", "repository callback"} {
+		t.Run(scenario, func(t *testing.T) {
+			dir, _ := localFixtureRepository(t)
+			environment := []string{"PATH=" + os.Getenv("PATH")}
+			limit := 100
+			ctx := t.Context()
+			want := e.Code("")
+			switch scenario {
+			case "newline path":
+				name := "name\nh hidden\nS skipped\t "
+				if err := os.WriteFile(filepath.Join(dir, name), []byte("literal path\n"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				localFixtureGit(t, dir, "add", "--", name)
+			case "assume-unchanged", "combined flags":
+				localFixtureGit(t, dir, "update-index", "--assume-unchanged", "--", "input.txt")
+				want = e.CodeFetchFailed
+			case "skip-worktree":
+				localFixtureGit(t, dir, "update-index", "--skip-worktree", "--", "input.txt")
+				want = e.CodeFetchFailed
+			case "entry bound":
+				limit, want = 1, e.CodeFetchFailed
+			case "canceled":
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+				want = e.CodeTimeout
+			case "repository callback":
+				localFixtureGit(t, dir, "config", "filter.poison.clean", "synthetic-private-callback")
+				want = e.CodeEngineCapability
+			}
+			if scenario == "combined flags" {
+				localFixtureGit(t, dir, "update-index", "--skip-worktree", "--", "input.txt")
+			}
+			index := filepath.Join(dir, ".git", "index")
+			before, err := os.ReadFile(index)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := CheckWorktreeIndex(ctx, environment, dir, limit); errorCode(err) != want {
+				t.Fatalf("index admission error=%v, want code %s", err, want)
+			}
+			after, err := os.ReadFile(index)
+			if err != nil || !bytes.Equal(before, after) {
+				t.Fatalf("index inspection changed metadata: %v", err)
+			}
+		})
+	}
+}
+
 func TestLocalGitNeutralizesGlobalCallbacksAndConversions(t *testing.T) {
 	source, commit := localFixtureRepository(t)
 	for _, withHome := range []bool{false, true} {
@@ -297,7 +413,7 @@ func TestLocalGitMaintainedOVNForkPin(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
-	overlay, err := catalog.LoadOverlayContext(ctx, "../../definitions/nvke-local-dev-arm64/os-tcg.json")
+	overlay, err := catalog.LoadOverlayContext(ctx, "../../inputs/catalogs/node-images/variants/nvidia-tcg.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -704,7 +820,7 @@ func TestLocalCloneChecksLocalObjects(t *testing.T) {
 			if malformed {
 				tree := localFixtureGit(t, source, "rev-parse", "HEAD^{tree}")
 				cmd := exec.CommandContext(t.Context(), "git", "-C", source, "hash-object", "--literally", "-t", "commit", "-w", "--stdin")
-				cmd.Stdin = strings.NewReader("tree " + tree + "\nauthor Fixture <nkd@example.test> invalid +0000\ncommitter Fixture <nkd@example.test> 0 +0000\n\nfixture\n")
+				cmd.Stdin = strings.NewReader("tree " + tree + "\nauthor Fixture <nvkr@example.test> invalid +0000\ncommitter Fixture <nvkr@example.test> 0 +0000\n\nfixture\n")
 				cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=" + os.DevNull}
 				out, err := cmd.CombinedOutput()
 				if err != nil {
@@ -903,6 +1019,37 @@ func TestLocalGitRejectsCleartextBeforeNetworkAcquisition(t *testing.T) {
 				t.Fatal("Git did not refuse the selected cleartext transport before connecting", err)
 			}
 		})
+	}
+}
+
+func TestLocalGitRejectsExternalHelperBeforeExecution(t *testing.T) {
+	root := t.TempDir()
+	helper, marker := filepath.Join(root, "helper"), filepath.Join(root, "helper-ran")
+	script := "#!/bin/sh\n: > '" + strings.ReplaceAll(marker, "'", "'\"'\"'") + "'\n"
+	if err := os.WriteFile(helper, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Prove the harmless fixture can create its marker before checking refusal.
+	if err := exec.CommandContext(t.Context(), helper).Run(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(marker); err != nil {
+		t.Fatal("helper did not create its marker", err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	cmd, err := LocalCommand(ctx, []string{"PATH=" + os.Getenv("PATH")}, "", "ls-remote", "ext::"+helper)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &output, &output
+	err = ownedcmd.Run(ctx, cmd)
+	if err == nil || ctx.Err() != nil || cmd.ProcessState == nil || cmd.ProcessState.ExitCode() != 128 || !strings.Contains(output.String(), "transport 'ext' not allowed") {
+		t.Fatalf("external helper transport was not refused: %v %s", err, &output)
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatal("external helper was executed", err)
 	}
 }
 

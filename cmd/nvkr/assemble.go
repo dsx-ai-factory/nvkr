@@ -4,6 +4,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -133,12 +134,10 @@ func verifyDecode(c *cli.Context, want *attest.Manifest, envelope string) error 
 func cmdAssemble() *cli.Command {
 	flags := []cli.Flag{
 		&cli.StringFlag{Name: "format", Required: true, Usage: "raw | iso | qcow2 for existing-byte measurement; producer formats currently fail closed"},
-		// disk (raw/qcow2/iso)
 		&cli.BoolFlag{Name: "boot", Usage: "reserved; fails closed until a qualified boot-observation adapter exists"},
 		&cli.IntFlag{Name: "boot-timeout", Value: 900},
 		&cli.BoolFlag{Name: "encrypt", Usage: "reserved; fails closed until a qualified post-attestation encryption adapter exists"},
 		&cli.StringFlag{Name: "from", Usage: "reserved input for the disabled --encrypt adapter"},
-		// Unified DiskManifest for existing disk bytes (ADR-14 §1).
 		&cli.StringFlag{Name: "from-raw", Usage: "emit a unified DiskManifest for this canonical RAW/ISO stream (ADR-14 §1)"},
 		&cli.StringFlag{Name: "envelope", Usage: "with --from-raw: also verify this derived envelope decodes to the canonical logical digest and record it as provenance"},
 		&cli.IntFlag{Name: "block-size", Value: 1 << 20,
@@ -199,7 +198,7 @@ func cmdPublish() *cli.Command {
 		},
 		Subcommands: []*cli.Command{
 			publishBundleCmd(), publishRootCmd(), publishPushCmd(), publishPullCmd(),
-			publishInspectCmd(), publishGetCmd(), publishExtractCmd(), publishChartCmd(), publishAPTCmd(),
+			publishInspectCmd(), publishGetCmd(), publishExtractCmd(), publishImageExportCmd(), publishChartCmd(), publishAPTCmd(),
 		},
 		Action: func(*cli.Context) error {
 			return e.New(e.CodeUnsupported,
@@ -440,6 +439,24 @@ func publishGetCmd() *cli.Command {
 				return err
 			}
 			fmt.Printf("verified and extracted %s/%s %s → %s\n", object.Kind, object.Name, object.SemanticDigest, c.String("out"))
+			return nil
+		}}
+}
+
+func publishImageExportCmd() *cli.Command {
+	return &cli.Command{Name: "image-export", Usage: "export one exact native published image to an unchanged OCI archive (no Release authority)",
+		Flags: []cli.Flag{&cli.StringFlag{Name: "layout"}, &cli.StringFlag{Name: "object"}, &cli.StringFlag{Name: "reference"}, &cli.StringFlag{Name: "platform"}, &cli.StringFlag{Name: "out"}},
+		Action: func(c *cli.Context) error {
+			if c.Args().Present() || c.String("layout") == "" || c.String("object") == "" || c.String("reference") == "" || c.String("out") == "" {
+				return e.New(e.CodeUsage, "image-export requires --layout, --object, --reference and --out, with no positional arguments")
+			}
+			result, err := delivery.ExportPublishedImage(c.Context, c.String("layout"), c.String("object"), c.String("reference"), c.String("platform"), c.String("out"))
+			if err != nil {
+				return err
+			}
+			if err := json.NewEncoder(c.App.Writer).Encode(result); err != nil {
+				return e.Wrap(e.CodeVerifyFailed, err, "writing image export description")
+			}
 			return nil
 		}}
 }

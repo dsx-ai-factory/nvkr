@@ -81,7 +81,7 @@ func TestGitHubSharedActionCountDoesNotGrowWithEquivalentJobs(t *testing.T) {
 				prepared, invoked := false, false
 				for _, step := range job.Steps {
 					if step.ID == githubContextStepID {
-						prepared = step.Uses == "./"+githubSharedDirectory+"prepare-stage" && step.With["action"] == "${{ github.job }}"
+						prepared = step.Uses == "./"+githubSharedDirectory+"prepare-stage" && len(step.With) == 1 && step.With["runner-artifact"] != ""
 						continue
 					}
 					if parameters := step.With["parameters"]; parameters != "" {
@@ -106,12 +106,12 @@ func TestGitHubSharedActionCountDoesNotGrowWithEquivalentJobs(t *testing.T) {
 				t.Fatalf("one shared implementation has %d calls for %d jobs", calls, count)
 			}
 			for name, raw := range templates {
-				assertGitHubCompositeReadableYAML(t, name, raw)
+				assertGitHubCompositeReadableYAML(t, name, raw, plan)
 				if strings.Contains(name, "/jobs/") || bytes.Contains(raw, []byte("producer-node-")) {
 					t.Fatalf("job-specific implementation remains in %s", name)
 				}
 			}
-			assertGitHubCompositeReadableYAML(t, "workflow", workflow)
+			assertGitHubCompositeReadableYAML(t, "workflow", workflow, plan)
 			expanded, err := expandGitHubActions(plan, workflow, files)
 			if err != nil {
 				t.Fatal(err)
@@ -120,6 +120,79 @@ func TestGitHubSharedActionCountDoesNotGrowWithEquivalentJobs(t *testing.T) {
 				t.Fatal("shared templates changed the jobs' concrete execution semantics")
 			}
 		})
+	}
+}
+
+func TestGitHubPrepareStageBindsCurrentJob(t *testing.T) {
+	plan := githubTestPlan(t)
+	for _, suffix := range []string{"", "-container"} {
+		for _, test := range []struct {
+			name   string
+			mutate func(call, action *yamlv3.Node)
+		}{
+			{name: "provider job"},
+			{name: "caller selects sibling", mutate: func(call, _ *yamlv3.Node) {
+				githubYAMLSet(githubYAMLField(call, "with"), "action", githubYAMLString("sibling"))
+			}},
+			{name: "redundant caller selector", mutate: func(call, _ *yamlv3.Node) {
+				githubYAMLSet(githubYAMLField(call, "with"), "action", githubYAMLString("${{ github.job }}"))
+			}},
+			{name: "selector input declaration", mutate: func(_, action *yamlv3.Node) {
+				githubYAMLSet(githubYAMLField(action, "inputs"), "action", githubActionInput("Injected selector"))
+			}},
+			{name: "action selects sibling", mutate: func(_, action *yamlv3.Node) {
+				steps := githubYAMLField(githubYAMLField(action, "runs"), "steps")
+				githubYAMLSet(githubYAMLField(steps.Content[1], "env"), "NVKR_ACTION", githubYAMLString("sibling"))
+			}},
+			{name: "action omits provider binding", mutate: func(_, action *yamlv3.Node) {
+				steps := githubYAMLField(githubYAMLField(action, "runs"), "steps")
+				githubYAMLRemove(steps.Content[1], "env")
+			}},
+		} {
+			t.Run("prepare-stage"+suffix+"/"+test.name, func(t *testing.T) {
+				files := map[string][]byte{}
+				helper := githubYAMLMap("uses", githubYAMLString("./"+githubActionsDirectoryFor(plan)+"prepare-runner"+suffix),
+					"with", githubYAMLMap("runner-artifact", githubYAMLString("nvkr-exec-linux-amd64")))
+				call, err := githubPrepareStage(plan, files, helper)
+				if err != nil {
+					t.Fatal(err)
+				}
+				path := strings.TrimPrefix(githubYAMLValue(call, "uses"), "./") + "/action.yml"
+				var action yamlv3.Node
+				if err := yamlv3.Unmarshal(files[path], &action); err != nil {
+					t.Fatal(err)
+				}
+				if test.mutate != nil {
+					test.mutate(call, action.Content[0])
+				}
+				files[path], err = encodeGitHubYAML(&action)
+				if err != nil {
+					t.Fatal(err)
+				}
+				files[githubActionDataPathFor(plan)], err = canonical.Marshal(githubActionDataDocument{Entries: map[string]githubActionDataEntry{
+					"current": {Template: "stage-context", Values: map[string]string{}},
+				}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				workflow, err := encodeGitHubYAML(githubYAMLMap("jobs", githubYAMLMap("current", githubYAMLMap(
+					"steps", &yamlv3.Node{Kind: yamlv3.SequenceNode, Tag: "!!seq", Content: []*yamlv3.Node{call}}))))
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, _, err = materializeGitHubSharedActions(plan, workflow, files)
+				if test.mutate == nil {
+					if err != nil {
+						t.Fatal(err)
+					}
+					return
+				}
+				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+				if !strings.Contains(err.Error(), "changes shared action preparation") {
+					t.Fatalf("changed selector reached the wrong admission guard: %v", err)
+				}
+			})
+		}
 	}
 }
 
@@ -473,44 +546,48 @@ func TestGitHubSharedActionsRejectDescriptorAndInterfaceTampering(t *testing.T) 
 }
 
 func TestWriteGitHubActionDataDerivesBoundedOutputFromPlan(t *testing.T) {
-	plan := githubTestPlan(t)
-	bundle, err := RenderGitHub(t.Context(), plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	data := sharedGitHubActionData(t, bundle)
-	selector := sortedKeys(data.Entries)[0]
-	wantData, err := canonical.Marshal(data.Entries[selector].Values)
-	if err != nil {
-		t.Fatal(err)
-	}
-	root := t.TempDir()
-	t.Chdir(root)
-	if err := os.MkdirAll(filepath.Dir(GitHubActionDataPath), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	untrusted := []byte(`{"entries":{"injected":{"template":"stage-context","values":{"part-1":"malicious command"}}}}`)
-	if err := os.WriteFile(GitHubActionDataPath, untrusted, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	output := filepath.Join(root, "github-output")
-	if err := os.WriteFile(output, []byte("existing=value\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := WriteGitHubActionData(t.Context(), plan, selector, output); err != nil {
-		t.Fatal(err)
-	}
-	raw, err := os.ReadFile(output)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := "existing=value\ndata=" + string(wantData) + "\n"
-	if string(raw) != want || bytes.Count(raw, []byte("\n")) != 2 || len(raw)-len("existing=value\n") > maxGitHubActionDataOutputBytes {
-		t.Fatal("provider output differs from bounded, single-line canonical Plan-derived data")
-	}
-	retained, err := os.ReadFile(GitHubActionDataPath)
-	if err != nil || !bytes.Equal(retained, untrusted) {
-		t.Fatalf("action description modified the checked-in data file: %v", err)
+	for _, name := range []string{"", "project-a", "project-b"} {
+		t.Run(name, func(t *testing.T) {
+			plan := namedGitHubTestPlan(t, name)
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			data := sharedGitHubActionData(t, bundle)
+			selector := sortedKeys(data.Entries)[0]
+			wantData, err := canonical.Marshal(data.Entries[selector].Values)
+			if err != nil {
+				t.Fatal(err)
+			}
+			root := t.TempDir()
+			t.Chdir(root)
+			if err := os.MkdirAll(filepath.Dir(githubActionDataPathFor(plan)), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			untrusted := []byte(`{"entries":{"injected":{"template":"stage-context","values":{"part-1":"malicious command"}}}}`)
+			if err := os.WriteFile(githubActionDataPathFor(plan), untrusted, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			output := filepath.Join(root, "github-output")
+			if err := os.WriteFile(output, []byte("existing=value\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := WriteGitHubActionData(t.Context(), plan, selector, output); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := os.ReadFile(output)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := "existing=value\ndata=" + string(wantData) + "\n"
+			if string(raw) != want || bytes.Count(raw, []byte("\n")) != 2 || len(raw)-len("existing=value\n") > maxGitHubActionDataOutputBytes {
+				t.Fatal("provider output differs from bounded, single-line canonical Plan-derived data")
+			}
+			retained, err := os.ReadFile(githubActionDataPathFor(plan))
+			if err != nil || !bytes.Equal(retained, untrusted) {
+				t.Fatalf("action description modified the checked-in data file: %v", err)
+			}
+		})
 	}
 }
 

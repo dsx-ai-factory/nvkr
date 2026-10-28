@@ -87,14 +87,15 @@ func TestGitHubContractedStagesRejectIntroducedCycle(t *testing.T) {
 	}
 }
 
-func TestGitHubStagesGroupOnlyCompatibleOfflineUtilityNodes(t *testing.T) {
+func TestGitHubStagesGroupOnlyTargetObservationAndSBOM(t *testing.T) {
 	base := Node{
-		ID:        "observe",
-		Kind:      NodeVerify,
-		RunsOn:    "ubuntu-latest",
-		Network:   ir.NetworkNone,
-		Container: "utility@sha256:" + strings.Repeat("1", 64),
-		Platform:  "linux/amd64",
+		ID:          "observe",
+		Kind:        NodeVerify,
+		BuildTarget: "worker",
+		RunsOn:      "ubuntu-latest",
+		Network:     ir.NetworkNone,
+		Container:   "utility@sha256:" + strings.Repeat("1", 64),
+		Platform:    "linux/amd64",
 	}
 	tests := []struct {
 		name   string
@@ -106,19 +107,26 @@ func TestGitHubStagesGroupOnlyCompatibleOfflineUtilityNodes(t *testing.T) {
 		{name: "container boundary", mutate: func(_, second *Node) { second.Container = "other@sha256:" + strings.Repeat("2", 64) }, want: 2},
 		{name: "platform boundary", mutate: func(_, second *Node) { second.Platform = "linux/arm64" }, want: 2},
 		{name: "runner boundary", mutate: func(_, second *Node) { second.RunsOn = "ubuntu-24.04-arm" }, want: 2},
-		{name: "build boundary", mutate: func(first, _ *Node) { first.Kind = NodeBuild }, want: 2},
+		{name: "closed producer consumer", mutate: func(first, _ *Node) { first.Kind = NodeBuild }, want: 1},
 		{name: "fetch boundary", mutate: func(_, second *Node) { second.Kind = NodeFetch }, want: 2},
+		{name: "package boundary", mutate: func(_, second *Node) { second.Kind = NodePackage }, want: 2},
+		{name: "different target", mutate: func(_, second *Node) { second.BuildTarget = "other" }, want: 2},
+		{name: "no target", mutate: func(first, second *Node) { first.BuildTarget, second.BuildTarget = "", "" }, want: 2},
+		{name: "no observation dependency", mutate: func(_, second *Node) { second.Inputs = nil }, want: 2},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			first := base
+			first.Outputs = []string{"observation"}
 			second := base
-			second.ID = "package"
-			second.Kind = NodePackage
+			second.ID = "sbom"
+			second.Kind = NodeSBOM
+			second.Inputs = []string{"observation"}
 			if test.mutate != nil {
 				test.mutate(&first, &second)
 			}
-			stages, jobs, err := githubStages(&Plan{Graph: ArtifactGraph{Nodes: []Node{first, second}}})
+			stages, jobs, err := githubStages(&Plan{Graph: ArtifactGraph{Nodes: []Node{first, second},
+				Artifacts: []Artifact{{ID: "observation", Producer: first.ID}}}})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -127,6 +135,43 @@ func TestGitHubStagesGroupOnlyCompatibleOfflineUtilityNodes(t *testing.T) {
 			}
 			if (jobs[first.ID] == jobs[second.ID]) != (test.want == 1) {
 				t.Fatalf("node-to-stage mapping does not match grouping: %v", jobs)
+			}
+		})
+	}
+}
+
+func TestGitHubObservationPairIgnoresUnrelatedInterleaving(t *testing.T) {
+	for _, extraInput := range []bool{false, true} {
+		name := "independent insertion"
+		if extraInput {
+			name = "new readiness dependency"
+		}
+		t.Run(name, func(t *testing.T) {
+			observe := Node{ID: "a-observe", Kind: NodeVerify, BuildTarget: "worker", Network: ir.NetworkNone,
+				Container: "utility@sha256:" + strings.Repeat("1", 64), RunsOn: "ubuntu-24.04", Platform: "linux/amd64",
+				Outputs: []string{"observation"}}
+			sbom := observe
+			sbom.ID, sbom.Kind, sbom.Outputs = "z-sbom", NodeSBOM, nil
+			sbom.Inputs = []string{"observation"}
+			if extraInput {
+				sbom.Inputs = append(sbom.Inputs, "unrelated")
+			}
+			plan := &Plan{Graph: ArtifactGraph{
+				Nodes:     []Node{observe, {ID: "middle", Kind: NodeAcquire, Outputs: []string{"unrelated"}}, sbom},
+				Artifacts: []Artifact{{ID: "observation", Producer: observe.ID}, {ID: "unrelated", Producer: "middle"}},
+			}}
+			stages, jobs, err := githubStages(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if (jobs[observe.ID] == jobs[sbom.ID]) == extraInput {
+				t.Fatalf("grouping must ignore unrelated work but retain new readiness boundaries: %v", jobs)
+			}
+			if jobs["middle"] == jobs[observe.ID] || jobs["middle"] == jobs[sbom.ID] {
+				t.Fatal("unrelated work entered observation stage")
+			}
+			if !extraInput && (len(stages) != 2 || stages[0].Nodes[0].ID != observe.ID || stages[0].Nodes[1].ID != sbom.ID) {
+				t.Fatal("pair lost exact observation-before-SBOM execution order")
 			}
 		})
 	}
@@ -204,6 +249,16 @@ func TestRenderGitHubGroupedStagePreservesExecutionAndTransport(t *testing.T) {
 }
 
 func TestValidateGitHubBundleRejectsGroupedExecutionTampering(t *testing.T) {
+	plan := githubTestPlan(t)
+	bundle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stages, _, err := githubStages(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stage := requireGroupedGitHubStage(t, stages)
 	tests := []struct {
 		name     string
 		unshared bool
@@ -234,17 +289,7 @@ func TestValidateGitHubBundleRejectsGroupedExecutionTampering(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			plan := githubTestPlan(t)
-			bundle, err := RenderGitHub(context.Background(), plan)
-			if err != nil {
-				t.Fatal(err)
-			}
 			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
-			stages, _, err := githubStages(plan)
-			if err != nil {
-				t.Fatal(err)
-			}
-			stage := requireGroupedGitHubStage(t, stages)
 			job := document.Jobs[stage.ID]
 			var execute []int
 			for index, step := range job.Steps {
@@ -278,6 +323,11 @@ func TestValidateGitHubBundleRejectsGroupedExecutionTampering(t *testing.T) {
 }
 
 func TestValidateGitHubBundleRejectsUnrecognizedWorkflowAuthority(t *testing.T) {
+	plan := githubLifecycleTestPlan(t)
+	bundle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, test := range []struct {
 		name       string
 		entrypoint bool
@@ -306,7 +356,7 @@ func TestValidateGitHubBundleRejectsUnrecognizedWorkflowAuthority(t *testing.T) 
 				for _, id := range sortedKeys(document.Jobs) {
 					job := document.Jobs[id]
 					for index, step := range job.Steps {
-						if strings.HasPrefix(step.Name, "Fetch pinned source") {
+						if step.Uses == "./"+githubSharedDirectory+"execute-node" || step.Uses == "./"+githubSharedDirectory+"execute-source" {
 							steps := append([]githubStep(nil), job.Steps[:index]...)
 							steps = append(steps, githubStep{Name: "Injected shell", Run: "printf injected"})
 							job.Steps = append(steps, job.Steps[index:]...)
@@ -343,11 +393,6 @@ func TestValidateGitHubBundleRejectsUnrecognizedWorkflowAuthority(t *testing.T) 
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			plan := githubLifecycleTestPlan(t)
-			bundle, err := RenderGitHub(context.Background(), plan)
-			if err != nil {
-				t.Fatal(err)
-			}
 			raw := expandedGitHubWorkflow(t, bundle)
 			if test.entrypoint {
 				// Inject an unknown operation beside a real shared action call.

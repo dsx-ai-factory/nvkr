@@ -68,6 +68,22 @@ def local_toolchain_scopes($lane):
   else map(. as $scope | . + {outputs:
     ([$plan.builds[] | select(.catalogDigest == $scope.catalogDigest) | .name] | sort)}) end;
 
+# Relocate only descriptive authored references and append the existing scoped
+# overlays. Linux and Mac call this same projection; catalog/capture own admission.
+def local_toolchain_substitutions($image): map(select(.pin != $image));
+
+def local_toolchain_definition($definition_dir; $repository_prefix; $scopes):
+  def relocate: if startswith("/") then error("local demo catalog references must be repository-relative")
+    else $repository_prefix + $definition_dir + "/" + . end;
+  def locate: .base |= relocate | if .overlays then .overlays |= map(relocate) else . end;
+  .catalog |= locate |
+  .catalog as $default |
+  .outputs |= map(.name as $name |
+    if .catalog then .catalog |= locate else .catalog = $default end |
+    .catalog.overlays = ((.catalog.overlays // []) +
+      [$scopes | to_entries[] | select(.value.outputs | index($name)) |
+        "./toolchain-attempt" + (if .key == 0 then "" else "-" + (.key | tostring) end) + ".json"]));
+
 # Conservatively recognize the NVKE project path before enforcing the one exact
 # transport URL served by the private-source handoff. This lexical diagnostic
 # also rejects that project path on other hosts; it does not parse or authenticate

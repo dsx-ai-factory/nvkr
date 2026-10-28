@@ -1,21 +1,22 @@
-# NVKR-to-NVKE artifact handoff reference
+# Legacy NVKR-to-NVKE artifact handoff and recovery
 
-Start with the [Ubuntu ARM64 quickstart](local-nvke-demo.md). This reference
-explains what the downstream adapter consumes and its safety/recovery limits;
-it is not another setup guide.
+For the current Mac/Linux workflow, use the [native demo guide](local-nvke-demo.md).
+This page describes the older staged-installer path with a Kind-hosted site and
+its retained-session recovery controls. It is a reference for those existing
+sessions, not the architecture or setup procedure for current `run` and `e2e`.
 
 NVKR builds/acquires and observes artifacts. NVKE owns installation, site
 configuration, provisioning and tenant lifecycle. The demo calls `nvkr`
 subprocesses, not an execution SDK, and delegates installation to the exact
-pinned NVKE staged installer at
-`8fb2d53368823bd386b4fbd55b4ab6d3c0931345`.
-See its [deployment instructions](https://github.com/dsx-ai-factory/nvke/blob/8fb2d53368823bd386b4fbd55b4ab6d3c0931345/deploy/README.md).
+pinned NVKE `v0.22.0` installer at
+`400c24fb6465b042be883d6b62472528520d6291`.
+See its [deployment instructions](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/deploy/README.md).
 
-`nvke-demo e2e` prepares this pinned installer automatically in a private
-attempt-local directory; `run.nvkeCheckout` is an optional read-only override.
-Replaying retained outputs with `nvke-demo run` still requires an explicit matching
-checkout. See [pin origins and upgrades](local-nvke-demo.md#where-the-nvke-versions-come-from)
-before moving to another NVKE release.
+That older implementation prepared this installer in a private attempt-local
+directory and accepted a matching read-only `run.nvkeCheckout` override. Current
+native commands consume source-built installer bundles from their selected Runs.
+See [pin origins and upgrades](local-nvke-demo.md#where-the-nvke-versions-come-from)
+before changing the NVKE source selection.
 
 ## Inputs consumed by the demo
 
@@ -23,7 +24,7 @@ before moving to another NVKE release.
 | --- | --- |
 | OS | Exact plain ARM64 QCOW2 exported by NVKR; NICoSim serves these held bytes |
 | Components | Dependency OCI images/charts and CAPNICo provider; provisioned provider is built but not used by this tenant path |
-| Site | Source-aligned CLI, controller image, image-bound controller chart and NKTP chart |
+| Site | Source-aligned CLI, controller image, image-bound controller chart and NVKE telemetry pipelines chart |
 | Tools | Verified native Helm, kubectl, clusterctl, ORAS and Kind bundle |
 | Profiles | Native OCI content image; the chart's init container copies `/profiles` into its shared read-only controller volume |
 | Simulator | NICoSim server/CLI and seed/UI archive |
@@ -62,7 +63,12 @@ The adapter asks `nvkr publish chart` to verify each selected Helm layout,
 manifest/config and bounded archive, then exports unchanged chart bytes. It
 copies only tracked deploy files from the clean pinned installer into a private
 directory and supplies the same archives to inventory rendering and execution
-through `DEPLOY_PATH`.
+through the installer's `--deploy-path` option. The source-owned site-spec renderer
+receives the selected images and local chart archives; the adapter runs readiness,
+Cluster API installation, stack installation and the source-owned identity overlay.
+The generated site spec supplies stack rendering inputs for the already owned Kind
+cluster. Its bootstrap fields are not reusable instructions for creating that
+cluster; the separately admitted Kind configuration owns its networking.
 
 It does not rebuild dependencies during deployment, edit the NVKE checkout or
 mint a Release. NVKE's existing deploy-item reader remains authoritative;
@@ -96,11 +102,17 @@ a fresh profiles selection and supply it with `--profiles-run`, or build a new
 combined Run. A compatibility replay with the older demo binary retains its
 original data-volume behavior; it is not validation of the new image handoff.
 
-The controller's CAPNICo override is currently tag-shaped. The adapter checks
-the exact destination subject; a tag alone is not an authenticated release
-contract. Runtime image checks cover the selected dependency roles.
+The adapter rewrites the private CAPNICo manifest's image reference to the verified
+destination digest. Runtime image checks cover the selected dependency roles.
 Kube-vip and the test workload are additional runtime acquisitions; this is
 not a completely offline deployment.
+
+The beta tenant API uses MachineImage, ClusterRelease and NodePoolRelease
+resources. Before tenant creation, the adapter reads the diagnostic profile from
+the observed controller pod, rechecks that pod and its images, and creates those
+resources with the admitted disk's digest and size recorded in annotations. The
+source-owned initialization template still references the owned disk service.
+These are diagnostic provisioning resources, not signed NVKR Releases.
 
 Diagnostic registry copies do not equal NVKR publication/signing. Hosted
 Release consumption additionally requires consumer-policy verification and
@@ -115,22 +127,22 @@ It contains no NVKE installer roles or release-wide source pin. NVKE owns conver
 format, source-checkout compatibility, chart values and the required artifact selection. That conversion
 is not supplied by NVKR's exporter. The existing local demo above retains its separate pinned installer path.
 
-The historical NKE consumer inspected at
-[`b506565e698a3f0f1a64b2072476ba928c2e799e`](https://github.com/dsx-ai-factory/nke/tree/b506565e698a3f0f1a64b2072476ba928c2e799e)
+The historical NVKE consumer inspected at
+[`b506565e698a3f0f1a64b2072476ba928c2e799e`](https://github.com/dsx-ai-factory/nvke/tree/b506565e698a3f0f1a64b2072476ba928c2e799e)
 compares a supplied source commit with the deployment checkout's HEAD and imports images named by
 deployment-item metadata. Extra runtime image references alone do not cause their import or rewrite chart
-values. Its [`FindLayout` implementation](https://github.com/dsx-ai-factory/nke/blob/b506565e698a3f0f1a64b2072476ba928c2e799e/cli/internal/bootstrap/nkerelease/chartlayer.go)
+values. Its [`FindLayout` implementation](https://github.com/dsx-ai-factory/nvke/blob/b506565e698a3f0f1a64b2072476ba928c2e799e/cli/internal/bootstrap/nkerelease/chartlayer.go)
 finds a native manifest listed in a layout's `index.json`, either directly or in a direct child directory.
 An NVKR aggregate layout instead uses `index.json` as the aggregate and lists its native children;
 finding the aggregate by that consumer's lookup requires consumer-owned staging that preserves its digest.
 The generic published description retains the aggregate digest and exact children without staging packages.
 
 A pre-cutover 2026-10-10 probe of that exact `FindLayout` implementation passed eleven discovery checks using
-synthetic NKD native AMD64/ARM64 image layouts and a retained inspected AMD64 binary bundle. It checked direct and
+synthetic pre-rebrand NVKR native AMD64/ARM64 image layouts and a retained inspected AMD64 binary bundle. It checked direct and
 parent-directory lookup plus missing/duplicate/scaffolding-digest rejection. This is discovery evidence
 only, with no container import, executable runtime, Release authentication or offline installation claim.
 The [full-source gap map](full-nvke-source-build.md#offline-deployment-inventory) retains the inspected
-NKTP/clusterctl prerequisites and remaining offline work.
+NVKE telemetry pipelines and clusterctl prerequisites and remaining offline work.
 
 ## Deploy retained completed Runs
 
@@ -243,27 +255,7 @@ After SIGKILL/OOM or VM restart:
    unexpected routes cause refusal. Inspect the discrepancy rather than forcing
    removal.
 
-The Go command accepts only version 2 journals. A Python-era version 1 journal
-must be restored **before upgrading**, using the last compatible revision
-`3b24beb5cb04df352e74a8d5405bd593871412b5`. If already upgraded, preserve the
-original output and use a separate checkout of that revision on the same Linux
-host/account, with its Python 3.12+ prerequisites:
-
-```sh
-git worktree add --detach /absolute/Linux/path/to/legacy-recovery \
-  3b24beb5cb04df352e74a8d5405bd593871412b5
-python3 /absolute/Linux/path/to/legacy-recovery/scripts/nke-local-demo.py \
-  restore --work /absolute/Linux/path/to/original-demo-output
-```
-
-Run `git worktree add` from a Git checkout containing that commit, not an
-archive-exported directory. The old CLI uses `scripts/nke-local-network.py` from
-the same revision. Current Go recovery diagnoses and refuses version 1; it does
-not migrate journals or execute the removed helper automatically. Do not change
-the journal's version number to bypass this boundary. Go version-2 journals retain
-the original `nkdvm0` bridge, firewall-owner prefix, policy-staging prefix and
-shared per-user coordination lock, so an upgrade does not strand existing grants
-or permit a second session to bypass the original lock.
+Recovery accepts version-3 journals. Unsupported journal versions fail before host mutation.
 
 Restoration takes the same kernel-released lock, never kills serialized PIDs
 and, on the same boot, waits 40 seconds for in-flight bounded sudo work. This

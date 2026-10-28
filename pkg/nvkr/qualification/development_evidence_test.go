@@ -1,0 +1,113 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package qualification
+
+import (
+	"encoding/json"
+	"reflect"
+	"strings"
+	"testing"
+
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationorigin"
+)
+
+func developmentEvidenceFixture() Evidence {
+	v := evidenceFixture()
+	v.SchemaVersion, v.GateVersion = DevelopmentSchemaVersion, DevelopmentGateVersion
+	update := func(d *qualificationorigin.Description, workflow, branch string) {
+		d.Workflow, d.Branch, d.Ref = workflow, branch, "refs/heads/"+branch
+		d.BuilderID = "https://github.com/" + d.Repository + "/" + workflow + "@" + d.Ref
+	}
+	update(&v.ArtifactChecks.Origin, development.ProducerWorkflow, "feature/build")
+	update(&v.Invocation, development.QualificationWorkflow, "feature/qualify")
+	prefix := "ghcr.io/example/nvkr/development/runs/12/attempts/1/"
+	v.ArtifactChecks.Inputs.ReleaseSubject = prefix + "releases@" + v.ArtifactChecks.Inputs.ContentSubject
+	for i := range v.ArtifactChecks.Outputs {
+		o := &v.ArtifactChecks.Outputs[i]
+		o.Reference = prefix + o.Name + "@" + o.Subject
+	}
+	p := &v.ToolSmoke.Policy
+	p.Source.Development, p.Source.Workflow = true, development.ProducerWorkflow
+	p.QualificationWorkflow, p.Smoke.Workflow = development.QualificationWorkflow, development.SmokeWorkflow
+	digest, err := p.Digest()
+	if err != nil {
+		panic(err)
+	}
+	v.ToolSmoke.PolicyDigest = digest
+	v.ToolSmoke.ArtifactChecks, v.ToolSmoke.Invocation = v.ArtifactChecks, v.Invocation
+	for i := range v.ToolSmoke.Workers {
+		w := &v.ToolSmoke.Workers[i]
+		w.ArtifactChecks, w.Invocation, w.PolicyDigest = v.ArtifactChecks, v.Invocation, digest
+	}
+	return v
+}
+
+func TestDevelopmentEvidenceIsNotProductionEvidence(t *testing.T) {
+	v := developmentEvidenceFixture()
+	raw, err := v.Canonical()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Decode(raw)
+	requireCode(t, err, e.CodeVerifyFailed)
+	for _, tc := range []struct {
+		name string
+		edit func(*Evidence)
+	}{
+		{"source attempt", func(v *Evidence) {
+			v.ArtifactChecks.Inputs.ReleaseSubject = strings.Replace(v.ArtifactChecks.Inputs.ReleaseSubject, "/attempts/1/", "/attempts/2/", 1)
+		}},
+		{"output attempt", func(v *Evidence) {
+			v.ArtifactChecks.Outputs[0].Reference = strings.Replace(v.ArtifactChecks.Outputs[0].Reference, "/runs/12/", "/runs/13/", 1)
+		}},
+		{"production schema", func(v *Evidence) { v.SchemaVersion, v.GateVersion = SchemaVersion, GateVersion }},
+		{"production source", func(v *Evidence) { v.ArtifactChecks.Origin.Branch = "" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			v := developmentEvidenceFixture()
+			tc.edit(&v)
+			requireCode(t, v.Validate(), e.CodeVerifyFailed)
+		})
+	}
+}
+
+func TestDevelopmentEvidenceRetainsMixedPublicationAttempts(t *testing.T) {
+	for _, tc := range []struct {
+		name, attempt string
+		code          e.Code
+	}{
+		{"retained output", "1", ""},
+		{"current output", "2", ""},
+		{"future output", "3", e.CodeVerifyFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			v := developmentEvidenceFixture()
+			v.ArtifactChecks.Origin.Attempt = "2"
+			v.ArtifactChecks.Origin.InvocationID = strings.Replace(v.ArtifactChecks.Origin.InvocationID, "/attempts/1", "/attempts/2", 1)
+			v.ArtifactChecks.Outputs[0].Reference = strings.Replace(v.ArtifactChecks.Outputs[0].Reference, "/attempts/1/", "/attempts/"+tc.attempt+"/", 1)
+			v.ToolSmoke.ArtifactChecks = v.ArtifactChecks
+			for i := range v.ToolSmoke.Workers {
+				v.ToolSmoke.Workers[i].ArtifactChecks = v.ArtifactChecks
+			}
+			raw, err := v.Canonical()
+			if tc.code != "" {
+				requireCode(t, err, tc.code)
+				return
+			}
+			if err != nil {
+				t.Fatalf("lost retained publication: %v", err)
+			}
+			var decoded Evidence
+			if err := json.Unmarshal(raw, &decoded); err != nil {
+				t.Fatal(err)
+			}
+			if decoded.ArtifactChecks.Origin.Attempt != "2" || decoded.ArtifactChecks.Inputs.ReleaseSubject != v.ArtifactChecks.Inputs.ReleaseSubject || !reflect.DeepEqual(decoded.ArtifactChecks.Outputs, v.ArtifactChecks.Outputs) {
+				t.Fatal("canonical evidence changed the consuming attempt or exact named retained references")
+			}
+
+		})
+	}
+}

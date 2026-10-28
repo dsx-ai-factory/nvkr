@@ -33,8 +33,11 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 	if err := options.Validate(); err != nil {
 		return Inspection{}, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Minute)
-	defer cancel()
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 20*time.Minute)
+		defer cancel()
+	}
 	parse := []name.Option{name.StrictValidation}
 	if options.PlainHTTP {
 		parse = append(parse, name.Insecure)
@@ -44,7 +47,13 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 		return Inspection{}, e.Wrap(e.CodeUnpinnedSource, err, "parse metadata reference")
 	}
 	remoteOptions := registryOptions(ctx, options)
-	fetched, err := remote.Get(ref, remoteOptions...)
+	// Reuse repository authentication only within this complete metadata pull.
+	// Independent calls retain independent credentials, contexts and admission.
+	puller, err := remote.NewPuller(remoteOptions...)
+	if err != nil {
+		return Inspection{}, metadataFetchError(ctx, err, "create metadata puller")
+	}
+	fetched, err := puller.Get(ctx, ref)
 	if err != nil {
 		return Inspection{}, metadataFetchError(ctx, err, "fetch metadata index")
 	}
@@ -71,7 +80,7 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 		return err
 	}
 	manifest := func(repo name.Repository, d Descriptor) (ociManifest, error) {
-		got, err := remote.Get(repo.Digest(d.Digest), remoteOptions...)
+		got, err := puller.Get(ctx, repo.Digest(d.Digest))
 		if err != nil {
 			return ociManifest{}, metadataFetchError(ctx, err, "fetch metadata manifest")
 		}
@@ -88,7 +97,7 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 		if d.Size < 0 || d.Size > max {
 			return e.New(e.CodeVerifyFailed, "oversized metadata blob")
 		}
-		layer, err := remote.Layer(repo.Digest(d.Digest), remoteOptions...)
+		layer, err := puller.Layer(ctx, repo.Digest(d.Digest))
 		if err != nil {
 			return metadataFetchError(ctx, err, "fetch metadata blob")
 		}
@@ -239,17 +248,33 @@ func metadataFetchError(ctx context.Context, err error, operation string) error 
 // referenced manifest exists. Caller-owned signature/provenance gates authorize
 // release assembly; manifest existence alone is not acceptance.
 func PushMetadata(ctx context.Context, source, repository string, options RegistryOptions) (string, error) {
+	return PushMetadataWithOptions(ctx, source, repository, PushOptions{Registry: options})
+}
+
+// PushMetadataWithOptions binds optional prior metadata admission to the exact
+// root being published. Metadata publication cannot advance payload aliases.
+func PushMetadataWithOptions(ctx context.Context, source, repository string, request PushOptions) (string, error) {
+	options := request.Registry
 	if err := deliveryContext(ctx); err != nil {
 		return "", err
 	}
-	if err := options.Validate(); err != nil {
+	if err := request.Validate(); err != nil {
 		return "", err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Minute)
-	defer cancel()
+	if len(request.ImageTags) != 0 {
+		return "", e.New(e.CodeUsage, "metadata publication cannot advance image tags")
+	}
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 20*time.Minute)
+		defer cancel()
+	}
 	inspection, err := InspectMetadata(ctx, source)
 	if err != nil {
 		return "", err
+	}
+	if request.ExpectedRootDigest != "" && inspection.RootDigest != request.ExpectedRootDigest {
+		return "", e.New(e.CodeVerifyFailed, "publication root changed after metadata admission")
 	}
 	parse := []name.Option{name.StrictValidation}
 	if options.PlainHTTP {
@@ -280,6 +305,13 @@ func PushMetadata(ctx context.Context, source, repository string, options Regist
 	index, err := path.ImageIndex()
 	if err != nil {
 		return "", e.Wrap(e.CodeVerifyFailed, err, "open metadata index")
+	}
+	digest, err := index.Digest()
+	if err != nil {
+		return "", e.Wrap(e.CodeVerifyFailed, err, "digest metadata index")
+	}
+	if digest.String() != inspection.RootDigest {
+		return "", e.New(e.CodeVerifyFailed, "metadata index changed after membership inspection")
 	}
 	if err := remote.WriteIndex(ref, index, registryOptions(ctx, options)...); err != nil {
 		return "", classifyContext(ctx, e.Wrap(e.CodeUnavailable, err, "publish metadata root"))

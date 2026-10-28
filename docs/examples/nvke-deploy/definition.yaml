@@ -1,0 +1,66 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+catalog:
+  base: ../../../inputs/catalogs/nvke/release
+cosignTool: cosign
+kind: Definition
+metadata:
+  description: Build Linux AMD64/ARM64 CWE and fixture profiles images as OCI indexes, the controller chart and CLI binaries;
+    acquire the four external charts selected by NVKE v0.22.0.
+  name: nvke-deploy
+outputs:
+- components:
+  - nvke-controller-chart
+  format: helm-oci
+  helm:
+    images:
+      controller: cwe
+  name: controller-chart
+  platform: linux/amd64
+- components:
+  - nvke-controller-profiles-image
+  format: oci
+  name: controller-profiles-image
+  platforms:
+  - linux/amd64
+  - linux/arm64
+- components:
+  - nvke-controller
+  format: oci
+  name: cwe
+  platforms:
+  - linux/amd64
+  - linux/arm64
+- components:
+  - nvkectl
+  format: executable
+  name: nvkectl-linux-amd64
+  platform: linux/amd64
+- components:
+  - nvkectl
+  format: executable
+  name: nvkectl-linux-arm64
+  platform: linux/arm64
+- components:
+  - postgresql-chart
+  format: helm-oci
+  name: postgresql
+  platform: linux/amd64
+- components:
+  - spire-chart
+  format: helm-oci
+  name: spire
+  platform: linux/amd64
+- components:
+  - spire-crds-chart
+  format: helm-oci
+  name: spire-crds
+  platform: linux/amd64
+- components:
+  - temporal-chart
+  format: helm-oci
+  name: temporal
+  platform: linux/amd64
+sbomTool: syft

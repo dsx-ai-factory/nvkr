@@ -493,10 +493,10 @@ func buildVerifiedSet(ctx context.Context, snapshot *buildgraph.Resolved, buildD
 			if aggregate.Components[i].Name == component.Name && component.Prebuilt != nil {
 				if publisherQualified {
 					aggregate.Components[i] = componentForPublisherEvidence(component,
-						hashes[component.Name], target.Arch(snapshot.Platform), verifiedProps[component.Name])
+						hashes[component.Name], target.ExecutableArch(snapshot.Platform), verifiedProps[component.Name])
 				} else {
 					aggregate.Components[i] = componentForWithExternalEvidence(component,
-						hashes[component.Name], target.Arch(snapshot.Platform), verifiedProps[component.Name])
+						hashes[component.Name], target.ExecutableArch(snapshot.Platform), verifiedProps[component.Name])
 				}
 				break
 			}
@@ -508,19 +508,19 @@ func buildVerifiedSet(ctx context.Context, snapshot *buildgraph.Resolved, buildD
 		if !component.FromSource && component.Prebuilt == nil {
 			continue
 		}
-		bom := fromComponentForArch(component, buildDigest, hashes[component.Name], target.Arch(snapshot.Platform))
+		bom := fromComponentForArch(component, buildDigest, hashes[component.Name], target.ExecutableArch(snapshot.Platform))
 		if publisherQualified {
 			publisherComponent := componentForPublisherEvidence(component,
-				hashes[component.Name], target.Arch(snapshot.Platform),
+				hashes[component.Name], target.ExecutableArch(snapshot.Platform),
 				externalEvidenceDeclarationProps(component.Prebuilt))
 			bom.Metadata.Component = publisherComponent
 		}
 		if component.Prebuilt != nil {
 			verifiedComponent := componentForWithExternalEvidence(component,
-				hashes[component.Name], target.Arch(snapshot.Platform), verifiedProps[component.Name])
+				hashes[component.Name], target.ExecutableArch(snapshot.Platform), verifiedProps[component.Name])
 			if publisherQualified {
 				verifiedComponent = componentForPublisherEvidence(component,
-					hashes[component.Name], target.Arch(snapshot.Platform), verifiedProps[component.Name])
+					hashes[component.Name], target.ExecutableArch(snapshot.Platform), verifiedProps[component.Name])
 			}
 			bom.Metadata.Component = verifiedComponent
 		}

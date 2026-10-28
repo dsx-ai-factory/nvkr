@@ -109,18 +109,11 @@ func runQualifiedLocalBuild(c *cli.Context, sourceRoot string) (*qualifiedLocalB
 			return nil, err
 		}
 	}
-	res, _, err := resolveBuild(c)
+	resolution, err := resolveBuildResult(c)
 	if err != nil {
 		return nil, err
 	}
-	graph, err := buildgraph.Compile(res)
-	if err != nil {
-		return nil, err
-	}
-	digest, err := graph.Digest()
-	if err != nil {
-		return nil, err
-	}
+	res := resolution.Resolved
 	result := &qualifiedLocalBuild{Resolved: res}
 	only := selectedComponents(c)
 	options := pipeline.RunOptions{
@@ -148,7 +141,7 @@ func runQualifiedLocalBuild(c *cli.Context, sourceRoot string) (*qualifiedLocalB
 		return result, e.New(e.CodeUntrustedProfile,
 			"an all-prebuilt qualified build must remain profile-independent")
 	}
-	result.Report, err = pipeline.Local{}.Run(graph, digest, options)
+	result.Report, err = pipeline.Local{}.Run(resolution.Graph, resolution.BuildDigest, options)
 	if err != nil {
 		if result.Report != nil {
 			_ = result.Report.Close()

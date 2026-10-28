@@ -4,7 +4,7 @@ This directory defines the OCI toolchain consumed by NVKR's local direct-Packer
 executor. Each host-platform image contains Packer 1.15.4, the QEMU plugin 1.1.6,
 QEMU for both supported guest architectures, AMD64 and ARM64 UEFI firmware, `qemu-img`,
 `ssh-keygen`, Python, `tar`, a shell and the core utilities used by the NVKE
-Packer project. It also contains Go 1.27.2, crane 0.21.9, nfpm 2.47.0,
+Packer project. It also contains Go 1.27.3, crane 0.21.9, nfpm 2.47.0,
 Helm 4.2.4 and ORAS 1.3.3,
 `dpkg-scanpackages`, `cloud-localds`, a native C compiler, Git, GnuPG, 7-Zip
 and xorriso. Those are the preparation and ISO-composition tools required by the
@@ -181,7 +181,7 @@ After publication, read back the exact repository reference's native descriptor,
 `crane digest --platform linux/arm64 '<repository>@sha256:<digest>'`, with the matching platform.
 
 The source lock's historical `validatedNVKE` commit is not validation of the capture-enabled M2 source.
-The [M2 README](../../definitions/nvke-m2/README.md) owns current source selections, candidate exceptions
+The [M2 README](../../inputs/definitions/nvke/README.md) owns current source selections, candidate exceptions
 and generated execution requirements; the machine-managed locks and overlay own their exact values.
 Native preparation and registry read-back do not establish source-owner release acceptance, runtime
 isolation, a full image bake, organizational approval or independent consumer acceptance.

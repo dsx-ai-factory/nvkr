@@ -29,21 +29,20 @@ func contentFixture(kind, architecture, payload string) *DiskContentInspection {
 	return &DiskContentInspection{runtimeDigest: pin, report: diskContentReport{Subject: "sha256:" + strings.Repeat(payload, 64), Size: 4096,
 		Kind: kind, Platform: "linux/" + architecture, Inspector: pin, Codec: pin, Guestfish: pin, Scanner: pin, PackageReader: pin, MaxFilesystemBytes: 8192,
 		Components: []Component{{Type: "library", Name: "base-package", Version: "2:1.0-1ubuntu4", PURL: "pkg:deb/ubuntu/base-package@2%3A1.0-1ubuntu4?arch=" + architecture,
-			Properties: []Property{{Name: diskContentClassProperty, Value: class}, {Name: "nkd:packageArchitecture", Value: architecture}, {Name: "nkd:packageFormat", Value: "deb"}}}},
+			Properties: []Property{{Name: diskContentClassProperty, Value: class}, {Name: "nvkr:packageArchitecture", Value: architecture}, {Name: "nvkr:packageFormat", Value: "deb"}}}},
 		Files: []DiskFile{{Path: "usr/bin/tool", Kind: "regular", Digest: pin, Size: 12}}}}
 }
 
-// Literal keys model the unchanged report from the digest-pinned inspector;
-// sharing the writer's constants would hide another accidental ABI rename.
-func TestPinnedDiskReportPropertyABI(t *testing.T) {
+// Literal keys pin the helper report vocabulary independently of the writer.
+func TestNVKRDiskReportPropertyABI(t *testing.T) {
 	for _, architecture := range []string{"amd64", "arm64"} {
 		t.Run(architecture, func(t *testing.T) {
 			carrier := "var/cache/input.deb@sha256:" + strings.Repeat("a", 64)
 			component := Component{Type: "library", Name: "observed", Version: "1", Properties: []Property{
-				{Name: "nkd:containedIn", Value: carrier},
-				{Name: "nkd:diskContentClass", Value: "debian-archive"},
-				{Name: "nkd:packageArchitecture", Value: architecture},
-				{Name: "nkd:packageFormat", Value: "deb"},
+				{Name: "nvkr:containedIn", Value: carrier},
+				{Name: "nvkr:diskContentClass", Value: "debian-archive"},
+				{Name: "nvkr:packageArchitecture", Value: architecture},
+				{Name: "nvkr:packageFormat", Value: "deb"},
 			}}
 			key, err := diskObservedComponentKey(component, "linux/"+architecture)
 			if err != nil || key != (diskObservedPackageKey{diskPackageKey{"observed", "1", "deb", architecture}, "debian-archive"}) {
@@ -59,7 +58,7 @@ func TestPinnedDiskReportPropertyABI(t *testing.T) {
 			}
 			contained := false
 			for _, property := range projected[0].Properties {
-				if property.Name == "nkd:containedIn" {
+				if property.Name == "nvkr:containedIn" {
 					contained = property.Value == string(want)
 				}
 				if property.Name == "nvkr:observedAtSubjectRoot" {
@@ -76,8 +75,8 @@ func TestPinnedDiskReportPropertyABI(t *testing.T) {
 				t.Run(test.property, func(t *testing.T) {
 					changed := cloneComponent(component)
 					for index := range changed.Properties {
-						if changed.Properties[index].Name == "nkd:"+test.property {
-							changed.Properties[index].Name = "nvkr:" + test.property
+						if changed.Properties[index].Name == "nvkr:"+test.property {
+							changed.Properties[index].Name = "unsupported:" + test.property
 						}
 					}
 					_, err := diskObservedComponentKey(changed, "linux/"+architecture)
@@ -146,7 +145,7 @@ func TestReconcileDiskContentsDoesNotEquateUnknownVersions(t *testing.T) {
 			root := contentFixture("disk-image", "arm64", "b")
 			inputs := []*DiskContentInspection{contentFixture("installer-iso", "arm64", "c"), contentFixture("apt-acquisition", "arm64", "d"), contentFixture("tarball", "arm64", "e")}
 			component := Component{Type: "library", Name: "observed", Version: test.materialVersion,
-				Properties: []Property{{Name: diskContentClassProperty, Value: diskClassFilesystem}, {Name: "nkd:packageArchitecture", Value: "arm64"}, {Name: "nkd:packageFormat", Value: test.format}}}
+				Properties: []Property{{Name: diskContentClassProperty, Value: diskClassFilesystem}, {Name: "nvkr:packageArchitecture", Value: "arm64"}, {Name: "nvkr:packageFormat", Value: test.format}}}
 			for _, input := range inputs {
 				input.report.Components = []Component{cloneComponent(component)}
 			}
@@ -294,7 +293,7 @@ func TestDiskPackageContentClassMatrixBothArchitectures(t *testing.T) {
 }
 
 func TestDiskClassesAreOwnerIssuedNotScannerProperties(t *testing.T) {
-	raw := []byte(`{"schema":{"version":"16.1.10"},"artifacts":[{"name":"sample","version":"1","type":"deb","metadata":{"architecture":"arm64"},"properties":[{"name":"nkd:diskContentClass","value":"debian-archive"}]}]}`)
+	raw := []byte(`{"schema":{"version":"16.1.10"},"artifacts":[{"name":"sample","version":"1","type":"deb","metadata":{"architecture":"arm64"},"properties":[{"name":"nvkr:diskContentClass","value":"debian-archive"}]}]}`)
 	inventory, err := filesystemDependenciesFromJSON(raw, "sha256:"+strings.Repeat("a", 64))
 	if err != nil {
 		t.Fatal(err)

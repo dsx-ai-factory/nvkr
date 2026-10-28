@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -65,7 +66,7 @@ func TestDemoFileTypedConversion(t *testing.T) {
 	}
 	var progress bytes.Buffer
 	build, err := file.BuildConfig(&progress)
-	if err != nil || build != (BuildConfig{Repository: "/native/nvkr", NVKEClone: "/native/nvke-source", AttemptPrefix: "example-01", Jobs: 2, Progress: &progress}) {
+	if err != nil || build != (BuildConfig{Repository: "/native/nvkr", NVKEClone: "/native/nvke-source", AttemptPrefix: "example-01", Jobs: 2, Progress: &progress, Network: "ovn"}) {
 		t.Fatalf("build=%+v error=%v", build, err)
 	}
 	run, err := file.RunConfig(&progress)
@@ -121,11 +122,46 @@ func TestDemoNetworkSelection(t *testing.T) {
 	}
 }
 
+func TestDemoTenantWorkersSelection(t *testing.T) {
+	for _, tc := range []struct {
+		value       string
+		conformance bool
+		workers     int
+		fail        bool
+	}{
+		{"0", false, 0, false}, {"1", false, 1, false}, {"2", false, 2, false},
+		{"0", true, 0, false}, {"2", true, 2, false}, {"1", true, 0, true},
+		{"-1", false, 0, true}, {"3", false, 0, true},
+		{"1.5", false, 0, true}, {"'2'", false, 0, true}, {"true", false, 0, true},
+	} {
+		t.Run(tc.value+fmt.Sprint(tc.conformance), func(t *testing.T) {
+			contents := strings.Replace(fullDemoYAML, "run:\n", fmt.Sprintf("run:\n  tenantWorkers: %s\n  conformance: %t\n", tc.value, tc.conformance), 1)
+			file, err := LoadDemoFile(t.Context(), demoConfigPath(t, contents))
+			var cfg Config
+			if err == nil {
+				cfg, err = file.RunConfig(nil)
+			}
+			if tc.fail {
+				assertConfigUsage(t, err)
+				return
+			}
+			if err != nil || cfg.TenantWorkers != tc.workers || cfg.Conformance != tc.conformance {
+				t.Fatalf("worker selection lost: %+v %v", cfg, err)
+			}
+			file.Run.NVKR, file.Run.Runs = "", RunFileInputs{}
+			build, run, err := file.E2EConfig(nil)
+			if err != nil || run.TenantWorkers != tc.workers || run.Conformance != tc.conformance || build.Conformance != tc.conformance {
+				t.Fatalf("E2E selection changed worker or suite intent: %+v %+v %v", build, run, err)
+			}
+		})
+	}
+}
+
 func TestDemoCleanupRequiresStrictBoolean(t *testing.T) {
 	for _, test := range []struct {
 		value          string
 		valid, cleanup bool
-	}{{"false", true, false}, {"true", true, true}, {"'true'", false, false}, {"1", false, false}, {"null", false, false}, {"[]", false, false}} {
+	}{{"false", true, false}, {"true", true, true}, {"'true'", false, false}, {"yes", false, false}, {"on", false, false}, {"1", false, false}, {"null", false, false}, {"[]", false, false}} {
 		t.Run(test.value, func(t *testing.T) {
 			contents := strings.Replace(fullDemoYAML, "run:\n", "run:\n  cleanup: "+test.value+"\n", 1)
 			file, err := LoadDemoFile(t.Context(), demoConfigPath(t, contents))
@@ -289,7 +325,8 @@ func TestDemoFileConversionRefusals(t *testing.T) {
 		{"build jobs zero", func(f *DemoFile) { f.Build.Jobs = 0 }, "build"},
 		{"build invalid optional clone", func(f *DemoFile) { f.Build.NVKEClone = "\n" }, "build"},
 		{"build version", func(f *DemoFile) { f.Version = 2 }, "build"},
-		{"run checkout", func(f *DemoFile) { f.Run.NVKECheckout = "" }, "run"},
+		{"run invalid accelerator", func(f *DemoFile) { f.Run.Accelerator = "unavailable" }, "run"},
+		{"run invalid optional checkout", func(f *DemoFile) { f.Run.NVKECheckout = "\n" }, "run"},
 		{"run out", func(f *DemoFile) { f.Run.Out = "" }, "run"},
 		{"run executable", func(f *DemoFile) { f.Run.NVKR = "" }, "run"},
 		{"run version", func(f *DemoFile) { f.Version = 0 }, "run"},
@@ -318,7 +355,7 @@ func TestDemoFileConversionRefusals(t *testing.T) {
 			assertConfigUsage(t, err)
 		})
 	}
-	for _, name := range []string{"os", "components", "providers", "site", "tools", "profiles", "simulator"} {
+	for _, name := range []string{"os", "components", "providers", "site", "tools", "profiles"} {
 		t.Run("missing "+name, func(t *testing.T) {
 			file := base
 			fields := map[string]*string{"os": &file.Run.Runs.OS, "components": &file.Run.Runs.Components, "providers": &file.Run.Runs.Providers, "site": &file.Run.Runs.Site, "tools": &file.Run.Runs.Tools, "profiles": &file.Run.Runs.Profiles, "simulator": &file.Run.Runs.Simulator}
@@ -368,7 +405,7 @@ func TestDemoFileTenantBudgetBoundaries(t *testing.T) {
 	}
 }
 
-func TestInstallerCheckoutOptionalOnlyForE2E(t *testing.T) {
+func TestInstallerCheckoutOptionalForBuildAndDeploy(t *testing.T) {
 	for _, checkout := range []string{"", "/native/installer", "\n"} {
 		t.Run("checkout="+checkout, func(t *testing.T) {
 			file := DemoFile{Version: 1, Build: BuildFile{Repo: "/native/repo", Attempt: "fresh", Jobs: 2}, Run: RunFile{NVKECheckout: checkout, Out: "/native/output", TimeoutSeconds: 3600}}
@@ -383,9 +420,7 @@ func TestInstallerCheckoutOptionalOnlyForE2E(t *testing.T) {
 			file.Run.NVKR = "/native/nvkr"
 			file.Run.Runs = RunFileInputs{OS: "run", Components: "run", Providers: "run", Site: "run", Tools: "run", Profiles: "run", Simulator: "run"}
 			_, err = file.RunConfig(nil)
-			if checkout == "" {
-				assertConfigUsage(t, err)
-			} else if err != nil {
+			if err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -401,4 +436,25 @@ func TestDemoFileMaintainedExample(t *testing.T) {
 	if err != nil || build.Jobs != 2 || build.AttemptPrefix != "demo-e2e-01" || run.Timeout != time.Hour || run.Runs != (RunInputs{}) || run.NVKR != "" {
 		t.Fatalf("maintained example does not describe a fresh e2e: build=%+v run=%+v error=%v", build, run, err)
 	}
+}
+
+func TestCombinedArtifactRunNeedsOnlyNativeTools(t *testing.T) {
+	file := DemoFile{Version: 1, Run: RunFile{NVKR: "nvkr", Out: "out", TimeoutSeconds: 3600, Runs: RunFileInputs{Artifacts: "built-artifacts", Tools: "built-native-tools"}}}
+	cfg, err := file.RunConfig(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.NVKECheckout != "" || cfg.Runs.Simulator != "" {
+		t.Fatal("native deployment added an old installer or simulator dependency")
+	}
+	for _, root := range []string{cfg.Runs.OS, cfg.Runs.Components, cfg.Runs.Providers, cfg.Runs.Site, cfg.Runs.Profiles} {
+		if root != "built-artifacts" {
+			t.Fatalf("combined Run binding changed: %+v", cfg.Runs)
+		}
+	}
+	if cfg.Runs.Tools != "built-native-tools" {
+		t.Fatal("native tools Run changed")
+	}
+	_, _, err = file.E2EConfig(nil)
+	assertConfigUsage(t, err)
 }

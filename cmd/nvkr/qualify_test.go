@@ -21,11 +21,16 @@ func TestQualificationCLISelectsOnlyIndependentPolicy(t *testing.T) {
 	for _, fail := range []bool{false, true} {
 		t.Run(map[bool]string{false: "success diagnostic", true: "failure diagnostic"}[fail], func(t *testing.T) {
 			t.Setenv("NVKR_GITHUB_TOKEN", "provider-token")
+			t.Setenv("NVKR_CI_STORAGE_TOKEN", "private-read-secret")
+			t.Setenv("NVKR_CI_STORAGE_USER", "storage-reader")
 			t.Setenv("NVKR_REGISTRY", "registry.example")
 			t.Setenv("NVKR_REGISTRY_USER", "registry-user")
 			t.Setenv("NVKR_REGISTRY_PASSWORD", "registry-secret")
 			var output bytes.Buffer
 			app := &cli.App{Writer: &output, Commands: []*cli.Command{cmdRunQualifyWithPublisher(func(ctx context.Context, policy string, options lifecycle.QualificationRuntimeOptions) (*qualification.Publication, error) {
+				if options.CIStorageUsername != "storage-reader" || options.CIStorageToken != "private-read-secret" {
+					t.Fatal("private registry account was not passed independently of publication credentials")
+				}
 				if ctx == nil || policy != "qualification.yaml" || options.WorkspaceRoot != ".nvkr/qualification" || options.GitHubToken != "provider-token" || options.Credential.Registry != "registry.example" || options.Credential.Username != "registry-user" || options.Registry.Password != "registry-secret" {
 					t.Fatal("incorrect policy or process configuration mapping")
 				}
@@ -51,14 +56,14 @@ func TestQualificationCLISelectsOnlyIndependentPolicy(t *testing.T) {
 			if result.Successful == fail || result.ArtifactChecks == nil || len(result.ArtifactChecks.Outputs) != 1 || result.ArtifactChecks.Outputs[0].Checks[0].Code != string(e.CodeSignatureInvalid) {
 				t.Fatal("qualification diagnostics changed")
 			}
-			if strings.Contains(output.String(), "provider-token") || strings.Contains(output.String(), "registry-secret") {
+			if strings.Contains(output.String(), "provider-token") || strings.Contains(output.String(), "registry-secret") || strings.Contains(output.String(), "private-read-secret") {
 				t.Fatal("diagnostics expose process credentials")
 			}
 		})
 	}
 	for _, flag := range cmdRunQualify().Flags {
 		for _, name := range flag.Names() {
-			if name != "policy" && name != "workspace" {
+			if name != "policy" && name != "workspace" && name != "issue-manifest" {
 				t.Fatalf("qualify exposes candidate or trust override %s", name)
 			}
 		}

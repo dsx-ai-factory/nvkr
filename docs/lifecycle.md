@@ -1,7 +1,7 @@
 # Definition, Run, and Release workflow
 
 This reference covers output completeness, immutable attempts, release verification and SDK use.
-Start with the [quickstart](quickstart.md) for CLI setup and the [concept reference](user-concepts.md)
+Start with the [quickstart](quickstart.md#build-only-the-cli) for CLI setup and the [concept reference](user-concepts.md)
 for the six public objects. [ADR-17](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0017-cli-sdk-foundation-and-package-topology.md) owns the
 lifecycle contract; [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md) owns current implementation and evidence.
 
@@ -16,8 +16,8 @@ The Build Digest identifies that generated graph's logical content. Output label
 execution settings remain in their owning records. Two outputs can share a Build Digest while requiring
 separate producer jobs, observations and evidence; one successful output cannot satisfy a missing sibling.
 
-The [NVKE Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-v1/definition.yaml) directly selects `nvkectl`, `cwe`, and `nvke-helm`
-for three outputs. The Helm output explicitly depends on the CWE image output. No reusable membership group,
+The [NVKE Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-tutorial/definition.yaml) directly selects `nvkectl`, `cwe`, and `nvke-helm`
+for three outputs. The Helm output explicitly depends on the NVKE management-plane image output (`cwe`). No reusable membership group,
 criteria query, inheritance chain, or mixin sits between an output and its producers.
 
 Deployment topology and placement are owned by the system that consumes the artifacts;
@@ -25,8 +25,8 @@ Definitions and Releases contain no cluster views, deployment roles or categorie
 
 ## Select an Environment
 
-The [local Environment](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-v1/environment-local.yaml) supplies execution settings and a local
-registry destination. The [GitHub Environment](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-v1/environment-github.yaml) supplies the
+The [local Environment](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-tutorial/environment-local.yaml) supplies execution settings and a local
+registry destination. The [GitHub Environment](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-tutorial/environment-github.yaml) supplies the
 corresponding hosted-run settings. Environments own runner routes and may declare named execution classes with
 host platform, resource capacity, exposed capabilities, and timeout ceilings. The compiler deterministically
 binds a requested build to one satisfying class and records that exact route in the Plan. A class declaration is
@@ -47,11 +47,11 @@ With `bin/nvkr` built as described in the quickstart, inspect the three-output N
 
 ```sh
 bin/nvkr definition validate \
-  --definition definitions/nvke-v1/definition.yaml
+  --definition docs/examples/nvke-tutorial/definition.yaml
 
 bin/nvkr run plan \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-local.yaml
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-local.yaml
 ```
 
 For saved generated Plans, `run plan --plan <path>` prints the required outputs and instructions;
@@ -59,23 +59,23 @@ For saved generated Plans, `run plan --plan <path>` prints the required outputs 
 and `run diff` explains changes between canonical Plans. See [Plan and graph inspection](plan-and-graph-inspection.md).
 
 Generation writes provider files and their commit manifest from the same admitted inputs. This example
-uses a temporary root: the repository's committed bundle selects M2, not the three-output Definition.
+uses a temporary root: the repository's committed bundle selects the maintained NVKE Definition, not the three-output Definition.
 The matching `--check` invocation regenerates in memory and fails if generated files differ:
 
 ```sh
 NVKR_LIFECYCLE_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-lifecycle.XXXXXX")
 bin/nvkr run generate \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-github.yaml \
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-github.yaml \
   --engine github --root "$NVKR_LIFECYCLE_ROOT"
 
 bin/nvkr run generate \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-github.yaml \
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-github.yaml \
   --engine github --root "$NVKR_LIFECYCLE_ROOT" --check
 ```
 
-Use the [M2 instructions](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/README.md) to regenerate the committed bundle.
+Use the [maintained NVKE Definition's instructions](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md) to regenerate the committed bundle.
 Generated CI defaults to generic hosted runners; ADR-18 separately admits the explicit native ARC disk
 route. Publication and signing belong to the GitHub v1 lane. Generation does not prove provider execution.
 
@@ -85,8 +85,8 @@ Inspect a local attempt without creating its workspace or executing nodes:
 
 ```sh
 bin/nvkr run local \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-local.yaml \
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-local.yaml \
   --attempt review-001 --dry-run
 ```
 
@@ -108,8 +108,8 @@ observation, finalization, release verification or runtime health.
 
 ```sh
 bin/nvkr run local \
-  --definition definitions/nvke-v1/definition.yaml \
-  --environment definitions/nvke-v1/environment-local.yaml \
+  --definition docs/examples/nvke-tutorial/definition.yaml \
+  --environment docs/examples/nvke-tutorial/environment-local.yaml \
   --attempt build-001 --ui=plain
 ```
 
@@ -160,29 +160,32 @@ producers and creates no attempt. Closing that view does not cancel another Run.
 The following public commands accept `--ui=tui` and `--no-color`: Definition validation
 and inspection; Run planning, graph, comparison, inspection, generation and local
 execution; producer resolution; all catalog inspection and maintenance commands;
-and Release inspection, browsing, export and verification. Other than the interactive
+and Release inspection, browsing, export, pulling and verification. Other than the interactive
 local Run default described above, commands default to `--ui=plain` and keep their
 existing text, canonical JSON or diagram output. On commands with a result
-browser, `--ui=auto` selects it when the terminal is eligible. Explicit JSON output
+browser, `--ui=auto` selects it when the terminal is eligible. Explicit JSON or Mermaid output
 and `--ui=tui` are incompatible and fail before input, network or write work.
-`run check-artifacts` and `run qualify` retain canonical machine-readable diagnostics and do not offer
+`validate`, `run check-artifacts` and `run qualify` retain canonical machine-readable diagnostics and do not offer
 presentation flags.
 
 ```sh
-bin/nvkr definition inspect --definition definitions/nvke-v1/definition.yaml --ui=tui
+bin/nvkr definition inspect --definition docs/examples/nvke-tutorial/definition.yaml --ui=tui
 bin/nvkr run graph --plan .github/nvkr-run/plan.json --ui=tui
-bin/nvkr catalog list --data definitions/nvke-v1/catalog --ui=tui
+bin/nvkr catalog list --data inputs/catalogs/nvke/module-tags --ui=tui
 ```
 
 Graph and release browsers start with an output overview when their supplied
 results also contain internal nodes or evidence entries. Press `g` to toggle all
 supplied entries; `/` searches the complete supplied set. Producer-only graph
 views keep their supplied producers. The default list uses one row per entry,
-with readable output names; repeated static states are omitted. Full digests and command context live in
+with readable output names; repeated static states are omitted. Release rows add compact kind/platform or
+chart-version summaries when the complete row fits. Full digests and command context live in
 Details.
 
 Results and Details show projected names, identities, counts and dependencies;
-`/` searches names and `f` cycles the available All, Changed and Failed filters.
+`/` searches result names, navigation identities, kinds and projected metadata fields, and `f` cycles the
+available All, Changed and Failed filters. Searches match a case-insensitive substring across the supplied
+entries; global command context is outside item search. Run progress keeps its output-name search.
 Static views offer Activity only when activity is supplied; live Runs retain it.
 Tab cycles the available panes, and 1/2/3 selects a pane when available.
 Details group navigable dependencies before item metadata and command context.
@@ -409,7 +412,7 @@ release acceptance still requires its deferred qualification, membership, and re
 result cannot substitute for them. The ADR-04 stock-cosign consumer contract remains independent of the
 convenience NVKR reader.
 
-## Authenticate an M3 candidate
+## Authenticate a qualification candidate
 
 On Linux, `nvkr run check-artifacts` checks the already-published bytes against one exact producing Run
 attempt and an independently selected trust policy:
@@ -456,7 +459,7 @@ delivered payload reference. The collector joins bounded aggregate metadata and 
 without reading payload packages. The handoff contains no consumer policy. Development, unsigned, dry-run and legacy aggregate workflows do not produce it;
 an older Run without a complete handoff fails instead of rebuilding or reconstructing missing evidence.
 Legacy aggregate builds/publication remain available, but they lack invocation-bound release metadata and
-the per-output route records needed for M3 qualification; direct qualification rejects that capability before publication work.
+the per-output route records needed for qualification; direct qualification rejects that capability before publication work.
 
 The lifecycle owner recompiles the captured authored bytes with their original logical paths and requires
 the exact original Plan identity. Authored reads have no checkout fallback. Catalog-owned authentication
@@ -482,9 +485,11 @@ or signature-verification I/O.
 Every selected output is checked for schema/membership, exact Run and inputs, signed evidence, build
 signature/provenance, applicable payload pins and any authored embedded declarations. Failed checks return coded
 diagnostics; only a complete passing set produces an opaque `ArtifactCheckReceipt`. Its description is
-defensive data and grants no authority. A successful receipt retains the verified publication and a frozen
-Plan until closed. Closure revokes all shallow copies, cancels and joins registered operations, then releases
-held payload bytes. This lifetime does not itself authorize smoke execution. The direct consumer and handoff
+defensive data and grants no authority. Hosted checks verify every output's complete payload in sequence,
+releasing non-executable scratch after each output. A successful receipt retains verified controls, evidence,
+exact executable bundle bytes and a frozen Plan until closed; it cannot export discarded payloads. Closure revokes
+all shallow copies, cancels and joins registered operations, then releases held bytes. This lifetime does not
+itself authorize smoke execution. The direct consumer and handoff
 methods borrow the caller's source Run receipt, whose closure also revokes the check receipt. The Run and
 file adapters transfer their internally created source owner to the returned receipt and close it with that
 receipt.
@@ -500,10 +505,13 @@ An incomplete evidence traversal is labeled as a failure of the complete publica
 signed-evidence diagnostic. Output-specific signature failures remain visible alongside that global failure;
 no output receives a passing evidence verdict merely because its own signature check did not fail.
 
-Qualification requires the root and every output predicate to name that exact source attempt. When output
-metadata records publication origin, both preparation and signing invocations must also match. Earlier-attempt
-publication reuse remains available to the existing publication retry protocol, but cannot satisfy this MVP
-qualification gate. Earlier bytes are never relabeled as produced by the current attempt. The CLI writes
+Production qualification accepts authenticated publications from earlier attempts of the same producer workflow run.
+The selected successful attempt anchors completion; each output retains its original preparation and signing
+identities and exact predicate bytes. Preparation must precede or equal signing, output signing must precede
+or equal aggregate assembly, and aggregate assembly/signing must precede or equal source completion.
+All subjects must match the same exact Plan, inputs and workflow builder. Missing origins, other runs,
+future attempts, changed inputs and invalid or incomplete evidence still fail. An earlier attempt may have
+failed unrelated jobs; its successfully authenticated outputs need not be rebuilt. The CLI writes
 check diagnostics and returns the stable failure code; its serialized output cannot restore a live receipt
 or grant qualification signing authority.
 
@@ -534,10 +542,31 @@ from the authenticated `workflow_run` event, verifies the source's exact success
 its original handoff. There are no source-commit, candidate-file, verdict-file or skip-smoke flags.
 A manually dispatched qualifier or the source build's own identity is rejected.
 
+The generated production qualifier adds `--issue-manifest`:
+
+```sh
+nvkr run qualify --policy qualification.yaml --issue-manifest
+```
+
+This keeps the live artifact-check receipt through complete qualification publication and manifest
+issuance. The same independently loaded policy selects the exact default-branch qualification identity
+and policy digest; evidence cannot select its own trusted signer. The issuer verifies the exact canonical
+qualification evidence on every artifact, attests the manifest to the publication root, then verifies its
+attached bytes. Development policies refuse this option before provider or publication work; their
+generated qualifier publishes development qualification only.
+
+With this option, canonical diagnostics contain the qualification result and, after successful issuance,
+the manifest, its digest and subject. A manifest failure returns a nonzero exit status and preserves the
+qualification diagnostics, including a successful qualification whose later manifest step failed. Earlier
+attachments may remain; failure does not imply rollback. Without the option, the command retains its
+qualification-only output shape. Neither mode creates a release tag, moves a channel, issues qualified-lane
+clearance or establishes full-release consumer acceptance. Hosted OIDC and registry acceptance remain
+subject to the evidence recorded in reconciliation.
+
 Add `--qualification-policy qualification.yaml` to the normal `run generate` invocation to generate the
 qualifier and its native smoke worker alongside the producer. The worker is a generated reusable GitHub
 Actions workflow; the operator does not write or maintain a separate worker implementation. The maintained
-candidate supplies `definitions/nvke-m2/qualification.yaml` and emits `.github/workflows/nvkr-qualify.yml`
+candidate supplies `inputs/policies/nvke-qualification.yaml` and emits `.github/workflows/nvkr-qualify.yml`
 and `.github/workflows/nvkr-smoke.yml`. The same invocation with `--check` compares
 all owned bytes without writing. The separately owned qualification manifest records both workflow files;
 hand edits and unowned files are not silently overwritten. The worker is a fixed same-repository reusable
@@ -553,11 +582,12 @@ The independent policy extends the artifact-check policy with these decisions:
 | `cosign.version` and `cosign.platformDigests` | An exact release locator and independently approved executable bytes for every worker platform plus the AMD64 final signer |
 | `smoke.workflow` | A separate same-repository worker identity, distinct from both builder and final signer |
 | `smoke.images` | Exact native execution-image references, pinned by digest |
-| `smoke.tools` | Exact component names mapped to fixed nvkectl, Helm or kubectl version-check profiles |
+| `smoke.tools` | Exact component names mapped to fixed nvkectl, Helm, kubectl, Kind, clusterctl or ORAS version-check profiles |
 | `smoke.nonToolOutputs` | Exact OCI/APT output names, kinds and components explicitly outside loose-tool smoke |
+| `smoke.nonToolMembers` | Exact output/member pairs for non-executable runtime-assets archives in mixed executable bundles |
 | `outsideMVPSuites` / `requiredSuites` | Unevaluated external suites, or a requirement that currently blocks qualification |
 
-The [maintained-candidate policy](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvke-m2/qualification.yaml)
+The [maintained-candidate policy](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/nvke-qualification.yaml)
 contains concrete verifier/native-image pins and exact output scope. Review those independent trust selections
 with the generated workflows before merge. Other Definitions need their own matching scope and native pins;
 the candidate policy is not a wildcard approval. The trust policy belongs to the operator, not the producing
@@ -577,15 +607,27 @@ are `kind: oci` with `reason: deployment-image`, and `kind: apt-repository` with
 candidate policy contains all 25 OCI records, alongside three profiles covering its four native
 tool invocations. It contains no Helm/disk exemptions because those formats have a fixed non-tool rule.
 
+For a mixed bundle, `smoke.nonToolMembers` accepts records with `output`, `member` and
+`reason: runtime-assets-archive`. Each must select a source-built `tarball` producer in that exact
+output; the delivered member must have no executable mode bits. Sibling tools still require their
+fixed profiles, and each executable output must contain at least one tool. The archive remains
+subject to artifact and provenance checks. This does not assert that its contents contain no tools.
+Missing, extra, duplicate and tool-overlapping member rules fail closed.
+
 Use independently approved native images containing `/bin/sh`, `cat`, `wc`, `sha256sum`, `chmod` and
 `/usr/bin/env`. They must have no declared volumes or extra inherited environment. The payload environment
-is fixed to `PATH=/usr/bin:/bin`, `HOME=/work`, `TMPDIR=/work`, `LC_ALL=C` and `TZ=UTC`; image configuration
+is fixed to `PATH=/usr/bin:/bin`, `HOME=/work`, `TMPDIR=/work`, `LC_ALL=C`, `TZ=UTC` and
+`CLUSTERCTL_DISABLE_VERSIONCHECK=true`. The last setting disables clusterctl's optional network update
+check after its version command; version/source checks and network isolation remain required. Image configuration
 must not add or conflict with it. Builder images and pins are not automatically trusted smoke images.
 The generated route also requires a GitHub-signing producer, its generated source workflow, and GHCR
 publication under the same repository owner with the existing `github:GITHUB_TOKEN` credential reference.
 
-The fixed profiles are `nvkectl-version-json`, `helm-version` and `kubectl-client-version-json`. Expected
-versions and the nvkectl commit come from the authenticated frozen Plan. The policy cannot supply a
+The fixed profiles include `nvkectl-version-json`, `helm-version`, `kubectl-client-version-json`,
+`kind-version`, `clusterctl-version-json`, `oras-version`, `nicosim-version-json` and
+`nicosim-patched-version-json`. NICoSim profiles require exact version, source commit and platform,
+with `clean` for unpatched inputs or `patched` for declared authenticated patch inputs. Dirty or unknown
+tree stamps fail. Expected versions and source commits come from the authenticated frozen Plan. The policy cannot supply a
 replacement expected version or arbitrary executable arguments. Every member of every executable bundle
 must be covered. OCI deployment-image and APT package-repository exemptions require exact membership;
 there is no wildcard exemption for an artifact format. Disk and Helm outputs use their explicit non-tool
@@ -606,12 +648,15 @@ check results remain intact; this does not claim the payload itself was executed
 
 After workers complete with success or failure, the final job repeats artifact checks and attempts to
 authenticate the complete smoke set. This produces refusal diagnostics when a worker failed. Canceled,
-skipped or untrusted source invocations do not enter this final job. Publication still requires successful worker
-jobs from the exact current attempt and verifies each report's signature, worker certificate SAN and GitHub
-issuer. The same verified leaf must bind the top-level workflow, workflow commit and exact Run attempt.
-It then recomputes the complete expected member set and compares the full independent policy, payload
-identities, native images, expected versions and observed results. A missing architecture, missing member,
-wrong identity, reused attempt or failed check prevents signing.
+skipped or untrusted source invocations do not enter this final job. For each platform, publication selects
+the latest worker job in the same qualifier run, up to the current attempt, and requires it to succeed.
+Successful workers from earlier attempts can be reused; a later failed or unfinished job blocks fallback.
+The original attempt's artifact, report signature, worker certificate SAN and GitHub issuer are verified.
+The same verified leaf must bind the worker's original top-level workflow, workflow commit and Run attempt.
+The final owner requires unchanged source artifact checks, commit, full independent policy, native images
+and complete expected member identities/results. A missing architecture or member, another run or workflow,
+future attempt, changed policy or failed check prevents signing. The final qualification evidence binds the
+current invocation and preserves every worker's original invocation.
 
 `qualification.PublishTriggeredRun` owns this orchestration. The lower-level publisher consumes live A,
 B and invocation receipts; serialized reports cannot restore them. The old `qualification.PublishFiles`
@@ -633,7 +678,8 @@ the command returns a failure code and retains those subjects in its diagnostics
 not establish successful qualification or release authorization.
 
 The maintained candidate's reviewed policy and generated workflows may merge before real acceptance runs.
-After merge, a fresh complete producer attempt must provide its original exact-attempt handoff; the hosted
+After merge, a complete producer run must provide its original evidence and a handoff for its successful
+completion attempt; authenticated partial retries are permitted. The hosted
 worker/qualifier and independent consumer then exercise positive and negative cases. These observations
 remain unproved and are required before production-readiness claims. Local native-container, race and protocol
 tests do not establish GitHub's actual reusable-job names, OIDC claims, production attachment/read-back or
@@ -693,7 +739,7 @@ Typed evidence explains reproduction, compatibility, conformance, or qualificati
 Clearance and publication roots explain authorization and transport. These records are useful diagnostic views;
 normal product authors do not construct and join them manually.
 
-Maintained inputs under `definitions/` use Definition and Environment. Superseded factory authoring APIs
+Maintained inputs under `inputs/` use Definition and Environment; teaching selections live in `docs/examples/`. Superseded factory authoring APIs
 and their migration fixtures are removed; backward compatibility is not a requirement.
 The direct-output model uses Definition v5, catalog v3 and producer IR v4. Generated Run Plans use v5; Run and Release use v4. Older recipe layouts and cluster/placement fields
 are rejected before work. Current migration checks and maintained-input build evidence are tracked in reconciliation;

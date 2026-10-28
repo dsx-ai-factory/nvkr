@@ -20,7 +20,7 @@ workflows; consumers verify the results with standard tooling and no NVKR softwa
   or installed composition; the NVKE OS image build team owns embedded software correctness and runtime validation.
 - V1 production acceptance retains its AMD64-only product floor. M2 requires producer provenance; M3 adds
   authenticated build/evidence checks while retaining producer-only disk scope. The
-  [approved October 12 M3 scope](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
+  approved initial scope
   defers strict inspection and material reconciliation; scope approval is not organizational ADR ratification.
   ARM64 is an implementation extension recorded in the
   [implementation record](adr/reconciliation.md#native-arc-disk-route). Any additional architecture explicitly selected
@@ -244,7 +244,7 @@ incomplete; a build failure cannot create an implicit deferral.
 2. Every artifact-matrix row assigned to M2 that is not inside the OS image and not deferred by a recorded decision (CWE controller, NVKE container images, Helm, spire-agent if acquired, third-party images, NVKE chart packages, operator tooling package) is published under a digest-pinned reference, signed, carries provenance for its source lane, passes the workflow's verification step, and passes consumer verification. Every acquired artifact's lockfile pin equals its published digest; every built artifact's run-record digest equals its published digest. Each selected disk's provenance binds its selected source and material inputs; every required inside-image component is accounted for in those production inputs. Missing producer/material evidence or a digest mismatch fails acceptance; producer-only evidence cannot claim an inspected inventory.
 3. CWE controller and NVKE container images are either built (`wrapped-build`, provenance naming the NVKE commit and tree hash) or, under the Sep 10 fallback, mirrored by digest and recorded as `acquired`. For each CWE, NVKE, and third-party image, `docker pull` by digest succeeds and `cosign verify` passes. A second default-branch run with no pin changes skips every already-present image and blob (each skip in the run log) and every pre-existing tag resolves to the same digest afterwards.
 4. The operator tooling package is published as one signed, attested OCI artifact and passes consumer verification. The same Run's Release binds every required output to its exact published digest and evidence. Consumer verification rejects any missing, extra or substituted output. An approved deferred artifact remains explicitly recorded in the requirements and qualification evidence; it cannot be reported as a successful output.
-5. Criteria 1-4 are satisfied by a single default-branch run identified by one run URL, not assembled from artifacts published by different runs.
+5. Criteria 1-4 are satisfied by a single default-branch run identified by one run URL. Partial retries may retain authenticated successful outputs from earlier attempts of that run, with unchanged inputs and original evidence. Artifacts from different runs cannot be combined to satisfy this criterion.
 
 **Definition of done**
 - Tests cover tag-move refusal for image, blob, and package pushes; skip-if-present idempotency; wrapped-build policy rejecting undeclared privilege, network or credentials before any output is written; the credential-free build phase; release membership rejecting a member digest that differs from the published digest; optional embedded metadata that is omitted, agrees with its pinned upstream reference, or fails because referenced upstream metadata is missing, malformed or inconsistent.
@@ -261,10 +261,10 @@ incomplete; a build failure cannot create an implicit deferral.
 Successful qualification produces independently verifiable evidence under an identity distinct from the
 builder. Release issuance requires successful qualification and evidence publication for the complete selected set.
 
-This specification records the current scope directed by the user, including optional embedded-component
-metadata. The [October 12 decision](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
+This specification records the current scope, including optional embedded-component
+metadata. The initial scope decision
 establishes producer-only disk evidence and the deferred capabilities described below. The
-[implementation plan](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021930) separates artifact
+implementation plan separates artifact
 authentication, delivered-tool smoke, independent evidence publication and acceptance demonstrations.
 Scope approval does not establish completed implementation or organizational ADR ratification. The reviewed
 implementation and candidate configuration may merge before real operational acceptance. A fresh complete
@@ -289,10 +289,13 @@ merge and repository tests do not satisfy those criteria.
 - **Trusted source and invocation.** Qualification admits only successful approved builds from the intended
   repository and default branch, authenticating the source Run separately from the qualification invocation.
   It reuses the same published bytes and never rebuilds or substitutes them. Missing required outputs cannot
-  be dropped or treated as passing.
+  be dropped or treated as passing. A retry may retain authenticated successful outputs from earlier attempts
+  of the same producing workflow run. Successful tool checks may likewise be retained within the same
+  qualification workflow run when their inputs, policy and complete membership are unchanged. Original
+  attempt identities remain visible; later failures cannot be hidden by an earlier passing result.
 
 **Deferred scope.** Full disk-content inspection and material reconciliation, including embedded disk-content
-verification; waived verdicts; offline pull-request qualification; a dedicated verify-only dispatch; incremental
+verification; waived verdicts; offline pull-request qualification; a dedicated verify-only dispatch; cross-run
 qualification reuse. Disk evidence explicitly remains producer-only. Cluster end-to-end tests, boot validation,
 vulnerability scanning and byte-identical reproduction are outside this MVP. External suites outside scope
 are explicitly reported as not evaluated, never passed. Any later required suite must supply authenticated
@@ -300,8 +303,8 @@ results bound to exact artifact subjects; missing or failing required results bl
 
 **Acceptance criteria**
 1. **Complete, exact candidate.** Qualification accounts for every selected output and authenticates its
-   relationship to the originating Run, attempt, commit, Definition and relevant input identities. Missing,
-   extra, duplicate, substituted or mismatched members fail with a specific error. Unrelated Run evidence
+   relationship to the originating Run, original attempt identities, commit, Definition and relevant input
+   identities. Missing, extra, duplicate, substituted or mismatched members fail with a specific error. Unrelated Run evidence
    cannot satisfy the candidate.
 2. **Authenticated checks.** Every output passes schema validation, applicable pin/digest consistency and
    verification of build signatures and provenance against the expected signer and issuer. Exact source, patch,
@@ -318,8 +321,8 @@ results bound to exact artifact subjects; missing or failing required results bl
    failed verdict blocks all qualification attestations for that invocation and preserves failure diagnostics.
 5. **Independent signed evidence.** After all verdicts pass, evidence is signed for every selected artifact
    under a qualification identity distinct from the builder. Evidence binds exact subjects, originating Run
-   and attempt, Definition and relevant input identities, check results, gate version and qualification
-   invocation. Disk evidence explicitly states that content inspection was not performed.
+   and original attempt identities, Definition and relevant input identities, check results, gate version and
+   qualification invocation. Disk evidence explicitly states that content inspection was not performed.
 6. **Trusted invocation.** Only successful approved builds from the intended repository and default branch
    enter qualification. Records belong to the exact originating build. Smoke execution has no qualification
    signing authority. A green build alone does not establish qualification.
@@ -354,8 +357,9 @@ predictably when two runs overlap or a run is interrupted part-way.
 - **Pin detection and regeneration.** A scheduled workflow detects new upstream versions, refreshes source pins,
   lockfile pins, and action pins in one pass, regenerates the workflows, and opens a pull request using a GitHub
   App installation token (the workflow's own token does not trigger pull-request workflows; a personal token is
-  not used) scoped to contents and pull requests on this repository only. The App's private key is the only
-  long-lived secret the pin-update workflow holds and is absent from every other workflow. The App authors the PR,
+  not used) scoped to contents, pull requests and workflows on this repository only, so a regenerated workflow
+  travels in the same reviewed pull request. The App's private key is the only
+  long-lived write secret the pin-update workflow holds and is absent from every other workflow. The App authors the PR,
   cannot approve it, and a code-owner approval is required to merge. The PR body lists, for every changed pin,
   the old and new tag, commit, tree hash, and digest. Merging to the default branch is the release decision for
   v1; the pin-update PR is the one that changes which pins are released.
@@ -409,7 +413,7 @@ anti-rollback guarantees on revocation; cluster-scoped qualification.
 
 **Definition of done**
 - Tests cover the pin refresh end to end on a fixture definition and lockfile, deterministic serialization of the release manifest, the "already released" no-op on a re-run, tag immutability and conditional tag creation against a registry, the channel winner rule, the interrupted-publication re-run, the revocation marker's shape and role, and release-scope verification rejecting a revoked digest.
-- An independent review of the release step, the pin tooling, the revocation dispatch's identity and environment restriction, and the pin-update workflow (App permission scope, key storage and rotation, least privilege, code-owner approval required) is closed before the release run is declared evidence; the final decision-record text is reviewed.
+- An independent review of the release step, the pin tooling, the revocation dispatch's identity and environment restriction, and the pin-update workflow (App permission scope, key storage and rotation, least privilege, code-owner approval required, and the repository settings that protect the pull-request branch) is closed before the release run is declared evidence; the final decision-record text is reviewed.
 - The evidence log records the pull request URL, run URLs, manifest reference, consumer transcripts, the tag-move refusal, the overlapping-run and interrupted-run logs, and the revocation transcript.
 - The owning decision records are final, including the release-manifest and revocation-marker schemas registered before implementation, the tag rule, the winner rule and the durable-record store and retention period; the implementation record, contributor guidance (including the explicit list of capabilities excluded from v1), and this specification's artifact source/delivery matrix match what shipped.
 
@@ -438,3 +442,7 @@ Outside v1: non-OCI delivery, upstream from-source replacement builds, acquired 
 verification, vulnerability scanning, deployment topology, cluster E2E qualification, air gap,
 builder-profile reproduction and byte-identity guarantees. GitHub is the sole hosted workflow,
 publication and signing provider. Per-built-artifact SBOM composition remains in scope.
+
+A downstream nightly end-to-end test is customer CI infrastructure, outside v1
+product acceptance. It can exercise delivered artifacts without expanding the
+build/evidence qualification milestone or supplying independently signed conformance.

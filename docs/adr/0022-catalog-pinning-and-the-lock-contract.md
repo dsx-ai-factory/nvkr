@@ -329,6 +329,14 @@ are readable; symlinks, submodules and path escapes are rejected. Reads are cont
 4 MiB per file, 32 MiB and 1,024 reads per tree. No checkout, source program, hook, template or dependency
 resolver runs. Extraction itself has no network access; obtaining pinned Git objects requires source access.
 
+Resolved catalog snapshots reuse the catalog owner's intrinsic pin-set declaration checks: supported
+format, canonical relative file path, bounded and unambiguous member declarations, and adapter-specific
+selectors. Compilation and Plan validation reject malformed descriptions before emitting credentialed
+catalog-revalidation steps. These checks and a matching snapshot digest establish semantic validity and
+byte identity, not upstream authentication. Reciprocal registry membership, lock completeness and exact
+pinned-tree re-derivation remain owned by catalog loading; resolved overlays do not recreate those
+authored registry records.
+
 **Atomic updates and provenance.** The catalog extracts a complete member-version map before resolving that
 umbrella's members. Acquired producers whose version comes from a derived source move in the same transaction.
 It validates and serializes the complete candidate lock within the byte limit before `--check` or commit; any
@@ -337,12 +345,19 @@ failure leaves the original lock intact. Full catalog loads and lock writes re-d
 Catalogs with pin sets therefore require access to pinned Git objects when loaded; ordinary catalogs retain
 local loading. Offline pin-set transport remains deferred.
 
-**NVKE deploy adapter.** `format: nvke-deploy-v1` reads `nke-deploy.yaml` and each Helm item's
+**NVKE deploy adapter.** `format: nvke-deploy-v1` reads the declared deploy document and each Helm item's
 `release.yaml` from the same pinned tree. Every deploy item must appear in `members` or `accounted`;
 unknown, missing, duplicate or reclassified items fail before chart acquisition. External members bind the
-reviewed chart name/repository through `prebuilt.chart` (acquired) or member `chart` (source). Accounted local
-charts bind their relative path and must match their `Chart.yaml` name/version. Order, values and installation
-remain NVKE-owned. See the [example catalog](../examples/nvke-pin-set/registry.yaml) and
+reviewed chart name/repository through `prebuilt.chart` (acquired) or member `chart` (source), and always
+require an exact version in `release.yaml`. Accounted local charts bind their relative path and authenticate
+their name and exact version against the same pinned tree's `Chart.yaml`. An optional accounted
+`chartName` explicitly binds a reviewed upstream chart rename; otherwise the release name must match. A local release may omit its version;
+when supplied it must be an exact string matching `Chart.yaml`. Empty, null, numeric and ranged versions fail.
+The local chart's optional `artifact`, `imageArtifact` and `profilesArtifact` fields accept plain names only.
+They describe downstream consumer mappings; they neither select catalog producers nor authorize Release
+membership. Other unknown fields and these mappings on external members remain rejected. Order, values and
+installation remain NVKE-owned. This is declared-metadata consistency for the admitted evidence lanes,
+not deployed compatibility or qualification. See the [example catalog](../examples/nvke-pin-set/registry.yaml) and
 [usage guide](../nvke-pin-set-usage.md). CycloneDX ingestion and qualified-set acceptance remain deferred.
 
 **Chart acquisition.** HTTPS Helm indexes and anonymous OCI repositories resolve one exact chart version.

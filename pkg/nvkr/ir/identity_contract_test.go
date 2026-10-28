@@ -52,7 +52,7 @@ func TestBuildIdentityCanonicalVectors(t *testing.T) {
 			}
 			// Independent historical-prefix reference only. The production codec
 			// must never mint a new object under the retired family.
-			historical := sha256.Sum256([]byte("nkd.recipe\x00" + test.logical))
+			historical := sha256.Sum256([]byte("unsupported.recipe\x00" + test.logical))
 			if fmt.Sprintf("sha256:%x", historical) == got {
 				t.Fatal("new build identity reused the retired recipe domain")
 			}

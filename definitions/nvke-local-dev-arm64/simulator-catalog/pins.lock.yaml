@@ -1,9 +1,0 @@
-# Machine-managed by `nvkr catalog pin` / `nvkr catalog bump`. Do not hand-edit.
-apiVersion: nvkr.dev/lock/v1
-kind: PinLock
-pins:
-  nvke-nicosim:
-    commit: 6ffc2e5cae6739215b5cccf71f2692dcfa8da1c4
-    sourceDateEpoch: 1791419815
-    tag: 6ffc2e5cae6739215b5cccf71f2692dcfa8da1c4
-    treeHash: d0e0f5265d1917d6cd7ff594442e0c8d1e74044d

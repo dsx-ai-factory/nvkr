@@ -46,6 +46,12 @@ composed and tested. Cross-compiling the helper does not exercise it, and merely
 selecting `--platform` does not prove a native host. The repository now supplies `scripts/prepare-native-toolchains.sh` and the manual
 `Prepare native NVKR toolchains` workflow for native Docker assembly and measurement of both architectures.
 They require a clean checkout and retain exact image archives alongside measurements for later publication.
+The workflow also accepts `verify_published=true` for a manual check of the committed Run's selected
+image digests on both native hosted architectures. That mode uses the repository's `packages: read`
+workflow token for pulls, removes its temporary registry configuration, then checks native tool versions
+and helper argument admission. Review the selected branch before dispatching. Verification grants no
+publication or signing permission; its result establishes pull access and entrypoint execution, not a
+complete disk bake or inspection.
 For Docker preparation, `NVKR_BUILD_ARCHIVES` selects a read-only named build
 context containing the official release filenames, including
 `syft_1.51.1_linux_ARCH.tar.gz`. The Dockerfile checks the pinned archive digest
@@ -77,7 +83,7 @@ podman run --rm --pull=never --platform "linux/${inspection_arch}" \
   --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
   --user 65534:65534 --entrypoint sha256sum "${inspection_id}" \
   /usr/bin/virt-inspector /usr/bin/qemu-img /usr/bin/guestfish \
-  /usr/local/bin/syft /usr/bin/dpkg-deb /usr/local/bin/nkd-disk-inspect
+  /usr/local/bin/syft /usr/bin/dpkg-deb /usr/local/bin/nvkr-disk-inspect
 podman run --rm --pull=never --platform "linux/${inspection_arch}" \
   --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
   --user 65534:65534 --entrypoint cat "${inspection_id}" \
@@ -247,7 +253,7 @@ After separately authorized publication supplies an exact reference, read back t
 descriptor using `crane digest --platform linux/amd64 '<repository>@sha256:<digest>'`, or ARM64 on its
 native host. Local image inspection and executable measurements above do not publish, approve or
 authenticate that reference. The inspector and Packer source locks retain their general approval gates;
-the [M2 candidate](../../definitions/nvke-m2/README.md) uses a separately recorded exception.
+the [M2 candidate](../../inputs/definitions/nvke/README.md) uses a separately recorded exception.
 
 The selected root's native host binding chooses the profile; guest package architecture remains a
 different field. The authenticated runtime accessor contract can be checked independently:

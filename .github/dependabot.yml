@@ -30,9 +30,14 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     # Generated workflow pins must change through NVKR inputs and regeneration.
-    # Keep Dependabot updates for the handwritten merge-gate.yaml workflow.
+    # Keep Dependabot updates for handwritten workflows and actions only.
     exclude-paths:
-      - .github/workflows/nvkr-run.yml
+      - .github/workflows/catalog-refresh.yaml
+      - .github/workflows/nvkr-run*.yml
+      - .github/workflows/nvkr-dev*.yml
+      - .github/workflows/nvkr-qualify.yml
+      - .github/workflows/nvkr-smoke.yml
+      - .github/nvkr-*/**
     schedule:
       interval: weekly
     # One PR per round: github/codeql-action init and analyze must move together,

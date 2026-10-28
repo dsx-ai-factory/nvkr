@@ -29,16 +29,8 @@ func (report NativeToolSmokeReport) Validate() error {
 	if checks.GateVersion != ArtifactCheckGateVersion || len(checks.Outputs) == 0 || len(checks.Outputs) > 1024 || !canonical.IsDigest(checks.CatalogDigest) {
 		return invalid()
 	}
-	for _, digest := range []string{checks.Inputs.PolicyDigest, checks.Inputs.DefinitionDigest, checks.Inputs.EnvironmentDigest, checks.Inputs.PlanDigest, checks.Inputs.ContentSubject} {
-		if !canonical.IsDigest(digest) {
-			return invalid()
-		}
-	}
-	if err := delivery.ValidatePublicationReference(checks.Inputs.ReleaseSubject); err != nil {
+	if err := checks.Inputs.Validate(); err != nil {
 		return err
-	}
-	if strings.Contains(checks.Inputs.ReleaseSubject, "://") {
-		return invalid()
 	}
 	if err := checks.Origin.Validate(); err != nil {
 		return err
@@ -101,8 +93,11 @@ func (report NativeToolSmokeReport) Validate() error {
 		if _, err := nativeSmokeProfile(member.Profile); err != nil {
 			return err
 		}
-		if member.Profile == "nvkectl-version-json" {
+		if member.Profile == "nvkectl-version-json" || member.Profile == "clusterctl-version-json" || member.Profile == "oras-version" || member.Profile == "nicosim-version-json" || member.Profile == "nicosim-patched-version-json" {
 			if !smokeHexCommit(member.ExpectedCommit) {
+				return invalid()
+			}
+			if member.Profile != "nvkectl-version-json" && len(member.ExpectedCommit) != 40 {
 				return invalid()
 			}
 		} else if member.ExpectedCommit != "" {

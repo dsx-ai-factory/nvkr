@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+{
+  "apiVersion": "nvkr.dev/catalog/v3",
+  "kind": "SourceBuildRegistry",
+  "metadata": {
+    "name": "nvke-cli-arm64-local",
+    "description": "Explicit new native ARM64 CLI producer using the maintained CLI source release and existing reviewed build command; not a target-changing catalog overlay."
+  },
+  "components": {
+    "nvkectl-arm64": {
+      "artifactPath": "cli/bin/nvkectl",
+      "buildCommand": [
+        "bash",
+        "-euc",
+        "export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor\nmake -C cli build NVKECTL_TREE=clean\n"
+      ],
+      "cgo": false,
+      "fromSource": true,
+      "outputType": "host-package",
+      "platforms": [
+        "linux/arm64"
+      ],
+      "source": "nvke",
+      "versionStamp": {
+        "NVKECTL_VERSION": "{{.Tag}}",
+        "NVKECTL_COMMIT": "{{.Commit}}",
+        "NVKECTL_DATE": "{{.Date}}"
+      },
+      "writeDir": "cli/bin"
+    }
+  },
+  "sources": {
+    "nvke": {
+      "constraint": "v0.22.0",
+      "repo": "https://github.com/dsx-ai-factory/nvke",
+      "toolchainImage": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        "export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\ntest ! -e controller/deploy/charts/go.sum\npins=\"$(sha256sum cli/go.mod cli/go.sum controller/api/go.mod controller/api/go.sum controller/deploy/charts/go.mod management-engine/go.mod management-engine/go.sum)\"\ncd cli\ntimeout --kill-after=10s 540s go mod download\nGOPROXY=off timeout --kill-after=10s 60s go mod verify\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor\ncd ..\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c -\ntest ! -e controller/deploy/charts/go.sum\n"
+      ]
+    }
+  }
+}

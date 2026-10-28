@@ -184,8 +184,17 @@ func effectiveCgroupCPUMillis(cgroupDir, cgroupRoot string, affinityMillis uint6
 	for _, directory := range ancestry {
 		raw, err := readBoundedKernelText(filepath.Join(directory, "cpu.max"), 128)
 		if err != nil {
-			if directory == root && errors.Is(err, os.ErrNotExist) {
-				continue
+			if errors.Is(err, os.ErrNotExist) {
+				if directory == root {
+					continue
+				}
+				disabled, controllerErr := cgroupControllerDisabled(directory, "cpu")
+				if controllerErr != nil {
+					return 0, controllerErr
+				}
+				if disabled {
+					continue
+				}
 			}
 			return 0, e.Wrap(e.CodeEngineCapability, err,
 				"reading cgroup CPU quota at %s", directory)
@@ -251,8 +260,17 @@ func effectiveCgroupMemoryMiB(cgroupDir, cgroupRoot string, hostAvailable uint64
 	for _, directory := range ancestry {
 		maximumRaw, err := readBoundedKernelText(filepath.Join(directory, "memory.max"), 128)
 		if err != nil {
-			if directory == root && errors.Is(err, os.ErrNotExist) {
-				continue
+			if errors.Is(err, os.ErrNotExist) {
+				if directory == root {
+					continue
+				}
+				disabled, controllerErr := cgroupControllerDisabled(directory, "memory")
+				if controllerErr != nil {
+					return 0, controllerErr
+				}
+				if disabled {
+					continue
+				}
 			}
 			return 0, e.Wrap(e.CodeEngineCapability, err,
 				"reading cgroup memory limit at %s", directory)
@@ -287,6 +305,35 @@ func effectiveCgroupMemoryMiB(cgroupDir, cgroupRoot string, hostAvailable uint64
 			"local VM admission has less than one MiB of effective memory")
 	}
 	return effective, nil
+}
+
+// A controller's interface files exist only where its parent enables it in
+// cgroup.subtree_control. A missing local limit is therefore not unlimited:
+// require both kernel lists to confirm that this controller is disabled here,
+// while the caller continues checking all ancestor limits. This does not relax
+// the separate container verifier's requirement for enforced local ceilings.
+func cgroupControllerDisabled(directory, controller string) (bool, error) {
+	for _, path := range []string{
+		filepath.Join(directory, "cgroup.controllers"),
+		filepath.Join(filepath.Dir(directory), "cgroup.subtree_control"),
+	} {
+		raw, err := readBoundedKernelText(path, 4096)
+		if err != nil {
+			return false, e.Wrap(e.CodeEngineCapability, err,
+				"reading cgroup controller availability at %s", path)
+		}
+		for _, field := range strings.Fields(raw) {
+			// The read ABI contains names; +/- prefixes are write operations.
+			if strings.ContainsRune(field, '\x00') || strings.HasPrefix(field, "+") || strings.HasPrefix(field, "-") {
+				return false, e.New(e.CodeEngineCapability,
+					"cgroup controller availability at %s is malformed", path)
+			}
+			if field == controller {
+				return false, nil
+			}
+		}
+	}
+	return true, nil
 }
 
 func cgroupV2Ancestry(cgroupDir, cgroupRoot string) ([]string, error) {

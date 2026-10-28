@@ -18,9 +18,9 @@ package sign
 //     through Linux anonymous-descriptor execution and fails closed elsewhere,
 //     exactly like the qualified sign-blob/verify-blob adapters in this package.
 //
-// Registry credentials NEVER appear in argv or in a record: they are written to
-// a private 0600 config.json inside a private 0700 DOCKER_CONFIG directory whose
-// lifetime is the operation.
+// Registry credentials NEVER appear in argv or in a record. The bundle reader
+// uses explicitly scoped in-memory credentials; subprocesses receive a private
+// 0600 config.json in a 0700 DOCKER_CONFIG directory owned by the operation.
 
 import (
 	"bytes"
@@ -233,10 +233,7 @@ func (r VerificationRecord) Canonical() ([]byte, error) {
 	return canonical.Marshal(r)
 }
 
-// ---------------------------------------------------------------------------
-// argv construction (shared by every adapter so a dry run describes the truth)
-// ---------------------------------------------------------------------------
-
+// ociSignArgs is shared by every adapter so a dry run describes the truth.
 func ociSignArgs(ref string) []string {
 	return []string{"sign", "--yes", "--new-bundle-format", ref}
 }
@@ -301,10 +298,6 @@ func resolvePolicy(policy VerifyPolicy, identity, issuer string) (VerifyPolicy, 
 	return policy, nil
 }
 
-// ---------------------------------------------------------------------------
-// DryRunSigner
-// ---------------------------------------------------------------------------
-
 // DryRunSigner records what a real signer would run and executes nothing. It is
 // available on every platform because it has no execution path at all.
 type DryRunSigner struct {
@@ -361,8 +354,9 @@ func (s *DryRunSigner) SignAndAttest(ctx context.Context, subject Subject, predi
 	return record, nil
 }
 
-// Verify records the exact verification invocations without running them. The
-// returned record never claims a verified signature or attestation.
+// Verify records the exact verification invocations without running them.
+// Registry discovery uses HTTP and has no subprocess argv. The returned record
+// never claims a verified signature or attestation.
 func (s *DryRunSigner) Verify(ctx context.Context, subject Subject, policy VerifyPolicy) (VerificationRecord, error) {
 	if s == nil {
 		return VerificationRecord{}, e.New(e.CodeInternal, "dry-run OCI signer is not initialized")
@@ -386,12 +380,11 @@ func (s *DryRunSigner) Verify(ctx context.Context, subject Subject, policy Verif
 		Issuer:        resolved.Issuer,
 		PredicateType: ProvenancePredicateType,
 		WouldRun: [][]string{
-			argv(DefaultBinary, ociDownloadBundleArgs(subject.Ref, CosignSignaturePredicateType)),
 			argv(DefaultBinary, ociVerifyBundleArgs(SignatureBundlePlaceholder, subject.Digest, CosignSignaturePredicateType, resolved)),
 		},
 	}
 	if resolved.RequireAttestation {
-		record.WouldRun = append(record.WouldRun, argv(DefaultBinary, ociDownloadBundleArgs(subject.Ref, ProvenancePredicateType)),
+		record.WouldRun = append(record.WouldRun,
 			argv(DefaultBinary, ociVerifyBundleArgs(ProvenanceBundlePlaceholder, subject.Digest, ProvenancePredicateType, resolved)))
 	}
 	if err := record.Validate(); err != nil {
@@ -400,18 +393,18 @@ func (s *DryRunSigner) Verify(ctx context.Context, subject Subject, policy Verif
 	return record, nil
 }
 
-// ---------------------------------------------------------------------------
-// CosignOCISigner
-// ---------------------------------------------------------------------------
-
-// Credential is one registry credential. It is written to a private Docker
-// config file for the duration of an operation and never reaches argv, a
-// record, or the child's inherited ambient environment.
+// Credential is one registry credential. Direct reads scope it to the subject
+// registry; subprocesses receive it through a private Docker config file. It
+// never reaches argv, a record, or the child's inherited ambient environment.
 type Credential struct {
 	Registry string
 	Username string
 	Password string
 }
+
+// Validate admits the existing complete-or-empty registry credential shape.
+// It performs no I/O and grants no registry host or signing authority.
+func (c Credential) Validate() error { return c.validate() }
 
 func (c Credential) empty() bool {
 	return c.Registry == "" && c.Username == "" && c.Password == ""
@@ -472,6 +465,9 @@ type CosignOCISigner struct {
 	identity     string
 	issuer       string
 	credential   Credential
+	// Tests may replace descriptive transport independently of crypto. Production
+	// always constructs one private, lazy source for the complete Verify call.
+	bundleSource func(context.Context, Subject, Credential) (*ociBundleSource, error)
 
 	versionOnce  sync.Mutex
 	version      string
@@ -608,6 +604,9 @@ func (s *CosignOCISigner) Verify(ctx context.Context, subject Subject, policy Ve
 	if err != nil {
 		return VerificationRecord{}, err
 	}
+	if _, err := admitOCIRegistry(subject, s.credential); err != nil {
+		return VerificationRecord{}, err
+	}
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 	workspace, cleanup, err := newPrivateWorkspace("nvkr-cosign-oci-verify-*")
@@ -620,6 +619,11 @@ func (s *CosignOCISigner) Verify(ctx context.Context, subject Subject, policy Ve
 		return VerificationRecord{}, err
 	}
 	environment := ociCosignEnvironment(os.Environ(), dockerConfig)
+	source, err := s.newOCIBundleSource(ctx, subject)
+	if err != nil {
+		return VerificationRecord{}, err
+	}
+	defer source.close()
 
 	record := VerificationRecord{
 		SchemaVersion: VerificationRecordSchemaVersion,
@@ -634,7 +638,7 @@ func (s *CosignOCISigner) Verify(ctx context.Context, subject Subject, policy Ve
 	// the artifact signature has its own distinct predicate and evidence type.
 	signaturePolicy := resolved
 	signaturePolicy.ExpectedPredicate = nil
-	identity, issuer, ran, err := s.verifyOCIBundles(ctx, subject, CosignSignaturePredicateType, signaturePolicy, workspace, environment)
+	identity, issuer, ran, err := s.verifyOCIType(ctx, source, subject, CosignSignaturePredicateType, signaturePolicy, workspace, environment)
 	if err != nil {
 		return VerificationRecord{}, err
 	}
@@ -643,7 +647,7 @@ func (s *CosignOCISigner) Verify(ctx context.Context, subject Subject, policy Ve
 	record.ObservedIdentity = identity
 	record.ObservedIssuer = issuer
 	if resolved.RequireAttestation {
-		_, _, ran, err := s.verifyOCIBundles(ctx, subject, ProvenancePredicateType, resolved, workspace, environment)
+		_, _, ran, err := s.verifyOCIType(ctx, source, subject, ProvenancePredicateType, resolved, workspace, environment)
 		if err != nil {
 			return VerificationRecord{}, err
 		}
@@ -651,6 +655,9 @@ func (s *CosignOCISigner) Verify(ctx context.Context, subject Subject, policy Ve
 		record.AttestationVerified = true
 	}
 	record.CosignVersion = s.detectVersion(ctx, environment)
+	if err := contextError(ctx); err != nil {
+		return VerificationRecord{}, err
+	}
 	if err := record.Validate(); err != nil {
 		return VerificationRecord{}, err
 	}
@@ -775,21 +782,19 @@ func (s *CosignOCISigner) runStock(ctx context.Context, args, environment []stri
 }
 
 // writeDockerConfig materializes the registry credential as a private Docker
-// config directory and returns its path (empty when no credential is set).
+// config directory and returns its path. Empty credentials produce an explicit
+// empty auth map, preventing ambient Docker or Podman credential discovery.
 func (s *CosignOCISigner) writeDockerConfig(ctx context.Context, workspace string) (string, error) {
-	if s.credential.empty() {
-		return "", nil
-	}
 	dir := filepath.Join(workspace, dockerConfigDirName)
 	if err := os.Mkdir(dir, 0o700); err != nil {
 		return "", e.Wrap(e.CodeInternal, err, "creating private registry credential directory")
 	}
-	auth := base64.StdEncoding.EncodeToString([]byte(s.credential.Username + ":" + s.credential.Password))
-	document, err := json.Marshal(map[string]any{
-		"auths": map[string]any{
-			s.credential.Registry: map[string]string{"auth": auth},
-		},
-	})
+	auths := map[string]any{}
+	if !s.credential.empty() {
+		auth := base64.StdEncoding.EncodeToString([]byte(s.credential.Username + ":" + s.credential.Password))
+		auths[s.credential.Registry] = map[string]string{"auth": auth}
+	}
+	document, err := json.Marshal(map[string]any{"auths": auths})
 	if err != nil {
 		return "", e.Wrap(e.CodeInternal, err, "encoding private registry credential")
 	}
@@ -800,10 +805,13 @@ func (s *CosignOCISigner) writeDockerConfig(ctx context.Context, workspace strin
 }
 
 // ociCosignEnvironment is the qualified cosign environment plus exclusive
-// control of registry authentication. It keeps the ambient scrub of the
+// control of Docker registry configuration. When a private workspace is supplied,
+// HOME is replaced because the upstream Docker keychain checks HOME before
+// DOCKER_CONFIG. Blob adapters without a registry workspace keep their ambient
+// home and cache locations. It keeps the ambient scrub of the
 // sign-blob/verify-blob adapters (loader injection, COSIGN_*, SIGSTORE_*, TUF_*,
-// SOURCE_DATE_EPOCH) and additionally removes every ambient registry-credential
-// control, so the only credential in scope is the one this adapter wrote.
+// SOURCE_DATE_EPOCH) and additionally removes ambient Docker/Podman registry
+// configuration controls.
 // ACTIONS_ID_TOKEN_REQUEST_URL/TOKEN are deliberately preserved: they are how
 // keyless signing obtains its workload identity in GitHub Actions.
 func ociCosignEnvironment(base []string, dockerConfigDir string) []string {
@@ -815,20 +823,20 @@ func ociCosignEnvironment(base []string, dockerConfigDir string) []string {
 			name = entry[:i]
 		}
 		switch strings.ToUpper(name) {
+		case "HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "XDG_CONFIG_HOME", "XDG_RUNTIME_DIR":
+			if dockerConfigDir != "" {
+				continue
+			}
 		case "DOCKER_CONFIG", "DOCKER_AUTH_CONFIG", "REGISTRY_AUTH_FILE", "REGISTRY_AUTH_TOKEN":
 			continue
 		}
 		out = append(out, entry)
 	}
 	if dockerConfigDir != "" {
-		out = append(out, "DOCKER_CONFIG="+dockerConfigDir)
+		out = append(out, "HOME="+filepath.Dir(dockerConfigDir), "DOCKER_CONFIG="+dockerConfigDir)
 	}
 	return out
 }
-
-// ---------------------------------------------------------------------------
-// cosign JSON output
-// ---------------------------------------------------------------------------
 
 type inTotoStatement struct {
 	Predicate     json.RawMessage `json:"predicate"`
@@ -838,10 +846,6 @@ type inTotoStatement struct {
 		Digest map[string]string `json:"digest"`
 	} `json:"subject"`
 }
-
-// ---------------------------------------------------------------------------
-// private files
-// ---------------------------------------------------------------------------
 
 func newPrivateWorkspace(pattern string) (string, func(), error) {
 	dir, err := os.MkdirTemp("", pattern)

@@ -36,6 +36,7 @@ const (
 // invocation, policy and complete subject/member coverage before accepting it.
 type NativeSmokeArtifact struct {
 	Platform    string
+	Invocation  Description
 	Document    []byte
 	Signature   []byte
 	Certificate []byte
@@ -58,8 +59,8 @@ type nativeSmokeJob struct {
 }
 
 // DownloadNativeSmoke retrieves one fixed-name worker artifact per requested
-// native platform from the authenticated current qualifier attempt. It verifies
-// the exact attempt's successful generated worker jobs and provider archive pins,
+// native platform from the authenticated qualifier Run. It selects each worker's
+// latest job through the current attempt, requires its success and verifies provider archive pins,
 // returning sorted transport descriptions only. The invocation and its source
 // are borrowed and must remain live through the complete bounded operation.
 //
@@ -94,7 +95,7 @@ func (g *GitHub) DownloadNativeSmoke(ctx context.Context, invocation *Invocation
 		_, err := invocation.Description()
 		return err
 	}
-	request := SourceRequest{Repository: origin.Repository, RunID: origin.RunID, Attempt: origin.Attempt,
+	request := SourceRequest{Branch: origin.Branch, Repository: origin.Repository, RunID: origin.RunID, Attempt: origin.Attempt,
 		Commit: origin.Commit, Workflow: origin.Workflow, DefaultBranch: origin.DefaultBranch}
 	repository, run, err := g.lookup(ctx, request)
 	if admission := require(); admission != nil {
@@ -106,15 +107,21 @@ func (g *GitHub) DownloadNativeSmoke(ctx context.Context, invocation *Invocation
 	if err := matchRun(request, repository, run); err != nil {
 		return nil, err
 	}
-	if run.Event != "workflow_run" || run.Status != "in_progress" || run.Conclusion != "" {
+	event := "workflow_run"
+	if origin.Branch != "" {
+		event = "workflow_dispatch"
+	}
+	if run.Event != event || run.Status != "in_progress" || run.Conclusion != "" {
 		return nil, e.New(e.CodeVerifyFailed, "native smoke transport requires the active qualification workflow attempt")
 	}
-	if err := g.requireNativeSmokeJobs(ctx, require, origin, selected); err != nil {
+	workers, err := g.nativeSmokeJobOrigins(ctx, require, origin, selected)
+	if err != nil {
 		return nil, err
 	}
 	out := make([]NativeSmokeArtifact, 0, len(selected))
 	for _, platform := range selected {
-		name := "nvkr-smoke-" + origin.RunID + "-" + origin.Attempt + "-" + strings.TrimPrefix(platform, "linux/")
+		worker := workers[platform]
+		name := "nvkr-smoke-" + worker.RunID + "-" + worker.Attempt + "-" + strings.TrimPrefix(platform, "linux/")
 		var listing qualificationArtifactList
 		path := "/repos/" + origin.Repository + "/actions/runs/" + origin.RunID + "/artifacts?name=" + url.QueryEscape(name) + "&per_page=100"
 		err := g.get(ctx, path, &listing)
@@ -125,10 +132,10 @@ func (g *GitHub) DownloadNativeSmoke(ctx context.Context, invocation *Invocation
 			return nil, err
 		}
 		if listing.TotalCount != "1" || len(listing.Artifacts) != 1 {
-			return nil, e.New(e.CodeProvenanceMissing, "native smoke requires exactly one %s artifact for the current attempt", platform)
+			return nil, e.New(e.CodeProvenanceMissing, "native smoke requires exactly one %s artifact for its latest worker attempt", platform)
 		}
 		artifact := listing.Artifacts[0]
-		if err := artifact.validate(name, origin); err != nil {
+		if err := artifact.validate(name, worker); err != nil {
 			return nil, err
 		}
 		size, err := strconv.ParseInt(string(artifact.Size), 10, 64)
@@ -146,11 +153,29 @@ func (g *GitHub) DownloadNativeSmoke(ctx context.Context, invocation *Invocation
 		if "sha256:"+hex.EncodeToString(hash[:]) != artifact.Digest || int64(len(archive)) != size {
 			return nil, e.New(e.CodeVerifyFailed, "native smoke archive differs from its provider digest or size")
 		}
-		result, err := unpackNativeSmoke(ctx, archive)
+		members, private, err := g.resolvePrivateArtifact(ctx, require, worker, name, archive, maxNativeSmokeArchiveBytes, map[string]int64{
+			"worker.json": maxNativeSmokeDocumentBytes, "worker.sig": maxNativeSmokeSignatureBytes,
+			"worker.pem": maxNativeSmokeCertificateBytes, "worker.bundle.json": maxNativeSmokeBundleBytes,
+		})
+		if err != nil {
+			return nil, err
+		}
+		var result NativeSmokeArtifact
+		if private {
+			for _, raw := range members {
+				if len(raw) == 0 {
+					return nil, e.New(e.CodeVerifyFailed, "private native smoke artifact contains an empty evidence member")
+				}
+			}
+			result = NativeSmokeArtifact{Document: members["worker.json"], Signature: members["worker.sig"], Certificate: members["worker.pem"], Bundle: members["worker.bundle.json"]}
+		} else {
+			result, err = unpackNativeSmoke(ctx, archive)
+		}
 		if err != nil {
 			return nil, err
 		}
 		result.Platform = platform
+		result.Invocation = worker
 		out = append(out, result)
 	}
 	if err := require(); err != nil {
@@ -173,59 +198,74 @@ func nativeSmokePlatforms(platforms []string) ([]string, error) {
 	return selected, nil
 }
 
-func (g *GitHub) requireNativeSmokeJobs(ctx context.Context, require func() error, origin Description, platforms []string) error {
-	required := make(map[string]bool, len(platforms))
+func (g *GitHub) nativeSmokeJobOrigins(ctx context.Context, require func() error, origin Description, platforms []string) (map[string]Description, error) {
+	required := make(map[string]nativeSmokeJob, len(platforms))
 	for _, platform := range platforms {
-		required["native-smoke / native-"+strings.TrimPrefix(platform, "linux/")] = false
+		required["native-smoke / native-"+strings.TrimPrefix(platform, "linux/")] = nativeSmokeJob{}
 	}
 	seen := make(map[json.Number]bool)
+	seenWorkerAttempts := make(map[string]bool)
 	total := -1
 	for page := 1; page <= maxNativeSmokeJobs/nativeSmokeJobsPerPage; page++ {
 		if err := require(); err != nil {
-			return err
+			return nil, err
 		}
 		var listing nativeSmokeJobList
-		path := "/repos/" + origin.Repository + "/actions/runs/" + origin.RunID + "/attempts/" + origin.Attempt + "/jobs?per_page=100&page=" + strconv.Itoa(page)
+		path := "/repos/" + origin.Repository + "/actions/runs/" + origin.RunID + "/jobs?filter=all&per_page=100&page=" + strconv.Itoa(page)
 		err := g.get(ctx, path, &listing)
 		if admission := require(); admission != nil {
-			return admission
+			return nil, admission
 		}
 		if err != nil {
-			return err
+			return nil, err
 		}
 		count, err := strconv.Atoi(string(listing.TotalCount))
 		if err != nil || count < 1 || count > maxNativeSmokeJobs || (total >= 0 && total != count) {
-			return e.New(e.CodeVerifyFailed, "native smoke job listing has an invalid, changing or excessive total count")
+			return nil, e.New(e.CodeVerifyFailed, "native smoke job listing has an invalid, changing or excessive total count")
 		}
 		total = count
 		remaining := total - (page-1)*nativeSmokeJobsPerPage
 		if len(listing.Jobs) != min(remaining, nativeSmokeJobsPerPage) {
-			return e.New(e.CodeVerifyFailed, "native smoke job listing is incomplete or exceeds its page bound")
+			return nil, e.New(e.CodeVerifyFailed, "native smoke job listing is incomplete or exceeds its page bound")
 		}
 		for _, job := range listing.Jobs {
+			attempt := string(job.Attempt)
 			if !numberPattern.MatchString(string(job.ID)) || seen[job.ID] || string(job.RunID) != origin.RunID ||
-				job.HeadSHA != origin.Commit || (job.Attempt != "" && string(job.Attempt) != origin.Attempt) {
-				return e.New(e.CodeVerifyFailed, "native smoke job does not belong uniquely to the exact qualifier attempt and commit")
+				job.HeadSHA != origin.Commit || !numberPattern.MatchString(attempt) || laterSmokeAttempt(attempt, origin.Attempt) {
+				return nil, e.New(e.CodeVerifyFailed, "native smoke job does not belong uniquely to the qualifier Run and commit through its current attempt")
 			}
 			seen[job.ID] = true
-			if completed, wanted := required[job.Name]; wanted {
-				if completed || job.Status != "completed" || job.Conclusion != "success" {
-					return e.New(e.CodeGateUnmet, "native smoke job %q is duplicated or has not completed successfully", job.Name)
+			if previous, wanted := required[job.Name]; wanted {
+				key := job.Name + "\x00" + attempt
+				if seenWorkerAttempts[key] {
+					return nil, e.New(e.CodeGateUnmet, "native smoke job %q is duplicated within one attempt", job.Name)
 				}
-				required[job.Name] = true
+				seenWorkerAttempts[key] = true
+				if previous.ID == "" || laterSmokeAttempt(attempt, string(previous.Attempt)) {
+					required[job.Name] = job
+				}
 			}
 		}
 		if len(seen) == total {
 			break
 		}
 	}
+	workers := make(map[string]Description, len(platforms))
 	for _, platform := range platforms {
 		name := "native-smoke / native-" + strings.TrimPrefix(platform, "linux/")
-		if !required[name] {
-			return e.New(e.CodeGateUnmet, "native smoke job %q is missing from the exact qualifier attempt", name)
+		job := required[name]
+		if job.ID == "" || job.Status != "completed" || job.Conclusion != "success" {
+			return nil, e.New(e.CodeGateUnmet, "native smoke job %q is missing or its latest attempt has not completed successfully", name)
 		}
+		workers[platform] = describe(SourceRequest{Branch: origin.Branch, Repository: origin.Repository, RunID: origin.RunID, Attempt: string(job.Attempt),
+			Commit: origin.Commit, Workflow: origin.Workflow, DefaultBranch: origin.DefaultBranch})
 	}
-	return nil
+	return workers, nil
+}
+
+// Attempts have already been checked as canonical positive decimal numbers.
+func laterSmokeAttempt(left, right string) bool {
+	return len(left) > len(right) || len(left) == len(right) && left > right
 }
 
 func unpackNativeSmoke(ctx context.Context, archive []byte) (NativeSmokeArtifact, error) {

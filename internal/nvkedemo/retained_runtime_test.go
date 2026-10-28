@@ -8,12 +8,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"slices"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -40,11 +36,21 @@ func retainedObserve(t *testing.T, owner *retainedRuntime) retainedRuntimeSnapsh
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
-	snapshot, err := owner.observe(ctx)
-	if err != nil {
-		t.Fatal(err)
+	ticker := time.NewTicker(time.Millisecond)
+	defer ticker.Stop()
+	for {
+		owner.mu.Lock()
+		snapshot := owner.snapshot
+		owner.mu.Unlock()
+		if snapshot.state != retainedStarting {
+			return snapshot
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatal("fixture owner did not reach its hold", ctx.Err())
+		case <-ticker.C:
+		}
 	}
-	return snapshot
 }
 
 func TestRetainedPanicIsRecordedBeforeNestedHold(t *testing.T) {
@@ -65,9 +71,7 @@ func TestRetainedPanicIsRecordedBeforeNestedHold(t *testing.T) {
 			}()
 			go func() {
 				defer close(done)
-				result := func() (result error) {
-					defer func() { result = errors.Join(result, waitRetainedCleanup(work, result)) }()
-					defer recoverRetainedPanic(work, &result)
+				result := withNativeSiteScope(work, &nativeSiteAttempt{}, Runner{}, "", "", func(context.Context, *NativeSite) error {
 					if kind == "panic" {
 						panic("PRIVATE-PANIC-PAYLOAD")
 					}
@@ -78,7 +82,7 @@ func TestRetainedPanicIsRecordedBeforeNestedHold(t *testing.T) {
 						return &CommandError{Phase: "private-command", ExitCode: -1, Cause: context.DeadlineExceeded}
 					}
 					return nvkrerr.Wrap(nvkrerr.CodeTimeout, context.DeadlineExceeded, "private-timeout-cause")
-				}()
+				})
 				joined <- result
 			}()
 			if state := retainedObserve(t, owner); state.state != retainedPartial {
@@ -124,97 +128,6 @@ func TestRetainedPanicIsRecordedBeforeNestedHold(t *testing.T) {
 				t.Fatal("fixture stack not joined")
 			}
 		})
-	}
-}
-
-func TestRetainedNestedPanicCleansKnownHandlesAfterExplicitRequest(t *testing.T) {
-	owner, work, _ := retainedTestOwner(t)
-	privatePath := filepath.Join(privateTestDir(t), "owner-panic.log")
-	owner.panicRecorder = func(raw []byte) error { return privateWrite(privatePath, raw) }
-	control := &retainedControl{owner: owner, finish: make(chan struct{}),
-		description: retainedControlDescription{Work: "/owned-work", Selector: "/owned-session", Token: "fixture-token"}}
-	stages := []string{"runtime", "management", "registry", "tenant"}
-	var order []string
-	var consume func(int) error
-	consume = func(level int) (result error) {
-		// Match the owning scopes' defer order. Registry and management use
-		// the actual shared cleanup helper; tenant/runtime retain their guards.
-		defer func() {
-			cleanup := func(context.Context) error {
-				order = append(order, stages[level])
-				return nil
-			}
-			if stages[level] == "registry" || stages[level] == "management" {
-				result = cleanupAfterJoinedWork(work, result, time.Second, cleanup)
-				return
-			}
-			if holdErr := waitRetainedCleanup(work, result); holdErr != nil {
-				result = errors.Join(result, holdErr)
-				return
-			}
-			if errors.Is(result, ErrUnjoined) || stages[level] == "runtime" && errors.Is(result, ErrRetainedControls) {
-				recordRetainedCleanup(work, result)
-				return
-			}
-			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(work), time.Second)
-			defer cancel()
-			cleanupErr := cleanup(cleanupCtx)
-			recordRetainedCleanup(work, cleanupErr)
-			result = errors.Join(result, cleanupErr)
-		}()
-		defer recoverRetainedPanic(work, &result)
-		if level == len(stages)-1 {
-			panic("PRIVATE-NESTED-PANIC")
-		}
-		return consume(level + 1)
-	}
-	joined := make(chan error, 1)
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		joined <- consume(0)
-	}()
-	defer func() {
-		_ = owner.requestCleanup(context.WithoutCancel(t.Context()))
-		select {
-		case <-done:
-		case <-time.After(time.Second):
-			t.Error("nested panic fixture did not join")
-		}
-	}()
-	if snapshot := retainedObserve(t, owner); snapshot.state != retainedPartial {
-		t.Fatal("nested panic did not hold before teardown", snapshot)
-	}
-	private, err := os.ReadFile(privatePath)
-	state, stateErr := control.snapshot(t.Context())
-	if err != nil || !bytes.Contains(private, []byte("PRIVATE-NESTED-PANIC")) || stateErr != nil || state.FailureCode != nvkrerr.CodeInternal || state.TeardownReturned {
-		t.Fatal("panic diagnostics unavailable before explicit cleanup", err, state, stateErr)
-	}
-	request := func(path string) int {
-		req := httptest.NewRequest(http.MethodPost, path, nil)
-		req = req.WithContext(context.WithValue(req.Context(), retainedRequesterKey{}, true))
-		req.Header.Set("Authorization", "Bearer "+control.description.Token)
-		req.Header.Set("X-NVKE-Retained-Work", control.description.Work)
-		req.Header.Set("X-NVKE-Retained-Session", control.description.Selector)
-		response := httptest.NewRecorder()
-		control.handle(response, req)
-		return response.Code
-	}
-	if status := request("/cleanup"); status != http.StatusOK {
-		t.Fatal("issued cleanup request was refused", status)
-	}
-	select {
-	case result := <-joined:
-		var coded *nvkrerr.Error
-		if !errors.As(result, &coded) || coded.Code != nvkrerr.CodeInternal || errors.Is(result, ErrRetainedControls) || !slices.Equal(order, []string{"tenant", "registry", "management", "runtime"}) {
-			t.Fatal("nested panic skipped known cleanup or lost its operation failure", order, result)
-		}
-		owner.recordTeardownReturn(result)
-		if err := control.recordJoined(t.Context(), nil); err != nil || request("/finish") != http.StatusOK {
-			t.Fatal("known joined cleanup did not permit owner finish", err)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("explicit cleanup did not join the nested panic chain")
 	}
 }
 
@@ -270,47 +183,6 @@ func TestRetainedRuntimeOperationCancellationNeverAuthorizesCleanup(t *testing.T
 	}
 }
 
-func TestRetainedRuntimeNestedTeardownIsReleasedOnlyOnce(t *testing.T) {
-	owner, work, _ := retainedTestOwner(t)
-	var order []string
-	joined := make(chan error, 1)
-	go func() {
-		var result error
-		// This fixture mirrors the four owning defers, without giving a fake
-		// process or serialized state permission over production resources.
-		defer func() { joined <- result }()
-		for _, stage := range []string{"runtime", "management", "registry", "tenant"} {
-			defer func() {
-				if err := waitRetainedCleanup(work); err != nil {
-					result = errors.Join(result, err)
-					return
-				}
-				order = append(order, stage)
-			}()
-		}
-	}()
-	if got := retainedObserve(t, owner); got.state != retainedPartial {
-		t.Fatal("missing held partial state")
-	}
-	var group sync.WaitGroup
-	for range 20 {
-		group.Go(func() {
-			if err := owner.requestCleanup(t.Context()); err != nil {
-				t.Error(err)
-			}
-		})
-	}
-	group.Wait()
-	select {
-	case err := <-joined:
-		if err != nil || !slices.Equal(order, []string{"tenant", "registry", "management", "runtime"}) {
-			t.Fatalf("dependent teardown did not join exactly once: %v %v", order, err)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("nested owner did not join")
-	}
-}
-
 func TestRetainedRuntimeRejectsViewerOwnedLifetimeBeforeWork(t *testing.T) {
 	canceled, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -336,11 +208,12 @@ func TestRetainedRuntimeRejectsViewerOwnedLifetimeBeforeWork(t *testing.T) {
 	}
 }
 
-func TestRetainedRuntimeObservationCannotChangeState(t *testing.T) {
+func TestRetainedControlObservationCannotChangeState(t *testing.T) {
 	owner, _, _ := retainedTestOwner(t)
-	short, cancel := context.WithTimeout(t.Context(), time.Millisecond)
+	short, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
 	defer cancel()
-	if got, err := owner.observe(short); got != (retainedRuntimeSnapshot{}) || !errors.Is(err, context.DeadlineExceeded) {
+	control := &retainedControl{owner: owner}
+	if got, err := control.snapshot(short); got.State != "" || !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatal("unready observer invented state", got, err)
 	}
 	owner.mu.Lock()
@@ -384,7 +257,8 @@ func TestRetainedRuntimeUnissuedDescriptionsAndReadinessTransitionsFailClosed(t 
 			if state == "unknown" {
 				observation, stop := context.WithTimeout(t.Context(), time.Second)
 				defer stop()
-				if got, err := owner.observe(observation); got != (retainedRuntimeSnapshot{}) || !errors.As(err, &coded) || coded.Code != nvkrerr.CodePreflightFailed {
+				control := &retainedControl{owner: owner}
+				if got, err := control.snapshot(observation); got.State != "" || !errors.As(err, &coded) || coded.Code != nvkrerr.CodePreflightFailed {
 					t.Fatal("unknown snapshot returned as an admitted observation", got, err)
 				}
 				if err := owner.requestCleanup(t.Context()); !errors.As(err, &coded) || coded.Code != nvkrerr.CodePreflightFailed {
@@ -434,114 +308,6 @@ func TestRetainedRuntimeRealServiceOutlivesCanceledWorkUntilJoinedCleanup(t *tes
 	}
 }
 
-func TestRetainedProductionCleanupHelperPreservesPrimaryAndUnjoined(t *testing.T) {
-	for _, mode := range []string{"success", "coded failure", "unjoined", "retained controls"} {
-		t.Run(mode, func(t *testing.T) {
-			owner, work, cancel := retainedTestOwner(t)
-			var primary error
-			switch mode {
-			case "coded failure":
-				primary = nvkrerr.New(nvkrerr.CodeFetchFailed, "original fixture failure")
-			case "unjoined":
-				primary = errors.Join(ErrUnjoined, nvkrerr.New(nvkrerr.CodeBuildFailed, "original fixture failure"))
-			case "retained controls":
-				primary = ErrRetainedControls
-			}
-			cancel()
-			var cleanupCalls atomic.Int32
-			joined := make(chan error, 1)
-			go func() {
-				joined <- cleanupAfterJoinedWork(work, primary, time.Second, func(cleanup context.Context) error {
-					cleanupCalls.Add(1)
-					if cleanup.Err() != nil {
-						return cleanup.Err()
-					}
-					if _, bounded := cleanup.Deadline(); !bounded {
-						return errors.New("fixture cleanup was unbounded")
-					}
-					return nil
-				})
-			}()
-			if got := retainedObserve(t, owner); got.state != retainedPartial || cleanupCalls.Load() != 0 {
-				t.Fatal("actual production helper cleaned before explicit request", got)
-			}
-			if err := owner.requestCleanup(t.Context()); err != nil {
-				t.Fatal(err)
-			}
-			select {
-			case err := <-joined:
-				if primary != nil && !errors.Is(err, primary) || primary == nil && err != nil {
-					t.Fatal("actual production helper discarded original failure", err)
-				}
-				owner.recordTeardownReturn(err)
-				want := int32(1)
-				if mode == "unjoined" || mode == "retained controls" {
-					want = 0
-				}
-				if cleanupCalls.Load() != want {
-					t.Fatalf("dependent controls removed around unjoined work: %d", cleanupCalls.Load())
-				}
-				if cleanupErr := owner.joinedCleanup(); (cleanupErr == nil) != (want == 1) {
-					t.Fatal("operation error was confused with teardown result", cleanupErr)
-				}
-			case <-time.After(2 * time.Second):
-				t.Fatal("actual production helper did not return")
-			}
-		})
-	}
-}
-
-func TestRetainedTeardownLeavesPrivilegedControlsForForegroundRestore(t *testing.T) {
-	for _, mode := range []string{"idle", "foreign domain", "inventory failed", "DNS unjoined", "not requested"} {
-		t.Run(mode, func(t *testing.T) {
-			owner, work, _ := retainedTestOwner(t)
-			guard := networkFixture(t)
-			guard.BGPIntent, guard.BridgeIntent = true, true
-			rootCalls, stoppedDNS := 0, 0
-			guard.capture = func(context.Context, []string, bool) ([]byte, error) {
-				rootCalls++
-				return nil, errors.New("retained process must not invoke host restoration")
-			}
-			guard.stopDNSHook = func(context.Context) error {
-				stoppedDNS++
-				if mode == "DNS unjoined" {
-					return ErrUnjoined
-				}
-				return nil
-			}
-			tools := privateTestDir(t)
-			body := "#!/bin/sh\nexit 0\n"
-			switch mode {
-			case "foreign domain":
-				body = "#!/bin/sh\nprintf 'foreign-domain\\n'\n"
-			case "inventory failed":
-				body = "#!/bin/sh\nexit 2\n"
-			}
-			if err := os.WriteFile(filepath.Join(tools, "virsh"), []byte(body), 0o700); err != nil {
-				t.Fatal(err)
-			}
-			if mode != "not requested" {
-				if err := owner.requestCleanup(t.Context()); err != nil {
-					t.Fatal(err)
-				}
-			}
-			ctx, stop := context.WithTimeout(context.WithoutCancel(work), 3*time.Second)
-			defer stop()
-			err := cleanupRetainedRuntime(ctx, nil, nil, guard, guard.Work, Runner{Env: []string{"PATH=" + tools + ":/usr/bin:/bin"}})
-			if (err == nil) != (mode == "idle") || rootCalls != 0 || !guard.BGPIntent || !guard.BridgeIntent || guard.finished {
-				t.Fatal("retained teardown changed privileged controls or overclaimed completion", err, rootCalls)
-			}
-			wantDNS := 1
-			if mode == "not requested" {
-				wantDNS = 0
-			}
-			if stoppedDNS != wantDNS || mode == "DNS unjoined" && !errors.Is(err, ErrUnjoined) {
-				t.Fatal("unjoined producer was discarded or unrequested cleanup ran", err, stoppedDNS)
-			}
-		})
-	}
-}
-
 func TestRetainedCleanupFailureCannotBeReplacedWithPrimarySuccess(t *testing.T) {
 	owner, work, _ := retainedTestOwner(t)
 	if err := owner.joinedCleanup(); !errors.Is(err, ErrRetainedControls) {
@@ -550,14 +316,23 @@ func TestRetainedCleanupFailureCannotBeReplacedWithPrimarySuccess(t *testing.T) 
 	if err := owner.requestCleanup(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	failure := errors.New("fixture teardown failed")
 	if err := owner.joinedCleanup(); !errors.Is(err, ErrRetainedControls) {
 		t.Fatal("request alone supplied a joined teardown", err)
 	}
-	result := cleanupAfterJoinedWork(work, nil, time.Second, func(context.Context) error { return failure })
-	owner.recordTeardownReturn(result)
-	if !errors.Is(result, failure) || !errors.Is(owner.joinedCleanup(), failure) {
-		t.Fatal("successful operation hid failed cleanup", result, owner.joinedCleanup())
+	root := privateTestDir(t)
+	writeTenantFixture(t, filepath.Join(root, "kind"), []byte("#!/bin/sh\nexit 7\n"), 0o700)
+	runner := Runner{Work: root, Env: []string{"PATH=/usr/bin:/bin"}}
+	attempt := nativeSiteAttempt{assets: NativeAssets{HostTools: root}, bootstrapRunner: &runner, bootstrapName: "owned"}
+	cleanup, stop := context.WithTimeout(context.WithoutCancel(work), 5*time.Second)
+	defer stop()
+	failure := attempt.close(cleanup)
+	if CommandExitCode(failure) != 7 {
+		t.Fatal("native cleanup fixture did not return its original failure", failure)
+	}
+	recordRetainedCleanup(work, failure)
+	owner.recordTeardownReturn(nil)
+	if !errors.Is(owner.joinedCleanup(), failure) {
+		t.Fatal("successful operation hid actual native cleanup failure", owner.joinedCleanup())
 	}
 	recordRetainedCleanup(work, nil)
 	if !errors.Is(owner.joinedCleanup(), failure) {

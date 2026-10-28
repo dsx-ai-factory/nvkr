@@ -194,15 +194,15 @@ func (g Graph) MarshalDeterministic() ([]byte, error) {
 // logicalGraph projects a previously validated execution graph into a distinct DTO
 // that cannot represent transport. This structural split prevents a newly added URL,
 // registry, credential, or mirror field from leaking into build identity merely
-// because a sanitizer forgot to clear it.
+// because a sanitizer forgot to clear it. Validation already requires canonical
+// ordering, so clone the retained fields directly without copying the full graph.
 func (g Graph) logicalGraph() LogicalGraph {
-	c := g.normalizedCopy()
 	logical := LogicalGraph{
-		SchemaVersion: c.SchemaVersion,
-		Platform:      c.Platform,
-		Nodes:         make([]LogicalNode, 0, len(c.Nodes)),
+		SchemaVersion: g.SchemaVersion,
+		Platform:      g.Platform,
+		Nodes:         make([]LogicalNode, 0, len(g.Nodes)),
 	}
-	for _, node := range c.Nodes {
+	for _, node := range g.Nodes {
 		logical.Nodes = append(logical.Nodes, LogicalNode{
 			ID: node.ID, Kind: node.Kind, Needs: append([]string(nil), node.Needs...),
 			Commit: node.Commit, TreeHash: node.TreeHash, Dest: node.Dest,

@@ -145,12 +145,23 @@ func TestGitHubUnreferencedFinalizerInterfacePreservesCommandsAndEnvironment(t *
 // Normal rendering keeps finalization inline for the closing summary; complete
 // bundle validation still rejects program changes and credential substitution.
 func TestGitHubFinalizerCommandAndEnvironmentAdmission(t *testing.T) {
-	// The admitted maintained Plan carries a PinSet-backed catalog credential;
-	// the lightweight source-fetch fixture does not authenticate catalog reads.
-	plan, err := LoadPlanContext(t.Context(), "../../../"+FactoryPlanPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Compile a small resolved snapshot with a PinSet-backed catalog credential.
+	// These two admission guards do not depend on the maintained product graph.
+	plan, _, source := authenticatedSourcePlan(t)
+	plan = recompileGitHubStabilityPlan(t, plan, func(in *githubStabilityInputs) {
+		for name, declaration := range in.catalog.Sources {
+			if declaration.Repo != source {
+				continue
+			}
+			declaration.PinSet = &catalog.PinSet{File: "versions.yaml", Members: map[string]catalog.PinSetMember{
+				"member": {Source: "fixture-member", Path: "member.version"},
+			}}
+			in.catalog.Sources[name] = declaration
+			in.catalog.Sources["fixture-member"] = catalog.Source{Repo: "https://github.com/test-owner/member", PinnedBy: name}
+			return
+		}
+		t.Fatal("fixture has no matching catalog source")
+	})
 	if githubCatalogSourceEnvironment(plan)["NVKR_PIN_SOURCE_TOKEN_0"] == "" {
 		t.Fatal("fixture requires admitted catalog-revalidation credentials")
 	}

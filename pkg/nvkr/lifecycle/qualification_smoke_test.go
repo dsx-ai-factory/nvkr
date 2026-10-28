@@ -224,7 +224,23 @@ func TestNativeSmokeExpectedStampBindings(t *testing.T) {
 		code e.Code
 	}{
 		{"exact prefix", func(*ir.Node) {}, ""},
+		{"current stamp family", func(n *ir.Node) { n.Env[0].Name, n.Env[1].Name = "NVKECTL_VERSION", "NVKECTL_COMMIT" }, ""},
+		{"mixed stamp families", func(n *ir.Node) { n.Env[0].Name = "NVKECTL_VERSION" }, e.CodeVerifyFailed},
+		{"both stamp families", func(n *ir.Node) {
+			n.Env = append(n.Env, ir.EnvVar{Name: "NVKECTL_VERSION", Value: "v1.2.3"}, ir.EnvVar{Name: "NVKECTL_COMMIT", Value: n.SourceCommit})
+		}, e.CodeVerifyFailed},
+		{"current wrong version", func(n *ir.Node) {
+			n.Env[0].Name, n.Env[1].Name = "NVKECTL_VERSION", "NVKECTL_COMMIT"
+			n.Env[0].Value = "v1.2.4"
+		}, e.CodeVerifyFailed},
+		{"current wrong commit", func(n *ir.Node) {
+			n.Env[0].Name, n.Env[1].Name = "NVKECTL_VERSION", "NVKECTL_COMMIT"
+			n.Env[1].Value = "bbbbbbbb"
+		}, e.CodeVerifyFailed},
 		{"exact full commit", func(n *ir.Node) { n.Env[1].Value = n.SourceCommit }, ""},
+		{"commit version", func(n *ir.Node) { n.Version = n.SourceCommit; n.Env[0].Value = n.SourceCommit }, ""},
+		{"wrong commit version", func(n *ir.Node) { n.Version = strings.Repeat("b", 40); n.Env[0].Value = n.Version }, e.CodeVerifyFailed},
+		{"prefixed commit version", func(n *ir.Node) { n.Version = n.SourceCommit; n.Env[0].Value = "v" + n.SourceCommit }, e.CodeVerifyFailed},
 		{"wrong version", func(n *ir.Node) { n.Env[0].Value = "v1.2.4" }, e.CodeVerifyFailed},
 		{"wrong commit", func(n *ir.Node) { n.Env[1].Value = "bbbbbbbb" }, e.CodeVerifyFailed},
 		{"weak prefix", func(n *ir.Node) { n.Env[1].Value = "aaaa" }, e.CodeVerifyFailed},
@@ -234,11 +250,13 @@ func TestNativeSmokeExpectedStampBindings(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			node := ir.Node{Kind: ir.KindBuild, Version: "1.2.3", SourceCommit: strings.Repeat("a", 40), Env: []ir.EnvVar{{Name: "NKECTL_VERSION", Value: "v1.2.3"}, {Name: "NKECTL_COMMIT", Value: "aaaaaaaa"}}}
 			tc.edit(&node)
-			_, _, err := expectedSmokeVersion(node, "nvkectl-version-json")
+			version, _, err := expectedSmokeVersion(node, "nvkectl-version-json")
 			if tc.code != "" {
 				assertCode(t, err, tc.code)
 			} else if err != nil {
 				t.Fatal(err)
+			} else if version != node.Env[0].Value {
+				t.Fatalf("expected version %q differs from frozen stamp %q", version, node.Env[0].Value)
 			}
 		})
 	}
@@ -377,23 +395,20 @@ func TestNativeSmokeOwnerIssuesOnlyAfterJoinedExecution(t *testing.T) {
 }
 
 func TestNativeSmokeOwnerFailureAndRevocation(t *testing.T) {
-	for _, mode := range []string{"runtime failure", "version mismatch", "cleanup failure", "invocation revoked", "final context canceled", "wrong invocation", "wrong policy", "unsupported platform"} {
+	checks, baseInvocation, basePolicy, baseOwner := nativeSmokeLiveFixture(t)
+	// Execution, version and cleanup failures have stronger member-by-member
+	// assertions in TestNativeSmokeFailureDiagnosticsCoverKnownMembers.
+	for _, mode := range []string{"invocation revoked", "final context canceled", "wrong invocation", "wrong policy", "unsupported platform"} {
 		t.Run(mode, func(t *testing.T) {
-			checks, invocation, policy, owner := nativeSmokeLiveFixture(t)
+			invocation := &nativeSmokeTestInvocation{source: baseInvocation.source, description: baseInvocation.description}
+			policy := basePolicy
+			owner := &nativeSmokeTestRuntime{expected: slices.Clone(baseOwner.expected)}
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			platform := "linux/amd64"
 			want := e.CodeEngineCapability
-			cause := errors.New("runtime stopped")
 			opened := false
 			switch mode {
-			case "runtime failure":
-				owner.runHook = func(context.Context) error { return e.Wrap(e.CodeEngineCapability, cause, "fixture runtime") }
-			case "version mismatch":
-				owner.expected[0].ExpectedVersion = "vwrong"
-				want = e.CodeVerifyFailed
-			case "cleanup failure":
-				owner.closeHook = func() error { return cause }
 			case "invocation revoked":
 				owner.closeHook = func() error { invocation.closed.Store(true); return nil }
 				want = e.CodeProvenanceMissing
@@ -419,12 +434,6 @@ func TestNativeSmokeOwnerFailureAndRevocation(t *testing.T) {
 			}
 			if opened && (!owner.closed || report == nil || report.Status != "fail" || report.Code != string(want)) {
 				t.Fatalf("failure lost cleanup/diagnostics: %+v %+v", owner, report)
-			}
-			if (mode == "runtime failure" || mode == "cleanup failure") && !errors.Is(err, cause) {
-				t.Fatal("lost runtime cause")
-			}
-			if mode == "version mismatch" && (len(report.Members) != 1 || report.Members[0].ObservedVersion != "vwrong" || report.Members[0].ExpectedVersion == "vwrong") {
-				t.Fatal("version failure lost exact expected and observed diagnostics")
 			}
 			if mode == "final context canceled" && !errors.Is(err, context.Canceled) {
 				t.Fatal("lost context cause")
@@ -490,6 +499,28 @@ func TestNativeSmokeReportRejectsIncompleteOrSubstitutedFields(t *testing.T) {
 	raw, err := report.Canonical()
 	if err != nil {
 		t.Fatal(err)
+	}
+	for _, profile := range []string{"kind-version", "clusterctl-version-json", "oras-version"} {
+		t.Run(profile+" commit shape", func(t *testing.T) {
+			var changed NativeToolSmokeReport
+			if err := canonical.UnmarshalExact(raw, &changed); err != nil {
+				t.Fatal(err)
+			}
+			member := &changed.Members[0]
+			member.Profile = profile
+			for _, commit := range []string{"", "abcdef12", strings.Repeat("a", 40)} {
+				member.ExpectedCommit, member.ObservedCommit = commit, commit
+				err := changed.Validate()
+				valid := (profile == "kind-version" && commit == "") || (profile != "kind-version" && len(commit) == 40)
+				if valid {
+					if err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					assertCode(t, err, e.CodeVerifyFailed)
+				}
+			}
+		})
 	}
 	for _, tc := range []struct {
 		name string

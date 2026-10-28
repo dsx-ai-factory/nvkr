@@ -20,10 +20,11 @@ import (
 // A future supervisor protocol must authenticate its own exact session too.
 // A SupervisorPeer owns a descriptor and mutex and must not be value-copied.
 type SupervisorPeer struct {
-	mu   sync.Mutex
-	file *os.File
-	pid  int
-	uid  uint32
+	mu     sync.Mutex
+	file   *os.File
+	pid    int
+	uid    uint32
+	exited bool
 }
 
 // ObserveSupervisorPeer checks the current user's actual connected peer against
@@ -89,7 +90,12 @@ func (peer *SupervisorPeer) WaitExit(ctx context.Context) error {
 		}
 		// Close and poll serialize on the held descriptor. Closing during poll
 		// cannot substitute an unrelated file that reuses its descriptor number.
-		exited, err := pollSupervisorPeer(peer.file, 50*time.Millisecond)
+		exited := peer.exited
+		var err error
+		if !exited {
+			exited, err = pollSupervisorPeer(peer.file, 50*time.Millisecond)
+			peer.exited = exited
+		}
 		peer.mu.Unlock()
 		if err != nil {
 			return nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "observe bound supervisor exit")

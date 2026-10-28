@@ -8,6 +8,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,7 +23,92 @@ import (
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
+	"golang.org/x/net/http2"
 )
+
+func TestOCIBlobTransportRecoversPeerInternalStreamError(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		failures, want int32
+		status         int
+	}{
+		{"one reset", 1, 2, http.StatusOK},
+		{"persistent reset", 3, 3, 0},
+		{"forbidden", 0, 1, http.StatusForbidden},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var requests atomic.Int32
+			server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.ProtoMajor != 2 {
+					t.Errorf("protocol = %s, want HTTP/2", r.Proto)
+				}
+				if requests.Add(1) <= tc.failures {
+					// net/http sends a real peer RST_STREAM(INTERNAL_ERROR).
+					panic(http.ErrAbortHandler)
+				}
+				w.WriteHeader(tc.status)
+			}))
+			server.EnableHTTP2 = true
+			server.StartTLS()
+			defer server.Close()
+			client := server.Client()
+			client.Transport = ociBlobTransport(client.Transport)
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			request, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/v2/", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			response, err := client.Do(request)
+			if response != nil {
+				defer response.Body.Close()
+			}
+			if tc.status == 0 {
+				var stream http2.StreamError
+				if !errors.As(err, &stream) || stream.Code != http2.ErrCodeInternal {
+					t.Fatalf("persistent reset = %v", err)
+				}
+			} else if err != nil || response.StatusCode != tc.status {
+				t.Fatalf("response = %v, error = %v", response, err)
+			}
+			if got := requests.Load(); got != tc.want {
+				t.Fatalf("requests = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestOCIBlobTransportDoesNotRetryUnrelatedErrors(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+	}{
+		{"lookalike text", errors.New("stream error: stream ID 3; INTERNAL_ERROR; received from peer")},
+		{"certificate", x509.UnknownAuthorityError{}},
+		{"canceled", context.Canceled},
+		{"deadline", context.DeadlineExceeded},
+		{"other stream code", http2.StreamError{StreamID: 3, Code: http2.ErrCodeProtocol, Cause: errors.New("received from peer")}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var requests int
+			base := releaseExecutableRoundTripper(func(*http.Request) (*http.Response, error) {
+				requests++
+				return nil, tc.err
+			})
+			request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://fixture.invalid/v2/", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			response, err := ociBlobTransport(base).RoundTrip(request)
+			if response != nil {
+				defer response.Body.Close()
+			}
+			if !errors.Is(err, tc.err) || requests != 1 {
+				t.Fatalf("requests = %d, error = %v", requests, err)
+			}
+		})
+	}
+}
 
 func TestPullOCIArchiveAnonymousBearerAndTerminalVerification(t *testing.T) {
 	body := ociChartArchive(t)

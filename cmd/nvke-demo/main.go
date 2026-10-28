@@ -12,47 +12,41 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/nvkedemo"
+	"github.com/dsx-ai-factory/nvkr/internal/qemutpm"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/spf13/cobra"
 )
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	defer cancel()
-	err := execute(ctx, os.Args[1:], os.Stdout, os.Stderr)
+	var err error
+	if filepath.Base(os.Args[0]) == qemutpm.LauncherName {
+		err = qemutpm.Run(ctx, os.Args[1:])
+	} else {
+		err = execute(ctx, os.Args[1:], os.Stdout, os.Stderr)
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
 	os.Exit(nvkrerr.ExitCode(err))
 }
 func execute(ctx context.Context, args []string, out, diagnostics io.Writer) error {
-	var retained *nvkedemo.RetainedSession
 	return executeRoot(ctx, newCommand(out, diagnostics, demoActions{
-		run: withOwnDemoExecutable(func(ctx context.Context, cfg nvkedemo.Config) error {
-			if cfg.Cleanup {
-				return nvkedemo.Run(ctx, cfg)
-			}
-			var err error
-			retained, err = nvkedemo.Retain(ctx, cfg)
-			return err
-		}), build: nvkedemo.BuildArtifacts, prepare: nvkedemo.PrepareInstaller, restore: nvkedemo.Restore, load: nvkedemo.LoadDemoFile,
-		retention: nvkedemo.CheckRetentionCapability, status: nvkedemo.RetainedStatus, cleanup: nvkedemo.CleanupRetained, owner: nvkedemo.ServeRetained,
-		after: func(ctx context.Context, out io.Writer) error {
-			if retained == nil {
-				return nil
-			}
-			path, err := os.Executable()
-			if err != nil {
-				return nvkrerr.Wrap(nvkrerr.CodePreflightFailed, err, "select executable for retained access instructions")
-			}
-			bounded, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
-			defer cancel()
-			return retained.WriteInstructions(bounded, path, out)
+		run: withOwnDemoExecutable(nvkedemo.DeployArtifacts),
+		admit: func(ctx context.Context, cfg nvkedemo.Config) error {
+			return nvkedemo.AdmitDemoDeployment(ctx, cfg)
 		},
+		build: nvkedemo.BuildArtifacts, tools: nvkedemo.PrepareTools,
+		guest:   nvkedemo.RunNativeGuest,
+		restore: nvkedemo.Restore, load: nvkedemo.LoadDemoFile,
+		status: nvkedemo.RetainedStatus, cleanup: nvkedemo.CleanupRetained,
+		owner: nvkedemo.ServeRetained,
 	}), args)
 }
 
@@ -72,16 +66,16 @@ func withOwnDemoExecutable(action func(context.Context, nvkedemo.Config) error) 
 // Actions stay typed library calls; injection lets command tests prove help,
 // completion and invalid input do not reach configuration I/O or runtime work.
 type demoActions struct {
-	run       func(context.Context, nvkedemo.Config) error
-	build     func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error)
-	prepare   func(context.Context, nvkedemo.BuildConfig, nvkedemo.Config) (nvkedemo.Config, error)
-	restore   func(context.Context, string, io.Writer) error
-	load      func(context.Context, string) (nvkedemo.DemoFile, error)
-	retention func(context.Context) error
-	status    func(context.Context, string, io.Writer) error
-	cleanup   func(context.Context, string, io.Writer) error
-	owner     func(context.Context, string) error
-	after     func(context.Context, io.Writer) error
+	admit   func(context.Context, nvkedemo.Config) error
+	run     func(context.Context, nvkedemo.Config) error
+	build   func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error)
+	tools   func(context.Context, nvkedemo.ToolConfig) (string, error)
+	guest   func(context.Context, nvkedemo.NativeGuestConfig) error
+	restore func(context.Context, string, io.Writer) error
+	load    func(context.Context, string) (nvkedemo.DemoFile, error)
+	status  func(context.Context, string, io.Writer) error
+	cleanup func(context.Context, string, io.Writer) error
+	owner   func(context.Context, string) error
 }
 
 func executeRoot(ctx context.Context, root *cobra.Command, args []string) error {
@@ -96,10 +90,10 @@ func executeRoot(ctx context.Context, root *cobra.Command, args []string) error 
 func newCommand(out, diagnostics io.Writer, actions demoActions) *cobra.Command {
 	var config string
 	root := &cobra.Command{
-		Use: "nvke-demo", Short: "Build and deploy a trusted local ARM64 NVKE diagnostic",
+		Use: "nvke-demo", Short: "Build and deploy a local NVKE demo with native host tools",
 		SilenceUsage: true, SilenceErrors: true, Args: cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error {
-			return nvkrerr.New(nvkrerr.CodeUsage, "select e2e, run, build, status, cleanup, restore or completion; use --help")
+			return nvkrerr.New(nvkrerr.CodeUsage, "select e2e, run, build, tools, guest, status, cleanup, restore or completion; use --help")
 		},
 	}
 	root.SetOut(out)
@@ -117,6 +111,9 @@ func newCommand(out, diagnostics io.Writer, actions demoActions) *cobra.Command 
 		},
 	})
 	root.AddCommand(newRunCommand(out, actions, &config), newBuildCommand(out, actions, &config), newRestoreCommand(out, actions, &config), newE2ECommand(out, actions, &config))
+	root.AddCommand(newToolsCommand(out, actions))
+	root.AddCommand(newGuestCommand(out, actions))
+	root.AddCommand(newQualificationSetupCommand(out, actions, &config), newQualificationRegistryStopCommand())
 	root.AddCommand(newSessionCommand("status", out, actions), newSessionCommand("cleanup", out, actions), newSessionCommand("retained-owner", out, actions))
 	root.InitDefaultCompletionCmd()
 	for _, command := range root.Commands() {
@@ -132,7 +129,7 @@ func newCommand(out, diagnostics io.Writer, actions demoActions) *cobra.Command 
 func newRunCommand(out io.Writer, actions demoActions, config *string) *cobra.Command {
 	flags := nvkedemo.DemoFile{Version: 1, Run: nvkedemo.RunFile{TimeoutSeconds: nvkedemo.DefaultTenantTimeoutSeconds}}
 	command := &cobra.Command{
-		Use: "run", Short: "Deploy exact completed Run outputs and test a real QCOW2 tenant", Args: cobra.NoArgs,
+		Use: "run", Short: "Deploy a native site and tenant QCOW guests from completed NVKR outputs", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := validateTimeoutFlag(cmd, flags.Run.TimeoutSeconds); err != nil {
 				return err
@@ -145,8 +142,8 @@ func newRunCommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			if err != nil {
 				return err
 			}
-			if !cfg.Cleanup && actions.retention != nil {
-				if err := actions.retention(cmd.Context()); err != nil {
+			if actions.admit != nil {
+				if err := actions.admit(cmd.Context(), cfg); err != nil {
 					return err
 				}
 			}
@@ -155,13 +152,13 @@ func newRunCommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			if err != nil {
 				return err
 			}
-			result := withTerminalSudo(recoveryCtx, out, cmd.ErrOrStderr(), func(session context.Context, refresh func(context.Context) error) error {
+			return withTerminalSudo(recoveryCtx, out, cmd.ErrOrStderr(), func(session context.Context, refresh func(context.Context) error) error {
 				return runProgress(session, out, plain, func(ctx context.Context, progress io.Writer) error {
 					cfg.Progress = progress
+					nativePresentation(progress, cfg.Conformance)
 					return actions.run(ctx, cfg)
 				}, refresh)
 			})
-			return finishRetainedInstructions(cmd.Context(), actions, out, result)
 		},
 	}
 	addRunFlags(command, &flags.Run, true)
@@ -170,7 +167,7 @@ func newRunCommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 func newBuildCommand(out io.Writer, actions demoActions, config *string) *cobra.Command {
 	flags := nvkedemo.DemoFile{Version: 1, Build: nvkedemo.BuildFile{Jobs: 1}}
 	command := &cobra.Command{
-		Use: "build", Short: "Build all ARM64 demo artifacts in one NVKR Definition/Run", Args: cobra.NoArgs,
+		Use: "build", Short: "Build demo artifacts and native tools through NVKR", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			selected, err := configuredFile(cmd, *config, flags, actions)
 			if err != nil {
@@ -188,7 +185,7 @@ func newBuildCommand(out io.Writer, actions demoActions, config *string) *cobra.
 				if err != nil {
 					return err
 				}
-				_, err = fmt.Fprintf(progress, "Artifact builds complete; nvkr: %s\nDeployment is separate: nvke-demo run --help\n", built.NVKR)
+				_, err = fmt.Fprintf(progress, "Artifact builds complete; nvkr: %s\nArtifacts Run: %s\nNative tools Run: %s\nDeployment is separate: nvke-demo run --artifacts-run <artifacts Run> --tools-run <native tools Run> --nvkr <nvkr> --out <fresh directory>\n", built.NVKR, built.Runs.OS, built.Runs.Tools)
 				return err
 			})
 		},
@@ -233,7 +230,7 @@ func newRestoreCommand(out io.Writer, actions demoActions, config *string) *cobr
 func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Command {
 	flags := nvkedemo.DemoFile{Version: 1, Build: nvkedemo.BuildFile{Jobs: 1}, Run: nvkedemo.RunFile{TimeoutSeconds: nvkedemo.DefaultTenantTimeoutSeconds}}
 	command := &cobra.Command{
-		Use: "e2e", Short: "Build one complete artifact Run from scratch, then deploy its exact outputs", Args: cobra.NoArgs,
+		Use: "e2e", Short: "Build artifact and native tool Runs, then deploy their exact outputs", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := validateTimeoutFlag(cmd, flags.Run.TimeoutSeconds); err != nil {
 				return err
@@ -246,8 +243,13 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			if err != nil {
 				return err
 			}
-			if !run.Cleanup && actions.retention != nil {
-				if err := actions.retention(cmd.Context()); err != nil {
+			if actions.admit != nil {
+				if err := actions.admit(cmd.Context(), run); err != nil {
+					return err
+				}
+			}
+			if run.Walkthrough {
+				if err := presentDemoNarration(cmd.Context(), out, build); err != nil {
 					return err
 				}
 			}
@@ -255,17 +257,18 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			if err != nil {
 				return err
 			}
-			budget, cancel := context.WithTimeout(recoveryCtx, 8*time.Hour)
+			ceiling := 8 * time.Hour
+			if run.Conformance {
+				ceiling += 4 * time.Hour
+			}
+			budget, cancel := context.WithTimeout(recoveryCtx, ceiling)
 			defer cancel()
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			plain, _ := cmd.Flags().GetBool("plain")
-			result := withTerminalSudo(budget, out, cmd.ErrOrStderr(), func(session context.Context, refresh func(context.Context) error) error {
+			return withTerminalSudo(budget, out, cmd.ErrOrStderr(), func(session context.Context, refresh func(context.Context) error) error {
 				return runBuildProgress(session, out, verbose, plain, func(ctx context.Context, progress io.Writer) error {
 					build.Progress, run.Progress = progress, progress
-					run, err = actions.prepare(ctx, build, run)
-					if err != nil {
-						return err
-					}
+					nativePresentation(progress, run.Conformance)
 					built, err := actions.build(ctx, build)
 					if err != nil {
 						return err
@@ -275,7 +278,6 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 					return actions.run(ctx, run)
 				}, refresh)
 			})
-			return finishRetainedInstructions(cmd.Context(), actions, out, result)
 		},
 	}
 	addBuildFlags(command, &flags.Build)
@@ -284,33 +286,48 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 }
 func addBuildFlags(command *cobra.Command, cfg *nvkedemo.BuildFile) {
 	flags := command.Flags()
-	flags.StringVar(&cfg.Repo, "repo", "", "native Linux repository path")
+	flags.BoolVar(&cfg.QualifyLocal, "qualify-local", false, "verify outputs, check tools, sign evidence with local keys and verify registry read-back; stop the registry afterward")
+	flags.BoolVar(&cfg.Prepared, "prepared", false, "use an existing prepare-only bootstrap; requires a matching qualification policy and no existing Run")
+	flags.StringVar(&cfg.Repo, "repo", "", "native host repository path")
+	flags.StringVar(&cfg.Definition, "definition", "", "NVKR Definition inside repo; requires environment and nvkr")
+	flags.StringVar(&cfg.Environment, "environment", "", "local NVKR Environment inside repo")
+	flags.StringVar(&cfg.NVKR, "nvkr", "", "native NVKR executable for explicitly selected build inputs")
 	flags.StringVar(&cfg.NVKEClone, "nvke-clone", "", "optional local source Git clone")
 	flags.StringVar(&cfg.Attempt, "attempt", "", "fresh name for the combined artifact Run")
+	flags.StringVar(&cfg.QualificationPolicy, "qualification-policy", "", "check the prepared Plan against a local qualification policy before building; does not sign or qualify outputs")
 	flags.IntVar(&cfg.Jobs, "jobs", 1, "maximum concurrent dependency-ready NVKR operations")
 }
 func addRunFlags(command *cobra.Command, cfg *nvkedemo.RunFile, existing bool) {
 	flags := command.Flags()
-	flags.BoolVar(&cfg.Cleanup, "cleanup", false, "delete the tenant and join/restore owned resources before returning (default: retain environment)")
-	checkoutHelp := "optional clean pinned installer checkout; e2e prepares it when omitted"
+	flags.StringVar(&cfg.Accelerator, "accelerator", "", "native guest accelerator: Mac hvf or explicit tcg for the selected 64K image; Linux kvm (default)")
+	flags.BoolVar(&cfg.Conformance, "conformance", false, "run Kubernetes conformance against this disposable tenant before cleanup (native Mac or Linux ARM64)")
+	flags.BoolVar(&cfg.Walkthrough, "walkthrough", false, "show bounded read-only site, tenant and existing workload observations before cleanup")
+	flags.BoolVar(&cfg.Cleanup, "cleanup", false, "delete owned VMs after acceptance; otherwise return after checks and retain until explicit cleanup")
+	checkoutHelp := "legacy source locator; deployment uses the NVKR installer archive"
 	if existing {
-		checkoutHelp = "required clean pinned NVKE installer checkout"
+		checkoutHelp = "optional source checkout; native deployment uses the NVKR installer archive"
 	}
 	flags.StringVar(&cfg.NVKECheckout, "nvke-checkout", "", checkoutHelp)
 	flags.StringVar(&cfg.Out, "out", "", "fresh private demo output directory")
-	flags.StringVar(&cfg.Network, "network", "ovn", "networking: ovn (NVIDIA default), upstream-ovn, or kind-calico (explicit diagnostics)")
+	flags.StringVar(&cfg.Network, "network", "ovn", "networking: ovn (NVIDIA default) or explicit upstream-ovn")
 	flags.IntVar(&cfg.TimeoutSeconds, "timeout", nvkedemo.DefaultTenantTimeoutSeconds, fmt.Sprintf("tenant provisioning budget in seconds (%d..%d)", nvkedemo.MinTenantTimeoutSeconds, nvkedemo.MaxTenantTimeoutSeconds))
 	if !existing {
 		return
 	}
+	flags.StringVar(&cfg.Repo, "repo", "", "repository containing the captured local artifact Run; required with --conformance")
 	flags.StringVar(&cfg.NVKR, "nvkr", "", "native nvkr executable")
+	flags.StringVar(&cfg.Runs.Artifacts, "artifacts-run", "", "completed artifact Run supplying disk, components, providers, site and profiles")
+	flags.StringVar(&cfg.Runs.HostTools, "host-tools-run", "", "completed native host tool Run; defaults to tools-run")
+	flags.StringVar(&cfg.Runs.Runtime, "runtime-run", "", "completed runtime-image Run; defaults to components-run")
 	flags.StringVar(&cfg.Runs.OS, "os-run", "", "completed OS attempt")
 	flags.StringVar(&cfg.Runs.Components, "components-run", "", "completed components attempt")
 	flags.StringVar(&cfg.Runs.Providers, "provider-run", "", "completed provider attempt (components Run is valid)")
 	flags.StringVar(&cfg.Runs.Site, "site-run", "", "completed site attempt")
-	flags.StringVar(&cfg.Runs.Tools, "tools-run", "", "completed installer-tools attempt")
+	flags.StringVar(&cfg.Runs.Tools, "tools-run", "", "completed native host/site/installer tool Run")
 	flags.StringVar(&cfg.Runs.Profiles, "profiles-run", "", "completed profiles attempt")
-	flags.StringVar(&cfg.Runs.Simulator, "simulator-run", "", "completed simulator attempt")
+	flags.StringVar(&cfg.Runs.Simulator, "simulator-run", "", "legacy simulator Run locator")
+	_ = flags.MarkHidden("simulator-run")
+	_ = flags.MarkHidden("nvke-checkout")
 }
 func validateTimeoutFlag(command *cobra.Command, seconds int) error {
 	if command.Flags().Changed("timeout") && (seconds < nvkedemo.MinTenantTimeoutSeconds || seconds > nvkedemo.MaxTenantTimeoutSeconds) {
@@ -323,6 +340,9 @@ func validateTimeoutFlag(command *cobra.Command, seconds int) error {
 // search directory supplies configuration; unchanged flag defaults cannot
 // overwrite authored YAML values.
 func configuredFile(command *cobra.Command, path string, flags nvkedemo.DemoFile, actions demoActions) (nvkedemo.DemoFile, error) {
+	if command.Flags().Changed("qualification-policy") && flags.Build.QualificationPolicy == "" {
+		return nvkedemo.DemoFile{}, nvkrerr.New(nvkrerr.CodeUsage, "--qualification-policy requires a nonempty path")
+	}
 	if path == "" {
 		if command.Flag("config").Changed {
 			return nvkedemo.DemoFile{}, nvkrerr.New(nvkrerr.CodeUsage, "--config requires a nonempty path")
@@ -339,34 +359,51 @@ func configuredFile(command *cobra.Command, path string, flags nvkedemo.DemoFile
 		value       string
 	}{
 		{"repo", &selected.Build.Repo, flags.Build.Repo}, {"nvke-clone", &selected.Build.NVKEClone, flags.Build.NVKEClone}, {"attempt", &selected.Build.Attempt, flags.Build.Attempt},
-		{"nvke-checkout", &selected.Run.NVKECheckout, flags.Run.NVKECheckout}, {"nvkr", &selected.Run.NVKR, flags.Run.NVKR}, {"out", &selected.Run.Out, flags.Run.Out}, {"network", &selected.Run.Network, flags.Run.Network},
-		{"os-run", &selected.Run.Runs.OS, flags.Run.Runs.OS}, {"components-run", &selected.Run.Runs.Components, flags.Run.Runs.Components}, {"provider-run", &selected.Run.Runs.Providers, flags.Run.Runs.Providers},
+		{"qualification-policy", &selected.Build.QualificationPolicy, flags.Build.QualificationPolicy},
+		{"definition", &selected.Build.Definition, flags.Build.Definition}, {"environment", &selected.Build.Environment, flags.Build.Environment},
+		{"accelerator", &selected.Run.Accelerator, flags.Run.Accelerator}, {"nvke-checkout", &selected.Run.NVKECheckout, flags.Run.NVKECheckout}, {"nvkr", &selected.Run.NVKR, flags.Run.NVKR}, {"out", &selected.Run.Out, flags.Run.Out}, {"network", &selected.Run.Network, flags.Run.Network},
+		{"artifacts-run", &selected.Run.Runs.Artifacts, flags.Run.Runs.Artifacts}, {"host-tools-run", &selected.Run.Runs.HostTools, flags.Run.Runs.HostTools}, {"runtime-run", &selected.Run.Runs.Runtime, flags.Run.Runs.Runtime}, {"os-run", &selected.Run.Runs.OS, flags.Run.Runs.OS}, {"components-run", &selected.Run.Runs.Components, flags.Run.Runs.Components}, {"provider-run", &selected.Run.Runs.Providers, flags.Run.Runs.Providers},
 		{"site-run", &selected.Run.Runs.Site, flags.Run.Runs.Site}, {"tools-run", &selected.Run.Runs.Tools, flags.Run.Runs.Tools}, {"profiles-run", &selected.Run.Runs.Profiles, flags.Run.Runs.Profiles},
 		{"simulator-run", &selected.Run.Runs.Simulator, flags.Run.Runs.Simulator}, {"work", &selected.Restore.Work, flags.Restore.Work},
 	} {
+		if field.name == "nvkr" && (command.Name() == "build" || command.Name() == "e2e") {
+			continue
+		}
+		if field.name == "repo" && command.Name() == "run" {
+			continue
+		}
 		if command.Flags().Changed(field.name) {
 			*field.destination = field.value
 		}
 	}
+	if command.Flags().Changed("nvkr") && (command.Name() == "build" || command.Name() == "e2e") {
+		selected.Build.NVKR = flags.Build.NVKR
+	}
+	if command.Flags().Changed("repo") && command.Name() == "run" {
+		selected.Run.Repo = flags.Run.Repo
+	}
+	if command.Flags().Changed("conformance") {
+		selected.Run.Conformance = flags.Run.Conformance
+	}
 	if command.Flags().Changed("jobs") {
 		selected.Build.Jobs = flags.Build.Jobs
 	}
+	if command.Flags().Changed("qualify-local") {
+		selected.Build.QualifyLocal = flags.Build.QualifyLocal
+	}
+	if command.Flags().Changed("prepared") {
+		selected.Build.Prepared = flags.Build.Prepared
+	}
 	if command.Flags().Changed("timeout") {
 		selected.Run.TimeoutSeconds = flags.Run.TimeoutSeconds
+	}
+	if command.Flags().Changed("walkthrough") {
+		selected.Run.Walkthrough = flags.Run.Walkthrough
 	}
 	if command.Flags().Changed("cleanup") {
 		selected.Run.Cleanup = flags.Run.Cleanup
 	}
 	return selected, nil
-}
-
-func finishRetainedInstructions(ctx context.Context, actions demoActions, out io.Writer, result error) error {
-	if actions.after != nil {
-		// The progress presenter and sudo refresher have already returned and
-		// restored terminal ownership. Full commands must not enter a log ring.
-		return errors.Join(result, actions.after(ctx, out))
-	}
-	return result
 }
 
 func newSessionCommand(name string, out io.Writer, actions demoActions) *cobra.Command {

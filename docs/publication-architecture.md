@@ -47,7 +47,7 @@ flowchart TB
   end
   subgraph helm["…/nvke-helm"]
     H["Helm artifact manifest"] --> HC["Helm chart config: Chart.yaml metadata"]
-    H --> HL["Final chart archive; exact CWE digest embedded"]
+    H --> HL["Final chart archive; exact management-plane image digest embedded"]
     HB["Final-package SBOM referrer manifest"] -. "OCI subject" .-> H
     HB --> HE["Empty OCI config"]
     HB --> HD["Sigstore bundle containing CycloneDX; final archive subject, packaging stage"]
@@ -73,7 +73,7 @@ carries its canonical config. That config alone owns output names, sibling repos
 manifest identities, build bindings, and evidence membership. No deliverable or SBOM payload
 is copied into the release repository, and no separate lifecycle-binding object is published.
 
-The CLI retains its file/platform config for extraction. CWE retains its native manifest, config and layers.
+The CLI retains its file/platform config for extraction. The management-plane image (`cwe`) retains its native manifest, config and layers.
 Helm has one artifact manifest, its real Chart.yaml-derived config, and one chart-archive layer — a
 standards-conformant Helm OCI chart, without a nested publication root.
 
@@ -86,11 +86,11 @@ no additional signature on the SBOM wrapper and no redundant SLSA attestation ab
 Evidence shared by multiple output projections belongs to the first sorted output membership's repository.
 Other memberships reference that same exact bundle through the release. Independent referrer discovery is
 available at the owning output; this avoids pretending that one OCI subject can name multiple repositories.
-The maintained CLI/CWE/Helm outputs each own their evidence, with two distinct inventories for Helm.
+The maintained CLI, management-plane image and Helm outputs each own their evidence, with two distinct inventories for Helm.
 
 ## Signing and publication order
 
-1. Build and observe outputs, generate private raw SBOMs, bind Helm to the exact CWE image, and prepare the
+1. Build and observe outputs, generate private raw SBOMs, bind Helm to the exact management-plane image, and prepare the
    complete local release closure.
 2. Create and verify a CycloneDX attestation for each SBOM's exact subject. Replace the private raw evidence
    with the verified bundles, then derive the final release metadata and index digest.
@@ -128,7 +128,7 @@ verification. No production verification bypass is enabled.
 ## Subjects and evidence scope
 
 OCI `subject` associates an evidence manifest with a deliverable for discovery. The signed statement's subject
-is the precise thing inventoried: a CLI binary, the native CWE image manifest, the original Helm source archive,
+is the precise thing inventoried: a CLI binary, the native management-plane image manifest, the original Helm source archive,
 or the final bound Helm archive. These can be different digests and are not interchangeable.
 
 The CycloneDX predicate retains the covered stage and scanner input. Release metadata binds the canonical
@@ -167,7 +167,7 @@ cosign verify-blob-attestation --bundle sbom.bundle.json --type cyclonedx \
 ```
 
 The expected digest comes from independently checked bytes or authenticated release metadata, not from blindly
-trusting the downloaded bundle. For CWE it is the native manifest digest; for CLI/Helm it is the specific binary
+trusting the downloaded bundle. For the management-plane image it is the native manifest digest; for CLI/Helm it is the specific binary
 or archive digest. Referrer discovery alone establishes no trust. The registry adapter uses the standard
 referrers API or the library's OCI fallback index; discovery indexes are not additional SBOM documents.
 
@@ -176,7 +176,7 @@ The NVKR adapter downloads only the required signature and provenance bundles, v
 It does not copy the artifact or fall back to legacy attachments. Existing legacy signatures/provenance must
 be reissued as bundles before the updated consumer can accept them.
 
-For M3 qualification, select the independent qualifier identity from the reviewed policy. The following
+For qualification, select the independent qualifier identity from the reviewed policy. The following
 shows the example qualifier path; it must match the actual approved workflow, and must differ from the
 builder identity used above:
 
@@ -198,11 +198,13 @@ Independent acceptance must also:
    and independently selected policy. Require all selected output verdicts and complete applicable smoke
    evidence to pass. An external suite marked `not-evaluated` supplies no passing result.
 4. Require the same complete successful evidence across the entire selected set. Reject missing outputs,
-   different subjects, different attempts or differing complete records, even if individual signatures pass.
+   different subjects, different final qualification invocations or differing complete records, even if
+   individual signatures pass. One complete record may retain authenticated original producer or worker
+   attempts from permitted same-run retries.
    Earlier attachments left by a failed publication do not prove completion.
 
 Retain the exact Run/artifact references and positive and controlled-failure verification transcript for
-hosted acceptance. The commands and contract tests are not that transcript. There is no general M4 release
+hosted acceptance. The commands and contract tests are not that transcript. There is no general release
 authorization command in this stack; verifying one attachment cannot grant it. Current qualification
 acceptance gaps remain in [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md#m3-mvp-scope-and-acceptance-boundary).
 
@@ -214,7 +216,7 @@ and stages, failed signing/verification, raw-evidence rejection, isolated reposi
 Legacy finalization compares restored raw SBOM handoffs and final Helm package inspection; per-output
 finalization authenticates exact document bindings through signed metadata and independently verifies bundles.
 
-The [recorded M2 candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) completed hosted publication,
+The [recorded hosted candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) completed hosted publication,
 signing, verification and finalization for 34 outputs, including both native disks. It used an explicitly
 admitted validation branch and `build-provenance-v1` disk evidence. This does not establish main-only
 execution, independent full-payload disk consumption, strict disk inspection or qualification. Current

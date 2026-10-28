@@ -15,16 +15,16 @@ import (
 
 // This opt-in integration authenticates the source-owned chart pin set through
 // actual Git acquisition. Static completeness is not runtime admission or a
-// successful runtime build. Ordinary tests still require 37 declared outputs and
+// successful runtime build. Ordinary tests still require 69 declared outputs and
 // independently load/resolve/compile all 24 native image rows.
 func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 	t.Chdir("../../..")
-	const root = "definitions/nvke-m2"
+	const root = "inputs/definitions/nvke"
 	authored, err := definition.LoadDefinition(t.Context(), filepath.Join(root, "definition.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(authored.Outputs) != 37 {
+	if len(authored.Outputs) != 69 {
 		t.Fatal("required output membership changed")
 	}
 	declaredImages := 0
@@ -34,7 +34,7 @@ func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 	}
 	declaredDisks := 0
 	for _, output := range authored.Outputs {
-		if output.Catalog != nil && output.Catalog.Base == "./image-catalog" {
+		if output.Catalog != nil && output.Catalog.Base == "../../catalogs/runtime-dependencies" {
 			declaredImages++
 		}
 		if output.Format == definition.OutputDiskImage {
@@ -53,7 +53,7 @@ func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 	if os.Getenv("NVKR_TEST_M2_ALL_OUTPUT_GRAPHS") != "1" {
 		t.Skip("explicit pinned-source Git integration was not requested; native image graphs are tested separately")
 	}
-	environmentPath := filepath.Join(root, "environment-github.yaml")
+	environmentPath := filepath.Join(root, "../../environments/github-release.yaml")
 	environment, err := definition.LoadEnvironment(t.Context(), environmentPath)
 	if err != nil {
 		t.Fatal(err)
@@ -68,7 +68,7 @@ func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 	if err := plan.Graph.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	if len(plan.Builds) != 38 || len(plan.LifecycleOutputs) != len(authored.Outputs) {
+	if len(plan.Builds) != 73 || len(plan.LifecycleOutputs) != len(authored.Outputs) {
 		t.Fatal("compiled Plan does not preserve every required output")
 	}
 	builds := make(map[string]factory.BuildPlan, len(plan.Builds))
@@ -103,7 +103,7 @@ func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 				t.Fatal(err)
 			}
 			graphs++
-			if output.Catalog != nil && output.Catalog.Base == "./image-catalog" {
+			if output.Catalog != nil && output.Catalog.Base == "../../catalogs/runtime-dependencies" {
 				pulls := 0
 				for _, node := range build.Graph.Nodes {
 					if node.Kind == ir.KindPull && node.OutputType == "oci-image" {
@@ -120,7 +120,7 @@ func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 	if images != 24 {
 		t.Fatalf("compiled %d required image rows, want 24", images)
 	}
-	if graphs != 38 {
-		t.Fatalf("validated %d required build graphs, want 38", graphs)
+	if graphs != 73 {
+		t.Fatalf("validated %d required build graphs, want 73", graphs)
 	}
 }

@@ -51,7 +51,9 @@ binary and unit were absent. Runtime dependencies came from the signed pinned Ub
 26.04's APT bootstrap required an explicit path to the copied trusted CA bundle; TLS and archive signature
 verification stayed enabled. These checks started no NVSentinel service and prove no API/GPU operation,
 healthy-node behavior or upgrade. This is an unqualified local platform-connectors package, without a signed
-release, full node bundle or OS image. Native AMD64 and OS recipe consumption still need their own runs.
+release or full node bundle. The separate OS recipe run below records its narrower image result;
+native AMD64 execution remains unproved. These standalone payloads and their staged copies were removed
+during the authorized local cleanup; their earlier records describe historical evidence.
 
 On a matching native Linux ARM64 caller with the local pinned toolchains and inspector available, execute
 through NVKR (use a new attempt name):
@@ -77,7 +79,7 @@ material; it supplies the raw `.deb` through the existing held material transfer
 No new scheduler, disk lifecycle or publication path is required.
 
 [The source patch](nvke-os-package-input.patch), based on NVKE development commit
-`f5763cbe12f8728404f7df1baacd6250edd2f598`, adds one optional composer argument:
+`115d07c8bf671f8e8f9c8e630fb02c8d0ffcfb17`, adds one optional composer argument:
 
 ```sh
 --nvsentinel-package /nvkr/inputs/materials/nvsentinel
@@ -87,6 +89,9 @@ The existing composer copies those exact bytes into
 `debs/nvsentinel-platform-connectors.deb`, checks architecture and applies its
 existing package byte limits and local APT indexing. The existing guest provisioner
 installs that file during the bake. Package-owned units remain stopped by default.
+The composer also includes the source-owned cloud-init network override and netplan
+DHCP configuration required by that provisioner, preserving their bytes and modes.
+Missing either configuration fails composition before replacing an existing archive.
 The patch is not an adopted NVKE release or proof of a completed OS build.
 
 The `os-ubuntu2404-{amd64,arm64}.yaml` and `os-ubuntu2604-{amd64,arm64}.yaml`
@@ -101,7 +106,7 @@ copies the raw package without rebuilding or repacking it.
 
 The OS consumer and kubeadm supplier select the upstream OS download/kernel
 recovery fix [NVKE #1588](https://github.com/dsx-ai-factory/nvke/pull/1588). The
-intake patch remains unchanged and applies to that source. Other supplier pins
+intake patch applies to that source. Other supplier pins
 and the NVSentinel source/package stay unchanged. This source update does not
 change NVKR's separately locked Packer-toolchain Ubuntu snapshot or establish
 that its download failures are resolved.
@@ -111,9 +116,23 @@ bin/nvkr run plan --definition definitions/nvsentinel/os-ubuntu2604-arm64.yaml \
   --environment definitions/nvsentinel/environment-os-arm64.yaml --json
 ```
 
-All four OS selections compile. This establishes the declared material handoff,
-not a completed QCOW bake. The local daemon does not have the selected baseline
-Packer toolchain image. The Ubuntu 24.04 selections also retain the baseline
+All four OS selections compile. Local native ARM64 Run `ubuntu26-arm64-native6`
+completed the Ubuntu 26.04 bake using the existing toolchain substitution overlays
+for the measured local Packer and matching Ubuntu SDK images. It retained a
+2,885,085,696-byte QCOW2 with SHA-256
+`4600f8364d75f0869ea0c94e067a685f26067da99266346944576e0145aee807`;
+its independent hash and length match the completed lifecycle's observed disk.
+The Run's Plan digest is
+`8bf4f5c0741835e5f7778076340d7a7886bc3bae8a9fd0f44bcca737d9dcb96e`.
+Read-only libguestfs inspection and Debian's package reader independently confirmed
+`nvsentinel-platform-connectors` version `0~git20261013.c159347735`, architecture
+`arm64`, with status `install ok installed`. The installed binary and unit match
+the fresh source DEB byte-for-byte. Both required network configurations match the
+source/material bytes and modes, and the QCOW hash remained unchanged afterward.
+This is unsigned, unqualified local execution; independent boot, service/API/GPU
+behavior and upgrades remain unverified.
+
+The Ubuntu 24.04 selections retain the baseline
 NVKE-agent CGO builder from Ubuntu 26.04; compatibility of that separate agent
 with the Ubuntu 24.04 guest is unresolved. Use a compatible existing package
 builder before executing those two OS candidates. NVSentinel's independent
@@ -121,13 +140,9 @@ Ubuntu 24.04 package installation does not establish the agent's compatibility.
 The AMD64 Environment requires a genuine native AMD64 host with KVM. The ARM64
 Environment uses the existing native ARM64 TCG development route.
 
-The retained Ubuntu 24.04 and 26.04 ARM64 catalog packages are also staged locally
-under `.nvkr/nvsentinel-os-inputs/ubuntu-24.04-arm64/debs/` and
-`.nvkr/nvsentinel-os-inputs/ubuntu-26.04-arm64/debs/`. Each staged file is byte-identical
-to its original completed package Run. These are inputs, not baked QCOW images or
-restored producer authority. A fresh customer Run uses the selected source producer
-and the existing material owner. Native AMD64 packages and the complete customer OS
-bake remain unproved.
+A fresh customer Run uses the selected source producer and existing material owner;
+earlier staged files or serialized records do not restore producer authority.
+Native AMD64 packages and the other OS target bakes remain unproved.
 
 ## Select the platform-connectors image
 
@@ -187,4 +202,6 @@ upstream declarations; it does not build or authenticate the complete deployed i
 default repository does not establish that the local image digest is published there. Consumers must select
 their actual published repository separately. These are local unsigned, unqualified artifacts and read-only
 rendering checks, without a Helm install, live service, host migration or acceptance with the source-declared
-Helm 3.19.2. Native AMD64 and customer OS recipe consumption remain unverified.
+Helm 3.19.2. Native AMD64 remains unverified. The separate Ubuntu 26.04 ARM64 OS
+Run above records package consumption through the existing image recipe; it does
+not establish deployment of this chart.

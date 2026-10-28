@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -14,6 +15,7 @@ import (
 )
 
 func TestNativeSmokeFailureDiagnosticsCoverKnownMembers(t *testing.T) {
+	checks, baseInvocation, policy, baseOwner := nativeSmokeLiveFixture(t)
 	for _, tc := range []struct {
 		name     string
 		code     e.Code
@@ -29,7 +31,8 @@ func TestNativeSmokeFailureDiagnosticsCoverKnownMembers(t *testing.T) {
 		{"final cancellation", e.CodeTimeout, []string{"pass", "pass"}, 2},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			checks, invocation, policy, owner := nativeSmokeLiveFixture(t)
+			invocation := &nativeSmokeTestInvocation{source: baseInvocation.source, description: baseInvocation.description}
+			owner := &nativeSmokeTestRuntime{expected: slices.Clone(baseOwner.expected)}
 			if len(owner.expected) != len(tc.statuses) {
 				t.Fatal("fixture must contain two independently named outputs")
 			}
@@ -84,6 +87,9 @@ func TestNativeSmokeFailureDiagnosticsCoverKnownMembers(t *testing.T) {
 			}
 			if len(report.Results) != len(owner.expected) || len(report.Members) != tc.observed {
 				t.Fatalf("incomplete or invented observations: %+v", report)
+			}
+			if tc.name == "version mismatch" && (report.Members[0].ObservedVersion != "vwrong" || report.Members[0].ExpectedVersion == "vwrong") {
+				t.Fatal("version failure lost exact expected and observed diagnostics")
 			}
 			for i, result := range report.Results {
 				member := owner.expected[i]

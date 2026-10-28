@@ -42,17 +42,20 @@ const (
 // owned by this module. Publication is opt-in because it is the sole consequential
 // remote mutation in the plan.
 type LocalRunOptions struct {
-	Workspace    string
-	RunnerSource string
-	Jobs         int
-	Runtime      string
-	Go           string
-	Publish      bool
-	DryRun       bool
-	Stdout       io.Writer
-	Stderr       io.Writer
-	Activity     *buildactivity.Sink // Optional descriptive log metadata only.
-	Progress     *progress.Monitor   // Optional descriptive latest state only.
+	// CompileInputs is canonical descriptive input transport. Factory replays it
+	// against the Plan and retains it only after workspace ownership is established.
+	CompileInputs string
+	Workspace     string
+	RunnerSource  string
+	Jobs          int
+	Runtime       string
+	Go            string
+	Publish       bool
+	DryRun        bool
+	Stdout        io.Writer
+	Stderr        io.Writer
+	Activity      *buildactivity.Sink // Optional descriptive log metadata only.
+	Progress      *progress.Monitor   // Optional descriptive latest state only.
 	// Diagnostics is an opaque lifecycle-issued attempt-directory capability.
 	// A path or serialized description cannot substitute for it.
 	Diagnostics   *pipeline.PackerDiagnosticSink
@@ -61,6 +64,7 @@ type LocalRunOptions struct {
 	vmDrivers     vmDriverExecutor
 	vmAdmissions  map[string]vmAdmission
 	materialOwner *LocalRunResult
+	nativeGo      map[string]*pipeline.NativeGoToolchain
 }
 
 // LocalNodeResult is a deterministic, unqualified execution observation.
@@ -164,10 +168,29 @@ func AdmitLocal(ctx context.Context, plan *Plan, options LocalRunOptions) error 
 	if hasLocalDebianBuild(plan) {
 		return admitLocalRuntime(ctx, options)
 	}
+	toolchains, err := admitLocalNativeGo(ctx, plan)
+	if err != nil {
+		return err
+	}
+	defer closeLocalNativeGo(toolchains)
 	vmBuild := hasLocalVMBuild(plan)
-	if vmBuild && runtime.GOOS != "linux" {
-		return e.New(e.CodeEngineCapability,
-			"local VM execution requires Linux; host is %s/%s", runtime.GOOS, runtime.GOARCH)
+	if vmBuild {
+		for _, selected := range plan.Graph.Nodes {
+			if selected.Kind != NodeBuild || selected.IRNode == "" {
+				continue
+			}
+			_, instruction, err := plan.producerInstruction(selected)
+			if err != nil {
+				return err
+			}
+			if instruction.BuilderType != ir.BuilderVMImage {
+				continue
+			}
+			_, native := plan.Environment.Runtime.NativeToolchains[instruction.Toolchain]
+			if err := validateLocalPackerHost(instruction, native); err != nil {
+				return err
+			}
+		}
 	}
 	platforms := localRunnerPlatforms(topologicalFactoryNodes(plan.Graph))
 	if vmBuild && len(platforms) == 0 {
@@ -239,6 +262,14 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 		return nil, err
 	}
 	if !options.DryRun {
+		var err error
+		options.nativeGo, err = admitLocalNativeGo(ctx, plan)
+		if err != nil {
+			return nil, err
+		}
+		defer closeLocalNativeGo(options.nativeGo)
+	}
+	if !options.DryRun {
 		if err := admitLocalDiskPublication(plan); err != nil {
 			return nil, err
 		}
@@ -297,6 +328,9 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 		completed = true
 		return result, nil
 	}
+	if err := validateLocalCompileInputs(ctx, plan, options.CompileInputs); err != nil {
+		return nil, err
+	}
 	if deps.prepareRunner == nil || deps.executeNode == nil {
 		return nil, e.New(e.CodeInternal, "factory local executor is incomplete")
 	}
@@ -326,7 +360,7 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 			return nil, relocateErr
 		}
 		options.vmDrivers, err = options.vmResolver.Admit(ctx, relocated, options.producers, vmDriverRunConfig{
-			Runtime: options.Runtime, Stdout: options.Stdout, Stderr: options.Stderr,
+			Runtime: options.Runtime, Workspace: options.Workspace, Stdout: options.Stdout, Stderr: options.Stderr,
 			Diagnostics: options.Diagnostics, Activity: options.Activity,
 		})
 		if err != nil {
@@ -366,6 +400,9 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 		if openErr != nil {
 			return nil, openErr
 		}
+	}
+	if err := retainLocalCompileInputs(ctx, options.Workspace, options.CompileInputs); err != nil {
+		return nil, err
 	}
 	platforms := localRunnerPlatforms(ordered)
 	if hasLocalDebianBuild(plan) {
@@ -433,13 +470,21 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 		}
 		batchCtx, cancel := context.WithCancel(ctx)
 		results := make([]LocalNodeResult, len(ready))
-		batchErrors := make([]error, len(ready))
+		var firstError error
+		var firstFailure sync.Once
 		var batch sync.WaitGroup
 		for index, node := range ready {
 			batch.Go(func() {
-				results[index], batchErrors[index] = runLocalNode(batchCtx, plan, node, options, runners, result, deps)
-				if batchErrors[index] != nil {
-					cancel()
+				var nodeErr error
+				results[index], nodeErr = runLocalNode(batchCtx, plan, node, options, runners, result, deps)
+				if nodeErr != nil {
+					// Record the initiating error before canceling siblings. A real
+					// operation timeout and the cancellations it triggers may carry
+					// the same code, so neither sort order nor code identifies cause.
+					firstFailure.Do(func() {
+						firstError = nodeErr
+						cancel()
+					})
 				}
 			})
 		}
@@ -448,18 +493,8 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 		if err := ctx.Err(); err != nil {
 			return nil, e.Wrap(e.CodeTimeout, err, "local Run canceled")
 		}
-		// A canceled sibling can sort before the operation that failed. Preserve
-		// the causal failure instead of reporting the cancellation it triggered.
-		for _, err := range batchErrors {
-			var coded *e.Error
-			if err != nil && (!errors.As(err, &coded) || coded.Code != e.CodeTimeout) {
-				return nil, err
-			}
-		}
-		for _, err := range batchErrors {
-			if err != nil {
-				return nil, err
-			}
+		if firstError != nil {
+			return nil, firstError
 		}
 		for _, completed := range results {
 			status[completed.ID] = completed.Status
@@ -961,7 +996,13 @@ func executeLocalProducer(ctx context.Context, plan *Plan, node Node, options Lo
 			owner = options.materialOwner
 		}
 	}
-	return executeProducer(ctx, relocated, node, options.Runtime, options.Jobs, options.Stdout, options.Stderr, run, owner)
+	invoke := func(instruction ir.Node, settings pipeline.RunOptions) (*pipeline.ArtifactResult, error) {
+		if instruction.BuilderType == ir.BuilderNativeGo {
+			settings.NativeGo = options.nativeGo[instruction.Toolchain]
+		}
+		return run(instruction, settings)
+	}
+	return executeProducer(ctx, relocated, node, options.Runtime, options.Jobs, options.Stdout, options.Stderr, invoke, owner)
 }
 
 func hasLocalVMBuild(plan *Plan) bool {
@@ -1042,10 +1083,8 @@ func joinFactoryCleanupError(primary, cleanup error, operation string) error {
 }
 
 func relocateFactoryPlan(plan *Plan, workspace string) (*Plan, error) {
-	// Capture the compiled identity BEFORE any path is rewritten, and carry it onto the
-	// relocated copy. Without this the plan's digest would silently become a function of
-	// the caller's --workspace, and every attestation minted from a non-default workspace
-	// would name a plan digest that nothing else in the system can reproduce.
+	// Capture the compiled identity BEFORE any path is rewritten so attestations do
+	// not depend on the caller's --workspace (see Plan.identityDigest).
 	identity, err := plan.IdentityDigest()
 	if err != nil {
 		return nil, err
@@ -1195,51 +1234,6 @@ func localRunnerPlatforms(nodes []Node) []string {
 		}
 	}
 	return sortedKeys(set)
-}
-
-func topologicalFactoryNodes(graph ArtifactGraph) []Node {
-	byID := make(map[string]Node, len(graph.Nodes))
-	producer := make(map[string]string, len(graph.Artifacts))
-	for _, node := range graph.Nodes {
-		byID[node.ID] = node
-	}
-	for _, artifact := range graph.Artifacts {
-		producer[artifact.ID] = artifact.Producer
-	}
-	indegree := make(map[string]int, len(graph.Nodes))
-	children := make(map[string][]string, len(graph.Nodes))
-	for _, node := range graph.Nodes {
-		parents := map[string]bool{}
-		for _, input := range node.Inputs {
-			parent := producer[input]
-			if !parents[parent] {
-				parents[parent] = true
-				indegree[node.ID]++
-				children[parent] = append(children[parent], node.ID)
-			}
-		}
-	}
-	var ready []string
-	for id := range byID {
-		if indegree[id] == 0 {
-			ready = append(ready, id)
-		}
-	}
-	sort.Strings(ready)
-	ordered := make([]Node, 0, len(byID))
-	for len(ready) > 0 {
-		id := ready[0]
-		ready = ready[1:]
-		ordered = append(ordered, byID[id])
-		for _, child := range children[id] {
-			indegree[child]--
-			if indegree[child] == 0 {
-				ready = append(ready, child)
-				sort.Strings(ready)
-			}
-		}
-	}
-	return ordered
 }
 
 func failedLocalDependency(graph ArtifactGraph, node Node, status map[string]string) string {

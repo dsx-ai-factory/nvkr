@@ -41,8 +41,8 @@ func generationFixture(t *testing.T) (*factory.Plan, lifecycle.QualificationPoli
 			policy.Smoke.NonToolOutputs = append(policy.Smoke.NonToolOutputs, lifecycle.QualificationNonToolOutput{Output: output.Name, Kind: output.Kind, Components: append([]string(nil), output.Components...), Reason: "deployment-image"})
 		}
 	}
-	if len(policy.Smoke.NonToolOutputs) != 25 {
-		t.Fatal("maintained candidate fixture changed its reviewed OCI scope")
+	if len(policy.Smoke.NonToolOutputs) != 56 {
+		t.Fatal("maintained candidate fixture changed its declared OCI membership")
 	}
 	return plan, policy
 }
@@ -80,6 +80,7 @@ type qualificationWorkflowStep struct {
 	Name            string            `yaml:"name"`
 	Uses            string            `yaml:"uses"`
 	Run             string            `yaml:"run"`
+	Timeout         int               `yaml:"timeout-minutes"`
 	Env             map[string]string `yaml:"env"`
 	With            map[string]string `yaml:"with"`
 }
@@ -91,6 +92,57 @@ func decodeQualificationWorkflow(t *testing.T, raw []byte) qualificationWorkflow
 		t.Fatal(err)
 	}
 	return result
+}
+
+func TestQualificationGeneratedCommandsOwnStepProcess(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		fixture func(*testing.T) (*factory.Plan, lifecycle.QualificationPolicy)
+	}{
+		{"production", generationFixture},
+		{"development", developmentGenerationFixture},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan, policy := tc.fixture(t)
+			bundle, err := RenderWorkflows(t.Context(), plan, policy, "qualification.yaml")
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, command := range []struct{ workflow, job, name string }{
+				{policy.QualificationWorkflow, "qualify", "qualify"},
+				{policy.Smoke.Workflow, "native", "smoke-worker"},
+			} {
+				workflow := decodeQualificationWorkflow(t, bundle.files[command.workflow])
+				if workflow.Jobs[command.job].Timeout != 90 {
+					t.Fatalf("%s does not reserve the complete hosted job budget", command.workflow)
+				}
+				found := 0
+				for _, step := range workflow.Jobs[command.job].Steps {
+					if !strings.Contains(step.Run, "./nvkr-exec run "+command.name+" --policy ") {
+						continue
+					}
+					found++
+					lines := strings.Split(strings.TrimSpace(step.Run), "\n")
+					want := "exec ./nvkr-exec run " + command.name + " --policy 'qualification.yaml'"
+					if !policy.Source.Development && command.name == "qualify" {
+						want += " --issue-manifest"
+					}
+					if lines[len(lines)-1] != want {
+						t.Fatalf("%s does not replace its shell with the final owner command", command.workflow)
+					}
+					if lines[0] != "set -euo pipefail" || !strings.Contains(step.Run, "[ -n \"${NVKR_PIN_SOURCE_TOKEN_0:-}\" ]") || step.Timeout != 60 {
+						t.Fatalf("%s changed source admission or its bounded step", command.workflow)
+					}
+					if time.Duration(step.Timeout)*time.Minute-hostedRuntimeTimeout != time.Minute {
+						t.Fatalf("%s does not preserve the one-minute owner cleanup margin before the step deadline", command.workflow)
+					}
+				}
+				if found != 1 {
+					t.Fatalf("%s has %d owner commands", command.workflow, found)
+				}
+			}
+		})
+	}
 }
 
 func TestQualificationGenerationWorkflowContract(t *testing.T) {
@@ -115,19 +167,61 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 	if call.Name != "native-smoke" || call.Uses != "./"+policy.Smoke.Workflow || native.Name != "native-${{ matrix.arch }}" || native.RunsOn != "${{ matrix.runner }}" {
 		t.Fatal("exact authenticated job or same-commit reusable identity changed")
 	}
-	if !reflect.DeepEqual(final.Needs, []string{"native-smoke"}) || final.Permissions["packages"] != "write" || call.Permissions["packages"] != "read" || native.Permissions["packages"] != "read" {
+	if !reflect.DeepEqual(final.Needs, []string{"native-smoke"}) || final.Permissions["packages"] != "" || call.Permissions["packages"] != "" || native.Permissions["packages"] != "" {
 		t.Fatal("final publication and read-only worker permissions are not separated")
 	}
-	if call.Secrets["NKE_SOURCE_TOKEN"] != "${{ secrets.NKE_SOURCE_TOKEN }}" || len(call.Secrets) != 1 {
+	if call.Secrets["NKE_SOURCE_TOKEN"] != "${{ secrets.NKE_SOURCE_TOKEN }}" ||
+		call.Secrets["NVKR_CI_STORAGE_READ_TOKEN"] != "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}" ||
+		call.Secrets["NVKR_REGISTRY_READ"] != "${{ secrets.NVKR_REGISTRY_READ }}" || len(call.Secrets) != 3 {
 		t.Fatalf("unexpected explicit source secrets: %v", call.Secrets)
 	}
+	contract, ok := worker.On["workflow_call"].(map[string]any)
+	if !ok {
+		t.Fatal("worker has no reusable workflow contract")
+	}
+	secrets, ok := contract["secrets"].(map[string]any)
+	if !ok {
+		t.Fatal("worker has no explicit secret contract")
+	}
+	readSecret, ok := secrets["NVKR_CI_STORAGE_READ_TOKEN"].(map[string]any)
+	if !ok || readSecret["required"] != true {
+		t.Fatal("private carrier read credential must be required")
+	}
+	registryRead, ok := secrets["NVKR_REGISTRY_READ"].(map[string]any)
+	if !ok || registryRead["required"] != true {
+		t.Fatal("registry reader must be required by the reusable worker")
+	}
+	for _, tc := range []struct{ name, user, token string }{
+		{"Acquire pinned native smoke image", "GHCR_USER", "GHCR_TOKEN"},
+		{"Authenticate and smoke exact delivered tool bytes", "NVKR_PULL_REGISTRY_USER", "NVKR_PULL_REGISTRY_PASSWORD"},
+	} {
+		found := 0
+		for _, step := range native.Steps {
+			if step.Name == tc.name {
+				found++
+				if step.Env[tc.user] != "${{ vars.NVKR_REGISTRY_READ_USER }}" || step.Env[tc.token] != "${{ secrets.NVKR_REGISTRY_READ }}" {
+					t.Fatalf("%s lost its exact registry reader binding", tc.name)
+				}
+			}
+		}
+		if found != 1 {
+			t.Fatalf("missing or repeated registry consumer %s", tc.name)
+		}
+	}
 	for _, job := range []qualificationWorkflowJob{native, final} {
-		if len(job.Env) != 0 || job.Timeout != 30 {
+		if len(job.Env) != 0 || job.Timeout != 90 {
 			t.Fatal("ambient job environment or missing timeout")
 		}
 		scoped := 0
+		storageScoped := 0
 		checkouts := 0
 		for _, step := range job.Steps {
+			if token, ok := step.Env["NVKR_CI_STORAGE_TOKEN"]; ok {
+				storageScoped++
+				if token != "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}" || step.Env["NVKR_CI_STORAGE_USER"] != "${{ vars.NVKR_CI_STORAGE_READ_USER }}" || !strings.Contains(step.Run, "./nvkr-exec run ") {
+					t.Fatal("private carrier read credential escaped its owner or gained an ambient fallback")
+				}
+			}
 			if strings.HasPrefix(step.Uses, "actions/checkout@") {
 				checkouts++
 				if step.With["ref"] != "${{ github.workflow_sha }}" || step.With["persist-credentials"] != "false" {
@@ -144,7 +238,7 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 				}
 			}
 		}
-		if scoped != 1 || checkouts != 1 {
+		if scoped != 1 || storageScoped != 1 || checkouts != 1 {
 			t.Fatal("incorrect credential or checkout scope")
 		}
 	}
@@ -155,8 +249,20 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 			}
 		}
 	}
+	manifestCalls := 0
+	for _, step := range final.Steps {
+		if strings.Contains(step.Run, "./nvkr-exec run qualify ") {
+			manifestCalls++
+			if !strings.Contains(step.Run, "--policy 'qualification.yaml' --issue-manifest") || step.ContinueOnError {
+				t.Fatal("production qualification must require manifest issuance under the same independent policy")
+			}
+		}
+	}
+	if manifestCalls != 1 || bytes.Contains(bundle.files[policy.Smoke.Workflow], []byte("--issue-manifest")) {
+		t.Fatal("manifest issuance escaped the single final signing job")
+	}
 	all := string(bundle.files[policy.QualificationWorkflow]) + string(bundle.files[policy.Smoke.Workflow])
-	for _, forbidden := range []string{"secrets: inherit", "refs/pull/", "ref: ${{ github.event.workflow_run.head_sha }}", "--run ", "--results ", "@main", "@v4"} {
+	for _, forbidden := range []string{"secrets.NVKR_CI_STORAGE_TOKEN", "secrets.NVKR_CI_STORAGE_WRITE_TOKEN", "secrets: inherit", "refs/pull/", "ref: ${{ github.event.workflow_run.head_sha }}", "--run ", "--results ", "@main", "@v4"} {
 		if strings.Contains(all, forbidden) {
 			t.Fatalf("unexpected generated surface %q", forbidden)
 		}
@@ -175,6 +281,42 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 		if bundle.files[name][0] == '!' {
 			t.Fatal("rendered file alias escaped")
 		}
+	}
+}
+
+func TestQualificationTriggerExcludesNamedProducerOfSameDefinition(t *testing.T) {
+	plan, policy := generationFixture(t)
+	qualifier, err := RenderWorkflows(t.Context(), plan, policy, "qualification.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	top := decodeQualificationWorkflow(t, qualifier.files[policy.QualificationWorkflow])
+	trigger, ok := top.On["workflow_run"].(map[string]any)
+	if !ok {
+		t.Fatal("qualifier omits the workflow_run trigger")
+	}
+	names, ok := trigger["workflows"].([]any)
+	if !ok || len(names) != 1 || names[0] != "nvkr-run-"+plan.Name {
+		t.Fatalf("qualifier changed its sole default producer selection: %v", trigger)
+	}
+	for _, name := range []string{plan.Name, "other-project"} {
+		t.Run(name, func(t *testing.T) {
+			named := *plan
+			named.Environment.GitHubBundle = name
+			var digestErr error
+			named.EnvironmentDigest, digestErr = named.Environment.Digest()
+			if digestErr != nil {
+				t.Fatal(digestErr)
+			}
+			producer, renderErr := factory.RenderGitHub(t.Context(), &named)
+			if renderErr != nil {
+				t.Fatal(renderErr)
+			}
+			workflow := decodeQualificationWorkflow(t, producer.Files[producer.WorkflowPath])
+			if workflow.Name != "nvkr-project-"+name || workflow.Name == names[0] {
+				t.Fatalf("named producer can trigger the default qualifier: %q", workflow.Name)
+			}
+		})
 	}
 }
 
@@ -203,6 +345,41 @@ func TestQualificationGenerationFinalReportsWorkerFailure(t *testing.T) {
 		if step.If != "" || step.ContinueOnError {
 			t.Fatalf("worker step %q no longer stops on failure", step.Name)
 		}
+	}
+}
+
+func TestQualificationProductionRegistryCredentialAdmission(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		publication bool
+		target      bool
+	}{
+		{"dedicated writer", false, false},
+		{"legacy publication", true, false},
+		{"legacy target", false, true},
+		{"legacy publication and target", true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan, policy := generationFixture(t)
+			if tc.publication {
+				plan.Environment.Publication.CredentialRef = "github:GITHUB_TOKEN"
+			}
+			if tc.target {
+				if len(plan.Targets) == 0 {
+					t.Fatal("fixture has no publication targets")
+				}
+				for name, target := range plan.Targets {
+					target.CredentialRef = "github:GITHUB_TOKEN"
+					plan.Targets[name] = target
+				}
+			}
+			err := admitQualificationRegistry(plan, policy)
+			if tc.publication || tc.target {
+				requireCode(t, err, e.CodeEngineCapability)
+			} else if err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 
@@ -413,17 +590,17 @@ func TestQualificationSourceCredentialContext(t *testing.T) {
 			cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + t.TempDir(), "LC_ALL=C"}
 			for key, value := range auth.environment {
 				if strings.HasPrefix(key, "NVKR_PIN_SOURCE_TOKEN_") {
-					value = "synthetic-scoped-token"
+					value = "fake-scoped-token"
 				}
 				cmd.Env = append(cmd.Env, key+"="+value)
 			}
 			cmd.Stdin = strings.NewReader("url=" + tc.url + "\n\n")
 			raw, err := cmd.CombinedOutput()
 			if tc.allowed {
-				if err != nil || !bytes.Contains(raw, []byte("password=synthetic-scoped-token")) {
+				if err != nil || !bytes.Contains(raw, []byte("password=fake-scoped-token")) {
 					t.Fatalf("selected credential context failed: %v", err)
 				}
-			} else if err == nil || bytes.Contains(raw, []byte("synthetic-scoped-token")) {
+			} else if err == nil || bytes.Contains(raw, []byte("fake-scoped-token")) {
 				t.Fatal("credential escaped selected repository context")
 			}
 		})
@@ -444,5 +621,52 @@ func writeQualificationTestFile(t *testing.T, root, name string, raw []byte) {
 	}
 	if err := os.WriteFile(full, raw, 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Producer namespaces are valid ordinary generation inputs, while qualification
+// currently owns only the default producer pair. Reject before either owner writes.
+func TestQualificationGenerationNamedProducerRefusesWithoutOutput(t *testing.T) {
+	plan, policy := generationFixture(t)
+	plan.Environment = plan.Environment.Clone()
+	plan.Environment.GitHubBundle = "nightly"
+	var err error
+	plan.EnvironmentDigest, err = plan.Environment.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := plan.Validate(); err != nil {
+		t.Fatalf("named producer Plan must remain valid: %v", err)
+	}
+	bundle, err := RenderWorkflows(t.Context(), plan, policy, "qualification.yaml")
+	requireCode(t, err, e.CodeEngineCapability)
+	if bundle != nil {
+		t.Fatal("unsupported named qualification emitted a bundle")
+	}
+	inputs := t.TempDir()
+	environment := plan.Environment.Clone()
+	environmentPath := filepath.Join(inputs, "environment.yaml")
+	for name, value := range map[string]any{"environment.yaml": environment, "qualification.yaml": policy} {
+		raw, err := yaml.Marshal(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(inputs, name), raw, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Chdir(inputs)
+	for _, check := range []bool{false, true} {
+		t.Run(map[bool]string{false: "write", true: "check"}[check], func(t *testing.T) {
+			output := filepath.Join(t.TempDir(), "uncreated")
+			digest, err := GenerateFiles(t.Context(), "unavailable-definition.yaml", environmentPath, "qualification.yaml", plan.GeneratorVersion, "github", output, check)
+			requireCode(t, err, e.CodeEngineCapability)
+			if digest != "" {
+				t.Fatal("unsupported qualification returned a Plan digest", digest)
+			}
+			if _, err := os.Lstat(output); !os.IsNotExist(err) {
+				t.Fatal("unsupported qualification created output or ownership manifests", err)
+			}
+		})
 	}
 }

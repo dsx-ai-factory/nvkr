@@ -101,6 +101,10 @@ Environment may also map a canonical source URL to an HTTPS fetch mirror and a G
 through `sourceAccess`. This changes transport and Environment identity, not the canonical source, pinned
 commit/tree, or build identity. The current adapter binds credentials to the matching GitHub fetch execution step and, for private
 pin-set sources, the bootstrap regeneration and Run finalization steps that re-read pinned Git trees.
+Admission permits an entry when its canonical repository is used by a compiled fetch or by a pin-set
+source in a catalog snapshot that compilation revalidates. An acquired-chart-only selection can therefore
+retain its pin-set source credential without inventing a producer fetch. Unused repository entries remain
+errors; revalidation credentials are not passed to artifact acquisition, build or publication steps.
 Production jobs require dispatch on the default branch or an exact `githubDispatchBranches` entry (ADR-18).
 The separate development mode admits manual branch dispatch with the same fixed source-read steps.
 Signed development uses the explicit isolated publication contract below; arbitrary job setup and variables
@@ -127,6 +131,20 @@ verified in one payload pass. Every copy/export still rehashes its held bytes; s
 and evidence boundaries authenticate their own closures and share one exact-output membership comparison.
 The evidence-attestation handoff consumes the private preparation under §6, transferring unchanged blobs
 without another payload copy. It still revalidates the complete source and final closures.
+The disk publisher adapts the held QCOW2 directly to the registry image interface, without copying its bytes
+into another local OCI layout. Exact bounded manifest/config bytes remain detached from mutable paths.
+Every upload body independently reads and hashes the held inode, checks its exact size and unchanged
+metadata, and remembers local integrity failures across transport retries. After the registry write, an
+unconditional full rehash covers deduplication paths that skipped the body; immutable-reference readback
+remains mandatory before release-root publication. Closing the owner cancels future reads, joins active
+file reads and revokes body adapters. It issues no live producer receipt or stronger evidence claim.
+Other native output kinds retain their existing private publication layout.
+Remote acquisition may restart only a one-layer disk body interrupted by a typed HTTP/2 peer
+`PROTOCOL_ERROR` reset. At most three attempts share the caller's deadline (or a thirty-minute default
+when none exists), with one- and two-second cancellable waits. Each failed private layout must be removed
+before another attempt starts, and the same immutable root and complete closure are reauthenticated.
+Close, filesystem, integrity and other protocol errors do not authorize recovery. Destination commit and
+post-commit inspection remain outside retry; no publication or signing operation is repeated.
 The wrapper platform describes the guest artifact; inspection tooling, scanner pins and resource admission
 select the native host profile from the frozen root producer's execution binding, including cross-guest TCG builds.
 Strict inspection packaging consumes the original live Run's exact-subject reconciliation receipt.
@@ -148,6 +166,17 @@ still rejects disk publication.
 Local admission rejects that unsupported publication graph before runtime, source or workspace work;
 compiler-only and dry-run inspection remain available. Transport construction alone does not authenticate
 composition or authorize release.
+
+For artifact-publication consumption, the verified lifecycle owner may export
+the complete held transport closure after matching its authenticated aggregate
+invocation to the expected originating Run/attempt. Export requires that same owner's
+opaque exact-input receipt binding the Definition, Environment and Plan expectation.
+Export uses the existing descriptor-relative, fsynced no-replace transaction and never reopens producer
+paths. Subsequent binary/chart/image extraction preserves their existing owning
+checks; archive transport checksums remain separate from native OCI subjects.
+This export grants no runtime verdict or stronger release/evidence lane. Contract
+tests exercise origin mismatch, closure substitution, closed capabilities and
+pre-start cancellation; externally exercised end-to-end consumption remains unrecorded.
 
 An optional future S3 object and CDN URL must project those same payload bytes, not alternate Build identities.
 The signed root must bind the payload digest, exact object route and authenticated upload/read-back result
@@ -196,15 +225,28 @@ module implements its transport representation as an OCI image index with artifa
 `application/vnd.nvkr.publication-root.v4`: every child is an exact OCI manifest or nested index, and the canonical
 root config binds each child's name, kind, artifact type, OCI descriptor digest, exact payload or root blob
 digest, semantic digest, size, and optional platform. The registry tag is only a discovery hint; the publisher
-returns, and the consumer requires, `repository@sha256:<root-index-digest>`. Pull materializes and verifies the
+returns, and the consumer requires, `repository@sha256:<root-index-digest>`. Full-layout pull materializes and verifies the
 complete recursive closure before the destination becomes visible.
 
 The config uses `nvkr.dev/publication-root/v4` and `application/vnd.nvkr.publication-root.config.v4+json`.
 Its release metadata binds the exact Definition, Environment, compiled Plan and release-content identities.
 Its output bindings carry Build Digest and exact named output membership; deployment cluster metadata is
-removed. Readers reject earlier metadata and removed fields. ValidationVector v3 and ReleaseSet/Inventory v4
+removed. Distinct named single-platform native image outputs may reference the same exact manifest in
+separate sibling repositories. Each keeps its own output, Build Subject and evidence bindings. Shared
+physical descriptors require identical native media type, size, blob and semantic digests, and platform;
+conflicting aliases, repeated logical names and duplicate direct index descriptors remain errors. Inspection
+checks every logical output and evidence binding while accounting for the distinct physical descriptor
+closure. This does not merge producer identities or grant publication or qualification authority.
+Readers reject earlier metadata and removed fields. ValidationVector v3 and ReleaseSet/Inventory v4
 remain implemented. The retired clearance and publication-manifest families remain reserved and nonminting;
 retained transport media identifiers do not imply a current clearance issuer or verifier.
+
+One metadata acquisition reuses its registry puller across the root and admitted sibling repositories.
+Authentication negotiation is reused within each repository for that operation; the puller and its
+authentication state are not retained for another acquisition. Every requested manifest, config and evidence blob retains
+its exact descriptor, size, digest and complete metadata inspection checks. Session reuse neither caches
+verified authority nor substitutes a previous logical member's checks. The caller's deadline and the
+metadata acquisition bound still cover the complete operation.
 
 Loose executables use `application/vnd.nvkr.binary-bundle.v1`. The Binary Bundle's canonical config binds OS,
 architecture, purpose, optional ReleaseSet and Inventory identities, and every file's name, absolute install
@@ -213,6 +255,41 @@ suggestion, mode, ordinary SHA-256, and size. Its one deterministic
 ORAS can download it and ordinary `tar` can unpack it. Debian packages may also be projected into a deterministic
 Acquire-By-Hash repository; that APT Projection is not a new release artifact, and an unsigned `Release` file is
 development-only.
+
+Diagnostic `release pull --output <name> --out <directory>` obtains one named output directly from the pinned
+registry release root. It checks the complete bounded release metadata/evidence closure before format admission,
+then downloads only the selected output's complete payload closure. Delivery checks exact descriptors and
+format-specific payload membership before exposing the new destination. The supported projections are:
+
+| Output format | Projection directly beneath the destination |
+|---|---|
+| `executable` | Exact regular bundle files by recorded name, SHA-256, size and mode; absolute installation suggestions are not followed |
+| `disk-image` | `<output-name>.qcow2` containing the exact plain or declared LUKS2-encrypted QCOW2 payload bytes; no decryption |
+| `helm-oci` | `<output-name>.tgz` containing the unchanged compressed chart archive |
+| `oci` | A standard OCI layout retaining exact native OCI or Docker schema-2 manifests, configs and layers; an aggregate OCI index includes every declared native platform and its full payload closure |
+| `apt-repository` | The complete checked repository tree of regular files and owner-readable, searchable directories; every file, including indexes, is digest-bound to the archive, and links and special files are rejected |
+
+The destination parent must already exist, and existing destinations are rejected.
+Failure or cancellation before commit exposes no destination. A failed parent-directory sync after commit
+reports failure even though the complete destination may exist. Delivery owns admission, metadata and payload
+checks, destination publication and private temporary-data cleanup; lifecycle bounds the overall deadline.
+Unknown selections fail with a coded usage error; malformed or unsupported format metadata fails with a coded
+error before payload or destination work. The command does not accept a local layout, infer a host platform,
+select only one aggregate platform, install or execute downloaded files, or load images into a runtime. It runs on macOS and
+Linux and checks byte integrity only: signatures and consumer policy remain unverified, no verification receipt
+is issued, and no accepted Release or stronger evidence lane is implied. Explicit `artifact-publication`
+verification retains its complete payload and policy checks; `authenticity` retains its signature/evidence-only scope.
+
+ADR-16's hosted artifact-check path uses a narrower delivery owner: it verifies the complete publication one
+output at a time and releases non-executable payload scratch after each output's format, descriptor and
+content checks. All named outputs and every declared native image child remain mandatory. The owner retains
+checked control documents, evidence and exact executable bundle bytes for subsequent qualification and smoke work;
+it exposes no layout or disk export for discarded payloads. Late failure or cancellation prevents issuance
+and closes retained bytes. This is a retention distinction, not metadata-only verification or a new evidence
+lane. The ordinary held `Publication` and verified Release export paths keep their complete payload owners.
+Registry image-index import copies the already verified held closure directly into the caller's private stage,
+without an intermediate layout or second complete snapshot. The import borrows the owner through completion,
+preserves exact index and child bytes, and retains complete publication binding and payload checks.
 
 The public CLI constructor emits only a visibly `diagnostic` root and requires `--allow-diagnostic` before push.
 It cannot set publication identity, publication-manifest digest, or clearance digest. Qualified publishing is
@@ -289,13 +366,33 @@ NVIDIA's hosted workflow publishes signed artifact bytes to its configured OCI r
 signature/attestation storage and ADR-16 owns evidence tiers and full release acceptance. The compiler generates
 one release index from named outputs; normal authors do not wire payload → root → route.
 
+GitHub-hosted GHCR publication admits the exact destination packages before payload upload. The target
+package and all output/evidence sibling packages must have API-confirmed private/internal visibility and
+no repository linkage, using the publication credential independently of CI carrier storage.
+NVKR-produced Helm manifests retain source URLs in the chart archive and Helm config, but do not
+promote them to `org.opencontainers.image.source`: GHCR can use that annotation to create repository
+linkage after admission. This deterministic packaging rule applies across execution targets; publication
+never rewrites an already identified artifact to remove the annotation.
+The source repository metadata lookup uses the job's automatic repository token, passed separately only to
+GHCR publication jobs. Package-scoped publication credentials therefore need no source-repository scope
+for this admission check. The repository token does not replace the publication credential for package
+metadata or registry operations and is not added to producer execution.
+Repeated metadata checks may use ADR-18's bounded operation-local authenticated ETag revalidation; no
+admission check is skipped, and errors cannot reuse an earlier successful policy response.
+Public, unknown or inaccessible policy fails closed. A missing package can receive only a metadata-only
+seed before admission. The existing metadata inspector derives sibling references without opening product
+payloads; the actual push must retain that inspected root digest. Hosted GHCR layouts outside this metadata
+contract are rejected rather than falling back to unchecked publication. Local and other-registry transport
+contracts remain unchanged. These checks cannot lock future provider visibility or establish independent
+package grants; public-source access configuration and hosted execution remain separate operational evidence.
+
 The signed metadata references each deliverable manifest once in its own sibling repository: binary bundle,
 unchanged native container image, Helm artifact or exact-QCOW2 wrapper. The OCI index directly references only its metadata manifest. Helm has one artifact manifest, its real Chart.yaml-derived config, and one chart-archive layer — a
 standards-conformant Helm OCI chart, readable by `helm pull`/`helm show`/`oras pull` without an NVKR-specific
 decoder — and its former nested publication root is removed. The native image is pullable from its own output repository by its manifest
 digest, without the release index. Local OCI-layout index files are handoff scaffolding, not registry wrappers.
 
-SBOM attestation consumes one disposable private preparation into a new final layout. The caller transfers
+Full-layout SBOM attestation consumes one disposable private preparation into a new final layout. The caller transfers
 exclusive ownership with no concurrent users or writers; source and destination must share a filesystem.
 Admission rejects overlapping paths, unexpected layout entries, symlinks within the source tree and
 hardlinked files before signing. The inventory has the existing bounded OCI blob count.
@@ -325,11 +422,35 @@ Partial retries may reuse an authenticated output-local root from an earlier att
 run. The server, repository, run ID and workflow builder must match exactly; canonical positive attempt
 numbers must satisfy preparation ≤ signing ≤ the consuming attempt. Different runs, future attempts,
 changed Plans or missing evidence fail closed. Signing may retry against an earlier prepared root without
-rewriting its metadata or original predicate. This exception is limited to pipeline-attested metadata
-assembly/finalization; it does not relax qualified execution or live disk ownership.
+rewriting its metadata or original predicate. This exception applies to pipeline-attested metadata
+assembly/finalization and ADR-16's independent artifact checks; it does not relax qualified execution or live
+disk ownership. Qualification authenticates the successful completion attempt separately and preserves each
+output's original preparation and signing identities rather than requiring every output to be rebuilt.
 Output-local chart reproduction transports its bound image packages and their producer/evidence
 closure. Those packages are validation dependencies; only the selected chart enters that route's
 published output membership.
+
+Per-output GitHub handoffs move only the bytes required by each role. The preparation producer retains
+complete-byte inspection and exports a bounded control/evidence layout with the same root digest. Its
+payload carrier goes directly to the publisher; the isolated OIDC SBOM job receives only those controls
+and canonical documents, and returns only attested controls and bundles. Before any publication side
+effect, the publisher re-inspects the original complete preparation and requires the returned metadata to
+preserve every output descriptor, repository, payload digest/size, Build Subject and release identity.
+Only raw CycloneDX evidence may become a verified bundle containing the identical decoded document.
+The publisher verifies those bundles under the admitted signer policy, consumes unchanged prepared blobs
+through the exclusive rename mechanism, and inspects the complete final layout before committing it.
+There is no payload download or re-upload in the SBOM job, no hardlinked retained preparation, and no
+caller-supplied verification flag.
+
+After the existing full-byte/privacy/push gate, the publisher exports separate bounded signing metadata
+whose root must equal the digest-pinned publication reference before the metadata is committed. This is a
+pre-sign description, distinct from the remote verifier's authenticated output handoff. The signer checks
+its exact route, named output, Plan, Definition, Environment and invocation bindings, re-derives all signing
+subjects, and verifies required SBOM bundles before signing. The subsequent independent remote verifier
+still retrieves and authenticates the complete served payload closure. Signing metadata cannot issue a
+full-payload receipt, bypass remote readback, or authorize finalization by itself. Legacy and aggregate
+routes retain their existing contracts. This reduces repeated transport within the pipeline-attested lane;
+it does not establish qualified execution or a stronger SLSA level.
 
 Release assembly authenticates every output-local root and its exact production predicate under the configured
 workflow identity/issuer, verifies its SBOM bundles, and joins its named output to the independently frozen
@@ -351,9 +472,15 @@ exact Plan/invocation-bound production predicate, output signatures/provenance a
 success records and unverified metadata cannot authorize a complete Run. This is the pipeline-attested lane:
 it trusts the admitted producing workflow's output-local byte checks, not qualified reproduction. Registry
 read access suffices for assembly and finalization; neither receives OIDC minting or package-write permission.
-Production GitHub per-output publication admits only anonymous access or the job-scoped
-`github:GITHUB_TOKEN`; arbitrary static credentials are rejected because job permissions cannot narrow their
-authority. The explicit signed-development contract below instead requires separately scoped read/write
+Production GitHub per-output publication additionally admits the fixed `github:NVKR_REGISTRY_WRITE`
+policy. Publishers and signers receive that secret and its explicit account; verification, assembly and
+finalization receive `NVKR_REGISTRY_READ` and its explicit account. These jobs request no workflow-token
+package permissions. Maintained production and nightly inputs use this policy. Legacy anonymous and
+job-scoped `github:GITHUB_TOKEN` configurations remain supported but are unsuitable for private binaries
+in a future-public source repository; arbitrary static credentials remain rejected. Generated production
+qualification requires the fixed production writer policy on both the publication and every target, matching
+its emitted credentials and permissions; legacy workflow-token producer profiles cannot generate that pair.
+The explicit signed-development contract below instead requires separately scoped read/write
 credentials. Legacy publication without this mode retains its full-closure assembly/finalization path. Local
 execution and dry-run signing do not admit the new mode. Interrupted production runs can leave independently
 published outputs; no production cross-run reuse, rollback, retention protocol or atomic multi-repository
@@ -381,8 +508,8 @@ platform-scoped evidence. It retrieves no artifact payload layers and issues onl
 authentication capability, which cannot authorize export or exact-input matching. A signed disk inventory
 authenticates the producer's inspection claim; this scope performs no consumer-side disk inspection.
 
-Consumer integrity checking opens an opaque delivery publication with an explicit lifetime. It snapshots the
-index and blobs into bounded anonymous retained files, verifies every reachable descriptor and evidence slot,
+Ordinary full-publication consumer integrity checking opens an opaque delivery publication with an explicit
+lifetime. It snapshots the index and blobs into bounded anonymous retained files, verifies every reachable descriptor and evidence slot,
 and checks format-specific payload membership against that exact closure. Private extraction workspaces are
 removed before the capability is returned. Later source-path replacement cannot change the checked output
 projection, and defensive copies cannot mutate the held view; closing releases the file capabilities and rejects
@@ -390,7 +517,8 @@ further projections. Signature and policy verification remain in the lifecycle c
 integrity and membership only, never signer authority by itself. Path-based diagnostic operations retain their
 independent revalidation at each call.
 
-Large QCOW2 payloads use streamed anonymous filesystem snapshots rather than payload-sized RAM files.
+This full-publication owner's large QCOW2 payloads use streamed anonymous filesystem snapshots rather than
+payload-sized RAM files.
 The consumer snapshot root uses the process `TMPDIR` (the platform temporary directory when unset),
 including when registry acquisition has a separate workspace. Before payload copies, the consumer admits
 aggregate unique QCOW2 bytes against writable free space and rejects detected tmpfs/ramfs storage with
@@ -477,7 +605,9 @@ same root. Signature/attestation attachments stay outside the signed index to av
 own repository for independent consumption. Signing processes deliverables before the root; hosted verification
 requires every child signature and attestation before recording success. The Release consumer still authenticates
 membership and SBOM coverage through the root. Standalone verification does not establish that release-wide claim. Run completion is a separate descriptive
-record, not signed merely because its referenced bytes are signed. Consumers resolve only sibling repositories within the chosen release namespace and fetch every pinned manifest.
+record, not signed merely because its referenced bytes are signed. Production consumers resolve only sibling repositories within the chosen release namespace and fetch every pinned manifest.
+Development consumers additionally admit the same-run earlier-attempt origins defined in the development
+publication section below, preserving each output's original namespace.
 Artifact-publication acceptance additionally verifies the full payload closure; authenticity explicitly leaves
 payload integrity unchecked. Metadata cannot redirect credentials
 to another host or namespace. The publisher validates local bytes first, uploads and checks deliverables in their
@@ -552,15 +682,22 @@ as `<prefix>/runs/<run-id>/attempts/<attempt>/<repository-leaf>` from the admitt
 revalidating source repository, dev workflow identity and canonical positive run/attempt IDs. No GitHub
 expression is interpolated into the committed Plan. The Plan binds the policy and route leaves; the runtime
 projection changes only transport location. Every publication, signing and verification boundary checks the
-same projection, and metadata authentication rejects another run or attempt's root. Existing subject,
+same namespace grammar; metadata authentication admits only current or earlier attempts of the same run. Existing subject,
 Plan, invocation, SBOM and signature checks remain mandatory. Native output digests and logical Build identity
 are unchanged. Helm aliases remain scoped inside that attempt's output repository.
 
-Full development retries rerun all jobs or start a fresh dispatch. They intentionally cannot reuse an
-older attempt's disposable roots, unlike the existing production same-run recovery rule. Each attempt owns
-its output roots, aggregate root, output bytes, signatures and referrers in separate packages. Partial or
-cancelled attempts therefore leave bounded, independently discoverable cleanup scope without requiring a
-successful final Run record.
+Development and production support failed-job and full-workflow retries within the same immutable GitHub
+run. Retained work keeps its original source request, publication location, preparation and signing
+invocations. New publication work uses the current attempt's namespace; signing and verification can
+consume earlier immutable references after exact Plan, named-output and evidence checks. Assembly may
+join outputs from different attempts of that run and records each original origin. Other runs, future
+attempts, changed inputs and incomplete evidence fail closed. Qualification reauthenticates the full
+closure against the successful completion attempt; it never treats a prior success flag as authority.
+Payload and evidence locators are derived from each recorded publication origin's namespace, even when
+the aggregate root is published in a later attempt. Delivery admits that change of namespace only for
+canonical non-future attempts of the same development run; ordinary production references remain siblings.
+Each attempt's packages remain independently discoverable for cleanup. Expired or deleted inputs require
+rebuilding the affected dependency closure; a fresh dispatch does not implicitly reuse another run.
 
 The fixed `github:NVKR_DEV_REGISTRY_WRITE` reference selects only the dedicated development publisher.
 Generated publishing/signing jobs use that secret and `NVKR_DEV_REGISTRY_WRITE_USER`; verification,
@@ -572,14 +709,24 @@ token scope still differs by phase. Provider ACLs are external prerequisites, ne
 Only artifact signing and SBOM attestation receive OIDC. The distinct default-branch cleanup environment
 holds the cleanup token; branch execution receives no deletion credential.
 
+Development qualification may attach its distinct predicate to existing immutable output subjects in the
+selected successful source run's original publication namespaces. It never rebuilds or republishes their payloads, changes
+aliases, or writes production qualification predicates. The final qualifier uses the dedicated development
+writer; native smoke uses the reader. Original producer signatures and complete artifact verification are
+required before qualification signing. Attachments are disposable with their subject packages. Qualification
+does not reserve a namespace against cleanup: run while source packages and provider metadata remain
+available. Concurrent cleanup or expired inputs cause failure, not a bypass or a rebuild.
+
 The development cleanup owner supports read-only preview by default and explicit apply. It inventories
-private GHCR container packages under only the exact reserved namespace, authenticates account/package identity
+internal GHCR container packages under only the exact reserved namespace, authenticates account/package identity
 and the matching `nvkr-dev.yml` manual-dispatch attempt, and requires completion plus at least 24 hours
-of age for that attempt, its package and every version. Source-repository linkage on package metadata is
+of age for that attempt, the latest attempt of the same run, its package and every version. Source-repository linkage on package metadata is
 not proof of ownership and is not required: preserved native images can carry upstream annotations.
+Private, public, missing/empty and unknown visibility are rejected during inventory and again immediately before deletion.
+Internal visibility permits enterprise-wide reading; deletion still requires package-admin authority.
 The reserved namespace policy plus authenticated provider account, package and attempt checks determine
 cleanup scope. Ambiguous names, malformed/unknown run records, incomplete inventories or API errors fail
-closed. Active or young attempts are retained. All candidate admission precedes deletion; each candidate's
+closed. An active or young latest attempt retains all original packages of that run. All candidate admission precedes deletion; each candidate's
 package/version metadata and run eligibility are rechecked immediately before deleting that whole package.
 
 The handwritten repository cleanup workflow uses only default-branch code, a separate protected
@@ -592,8 +739,9 @@ after an ambiguous outcome. Calls, response sizes and pagination are bounded and
 The 24-hour age is eligibility, not an exact expiry SLA. GitHub's deletion/restoration and physical garbage
 collection remain provider behavior; Sigstore transparency records remain external and are not erased.
 Production packages, old shared prefixes and arbitrary registries are outside this protocol. The protocol
-assumes completed attempt namespaces are never repopulated by an external writer; development retries
-always obtain a new attempt namespace. Provider ACL enforcement and successful real deletion require
+assumes deleted attempt namespaces are never repopulated by an external writer. Retry publication writes
+new namespaces while signatures may attach to retained earlier subjects. Cleanup cannot reserve packages
+against a retry starting after its final provider check; a missing subject fails closed. Provider ACL enforcement and successful real deletion require
 separate external evidence.
 
 ### 7. Operator release registration — deferred

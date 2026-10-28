@@ -6,10 +6,10 @@ package nvkedemo
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"slices"
@@ -19,18 +19,8 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
-	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"golang.org/x/sys/unix"
 )
-
-const legacyNetworkRecoveryRevision = "3b24beb5cb04df352e74a8d5405bd593871412b5"
-const legacyNetworkRecoveryHelper = "scripts/nke-local-demo.py"
-
-func legacyNetworkRecoveryError() error {
-	return nvkrerr.New(nvkrerr.CodePreflightFailed,
-		"legacy network journal version 1 is not supported by Go recovery; restore with %s at commit %s before upgrading; no legacy recovery was attempted",
-		legacyNetworkRecoveryHelper, legacyNetworkRecoveryRevision)
-}
 
 func readNetworkState(work string) (networkState, error) {
 	var state networkState
@@ -53,21 +43,6 @@ func readNetworkState(work string) (networkState, error) {
 	if len(raw) > 65536 {
 		return state, fmt.Errorf("recovery journal exceeds bound")
 	}
-	// The old Python schema used different field shapes. Inspect only its version
-	// for an actionable refusal; no legacy state is adopted or executed. Existing
-	// JSON validation rejects duplicate names and trailing/invalid documents.
-	if err = canonical.ValidateJSONDocument(raw); err != nil {
-		return state, err
-	}
-	var header struct {
-		Version int `json:"version"`
-	}
-	if err = json.Unmarshal(raw, &header); err != nil {
-		return state, err
-	}
-	if header.Version == 1 {
-		return state, legacyNetworkRecoveryError()
-	}
 	if err = canonical.UnmarshalExact(raw, &state); err != nil {
 		return state, err
 	}
@@ -79,15 +54,12 @@ func readNetworkState(work string) (networkState, error) {
 
 func validNetworkID(id networkFileID) bool { return id.Inode > 0 && id.Mode <= 0o7777 }
 func validateNetworkState(s networkState, work string) error {
-	if s.Version == 1 {
-		return legacyNetworkRecoveryError()
-	}
-	if s.Version != 2 || s.Work != work || s.UID != uint32(os.Getuid()) || s.PID <= 0 {
+	if (s.Version != 3 && s.Version != 4) || s.Work != work || s.UID != uint32(os.Getuid()) || s.PID <= 0 {
 		return fmt.Errorf("recovery journal version/work/owner differs")
 	}
-	owner := strings.TrimPrefix(s.Owner, "nkd-demo-")
+	owner := strings.TrimPrefix(s.Owner, "nvke-demo-")
 	raw, err := hex.DecodeString(owner)
-	if err != nil || len(raw) != 16 || s.Owner != "nkd-demo-"+hex.EncodeToString(raw) {
+	if err != nil || len(raw) != 16 || s.Owner != "nvke-demo-"+hex.EncodeToString(raw) {
 		return fmt.Errorf("invalid firewall owner")
 	}
 	boot := strings.Split(s.Boot, "-")
@@ -98,18 +70,12 @@ func validateNetworkState(s networkState, work string) error {
 	if err != nil || strings.Join(boot, "") != hex.EncodeToString(raw) {
 		return fmt.Errorf("invalid boot identity")
 	}
-	mac := strings.Split(s.BridgeMAC, ":")
-	if len(mac) != 6 {
+	mac, err := net.ParseMAC(s.BridgeMAC)
+	if err != nil || len(mac) != 6 || mac[0]&3 != 2 {
 		return fmt.Errorf("invalid bridge marker")
 	}
-	raw, err = hex.DecodeString(strings.Join(mac, ""))
-	if err != nil || len(raw) != 6 || raw[0]&3 != 2 {
-		return fmt.Errorf("invalid bridge marker")
-	}
-	for i, part := range mac {
-		if len(part) != 2 || part != hex.EncodeToString(raw[i:i+1]) {
-			return fmt.Errorf("noncanonical bridge marker")
-		}
+	if mac.String() != s.BridgeMAC {
+		return fmt.Errorf("noncanonical bridge marker")
 	}
 	if s.BridgeID != "" {
 		index, err := strconv.Atoi(s.BridgeID)
@@ -124,7 +90,7 @@ func validateNetworkState(s networkState, work string) error {
 		return fmt.Errorf("unsupported bridge policy identity")
 	}
 	if s.Staging != nil {
-		if s.Staging.Path != filepath.Join(filepath.Dir(qemuPolicy), ".nkd-policy-"+owner) {
+		if s.Staging.Path != filepath.Join(filepath.Dir(qemuPolicy), ".nvke-policy-"+owner) {
 			return fmt.Errorf("unsupported root staging path")
 		}
 		if id := s.Staging.Binding; id != nil && (!validNetworkID(*id) || id.Mode != 0o600 || id.UID != 0 || id.GID != 0) {
@@ -147,11 +113,15 @@ func validateNetworkState(s networkState, work string) error {
 		seen[key] = true
 	}
 	// Reuse the constructor's IP admission, without opening work or generating IDs.
-	if err := validateNetworkKind(s.KindCIDR); err != nil {
+	if s.Version == 4 {
+		if s.KindCIDR != "" || s.KindGateway != "" || s.BGPIntent {
+			return fmt.Errorf("native host transport cannot carry Kind or BGP bindings")
+		}
+	} else if err := validateNetworkKind(s.KindCIDR); err != nil {
 		return err
 	}
-	allowed := networkRules(s.Owner, s.KindCIDR)
-	maxRules := 14
+	allowed := append(networkRules(s.Owner, s.KindCIDR), nativeBootstrapRules(s.Owner, s.KindCIDR)...)
+	maxRules := 14 + len(nativeBootstrapRules(s.Owner, s.KindCIDR))
 	if s.KindGateway != "" {
 		if err := admittedKindGateway(s.KindCIDR, s.KindGateway); err != nil {
 			return err
@@ -178,7 +148,7 @@ func validateNetworkState(s networkState, work string) error {
 		if exact {
 			continue
 		}
-		if row.Table != "raw" || row.Chain != "PREROUTING" || len(row.Args) != 16 {
+		if s.Version == 4 || row.Table != "raw" || row.Chain != "PREROUTING" || len(row.Args) != 16 {
 			return fmt.Errorf("unknown firewall intent")
 		}
 		port, err := strconv.Atoi(row.Args[13])
@@ -204,9 +174,8 @@ func validateNetworkState(s networkState, work string) error {
 }
 
 // RecoverNetworkGuard authenticates only the original operator recovery journal.
-// It never signals serialized PIDs or resumes builds. Version2 is the typed Go
-// journal; former Python version1 journals must be restored by their original
-// implementation before migration, never silently adopted.
+// It never signals serialized PIDs or resumes builds. It supports version-3 Kind
+// and version-4 native journals with their distinct admitted control sets.
 func RecoverNetworkGuard(ctx context.Context, runner Runner) (*NetworkGuard, error) {
 	if err := requireContext(ctx); err != nil {
 		return nil, err

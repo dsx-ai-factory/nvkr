@@ -58,7 +58,11 @@ func (selection Selection) Validate() error {
 		if selection.Debian != nil {
 			return e.New(e.CodeInvalidCatalog, "Debian target requires a Debian output")
 		}
-		if err := target.ValidatePlatform(selection.Platform); err != nil {
+		validate := target.ValidatePlatform
+		if selection.OutputFormat == definition.OutputExecutable {
+			validate = target.ValidateExecutablePlatform
+		}
+		if err := validate(selection.Platform); err != nil {
 			return err
 		}
 	}
@@ -272,7 +276,7 @@ func cloneComponent(component catalog.Component) catalog.Component {
 }
 
 func validateResolved(resolved *Resolved) error {
-	if err := target.ValidatePlatform(resolved.Platform); err != nil {
+	if err := target.ValidateExecutablePlatform(resolved.Platform); err != nil {
 		return err
 	}
 	if len(resolved.Components) == 0 {
@@ -318,7 +322,14 @@ func requireComponentRoute(name string, component catalog.Component, platform st
 	if !slices.Contains(component.Platforms, platform) {
 		return e.New(e.CodeEngineCapability, "component %q does not support target %q", name, platform)
 	}
-	arch := target.Arch(platform)
+	if platform == "darwin/arm64" {
+		acquired := !component.FromSource && component.OutputType == "host-package" && component.Prebuilt != nil && component.Prebuilt.Executable != nil
+		built := component.FromSource && component.Prebuilt == nil && ((!component.CGO && (component.BuilderType == "" || component.BuilderType == catalog.BuilderOCIHermetic)) || component.BuilderType == catalog.BuilderNativeGo) && (component.OutputType == "host-package" || component.OutputType == "tarball")
+		if !acquired && !built {
+			return e.New(e.CodeEngineCapability, "component %q requires a pinned executable acquisition or CGO-free OCI build for target %q", name, platform)
+		}
+	}
+	arch := target.ExecutableArch(platform)
 	switch {
 	case component.Prebuilt != nil:
 		if component.Prebuilt.Digests[arch] == "" {

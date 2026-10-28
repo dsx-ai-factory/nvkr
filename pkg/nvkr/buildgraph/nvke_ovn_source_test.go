@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -33,19 +34,21 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-const ovnForkCommit = "12ca20e67b516f1a023da85a22deeaf8d2d70d0b"
+const ovnForkCommit = "8af51273d52dfa07454435d18d37230e582d797a"
 
 // ovnForkStream matches Chart.yaml at ovnForkCommit; it is not the Debian revision.
-const ovnForkStream = "2.4.0"
+const ovnForkStream = "2.4.2"
 
-// Both source trees use a vendored JSON adapter incompatible with Go 1.27.
-const ovnGoBuilder = "quay.io/projectquay/golang@sha256:506a668eb4c763a964ffc4d4ad0125d45d75aac899392be7e5d39380f8452564"
+// Dockerfile.ubuntu consumes this override; the .nv fork owns its compiler FROM.
+// This literal-binding contract does not check live registry availability.
+// Quay Go 1.26.10 index, verified for linux/amd64 and linux/arm64 on 2026-10-20.
+const ovnGoBuilder = "quay.io/projectquay/golang@sha256:d5acf07940fb5e6e2d07542abd853cece623d95ffd364769ec825aab5471d3b8"
 
 func TestNVKEOVNBuilderPinBindings(t *testing.T) {
 	for _, path := range []string{
-		"../../../definitions/nvke-ovn-source/catalog",
-		"../../../definitions/nvke-m2/os-catalog",
-		"../../../definitions/nvke-os/catalog",
+		"../../../inputs/catalogs/ovn-upstream",
+		"../../../inputs/catalogs/node-images/release",
+		"../../../inputs/catalogs/node-images/diagnostic",
 	} {
 		t.Run(path, func(t *testing.T) {
 			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(path))
@@ -62,7 +65,7 @@ func TestNVKEOVNBuilderPinBindings(t *testing.T) {
 
 func loadOVNForkCatalog(t *testing.T) *catalog.Catalog {
 	t.Helper()
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../definitions/nvke-ovn-source/catalog"))
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/ovn-nvidia"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,11 +75,11 @@ func loadOVNForkCatalog(t *testing.T) *catalog.Catalog {
 // The local disk selects the same pinned fork producers as the standalone image
 // and chart outputs, while retaining the source-owned image-inputs handoff.
 func TestNVKEOVNForkLocalDiskSelection(t *testing.T) {
-	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../definitions/nvke-m2/os-catalog"))
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/node-images/release"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	overlay, err := catalog.LoadOverlayContext(t.Context(), "../../../definitions/nvke-local-dev-arm64/os-tcg.json")
+	overlay, err := catalog.LoadOverlayContext(t.Context(), "../../../inputs/catalogs/node-images/variants/nvidia-tcg.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +96,7 @@ func TestNVKEOVNForkLocalDiskSelection(t *testing.T) {
 	if got := stack.Catalog.Components["nvke-image-inputs"].Materials["ovn"]; got != "nvke-cni-ovn" {
 		t.Fatalf("OS material binding = %q, want fork Debian bundle", got)
 	}
-	d, err := definition.LoadDefinition(t.Context(), "../../../definitions/nvke-local-dev-arm64/definition-os.json")
+	d, err := definition.LoadDefinition(t.Context(), "../../../inputs/definitions/diagnostics/demo-arm64/os.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,12 +111,12 @@ func TestNVKEOVNForkLocalDiskSelection(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	profiles, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../definitions/nvke-local-dev-arm64/profiles-catalog"))
+	profiles, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/controller-profiles/nvidia-arm64"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	profile := profiles.Components["nvke-local-profiles"]
-	raw, err := os.ReadFile("../../../definitions/nvke-local-dev-arm64/profiles-catalog/patches/local-profile.patch")
+	raw, err := os.ReadFile("../../../inputs/catalogs/controller-profiles/nvidia-arm64/patches/local-profile.patch")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +205,7 @@ func TestNVKEOVNForkGraphs(t *testing.T) {
 // TestNVKEOVNForkPinBindings guards the supplied catalog's repeated literals.
 // Re-pinning this candidate requires reviewing its stream and packaging together.
 func TestNVKEOVNForkPinBindings(t *testing.T) {
-	lock, err := catalog.LoadLockContext(t.Context(), "../../../definitions/nvke-ovn-source/catalog")
+	lock, err := catalog.LoadLockContext(t.Context(), "../../../inputs/catalogs/ovn-nvidia")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,6 +214,10 @@ func TestNVKEOVNForkPinBindings(t *testing.T) {
 		t.Fatal("fork lock changed without reviewing the catalog's stream and packaging bindings")
 	}
 	cat := loadOVNForkCatalog(t)
+	// The exact source-owned Dockerfile hardcodes Go 1.26.9 and ignores this argument.
+	if strings.Contains(strings.Join(cat.Components["ovn-kube-ubuntu"].BuildCommand, "\n"), "build-arg:BUILDER_IMAGE=") {
+		t.Fatal("fork compiler must not be represented by an unused build argument")
+	}
 	for _, tc := range []struct {
 		component string
 		fragments []string
@@ -218,9 +225,7 @@ func TestNVKEOVNForkPinBindings(t *testing.T) {
 		{component: "ovn-kube-ubuntu", fragments: []string{
 			"name=localhost/nvke/ovn-kubernetes:git-" + pin.Commit,
 			"filename=Dockerfile.ubuntu.nv",
-			// The fork's vendored JSON adapter needs Go 1.26, not Go 1.27's
-			// changed JSON v2 API. This is the measured patched 1.26.9 builder.
-			"build-arg:BUILDER_IMAGE=" + ovnGoBuilder,
+			"build-arg:OVN_K8S_SRC_ROOT=.",
 			`--opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"`,
 			// The Dockerfile defaults to the fork's private FIPS/STIG base and
 			// Artifactory; these overrides keep the producer credential-free.
@@ -739,5 +744,66 @@ func TestNVKEOVNPostinstImportDiagnostics(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+// The diagnostic KVM route binds the TCG predecessor, not the release base.
+func TestNVKEOVNForkDiagnosticKVMStack(t *testing.T) {
+	const path = "../../../inputs/definitions/diagnostics/demo-arm64/os-kvm.json"
+	d, err := definition.LoadDefinition(t.Context(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selection := d.Outputs[0].Catalog
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(filepath.Dir(path), selection.Base)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(selection.Overlays) != 2 {
+		t.Fatal("diagnostic KVM must retain its two ordered overlays")
+	}
+	overlays := make([]catalog.Overlay, 2)
+	for i, name := range selection.Overlays {
+		overlays[i], err = catalog.LoadOverlayContext(t.Context(), filepath.Join(filepath.Dir(path), name))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	prior, err := catalog.ApplyStack(base, overlays[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := catalog.ApplyStack(base, overlays...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = catalog.ApplyStack(base, overlays[1]); err == nil {
+		t.Fatal("diagnostic KVM accepted without its predecessor")
+	} else {
+		var coded *nvkrerr.Error
+		if !errors.As(err, &coded) || coded.Code != nvkrerr.CodeUnverifiedRef {
+			t.Fatalf("wrong predecessor error: %v", err)
+		}
+	}
+	if len(got.Catalog.Components) != len(prior.Catalog.Components) {
+		t.Fatal("KVM changed component membership")
+	}
+	for name, before := range prior.Catalog.Components {
+		want := before
+		if name == "nvke-node-image" {
+			raw, err := canonical.Marshal(before)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := canonical.UnmarshalExact(raw, &want); err != nil {
+				t.Fatal(err)
+			}
+			want.BuildRequirements.Capabilities = []execution.CapabilityRequirement{{Name: "kvm", Policy: "required"}}
+			want.Packer.Variables["cpu_model"] = "host"
+			want.Packer.Variables["ssh_timeout"] = "60m"
+		}
+		if !reflect.DeepEqual(got.Catalog.Components[name], want) {
+			t.Fatalf("KVM changed unintended fields of %s", name)
+		}
 	}
 }

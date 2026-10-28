@@ -21,6 +21,7 @@ import (
 )
 
 const githubImageToken = "NVKR_TOOLCHAIN_READ_TOKEN"
+const githubImageUser = "NVKR_TOOLCHAIN_READ_USER"
 
 func githubPrivateToolchain(plan *Plan, image string) bool {
 	if plan.Environment.GitHubARC != "native-kvm-v1" || !strings.Contains(image, "@sha256:") {
@@ -29,8 +30,7 @@ func githubPrivateToolchain(plan *Plan, image string) bool {
 	if GitHubDiskBuildOnly(plan) {
 		// Build-only iteration consumes the same published native tooling, with
 		// read access independent of any output publication configuration.
-		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/") ||
-			strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/")
+		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/")
 	}
 	if plan.Environment.Publication == nil || !strings.HasPrefix(plan.Environment.Publication.RepositoryPrefix, "ghcr.io/") {
 		return false
@@ -40,17 +40,22 @@ func githubPrivateToolchain(plan *Plan, image string) bool {
 		return true
 	}
 	// Development publication does not move already-pinned native toolchains.
-	// Only the maintained NVKR development namespace may prepare these two
-	// retained toolchain roots, using the separate read-only workflow token.
+	// Only the maintained NVKR development namespace may prepare the
+	// toolchain roots, using the separate read-only registry credential.
 	if plan.Environment.GitHubDevelopment && prefix == "ghcr.io/dsx-ai-factory/nvkr/development" {
-		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/") ||
-			strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/")
+		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/")
 	}
-	// Rebranding publication does not relocate the already-published, pinned
-	// candidate toolchains. Preserve their separate credential preparation only
-	// for the matching maintained namespace, not for arbitrary third-party images.
-	return prefix == "ghcr.io/dsx-ai-factory/nvkr/m2-candidate" &&
-		strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/")
+	// Maintained disk-family and nightly outputs reuse the published M2 tooling.
+	// Output publication does not relocate those subjects or authorize other owners.
+	switch prefix {
+	case "ghcr.io/dsx-ai-factory/nvkr/m2-candidate",
+		"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks",
+		"ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64",
+		"ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-upstream-ovn-arm64":
+		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/")
+	default:
+		return false
+	}
 }
 
 func githubStagePrivateImages(plan *Plan, stage githubStage) []string {
@@ -70,7 +75,7 @@ func githubStagePrivateImages(plan *Plan, stage githubStage) []string {
 }
 
 func githubImageEnvironment() map[string]string {
-	return map[string]string{githubImageToken: "${{ github.token }}", "NVKR_TOOLCHAIN_READ_USER": "${{ github.actor }}"}
+	return map[string]string{githubImageToken: "${{ secrets.NVKR_REGISTRY_READ }}", githubImageUser: "${{ vars.NVKR_REGISTRY_READ_USER }}"}
 }
 
 // PrepareGitHubImages is a separate credential-bearing step. Its temporary Docker

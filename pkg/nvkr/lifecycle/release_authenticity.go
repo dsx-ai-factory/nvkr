@@ -38,9 +38,10 @@ type AuthenticatedRelease struct {
 }
 
 type authenticatedReleaseState struct {
-	mu          sync.RWMutex
-	valid       bool
-	description AuthenticityDescription
+	mu           sync.RWMutex
+	valid        bool
+	description  AuthenticityDescription
+	invocationID string
 }
 
 func (authenticated *AuthenticatedRelease) Description() (AuthenticityDescription, error) {
@@ -67,6 +68,7 @@ func (authenticated *AuthenticatedRelease) Close() error {
 	defer state.mu.Unlock()
 	state.valid = false
 	state.description = AuthenticityDescription{}
+	state.invocationID = ""
 	return nil
 }
 
@@ -108,7 +110,6 @@ func (consumer *Consumer) Authenticate(ctx context.Context, reference string, po
 	if !ok {
 		return nil, e.New(e.CodeEngineCapability, "release authentication requires signed SBOM verification")
 	}
-	// Bound the complete operation, including all independent signature checks.
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 	if err := authenticateReleaseSubject(ctx, verifier, reference, policy); err != nil {
@@ -137,7 +138,7 @@ func (consumer *Consumer) Authenticate(ctx context.Context, reference string, po
 	if err := authenticityContext(ctx); err != nil {
 		return nil, err
 	}
-	return &AuthenticatedRelease{state: &authenticatedReleaseState{valid: true, description: AuthenticityDescription{
+	return &AuthenticatedRelease{state: &authenticatedReleaseState{valid: true, invocationID: metadata.Metadata.InvocationID, description: AuthenticityDescription{
 		SchemaVersion: AuthenticitySchemaVersion, Subject: reference, Lane: policy.Lane, Scope: policy.Scope,
 		Artifacts: cloneArtifacts(artifacts), ContentSubject: metadata.Metadata.ContentSubject, PolicyDigest: policyDigest,
 		PayloadIntegrityVerified: false,
@@ -183,4 +184,28 @@ func authenticateReleaseSubject(ctx context.Context, verifier sign.OCISigner, re
 		return e.New(e.CodeUntrustedSigner, "observed signer for %s does not satisfy the requested identity and issuer policy", reference)
 	}
 	return nil
+}
+
+// sourceInvocation reads only the root metadata retained by Authenticate. A
+// detached authenticity description cannot restore this private source binding.
+func (authenticated *AuthenticatedRelease) sourceInvocation(ctx context.Context) (string, error) {
+	if ctx == nil {
+		return "", e.New(e.CodeUsage, "authenticated source lookup requires context")
+	}
+	if err := authenticityContext(ctx); err != nil {
+		return "", err
+	}
+	if authenticated == nil || authenticated.state == nil {
+		return "", e.New(e.CodeGateUnmet, "release authenticity result was not issued")
+	}
+	state := authenticated.state
+	state.mu.RLock()
+	defer state.mu.RUnlock()
+	if !state.valid {
+		return "", e.New(e.CodeGateUnmet, "release authenticity result is closed")
+	}
+	if state.invocationID == "" {
+		return "", e.New(e.CodeProvenanceMissing, "authenticated publication root omits its source invocation")
+	}
+	return state.invocationID, nil
 }

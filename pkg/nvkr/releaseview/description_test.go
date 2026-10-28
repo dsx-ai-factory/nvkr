@@ -6,6 +6,7 @@ package releaseview
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"math/rand/v2"
 	"os"
 	"reflect"
@@ -14,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 func TestDescriptionVersionedContract(t *testing.T) {
@@ -178,7 +180,10 @@ func TestDescriptionDetachedNestedValues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := describe(view{PublicationDescription: publication, TotalOutputs: len(publication.Outputs)})
+	got, err := Describe(publication, "")
+	if err != nil {
+		t.Fatal(err)
+	}
 	got.Outputs[0].Components[0] = "replacement"
 	got.Outputs[0].BuildSubjects[0].Component = "replacement"
 	got.Outputs[2].Disk.Producer = "replacement"
@@ -189,6 +194,35 @@ func TestDescriptionDetachedNestedValues(t *testing.T) {
 	after, err := json.Marshal(publication)
 	if err != nil || !bytes.Equal(before, after) {
 		t.Fatalf("projected values alias the source description: %v", err)
+	}
+}
+
+func TestDescribeMatchesJSONAndRejectsAmbiguousSelection(t *testing.T) {
+	for _, selection := range []string{"", "tools", "multi", "missing", "tools\n"} {
+		t.Run(selection, func(t *testing.T) {
+			got, err := Describe(descriptionFixture(), selection)
+			if selection == "missing" || selection == "tools\n" {
+				var coded *e.Error
+				if !errors.As(err, &coded) || coded.Code != e.CodeUsage || !reflect.DeepEqual(got, Description{}) {
+					t.Fatalf("invalid selection returned a partial view or wrong error: %+v, %v", got, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, err := Render(descriptionFixture(), Options{Format: "json", Output: selection})
+			if err != nil || !reflect.DeepEqual(got, decodeDescription(t, raw)) {
+				t.Fatalf("typed and JSON views differ: %v", err)
+			}
+		})
+	}
+	publication := descriptionFixture()
+	publication.Outputs = append(publication.Outputs, publication.Outputs[len(publication.Outputs)-1])
+	got, err := Describe(publication, "tools")
+	var coded *e.Error
+	if !errors.As(err, &coded) || coded.Code != e.CodeUsage || !reflect.DeepEqual(got, Description{}) {
+		t.Fatalf("ambiguous selection returned a partial view or wrong error: %+v, %v", got, err)
 	}
 }
 

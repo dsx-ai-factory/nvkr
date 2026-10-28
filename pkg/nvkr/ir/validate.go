@@ -55,6 +55,13 @@ var allowedBuildEnv = map[string]bool{
 	"NKECTL_COMMIT":       true,
 	"NKECTL_DATE":         true,
 	"NKECTL_CAPI_VERSION": true,
+	"NVKECTL_VERSION":     true,
+	"NVKECTL_COMMIT":      true,
+	"NVKECTL_DATE":        true,
+	// NICoSim source and explicitly patched tree stamps participate in build identity.
+	"NICO_SIM_VERSION": true,
+	"NICO_SIM_COMMIT":  true,
+	"NICO_SIM_TREE":    true,
 	// Upstream CWE Dockerfile build arguments, rendered from the source lock.
 	"BUILD_VERSION": true,
 	"GIT_VERSION":   true,
@@ -81,7 +88,7 @@ func (g *Graph) Validate() error {
 		return e.New(e.CodeUnsupported,
 			"IR graph schemaVersion %q is unsupported; want %q", g.SchemaVersion, SchemaVersion)
 	}
-	if err := target.ValidatePlatform(g.Platform); err != nil {
+	if err := target.ValidateExecutablePlatform(g.Platform); err != nil {
 		return err
 	}
 	if len(g.Nodes) == 0 {
@@ -319,7 +326,7 @@ func validateBuildNode(n Node) error {
 	if err := rejectUnexpectedNodeFields(n, allowFields(
 		"requirements", "executionBinding",
 		"component", "builderType", "flakeRef", "flakeOutput", "flakeLockDigest",
-		"toolchain", "platform", "network", "env", "patches", "command", "workdir",
+		"toolchain", "toolchainPlatform", "platform", "network", "env", "patches", "command", "workdir",
 		"sourceDest", "sourceCommit", "sourceTreeHash", "vendorSpecDigest",
 		"sourceReadOnly", "writeDir", "materials", "debian", "outputType", "artifactPath", "version")); err != nil {
 		return err
@@ -342,20 +349,30 @@ func validateBuildNode(n Node) error {
 		return e.New(e.CodeTagToolchain,
 			"build node %q toolchain %q is not an exact OCI digest pin", n.ID, n.Toolchain)
 	}
-	arch, ok := platformArch(n.Platform)
-	if !ok {
-		return e.New(e.CodeInvalidCatalog,
-			"build node %q platform %q is not linux/amd64 or linux/arm64", n.ID, n.Platform)
+	if err := target.ValidateExecutablePlatform(n.Platform); err != nil {
+		return err
+	}
+	arch := target.ExecutableArch(n.Platform)
+	if n.BuilderType == BuilderNativeGo {
+		if n.ToolchainPlatform != n.Platform || n.OutputType != "host-package" || n.Requirements != nil || n.ExecutionBinding != nil || len(n.Materials) != 0 || len(n.Patches) != 0 || len(n.Command) == 0 || n.Command[0] != "go" || !canonical.IsDigest(n.Toolchain) {
+			return e.New(e.CodeEngineCapability, "native Go requires a host-matching SDK identity and an unpatched host-package producer")
+		}
+	} else if n.Platform == "darwin/arm64" {
+		if n.ToolchainPlatform != "linux/arm64" || n.BuilderType != BuilderOCIHermetic || (n.OutputType != "host-package" && n.OutputType != "tarball") || n.Requirements != nil || n.ExecutionBinding != nil {
+			return e.New(e.CodeEngineCapability, "Mac executable source builds require a plain Linux ARM64 OCI toolchain without execution requirements")
+		}
+	} else if n.ToolchainPlatform != "" {
+		return e.New(e.CodeInvalidCatalog, "native Linux OCI builds must not override their toolchain platform")
 	}
 	wantNetwork := NetworkNone
-	if n.BuilderType == BuilderBuildKit {
+	if n.BuilderType == BuilderBuildKit || n.BuilderType == BuilderNativeGo {
 		wantNetwork = NetworkDefault
 	}
 	if n.Network != wantNetwork {
 		return e.New(e.CodeInvalidCatalog,
 			"build node %q network mode %q differs from builder mode %q", n.ID, n.Network, wantNetwork)
 	}
-	if err := validateBuildEnv(n.ID, arch, n.Env); err != nil {
+	if err := validateBuildEnv(n.ID, arch, n.Platform, n.BuilderType, n.Env); err != nil {
 		return err
 	}
 	if err := validatePatches(n); err != nil {
@@ -368,7 +385,7 @@ func validateBuildNode(n Node) error {
 		return e.New(e.CodeInvalidCatalog,
 			"build node %q workdir %q is outside the fixed /src root", n.ID, n.Workdir)
 	}
-	if !n.SourceReadOnly || n.WriteDir == "" {
+	if n.WriteDir == "" || n.SourceReadOnly != (n.BuilderType != BuilderNativeGo) {
 		return e.New(e.CodeEngineCapability,
 			"build node %q requires sourceReadOnly=true and a private writeDir", n.ID)
 	}
@@ -409,7 +426,7 @@ func validateBuildNode(n Node) error {
 				return e.New(e.CodeInvalidCatalog, "rootless BuildKit node %q may not override fixed daemon isolation", n.ID)
 			}
 		}
-	case BuilderOCIHermetic:
+	case BuilderOCIHermetic, BuilderNativeGo:
 		if n.FlakeRef != "" || n.FlakeOutput != "" || n.FlakeLockDigest != "" {
 			return e.New(e.CodeInvalidCatalog,
 				"OCI build node %q must not carry Nix flake fields", n.ID)
@@ -537,18 +554,22 @@ func validateVMRequirements(n Node) error {
 		requirements.Resources.CPUMillis == 0 || requirements.Resources.MemoryMiB == 0 ||
 		requirements.Resources.EphemeralStorageMiB == 0 || len(requirements.AllowedHostPlatforms) == 0 ||
 		len(requirements.Capabilities) != 1 ||
-		requirements.Capabilities[0].Name != execution.CapabilityKVM || requirements.TimeoutSeconds == 0 {
+		(requirements.Capabilities[0].Name != execution.CapabilityKVM && requirements.Capabilities[0].Name != execution.CapabilityHVF) || requirements.TimeoutSeconds == 0 {
 		return e.New(e.CodeInvalidCatalog,
-			"VM build node %q requires complete resources, host platforms, KVM policy, and timeout", n.ID)
+			"VM build node %q requires complete resources, host platforms, virtualization policy, and timeout", n.ID)
 	}
 	if requirements.Capabilities[0].Policy == execution.CapabilityRequired {
-		if n.ToolchainPlatform != n.Platform {
-			return e.New(e.CodeEngineCapability,
-				"VM build node %q requires KVM on guest-matching host platform %q", n.ID, n.Platform)
+		expectedHost := n.Platform
+		if requirements.Capabilities[0].Name == execution.CapabilityHVF {
+			expectedHost = "darwin/" + target.Arch(n.Platform)
 		}
-		if n.ExecutionBinding != nil && string(n.ExecutionBinding.Class.HostPlatform) != n.Platform {
+		if n.ToolchainPlatform != expectedHost {
 			return e.New(e.CodeEngineCapability,
-				"VM build node %q requires KVM on guest-matching host platform %q", n.ID, n.Platform)
+				"VM build node %q requires %s on guest-matching host platform %q", n.ID, requirements.Capabilities[0].Name, expectedHost)
+		}
+		if n.ExecutionBinding != nil && string(n.ExecutionBinding.Class.HostPlatform) != expectedHost {
+			return e.New(e.CodeEngineCapability,
+				"VM build node %q requires %s on guest-matching host platform %q", n.ID, requirements.Capabilities[0].Name, expectedHost)
 		}
 	}
 	return nil
@@ -556,7 +577,7 @@ func validateVMRequirements(n Node) error {
 
 func validateIRPackerConfig(nodeID string, config *PackerConfig) error {
 	if config == nil || !safetext.Valid(config.ProjectPath, 4096, false) ||
-		!safeRelativePath(config.ProjectPath) || strings.ContainsAny(config.ProjectPath, "{}") {
+		(config.ProjectPath != "." && !safeRelativePath(config.ProjectPath)) || strings.ContainsAny(config.ProjectPath, "{}") {
 		return e.New(e.CodeInvalidCatalog,
 			"VM build node %q has an unsafe Packer project path", nodeID)
 	}
@@ -712,9 +733,11 @@ func validatePullNode(n Node) error {
 		return e.New(e.CodeUnpinnedSource,
 			"pull node %q requires an artifact transport and exact content digest", n.ID)
 	}
-	if _, ok := platformArch(n.Platform); !ok {
-		return e.New(e.CodeInvalidCatalog,
-			"pull node %q platform %q is not linux/amd64 or linux/arm64", n.ID, n.Platform)
+	if err := target.ValidateExecutablePlatform(n.Platform); err != nil {
+		return err
+	}
+	if n.Platform == "darwin/arm64" && (n.OutputType != "host-package" || !strings.HasPrefix(n.Artifact, "https://")) {
+		return e.New(e.CodeEngineCapability, "native tool acquisition requires an HTTPS host executable")
 	}
 	if n.Network != NetworkDefault {
 		return e.New(e.CodeInvalidCatalog,
@@ -730,7 +753,7 @@ func validatePullNode(n Node) error {
 		return e.New(e.CodeInvalidCatalog, "image parent is valid only for OCI image pulls")
 	}
 	if n.ExecutableArchive != nil {
-		if n.OutputType != "host-package" || !strings.HasPrefix(n.Artifact, "https://") ||
+		if (n.ExecutableArchive.Format != "" && n.ExecutableArchive.Format != "zip") || n.OutputType != "host-package" || !strings.HasPrefix(n.Artifact, "https://") ||
 			!safeRelativePath(n.ExecutableArchive.Member) || !canonical.IsDigest(n.ExecutableArchive.Digest) {
 			return e.New(e.CodeInvalidCatalog, "release executable %q requires a pinned HTTPS archive and exact regular member", n.ID)
 		}
@@ -772,13 +795,14 @@ func validateVerifyNode(n Node) error {
 	return nil
 }
 
-func validateBuildEnv(nodeID, arch string, env []EnvVar) error {
+func validateBuildEnv(nodeID, arch, platform, builder string, env []EnvVar) error {
 	values, err := validateEnv(nodeID, env, allowedBuildEnv)
 	if err != nil {
 		return err
 	}
+	osName, _, _ := strings.Cut(platform, "/")
 	required := map[string]string{
-		"TZ": "UTC", "LC_ALL": "C", "GOTOOLCHAIN": "local", "GOOS": "linux",
+		"TZ": "UTC", "LC_ALL": "C", "GOTOOLCHAIN": "local", "GOOS": osName,
 		"GOARCH": arch, "GOFLAGS": "-trimpath -buildvcs=false",
 	}
 	for name, want := range required {
@@ -790,6 +814,9 @@ func validateBuildEnv(nodeID, arch string, env []EnvVar) error {
 	if values["CGO_ENABLED"] != "0" && values["CGO_ENABLED"] != "1" {
 		return e.New(e.CodeInvalidCatalog,
 			"build node %q environment CGO_ENABLED must be 0 or 1", nodeID)
+	}
+	if osName == "darwin" && values["CGO_ENABLED"] != "0" && builder != BuilderNativeGo {
+		return e.New(e.CodeEngineCapability, "Mac executable cross-compilation requires CGO_ENABLED=0")
 	}
 	if !positiveEpoch(values["SOURCE_DATE_EPOCH"]) {
 		return e.New(e.CodeUnpinnedSource,

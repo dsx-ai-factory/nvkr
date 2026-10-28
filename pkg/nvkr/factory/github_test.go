@@ -51,9 +51,11 @@ func TestRenderGitHubProducesStaticallyValidCompleteBundle(t *testing.T) {
 	for _, required := range [][]byte{
 		[]byte("qualification: " + TierStaticUnqualified.String()),
 		// The bootstrap provisions Go via the pinned setup-go action (from .go-version) rather
-		// than assuming a preinstalled toolchain.
+		// than assuming a preinstalled toolchain. Test binaries are development builds, so the
+		// runner is installed from the checkout's own source.
 		[]byte("uses: " + plan.Actions["setup-go"].Uses()),
 		[]byte("go-version-file: '.go-version'"),
+		[]byte("go install -trimpath -ldflags '-X main.version=v1.2.3 -X main.commit=deadbeef' ./cmd/nvkr\n"),
 		[]byte("cache: 'false'"),
 		// Factory helpers own operation isolation and Plan-derived carrier selections.
 		[]byte("factory github run-node --plan"),
@@ -112,11 +114,15 @@ func TestValidateGitHubBundleRejectsIsolationAndTransportTampering(t *testing.T)
 		{"execution-event", bundle.WorkflowPath, set("true", "jobs", stage.ID, "if"), e.CodeEngineCapability, "admitted branch"},
 		{"job-timeout", bundle.WorkflowPath, set("0", "jobs", bootstrapJob, "timeout-minutes"), e.CodeEngineCapability, "timeout"},
 		{"stage-timeout", bundle.WorkflowPath, set("59", "jobs", stage.ID, "timeout-minutes"), e.CodeEngineCapability, "timeout"},
+		{"finalizer-timeout", bundle.WorkflowPath, set("15", "jobs", githubFinalizerJobID, "timeout-minutes"), e.CodeEngineCapability, "timeout"},
 		{"cancel-running-publication", bundle.WorkflowPath, set("true", "concurrency", "cancel-in-progress"), e.CodeEngineCapability, "concurrency"},
 		{"unplanned-launch-argument", executeMember, rewriteRun("id", "operation_execute", "factory github run-node --plan", "factory github run-node --network bridge --plan"), e.CodeEngineCapability, ""},
 		{"node-dispatch", executeMember, rewriteRun("id", "operation_execute", "factory github run-node --plan", "factory execute-node --plan"), e.CodeEngineCapability, ""},
 		{"setup-go-version", bootstrapMember, func(t *testing.T, root *yamlv3.Node) {
 			githubTestYAMLField(t, setup(t, root), "go-version-file").Value = "go.mod"
+		}, e.CodeInvalidCatalog, "pinned Go toolchain"},
+		{"setup-go-release", bootstrapMember, func(t *testing.T, root *yamlv3.Node) {
+			githubYAMLSet(setup(t, root), "go-version", githubYAMLString("stable"))
 		}, e.CodeInvalidCatalog, "pinned Go toolchain"},
 		{"setup-go-cache", bootstrapMember, func(t *testing.T, root *yamlv3.Node) { githubTestYAMLField(t, setup(t, root), "cache").Value = "true" }, e.CodeInvalidCatalog, "pinned Go toolchain"},
 		{"setup-go-cache-removed", bootstrapMember, func(t *testing.T, root *yamlv3.Node) { githubYAMLRemove(setup(t, root), "cache") }, e.CodeInvalidCatalog, "pinned Go toolchain"},
@@ -249,6 +255,65 @@ func expandedGitHubWorkflow(t *testing.T, bundle *GeneratedBundle) []byte {
 		t.Fatal(err)
 	}
 	raw, err := expandGitHubActions(&plan, bundle.Files[bundle.WorkflowPath], bundle.Files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return logicalGitHubWorkflow(t, &plan, raw)
+}
+
+// Admit physical scheduling before examining logical artifact dependencies.
+// Preserve the actual expanded programs and YAML styles used by the assertions.
+func logicalGitHubWorkflow(t *testing.T, plan *Plan, raw []byte) []byte {
+	t.Helper()
+	logical := decodeGitHubWorkflow(t, raw)
+	if err := admitGitHubNeeds(t.Context(), plan, &logical); err != nil {
+		t.Fatal(err)
+	}
+	var parsed yamlv3.Node
+	if err := yamlv3.Unmarshal(raw, &parsed); err != nil || len(parsed.Content) != 1 {
+		t.Fatalf("decode logical workflow: %v", err)
+	}
+	document, err := githubResolveAliases(&parsed, map[*yamlv3.Node]bool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobs := githubTestYAMLField(t, document.Content[0], "jobs")
+	for _, id := range githubSerializedJobOrder(t, raw) {
+		job, retained := logical.Jobs[id]
+		if !retained {
+			githubYAMLRemove(jobs, id)
+			continue
+		}
+		node := githubYAMLField(jobs, id)
+		if len(job.Needs) == 0 {
+			githubYAMLRemove(node, "needs")
+		} else {
+			needs := &yamlv3.Node{Kind: yamlv3.SequenceNode, Tag: "!!seq", Style: yamlv3.FlowStyle}
+			for _, dependency := range job.Needs {
+				needs.Content = append(needs.Content, githubYAMLString(dependency))
+			}
+			githubYAMLSet(node, "needs", needs)
+		}
+		if id == "nvkr-lifecycle-run" {
+			steps := githubYAMLField(node, "steps")
+			if steps != nil && len(steps.Content) > 0 {
+				last := steps.Content[len(steps.Content)-1]
+				if githubYAMLValue(last, "id") == githubRunEndSummaryID {
+					githubYAMLSet(githubYAMLField(last, "env"), "NVKR_JOB_RESULTS", githubYAMLString(githubRunEndSummary(len(job.Needs)).Env["NVKR_JOB_RESULTS"]))
+				}
+			}
+		}
+	}
+	result, err := encodeGitHubYAML(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+
+func githubTestYAMLBytes(t *testing.T, node *yamlv3.Node) []byte {
+	t.Helper()
+	raw, err := encodeGitHubYAML(node)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -439,6 +504,10 @@ func relowerGitHubTestBundle(t *testing.T, plan *Plan, bundle *GeneratedBundle, 
 	if err != nil {
 		t.Fatal(err)
 	}
+	workflow, changed.Files, err = privatizeGitHubTransfers(plan, workflow, changed.Files, testActionRefs(t, plan))
+	if err != nil {
+		t.Fatal(err)
+	}
 	changed.Files[bundle.WorkflowPath] = workflow
 	changed.WorkflowDigest = pipeline.FileDigest(workflow)
 	return changed
@@ -455,12 +524,50 @@ func unsharedGitHubTestBundle(t *testing.T, plan *Plan, bundle *GeneratedBundle,
 	if err != nil {
 		t.Fatal(err)
 	}
+	workflow = lowerGitHubTestNeeds(t, plan, workflow)
 	changed := *bundle
 	changed.Files = files
 	changed.Files[bundle.PlanPath] = append([]byte(nil), bundle.Files[bundle.PlanPath]...)
 	changed.Files[bundle.WorkflowPath] = workflow
 	changed.WorkflowDigest = pipeline.FileDigest(workflow)
 	return &changed
+}
+
+// Logical mutation fixtures retain the original dependencies and summary input.
+// Restore only their emitted scheduling representation, leaving mutated job
+// policy, programs and summary fields available to the semantic validator.
+func lowerGitHubTestNeeds(t *testing.T, plan *Plan, raw []byte) []byte {
+	t.Helper()
+	projection, err := githubNeedsForPlan(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(projection.Collectors) != 0 {
+		var document yamlv3.Node
+		if err := yamlv3.Unmarshal(raw, &document); err != nil || len(document.Content) != 1 {
+			t.Fatalf("decode logical mutation workflow: %v", err)
+		}
+		finalizer := githubYAMLField(githubYAMLField(document.Content[0], "jobs"), githubFinalizerJobID)
+		steps := githubYAMLField(finalizer, "steps")
+		if steps != nil && len(steps.Content) > 0 {
+			last := steps.Content[len(steps.Content)-1]
+			results := githubYAMLField(githubYAMLField(last, "env"), "NVKR_JOB_RESULTS")
+			expected := len(projection.Full[githubFinalizerJobID])
+			if githubYAMLValue(last, "id") == githubRunEndSummaryID && results != nil &&
+				results.Value == githubRunEndSummary(expected).Env["NVKR_JOB_RESULTS"] {
+				results.Value = githubCollectedRunEndSummary(expected).Env["NVKR_JOB_RESULTS"]
+			}
+		}
+		raw, err = encodeGitHubYAML(&document)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	lowered, err := lowerGitHubNeeds(t.Context(), plan, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return lowered
 }
 
 func assertGeneratedGitHubMembers(t *testing.T, bundle *GeneratedBundle) {
@@ -513,9 +620,6 @@ func TestGitHubExplicitDispatchBranchPolicy(t *testing.T) {
 			}
 			document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 			for name, job := range document.Jobs {
-				if strings.HasPrefix(name, "build-runner-") {
-					continue
-				}
 				if !strings.Contains(job.If, want) {
 					t.Fatalf("job %s lost exact dispatch policy: %s", name, job.If)
 				}

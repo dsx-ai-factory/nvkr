@@ -23,3 +23,5 @@ Use `definitions/` and the demo index for current workflows. Generated hosted OS
 NVSentinel image producer. Its README discloses the selected development tool source and dependency
 security patch, independently of NVSentinel's source compiler version. It provides no signing or
 publication authority.
+
+`quickstart/` pins the official native Go SDK archives used by the consent-based local quickstart setup.

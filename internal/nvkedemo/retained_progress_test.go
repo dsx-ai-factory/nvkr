@@ -20,11 +20,13 @@ import (
 
 type retainedTypedStatusBuffer struct {
 	bytes.Buffer
-	statuses int
+	statuses    int
+	walkthrough bool
 }
 
 func (out *retainedTypedStatusBuffer) WriteOperatorStatus(status OperatorStatus) error {
 	out.statuses++
+	out.walkthrough = status.Walkthrough()
 	_, err := out.WriteString(status.Text())
 	return err
 }
@@ -102,6 +104,7 @@ func TestRetainedOperatorStatusRejectsInvalidOrOversizeEnvelopes(t *testing.T) {
 		})
 	}
 	for _, frame := range []retainedProgressFrame{
+		{Sequence: 1, Walkthrough: true},
 		{Sequence: 1, Status: "public fixture", Text: "ambiguous log"},
 		{Sequence: 1, Status: "public fixture", Event: &ProgressEvent{}},
 		{Sequence: 1, Status: strings.Repeat("x", retainedProgressLimit+1)},
@@ -112,6 +115,26 @@ func TestRetainedOperatorStatusRejectsInvalidOrOversizeEnvelopes(t *testing.T) {
 		if err := relayRetainedProgress(&out, &cursor, []retainedProgressFrame{frame}); !errors.As(err, &coded) || coded.Code != nvkrerr.CodePreflightFailed || out.Len() != 0 || cursor != 0 {
 			t.Fatal("invalid envelope reached a presenter", err)
 		}
+	}
+}
+
+func TestRetainedWalkthroughKindSurvivesWireCodec(t *testing.T) {
+	progress := &retainedProgress{}
+	if err := progress.WriteOperatorStatus(OperatorStatus{text: "get pods -A\n", walkthrough: true}); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(progress.frames())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var frames []retainedProgressFrame
+	if err := json.Unmarshal(raw, &frames); err != nil {
+		t.Fatal(err)
+	}
+	var out retainedTypedStatusBuffer
+	var cursor uint64
+	if err := relayRetainedProgress(&out, &cursor, frames); err != nil || !out.walkthrough || out.String() != "get pods -A\n" {
+		t.Fatal("relay erased walkthrough presentation kind", err)
 	}
 }
 
@@ -218,7 +241,7 @@ func TestRetainedWorkPanicRemainsPrivateAndDoesNotInventCleanup(t *testing.T) {
 }
 
 func TestRetainedPrimaryFailureIsReadableBeforeCleanup(t *testing.T) {
-	for _, mode := range []string{"entry hold", "nested finalizer"} {
+	for _, mode := range []string{"entry hold", "native finalizer"} {
 		t.Run(mode, func(t *testing.T) {
 			owner, work, _ := retainedTestOwner(t)
 			root := privateTestDir(t)
@@ -226,12 +249,16 @@ func TestRetainedPrimaryFailureIsReadableBeforeCleanup(t *testing.T) {
 			owner.failureRecorder = func(err error) error { return privateWrite(path, []byte(err.Error())) }
 			primary := errors.New("private-primary-failure-sentinel")
 			joined := make(chan error, 1)
+			var scope *nativeSiteScope
 			go func() {
 				if mode == "entry hold" {
 					failureErr := owner.retainFailure(primary)
 					joined <- errors.Join(failureErr, owner.hold())
 				} else {
-					joined <- cleanupAfterJoinedWork(work, primary, time.Second, func(context.Context) error { return nil })
+					joined <- withNativeSiteScope(work, &nativeSiteAttempt{}, Runner{}, "", "", func(_ context.Context, site *NativeSite) error {
+						scope = site.scope
+						return primary
+					})
 				}
 			}()
 			defer func() {
@@ -239,7 +266,10 @@ func TestRetainedPrimaryFailureIsReadableBeforeCleanup(t *testing.T) {
 					t.Error(err)
 				}
 				select {
-				case <-joined:
+				case result := <-joined:
+					if mode == "native finalizer" && (!errors.Is(result, primary) || scope == nil || !scope.closed) {
+						t.Error("native finalizer lost its primary failure or scope invalidation", result)
+					}
 				case <-time.After(2 * time.Second):
 					t.Error("test failure owner not joined")
 				}
@@ -253,6 +283,9 @@ func TestRetainedPrimaryFailureIsReadableBeforeCleanup(t *testing.T) {
 			}
 			if err := owner.retainFailure(errors.New("later failure")); err != nil {
 				t.Fatal("first private failure overwritten", err)
+			}
+			if raw, err := os.ReadFile(path); err != nil || string(raw) != primary.Error() {
+				t.Fatal("later failure replaced the original private cause", err)
 			}
 			select {
 			case <-joined:
@@ -268,14 +301,24 @@ func TestRetainedDiagnosticFailureDoesNotSkipExplicitTeardown(t *testing.T) {
 	diagnosticErr := errors.New("diagnostic storage unavailable")
 	owner.failureRecorder = func(error) error { return diagnosticErr }
 	primary := errors.New("operation failed")
-	cleaned := make(chan struct{})
 	joined := make(chan error, 1)
+	done := make(chan struct{})
+	var scope *nativeSiteScope
 	go func() {
-		joined <- cleanupAfterJoinedWork(work, primary, time.Second, func(context.Context) error { close(cleaned); return nil })
+		defer close(done)
+		joined <- withNativeSiteScope(work, &nativeSiteAttempt{}, Runner{}, "", "", func(_ context.Context, site *NativeSite) error {
+			scope = site.scope
+			return primary
+		})
 	}()
 	defer func() {
 		if err := owner.requestCleanup(context.WithoutCancel(t.Context())); err != nil {
 			t.Error(err)
+		}
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Error("native diagnostic-failure finalizer did not join")
 		}
 	}()
 	if snapshot := retainedObserve(t, owner); snapshot.state != retainedPartial {
@@ -289,10 +332,8 @@ func TestRetainedDiagnosticFailureDoesNotSkipExplicitTeardown(t *testing.T) {
 		if !errors.Is(result, primary) || !errors.Is(owner.retainFailure(primary), diagnosticErr) {
 			t.Fatal("primary/recording failures were lost", result)
 		}
-		select {
-		case <-cleaned:
-		default:
-			t.Fatal("diagnostic storage failure skipped natural teardown")
+		if scope == nil || !scope.closed {
+			t.Fatal("diagnostic storage failure skipped native scope invalidation")
 		}
 		owner.recordTeardownReturn(result)
 		if err := owner.joinedCleanup(); err != nil {

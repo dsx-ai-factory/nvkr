@@ -806,11 +806,15 @@ func TestOpenTransportTarSourceBoundsBothCarrierShapes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		source, closeSource, err := openTransportTarSource(file, true)
+		source, closeSource, err := openTransportTarSource(t.Context(), file, true)
 		if err != nil {
 			t.Fatal(err)
 		}
-		limited, ok := source.(*transportLimitReader)
+		contextual, ok := source.(transportContextReader)
+		if !ok {
+			t.Fatalf("%s carrier is not context-bound: %T", name, source)
+		}
+		limited, ok := contextual.reader.(*transportLimitReader)
 		if !ok {
 			t.Fatalf("%s carrier is unbounded: %T", name, source)
 		}

@@ -31,6 +31,8 @@ func TestGitHubDevelopmentAdmission(t *testing.T) {
 		code e.Code
 	}{
 		{name: "build only", edit: func(*Environment) {}},
+		{name: "named bundle", edit: func(environment *Environment) { environment.GitHubBundle = "project" }, code: e.CodeEngineCapability},
+		{name: "unsafe named bundle", edit: func(environment *Environment) { environment.GitHubBundle = "../project" }, code: e.CodeEngineCapability},
 		{name: "scoped source access", edit: func(environment *Environment) {
 			environment.SourceAccess = map[string]SourceAccess{
 				"https://github.com/example/private": {Mirror: "https://github.com/example/private", CredentialRef: "github:SOURCE_TOKEN"},
@@ -124,6 +126,7 @@ func TestGitHubDevelopmentPublicationAdmission(t *testing.T) {
 		valid bool
 	}{
 		{"signed development", func(*Environment) {}, true},
+		{"named bundle", func(env *Environment) { env.GitHubBundle = "project" }, false},
 		{"native disk route", func(env *Environment) { env.GitHubARC = "native-kvm-v1"; env.DiskEvidence = "build-provenance-v1" }, true},
 		{"missing signer", func(env *Environment) { env.Signing = nil }, false},
 		{"missing publication", func(env *Environment) { env.Publication = nil }, false},

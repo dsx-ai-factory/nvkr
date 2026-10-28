@@ -30,8 +30,8 @@ func TestLaptopNKTPDependencyArchiveChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(root)
-	definitionPath := filepath.Join("definitions", "nvke-local-dev-arm64", "definition-site.json")
-	environmentPath := filepath.Join(filepath.Dir(definitionPath), "environment-local-docker.json")
+	definitionPath := filepath.Join("inputs", "definitions", "diagnostics", "demo-arm64", "site.json")
+	environmentPath := "inputs/environments/local-arm64-tcg.json"
 	doc, err := definition.LoadDefinition(t.Context(), definitionPath)
 	if err != nil {
 		t.Fatal(err)
@@ -124,13 +124,12 @@ func TestLaptopNKTPDependencyArchiveChecks(t *testing.T) {
 
 // These are compiler contracts, not a five-output build or installation test.
 func TestLaptopSiteArtifactContract(t *testing.T) {
-	const compiler = "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c"
 	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Chdir(root)
-	definitionPath := filepath.Join("definitions", "nvke-local-dev-arm64", "definition-site.json")
+	definitionPath := filepath.Join("inputs", "definitions", "diagnostics", "demo-arm64", "site.json")
 	for _, tc := range []struct {
 		name             string
 		foreign, unbound bool
@@ -145,7 +144,7 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			environmentPath := filepath.Join(filepath.Dir(definitionPath), "environment-local-docker.json")
+			environmentPath := "inputs/environments/local-arm64-tcg.json"
 			env, err := definition.LoadEnvironment(t.Context(), environmentPath)
 			if err != nil {
 				t.Fatal(err)
@@ -172,6 +171,12 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 			if err := plan.Validate(); err != nil {
 				t.Fatal(err)
 			}
+			installerPin, err := plan.CatalogSnapshot.SourcePin("nvke-cli")
+			if err != nil {
+				t.Fatal(err)
+			}
+			installerSource := plan.CatalogSnapshot.Sources["nvke-cli"]
+			compiler := installerSource.ToolchainImage
 			var names []string
 			for _, output := range plan.LifecycleOutputs {
 				names = append(names, output.Name)
@@ -190,7 +195,7 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 						t.Fatal("site applications/charts must not fall back to acquired releases")
 					case ir.KindFetch:
 						fetches++
-						if node.Commit != "8fb2d53368823bd386b4fbd55b4ab6d3c0931345" || node.TreeHash != "36569cf4ec0e2360ee023cd7e53da65b96ce770d" {
+						if node.Repo != installerSource.Repo || node.Commit != installerPin.Commit || node.TreeHash != installerPin.TreeHash {
 							t.Fatal("CLI, controller and charts must share the selected installer source")
 						}
 						if build.Name == "nktp" {
@@ -233,7 +238,7 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 						if build.Name == "nvkectl" && node.Toolchain != compiler {
 							t.Fatal("site CLI must select the exact reviewed compiler, not the retained producer pin")
 						}
-						if build.Name == "nvkectl" && !strings.Contains(strings.Join(node.Command, " "), "make -C cli build NKECTL_TREE=clean") {
+						if build.Name == "nvkectl" && !strings.Contains(strings.Join(node.Command, " "), "make -C cli build NVKECTL_TREE=clean") {
 							t.Fatal("source-owned Make must own the changed CLI linker symbols and stamp assertion")
 						}
 					}

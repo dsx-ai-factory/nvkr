@@ -30,6 +30,7 @@ type cleanupFixture struct {
 	recheckPackage func(*cleanupPackage)
 	recheckJSON    json.RawMessage
 	recheckRun     func(*cleanupRun)
+	latestRun      func(*cleanupRun)
 	deletes        []string
 	requests       int
 	runReads       int
@@ -44,7 +45,7 @@ func newCleanupFixture() *cleanupFixture {
 	repo := cleanupRepository{ID: 43, FullName: "example/project", Owner: owner}
 	return &cleanupFixture{
 		now: now, repo: repo,
-		packages: []cleanupPackage{{ID: 11, Name: "project/development/runs/100/attempts/1/releases", Type: "container", Visibility: "private", Owner: owner, CreatedAt: old, UpdatedAt: old}},
+		packages: []cleanupPackage{{ID: 11, Name: "project/development/runs/100/attempts/1/releases", Type: "container", Visibility: "internal", Owner: owner, CreatedAt: old, UpdatedAt: old}},
 		// Every version is considered, without interpreting tags: this includes
 		// unsigned partial uploads, child manifests and Sigstore referrers.
 		versions: []cleanupVersion{{ID: 21, CreatedAt: old, UpdatedAt: old}, {ID: 22, CreatedAt: old, UpdatedAt: old}},
@@ -100,6 +101,12 @@ func (fixture *cleanupFixture) serve(t *testing.T, writer http.ResponseWriter, r
 			_, _ = fmt.Sscan(request.URL.Query().Get("page"), &page)
 			payload = fixture.versionPage(page)
 		}
+	case request.URL.Path == "/repos/example/project/actions/runs/100":
+		run := fixture.run
+		if fixture.latestRun != nil {
+			fixture.latestRun(&run)
+		}
+		payload = run
 	case strings.HasPrefix(request.URL.Path, "/repos/example/project/actions/runs/"):
 		fixture.runReads++
 		if request.URL.Path != "/repos/example/project/actions/runs/100/attempts/1" {
@@ -155,6 +162,15 @@ func TestCleanupAdmitsOnlyExpiredCompleteDevelopmentAttempts(t *testing.T) {
 		code   e.Code
 	}{
 		{"success", nil, 1, ""},
+		{"active retry retains original packages", func(f *cleanupFixture) {
+			f.latestRun = func(r *cleanupRun) { r.Attempt = 2; r.Status = "in_progress"; r.Conclusion = "" }
+		}, 0, ""},
+		{"recent retry retains original packages", func(f *cleanupFixture) {
+			f.latestRun = func(r *cleanupRun) { r.Attempt = 2; r.UpdatedAt = f.now.Add(-time.Hour) }
+		}, 0, ""},
+		{"expired retry", func(f *cleanupFixture) {
+			f.latestRun = func(r *cleanupRun) { r.Attempt = 2 }
+		}, 1, ""},
 		{"failed partial publication", func(f *cleanupFixture) { f.run.Conclusion = "failure" }, 1, ""},
 		{"canceled partial publication", func(f *cleanupFixture) { f.run.Conclusion = cleanupCanceledConclusion }, 1, ""},
 		{"user account", func(f *cleanupFixture) { f.repo.Owner.Type = "User"; f.packages[0].Owner.Type = "User" }, 1, ""},
@@ -170,6 +186,9 @@ func TestCleanupAdmitsOnlyExpiredCompleteDevelopmentAttempts(t *testing.T) {
 		{"path traversal", func(f *cleanupFixture) { f.packages[0].Name = "project/development/runs/100/attempts/1/../releases" }, 0, e.CodeEngineCapability},
 		{"wrong owner", func(f *cleanupFixture) { f.packages[0].Owner.ID++ }, 0, e.CodeVerifyFailed},
 		{"wrong package type", func(f *cleanupFixture) { f.packages[0].Type = "npm" }, 0, e.CodeVerifyFailed},
+		{"private package visibility", func(f *cleanupFixture) { f.packages[0].Visibility = "private" }, 0, e.CodeVerifyFailed},
+		{"missing package visibility", func(f *cleanupFixture) { f.packages[0].Visibility = "" }, 0, e.CodeVerifyFailed},
+		{"unknown package visibility", func(f *cleanupFixture) { f.packages[0].Visibility = "unknown" }, 0, e.CodeVerifyFailed},
 		{"public package", func(f *cleanupFixture) { f.packages[0].Visibility = "public" }, 0, e.CodeVerifyFailed},
 		{"wrong repository", func(f *cleanupFixture) { f.run.Repository.ID++ }, 0, e.CodeVerifyFailed},
 		{"production workflow", func(f *cleanupFixture) { f.run.Path = ".github/workflows/nvkr-run.yml" }, 0, e.CodeVerifyFailed},
@@ -209,10 +228,26 @@ func TestCleanupDryRunAndRecheck(t *testing.T) {
 	}{
 		{"dry run", false, nil, ""},
 		{"missing recheck fields", true, func(f *cleanupFixture) { f.recheckJSON = json.RawMessage(`{}`) }, e.CodeVerifyFailed},
+		{"visibility changed to private", true, func(f *cleanupFixture) { f.recheckPackage = func(p *cleanupPackage) { p.Visibility = "private" } }, e.CodeVerifyFailed},
+		{"visibility changed to public", true, func(f *cleanupFixture) { f.recheckPackage = func(p *cleanupPackage) { p.Visibility = "public" } }, e.CodeVerifyFailed},
+		{"visibility changed to missing", true, func(f *cleanupFixture) { f.recheckPackage = func(p *cleanupPackage) { p.Visibility = "" } }, e.CodeVerifyFailed},
+		{"visibility changed to unknown", true, func(f *cleanupFixture) { f.recheckPackage = func(p *cleanupPackage) { p.Visibility = "unknown" } }, e.CodeVerifyFailed},
 		{"recreated package", true, func(f *cleanupFixture) { f.recheckPackage = func(p *cleanupPackage) { p.ID++ } }, e.CodeVerifyFailed},
 		{"package updated", true, func(f *cleanupFixture) { f.recheckPackage = func(p *cleanupPackage) { p.UpdatedAt = f.now } }, e.CodeVerifyFailed},
 		{"attempt reactivated", true, func(f *cleanupFixture) {
 			f.recheckRun = func(r *cleanupRun) { r.Status = "in_progress"; r.Conclusion = "" }
+		}, e.CodeVerifyFailed},
+		{"latest retry starts on recheck", true, func(f *cleanupFixture) {
+			reads := 0
+			f.latestRun = func(r *cleanupRun) {
+				reads++
+				if reads > 1 {
+					r.Attempt = 2
+					r.Status = "in_progress"
+					r.Conclusion = ""
+					r.UpdatedAt = f.now
+				}
+			}
 		}, e.CodeVerifyFailed},
 		{"attempt updated", true, func(f *cleanupFixture) { f.recheckRun = func(r *cleanupRun) { r.UpdatedAt = f.now } }, e.CodeVerifyFailed},
 		{"new signature on recheck", true, func(f *cleanupFixture) {

@@ -78,7 +78,7 @@ current implementation boundary:
 
 ## Contributing a catalog / component
 
-Adding a component is a **declarative** change in the selected Definition’s catalog under `definitions/`.
+Adding a component is a **declarative** change in the selected Definition’s catalog under `inputs/catalogs/`.
 Select it directly in an output with a concrete platform, with every source, toolchain, vendor closure, or acquired artifact pinned by exact
 content identity. A qualified prebuilt entry must also declare digest-pinned typed evidence or an exact authenticated
 waiver; v1 acquisition uses the separate production-evidence contract. Run `make build` and validate the changed Definition with `bin/nvkr definition validate --definition <path>`. A source bake-off is useful contract evidence, but
@@ -90,6 +90,12 @@ Catalog diagnostics require an explicit `--data` path. There is no embedded work
 requirement. Worker binaries belong to the NVKE OS-image build; add product outputs through a Definition.
 
 ## Pull request process
+
+For a substantial feature, behavior change, or architectural change, open or find a GitHub issue and discuss
+the approach with maintainers before starting implementation. Link that issue in the PR so reviewers can
+follow the problem and agreed scope. Small bug fixes, typo corrections, and documentation clarifications
+may go directly to a focused PR. Report security vulnerabilities privately through
+[SECURITY.md](SECURITY.md), rather than opening a public issue or PR.
 
 1. **Branch** off `main`; keep the change focused.
 2. **`make check` is green** and new behavior has a test (pure-logic where possible).
@@ -105,6 +111,23 @@ requirement. Worker binaries belong to the NVKE OS-image build; add product outp
    changes. Current product requirements belong in the milestone specification; engineering contracts belong
    in the owning ADR. Superseded plans and requirement exports are available in Git history.
 5. Open the PR with a clear description of *what* and *why*; link any issue.
+
+### Review
+
+- **Who reviews.** GitHub requests review from the code owners of the paths you touch.
+  [`.github/CODEOWNERS`](.github/CODEOWNERS) routes every path to the `@dsx-ai-factory/nvke-write` team. The
+  [maintainers](MAINTAINERS.md) handle the review, requests for changes and the merge decision under
+  [GOVERNANCE.md](GOVERNANCE.md). The branch rules on `main` require one approving review from a code owner and a
+  green `gate` check before a merge.
+- **What to expect.** A non-trivial change stays open for at least five business days so that any maintainer can
+  raise a blocking objection (lazy consensus, [GOVERNANCE.md](GOVERNANCE.md#decision-making)). A draft pull request
+  is not reviewed until you mark it ready. The repository does not publish a response-time target for pull requests;
+  maintainers review issues and discussions at least weekly under the
+  [issue and PR management procedure](docs/github-issue-pr-management.md).
+- **How to follow up.** If a pull request has had no response after a week, comment on it and mention
+  `@dsx-ai-factory/nvke-write` or a maintainer from [MAINTAINERS.md](MAINTAINERS.md). If you are not sure who owns the
+  change, ask in [GitHub Discussions Q&A](https://github.com/dsx-ai-factory/nvkr/discussions/categories/q-a). Pull
+  requests are not closed automatically for inactivity; issues are (see the procedure).
 
 ## Signing your commits
 

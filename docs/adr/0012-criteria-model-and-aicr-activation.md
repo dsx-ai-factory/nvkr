@@ -20,8 +20,9 @@ routes. Neither requires an NVKR Recipe, deployment topology, or a generic crite
 
 ### 1. Concrete target platforms
 
-Ordinary native Definition outputs declare `platform: linux/amd64` or `linux/arm64`; no wildcard, missing value or
-host-derived default is admitted. The explicit standalone Debian exception is defined in section 2.
+Ordinary native Definition outputs declare `platform: linux/amd64` or `linux/arm64`; the local executable
+diagnostic also admits `darwin/arm64`. No wildcard, missing value or host-derived default is admitted.
+The explicit standalone Debian exception is defined in section 2.
 Catalog components declare sorted supported `platforms`, with complete exact
 pin/toolchain routes for those declarations. Selecting an unsupported route fails before external work.
 `pkg/nvkr/target` owns the platform and architecture domains.
@@ -33,9 +34,20 @@ output is a standard OCI image index whose concrete native children exhaust that
 this output must declare a platform contained in the required set. Executable outputs remain separate named
 native artifacts; the image-index contract does not create an executable aggregate.
 
+The Darwin exception admits HTTPS executable acquisition and CGO-free `oci-hermetic` host-package or
+tarball producers. Its payload target is `darwin/arm64`; its explicit `toolchainPlatform` is `linux/arm64`.
+The compiler sets `GOOS=darwin`, `GOARCH=arm64` and `CGO_ENABLED=0`. Images, disks, CGO producers, hosted
+execution, signing and qualified authority do not inherit this exception. Linux target admission is unchanged.
+
+ADR-10 separately admits the local `native-go` diagnostic builder for host-matching executable packages,
+including CGO. Its `toolchainPlatform` equals its payload platform, and the toolchain identity binds the
+installed Go SDK tree and C compiler bytes. It requires an explicit local Environment binding and declared
+host network; it provides no hosted, signing, publication, qualified or container-isolation claim.
+
 Targets remain distinct from execution-host requirements. A VM producer's eligible host, KVM/TCG route and
-capability policy are execution contracts, not target defaults. Source builds retain the native-target container
-model; a foreign host requires its admitted execution mechanism. The typed `{{.Arch}}` producer token is resolved
+capability policy are execution contracts, not target defaults. Linux source builds retain the native-target container
+model; Darwin executable cross-builds use the explicit exception above. A foreign host otherwise requires
+its admitted execution mechanism. The typed `{{.Arch}}` producer token is resolved
 from the explicit target. Other command values are never inferred from deployment context.
 
 ### 2. Debian producer targets and local execution

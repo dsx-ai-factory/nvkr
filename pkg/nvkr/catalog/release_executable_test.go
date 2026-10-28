@@ -103,4 +103,14 @@ pins:
 		pin.Digests["amd64"] != pin.Executable.ExecutableDigest {
 		t.Fatalf("wrong resolved acquisition %+v", pin)
 	}
+	mac, err := LoadContext(t.Context(), bytesProvider{
+		RegistryFile: []byte(strings.ReplaceAll(registry, "linux/amd64", "darwin/arm64")),
+		LockFile:     []byte(strings.ReplaceAll(lock, "linux/amd64", "darwin/arm64")),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tool := mac.Components["tool"].Prebuilt; tool.Executable.Platform != "darwin/arm64" || tool.Digests["arm64"] != tool.Executable.ExecutableDigest {
+		t.Fatalf("wrong native Mac acquisition: %+v", tool)
+	}
 }

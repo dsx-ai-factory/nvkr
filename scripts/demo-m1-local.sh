@@ -23,7 +23,7 @@ ATTEMPTS_ROOT=${ATTEMPTS_ROOT:-.nvkr/m1-local}
 ATTEMPT=${ATTEMPT:-$(demo_default_attempt m1)}
 WORKSPACE=$ATTEMPTS_ROOT/$ATTEMPT
 CONSUME=${CONSUME:-.nvkr/m1-local-consume}
-DEFINITIONS=${DEFINITIONS:-definitions/nvke-v1}
+DEFINITIONS=${DEFINITIONS:-docs/examples/nvke-tutorial}
 ROUTE=${ROUTE:-release}
 BUNDLE=${BUNDLE:-nvkectl}
 BUILD_TARGET=${BUILD_TARGET:-nvkectl}
@@ -37,9 +37,9 @@ KEEP_REGISTRY=1
 # The same pinned toolchain image the catalog builds nvkectl with, reused here as the
 # amd64 execution environment for the recovered binary. Reusing it keeps this script from
 # introducing another execution image. The loopback registry service uses registry:3.
-RUN_IMAGE=golang@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
-# The version string upstream's own cli/Makefile stamps for tag cli/v0.1.0-rc.2.
-EXPECT_VERSION=${EXPECT_VERSION:-v0.1.0-rc.2}
+RUN_IMAGE=golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
+# The version string the catalog passes to upstream's cli/Makefile for the shared release.
+EXPECT_VERSION=${EXPECT_VERSION:-v0.22.0-beta.6}
 
 usage() {
   cat <<'EOF'
@@ -65,6 +65,8 @@ Options:
   -h, --help        show this help
 
 Environment:
+  DEFINITIONS       directory containing the tutorial Definition and Environments
+                    (default: docs/examples/nvke-tutorial).
   NVKE_LOCAL_CLONE   path to a local NVKE clone containing the exact pinned commits. When set, git is
                     redirected to it for this process only, via GIT_CONFIG_COUNT.
                     The catalog keeps its https://github.com/dsx-ai-factory/nvke identity and
@@ -87,16 +89,6 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-for legacy_variable in NKE_LOCAL_CLONE NKDCTL_BIN; do
-  if [ -n "${!legacy_variable:-}" ]; then
-    case "$legacy_variable" in
-      NKE_LOCAL_CLONE) replacement=NVKE_LOCAL_CLONE ;;
-      NKDCTL_BIN) replacement=NVKR_BIN ;;
-    esac
-    demo_die "$legacy_variable was renamed to $replacement; unset the legacy variable before running"
-  fi
-done
-
 case "$ATTEMPTS_ROOT" in .nvkr/?*) ;; *) demo_die "--attempts-root must be a repository-relative child of .nvkr" ;; esac
 case "$ATTEMPT" in ""|*/*|*..*) demo_die "--attempt must be one clean name" ;; esac
 WORKSPACE=$ATTEMPTS_ROOT/$ATTEMPT
@@ -107,8 +99,13 @@ demo_need_command docker
 demo_need_command git
 demo_need_command curl
 docker info >/dev/null 2>&1 || demo_die "Docker daemon is not reachable"
-if docker container inspect nkd-m1-registry >/dev/null 2>&1; then
-  demo_die "legacy nkd-m1-registry container exists; inspect and stop/remove it explicitly before starting nvkr-m1-registry"
+
+# Detect an occupied endpoint before building the CLI. Docker still owns final
+# port admission; an HTTP response here is enough to reject another service.
+running_containers=$(docker container ls --format '{{.Names}}') || demo_die "cannot read running registry containers"
+if ! printf '%s\n' "$running_containers" | grep -Fx -- "$REGISTRY_CONTAINER" >/dev/null &&
+  curl --silent --output /dev/null --connect-timeout 2 --max-time 3 --noproxy '*' "http://$REGISTRY_HOSTPORT/v2/"; then
+  demo_die "registry endpoint $REGISTRY_HOSTPORT is already in use; stop the existing service or select another REGISTRY_HOSTPORT"
 fi
 
 # Pretty-print a small canonical JSON record. python3 is a convenience for reading, never
@@ -170,13 +167,12 @@ done
 [ "$registry_ready" -eq 1 ] || demo_die "registry $REGISTRY_HOSTPORT did not become ready"
 printf 'registry ready: http://%s/v2/\n' "$REGISTRY_HOSTPORT"
 
-demo_section "2/8  Validate the pinned component catalog"
-"$NVKR" catalog validate --data "$DEFINITIONS/catalog"
+demo_section "2/8  Validate the pinned producers and plan the Run"
+"$NVKR" run plan --definition "$DEFINITIONS/definition.yaml" \
+  --environment "$DEFINITIONS/environment-local.yaml"
 
 demo_section "3/8  Validate the Definition and generate its hosted Run in scratch space"
 "$NVKR" definition validate --definition "$DEFINITIONS/definition.yaml"
-"$NVKR" run plan --definition "$DEFINITIONS/definition.yaml" \
-  --environment "$DEFINITIONS/environment-local.yaml"
 # The committed workflow selects M2, while this demo selects the three-output v1
 # Definition. Generate and check that example with the same binary in a fresh root.
 HOSTED_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-m1-hosted.XXXXXX")

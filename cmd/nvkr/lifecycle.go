@@ -98,22 +98,32 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 			return nil
 		}},
 		cmdRunPlan(),
+		cmdArtifactTestInputs(),
+		cmdArtifactTest(),
 		cmdRunGraph(),
 		cmdRunDiff(),
 		cmdRunInspect(),
 		cmdRunCheckArtifacts(),
 		cmdRunQualify(),
+		cmdQualificationSource(),
+		cmdRunQualifyLocal(),
 		cmdRunSmokeWorker(),
 		{Name: "generate", Usage: "generate and statically validate a hosted CI run", Flags: append(generationFlags,
 			&cli.StringFlag{Name: "root", Value: ".", Usage: "repository root receiving generated files"},
 			&cli.StringFlag{Name: "qualification-policy", Usage: "also generate hosted qualification from this independent policy"},
+			&cli.BoolFlag{Name: "runtime", Usage: "refresh named production Plan data within its reviewed workflow contract"},
 			&cli.BoolFlag{Name: "check", Usage: "write nothing; fail on generated drift"}), Action: func(c *cli.Context) error {
 			view, err := selectCommandPresentation(c)
 			if err != nil {
 				return err
 			}
 			var digest string
-			if c.IsSet("qualification-policy") {
+			if c.Bool("runtime") && c.IsSet("qualification-policy") {
+				return e.New(e.CodeUsage, "runtime Plan preparation does not generate qualification workflows")
+			}
+			if c.Bool("runtime") {
+				digest, err = lifecycle.GenerateRuntimeFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("engine"), c.String("root"), c.Bool("check"))
+			} else if c.IsSet("qualification-policy") {
 				digest, err = qualification.GenerateFiles(c.Context, c.String("definition"), c.String("environment"), c.String("qualification-policy"), factoryGeneratorVersion(), c.String("engine"), c.String("root"), c.Bool("check"))
 			} else {
 				digest, err = lifecycle.GenerateFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("engine"), c.String("root"), c.Bool("check"))
@@ -138,6 +148,7 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 		{Name: "local", Usage: "execute a local run; publication remains opt-in", Flags: append(lifecycleInputFlags(),
 			&cli.StringFlag{Name: "attempt", Required: true, Usage: "new immutable attempt name"},
 			&cli.StringFlag{Name: "attempts-root", Value: ".nvkr/runs"}, &cli.StringFlag{Name: "runner-source", Value: "."},
+			&cli.StringFlag{Name: "capture-inputs-root", Usage: "retain compiler inputs beneath this root; definition and environment paths must be repository-relative"},
 			&cli.IntFlag{Name: "jobs", Aliases: []string{"j"}, Value: 1}, &cli.StringFlag{Name: "runtime", Value: "docker"},
 			&cli.StringFlag{Name: "go", Value: "go"}, &cli.BoolFlag{Name: "publish"}, &cli.BoolFlag{Name: "dry-run"},
 			&cli.DurationFlag{Name: "timeout", Value: time.Hour, Usage: "bound preparation, execution and output observation"},

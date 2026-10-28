@@ -5,6 +5,7 @@ package lifecycle
 
 import (
 	"context"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -88,6 +89,9 @@ func (fixture *binaryObservationFixture) path(t *testing.T, planned string) stri
 }
 
 func TestObserveOutputReconstructsExactBundleAndPublicationMembership(t *testing.T) {
+	// Each mutation gets its own bytes; compiling and publishing the identical
+	// starting point again adds no observation coverage.
+	baseline := prepareBinaryObservationFixture(t)
 	for _, tc := range []struct {
 		name   string
 		mutate func(*testing.T, *binaryObservationFixture)
@@ -139,9 +143,16 @@ func TestObserveOutputReconstructsExactBundleAndPublicationMembership(t *testing
 		}, code: e.CodeVerifyFailed},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			fixture := prepareBinaryObservationFixture(t)
+			fixture := *baseline
+			fixture.artifacts = maps.Clone(baseline.artifacts)
+			fixture.workspace = t.TempDir()
+			if err := os.CopyFS(fixture.workspace, os.DirFS(baseline.workspace)); err != nil {
+				t.Fatal(err)
+			}
+			fixture.payload = fixture.path(t, fixture.artifacts["artifact/cli/kubectl"].Path)
+			fixture.resultPath = fixture.path(t, fixture.artifacts[fixture.slot.ComponentResults[0]].Path)
 			if tc.mutate != nil {
-				tc.mutate(t, fixture)
+				tc.mutate(t, &fixture)
 			}
 			observed, err := observeFixtureOutput(t.Context(), fixture.workspace, fixture.slot, fixture.artifacts, fixture.plan)
 			if tc.code != "" {
@@ -176,6 +187,7 @@ func TestObserveOutputReconstructsExactBundleAndPublicationMembership(t *testing
 }
 
 func TestBinaryObservationRechecksExactProducerMetadata(t *testing.T) {
+	baseline := prepareBinaryObservationFixture(t)
 	for _, tc := range []struct {
 		name   string
 		mutate func(*pipeline.ArtifactResult)
@@ -191,7 +203,7 @@ func TestBinaryObservationRechecksExactProducerMetadata(t *testing.T) {
 		{"output type", func(r *pipeline.ArtifactResult) { r.OutputType = "oci-image" }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			fixture := prepareBinaryObservationFixture(t)
+			fixture := *baseline
 			tc.mutate(&fixture.result)
 			writeCanonicalTestFile(t, fixture.resultPath, fixture.result)
 			_, err := observeFixtureOutput(t.Context(), fixture.workspace, fixture.slot, fixture.artifacts, fixture.plan)

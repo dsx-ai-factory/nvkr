@@ -12,11 +12,15 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 // executePackage admits every declared input before dispatching format-specific I/O.
 func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer) error {
-	output := artifacts[node.Outputs[0]]
+	output, err := signNodeOutput(node, artifacts, node.PackageKind)
+	if err != nil {
+		return err
+	}
 	inputs, err := packageInputs(plan, node, artifacts)
 	if err != nil {
 		return err
@@ -67,15 +71,52 @@ func packageInputs(plan *Plan, node Node, artifacts map[string]Artifact) ([]Arti
 }
 
 func executeBinaryPackage(ctx context.Context, plan *Plan, output Artifact, inputs []Artifact) error {
+	platform, err := binaryPackagePlatform(plan, inputs)
+	if err != nil {
+		return err
+	}
+	osName, arch, _ := strings.Cut(platform, "/")
 	files := make([]delivery.BinaryFileInput, 0, len(inputs))
 	for _, input := range inputs {
+		mode := uint32(0o755)
+		if input.Kind == "tarball" {
+			// The compiled producer type owns applicability; filesystem mode and
+			// filename suffixes must not promote runtime assets to executable tools.
+			mode = 0o644
+		}
 		files = append(files, delivery.BinaryFileInput{Name: input.Name, Path: input.Path,
-			InstallPath: "/usr/local/bin/" + input.Name, Mode: 0o755})
+			InstallPath: "/usr/local/bin/" + input.Name, Mode: mode})
 	}
-	_, err := delivery.BuildBinaryBundle(ctx, output.Path, delivery.BinaryBundleRequest{
-		OS: "linux", Arch: packageArch(plan, inputs), Purpose: output.Name, Files: files,
+	_, err = delivery.BuildBinaryBundle(ctx, output.Path, delivery.BinaryBundleRequest{
+		OS: osName, Arch: arch, Purpose: output.Name, Files: files,
 	})
 	return err
+}
+
+func binaryPackagePlatform(plan *Plan, inputs []Artifact) (string, error) {
+	platform := ""
+	for _, input := range inputs {
+		selected := ""
+		for _, build := range plan.Builds {
+			if build.Name == input.BuildTarget {
+				if selected != "" {
+					return "", e.New(e.CodePipelineDrift, "binary input %q has ambiguous build targets", input.ID)
+				}
+				selected = build.Platform
+			}
+		}
+		if err := target.ValidateExecutablePlatform(selected); err != nil {
+			return "", err
+		}
+		if platform != "" && selected != platform {
+			return "", e.New(e.CodePipelineDrift, "binary bundle inputs have different target platforms")
+		}
+		platform = selected
+	}
+	if platform == "" {
+		return "", e.New(e.CodeReleaseIncomplete, "binary bundle has no target-bound inputs")
+	}
+	return platform, nil
 }
 
 func packageArch(plan *Plan, inputs []Artifact) string {

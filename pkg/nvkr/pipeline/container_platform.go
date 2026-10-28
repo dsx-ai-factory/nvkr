@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -34,8 +35,11 @@ func CheckContainerPlatform(ctx context.Context, runtimeBinary, image, platform 
 	default:
 		return e.New(e.CodeEngineCapability, "container platform admission requires Docker or Podman")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-	defer cancel()
+	if _, bounded := ctx.Deadline(); !bounded {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 10*time.Minute)
+		defer cancel()
+	}
 	defer func() {
 		if ctx.Err() != nil {
 			err = e.Wrap(e.CodeTimeout, ctx.Err(), "container platform admission canceled")
@@ -49,15 +53,52 @@ func CheckContainerPlatform(ctx context.Context, runtimeBinary, image, platform 
 		return err
 	}
 	pull := execCmd(RunOptions{Ctx: ctx}, runtimeBinary, "pull", "--platform", platform, image)
-	pull.Stdout, pull.Stderr = io.Discard, io.Discard
+	var diagnostic containerPlatformBuffer
+	pull.Stdout, pull.Stderr = io.Discard, &diagnostic
 	if err := runOwnedCommand(ctx, pull); err != nil {
-		return e.Wrap(e.CodeEngineCapability, err, "materializing %s toolchain", platform)
+		return containerPullFailure(ctx, platform, err, &diagnostic)
 	}
 	raw, err = containerPlatformOutput(ctx, runtimeBinary, "image", "inspect", "--format", "{{json .}}", image)
 	if err != nil {
 		return e.Wrap(e.CodeEngineCapability, err, "inspecting %s toolchain", platform)
 	}
 	return checkContainerPlatform(raw, image, platform)
+}
+
+func containerPullFailure(ctx context.Context, platform string, cause error, diagnostic *containerPlatformBuffer) error {
+	if err := ctx.Err(); err != nil {
+		return e.Wrap(e.CodeTimeout, err, "container platform admission canceled")
+	}
+	return e.Wrap(e.CodeEngineCapability, cause, "materializing %s toolchain (diagnostic: %s)", platform, containerPullDiagnostic(diagnostic))
+}
+
+// Only fixed descriptive categories cross the error boundary. Registry messages
+// can include credentials, URLs or headers and must never be copied into logs.
+// These categories do not authorize retry or change capability admission.
+func containerPullDiagnostic(diagnostic *containerPlatformBuffer) string {
+	if diagnostic.overflow {
+		return "oversized"
+	}
+	message := strings.ToLower(diagnostic.buffer.String())
+	for _, category := range []struct {
+		name    string
+		phrases []string
+	}{
+		{"registry-rate-limit", []string{"toomanyrequests:", "too many requests", "you have reached your pull rate limit"}},
+		{"registry-auth", []string{"authentication required", "pull access denied", "requested access to the resource is denied", "401 unauthorized", "403 forbidden"}},
+		{"registry-unavailable", []string{"500 internal server error", "502 bad gateway", "503 service unavailable", "504 gateway timeout"}},
+		{"network-timeout", []string{"context deadline exceeded", "i/o timeout", "tls handshake timeout", "client.timeout exceeded while awaiting headers"}},
+		{"network-unavailable", []string{"no such host", "network is unreachable", "connection refused", "connection reset by peer", "temporary failure in name resolution"}},
+		{"local-storage", []string{"no space left on device", "read-only file system", "disk quota exceeded"}},
+		{"runtime-unavailable", []string{"cannot connect to the docker daemon", "unable to connect to podman socket"}},
+	} {
+		for _, phrase := range category.phrases {
+			if strings.Contains(message, phrase) {
+				return category.name
+			}
+		}
+	}
+	return "unknown"
 }
 
 func checkContainerPlatform(raw []byte, image, platform string) error {
@@ -90,6 +131,8 @@ func checkContainerPlatform(raw []byte, image, platform string) error {
 
 // Inspection is small JSON; bound captured bytes as well as subprocess lifetime.
 func containerPlatformOutput(ctx context.Context, runtimeBinary string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 	cmd := execCmd(RunOptions{Ctx: ctx}, runtimeBinary, args...)
 	var output containerPlatformBuffer
 	cmd.Stdout, cmd.Stderr = &output, io.Discard

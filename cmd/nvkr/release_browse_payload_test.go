@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"log"
@@ -13,13 +14,16 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/internal/runpresenter"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/progress"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 	"github.com/google/go-containerregistry/pkg/registry"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -27,102 +31,131 @@ import (
 )
 
 func TestReleaseBrowseNeverDownloadsOutputLayers(t *testing.T) {
-	for _, arch := range []string{"amd64", "arm64"} {
-		t.Run(arch, func(t *testing.T) {
-			fixture := releaseBrowsePayloadFixture(t, arch)
-			var payloadGets atomic.Int64
-			var corruptConfig atomic.Bool
-			handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.Method == http.MethodGet {
-					if fixture.payloads[filepath.Base(r.URL.Path)] && strings.Contains(r.URL.Path, "/blobs/") {
-						payloadGets.Add(1)
-						http.Error(w, "browsing must not download output payloads", http.StatusForbidden)
-						return
-					}
-					if corruptConfig.Load() && strings.HasSuffix(r.URL.Path, "/blobs/"+fixture.diskConfig) {
-						raw := append([]byte(nil), fixture.diskConfigBytes...)
-						raw[len(raw)-1] ^= 1
-						_, _ = w.Write(raw)
-						return
-					}
-				}
-				handler.ServeHTTP(w, r)
-			}))
-			defer server.Close()
-			transport := delivery.RegistryOptions{Anonymous: true, PlainHTTP: true}
-			reference, err := delivery.Push(t.Context(), fixture.layout, strings.TrimPrefix(server.URL, "http://")+"/product/releases", transport)
-			if err != nil {
-				t.Fatal(err)
+	// Metadata-only transport and presentation do not branch on architecture;
+	// delivery owns both native disk profile round trips.
+	fixture := releaseBrowsePayloadFixture(t, "amd64")
+	var payloadGets atomic.Int64
+	var corruptConfig atomic.Bool
+	handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			if fixture.payloads[filepath.Base(r.URL.Path)] && strings.Contains(r.URL.Path, "/blobs/") {
+				payloadGets.Add(1)
+				http.Error(w, "browsing must not download output payloads", http.StatusForbidden)
+				return
 			}
-			payloadGets.Store(0)
-			for _, format := range []string{"text", "json", "mermaid"} {
-				for _, output := range []string{"", "tools", "node-image"} {
-					t.Run(format+"/"+output, func(t *testing.T) {
-						payloadGets.Store(0)
-						raw, err := runReleaseBrowse(t, reference, format, output)
-						if got := payloadGets.Load(); got != 0 {
-							t.Errorf("browse downloaded output layers: %d GETs", got)
-						}
-						if err != nil {
-							t.Fatalf("browsing metadata with inaccessible payloads: %v", err)
-						}
-						for _, scope := range []string{"metadata inspection", "payloads, signatures and policy not verified"} {
-							if !strings.Contains(raw, scope) {
-								t.Errorf("%s omits inspection scope %q: %s", format, scope, raw)
-							}
-						}
-						for _, name := range []string{"tools", "node-image"} {
-							if strings.Contains(raw, name) != (output == "" || output == name) {
-								t.Errorf("%s output filter %q did not preserve %q membership: %s", format, output, name, raw)
-							}
-						}
-						if format == "json" {
-							var view struct {
-								SelectedOutput string `json:"selectedOutput"`
-								TotalOutputs   int    `json:"totalOutputs"`
-								delivery.PublicationDescription
-							}
-							if err := json.Unmarshal([]byte(raw), &view); err != nil {
-								t.Fatal(err)
-							}
-							want := 2
-							if output != "" {
-								want = 1
-							}
-							if view.SelectedOutput != output || view.TotalOutputs != 2 || len(view.Outputs) != want || len(view.Evidence) != want {
-								t.Fatalf("JSON lost complete or selected membership: %s", raw)
-							}
-						}
-					})
-				}
+			if corruptConfig.Load() && strings.HasSuffix(r.URL.Path, "/blobs/"+fixture.diskConfig) {
+				raw := append([]byte(nil), fixture.diskConfigBytes...)
+				raw[len(raw)-1] ^= 1
+				_, _ = w.Write(raw)
+				return
 			}
-			t.Run("reject corrupt unselected metadata", func(t *testing.T) {
-				corruptConfig.Store(true)
-				defer corruptConfig.Store(false)
+		}
+		handler.ServeHTTP(w, r)
+	}))
+	defer server.Close()
+	transport := delivery.RegistryOptions{Anonymous: true, PlainHTTP: true}
+	reference, err := delivery.Push(t.Context(), fixture.layout, strings.TrimPrefix(server.URL, "http://")+"/product/releases", transport)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payloadGets.Store(0)
+	for _, format := range []string{"text", "json", "mermaid"} {
+		for _, output := range []string{"", "tools", "node-image"} {
+			t.Run(format+"/"+output, func(t *testing.T) {
 				payloadGets.Store(0)
-				raw, err := runReleaseBrowse(t, reference, "json", "tools")
-				if cliErrorCode(err) != e.CodeFetchFailed || raw != "" {
-					t.Fatalf("filtered browse accepted changed disk metadata or emitted a partial view: %q, %v", raw, err)
-				}
+				raw, err := runReleaseBrowse(t, reference, format, output)
 				if got := payloadGets.Load(); got != 0 {
-					t.Fatalf("metadata rejection downloaded output layers: %d GETs", got)
+					t.Errorf("browse downloaded output layers: %d GETs", got)
+				}
+				if err != nil {
+					t.Fatalf("browsing metadata with inaccessible payloads: %v", err)
+				}
+				for _, scope := range []string{"metadata inspection", "payloads, signatures and policy not verified"} {
+					if !strings.Contains(raw, scope) {
+						t.Errorf("%s omits inspection scope %q: %s", format, scope, raw)
+					}
+				}
+				for _, name := range []string{"tools", "node-image"} {
+					if strings.Contains(raw, name) != (output == "" || output == name) {
+						t.Errorf("%s output filter %q did not preserve %q membership: %s", format, output, name, raw)
+					}
+				}
+				if format == "json" {
+					var view struct {
+						SelectedOutput string `json:"selectedOutput"`
+						TotalOutputs   int    `json:"totalOutputs"`
+						delivery.PublicationDescription
+					}
+					if err := json.Unmarshal([]byte(raw), &view); err != nil {
+						t.Fatal(err)
+					}
+					want := 2
+					if output != "" {
+						want = 1
+					}
+					if view.SelectedOutput != output || view.TotalOutputs != 2 || len(view.Outputs) != want || len(view.Evidence) != want {
+						t.Fatalf("JSON lost complete or selected membership: %s", raw)
+					}
 				}
 			})
-			t.Run("full publication still requires payloads", func(t *testing.T) {
-				payloadGets.Store(0)
-				publication, err := delivery.PullPublication(t.Context(), reference, t.TempDir(), transport)
-				if publication != nil {
-					_ = publication.Close()
+		}
+	}
+	for _, corrupt := range []bool{false, true} {
+		t.Run("TUI/corrupt="+strconv.FormatBool(corrupt), func(t *testing.T) {
+			corruptConfig.Store(corrupt)
+			defer corruptConfig.Store(false)
+			payloadGets.Store(0)
+			shows := 0
+			var snapshot progress.Snapshot
+			services := runPresentationServices{eligible: func(io.Writer) bool { return true }, show: func(_ context.Context, _ runpresenter.Options, source runSnapshotSource, work func(context.Context) error) runpresenter.Result {
+				shows++
+				snapshot = source.Snapshot()
+				if work != nil {
+					t.Fatal("read-only browser retained inspection work")
 				}
-				// This control proves payload acquisition and coded failure; registry
-				// retry classification has separate transport contract coverage.
-				if cliErrorCode(err) == "" || publication != nil || payloadGets.Load() == 0 {
-					t.Fatalf("full publication accepted inaccessible payloads: GETs=%d, publication=%v, error=%v", payloadGets.Load(), publication, err)
+				return runpresenter.Result{}
+			}}
+			var out bytes.Buffer
+			app := releasePresentationTestApp(executeReleaseVerification, &out, services)
+			err := app.RunContext(t.Context(), []string{"nvkr", "release", "browse", "--reference", reference, "--output", "tools", "--ui=tui", "--anonymous", "--plain-http"})
+			if corrupt {
+				assertLifecycleCommandCode(t, err, e.CodeFetchFailed)
+				if len(snapshot.Items) != 0 || snapshot.Status != "failed" {
+					t.Fatal("TUI hid invalid sibling metadata behind output selection")
 				}
-			})
+			} else if err != nil || len(snapshot.Items) != 2 || snapshot.Status != "complete" {
+				t.Fatalf("metadata-only browser failed: %+v, %v", snapshot, err)
+			}
+			if payloadGets.Load() != 0 || shows != 1 || out.Len() != 0 {
+				t.Fatalf("TUI downloaded payloads or changed output: GETs=%d shows=%d stdout=%q", payloadGets.Load(), shows, out.String())
+			}
 		})
 	}
+	t.Run("reject corrupt unselected metadata", func(t *testing.T) {
+		corruptConfig.Store(true)
+		defer corruptConfig.Store(false)
+		payloadGets.Store(0)
+		raw, err := runReleaseBrowse(t, reference, "json", "tools")
+		if cliErrorCode(err) != e.CodeFetchFailed || raw != "" {
+			t.Fatalf("filtered browse accepted changed disk metadata or emitted a partial view: %q, %v", raw, err)
+		}
+		if got := payloadGets.Load(); got != 0 {
+			t.Fatalf("metadata rejection downloaded output layers: %d GETs", got)
+		}
+	})
+	t.Run("full publication still requires payloads", func(t *testing.T) {
+		payloadGets.Store(0)
+		publication, err := delivery.PullPublication(t.Context(), reference, t.TempDir(), transport)
+		if publication != nil {
+			_ = publication.Close()
+		}
+		// This control proves payload acquisition and coded failure; registry
+		// retry classification has separate transport contract coverage.
+		if cliErrorCode(err) == "" || publication != nil || payloadGets.Load() == 0 {
+			t.Fatalf("full publication accepted inaccessible payloads: GETs=%d, publication=%v, error=%v", payloadGets.Load(), publication, err)
+		}
+	})
 }
 
 func runReleaseBrowse(t *testing.T, reference, format, output string) (string, error) {

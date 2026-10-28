@@ -1,4 +1,4 @@
-# Browse and export release metadata
+# Browse, export, and pull release outputs
 
 `nvkr release browse` reads the bounded metadata and evidence of an exact release publication root and
 shows its declared artifacts and memberships. `release export` writes that complete description as versioned
@@ -37,6 +37,38 @@ and bounded evidence documents from their derived sibling repositories. It check
 sizes, schemas and memberships. Artifact payload layers, including container layers, executable archives and
 disk images, are not downloaded.
 
+## Browse interactively
+
+Opt into the read-only terminal browser from an interactive terminal:
+
+```sh
+bin/nvkr release browse --reference "$RELEASE_REF" --ui=tui
+```
+
+The browser opens after the complete metadata inspection and starts with named outputs. Rows show the
+artifact kind, recorded platforms or chart version when space permits. Details retain the complete values,
+including component build subjects, aggregate image children and declared disk metadata. The metadata-only
+scope stays visible; publisher declarations are not verification results.
+
+- Use Up/Down to select an output and Enter to open Details.
+- Press `/`, type a name, kind, platform, component, version or digest, then Enter to search the supplied
+  outputs and evidence. Search is case-insensitive and matches a substring; for example, `linux/arm64`.
+- Press `g` to switch between the output overview and all supplied entries when evidence is present.
+- In Details, use Up/Down to select an evidence link and Enter to follow it. Esc returns to the previous
+  selection. Shared evidence lists every bound output; links target only outputs included in the view.
+- Press `?` for help, `q` then `y` to close, or Ctrl+C to close immediately. Closing preserves the command's
+  result and performs no download, verification or publication action.
+
+`--output` can restrict the supplied view to one exact output and its evidence. Interactive search and
+navigation cannot widen that selection. `--layout` works with the same browser for a local OCI layout.
+At least 40 columns and 12 rows are needed; smaller terminals pause browsing until resized. Add `--no-color`
+or set `NO_COLOR` to disable colors.
+
+Plain output remains the default. `--ui=auto` selects the browser only with eligible interactive input/output
+and an empty `CI` environment variable. Explicit `--format json` or `--format mermaid` keeps its output in
+auto mode and conflicts with `--ui=tui`. Unsupported terminal or conflicting explicit TUI requests fail
+before inspection. See [command result navigation](lifecycle.md#browse-public-command-results) for shared keys.
+
 ## Focus on one output
 
 ```sh
@@ -48,6 +80,56 @@ after all release metadata and evidence memberships have been checked; it cannot
 metadata or missing evidence. Payload integrity remains outside browsing's scope.
 Shared evidence keeps its complete list of output memberships in text and JSON even when only one output is
 shown. Evidence references identify the exact manifest under the derived owning output repository.
+
+## Pull an output
+
+Choose an exact output name from `release browse` and an explicit new destination directory:
+
+```sh
+bin/nvkr release pull --reference "$RELEASE_REF" \
+  --output nvkectl-linux-arm64 --out ./nvkectl-linux-arm64
+```
+
+The selected output's format determines what appears directly beneath `--out`:
+
+| Output format | Destination contents |
+|---|---|
+| `executable` | The bundle's named files with recorded permission modes, such as `nvkectl` |
+| `disk-image` | `<output-name>.qcow2`, preserving the exact plain or declared LUKS2-encrypted disk payload bytes without decryption |
+| `helm-oci` | `<output-name>.tgz`, preserving the unchanged chart archive |
+| `oci` | A standard OCI layout with `oci-layout`, `index.json`, and `blobs/`; native OCI and Docker schema-2 images retain their exact manifests, configs, and layers; aggregate OCI indexes include every declared platform |
+| `apt-repository` | The checked APT repository tree of regular files and directories, directly beneath the destination directory |
+
+For the example above, the executable is `./nvkectl-linux-arm64/nvkectl`. The destination's parent must exist;
+the destination itself must not already exist, and it is exposed only after successful integrity checks.
+Bundle installation suggestions do not choose destination paths. Pulling neither installs nor executes a
+file and does not import images into a runtime. It does not infer a platform from the host or output name or
+reduce an aggregate image to the current host's platform. Inspect the declared platform before choosing an output.
+Failure before the directory is committed leaves no destination. If the final parent-directory sync fails,
+the command reports failure even though the complete destination may already exist.
+
+The operation validates the complete bounded release metadata and evidence closure before selecting the
+payload. It checks the selected output's exact payload closure and format-specific integrity, including
+descriptor digests and sizes, archive membership where applicable, and executable file digests and modes.
+An aggregate image's closure includes all its declared native children. Payloads belonging only to other
+outputs are not downloaded. An unknown output is a coded usage error. Malformed or unsupported format metadata
+fails with a coded error before payload or destination work. APT archives reject links and special files;
+directories must be readable and searchable by their owner. Every file, including repository indexes, is bound
+to the downloaded archive by its digest.
+
+`release pull` accepts only a registry reference. Use `publish extract` for an executable bundle already in a
+local layout. Registry credentials, `--anonymous`, `--plain-http`, `--workspace`, and the ten-minute default
+`--timeout` follow the browsing rules above. `--workspace` selects the parent for private temporary registry
+data; `--out` selects the new directory containing the downloaded output. Temporary data is removed on success,
+failure, or cancellation; a caller-owned workspace remains.
+
+The default result is plain text. `--ui=tui` opens the [read-only result browser](lifecycle.md#browse-public-command-results)
+after a successful pull, showing the format, declared platforms and written file identities. Closing the browser
+does not repeat the download or undo the written files. Presentation admission precedes acquisition.
+
+Successful pulling establishes byte integrity against the supplied release metadata. Its result grants no
+signature, consumer-policy, qualification, installation, or runtime acceptance. Apply `release verify` to the
+same exact root under an independently accepted policy before treating the downloaded output as trusted.
 
 ## Export a complete release description
 
@@ -157,8 +239,8 @@ artifact payload downloads, or `--scope artifact-publication` to include payload
 
 ## Implementation and validation scope
 
-Delivery owns the bounded metadata reader and the output/evidence projection. Lifecycle admits the reference
-and options, bounds the operation, reads or pulls the metadata, obtains its detached description and removes
+For browsing, delivery owns the bounded metadata reader and the output/evidence projection. Lifecycle admits
+the reference and options, bounds the operation, reads or pulls the metadata, obtains its detached description and removes
 temporary resources. Presentation owns the explicit versioned wire description and filters and formats only
 that description. No new release identity or publication format is introduced. Artifact-publication verification
 retains its full payload and policy checks. The pre-cutover exporter passed targeted tests, the full local
@@ -166,12 +248,18 @@ completion gate with uncached tests, and the uncached race suite on pinned Go 1.
 validation and the existing inspection evidence below retain their original namespace and scope; they do
 not establish external acceptance of the renamed reader.
 
+For pulling, delivery owns admission, complete metadata validation, retrieval and integrity of the selected
+payload closure, destination publication, and private temporary cleanup. Lifecycle supplies the overall deadline.
+
 Contract tests cover anonymous and authenticated loopback registries, identical local/remote descriptions,
 exact sibling references and evidence subjects, config-declared platforms, zero artifact payload-layer
 downloads including disk images, failed admission before filesystem/network work, temporary-workspace cleanup
 in a read-only current directory, rejection of evidence without output membership, empty Helm build-subject
 arrays, filtered shared membership, Unicode-safe JSON round trips and CLI option admission. Those fixtures
-establish contracts, not GHCR, signing-service or production acceptance. Current support and external evidence remain recorded in
+establish contracts, not GHCR, signing-service or production acceptance. Pulling contracts cover exact output
+selection, the five supported formats, complete aggregate-platform membership, exclusion of unrelated payloads,
+integrity failures, existing-destination refusal, and cleanup. They do not establish registry-service,
+installation, image-runtime, or production acceptance. Current support and external evidence remain recorded in
 [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md).
 
 The [recorded loopback replay](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-03-release-navigation.md) exercised the earlier full-closure CLI

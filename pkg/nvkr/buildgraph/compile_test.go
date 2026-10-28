@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
@@ -22,6 +23,100 @@ func mustCompile(t testing.TB, resolved *Resolved) *ir.Graph {
 		t.Fatalf("compile build graph: %v", err)
 	}
 	return graph
+}
+
+func TestCompileNativeMacAcquiredExecutable(t *testing.T) {
+	tool := catalog.ToolPin{Format: "tar-gzip", URL: "https://example.test/tool.tar.gz", Platform: "darwin/arm64", ExecutablePath: "bin/tool", ArchiveDigest: "sha256:" + strings.Repeat("a", 64), ExecutableDigest: "sha256:" + strings.Repeat("b", 64)}
+	component := catalog.Component{Platforms: []string{tool.Platform}, OutputType: "host-package", Tag: "v1.2.3", SourceDate: 1, Prebuilt: &catalog.Prebuilt{URL: tool.URL, Digests: map[string]string{"arm64": tool.ExecutableDigest}, Executable: &tool, Evidence: &catalog.ExternalEvidence{None: true}}}
+	for _, format := range []string{definition.OutputExecutable, definition.OutputOCI, ""} {
+		t.Run(format, func(t *testing.T) {
+			resolved, err := Resolve(&catalog.Catalog{Components: map[string]catalog.Component{"tool": component}}, Selection{Components: []string{"tool"}, Platform: tool.Platform, OutputFormat: format})
+			if format != definition.OutputExecutable {
+				if resolved != nil || code(err) != nvkrerr.CodeInvalidCatalog {
+					t.Fatalf("unsupported format admitted: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			graph := mustCompile(t, resolved)
+			pull := graph.Nodes[0]
+			if pull.Kind != ir.KindPull || pull.Platform != tool.Platform || pull.Digest != tool.ExecutableDigest || pull.ExecutableArchive.Digest != tool.ArchiveDigest {
+				t.Fatalf("lost native acquisition identity: %+v", pull)
+			}
+		})
+	}
+	component.Prebuilt.Executable = nil
+	if graph, err := Compile(&Resolved{Platform: tool.Platform, Components: []catalog.NamedComponent{{Name: "tool", Component: component}}}); graph != nil || err == nil {
+		t.Fatal("Mac acquisition admitted an unbound tool")
+	}
+}
+
+func TestCompileZipAcquiredExecutable(t *testing.T) {
+	tool := catalog.ToolPin{Format: "zip", URL: "https://example.test/tool.zip", Platform: "darwin/arm64", ExecutablePath: "tool", ArchiveDigest: "sha256:" + strings.Repeat("a", 64), ExecutableDigest: "sha256:" + strings.Repeat("b", 64)}
+	component := catalog.Component{Platforms: []string{tool.Platform}, OutputType: "host-package", Tag: "v1.2.3", SourceDate: 1, Prebuilt: &catalog.Prebuilt{URL: tool.URL, Digests: map[string]string{"arm64": tool.ExecutableDigest}, Executable: &tool, Evidence: &catalog.ExternalEvidence{None: true}}}
+	resolved, err := Resolve(&catalog.Catalog{Components: map[string]catalog.Component{"tool": component}}, Selection{Components: []string{"tool"}, Platform: tool.Platform, OutputFormat: definition.OutputExecutable})
+	if err != nil {
+		t.Fatal(err)
+	}
+	node := mustCompile(t, resolved).Nodes[0]
+	if node.ExecutableArchive == nil || node.ExecutableArchive.Format != "zip" || node.ExecutableArchive.Digest != tool.ArchiveDigest || node.Digest != tool.ExecutableDigest {
+		t.Fatalf("lost ZIP acquisition binding: %+v", node)
+	}
+}
+
+func TestCompileMacSourceUsesLinuxToolchainAndMacPayload(t *testing.T) {
+	base := catalog.Component{Platforms: []string{"darwin/arm64"}, FromSource: true,
+		Repo: "https://example.test/source", Tag: "v1.0.0", Commit: strings.Repeat("a", 40), TreeHash: strings.Repeat("b", 40),
+		ToolchainImage: "example.test/go@sha256:" + strings.Repeat("c", 64), OutputType: "host-package",
+		BuildCommand: []string{"go", "build", "-o", "bin/tool", "./cmd/tool"}, WriteDir: "bin", ArtifactPath: "bin/tool", SourceDate: 1}
+	for _, tc := range []struct {
+		name            string
+		cgo             bool
+		builder, output string
+		valid           bool
+	}{
+		{"pure Go", false, catalog.BuilderOCIHermetic, "host-package", true},
+		{"assets", false, catalog.BuilderOCIHermetic, "tarball", true},
+		{"CGO", true, catalog.BuilderOCIHermetic, "host-package", false},
+		{"Nix", false, catalog.BuilderNix, "host-package", false},
+		{"OCI", false, catalog.BuilderOCIHermetic, "oci-image", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			component := base
+			component.CGO, component.BuilderType, component.OutputType = tc.cgo, tc.builder, tc.output
+			resolved, err := Resolve(&catalog.Catalog{Components: map[string]catalog.Component{"tool": component}}, Selection{Components: []string{"tool"}, Platform: "darwin/arm64", OutputFormat: definition.OutputExecutable})
+			if !tc.valid {
+				if resolved != nil || err == nil {
+					t.Fatal("unsupported Mac build admitted")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			graph := mustCompile(t, resolved)
+			for _, node := range graph.Nodes {
+				if node.Kind != ir.KindBuild {
+					continue
+				}
+				if node.Platform != "darwin/arm64" || node.ToolchainPlatform != "linux/arm64" {
+					t.Fatalf("incorrect payload/toolchain binding: %+v", node)
+				}
+				for _, env := range node.Env {
+					if env.Name == "GOOS" && env.Value != "darwin" || env.Name == "CGO_ENABLED" && env.Value != "0" {
+						t.Fatalf("incorrect build environment: %+v", node.Env)
+					}
+				}
+				mutated := node
+				mutated.ToolchainPlatform = "darwin/arm64"
+				if err := mutated.Validate(); err == nil {
+					t.Fatal("Mac payload admitted as OCI execution host")
+				}
+			}
+		})
+	}
 }
 
 func TestCompileCarriesGenericBuildRequirementsOutsideBuildIdentity(t *testing.T) {

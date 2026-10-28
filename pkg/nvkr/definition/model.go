@@ -9,6 +9,7 @@ package definition
 
 import (
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -100,6 +101,12 @@ type DebianOutput struct {
 // Environment contains settings independently selected for one run. Publish
 // uses a registry namespace; output repositories and routes are derived.
 type Environment struct {
+	// GitHubBundle selects an independent generated workflow namespace; empty
+	// preserves the original generated Run paths. Paths are never authored.
+	GitHubBundle string `json:"githubBundle,omitempty"`
+	// GitHubRuntimePlan compiles current catalog pins at dispatch while retaining
+	// the reviewed named production workflow and its complete execution policy.
+	GitHubRuntimePlan bool `json:"githubRuntimePlan,omitempty"`
 	// GitHubDevelopment admits branch-dispatched hosted builds and, when explicitly
 	// configured, isolated signed publications under a disposable attempt namespace.
 	GitHubDevelopment bool `json:"githubDevelopment,omitempty"`
@@ -151,11 +158,25 @@ type Publication struct {
 	PlainHTTP        bool              `json:"plainHTTP,omitempty"`
 }
 
+// NativeToolchain locates an existing local NVKR binary-bundle output.
+// The map key in Runtime is its exact semantic identity; paths are descriptions
+// authenticated by the consuming toolchain owner, never execution proof.
+type NativeToolchain struct {
+	Layout string `json:"layout,omitempty"`
+	Bundle string `json:"bundle,omitempty"`
+	// The installed Go form is local only. The consumer remeasures these
+	// descriptive locations against the canonical manifest and map key.
+	GoManifest string `json:"goManifest,omitempty"`
+	GoRoot     string `json:"goRoot,omitempty"`
+	Compiler   string `json:"compiler,omitempty"`
+}
+
 type Runtime struct {
-	PodmanStorageDriver PodmanStorageDriver `json:"podmanStorageDriver,omitempty"`
-	Runtime             string              `json:"runtime,omitempty"`
-	RuntimeImage        string              `json:"runtimeImage,omitempty"`
-	HelperImage         string              `json:"helperImage,omitempty"`
+	NativeToolchains    map[string]NativeToolchain `json:"nativeToolchains,omitempty"`
+	PodmanStorageDriver PodmanStorageDriver        `json:"podmanStorageDriver,omitempty"`
+	Runtime             string                     `json:"runtime,omitempty"`
+	RuntimeImage        string                     `json:"runtimeImage,omitempty"`
+	HelperImage         string                     `json:"helperImage,omitempty"`
 	// BuilderImage retains the retired GitLab bootstrap schema allocation.
 	// Nonempty values are unsupported by maintained execution targets.
 	BuilderImage      string            `json:"builderImage,omitempty"`
@@ -276,6 +297,15 @@ func (definition Definition) Digest() (string, error) {
 func (environment Environment) Validate() error {
 	if environment.APIVersion != EnvironmentAPIVersion || environment.Kind != EnvironmentKind || !namePattern.MatchString(environment.Metadata.Name) {
 		return e.New(e.CodeInvalidCatalog, "environment has unsupported apiVersion/kind or invalid name")
+	}
+	if environment.GitHubDevelopment && environment.GitHubBundle != "" {
+		return e.New(e.CodeEngineCapability, "githubDevelopment does not support a named githubBundle")
+	}
+	if environment.GitHubRuntimePlan && (environment.GitHubDevelopment || environment.GitHubBundle == "") {
+		return e.New(e.CodeEngineCapability, "githubRuntimePlan requires a named production githubBundle")
+	}
+	if err := ValidateGitHubBundleName(environment.GitHubBundle); err != nil {
+		return err
 	}
 	if environment.GitHubDevelopment {
 		if err := environment.validateGitHubDevelopment(); err != nil {
@@ -460,6 +490,25 @@ func (profile Environment) RuntimeBinary() string {
 }
 
 func (profile Runtime) validate() error {
+	if len(profile.NativeToolchains) > 256 {
+		return e.New(e.CodeInvalidCatalog, "native toolchain inventory exceeds 256 entries")
+	}
+	for digest, toolchain := range profile.NativeToolchains {
+		if toolchain.GoManifest != "" || toolchain.GoRoot != "" || toolchain.Compiler != "" {
+			if !canonical.IsDigest(digest) || toolchain.Layout != "" || toolchain.Bundle != "" {
+				return e.New(e.CodeInvalidCatalog, "native Go and binary-bundle toolchain locations cannot be mixed")
+			}
+			for _, location := range []string{toolchain.GoManifest, toolchain.GoRoot, toolchain.Compiler} {
+				if !filepath.IsAbs(location) || filepath.Clean(location) != location || strings.ContainsAny(location, "\r\n\x00") {
+					return e.New(e.CodeInvalidCatalog, "native Go toolchain requires three clean absolute local paths")
+				}
+			}
+			continue
+		}
+		if !canonical.IsDigest(digest) || !namePattern.MatchString(toolchain.Bundle) || strings.TrimSpace(toolchain.Layout) == "" || strings.ContainsAny(toolchain.Layout, "\r\n\x00") {
+			return e.New(e.CodeInvalidCatalog, "native toolchain requires an exact digest, canonical bundle name and safe local layout path")
+		}
+	}
 	if err := profile.PodmanStorageDriver.Validate(profile.Runtime); err != nil {
 		return err
 	}

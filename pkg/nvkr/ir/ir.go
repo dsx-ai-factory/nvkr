@@ -40,6 +40,7 @@ const (
 	BuilderNix         = "nix"               // produced from a locked flake in a pinned nix container
 	BuilderBuildKit    = "buildkit-rootless" // networked wrapped Dockerfile build; not qualified execution
 	BuilderVMImage     = "vm-image"          // source-owned command or Packer project producing one disk image
+	BuilderNativeGo    = "native-go"         // local, unqualified compilation with an observed installed SDK
 )
 
 // DiskSpec is the exact disk payload contract carried by a VM build node.
@@ -114,6 +115,8 @@ type PatchRef struct {
 // ExecutableArchive binds the release transport separately from the selected
 // executable's Node.Digest. Neither digest can substitute for the other.
 type ExecutableArchive struct {
+	// Format is empty for the original tar-gzip encoding, or zip.
+	Format string `json:"format,omitempty"`
 	Digest string `json:"digest"`
 	Member string `json:"member"`
 }
@@ -169,13 +172,13 @@ type Node struct {
 	FlakeLockDigest string `json:"flakeLockDigest,omitempty"`
 	Toolchain       string `json:"toolchain,omitempty"` // OCI image pinned by @sha256: digest
 	// ToolchainPlatform is the identity-bearing host platform used to select a
-	// VM toolchain. It is distinct from Platform, which is the guest/output.
+	// VM toolchain or the explicit local Mac executable cross-build toolchain.
+	// It is distinct from Platform, which describes the guest/output payload.
 	ToolchainPlatform string `json:"toolchainPlatform,omitempty"`
-	// Platform is the target run platform (linux/<arch>). It forces the container to
-	// run the toolchain image's NATIVE arch variant (of a multi-arch toolchain) — or,
-	// on a foreign host, under emulation — so GOARCH compilation is native, never a
-	// cross-compile (model B). Derived from the selected target platform, so it is part of the
-	// per-arch buildDigest (NVKR-NFR-093).
+	// Platform is the declared payload target. Ordinary Linux producers use its
+	// matching native toolchain container; the explicitly admitted local Mac
+	// executable route records a distinct Linux ToolchainPlatform. It remains part
+	// of the build identity regardless of the execution host.
 	Platform   string     `json:"platform,omitempty"`
 	Network    string     `json:"network,omitempty"`
 	Env        []EnvVar   `json:"env,omitempty"`     // sorted by Name

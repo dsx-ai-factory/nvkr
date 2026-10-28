@@ -224,7 +224,7 @@ components:
     patches:
     - &id002
       name: nvke-os-package-input.patch
-      sha256: sha256:e5ffe0e241609eb90814bafc6296f4660f51975c1105bdc246082ce3a3dc0705
+      sha256: sha256:f6bbb4b72aa8548eec9e8cb239f6ac18b92865c338b244516c7d8eebbada0660
   nvke-kubeadm-distro:
     platforms:
     - linux/amd64

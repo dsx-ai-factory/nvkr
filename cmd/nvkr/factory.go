@@ -4,7 +4,9 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
+	"strings"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
@@ -63,6 +65,113 @@ func cmdFactory() *cli.Command {
 				}
 				return factory.CheckNodePlatform(c.Context, plan, c.String("node"))
 			},
+		}, {
+			Name:   "inspect-source",
+			Hidden: true,
+			Usage:  "verify one restored pinned source without fetching or building",
+			Flags: []cli.Flag{
+				&cli.StringFlag{Name: "plan"},
+				&cli.StringFlag{Name: "plan-digest"},
+				&cli.StringFlag{Name: "node"},
+			},
+			Action: func(c *cli.Context) error {
+				if c.Args().Present() || c.String("plan") == "" || c.String("plan-digest") == "" || c.String("node") == "" {
+					return e.New(e.CodeUsage, "inspect-source requires --plan, --plan-digest and --node, with no positional arguments")
+				}
+				plan, err := factory.LoadPlanContext(c.Context, c.String("plan"))
+				if err != nil {
+					return err
+				}
+				if err := factory.VerifyPlanDigest(plan, c.String("plan-digest")); err != nil {
+					return err
+				}
+				description, err := factory.InspectRestoredSource(c.Context, plan, c.String("node"))
+				if err != nil {
+					return err
+				}
+				if err := json.NewEncoder(c.App.Writer).Encode(description); err != nil {
+					return e.Wrap(e.CodeVerifyFailed, err, "writing source inspection")
+				}
+				return nil
+			},
+		}, {
+			Name:   "prepare-native-go",
+			Hidden: true,
+			Usage:  "bind local Mac CGO producers to an existing installed SDK",
+			Flags: []cli.Flag{
+				&cli.StringFlag{Name: "definition", Required: true},
+				&cli.StringFlag{Name: "environment", Required: true},
+				&cli.StringFlag{Name: "go-root", Required: true},
+				&cli.StringFlag{Name: "cc", Required: true},
+				&cli.StringFlag{Name: "out", Required: true},
+			},
+			Action: func(c *cli.Context) error {
+				if c.Args().Present() {
+					return e.New(e.CodeUsage, "prepare-native-go accepts no positional arguments")
+				}
+				prepared, err := factory.PrepareNativeGo(c.Context, c.String("definition"), c.String("environment"), c.String("go-root"), c.String("cc"), c.String("out"))
+				if err != nil {
+					return err
+				}
+				if err := json.NewEncoder(c.App.Writer).Encode(prepared); err != nil {
+					return e.Wrap(e.CodeInternal, err, "writing native Go input locations")
+				}
+				return nil
+			},
+		}, {
+			Name: "prepare-native-packer", Hidden: true,
+			Usage: "capture and validate a local native Packer dependency bundle",
+			Flags: []cli.Flag{
+				&cli.StringFlag{Name: "manifest", Required: true},
+				&cli.StringFlag{Name: "out", Required: true},
+			},
+			Action: func(c *cli.Context) error {
+				if c.Args().Present() {
+					return e.New(e.CodeUsage, "prepare-native-packer accepts no positional arguments")
+				}
+				prepared, err := factory.PrepareNativePacker(c.Context, c.String("manifest"), c.String("out"))
+				if err != nil {
+					return err
+				}
+				if err := json.NewEncoder(c.App.Writer).Encode(prepared); err != nil {
+					return e.Wrap(e.CodeInternal, err, "writing native Packer dependency locations")
+				}
+				return nil
+			},
+		}, {
+			Name: "prepare-native-packer-inputs", Hidden: true,
+			Usage: "bind selected disk producers to a verified native Packer bundle",
+			Flags: []cli.Flag{
+				&cli.StringFlag{Name: "definition", Required: true},
+				&cli.StringFlag{Name: "environment", Required: true},
+				&cli.StringFlag{Name: "layout", Required: true},
+				&cli.StringFlag{Name: "bundle", Required: true},
+				&cli.StringFlag{Name: "toolchain", Required: true},
+				&cli.StringFlag{Name: "out", Required: true},
+				&cli.StringFlag{Name: "accelerator", Value: "hvf", Usage: "explicit native Mac accelerator: hvf or tcg"},
+				&cli.StringSliceFlag{Name: "variable"},
+			},
+			Action: func(c *cli.Context) error {
+				if c.Args().Present() {
+					return e.New(e.CodeUsage, "prepare-native-packer-inputs accepts no positional arguments")
+				}
+				variables := make(map[string]string)
+				for _, override := range c.StringSlice("variable") {
+					key, value, ok := strings.Cut(override, "=")
+					if _, repeated := variables[key]; !ok || key == "" || value == "" || repeated {
+						return e.New(e.CodeUsage, "require unique nonempty Packer variable assignments")
+					}
+					variables[key] = value
+				}
+				prepared, err := factory.PrepareNativePackerBuildWithAccelerator(c.Context, c.String("definition"), c.String("environment"), c.String("layout"), c.String("bundle"), c.String("toolchain"), c.String("out"), c.String("accelerator"), variables)
+				if err != nil {
+					return err
+				}
+				if err := json.NewEncoder(c.App.Writer).Encode(prepared); err != nil {
+					return e.Wrap(e.CodeInternal, err, "writing native Packer build input locations")
+				}
+				return nil
+			},
 		}, cmdFactoryGitHub()},
 	}
 }
@@ -73,6 +182,15 @@ func factoryGeneratorVersion() string { return version + " (" + commit + ")" }
 // execution/transport behavior remain in the factory module.
 func cmdFactoryGitHub() *cli.Command {
 	return &cli.Command{Name: "github", Hidden: true, Usage: "execute exact generated GitHub steps", Subcommands: []*cli.Command{
+		cmdFactoryCIUpload(),
+		cmdFactoryCIFetchLocators(),
+		cmdFactoryCIDownload(),
+		githubFactoryCommand("check-runtime-inputs", "", func(c *cli.Context, plan *factory.Plan, _ factory.GitHubStepOptions) error {
+			return factory.CheckGitHubRuntimeInputs(c.Context, plan, ".")
+		}),
+		githubFactoryCommand("install-runtime-inputs", "", func(c *cli.Context, plan *factory.Plan, _ factory.GitHubStepOptions) error {
+			return factory.InstallGitHubRuntimeInputs(c.Context, plan, ".")
+		}),
 		githubFactoryCommand("describe-action", "action", func(c *cli.Context, plan *factory.Plan, _ factory.GitHubStepOptions) error {
 			return factory.WriteGitHubActionData(c.Context, plan, c.String("action"), os.Getenv("GITHUB_OUTPUT"))
 		}),

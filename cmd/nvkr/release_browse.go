@@ -5,7 +5,7 @@ package main
 
 import (
 	"fmt"
-	"slices"
+	"strings"
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
@@ -54,13 +54,17 @@ func releaseBrowseCmd() *cli.Command {
 			if err != nil {
 				return err
 			}
+			if view.tui {
+				display, err := releasePublicationDisplay(description, presentation.Output)
+				if err != nil {
+					return err
+				}
+				shown = true
+				return showCommandResult(c, view, display, nil)
+			}
 			raw, err := releaseview.Render(description, presentation)
 			if err != nil {
 				return err
-			}
-			if view.tui {
-				shown = true
-				return showCommandResult(c, view, releasePublicationDisplay(description, presentation.Output), nil)
 			}
 			if _, err := c.App.Writer.Write(raw); err != nil {
 				return e.Wrap(e.CodeUnavailable, err, "writing release view")
@@ -134,47 +138,14 @@ func verifiedReleaseDisplay(result releaseVerificationResult) commandDisplay {
 	return display
 }
 
-func releasePublicationDisplay(description delivery.PublicationDescription, selection string) commandDisplay {
-	artifacts := make([]lifecycle.Artifact, 0, len(description.Outputs))
-	for _, output := range description.Outputs {
-		if selection == "" || output.Name == selection {
-			artifacts = append(artifacts, output.Output)
-		}
+func releasePublicationDisplay(description delivery.PublicationDescription, selection string) (commandDisplay, error) {
+	described, err := releaseview.Describe(description, selection)
+	if err != nil {
+		return commandDisplay{}, err
 	}
-	display := releaseArtifactsDisplay("Release metadata browse", "Metadata inspection only; payloads, signatures and policy were not verified.", artifacts)
-	outputs := releaseOutputIndices(display.Items)
-	for _, output := range description.Outputs {
-		if output.OS == "" && output.Arch == "" {
-			continue
-		}
-		if index, visible := outputs["output/"+output.Name]; visible {
-			display.Items[index].Fields = append(display.Items[index].Fields, progress.Field{Label: "Recorded platform", Value: output.OS + "/" + output.Arch})
-		}
-	}
-	display.Fields = append(display.Fields,
-		progress.Field{Label: "Declared qualification", Value: description.DeclaredQualification},
-		progress.Field{Label: "Publication identity", Value: description.RootDigest},
-		progress.Field{Label: "Definition identity", Value: description.Metadata.DefinitionDigest},
-		progress.Field{Label: "Environment identity", Value: description.Metadata.EnvironmentDigest},
-		progress.Field{Label: "Plan identity", Value: description.Metadata.PlanDigest},
-		progress.Field{Label: "Content identity", Value: description.Metadata.ContentSubject},
-		progress.Field{Label: "Total outputs", Value: fmt.Sprint(len(description.Outputs))})
-	evidenceCount := 0
-	for _, evidence := range description.Evidence {
-		if selection != "" && !slices.Contains(evidence.Binding.Outputs, selection) {
-			continue
-		}
-		evidenceCount++
-		item := releaseEvidenceItem(evidence.Name, evidence.Kind, evidence.ManifestDigest, evidence.BlobDigest, evidence.Binding)
-		for _, output := range evidence.Binding.Outputs {
-			if selection == "" || selection == output {
-				linkReleaseEvidence(&display, outputs, &item, output)
-			}
-		}
-		display.Items = append(display.Items, item)
-	}
-	display.Fields = append(display.Fields, progress.Field{Label: "Evidence records", Value: fmt.Sprint(evidenceCount)})
-	return display
+	display := releaseDescriptionDisplay(described)
+	display.Title = "Release metadata browse"
+	return display, nil
 }
 
 // Indices stay valid as evidence items are appended; pointers into Items would
@@ -200,9 +171,17 @@ func linkReleaseEvidence(display *commandDisplay, outputs map[string]int, eviden
 // fields. Transport references, source locations and other raw values stay out.
 func releaseEvidenceItem(name, kind, manifestDigest, blobDigest string, binding delivery.EvidenceBinding) progress.Item {
 	item := progress.Item{ID: "evidence/" + name, Name: name, Kind: kind, State: "metadata",
-		Fields: commandFields("Stage", binding.Stage, "Subject kind", binding.SubjectKind, "Subject digest", binding.SubjectDigest, "Manifest digest", manifestDigest, "Blob digest", blobDigest)}
+		Summary: kind,
+		Fields: commandFields("Stage", binding.Stage, "Component", binding.Component, "Subject kind", binding.SubjectKind, "Subject digest", binding.SubjectDigest, "Manifest digest", manifestDigest, "Blob digest", blobDigest,
+			"Document digest", binding.DocumentDigest, "Inspection input digest", binding.InspectionInputDigest)}
 	if binding.Platform != "" {
+		item.Summary += " · " + binding.Platform
 		item.Fields = append(item.Fields, progress.Field{Label: "Recorded platform", Value: binding.Platform})
+	}
+	// Shared evidence retains its complete membership even in a filtered view;
+	// only visible members are navigable, through linkReleaseEvidence.
+	for _, output := range binding.Outputs {
+		item.Fields = append(item.Fields, progress.Field{Label: "Bound output", Value: output})
 	}
 	return item
 }
@@ -220,25 +199,42 @@ func releaseDescriptionDisplay(description releaseview.Description) commandDispl
 			{Label: "Plan identity", Value: description.Metadata.PlanDigest},
 			{Label: "Content identity", Value: description.Metadata.ContentSubject},
 		}}
+	if description.SelectedOutput != "" {
+		display.Fields = append(display.Fields, progress.Field{Label: "Selected output", Value: description.SelectedOutput})
+	}
 	for _, output := range description.Outputs {
 		item := progress.Item{ID: "output/" + output.Name, Name: output.Name, Kind: output.Kind, State: "metadata", Primary: true,
-			Fields: []progress.Field{{Label: "Digest", Value: output.Digest}, {Label: "Build identity", Value: output.BuildDigest}}}
+			Summary: output.Kind,
+			Fields:  []progress.Field{{Label: "Digest", Value: output.Digest}, {Label: "Build identity", Value: output.BuildDigest}}}
 		if output.OS != "" || output.Arch != "" {
+			item.Summary += " · " + output.OS + "/" + output.Arch
 			item.Fields = append(item.Fields, progress.Field{Label: "Recorded platform", Value: output.OS + "/" + output.Arch})
 		}
 		if output.ChartVersion != "" {
+			item.Summary += " · " + output.ChartVersion
 			item.Fields = append(item.Fields, progress.Field{Label: "Chart version", Value: output.ChartVersion})
 		}
-		if output.Disk != nil {
-			item.Fields = append(item.Fields, progress.Field{Label: "Declared disk evidence", Value: declaredDiskEvidenceMode(output.Disk.EvidenceMode)})
+		for _, component := range output.Components {
+			item.Fields = append(item.Fields, progress.Field{Label: "Component", Value: component})
+		}
+		for _, subject := range output.BuildSubjects {
+			item.Fields = append(item.Fields, progress.Field{Label: subject.Component + " build subject", Value: subject.Digest})
+		}
+		if disk := output.Disk; disk != nil {
+			item.Fields = append(item.Fields, commandFields("Declared disk evidence", declaredDiskEvidenceMode(disk.EvidenceMode),
+				"Disk format", disk.Format, "Declared encryption", disk.Encryption, "Payload digest", disk.PayloadDigest,
+				"Payload bytes", fmt.Sprint(disk.Size), "Producer", disk.Producer, "Disk component", disk.Component,
+				"Disk Plan identity", disk.PlanDigest, "Declared producer outcome", disk.Outcome)...)
 		}
 		if output.ImageIndex != nil {
+			item.Summary += " · " + strings.Join(output.ImageIndex.RequiredPlatforms, ", ")
 			for _, platform := range output.ImageIndex.RequiredPlatforms {
 				item.Fields = append(item.Fields, progress.Field{Label: "Required platform", Value: platform})
 			}
 			for _, child := range output.ImageIndex.Children {
 				item.Fields = append(item.Fields,
 					progress.Field{Label: "Child platform", Value: child.Platform},
+					progress.Field{Label: child.Platform + " component", Value: child.Component},
 					progress.Field{Label: child.Platform + " manifest digest", Value: child.ManifestDigest},
 					progress.Field{Label: child.Platform + " build identity", Value: child.BuildDigest},
 					progress.Field{Label: child.Platform + " build subject", Value: child.BuildSubject})

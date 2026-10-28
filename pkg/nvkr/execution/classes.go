@@ -109,7 +109,7 @@ func (class Class) Validate() error {
 	}
 	previous := CapabilityName("")
 	for _, capability := range class.Capabilities {
-		if capability != CapabilityKVM {
+		if !capabilityMatchesHost(capability, class.HostPlatform) {
 			return e.New(e.CodeInvalidCatalog,
 				"execution class %q exposes unsupported capability %q", class.Name, capability)
 		}
@@ -292,7 +292,22 @@ func exposes(class Class, capability CapabilityName) bool {
 }
 
 func supportedHostPlatform(platform HostPlatform) bool {
-	return platform == HostPlatformLinuxAMD64 || platform == HostPlatformLinuxARM64
+	return platform == HostPlatformDarwinARM64 || platform == HostPlatformLinuxAMD64 || platform == HostPlatformLinuxARM64
+}
+
+func supportedCapability(capability CapabilityName) bool {
+	return capability == CapabilityKVM || capability == CapabilityHVF
+}
+
+func capabilityMatchesHost(capability CapabilityName, platform HostPlatform) bool {
+	switch capability {
+	case CapabilityHVF:
+		return platform == HostPlatformDarwinARM64
+	case CapabilityKVM:
+		return platform == HostPlatformLinuxAMD64 || platform == HostPlatformLinuxARM64
+	default:
+		return false
+	}
 }
 
 func cloneClass(class Class) Class {

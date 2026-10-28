@@ -199,6 +199,9 @@ func authenticityRegistryPolicy() VerificationPolicy {
 }
 
 func TestAuthenticateRegistryNeverDownloadsPayloads(t *testing.T) {
+	// Keep each distinct output transport. Disk architecture and encryption
+	// combinations are validated by delivery's disk binding tests, not by a
+	// repeated registry round trip through the same metadata-only route.
 	for _, tc := range []struct {
 		name    string
 		fixture func(*testing.T) (string, string)
@@ -207,15 +210,6 @@ func TestAuthenticateRegistryNeverDownloadsPayloads(t *testing.T) {
 		{"APT-and-binary", authenticityRegistryAPTLayout},
 		{"disk-amd64", func(t *testing.T) (string, string) {
 			return testDiskPublication(t, "amd64", string(DiskEvidenceBuildProvenance), "")
-		}},
-		{"disk-arm64", func(t *testing.T) (string, string) {
-			return testDiskPublication(t, "arm64", string(DiskEvidenceBuildProvenance), "")
-		}},
-		{"fde-amd64", func(t *testing.T) (string, string) {
-			return testDiskPublication(t, "amd64", string(DiskEvidenceBuildProvenance), "", "luks2")
-		}},
-		{"fde-arm64", func(t *testing.T) (string, string) {
-			return testDiskPublication(t, "arm64", string(DiskEvidenceBuildProvenance), "", "luks2")
 		}},
 		{"aggregate-image", authenticityRegistryIndexLayout},
 	} {
@@ -271,7 +265,7 @@ func TestAuthenticateRegistryNeverDownloadsPayloads(t *testing.T) {
 				t.Fatalf("metadata requests=%d, forbidden payload GETs=%d", fixture.requests.Load(), fixture.payloadGets.Load())
 			}
 			assertAuthenticityWorkspaceClean(t, workspace)
-			if tc.name == "binary" || strings.HasPrefix(tc.name, "fde-") {
+			if tc.name == "binary" {
 				policy := authenticityRegistryPolicy()
 				policy.Scope = ScopeArtifactPublication
 				ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
@@ -288,6 +282,8 @@ func TestAuthenticateRegistryNeverDownloadsPayloads(t *testing.T) {
 }
 
 func TestAuthenticateRegistryRejectsMissingOrCorruptEvidence(t *testing.T) {
+	layout, _ := testPublicationLayout(t)
+	fixture := newAuthenticityRegistryFixture(t, layout)
 	for _, tc := range []struct {
 		name string
 		code e.Code
@@ -300,13 +296,12 @@ func TestAuthenticateRegistryRejectsMissingOrCorruptEvidence(t *testing.T) {
 		{"raw SBOM", e.CodeProvenanceMissing},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			var layout string
+			fixture := fixture
 			if tc.name == "raw SBOM" {
-				layout, _ = testPreparedPublicationLayout(t)
-			} else {
-				layout, _ = testPublicationLayout(t)
+				layout, _ := testPreparedPublicationLayout(t)
+				fixture = newAuthenticityRegistryFixture(t, layout)
 			}
-			fixture := newAuthenticityRegistryFixture(t, layout)
+			requestsBefore := fixture.requests.Load()
 			consumer, verifier, workspace := fixture.consumer(t)
 			switch tc.name {
 			case "root signature":
@@ -319,13 +314,14 @@ func TestAuthenticateRegistryRejectsMissingOrCorruptEvidence(t *testing.T) {
 				verifier.failSBOM = true
 			case "metadata corruption":
 				fixture.corruptConfig.Store(true)
+				defer fixture.corruptConfig.Store(false)
 			}
 			authenticated, err := consumer.Authenticate(t.Context(), fixture.reference, authenticityRegistryPolicy())
 			assertCode(t, err, tc.code)
 			if authenticated != nil || fixture.payloadGets.Load() != 0 {
 				t.Fatal("rejection returned partial authentication or downloaded payloads")
 			}
-			if tc.name == "root signature" && fixture.requests.Load() != 0 {
+			if tc.name == "root signature" && fixture.requests.Load() != requestsBefore {
 				t.Fatal("unauthenticated root reached metadata acquisition")
 			}
 			assertAuthenticityWorkspaceClean(t, workspace)
@@ -334,10 +330,11 @@ func TestAuthenticateRegistryRejectsMissingOrCorruptEvidence(t *testing.T) {
 }
 
 func TestAuthenticateRegistryEnforcesDiskEvidenceMinimum(t *testing.T) {
+	// The pure policy matrix covers every evidence mode. These two transport
+	// cases retain strict acceptance and producer-only rejection without a
+	// Cartesian product of architecture and encryption.
 	for _, tc := range []struct{ arch, mode, encryption string }{
 		{"amd64", "", "none"},
-		{"amd64", string(DiskEvidenceBuildProvenance), "none"},
-		{"amd64", string(DiskEvidenceBuildProvenance), "luks2"},
 		{"arm64", string(DiskEvidenceBuildProvenance), "luks2"},
 	} {
 		t.Run(tc.arch+"/"+tc.encryption+"/"+tc.mode, func(t *testing.T) {

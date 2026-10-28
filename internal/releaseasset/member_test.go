@@ -50,6 +50,12 @@ func TestSelectTarGzip(t *testing.T) {
 		code   e.Code
 	}{
 		{name: "regular", data: valid},
+		{name: "relative spelling", data: releaseArchive(t, tar.Header{Name: ".", Typeflag: tar.TypeDir}, tar.Header{Name: "./bin/", Typeflag: tar.TypeDir}, tar.Header{Name: "./bin/tool", Size: 4, Typeflag: tar.TypeReg})},
+		{name: "relative alias duplicate", data: releaseArchive(t, regular, tar.Header{Name: "./bin/tool", Size: 4, Typeflag: tar.TypeReg}), code: e.CodeVerifyFailed},
+		{name: "relative traversal", data: releaseArchive(t, regular, tar.Header{Name: "./../escape", Typeflag: tar.TypeReg}), code: e.CodeVerifyFailed},
+		{name: "multiple dot prefixes", data: releaseArchive(t, regular, tar.Header{Name: "././escape", Typeflag: tar.TypeReg}), code: e.CodeVerifyFailed},
+		{name: "duplicate root", data: releaseArchive(t, tar.Header{Name: ".", Typeflag: tar.TypeDir}, tar.Header{Name: "./", Typeflag: tar.TypeDir}, regular), code: e.CodeVerifyFailed},
+		{name: "regular root", data: releaseArchive(t, tar.Header{Name: ".", Typeflag: tar.TypeReg}, regular), code: e.CodeVerifyFailed},
 		{name: "missing", data: releaseArchive(t, tar.Header{Name: "other", Size: 1, Typeflag: tar.TypeReg}), code: e.CodeVerifyFailed},
 		{name: "empty", data: releaseArchive(t, tar.Header{Name: "bin/tool", Typeflag: tar.TypeReg}), code: e.CodeVerifyFailed},
 		{name: "duplicate", data: releaseArchive(t, regular, regular), code: e.CodeVerifyFailed},

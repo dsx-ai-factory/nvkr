@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog/v3
+components:
+  conformance-image:
+    outputType: oci-image
+    platforms:
+      - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: registry.k8s.io/conformance@sha256:5f1834bee8c1ebea061b46a567de66975e028cfe4476ca8b9226654c9338a11d
+    source: kubernetes-conformance
+kind: SourceBuildRegistry
+metadata:
+  description: Kubernetes v1.36.3 suite selection matching the maintained native demo tenant; acquired image integrity only, without upstream signature or qualification acceptance.
+  name: kubernetes-conformance-demo-1-36-arm64
+sources:
+  kubernetes-conformance:
+    constraint: 1.36.3
+    repo: https://github.com/kubernetes/kubernetes

@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationorigin"
 )
 
 // Validate checks the complete inspectable shape. Only hosted authentication can
@@ -40,7 +41,10 @@ func (description ToolSmokeDescription) Validate() error {
 		if err := worker.Validate(); err != nil {
 			return err
 		}
-		if worker.Platform <= previous || worker.Image != policy.Smoke.Images[worker.Platform] || worker.PolicyDigest != digest || worker.Invocation != description.Invocation || !sameSmokeChecks(worker.ArtifactChecks, description.ArtifactChecks) {
+		if err := matchSmokeWorkerInvocation(worker.Invocation, description.Invocation); err != nil {
+			return err
+		}
+		if worker.Platform <= previous || worker.Image != policy.Smoke.Images[worker.Platform] || worker.PolicyDigest != digest || !sameSmokeChecks(worker.ArtifactChecks, description.ArtifactChecks) {
 			return e.New(e.CodeGateUnmet, "native worker does not bind the exact smoke scope")
 		}
 		previous = worker.Platform
@@ -69,16 +73,32 @@ func (description ToolSmokeDescription) Validate() error {
 	for _, rule := range policy.Smoke.NonToolOutputs {
 		exemptions[rule.Output] = rule
 	}
+	memberExemptions := map[string]bool{}
+	for _, rule := range policy.Smoke.NonToolMembers {
+		memberExemptions[rule.key()] = true
+	}
 	for _, output := range description.ArtifactChecks.Outputs {
 		switch output.Kind {
 		case OutputExecutable:
-			if len(members[output.Name]) != len(output.BuildSubjects) || len(output.BuildSubjects) == 0 {
+			if len(members[output.Name]) == 0 || len(output.BuildSubjects) == 0 {
 				return e.New(e.CodeReleaseIncomplete, "smoke does not cover the complete executable component set")
 			}
 			for _, subject := range output.BuildSubjects {
+				key := output.Name + "\x00" + subject.Component
+				if memberExemptions[key] {
+					if _, exists := members[output.Name][subject.Component]; exists {
+						return e.New(e.CodeGateUnmet, "non-tool archive cannot also carry a tool smoke result")
+					}
+					delete(memberExemptions, key)
+					continue
+				}
 				if _, ok := members[output.Name][subject.Component]; !ok {
 					return e.New(e.CodeReleaseIncomplete, "smoke omits an executable component")
 				}
+				delete(members[output.Name], subject.Component)
+			}
+			if len(members[output.Name]) != 0 {
+				return e.New(e.CodeReleaseIncomplete, "smoke contains unselected executable members")
 			}
 			delete(members, output.Name)
 		case OutputOCI, OutputAPT:
@@ -109,8 +129,28 @@ func (description ToolSmokeDescription) Validate() error {
 			return e.New(e.CodeEngineCapability, "unsupported smoke artifact kind")
 		}
 	}
-	if len(members) != 0 || len(exemptions) != 0 {
+	if len(members) != 0 || len(exemptions) != 0 || len(memberExemptions) != 0 {
 		return e.New(e.CodeReleaseIncomplete, "smoke evidence contains extra output scope")
+	}
+	return nil
+}
+
+// A retried qualifier may retain a worker's original attempt identity, but every
+// other workflow identity field must match. This checks descriptions only; the
+// hosted owner separately authenticates the latest provider job and exact leaf.
+func matchSmokeWorkerInvocation(worker, current qualificationorigin.Description) error {
+	if err := worker.Validate(); err != nil {
+		return err
+	}
+	if err := current.Validate(); err != nil {
+		return err
+	}
+	if len(worker.Attempt) > len(current.Attempt) || len(worker.Attempt) == len(current.Attempt) && worker.Attempt > current.Attempt {
+		return e.New(e.CodeGateUnmet, "native worker invocation is newer than the current qualifier attempt")
+	}
+	worker.Attempt, worker.InvocationID = current.Attempt, current.InvocationID
+	if worker != current {
+		return e.New(e.CodeGateUnmet, "native worker invocation differs from the qualifier Run, workflow or commit")
 	}
 	return nil
 }

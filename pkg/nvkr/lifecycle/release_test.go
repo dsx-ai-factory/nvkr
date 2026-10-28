@@ -324,6 +324,12 @@ type exactInputFixture struct {
 
 func newExactInputFixture(t *testing.T) exactInputFixture {
 	t.Helper()
+	plan := newExactInputPlan(t)
+	return exactInputFixtureForPlan(t, plan.Definition, plan.Environment, plan)
+}
+
+func newExactInputPlan(t *testing.T) *factory.Plan {
+	t.Helper()
 	definition, environment := testDefinition(t), testEnvironment()
 	definition.Outputs = append(definition.Outputs, DefinitionOutput{Name: "runtime", Platform: "linux/amd64",
 		Components: []string{"kubeadm"}, Format: OutputExecutable})
@@ -331,10 +337,15 @@ func newExactInputFixture(t *testing.T) exactInputFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return exactInputFixtureForPlan(t, definition, environment, plan)
+	return plan
 }
 
 func exactInputFixtureForPlan(t *testing.T, definition Definition, environment Environment, plan *factory.Plan) exactInputFixture {
+	t.Helper()
+	return exactInputFixtureForPlanAndInvocation(t, definition, environment, plan, "")
+}
+
+func exactInputFixtureForPlanAndInvocation(t *testing.T, definition Definition, environment Environment, plan *factory.Plan, invocation string, mutations ...func(*delivery.PublicationRequest)) exactInputFixture {
 	t.Helper()
 	builds := make(map[string]factory.BuildPlan, len(plan.Builds))
 	for _, build := range plan.Builds {
@@ -370,6 +381,7 @@ func exactInputFixtureForPlan(t *testing.T, definition Definition, environment E
 		subjects[component] = pipeline.FileDigest(payload)
 	}
 	request := testReleaseRequest(t, artifacts, objects, subjects)
+	request.Release.InvocationID = invocation
 	var err error
 	request.Release.DefinitionDigest, err = definition.Digest()
 	if err != nil {
@@ -382,6 +394,9 @@ func exactInputFixtureForPlan(t *testing.T, definition Definition, environment E
 	request.Release.EnvironmentDigest, err = environment.Digest()
 	if err != nil {
 		t.Fatal(err)
+	}
+	for _, mutate := range mutations {
+		mutate(&request)
 	}
 	layout := filepath.Join(t.TempDir(), "publication")
 	publication, err := delivery.BuildPublicationRoot(t.Context(), layout, request)
@@ -704,6 +719,10 @@ func testPublicationLayout(t *testing.T) (string, string) {
 }
 
 func testPreparedPublicationLayout(t *testing.T) (string, string) {
+	return testPreparedPublicationLayoutForInvocation(t, "")
+}
+
+func testPreparedPublicationLayoutForInvocation(t *testing.T, invocation string) (string, string) {
 	t.Helper()
 	root := t.TempDir()
 	source := filepath.Join(root, "kubectl")
@@ -722,6 +741,11 @@ func testPreparedPublicationLayout(t *testing.T) (string, string) {
 	}
 	artifact := Artifact{Name: "tools", Kind: OutputExecutable, Digest: descriptor.Digest, BuildDigest: "sha256:" + repeat("5", 64), Components: []string{"kubectl"}}
 	request := testReleaseRequest(t, []Artifact{artifact}, []delivery.ObjectInput{{Name: "tools", Kind: factory.PackageBinaryBundle, Path: bundlePath, Layout: true, ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest}}, map[string]string{"kubectl": pipeline.FileDigest([]byte("kubectl"))})
+	if invocation != "" {
+		request.Release.InvocationID = invocation
+		request.Objects[0].Output.Publication = &delivery.PublicationOrigin{Ref: "registry.example.test/tools@" + descriptor.Digest,
+			PreparedInvocationID: invocation, SignedInvocationID: invocation}
+	}
 	layout := filepath.Join(root, "publication")
 	publication, err := delivery.BuildPublicationRoot(context.Background(), layout, request)
 	if err != nil {

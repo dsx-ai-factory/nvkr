@@ -19,9 +19,11 @@ import (
 )
 
 const (
-	// External capture envelope emitted by the pinned NVKE producer. Repository
-	// branding does not rewrite producer-owned bytes; internal identities use NVKR.
-	AcquisitionSchemaVersion               = "nkd.dev/package-acquisitions/v1"
+	// Capture envelope emitted by the selected NVKE producer.
+	AcquisitionSchemaVersion = "nvkr.dev/package-acquisitions/v1"
+	// The pinned upstream NVKE capture producer retains its original envelope.
+	// Decode it without rewriting its digest-bound source bytes or metadata.
+	upstreamAcquisitionSchemaVersion       = "nkd.dev/package-acquisitions/v1"
 	MaxAcquisitionArchiveBytes       int64 = 8 << 30
 	maxAcquisitionManifestBytes      int64 = 8 << 20
 	maxAcquisitionPackageBytes       int64 = 1 << 30
@@ -90,7 +92,7 @@ func (observation *AcquisitionObservation) Binding() (archive string, size int64
 }
 
 func (manifest *AcquisitionManifest) validate() error {
-	if manifest.SchemaVersion != AcquisitionSchemaVersion {
+	if manifest.SchemaVersion != AcquisitionSchemaVersion && manifest.SchemaVersion != upstreamAcquisitionSchemaVersion {
 		return e.New(e.CodeVerifyFailed, "unsupported package acquisition schema")
 	}
 	if manifest.Scope != "apt-pre-install-pkgs" {

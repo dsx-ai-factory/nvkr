@@ -49,11 +49,11 @@ func validateDebianProducer(name string, component Component) error {
 		component.Packer != nil || component.Flake != nil || len(component.Materials) != 0 {
 		return e.New(e.CodeInvalidCatalog, "Debian producer %q requires an OCI-hermetic source build without competing output contracts", name)
 	}
-	if len(component.BuildCommand) != 0 || component.ArtifactPath != "" || component.WriteDir != "" ||
+	if len(component.BuildCommand) != 0 || len(component.BuildCommandByPlatform) != 0 || component.ArtifactPath != "" || component.WriteDir != "" ||
 		component.ToolchainImage != "" || len(component.ToolchainImages) != 0 {
 		return e.New(e.CodeInvalidCatalog, "Debian producer %q must declare commands, paths and toolchains only in its exact routes", name)
 	}
-	if err := validateComponentTargets(name, component.Platforms); err != nil {
+	if err := validateComponentTargets(name, component.Platforms, false); err != nil {
 		return err
 	}
 	targets := make([]target.Debian, 0, len(component.Debian.Routes))

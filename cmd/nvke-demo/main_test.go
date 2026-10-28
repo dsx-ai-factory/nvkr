@@ -7,9 +7,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -28,7 +30,7 @@ func TestRunActionSelectsOwnExecutableForBothLifetimeModes(t *testing.T) {
 			name := map[bool]string{false: "retain", true: "cleanup"}[cleanup] + map[bool]string{false: "/success", true: "/refusal"}[fails]
 			t.Run(name, func(t *testing.T) {
 				var progress bytes.Buffer
-				cfg := nvkedemo.Config{DemoExecutable: "/caller-supplied-executable", Cleanup: cleanup, Network: "upstream-ovn", Out: "/selected-output", Timeout: time.Minute, Progress: &progress}
+				cfg := nvkedemo.Config{DemoExecutable: "/caller-supplied-executable", Accelerator: "tcg", Cleanup: cleanup, Network: "upstream-ovn", Out: "/selected-output", Timeout: time.Minute, Progress: &progress}
 				var expected error
 				if fails {
 					expected = nvkrerr.New(nvkrerr.CodeFetchFailed, "fixture runtime refusal")
@@ -37,7 +39,7 @@ func TestRunActionSelectsOwnExecutableForBothLifetimeModes(t *testing.T) {
 				calls := 0
 				action := withOwnDemoExecutable(func(selected context.Context, actual nvkedemo.Config) error {
 					calls++
-					if selected != ctx || actual.DemoExecutable != executable || actual.Cleanup != cfg.Cleanup || actual.Network != cfg.Network || actual.Out != cfg.Out || actual.Timeout != cfg.Timeout || actual.Progress != cfg.Progress {
+					if selected != ctx || actual.DemoExecutable != executable || actual.Accelerator != "tcg" || actual.Cleanup != cfg.Cleanup || actual.Network != cfg.Network || actual.Out != cfg.Out || actual.Timeout != cfg.Timeout || actual.Progress != cfg.Progress {
 						t.Fatal("runtime action did not receive this CLI's executable and unchanged invocation")
 					}
 					return expected
@@ -168,13 +170,6 @@ func TestDeploymentNetworkConfigAndFlagSelection(t *testing.T) {
 						}
 						return file, nil
 					},
-					prepare: func(_ context.Context, _ nvkedemo.BuildConfig, cfg nvkedemo.Config) (nvkedemo.Config, error) {
-						calls++
-						if cfg.Network != tc.expected {
-							t.Fatalf("prepare network=%q want=%q", cfg.Network, tc.expected)
-						}
-						return cfg, nil
-					},
 					build: func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
 						calls++
 						return nvkedemo.BuiltInputs{NVKR: "fresh"}, nil
@@ -203,7 +198,7 @@ func TestDeploymentNetworkConfigAndFlagSelection(t *testing.T) {
 				assertCode(t, err, "")
 				expectedCalls := 1
 				if operation == "e2e" {
-					expectedCalls = 3
+					expectedCalls = 2
 				}
 				if calls != expectedCalls {
 					t.Fatalf("calls=%d want=%d", calls, expectedCalls)
@@ -306,10 +301,10 @@ func TestExplicitConfigOnlyChangedFlagsOverrideIt(t *testing.T) {
 
 func TestE2EBuildsBeforeDeploymentAndRejectsRetainedInputs(t *testing.T) {
 	t.Setenv("TMPDIR", t.TempDir())
-	for _, name := range []string{"exact", "omittedInstaller", "retainedRun", "retainedTool", "prepareFailure", "buildFailure", "runFailure"} {
+	for _, name := range []string{"exact", "omittedInstaller", "retainedRun", "retainedTool", "buildFailure", "runFailure"} {
 		t.Run(name, func(t *testing.T) {
 			var out, diagnostics bytes.Buffer
-			prepares, builds, runs := 0, 0, 0
+			builds, runs := 0, 0
 			var workContext context.Context
 			fresh := nvkedemo.BuiltInputs{NVKR: "fresh-nvkr", Runs: nvkedemo.RunInputs{OS: "fresh-os", Components: "fresh-components", Providers: "fresh-components", Site: "fresh-site", Tools: "fresh-tools", Profiles: "fresh-profiles", Simulator: "fresh-simulator"}}
 			actions := demoActions{
@@ -328,28 +323,11 @@ func TestE2EBuildsBeforeDeploymentAndRejectsRetainedInputs(t *testing.T) {
 					}
 					return file, nil
 				},
-				prepare: func(ctx context.Context, build nvkedemo.BuildConfig, cfg nvkedemo.Config) (nvkedemo.Config, error) {
-					prepares++
-					assertE2EBudget(t, ctx)
-					if builds != 0 || runs != 0 || build.AttemptPrefix != "fresh-prefix" || build.Jobs != 3 {
-						t.Fatal("installer preparation must precede the build")
-					}
-					if name == "prepareFailure" {
-						return nvkedemo.Config{}, nvkrerr.New(nvkrerr.CodePreflightFailed, "installer failed")
-					}
-					if name == "omittedInstaller" {
-						if cfg.NVKECheckout != "" {
-							t.Fatal("omitted checkout was fabricated by configuration")
-						}
-						cfg.NVKECheckout = "prepared-installer"
-					}
-					return cfg, nil
-				},
 				build: func(ctx context.Context, cfg nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
 					builds++
 					workContext = ctx
 					assertE2EBudget(t, ctx)
-					if prepares != 1 || cfg.AttemptPrefix != "fresh-prefix" || cfg.Jobs != 3 {
+					if cfg.AttemptPrefix != "fresh-prefix" || cfg.Jobs != 3 {
 						t.Fatal("wrong build intent")
 					}
 					if name == "buildFailure" {
@@ -362,7 +340,7 @@ func TestE2EBuildsBeforeDeploymentAndRejectsRetainedInputs(t *testing.T) {
 					assertE2EBudget(t, ctx)
 					expectedInstaller := "configured-installer"
 					if name == "omittedInstaller" {
-						expectedInstaller = "prepared-installer"
+						expectedInstaller = ""
 					}
 					if builds != 1 || ctx != workContext || cfg.Runs != fresh.Runs || cfg.NVKR != fresh.NVKR || cfg.NVKECheckout != expectedInstaller || cfg.Timeout != 600*time.Second {
 						t.Fatalf("deployment not bound to fresh build: %+v", cfg)
@@ -377,13 +355,8 @@ func TestE2EBuildsBeforeDeploymentAndRejectsRetainedInputs(t *testing.T) {
 			switch name {
 			case "retainedRun", "retainedTool":
 				assertCode(t, err, nvkrerr.CodeUsage)
-				if prepares != 0 || builds != 0 || runs != 0 {
+				if builds != 0 || runs != 0 {
 					t.Fatal("conflicting references started work")
-				}
-			case "prepareFailure":
-				assertCode(t, err, nvkrerr.CodePreflightFailed)
-				if prepares != 1 || builds != 0 || runs != 0 {
-					t.Fatal("build followed failed installer preparation")
 				}
 			case "buildFailure":
 				assertCode(t, err, nvkrerr.CodeBuildFailed)
@@ -429,14 +402,6 @@ func TestE2EWithoutConfigKeepsFlagDefaultsAndFreshReferences(t *testing.T) {
 			t.Fatal("searched for implicit configuration")
 			return nvkedemo.DemoFile{}, nil
 		},
-		prepare: func(_ context.Context, _ nvkedemo.BuildConfig, cfg nvkedemo.Config) (nvkedemo.Config, error) {
-			order = append(order, "prepare")
-			if cfg.NVKECheckout != "" {
-				t.Fatal("no explicit installer was provided")
-			}
-			cfg.NVKECheckout = "installer"
-			return cfg, nil
-		},
 		build: func(_ context.Context, cfg nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
 			order = append(order, "build")
 			if cfg.Repository != "repo" || cfg.AttemptPrefix != "fresh" || cfg.Jobs != 1 {
@@ -446,7 +411,7 @@ func TestE2EWithoutConfigKeepsFlagDefaultsAndFreshReferences(t *testing.T) {
 		},
 		run: func(_ context.Context, cfg nvkedemo.Config) error {
 			order = append(order, "run")
-			if cfg.Timeout != time.Hour || cfg.NVKECheckout != "installer" || cfg.Out != "new-out" || cfg.NVKR != fresh.NVKR || cfg.Runs != fresh.Runs {
+			if cfg.Timeout != time.Hour || cfg.NVKECheckout != "" || cfg.Out != "new-out" || cfg.NVKR != fresh.NVKR || cfg.Runs != fresh.Runs {
 				t.Fatalf("not fresh derived inputs: %+v", cfg)
 			}
 			return nil
@@ -454,8 +419,41 @@ func TestE2EWithoutConfigKeepsFlagDefaultsAndFreshReferences(t *testing.T) {
 	}
 	err := executeRoot(t.Context(), newCommand(&out, &diagnostics, actions), []string{"e2e", "--repo", "repo", "--attempt", "fresh", "--out", "new-out"})
 	assertCode(t, err, "")
-	if strings.Join(order, ",") != "prepare,build,run" {
+	if strings.Join(order, ",") != "build,run" {
 		t.Fatalf("wrong operation order: %v", order)
+	}
+}
+
+func TestE2EPreservesExplicitTCGThroughAdmissionBuildAndOwnExecutable(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var order []string
+	actions := demoActions{
+		admit: func(_ context.Context, cfg nvkedemo.Config) error {
+			order = append(order, "admit")
+			if cfg.Accelerator != "tcg" {
+				t.Fatal("TCG lost before build")
+			}
+			return nil
+		},
+		build: func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
+			order = append(order, "build")
+			return nvkedemo.BuiltInputs{NVKR: "fresh-nvkr", Runs: nvkedemo.RunInputs{OS: "fresh-os", Tools: "fresh-tools"}}, nil
+		},
+		run: withOwnDemoExecutable(func(_ context.Context, cfg nvkedemo.Config) error {
+			order = append(order, "run")
+			if cfg.Accelerator != "tcg" || cfg.DemoExecutable != executable || cfg.Runs.OS != "fresh-os" {
+				t.Fatal("TCG or adapter executable lost after build")
+			}
+			return nil
+		}),
+	}
+	err = executeRoot(t.Context(), newCommand(io.Discard, io.Discard, actions), []string{"e2e", "--repo", "repo", "--attempt", "fresh", "--out", "fresh-out", "--accelerator", "tcg"})
+	if err != nil || strings.Join(order, ",") != "admit,build,run" {
+		t.Fatalf("TCG handoff order=%v err=%v", order, err)
 	}
 }
 
@@ -539,14 +537,6 @@ func TestTenantBudgetConfigAndFlagSelection(t *testing.T) {
 						}
 						return file, nil
 					},
-					prepare: func(ctx context.Context, _ nvkedemo.BuildConfig, cfg nvkedemo.Config) (nvkedemo.Config, error) {
-						calls++
-						assertE2EBudget(t, ctx)
-						if cfg.Timeout != tc.want {
-							t.Fatalf("prepare timeout=%s want=%s", cfg.Timeout, tc.want)
-						}
-						return cfg, nil
-					},
 					build: func(ctx context.Context, _ nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
 						calls++
 						assertE2EBudget(t, ctx)
@@ -579,7 +569,7 @@ func TestTenantBudgetConfigAndFlagSelection(t *testing.T) {
 				assertCode(t, err, "")
 				wantCalls := 1
 				if operation == "e2e" {
-					wantCalls = 3
+					wantCalls = 2
 				}
 				if calls != wantCalls {
 					t.Fatalf("calls=%d want=%d", calls, wantCalls)
@@ -639,6 +629,303 @@ func TestBuildAndRestoreDelegateTypedInputs(t *testing.T) {
 			}
 			if !called {
 				t.Fatal("library not called")
+			}
+		})
+	}
+}
+
+func TestProductionRunCannotSelectKindSiteWorkflow(t *testing.T) {
+	root := t.TempDir()
+	// Supply only the platform's version prerequisite so this test still
+	// reaches real native artifact selection without starting a backend.
+	version := "2.2.1"
+	if runtime.GOOS == "linux" {
+		version = "f47461e"
+	}
+	for name, body := range map[string]string{
+		"limactl":      "#!/bin/sh\nset -eu\ntest \"$#\" = 1\ntest \"$1\" = --version\ntest -n \"$HOME\"\nprintf 'limactl version " + version + "\\n'\n",
+		"nerdctl.lima": "#!/bin/sh\nexit 89\n",
+	} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", root+string(os.PathListSeparator)+os.Getenv("PATH"))
+	var out, diagnostics bytes.Buffer
+	err := execute(t.Context(), []string{"run", "--plain", "--artifacts-run", filepath.Join(root, "missing-artifacts"), "--tools-run", filepath.Join(root, "missing-tools"), "--nvkr", filepath.Join(root, "nvkr"), "--out", filepath.Join(root, "demo")}, &out, &diagnostics)
+	if err == nil {
+		t.Fatal("missing artifacts unexpectedly started deployment")
+	}
+	platform := runtime.GOOS + "/" + runtime.GOARCH
+	if platform != "darwin/arm64" && platform != "linux/arm64" {
+		assertCode(t, err, nvkrerr.CodeEngineCapability)
+		if !strings.Contains(err.Error(), "native demo does not support host") {
+			t.Fatalf("unsupported host selected another deployment owner: %v", err)
+		}
+	} else if strings.Contains(err.Error(), "native guests require") {
+		// The real native capacity boundary can reject a constrained test host
+		// before artifact selection; it must not dispatch another backend.
+		assertCode(t, err, nvkrerr.CodeEngineCapability)
+	} else if admissionErr := nvkedemo.AdmitNativeDeployment(t.Context(), ""); admissionErr != nil {
+		assertCode(t, err, nvkrerr.CodeEngineCapability)
+		assertCode(t, admissionErr, nvkrerr.CodeEngineCapability)
+		if err.Error() != admissionErr.Error() {
+			t.Fatalf("run lost its native capability refusal: %v; admission: %v", err, admissionErr)
+		}
+	} else {
+		assertCode(t, err, nvkrerr.CodePreflightFailed)
+		if !strings.Contains(err.Error(), "select native deployment from NVKR outputs") {
+			t.Fatalf("standard run selected another deployment owner: %v", err)
+		}
+	}
+	if _, err := os.Lstat(filepath.Join(root, "demo")); !os.IsNotExist(err) {
+		t.Fatal("missing native artifacts reached deployment work", err)
+	}
+}
+
+func TestE2EAdmitsNativeVMRuntimeBeforeBuild(t *testing.T) {
+	calls := 0
+	actions := demoActions{
+		load: func(context.Context, string) (nvkedemo.DemoFile, error) {
+			file := configuredFixture()
+			file.Run.NVKR = ""
+			file.Run.Runs = nvkedemo.RunFileInputs{}
+			return file, nil
+		},
+		admit: func(context.Context, nvkedemo.Config) error {
+			calls++
+			return nvkrerr.New(nvkrerr.CodeEngineCapability, "native runtime unavailable")
+		},
+		build: func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
+			t.Fatal("unsupported runtime reached BUILD")
+			return nvkedemo.BuiltInputs{}, nil
+		},
+		run: func(context.Context, nvkedemo.Config) error {
+			t.Fatal("unsupported runtime reached DEPLOY")
+			return nil
+		},
+	}
+	err := executeRoot(t.Context(), newCommand(io.Discard, io.Discard, actions), []string{"e2e", "--config", "explicit.yaml"})
+	assertCode(t, err, nvkrerr.CodeEngineCapability)
+	if calls != 1 {
+		t.Fatal("native admission was not performed once")
+	}
+}
+
+func TestConformanceOptionKeepsFreshE2EHandoffAndExplicitFalse(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
+	for _, row := range []struct {
+		name       string
+		configured bool
+		flag       string
+		want       bool
+	}{
+		{"explicit on", false, "true", true}, {"configured on", true, "", true}, {"explicit off", true, "false", false}, {"ordinary", false, "", false},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			var out bytes.Buffer
+			calls := 0
+			fresh := nvkedemo.BuiltInputs{NVKR: "fresh-nvkr", Runs: nvkedemo.RunInputs{OS: "fresh-artifacts", Components: "fresh-artifacts", Providers: "fresh-artifacts", Site: "fresh-artifacts", Profiles: "fresh-artifacts", Tools: "fresh-native-tools"}}
+			actions := demoActions{
+				load: func(context.Context, string) (nvkedemo.DemoFile, error) {
+					file := configuredFixture()
+					file.Run.NVKR = ""
+					file.Run.Runs = nvkedemo.RunFileInputs{}
+					file.Run.Conformance = row.configured
+					return file, nil
+				},
+				admit: func(_ context.Context, cfg nvkedemo.Config) error {
+					if cfg.Conformance != row.want || cfg.Repository != "configured-repo" {
+						t.Fatalf("wrong prebuild admission: %+v", cfg)
+					}
+					return nil
+				},
+				build: func(ctx context.Context, cfg nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
+					calls++
+					if cfg.Conformance != row.want {
+						t.Fatal("build lost explicit selection")
+					}
+					deadline, ok := ctx.Deadline()
+					ceiling := 8 * time.Hour
+					if row.want {
+						ceiling = 12 * time.Hour
+					}
+					if !ok || time.Until(deadline) > ceiling {
+						t.Fatal("missing bounded e2e ceiling")
+					}
+					return fresh, nil
+				},
+				run: func(_ context.Context, cfg nvkedemo.Config) error {
+					calls++
+					if cfg.Conformance != row.want || cfg.Runs != fresh.Runs || cfg.NVKR != fresh.NVKR {
+						t.Fatalf("conformance lost SAMEfresh handoff: %+v", cfg)
+					}
+					return nil
+				},
+			}
+			args := []string{"e2e", "--config", "explicit.yaml"}
+			if row.flag != "" {
+				args = append(args, "--conformance="+row.flag)
+			}
+			err := executeRoot(t.Context(), newCommand(&out, io.Discard, actions), args)
+			if err != nil || calls != 2 {
+				t.Fatalf("calls=%d err=%v", calls, err)
+			}
+		})
+	}
+}
+
+func narrationRepository(t *testing.T) string {
+	t.Helper()
+	repo := t.TempDir()
+	for _, relative := range []string{
+		"inputs/definitions/demo/arm64-nvidia-local-kvm.json",
+		"inputs/definitions/demo/arm64-upstream-local-kvm.json",
+		"inputs/definitions/demo/arm64-nvidia-local-kvm-conformance.json",
+		"inputs/definitions/demo/arm64-upstream-local-kvm-conformance.json",
+		"inputs/environments/local-arm64-kvm.json",
+		"inputs/environments/local-native-mac.json",
+	} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(repo, relative)), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		raw, err := os.ReadFile(filepath.Join("..", "..", relative))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(repo, relative), raw, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return repo
+}
+
+func TestDemoNarrationFailuresBeforeExecution(t *testing.T) {
+	repo := narrationRepository(t)
+	for _, row := range []struct {
+		name string
+		cfg  nvkedemo.BuildConfig
+		out  io.Writer
+		code nvkrerr.Code
+	}{
+		{"unknown network", nvkedemo.BuildConfig{Repository: "/must-not-read", Network: "unknown"}, &bytes.Buffer{}, nvkrerr.CodeUsage},
+		{"missing inputs", nvkedemo.BuildConfig{Repository: t.TempDir()}, &bytes.Buffer{}, nvkrerr.CodeInvalidCatalog},
+		{"nil writer", nvkedemo.BuildConfig{Repository: repo}, nil, nvkrerr.CodeUsage},
+		{"write error", nvkedemo.BuildConfig{Repository: repo}, failedProgressWriter{}, nvkrerr.CodePreflightFailed},
+		{"short write", nvkedemo.BuildConfig{Repository: repo}, failedProgressWriter{short: true}, nvkrerr.CodePreflightFailed},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			err := presentDemoNarration(t.Context(), row.out, row.cfg)
+			assertCode(t, err, row.code)
+			if strings.Contains(err.Error(), "private writer details") {
+				t.Fatal("private writer error escaped")
+			}
+		})
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	var out bytes.Buffer
+	assertCode(t, presentDemoNarration(ctx, &out, nvkedemo.BuildConfig{Repository: repo}), nvkrerr.CodeTimeout)
+	if out.Len() != 0 {
+		t.Fatal("canceled introduction emitted output")
+	}
+}
+
+func TestDemoNarrationInvalidAuthoredInputsEmitNothing(t *testing.T) {
+	environment := "inputs/environments/local-arm64-kvm.json"
+	if runtime.GOOS == "darwin" {
+		environment = "inputs/environments/local-native-mac.json"
+	}
+	for _, name := range []string{"inputs/definitions/demo/arm64-nvidia-local-kvm.json", environment} {
+		t.Run(name, func(t *testing.T) {
+			repo := narrationRepository(t)
+			if err := os.WriteFile(filepath.Join(repo, name), []byte(`{"unknown":"rejected"}`), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			var out bytes.Buffer
+			assertCode(t, presentDemoNarration(t.Context(), &out, nvkedemo.BuildConfig{Repository: repo}), nvkrerr.CodeInvalidCatalog)
+			if out.Len() != 0 {
+				t.Fatal("invalid authored input emitted an introduction")
+			}
+		})
+	}
+}
+
+func TestE2EWalkthroughIntroductionAdmissionAndOrder(t *testing.T) {
+	repo := narrationRepository(t)
+	for _, row := range []struct {
+		name, network, definition                     string
+		invalid, outputFailure, conformance, explicit bool
+	}{
+		{name: "admitted", definition: "arm64-nvidia-local-kvm.json"},
+		{name: "upstream", network: "upstream-ovn", definition: "arm64-upstream-local-kvm.json"},
+		{name: "conformance", conformance: true, definition: "arm64-nvidia-local-kvm-conformance.json"},
+		{name: "upstream conformance", network: "upstream-ovn", conformance: true, definition: "arm64-upstream-local-kvm-conformance.json"},
+		{name: "explicit selection", explicit: true, definition: "arm64-upstream-local-kvm.json"},
+		{name: "invalid config", invalid: true},
+		{name: "output failure", outputFailure: true},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			var out bytes.Buffer
+			var writer io.Writer = &out
+			if row.outputFailure {
+				writer = failedProgressWriter{}
+			}
+			calls := 0
+			actions := demoActions{build: func(_ context.Context, cfg nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
+				calls++
+				if out.Len() == 0 {
+					t.Fatal("runtime admission preceded narration")
+				}
+				definition := filepath.Join("inputs/definitions/demo", row.definition)
+				environment := "inputs/environments/local-arm64-kvm.json"
+				if runtime.GOOS == "darwin" {
+					environment = "inputs/environments/local-native-mac.json"
+				}
+				if row.explicit {
+					if cfg.Definition != definition || cfg.Environment != "inputs/environments/local-arm64-kvm.json" || cfg.NVKR != "/explicit/nvkr" {
+						t.Fatal("explicit build selection changed", cfg)
+					}
+					definition = filepath.Join(repo, definition)
+					environment = filepath.Join(repo, cfg.Environment)
+				}
+				if !strings.Contains(out.String(), fmt.Sprintf("%q", definition)) || !strings.Contains(out.String(), fmt.Sprintf("%q", environment)) {
+					t.Fatalf("narration differs from build selection: Definition=%s Environment=%s", definition, environment)
+				}
+				return nvkedemo.BuiltInputs{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "bounded test stops before runtime")
+			}}
+			args := []string{"e2e", "--repo", repo, "--attempt", "fresh-01", "--out", filepath.Join(repo, "fresh-output"), "--walkthrough"}
+			if row.network != "" {
+				args = append(args, "--network", row.network)
+			}
+			if row.conformance {
+				args = append(args, "--conformance")
+			}
+			if row.explicit {
+				args = append(args, "--definition", filepath.Join("inputs/definitions/demo", row.definition), "--environment", "inputs/environments/local-arm64-kvm.json", "--nvkr", "/explicit/nvkr")
+			}
+			if row.invalid {
+				args = append(args, "--network", "unknown")
+			}
+			err := executeRoot(t.Context(), newCommand(writer, io.Discard, actions), args)
+			want := nvkrerr.CodeEngineCapability
+			if row.invalid {
+				want = nvkrerr.CodeUsage
+			}
+			if row.outputFailure {
+				want = nvkrerr.CodePreflightFailed
+			}
+			assertCode(t, err, want)
+			if calls != map[bool]int{true: 0, false: 1}[row.invalid || row.outputFailure] {
+				t.Fatal("unexpected execution", calls)
+			}
+			if row.invalid && out.Len() != 0 {
+				t.Fatal("invalid configuration emitted introduction")
+			}
+			for _, name := range []string{".nvkr", "fresh-output"} {
+				if _, err := os.Stat(filepath.Join(repo, name)); !os.IsNotExist(err) {
+					t.Fatal("presentation wrote runtime state", err)
+				}
 			}
 		})
 	}

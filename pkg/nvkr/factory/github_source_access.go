@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/internal/sourcegit"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
@@ -62,20 +61,9 @@ func githubSourceEnvironment(plan *Plan, node Node) map[string]string {
 // the two steps that recompile authored inputs, including overlay catalogs.
 func githubCatalogSourceEnvironment(plan *Plan) map[string]string {
 	repos := map[string]bool{}
-	catalogs := []*catalog.Catalog{plan.CatalogSnapshot}
-	for _, build := range plan.Builds {
-		catalogs = append(catalogs, build.CatalogSnapshot)
-	}
-	for _, snapshot := range catalogs {
-		if snapshot == nil {
-			continue
-		}
-		for _, source := range snapshot.Sources {
-			if source.PinSet != nil {
-				if _, ok := plan.Environment.SourceAccess[source.Repo]; ok {
-					repos[source.Repo] = true
-				}
-			}
+	for repository := range plan.catalogPinSetRepositories() {
+		if _, ok := plan.Environment.SourceAccess[repository]; ok {
+			repos[repository] = true
 		}
 	}
 	if len(repos) == 0 {

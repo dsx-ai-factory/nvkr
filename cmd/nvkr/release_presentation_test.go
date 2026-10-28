@@ -71,13 +71,14 @@ func TestReleasePresentationAdmissionPrecedesOwner(t *testing.T) {
 		{"verify redirected TUI", releasePresentationVerifyArgs("--ui=tui"), false},
 		{"inspect unknown UI", []string{"nvkr", "release", "inspect", "--reference", "missing", "--layout", "missing", "--ui=unknown"}, true},
 		{"browse JSON conflict", []string{"nvkr", "release", "browse", "--reference", "missing", "--ui=tui", "--format=json"}, true},
+		{"browse Mermaid conflict", []string{"nvkr", "release", "browse", "--reference", "missing", "--ui=tui", "--format=mermaid"}, true},
 		{"export unknown UI", []string{"nvkr", "release", "export", "--reference", "missing", "--ui=unknown"}, true},
 		{"export redirected TUI", []string{"nvkr", "release", "export", "--reference", "missing", "--ui=tui"}, false},
 		{"export JSON conflict", []string{"nvkr", "release", "export", "--reference", "missing", "--ui=tui", "--format=json"}, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			called, shown := false, false
-			verify := func(context.Context, string, lifecycle.VerificationPolicy, lifecycle.ConsumerOptions, *lifecycle.ExactInputExpectation) (releaseVerificationResult, error) {
+			verify := func(context.Context, string, lifecycle.VerificationPolicy, lifecycle.ConsumerOptions, *lifecycle.ExactInputExpectation, releaseExportOptions) (releaseVerificationResult, error) {
 				called = true
 				return releaseVerificationResult{}, nil
 			}
@@ -99,7 +100,7 @@ func TestReleaseVerificationTUIProjectsOwningResultOnce(t *testing.T) {
 	for _, exact := range []bool{false, true} {
 		t.Run(map[bool]string{false: "normal", true: "exact inputs"}[exact], func(t *testing.T) {
 			calls, shows := 0, 0
-			verify := func(_ context.Context, _ string, policy lifecycle.VerificationPolicy, _ lifecycle.ConsumerOptions, _ *lifecycle.ExactInputExpectation) (releaseVerificationResult, error) {
+			verify := func(_ context.Context, _ string, policy lifecycle.VerificationPolicy, _ lifecycle.ConsumerOptions, _ *lifecycle.ExactInputExpectation, _ releaseExportOptions) (releaseVerificationResult, error) {
 				calls++
 				if policy.Lane != lifecycle.LanePipeline || policy.Scope != lifecycle.ScopeArtifactPublication {
 					t.Fatal("policy changed")
@@ -148,7 +149,7 @@ func TestReleaseVerificationTUIKeepsOwnerFailureCode(t *testing.T) {
 		t.Run(string(code), func(t *testing.T) {
 			owner := e.New(code, "private-owner-error-sentinel")
 			reporting := e.New(e.CodeInternal, "renderer failure")
-			verify := func(context.Context, string, lifecycle.VerificationPolicy, lifecycle.ConsumerOptions, *lifecycle.ExactInputExpectation) (releaseVerificationResult, error) {
+			verify := func(context.Context, string, lifecycle.VerificationPolicy, lifecycle.ConsumerOptions, *lifecycle.ExactInputExpectation, releaseExportOptions) (releaseVerificationResult, error) {
 				return releaseVerificationResult{}, owner
 			}
 			shows := 0
@@ -176,7 +177,7 @@ func TestReleaseVerificationPlainRetainsExactJSONBytes(t *testing.T) {
 		result := releasePresentationFixtureResult(exact)
 		for _, explicit := range []bool{false, true} {
 			t.Run(map[bool]string{false: "normal", true: "exact"}[exact]+"/"+map[bool]string{false: "default", true: "plain"}[explicit], func(t *testing.T) {
-				verify := func(context.Context, string, lifecycle.VerificationPolicy, lifecycle.ConsumerOptions, *lifecycle.ExactInputExpectation) (releaseVerificationResult, error) {
+				verify := func(context.Context, string, lifecycle.VerificationPolicy, lifecycle.ConsumerOptions, *lifecycle.ExactInputExpectation, releaseExportOptions) (releaseVerificationResult, error) {
 					return result, nil
 				}
 				app := &cli.App{Commands: []*cli.Command{cmdReleaseWithVerify(verify)}}
@@ -305,7 +306,10 @@ func TestReleaseBrowseLinksOnlyExactVisibleEvidenceBindings(t *testing.T) {
 	}
 	for _, selection := range []string{"", "a", "ab"} {
 		t.Run("selection="+selection, func(t *testing.T) {
-			browse := releasePublicationDisplay(description, selection)
+			browse, err := releasePublicationDisplay(description, selection)
+			if err != nil {
+				t.Fatal(err)
+			}
 			exported := releaseview.Description{TotalOutputs: len(description.Outputs)}
 			for _, output := range description.Outputs {
 				if selection == "" || selection == output.Name {
@@ -339,7 +343,8 @@ func TestReleaseBrowseLinksOnlyExactVisibleEvidenceBindings(t *testing.T) {
 						t.Fatalf("%s: selected evidence linked hidden output: %+v", display.Title, items)
 					}
 				}
-				if !slices.Equal(items["evidence/shared"].Fields, browse.Items[len(exported.Outputs)].Fields) {
+				shared := slices.IndexFunc(browse.Items, func(item progress.Item) bool { return item.ID == "evidence/shared" })
+				if !slices.Equal(items["evidence/shared"].Fields, browse.Items[shared].Fields) {
 					t.Fatalf("%s: browse/export evidence fields differ", display.Title)
 				}
 			}
@@ -362,7 +367,9 @@ func BenchmarkReleasePublicationProjection(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		_ = releasePublicationDisplay(description, "")
+		if _, err := releasePublicationDisplay(description, ""); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -383,7 +390,11 @@ func TestReleaseBrowseAndExportDiskEvidenceDeclarationParity(t *testing.T) {
 			publication := delivery.PublicationDescription{Outputs: []delivery.PublicationOutput{{Output: artifact}}}
 			description := releaseview.Description{TotalOutputs: 1, Outputs: []releaseview.Output{{Name: artifact.Name, Kind: artifact.Kind, Digest: artifact.Digest, BuildDigest: artifact.BuildDigest,
 				Disk: &releaseview.Disk{EvidenceMode: test.mode}}}}
-			for _, display := range []commandDisplay{releasePublicationDisplay(publication, ""), releaseDescriptionDisplay(description)} {
+			browse, err := releasePublicationDisplay(publication, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, display := range []commandDisplay{browse, releaseDescriptionDisplay(description)} {
 				if len(display.Items) != 1 || display.Items[0].State != "metadata" || display.Note != "Metadata inspection only; payloads, signatures and policy were not verified." {
 					t.Fatalf("disk declaration acquired verification or lost scope: %+v", display)
 				}

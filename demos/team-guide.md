@@ -113,7 +113,7 @@ NVKR validates that selection against the catalog graph; the list is not positio
 NVKR checks and stages the input bytes. NVKE's source-owned commands understand the packages and
 archives, and Packer assembles the disk. Use the [Materials concept](demo-team-concepts.html#materials)
 for the full explanation. The separate OS script compiles and dry-runs the Plan; it does not bake a disk.
-Actual disk execution requires the matching host capabilities in the [OS-image guide](../definitions/nvke-os/README.md).
+Actual disk execution requires the matching host capabilities in the [OS-image guide](../inputs/definitions/diagnostics/README.md).
 
 ## Browse the hosted release
 
@@ -189,7 +189,7 @@ The [concept gallery](demo-team-concepts.html) includes pin sets, version stamps
 substitutions, builder types, generator adapters, graph views, Helm bindings, completeness, SBOMs,
 publication identities, verification policy, maintenance and the Go SDK.
 
-Use the [Markdown quickstart](../docs/quickstart.md) for first-time planning, the
+Use [CLI setup](../docs/quickstart.md#build-only-the-cli) and [Plan inspection](../docs/plan-and-graph-inspection.md) for first-time planning, the
 [full local NVKE demo](m1-local.md) for CLI/image/chart execution and pull-back, and the
 [documentation index](../docs/README.md) for task guides. The
 [reconciliation record](../docs/adr/reconciliation.md) owns current support and evidence limits.

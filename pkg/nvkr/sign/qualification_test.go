@@ -92,9 +92,6 @@ func TestQualificationAttestationUsesSeparateTypeAndVerifiesExactBytes(t *testin
 						return os.WriteFile(call.args[6], []byte("changed"), 0600)
 					}
 				}
-				if call.args[0] == "download" && call.args[3] != QualificationPredicateType {
-					t.Fatal("qualification downloaded another evidence type")
-				}
 				if call.args[0] == "verify-blob-attestation" && call.args[4] != QualificationPredicateType {
 					t.Fatal("qualification verified another evidence type")
 				}
@@ -106,7 +103,7 @@ func TestQualificationAttestationUsesSeparateTypeAndVerifiesExactBytes(t *testin
 			} else if err != nil {
 				t.Fatal(err)
 			}
-			if tc.code == "" && (len(stub.calls) != 3 || stub.calls[0].args[0] != "attest" || stub.calls[1].args[0] != "download" || stub.calls[2].args[0] != "verify-blob-attestation") {
+			if tc.code == "" && (len(stub.calls) != 2 || stub.calls[0].args[0] != "attest" || stub.calls[1].args[0] != "verify-blob-attestation") {
 				t.Fatalf("calls=%+v", stub.calls)
 			}
 			for _, call := range stub.calls {
@@ -138,5 +135,46 @@ func TestQualificationInvalidPolicyCannotAttach(t *testing.T) {
 	requireSignCode(t, err, e.CodeTrustPolicyMissing)
 	if len(stub.calls) != 0 {
 		t.Fatal("invalid verification policy attached an attestation")
+	}
+}
+
+func TestDevelopmentQualificationUsesDistinctPredicate(t *testing.T) {
+	const predicate = `{"schemaVersion":"nvkr.dev/development-qualification-evidence/v1"}`
+	for _, tc := range []struct {
+		name, returned string
+		production     bool
+		code           e.Code
+	}{
+		{"development round trip", DevelopmentQualificationPredicateType, false, ""},
+		{"production substitution", QualificationPredicateType, false, e.CodeVerifyFailed},
+		{"production verifier rejects development", DevelopmentQualificationPredicateType, true, e.CodeVerifyFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stub := &cosignStub{stdout: map[string]string{"download": qualificationBundle(t, ociTestDigest, tc.returned, ociObservedIdentity, ociTestIssuer, []byte(predicate))}}
+			signer := newStubbedSigner(t, stub, Credential{})
+			var err error
+			if tc.production {
+				err = signer.VerifyQualification(t.Context(), ociSubject(), []byte(predicate))
+			} else {
+				err = signer.AttestDevelopmentQualification(t.Context(), ociSubject(), []byte(predicate))
+			}
+			if tc.code != "" {
+				requireSignCode(t, err, tc.code)
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			expected := DevelopmentQualificationPredicateType
+			if tc.production {
+				expected = QualificationPredicateType
+			}
+			for _, call := range stub.calls {
+				switch call.args[0] {
+				case "attest", "verify-blob-attestation":
+					if call.args[4] != expected {
+						t.Fatalf("wrong predicate: %v", call.args)
+					}
+				}
+			}
+		})
 	}
 }

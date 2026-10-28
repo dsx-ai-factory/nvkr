@@ -37,7 +37,7 @@ func TestImageIndexDestinationSeparators(t *testing.T) {
 				}
 				err := index.WriteLayout(t.Context(), requested)
 				if existing {
-					assertRegistryCode(t, err, e.CodeVerifyFailed)
+					assertRegistryCode(t, err, e.CodeImmutableViolation)
 					if len(mustReadImageDirectory(t, out)) != 0 {
 						t.Fatal("existing destination modified")
 					}

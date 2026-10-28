@@ -14,11 +14,13 @@ not complete a milestone.
 | M4 — Automated releases | Reviewed pin updates, signed immutable release manifests, safe channel/tag behavior and revocation | [M4 criteria](epics-v1-spec.md#epic-m4--automated-releases) |
 
 M2 disk delivery binds the exact produced disk and traced materials. The
-[October 12 decision](https://nvidia.atlassian.net/browse/NKX-15959?focusedCommentId=25021826)
+initial scope decision
 retains producer-only disk evidence and defers deep inventory, material reconciliation, waivers, offline
-pull-request qualification, a dedicated verify-only dispatch and incremental reuse.
+pull-request qualification, a dedicated verify-only dispatch and cross-run qualification reuse. Authenticated
+partial retries within one producer or qualification workflow run preserve original evidence and attempt
+identities while keeping complete-output, exact-input and policy checks mandatory.
 
-The current scope directed by the user makes embedded-component declarations optional. Omission is not
+The current scope makes embedded-component declarations optional. Omission is not
 applicable, while authored declarations must match their referenced
 pinned upstream metadata. This comparison does not establish customized or installed composition. Exact source,
 patch, configuration and material bindings remain required. A stronger input claim does not reproduce the
@@ -36,6 +38,13 @@ recorded inputs. NVKE owns embedded-software correctness and runtime validation;
 own deployment topology and placement. The acceptance specification retains the full dependencies,
 artifact matrix obligations and exclusions.
 
-M2’s product floor remains AMD64 producer provenance. The October 12 approved M3 scope defers strict
+The separately authored [NVKE nightly E2E adapter](nvke-nightly.md) is downstream
+repository CI infrastructure outside these product milestones. Its first target
+uses kind and native ARM64 KVM guests under ADR-18's separate test-adapter contract;
+it does not widen the generated ARC disk engine or complete M3 qualification.
+NVKE owns guest/cluster provisioning and teardown; the parent harness owns outer
+host and network restoration. A successful combined cycle remains unrecorded.
+
+M2’s product floor remains AMD64 producer provenance. The approved initial scope defers strict
 inspection and material reconciliation without organizational ADR ratification. ARM64 is an implementation extension; every additional
 output explicitly selected by a Definition remains mandatory for that Run and Release.

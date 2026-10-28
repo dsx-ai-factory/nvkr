@@ -136,6 +136,72 @@ func TestGitHubRunSummaryResults(t *testing.T) {
 	}
 }
 
+func TestGitHubCollectedRunEndSummaryTemplate(t *testing.T) {
+	want := githubRunEndSummary(5)
+	want.Env["NVKR_JOB_RESULTS"] = "${{ join(needs.*.outputs.statuses, ' ') }}"
+	if got := githubCollectedRunEndSummary(5); !reflect.DeepEqual(got, want) {
+		t.Fatalf("collected summary changes more than its leaf-status input:\ngot: %+v\nwant: %+v", got, want)
+	}
+}
+
+func TestGitHubCollectedRunSummaryLeafResults(t *testing.T) {
+	for _, tc := range []struct {
+		name, finalize, status, counts string
+		collectors                     []string
+	}{
+		{
+			name: "complete leaf set", collectors: []string{"success success", "success success success"}, finalize: "success",
+			status: "Completed", counts: "5 succeeded · 0 failed · 0 cancelled · 0 skipped · 0 unknown", //nolint:misspell // GitHub result enum spelling.
+		},
+		{
+			name: "failed leaf despite successful collection", collectors: []string{"success failure", "success success success"}, finalize: "success",
+			status: "Failed", counts: "4 succeeded · 1 failed · 0 cancelled · 0 skipped · 0 unknown", //nolint:misspell // GitHub result enum spelling.
+		},
+		{
+			name: "skipped leaf despite successful collection", collectors: []string{"success success", "skipped success success"}, finalize: "success",
+			status: "Incomplete (skipped)", counts: "4 succeeded · 0 failed · 0 cancelled · 1 skipped · 0 unknown", //nolint:misspell // GitHub result enum spelling.
+		},
+		{
+			name: "missing leaf", collectors: []string{"success success", "", "success success"}, finalize: "success",
+			status: "Incomplete (unknown status)", counts: "4 succeeded · 0 failed · 0 cancelled · 0 skipped · 0 unknown", //nolint:misspell // GitHub result enum spelling.
+		},
+		{
+			name: "collector success is not the leaf set", collectors: []string{"success", "success"}, finalize: "success",
+			status: "Incomplete (unknown status)", counts: "2 succeeded · 0 failed · 0 cancelled · 0 skipped · 0 unknown", //nolint:misspell // GitHub result enum spelling.
+		},
+		{
+			name: "successful finalizer without leaf results", finalize: "success",
+			status: "Incomplete (unknown status)", counts: "0 succeeded · 0 failed · 0 cancelled · 0 skipped · 0 unknown", //nolint:misspell // GitHub result enum spelling.
+		},
+		{
+			name: "failed finalizer after successful leaves", collectors: []string{"success success", "success success success"}, finalize: "failure",
+			status: "Failed", counts: "5 succeeded · 0 failed · 0 cancelled · 0 skipped · 0 unknown", //nolint:misspell // GitHub result enum spelling.
+		},
+		{
+			name: "missing finalization after successful leaves", collectors: []string{"success success", "success success success"},
+			status: "Incomplete (unknown status)", counts: "5 succeeded · 0 failed · 0 cancelled · 0 skipped · 0 unknown", //nolint:misspell // GitHub result enum spelling.
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sink := filepath.Join(t.TempDir(), "summary.md")
+			runGitHubSummaryScript(t, githubCollectedRunEndSummary(5).Run, map[string]string{
+				"PATH": t.TempDir(), "GITHUB_STEP_SUMMARY": sink,
+				"NVKR_JOB_RESULTS": strings.Join(tc.collectors, " "), "NVKR_FINALIZE_OUTCOME": tc.finalize,
+				"NVKR_JOB_STATUS": "success", "NVKR_UPLOAD_OUTCOME": "success",
+			})
+			raw, err := os.ReadFile(sink)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(raw), "## NVKR Run result: "+tc.status+"\n") ||
+				!strings.Contains(string(raw), "Upstream jobs: "+tc.counts+".") ||
+				!strings.Contains(string(raw), "This summary is diagnostic; the Run record carries the completeness result.") {
+				t.Fatalf("wrong collected leaf summary:\n%s", raw)
+			}
+		})
+	}
+}
+
 func TestGitHubRunRenderedSummaryResults(t *testing.T) {
 	for _, tc := range []struct {
 		name string

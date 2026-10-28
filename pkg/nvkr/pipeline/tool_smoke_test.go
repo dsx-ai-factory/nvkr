@@ -85,6 +85,10 @@ func TestToolSmokeAdmission(t *testing.T) {
 		{ToolSmokeNVKECTL, []string{"version", "--output", "json"}},
 		{ToolSmokeHelm, []string{"version", "--template", "{{.Version}}"}},
 		{ToolSmokeKubectl, []string{"version", "--client", "--output", "json"}},
+		{ToolSmokeKind, []string{"version", "-q"}},
+		{ToolSmokeClusterctl, []string{"version", "--output=json"}},
+		{ToolSmokeORAS, []string{"version"}},
+		{ToolSmokeNICoSim, []string{"version", "--output=json"}},
 	} {
 		got, err := toolSmokeArguments(tc.profile)
 		if err != nil || !slices.Equal(got, tc.want) {
@@ -173,6 +177,12 @@ func (f *smokeRuntimeFixture) Run(ctx context.Context, input io.Reader, out, dia
 	case "info":
 		return write(`"fixture-daemon"`)
 	case "image":
+		// Docker clients predating API 1.49 reject this option before contacting
+		// the daemon. Keep the fixture faithful to the hosted CLI contract.
+		if slices.Contains(args, "--platform") {
+			_, _ = io.WriteString(diagnostic, "unknown flag: --platform")
+			return errors.New("exit status 125")
+		}
 		id := smokeSelection().Image
 		if f.started && f.changeImage {
 			id = "sha256:" + strings.Repeat("f", 64)

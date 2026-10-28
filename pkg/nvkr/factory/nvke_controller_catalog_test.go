@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -31,11 +32,18 @@ func controllerCatalogFixture(t *testing.T, directory string) (*catalog.Catalog,
 	if err != nil {
 		t.Fatal(err)
 	}
-	const sourceCommit = "33fb71b2f4224b470ebc628a9165fc4b92870406"
+	// The release is whatever the authored lock records, so a reviewed catalog
+	// maintenance bump does not break this fixture. The chart-owning nvke source
+	// and its chart source are one maintained release cohort and must agree; the
+	// independent nvke-cli role only has to be a complete commit.
+	sourceCommit := lock.Pins["nvke"].Commit
 	for _, name := range []string{"nvke", "nvke-cli", "nvke-helm"} {
-		if lock.Pins[name].Commit != sourceCommit {
-			t.Fatalf("authored %s source=%s, want %s", name, lock.Pins[name].Commit, sourceCommit)
+		if !fullCommit.MatchString(lock.Pins[name].Commit) {
+			t.Fatalf("authored %s source=%q is not a full commit", name, lock.Pins[name].Commit)
 		}
+	}
+	if lock.Pins["nvke-helm"].Commit != sourceCommit {
+		t.Fatalf("authored nvke-helm source=%s, want the nvke source %s", lock.Pins["nvke-helm"].Commit, sourceCommit)
 	}
 
 	_, filename, _, ok := runtime.Caller(0)
@@ -43,7 +51,16 @@ func controllerCatalogFixture(t *testing.T, directory string) (*catalog.Catalog,
 		t.Fatal("locate controller pin-set fixture")
 	}
 	repo := t.TempDir()
-	if err := os.CopyFS(repo, os.DirFS(filepath.Join(filepath.Dir(filename), "../catalog/testdata/nvke-pin-set"))); err != nil {
+	if err := os.CopyFS(repo, os.DirFS(filepath.Join(filepath.Dir(filename), "../catalog/testdata/nvke-beta-pin-set"))); err != nil {
+		t.Fatal(err)
+	}
+	// The release changes the chart name; the beta fixture already owns its layout.
+	chart := filepath.Join(repo, "controller/deploy/charts/controller/Chart.yaml")
+	raw, err := os.ReadFile(chart)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(chart, []byte(strings.ReplaceAll(string(raw), "name: nke-controller", "name: nvke-controller")), 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
@@ -95,3 +112,5 @@ func controllerCatalogFixture(t *testing.T, directory string) (*catalog.Catalog,
 	}
 	return cat, commit
 }
+
+var fullCommit = regexp.MustCompile(`^[0-9a-f]{40}$`)

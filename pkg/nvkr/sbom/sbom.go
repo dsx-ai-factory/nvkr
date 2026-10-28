@@ -94,7 +94,7 @@ func fromBuild(res *buildgraph.Resolved, buildDigest string, artifactHashes map[
 	sort.Slice(comps, func(i, j int) bool { return comps[i].Name < comps[j].Name })
 	for _, nc := range comps {
 		bom.Components = append(bom.Components,
-			componentForEvidence(nc, artifactHashes[nc.Name], target.Arch(res.Platform),
+			componentForEvidence(nc, artifactHashes[nc.Name], target.ExecutableArch(res.Platform),
 				externalEvidenceDeclarationProps(nc.Prebuilt), transportIndependent))
 	}
 	return bom
@@ -160,7 +160,7 @@ func PerArtifact(res *buildgraph.Resolved, buildDigest string, artifactHashes ma
 		if !nc.FromSource && nc.Prebuilt == nil {
 			continue // an exclusion has no artifact SBOM
 		}
-		b := fromComponentForArch(nc, buildDigest, artifactHashes[nc.Name], target.Arch(res.Platform))
+		b := fromComponentForArch(nc, buildDigest, artifactHashes[nc.Name], target.ExecutableArch(res.Platform))
 		if nc.OutputType == catalog.OutputDebianPackage {
 			b.Metadata.Component.Properties = append(b.Metadata.Component.Properties,
 				Property{Name: "nvkr:debianDistribution", Value: res.Debian.Distribution},
@@ -303,6 +303,9 @@ func componentForEvidence(nc catalog.NamedComponent, artifactHash, arch string,
 func selectedToolchain(nc catalog.NamedComponent, arch string) string {
 	if nc.BuilderType == ir.BuilderNix && nc.Flake != nil && nc.Flake.Image != "" {
 		return nc.Flake.Image
+	}
+	if nc.BuilderType == ir.BuilderNativeGo {
+		return nc.ToolchainImage
 	}
 	if arch != "" {
 		if toolchain := nc.ToolchainImages[arch]; toolchain != "" {

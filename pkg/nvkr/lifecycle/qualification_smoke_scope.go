@@ -42,11 +42,18 @@ func deriveQualificationSmokeMembers(plan *factory.Plan, description ArtifactChe
 	if err != nil {
 		return nil, err
 	}
-	if len(description.Outputs) != len(planned) {
+	return deriveToolSmokeMembers(planned, description.Outputs, bundles)
+}
+
+// deriveToolSmokeMembers binds execution scope to exact checked bundle members.
+// Callers authenticate their own source and retain payload ownership; these
+// descriptions alone cannot grant execution or signing authority.
+func deriveToolSmokeMembers(planned []plannedSmokeOutput, checkedOutputs []ArtifactCheckOutput, bundles smokeBundleDescriptions) ([]ToolSmokeMember, error) {
+	if len(checkedOutputs) != len(planned) {
 		return nil, e.New(e.CodeReleaseIncomplete, "smoke requires the complete planned output set")
 	}
-	outputs := make(map[string]ArtifactCheckOutput, len(description.Outputs))
-	for _, output := range description.Outputs {
+	outputs := make(map[string]ArtifactCheckOutput, len(checkedOutputs))
+	for _, output := range checkedOutputs {
 		if _, exists := outputs[output.Name]; exists || output.Overall != "pass" {
 			return nil, e.New(e.CodeGateUnmet, "smoke requires unique successful artifact checks")
 		}
@@ -76,11 +83,20 @@ func deriveQualificationSmokeMembers(plan *factory.Plan, description ArtifactChe
 		}
 		for _, entry := range bundle.Entries {
 			member, exists := output.members[entry.Name]
-			if !exists || entry.Mode&0o111 == 0 || entry.Size <= 0 || entry.Size > pipeline.MaxToolSmokeExecutableBytes {
+			if !exists || entry.Size <= 0 || entry.Size > pipeline.MaxToolSmokeExecutableBytes {
 				return nil, e.New(e.CodeEngineCapability, "output %q has an unselected, non-executable or unsupported-size member", output.name)
 			}
 			if !canonical.IsDigest(checked.Subject) {
 				return nil, e.New(e.CodeVerifyFailed, "smoke output has no exact subject")
+			}
+			if member.nonToolReason != "" {
+				if member.nonToolReason != "runtime-assets-archive" || entry.Mode&0o111 != 0 {
+					return nil, e.New(e.CodeGateUnmet, "non-tool archive member is executable or has an unsupported role")
+				}
+				continue
+			}
+			if entry.Mode&0o111 == 0 {
+				return nil, e.New(e.CodeEngineCapability, "selected smoke tool is not executable")
 			}
 			members = append(members, ToolSmokeMember{Output: output.name, Member: entry.Name, Subject: checked.Subject, BuildDigest: output.buildDigest, Platform: output.platform, PayloadDigest: entry.SHA256, Size: entry.Size, Profile: member.profile, ExpectedVersion: member.version, ExpectedCommit: member.commit})
 		}
@@ -116,6 +132,19 @@ func smokeOutputBuild(plan *factory.Plan, name string) (factory.BuildPlan, error
 	return *found, nil
 }
 func smokeComponentNode(build factory.BuildPlan, component string) (ir.Node, error) {
+	node, err := smokeProducerNode(build, component)
+	if err != nil {
+		return ir.Node{}, err
+	}
+	// Raw source-built tools are packaged as executable members too. Admission
+	// here does not replace delivered mode or native ELF checks at execution.
+	if node.OutputType != "host-package" && node.OutputType != "raw" {
+		return ir.Node{}, e.New(e.CodeVerifyFailed, "smoke component has no matching executable producer")
+	}
+	return node, nil
+}
+
+func smokeProducerNode(build factory.BuildPlan, component string) (ir.Node, error) {
 	var found *ir.Node
 	for i := range build.Graph.Nodes {
 		node := &build.Graph.Nodes[i]
@@ -126,7 +155,7 @@ func smokeComponentNode(build factory.BuildPlan, component string) (ir.Node, err
 			found = node
 		}
 	}
-	if found == nil || found.OutputType != "host-package" || found.Platform != build.Platform {
+	if found == nil || found.Platform != build.Platform {
 		return ir.Node{}, e.New(e.CodeVerifyFailed, "smoke component has no matching executable producer")
 	}
 	return *found, nil
@@ -139,7 +168,7 @@ func expectedSmokeVersion(node ir.Node, profile string) (string, string, error) 
 		return "", "", e.New(e.CodeVerifyFailed, "smoke producer version is not the normalized pinned version")
 	}
 	version := "v" + node.Version
-	if profile != "nvkectl-version-json" {
+	if profile == "helm-version" || profile == "kubectl-client-version-json" {
 		return version, "", nil
 	}
 	stamps := map[string]string{}
@@ -149,8 +178,54 @@ func expectedSmokeVersion(node ir.Node, profile string) (string, string, error) 
 		}
 		stamps[item.Name] = item.Value
 	}
-	commit := stamps["NKECTL_COMMIT"]
-	if node.Kind != ir.KindBuild || stamps["NKECTL_VERSION"] != version || len(node.SourceCommit) != 40 || !smokeHexCommit(node.SourceCommit) || !smokeHexCommit(commit) || !strings.HasPrefix(node.SourceCommit, commit) {
+	if profile == "nicosim-version-json" || profile == "nicosim-patched-version-json" {
+		tree := "clean"
+		patched := profile == "nicosim-patched-version-json"
+		if patched {
+			tree = "patched"
+		}
+		if node.Kind != ir.KindBuild || len(node.SourceCommit) != 40 || !smokeHexCommit(node.SourceCommit) || stamps["NICO_SIM_VERSION"] != version || stamps["NICO_SIM_COMMIT"] != node.SourceCommit || stamps["NICO_SIM_TREE"] != tree || patched != (len(node.Patches) != 0) {
+			return "", "", e.New(e.CodeVerifyFailed, "NICoSim stamps or patch state differ from the frozen producer")
+		}
+		return version, node.SourceCommit, nil
+	}
+	if profile != "nvkectl-version-json" {
+		if node.Kind != ir.KindBuild || len(node.SourceCommit) != 40 || !smokeHexCommit(node.SourceCommit) || stamps["GIT_VERSION"] != node.SourceCommit {
+			return "", "", e.New(e.CodeVerifyFailed, "installer tool stamps differ from the frozen source commit")
+		}
+		switch profile {
+		case "kind-version":
+			if stamps["BUILD_VERSION"] != node.Version {
+				return "", "", e.New(e.CodeVerifyFailed, "kind version stamp differs from frozen producer")
+			}
+			return node.Version, "", nil
+		case "oras-version":
+			return node.Version, node.SourceCommit, nil
+		case "clusterctl-version-json":
+			if stamps["BUILD_VERSION"] != version {
+				return "", "", e.New(e.CodeVerifyFailed, "clusterctl version stamp differs from frozen producer")
+			}
+			return version, node.SourceCommit, nil
+		}
+	}
+	prefix := "NKECTL_"
+	_, currentVersion := stamps["NVKECTL_VERSION"]
+	_, currentCommit := stamps["NVKECTL_COMMIT"]
+	if currentVersion || currentCommit {
+		if _, legacy := stamps["NKECTL_VERSION"]; legacy {
+			return "", "", e.New(e.CodeVerifyFailed, "ambiguous nvkectl version stamp family")
+		}
+		if _, legacy := stamps["NKECTL_COMMIT"]; legacy {
+			return "", "", e.New(e.CodeVerifyFailed, "ambiguous nvkectl commit stamp family")
+		}
+		prefix = "NVKECTL_"
+	}
+	commit := stamps[prefix+"COMMIT"]
+	if len(node.Version) == 40 && node.Version == node.SourceCommit && smokeHexCommit(node.Version) {
+		// Commit-selected CLI producers stamp the exact commit without a v prefix.
+		version = node.Version
+	}
+	if node.Kind != ir.KindBuild || stamps[prefix+"VERSION"] != version || len(node.SourceCommit) != 40 || !smokeHexCommit(node.SourceCommit) || !smokeHexCommit(commit) || !strings.HasPrefix(node.SourceCommit, commit) {
 		return "", "", e.New(e.CodeVerifyFailed, "nvkectl stamps differ from frozen producer version or commit")
 	}
 	return version, commit, nil
@@ -163,6 +238,14 @@ func nativeSmokeProfile(profile string) (pipeline.ToolSmokeProfile, error) {
 		return pipeline.ToolSmokeHelm, nil
 	case "kubectl-client-version-json":
 		return pipeline.ToolSmokeKubectl, nil
+	case "kind-version":
+		return pipeline.ToolSmokeKind, nil
+	case "clusterctl-version-json":
+		return pipeline.ToolSmokeClusterctl, nil
+	case "oras-version":
+		return pipeline.ToolSmokeORAS, nil
+	case "nicosim-version-json", "nicosim-patched-version-json":
+		return pipeline.ToolSmokeNICoSim, nil
 	default:
 		return "", e.New(e.CodeEngineCapability, "unsupported tool smoke profile %q", profile)
 	}

@@ -27,9 +27,12 @@ paths from another step pass through explicit inputs. Referenced outcomes and ou
 scope, including the finalization step and final Run upload read by the closing summary. Recovery uses the
 shared `recover-inputs` action before inline finalization. These templates and invocation values are regenerated and checked with the workflow; they do not introduce another
 authored configuration surface.
-Repeated native preflight, pinned checkout and helper/parameter preparation steps use descriptive aliases.
-Preparation selects the current provider job with `github.job`; permissions, dependencies and execution or
-transport calls stay explicit.
+Repeated native preflight, pinned checkout, helper/parameter preparation and identical uncontrolled
+operation calls use descriptive aliases. Complete identical host sequences of preflight, credential-free
+checkout, current-job preparation and one or two node calls can share a `steps-<runner>-node` or
+`steps-<runner>-two-nodes` anchor. Preparation selects the current provider job with `github.job` even
+when its sequence is shared. Permissions, conditions and dependencies stay explicit; authored setup,
+source credentials and controlled transport stay outside the sequence form.
 
 Workflow headers refer to fixed Plan and manifest paths. Source-fetch job names and ordering follow the
 target and actual consuming components; resolved commands and logs still identify exact pin-bound Plan nodes.
@@ -98,12 +101,15 @@ Per-output publication uses metadata-only finalization carriers under the same p
 The shared templates resolve their invocation parameters through `factory github describe-action` and invoke
 the execution and transport operations against the canonical Plan. The helper derives exact input
 and output paths, execution settings, diagnostic context and recovery membership; the workflow retains
-meaningful step names, pinned provider actions, credentials, permissions, dependencies and conditions.
+distinct operation-and-part step names, pinned provider actions, credentials, permissions, dependencies and conditions.
+For example, `collect node outputs part-3` identifies the operation within its job; expand it to see
+the exact producer in its original inner step labels. Identical complete calls can still share an alias
+across jobs without repeating an ambiguous label inside one job.
 The generated invocation-data member is not an authored transport manifest or an alternative Plan. Source-fetch credentials stay on `run-node`, while
 `pack-outputs` remains a separate step.
 
 These excerpts illustrate the expanded controller-chart operations and finalizer. Exact names and node IDs
-come from the selected Plan; the repository currently selects the 37-output M2 Definition.
+come from the selected Plan; the repository currently selects the 69-output M2 Definition.
 Composite shell steps preserve the original default with `bash -e {0}` on
 the host or `sh -e {0}` in a job container. Caller-only
 expressions such as `toJSON(needs)` are passed as explicit inputs and mapped to the original consuming field.

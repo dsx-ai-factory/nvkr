@@ -52,6 +52,7 @@ type qualificationVerifier struct {
 	origin            qualificationorigin.Description
 	source            *qualificationFixtureSource
 	predicate         []byte
+	subjectPredicates map[string][]byte
 	fail              map[string]error
 	predicateFailures map[string]error
 	observed          map[string]string
@@ -77,7 +78,11 @@ func (v *qualificationVerifier) Verify(_ context.Context, subject sign.Subject, 
 			return sign.VerificationRecord{}, err
 		}
 	}
-	if len(policy.ExpectedPredicate) > 0 && string(policy.ExpectedPredicate) != string(v.predicate) {
+	expected := v.predicate
+	if original, found := v.subjectPredicates[subject.Ref]; found {
+		expected = original
+	}
+	if len(policy.ExpectedPredicate) > 0 && string(policy.ExpectedPredicate) != string(expected) {
 		return sign.VerificationRecord{}, e.New(e.CodeSignatureInvalid, "fixture signature does not cover predicate")
 	}
 	identity := v.origin.BuilderID
@@ -141,19 +146,24 @@ func newQualificationFixture(t *testing.T) (QualificationRequest, *Consumer, *qu
 	return newQualificationFixtureWithSigningIdentity(t, "^"+regexp.QuoteMeta(qualificationSourceFixture().value.BuilderID)+"$")
 }
 
-func newQualificationFixtureWithSigningIdentity(t *testing.T, identity string) (QualificationRequest, *Consumer, *qualificationVerifier) {
+type qualificationFixtureOptions struct {
+	publication func(*delivery.PublicationRequest)
+	predicate   func(string, *provenance.Predicate)
+}
+
+func newQualificationFixtureWithSigningIdentity(t *testing.T, identity string, options ...qualificationFixtureOptions) (QualificationRequest, *Consumer, *qualificationVerifier) {
 	t.Helper()
 	origin := qualificationSourceFixture()
 	description, err := origin.Description()
 	if err != nil {
 		t.Fatal(err)
 	}
-	base := newExactInputFixture(t)
-	definition, environment := base.definition, base.environment
+	base := newExactInputPlan(t)
+	definition, environment := base.Definition, base.Environment
 	definition.CosignTool = "cosign"
 	environment.Signing = &Signing{Mode: factory.SigningModeCosign, Identity: identity, Issuer: "https://token.actions.githubusercontent.com"}
 	environment.Publication.Mode = "per-output-v1"
-	snapshot := base.plan.CatalogSnapshot
+	snapshot := base.CatalogSnapshot
 	snapshot.Tools = map[string]catalog.ToolPin{"cosign": {Format: factory.ToolFormatTarGzip, URL: "https://example.invalid/cosign.tar.gz", Platform: "linux/amd64", ArchiveDigest: "sha256:" + strings.Repeat("1", 64), ExecutablePath: "cosign", ExecutableDigest: "sha256:" + strings.Repeat("2", 64)}}
 	stack, err := catalog.ApplyStack(snapshot)
 	if err != nil {
@@ -163,8 +173,22 @@ func newQualificationFixtureWithSigningIdentity(t *testing.T, identity string) (
 	if err != nil {
 		t.Fatal(err)
 	}
-	fixture := exactInputFixtureForPlan(t, definition, environment, plan)
-	fixture = fixture.withReleaseMetadata(t, func(metadata *delivery.ReleaseMetadata) { metadata.InvocationID = description.InvocationID })
+	fixture := exactInputFixtureForPlanAndInvocation(t, definition, environment, plan, description.InvocationID, func(request *delivery.PublicationRequest) {
+		for i := range request.Objects {
+			object := &request.Objects[i]
+			if object.Output != nil {
+				object.Output.Publication = &delivery.PublicationOrigin{
+					Ref:                  plan.Targets["output-"+object.Name].Ref + "@sha256:" + strings.Repeat("b", 64),
+					PreparedInvocationID: description.InvocationID, SignedInvocationID: description.InvocationID,
+				}
+			}
+		}
+		for _, option := range options {
+			if option.publication != nil {
+				option.publication(request)
+			}
+		}
+	})
 	run, err := provenance.NewGitHubRunContext(func(key string) string {
 		return map[string]string{
 			"GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": description.Repository,
@@ -195,6 +219,35 @@ func newQualificationFixtureWithSigningIdentity(t *testing.T, identity string) (
 		request.Predicates = append(request.Predicates, QualificationPredicate{Reference: output.Reference, Predicate: append([]byte(nil), predicate...)})
 	}
 	verifier := &qualificationVerifier{origin: description, source: origin, predicate: predicate, fail: map[string]error{}}
+	if len(options) > 0 {
+		verifier.subjectPredicates = make(map[string][]byte, len(request.Predicates))
+		for i := range request.Predicates {
+			var original provenance.Predicate
+			if err := canonical.UnmarshalExact(predicate, &original); err != nil {
+				t.Fatal(err)
+			}
+			name, invocation := "release", view.Metadata.InvocationID
+			if i > 0 {
+				output := view.Outputs[i-1]
+				name = output.Name
+				if output.Publication != nil {
+					invocation = output.Publication.SignedInvocationID
+				}
+			}
+			original.RunDetails.Metadata["invocationId"] = invocation
+			for _, option := range options {
+				if option.predicate != nil {
+					option.predicate(name, &original)
+				}
+			}
+			raw, err := canonical.Marshal(original)
+			if err != nil {
+				t.Fatal(err)
+			}
+			request.Predicates[i].Predicate = raw
+			verifier.subjectPredicates[request.Predicates[i].Reference] = append([]byte(nil), raw...)
+		}
+	}
 	consumer := &Consumer{verifier: verifier, materialize: func(ctx context.Context, reference string) (*delivery.Publication, error) {
 		if reference != fixture.reference {
 			return nil, e.New(e.CodeVerifyFailed, "wrong fixture reference")
@@ -220,7 +273,7 @@ func TestQualificationBroadSigningPolicyRequiresExactSource(t *testing.T) {
 		{name: "exact provider workflow", wantVerified: 4, wantEvidence: 2},
 		{name: "different repository signer", observed: "https://github.com/other/nvkr/.github/workflows/build.yml@refs/heads/main", code: e.CodeUntrustedSigner, wantVerified: 1},
 		{name: "different output workflow", observed: "https://github.com/example/nvkr/.github/workflows/other.yml@refs/heads/main", outputOnly: true, code: e.CodeSignatureInvalid, wantVerified: 4, wantEvidence: 2},
-		{name: "prior production attempt", priorAttempt: true, code: e.CodeVerifyFailed},
+		{name: "predicate predates aggregate preparation", priorAttempt: true, code: e.CodeVerifyFailed, wantVerified: 1},
 		{name: "literal substring exact workflow", identity: "build", wantVerified: 4, wantEvidence: 2},
 		{name: "literal substring different workflow", identity: "build", observed: "https://github.com/example/nvkr/.github/workflows/other-build.yml@refs/heads/main", outputOnly: true, code: e.CodeSignatureInvalid, wantVerified: 4, wantEvidence: 2},
 	} {

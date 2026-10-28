@@ -44,10 +44,6 @@ func requireSignCode(t *testing.T, err error, want nvkrerr.Code) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Subject
-// ---------------------------------------------------------------------------
-
 func TestSubjectRefusesUnpinnedOrDivergentReferences(t *testing.T) {
 	requireSignCode(t, Subject{Ref: "", Digest: ociTestDigest}.Validate(), nvkrerr.CodeUsage)
 	requireSignCode(t, Subject{Ref: ociTestRepo + ":v1", Digest: ociTestDigest}.Validate(), nvkrerr.CodeUnpinnedSource)
@@ -63,10 +59,6 @@ func TestSubjectRefusesUnpinnedOrDivergentReferences(t *testing.T) {
 		t.Fatalf("repository = %q", ociSubject().Repository())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// DryRunSigner
-// ---------------------------------------------------------------------------
 
 func TestNewDryRunSignerRequiresIdentityAndIssuer(t *testing.T) {
 	_, err := NewDryRunSigner("", ociTestIssuer)
@@ -111,14 +103,14 @@ func TestDryRunSignerVerifyRecord(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := 2
+			want := 1
 			if required {
-				want = 4
+				want = 2
 			}
 			if len(record.WouldRun) != want || len(record.Ran) != 0 || record.SignatureVerified || record.AttestationVerified {
 				t.Fatalf("record: %+v", record)
 			}
-			if record.WouldRun[0][1] != "download" || record.WouldRun[1][1] != "verify-blob-attestation" {
+			if record.WouldRun[0][1] != "verify-blob-attestation" {
 				t.Fatalf("commands: %v", record.WouldRun)
 			}
 			if err := record.Validate(); err != nil {
@@ -161,10 +153,6 @@ func TestDryRunSignerHonorsContextCancellation(t *testing.T) {
 	_, err = signer.SignAndAttest(ctx, ociSubject(), []byte(ociTestPredicate))
 	requireSignCode(t, err, nvkrerr.CodeTimeout)
 }
-
-// ---------------------------------------------------------------------------
-// CosignOCISigner: argv, output parsing, credentials
-// ---------------------------------------------------------------------------
 
 type recordedCall struct {
 	binary string
@@ -249,6 +237,9 @@ func newStubbedSigner(t *testing.T, stub *cosignStub, credential Credential) *Co
 	if err != nil {
 		t.Fatalf("NewCosignOCISigner: %v", err)
 	}
+	signer.bundleSource = func(_ context.Context, _ Subject, _ Credential) (*ociBundleSource, error) {
+		return fixtureOCIBundleSource([]byte(stub.stdout["download"]))
+	}
 	return signer
 }
 
@@ -325,7 +316,7 @@ func TestCosignOCICredentialsNeverReachArgv(t *testing.T) {
 		"version":  cosignVersionJSON,
 		"download": testOCIBundle(t, ociTestDigest, CosignSignaturePredicateType, ociObservedIdentity, ociTestIssuer),
 	}}
-	credential := Credential{Registry: "ghcr.io", Username: "publisher-bot", Password: "s3cr3t-token"}
+	credential := Credential{Registry: "127.0.0.1:5000", Username: "publisher-bot", Password: "s3cr3t-token"}
 	var configPath string
 	var configMode, dirMode os.FileMode
 	var document []byte
@@ -371,7 +362,7 @@ func TestCosignOCICredentialsNeverReachArgv(t *testing.T) {
 	if err := json.Unmarshal(document, &config); err != nil {
 		t.Fatalf("config.json is not JSON: %v (%s)", err, document)
 	}
-	decoded, err := base64.StdEncoding.DecodeString(config.Auths["ghcr.io"].Auth)
+	decoded, err := base64.StdEncoding.DecodeString(config.Auths["127.0.0.1:5000"].Auth)
 	if err != nil {
 		t.Fatalf("auth is not base64: %v", err)
 	}
@@ -390,21 +381,53 @@ func TestCosignOCICredentialsNeverReachArgv(t *testing.T) {
 	}
 }
 
-func TestCosignOCINoCredentialLeavesDockerConfigUnset(t *testing.T) {
-	stub := &cosignStub{stdout: map[string]string{
-		"version":  cosignVersionJSON,
-		"download": testOCIBundle(t, ociTestDigest, CosignSignaturePredicateType, ociObservedIdentity, ociTestIssuer),
-	}}
-	signer := newStubbedSigner(t, stub, Credential{})
-	if _, err := signer.Verify(context.Background(), ociSubject(), VerifyPolicy{}); err != nil {
-		t.Fatalf("Verify: %v", err)
+func TestCosignOCINoCredentialUsesPrivateEmptyDockerConfig(t *testing.T) {
+	ambient := t.TempDir()
+	if err := os.Mkdir(filepath.Join(ambient, ".docker"), 0700); err != nil {
+		t.Fatal(err)
 	}
-	for _, call := range stub.calls {
+	if err := os.WriteFile(filepath.Join(ambient, ".docker", "config.json"), []byte(`{"credsStore":"must-not-run","auths":{"127.0.0.1:5000":{"auth":"YXR0YWNrZXI6cHJpdmF0ZQ=="}}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", ambient)
+	t.Setenv("DOCKER_CONFIG", filepath.Join(ambient, ".docker"))
+	t.Setenv("XDG_CONFIG_HOME", ambient)
+	t.Setenv("XDG_RUNTIME_DIR", ambient)
+	stub := &cosignStub{stdout: map[string]string{"version": cosignVersionJSON, "download": testOCIBundle(t, ociTestDigest, CosignSignaturePredicateType, ociObservedIdentity, ociTestIssuer)}}
+	var captured string
+	stub.onCall = func(call recordedCall) error {
+		env := map[string]string{}
 		for _, entry := range call.env {
-			if strings.HasPrefix(entry, "DOCKER_CONFIG=") {
-				t.Fatalf("unexpected DOCKER_CONFIG: %q", entry)
+			key, value, ok := strings.Cut(entry, "=")
+			if ok {
+				env[key] = value
 			}
 		}
+		if env["HOME"] == "" || env["HOME"] == ambient || env["DOCKER_CONFIG"] == "" || filepath.Dir(env["DOCKER_CONFIG"]) != env["HOME"] || env["XDG_CONFIG_HOME"] != "" || env["XDG_RUNTIME_DIR"] != "" {
+			return fmt.Errorf("ambient credential search paths remained")
+		}
+		captured = filepath.Join(env["DOCKER_CONFIG"], "config.json")
+		raw, err := os.ReadFile(captured)
+		if err != nil {
+			return err
+		}
+		if string(raw) != `{"auths":{}}` {
+			return fmt.Errorf("anonymous config is not explicit empty auths")
+		}
+		if _, err := os.Stat(filepath.Join(env["HOME"], ".docker", "config.json")); !os.IsNotExist(err) {
+			return fmt.Errorf("private HOME contains overriding Docker config")
+		}
+		return nil
+	}
+	signer := newStubbedSigner(t, stub, Credential{})
+	if _, err := signer.Verify(t.Context(), ociSubject(), VerifyPolicy{}); err != nil {
+		t.Fatal(err)
+	}
+	if captured == "" {
+		t.Fatal("private credential environment was not exercised")
+	}
+	if _, err := os.Stat(captured); !os.IsNotExist(err) {
+		t.Fatal("private empty config outlived operation")
 	}
 }
 
@@ -412,6 +435,8 @@ func TestOCICosignEnvironmentScrub(t *testing.T) {
 	got := ociCosignEnvironment([]string{
 		"PATH=/usr/bin",
 		"HOME=/home/runner",
+		"XDG_CONFIG_HOME=/ambient/config",
+		"XDG_RUNTIME_DIR=/ambient/runtime",
 		"ACTIONS_ID_TOKEN_REQUEST_URL=https://token/request",
 		"ACTIONS_ID_TOKEN_REQUEST_TOKEN=abc",
 		"COSIGN_EXPERIMENTAL=1",
@@ -425,7 +450,7 @@ func TestOCICosignEnvironmentScrub(t *testing.T) {
 	}, "/private/nvkr/docker")
 	joined := strings.Join(got, "\n")
 	for _, want := range []string{
-		"PATH=/usr/bin", "HOME=/home/runner",
+		"PATH=/usr/bin", "HOME=/private/nvkr",
 		"ACTIONS_ID_TOKEN_REQUEST_URL=https://token/request",
 		"ACTIONS_ID_TOKEN_REQUEST_TOKEN=abc",
 		"DOCKER_CONFIG=/private/nvkr/docker",
@@ -436,7 +461,7 @@ func TestOCICosignEnvironmentScrub(t *testing.T) {
 	}
 	for _, forbidden := range []string{
 		"COSIGN_EXPERIMENTAL", "SIGSTORE_REKOR_URL", "TUF_ROOT", "SOURCE_DATE_EPOCH",
-		"LD_PRELOAD", "/home/runner/.docker", "REGISTRY_AUTH_FILE", "DOCKER_AUTH_CONFIG",
+		"LD_PRELOAD", "/home/runner", "XDG_CONFIG_HOME", "XDG_RUNTIME_DIR", "REGISTRY_AUTH_FILE", "DOCKER_AUTH_CONFIG",
 	} {
 		if strings.Contains(joined, forbidden) {
 			t.Fatalf("environment must scrub %q: %v", forbidden, got)
@@ -473,10 +498,6 @@ func TestCosignOCIStockExecutionFailsClosed(t *testing.T) {
 	}
 	requireSignCode(t, err, nvkrerr.CodeEngineCapability)
 }
-
-// ---------------------------------------------------------------------------
-// records
-// ---------------------------------------------------------------------------
 
 func TestSigningRecordValidateRefusesInconsistentRecords(t *testing.T) {
 	valid := SigningRecord{
@@ -531,5 +552,35 @@ func TestVerificationRecordValidateRefusesDryRunClaims(t *testing.T) {
 	record.SignatureVerified = false
 	if err := record.Validate(); err != nil {
 		t.Fatalf("valid dry-run verification record rejected: %v", err)
+	}
+}
+
+func TestOCICosignEnvironmentHomeRequiresReplacement(t *testing.T) {
+	for _, tc := range []struct {
+		name, directory, home string
+		keepCache             bool
+	}{
+		{"blob adapter", "", "/ambient/home", true},
+		{"OCI private workspace", "/private/work/docker", "/private/work", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			base := []string{"HOME=/ambient/home", "USERPROFILE=/ambient/profile", "XDG_CONFIG_HOME=/ambient/cache", "XDG_RUNTIME_DIR=/ambient/runtime", "DOCKER_CONFIG=/ambient/docker", "REGISTRY_AUTH_FILE=/ambient/auth", "ACTIONS_ID_TOKEN_REQUEST_URL=https://oidc.example/token", "ACTIONS_ID_TOKEN_REQUEST_TOKEN=identity-token", "COSIGN_PASSWORD=placeholder"}
+			got := ociCosignEnvironment(base, tc.directory)
+			values := map[string]string{}
+			for _, entry := range got {
+				if key, value, ok := strings.Cut(entry, "="); ok {
+					values[key] = value
+				}
+			}
+			if values["HOME"] != tc.home || values["ACTIONS_ID_TOKEN_REQUEST_TOKEN"] != "identity-token" {
+				t.Fatalf("home or signing identity environment changed: %v", got)
+			}
+			if (values["XDG_CONFIG_HOME"] != "") != tc.keepCache || (values["USERPROFILE"] != "") != tc.keepCache || (values["XDG_RUNTIME_DIR"] != "") != tc.keepCache {
+				t.Fatalf("cache scope differs from replacement scope: %v", got)
+			}
+			if values["DOCKER_CONFIG"] != tc.directory || values["REGISTRY_AUTH_FILE"] != "" || values["COSIGN_PASSWORD"] != "" {
+				t.Fatalf("registry or cosign configuration not scrubbed: %v", got)
+			}
+		})
 	}
 }

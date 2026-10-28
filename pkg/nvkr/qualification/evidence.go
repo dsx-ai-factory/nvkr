@@ -13,7 +13,9 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationorigin"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
@@ -21,6 +23,8 @@ import (
 
 const SchemaVersion = "nvkr.dev/qualification-evidence/v2"
 const GateVersion = "nvkr.dev/qualification-gate/v2"
+const DevelopmentSchemaVersion = "nvkr.dev/development-qualification-evidence/v1"
+const DevelopmentGateVersion = "nvkr.dev/development-qualification-gate/v1"
 
 // Verdict is diagnostic data. Only owner-issued receipts authorize publication.
 type Verdict struct {
@@ -54,10 +58,14 @@ var requiredArtifactChecks = []string{"build-signature-and-provenance", "embedde
 var subjectNamePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
 
 func (evidence Evidence) validate() error {
-	if evidence.SchemaVersion != SchemaVersion || evidence.GateVersion != GateVersion || evidence.ArtifactChecks.GateVersion != lifecycle.ArtifactCheckGateVersion {
+	dev := evidence.SchemaVersion == DevelopmentSchemaVersion && evidence.GateVersion == DevelopmentGateVersion
+	if (!dev && (evidence.SchemaVersion != SchemaVersion || evidence.GateVersion != GateVersion)) || evidence.ArtifactChecks.GateVersion != lifecycle.ArtifactCheckGateVersion {
 		return e.New(e.CodeVerifyFailed, "unknown qualification schema or gate version")
 	}
 	checks := evidence.ArtifactChecks
+	if dev != (checks.Origin.Branch != "") || dev != (evidence.Invocation.Branch != "") || dev != evidence.ToolSmoke.Policy.Source.Development {
+		return e.New(e.CodeVerifyFailed, "production qualification rejects development evidence")
+	}
 	if err := checks.Origin.Validate(); err != nil {
 		return err
 	}
@@ -66,7 +74,7 @@ func (evidence Evidence) validate() error {
 	}
 	if checks.Origin.Repository == "" || checks.Origin.Commit == "" || evidence.Invocation.Repository != checks.Origin.Repository ||
 		evidence.Invocation.BuilderID == checks.Origin.BuilderID || evidence.Invocation.InvocationID == checks.Origin.InvocationID ||
-		evidence.Invocation.Ref != checks.Origin.Ref || evidence.Invocation.BuilderID == "" || evidence.Invocation.InvocationID == "" {
+		(!dev && evidence.Invocation.Ref != checks.Origin.Ref) || evidence.Invocation.BuilderID == "" || evidence.Invocation.InvocationID == "" {
 		return e.New(e.CodeVerifyFailed, "qualification evidence lacks separate exact build and qualification identities")
 	}
 	for _, digest := range []string{checks.CatalogDigest, checks.Inputs.PolicyDigest, checks.Inputs.DefinitionDigest, checks.Inputs.EnvironmentDigest, checks.Inputs.PlanDigest, checks.Inputs.ContentSubject} {
@@ -82,6 +90,30 @@ func (evidence Evidence) validate() error {
 	}
 	if len(checks.Outputs) == 0 || len(evidence.Smoke) != len(checks.Outputs) {
 		return e.New(e.CodeReleaseIncomplete, "qualification evidence requires the complete output and smoke set")
+	}
+	if dev {
+		namespace, err := development.ParseNamespace("ghcr.io/" + strings.ToLower(checks.Origin.Repository) + "/development")
+		if err != nil {
+			return err
+		}
+		refs := []string{checks.Inputs.ReleaseSubject}
+		for _, output := range checks.Outputs {
+			refs = append(refs, output.Reference)
+		}
+		for _, ref := range refs {
+			repository, _, ok := strings.Cut(ref, "@")
+			if !ok {
+				return e.New(e.CodeVerifyFailed, "development evidence requires immutable subjects")
+			}
+			parsed, err := namespace.ParseReference(repository)
+			if err != nil {
+				return err
+			}
+			invocation := "https://github.com/" + namespace.Repository() + "/actions/runs/" + parsed.RunID() + "/attempts/" + parsed.Attempt()
+			if err := factory.ValidatePublicationInvocation(invocation, checks.Origin.InvocationID); err != nil {
+				return err
+			}
+		}
 	}
 	previous := ""
 	for _, output := range checks.Outputs {
@@ -225,6 +257,9 @@ func Decode(raw []byte) (Evidence, error) {
 	var evidence Evidence
 	if err := canonical.UnmarshalExact(raw, &evidence); err != nil {
 		return Evidence{}, e.Wrap(e.CodeVerifyFailed, err, "decoding qualification evidence")
+	}
+	if evidence.SchemaVersion != SchemaVersion {
+		return Evidence{}, e.New(e.CodeVerifyFailed, "production qualification decoder rejects development evidence")
 	}
 	if err := evidence.Validate(); err != nil {
 		return Evidence{}, err

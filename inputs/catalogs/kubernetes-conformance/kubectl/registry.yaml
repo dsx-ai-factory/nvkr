@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog/v3
+components:
+  kubectl:
+    artifactPath: nvkr-output/kubectl
+    buildCommand:
+      - bash
+      - -euc
+      - |
+        export GOENV=off GOWORK=/src/go.work GOTOOLCHAIN=local GOPROXY=off
+        build_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
+        go build -trimpath -mod=vendor -tags selinux,notest,grpcnotrace -ldflags "-s -w -buildid= -X k8s.io/component-base/version.gitVersion=$BUILD_VERSION -X k8s.io/component-base/version.gitCommit=$GIT_VERSION -X k8s.io/component-base/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/component-base/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/component-base/version.gitTreeState=dirty -X k8s.io/component-base/version.buildDate=$build_date -X k8s.io/client-go/pkg/version.gitVersion=$BUILD_VERSION -X k8s.io/client-go/pkg/version.gitCommit=$GIT_VERSION -X k8s.io/client-go/pkg/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/client-go/pkg/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/client-go/pkg/version.gitTreeState=dirty -X k8s.io/client-go/pkg/version.buildDate=$build_date" -o /src/nvkr-output/kubectl ./cmd/kubectl
+    cgo: false
+    fromSource: true
+    outputType: host-package
+    platforms:
+      - darwin/arm64
+      - linux/arm64
+    source: kubectl
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}-dirty'
+      GIT_VERSION: '{{.Commit}}'
+      KUBE_GIT_MAJOR: '{{.Major}}'
+      KUBE_GIT_MINOR: '{{.Minor}}'
+    writeDir: nvkr-output
+kind: SourceBuildRegistry
+metadata:
+  description: Exact Kubernetes1.36.3 with explicit bounded reviewed dependency transformation before workspace vendoring; diagnostic candidate only.
+  name: validation-kubectl-reviewed-candidate
+sources:
+  kubectl:
+    constraint: 1.36.3
+    repo: https://github.com/kubernetes/kubernetes
+    toolchainImagesByArch:
+      arm64: docker.io/library/golang@sha256:a83e961ad968e2e7abc2a59554e356f00c2a270a15fbb39f2c84a4caf13be9c3
+    vendorCommand:
+      - bash
+      - -euc
+      - |
+        export GOENV=off GOWORK=/src/go.work GOTOOLCHAIN=local GOFLAGS=
+        printf '%s\n' '1e271558a0cbc2f623a7647d360fc04f615b6126a5b1a6ac51c32fb38bcaf1c3  go.mod' '6b0e5fd38cc02025e9886628876e0d51fb6e65005a59f8ab6c414fbbef344d2a  go.sum' '5767a2d74f9df4c4bcc0ed4ef6c4de322d6d48ae4a041b0af8016a4f178cf234  go.work' '2143624a54f681afb5d9877bab0ab51ad0866af20bbfd873bc3ed4d7e6476171  go.work.sum' | sha256sum --quiet -c -
+        go mod edit -require=golang.org/x/net@v0.60.0 -require=golang.org/x/text@v0.42.0 -require=golang.org/x/sys@v0.48.0 -require=golang.org/x/term@v0.46.0 -require=go.opentelemetry.io/otel@v1.42.0 -require=go.opentelemetry.io/otel/metric@v1.42.0 -require=go.opentelemetry.io/otel/trace@v1.42.0
+        timeout --kill-after=10s 1080s go mod download all
+        printf '%s\n' 'cbea5a65ed672412415ca0908679d12abf398112176014a40896494d335ff140  go.mod' '6b0e5fd38cc02025e9886628876e0d51fb6e65005a59f8ab6c414fbbef344d2a  go.sum' '5767a2d74f9df4c4bcc0ed4ef6c4de322d6d48ae4a041b0af8016a4f178cf234  go.work' '5aeb619c3f0d507f576e99f8bb84970a97b31d6f4828ea0eadcaf3572511eca0  go.work.sum' | sha256sum --quiet -c -
+        GOPROXY=off timeout --kill-after=10s 60s go mod verify
+        GOPROXY=off timeout --kill-after=10s 240s go work vendor
+        printf '%s\n' 'cbea5a65ed672412415ca0908679d12abf398112176014a40896494d335ff140  go.mod' '6b0e5fd38cc02025e9886628876e0d51fb6e65005a59f8ab6c414fbbef344d2a  go.sum' '5767a2d74f9df4c4bcc0ed4ef6c4de322d6d48ae4a041b0af8016a4f178cf234  go.work' '5aeb619c3f0d507f576e99f8bb84970a97b31d6f4828ea0eadcaf3572511eca0  go.work.sum' | sha256sum --quiet -c -

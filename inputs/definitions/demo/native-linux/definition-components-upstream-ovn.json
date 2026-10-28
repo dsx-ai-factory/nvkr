@@ -1,0 +1,57 @@
+{
+  "apiVersion": "nvkr.dev/definition/v5",
+  "catalog": {
+    "base": "../../../catalogs/tools/native"
+  },
+  "kind": "Definition",
+  "metadata": {
+    "description": "Four existing pinned ARM64 bootstrap/deployment image producers for the explicit upstream OVN native diagnostic. Source versions remain explicit; no disk or complete distribution claim.",
+    "name": "nvke-native-linux-components-upstream-ovn"
+  },
+  "outputs": [
+    {
+      "catalog": {
+        "base": "../../../catalogs/capnico/local-arm64"
+      },
+      "components": [
+        "capnico-controller"
+      ],
+      "format": "oci",
+      "name": "capnico-controller-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/nvke/release"
+      },
+      "components": [
+        "cluster-api-provider-provisioned"
+      ],
+      "format": "oci",
+      "name": "cluster-api-provider-provisioned-arm64",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/controller-profiles/upstream-arm64"
+      },
+      "components": [
+        "nvke-local-profiles"
+      ],
+      "format": "oci",
+      "name": "controller-profiles-upstream-ovn",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../../catalogs/nvke/local-site-arm64"
+      },
+      "components": [
+        "nvke-controller"
+      ],
+      "format": "oci",
+      "name": "cwe",
+      "platform": "linux/arm64"
+    }
+  ]
+}

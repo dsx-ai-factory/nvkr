@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationorigin"
@@ -50,6 +51,9 @@ func (policy QualificationPolicy) Validate() error {
 	}
 	if err := policy.Source.Validate(); err != nil {
 		return err
+	}
+	if policy.Source.Development && (policy.Source.Workflow != development.ProducerWorkflow || policy.QualificationWorkflow != development.QualificationWorkflow || policy.Smoke == nil || policy.Smoke.Workflow != development.SmokeWorkflow) {
+		return e.New(e.CodeTrustPolicyMissing, "development qualification requires its dedicated producer, qualifier and smoke workflows")
 	}
 	if policy.QualificationWorkflow != "" {
 		qualifier := policy.Source

@@ -1,0 +1,215 @@
+--- a/controller/nico-sim/Makefile
++++ b/controller/nico-sim/Makefile
+@@ -14,6 +14,13 @@
+ 	@echo
+ 
+ GO ?= go
++
++# Release producers supply these from their exact source selection.
++BUILD_VERSION ?= dev
++GIT_COMMIT ?= unknown
++GIT_TREE_STATE ?= unknown
++VERSION_PACKAGE := github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/version
++VERSION_LDFLAGS := -X $(VERSION_PACKAGE).BuildVersion=$(BUILD_VERSION) -X $(VERSION_PACKAGE).GitCommit=$(GIT_COMMIT) -X $(VERSION_PACKAGE).GitTreeState=$(GIT_TREE_STATE)
+ 
+ REPO_ROOT := $(shell pwd)
+ BINARY := $(REPO_ROOT)/bin/nico-sim
+@@ -44,12 +51,12 @@
+ NICO_VMS_BASE_IMAGE ?= images/ubuntu-cloud.qcow2
+ 
+ build: ## Build this module's binaries.
+-	$(GO) build -o $(BINARY) ./cmd/nico-sim
+-	$(GO) build -o ./bin/nico-simctl ./cmd/nico-simctl
++	$(GO) build -ldflags "$(VERSION_LDFLAGS)" -o $(BINARY) ./cmd/nico-sim
++	$(GO) build -ldflags "$(VERSION_LDFLAGS)" -o ./bin/nico-simctl ./cmd/nico-simctl
+ 
+ build-static: ## Build a static nico-sim binary for minimal Linux containers.
+ 	CGO_ENABLED=1 $(GO) build -tags "netgo osusergo" \
+-		-ldflags "-linkmode external -extldflags -static" \
++		-ldflags "$(VERSION_LDFLAGS) -linkmode external -extldflags -static" \
+ 		-o $(BINARY) ./cmd/nico-sim
+ 
+ # Build + apply CAP_NET_ADMIN (requires sudoers rule — see setup script)
+--- a/controller/nico-sim/cmd/nico-sim/main.go
++++ b/controller/nico-sim/cmd/nico-sim/main.go
+@@ -18,9 +18,13 @@
+ 	"github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/app"
+ 	nvmconfig "github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/config"
+ 	"github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/seed"
++	"github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/version"
+ )
+ 
+ func main() {
++	if handled, code := version.Run(os.Args[1:], os.Stdout, os.Stderr); handled {
++		os.Exit(code)
++	}
+ 	if len(os.Args) > 1 {
+ 		switch os.Args[1] {
+ 		case "test-server":
+--- a/controller/nico-sim/cmd/nico-simctl/main.go
++++ b/controller/nico-sim/cmd/nico-simctl/main.go
+@@ -7,6 +7,7 @@
+ 	"bytes"
+ 	"encoding/json"
+ 	"fmt"
++	"github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/version"
+ 	"io"
+ 	"net/http"
+ 	"net/url"
+@@ -23,6 +24,9 @@
+ }
+ 
+ func main() {
++	if handled, code := version.Run(os.Args[1:], os.Stdout, os.Stderr); handled {
++		os.Exit(code)
++	}
+ 	if len(os.Args) < 3 {
+ 		usage()
+ 		os.Exit(2)
+--- /dev/null
++++ b/controller/nico-sim/docs/version.md
+@@ -0,0 +1,22 @@
++# Executable version information
++
++Both executables support a version command that exits before reading configuration,
++opening state, contacting a server or initializing a VM backend:
++
++```sh
++nico-sim version --output=json
++nico-simctl version --output=json
++```
++
++The JSON contains `buildVersion`, `gitCommit`, `gitTreeState` and `platform`.
++`version` and `--version` produce the same JSON. Unsupported version arguments
++exit with status 2; an output failure exits with status 1.
++
++Release producers supply `BUILD_VERSION`, `GIT_COMMIT` and `GIT_TREE_STATE` to
++`make build` or `make build-static`. The commit must identify their actual source
++selection, and the tree state must reflect their observed source tree. Direct
++Go builds can set the corresponding variables in `internal/version` using `-X`.
++Unstamped builds report `dev` and `unknown`; they do not claim clean release provenance.
++
++Version output is a diagnostic. Independent artifact checks still need to bind
++the executable bytes and reported stamps to their producing source and build.
+--- /dev/null
++++ b/controller/nico-sim/internal/version/version.go
+@@ -0,0 +1,47 @@
++// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++// SPDX-License-Identifier: Apache-2.0
++
++// Package version owns the side-effect-free version interface shared by both
++// NICoSim executables. Release producers set the stamps with Go linker flags.
++package version
++
++import (
++	"encoding/json"
++	"fmt"
++	"io"
++	"runtime"
++	"slices"
++)
++
++// BuildVersion is the release version, or dev for an unstamped build.
++var BuildVersion = "dev"
++
++// GitCommit is the complete source revision, or unknown for an unstamped build.
++var GitCommit = "unknown"
++
++// GitTreeState is the producer-observed source state; unstamped builds say unknown.
++var GitTreeState = "unknown"
++
++// Run handles the version command before configuration, state, network or VM
++// initialization. Unrelated commands return handled=false without writing.
++// Invalid version arguments return 2; output failures return 1.
++func Run(args []string, stdout, stderr io.Writer) (handled bool, code int) {
++	if len(args) == 0 || (args[0] != "version" && args[0] != "--version") {
++		return false, 0
++	}
++	if len(args) != 1 && !slices.Equal(args, []string{"version", "--output=json"}) {
++		fmt.Fprintln(stderr, "usage: version [--output=json]")
++		return true, 2
++	}
++	info := struct {
++		BuildVersion string `json:"buildVersion"`
++		GitCommit    string `json:"gitCommit"`
++		GitTreeState string `json:"gitTreeState"`
++		Platform     string `json:"platform"`
++	}{BuildVersion, GitCommit, GitTreeState, runtime.GOOS + "/" + runtime.GOARCH}
++	if err := json.NewEncoder(stdout).Encode(info); err != nil {
++		fmt.Fprintln(stderr, "writing version:", err)
++		return true, 1
++	}
++	return true, 0
++}
+--- /dev/null
++++ b/controller/nico-sim/internal/version/version_test.go
+@@ -0,0 +1,69 @@
++// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++// SPDX-License-Identifier: Apache-2.0
++
++package version
++
++import (
++	"bytes"
++	"encoding/json"
++	"errors"
++	"runtime"
++	"testing"
++)
++
++func TestVersionCommand(t *testing.T) {
++	for _, tc := range []struct {
++		name    string
++		args    []string
++		handled bool
++		code    int
++	}{
++		{"default", nil, false, 0},
++		{"other command", []string{"test-server"}, false, 0},
++		{"version", []string{"version"}, true, 0},
++		{"explicit JSON", []string{"version", "--output=json"}, true, 0},
++		{"version flag", []string{"--version"}, true, 0},
++		{"wrong output", []string{"version", "--output=yaml"}, true, 2},
++		{"extra argument", []string{"version", "unexpected"}, true, 2},
++		{"extra flag argument", []string{"--version", "unexpected"}, true, 2},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			var out, diagnostic bytes.Buffer
++			handled, code := Run(tc.args, &out, &diagnostic)
++			if handled != tc.handled || code != tc.code {
++				t.Fatalf("handled=%v code=%d", handled, code)
++			}
++			if !handled || code != 0 {
++				if out.Len() != 0 {
++					t.Fatal("failed or unrelated command emitted version")
++				}
++				if !handled && diagnostic.Len() != 0 {
++					t.Fatal("unrelated command emitted diagnostic")
++				}
++				return
++			}
++			if diagnostic.Len() != 0 {
++				t.Fatal("successful version emitted diagnostic")
++			}
++			var got map[string]string
++			if err := json.Unmarshal(out.Bytes(), &got); err != nil {
++				t.Fatal(err)
++			}
++			if len(got) != 4 || got["buildVersion"] != BuildVersion || got["gitCommit"] != GitCommit || got["gitTreeState"] != GitTreeState || got["platform"] != runtime.GOOS+"/"+runtime.GOARCH {
++				t.Fatalf("wrong stamps: %v", got)
++			}
++		})
++	}
++}
++
++type failedWriter struct{}
++
++func (failedWriter) Write([]byte) (int, error) { return 0, errors.New("fixture output failure") }
++
++func TestVersionWriteFailure(t *testing.T) {
++	var diagnostic bytes.Buffer
++	handled, code := Run([]string{"version"}, failedWriter{}, &diagnostic)
++	if !handled || code != 1 || diagnostic.Len() == 0 {
++		t.Fatalf("handled=%v code=%d", handled, code)
++	}
++}

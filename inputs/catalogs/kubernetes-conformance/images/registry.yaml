@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog/v3
+components:
+  busybox-image:
+    outputType: oci-image
+    platforms:
+      - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: registry.k8s.io/e2e-test-images/busybox@sha256:55c89c6d9404d6668eb237dda92f28a99eb14e640f1c177a55cc9d738c53c303
+    source: hydrophone-suite-selection
+  conformance-image:
+    outputType: oci-image
+    platforms:
+      - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: registry.k8s.io/conformance@sha256:a308614b20795ed57586bbe929721909ba4524d7babfe44b70b18b56f5edb375
+    source: hydrophone-suite-selection
+kind: SourceBuildRegistry
+metadata:
+  description: Original recorded local ARM64 diagnostic suite image selections, acquired through ordinary OCI outputs; no deployment or conformance acceptance claim.
+  name: kubernetes-conformance-runtime-arm64
+sources:
+  hydrophone-suite-selection:
+    repo: https://github.com/kubernetes-sigs/hydrophone

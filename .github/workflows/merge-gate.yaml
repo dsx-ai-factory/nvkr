@@ -72,10 +72,6 @@ concurrency:
 
 jobs:
 
-  # ---------------------------------------------------------------------------
-  # Path classification — determines which checks run vs skip
-  # ---------------------------------------------------------------------------
-
   check-paths:
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -101,10 +97,17 @@ jobs:
       pipeline: ${{ github.event_name != 'pull_request' && 'true' || steps.changes.outputs.pipeline }}
       notices: ${{ github.event_name != 'pull_request' && 'true' || steps.changes.outputs.notices }}
       docs: ${{ github.event_name != 'pull_request' && 'true' || steps.changes.outputs.docs }}
+      test-matrix: ${{ steps.test-matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Derive complete test matrix
+        id: test-matrix
+        run: |
+          matrix=$(python3 -B scripts/ci-test-shard.py --matrix)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
       # Pull requests only: the outputs above already force every category
       # true elsewhere, and on a push event this action diffs against
@@ -117,14 +120,17 @@ jobs:
         with:
           filters: |
             code:
-              # Everything the `check` job compiles, lints, or tests, plus the
+              # Everything the repository jobs compile, lint, or test, plus the
               # files that define the check itself: the Makefile recipes, the
               # pinned Go toolchain, the lint configuration, and this workflow.
               - 'client/**'
               - 'cmd/**'
               - 'internal/**'
               - 'pkg/**'
+              - 'inputs/**'
+              # Watched so definitions-location-check runs on any re-addition.
               - 'definitions/**'
+              - 'docs/examples/**'
               - 'scripts/**'
               - 'demos/**'
               - 'testdata/**'
@@ -153,14 +159,20 @@ jobs:
               # Everything `run generate` consumes or emits, plus the files that
               # define the check itself, so a change to the gate cannot skip the
               # gate it changes.
-              - 'definitions/**'
+              - 'inputs/**'
               - '.github/workflows/nvkr-run.yml'
               - '.github/nvkr-run/**'
+              - '.github/workflows/nvkr-run-*.yml'
+              - '.github/nvkr-run-*/**'
               - '.github/workflows/nvkr-qualify.yml'
               - '.github/workflows/nvkr-smoke.yml'
               - '.github/nvkr-qualification/**'
               - '.github/workflows/nvkr-dev.yml'
               - '.github/nvkr-dev/**'
+              - '.github/workflows/nvkr-dev-qualify.yml'
+              - '.github/workflows/nvkr-dev-smoke.yml'
+              - '.github/nvkr-dev-qualification/**'
+              - '.github/workflows/catalog-refresh.yaml'
               - 'cmd/**'
               - 'client/**'
               - 'internal/**'
@@ -199,47 +211,28 @@ jobs:
               - 'Makefile'
               - '.github/workflows/merge-gate.yaml'
 
-  # ---------------------------------------------------------------------------
   # Repository checks — the same gates `make check` runs locally, plus build
-  # ---------------------------------------------------------------------------
 
   check:
     needs: [check-paths]
     if: needs.check-paths.outputs.code == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        id: go
         with:
           go-version-file: .go-version
           cache: false
 
-      # This job owns its instrumented build cache. Other jobs must not win a
-      # shared immutable key with a cache that never compiled the race tests.
-      - name: Locate Go caches
-        id: cache-paths
-        run: |
-          echo "modules=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
-          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-
-      - name: Restore check cache
-        id: go-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ${{ steps.cache-paths.outputs.modules }}
-            ${{ steps.cache-paths.outputs.build }}
-          key: nvkr-check-v1-${{ runner.os }}-${{ runner.arch }}-go${{ steps.go.outputs.go-version }}-${{ hashFiles('go.sum', 'toolchains/govulncheck/go.sum') }}-${{ github.sha }}
-          restore-keys: |
-            nvkr-check-v1-${{ runner.os }}-${{ runner.arch }}-go${{ steps.go.outputs.go-version }}-${{ hashFiles('go.sum', 'toolchains/govulncheck/go.sum') }}-
-
       - name: fmt-check
         run: make fmt-check
+
+      - name: definitions-location-check
+        run: make definitions-location-check
 
       - name: license-header-check
         run: make license-header-check
@@ -247,26 +240,113 @@ jobs:
       - name: vet
         run: make vet
 
-      # golangci-lint-action v9 supports the golangci-lint v2 config schema
-      # (.golangci.yml `version: "2"`). SHA-pinned for supply-chain safety.
+      - name: shellcheck
+        run: make shellcheck
+
+      - name: CI sharding, report and adapter tests
+        run: make test-ci-tools
+
+      - name: build
+        run: make build
+
+  # Lint installation/analysis, vulnerability scanning and tests are independent
+  # checks. Serializing them added minutes before the first test could start.
+  lint:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+
+      # Verify the public tool archive before extraction. Keep the binary in
+      # runner-local temporary storage instead of rebuilding it on every PR.
+      - name: Install checksum-pinned golangci-lint
+        shell: bash
+        run: |
+          set -euo pipefail
+          lint_version=2.14.0
+          lint_archive="golangci-lint-${lint_version}-linux-amd64.tar.gz"
+          lint_install_root=$(mktemp -d "$RUNNER_TEMP/golangci-lint.XXXXXX")
+          curl --fail --silent --show-error --location \
+            --connect-timeout 10 --max-time 60 --retry 2 --retry-max-time 90 \
+            "https://github.com/golangci/golangci-lint/releases/download/v${lint_version}/${lint_archive}" \
+            --output "$lint_install_root/$lint_archive"
+          if ! printf '%s  %s\n' \
+            'ab90aeb7b066f92a33415b638a50fe5344bbb75a0d32ad30cc248d88f81032ab' \
+            "$lint_install_root/$lint_archive" | sha256sum --check --status; then
+            echo '::error::golangci-lint checksum verification failed'
+            exit 1
+          fi
+          tar -xzf "$lint_install_root/$lint_archive" -C "$lint_install_root" \
+            "golangci-lint-${lint_version}-linux-amd64/golangci-lint"
+          echo "$lint_install_root/golangci-lint-${lint_version}-linux-amd64" >> "$GITHUB_PATH"
+
       - name: lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.14.0
-          # Build the importer with setup-go's exact SDK. Older release
-          # binaries cannot read Go 1.27.2's version-5 export data.
-          install-mode: goinstall
+          install-mode: none
+          skip-cache: true
 
-      - name: shellcheck
-        run: make shellcheck
+  vulnerabilities:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - name: CI report tests
-        run: make test-ci-tools
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
 
-      - name: test (fast default)
+      - name: Go vulnerability check
+        run: make vulncheck
+
+  tests:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.code == 'true'
+    # Tests need disk-backed /tmp and GNU tools, unlike Ubuntu 26.04.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    strategy:
+      # Keep every shard's diagnostics when another fails. The aggregate gate
+      # requires the entire matrix to succeed.
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.check-paths.outputs.test-matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+
+      - name: test (ordinary suite shard)
         id: tests
         shell: bash
-        run: make test GO_TEST_FLAGS=-json | tee "$RUNNER_TEMP/go-test.jsonl"
+        env:
+          # Rendered workflow-step tests fail instead of skipping when bash, git, jq or yq is missing.
+          NVKR_REQUIRE_SHELL_TOOLS: '1'
+          # Disk transport tests require writable disk-backed scratch.
+          # The runner's /tmp may be tmpfs.
+          TMPDIR: ${{ runner.temp }}
+          TEST_SHARD_GROUP: ${{ matrix.group }}
+          TEST_SHARD_INDEX: ${{ matrix.index }}
+        run: make test-shard | tee "$RUNNER_TEMP/go-test.jsonl"
 
       - name: Summarize test timings
         if: always() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure')
@@ -276,26 +356,11 @@ jobs:
         if: always() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: merge-gate-tests
+          name: merge-gate-tests-${{ matrix.group }}-${{ matrix.index }}
           path: |
             ${{ runner.temp }}/go-test.jsonl
           retention-days: 7
           if-no-files-found: error
-
-      - name: build
-        run: make build
-
-      - name: Go vulnerability check
-        run: make vulncheck
-
-      - name: Save check cache
-        if: success() && steps.go-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ${{ steps.cache-paths.outputs.modules }}
-            ${{ steps.cache-paths.outputs.build }}
-          key: ${{ steps.go-cache.outputs.cache-primary-key }}
 
   check-skip:
     needs: [check-paths]
@@ -305,13 +370,11 @@ jobs:
     steps:
       - run: echo "No code changes — repository checks not required"
 
-  # ---------------------------------------------------------------------------
   # Workflow linting
   #
   # Highest value on this repository specifically: workflows here are generated
   # rather than hand-written, so a malformed emission should fail the gate
   # rather than land.
-  # ---------------------------------------------------------------------------
 
   actionlint:
     needs: [check-paths]
@@ -363,7 +426,6 @@ jobs:
     steps:
       - run: echo "No workflow/action changes — actionlint not required"
 
-  # ---------------------------------------------------------------------------
   # PLANNED: verify-licenses
   #
   # CONTRIBUTING.md names "Apache-clean" a load-bearing invariant — no
@@ -371,9 +433,7 @@ jobs:
   # enforces it. Needs a `make license-check` target first so the local gate
   # and CI stay equal. Add a `deps` path filter watching go.mod, go.sum,
   # Makefile, .go-version, and this workflow.
-  # ---------------------------------------------------------------------------
 
-  # ---------------------------------------------------------------------------
   # Generated-pipeline drift (ADR-21 §2)
   #
   # The committed Run workflow and its plan must equal what `run generate`
@@ -386,7 +446,6 @@ jobs:
   #
   # Per ADR-21 §2 this job lives OUTSIDE the emitted pipeline and does not
   # self-check recursively.
-  # ---------------------------------------------------------------------------
 
   workflows-regen:
     needs: [check-paths]
@@ -404,7 +463,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: .go-version
-          cache: true
+          cache: false
 
       # Catalog validation re-reads the pinned NVKE tree. Acquire it with a
       # fixed action before running checkout code; never pass this token to
@@ -414,13 +473,13 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: dsx-ai-factory/nvke
-          ref: 33fb71b2f4224b470ebc628a9165fc4b92870406 # v0.21.0
+          ref: 6991e36bef8f15b42b6f6519ccff089c587a6e49 # v0.22.0-beta.1
           fetch-depth: 0
           path: .nvkr-inputs/nvke
           token: ${{ secrets.NKE_SOURCE_TOKEN }}
           persist-credentials: false
 
-      - name: Verify committed producer and qualification generation is current
+      - name: Verify committed producer, qualification and catalog refresh generation is current
         env:
           GIT_CONFIG_COUNT: '1'
           GIT_CONFIG_KEY_0: url.${{ github.workspace }}/.nvkr-inputs/nvke/.insteadOf
@@ -449,12 +508,10 @@ jobs:
           github.event.pull_request.head.repo.full_name == github.repository
         run: echo "No pipeline inputs changed — regeneration check not required"
 
-  # ---------------------------------------------------------------------------
   # Third-party notices drift — THIRD_PARTY_NOTICES.md must regenerate
   # byte-for-byte from the linked module set, the same "local equals CI" and
   # "generated files regenerate byte-for-byte" contract workflows-check
   # enforces. Adding a dependency without rerunning `make notices` fails here.
-  # ---------------------------------------------------------------------------
 
   notices-regen:
     needs: [check-paths]
@@ -469,7 +526,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: .go-version
-          cache: true
+          cache: false
 
       - name: Verify THIRD_PARTY_NOTICES.md is current
         run: make notices-check
@@ -482,7 +539,6 @@ jobs:
     steps:
       - run: echo "No dependency or notices inputs changed — notices check not required"
 
-  # ---------------------------------------------------------------------------
   # Fern docs — the operator-facing site published from docs/index.yml.
   #
   # `make docs-check` runs the MDX safety checker, `fern check`, `fern docs md
@@ -490,7 +546,6 @@ jobs:
   # fork PRs. The Fern CLI is intentionally installed unpinned (`@latest`), so
   # an upstream Fern release can fail this check without a change in this
   # repository; Node itself is pinned by setup-node.
-  # ---------------------------------------------------------------------------
 
   docs:
     needs: [check-paths]
@@ -521,7 +576,6 @@ jobs:
     steps:
       - run: echo "No docs or Fern inputs changed — docs check not required"
 
-  # ---------------------------------------------------------------------------
   # Static analysis (CodeQL)
   #
   # Uploading results needs `security-events: write`. On a private or internal
@@ -529,7 +583,6 @@ jobs:
   # is free, which is why a workflow copied from a public repository can pass
   # there and fail here. A fork PR never receives the scope, so this job must
   # be allowed to fail on fork runs or be reached via the copy-pr-bot mirror.
-  # ---------------------------------------------------------------------------
 
   analyze:
     needs: [check-paths]
@@ -554,15 +607,32 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: .go-version
-          cache: true
+          cache: false
 
-      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+      # CodeQL automatically uploads complete/partial databases as Actions
+      # artifacts in runner debug mode, even when debug and upload-database are
+      # false. RUNNER_DEBUG is provider-owned and cannot be overridden by env.
+      - name: Admit CodeQL without database artifact uploads
+        run: |
+          if [ "${RUNNER_DEBUG:-0}" = '1' ]; then
+            echo '::error::[NVKR-E-ENGINE-CAPABILITY] CodeQL debug reruns upload compiled databases; rerun with debug logging disabled.'
+            exit 1
+          fi
+
+      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        env:
+          CODEQL_OVERLAY_DATABASE_MODE: none
         with:
           languages: go
+          debug: false
+          trap-caching: false
+          dependency-caching: false
 
       - run: go build ./...
 
-      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          upload-database: false
 
   analyze-skip:
     needs: [check-paths]
@@ -574,22 +644,19 @@ jobs:
     steps:
       - run: echo "No code changes — CodeQL not required"
 
-  # ---------------------------------------------------------------------------
   # PLANNED: malware-scan (ClamAV)
   #
   # A port of AICR's 197-line composite action; kept separate because it
   # introduces a new local action rather than reusing an upstream one.
-  # ---------------------------------------------------------------------------
-
-  # ---------------------------------------------------------------------------
-  # Aggregate gate — the single required status check
-  # ---------------------------------------------------------------------------
 
   gate:
     if: always()
     needs:
       - check-paths
       - check
+      - lint
+      - vulnerabilities
+      - tests
       - check-skip
       - actionlint
       - actionlint-skip
@@ -616,6 +683,19 @@ jobs:
           # skipped (not failed), which would silently pass the gate.
           if [ "${{ needs.check-paths.result }}" != "success" ]; then
             echo "::error::check-paths did not succeed (result: ${{ needs.check-paths.result }})"
+            exit 1
+          fi
+
+          # A successful matrix means every test shard passed. Never treat a
+          # skipped code job as success when the classifier required it.
+          if [ "${{ needs.check-paths.outputs.code }}" = 'true' ]; then
+            echo '${{ toJSON(needs) }}' | jq -e \
+              '[.check, .lint, .vulnerabilities, .tests] | all(.result == "success")' >/dev/null
+          elif [ "${{ needs.check-paths.outputs.code }}" = 'false' ]; then
+            echo '${{ toJSON(needs) }}' | jq -e \
+              '.["check-skip"].result == "success" and ([.check, .lint, .vulnerabilities, .tests] | all(.result == "skipped"))' >/dev/null
+          else
+            echo '::error::Code classification must be true or false'
             exit 1
           fi
 

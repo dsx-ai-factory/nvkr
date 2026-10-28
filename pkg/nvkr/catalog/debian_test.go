@@ -102,6 +102,13 @@ func TestDebianProducerRoutesAreCompleteAndPinned(t *testing.T) {
 		{"missing platform route", func(c *Component) { c.Platforms = append(c.Platforms, "linux/arm64") }, e.CodeInvalidCatalog},
 		{"common toolchain", func(c *Component) { c.ToolchainImage = goodImage }, e.CodeInvalidCatalog},
 		{"common command", func(c *Component) { c.BuildCommand = []string{"make"} }, e.CodeInvalidCatalog},
+		{"platform command", func(c *Component) {
+			c.BuildCommandByPlatform = map[string][]string{"linux/amd64": {"make", "other-deb"}}
+		}, e.CodeInvalidCatalog},
+		{"Darwin platform", func(c *Component) {
+			c.Platforms = []string{"darwin/arm64"}
+			c.Debian.Routes[0].Target.Platform = "darwin/arm64"
+		}, e.CodeInvalidCatalog},
 		{"competing output", func(c *Component) { c.OutputType = "host-package" }, e.CodeInvalidCatalog},
 		{"not from source", func(c *Component) { c.FromSource = false }, e.CodeInvalidCatalog},
 		{"other builder", func(c *Component) { c.BuilderType = BuilderNix }, e.CodeInvalidCatalog},

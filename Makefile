@@ -10,12 +10,17 @@ DEMO_TEST_BIN ?= bin/nvke-demo.test
 PKG         := ./...
 # Optional diagnostic flags, e.g. GO_TEST_FLAGS=-json for CI timing capture.
 GO_TEST_FLAGS ?=
+# Bound each package explicitly; the local unsharded suite can exceed Go's
+# implicit 10-minute default. Hosted shards have a separate five-minute job budget.
+GO_TEST_TIMEOUT ?= 20m
+# CI splits the ordinary suite; reproduce any matrix entry with make test-shard.
+TEST_SHARD_GROUP ?=
+TEST_SHARD_INDEX ?=
 # Dispatch is explicit about the repository: a checkout may have a fork and upstream.
 PIPELINE_DEV_REPO ?=
 export PIPELINE_DEV_REPO
 # Module source dirs only (never the vendored trees checked out under .nvkr/).
 GOSRC       := client cmd internal pkg
-GOFILES     := $(shell find $(GOSRC) -type f -name '*.go' -print)
 GO_VERSION  := $(shell cat .go-version 2>/dev/null)
 VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT      := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -43,15 +48,15 @@ info: ## Print version / toolchain info.
 	@echo "go:          $(GO_VERSION)"
 	@echo "gotoolchain: $(GOTOOLCHAIN)"
 
-# --- build ------------------------------------------------------------------
-
 .PHONY: build
 build: go-version-check ## Compile the nvkr binary.
 	go build -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/nvkr
+	chmod 0755 $(BIN)
 
 .PHONY: demo demo-test-bin
 demo: go-version-check ## Build the downstream Go local NVKE demo CLI (calls nvkr).
 	go build -o $(DEMO_BIN) ./cmd/nvke-demo
+	chmod 0755 $(DEMO_BIN)
 
 demo-test-bin: go-version-check ## Compile opt-in native NVKE E2E tests; does not run them.
 	go test -c -o $(DEMO_TEST_BIN) ./internal/nvkedemo
@@ -64,8 +69,6 @@ install: ## Install nvkr into $$(go env GOBIN).
 nvkr-exec-helper: ## Reproducibly build the ADR-18 nvkr-exec helper binaries + write the lock (ARGS=--image also assembles the image).
 	@bash toolchains/nvkr-exec/build-nvkr-exec.sh $(ARGS)
 
-# --- quality ----------------------------------------------------------------
-
 .PHONY: go-version-check
 go-version-check: ## Require the exact Go patch pinned in .go-version.
 	@actual="$$(go env GOVERSION)"; expected="go$(GO_VERSION)"; \
@@ -73,11 +76,12 @@ go-version-check: ## Require the exact Go patch pinned in .go-version.
 
 .PHONY: fmt
 fmt: ## Format code (gofmt -s -w).
-	gofmt -s -w $(GOFILES)
+	gofmt -s -w $(GOSRC)
 
 .PHONY: fmt-check
 fmt-check: ## Check formatting (CI-friendly, no writes).
-	@test -z "$$(gofmt -l $(GOFILES))" || { echo "unformatted files — run 'make fmt':"; gofmt -l $(GOFILES); exit 1; }
+	@unformatted="$$(gofmt -l $(GOSRC))" || exit $$?; \
+	  test -z "$$unformatted" || { echo "unformatted files — run 'make fmt':"; printf '%s\n' "$$unformatted"; exit 1; }
 	@echo "formatting ok"
 
 .PHONY: vet
@@ -101,7 +105,11 @@ vulncheck: go-version-check ## Check reachable Go vulnerabilities using the pinn
 
 .PHONY: test
 test: ## Fast default tests for CI and agents (no extended fixtures or instrumentation).
-	go test $(GO_TEST_FLAGS) $(PKG)
+	go test -timeout $(GO_TEST_TIMEOUT) $(GO_TEST_FLAGS) $(PKG)
+
+.PHONY: test-shard
+test-shard: go-version-check ## Reproduce one CI test shard (TEST_SHARD_GROUP and TEST_SHARD_INDEX required).
+	python3 -B scripts/ci-test-shard.py --group '$(TEST_SHARD_GROUP)' --index '$(TEST_SHARD_INDEX)' --timeout '$(GO_TEST_TIMEOUT)'
 
 .PHONY: test-race
 test-race: ## Opt-in race detection and coverage for the default suite.
@@ -113,7 +121,7 @@ test-full: ## Include extended capacity/integration fixtures with race + coverag
 	NVKR_TEST_EXTENDED=1 $(MAKE) test-race
 
 .PHONY: test-ci-tools
-test-ci-tools: ## Require Python and check the existing CI report tools.
+test-ci-tools: ## Require Python and check CI sharding, reports and local adapters.
 	python3 -B -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else "Python 3.12+ is required for CI report tests")'
 	python3 -B -m unittest discover -s scripts -p '*_test.py'
 
@@ -123,7 +131,7 @@ cover: test-race ## Open the HTML coverage report in a browser.
 
 .PHONY: tidy
 tidy: ## Format + go mod tidy.
-	gofmt -s -w $(GOFILES)
+	gofmt -s -w $(GOSRC)
 	go mod tidy
 
 .PHONY: notices
@@ -173,10 +181,12 @@ LICENSE_HOLDER     := NVIDIA CORPORATION & AFFILIATES
 # build output. Keep LICENSE_UNCHECKED in step with LICENSE_IGNORES.
 LICENSE_IGNORES := -ignore '**/testdata/**' -ignore '**/pins.lock.yaml' \
 	-ignore '.github/workflows/nvkr-run.yml' -ignore '.github/workflows/nvkr-qualify.yml' \
+	-ignore '.github/workflows/nvkr-run-*.yml' \
+	-ignore '.github/workflows/nvkr-dev-qualify.yml' -ignore '.github/workflows/nvkr-dev-smoke.yml' \
 	-ignore '.github/workflows/nvkr-smoke.yml' -ignore '.github/workflows/nvkr-dev.yml' -ignore '**/*.tmpl' \
 	-ignore 'docs/evidence/**' -ignore 'docs/**/*.yaml' -ignore 'docs/**/*.yml' \
 	-ignore '.nvkr/**' -ignore '.nvkr-inputs/**' -ignore '.claude/**' -ignore 'bin/**'
-LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-(run|qualify|smoke|dev)\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
+LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-(run(-[a-z0-9-]+)?|qualify|smoke|dev(-qualify|-smoke)?)\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
 ADDLICENSE := go run github.com/google/addlicense@$(ADDLICENSE_VERSION)
 # addlicense walks every directory under its argument, including untracked ones
 # such as other worktrees, so hand it Git's file list instead of ".".
@@ -185,6 +195,12 @@ LICENSE_FILES := git ls-files -z --cached --others --exclude-standard
 .PHONY: license
 license: ## Add the SPDX license header to source files that lack one.
 	$(LICENSE_FILES) | xargs -0 $(ADDLICENSE) -f scripts/license-header.tmpl -c "$(LICENSE_HOLDER)" $(LICENSE_IGNORES)
+
+.PHONY: definitions-location-check
+definitions-location-check: ## Fail when a file is tracked under the retired top-level definitions/ directory.
+	@files=$$(git ls-files -- ':/definitions') || exit 1; \
+	if [ -n "$$files" ]; then printf '%s\n' "$$files" >&2; \
+		echo "ERROR: authored Definitions belong under inputs/ (see inputs/README.md), not top-level definitions/" >&2; exit 1; fi
 
 .PHONY: license-header-check
 license-header-check: ## Fail when a source file has no license header.
@@ -211,45 +227,96 @@ workflow-generator: go-version-check
 		-o bin/nvkr-exec ./cmd/nvkr
 
 .PHONY: workflows-check
-workflows-check: workflow-generator pipeline-dev-check ## Check committed producer, qualification and development bundles for drift.
+workflows-check: workflow-generator pipeline-dev-check nvke-split-check catalog-refresh-check ## Check committed producer, qualification, development and family bundles and the catalog refresh workflow for drift.
 	@# Repeat the committed Plan's authored selection, including focused feature-branch
 	@# Definitions. The generator still authenticates the complete bundle and inputs.
 	@definition="$$(jq -er '.definitionPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
 	 environment="$$(jq -er '.environmentPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
 	 bin/nvkr-exec run generate --engine github \
 		--definition "$$definition" --environment "$$environment" \
-		--qualification-policy definitions/nvke-m2/qualification.yaml \
-		--root . --check
+		--qualification-policy inputs/policies/nvke-qualification.yaml --root . --check
+	bin/nvkr-exec run generate --engine github \
+		--definition inputs/definitions/demo/arm64-nvidia-kvm.json \
+		--environment inputs/environments/github-nightly-nvidia.json \
+		--root . --runtime --check
+	bin/nvkr-exec run generate --engine github \
+		--definition inputs/definitions/demo/arm64-upstream-kvm.json \
+		--environment inputs/environments/github-nightly-upstream.json \
+		--root . --runtime --check
+
+# The private NVKE source the installed catalog refresh workflow was rendered with.
+CATALOG_REFRESH_SOURCE ?= dsx-ai-factory/nvke:NKE_SOURCE_TOKEN
+
+.PHONY: catalog-refresh-check
+catalog-refresh-check: workflow-generator ## Check the installed catalog refresh workflow against `catalog update-ci`.
+	@# The installed file is generated, so it must equal the renderer's output for the
+	@# same source option and the canonical generator stamp. Regenerate it with
+	@# `make catalog-refresh-generate`; never edit the file by hand.
+	@rendered="$$(mktemp)" && trap 'rm -f "$$rendered"' EXIT && \
+	 bin/nvkr-exec catalog update-ci --source-checkout "$(CATALOG_REFRESH_SOURCE)" > "$$rendered" && \
+	 { diff -u .github/workflows/catalog-refresh.yaml "$$rendered" || { \
+	   echo "catalog-refresh.yaml differs from catalog update-ci output; regenerate it from the generator" >&2; exit 1; }; }
+
+.PHONY: catalog-refresh-generate
+catalog-refresh-generate: workflow-generator ## Regenerate the installed catalog refresh workflow with the canonical generator stamp.
+	@# Render to a temporary file and replace the installed workflow only after the renderer
+	@# succeeds: a refused render (source, stamp or closure admission) leaves it untouched.
+	@rendered="$$(mktemp .github/workflows/.catalog-refresh.XXXXXX)" && trap 'rm -f "$$rendered"' EXIT && \
+	 bin/nvkr-exec catalog update-ci --source-checkout "$(CATALOG_REFRESH_SOURCE)" > "$$rendered" && \
+	 chmod 0644 "$$rendered" && mv "$$rendered" .github/workflows/catalog-refresh.yaml
 
 .PHONY: workflows-generate
-workflows-generate: workflow-generator pipeline-dev-generate ## Regenerate producer, qualification and development bundles with their canonical generator stamp.
+workflows-generate: workflow-generator pipeline-dev-generate nvke-split-generate ## Regenerate producer, qualification, development and family bundles with their canonical generator stamp.
 	@definition="$$(jq -er '.definitionPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
 	 environment="$$(jq -er '.environmentPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
 	 bin/nvkr-exec run generate --engine github \
 		--definition "$$definition" --environment "$$environment" \
-		--qualification-policy definitions/nvke-m2/qualification.yaml \
+		--qualification-policy inputs/policies/nvke-qualification.yaml \
 		--root .
+	bin/nvkr-exec run generate --engine github \
+		--definition inputs/definitions/demo/arm64-nvidia-kvm.json \
+		--environment inputs/environments/github-nightly-nvidia.json --root .
+	bin/nvkr-exec run generate --engine github \
+		--definition inputs/definitions/demo/arm64-upstream-kvm.json \
+		--environment inputs/environments/github-nightly-upstream.json --root .
+	$(MAKE) catalog-refresh-generate
+
+.PHONY: nvke-split-generate
+nvke-split-generate: workflow-generator ## Regenerate the four independent NVKE family bundles.
+	@set -e; for family in core services telemetry disks; do \
+		bin/nvkr-exec run generate --engine github \
+			--definition "inputs/definitions/nvke/$$family.yaml" \
+			--environment "inputs/environments/github-nvke-$$family.yaml" --root .; \
+	done
+
+.PHONY: nvke-split-check
+nvke-split-check: workflow-generator ## Check the four independent NVKE family bundles without changing files.
+	@set -e; for family in core services telemetry disks; do \
+		bin/nvkr-exec run generate --engine github \
+			--definition "inputs/definitions/nvke/$$family.yaml" \
+			--environment "inputs/environments/github-nvke-$$family.yaml" --root . --check; \
+	done
 
 .PHONY: pipeline-dev-generate
 pipeline-dev-generate: workflow-generator ## Regenerate the full feature-branch development pipeline.
 	bin/nvkr-exec run generate --engine github \
-		--definition definitions/nvke-m2/definition.yaml \
-		--environment definitions/nvke-m2/environment-github-dev.yaml --root .
+		--definition inputs/definitions/nvke/definition.yaml \
+		--environment inputs/environments/github-development.yaml \
+		--qualification-policy inputs/policies/nvke-development-qualification.yaml --root .
 
 .PHONY: pipeline-dev-check
 pipeline-dev-check: workflow-generator ## Check development workflow generation without changing files.
 	bin/nvkr-exec run generate --engine github \
-		--definition definitions/nvke-m2/definition.yaml \
-		--environment definitions/nvke-m2/environment-github-dev.yaml --root . --check
+		--definition inputs/definitions/nvke/definition.yaml \
+		--environment inputs/environments/github-development.yaml \
+		--qualification-policy inputs/policies/nvke-development-qualification.yaml --root . --check
 
 .PHONY: pipeline-dev-run
 pipeline-dev-run: pipeline-dev-check ## Dispatch the clean, pushed current branch (PIPELINE_DEV_REPO=owner/repo).
 	python3 scripts/pipeline-dev.py --repo "$$PIPELINE_DEV_REPO"
 
 .PHONY: check
-check: go-version-check fmt-check license-header-check vet lint shellcheck test-ci-tools test vulncheck ## Full local gate — run before pushing.
-
-# --- housekeeping -----------------------------------------------------------
+check: go-version-check fmt-check definitions-location-check license-header-check vet lint shellcheck test-ci-tools test vulncheck ## Full local gate — run before pushing.
 
 .PHONY: clean
 clean: ## Remove build output, coverage, and the local engine workspace.

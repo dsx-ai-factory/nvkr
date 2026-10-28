@@ -41,6 +41,8 @@ func RunTriggeredSmokeWorker(ctx context.Context, policyPath string, options lif
 	if runtime.GOOS != "linux" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64") {
 		return nil, e.New(e.CodeEngineCapability, "native smoke worker requires Linux AMD64 or ARM64")
 	}
+	ctx, cancel := WithHostedRuntimeBudget(ctx)
+	defer cancel()
 	policy, err := lifecycle.LoadQualificationPolicy(ctx, policyPath)
 	if err != nil {
 		return nil, err
@@ -63,7 +65,7 @@ func RunTriggeredSmokeWorker(ctx context.Context, policyPath string, options lif
 	if options.WorkspaceRoot == "" {
 		options.WorkspaceRoot = SmokeWorkerWorkspace
 	}
-	provider := qualificationorigin.NewGitHub(options.GitHubToken)
+	provider := qualificationorigin.NewGitHubWithCIStorageCredential(options.GitHubToken, qualificationorigin.CIStorageCredential{Username: options.CIStorageUsername, Token: options.CIStorageToken})
 	source, err := provider.AuthenticateTriggeredSource(ctx, policy.Source)
 	if err != nil {
 		return nil, err
@@ -74,11 +76,15 @@ func RunTriggeredSmokeWorker(ctx context.Context, policyPath string, options lif
 		return nil, err
 	}
 	defer func() { _ = invocation.Close() }()
-	raw, err := provider.DownloadQualificationHandoff(ctx, source)
-	if err != nil {
-		return nil, err
+	if policy.Source.Development {
+		current, err := invocation.Description()
+		if err != nil {
+			return nil, err
+		}
+		identity = "https://github.com/" + current.Repository + "/" + policy.Smoke.Workflow + "@" + current.Ref
 	}
-	checks, report, err := lifecycle.CheckQualificationHandoff(ctx, raw, source, policy, options)
+
+	checks, report, err := checkTriggeredArtifacts(ctx, provider, source, policy, options)
 	result := &SmokeWorkerResult{ArtifactChecks: report}
 	if err != nil {
 		return result, err
