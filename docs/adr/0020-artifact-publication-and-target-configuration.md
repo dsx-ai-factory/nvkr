@@ -261,7 +261,7 @@ Object deletion, bucket-policy changes and bucket-wide multipart enumeration are
 Encryption-specific permissions, when needed, require explicit provider admission and narrowly scoped key
 policy review; these S3 actions do not implicitly grant them.
 
-Enablement requires recorded operator provisioning and review of the identities' effective policies;
+Record evidence of both operator provisioning and review of the identities' effective policies before enablement;
 missing required grants or grants beyond the admitted action/resource scope fail that gate. Runtime admission
 must match credential references and operation/resource bindings to that admitted profile before work.
 Denied or unsupported operations fail closed. A successful request or credential reference cannot prove
@@ -418,15 +418,41 @@ fails admission, not a silent safety downgrade. The PUT/multipart retry distinct
 [AWS conditional-write behavior](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html);
 mandatory full-byte reconciliation is this contract's requirement for every admitted provider.
 
-Before signing or committing, `lifecycle` must establish serialized ownership for the authenticated repository,
-target name and exact destination tuple (`endpoint`, `region`, `bucket`, `prefix`, `addressing`) across all
-Runs and attempts. Workflow, provider run ID, attempt, source, Plan and policy identities are operation
-bindings, not parts of this pending-state key. A fresh dispatch therefore encounters the same unresolved
-operation. Use the admitted provider's non-canceling single-writer boundary and the Run-record owner;
+Before work, admit a physical namespace identity: provider/resource identity, bucket and canonical literal
+key prefix. Establish equivalent endpoints and addressing forms through the admitted SDK/service profile
+and recorded authoritative operator resource evidence; URL normalization alone is not proof. Unknown or
+ambiguous mappings fail admission. Target names, endpoint spelling, addressing mode and Run IDs are not
+parts of the pending-state key. Renaming a target or changing transport configuration cannot clear a predecessor.
+
+Operator-authorized no-replace enrollment through the Run-record owner initializes authenticated state for
+a dedicated unused physical namespace. The initial profile admits neither owner migration nor reinitialization
+of a previously enrolled namespace. Enrollment records
+the resource mapping, recovery capabilities and one owning repository, workflow path, display name/bundle,
+exact dispatch ref and evaluated non-canceling concurrency group. Admit only that owner. Another bundle,
+workflow or ref cannot share the namespace under a different group; the current per-workflow groups are not
+a repository-wide lock. Ordinary publication cannot initialize or reset missing state. Concurrent enrollment
+has one winner; retries authenticate the existing record rather than overwrite it. Missing enrolled state,
+an attempted migration/reset or ownership/resource ambiguity fails admission before producer or delivery work.
+
+Across Runs and attempts, `lifecycle` and the Run-record owner serialize that enrolled physical namespace;
 serialization covers predecessor lookup, registration, signing, recovery-byte retention and commit disposition.
 Durable CAS/no-replace state must preserve unresolved obligations even when a byte carrier expires.
 Concurrent callers cannot both observe an empty state and acquire signing authority. Missing serialization,
 missing state or incomplete recovery history fails admission; this requires no new public object or service.
+
+The pending operation binds an exact operation ID and generation. In `preparing`, final PUT is forbidden.
+Only atomic promotion to `commit-authorized`, after confirmed recovery-package retention/read-back, may
+issue authority for its exact frozen bundle and key. Exact-state CAS can instead close `preparing` as
+`closed-never-dispatched`; that winning close fences stale promotion and PUT authority, including after
+a replacement operation starts. If promotion wins or its outcome is uncertain, do not classify the operation
+as undispatched. Recover the durable phase; lost acknowledgements are not proof of a failed transition.
+
+An authorized operator may retire an unrecoverable namespace as `retired-indeterminate`, retaining its
+operation, locator and unknown remote fate. Retirement never proves absence, cancels an earlier request or
+revokes an old signature. The old physical namespace remains blocked through every alias; continued delivery
+requires explicit enrollment of a dedicated non-overlapping new prefix. This is not same-prefix reset or
+automatic expiry cleanup. Operator authority, the retirement reason and its durable disposition must be
+authenticated by the record owner; a caller boolean cannot clear the obligation.
 
 Authenticate a predecessor against its own frozen source, Plan, Environment, destination and invocation
 under current independent policies. If complete and the current request bindings match, reuse its unchanged
@@ -443,7 +469,7 @@ For recovery after producer loss, retain the exact canonical root, original Sigs
 locator together before the first final PUT. Authenticate all three and the required remote closure into
 fresh held owners; the remote root and its `objects` must verify, but the final bundle may still be absent.
 Stored descriptions or success flags cannot restore authority. After serialized recovery
-ownership and confirmed joining of the prior local writer, recovery may conditionally PUT the identical
+ownership, recovery may conditionally PUT the identical
 retained final bundle at its original key without proving absence. This narrow final-bundle replay is the
 exception to the ordinary retry-on-authenticated-absence rule above, including a bounded `409` retry; it
 does not authorize other payload retries, multipart resume, re-signing or another key. The recovery operation's
@@ -453,6 +479,10 @@ verification before success. Preserve the original root, signature, locator and 
 recovery bytes plus an unverifiable remote completion leaves the pending state blocked. Conditional writes
 can create another identical-byte version after a delete marker; recovery converges on the pinned bytes/key,
 not a promise of one stored version.
+For this exact-bundle replay only, prior-runner exit or joining need not be established: a late original
+request and the replay use the same authenticated bytes, physical key and `If-None-Match: *`. All other
+conditions remain, including stop/join ownership of workers started by the current recovery operation.
+This exception authorizes no fresh signature, other-key write, payload replay or multipart work.
 
 After that gate, the state order is source authentication → upload payloads and proofs → verify every required
 storage object and boot URL → generate canonical root → detached signing → root upload and read-back → durable recovery-byte retention
@@ -545,7 +575,7 @@ DHCP/PXE service and instance-specific metadata remain deployment prerequisites.
 not establish UEFI Secure Boot. A built or signed EFI cannot silently substitute for another imager contract;
 the pinned NVKE source [documents incompatible disk-selection parameters](https://github.com/dsx-ai-factory/nvke/blob/ff21ba8c07cafff74b68e238a8876af11e5beded/os-image/efi/README.md#L36).
 
-Enablement requires recorded default-branch generated delivery to the named service/version, independent
+Before enablement, record evidence of default-branch generated delivery to the named service/version, independent
 read-only S3 consumption with registry access disabled, direct VM boot of the downloaded QCOW2, and actual
 iPXE chainload → EFI image verification/disk write → installed-disk reboot → cloud-init/node-service checks
 for every supported architecture/profile. A simulator that skips EFI execution cannot establish that path.
@@ -568,9 +598,20 @@ admission, cancellation during active transfer and a cleanup deadline expiring b
 restart, held payload/proof release or success may precede joining. On a versioned bucket, lose the final
 acknowledgement and recover the same frozen locator through version discovery and complete independent
 verification. A new provider Run ID must not bypass an unresolved operation for the same repository, target
-and destination. Exercise death after recovery-byte retention both before and during final PUT, including a
+and physical namespace. Target rename, endpoint alias and addressing-mode changes must select the same state.
+Test first-use enrollment, a conflicting second owner/bundle/ref, missing enrolled state, concurrent initialization
+and attempted migration/reset. Each invalid delivery admission must return a coded error with zero producer
+execution, payload/proof transfer, signing or final PUTs; control-record inspection/enrollment is separate.
+Test death in `preparing` before recovery retention: exact-state closure must permit
+the next operation without a possible stale commit. Race closure against promotion; only the winning transition
+may authorize its outcome, and stale generations cannot promote or PUT. Test expired/unrecoverable authorized
+state: only authenticated retirement may close its active obligation, the old physical namespace stays blocked,
+and a separately enrolled non-overlapping prefix permits continued delivery without claiming old absence.
+Exercise death after recovery-byte retention both before and during final PUT, including a
 missing-object `403`: exact-bundle replay must converge without re-signing. Lost-acknowledgement replay must
-verify the same pinned bytes/key; missing recovery bytes and unverifiable remote state must block signing.
+verify the same pinned bytes/key. Include a racing original request with unavailable prior-runner status;
+replay cannot require an impossible old-runner join. Missing recovery bytes and unverifiable remote state
+must block signing except for the explicit retirement/new-namespace path.
 A verified terminal predecessor must permit a genuinely different subsequent delivery. Uncertain, expired
 or incomplete pending history prevents new signing. Concurrent callers must not both acquire signing authority.
 With successful byte read-back, require coded failure and zero final commit requests for service expiry
@@ -579,7 +620,10 @@ unverifiable expiry/access, or discovery requiring a terminal Run record that wa
 Confirmed expiry equal to the deadline is sufficient; a requested/reported difference alone is not failure
 when the confirmed expiry still covers the deadline. Delay a finalizer past the frozen publication cutoff:
 it must fail with a coded error, issue no new commit request and neither publish nor accept a terminal record
-for that old attempt. No retry may extend the old cutoff. A cleanup expiry must trigger bounded supervisor termination;
+for that old attempt. Admission without an enforceable finite cutoff must return `CodeEngineCapability`
+before producer execution, payload/proof transfer, signing or a final PUT. Delay a queued operation before execution until its
+already-frozen cutoff expires: return `CodeTimeout` with zero such work or PUTs; worker start cannot
+recompute or extend the cutoff. No retry may extend the old cutoff. A cleanup expiry must trigger bounded supervisor termination;
 an unconfirmed exit at its deadline must preserve blocked state, unsafe ownership and failure without success.
 Terminate the
 producer or runner after the bundle lands but before acknowledgement, then retrieve the pre-recorded locator

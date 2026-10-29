@@ -1083,7 +1083,7 @@ prevent finalization. Release finalizers have a dedicated two-hour job budget fo
 carrier acquisition/restoration, complete-release authentication and record uploads; the fifteen-minute
 utility-job budget does not apply. This bound is not evidence of successful hosted completion.
 Expired carriers require a complete new Run. That does not clear an unresolved S3 delivery: ADR-20's
-cross-Run repository/target/destination gate must still reconcile it before fresh signing. Signed development uses per-attempt
+cross-Run physical-namespace gate must still reconcile it before fresh signing. Signed development uses per-attempt
 registry namespaces and the same authenticated earlier-attempt reuse as production.
 These retention periods govern provider locator records. Private carrier blobs have no automatic expiry
 in this implementation; registry retention must be managed separately, without removing active Run inputs.
@@ -1569,11 +1569,17 @@ policies. Secret references may be recorded; secret values cannot be
 transported in plans, command arguments, boot scripts, artifacts or logs. Referenced authentication and
 provider capabilities must be admitted before producer, storage or publication work.
 
-Across provider Runs and attempts, the admitted non-canceling provider boundary and durable Run state must
-serialize repository, target and exact destination before signing or commit. A fresh dispatch cannot discard
+The S3 extension admits one enrolled physical namespace to one repository/workflow/bundle/ref and its exact
+non-canceling concurrency group. Current per-workflow groups cannot serialize two different bundle owners
+of one namespace; reject such ownership rather than assume a repository-wide lock. Across Runs and attempts,
+that admitted boundary and durable Run state must serialize the physical namespace before signing or commit.
+A fresh dispatch or transport alias cannot discard
 an unresolved locator. Authenticated recovery can re-dispatch retained exact bundle bytes at their original
 conditional key, preserving the signed invocation and recording the recovery attempt separately. A verified
 terminal predecessor permits a later distinct delivery; its receipt cannot satisfy different required outputs.
+Exact-bundle replay may race a lost runner's identical original request; only workers started by the current
+operation require its local stop/join ownership. Preparing-state closure and operator retirement follow ADR-20;
+retirement leaves the old namespace indeterminate and blocked, requiring a newly enrolled disjoint prefix.
 
 The completion operation must depend on confirmed exact-byte retention of the frozen root, bundle and locator under the
 originating Run/attempt and target, accessible after producer or runner loss. A post-commit artifact-upload

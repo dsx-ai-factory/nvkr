@@ -477,6 +477,9 @@ Acceptance of this extension requires:
    Starting a new Run does not clear uncertainty for the same target and destination. Recovery preserves
    the original proof bytes and permits safe replay; inadequate retention, unavailable recovery data or
    delayed finalization beyond the fixed publication deadline cannot yield a successful completion.
+   Renaming a target or changing its access method cannot bypass unresolved state. A provably undispatched
+   operation can be closed; an unrecoverable destination requires recorded operator retirement and a new
+   dedicated destination, without claiming that the old completion is absent or revoked.
 5. Successful delivery, demonstrated boot readiness and release qualification are distinct results.
    The supported service, compatibility set and observed limits are recorded before enablement.
 
