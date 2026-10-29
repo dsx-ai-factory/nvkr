@@ -236,9 +236,40 @@ implicit selection of all outputs.
 | `s3.endpoint`, `s3.region` | Explicit S3 API origin using HTTPS, plus the signing region. The endpoint has no user information, query, fragment or embedded credentials; provider endpoint and addressing behavior must be exercised. |
 | `s3.bucket`, `s3.prefix` | Explicit bucket and nonempty canonical relative key prefix; no traversal, empty segments or leading/trailing slash. Provider naming validation belongs to the admitted SDK/service boundary. |
 | `s3.addressing` | Exactly `path` or `virtual-host`; no silent addressing fallback. |
-| `s3.writeCredentialRef`, `s3.readCredentialRef` | Separate references to writer and verifier credentials. They resolve only in admitted operations; secret values never enter authored/generated records, URLs or logs. |
+| `s3.writeCredentialRef`, `s3.readCredentialRef` | Separate references to the scoped writer/cleanup and read-only verifier identities defined below. They resolve only in admitted operations; secret values never enter authored/generated records, URLs or logs. |
 | `s3.readBaseURL` | Optional HTTPS origin/path for ordinary file reads; mandatory for boot outputs. It is separate from the API endpoint. Each generated boot URL is a clean path with no query, fragment or secret and must be readable by the intended provisioning client. |
 | `s3.transfer` | Required positive bounds: `maxObjectBytes`, `maxTotalBytes`, `maxObjects`, `partSizeBytes`, `maxConcurrency`, `maxRequestAttempts`, `maxUploadAttempts`, `operationTimeoutSeconds`, `cleanupTimeoutSeconds`. Admission checks provider/SDK limits, memory and scratch before upload. Concurrency is global across transfers and the whole operation has a deadline. |
+
+The initial object-operation profile separates credentials as follows. These are the
+[AWS S3 action mappings](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-with-s3-policy-actions.html);
+an admitted compatible provider must establish equivalent operations and resource restrictions.
+
+| Credential | Operation | Required S3 action |
+| --- | --- | --- |
+| Read | GET and HEAD of the current object | `s3:GetObject` |
+| Read | GET of an exact object version | `s3:GetObjectVersion`, when version reads are supported |
+| Write | PUT, multipart initiation, part upload and completion | `s3:PutObject` |
+| Write | Abort an owned incomplete upload | `s3:AbortMultipartUpload` |
+| Write | List parts of an owned incomplete upload | `s3:ListMultipartUploadParts` |
+
+Both identities are restricted to objects in the configured bucket and literal `<prefix>/` subtree,
+represented for AWS by `arn:<partition>:s3:::<bucket>/<prefix>/*`. Policy rendering must not turn literal
+prefix characters into broader wildcard grants. The read identity grants no mutation or multipart-cleanup
+actions; the write identity's S3 actions are limited to the mapped write and cleanup actions. Runtime cleanup
+must also establish ownership of each upload ID; object-resource permission does not establish that ownership.
+Object deletion, bucket-policy changes and bucket-wide multipart enumeration are not part of this profile.
+Encryption-specific permissions, when needed, require explicit provider admission and narrowly scoped key
+policy review; these S3 actions do not implicitly grant them.
+
+Enablement requires recorded operator provisioning and review of the identities' effective policies;
+missing required grants or grants beyond the admitted action/resource scope fail that gate. Runtime admission
+must match credential references and operation/resource bindings to that admitted profile before work.
+Denied or unsupported operations fail closed. A successful request or credential reference cannot prove
+the absence of broader grants; this contract promises no comprehensive effective-IAM introspection.
+The initial profile requires no bucket listing. In particular, [missing-object HEAD may return `403` without
+`s3:ListBucket`](https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadObject.html); such a result remains
+unknown, never authenticated absence authorizing a retry. If the admitted permissions cannot establish
+absence, fail or retain the indeterminate result rather than expanding access or guessing.
 
 `maxRequestAttempts` counts the initial request and all SDK retries for each API call. `maxUploadAttempts`
 counts the initial single PUT or multipart upload and each fresh whole-object restart; it does not reset the
@@ -305,14 +336,17 @@ digest family. The generated canonical delivery root has exactly these top-level
 | `objects` | Sorted exhaustive object records: `key`, `sha256`, `size`, `mediaType`, `role`, `sourceBindings`, `readback`, and optional `versionId`/`readURL`. Roles are `payload`, `manifest`, `signature`, `provenance` or `sbom`; `manifest` covers indexes/configs/control JSON with their exact media types. Source bindings use the closed variants below. |
 
 Each `sourceBindings` record contains exactly the fields of its `type` variant. All digests below are raw
-blob SHA-256 values; structured semantic digests are never substituted. Bindings are sorted and unique by
-type, publication reference, output name, member name and selected byte digest, omitting nonexistent sort components.
+blob SHA-256 values; structured semantic digests are never substituted. Compare bindings field by field,
+lexicographically by exact UTF-8 bytes, beginning with the literal `type` and then its complete tuple below.
+Do not use locale order, enum ordinals or ambiguous concatenation. The array must be strictly increasing
+under this comparison; unsorted arrays and exact full-tuple duplicates fail. Equal selected bytes must
+retain distinct authenticated descriptor or parent-archive bindings.
 
-| `type` | Exact remaining fields and meaning |
-| --- | --- |
-| `control` | `publicationReference`, `sha256`: an original control/evidence blob or verified detached proof for that exact publication subject. |
-| `payload` | `publicationReference`, `outputName`, `descriptorDigest`, `payloadSHA256`: the exact whole payload bound by that output's authenticated wrapper. |
-| `member` | `publicationReference`, `outputName`, `parentSHA256`, `memberName`, `memberSHA256`: the original held file/archive and its exact canonical regular member. |
+| `type` | Exact remaining fields and meaning | Ordering and uniqueness tuple |
+| --- | --- | --- |
+| `control` | `publicationReference`, `sha256`: an original control/evidence blob or verified detached proof for that exact publication subject. | `(type, publicationReference, sha256)` |
+| `payload` | `publicationReference`, `outputName`, `descriptorDigest`, `payloadSHA256`: the exact whole payload bound by that output's authenticated wrapper. | `(type, publicationReference, outputName, descriptorDigest, payloadSHA256)` |
+| `member` | `publicationReference`, `outputName`, `parentSHA256`, `memberName`, `memberSHA256`: the original held file/archive and its exact canonical regular member. | `(type, publicationReference, outputName, parentSHA256, memberName, memberSHA256)` |
 
 The owning verifier derives every binding from authenticated source controls, proof bytes and held payloads.
 The binding's selected byte digest must equal the destination object's `sha256`. A member must match its
@@ -405,9 +439,18 @@ report the exact attempted locator as indeterminate. An independent consumer may
 signature, policy and required-closure checks pass. Do not promise rollback, absence of a valid remote commit
 after an error, or an atomic transaction across objects or targets. Every consumer checks the closure anew.
 
-Before abandoning or restarting a multipart attempt, and on every operation exit, stop and join its
-transfer workers. This includes equal-object reuse, non-cancellation failure, deadline expiration and
-cancellation. Under a fresh context bounded by `cleanupTimeoutSeconds`, abort every remaining owned
+Before abandoning or restarting a multipart attempt, and on every operation exit, start one fresh cleanup
+context bounded by `cleanupTimeoutSeconds` before stopping and joining transfer workers. This includes
+equal-object reuse, non-cancellation failure, deadline expiration and cancellation. Every worker request
+and body operation must honor cancellation and admitted I/O bounds. Stop new work, cancel active requests
+and close owned active bodies/transport resources as needed; confirm worker joining before abort/list,
+restarting an upload or releasing held payload/proof owners. Abort/list verification uses the remaining
+cleanup budget, not a second full timeout. If that budget expires before joining, record cleanup failure
+and retain lifetime ownership: do not abort/list, restart, release held payload/proof owners or report producer
+success. Continue supervised joining or terminate and join the owning execution process; a timed-out wait
+cannot establish that workers stopped or authorize detached workers. An adapter without bounded cancellation
+and teardown is not admitted. Remote leftovers remain subject to operator expiration; that policy cannot
+replace local worker ownership. Once joined and within the remaining budget, abort every remaining owned
 incomplete upload ID and verify that its parts are gone, repeating bounded abort/list operations when
 necessary. Never abort a known completed upload or delete a completed object. An absent upload ID does not
 establish whether completion succeeded: reconcile ambiguous completion against the exact object key,
@@ -449,8 +492,12 @@ Required tests cover corrupt or missing proof or boot files, EFI or script subst
 wrong architectures or digests, incompatible imager parameters, equal or conflicting existing objects,
 concurrent writes, lost commit acknowledgements, denied access, interrupted multipart transfers and failed
 boot or installation. Exercise unchanged Debian names containing `+` through actual emitted URLs, including
-distinct space and literal-percent names. On a versioned bucket, lose the final acknowledgement and recover
-the same frozen locator through version discovery and complete independent verification. Terminate the
+distinct space and literal-percent names. Verify complete binding tuples retain distinct descriptor/parent
+membership for equal payload bytes and reject exact duplicates. Exercise denied and out-of-scope credential
+admission, cancellation during active transfer and a cleanup deadline expiring before worker join; no abort,
+restart, held payload/proof release or success may precede joining. On a versioned bucket, lose the final
+acknowledgement and recover the same frozen locator through version discovery and complete independent
+verification. Terminate the
 producer or runner after the bundle lands but before acknowledgement, then retrieve the pre-recorded locator
 and reconcile without the producer's memory or files. Failed durable retention or its read-back must prevent
 the final commit request. Delivery success, boot readiness and qualification remain separate results. Record

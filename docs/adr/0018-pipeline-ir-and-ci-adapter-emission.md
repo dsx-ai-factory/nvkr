@@ -1559,7 +1559,9 @@ an unverified locator cannot replace the authenticated result.
 Source, build and ARC jobs must receive no S3 credentials. Only admitted transfer and completion operations
 may resolve writer credential references or obtain federated write credentials; verifier access must be
 independently scoped to read-only operations. Writer credentials must be limited to the configured target
-bucket, key prefix and required write and cleanup operations. A new S3 OIDC consumer requires explicit
+bucket, key prefix and the admitted action/resource profile in ADR-20. Its operator policy review remains
+an enablement prerequisite; successful SDK calls cannot prove that effective grants are least-privilege.
+A new S3 OIDC consumer requires explicit
 renderer and bundle-validator admission, not removal of existing signing-only token checks. No OIDC or storage
 credentials are available to arbitrary jobs, PRs or forks. The consumer selects its own read identity and
 policies. Secret references may be recorded; secret values cannot be

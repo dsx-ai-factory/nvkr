@@ -458,6 +458,8 @@ Acceptance of this extension requires:
    registry access or producer files. Original package/image bytes and evidence subjects are preserved.
 2. Actual boot clients retrieve assets from immutable boot URLs, chainload the compatible EFI, reject a
    wrong image digest, install to the intended disposable disk, reboot and complete first-boot services.
+   Negative cases reject an architecture-mismatched EFI and incompatible imager parameters, including
+   disk-selection parameters, without reporting a successful installation.
    Direct VM boot of the delivered disk is exercised separately on each supported architecture and profile.
    Executed boot scripts and imagers are bound to authenticated assets; substitution of either after
    verification must be rejected.

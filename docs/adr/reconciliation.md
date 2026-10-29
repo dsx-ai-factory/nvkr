@@ -1253,6 +1253,10 @@ The contract requires URL-path encoding that preserves native Debian basenames c
 locator without a final-bundle version ID, and confirmed durable locator retention before the commit request.
 Encoding/read-back, versioned-bucket lost-acknowledgement recovery and recovery after producer/runner loss
 remain required acceptance; these documentation requirements add no implemented recovery or storage capability.
+The contract also requires reviewed credential action/resource scopes, complete source-binding tuple
+ordering, and a cleanup budget covering cancellation and worker joining without abandoning workers.
+Negative boot acceptance explicitly includes mismatched EFI architecture and incompatible imager parameters.
+Provider policy evidence and these failure/rejection exercises remain outstanding.
 
 ## Support by owner
 
