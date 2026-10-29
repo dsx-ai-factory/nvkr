@@ -21,8 +21,8 @@ func TestConformanceCatalogInputsCompile(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(repo)
-	const root = "definitions/kubernetes-conformance-arm64"
-	plan, err := CompileFiles(t.Context(), root+"/definition.yaml", root+"/environment-local-docker.yaml", "test (deadbeef)")
+	const root = "inputs/definitions/kubernetes-conformance-arm64"
+	plan, err := CompileFiles(t.Context(), root+"/definition.yaml", "inputs/environments/local-conformance-tools-arm64.yaml", "test (deadbeef)")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestConformanceCatalogInputsCompile(t *testing.T) {
 				if node.Component != "hydrophone" || patch.Name != "patches/bounded-download.patch" {
 					t.Fatalf("unexpected source patch: %s %s", node.Component, patch.Name)
 				}
-				raw, err := os.ReadFile(filepath.Join(root, "hydrophone-catalog", patch.Name))
+				raw, err := os.ReadFile(filepath.Join("inputs/catalogs/kubernetes-conformance/hydrophone", patch.Name))
 				if err != nil {
 					t.Fatal(err)
 				}

@@ -13,7 +13,7 @@
       "name": "busybox-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../../definitions/kubernetes-conformance-arm64/image-catalog"
+        "base": "../../catalogs/kubernetes-conformance/images"
       },
       "components": [
         "busybox-image"
@@ -68,7 +68,7 @@
       "name": "conformance-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../../definitions/kubernetes-conformance-arm64/demo-1.36/image-catalog"
+        "base": "../../catalogs/kubernetes-conformance/images-1.36"
       },
       "components": [
         "conformance-image"
@@ -128,7 +128,7 @@
       "name": "hydrophone-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../../definitions/kubernetes-conformance-arm64/hydrophone-catalog"
+        "base": "../../catalogs/kubernetes-conformance/hydrophone"
       },
       "components": [
         "hydrophone"
@@ -139,7 +139,7 @@
       "name": "hydrophone-darwin-arm64",
       "platform": "darwin/arm64",
       "catalog": {
-        "base": "../../../definitions/kubernetes-conformance-arm64/hydrophone-catalog"
+        "base": "../../catalogs/kubernetes-conformance/hydrophone"
       },
       "components": [
         "hydrophone"
@@ -165,7 +165,7 @@
       "name": "kubectl-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../../definitions/kubernetes-conformance-arm64/kubectl-catalog"
+        "base": "../../catalogs/kubernetes-conformance/kubectl"
       },
       "components": [
         "kubectl"
@@ -176,7 +176,7 @@
       "name": "kubectl-darwin-arm64",
       "platform": "darwin/arm64",
       "catalog": {
-        "base": "../../../definitions/kubernetes-conformance-arm64/kubectl-catalog"
+        "base": "../../catalogs/kubernetes-conformance/kubectl"
       },
       "components": [
         "kubectl"

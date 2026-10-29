@@ -44,10 +44,6 @@ func requireSignCode(t *testing.T, err error, want nvkrerr.Code) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Subject
-// ---------------------------------------------------------------------------
-
 func TestSubjectRefusesUnpinnedOrDivergentReferences(t *testing.T) {
 	requireSignCode(t, Subject{Ref: "", Digest: ociTestDigest}.Validate(), nvkrerr.CodeUsage)
 	requireSignCode(t, Subject{Ref: ociTestRepo + ":v1", Digest: ociTestDigest}.Validate(), nvkrerr.CodeUnpinnedSource)
@@ -63,10 +59,6 @@ func TestSubjectRefusesUnpinnedOrDivergentReferences(t *testing.T) {
 		t.Fatalf("repository = %q", ociSubject().Repository())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// DryRunSigner
-// ---------------------------------------------------------------------------
 
 func TestNewDryRunSignerRequiresIdentityAndIssuer(t *testing.T) {
 	_, err := NewDryRunSigner("", ociTestIssuer)
@@ -161,10 +153,6 @@ func TestDryRunSignerHonorsContextCancellation(t *testing.T) {
 	_, err = signer.SignAndAttest(ctx, ociSubject(), []byte(ociTestPredicate))
 	requireSignCode(t, err, nvkrerr.CodeTimeout)
 }
-
-// ---------------------------------------------------------------------------
-// CosignOCISigner: argv, output parsing, credentials
-// ---------------------------------------------------------------------------
 
 type recordedCall struct {
 	binary string
@@ -510,10 +498,6 @@ func TestCosignOCIStockExecutionFailsClosed(t *testing.T) {
 	}
 	requireSignCode(t, err, nvkrerr.CodeEngineCapability)
 }
-
-// ---------------------------------------------------------------------------
-// records
-// ---------------------------------------------------------------------------
 
 func TestSigningRecordValidateRefusesInconsistentRecords(t *testing.T) {
 	valid := SigningRecord{

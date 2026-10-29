@@ -31,12 +31,12 @@ From the repository root:
 
 ```sh
 bin/nvkr run plan \
-  --definition definitions/kubernetes-conformance-arm64/demo-1.34/definition.yaml \
-  --environment definitions/kubernetes-conformance-arm64/environment-local-docker.yaml \
+  --definition inputs/definitions/kubernetes-conformance-arm64/demo-1.34/definition.yaml \
+  --environment inputs/environments/local-conformance-tools-arm64.yaml \
   --json
 bin/nvkr run local \
-  --definition definitions/kubernetes-conformance-arm64/demo-1.34/definition.yaml \
-  --environment definitions/kubernetes-conformance-arm64/environment-local-docker.yaml \
+  --definition inputs/definitions/kubernetes-conformance-arm64/demo-1.34/definition.yaml \
+  --environment inputs/environments/local-conformance-tools-arm64.yaml \
   --capture-inputs-root . \
   --attempt conformance-tools-demo134-01
 ```

@@ -110,7 +110,6 @@ func (consumer *Consumer) Authenticate(ctx context.Context, reference string, po
 	if !ok {
 		return nil, e.New(e.CodeEngineCapability, "release authentication requires signed SBOM verification")
 	}
-	// Bound the complete operation, including all independent signature checks.
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 	if err := authenticateReleaseSubject(ctx, verifier, reference, policy); err != nil {

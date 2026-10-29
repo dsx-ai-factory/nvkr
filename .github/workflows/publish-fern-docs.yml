@@ -154,7 +154,6 @@ jobs:
           EXPR+=' "slug": env(TAG_VERSION), "availability": "stable"}]'
           yq -i "$EXPR" fern/docs.yml
 
-          # Sort all version entries by semver descending
           SORTED_SLUGS=$(yq '.products[0].versions[].slug' fern/docs.yml | sort -rV)
           yq -i '.products[0].versions = []' fern/docs.yml
           for slug in $SORTED_SLUGS; do

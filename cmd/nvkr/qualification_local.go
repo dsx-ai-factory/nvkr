@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/dsx-ai-factory/nvkr/internal/qualificationprogress"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -29,11 +30,12 @@ func cmdRunQualifyLocalWith(qualify localQualifier) *cli.Command {
 			&cli.StringFlag{Name: "qualifier-key", Usage: "distinct local qualifier private-key file"},
 			&cli.StringFlag{Name: "cosign", Usage: "cosign executable pinned by the policy"},
 			&cli.StringFlag{Name: "runtime", Value: "docker", Usage: "native isolated tool-smoke runtime"},
-			&cli.StringFlag{Name: "repository", Usage: "canonical untagged registry namespace for this local rehearsal"},
+			&cli.StringFlag{Name: "repository", Usage: "canonical untagged registry namespace for local qualification artifacts and evidence"},
 			&cli.StringFlag{Name: "scratch", Usage: "existing disk-backed directory with capacity for export and read-back"},
 			&cli.StringFlag{Name: "evidence-out", Usage: "new evidence-bundle file in an existing directory"},
 			&cli.BoolFlag{Name: "plain-http", Usage: "explicit HTTP transport for a development registry"},
 			&cli.BoolFlag{Name: "anonymous", Usage: "explicit anonymous registry access"},
+			&cli.IntFlag{Name: "qualification-progress-fd", Hidden: true, Usage: "private nonblocking qualification progress pipe"},
 		}, Action: func(c *cli.Context) error {
 			if c.Args().Present() {
 				return e.New(e.CodeUsage, "qualify-local accepts no positional arguments")
@@ -43,7 +45,16 @@ func cmdRunQualifyLocalWith(qualify localQualifier) *cli.Command {
 					return e.New(e.CodeUsage, "qualify-local requires --%s", flag)
 				}
 			}
-			result, qualifyErr := qualify(c.Context, lifecycle.LocalQualificationOptions{Workspace: c.String("workspace"), PolicyPath: c.String("policy"), BuilderKeyPath: c.String("builder-key"), SmokeKeyPath: c.String("smoke-key"), QualifierKeyPath: c.String("qualifier-key"), CosignExecutable: c.String("cosign"), RuntimeExecutable: c.String("runtime"), Repository: c.String("repository"), Scratch: c.String("scratch"), EvidenceOut: c.String("evidence-out"), Registry: delivery.RegistryOptions{PlainHTTP: c.Bool("plain-http"), Anonymous: c.Bool("anonymous"), Username: os.Getenv("NVKR_REGISTRY_USER"), Password: os.Getenv("NVKR_REGISTRY_PASSWORD")}})
+			var progress func(qualificationprogress.Event)
+			if c.IsSet("qualification-progress-fd") {
+				sink, err := qualificationprogress.AdoptFD(c.Context, c.Int("qualification-progress-fd"))
+				if err != nil {
+					return err
+				}
+				defer func() { _ = sink.Close() }()
+				progress = sink.Offer
+			}
+			result, qualifyErr := qualify(c.Context, lifecycle.LocalQualificationOptions{Workspace: c.String("workspace"), PolicyPath: c.String("policy"), BuilderKeyPath: c.String("builder-key"), SmokeKeyPath: c.String("smoke-key"), QualifierKeyPath: c.String("qualifier-key"), CosignExecutable: c.String("cosign"), RuntimeExecutable: c.String("runtime"), Repository: c.String("repository"), Scratch: c.String("scratch"), EvidenceOut: c.String("evidence-out"), Progress: progress, Registry: delivery.RegistryOptions{PlainHTTP: c.Bool("plain-http"), Anonymous: c.Bool("anonymous"), Username: os.Getenv("NVKR_REGISTRY_USER"), Password: os.Getenv("NVKR_REGISTRY_PASSWORD")}})
 			if result != nil {
 				raw, err := canonical.Marshal(result)
 				if err != nil {

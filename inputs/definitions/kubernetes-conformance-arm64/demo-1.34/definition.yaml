@@ -3,20 +3,20 @@
 
 apiVersion: nvkr.dev/definition/v5
 catalog:
-  base: ../hydrophone-catalog
+  base: ../../../catalogs/kubernetes-conformance/hydrophone
 kind: Definition
 metadata:
   name: kubernetes-conformance-demo-1-34-arm64
 outputs:
   - catalog:
-      base: ../image-catalog
+      base: ../../../catalogs/kubernetes-conformance/images
     components:
       - busybox-image
     format: oci
     name: busybox-image-arm64
     platform: linux/arm64
   - catalog:
-      base: ./image-catalog
+      base: ../../../catalogs/kubernetes-conformance/images-1.34
     components:
       - conformance-image
     format: oci
@@ -28,7 +28,7 @@ outputs:
     name: hydrophone-arm64
     platform: linux/arm64
   - catalog:
-      base: ./kubectl-catalog
+      base: ../../../catalogs/kubernetes-conformance/kubectl-1.34
     components:
       - kubectl
     format: executable

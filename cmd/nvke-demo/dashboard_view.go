@@ -104,6 +104,7 @@ type dashboardSnapshot struct {
 	buildDetails                  bool
 	buildLogPath                  string
 	recoveryWork                  string
+	qualification                 dashboardQualification
 }
 
 // Only the presentation loop touches widgets. Worker callbacks update bounded
@@ -410,6 +411,9 @@ func stopDashboardStages(stages []dashboardStage, state string) {
 func (d *dashboard) Report(event nvkedemo.ProgressEvent) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if d.observeQualification(event) {
+		return
+	}
 	if event.Name == "tenant-provisioning" && event.Kind == nvkedemo.DeploymentStarted {
 		d.resetTenantObservation()
 	}
@@ -825,6 +829,9 @@ func (d *dashboard) snapshot() dashboardSnapshot {
 	copy.buildOutputs = slices.Clone(d.buildOutputs)
 	copy.buildVertices = slices.Clone(d.buildVertices)
 	copy.buildEdges = slices.Clone(d.buildEdges)
+	for index := range copy.qualification.stages {
+		copy.qualification.stages[index].items = slices.Clone(d.qualification.stages[index].items)
+	}
 	copy.buildLogs = make(map[string]dashboardOSLogs, len(d.buildLogs))
 	for operation, logs := range d.buildLogs {
 		copy.buildLogs[operation] = logs
@@ -861,6 +868,9 @@ func (d *dashboard) input(event *tcell.EventKey) (cancel bool) {
 	}
 	if event.Key() == tcell.KeyCtrlC || event.Key() == tcell.KeyRune && (event.Rune() == 'q' || event.Rune() == 'Q') {
 		d.confirmCancel = true
+		return false
+	}
+	if d.qualificationInput(event) {
 		return false
 	}
 	switch event.Key() {
@@ -1000,6 +1010,10 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 		d.drawBuild(screen, s, now, width, height)
 		return
 	}
+	if dashboardQualificationActive(s) && !canceling {
+		d.drawQualification(screen, s, now, width, height)
+		return
+	}
 	d.phasesView.SetTitle(" Phase map ")
 	d.phasesView.SetWrap(true)
 	d.stateView.SetTitle(" Observed state ")
@@ -1019,6 +1033,9 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 		} else {
 			fmt.Fprintf(&phases, "[%s::b]%-14s[-::-] %s\n", colors[phase.state], named.name, phase.state)
 		}
+	}
+	if s.qualification.state != "" {
+		fmt.Fprintf(&phases, "[lightcyan::b]Qualification[-::-] %s\n", s.qualification.state)
 	}
 	checklist, stageRows := dashboardChecklist(s, now)
 	phases.WriteByte('\n')

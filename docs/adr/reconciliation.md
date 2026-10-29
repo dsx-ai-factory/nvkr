@@ -608,7 +608,38 @@ inputs/materials, source attempts, signatures, provenance, complete output membe
 smoke remain required. Concrete candidate policy pins do not establish the real producer/hosted acceptance
 that remains outstanding after merge.
 
-### Local M3 demo rehearsal
+### Local qualification demo
+
+The local demo presents six qualification stages: Verify build outputs, Sign build
+evidence, Check delivered tools, Sign qualification, Publish artifacts, and Verify
+registry contents. A private nonblocking pipe carries bounded owner-reported
+stage/item descriptions separately from canonical result stdout and private
+diagnostics. The TUI shows role relationships, each stage's input/action/result,
+counts of outputs, tools, uploads or checks, and the last observed operation;
+navigation cannot change execution. Missing or completed telemetry cannot grant
+a pass. The adapter reports the qualification outcome only after child completion,
+result retention and validation; automatic registry
+cleanup remains independently required before deployment. Portable layout,
+failure/privacy and targeted race tests, plus native Linux ARM64 pipe/Runner
+tests, cover these presentation contracts. The full `make check` gate passed with
+uncached tests; focused presentation, progress transport and lifecycle race checks passed.
+
+On 2026-10-16, live recording `m3-tui-20261016-01` exercised the production dashboard,
+private progress pipe and qualification command on native Linux ARM64. The fresh M3 run
+reused the retained `m3-video-04` build, displayed all six stages, checked all 29 outputs
+and smoked all 10 native tool members. The 814-second capture includes successful command
+completion and result retention after publication and independent read-back. Its content
+subject remained
+`sha256:c811839c5fe210cb9a355ced62973cd8d38c263e9c9ca7da9acabbfb0d1063bf`; fresh evidence was
+`localhost:32774/local-m3/evidence@sha256:0d424cd0342e565d1dcba3ecd850f7f7559e1ac618e0b56fb70add8b6c724cd8`.
+The retained canonical result has exact-byte SHA-256
+`1086398389995fc40c5cbeb5a3211b23f629138e60fa7403e2c365dc8d50e20f`.
+The recording and canonical result are retained locally/private to the operator; no
+durable shared download is published. The loopback registry reference is not remotely
+retrievable, and the hashes identify bytes rather than provide access. Reviewers need
+an operator-provided permitted copy to independently inspect this run.
+This records local operator trust and `unqualified-local-execution`; it did not rebuild
+producers, exercise hosted signing or deploy a cluster.
 
 On 2026-10-16, the automatic `m3-video-04` rehearsal completed its 29-output build and
 signing/smoke stages but failed publication: the capability-dropped root registry could not traverse

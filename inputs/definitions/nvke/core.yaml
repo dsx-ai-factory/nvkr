@@ -114,6 +114,21 @@ outputs:
     format: oci
     components:
       - nvke-controller
+  # NICo charts are site-installed outside NVKE's pin set; their images stay consumer-supplied.
+  - name: nico
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nico
+    format: helm-oci
+    components:
+      - nico-chart
+  - name: nico-prereqs
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nico
+    format: helm-oci
+    components:
+      - nico-prereqs-chart
   # Reference test data, not the runnable demo's controller-profiles or fleet configuration.
   - name: nico-reference-profiles-fixture
     platforms: [linux/amd64, linux/arm64]
