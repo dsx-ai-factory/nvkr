@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -16,11 +17,14 @@ const workloadFixtureImage = "docker.io/library/alpine@sha256:aaaaaaaaaaaaaaaaaa
 
 func TestTenantWorkloadRequiresExecutionDNSAndExactImage(t *testing.T) {
 	for _, tc := range []struct {
-		name, marker, image, selected, fail string
-		copies                              int
-		wantError                           bool
+		name, marker, image, selected, fail, arch string
+		copies                                    int
+		wantError                                 bool
 	}{
 		{name: "accepted", marker: "NVKE_LOCAL_WORKLOAD_PASS\n", image: workloadFixtureImage, copies: 1},
+		{name: "accepted AMD", arch: "amd64", marker: "NVKE_LOCAL_WORKLOAD_PASS\n", image: workloadFixtureImage, copies: 1},
+		{name: "AMD wrong image", arch: "amd64", marker: "NVKE_LOCAL_WORKLOAD_PASS\n", image: "sha256:wrong", copies: 1, wantError: true},
+		{name: "AMD missing execution marker", arch: "amd64", image: workloadFixtureImage, copies: 1, wantError: true},
 		{name: "new acquired image", marker: "NVKE_LOCAL_WORKLOAD_PASS\n", selected: "example.invalid/workload@sha256:" + strings.Repeat("b", 64), image: "sha256:" + strings.Repeat("b", 64), copies: 1},
 		{name: "missing execution marker", image: workloadFixtureImage, copies: 1, wantError: true},
 		{name: "partial marker", marker: "prefixNVKE_LOCAL_WORKLOAD_PASS\n", image: workloadFixtureImage, copies: 1, wantError: true},
@@ -44,6 +48,23 @@ func TestTenantWorkloadRequiresExecutionDNSAndExactImage(t *testing.T) {
 				if phase == tc.fail {
 					return nil, failed
 				}
+				if phase == "workload-apply" {
+					raw, err := os.ReadFile(args[len(args)-1])
+					if err != nil {
+						t.Fatal(err)
+					}
+					var manifest workload
+					if err := json.Unmarshal(raw, &manifest); err != nil {
+						t.Fatal(err)
+					}
+					machine := "aarch64"
+					if tc.arch == "amd64" {
+						machine = "x86_64"
+					}
+					if len(manifest.Spec.Template.Spec.Containers) != 1 || !strings.Contains(strings.Join(manifest.Spec.Template.Spec.Containers[0].Command, " "), "test $(uname -m) = "+machine+";") {
+						t.Fatal("workload did not check selected native architecture")
+					}
+				}
 				if phase == "workload-log" {
 					return []byte(tc.marker), nil
 				}
@@ -58,7 +79,12 @@ func TestTenantWorkloadRequiresExecutionDNSAndExactImage(t *testing.T) {
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), time.Hour)
 			defer cancel()
-			_, err := runTenantWorkload(ctx, t.TempDir(), "tenant.config", "kubectl", selected, capture)
+			var err error
+			if tc.arch == "" {
+				_, err = runTenantWorkload(ctx, t.TempDir(), "tenant.config", "kubectl", selected, capture)
+			} else {
+				_, err = runTenantWorkloadForArchitecture(ctx, t.TempDir(), "tenant.config", "kubectl", selected, tc.arch, capture)
+			}
 			if (err != nil) != tc.wantError {
 				t.Fatalf("acceptance error=%v; wantError=%v", err, tc.wantError)
 			}

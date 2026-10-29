@@ -49,9 +49,14 @@ func nativeSimulatorEnvironment(ctx context.Context, cfg NativeGuestConfig, netw
 	image, seedPath, simdir string,
 ) (map[string]string, error) {
 	readinessTimeout := cfg.Timeout
+	resources := NativeResources{VCPUs: 2, TenantMemoryGiB: 2}
 	if cfg.site != nil {
 		var err error
 		readinessTimeout, err = remainingWork(ctx)
+		if err != nil {
+			return nil, err
+		}
+		resources, err = selectedNativeResources(cfg.site.resources)
 		if err != nil {
 			return nil, err
 		}
@@ -61,6 +66,7 @@ func nativeSimulatorEnvironment(ctx context.Context, cfg NativeGuestConfig, netw
 		"NICO_SIM_SEED_PATH": seedPath, "NICO_SIM_FILES_DIR": filepath.Join(simdir, "files"),
 		"NICO_VMS_VM_BACKEND": "darwin-qemu", "NICO_VMS_BRIDGE_CIDR": network.prefix.String(),
 		"NICO_VMS_BASE_IMAGE": image, "NICO_VMS_QEMU_ACCELERATOR": cfg.Accelerator,
+		"NICO_VMS_VM_VCPUS": strconv.Itoa(resources.VCPUs), "NICO_VMS_VM_MEMORY_MIB": strconv.Itoa(resources.TenantMemoryGiB * 1024),
 		"NICO_VMS_BGP_ENABLED": "false", "NICO_CONTAINERS_ENABLED": "false",
 		"NICO_VMS_DIAG_SSH_ENABLED": "false", "NICO_VMS_CLEANUP_ORPHANED_VMS": "false",
 		"NICO_VMS_CONSOLE_SSH_PORT":   "-1",
@@ -110,7 +116,7 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 	if err != nil || cfg.Tools == "" {
 		return errors.New("require extracted native tools")
 	}
-	_, _, _, members, err := nativeToolSelection(runtime.GOOS + "/" + runtime.GOARCH)
+	members, err := nativeRuntimeToolMembers(runtime.GOOS + "/" + runtime.GOARCH)
 	if err != nil {
 		return err
 	}
@@ -655,7 +661,7 @@ for root in /usr/lib/nvke/debs /usr/lib/nke/debs /opt/nke/debs; do
   fi
 done
 apt-cache pkgnames | sort | sed -n '/^nke/p; /^nvke/p; /^spire/p; /^containerd/p'
-for file in /usr/local/lib/spire-agent/dsx-imds-node-attestor-agent /usr/lib/nvke/debs/spire-agent_1.14.1+tpm1.9.0-1_arm64.deb /usr/lib/nke/debs/spire-agent_1.14.1+tpm1.9.0-1_arm64.deb; do
+for file in /usr/local/lib/spire-agent/dsx-imds-node-attestor-agent /usr/lib/nvke/debs/spire-agent_*_"$(dpkg --print-architecture)".deb /usr/lib/nke/debs/spire-agent_*_"$(dpkg --print-architecture)".deb; do
   if [[ -f "$file" ]]; then sha256sum "$file"; fi
 done
 printf 'NVKE_PACKAGE_INSPECTION_END\n'

@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"sort"
 	"strings"
@@ -100,6 +101,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	}
 	if _, ok := document.On["workflow_dispatch"]; !ok {
 		return e.New(e.CodeInvalidCatalog, "GitHub workflow omits workflow_dispatch")
+	}
+	if err := validateGitHubRuntimeSourceDispatch(plan, document.On["workflow_dispatch"]); err != nil {
+		return err
 	}
 	if len(document.On) != 1 || document.Concurrency.Group != "nvkr-run-${{ github.workflow }}-${{ github.ref }}" || document.Concurrency.CancelInProgress != githubCancelInProgress(plan) {
 		return e.New(e.CodeEngineCapability, "GitHub Run requires manual dispatch only and concurrency matching its development policy")
@@ -250,8 +254,15 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				}
 				continue
 			}
-			if len(catalogEnv) > 0 && ((strings.HasPrefix(jobID, "build-runner-") && step.ID == "validate-catalog") || (jobID == "nvkr-lifecycle-run" && step.ID == "finalize-catalog")) {
-				if !reflect.DeepEqual(step.Env, catalogEnv) {
+			wantCatalogEnv := maps.Clone(catalogEnv)
+			if plan.Environment.GitHubRuntimeSource != nil && strings.HasPrefix(jobID, "build-runner-") && step.ID == "validate-catalog" {
+				if wantCatalogEnv == nil {
+					wantCatalogEnv = make(map[string]string)
+				}
+				wantCatalogEnv["NVKR_RUNTIME_SOURCE_COMMIT"] = "${{ github.event.inputs.source_commit }}"
+			}
+			if len(wantCatalogEnv) > 0 && ((strings.HasPrefix(jobID, "build-runner-") && step.ID == "validate-catalog") || (jobID == "nvkr-lifecycle-run" && step.ID == "finalize-catalog")) {
+				if !reflect.DeepEqual(step.Env, wantCatalogEnv) {
 					return e.New(e.CodeEngineCapability, "catalog source environment differs")
 				}
 				for key := range catalogEnv {
@@ -324,6 +335,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				command = githubRuntimeGenerationCommand(plan)
 			} else {
 				wantSteps = 7
+				if plan.Environment.GitHubRuntimeSource != nil {
+					command = githubRuntimeGenerationCommand(plan) + " --check"
+				}
 				if !strings.Contains(joinRuns(job.Steps), githubRuntimeInstallCommand(plan)) {
 					return e.New(e.CodeInvalidCatalog, "secondary GitHub bootstrap omits runtime input installation")
 				}

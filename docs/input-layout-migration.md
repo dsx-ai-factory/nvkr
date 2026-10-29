@@ -18,6 +18,17 @@ The engineering contracts remain [ADR-19](adr/0019-clusterdefinition-and-provisi
 owns current implementation and external evidence. Product source, output membership and publication
 policy changes require their own explicit review, even when performed during this migration.
 
+## NVSentinel ownership
+
+The [NVSentinel development catalog](../inputs/catalogs/nvsentinel/README.md) now lives under
+`inputs/catalogs/nvsentinel/`. Its Definitions and Environments have separate owners under
+`inputs/definitions/nvsentinel/` and `inputs/environments/nvsentinel/`. The NVKE consumer catalog and
+predecessor-bound OS overlays remain an explicit [experiment](../inputs/experiments/nvsentinel/README.md).
+The old `definitions/nvsentinel/` candidate exception is retired. These additions sit outside the retained
+NVKE migration counts above; they do not change its maintained release selections or establish acceptance.
+Current producers leave upstream source unchanged. Retired patch-based Run observations remain historical
+in reconciliation; they do not validate the corrected recipes or reproduce their changed build identities.
+
 ## Conditional supported target inputs
 
 All Definition paths below are relative to `inputs/definitions/`. These are the intended final entry points;

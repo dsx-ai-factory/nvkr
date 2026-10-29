@@ -412,9 +412,8 @@ Factory callers retain the ordinary dependency API; no maintained factory output
 Debian metadata diagnostic. Factory SBOM nodes inspect producer bytes before APT wrapping, and the existing
 executable/APT routes do not preserve a source-created Debian package. The diagnostic does not admit such
 a delivery route. The authoritative Debian material reader remains digest-pinned
-`dpkg-deb`, with platform checks and bounded payload expansion in the disk owner. A standalone Debian
-delivery format, declared-format propagation through path and held APIs, and payload coverage through that
-owner remain deferred. This diagnostic does not validate target architecture, preserve a source package,
+`dpkg-deb`, with platform checks and bounded payload expansion in the disk owner. Local raw Debian output uses ordinary producer-result authentication and archive retention.
+Independent standalone package payload inspection and dependency evidence remain deferred. This diagnostic does not validate target architecture, preserve a source package,
 enable direct APT publication, or prove installation.
 
 For Helm source archives and exact acquired archives selected as Helm outputs, a generic manifest reader inventories bundled `Chart.yaml` declarations and chart

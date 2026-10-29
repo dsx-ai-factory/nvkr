@@ -254,7 +254,7 @@ func TestRuntimeImageTagSurvivesCompiledPlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	environment, err := definition.LoadEnvironment(t.Context(), filepath.Join(root, "environments", "local-native-linux.json"))
+	environment, err := definition.LoadEnvironment(t.Context(), filepath.Join(root, "environments", "local-arm64-kvm.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

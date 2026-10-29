@@ -37,9 +37,10 @@ flowchart TD
 | Host | CLI and simulator | Kubernetes guest runtime |
 | --- | --- | --- |
 | Ubuntu ARM64 | Native Linux executables | QEMU/KVM through session libvirt |
+| Ubuntu AMD64 | Native Linux executables | QEMU/KVM through session libvirt |
 | Apple Silicon Mac | Native Darwin executables | Host QEMU with explicit TCG for the selected 64K image, and vmnet |
 
-Both hosts use Docker for artifact builds and a separate private Lima
+Linux and Mac use Docker for artifact builds and a separate private Lima
 containerd backend for temporary Kind bootstrap. Mac operators run the commands
 directly in macOS; no SSH into a Linux execution VM or Colima host is required.
 The CLI owns the temporary backend's start, readiness, stop and join. It shares
@@ -48,10 +49,12 @@ forwards SPIRE port 30081 to the observed demo gateway, and removes that backend
 before provisioning tenant guests. It does not adopt existing instances or mount
 the simulator state/QCOW directory into Lima.
 
-`build` creates an artifact Run and native-tool Run. `run` consumes explicitly
+`build` creates an artifact Run and, when not already included in that Definition,
+a native-tool Run. The default AMD64 Definition includes both host and site tools,
+so they are built once in the artifact Run. `run` consumes explicitly
 selected completed Runs. `e2e` calls those same stages in sequence. NVKR owns
 builds, acquisition, observation and artifact verification; NVKE owns bootstrap,
-site deployment and tenant operations. Both hosts derive the Kubernetes version
+site deployment and tenant operations. All hosts derive the Kubernetes version
 from the selected NVKE source’s shipped site-spec template. The current source
 selects 1.36.3; site package installation, bootstrap, tenant creation, node checks
 and conformance use that selection. The conformance Definition selects the
@@ -63,13 +66,31 @@ Its allowance follows the remaining operation budget; see the
 [implementation and evidence limits](adr/reconciliation.md#local-arm64-demo-presentation).
 
 The native path remains a local diagnostic.
+Ordinary `build` and `e2e` select the host-matched Definition and Environment
+and the `nvkr` executable beside `nvke-demo` on both Linux architectures and Mac.
+NVKR's existing target owner defines the compiler platform domain. The demo derives
+input filenames and output names from that target instead of maintaining another
+architecture allowlist. Tool Definitions use `inputs/definitions/demo/tools/<os>-<arch>.json`.
+On Ubuntu AMD64, the selected images, QCOW2, tool bundles, bootstrap backend and
+node checks use AMD64 through the shared deployment owner. Default AMD64
+preparation builds and validates the local Packer toolchain, then binds its exact image ID through the existing
+catalog overlays; it does not require access to the older published toolchain.
+AMD64's committed default inputs currently cover NVIDIA OVN without conformance.
+Matching AMD64 upstream and conformance Definitions are not supplied; those missing
+inputs fail before build execution. Shared conformance selectors use the host
+architecture, but a completed AMD64 conformance run is not recorded.
+A conformance deployment also checks the selected completed Run for native
+Hydrophone/kubectl and matching Linux conformance/BusyBox outputs before guest
+creation. An ordinary Run without those outputs is rejected at admission.
+Local qualification retains its separate ARM64 evidence lane. Architecture contract tests and Plan compilation do not
+establish a completed AMD64 KVM deployment.
 A complete fresh Mac/Linux build, deployment and cleanup result has not yet been
 established for this candidate. See [current implementation and evidence](adr/reconciliation.md)
 and [remaining source-build gaps](full-nvke-source-build.md).
 
 ## 1. Choose your Linux execution host
 
-Use a dedicated trusted Ubuntu ARM64 host with usable KVM and sufficient native
+Use a dedicated trusted Ubuntu ARM64 or AMD64 host with usable KVM and sufficient native
 storage for source builds, OCI outputs, the QCOW2 and guest overlays. The native
 workflow allocates **6 CPUs / 12 GiB to the site and 6 CPUs / 12 GiB to each
 tenant**: 36 GiB with one tenant worker or 48 GiB with two workers, before host,
@@ -106,7 +127,7 @@ build/run selections. All three resource fields are required when overriding
 the defaults. `tenantWorkers` accepts only 1 or 2; omission or zero retains one
 worker ordinarily and two with conformance. Explicitly selecting one worker with
 conformance is rejected before work. Worker count changes neither the selected
-artifacts nor source pins; the ordinary 32-output Run supplies this deployment.
+artifacts nor source pins; the ordinary artifact Run supplies this deployment.
 
 The Linux artifact preflight checks eight CPUs, 10 GiB available RAM and 64 GiB
 free workspace. These are stage-specific advisory checks, not reserved resources
@@ -155,15 +176,25 @@ prerequisite package selection is:
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends \
   git make gcc libc6-dev jq coreutils python3 openssh-client bash curl openssl \
-  libvirt-daemon-system libvirt-clients qemu-system-arm qemu-utils \
-  qemu-efi-aarch64 cloud-image-utils swtpm swtpm-tools gnutls-bin ipxe-qemu \
+  libvirt-daemon-system libvirt-clients qemu-utils \
+  cloud-image-utils swtpm swtpm-tools gnutls-bin ipxe-qemu \
   dnsmasq-base iptables iproute2 libcap2-bin e2fsprogs kmod
+```
+
+Install firmware and the QEMU system executable for the host architecture:
+
+```sh
+case "$(uname -m)" in
+  aarch64) sudo apt-get install -y qemu-system-arm qemu-efi-aarch64 ;;
+  x86_64) sudo apt-get install -y qemu-system-x86 ovmf ;;
+  *) echo 'Unsupported demo host architecture' >&2; exit 1 ;;
+esac
 ```
 
 The CLI refuses conflicting resources and overlapping networks; it does not
 install those packages or delete an existing libvirt session. Linux bootstrap
 additionally requires the source-built Lima `f47461e` distribution and matched
-helpers. Follow the [public source installation procedure](native-linux-bootstrap.md#install-from-public-source-on-ubuntu-arm64)
+helpers. Follow the [public source installation procedure](native-linux-bootstrap.md#install-from-public-source-on-ubuntu-arm64-or-amd64)
 once, keeping its installation directory on `PATH` in the terminal used below.
 That candidate's binary vulnerability findings and bounded pilot scope remain
 visible there; a backend-only pilot is not full native runtime acceptance.
@@ -274,14 +305,14 @@ need their endpoints.
 
 Choose a fresh attempt and output directory for each invocation. With the host
 prerequisites installed and on `PATH`, run these commands from the NVKR checkout
-on Ubuntu ARM64. This builds fresh artifact and tool Runs, creates the site and
-three tenant VMs, checks workload/DNS, runs conformance and retains the cluster:
+on Ubuntu ARM64 or AMD64. This builds fresh artifacts and any separate tools,
+creates the site and two tenant VMs, checks workload/DNS and retains the cluster:
 
 ```sh
 mkdir -p .nvkr
 bin/nvke-demo e2e --repo "$PWD" \
   --attempt demo-01 --out "$PWD/.nvkr/demo-01" \
-  --jobs 8 --conformance
+  --jobs 8
 ```
 
 NVIDIA OVN and Linux KVM are defaults. These commands select the catalogs'
@@ -291,6 +322,8 @@ deployment on the same host, use the exact `cleanup --session` command printed
 by the previous retained demo; an existing demo network is not adopted or deleted
 by a new invocation. Add `--walkthrough` for read-only cluster observations or
 `--cleanup` to request deletion after acceptance.
+On ARM64, add `--conformance` to select the matching suite and a second tenant
+worker. Default AMD64 conformance inputs are not supplied.
 
 On Mac, use explicit TCG for the selected 64K image:
 
@@ -305,7 +338,7 @@ Add `--nvke-clone /absolute/path/to/nvke` when supplying local source objects.
 placeholders. Keep the artifact attempt, native-tool attempt and output paths
 fresh. Deleting one directory does not clean resources or make an old attempt new.
 
-NVIDIA OVN is the default. Both hosts retain the selected NVKE source's ARM64
+NVIDIA OVN is the default. The ARM64 selections on Linux and Mac retain NVKE's
 `linux-nvidia-64k` kernel. Linux requires KVM. Explicit Mac `--accelerator tcg`
 uses the standard QEMU `max` CPU and is slower than hardware virtualization.
 Default Mac build preparation gives the Ubuntu installer a three-hour wait for
@@ -318,8 +351,8 @@ so the default HVF selection cannot run this image. HVF remains available for
 independently compatible images; there is no automatic fallback or kernel
 substitution. Device probes alone do not establish guest boot or full acceptance.
 
-The site uses the source-selected ARM64 MachineImage boot script with the
-current local disk URL. NICoSim owns its parsing, image boot and DHCP identity
+For these ARM64 selections, the site uses the source-selected MachineImage boot
+script with the current local disk URL. NICoSim owns its parsing, image boot and DHCP identity
 registration; the URL itself is not content authentication.
 
 Before site or tenant agents start, the adapter imports the selected named OVN
@@ -653,28 +686,72 @@ Cross-process automatic Packer orphan recovery is not implemented.
 
 ## Repeat through the opt-in native E2E test
 
-`TestEndToEnd` invokes the normal `bin/nvke-demo e2e` CLI with fresh paths,
-NVIDIA OVN, conformance and cleanup on native Mac/Ubuntu ARM64. Both hosts use
-the 14-hour wrapper budget, including two hours beyond the CLI work deadline.
-Ordinary tests skip this real build/deployment operation.
-The binary and checkout must come from the same reviewed source revision.
+`TestEndToEnd` calls the existing Go build and native-site owners directly. It
+builds fresh local Runs, bootstraps a real site VM and, by default, checks the
+site API and identified Ready node. Linux additionally checks native VM evidence.
+Ordinary tests skip this operation unless `NVKR_NVKE_E2E=1`. The scoped site
+owner handles cleanup after success, failure or cancellation; unjoined work
+retains its dependent controls.
+
+The environment-only example below is for Ubuntu ARM64 or AMD64 with KVM. It
+selects the host's default local build inputs. The test needs
+`bin/nvke-demo` from the same reviewed NVKR revision for its private host helpers;
+it does not launch the `nvke-demo e2e` CLI. From the NVKR checkout, use fresh
+attempt and output paths:
 
 ```sh
 export NVKR_NVKE_E2E=1
 export NVKR_NVKE_E2E_REPO="$(pwd -P)"
 export NVKR_NVKE_E2E_OUT="$PWD/.nvkr/native-test-01"
 export NVKR_NVKE_E2E_ATTEMPT=native-test-01
-# Optional: NVKR_NVKE_E2E_BINARY selects the same-revision CLI at another path.
-GOTOOLCHAIN=local go test ./internal/nvkedemo -run '^TestEndToEnd$' -count=1 -timeout 16h
+# Optional: NVKR_NVKE_E2E_BINARY selects the same-revision helper at another path.
+GOTOOLCHAIN=local go test ./internal/nvkedemo -run '^TestEndToEnd$' -count=1 -timeout 10h
 ```
 
-This test launches the CLI non-interactively. It cannot accept sudo passwords;
-Linux requires the documented unattended administrator policy, not a temporary
-`sudo -v` cache. Mac still requires its installed native/vmnet prerequisites.
-The test wrapper leaves two hours beyond the CLI's own work deadline for
-independently bounded diagnostics and joined cleanup.
-Its normal CLI invocation is test wiring, not evidence that a fresh complete
-Mac or Ubuntu invocation has passed.
+On Mac, use `NVKR_NVKE_E2E_CONFIG` with `run.accelerator: tcg` for the retained
+64K image. An empty accelerator selects HVF, which cannot boot this image as
+described in the [Mac setup](#4-build-and-run-the-demo). Adapt the complete
+[version-1 configuration](../demos/local-nvke.yaml): edit its absolute paths,
+choose fresh `build.attempt` and `run.out`, and add `accelerator: tcg` to its
+existing `run` mapping. Then run:
+
+```sh
+export NVKR_NVKE_E2E=1
+export NVKR_NVKE_E2E_CONFIG=/absolute/path/to/native-mac.yaml
+GOTOOLCHAIN=local go test ./internal/nvkedemo -run '^TestEndToEnd$' -count=1 -timeout 10h
+```
+
+The optional selections are:
+
+- `NVKR_NVKE_E2E_TENANT=1` additionally creates a tenant and checks node readiness,
+  workload and DNS.
+- `NVKR_NVKE_E2E_CONFORMANCE=1` additionally creates the tenant and runs conformance.
+  Committed conformance inputs are supplied for native Mac and Ubuntu ARM64;
+  the default AMD64 selection fails admission because matching inputs are absent.
+  A configuration with `run.conformance: true` selects the same scope.
+- `NVKR_NVKE_E2E_CONFIG=/absolute/path/to/demo.yaml` selects an explicit version-1
+  build/run configuration, replacing the repository, output and attempt environment
+  inputs above. Adapt [the existing example](../demos/local-nvke.yaml) with fresh
+  paths and positive `build.jobs`. Existing `run.runs` or `run.nvkr` selections are
+  refused because this test consumes its own fresh build.
+
+Work has an eight-hour ceiling, extended to twelve hours with conformance. The
+test also reserves two hours before the Go test deadline for independently
+bounded diagnostics and joined cleanup; a shorter timeout reduces work time.
+Use `-timeout 10h` for the full ordinary budget or `-timeout 14h` with conformance.
+Choose fresh attempt/output paths before every invocation.
+
+Ordinary Linux AMD64 builds select their default inputs without explicit
+configuration. To override any host's build inputs, supply `build.definition`,
+`build.environment` and `build.nvkr` together in the configuration. Linux requires KVM.
+`build.nvkeClone` optionally supplies local source objects; without a configuration,
+the corresponding input is `NVKE_LOCAL_CLONE`.
+
+Execution is noninteractive and cannot accept sudo passwords. Linux requires the
+documented unattended administrator policy; Mac requires its installed native/vmnet
+prerequisites. These test paths and budgets do not establish a completed runtime
+or conformance result. The [scheduled nightly](nvke-nightly.md) separately consumes
+authenticated published artifacts through `TestNightlyPublishedCandidate`.
 
 ### Reuse a native site from Go tests
 
@@ -760,12 +837,13 @@ race-test coverage; a real site-reuse test remains externally unverified.
 
 ## Private site identity operation helper
 
-The shared site-startup tool catalog builds a fixed Linux ARM64 helper for
-execution in an existing admitted NVKE controller container. `pkg/nvkr/siteidentity` owns its
+The shared site-startup tool catalog builds a Linux helper matching the selected
+guest architecture for execution in an existing admitted NVKE controller container. `pkg/nvkr/siteidentity` owns its
 mTLS probe, upstream SPIRE reconfiguration and authenticated fresh-peer observation;
 the executable only adapts bounded standard input/output and coded errors.
-Both native host selections consume the same Linux ARM64 helper through the
-shared site-startup tool output. It is built from catalog-selected source;
+ARM64 guests consume `site-startup-tools-arm64`; AMD64 guests consume
+`site-startup-tools-amd64`. The Mac host uses the Linux ARM64 companion for its
+ARM64 guest. It is built from catalog-selected source;
 the normal startup owner invokes it in its existing admitted controller container.
 Building the helper alone
 does not deploy, import SPIRE policy or repair a site.
@@ -845,8 +923,8 @@ below. NVKR verifies the pinned commit and tree; NVIDIA OVN retains its separate
 | Upstream SPIRE/TPM agent packaging | `v0.22.0` / `400c24fb` | [Shared release OS lock](../inputs/catalogs/node-images/release/pins.lock.yaml) |
 | NVIDIA OVN image/chart | [`8af51273`](https://github.com/dsx-ai-factory/ovn-kubernetes/commit/8af51273d52dfa07454435d18d37230e582d797a), 2.4.2 | [Native NVIDIA overlay](../inputs/catalogs/node-images/variants/native-nvidia.json) |
 
-Both hosts use these same source selections. SPIRE packaging and its startup
-renderer come from the same NVKE `v0.22.0` source as the OS, CLI and controller.
+These host architectures use the same NVKE source selections. SPIRE packaging
+and its startup renderer come from the same NVKE `v0.22.0` source as the OS, CLI and controller.
 The source-owned lock pins public SPIRE 1.14.1 and TPM plugin 1.9.0 archives.
 The package revision is `1.14.1+tpm1.9.0-4`; no DSX binary is downloaded or
 included by that producer.
@@ -858,16 +936,17 @@ owns the exact Ubuntu conformance result, completed cleanup, failed Mac attempt
 and limits of each recorded revision. Earlier retained-artifact diagnostics used
 a two-node tenant and do not establish the current four-guest conformance topology.
 
-Native NVIDIA Definitions select 32 outputs, or 38 with conformance. Package
-producers inspect actual Debian `Package`/`Architecture` metadata, and the disk
+Native ARM64 NVIDIA Definitions select 32 outputs, or 38 with conformance.
+The default AMD64 Definition selects 34 outputs, including host and site tools.
+Package producers inspect actual Debian `Package`/`Architecture` metadata, and the disk
 uses NVKE's renamed Packer build/material schema and QCOW2 output. Changed package
 bytes require a fresh disk build. Maintained release, upstream and TCG product
 selections also use NVKE `v0.22.0`; their third-party pins and historical runtime
-evidence remain separate. The independent `nvke-nightly-arm64` and
-`nvke-nightly-upstream-ovn-arm64` test harnesses in
-[nightly-profiles.json](../inputs/testing/nightly-profiles.json) remain pinned to
-[`b4f90e2c`](https://github.com/dsx-ai-factory/nvke/commit/b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8)
-because `v0.22.0` omits their reviewed candidate entrypoint.
+evidence remain separate. The [scheduled nightly](nvke-nightly.md) resolves latest
+NVKE main, dispatches the NVIDIA ARM64 producer and runs its native Go site smoke
+against that exact Run's authenticated published artifacts. Its runtime consumer
+does not rebuild products or use the upstream OVN producer. The local
+`TestEndToEnd` flow above retains its separate fresh-build scope.
 
 The native VM recipe stages `dhcp-identifier: mac` for both hosts through NVKE's
 existing image-input composer. This makes DHCPv4 use the NIC MAC rather than an

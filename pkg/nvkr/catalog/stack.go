@@ -244,6 +244,14 @@ func ApplyStack(base *Catalog, overlays ...Overlay) (*Stack, error) {
 				return nil, e.Wrap(e.CodeInvalidCatalog, err, "catalog overlay %q", overlay.Name)
 			}
 			current.Components[name] = replacement
+			if replacement.FromSource {
+				if current.stampDeclarations == nil {
+					current.stampDeclarations = make(map[string]sourceStampDeclaration)
+				}
+				current.stampDeclarations[name] = sourceStampDeclarationFor(replacement, overlay.Components[name].Component.VersionStamp)
+			} else {
+				delete(current.stampDeclarations, name)
+			}
 		}
 		for _, substitution := range overlay.ToolchainSubstitutions {
 			for _, name := range substitution.Components {
@@ -277,6 +285,13 @@ func materializeReplacement(name string, original Component, replacement Compone
 	var out Component
 	if replacement.Component != nil {
 		out = *replacement.Component
+		if out.FromSource {
+			var err error
+			out.VersionStamp, err = renderStamps(replacement.Component.VersionStamp, Pin{Tag: out.Tag, Commit: out.Commit, TreeHash: out.TreeHash, SourceDateEpoch: out.SourceDate})
+			if err != nil {
+				return Component{}, e.Wrap(e.CodeInvalidCatalog, err, "component %q replacement versionStamp", name)
+			}
+		}
 	} else {
 		if strings.TrimSpace(replacement.Version) == "" {
 			return Component{}, fmt.Errorf("component %q supplier replacement has no version", name)
@@ -317,6 +332,12 @@ func cloneCatalog(in *Catalog) (*Catalog, error) {
 	out.sourcePins = make(map[string]Pin, len(in.sourcePins))
 	for name, pin := range in.sourcePins {
 		out.sourcePins[name] = clonePin(pin)
+	}
+	out.stampDeclarations = make(map[string]sourceStampDeclaration, len(in.stampDeclarations))
+	for name, declaration := range in.stampDeclarations {
+		declaration.templates = cloneStringMap(declaration.templates)
+		declaration.rendered = cloneStringMap(declaration.rendered)
+		out.stampDeclarations[name] = declaration
 	}
 	return &out, nil
 }

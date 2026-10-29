@@ -38,3 +38,15 @@ func TestRunRuntimeAdmissionPrecedesCatalogResolution(t *testing.T) {
 		})
 	}
 }
+
+func TestRunExactSourceRequiresRuntimeBeforeInputWork(t *testing.T) {
+	for _, commit := range []string{"", strings.Repeat("a", 40)} {
+		t.Run("commit="+commit, func(t *testing.T) {
+			_, err := invokeLifecycleCLI(t, "run", "generate", "--definition", "missing-definition.json", "--environment", "missing-environment.json", "--source-commit", commit)
+			var coded *e.Error
+			if !errors.As(err, &coded) || coded.Code != e.CodeUsage {
+				t.Fatalf("source selection reached input work without runtime admission: %v", err)
+			}
+		})
+	}
+}

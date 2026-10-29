@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+kind: Definition
+metadata:
+  name: nvsentinel-os-ubuntu2404-arm64
+  description: Existing non-FDE NVKE OS recipe with the source-built NVSentinel package
+    staged in its local APT folder; unsigned local candidate.
+catalog:
+  base: ./catalog
+  overlays:
+  - ./variants/nvsentinel-os-ubuntu2404-arm64.json
+outputs:
+- name: nvsentinel-os-ubuntu2404-arm64
+  platform: linux/arm64
+  format: disk-image
+  components:
+  - nvke-agent
+  - nvke-cni-calico
+  - nvke-cni-ovn
+  - nvke-image-inputs
+  - nvke-kubeadm-distro
+  - nvke-node-image
+  - nvke-patched-installer-iso
+  - nvke-spire-agent
+  - nvsentinel-platform-connectors-deb-ubuntu2404
+  - ovn-kube-ubuntu
+  - ovn-kubernetes-chart
+  - ubuntu-installer-iso

@@ -32,6 +32,9 @@ const (
 	OutputAPT                    = "apt-repository"
 	OutputHelm                   = "helm-oci"
 	OutputDiskImage              = "disk-image"
+	OutputDebianPackage          = "debian-package"
+	PublicationTransportAPT      = "apt"
+	PublicationTransportOCI      = "oci"
 	BuildNetworkOfflineOnly      = "offline-only"
 	BuildNetworkProducerDeclared = "producer-declared"
 )
@@ -96,6 +99,9 @@ type Environment struct {
 	// GitHubRuntimePlan compiles current catalog pins at dispatch while retaining
 	// the reviewed named production workflow and its complete execution policy.
 	GitHubRuntimePlan bool `json:"githubRuntimePlan,omitempty"`
+	// GitHubRuntimeSource permits one exact repository revision to be frozen
+	// for this production runtime Plan; the coordinator selects the main commit.
+	GitHubRuntimeSource *GitHubRuntimeSource `json:"githubRuntimeSource,omitempty"`
 	// GitHubDevelopment admits branch-dispatched hosted builds and, when explicitly
 	// configured, isolated signed publications under a disposable attempt namespace.
 	GitHubDevelopment bool `json:"githubDevelopment,omitempty"`
@@ -131,8 +137,12 @@ type SourceAccess struct {
 	CredentialRef string `json:"credentialRef"`
 }
 
-// Publication selects one OCI namespace. Release metadata/evidence use /releases; outputs use named sibling repositories.
+// Publication selects required transports. The admitted OCI route uses one namespace;
+// release metadata/evidence use /releases and outputs use named sibling repositories.
 type Publication struct {
+	// Transports is a sorted, unique selection. Omission preserves the OCI route.
+	// APT is recognized but unavailable until its publication adapter is admitted.
+	Transports []string `json:"transports,omitempty"`
 	// Mode selects output-local publication and metadata-only release assembly.
 	Mode string `json:"mode,omitempty"`
 	// ImageTags selects mutable discovery aliases for exact aggregate OCI outputs.
@@ -204,7 +214,7 @@ func (definition Definition) Validate() error {
 		if output.Catalog != nil && output.Catalog.Base == "" {
 			return e.New(e.CodeInvalidCatalog, "output %q has an empty catalog override", output.Name)
 		}
-		if output.Format != OutputExecutable && output.Format != OutputOCI && output.Format != OutputAPT && output.Format != OutputHelm && output.Format != OutputDiskImage {
+		if output.Format != OutputExecutable && output.Format != OutputOCI && output.Format != OutputAPT && output.Format != OutputHelm && output.Format != OutputDiskImage && output.Format != OutputDebianPackage {
 			return e.New(e.CodeInvalidCatalog, "definition output %q has unsupported format %q", output.Name, output.Format)
 		}
 		if output.Format == OutputHelm {
@@ -216,6 +226,9 @@ func (definition Definition) Validate() error {
 		}
 		if output.Format == OutputOCI && len(output.Components) != 1 {
 			return e.New(e.CodeInvalidCatalog, "definition OCI output %q requires exactly one image component", output.Name)
+		}
+		if output.Format == OutputDebianPackage && len(output.Components) != 1 {
+			return e.New(e.CodeInvalidCatalog, "Debian output %q requires one source producer", output.Name)
 		}
 		if output.Format == OutputAPT {
 			if output.APT == nil || !namePattern.MatchString(output.APT.Distribution) || !namePattern.MatchString(output.APT.Component) {
@@ -271,6 +284,9 @@ func (environment Environment) Validate() error {
 	}
 	if environment.GitHubRuntimePlan && (environment.GitHubDevelopment || environment.GitHubBundle == "") {
 		return e.New(e.CodeEngineCapability, "githubRuntimePlan requires a named production githubBundle")
+	}
+	if err := environment.validateGitHubRuntimeSource(); err != nil {
+		return err
 	}
 	if err := ValidateGitHubBundleName(environment.GitHubBundle); err != nil {
 		return err
@@ -350,6 +366,9 @@ func (environment Environment) Validate() error {
 		}
 	}
 	if publication := environment.Publication; publication != nil {
+		if err := publication.validateTransports(); err != nil {
+			return err
+		}
 		if publication.Mode != "" && (publication.Mode != "per-output-v1" || environment.Signing == nil || environment.Signing.Mode != "cosign") {
 			return e.New(e.CodeEngineCapability, "per-output publication requires production cosign signing")
 		}

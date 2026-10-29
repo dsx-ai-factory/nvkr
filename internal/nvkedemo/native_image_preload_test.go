@@ -135,13 +135,28 @@ func TestNativeOVNProjectionUsesOnlyTheSelectedManifest(t *testing.T) {
 				t.Fatal(err)
 			}
 			global := values["global"].(map[string]any)
-			image := global["image"].(map[string]any)
 			if version == siteOVNVersion {
-				if global["useImageDigest"] != true || global["skipCallToK8s"] != false || global["enablePodHostPort"] != true || global["imagePullSecretName"] != "" || image["repository"] != "localhost/nvke/ovn-kubernetes" || image["tag"] != "nvkr" || image["sha256"] != strings.TrimPrefix(digest, "sha256:") {
+				if global["image"] != nil || global["useImageDigest"] != true || global["skipCallToK8s"] != false || global["enablePodHostPort"] != true || global["imagePullSecretName"] != "" {
 					t.Fatal("NVIDIA native OVN projection lost exact image, Service lookup or hostPort support")
 				}
-			} else if global["enablePodHostPort"] != nil || global["enableOvnKubeIdentity"] != false || values["skipCallToK8s"] != true || image["repository"] != "localhost/nvke/ovn-kubernetes@sha256" || image["tag"] != strings.TrimPrefix(digest, "sha256:") || image["pullPolicy"] != "IfNotPresent" {
-				t.Fatal("upstream image override used the NVIDIA schema")
+				for _, binding := range []struct{ component, workload string }{
+					{"ovnkube-control-plane", "ovnkubeControlPlane"},
+					{"ovnkube-single-node-zone", "ovnkubeSingleNodeZone"},
+					{"ovnkube-single-node-zone", "ovnkubeSingleNodeZoneNbdb"},
+					{"ovnkube-single-node-zone", "ovnkubeSingleNodeZoneSbdb"},
+					{"ovnkube-single-node-zone", "ovnkubeSingleNodeZoneNorthd"},
+					{"ovnkube-single-node-zone", "ovnkubeSingleNodeZoneOvnHost"},
+				} {
+					image := values[binding.component].(map[string]any)[binding.workload].(map[string]any)["image"].(map[string]any)
+					if image["repository"] != "localhost/nvke/ovn-kubernetes" || image["tag"] != "nvkr" || image["sha256"] != strings.TrimPrefix(digest, "sha256:") {
+						t.Fatalf("chart image binding %s.%s differs from selected manifest", binding.component, binding.workload)
+					}
+				}
+			} else {
+				image := global["image"].(map[string]any)
+				if global["enablePodHostPort"] != nil || global["enableOvnKubeIdentity"] != false || values["skipCallToK8s"] != true || image["repository"] != "localhost/nvke/ovn-kubernetes@sha256" || image["tag"] != strings.TrimPrefix(digest, "sha256:") || image["pullPolicy"] != "IfNotPresent" {
+					t.Fatal("upstream image override used the NVIDIA schema")
+				}
 			}
 			script, err := nativeImageImportScript("ovn.tar", reference)
 			if err != nil || !strings.Contains(script, "--digests --base-name "+operatorQuote("localhost/nvke/ovn-kubernetes")) || !strings.Contains(script, "inspecti --quiet "+operatorQuote(reference)) {
@@ -163,16 +178,18 @@ func TestNativeOVNProjectionUsesOnlyTheSelectedManifest(t *testing.T) {
 func TestNativeOVNArchiveRetainsTheExactObservedManifest(t *testing.T) {
 	for _, tc := range []struct {
 		name, arch, projection string
+		observedArch           string
 		wrongDigest            bool
 		existing               bool
 		valid                  bool
 	}{
-		{"selected", "arm64", "", false, false, true},
-		{"sibling observation", "arm64", "", true, false, false},
-		{"wrong platform", "amd64", "", false, false, false},
-		{"occupied destination", "arm64", "", false, true, false},
-		{"occupied projection", "arm64", "directory", false, false, false},
-		{"linked projection", "arm64", "symlink", false, false, false},
+		{"selected", "arm64", "", "arm64", false, false, true},
+		{"selected AMD64", "amd64", "", "amd64", false, false, true},
+		{"sibling observation", "arm64", "", "arm64", true, false, false},
+		{"wrong platform", "amd64", "", "arm64", false, false, false},
+		{"occupied destination", "arm64", "", "arm64", false, true, false},
+		{"occupied projection", "arm64", "directory", "arm64", false, false, false},
+		{"linked projection", "arm64", "symlink", "arm64", false, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			run := t.TempDir()
@@ -248,7 +265,7 @@ func TestNativeOVNArchiveRetainsTheExactObservedManifest(t *testing.T) {
 				writeTenantFixture(t, filepath.Join(retained, "sentinel"), []byte("retain"), 0600)
 			}
 			reference := "localhost/nvke/ovn-kubernetes@" + observed
-			got, err := prepareNativeImage(t.Context(), nativeImageSelection{role: "ovn", root: run, output: "ovn-image-arm64", reference: reference, observed: lifecycle.Artifact{Digest: observed}}, work, files)
+			got, err := prepareNativeImage(t.Context(), nativeImageSelection{role: "ovn", root: run, output: "ovn-image-arm64", reference: reference, platform: "linux/" + tc.observedArch, observed: lifecycle.Artifact{Digest: observed}}, work, files)
 			if (err == nil) != tc.valid {
 				t.Fatalf("image projection: %v", err)
 			}
@@ -287,7 +304,7 @@ func TestNativeOVNArchiveRetainsTheExactObservedManifest(t *testing.T) {
 			if err := transportarchive.Unpack(t.Context(), got.File, restored, []string{"blobs", "index.json", "oci-layout"}); err != nil {
 				t.Fatal(err)
 			}
-			inspected, err := delivery.InspectContainerImage(t.Context(), restored, "linux/arm64")
+			inspected, err := delivery.InspectContainerImage(t.Context(), restored, "linux/"+tc.observedArch)
 			if err != nil || inspected.ManifestDigest != observed {
 				t.Fatalf("projected manifest: %v", err)
 			}

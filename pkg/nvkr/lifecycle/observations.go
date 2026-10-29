@@ -67,7 +67,7 @@ func observeOutputsWithDiskStaging(ctx context.Context, workspace string, slots 
 		}
 		var artifact Artifact
 		var err error
-		if slot.Kind == OutputDiskImage && stage != nil {
+		if (slot.Kind == OutputDiskImage || slot.Kind == OutputDebianPackage) && stage != nil {
 			artifact, err = stage(ctx, slot, plan, execution)
 		} else {
 			artifact, err = observeOutput(ctx, slot, localized, plan, execution, workspace)
@@ -85,6 +85,9 @@ func observeOutputsWithDiskStaging(ctx context.Context, workspace string, slots 
 func observeOutput(ctx context.Context, slot requiredOutput, artifacts map[string]factory.Artifact,
 	plan *factory.Plan, execution diskPayloadObserver, workspace string,
 ) (Artifact, error) {
+	if slot.Kind == OutputDebianPackage {
+		return Artifact{}, e.New(e.CodeEngineCapability, "raw Debian output requires durable local staging")
+	}
 	if slot.Kind == OutputDiskImage {
 		if execution == nil {
 			return Artifact{}, e.New(e.CodeEngineCapability,

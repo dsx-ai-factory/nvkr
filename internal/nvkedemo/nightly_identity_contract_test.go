@@ -33,14 +33,6 @@ func nightlyIdentityFixture() (NightlyProfile, NightlyBuild) {
 	return profile, build
 }
 
-func assertNightlyCode(t *testing.T, err error, code e.Code) {
-	t.Helper()
-	var coded *e.Error
-	if err == nil || !errors.As(err, &coded) || coded.Code != code {
-		t.Fatalf("got %v; want %s", err, code)
-	}
-}
-
 func TestNightlyCycleBindsCoordinatorSourceProfileAndProducer(t *testing.T) {
 	profile, base := nightlyIdentityFixture()
 	for _, test := range []struct {
@@ -48,6 +40,8 @@ func TestNightlyCycleBindsCoordinatorSourceProfileAndProducer(t *testing.T) {
 		change func(*NightlyBuild)
 	}{
 		{"profile substitution", func(b *NightlyBuild) { b.Profile.HarnessCommit = strings.Repeat("c", 40) }},
+		{"mutable NVKE source", func(b *NightlyBuild) { b.NVKECommit = "main" }},
+		{"uppercase NVKE source", func(b *NightlyBuild) { b.NVKECommit = strings.Repeat("D", 40) }},
 		{"head substitution", func(b *NightlyBuild) { b.SourceCommit = strings.Repeat("c", 40) }},
 		{"producer retry", func(b *NightlyBuild) { b.ProducerAttempt = 2 }},
 		{"missing run", func(b *NightlyBuild) { b.ProducerRun = 0 }},

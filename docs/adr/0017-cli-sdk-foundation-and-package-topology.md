@@ -66,6 +66,14 @@ strict inventory hardening, M3 qualification acceptance and organizational accep
 Definition v5, Run/Release v4, and compiled Run Plan/artifact graph v5 records reject the
 retired cluster, role, category and composition fields. Signer policy roles remain a distinct security concept.
 
+An explicit `debian-package` output selects one ordinary from-source `host-package` producer on an
+explicit Linux platform (ADR-10/12). Local execution uses the existing producer session and source-only
+composition. Ordinary result authentication and bounded held files bind the raw archive to its exact
+named output; lifecycle retains it through the existing no-replace output transaction. Cancellation,
+cleanup and rollback remain with those owners. The archive supplies no package dependency inspection,
+standalone production predicate, installation or qualification proof. Direct-node, hosted, signing and
+publication routes remain capability-gated.
+
 Environment separately supplies runtime, runner, publication namespace, credential references and signing policy
 (ADR-20). Output-affecting tools stay in the build identity they affect.
 Changing transport or signing configuration cannot silently change logical Build identity.
@@ -461,7 +469,6 @@ record; absence of a record proves neither success nor absence of remote effects
 - **Keep orchestration in `main`, export helpers.** Rejected — blocks embedding and re-accretes logic.
 - **Options carry everything (no per-call request structs).** Rejected — conflates per-call inputs with
   process-lifetime config.
-
 
 ## Follow-ups
 

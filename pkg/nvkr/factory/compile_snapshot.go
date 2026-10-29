@@ -117,6 +117,9 @@ func compileInputState(ctx context.Context, state *inputState, definitionPath, e
 	if err != nil {
 		return nil, err
 	}
+	if environment.GitHubRuntimeSource != nil {
+		return nil, e.New(e.CodeEngineCapability, "input capture cannot replay an exact runtime source selection")
+	}
 	return compileDocumentsWithLoader(ctx, definitionPath, definition, environmentPath, environment, generatorVersion,
 		func(ctx context.Context, spec authored.Catalog) (*catalog.Stack, error) {
 			return state.loadStack(ctx, definitionPath, spec)

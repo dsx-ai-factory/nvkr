@@ -1,0 +1,53 @@
+# Machine-managed by `nvkr catalog pin` / `nvkr catalog bump`. Do not hand-edit.
+apiVersion: nvkr.dev/lock/v1
+artifacts:
+  ubuntu-installer-iso:
+    digests:
+      arm64: sha256:af78753c94b924c85c4964c670692a853f7c80299a4064e317edad95462e3168
+    tag: 26.04.1
+  ubuntu-installer-iso-amd64:
+    digests:
+      amd64: sha256:cc8a95cde20f6ced61a322420de00f10cc3c90ced545daa46cb9c1a117f1d927
+    tag: 26.04.1
+kind: PinLock
+pins:
+  nvke-cni-calico-source:
+    commit: ff21ba8c07cafff74b68e238a8876af11e5beded
+    sourceDateEpoch: 1791257393
+    tag: ff21ba8c07cafff74b68e238a8876af11e5beded
+    treeHash: b915345debd33ccd63dfbf8146415bf20e94c4ea
+  nvke-kubeadm-distro-source:
+    commit: 115d07c8bf671f8e8f9c8e630fb02c8d0ffcfb17
+    sourceDateEpoch: 1791989083
+    tag: 115d07c8bf671f8e8f9c8e630fb02c8d0ffcfb17
+    treeHash: 8505bc69875db03a12cd0907c1b411331104ca2f
+  nvke-os:
+    commit: ff21ba8c07cafff74b68e238a8876af11e5beded
+    sourceDateEpoch: 1791257393
+    tag: ff21ba8c07cafff74b68e238a8876af11e5beded
+    treeHash: b915345debd33ccd63dfbf8146415bf20e94c4ea
+  nvke-os-consumer:
+    commit: 115d07c8bf671f8e8f9c8e630fb02c8d0ffcfb17
+    sourceDateEpoch: 1791989083
+    tag: 115d07c8bf671f8e8f9c8e630fb02c8d0ffcfb17
+    treeHash: 8505bc69875db03a12cd0907c1b411331104ca2f
+  nvke-spire-agent-source:
+    commit: 726f76944404e1106626b8333d3576bdf67b575b
+    sourceDateEpoch: 1790192178
+    tag: 726f76944404e1106626b8333d3576bdf67b575b
+    treeHash: 3d6ea77f85d5da2648038425f805a598e23464ba
+  nvsentinel:
+    commit: c1593477357299ab93dd5246f5b2cd236f8f07c8
+    sourceDateEpoch: 1791905987
+    tag: c1593477357299ab93dd5246f5b2cd236f8f07c8
+    treeHash: b4dfd9cb83141d4e25e00f37548f3bd5c113d09c
+  nvsentinel-ubuntu2604:
+    commit: c1593477357299ab93dd5246f5b2cd236f8f07c8
+    sourceDateEpoch: 1791905987
+    tag: c1593477357299ab93dd5246f5b2cd236f8f07c8
+    treeHash: b4dfd9cb83141d4e25e00f37548f3bd5c113d09c
+  ovn-kubernetes:
+    commit: d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d
+    sourceDateEpoch: 1788540677
+    tag: v1.4.0
+    treeHash: ce0cb49cd14f2fc260457e61a5a222c027a07f79

@@ -90,6 +90,9 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
+	if err := rejectUnjoinedDebianPlan(plan, "GitHub generation"); err != nil {
+		return nil, err
+	}
 	if err := rejectUnsupportedRuntimeStorage(plan, "GitHub generation"); err != nil {
 		return nil, err
 	}
@@ -151,7 +154,11 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	fmt.Fprintf(&body, "# plan: %s\n# manifest: %s\n", layout.planPath, layout.manifestPath)
 	fmt.Fprintf(&body, "# qualification: %s (runtime receipts are not fabricated)\n", plan.Qualification)
 	fmt.Fprintf(&body, "name: %s\n", githubWorkflowName(plan))
-	fmt.Fprintf(&body, "'on':\n  workflow_dispatch: {}\n")
+	if plan.Environment.GitHubRuntimeSource != nil {
+		fmt.Fprint(&body, "'on':\n  workflow_dispatch:\n    inputs:\n      source_commit:\n        description: Exact source commit frozen by the coordinating main workflow\n        type: string\n        required: true\n")
+	} else {
+		fmt.Fprintf(&body, "'on':\n  workflow_dispatch: {}\n")
+	}
 	fmt.Fprintf(&body, "permissions:\n  contents: read\n\n")
 	fmt.Fprintf(&body, "concurrency:\n  group: nvkr-run-${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: %t\n", githubCancelInProgress(plan))
 	fmt.Fprintf(&body, "jobs:\n")
@@ -186,6 +193,9 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			} else {
 				actions.writeDownloadStep(&body, "NVKR runtime inputs", githubRuntimeInputsArtifact, githubRuntimeInputDirectory)
 				writeGitHubShellStep(&body, "Install NVKR runtime inputs", []string{githubRuntimeInstallCommand(plan)})
+				if plan.Environment.GitHubRuntimeSource != nil {
+					command = githubRuntimeGenerationCommand(plan) + " --check"
+				}
 			}
 		}
 		writeCatalogValidationStep(&body, plan, "Verify committed Run generation is current", "validate-catalog", command)
@@ -587,7 +597,11 @@ func githubRuntimeInputPaths(plan *Plan) []string {
 }
 
 func githubRuntimeGenerationCommand(plan *Plan) string {
-	return strings.TrimSuffix(generationCommand(plan, EngineGitHub), " --check") + " --runtime"
+	command := strings.TrimSuffix(generationCommand(plan, EngineGitHub), " --check") + " --runtime"
+	if plan.Environment.GitHubRuntimeSource != nil {
+		command += ` --source-commit "$NVKR_RUNTIME_SOURCE_COMMIT"`
+	}
+	return command
 }
 
 func writeGitHubRuntimeInputsUpload(out *bytes.Buffer, plan *Plan, actions githubActionRefs) {
