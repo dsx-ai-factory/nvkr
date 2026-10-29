@@ -190,10 +190,12 @@ type AdmittedMember struct {
 // bounded reader, is a complete plain Definition and equals its pinned digest.
 // Its fields are unexported so callers cannot assemble one without admission.
 type Composition struct {
-	path      string
-	composite CompositeDefinition
-	digest    string
-	members   []AdmittedMember
+	path        string
+	composite   CompositeDefinition
+	digest      string
+	members     []AdmittedMember
+	effective   Definition
+	attribution []OutputAttribution
 }
 
 // Path is the root-relative composite locator. It is transport, not identity.
@@ -252,7 +254,8 @@ func RootReader(root string) InputReader {
 
 // AdmitComposite applies ADR-26 §2 in order: the composite schema and bounds,
 // then each member's bounded read, plain-kind check, strict admission, name and
-// exact digest. It performs no catalog, network, subprocess or output work.
+// exact digest, and finally the §3 merge into a validated effective Definition.
+// It performs no catalog, network, subprocess or output work.
 func AdmitComposite(ctx context.Context, compositePath string, raw []byte, read InputReader) (Composition, error) {
 	if ctx == nil {
 		return Composition{}, e.New(e.CodeUsage, "composite definition admission requires a context")
@@ -326,6 +329,9 @@ func AdmitComposite(ctx context.Context, compositePath string, raw []byte, read 
 			return Composition{}, e.New(e.CodeUnverifiedRef, "composite member %q has digest %s, not its pinned %s; run definition pin", member.Name, memberDigest, member.Digest)
 		}
 		composition.members = append(composition.members, AdmittedMember{Name: member.Name, Path: paths[i], Digest: memberDigest, Definition: definition})
+	}
+	if composition.effective, composition.attribution, err = mergeComposite(compositePath, composite.Metadata, composition.members); err != nil {
+		return Composition{}, err
 	}
 	return composition, nil
 }

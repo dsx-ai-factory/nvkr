@@ -19,7 +19,7 @@ import (
 
 func compositeMemberFixture(name string, outputs ...string) Definition {
 	definition := Definition{APIVersion: DefinitionAPIVersion, Kind: DefinitionKind, Metadata: Metadata{Name: name},
-		Catalog: Catalog{Base: "catalog"}, SBOMTool: "syft", CosignTool: "cosign"}
+		Catalog: Catalog{Base: "../catalog"}, SBOMTool: "syft", CosignTool: "cosign"}
 	for _, output := range outputs {
 		definition.Outputs = append(definition.Outputs, DefinitionOutput{Name: output, Platform: "linux/amd64", Components: []string{output}, Format: OutputExecutable})
 	}
@@ -213,7 +213,7 @@ func TestCompositeAdmissionContract(t *testing.T) {
 func TestCompositeAdmissionKeepsDigestAcrossMemberFormatting(t *testing.T) {
 	root, composite := compositeFixture(t)
 	formatted := "# reformatted\napiVersion: nvkr.dev/definition/v5\nkind: Definition\nmetadata:\n  name: beta\n" +
-		"catalog:\n  base: catalog   # same catalog\nsbomTool: syft\ncosignTool: cosign\noutputs:\n" +
+		"catalog:\n  base: ../catalog   # same catalog\nsbomTool: syft\ncosignTool: cosign\noutputs:\n" +
 		"  - name: beta-cli\n    format: executable\n    platform: linux/amd64\n    components: [beta-cli]\n"
 	writeCompositeRaw(t, filepath.Join(root, "defs", "beta.yaml"), []byte(formatted))
 	writeCompositeFile(t, filepath.Join(root, "defs", "composite.yaml"), composite)
