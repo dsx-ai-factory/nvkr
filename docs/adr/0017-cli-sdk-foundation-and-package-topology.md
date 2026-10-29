@@ -65,6 +65,9 @@ strict inventory hardening, M3 qualification acceptance and organizational accep
 
 Definition v5, Run/Release v4, and compiled Run Plan/artifact graph v5 records reject the
 retired cluster, role, category and composition fields. Signer policy roles remain a distinct security concept.
+Proposed [ADR-26](0026-definition-composition.md) designs a separate composite Definition form that joins
+complete, digest-pinned Definitions into one Plan, Run and Release. It is not implemented, adds no Recipe,
+selection group or inheritance, and does not reintroduce those retired fields.
 
 An explicit `debian-package` output selects one ordinary from-source `host-package` producer on an
 explicit Linux platform (ADR-10/12). Local execution uses the existing producer session and source-only

@@ -653,32 +653,46 @@ var (
 	readGitHubGeneratorBuildInfo = debug.ReadBuildInfo
 )
 
-// githubRunnerRelease is the exact published NVKR module whose runner generated
-// workflows install. The zero value means the generator is a development build,
-// so workflows build the runner from the checkout's own NVKR source instead.
+// githubRunnerRelease is the exact published NVKR module version, a release or
+// a commit's pseudo-version, whose runner generated workflows install. The zero
+// value means the generator is a checkout build, so workflows build the runner
+// from the checkout's own NVKR source instead.
 type githubRunnerRelease struct {
 	Version, Sum, GoVersion string
 }
 
 // githubRunnerReleaseForGenerator pins generated workflows to the generator's
-// own release. Only a module-mode install of an exact release (for example
-// `go install github.com/dsx-ai-factory/nvkr/cmd/nvkr@v1.2.3`) records both a
-// release version and a module checksum; every other build, including a tagged
-// local checkout, is a development build that builds the runner from source.
+// own module version. Only a module-mode install of an exact release or commit
+// (for example `go install github.com/dsx-ai-factory/nvkr/cmd/nvkr@v1.2.3` or
+// `…@<commit>`) records both that version and a module checksum; every other
+// build, including a tagged local checkout, builds the runner from source.
 func githubRunnerReleaseForGenerator() (githubRunnerRelease, error) {
 	info, ok := readGitHubGeneratorBuildInfo()
-	if !ok || info.Main.Path != githubRunnerModule || info.Main.Sum == "" ||
-		!githubReleaseVersionPattern.MatchString(info.Main.Version) || githubPseudoVersionPattern.MatchString(info.Main.Version) {
+	if !moduleGeneratorBuild(info, ok) {
 		return githubRunnerRelease{}, nil
 	}
 	if !githubModuleSumPattern.MatchString(info.Main.Sum) {
-		return githubRunnerRelease{}, e.New(e.CodeEngineCapability, "released generator %s records an unsupported module checksum", info.Main.Version)
+		return githubRunnerRelease{}, e.New(e.CodeEngineCapability, "module-installed generator %s records an unsupported module checksum", info.Main.Version)
 	}
 	goVersion := githubGoVersionPattern.FindStringSubmatch(info.GoVersion)
 	if goVersion == nil {
-		return githubRunnerRelease{}, e.New(e.CodeEngineCapability, "released generator %s was built with unreleased Go toolchain %s", info.Main.Version, info.GoVersion)
+		return githubRunnerRelease{}, e.New(e.CodeEngineCapability, "module-installed generator %s was built with unreleased Go toolchain %s", info.Main.Version, info.GoVersion)
 	}
 	return githubRunnerRelease{Version: info.Main.Version, Sum: info.Main.Sum, GoVersion: goVersion[1]}, nil
+}
+
+// moduleGeneratorBuild reports whether info is a module-mode install of an
+// exact NVKR module version: the build records that version, a release or a
+// commit's pseudo-version, and its module checksum. Checkout builds record no checksum.
+func moduleGeneratorBuild(info *debug.BuildInfo, ok bool) bool {
+	return ok && info != nil && info.Main.Path == githubRunnerModule && info.Main.Sum != "" &&
+		githubReleaseVersionPattern.MatchString(info.Main.Version)
+}
+
+// releasedGeneratorBuild reports whether info is a module-mode install of an
+// exact NVKR release; pseudo-versions name a commit, not a release.
+func releasedGeneratorBuild(info *debug.BuildInfo, ok bool) bool {
+	return moduleGeneratorBuild(info, ok) && !githubPseudoVersionPattern.MatchString(info.Main.Version)
 }
 
 // githubRunnerModule is the module that owns nvkrRunnerPackage.
@@ -698,7 +712,7 @@ func githubRunnerHelperEnvironment(plan *Plan, runner string) (string, error) {
 }
 
 // githubRunnerInstallCommand builds the runner from the checkout's NVKR source,
-// or installs the pinned release and requires its recorded module version and
+// or installs the pinned module version and requires its recorded version and
 // checksum to match the pin before the runner is used.
 func githubRunnerInstallCommand(helperEnvironment, linkerFlags string, release githubRunnerRelease) string {
 	command := "set -eu\n" +
@@ -717,7 +731,7 @@ func githubRunnerInstallCommand(helperEnvironment, linkerFlags string, release g
 }
 
 // githubSetupGoWith returns setup-go's inputs: the checkout's .go-version for a
-// source build, or the released generator's own Go release for a pinned install.
+// source build, or the module-installed generator's own Go release for a pinned install.
 func githubSetupGoWith(release githubRunnerRelease) (key, value string) {
 	if release.Version == "" {
 		return "go-version-file", ".go-version"

@@ -12,6 +12,7 @@ intent. An output directly selects components. Packaging intent may bind catalog
 deployment repository remains transport configuration. Catalog-owned digest representation
 may retain the full OCI digest or supply SHA-256 hex to a template that owns the algorithm prefix;
 this does not change the authenticated image identity or rewrite templates.
+A proposed composite Definition is a form of this object, not a seventh lifecycle object (below).
 _Avoid_: Factory, FactoryDefinition, cluster definition
 
 **Environment**:
@@ -59,6 +60,20 @@ Consumer-owned requirements defining the acceptance scope, identities, evidence,
 _Avoid_: Signing configuration, verification result, producer assertion
 
 ## Definition and production relationships
+
+**Composite Definition (proposed)**:
+A Definition form that names complete member Definitions by locator and exact `nvkr.definition` digest and
+releases the exact union of their named outputs through one Plan, Run and Release. Output names are preserved;
+duplicates, divergent shared producers, differing base catalogs or tools, and digest drift are coded errors,
+never precedence. Members keep their own Runs and Releases; a composite neither references nor inherits them.
+Proposed [ADR-26](docs/adr/0026-definition-composition.md) designs it; it is not implemented.
+_Avoid_: Recipe, selection group, parent Release, association file, include
+
+**Effective Definition (proposed)**:
+The derived ordinary Definition that composite admission produces by merging its members, with every output's
+catalog stack made explicit. It is an internal record, recorded by digest in the composite's Plan; it is never
+authored or selected as input.
+_Avoid_: Flattened file, combined candidate, authored Definition
 
 **Named output**:
 A Definition's declaration of exact selected producers, concrete target platform or explicit aggregate image
@@ -127,7 +142,8 @@ authored lifecycle inputs are admitted.
 Opt-in execution partitioning moves original jobs into bounded same-commit worker workflows under the same
 manifest; OIDC-signing jobs remain in the entry to preserve signer identity. Moving them requires an explicit
 certificate-identity and trust-policy migration, which is proposed but not implemented. A partition is generated
-scheduling structure, not a Definition, Run or Release. It forwards original
+scheduling structure, not a Definition, Run or Release, and never follows proposed composite member
+boundaries. It forwards original
 job results to the single finalizer; it does not authorize artifact acceptance. The complete Plan and required
 output set remain shared. The provider-independent execution graph owns membership, dependency conditions,
 partition validation and exact outcome accounting; adapters project this internal structure. Reconciliation
