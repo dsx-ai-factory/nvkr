@@ -83,7 +83,8 @@ func renderGitHubPartition(ctx context.Context, plan *Plan, raw []byte, partitio
 				return nil, e.New(e.CodePipelineDrift, "GitHub partition cannot export foreign job %q", id)
 			}
 		}
-		if export.Name == "results" || export.Name == "statuses" || githubYAMLField(reported, export.Name) != nil {
+		if export.Name == "results" || export.Name == "statuses" || githubYAMLField(reported, export.Name) != nil ||
+			(export.Statuses && githubYAMLField(reported, export.Name+"-statuses") != nil) {
 			return nil, e.New(e.CodePipelineDrift, "GitHub partition export %q collides with another output", export.Name)
 		}
 		githubYAMLSet(reported, export.Name, githubYAMLString("${{ "+githubPartitionResultsFragment(export.Members)+" }}"))

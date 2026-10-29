@@ -68,8 +68,9 @@ the largest worker at 162,024 bytes and unchanged signer jobs. These are local g
 Workers never contain OIDC jobs. A fixed `<entry-stem>__signer.yml` signer workflow is proposed only
 together with ADR-18 §8's explicit certificate-identity and trust-policy migration. It is not an admitted
 member name; the reserved child-namespace rules below fail closed on such a file. Workers share one complete Plan and do not add
-an authored lifecycle object or a child Release. ADR-18 owns scheduling and result propagation; hosted
-acceptance of this opt-in topology remains unrecorded. Optional qualification
+an authored lifecycle object or a child Release. ADR-18 owns scheduling and result propagation. Reconciliation
+records one earlier successful hosted development execution of this opt-in topology; hosted execution of per-worker
+fragment forwarding, including failure and cancellation reporting, remains unrecorded. Optional qualification
 generation separately emits the admitted `workflow_run` qualifier and fixed `workflow_call` smoke pair (§4).
 That pair currently admits the default producer workflow only; named producer
 qualification is not part of this namespace contract.

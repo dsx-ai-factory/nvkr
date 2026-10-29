@@ -4,6 +4,7 @@
 package factory
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -113,7 +114,7 @@ func TestGitHubPartitionForwardingResolvesExactMembers(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !plan.Environment.GitHubExecutionPartitions {
-		t.Skip("committed development bundle is not partitioned")
+		t.Fatal("committed development bundle is not partitioned; replace this fixture rather than skipping")
 	}
 	layout := githubLayoutFor(plan)
 	entry := githubForwardingJobs(t, filepath.Join(root, layout.workflowPath))
@@ -161,12 +162,14 @@ func TestGitHubPartitionForwardingResolvesExactMembers(t *testing.T) {
 
 // githubForwardedMembers resolves one entry format expression: inline arguments
 // name a job directly, worker arguments name one exported reporter fragment.
+// The outer format must bind each argument once, in order, under its own label.
 func githubForwardedMembers(t *testing.T, expression string, reporters map[string]*yamlv3.Node, field, member string) []string {
 	t.Helper()
 	fragment := regexp.MustCompile(`^\(needs\['([^']+)'\]\.outputs\['([^']+)'\] \|\| '([^']*)'\)$`)
 	direct := regexp.MustCompile("^" + member + "$")
-	var members []string
-	for _, argument := range githubFormatArguments(t, expression) {
+	var members, placeholders []string
+	for n, argument := range githubFormatArguments(t, expression) {
+		placeholders = append(placeholders, fmt.Sprintf("{%d}", n))
 		if match := fragment.FindStringSubmatch(argument); match != nil {
 			value := githubYAMLValue(reporters[match[1]], match[2])
 			if value == "" {
@@ -210,13 +213,32 @@ func githubForwardedMembers(t *testing.T, expression string, reporters map[strin
 		if got == nil {
 			t.Fatalf("unexpected entry argument %q", argument)
 		}
+		if field != "" {
+			placeholders[n] = `"` + got[1] + `":` + placeholders[n]
+		}
 		members = append(members, got[1])
+	}
+	want := strings.Join(placeholders, " ")
+	if field != "" {
+		want = "{{" + strings.Join(placeholders, ",") + "}}"
+	}
+	if got := githubFormatString(t, expression); got != want {
+		t.Fatalf("entry format %q does not bind its arguments as %q", got, want)
 	}
 	slices.Sort(members)
 	if len(slices.Compact(slices.Clone(members))) != len(members) {
 		t.Fatalf("expression forwards a job more than once: %v", members)
 	}
 	return members
+}
+
+func githubFormatString(t *testing.T, expression string) string {
+	t.Helper()
+	match := regexp.MustCompile(`^\$\{\{ format\('([^']*)', `).FindStringSubmatch(expression)
+	if match == nil {
+		t.Fatalf("unexpected forwarding expression %q", expression)
+	}
+	return match[1]
 }
 
 func githubFormatArguments(t *testing.T, expression string) []string {

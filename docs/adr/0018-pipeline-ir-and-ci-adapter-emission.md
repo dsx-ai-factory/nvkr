@@ -1457,8 +1457,10 @@ would also churn with unrelated topology changes. Any relocation must ship toget
 2. **Caller binding in the trust policy.** Any workflow allowed to call a reusable workflow can mint the same
    SAN. The policy must therefore pin the signer workflow SAN, the Build Config URI of the exact entry
    workflow and ref, the `workflow_dispatch` trigger and the issuer. Verification must reject a certificate
-   whose caller differs. Current verification matches SAN and issuer only, so this verifier capability (ADR-04)
-   must be implemented and contract-tested first. Provenance `builder.id` comes from `GITHUB_WORKFLOW_REF`,
+   whose caller differs. Current OCI signature verification matches SAN and issuer only, so this verifier
+   capability (ADR-04) must be implemented for the OCI path and contract-tested first. Detached-document
+   verification already checks the exact Build Config URI, Build Config digest and Run invocation (ADR-04); it
+   is the owning context to extend, but it does not implement this trigger and caller policy or signer relocation. Provenance `builder.id` comes from `GITHUB_WORKFLOW_REF`,
    which stays the caller's entry workflow (ADR-09). Development publication admission matches its workflow identity
    against that `builder.id` and would then diverge from the SAN. The migration must define `builder.id` as the
    Build Config URI and match the caller and signer identities separately, in the same change.

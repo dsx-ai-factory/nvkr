@@ -61,6 +61,52 @@ func TestGitHubPartitionWorkflowPreservesJobIdentityAndFailurePolicy(t *testing.
 	}
 }
 
+func TestGitHubPartitionExports(t *testing.T) {
+	plan := githubTestPlan(t)
+	raw := []byte("permissions: {contents: read}\njobs:\n  build:\n    if: ${{ " + githubDispatchCondition(plan) + " }}\n    runs-on: ubuntu-24.04\n")
+	model, err := newExecutionGraph(t.Context(), map[string]executionOperation{"build": {}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name    string
+		exports []githubPartitionExport
+		want    []string
+	}{
+		{"valid", []githubPartitionExport{{Name: "x", Members: []string{"build"}, Statuses: true}, {Name: "y", Members: []string{"build"}}}, []string{"x", "x-statuses", "y"}},
+		{"foreign member", []githubPartitionExport{{Name: "x", Members: []string{"other"}}}, nil},
+		{"reserved results", []githubPartitionExport{{Name: "results", Members: []string{"build"}}}, nil},
+		{"reserved statuses", []githubPartitionExport{{Name: "statuses", Members: []string{"build"}}}, nil},
+		{"duplicate", []githubPartitionExport{{Name: "x", Members: []string{"build"}}, {Name: "x", Members: []string{"build"}}}, nil},
+		{"derived after explicit", []githubPartitionExport{{Name: "x-statuses", Members: []string{"build"}}, {Name: "x", Members: []string{"build"}, Statuses: true}}, nil},
+		{"explicit after derived", []githubPartitionExport{{Name: "x", Members: []string{"build"}, Statuses: true}, {Name: "x-statuses", Members: []string{"build"}}}, nil},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			child, err := renderGitHubPartition(t.Context(), plan, raw, githubExecutionPartition{Jobs: []string{"build"}}, model, test.exports)
+			if test.want == nil {
+				assertFactoryErrorCode(t, err, e.CodePipelineDrift)
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			var doc yamlv3.Node
+			if err := yamlv3.Unmarshal(child, &doc); err != nil {
+				t.Fatal(err)
+			}
+			outputs := githubYAMLField(githubYAMLField(githubYAMLField(doc.Content[0], "on"), "workflow_call"), "outputs")
+			for _, name := range append([]string{"results", "statuses"}, test.want...) {
+				if githubYAMLField(outputs, name) == nil {
+					t.Fatalf("missing output %q", name)
+				}
+			}
+			if len(outputs.Content) != 2*(2+len(test.want)) {
+				t.Fatalf("unexpected output count %d", len(outputs.Content)/2)
+			}
+		})
+	}
+}
+
 func TestGitHubPartitionRefusesUnprojectedDependencyExpressions(t *testing.T) {
 	plan := githubTestPlan(t)
 	for _, expression := range []string{
