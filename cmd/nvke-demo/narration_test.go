@@ -63,6 +63,9 @@ func TestDemoNarrationMissingDefaultAndExplicitInputs(t *testing.T) {
 					cfg.Definition, cfg.Environment = selected, environment
 					want = nvkrerr.CodeInvalidCatalog
 				}
+				if !explicit {
+					assertCode(t, nvkedemo.AdmitDemoBuild(t.Context(), cfg), nvkrerr.CodeEngineCapability)
+				}
 				var out bytes.Buffer
 				err := presentDemoNarration(t.Context(), &out, cfg)
 				assertCode(t, err, want)

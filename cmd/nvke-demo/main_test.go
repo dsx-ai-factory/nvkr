@@ -684,6 +684,97 @@ func TestProductionRunCannotSelectKindSiteWorkflow(t *testing.T) {
 	}
 }
 
+func TestE2EBuildAdmissionPrecedesRuntimeAndPresentation(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		flags []string
+	}{
+		{"missing-default", nil},
+		{"upstream-ovn", []string{"--network", "upstream-ovn"}},
+		{"conformance", []string{"--conformance"}},
+		{"prepared", []string{"--prepared", "--qualification-policy", "/must-not-read"}},
+		{"qualify-local", []string{"--qualify-local"}},
+		{"policy", []string{"--qualification-policy", "/must-not-read"}},
+	} {
+		if tc.name != "missing-default" && (runtime.GOOS != "linux" || runtime.GOARCH != "amd64") {
+			continue
+		}
+		for _, walkthrough := range []bool{false, true} {
+			t.Run(tc.name+map[bool]string{false: "/plain", true: "/walkthrough"}[walkthrough], func(t *testing.T) {
+				repo, temporary := t.TempDir(), t.TempDir()
+				t.Setenv("TMPDIR", temporary)
+				var out, diagnostics bytes.Buffer
+				actions := defaultDemoActions()
+				actions.admit = func(context.Context, nvkedemo.Config) error {
+					t.Fatal("unsupported build reached runtime admission")
+					return nil
+				}
+				actions.build = func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
+					t.Fatal("unsupported build reached producer work")
+					return nvkedemo.BuiltInputs{}, nil
+				}
+				actions.run = func(context.Context, nvkedemo.Config) error {
+					t.Fatal("unsupported build reached deployment")
+					return nil
+				}
+				args := append([]string{"e2e", "--repo", repo, "--attempt", "unsupported", "--out", filepath.Join(repo, "out")}, tc.flags...)
+				if walkthrough {
+					args = append(args, "--walkthrough")
+				}
+				err := executeRoot(t.Context(), newCommand(&out, &diagnostics, actions), args)
+				assertCode(t, err, nvkrerr.CodeEngineCapability)
+				if out.Len() != 0 || diagnostics.Len() != 0 {
+					t.Fatal("unsupported build emitted narration, sudo diagnostics or progress")
+				}
+				for _, root := range []string{repo, temporary} {
+					entries, err := os.ReadDir(root)
+					if err != nil || len(entries) != 0 {
+						t.Fatal("unsupported build wrote attempt state or a progress log", entries, err)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestBuildStaticAdmissionPrecedesProgress(t *testing.T) {
+	repo, temporary := t.TempDir(), t.TempDir()
+	t.Setenv("TMPDIR", temporary)
+	var out, diagnostics bytes.Buffer
+	actions := defaultDemoActions()
+	actions.build = func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
+		t.Fatal("unsupported selection reached build")
+		return nvkedemo.BuiltInputs{}, nil
+	}
+	err := executeRoot(t.Context(), newCommand(&out, &diagnostics, actions), []string{"build", "--repo", repo, "--attempt", "unsupported"})
+	assertCode(t, err, nvkrerr.CodeEngineCapability)
+	if out.Len() != 0 || diagnostics.Len() != 0 {
+		t.Fatal("unsupported build emitted progress")
+	}
+	for _, root := range []string{repo, temporary} {
+		entries, err := os.ReadDir(root)
+		if err != nil || len(entries) != 0 {
+			t.Fatal("unsupported build wrote state or progress logs", entries, err)
+		}
+	}
+}
+
+func TestE2EStaticBuildAdmissionKeepsSupportedSelection(t *testing.T) {
+	repo := narrationRepository(t)
+	var out bytes.Buffer
+	actions := defaultDemoActions()
+	calls := 0
+	actions.admit = func(context.Context, nvkedemo.Config) error {
+		calls++
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "bounded runtime admission")
+	}
+	err := executeRoot(t.Context(), newCommand(&out, io.Discard, actions), []string{"e2e", "--repo", repo, "--attempt", "fresh", "--out", filepath.Join(repo, "out"), "--walkthrough"})
+	assertCode(t, err, nvkrerr.CodeEngineCapability)
+	if calls != 1 || !strings.Contains(err.Error(), "bounded runtime admission") || out.Len() != 0 {
+		t.Fatal("supported build did not reach runtime admission before narration", calls, err)
+	}
+}
+
 func TestE2EAdmitsNativeVMRuntimeBeforeBuild(t *testing.T) {
 	calls := 0
 	actions := demoActions{

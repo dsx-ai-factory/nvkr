@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -66,26 +65,28 @@ func TestDefaultBuildRejectsUnavailableAMD64LanesBeforeWork(t *testing.T) {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		t.Skip("exercises the actual Linux AMD64 public build boundary")
 	}
-	repo, err := filepath.Abs("../..")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, cfg := range []BuildConfig{
-		{Network: "upstream-ovn"}, {Conformance: true},
-		{Prepared: true, QualificationPolicy: "/must-not-be-read"},
-		{QualifyLocal: true}, {QualificationPolicy: "/must-not-be-read"},
+	for _, tc := range []struct {
+		name string
+		cfg  BuildConfig
+	}{
+		{"upstream-ovn", BuildConfig{Network: "upstream-ovn"}},
+		{"conformance", BuildConfig{Conformance: true}},
+		{"prepared", BuildConfig{Prepared: true, QualificationPolicy: "/must-not-be-read"}},
+		{"qualify-local", BuildConfig{QualifyLocal: true}},
+		{"policy", BuildConfig{QualificationPolicy: "/must-not-be-read"}},
 	} {
-		t.Run(fmt.Sprintf("%+v", cfg), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := t.TempDir()
+			cfg := tc.cfg
 			cfg.Repository, cfg.AttemptPrefix, cfg.Jobs = repo, "unsupported-amd64", 1
+			assertNightlyCode(t, AdmitDemoBuild(t.Context(), cfg), nvkrerr.CodeEngineCapability)
 			got, err := BuildArtifacts(t.Context(), cfg)
 			assertNightlyCode(t, err, nvkrerr.CodeEngineCapability)
 			if got != (BuiltInputs{}) {
 				t.Fatal("unsupported lane returned build outputs")
 			}
-			for _, root := range []string{"runs", "laptop-bootstrap", "native-build"} {
-				if _, err := os.Lstat(filepath.Join(repo, ".nvkr", root, cfg.AttemptPrefix)); !os.IsNotExist(err) {
-					t.Fatal("unsupported lane created attempt state", err)
-				}
+			if _, err := os.Lstat(filepath.Join(repo, ".nvkr")); !os.IsNotExist(err) {
+				t.Fatal("unsupported lane created attempt state", err)
 			}
 		})
 	}

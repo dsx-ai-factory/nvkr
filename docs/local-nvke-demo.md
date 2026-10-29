@@ -71,9 +71,9 @@ and the `nvkr` executable beside `nvke-demo` on both Linux architectures and Mac
 NVKR's existing target owner defines the compiler platform domain. The demo derives
 input filenames and output names from that target instead of maintaining another
 architecture allowlist. Tool Definitions use `inputs/definitions/demo/tools/<os>-<arch>.json`.
-Its images, QCOW2, tool bundles, bootstrap backend and node checks use AMD64
-through the same deployment owner. Default AMD64 preparation builds and validates
-the local Packer toolchain, then binds its exact image ID through the existing
+On Ubuntu AMD64, the selected images, QCOW2, tool bundles, bootstrap backend and
+node checks use AMD64 through the shared deployment owner. Default AMD64
+preparation builds and validates the local Packer toolchain, then binds its exact image ID through the existing
 catalog overlays; it does not require access to the older published toolchain.
 AMD64's committed default inputs currently cover NVIDIA OVN without conformance.
 Matching AMD64 upstream and conformance Definitions are not supplied; those missing

@@ -4,6 +4,7 @@
 package nvkedemo
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -312,6 +313,22 @@ func TestSelectedBuildResolvesInputsWithinRepository(t *testing.T) {
 			if _, err := os.Stat(filepath.Join(repo, ".nvkr")); !os.IsNotExist(err) {
 				t.Fatal("input admission created build state")
 			}
+		})
+	}
+}
+
+func TestDemoBuildAdmissionContextBeforeInputs(t *testing.T) {
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	for _, tc := range []struct {
+		name string
+		ctx  context.Context
+		code e.Code
+	}{
+		{"nil", nil, e.CodeUsage}, {"canceled", canceled, e.CodeTimeout},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assertNightlyCode(t, AdmitDemoBuild(tc.ctx, BuildConfig{Repository: "/must-not-read"}), tc.code)
 		})
 	}
 }

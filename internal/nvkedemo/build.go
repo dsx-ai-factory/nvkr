@@ -51,19 +51,8 @@ func BuildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	return result, nil
 }
 func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
-	if err := validateAutomaticQualification(cfg.QualifyLocal, cfg.Prepared, cfg.QualificationPolicy, cfg.Qualification); err != nil {
+	if err := AdmitDemoBuild(ctx, cfg); err != nil {
 		return BuiltInputs{}, err
-	}
-	if err := requireContext(ctx); err != nil {
-		return BuiltInputs{}, err
-	}
-	if cfg.Conformance && (cfg.QualifyLocal || cfg.Prepared || cfg.QualificationPolicy != "") {
-		return BuiltInputs{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "demo conformance selects a fresh unsigned diagnostic Run; prepared or local-signing combinations are not admitted")
-	}
-	if cfg.Prepared || cfg.QualifyLocal || cfg.QualificationPolicy != "" {
-		if err := admitQualificationHost(runtime.GOOS + "/" + runtime.GOARCH); err != nil {
-			return BuiltInputs{}, err
-		}
 	}
 	if err := cfg.Qualification.validate(cfg.QualificationPolicy); err != nil {
 		return BuiltInputs{}, err
@@ -73,9 +62,6 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	}
 	launcherFlags, err := buildSelectionFlags(cfg)
 	if err != nil {
-		return BuiltInputs{}, err
-	}
-	if err := validateSelectedBuild(cfg.Definition, cfg.Environment, cfg.NVKR, cfg.Prepared || cfg.QualifyLocal || cfg.QualificationPolicy != ""); err != nil {
 		return BuiltInputs{}, err
 	}
 	if err := admitNativeBuildHost(runtime.GOOS + "/" + runtime.GOARCH); err != nil {
