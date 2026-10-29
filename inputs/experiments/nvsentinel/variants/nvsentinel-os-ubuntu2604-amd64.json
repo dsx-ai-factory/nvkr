@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvsentinel-os-ubuntu2604-amd64",
-  "requiresCatalogDigest": "sha256:12748047f55f9f4b142ee9932b07026272dfb755c443f07b63afc8bb88f61701",
+  "requiresCatalogDigest": "sha256:50b09cc08af569b69a5766695a4931db25532c0360a17634fa12f302ca767c5a",
   "components": {
     "nvke-cni-ovn": {
       "component": {

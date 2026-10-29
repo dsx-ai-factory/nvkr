@@ -126,6 +126,19 @@ for OCI-export archives on the admitted Docker or Podman runtime, locally and in
 qualified execution remain deferred. A component may select its own digest-pinned toolchain image while
 retaining the same pinned source as other components; this changes its build identity, not its source pin.
 
+### Raw Debian output
+
+A Debian package is an output of the existing `host-package` source producer, not a new builder or runtime.
+The component declares its platform, pinned toolchain, command, private output directory and archive path
+through ordinary catalog fields. Distribution-specific commands and toolchains belong to explicit components;
+there is no separate target-profile resolver or inferred distribution/platform default.
+
+A standalone `debian-package` Definition output selects one archive producer. The normal producer session
+executes it; existing producer-result authentication, bounded held files and lifecycle staging preserve exact
+bytes and rollback on failure. OS consumers use the ordinary material handoff. These local artifacts carry
+composition metadata only. Full-content inspection, independent architecture/ABI acceptance and authenticated
+provenance remain separate; direct-node/hosted raw-DEB execution, signing and publication remain gated.
+
 ### Disk-image authoring contract
 
 `disk-image` is an output semantic, independent of how its bytes are obtained. Every such component declares
@@ -476,19 +489,6 @@ remain the upstream build owner's duty. ADR-22's future curated-set derivation r
 
 **Neutral**
 - `buildDigest` changes for any component moved to `nix` — by design; a builder switch is a new build.
-
-### Raw Debian output
-
-A Debian package is an output of the existing `host-package` source producer, not a new builder or runtime.
-The component declares its platform, pinned toolchain, command, private output directory and archive path
-through ordinary catalog fields. Distribution-specific commands and toolchains belong to explicit components;
-there is no separate target-profile resolver or inferred distribution/platform default.
-
-A standalone `debian-package` Definition output selects one archive producer. The normal producer session
-executes it; existing producer-result authentication, bounded held files and lifecycle staging preserve exact
-bytes and rollback on failure. OS consumers use the ordinary material handoff. These local artifacts carry
-composition metadata only. Full-content inspection, independent architecture/ABI acceptance and authenticated
-provenance remain separate; direct-node/hosted raw-DEB execution, signing and publication remain gated.
 
 ## Alternatives considered
 

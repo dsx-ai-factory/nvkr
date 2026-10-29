@@ -564,6 +564,9 @@ components:
         test "$ID" = ubuntu
         test "$VERSION_ID" = "$ubuntu_version"
         : "${SOURCE_DATE_EPOCH:?compiled source date is required}"
+        : "${GIT_VERSION:?compiled source commit is required}"
+        pkg_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y%m%d)"
+        pkg_version="0~git$pkg_date.$(printf '%.10s' "$GIT_VERSION")"
         test "$(go env GOVERSION)" = go1.27.0
         test "$(go env GOARCH)" = "$arch"
         test "$(dpkg --print-architecture)" = "$arch"
@@ -574,7 +577,7 @@ components:
           "$root/usr/share/doc/nvsentinel-platform-connectors" "$out/go-cache"
         cat >"$root/DEBIAN/control" <<EOF
         Package: nvsentinel-platform-connectors
-        Version: 0~git20261013.c159347735
+        Version: $pkg_version
         Architecture: $arch
         Maintainer: Ilya Kislenko <ikislenko@nvidia.com>
         Section: admin
@@ -597,6 +600,8 @@ components:
       - ubuntu-24.04
     writeDir: nvkr-output
     artifactPath: nvkr-output/nvsentinel-platform-connectors_{{.Arch}}.deb
+    versionStamp:
+      GIT_VERSION: '{{.Commit}}'
   nvsentinel-platform-connectors-deb-ubuntu2604:
     source: nvsentinel-ubuntu2604
     fromSource: true
@@ -612,3 +617,5 @@ components:
       - ubuntu-26.04
     writeDir: nvkr-output
     artifactPath: nvkr-output/nvsentinel-platform-connectors_{{.Arch}}.deb
+    versionStamp:
+      GIT_VERSION: '{{.Commit}}'
