@@ -313,9 +313,11 @@ def download(args, env, deadline, cwd, check):
             time.sleep(min(0.2, max(0, until - time.monotonic())))
 
 def published_source(cache, env, deadline):
-    # A checkout without NVKR source builds the latest published release. Go
-    # ignores go.mod beneath the module cache, so build from a private copy.
-    raw = download(["%[8]s@latest"], env, deadline, None, lambda: None)
+    # A checkout without NVKR source builds the latest published release.
+    # Resolve it from the private cache root so the consumer checkout's own
+    # go.mod and toolchain lines cannot affect acquisition. Go ignores go.mod
+    # beneath the module cache, so build from a private copy.
+    raw = download(["%[8]s@latest"], env, deadline, cache, lambda: None)
     decoder = json.JSONDecoder(object_pairs_hook=unique_object, parse_constant=invalid_constant)
     item = decoder.decode(raw.decode("utf-8"))
     if not isinstance(item, dict):

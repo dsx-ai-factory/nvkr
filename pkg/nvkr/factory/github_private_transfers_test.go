@@ -793,6 +793,10 @@ func TestGitHubPrivateBootstrapBuildsPublishedReleaseWithoutSource(t *testing.T)
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root, runnerTemp, published := t.TempDir(), t.TempDir(), t.TempDir()
+			// The consumer's own module must not take part in runner acquisition.
+			if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/recipes\n\ngo 9.99\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
 			for _, name := range []string{"go.mod", "go.sum"} {
 				if err := os.WriteFile(filepath.Join(published, name), []byte("published "+name), 0o400); err != nil {
 					t.Fatal(err)
@@ -803,7 +807,7 @@ published, module, workspace = ` + strconv.Quote(published) + `, ` + strconv.Quo
 cache = pathlib.Path(os.environ["GOCACHE"]).parent
 source = cache / "source"
 if sys.argv[1:] == ["mod", "download", "-json", ` + strconv.Quote(module+"@latest") + `]:
-    assert "GOPROXY" not in os.environ and os.path.realpath(os.getcwd()) == os.path.realpath(workspace)
+    assert "GOPROXY" not in os.environ and os.path.realpath(os.getcwd()) == os.path.realpath(cache)
     print(json.dumps({"Path": module, "Version": "v1.2.3", "Dir": published}))
     sys.exit(0)
 assert os.path.realpath(os.getcwd()) == os.path.realpath(source)
