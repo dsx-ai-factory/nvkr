@@ -54,7 +54,7 @@ bin/nvkr run plan \
   --environment docs/examples/nvke-tutorial/environment-local.yaml
 ```
 
-A composite Definition (proposed [ADR-26](adr/0026-definition-composition.md)) pins complete member
+A composite Definition (proposed ADR-26) pins complete member
 Definitions by their exact `nvkr.definition` digest. `--definition` accepts either kind; a composite path
 and every member and catalog it reaches must lie beneath the working directory. `definition inspect`
 describes the composite, its members and the derived effective Definition. After editing a member,

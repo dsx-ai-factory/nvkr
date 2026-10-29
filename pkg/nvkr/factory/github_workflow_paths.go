@@ -32,6 +32,11 @@ func legacyGitHubChildWorkflowOwner(relative string) (string, bool) {
 		return "", false
 	}
 	entry := stem + ".yml"
+	// Named development bundles postdate legacy producer children; they own
+	// only their execution partition workers.
+	if strings.HasPrefix(entry, ".github/workflows/nvkr-dev-") && !githubPartitionWorkflowSuffix.MatchString(relative) {
+		return "", false
+	}
 	_, ok = githubWorkflowNamespace(entry)
 	return entry, ok
 }
