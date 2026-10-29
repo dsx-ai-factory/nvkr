@@ -435,6 +435,11 @@ only that carrier, not recursively validate its embedded references.
 [OCI manifest specification](https://github.com/opencontainers/image-spec/blob/main/manifest.md),
 [Definition format admission](../pkg/nvkr/definition/model.go)
 
+Proposed [ADR-26](adr/0026-definition-composition.md) takes a narrower path than a parent Release: a composite
+Definition pins the family Definitions by digest and rebuilds their exact union in one Run and one flat Release,
+without importing family Releases. Reusing published family outputs is deferred to authenticated result reuse.
+It is designed, not implemented.
+
 Any accepted native design must update ADR-17/19/20 and lane/policy contracts in ADR-04/16, reconciliation,
 SADD and domain vocabulary. Required negative contracts include missing/extra/duplicate children,
 substituted outputs, unauthorized signers, policy weakening, unsupported lanes, evidence reuse, traversal

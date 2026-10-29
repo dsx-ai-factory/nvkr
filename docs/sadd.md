@@ -65,6 +65,12 @@ owners; native upstream catalog execution remains unexercised. Shared schema sta
 adapters and controller/chart integration are deferred. Existing CLI and legacy validation diagnostics
 retain their separate admission and result contracts; catalog registration grants no qualification authority.
 
+Proposed [ADR-26](adr/0026-definition-composition.md) designs composite Definitions: complete member Definitions
+pinned by exact digest compile to one Plan, Run and Release whose membership is the exact union of their named
+outputs. Members keep independent ownership, Runs and Releases; a composite rebuilds every output and inherits
+no member Run, Release or lane. Development bundles are planned with generation; member Release reuse and
+composite qualification are deferred. Nothing is implemented.
+
 ## Assumptions {#assumptions}
 
 These assumptions are subject to the current ADRs and milestone acceptance criteria.
@@ -256,6 +262,11 @@ Environment values and returns a complete Plan, including the original input ide
 publication routes, and required output slots, then joins independently observed bytes into those slots.
 Required membership exists before execution, so omitting a failed output cannot make a partial run complete.
 Specialized byte-changing transformations remain explicit product intent.
+
+A proposed composite Definition (ADR-26) would enter this flow before the compiler: admission loads each
+digest-pinned member, rejects drift and conflicts, and derives one effective Definition that the same compiler
+consumes. Composition changes Definition, Plan, Run and Release identities and records every member digest and
+output attribution; it never changes an output's Build Digest. This path is designed, not implemented.
 
 The compiler derives each output's graph from its exact selected components and concrete
 target. `nvkr.build` identifies the logical projection of that validated graph. Output names, packaging and execution settings remain bound by their owning records. Equal Build
@@ -1172,6 +1183,7 @@ already obtained.
 | Qualified provider observation, Nix, authority/discovery adapters and operational exercises | Qualified-lane module owners | Qualified production acceptance |
 | Qualified helper-image admission | Execution/trust owners | Exact executable/runtime receipt protocol; image pin alone is insufficient |
 | Deferred release registration transport | Registry/integration owners | Optional downstream discovery |
+| Proposed ADR-26 composite Definitions, then member Release reuse and composite qualification | Release-engineering, catalog, qualification and result-reuse owners | One combined Release from independently owned Definitions without a hand-maintained combined copy |
 
 Qualified helper-image use remains unavailable until it satisfies ADR-07/18's executable/runtime admission.
 Source bootstrap records only the identities that actually participated; delivery by image cannot imply
