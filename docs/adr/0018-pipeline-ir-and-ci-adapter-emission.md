@@ -508,29 +508,38 @@ belong to Environment/profile configuration; component toolchains remain produce
 
 #### Repository NVKE E2E adapter outside generated execution
 
-The separately authored repository CI adapter uses `arc-arm64-kvm` and `nvkr-arc`
-for kind management plus native KVM tenant guests. This engineering contract is
-outside generated Run execution and v1 product qualification acceptance; it adds
-no Environment runtime engine, public runtime API or qualified runner claim.
-The generated adapter's native disk policy above remains unchanged. Other labels
-and downstream runtime targets are unsupported by this E2E adapter.
+The separately authored nightly coordinator resolves one NVKE main commit and
+dispatches the existing generated ARM64 NVIDIA producer with that exact source
+selection. The producer retains build, private transport, publication, signing,
+verification and frozen-Plan ownership. No parallel AMD64 producer is added.
+The admitted runtime source policy binds preparation, every source-built
+NVKE component and finalization to the cycle selection without a version-bump
+commit; independently acquired dependencies retain their reviewed pins.
 
-NVKE owns guest and cluster provisioning, assertions and guest/cluster teardown.
-The parent repository harness owns host admission, serialization, the disk service,
-outer leases, network-control mutation and journaled restoration. It requires
-native architecture, KVM, host packages, exact source and private workspace before
-host mutation and joins both owners before reporting a successful cycle. Missing
-cleanup evidence retains recovery controls and fails the cycle.
+The consumer retrieves the exact producing Run and same-Run Plan, authenticates
+the complete publication under the Environment's policy and requires the issued
+exact-input receipt plus producing invocation. It rejects a Plan that differs
+from the coordinator's NVKE commit. Existing Go native owners consume those
+published artifacts directly, invoke the built CLI to bootstrap a real site VM
+through a temporary kind/Lima backend, check the live API and Ready node, and
+join VM/backend/network cleanup. The nightly performs no second product build
+and fabricates no local Run. Tenant workload/DNS checks are explicit manual
+opt-ins. Local developer build-and-test integration retains its separate scope.
 
-The pinned NVKE suite is fully trusted code. Its sudo and Docker access are
-root-equivalent on the runner; running under the parent's UID means it can access
-the parent's read-only job token despite environment scrubbing. Private paths
-and separate workflow jobs do not establish an independent sandbox or signer.
-The suite's unsigned outcomes therefore remain diagnostics, including its own
-pass verdict. A label, configured schedule or local contract test proves neither
-pool access nor combined runtime acceptance. Provider admission and the first
-combined cycle remain external evidence in reconciliation; no organizational
-tool approval or named-decider ratification is inferred.
+Runtime uses `arc-arm64-kvm` and `nvkr-arc`; a public AMD64 lane awaits admitted
+artifact production support. Native KVM and actual capacity remain admission
+requirements. Jobs and blocking operations have bounded lifetimes; the runtime
+test reserves 125 minutes for native cleanup, reporting and margin within its
+six-hour job. Coordinator public attachments contain only constructed selection,
+producing-Run locator and cycle-verdict JSON. Binary products and raw diagnostics
+remain under private transport/publication policies; the runtime has no writer
+or OIDC permission and no shared Actions build cache.
+
+This downstream CI remains outside v1 qualified acceptance. Trusted NVKE code has
+sudo and Docker access; private paths and environment scrubbing provide no
+independent sandbox. Outcomes are unsigned diagnostics. Existing generated ARC
+disk policies and exact producer result accounting retain their owners. A
+completed hosted producer/bootstrap/cleanup cycle remains separate evidence.
 
 ### 4. Runner provenance and conditional self-hosting bootstrap
 
@@ -1319,6 +1328,25 @@ before execution. This retains the existing trusted bootstrap and same-Run artif
 no new execution receipt. CI uses `run generate --runtime --check` to admit unchanged scheduling and
 policy without requiring current source pins in the committed baseline. Ordinary `--check` remains
 byte-exact, including after bootstrap restoration. Default and development generation remain unchanged.
+
+An optional `githubRuntimeSource` policy names one canonical GitHub repository and
+`refs/heads/main` for the coordinator's selection. The coordinator resolves that ref once;
+the generated producer requires its full commit as dispatch input. The catalog owner
+fetches the configured main ref and admits only equality or Git-proven ancestry of the
+selected commit, allowing main to advance between selection and replay. Equality uses
+a depth-one acquisition; ancestry is bounded to 64 commits and retains the existing Git
+byte and time limits. An off-main commit or unavailable bounded proof fails closed.
+The owner authenticates that exact Git tree and applies it after existing catalog overlays to every
+matching source-built producer, retaining reviewed commands, toolchains and independent
+acquisition pins. The Plan records the frozen commit. Bootstrap and finalization replay
+that same revision; a missing or mixed revision fails before producer acceptance.
+Finalization repeats the proof against the then-current `main`. A delayed retry outside
+the 64-commit fetch window, or a ref rewrite that removes the frozen commit, fails closed
+before a Run record is issued even if signing and publication already completed. This
+changes frozen Plan data, not the authored catalog files or workflow between source pins.
+The committed baseline is generation input, not an executable source selection. Ordinary
+input capture and qualification handoff have no replay contract for this lane and reject it;
+published artifact authentication remains separate from downstream runtime acceptance.
 
 Native preflight and pinned checkout remain explicit steps in their entry-workflow execution job.
 Operator-authored environment setup, timed producer execution and steps whose outcomes or outputs are

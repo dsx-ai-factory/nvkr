@@ -125,6 +125,11 @@ func runDiskInspectionFixture(root string, args []string) int {
 			"example.test/inspection@sha256:"+strings.Repeat("1", 64), runtime.GOARCH)
 	case "create":
 		fmt.Print(strings.Repeat("a", 64))
+	case "container":
+		if len(args) != 5 || args[1] != "inspect" || args[2] != "--format" || args[3] != "{{json .}}" || args[4] != strings.Repeat("a", 64) {
+			return 96
+		}
+		fmt.Printf("{\"Id\":%q,\"Image\":%q}", args[4], "sha256:"+strings.Repeat("4", 64))
 	case "start":
 		if _, err := io.Copy(io.Discard, os.Stdin); err != nil {
 			return 92

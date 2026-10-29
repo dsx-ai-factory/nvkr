@@ -4,7 +4,7 @@ These Definitions select Apple Silicon host tools, the Linux site runtime compan
 
 | Definition | Purpose |
 | --- | --- |
-| `definition-tools.json` | Host bundle and site runtime companion |
+| [`../tools/darwin-arm64.json`](../tools/darwin-arm64.json) | Host bundle and site runtime companion |
 | `definition-runtime-images.json` | Existing pinned runtime and CAPI authentication images for local import |
 
 ```sh

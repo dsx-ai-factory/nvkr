@@ -22,6 +22,7 @@ import (
 )
 
 const nightlySHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+const nightlyNVKESHA = "dddddddddddddddddddddddddddddddddddddddd"
 const nightlyWorkflow = "nvkr-run-oss.yml"
 
 // The fixture records every endpoint and method. It admits no latest-run/list
@@ -108,7 +109,7 @@ func newNightlyFixture(t *testing.T) *nightlyFixture {
 		"FAKE_GH_ROOT=" + root, "FAKE_DISPATCH_FAILURE=false",
 		"GITHUB_SERVER_URL=https://github.com", "GITHUB_REF=refs/heads/main",
 		"GITHUB_REPOSITORY=example/nvkr", "GITHUB_REPOSITORY_ID=123",
-		"GITHUB_SHA=" + nightlySHA, "GITHUB_RUN_ID=101", "GITHUB_RUN_ATTEMPT=3",
+		"NVKE_COMMIT=" + nightlyNVKESHA, "GITHUB_SHA=" + nightlySHA, "GITHUB_RUN_ID=101", "GITHUB_RUN_ATTEMPT=3",
 	}
 	sleep, err := exec.LookPath("sleep")
 	if err != nil {
@@ -196,22 +197,27 @@ func TestNightlyBuildRecordsOnlyExactSuccessfulProducer(t *testing.T) {
 		t.Fatal(err)
 	}
 	var record struct {
-		CoordinatorRun, CoordinatorAttempt, SourceCommit, ProducerURL, Trust string
-		ProducerRun, ProducerAttempt                                         int
-		Profile                                                              map[string]string
+		CoordinatorRun, CoordinatorAttempt, SourceCommit, NVKECommit, ProducerURL, Trust string
+		ProducerRun, ProducerAttempt                                                     int
+		Profile                                                                          map[string]string
 	}
 	if err := json.Unmarshal(data, &record); err != nil {
 		t.Fatal(err)
 	}
-	if record.ProducerRun != 4242 || record.ProducerAttempt != 1 || record.CoordinatorRun != "101" || record.CoordinatorAttempt != "3" || record.SourceCommit != nightlySHA || record.ProducerURL != f.producer["html_url"] || record.Profile["build_workflow"] != nightlyWorkflow || record.Trust != "github-run-facts; publication-not-yet-verified" {
+	if record.ProducerRun != 4242 || record.ProducerAttempt != 1 || record.CoordinatorRun != "101" || record.CoordinatorAttempt != "3" || record.SourceCommit != nightlySHA || record.NVKECommit != nightlyNVKESHA || record.ProducerURL != f.producer["html_url"] || record.Profile["build_workflow"] != nightlyWorkflow || record.Trust != "github-run-facts; publication-not-yet-verified" {
 		t.Fatalf("producer record substituted identity or overclaimed authority: %+v", record)
 	}
 	if calls := f.calls(t); len(calls) != 4 || calls[2] != "POST repos/example/nvkr/actions/workflows/"+nightlyWorkflow+"/dispatches" || calls[3] != "GET repos/example/nvkr/actions/runs/4242" {
 		t.Fatalf("did not use exact dispatch response ID: %v", calls)
 	}
-	var request map[string]string
+	var request struct {
+		Ref    string `json:"ref"`
+		Inputs struct {
+			SourceCommit string `json:"source_commit"`
+		} `json:"inputs"`
+	}
 	data, err = os.ReadFile(filepath.Join(f.out, "request.json"))
-	if err != nil || json.Unmarshal(data, &request) != nil || len(request) != 1 || request["ref"] != "main" {
+	if err != nil || json.Unmarshal(data, &request) != nil || request.Ref != "main" || request.Inputs.SourceCommit != nightlyNVKESHA {
 		t.Fatalf("unexpected dispatch request: %s (%v)", data, err)
 	}
 }
@@ -433,5 +439,24 @@ exec "$FAKE_REAL_SLEEP" "$@"
 				}
 			})
 		}
+	}
+}
+
+func TestNightlyBuildRejectsMissingOrMutableNVKERevisionBeforeDispatch(t *testing.T) {
+	for _, revision := range []string{"", "main", strings.Repeat("D", 40), strings.Repeat("d", 39)} {
+		t.Run(revision, func(t *testing.T) {
+			fixture := newNightlyFixture(t)
+			fixture.setEnv("NVKE_COMMIT", revision)
+			output, status := fixture.run(t, "oss")
+			if status != 49 || !strings.Contains(output, "NVKR-E-UNPINNED-INPUT") {
+				t.Fatalf("invalid source admitted: %d %s", status, output)
+			}
+			if len(fixture.calls(t)) != 0 {
+				t.Fatal("source refusal occurred after API work")
+			}
+			if _, err := os.Stat(fixture.out); !os.IsNotExist(err) {
+				t.Fatal("source refusal produced output", err)
+			}
+		})
 	}
 }

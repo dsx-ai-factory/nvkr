@@ -20,6 +20,10 @@ output-scoped selections retain the same NVKE release producers.
 [`nico`](nico/registry.yaml) owns the source-packaged NICo and NICo prerequisite charts, pinned
 independently of NVKE to one infra-controller release. NICo images remain consumer-supplied.
 
+The native local Go smoke inputs select AMD64 and ARM64 from the existing NVKE, CAPNICo,
+controller-profiles and native-tools catalogs. Architecture-specific tool acquisitions remain
+explicit members of the shared native-tools catalog; no copied AMD64 site catalog is required.
+
 ## Current-to-shared mapping
 
 Former paths below were relative to `definitions/` at upstream commit
@@ -95,3 +99,11 @@ snapshot. The native KVM overlay binds the resulting NVIDIA stack. The release,
 upstream, TCG and hosted nightly selections retain their source pin cohorts.
 Package metadata checks and Plan compilation establish input
 alignment; a fresh package/disk build and full native runtime acceptance remain required.
+
+## NVSentinel development catalog
+
+[`nvsentinel/`](nvsentinel/README.md) separately owns the pinned NVSentinel image, chart, executable and
+Debian producers. It uses existing format handlers and adds no upstream script patches. Its local
+Definitions do not change the maintained NVKE release. The separate
+[NVKE OS material experiment](../experiments/nvsentinel/README.md) retains its existing consumer source
+cohort and stages the package through the ordinary material folder.

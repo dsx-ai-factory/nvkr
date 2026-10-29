@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	yamlv3 "go.yaml.in/yaml/v3"
 )
@@ -21,6 +22,12 @@ func TestGitHubQualificationHandoffRequiresCompleteSignedOutputPublication(t *te
 		{"dry run", func(t *testing.T) *Plan { return signedTestPlan(t, dryRunSigningProfile(), ghcrTarget()) }, false},
 		{"signed aggregate", func(t *testing.T) *Plan { return signedTestPlan(t, cosignSigningProfile(), ghcrTarget()) }, false},
 		{"signed outputs", referenceTestPlan, true},
+		{"exact runtime source", func(t *testing.T) *Plan {
+			return recompileGitHubStabilityPlan(t, referenceTestPlan(t), func(in *githubStabilityInputs) {
+				in.environment.GitHubBundle, in.environment.GitHubRuntimePlan = "exact-source", true
+				in.environment.GitHubRuntimeSource = &authored.GitHubRuntimeSource{Repository: "https://github.com/containerd/containerd", Ref: "refs/heads/main"}
+			})
+		}, false},
 		{"unsigned development", githubDevelopmentTestPlan, false},
 		{"signed development", githubDevelopmentPublicationTestPlan, false},
 	} {

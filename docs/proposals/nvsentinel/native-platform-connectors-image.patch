@@ -1,0 +1,81 @@
+diff --git a/distros/oci/build-platform-connectors.sh b/distros/oci/build-platform-connectors.sh
+new file mode 100644
+index 0000000..4f2b918
+--- /dev/null
++++ b/distros/oci/build-platform-connectors.sh
+@@ -0,0 +1,39 @@
++#!/bin/sh
++# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# SPDX-License-Identifier: Apache-2.0
++
++set -eu
++arch="$1"
++case "$arch" in amd64|arm64) ;; *) exit 2 ;; esac
++test "$(go env GOVERSION)" = go1.27.0
++test "$(go env GOOS)" = linux
++test "$(go env GOARCH)" = "$arch"
++: "${SOURCE_DATE_EPOCH:?}" "${BUILD_VERSION:?}" "${GIT_VERSION:?}"
++export VERSION="$BUILD_VERSION" GIT_COMMIT="$GIT_VERSION"
++export GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
++export GOFLAGS="${GOFLAGS:-} -mod=vendor"
++BUILD_DATE="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
++export BUILD_DATE
++export KO_CONFIG_PATH="/src/distros/oci/platform-connectors-$arch.ko.yaml"
++export KO_DOCKER_REPO=localhost/nvsentinel/platform-connectors
++# This cache contains the complete pinned native base in the toolchain closure.
++test ! -e /src/nvkr-output/ko-cache
++cp -R /opt/ko-cache /src/nvkr-output/ko-cache
++export KOCACHE=/src/nvkr-output/ko-cache
++cd /src/platform-connectors
++test -f vendor/modules.txt
++ko build . --push=false --bare --sbom=none \
++  --image-label=org.opencontainers.image.source=https://github.com/nvidia/nvsentinel \
++  --image-label=org.opencontainers.image.licenses=Apache-2.0 \
++  --image-label="org.opencontainers.image.title=NVSentinel Platform Connectors" \
++  --image-label="org.opencontainers.image.description=Fault remediation service for rapid node-level issue resolution in GPU-accelerated Kubernetes environments" \
++  --image-label="org.opencontainers.image.version=$VERSION" \
++  --image-label="org.opencontainers.image.revision=$GIT_COMMIT" \
++  --image-label="org.opencontainers.image.created=$BUILD_DATE" \
++  --image-annotation="org.opencontainers.image.description=Fault remediation service for rapid node-level issue resolution in GPU-accelerated Kubernetes environments" \
++  --oci-layout-path=/src/nvkr-output/platform-connectors-layout \
++  --image-refs=/src/nvkr-output/platform-connectors-image-ref.txt
++# Export the native OCI layout, not ko's distinct Docker archive format.
++tar --format=ustar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
++  --numeric-owner -C /src/nvkr-output/platform-connectors-layout \
++  -cf /src/nvkr-output/platform-connectors.oci.tar oci-layout index.json blobs
+diff --git a/distros/oci/platform-connectors-amd64.ko.yaml b/distros/oci/platform-connectors-amd64.ko.yaml
+new file mode 100644
+index 0000000..233e5ce
+--- /dev/null
++++ b/distros/oci/platform-connectors-amd64.ko.yaml
+@@ -0,0 +1,12 @@
++# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# SPDX-License-Identifier: Apache-2.0
++
++# Selected component from upstream .ko.yaml; executed in platform-connectors.
++defaultBaseImage: cgr.dev/chainguard/static@sha256:a40219f3b0c2719e4e4220310e80a2230a4b95881644292c130e3a8e8287fc6c
++builds:
++  - id: platform-connectors
++    dir: .
++    main: .
++    ldflags:
++      - "-s -w"
++      - "-X main.version={{.Env.VERSION}} -X main.commit={{.Env.GIT_COMMIT}} -X main.date={{.Env.BUILD_DATE}}"
+diff --git a/distros/oci/platform-connectors-arm64.ko.yaml b/distros/oci/platform-connectors-arm64.ko.yaml
+new file mode 100644
+index 0000000..2bd1ed9
+--- /dev/null
++++ b/distros/oci/platform-connectors-arm64.ko.yaml
+@@ -0,0 +1,12 @@
++# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# SPDX-License-Identifier: Apache-2.0
++
++# Selected component from upstream .ko.yaml; executed in platform-connectors.
++defaultBaseImage: cgr.dev/chainguard/static@sha256:daed076c904e5dc26f5ff87d77aa4cea8b7ca76e906b561915dafe5b086377dc
++builds:
++  - id: platform-connectors
++    dir: .
++    main: .
++    ldflags:
++      - "-s -w"
++      - "-X main.version={{.Env.VERSION}} -X main.commit={{.Env.GIT_COMMIT}} -X main.date={{.Env.BUILD_DATE}}"
