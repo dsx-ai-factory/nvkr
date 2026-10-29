@@ -474,13 +474,14 @@ Acceptance of this extension requires:
    recovery on versioned storage. Failure to retain and confirm that reference prevents the final commit.
    A retry must reconcile earlier uncertain completion before creating another signed completion; a valid
    prior completion is reused with its original proof, and unresolved history cannot be bypassed.
-   Starting a new Run does not clear uncertainty for the same target and destination. Recovery preserves
+   Starting a new Run does not clear uncertainty for an enrolled physical namespace. Recovery preserves
    the original proof bytes and permits safe replay; inadequate retention, unavailable recovery data or
    delayed finalization beyond the fixed publication deadline cannot yield a successful completion.
    Renaming a target or changing its access method cannot bypass unresolved state. A provably undispatched
    operation can be closed; an unrecoverable destination requires recorded operator retirement. The old
    physical namespace remains blocked; continued delivery requires a newly enrolled physical namespace with
    a non-overlapping prefix, without claiming that the old completion is absent or revoked.
+   New destinations cannot overlap enrolled or retired physical namespaces.
 5. Successful delivery, demonstrated boot readiness and release qualification are distinct results.
    The supported service, compatibility set and observed limits are recorded before enablement.
 

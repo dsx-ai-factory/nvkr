@@ -1257,7 +1257,7 @@ The contract also requires reviewed credential action/resource scopes, complete 
 ordering, and a cleanup budget covering cancellation and worker joining without abandoning workers.
 Negative boot acceptance explicitly includes mismatched EFI architecture and incompatible imager parameters.
 Provider policy evidence and these failure/rejection exercises remain outstanding.
-Cross-Run signing also requires serialized predecessor reconciliation for repository, target and exact destination; an uncertain or expired locator
+Cross-Run signing also requires serialized predecessor reconciliation for the enrolled physical namespace; an uncertain or expired locator
 cannot be bypassed by re-signing. Cleanup expiry requires separately bounded supervisor termination/reap
 observation, and ordering acceptance covers unsorted and mixed-type bindings independently of the comparator.
 These remain implementation and acceptance requirements, not exercised retry or process-lifetime evidence.
@@ -1271,9 +1271,12 @@ these retention/cutoff guarantees remain implementation and acceptance work; a j
 neither serialization nor a persistent pending-state index. The proposed namespace identity excludes target
 names and transport aliases, with explicit operator enrollment and one owning repository, workflow path,
 display name/bundle, exact dispatch ref and evaluated non-canceling concurrency group.
+New enrollment must exclude equal, ancestor and descendant prefixes of enrolled or retired reservations on
+the same provider/resource and bucket, with serialized overlap checking and no-replace creation.
 Preparing-state CAS permits proven-undispatched closure; unrecoverable authorized state requires recorded
 retirement and a separately enrolled disjoint prefix. Exact-bundle replay does not require joining a lost
-runner, while current workers remain owned through stop/join. First-use, alias/owner collisions, closure races,
+runner, while current workers remain owned through stop/join. First-use, alias/owner collisions, overlapping
+enrollment races, workflow/group/cancellation mismatches, closure races,
 retirement and missing/queue-expired cutoff tests are required. These boundaries remain unimplemented/unexercised.
 
 ## Support by owner

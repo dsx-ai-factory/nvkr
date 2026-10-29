@@ -283,7 +283,8 @@ operation/cleanup deadlines.
 
 Targets affect Environment, Plan and delivery identity, never producer Build identity or unchanged file digests.
 The target must have a corresponding OCI publication source and signing configuration; the first extension does
-not replace OCI production. Local credentials may support diagnostics, but authority-bearing delivery/signing
+not replace OCI production. File delivery cannot satisfy or bypass any required `publication.transports`
+selection, including `apt`. Local credentials may support diagnostics, but authority-bearing delivery/signing
 remains GitHub-only. Implementations may resolve those references through federation or credentials for an
 admitted S3-compatible service. Build jobs must not inherit ambient storage credentials. Dependency,
 license, provenance and security review must admit pinned AWS SDK modules and transitive dependencies
@@ -433,6 +434,13 @@ workflow or ref cannot share the namespace under a different group; the current 
 a repository-wide lock. Ordinary publication cannot initialize or reset missing state. Concurrent enrollment
 has one winner; retries authenticate the existing record rather than overwrite it. Missing enrolled state,
 an attempted migration/reset or ownership/resource ambiguity fails admission before producer or delivery work.
+
+New enrollment must reject a prefix equal to, containing, or contained by any enrolled or retired namespace
+on the same admitted provider/resource and bucket. Compare canonical literal prefix subtrees at `/` key-segment
+boundaries: `nvke` contains `nvke/os`, but not `nvke2`. The enrollment owner must serialize the complete
+overlap check and no-replace creation so concurrent overlapping enrollments cannot both succeed; missing or
+incomplete reservation state fails admission. An exact retry may authenticate the existing enrollment without
+creating or resetting state. Empty and bucket-root prefixes remain rejected by the authored prefix grammar.
 
 Across Runs and attempts, `lifecycle` and the Run-record owner serialize that enrolled physical namespace;
 serialization covers predecessor lookup, registration, signing, recovery-byte retention and commit disposition.
@@ -597,10 +605,15 @@ Exercise denied and out-of-scope credential
 admission, cancellation during active transfer and a cleanup deadline expiring before worker join; no abort,
 restart, held payload/proof release or success may precede joining. On a versioned bucket, lose the final
 acknowledgement and recover the same frozen locator through version discovery and complete independent
-verification. A new provider Run ID must not bypass an unresolved operation for the same repository, target
-and physical namespace. Target rename, endpoint alias and addressing-mode changes must select the same state.
+verification. A new provider Run ID must not bypass an unresolved operation for the same enrolled physical
+namespace. Target rename, endpoint alias and addressing-mode changes must select the same state.
 Test first-use enrollment, a conflicting second owner/bundle/ref, missing enrolled state, concurrent initialization
-and attempted migration/reset. Each invalid delivery admission must return a coded error with zero producer
+and attempted migration/reset. With bundle and dispatch ref unchanged, reject a changed workflow path,
+changed evaluated concurrency group and `cancel-in-progress: true`. Reject equal, ancestor and descendant
+prefixes against both enrolled and retired reservations on the same provider/resource and bucket; race
+concurrent parent/child enrollments so only one can succeed. Include disjoint sibling prefixes as a positive
+case, and reject empty/bucket-root prefixes under the existing grammar. Each invalid delivery admission must
+return a coded error with zero producer
 execution, payload/proof transfer, signing or final PUTs; control-record inspection/enrollment is separate.
 Test death in `preparing` before recovery retention: exact-state closure must permit
 the next operation without a possible stale commit. Race closure against promotion; only the winning transition
