@@ -463,10 +463,13 @@ Acceptance of this extension requires:
    verification must be rejected.
 3. Each delivered package is installed on a matching clean system with dependency and runtime checks.
    Mutually exclusive package versions are tested as alternatives. A list of package metadata or files
-   cannot replace evidence covering the actual package payload.
+   cannot replace evidence covering the actual package payload. Package filenames containing plus signs remain
+   unchanged and retrievable by intended clients, distinct from filenames containing spaces or percent signs.
 4. Conflicting objects, missing/corrupt evidence, denied access, concurrent publication, interrupted transfer
    and failed boot/install cannot yield a successful required operation. A lost completion acknowledgement
    is reconciled or reported as indeterminate; already stored valid evidence is not described as rolled back.
+   The exact completion reference remains retrievable after producer or runner loss and permits independent
+   recovery on versioned storage. Failure to retain and confirm that reference prevents the final commit.
 5. Successful delivery, demonstrated boot readiness and release qualification are distinct results.
    The supported service, compatibility set and observed limits are recorded before enablement.
 

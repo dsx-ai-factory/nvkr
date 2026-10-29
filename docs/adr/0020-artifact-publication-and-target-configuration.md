@@ -331,20 +331,41 @@ bindings and subject/format confusion fail strict canonical validation.
 Payload/proof keys are `<prefix>/blobs/sha256/<hex>/<basename>`. A projected native/executable member uses the
 last segment of its canonical relative source name; the full member path remains in its source binding.
 A raw disk uses `<output-name>.qcow2`. Every other source blob, including parent archives, OCI index/config
-bytes and proof bundles, uses the fixed basename `blob`. Encode the basename as one URL path segment using
-the standard URL implementation; reject ambiguous/unsafe names at source admission. Shared bytes may reuse
-an exact key only with every named source binding preserved. Root bytes live at
+bytes and proof bundles, uses the fixed basename `blob`. Storage keys and source names retain their original
+characters. Construct URLs by encoding each key path segment exactly once: leave only ASCII letters, digits,
+`-`, `.`, `_` and `~` unescaped; encode other UTF-8 bytes as uppercase percent escapes. In particular, a literal
+`+` is `%2B`, a space is `%20` and a literal `%` is `%25`; never substitute `+` for space or double-encode an
+escaped segment. Thus `foo_1.2+nvke1_amd64.deb` retains that basename in storage and uses
+`foo_1.2%2Bnvke1_amd64.deb` in its URL. URL construction must preserve those escapes through request emission;
+generic path escaping alone is insufficient. This follows the [S3 URI-encoding rules](https://docs.aws.amazon.com/AmazonS3/latest/developerguide/sig-v4-header-based-auth.html)
+and the [object-key special-character guidance](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html).
+Reject ambiguous/unsafe names at source admission; ordinary Debian names containing `+` remain admitted.
+Shared bytes may reuse an exact key only with every named source binding preserved. Root bytes live at
 `<prefix>/deliveries/sha256/<root-blob-hex>.json`; the detached Sigstore
 bundle lives at `<prefix>/commits/sha256/<bundle-blob-hex>.sigstore.json`. These final two objects are outside
 the root's `objects` list. The root contains neither its own digest/location nor its signature, avoiding
 self-reference. Its semantic family digest, raw JSON SHA-256 and payload/wrapper identities are distinct.
 
 The strict caller-pinned locator `nvkr.dev/file-delivery-locator/v1` contains `schemaVersion`, `endpoint`,
-`region`, `bucket`, `addressing`, `document` and `bundle`. Each of the latter two contains `key`, `sha256`,
-`size` and optional `versionId`. The consumer admits endpoint/read access independently, hashes the downloaded
-objects and requires that the detached bundle authenticates the exact canonical document. A mutable name or
-the locator alone supplies no trust. Source and delivery Verification Policies are independent caller inputs;
-publisher-policy digests in the root are descriptive. Consumer receipts bind the policies actually enforced.
+`region`, `bucket`, `addressing`, `document` and `bundle`. `document` contains `key`, `sha256`, `size` and an
+optional `versionId` learned from its completed upload/read-back. `bundle` contains exactly `key`, `sha256`
+and `size`; `versionId` is forbidden because the final commit has not occurred when the locator is frozen.
+Do not add a version to the frozen locator after acknowledgement or recovery. To discover the bundle after
+commit or an indeterminate result, perform a bounded HEAD at its exact key, then GET the returned exact
+version where supported; otherwise use the returned ETag for a conditional GET. Admit both metadata access
+and exact-version read permission when required; denied or failed version reads permit no fallback to an
+unversioned read. Metadata is no proof: verify the complete bytes against the pinned digest/size and
+authenticate the bundle, document and required closure under independent consumer policies. Record the
+observed version or conditional-read binding in the resulting
+receipt, not in a rewritten locator. A missing, denied, conflicting or changed object cannot yield success;
+do not search other keys or reconstruct the locator by re-signing. The
+[PUT response](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html) supplies the assigned version;
+the [GET contract](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html) supports exact-version
+and ETag-conditional reads; [HEAD](https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadObject.html) discovers
+metadata without authenticating object bytes. The consumer admits endpoint/read access independently.
+A mutable name or the locator alone supplies no trust. Source and delivery Verification Policies are
+independent caller inputs; publisher-policy digests in the root are descriptive. Consumer receipts bind the
+policies actually enforced.
 The root cannot nominate its trusted signer, weaken disk evidence, or upgrade the lane or acceptance scope.
 Full Release qualification, revocation and offline acceptance remain outside this artifact-publication contract.
 
@@ -364,10 +385,21 @@ fails admission, not a silent safety downgrade. The PUT/multipart retry distinct
 mandatory full-byte reconciliation is this contract's requirement for every admitted provider.
 
 The state order is source authentication → upload payloads and proofs → verify every required storage object
-and boot URL → generate canonical root → detached signing → root upload and read-back → conditional bundle
-upload last → independent root and bundle authentication → producer success. Freeze the exact root, bundle and locator bytes
-before the final commit request; retries never silently re-sign under the same key. Before that request,
-failure cannot publish a completion. Its result can be indeterminate: a lost response or failed final read-back
+and boot URL → generate canonical root → detached signing → root upload and read-back → durable locator retention
+→ conditional bundle upload last → independent root and bundle authentication → producer success.
+Freeze the exact root, bundle and locator bytes before the final commit request; retries never silently
+re-sign under the same key. `lifecycle` must durably retain the exact frozen locator under the originating
+Run/attempt and target in a record retrievable after producer process or runner loss. Confirm its exact-byte
+read-back before permitting the final request; failed or unconfirmed retention prevents that request.
+An acknowledged durable Run record or already retained job artifact may satisfy this requirement; process
+memory, logs, an ephemeral runner file or an artifact uploaded only after the commit cannot. Recovery access
+and retention must cover cancellation, timeout and indeterminate-result reconciliation. Before work, admit
+and record the recovery window and expiry, retaining the locator at least as long as its associated Run
+record; cleanup cannot remove it within that window while reconciliation remains outstanding. Expiry limits
+recovery availability, never the validity of a surviving remote completion. The record supplies coordinates,
+never trust or a successful outcome. Reconciliation retrieves it independently of the producer and performs
+the locator's complete verification, without bucket scans or regenerated signatures. Before the final commit
+request, failure cannot publish a completion. Its result can be indeterminate: a lost response or failed final read-back
 may leave a valid completion remotely. Return no producer success until reconciliation; preserve objects and
 report the exact attempted locator as indeterminate. An independent consumer may accept it only after all
 signature, policy and required-closure checks pass. Do not promise rollback, absence of a valid remote commit
@@ -416,7 +448,12 @@ mutually exclusive package versions use separate test cases, not one impossible 
 Required tests cover corrupt or missing proof or boot files, EFI or script substitution after verification,
 wrong architectures or digests, incompatible imager parameters, equal or conflicting existing objects,
 concurrent writes, lost commit acknowledgements, denied access, interrupted multipart transfers and failed
-boot or installation. Delivery success, boot readiness and qualification remain separate results. Record
+boot or installation. Exercise unchanged Debian names containing `+` through actual emitted URLs, including
+distinct space and literal-percent names. On a versioned bucket, lose the final acknowledgement and recover
+the same frozen locator through version discovery and complete independent verification. Terminate the
+producer or runner after the bundle lands but before acknowledgement, then retrieve the pre-recorded locator
+and reconcile without the producer's memory or files. Failed durable retention or its read-back must prevent
+the final commit request. Delivery success, boot readiness and qualification remain separate results. Record
 provider capabilities, exact artifact/client identities and acceptance limits in reconciliation; no provider
 or format is enabled by this contract freeze alone.
 

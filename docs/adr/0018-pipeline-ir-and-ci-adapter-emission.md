@@ -1552,9 +1552,9 @@ ADR-20 specifies the S3 extension; its generated execution remains implementatio
 retain GitHub-only authority, the admitted source/signing branches and protected Environments, and the
 existing producer isolation. Derive required delivery nodes from typed targets and named outputs in the
 complete Plan. The graph orders source aggregate authentication, selected complete output checks, proof
-capture, upload/read-back, detached delivery signing, completion publication and independent completion
-verification. Every required target result is a finalizer dependency; job success or an unverified locator
-cannot replace the authenticated result.
+capture, upload/read-back, detached delivery signing, durable locator retention, completion publication and
+independent completion verification. Every required target result is a finalizer dependency; job success or
+an unverified locator cannot replace the authenticated result.
 
 Source, build and ARC jobs must receive no S3 credentials. Only admitted transfer and completion operations
 may resolve writer credential references or obtain federated write credentials; verifier access must be
@@ -1566,9 +1566,14 @@ policies. Secret references may be recorded; secret values cannot be
 transported in plans, command arguments, boot scripts, artifacts or logs. Referenced authentication and
 provider capabilities must be admitted before producer, storage or publication work.
 
+The completion operation must depend on confirmed exact-byte retention of its frozen locator under the
+originating Run/attempt and target, accessible after producer or runner loss. A post-commit artifact-upload
+step or finalizer cannot satisfy that prerequisite. Admit the recovery access and retention before work;
+failed or unconfirmed retention prevents the commit request. The bundle locator omits its unknown version;
+independent recovery resolves the exact key and verifies the observed version as specified in ADR-20.
 The finalizer reports no successful required delivery for failed or indeterminate completion. A valid remote
-commit can survive lost acknowledgement, cancellation or finalizer failure; preserve its exact locator for
-independent reconciliation rather than claiming rollback. Existing OCI publication may remain successful
+commit can survive lost acknowledgement, cancellation or finalizer failure; retrieve its preserved locator
+for independent reconciliation rather than claiming rollback. Existing OCI publication may remain successful
 while its required S3 delivery fails. Native EFI production needs its own admitted Linux/mkosi/material
 capability; existing ARC disk admission does not implicitly authorize it. Boot/install acceptance is a
 downstream exercise of delivered artifacts, not a new generated provisioning engine or qualification verdict.

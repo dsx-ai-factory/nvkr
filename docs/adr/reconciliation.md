@@ -1249,6 +1249,10 @@ acceptance is recorded for this extension. Enablement requires the exact provide
 independent proof/payload consumption, real EFI imaging/reboot, direct VM boot and native package checks,
 including failure and indeterminate-commit cases. Existing OCI evidence, dry-runs and unit tests do not
 establish these outcomes. The owning ADR states the prerequisite acceptance.
+The contract requires URL-path encoding that preserves native Debian basenames containing `+`, a frozen
+locator without a final-bundle version ID, and confirmed durable locator retention before the commit request.
+Encoding/read-back, versioned-bucket lost-acknowledgement recovery and recovery after producer/runner loss
+remain required acceptance; these documentation requirements add no implemented recovery or storage capability.
 
 ## Support by owner
 
