@@ -151,7 +151,7 @@ func qualificationPayloadPredicates(ctx context.Context, plan *Plan, metadataPat
 		return nil, err
 	}
 	metadata := inspection.Root.Release
-	if metadata == nil || metadata.PlanDigest != planDigest || metadata.DefinitionDigest != plan.DefinitionDigest || metadata.EnvironmentDigest != plan.EnvironmentDigest {
+	if metadata == nil || metadata.PlanDigest != planDigest || metadata.DefinitionDigest != plan.DefinitionDigest || metadata.EnvironmentDigest != plan.EnvironmentDigest || !metadata.Composition.Equal(plan.Composition) {
 		return nil, e.New(e.CodeVerifyFailed, "qualification metadata differs from the original Plan")
 	}
 	rootInvocation, err := qualificationPredicateInvocation(root.Predicate)

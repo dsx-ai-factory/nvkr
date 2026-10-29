@@ -18,93 +18,11 @@ import (
 // record. Plain-Definition Plans keep PlanSchemaVersion and their bytes.
 const CompositePlanSchemaVersion = "nvkr.dev/run-plan/v6"
 
-// CompositionRecord binds a composite's identity, its members and every
-// output's declaring member into a Plan (ADR-26 §4). Attribution is
-// descriptive membership inside the authenticated record; it grants nothing.
-type CompositionRecord struct {
-	Kind                      string                       `json:"kind"`
-	Metadata                  authored.Metadata            `json:"metadata"`
-	Members                   []authored.MemberIdentity    `json:"members"`
-	EffectiveDefinitionDigest string                       `json:"effectiveDefinitionDigest"`
-	Outputs                   []authored.OutputAttribution `json:"outputs"`
-}
-
-// Validate requires a complete record consistent with the effective
-// Definition and the definitionDigest that names the composite.
-func (record CompositionRecord) Validate(definition authored.Definition, definitionDigest string) error {
-	if record.Kind != authored.CompositeKind {
-		return e.New(e.CodeUnverifiedRef, "composition record has unsupported definition kind %q", record.Kind)
-	}
-	compositeDigest, err := authored.CompositeDigest(record.Metadata, record.Members)
-	if err != nil {
-		return e.Wrap(e.CodeUnverifiedRef, err, "composition record members")
-	}
-	if compositeDigest != definitionDigest {
-		return e.New(e.CodeUnverifiedRef, "composition record does not recompute definitionDigest")
-	}
-	effectiveDigest, err := definition.Digest()
-	if err != nil {
-		return err
-	}
-	if record.EffectiveDefinitionDigest != effectiveDigest || definition.Metadata != record.Metadata {
-		return e.New(e.CodeUnverifiedRef, "composition record does not bind the effective Definition")
-	}
-	if len(record.Outputs) != len(definition.Outputs) {
-		return e.New(e.CodeUnverifiedRef, "composition record must attribute every output exactly once")
-	}
-	listed := make(map[string]int, len(record.Members))
-	for _, member := range record.Members {
-		listed[member.Name] = 0
-	}
-	for i, output := range definition.Outputs {
-		attribution := record.Outputs[i]
-		if attribution.Output != output.Name {
-			return e.New(e.CodeUnverifiedRef, "composition record attribution for output %q is missing or out of order", output.Name)
-		}
-		count, ok := listed[attribution.Member]
-		if !ok {
-			return e.New(e.CodeUnverifiedRef, "output %q is attributed to unlisted member %q", output.Name, attribution.Member)
-		}
-		listed[attribution.Member] = count + 1
-	}
-	for name, count := range listed {
-		if count == 0 {
-			return e.New(e.CodeUnverifiedRef, "composition record lists member %q without outputs", name)
-		}
-	}
-	return nil
-}
-
-// MemberOf returns the member that declared output, if any.
-func (record CompositionRecord) MemberOf(output string) (string, bool) {
-	for _, attribution := range record.Outputs {
-		if attribution.Output == output {
-			return attribution.Member, true
-		}
-	}
-	return "", false
-}
-
-// Clone returns an independent record.
-func (record *CompositionRecord) Clone() *CompositionRecord {
-	if record == nil {
-		return nil
-	}
-	value := *record
-	value.Members = append([]authored.MemberIdentity(nil), record.Members...)
-	value.Outputs = append([]authored.OutputAttribution(nil), record.Outputs...)
-	return &value
-}
+// CompositionRecord is the definition-owned record carried by composite Plans.
+type CompositionRecord = authored.CompositionRecord
 
 func newCompositionRecord(composition authored.Composition) (*CompositionRecord, error) {
-	effective := composition.Effective()
-	digest, err := effective.Digest()
-	if err != nil {
-		return nil, err
-	}
-	composite := composition.Composite()
-	return &CompositionRecord{Kind: authored.CompositeKind, Metadata: composite.Metadata, Members: composite.MemberIdentities(),
-		EffectiveDefinitionDigest: digest, Outputs: composition.Attribution()}, nil
+	return authored.NewCompositionRecord(composition)
 }
 
 // compileComposition compiles an admitted composite's effective Definition

@@ -35,6 +35,15 @@ func PrepareRun(definition Definition, environment Environment, plan *factory.Pl
 	if err != nil {
 		return nil, err
 	}
+	schema := RunSchemaVersion
+	if plan.Composition != nil {
+		// A composite Plan binds its effective Definition through the
+		// validated record; the Run names the composite like the Plan.
+		if plan.Composition.EffectiveDefinitionDigest != definitionDigest {
+			return nil, e.New(e.CodeUnverifiedRef, "compiled composite plan does not bind the supplied effective Definition")
+		}
+		schema, definitionDigest = CompositeRunSchemaVersion, plan.DefinitionDigest
+	}
 	if plan.DefinitionDigest != definitionDigest || plan.EnvironmentDigest != environmentDigest {
 		return nil, e.New(e.CodeUnverifiedRef, "compiled plan does not bind the supplied Definition and Environment")
 	}
@@ -42,9 +51,9 @@ func PrepareRun(definition Definition, environment Environment, plan *factory.Pl
 	if err != nil {
 		return nil, err
 	}
-	run := &Run{SchemaVersion: RunSchemaVersion, Attempt: attempt, DefinitionDigest: definitionDigest,
+	run := &Run{SchemaVersion: schema, Attempt: attempt, DefinitionDigest: definitionDigest,
 		EnvironmentDigest: environmentDigest, PlanDigest: planDigest,
-		Lane: LaneUnqualified, Status: RunPending}
+		Lane: LaneUnqualified, Status: RunPending, Composition: plan.Composition.Clone()}
 	outputs := make(map[string]factory.LifecycleOutputPlan, len(plan.LifecycleOutputs))
 	for _, output := range plan.LifecycleOutputs {
 		outputs[output.Name] = output
@@ -143,10 +152,33 @@ func bindObserved(run *Run, artifacts []Artifact) (*Run, error) {
 	return &copyRun, nil
 }
 
+// validateRunComposition admits v4 Runs without a composition record and v5
+// Runs with a complete record attributing exactly the frozen outputs.
+func validateRunComposition(run *Run) error {
+	switch {
+	case run.SchemaVersion == RunSchemaVersion && run.Composition == nil:
+		return nil
+	case run.SchemaVersion == CompositeRunSchemaVersion && run.Composition != nil:
+		names := make([]string, 0, len(run.Expected))
+		for _, output := range run.Expected {
+			names = append(names, output.Name)
+		}
+		if err := run.Composition.ValidateMembership(run.DefinitionDigest, names); err != nil {
+			return e.Wrap(e.CodeVerifyFailed, err, "run composition record")
+		}
+		return nil
+	default:
+		return e.New(e.CodeVerifyFailed, "run schemaVersion %q does not match its composition binding", run.SchemaVersion)
+	}
+}
+
 func validateRun(run *Run) error {
-	if run == nil || run.SchemaVersion != RunSchemaVersion || !namePattern.MatchString(run.Attempt) || !canonical.IsDigest(run.DefinitionDigest) ||
+	if run == nil || !namePattern.MatchString(run.Attempt) || !canonical.IsDigest(run.DefinitionDigest) ||
 		!canonical.IsDigest(run.EnvironmentDigest) || !canonical.IsDigest(run.PlanDigest) || len(run.Expected) == 0 {
 		return e.New(e.CodeVerifyFailed, "run does not contain a complete frozen input and output description")
+	}
+	if err := validateRunComposition(run); err != nil {
+		return err
 	}
 	switch run.Status {
 	case RunPending:

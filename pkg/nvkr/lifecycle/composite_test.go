@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -168,5 +169,61 @@ func TestPinDefinitionDelegatesToOwner(t *testing.T) {
 	}
 	if _, err := CompileFiles(t.Context(), compositeTestPath, compositeTestEnv, "composite-test"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestCompositeRunRecordContract(t *testing.T) {
+	compositeLifecycleFixture(t, nil)
+	prepared, err := PrepareFiles(t.Context(), compositeTestPath, compositeTestEnv, "composite-test", "attempt-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	run := prepared.run
+	if run.SchemaVersion != CompositeRunSchemaVersion || run.Composition == nil || run.DefinitionDigest != prepared.plan.DefinitionDigest ||
+		run.Lane != LaneUnqualified || prepared.inputs == "" {
+		t.Fatalf("composite Run = %+v", run)
+	}
+	if member, _ := run.Composition.MemberOf("beta-tools"); member != "beta" {
+		t.Fatal("composite Run omits per-output member attribution")
+	}
+	plain, err := PrepareFiles(t.Context(), "defs/alpha.yaml", compositeTestEnv, "composite-test", "attempt-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := canonical.Marshal(plain.run)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plain.run.SchemaVersion != RunSchemaVersion || strings.Contains(string(raw), `"composition"`) {
+		t.Fatal("plain Run changed its v4 schema or bytes")
+	}
+	for _, tc := range []struct {
+		name   string
+		mutate func(run *Run)
+	}{
+		{"complete record", nil},
+		{"v4 reader rejects composite major", func(run *Run) { run.SchemaVersion = RunSchemaVersion }},
+		{"composite major without record", func(run *Run) { run.Composition = nil }},
+		{"attribution to unlisted member", func(run *Run) { run.Composition.Outputs[0].Member = "gamma" }},
+		{"missing attribution", func(run *Run) { run.Composition.Outputs = run.Composition.Outputs[1:] }},
+		{"extra member", func(run *Run) { run.Composition.Outputs[1].Member = run.Composition.Outputs[0].Member }},
+		{"tampered effective digest", func(run *Run) { run.Composition.EffectiveDefinitionDigest = "sha256:short" }},
+		{"plain definition digest", func(run *Run) { run.DefinitionDigest = run.Composition.EffectiveDefinitionDigest }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			candidate := *run
+			candidate.Composition = run.Composition.Clone()
+			if tc.mutate != nil {
+				tc.mutate(&candidate)
+			}
+			err := validateInspectedRun(&candidate)
+			if tc.mutate == nil {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			requireLifecycleCode(t, err, e.CodeVerifyFailed)
+		})
 	}
 }

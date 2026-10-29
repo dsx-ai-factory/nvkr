@@ -20,23 +20,26 @@ import (
 )
 
 const (
-	BinaryBundleSchemaVersion  = "nvkr.dev/binary-bundle/v1"
-	PublicationRootSchema      = "nvkr.dev/publication-root/v4"
-	ObjectConfigSchema         = "nvkr.dev/delivery-object/v1"
-	QualificationDiagnostic    = "diagnostic"
-	QualificationQualified     = "qualified"
-	MediaOCIIndex              = "application/vnd.oci.image.index.v1+json"
-	MediaOCIManifest           = "application/vnd.oci.image.manifest.v1+json"
-	MediaBinaryBundle          = "application/vnd.nvkr.binary-bundle.v1"
-	MediaBinaryBundleConfig    = "application/vnd.nvkr.binary-bundle.config.v1+json"
-	MediaBinaryBundleLayer     = "application/vnd.nvkr.binary-bundle.layer.v1.tar+gzip"
-	MediaPublicationRoot       = "application/vnd.nvkr.publication-root.v4"
-	MediaPublicationRootConfig = "application/vnd.nvkr.publication-root.config.v4+json"
-	MediaDeliveryObject        = "application/vnd.nvkr.delivery-object.v1"
-	MediaDeliveryObjectConfig  = "application/vnd.nvkr.delivery-object.config.v1+json"
-	MediaReleaseSet            = "application/vnd.nvkr.release-set.v4+json"
-	MediaInventory             = "application/vnd.nvkr.inventory.v4+json"
-	MediaOctetStream           = "application/octet-stream"
+	BinaryBundleSchemaVersion = "nvkr.dev/binary-bundle/v1"
+	PublicationRootSchema     = "nvkr.dev/publication-root/v4"
+	// PublicationRootCompositeSchema is the major for roots whose release
+	// metadata carries an ADR-26 composition record; plain roots keep v4 bytes.
+	PublicationRootCompositeSchema = "nvkr.dev/publication-root/v5"
+	ObjectConfigSchema             = "nvkr.dev/delivery-object/v1"
+	QualificationDiagnostic        = "diagnostic"
+	QualificationQualified         = "qualified"
+	MediaOCIIndex                  = "application/vnd.oci.image.index.v1+json"
+	MediaOCIManifest               = "application/vnd.oci.image.manifest.v1+json"
+	MediaBinaryBundle              = "application/vnd.nvkr.binary-bundle.v1"
+	MediaBinaryBundleConfig        = "application/vnd.nvkr.binary-bundle.config.v1+json"
+	MediaBinaryBundleLayer         = "application/vnd.nvkr.binary-bundle.layer.v1.tar+gzip"
+	MediaPublicationRoot           = "application/vnd.nvkr.publication-root.v4"
+	MediaPublicationRootConfig     = "application/vnd.nvkr.publication-root.config.v4+json"
+	MediaDeliveryObject            = "application/vnd.nvkr.delivery-object.v1"
+	MediaDeliveryObjectConfig      = "application/vnd.nvkr.delivery-object.config.v1+json"
+	MediaReleaseSet                = "application/vnd.nvkr.release-set.v4+json"
+	MediaInventory                 = "application/vnd.nvkr.inventory.v4+json"
+	MediaOctetStream               = "application/octet-stream"
 )
 
 // BinaryEntry is one regular file in an installable binary bundle. SHA256 is the
@@ -129,11 +132,19 @@ type PublicationRoot struct {
 	Objects             []PublishedObject `json:"objects"`
 }
 
+// PublicationRootSchemaFor selects the root major for release metadata.
+func PublicationRootSchemaFor(release *ReleaseMetadata) string {
+	if release != nil && release.Composition != nil {
+		return PublicationRootCompositeSchema
+	}
+	return PublicationRootSchema
+}
+
 func (root PublicationRoot) Validate() error {
 	if err := validateReleaseMetadata(root); err != nil {
 		return err
 	}
-	if root.SchemaVersion != PublicationRootSchema {
+	if root.SchemaVersion != PublicationRootSchemaFor(root.Release) {
 		return e.New(e.CodeVerifyFailed, "publication root schemaVersion %q is unsupported", root.SchemaVersion)
 	}
 	switch root.Qualification {

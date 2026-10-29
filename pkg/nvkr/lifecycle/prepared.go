@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 )
 
@@ -40,6 +41,19 @@ func PrepareCapturedFiles(ctx context.Context, root, definitionPath, environment
 }
 
 func PrepareFiles(ctx context.Context, definitionPath, environmentPath, generatorVersion, attempt string) (*PreparedRun, error) {
+	// A composite prepares through bounded capture beneath the working
+	// directory, so its static-unqualified local Run retains member bytes.
+	if kind, err := authored.ReadDocumentKind(ctx, definitionPath); err == nil && kind == authored.CompositeKind {
+		relativeDefinition, err := authored.WorkingRelativePath(definitionPath)
+		if err != nil {
+			return nil, err
+		}
+		relativeEnvironment, err := authored.WorkingRelativePath(environmentPath)
+		if err != nil {
+			return nil, err
+		}
+		return PrepareCapturedFiles(ctx, ".", relativeDefinition, relativeEnvironment, generatorVersion, attempt)
+	}
 	definition, err := LoadDefinition(ctx, definitionPath)
 	if err != nil {
 		return nil, err

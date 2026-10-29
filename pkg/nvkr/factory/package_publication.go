@@ -214,7 +214,7 @@ func bindPublicationMetadata(ctx context.Context, plan *Plan, node Node, artifac
 			return nil, err
 		}
 		metadata = &delivery.ReleaseMetadata{DefinitionDigest: plan.DefinitionDigest, EnvironmentDigest: plan.EnvironmentDigest,
-			PlanDigest: planDigest, ContentSubject: contentSubject}
+			PlanDigest: planDigest, ContentSubject: contentSubject, Composition: plan.Composition.Clone()}
 		if PerOutputPublication(plan) {
 			run, err := publicationRunContext(plan, planDigest, time.Now().UTC(), time.Now().UTC())
 			if err != nil {

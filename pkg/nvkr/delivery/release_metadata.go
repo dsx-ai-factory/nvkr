@@ -4,9 +4,12 @@
 package delivery
 
 import (
+	"maps"
 	"regexp"
+	"slices"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 )
@@ -19,6 +22,9 @@ type ReleaseMetadata struct {
 	EnvironmentDigest string `json:"environmentDigest"`
 	PlanDigest        string `json:"planDigest"`
 	ContentSubject    string `json:"contentSubject"`
+	// Composition binds a composite Release's members and per-output member
+	// attribution. definitionDigest then names the composite (ADR-26 §4).
+	Composition *definition.CompositionRecord `json:"composition,omitempty"`
 }
 
 // OutputBinding adds meaning to the object's one descriptor; it does not repeat
@@ -172,6 +178,11 @@ func validateReleaseMetadata(root PublicationRoot) error {
 	}
 	if len(outputs) == 0 {
 		return e.New(e.CodeReleaseIncomplete, "release has no deliverables")
+	}
+	if m.Composition != nil {
+		if err := m.Composition.ValidateMembership(m.DefinitionDigest, slices.Sorted(maps.Keys(outputs))); err != nil {
+			return e.Wrap(e.CodeVerifyFailed, err, "release composition record")
+		}
 	}
 	return nil
 }

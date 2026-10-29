@@ -130,6 +130,7 @@ changed shapes are:
 | Run plan and artifact graph | `nvkr.dev/run-plan/v5`, `nvkr.dev/artifact-graph/v5` |
 | Composite Run plan (proposed ADR-26) | `nvkr.dev/run-plan/v6`, carrying the composition record; plain Plans stay v5 |
 | Run and Release views | `nvkr.dev/run/v4`, `nvkr.dev/release/v4` |
+| Composite Run record and publication root (proposed ADR-26) | `nvkr.dev/run/v5`, `nvkr.dev/publication-root/v5`, each carrying the composition record; plain records stay v4 and OCI media types are unchanged |
 
 Definition v5 retains removal of cluster views and adds an explicit required platform set for an aggregate OCI image. Catalog v3 removes delivery categories and node-role affinities. IR v4
 binds typed VM disk, producer, selected toolchain-host platform,

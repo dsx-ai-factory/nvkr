@@ -29,7 +29,10 @@ const (
 	EnvironmentAPIVersion = definition.EnvironmentAPIVersion
 	EnvironmentKind       = definition.EnvironmentKind
 	RunSchemaVersion      = "nvkr.dev/run/v4"
-	ReleaseSchemaVersion  = "nvkr.dev/release/v4"
+	// CompositeRunSchemaVersion is the Run major carrying an ADR-26
+	// composition record; plain Run records keep v4 bytes.
+	CompositeRunSchemaVersion = "nvkr.dev/run/v5"
+	ReleaseSchemaVersion      = "nvkr.dev/release/v4"
 )
 
 const (
@@ -88,6 +91,9 @@ type Run struct {
 	Observed          []Artifact       `json:"observed,omitempty"`
 	Failure           *runFailure      `json:"failure,omitempty"`
 	ContentSubject    string           `json:"contentSubject,omitempty"`
+	// Composition binds a composite Run's members and per-output attribution;
+	// definitionDigest then names the composite (ADR-26 §4).
+	Composition *definition.CompositionRecord `json:"composition,omitempty"`
 	// Diagnostic inventories are returned only by this live execution. JSON
 	// cannot restore them, and they grant no live or full-SBOM authority.
 	diskInventories []factory.DiskInstalledInventoryDescription

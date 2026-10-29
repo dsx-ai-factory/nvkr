@@ -160,7 +160,7 @@ func admitDevelopmentMetadata(plan *Plan, inspection delivery.Inspection) error 
 		return err
 	}
 	metadata := inspection.Root.Release
-	if metadata == nil || metadata.PlanDigest != digest || metadata.EnvironmentDigest != plan.EnvironmentDigest || metadata.DefinitionDigest != plan.DefinitionDigest {
+	if metadata == nil || metadata.PlanDigest != digest || metadata.EnvironmentDigest != plan.EnvironmentDigest || metadata.DefinitionDigest != plan.DefinitionDigest || !metadata.Composition.Equal(plan.Composition) {
 		return e.New(e.CodeVerifyFailed, "development publication metadata differs from this exact Plan")
 	}
 	return admitReferenceInvocation(metadata.InvocationID, run.InvocationID())

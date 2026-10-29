@@ -124,7 +124,7 @@ func BuildPublicationRoot(ctx context.Context, out string, request PublicationRe
 		(request.ReleaseSetDigest != "" && (!isDigest(request.ReleaseSetDigest) || !isDigest(request.InventoryDigest))) {
 		return Result{}, e.New(e.CodeUnverifiedRef, "publication root input identities are incomplete or malformed")
 	}
-	root := PublicationRoot{SchemaVersion: PublicationRootSchema, Qualification: QualificationDiagnostic,
+	root := PublicationRoot{SchemaVersion: PublicationRootSchemaFor(request.Release), Qualification: QualificationDiagnostic,
 		Release:          request.Release,
 		ReleaseSetDigest: request.ReleaseSetDigest, InventoryDigest: request.InventoryDigest}
 	return buildPublicationRoot(ctx, out, root, request.Objects)
