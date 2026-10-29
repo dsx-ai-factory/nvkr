@@ -35,9 +35,10 @@ workflows beneath one Run and one Release, and its development Run 40727132359 c
 way. The missing piece is an authored input that produces that combined Plan from the family Definitions without
 a second copy of their declarations.
 
-ADR-11, ADR-17 and ADR-19 reject authored Recipes, reusable selection groups, inheritance, mixins and overlays.
-Composition must not reintroduce them: it adds no selection, matching, override or default. It only joins
-complete Definitions whose declarations are each valid on their own.
+ADR-11, ADR-17 and ADR-19 reject authored Recipes, reusable selection groups, inheritance, mixins and selection
+overlays. Composition must not reintroduce them: it adds no selection, matching, override or default. It only
+joins complete Definitions whose declarations are each valid on their own. Component catalog producer overlays
+(ADR-11 §3) are a separate, retained feature; §3 rebases them unchanged.
 
 ## Decision
 
@@ -85,12 +86,13 @@ locator finds bytes; only the digest admits them.
    `nvkr.dev/definition/v5` Definition on its own, including its own Helm image bindings;
 4. rejects any member whose document kind is `CompositeDefinition` (§8);
 5. recomputes each member's canonical digest and requires equality with the pinned digest;
-6. performs the merge of §3 and validates the resulting effective Definition with the ordinary
-   `Definition.Validate`.
+6. performs the structural merge of §3 (every rule except the cross-member producer comparison) and validates
+   the resulting effective Definition with the ordinary `Definition.Validate`.
 
-Only after all six steps may factory open catalogs. A failure at any step returns a coded error and produces no
-Plan, bundle, attempt directory or partial output. Context cancellation is checked between members and maps to
-`timeout`.
+Only after all six steps may factory open catalogs. The cross-member producer rule of §3 needs resolved catalogs
+and overlays, so compilation (U3) checks it after opening them and before it returns any Plan, bundle or output.
+Both phases are required: a failure in either returns a coded error and produces no Plan, bundle, attempt
+directory or partial output. Context cancellation is checked between members and maps to `timeout`.
 
 ### 3. Merge rules: exact union, never precedence
 
@@ -100,7 +102,7 @@ consumes unchanged. The derivation is a pure, deterministic function of the comp
 | Input | Rule | Conflict |
 |---|---|---|
 | Named outputs | Disjoint union. Each output declaration is copied unchanged except for catalog path rebasing below. Output names are preserved; there is no prefixing, renaming or namespacing. The union is sorted by name. | The same output name in two members is an error, even if the declarations are identical. There is no deduplication. |
-| Per-output catalog | Every output receives an explicit catalog stack. An output without an override inherits its own member's top-level `catalog`. Base and overlay locators are rebased from the member's directory to the composite's directory. | A rebased locator outside the admitted input root is an error. |
+| Per-output catalog | Every output receives an explicit catalog stack. An output without an override inherits its own member's top-level `catalog`. Base and overlay locators are rebased from the member's directory to the composite's directory. Member locators must be relative; absolute locators are rejected, not rebased, matching compile-input capture. | An absolute base or overlay locator, or a rebased locator outside the admitted input root, is an error. |
 | Top-level `catalog` | Every member's top-level catalog stack, after rebasing, must be identical. It becomes the effective Definition's top-level stack. | Any difference is an error. |
 | `sbomTool`, `cosignTool` | Every member must select the same value (including omission). | Any difference is an error. |
 | Helm image bindings | Copied unchanged. Each member was validated standalone (§2 step 3), so every binding already resolves inside its own member; preserved names keep it resolving to the same output. | A binding cannot reach another member's output by construction. |
@@ -266,7 +268,7 @@ and owning operation carry that detail.
 
 | Condition | Code |
 |---|---|
-| Malformed composite, unknown field, empty or unsorted members, too many members, duplicate member name, locator or digest, member name mismatch, locator outside the input root, nested member | `invalid-catalog` |
+| Malformed composite, unknown field, empty or unsorted members, too many members, duplicate member name, locator or digest, member name mismatch, locator outside the input root, absolute member catalog or overlay locator, nested member | `invalid-catalog` |
 | Duplicate output name across members, differing top-level catalog stacks or tool selectors, divergent cross-member effective producer | `invalid-catalog` |
 | Member digest differs from the loaded member, at load, generation or `--check` | `unverified-ref` |
 | Deferred use (qualification, member Release reuse) | `engine-capability` |
@@ -276,7 +278,22 @@ and owning operation carry that detail.
 
 This example is illustrative and is **not** added to `inputs/`. It assumes the composite would live beside the
 families as `inputs/definitions/nvke/composite.yaml`. The digests are the actual `nvkr.definition` digests of the
-family Definitions at commit `75f154fe`, computed with the existing `Definition.Digest`.
+family Definitions at commit `75f154fe`, computed with the existing `Definition.Digest` and the Go toolchain in
+`.go-version`. Until `definition pin` exists, a short program against the existing API reproduces them:
+
+```go
+for _, path := range os.Args[1:] { // inputs/definitions/nvke/{core,disks,services,telemetry}.yaml
+	def, err := definition.LoadDefinition(ctx, path)
+	if err != nil {
+		return err
+	}
+	digest, err := def.Digest()
+	if err != nil {
+		return err
+	}
+	fmt.Println(def.Metadata.Name, digest)
+}
+```
 
 ```yaml
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
@@ -332,15 +349,26 @@ catalog:
 sbomTool: syft                                   # identical in all four members
 cosignTool: cosign                               # identical in all four members
 outputs:                                         # 69 outputs, sorted by name
-  - name: capi-controller-image                  # from nvke-core
+  - name: capi-controller-image                  # from nvke-core; explicit override copied unchanged
     platform: linux/amd64
     catalog:
       base: ../../catalogs/nvke/release-components
     format: oci
     components: [capi-controller-image]
+  # ...
+  - name: nvkectl                                # from nvke-core; member default made explicit
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nvke/module-tags
+    format: executable
+    components: [nvkectl]
   # ... remaining nvke-core, nvke-disks, nvke-services and nvke-telemetry outputs, each copied unchanged;
-  # outputs that used their member's default catalog now name ../../catalogs/nvke/module-tags explicitly.
+  # every output that used its member's default catalog now names ../../catalogs/nvke/module-tags explicitly.
 ```
+
+Every output now carries its own stack, so the effective top-level `catalog` no longer selects any output's
+producers. It is retained because the compiler still resolves Definition-wide tools, such as the `syft` and
+`cosign` selectors, from it.
 
 Expected results, which unit U3 must prove rather than assume:
 
@@ -393,7 +421,8 @@ Acceptance tests per unit:
   updating its locator keeps the composite digest).
 - **U2:** deterministic output (shuffled member order in memory yields identical bytes); duplicate output name,
   even with identical declarations → `invalid-catalog`; differing top-level stack, `sbomTool` or `cosignTool`
-  → `invalid-catalog`; default-catalog outputs receive explicit rebased stacks; Helm bindings resolve to the same
+  → `invalid-catalog`; absolute member base or overlay locator → `invalid-catalog`, matching captured
+  compile-input replay; default-catalog outputs receive explicit rebased stacks; Helm bindings resolve to the same
   outputs; effective Definition passes `Definition.Validate`.
 - **U3:** **identity invariance** — for the four NVKE families (extended, with pinned-source access like the
   existing split contract), every output's Build Digest and native records equal the family Plans and the

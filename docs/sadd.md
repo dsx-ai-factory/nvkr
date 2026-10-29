@@ -264,8 +264,8 @@ Required membership exists before execution, so omitting a failed output cannot 
 Specialized byte-changing transformations remain explicit product intent.
 
 A proposed composite Definition (ADR-26) would enter this flow before the compiler: admission loads each
-digest-pinned member, rejects drift and conflicts, and derives one effective Definition that the same compiler
-consumes. Composition changes Definition, Plan, Run and Release identities and records every member digest and
+digest-pinned member, rejects drift and structural conflicts, and derives one effective Definition that the same
+compiler consumes; the compiler rejects divergent cross-member producers once catalogs are resolved. Composition changes Definition, Plan, Run and Release identities and records every member digest and
 output attribution; it never changes an output's Build Digest. This path is designed, not implemented.
 
 The compiler derives each output's graph from its exact selected components and concrete
