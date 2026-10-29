@@ -2841,16 +2841,46 @@ results through recovery boundaries; focused contracts, actionlint, yamllint and
 The full local gate, build, diff checks and all-owner workflow regeneration checks pass on Go 1.27.3
 Darwin ARM64. Earlier attempts encountered Helm cancellation cleanup failure and pinned catalog fetch
 timeouts; unchanged reruns passed after transport recovered, without increasing timeouts or weakening
-authentication. Full generated-bundle hosted execution, signing identity and qualification remain
-unverified; the checked-in flat production path is retained pending operational validation.
+authentication.
 
-The combined production/development layout has 564 original jobs and 16 collectors, down from
+The full partitioned development [Run 40727132359, attempt 1](https://github.com/dsx-ai-factory/nvkr/actions/runs/40727132359/attempts/1)
+at commit `28df13596fa63a13060f94fb8f535d9f936393a5` completed with all 601 jobs successful,
+including 21 partition reporters and one finalizer. The retained finalizer input contains 16 collector
+reports covering exactly 563 original operations, all successful, with no omissions or duplicates against
+generated operation and runner-bootstrap membership. Its private final Run carrier was retrieved through
+the existing request-bound, digest-checked transport. The Run record reports `complete` in the
+`pipeline-attested` lane with exactly 69 expected and observed named outputs, matching Build Digests,
+and Plan digest `sha256:9ff03b878c6e326163ccbfc752a3c34cb59fd723dedfc3a346493c429974034f`.
+Inspection of the retained release metadata checked 391 metadata blob hashes and matched all 69 output
+descriptor digests and Build Digests to that Run. Each named output's publication reference matched a
+non-dry-run verification record reporting successful signature and provenance verification. The release
+verification record reports the same for publication root
+`ghcr.io/dsx-ai-factory/nvkr/development/runs/40727132359/attempts/1/releases@sha256:6a430259c9fbe2d169f0ec966fcf0405937c948198f5bec081a086ecc1e83a46`.
+The observed signer is the entry workflow `nvkr-dev.yml@refs/heads/codex/nvke-execution-partitioning`
+under the GitHub Actions issuer. These are inspected hosted execution records, not a new independent
+local full-payload readback or qualification result. This establishes the successful full development
+execution path; full-product failure/cancellation recovery and production qualification remain unproven.
+The production workflow remains flat.
+
+The execution-model extraction keeps scheduling semantics in factory's provider-independent graph:
+typed success/completion conditions, recovery prerequisites, disjoint operation membership, acyclic
+partition contraction, and exact individual outcome accounting. GitHub derives that graph from typed
+stages and validates its final inline/worker placement before rendering. Local equivalence contracts
+compare flat ancestor evaluation with partition result evaluation at capacities 1, 2 and 64, enumerating
+success, failure, cancellation and skipped operation outcomes with and without Run cancellation.
+These contracts do not establish another adapter or full-product provider cancellation recovery.
+The extraction passes the full local gate with uncached tests on Go 1.27.3 Darwin ARM64, build,
+all-owner workflow regeneration, and the targeted extended partition contracts including actionlint and
+yamllint. Regeneration retains the exercised development bundle byte-for-byte. The hosted Run above
+predates this internal extraction; its evidence is not a separate hosted execution of the refactored code.
+
+Earlier flat-layout measurements recorded 564 original jobs and 16 collectors, down from
 596 original jobs and 16 collectors in the private-storage draft based on the same upstream code.
-The production dependency graph has 1,375 edges, down from 1,438. Logical Plan identity and original
+The production dependency graph then had 1,375 edges, down from 1,438. Logical Plan identity and original
 per-node result accounting remain unchanged by scheduling. Shared preparation selects the current
 `github.job` internally, removing a redundant caller input while retaining exact projection checks.
-Production is 380,112 bytes and 47,451 expanded YAML events; development is 359,349 bytes and 47,008 events.
-The named ARM64 nightly and upstream-OVN entries are respectively 182,314/183,231 bytes and
+Those production measurements were 380,112 bytes and 47,451 expanded YAML events; development was
+359,349 bytes and 47,008 events. The named ARM64 nightly and upstream-OVN entries were respectively 182,314/183,231 bytes and
 22,125/22,117 events, each with 282 jobs and 644 dependency edges.
 All four producer bundles keep their jobs inline. The earlier output-local grouping migration removed
 accidental unrelated-output failure barriers; dependency reduction preserves the resulting ancestor closure.

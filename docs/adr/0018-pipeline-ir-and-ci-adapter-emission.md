@@ -1391,9 +1391,18 @@ successful diagnostic dispatches.
 The opt-in Environment setting `githubExecutionPartitions: true` projects producer jobs into generated
 same-commit `workflow_call` workers. This is one Definition, complete Plan, provider Run and final Release;
 workers do not publish independent family Releases. Local generation contracts are implemented. A minimal
-hosted diagnostic exercised result forwarding on success, failure and cancellation; full generated-bundle
-execution, signing identity and qualification remain unexercised for this topology. The retained flat mode
+hosted diagnostic exercised result forwarding on success, failure and cancellation. The full development
+Run recorded in reconciliation exercised generated-bundle execution and signing identity; qualification
+remains unestablished for this topology. The retained flat mode
 remains the default.
+
+Factory's provider-independent execution graph owns operation membership, admitted success/completion
+conditions, prerequisite results through recovery, and exact outcome accounting. GitHub derives this model
+from typed stages before rendering; rendered YAML supplies execution bodies, not scheduling semantics.
+The core validates the final worker and inline layout as an exact disjoint cover with independent members
+and an acyclic contracted dependency graph. Semantic equivalence tests compare flat ancestor evaluation
+with partitioned prerequisite-result evaluation under failure and cancellation. These are local contracts,
+not proof of provider cancellation timing or support for another CI adapter.
 
 The compiler groups lexically ordered jobs by dependency depth, with at most 64 original jobs per worker
 and at most 50 workers. Jobs requesting `id-token: write` remain in the entry workflow: Fulcio uses the

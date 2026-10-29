@@ -21,7 +21,7 @@ var (
 
 // renderGitHubPartition keeps original job IDs: shared action selection uses
 // github.job to select parameters from the complete, unchanged Plan.
-func renderGitHubPartition(ctx context.Context, plan *Plan, raw []byte, partition githubExecutionPartition) ([]byte, error) {
+func renderGitHubPartition(ctx context.Context, plan *Plan, raw []byte, partition githubExecutionPartition, model *executionGraph) ([]byte, error) {
 	if err := githubNeedsContext(ctx); err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func renderGitHubPartition(ctx context.Context, plan *Plan, raw []byte, partitio
 		if err := githubNeedsContext(ctx); err != nil {
 			return nil, err
 		}
-		parents, err := githubPartitionPrerequisites(ctx, plan, jobs, id)
+		parents, err := model.prerequisiteResults(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -68,7 +68,7 @@ func renderGitHubPartition(ctx context.Context, plan *Plan, raw []byte, partitio
 	}
 	childJobs := githubYAMLMap()
 	for _, id := range partition.Jobs {
-		job, err := projectGitHubPartitionJob(plan, id, githubYAMLField(jobs, id), dependencies[id], nil)
+		job, err := projectGitHubPartitionJob(plan, id, githubYAMLField(jobs, id), dependencies[id], nil, model.operations[id].Condition)
 		if err != nil {
 			return nil, err
 		}
@@ -130,40 +130,7 @@ func githubPartitionSecretNames(node *yamlv3.Node) ([]string, error) {
 	return uniqueSorted(names), nil
 }
 
-// An always job can succeed after a failed ancestor. Carry that ancestor across
-// the boundary so ordinary jobs preserve GitHub's implicit success condition.
-func githubPartitionPrerequisites(ctx context.Context, plan *Plan, jobs *yamlv3.Node, id string) ([]string, error) {
-	unconditional := "${{ always() && " + githubDispatchCondition(plan) + " }}"
-	parents, err := githubNeedsValues(githubYAMLField(githubYAMLField(jobs, id), "needs"))
-	if err != nil || githubYAMLValue(githubYAMLField(jobs, id), "if") == unconditional {
-		return parents, err
-	}
-	seen := map[string]bool{}
-	for index := 0; index < len(parents); index++ {
-		if err := githubNeedsContext(ctx); err != nil {
-			return nil, err
-		}
-		parent := parents[index]
-		if parent == id || githubYAMLField(jobs, parent) == nil {
-			return nil, e.New(e.CodePipelineDrift, "GitHub partition has invalid prerequisite %q", parent)
-		}
-		if seen[parent] {
-			continue
-		}
-		seen[parent] = true
-		job := githubYAMLField(jobs, parent)
-		if githubYAMLValue(job, "if") == unconditional {
-			ancestors, err := githubNeedsValues(githubYAMLField(job, "needs"))
-			if err != nil {
-				return nil, err
-			}
-			parents = append(parents, ancestors...)
-		}
-	}
-	return uniqueSorted(parents), nil
-}
-
-func projectGitHubPartitionJob(plan *Plan, id string, source *yamlv3.Node, parents []string, owners map[string]string) (*yamlv3.Node, error) {
+func projectGitHubPartitionJob(plan *Plan, id string, source *yamlv3.Node, parents []string, owners map[string]string, scheduling executionCondition) (*yamlv3.Node, error) {
 	job := githubInterfaceClone(source)
 	githubYAMLRemove(job, "needs")
 	condition := githubYAMLValue(job, "if")
@@ -178,11 +145,15 @@ func projectGitHubPartitionJob(plan *Plan, id string, source *yamlv3.Node, paren
 	}
 	ordinary := "${{ " + githubDispatchCondition(plan) + " }}"
 	unconditional := "${{ always() && " + githubDispatchCondition(plan) + " }}"
-	if condition != ordinary && condition != unconditional {
+	expectedCondition := ordinary
+	if scheduling == executionAfterCompletion {
+		expectedCondition = unconditional
+	}
+	if (scheduling != executionAfterSuccess && scheduling != executionAfterCompletion) || condition != expectedCondition {
 		return nil, e.New(e.CodeEngineCapability, "GitHub partition job %q has an unsupported scheduling condition", id)
 	}
 	guard := "always() && " + githubDispatchCondition(plan)
-	if condition == ordinary {
+	if scheduling == executionAfterSuccess {
 		guard = "!cancelled() && " + githubDispatchCondition(plan) //nolint:misspell // GitHub expression function spelling.
 		for _, parent := range parents {
 			result := "fromJSON(inputs.dependencies)['" + parent + "']"

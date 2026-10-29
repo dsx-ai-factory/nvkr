@@ -405,13 +405,8 @@ func (stage githubStage) needs(artifacts map[string]Artifact, nodeJobs map[strin
 }
 
 func (stage githubStage) condition(plan *Plan) string {
-	if stage.DiskOutput != "" || githubProducerStage(stage) {
-		return "${{ " + githubDispatchCondition(plan) + " }}"
-	}
-	for _, node := range stage.Nodes {
-		if node.Kind == NodeVerify {
-			return "${{ always() && " + githubDispatchCondition(plan) + " }}"
-		}
+	if stage.executionCondition() == executionAfterCompletion {
+		return "${{ always() && " + githubDispatchCondition(plan) + " }}"
 	}
 	return "${{ " + githubDispatchCondition(plan) + " }}"
 }

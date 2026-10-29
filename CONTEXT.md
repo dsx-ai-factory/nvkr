@@ -126,7 +126,10 @@ Opt-in execution partitioning moves original jobs into bounded same-commit worke
 manifest; OIDC-signing jobs remain in the entry to preserve signer identity. A partition is generated
 scheduling structure, not a Definition, Run or Release. It forwards original
 job results to the single finalizer; it does not authorize artifact acceptance. The complete Plan and required
-output set remain shared. Local generation is implemented; hosted acceptance remains unrecorded.
+output set remain shared. The provider-independent execution graph owns membership, dependency conditions,
+partition validation and exact outcome accounting; adapters project this internal structure. Reconciliation
+records the full development execution and its hosted verification evidence. Qualification and full-product
+failure/cancellation recovery remain unproven.
 Production and development partial retries may transport retained same-Run artifacts from earlier attempts while preserving
 their original source bindings. Same-name candidates are bounded and authenticated before selecting the
 newest source attempt, with ties rejected. Transport admission does not replace consumer evidence or completeness checks;

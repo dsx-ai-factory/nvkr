@@ -41,16 +41,13 @@ func lowerGitHubPartitions(ctx context.Context, plan *Plan, raw []byte) ([]byte,
 	if !githubYAMLOnlyFields(jobs, sortedKeys(projection.Reduced)...) || githubYAMLLength(jobs) != 2*len(projection.Reduced) {
 		return nil, nil, e.New(e.CodePipelineDrift, "GitHub partitioning requires the complete projected jobs")
 	}
-	dependencies := map[string][]string{}
-	for _, id := range sortedKeys(projection.Reduced) {
-		if id == githubFinalizerJobID || projection.Collectors[id] != nil {
-			continue
-		}
-		parents, err := githubPartitionPrerequisites(ctx, plan, jobs, id)
-		if err != nil {
-			return nil, nil, err
-		}
-		dependencies[id] = parents
+	model, inline, err := githubExecutionModel(ctx, plan, projection)
+	if err != nil {
+		return nil, nil, err
+	}
+	dependencies, err := model.dependencies(ctx)
+	if err != nil {
+		return nil, nil, err
 	}
 	partitions, err := partitionGitHubJobs(ctx, dependencies, githubMaximumResultInputs)
 	if err != nil {
@@ -63,8 +60,7 @@ func lowerGitHubPartitions(ctx context.Context, plan *Plan, raw []byte) ([]byte,
 	for _, partition := range partitions {
 		var memberIDs []string
 		for _, id := range partition.Jobs {
-			permissions := githubYAMLField(githubYAMLField(jobs, id), "permissions")
-			if githubYAMLValue(permissions, "id-token") == "write" {
+			if inline[id] {
 				owners[id] = id
 			} else {
 				memberIDs = append(memberIDs, id)
@@ -87,10 +83,20 @@ func lowerGitHubPartitions(ctx context.Context, plan *Plan, raw []byte) ([]byte,
 			owners[job] = id
 		}
 	}
+	var groups [][]string
+	for _, partition := range partitions {
+		groups = append(groups, partition.Jobs)
+	}
+	for _, id := range sortedKeys(inline) {
+		groups = append(groups, []string{id})
+	}
+	if err := model.validatePartitions(ctx, groups); err != nil {
+		return nil, nil, err
+	}
 	files := map[string][]byte{}
 	callerJobs := githubYAMLMap()
 	for index, partition := range partitions {
-		child, err := renderGitHubPartition(ctx, plan, raw, partition)
+		child, err := renderGitHubPartition(ctx, plan, raw, partition, model)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -141,7 +147,7 @@ func lowerGitHubPartitions(ctx context.Context, plan *Plan, raw []byte) ([]byte,
 		if owners[id] != id {
 			continue
 		}
-		job, err := projectGitHubPartitionJob(plan, id, githubYAMLField(jobs, id), dependencies[id], owners)
+		job, err := projectGitHubPartitionJob(plan, id, githubYAMLField(jobs, id), dependencies[id], owners, model.operations[id].Condition)
 		if err != nil {
 			return nil, nil, err
 		}

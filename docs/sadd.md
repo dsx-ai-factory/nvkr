@@ -627,8 +627,12 @@ workers, with original job IDs and per-job controls. OIDC-signing jobs stay in t
 the authored signer identity policy. Partitions may delay independent work behind an earlier
 group, but original prerequisite results govern ordinary job admission. One complete Plan and one finalizer
 retain the Run and Release boundary. Exact regeneration admits every worker and caller connection under the
-same ownership manifest. Local generation contracts are implemented; hosted failure/cancellation behavior,
-signing and qualification remain unexercised (ADR-18 §8). Producer matrices remain deferred; ADR-21 separately
+same ownership manifest. Factory's provider-independent execution graph owns operation membership,
+success/completion conditions, recovery prerequisites, partition validation and exact outcome accounting;
+GitHub renders the typed model rather than deriving scheduling semantics from YAML. Reconciliation records
+full development execution and hosted signing/verification evidence. Local equivalence contracts cover
+failure and cancellation; full-product provider recovery and qualification remain unproven (ADR-18 §8).
+Producer matrices remain deferred; ADR-21 separately
 admits the fixed native qualification worker and its selected-platform matrix.
 
 An explicit GitHub development Environment selects a separate fixed bundle. It shares the

@@ -342,34 +342,9 @@ func parseGitHubCollectedProviderResults(ctx context.Context, raw string, expect
 }
 
 func validateGitHubCollectorMembers(expected []string, collectors map[string][]string) error {
-	unclaimed := make(map[string]bool, len(expected))
-	for _, leaf := range expected {
-		if leaf == "" || unclaimed[leaf] {
-			return e.New(e.CodeInvalidCatalog, "GitHub result membership contains an empty or duplicate leaf")
-		}
-		unclaimed[leaf] = true
-	}
-	claimed := 0
-	for id, members := range collectors {
-		if _, collision := unclaimed[id]; id == "" || collision || len(members) == 0 {
-			return e.New(e.CodeInvalidCatalog, "GitHub result collectors require distinct names and nonempty membership")
-		}
-		for _, member := range members {
-			if !unclaimed[member] {
-				return e.New(e.CodeInvalidCatalog, "GitHub result collectors contain an unknown or repeated member")
-			}
-			unclaimed[member] = false
-			claimed++
-		}
-	}
-	if claimed != len(expected) {
-		return e.New(e.CodeInvalidCatalog, "GitHub result collectors omit a required stage or runner bootstrap")
-	}
-	return nil
+	return validateExecutionMembers(expected, collectors)
 }
 
-// Object-filter order is not guaranteed by GitHub. The diagnostic status list
-// must match the exact result multiset; only the results map binds job names.
 func validateGitHubCollectorStatuses(raw string, leaves map[string]githubProviderJob) error {
 	counts := make(map[string]int)
 	for _, job := range leaves {
@@ -433,9 +408,14 @@ func parseGitHubProviderJobs(ctx context.Context, raw string, expected []string,
 	if _, err := parser.decoder.Token(); err != io.EOF {
 		return nil, e.New(e.CodeInvalidCatalog, "GitHub job results contain trailing data")
 	}
-	if len(results) != len(allowed) {
-		return nil, e.New(e.CodeInvalidCatalog, "GitHub job results omit a required stage or runner bootstrap")
+	observations := make([]executionResult, 0, len(results))
+	for id, job := range results {
+		observations = append(observations, executionResult{Operation: id, Outcome: githubExecutionOutcome(job.result)})
 	}
+	if _, err := accountExecutionResults(ctx, expected, observations); err != nil {
+		return nil, err
+	}
+
 	return results, githubCarrierContext(ctx)
 }
 
@@ -547,4 +527,20 @@ func (parser *githubProviderParser) outputs() (map[string]string, error) {
 		outputs[field] = value
 	}
 	return outputs, parser.delimiter('}')
+}
+
+// Translate provider vocabulary before shared exact-result accounting.
+func githubExecutionOutcome(result string) executionOutcome {
+	switch result {
+	case "success":
+		return executionSucceeded
+	case "failure":
+		return executionFailed
+	case "cancelled": //nolint:misspell // GitHub result enum spelling.
+		return executionCanceled
+	case "skipped":
+		return executionSkipped
+	default:
+		return 0
+	}
 }

@@ -15,7 +15,13 @@ func TestGitHubPartitionWorkflowPreservesJobIdentityAndFailurePolicy(t *testing.
 	plan := githubTestPlan(t)
 	condition := githubDispatchCondition(plan)
 	raw := []byte("permissions: {contents: read}\njobs:\n  source:\n    runs-on: ubuntu-24.04\n  build:\n    needs: [source]\n    if: ${{ " + condition + " }}\n    runs-on: ubuntu-24.04\n    timeout-minutes: 30\n    steps:\n      - run: echo build\n        env:\n          TOKEN: ${{ secrets.BUILD_TOKEN }}\n  inspect:\n    needs: [source]\n    if: ${{ always() && " + condition + " }}\n    runs-on: ubuntu-24.04\n    timeout-minutes: 30\n    steps:\n      - run: echo inspect\n")
-	child, err := renderGitHubPartition(t.Context(), plan, raw, githubExecutionPartition{Jobs: []string{"build", "inspect"}})
+	model, err := newExecutionGraph(t.Context(), map[string]executionOperation{
+		"source": {}, "build": {Needs: []string{"source"}}, "inspect": {Needs: []string{"source"}, Condition: executionAfterCompletion},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	child, err := renderGitHubPartition(t.Context(), plan, raw, githubExecutionPartition{Jobs: []string{"build", "inspect"}}, model)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +56,7 @@ func TestGitHubPartitionWorkflowPreservesJobIdentityAndFailurePolicy(t *testing.
 		t.Fatal("worker must not compete with entry workflow concurrency")
 	}
 	for _, ids := range [][]string{{"missing"}, {"build", "build"}, {"source", "build"}, {githubPartitionReporter}} {
-		_, err := renderGitHubPartition(t.Context(), plan, raw, githubExecutionPartition{Jobs: ids})
+		_, err := renderGitHubPartition(t.Context(), plan, raw, githubExecutionPartition{Jobs: ids}, model)
 		assertFactoryErrorCode(t, err, e.CodePipelineDrift)
 	}
 }
@@ -63,7 +69,7 @@ func TestGitHubPartitionRefusesUnprojectedDependencyExpressions(t *testing.T) {
 		t.Run(expression, func(t *testing.T) {
 			job := githubYAMLMap("if", githubYAMLString("${{ "+githubDispatchCondition(plan)+" }}"),
 				"env", githubYAMLMap("INPUT", githubYAMLString("${{ "+expression+" }}")))
-			_, err := projectGitHubPartitionJob(plan, "consumer", job, []string{"source"}, nil)
+			_, err := projectGitHubPartitionJob(plan, "consumer", job, []string{"source"}, nil, executionAfterSuccess)
 			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
 		})
 	}
@@ -109,12 +115,22 @@ func TestGitHubPartitionPreservesFailureAncestryThroughRecovery(t *testing.T) {
 				"source", githubYAMLMap("if", githubYAMLString(ordinary)),
 				"recovery", githubYAMLMap("if", githubYAMLString(test.condition), "needs", githubNeedsSequence([]string{"source"})),
 				"consumer", githubYAMLMap("if", githubYAMLString(ordinary), "needs", githubNeedsSequence([]string{"recovery"})))
-			parents, err := githubPartitionPrerequisites(t.Context(), plan, jobs, "consumer")
+			recoveryCondition := executionAfterSuccess
+			if test.condition == always {
+				recoveryCondition = executionAfterCompletion
+			}
+			model, err := newExecutionGraph(t.Context(), map[string]executionOperation{
+				"source": {}, "recovery": {Needs: []string{"source"}, Condition: recoveryCondition}, "consumer": {Needs: []string{"recovery"}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			parents, err := model.prerequisiteResults(t.Context(), "consumer")
 			if err != nil || strings.Join(parents, ",") != test.want {
 				t.Fatalf("prerequisites=%v error=%v", parents, err)
 			}
 			for _, owners := range []map[string]string{nil, {"source": "source-worker", "recovery": "recovery-worker"}} {
-				job, err := projectGitHubPartitionJob(plan, "consumer", githubYAMLField(jobs, "consumer"), parents, owners)
+				job, err := projectGitHubPartitionJob(plan, "consumer", githubYAMLField(jobs, "consumer"), parents, owners, executionAfterSuccess)
 				if err != nil {
 					t.Fatal(err)
 				}
