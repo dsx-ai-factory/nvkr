@@ -35,6 +35,9 @@ func AdmitQualificationHandoff(plan *Plan) error {
 	if plan == nil {
 		return e.New(e.CodeUsage, "qualification handoff requires an original Plan")
 	}
+	if plan.Composition != nil {
+		return e.New(e.CodeEngineCapability, "qualification of a composite Definition Run is deferred (ADR-26 §7)")
+	}
 	if plan.Environment.GitHubDevelopment {
 		return e.New(e.CodeEngineCapability, "qualification handoff requires production publication; development publication has a separate trust policy")
 	}

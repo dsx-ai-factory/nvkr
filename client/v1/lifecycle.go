@@ -20,6 +20,8 @@ type Release = lifecycle.Release
 type VerificationPolicy = lifecycle.VerificationPolicy
 type DiskEvidenceRequirement = lifecycle.DiskEvidenceRequirement
 type ReleaseConsumerOptions = lifecycle.ConsumerOptions
+type DefinitionInput = lifecycle.DefinitionInput
+type DefinitionPinReport = lifecycle.DefinitionPinReport
 
 const (
 	DiskEvidenceStrict          = lifecycle.DiskEvidenceStrict
@@ -34,6 +36,23 @@ func (c *Client) LoadDefinition(ctx context.Context, path string) (Definition, e
 		return Definition{}, err
 	}
 	return lifecycle.LoadDefinition(ctx, path)
+}
+
+// LoadDefinitionInput admits a plain or composite Definition through the same
+// owner as the CLI. A composite's Definition field is its effective Definition.
+func (c *Client) LoadDefinitionInput(ctx context.Context, path string) (DefinitionInput, error) {
+	if err := c.ready(ctx, "definition load"); err != nil {
+		return DefinitionInput{}, err
+	}
+	return lifecycle.LoadDefinitionInput(ctx, path)
+}
+
+// PinDefinition recomputes a composite's member digests; check writes nothing.
+func (c *Client) PinDefinition(ctx context.Context, path string, check bool) (DefinitionPinReport, error) {
+	if err := c.ready(ctx, "definition pin"); err != nil {
+		return DefinitionPinReport{}, err
+	}
+	return lifecycle.PinDefinition(ctx, path, check)
 }
 
 func (c *Client) LoadEnvironment(ctx context.Context, path string) (Environment, error) {

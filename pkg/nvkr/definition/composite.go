@@ -277,18 +277,9 @@ func AdmitComposite(ctx context.Context, compositePath string, raw []byte, read 
 	if err != nil {
 		return Composition{}, err
 	}
-	locators := make(map[string]string, len(composite.Members))
-	paths := make([]string, 0, len(composite.Members))
-	for _, member := range composite.Members {
-		resolved, err := ResolveInputPath(compositePath, member.Definition, false)
-		if err != nil {
-			return Composition{}, err
-		}
-		if previous, repeated := locators[resolved]; repeated {
-			return Composition{}, e.New(e.CodeInvalidCatalog, "composite members %q and %q resolve to the same file %q", previous, member.Name, resolved)
-		}
-		locators[resolved] = member.Name
-		paths = append(paths, resolved)
+	paths, err := resolveMembers(compositePath, composite)
+	if err != nil {
+		return Composition{}, err
 	}
 	total := int64(len(raw))
 	composition := Composition{path: compositePath, composite: composite.Clone(), digest: digest}
@@ -296,31 +287,11 @@ func AdmitComposite(ctx context.Context, compositePath string, raw []byte, read 
 		if err := ctx.Err(); err != nil {
 			return Composition{}, e.Wrap(e.CodeTimeout, err, "composite definition admission canceled")
 		}
-		memberRaw, err := read(ctx, paths[i])
+		definition, size, err := loadMember(ctx, read, member, paths[i], maxCompositeInputBytes-total)
 		if err != nil {
-			if ctx.Err() != nil {
-				return Composition{}, e.Wrap(e.CodeTimeout, ctx.Err(), "reading composite member %q canceled", member.Name)
-			}
-			return Composition{}, e.Wrap(e.CodeInvalidCatalog, err, "reading composite member %q", member.Name)
+			return Composition{}, err
 		}
-		if int64(len(memberRaw)) > maxCompositeInputBytes-total {
-			return Composition{}, e.New(e.CodeInvalidCatalog, "composite and member documents exceed the %d-byte input bound", maxCompositeInputBytes)
-		}
-		total += int64(len(memberRaw))
-		kind, err := DocumentKind(memberRaw)
-		if err != nil {
-			return Composition{}, e.Wrap(e.CodeInvalidCatalog, err, "composite member %q", member.Name)
-		}
-		if kind != DefinitionKind {
-			return Composition{}, e.New(e.CodeInvalidCatalog, "composite member %q is a nested composite; members must be plain Definitions", member.Name)
-		}
-		definition, err := DecodeDefinition(memberRaw)
-		if err != nil {
-			return Composition{}, e.Wrap(e.CodeInvalidCatalog, err, "admitting composite member %q", member.Name)
-		}
-		if definition.Metadata.Name != member.Name {
-			return Composition{}, e.New(e.CodeInvalidCatalog, "composite member %q names Definition %q", member.Name, definition.Metadata.Name)
-		}
+		total += size
 		memberDigest, err := definition.Digest()
 		if err != nil {
 			return Composition{}, err
@@ -334,6 +305,55 @@ func AdmitComposite(ctx context.Context, compositePath string, raw []byte, read 
 		return Composition{}, err
 	}
 	return composition, nil
+}
+
+// resolveMembers resolves every locator beneath the input root and rejects two
+// members resolving to one file.
+func resolveMembers(compositePath string, composite CompositeDefinition) ([]string, error) {
+	locators := make(map[string]string, len(composite.Members))
+	paths := make([]string, 0, len(composite.Members))
+	for _, member := range composite.Members {
+		resolved, err := ResolveInputPath(compositePath, member.Definition, false)
+		if err != nil {
+			return nil, err
+		}
+		if previous, repeated := locators[resolved]; repeated {
+			return nil, e.New(e.CodeInvalidCatalog, "composite members %q and %q resolve to the same file %q", previous, member.Name, resolved)
+		}
+		locators[resolved] = member.Name
+		paths = append(paths, resolved)
+	}
+	return paths, nil
+}
+
+// loadMember reads one member through the bounded reader and admits it as a
+// complete plain Definition named by its pin. It does not compare digests.
+func loadMember(ctx context.Context, read InputReader, member CompositeMember, resolved string, remaining int64) (Definition, int64, error) {
+	raw, err := read(ctx, resolved)
+	if err != nil {
+		if ctx.Err() != nil {
+			return Definition{}, 0, e.Wrap(e.CodeTimeout, ctx.Err(), "reading composite member %q canceled", member.Name)
+		}
+		return Definition{}, 0, e.Wrap(e.CodeInvalidCatalog, err, "reading composite member %q", member.Name)
+	}
+	if int64(len(raw)) > remaining {
+		return Definition{}, 0, e.New(e.CodeInvalidCatalog, "composite and member documents exceed the %d-byte input bound", maxCompositeInputBytes)
+	}
+	kind, err := DocumentKind(raw)
+	if err != nil {
+		return Definition{}, 0, e.Wrap(e.CodeInvalidCatalog, err, "composite member %q", member.Name)
+	}
+	if kind != DefinitionKind {
+		return Definition{}, 0, e.New(e.CodeInvalidCatalog, "composite member %q is a nested composite; members must be plain Definitions", member.Name)
+	}
+	definition, err := DecodeDefinition(raw)
+	if err != nil {
+		return Definition{}, 0, e.Wrap(e.CodeInvalidCatalog, err, "admitting composite member %q", member.Name)
+	}
+	if definition.Metadata.Name != member.Name {
+		return Definition{}, 0, e.New(e.CodeInvalidCatalog, "composite member %q names Definition %q", member.Name, definition.Metadata.Name)
+	}
+	return definition, int64(len(raw)), nil
 }
 
 // ResolveInputPath joins a relative authored locator to the directory of a

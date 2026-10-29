@@ -66,6 +66,9 @@ func GenerateFiles(ctx context.Context, definitionPath, environmentPath, policyP
 	if err := factory.ValidateGenerationEngine(engine); err != nil {
 		return "", err
 	}
+	if err := lifecycle.RefuseComposite(ctx, definitionPath, "qualification generation"); err != nil {
+		return "", err
+	}
 	if !qualificationInputPath(policyPath) {
 		return "", e.New(e.CodeUsage, "qualification policy must have a clean repository-relative path")
 	}
