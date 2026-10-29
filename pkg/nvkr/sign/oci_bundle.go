@@ -128,7 +128,7 @@ func (s *CosignOCISigner) newOCIBundleSource(ctx context.Context, subject Subjec
 	if s.bundleSource != nil {
 		return s.bundleSource(ctx, subject, s.credential)
 	}
-	return newRegistryBundleSource(ctx, subject, s.credential)
+	return newRegistryBundleSource(ctx, subject, s.credential, s.keychain)
 }
 
 // A type annotation controls search order only. The statement's actual type

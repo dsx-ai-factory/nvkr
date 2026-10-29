@@ -2476,6 +2476,11 @@ integrity on macOS and Linux, without signature or policy verification, installa
 contracts do not establish GHCR interoperability, signing-service behavior,
 runtime compatibility, installation or external acceptance of the new format projections; earlier browsing
 and publication records do not establish that acceptance.
+`release pull` layer downloads share the bounded HTTP/2 peer-reset reacquisition used by registry and
+checked-publication pulls: at most three attempts within the command deadline, each removing its partial
+download and re-hashing the complete layer. Resets after the declared size, integrity failures and
+cancellation are not retried. `httptest` contracts cover recovery, a tampered reacquisition, exhausted
+attempts and prompt cancellation; no external large-disk `release pull` has been re-run since.
 
 Private CI payload transport uses the existing Go registry and bounded archive owners. Actions attachments
 carry canonical JSON locators; source archives, helpers, tools and compiled payloads stay in an API-confirmed
@@ -3582,3 +3587,16 @@ payloads. Its description reports `payloadIntegrityVerified: false`; it grants n
 exact-input receipt, qualification or revocation acceptance. Contract fixtures cover rejected signatures,
 missing or substituted evidence, whole-release membership, policy enforcement, capability separation and
 zero payload-layer retrieval. These are controlled contracts, not a recorded external authenticity run.
+
+Consumer signature, provenance and SBOM bundle reads resolve registry access like the consumer's payload
+reads. With neither `--anonymous` nor explicit transport credentials, the bundle reader consults the same
+default keychain; an explicit signing credential still takes precedence, and explicit transport passwords
+are not widened to it. Bundle verification by cosign stays offline against an empty private Docker
+configuration. A registry 401 or 403 on the referrers index reports `NVKR-E-FETCH-FAILED`, distinct from
+`NVKR-E-SIGNATURE-INVALID`. A denied candidate does not end the search: later valid evidence still
+authenticates, and with none the last candidate failure sets the code, so a sole denied candidate reports
+`NVKR-E-FETCH-FAILED` while a later malformed candidate reports `NVKR-E-SIGNATURE-INVALID`. Contract tests with an `httptest` registry cover keychain-authenticated
+reads, anonymous-only reads with and without a keychain, a missing or rejected keychain credential, and
+the credential-plus-keychain conflict. No private-registry consumer verification has been re-run since
+this change; the earlier private GHCR readback that failed with `NVKR-E-SIGNATURE-INVALID` remains the
+only external record.

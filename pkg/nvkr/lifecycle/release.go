@@ -17,6 +17,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
+	"github.com/google/go-containerregistry/pkg/authn"
 )
 
 type releaseMaterializer func(context.Context, string) (*delivery.Publication, error)
@@ -82,9 +83,15 @@ func NewConsumer(options ConsumerOptions) (*Consumer, error) {
 	if root == "" {
 		root = filepath.ToSlash(filepath.Join(".nvkr", "verified-releases"))
 	}
+	// Signature reads share the payload reads' ambient keychain; an explicit
+	// signing credential stays the only explicit secret the reader receives.
+	var keychain authn.Keychain
+	if options.Credential == (sign.Credential{}) {
+		keychain = options.Registry.AmbientKeychain()
+	}
 	return &Consumer{inspection: InspectionOptions{WorkspaceRoot: options.WorkspaceRoot, Registry: options.Registry}, verifierFor: func(policy VerificationPolicy) (sign.OCISigner, error) {
 		return sign.NewCosignOCISigner(sign.CosignOCIOptions{Binary: options.CosignBinary,
-			BinaryDigest: options.CosignDigest, Identity: policy.IdentityRegexp, Issuer: policy.Issuer, Credential: options.Credential})
+			BinaryDigest: options.CosignDigest, Identity: policy.IdentityRegexp, Issuer: policy.Issuer, Credential: options.Credential, Keychain: keychain})
 	}, materialize: func(ctx context.Context, reference string) (*delivery.Publication, error) {
 		return delivery.PullPublication(ctx, reference, root, options.Registry)
 	}, materializeChecked: func(ctx context.Context, reference string) (qualificationPublication, error) {
