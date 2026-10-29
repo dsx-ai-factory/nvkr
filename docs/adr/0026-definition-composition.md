@@ -520,8 +520,8 @@ The questions left open by the first draft were decided on 2026-10-29:
 
 Contract suites only. U1–U7 are implemented with table-driven contract tests that assert coded errors;
 `NVKR_TEST_EXTENDED=1` additionally compiles the worked example above against the combined Plan's resolved
-catalogs and shows that the composite's 71 outputs and 75 native builds keep the Build Digests and native build
-records of the combined Definition and the four families, and that its worker partitions equal those of its
-effective Definition compiled plainly under the same partitioned Environment. The combined Definition lacks the
-two family-only NICo chart outputs. These are local contracts. No hosted composite Run, composite publication or consumer verification exists, and no claim
+catalogs and shows that every composite output and native build keeps the Build Digest and native build records
+of the combined Definition and the four families, including family-only outputs the combined Definition lacks,
+and that its worker partitions equal those of its effective Definition compiled plainly under the same
+partitioned Environment. These are local contracts. No hosted composite Run, composite publication or consumer verification exists, and no claim
 follows from the family pilot's or the combined candidate's evidence.

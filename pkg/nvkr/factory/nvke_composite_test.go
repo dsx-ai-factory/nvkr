@@ -111,8 +111,8 @@ func TestNVKECompositeIdentityInvariance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(plan.LifecycleOutputs) != 71 || len(plan.Builds) != 75 || len(plan.Composition.Members) != 4 {
-		t.Fatalf("composite Plan has %d outputs and %d native builds, want 71 and 75", len(plan.LifecycleOutputs), len(plan.Builds))
+	if want := len(combined.Definition.Outputs) + len(nvkeFamilyOnlyOutputs); len(plan.LifecycleOutputs) != want || len(plan.Composition.Members) != 4 {
+		t.Fatalf("composite Plan has %d outputs, want %d", len(plan.LifecycleOutputs), want)
 	}
 	// The combined Definition lacks family-only outputs, so the plain baseline is the effective Definition.
 	partitioned, err := compileDocumentsWithLoader(t.Context(), nvkeCompositePath, composition.Effective(), "inputs/environments/github-release.yaml",
@@ -121,7 +121,7 @@ func TestNVKECompositeIdentityInvariance(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertPartitionsIgnoreMembers(t, partitioned, plan)
-	baselines := []*Plan{combined}
+	baselines, familyBuilds := []*Plan{combined}, 0
 	for _, family := range nvkeSplitFamilies {
 		definitionPath, environmentPath := nvkeSplitPaths(family.name)
 		familyPlan, err := compileDocumentsWithLoader(t.Context(), definitionPath, nvkeSplitDefinition(t, definitionPath), environmentPath,
@@ -134,7 +134,10 @@ func TestNVKECompositeIdentityInvariance(t *testing.T) {
 				t.Fatalf("output %q is attributed to %q, not nvke-%s", output.Name, member, family.name)
 			}
 		}
-		baselines = append(baselines, familyPlan)
+		baselines, familyBuilds = append(baselines, familyPlan), familyBuilds+len(familyPlan.Builds)
+	}
+	if len(plan.Builds) != familyBuilds {
+		t.Fatalf("composite Plan has %d native builds, families have %d", len(plan.Builds), familyBuilds)
 	}
 	builds := map[string][]byte{}
 	outputs := map[string][]byte{}
