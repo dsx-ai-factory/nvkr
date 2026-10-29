@@ -93,6 +93,9 @@ func TestGitHubPartitionSecretReferences(t *testing.T) {
 		{"${{ format('}}', secrets.LATE) }}", "LATE", false},
 		{"${{ format('}}', toJSON(secrets)) }}", "", true},
 		{"${{ secrets.OPEN", "", true},
+		{"${{ format('uses secrets: {0}', github.sha) }}", "", false},
+		{"${{ format('secrets.QUOTED {0}', secrets.REAL) }}", "REAL", false},
+		{"${{ format('it''s {0}', toJSON(secrets)) }}", "", true},
 	} {
 		t.Run(test.value, func(t *testing.T) {
 			names, err := githubPartitionSecretNames(githubYAMLString(test.value))

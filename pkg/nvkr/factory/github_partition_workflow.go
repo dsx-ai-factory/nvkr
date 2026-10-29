@@ -15,7 +15,9 @@ import (
 const githubPartitionReporter = "nvkr-partition-results"
 
 var (
-	githubPartitionSecret      = regexp.MustCompile(`(?i)\bsecrets(?:\s*\.\s*([a-z_][a-z0-9_]*)|\s*\[\s*'([a-z_][a-z0-9_]*)'\s*\])`)
+	githubPartitionSecret      = regexp.MustCompile(`(?i)\bsecrets\s*\.\s*([a-z_][a-z0-9_]*)`)
+	githubPartitionSecretIndex = regexp.MustCompile(`(?i)\bsecrets\s*\[\s*'([a-z_][a-z0-9_]*)'\s*\]`)
+	githubExpressionString     = regexp.MustCompile(`'(?:[^']|'')*'`)
 	githubPartitionSecretsWord = regexp.MustCompile(`(?i)\bsecrets\b`)
 )
 
@@ -143,9 +145,13 @@ func githubPartitionSecretNames(node *yamlv3.Node) ([]string, error) {
 }
 
 func githubPartitionExpressionSecretNames(expression string) ([]string, error) {
+	// Normalize static index lookups before dropping string literals, so quoted
+	// text is neither a reference nor a refused dynamic lookup.
+	expression = githubPartitionSecretIndex.ReplaceAllString(expression, "secrets.$1")
+	expression = githubExpressionString.ReplaceAllString(expression, "''")
 	var names []string
 	for _, match := range githubPartitionSecret.FindAllStringSubmatch(expression, -1) {
-		name := strings.ToUpper(match[1] + match[2])
+		name := strings.ToUpper(match[1])
 		if name != "GITHUB_TOKEN" {
 			names = append(names, name)
 		}
