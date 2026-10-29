@@ -159,10 +159,41 @@ func githubCITransferMode(plan *Plan, uses string) string {
 	return ""
 }
 
+// githubCIPublishedSourcePython acquires the pinned published NVKR module for
+// the transport helper. Its arguments are the module path, version and checksum.
+const githubCIPublishedSourcePython = `def published_source(cache, env, deadline):
+    # A released generator pins the helper to its own published module.
+    # Resolve it from the private cache root so the checkout's own go.mod and
+    # toolchain lines cannot affect acquisition, and require the pinned version
+    # and checksum. Go ignores go.mod beneath the module cache, so build from a
+    # private copy.
+    raw = download(["%[1]s@%[2]s"], env, deadline, cache, lambda: None)
+    decoder = json.JSONDecoder(object_pairs_hook=unique_object, parse_constant=invalid_constant)
+    item = decoder.decode(raw.decode("utf-8"))
+    if not isinstance(item, dict):
+        raise ValueError("invalid published runner module")
+    directory = item.get("Dir")
+    if item.get("Path") != "%[1]s" or item.get("Version") != "%[2]s" or item.get("Sum") != "%[3]s" or \
+            not isinstance(directory, str) or not os.path.isabs(directory):
+        raise ValueError("published runner module does not match its pin")
+    print("Building NVKR transport helper from " + item["Path"] + " " + item["Version"] + " " + item["Sum"], file=sys.stderr)
+    source = os.path.join(cache, "source")
+    shutil.copytree(directory, source, symlinks=True)
+    return source
+
+`
+
 // The source bootstrap retries only the observed public-proxy module body
 // failure, then compiles once offline. Every child shares one deadline and is
 // stopped and joined before its disposable caches are removed.
-func githubCIBootstrapBuildCommand(linker string) string {
+func githubCIBootstrapBuildCommand(linker string, release githubRunnerRelease) string {
+	// A development build compiles the checkout's own source. Only a pinned
+	// release carries the published-module acquisition and its checks.
+	publishedSource, sourceExpression := "", `"."`
+	if release.Version != "" {
+		publishedSource = fmt.Sprintf(githubCIPublishedSourcePython, githubRunnerModule, release.Version, release.Sum)
+		sourceExpression = "published_source(cache, env, deadline)"
+	}
 	return fmt.Sprintf(`set +x +v
 set -eu
 if ! command -v python3 >/dev/null 2>&1; then
@@ -312,31 +343,14 @@ def download(args, env, deadline, cwd, check):
             check_deadline(deadline)
             time.sleep(min(0.2, max(0, until - time.monotonic())))
 
-def published_source(cache, env, deadline):
-    # A checkout without NVKR source builds the latest published release.
-    # Resolve it from the private cache root so the consumer checkout's own
-    # go.mod and toolchain lines cannot affect acquisition. Go ignores go.mod
-    # beneath the module cache, so build from a private copy.
-    raw = download(["%[8]s@latest"], env, deadline, cache, lambda: None)
-    decoder = json.JSONDecoder(object_pairs_hook=unique_object, parse_constant=invalid_constant)
-    item = decoder.decode(raw.decode("utf-8"))
-    if not isinstance(item, dict):
-        raise ValueError("invalid published runner module")
-    directory = item.get("Dir")
-    if item.get("Path") != "%[8]s" or not isinstance(directory, str) or not os.path.isabs(directory):
-        raise ValueError("invalid published runner module")
-    source = os.path.join(cache, "source")
-    shutil.copytree(directory, source, symlinks=True)
-    return source
-
-def build(cache):
+%[8]sdef build(cache):
     # Never pass repository, registry or OIDC credentials to either Go process.
     env = {key: os.environ[key] for key in ("PATH", "HOME", "TMPDIR", "GOROOT") if key in os.environ}
     env.update(CGO_ENABLED="0", GOTOOLCHAIN="local", GOENV="off", GOWORK="off",
                GOCACHE=os.path.join(cache, "build"), GOMODCACHE=os.path.join(cache, "modules"))
     deadline = time.monotonic() + 900
     check_deadline(deadline)
-    source = "." if os.path.isfile("%[9]s") else published_source(cache, env, deadline)
+    source = %[9]s
     original = manifests(source)
     # Go may normalize module manifests. Private copies keep the source
     # untouched; both must remain byte-exact through download and build.
@@ -382,7 +396,7 @@ if canceled and result != %[5]d:
 sys.exit(result)
 PY`, e.CodeEngineCapability, e.ExitCode(e.New(e.CodeEngineCapability, "")), shellQuote(linker),
 		e.CodeTimeout, e.ExitCode(e.New(e.CodeTimeout, "")), e.CodeBuildFailed, e.ExitCode(e.New(e.CodeBuildFailed, "")),
-		strings.TrimSuffix(nvkrRunnerPackage, "/cmd/nvkr"), githubRunnerSourceMarker)
+		publishedSource, sourceExpression)
 }
 
 func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string][]byte, error) {
@@ -390,7 +404,7 @@ func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string
 	if err != nil {
 		return nil, err
 	}
-	goVersion, err := githubPublishedRunnerGoVersion()
+	release, err := githubRunnerReleaseForGenerator()
 	if err != nil {
 		return nil, err
 	}
@@ -413,10 +427,10 @@ func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string
 		}
 		steps := &yamlv3.Node{Kind: yamlv3.SequenceNode, Tag: "!!seq"}
 		if mode == "bootstrap-download" {
-			versionFile, version := githubSetupGoWith(goVersion)
+			key, value := githubSetupGoWith(release)
 			steps.Content = append(steps.Content,
-				githubYAMLMap("name", githubYAMLString("Provision the pinned Go bootstrap"), "uses", githubYAMLString(actions.SetupGo), "with", githubYAMLMap("go-version-file", githubYAMLString(versionFile), "go-version", githubYAMLString(version), "cache", githubYAMLString("false"))),
-				githubYAMLMap("name", githubYAMLString("Build private transport helper"), "shell", githubYAMLString("bash"), "env", githubYAMLMap("GOTOOLCHAIN", githubYAMLString("local")), "run", githubYAMLString(githubCIBootstrapBuildCommand(linker))))
+				githubYAMLMap("name", githubYAMLString("Provision the pinned Go bootstrap"), "uses", githubYAMLString(actions.SetupGo), "with", githubYAMLMap(key, githubYAMLString(value), "cache", githubYAMLString("false"))),
+				githubYAMLMap("name", githubYAMLString("Build private transport helper"), "shell", githubYAMLString("bash"), "env", githubYAMLMap("GOTOOLCHAIN", githubYAMLString("local")), "run", githubYAMLString(githubCIBootstrapBuildCommand(linker, release))))
 		}
 		steps.Content = append(steps.Content, githubYAMLMap("name", githubYAMLString("Create a fresh locator directory"), "id", githubYAMLString("directory"), "shell", githubYAMLString("bash"), "run", githubYAMLString("set -eu\ndirectory=$(mktemp -d \"$RUNNER_TEMP/nvkr-ci-index.XXXXXX\")\nprintf 'path=%s\\n' \"$directory\" >> \"$GITHUB_OUTPUT\"")))
 		username := "${{ env.NVKR_CI_STORAGE_READ_USER }}"

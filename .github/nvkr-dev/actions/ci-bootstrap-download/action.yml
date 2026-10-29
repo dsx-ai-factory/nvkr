@@ -45,8 +45,7 @@ runs:
     - name: Provision the pinned Go bootstrap
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
       with:
-        go-version-file: ${{ hashFiles('cmd/nvkr/main.go') != '' && '.go-version' || '' }}
-        go-version: ${{ hashFiles('cmd/nvkr/main.go') == '' && '1.27.3' || '' }}
+        go-version-file: .go-version
         cache: "false"
     - name: Build private transport helper
       shell: bash
@@ -202,23 +201,6 @@ runs:
                     check_deadline(deadline)
                     time.sleep(min(0.2, max(0, until - time.monotonic())))
 
-        def published_source(cache, env, deadline):
-            # A checkout without NVKR source builds the latest published release.
-            # Resolve it from the private cache root so the consumer checkout's own
-            # go.mod and toolchain lines cannot affect acquisition. Go ignores go.mod
-            # beneath the module cache, so build from a private copy.
-            raw = download(["github.com/dsx-ai-factory/nvkr@latest"], env, deadline, cache, lambda: None)
-            decoder = json.JSONDecoder(object_pairs_hook=unique_object, parse_constant=invalid_constant)
-            item = decoder.decode(raw.decode("utf-8"))
-            if not isinstance(item, dict):
-                raise ValueError("invalid published runner module")
-            directory = item.get("Dir")
-            if item.get("Path") != "github.com/dsx-ai-factory/nvkr" or not isinstance(directory, str) or not os.path.isabs(directory):
-                raise ValueError("invalid published runner module")
-            source = os.path.join(cache, "source")
-            shutil.copytree(directory, source, symlinks=True)
-            return source
-
         def build(cache):
             # Never pass repository, registry or OIDC credentials to either Go process.
             env = {key: os.environ[key] for key in ("PATH", "HOME", "TMPDIR", "GOROOT") if key in os.environ}
@@ -226,7 +208,7 @@ runs:
                        GOCACHE=os.path.join(cache, "build"), GOMODCACHE=os.path.join(cache, "modules"))
             deadline = time.monotonic() + 900
             check_deadline(deadline)
-            source = "." if os.path.isfile("cmd/nvkr/main.go") else published_source(cache, env, deadline)
+            source = "."
             original = manifests(source)
             # Go may normalize module manifests. Private copies keep the source
             # untouched; both must remain byte-exact through download and build.

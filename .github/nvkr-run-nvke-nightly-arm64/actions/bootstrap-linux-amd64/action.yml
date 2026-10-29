@@ -23,15 +23,13 @@ runs:
     - name: Set up Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
       with:
-        go-version-file: '${{ hashFiles(''cmd/nvkr/main.go'') != '''' && ''.go-version'' || '''' }}'
-        go-version: '${{ hashFiles(''cmd/nvkr/main.go'') == '''' && ''1.27.3'' || '''' }}'
+        go-version-file: '.go-version'
         cache: 'false'
     - name: 'Install NVKR runner'
       run: |
         set -eu
         export CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOBIN="$RUNNER_TEMP/nvkr-runner"
-        if [ -f cmd/nvkr/main.go ]; then package=./cmd/nvkr; else package=github.com/dsx-ai-factory/nvkr/cmd/nvkr@latest; fi
-        go install -trimpath -ldflags '-X main.version=dev -X main.commit=unknown' "$package"
+        go install -trimpath -ldflags '-X main.version=dev -X main.commit=unknown' ./cmd/nvkr
         mv "$GOBIN/nvkr" nvkr-exec
       shell: bash -e {0}
     - name: 'Download NVKR runtime inputs'

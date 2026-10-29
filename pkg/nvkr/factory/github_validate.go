@@ -334,15 +334,15 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q is incomplete", jobID)
 		}
 		// The bootstrap must provision the Go toolchain via the pinned setup-go action rather
-		// than assume a preinstalled Go: an NVKR source checkout's .go-version, otherwise the
-		// generator's Go release for the published runner.
-		goVersion, err := githubPublishedRunnerGoVersion()
+		// than assume a preinstalled Go: the checkout's .go-version for a source build, or the
+		// released generator's own Go release for its pinned runner.
+		release, err := githubRunnerReleaseForGenerator()
 		if err != nil {
 			return err
 		}
-		versionFile, version := githubSetupGoWith(goVersion)
-		if job.Steps[1].Uses != actions.SetupGo || job.Steps[1].With["go-version-file"] != versionFile ||
-			job.Steps[1].With["go-version"] != version || job.Steps[1].With["cache"] != "false" {
+		key, value := githubSetupGoWith(release)
+		if job.Steps[1].Uses != actions.SetupGo || len(job.Steps[1].With) != 2 || job.Steps[1].With[key] != value ||
+			job.Steps[1].With["cache"] != "false" {
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q does not provision the pinned Go toolchain", jobID)
 		}
 		bootstrapRuns := joinRuns(job.Steps)
@@ -350,8 +350,12 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		if err != nil {
 			return err
 		}
-		if !stepUses(job.Steps, actions.Upload) || !strings.Contains(bootstrapRuns, "go install -trimpath") ||
-			!strings.Contains(bootstrapRuns, "-ldflags "+shellQuote(linkerFlags)) ||
+		helperEnvironment, err := githubRunnerHelperEnvironment(plan, runner)
+		if err != nil {
+			return err
+		}
+		if !stepUses(job.Steps, actions.Upload) ||
+			!strings.Contains(bootstrapRuns, githubRunnerInstallCommand(helperEnvironment, linkerFlags, release)) ||
 			!strings.Contains(bootstrapRuns, command) {
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q does not build and transport the runner", jobID)
 		}

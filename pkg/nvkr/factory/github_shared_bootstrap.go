@@ -28,6 +28,14 @@ func shareGitHubBootstrap(plan *Plan, files map[string][]byte, oldPath string, c
 		return e.New(e.CodePipelineDrift, "generated bootstrap action requires a mapping document")
 	}
 	action := document.Content[0]
+	linkerFlags, err := generatorLinkerFlags(plan.GeneratorVersion)
+	if err != nil {
+		return err
+	}
+	release, err := githubRunnerReleaseForGenerator()
+	if err != nil {
+		return err
+	}
 	runs := githubYAMLField(action, "runs")
 	steps := githubYAMLField(runs, "steps")
 	if githubYAMLValue(runs, "using") != "composite" || steps == nil || steps.Kind != yamlv3.SequenceNode {
@@ -41,15 +49,17 @@ func shareGitHubBootstrap(plan *Plan, files map[string][]byte, oldPath string, c
 			if variant != "" {
 				return e.New(e.CodePipelineDrift, "generated bootstrap action repeats its runner build")
 			}
-			command := githubYAMLValue(step, "run")
-			switch {
-			case strings.HasPrefix(command, "set -eu\nexport CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOBIN="):
-				variant = "linux-amd64"
-			case strings.HasPrefix(command, "set -eu\nexport CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOBIN="):
-				variant = "linux-arm64"
-			case strings.HasPrefix(command, "set -eu\nexport CGO_ENABLED=0 GOBIN="):
-				variant = "native"
-			default:
+			command := strings.TrimSuffix(githubYAMLValue(step, "run"), "\n")
+			for _, candidate := range []struct{ name, environment string }{
+				{"linux-amd64", "CGO_ENABLED=0 GOOS=linux GOARCH=amd64"},
+				{"linux-arm64", "CGO_ENABLED=0 GOOS=linux GOARCH=arm64"},
+				{"native", "CGO_ENABLED=0"},
+			} {
+				if command == githubRunnerInstallCommand(candidate.environment, linkerFlags, release) {
+					variant = candidate.name
+				}
+			}
+			if variant == "" {
 				return e.New(e.CodeEngineCapability, "generated bootstrap action has an unsupported runner build command")
 			}
 		case "Upload NVKR runner":

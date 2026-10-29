@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"path"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -49,16 +48,14 @@ func TestRenderGitHubProducesStaticallyValidCompleteBundle(t *testing.T) {
 		t.Fatal(err)
 	}
 	workflow := expandedGitHubWorkflow(t, bundle)
-	setupGoVersionFile, setupGoVersion := githubSetupGoWith(strings.TrimPrefix(runtime.Version(), "go"))
 	for _, required := range [][]byte{
 		[]byte("qualification: " + TierStaticUnqualified.String()),
-		// The bootstrap provisions Go via the pinned setup-go action (from an NVKR source
-		// checkout's .go-version, otherwise the generator's Go) rather than assuming a
-		// preinstalled toolchain, then installs the runner from that source or the release.
+		// The bootstrap provisions Go via the pinned setup-go action (from .go-version) rather
+		// than assuming a preinstalled toolchain. Test binaries are development builds, so the
+		// runner is installed from the checkout's own source.
 		[]byte("uses: " + plan.Actions["setup-go"].Uses()),
-		[]byte("go-version-file: " + yamlSingle(setupGoVersionFile)),
-		[]byte("go-version: " + yamlSingle(setupGoVersion)),
-		[]byte("then package=./cmd/nvkr; else package=" + githubPublishedRunner + "; fi"),
+		[]byte("go-version-file: '.go-version'"),
+		[]byte("go install -trimpath -ldflags '-X main.version=v1.2.3 -X main.commit=deadbeef' ./cmd/nvkr\n"),
 		[]byte("cache: 'false'"),
 		// Factory helpers own operation isolation and Plan-derived carrier selections.
 		[]byte("factory github run-node --plan"),
@@ -125,7 +122,7 @@ func TestValidateGitHubBundleRejectsIsolationAndTransportTampering(t *testing.T)
 			githubTestYAMLField(t, setup(t, root), "go-version-file").Value = "go.mod"
 		}, e.CodeInvalidCatalog, "pinned Go toolchain"},
 		{"setup-go-release", bootstrapMember, func(t *testing.T, root *yamlv3.Node) {
-			githubTestYAMLField(t, setup(t, root), "go-version").Value = "stable"
+			githubYAMLSet(setup(t, root), "go-version", githubYAMLString("stable"))
 		}, e.CodeInvalidCatalog, "pinned Go toolchain"},
 		{"setup-go-cache", bootstrapMember, func(t *testing.T, root *yamlv3.Node) { githubTestYAMLField(t, setup(t, root), "cache").Value = "true" }, e.CodeInvalidCatalog, "pinned Go toolchain"},
 		{"setup-go-cache-removed", bootstrapMember, func(t *testing.T, root *yamlv3.Node) { githubYAMLRemove(setup(t, root), "cache") }, e.CodeInvalidCatalog, "pinned Go toolchain"},

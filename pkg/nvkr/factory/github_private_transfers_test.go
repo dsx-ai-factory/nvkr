@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -56,7 +55,6 @@ func TestGitHubPrivateBootstrapOwnsAndDiscardsItsCaches(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			writeRunnerSourceMarker(t, root)
 			fakeGo := "#!/bin/sh\nexec " + shellQuote(python) + " -I - \"$@\" <<'PY'\n" + `import json, os, pathlib, signal, sys, time
 for key in ("NVKR_CREDENTIAL", "NVKR_CI_STORAGE_TOKEN", "ACTIONS_ID_TOKEN_REQUEST_TOKEN"):
     assert key not in os.environ
@@ -95,7 +93,7 @@ PY
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
-			command := exec.CommandContext(ctx, bash, "-c", githubCIBootstrapBuildCommand("-X main.version=fixture"))
+			command := exec.CommandContext(ctx, bash, "-c", githubCIBootstrapBuildCommand("-X main.version=fixture", githubRunnerRelease{}))
 			command.Dir = root
 			command.Env = append(os.Environ(), "PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"),
 				"RUNNER_TEMP="+selectedTemp, "GOCACHE="+ambient, "GOMODCACHE="+ambient,
@@ -206,7 +204,6 @@ func TestGitHubPrivateBootstrapRetriesOnlyAdmittedModuleBodyFailure(t *testing.T
 					t.Fatal(err)
 				}
 			}
-			writeRunnerSourceMarker(t, root)
 			fakeGo := "#!/bin/sh\nexec " + shellQuote(python) + " -I - \"$@\" <<'PY'\n" + `import json, os, pathlib, signal, sys, time
 mode = ` + strconv.Quote(test.name) + `
 kind = "download" if sys.argv[1:4] == ["mod", "download", "-json"] else "build"
@@ -285,7 +282,7 @@ PY
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 			defer cancel()
-			command := exec.CommandContext(ctx, bash, "-c", githubCIBootstrapBuildCommand("-X main.version=fixture"))
+			command := exec.CommandContext(ctx, bash, "-c", githubCIBootstrapBuildCommand("-X main.version=fixture", githubRunnerRelease{}))
 			command.Dir = root
 			command.Env = append(os.Environ(), "PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"), "RUNNER_TEMP="+runnerTemp,
 				"NVKR_CREDENTIAL=must-not-inherit", "NVKR_CI_STORAGE_TOKEN=must-not-inherit", "ACTIONS_ID_TOKEN_REQUEST_TOKEN=must-not-inherit",
@@ -396,8 +393,8 @@ func TestGitHubPrivateTransfersExposeOnlyLocatorsToActions(t *testing.T) {
 					case actions.SetupGo:
 						if name == githubCITransferPath(plan, "bootstrap-download")+"/action.yml" {
 							builds++
-							versionFile, version := githubSetupGoWith(strings.TrimPrefix(runtime.Version(), "go"))
-							if githubYAMLValue(with, "cache") != "false" || githubYAMLValue(with, "go-version-file") != versionFile || githubYAMLValue(with, "go-version") != version {
+							// Test binaries are development builds, which build the runner from source.
+							if githubYAMLValue(with, "cache") != "false" || githubYAMLValue(with, "go-version-file") != ".go-version" || githubYAMLField(with, "go-version") != nil {
 								t.Fatal("private helper bootstrap does not provision the pinned toolchain")
 							}
 						}
@@ -758,23 +755,13 @@ func TestPrivateTransferRetryPolicyAtInvocation(t *testing.T) {
 	}
 }
 
-// writeRunnerSourceMarker makes root an NVKR source checkout, so bootstraps
-// build its source instead of the published release.
-func writeRunnerSourceMarker(t *testing.T, root string) {
-	t.Helper()
-	marker := filepath.Join(root, filepath.FromSlash(githubRunnerSourceMarker))
-	if err := os.MkdirAll(filepath.Dir(marker), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(marker, []byte("package main\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-}
+// testRunnerRelease is a syntactically valid pinned NVKR release.
+var testRunnerRelease = githubRunnerRelease{Version: "v1.2.3", Sum: "h1:" + strings.Repeat("A", 43) + "=", GoVersion: "1.27.3"}
 
-// A checkout without NVKR source, such as a recipes repository, builds the
-// latest published release from a private copy of the downloaded module and
-// leaves the module cache and the checkout's own files untouched.
-func TestGitHubPrivateBootstrapBuildsPublishedReleaseWithoutSource(t *testing.T) {
+// A released generator pins the transport helper to its own published module,
+// builds it from a private copy, and leaves the module cache and the checkout's
+// own files untouched. Any other module, version or checksum is refused.
+func TestGitHubPrivateBootstrapBuildsPinnedPublishedRelease(t *testing.T) {
 	python, err := exec.LookPath("python3")
 	if err != nil {
 		t.Skip("Python 3 is required to exercise the hosted bootstrap owner")
@@ -783,13 +770,14 @@ func TestGitHubPrivateBootstrapBuildsPublishedReleaseWithoutSource(t *testing.T)
 	if err != nil {
 		t.Skip("Bash is required to exercise the hosted bootstrap owner")
 	}
-	module := strings.TrimSuffix(nvkrRunnerPackage, "/cmd/nvkr")
 	for _, test := range []struct {
-		name, path string
-		code       e.Code
+		name, path, version, sum string
+		code                     e.Code
 	}{
-		{name: "published release", path: module},
-		{name: "unexpected module", path: "example.com/other", code: e.CodeBuildFailed},
+		{name: "pinned release", path: githubRunnerModule, version: testRunnerRelease.Version, sum: testRunnerRelease.Sum},
+		{name: "unexpected module", path: "example.com/other", version: testRunnerRelease.Version, sum: testRunnerRelease.Sum, code: e.CodeBuildFailed},
+		{name: "unexpected version", path: githubRunnerModule, version: "v1.2.4", sum: testRunnerRelease.Sum, code: e.CodeBuildFailed},
+		{name: "unexpected checksum", path: githubRunnerModule, version: testRunnerRelease.Version, sum: "h1:" + strings.Repeat("B", 43) + "=", code: e.CodeBuildFailed},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root, runnerTemp, published := t.TempDir(), t.TempDir(), t.TempDir()
@@ -803,12 +791,12 @@ func TestGitHubPrivateBootstrapBuildsPublishedReleaseWithoutSource(t *testing.T)
 				}
 			}
 			fakeGo := "#!/bin/sh\nexec " + shellQuote(python) + " -I - \"$@\" <<'PY'\n" + `import json, os, pathlib, sys
-published, module, workspace = ` + strconv.Quote(published) + `, ` + strconv.Quote(test.path) + `, ` + strconv.Quote(root) + `
+published, workspace = ` + strconv.Quote(published) + `, ` + strconv.Quote(root) + `
 cache = pathlib.Path(os.environ["GOCACHE"]).parent
 source = cache / "source"
-if sys.argv[1:] == ["mod", "download", "-json", ` + strconv.Quote(module+"@latest") + `]:
+if sys.argv[1:] == ["mod", "download", "-json", ` + strconv.Quote(githubRunnerModule+"@"+testRunnerRelease.Version) + `]:
     assert "GOPROXY" not in os.environ and os.path.realpath(os.getcwd()) == os.path.realpath(cache)
-    print(json.dumps({"Path": module, "Version": "v1.2.3", "Dir": published}))
+    print(json.dumps({"Path": ` + strconv.Quote(test.path) + `, "Version": ` + strconv.Quote(test.version) + `, "Sum": ` + strconv.Quote(test.sum) + `, "Dir": published}))
     sys.exit(0)
 assert os.path.realpath(os.getcwd()) == os.path.realpath(source)
 modfile = pathlib.Path(next(value.removeprefix("-modfile=") for value in sys.argv if value.startswith("-modfile=")))
@@ -827,19 +815,20 @@ PY
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
-			command := exec.CommandContext(ctx, bash, "-c", githubCIBootstrapBuildCommand("-X main.version=fixture"))
+			command := exec.CommandContext(ctx, bash, "-c", githubCIBootstrapBuildCommand("-X main.version=fixture", testRunnerRelease))
 			command.Dir = root
 			command.Env = append(os.Environ(), "PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"), "RUNNER_TEMP="+runnerTemp)
 			output, runErr := command.CombinedOutput()
 			helper, readErr := os.ReadFile(filepath.Join(root, ".nvkr/ci-bootstrap/nvkr-exec"))
 			if test.code == "" {
-				if runErr != nil || readErr != nil || string(helper) != "published helper" {
-					t.Fatalf("published bootstrap failed: %v %v\n%s", runErr, readErr, output)
+				if runErr != nil || readErr != nil || string(helper) != "published helper" ||
+					!bytes.Contains(output, []byte("from "+githubRunnerModule+" "+testRunnerRelease.Version+" "+testRunnerRelease.Sum)) {
+					t.Fatalf("pinned bootstrap failed or did not log its module: %v %v\n%s", runErr, readErr, output)
 				}
 			} else {
 				var exit *exec.ExitError
 				if !errors.As(runErr, &exit) || exit.ExitCode() != e.ExitCode(e.New(test.code, "")) || readErr == nil {
-					t.Fatalf("unexpected module was not refused with %s: %v\n%s", test.code, runErr, output)
+					t.Fatalf("mismatched module was not refused with %s: %v\n%s", test.code, runErr, output)
 				}
 			}
 			for _, name := range []string{"go.mod", "go.sum"} {
