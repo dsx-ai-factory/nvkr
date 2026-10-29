@@ -9,12 +9,8 @@ import (
 )
 
 // EvidenceTier is the exact authority a factory plan, a generated pipeline, an
-// emitted observation, or a local run claims for itself. It exists so the tier is
-// stated in ONE place: before this type the same four strings were re-typed at a
-// dozen sites (the plan field, the workflow header comment, the observation
-// record, the terminal-observation artifact kind, the package input filter, and
-// the local run record), and a typo in any one of them silently produced a
-// document that no gate would recognize.
+// emitted observation, or a local run claims for itself. Tokens are spelled only
+// here: a retyped copy elsewhere is one typo from a document no gate recognizes.
 //
 // The tiers are deliberately NOT ordered or comparable: `pipeline-attested` is
 // not "more" than `static-unqualified` on the same scale, it is a different claim

@@ -978,10 +978,8 @@ func joinFactoryCleanupError(primary, cleanup error, operation string) error {
 }
 
 func relocateFactoryPlan(plan *Plan, workspace string) (*Plan, error) {
-	// Capture the compiled identity BEFORE any path is rewritten, and carry it onto the
-	// relocated copy. Without this the plan's digest would silently become a function of
-	// the caller's --workspace, and every attestation minted from a non-default workspace
-	// would name a plan digest that nothing else in the system can reproduce.
+	// Capture the compiled identity BEFORE any path is rewritten so attestations do
+	// not depend on the caller's --workspace (see Plan.identityDigest).
 	identity, err := plan.IdentityDigest()
 	if err != nil {
 		return nil, err

@@ -385,8 +385,8 @@ selected payload bytes.
 Explicit `--definition`, `--environment` and `--nvkr` build selections also remain
 available. Those repository-contained inputs must already bind their native
 dependencies; local signing/publication requests are refused on that path.
-The separate Linux qualification rehearsal is described in
-[local development](local-development.md#rehearse-local-m3-qualification).
+The separate Linux qualification flow is described in
+[local development](local-development.md#qualify-local-artifacts).
 
 ### Explicit upstream OVN alternative
 
@@ -432,7 +432,7 @@ Hydrophone/kubectl outputs, the matching Linux ARM64 Kubernetes v1.36.3
 conformance image and BusyBox. Each host executes its native tools; the suite
 pods run in the same fresh Linux tenant. The kubectl source is v1.36.3 with the
 catalog's declared dependency updates, built using Go 1.27.2. It reports
-`v1.36.3-dirty`; see the [conformance producer](../definitions/kubernetes-conformance-arm64/README.md)
+`v1.36.3-dirty`; see the [conformance producer](../inputs/definitions/kubernetes-conformance-arm64/README.md)
 for the exact source and dependency transformations.
 
 Conformance requires exactly one Ready control plane and two Ready schedulable
@@ -492,6 +492,23 @@ held-domain observer. Mac process state remains explicitly unobserved; NICo Read
 does not establish a running QEMU process. Snapshots carry their own age, and a
 failed refresh clears stale provider observations. These are presentation-only
 observations, not qualification evidence.
+
+When the Linux artifact build uses `--qualify-local`, the dashboard switches to
+qualification after the artifact build. It follows six stages: **Verify build
+outputs**, **Sign build evidence**, **Check delivered tools**, **Sign qualification**,
+**Publish artifacts**, and **Verify registry contents**. Each stage explains its
+input, action and result. Counts show observed outputs, tools, uploads or checks.
+Publication and download checks list ordinary artifacts, named disks and signed
+evidence separately. Independent consumer verification follows the downloads.
+
+Use Up/Down to inspect any stage and End to return to live work. The signature
+chain distinguishes builder, smoke and qualifier roles from registry transport
+and consumer verification. Completed stage reports do not authorize deployment:
+the qualification result becomes successful only after the child exits successfully
+and the adapter retains and validates its result. Failures keep the last reported
+item and refuse deployment handoff. Plain output prints the same stage and item
+observations. The final qualification outcome remains in scrollback after the TUI
+closes. These are local keys and the lane remains `unqualified-local-execution`.
 
 | Key | Action |
 | --- | --- |

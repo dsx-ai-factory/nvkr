@@ -84,6 +84,7 @@ ordered NVIDIA and native KVM overlays. Their other selections are:
 | [`nvke/native-site-arm64`](nvke/native-site-arm64/registry.yaml) | Source-aligned CLI, controller, provisioned provider and chart producers; acquired deployment charts derived from the same source pin set |
 | [`controller-profiles/native-nvidia-arm64`](controller-profiles/native-nvidia-arm64/registry.yaml) | Unchanged upstream config profiles and runbooks; releases are registered by the consumer |
 | [`runtime-dependencies`](runtime-dependencies/registry.yaml) | Shared release and native demo runtime acquisitions from the same NVKE deployment selection |
+| [`kubernetes-conformance/`](kubernetes-conformance/hydrophone/registry.yaml) | Hydrophone (with its bounded-download patch), kubectl and conformance/BusyBox image producers shared by the [conformance tool Definitions](../definitions/kubernetes-conformance-arm64/README.md) and the native conformance demo |
 
 [`node-images/variants/native-nvidia.json`](node-images/variants/native-nvidia.json)
 binds its complete producer replacements to the shared release catalog's exact

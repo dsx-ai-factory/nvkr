@@ -41,8 +41,8 @@ const (
 	NodeAcquire = "acquire"
 	NodeVerify  = "terminal-observe"
 	// NodeSBOM emits a deterministic CycloneDX SBOM per built artifact plus an
-	// aggregate index for one build target (ADR-13 §1, re-entered into v1 by
-	// ADR-13). It runs after that target's terminal observation because it binds
+	// aggregate index for one build target (ADR-13 §1). It runs after that
+	// target's terminal observation because it binds
 	// each component's SBOM to the runner-observed artifact digest that observation
 	// gates. It asserts composition only, never signature or reproduction.
 	NodeSBOM      = "sbom"
@@ -184,8 +184,7 @@ type BuildPlan struct {
 	// ResolvedComponents is the exact resolved catalog component set this build
 	// compiled from. It is persisted so the SBOM node (ADR-13) can build a
 	// faithful CycloneDX document at node-execution time, where the catalog is not
-	// reachable — the container-isolated executor only ever sees this plan. Adding
-	// it is the reason the plan identity digest moved when SBOM re-entered v1.
+	// reachable — the container-isolated executor only ever sees this plan.
 	ResolvedComponents []catalog.NamedComponent `json:"resolvedComponents,omitempty"`
 	Graph              *ir.Graph                `json:"executionGraph"`
 }
