@@ -33,14 +33,20 @@ The maintained GitHub adapter and local runner use the same producer IR. GitLab,
 are unavailable; their unused adapters are removed, as are the separate qualified GitHub/GitLab renderers.
 The former GitLab-only `runtime.builderImage` schema field has no retained adapter and any nonempty value
 fails capability admission. GitHub uses its pinned setup-go action for source bootstrap. The generator's
-own build selects how bootstraps obtain the runner. A development build, which includes any build of a local
-checkout, emits bootstraps that install `./cmd/nvkr` from the checkout with its `.go-version`; they require
-NVKR source. A module-mode install of an exact release (`go install …/cmd/nvkr@vX.Y.Z`, whose build
-information records that version and its module checksum) emits bootstraps that install exactly that
-release with the generator's Go release and refuse a runner whose recorded module version or checksum
-differs, so repositories without NVKR source, such as a customer recipes repository, run the release that
-generated them. The committed-generation check guards rendering differences between NVKR revisions; it is
-not a trust control over the runner, which the exact version and checksum pin provides.
+own build selects how bootstraps obtain the runner. Any build of a local checkout emits bootstraps that install
+`./cmd/nvkr` from the checkout with its `.go-version`; they require NVKR source. A module-mode install of an
+exact module version, either a release (`go install …/cmd/nvkr@vX.Y.Z`) or a commit
+(`go install …/cmd/nvkr@<commit>`, recorded as a pseudo-version), records that version and its module checksum
+in its build information. It emits bootstraps that install exactly that module version with the generator's Go
+release and refuse a runner whose recorded module version or checksum differs, so repositories without NVKR
+source, such as a customer recipes repository, run the module version that generated them. The
+committed-generation check guards rendering differences between NVKR revisions; it is not a trust control over
+the runner, which the exact version and checksum pin provides. Such an install carries no linker stamps, so its
+generator version label comes from the same build information, which records no VCS revision: a release is
+labeled with its version and an `unknown` commit, and a commit install is labeled `dev` with the 12-character
+revision its pseudo-version encodes. Linker stamps still take precedence, and unstamped checkout builds keep
+the fixed `dev (unknown)` label so committed bundles do not depend on the checked-out commit. The label is
+descriptive and grants no authority.
 A future provider must satisfy its evidence admission before receiving an implementation. Adapters map **job/step
 topology and artifact transport only**, never build semantics. Adding an engine is one thin adapter; adding a
 component is one catalog entry and no code. Definition v5 names each output and its exact catalog producers.
