@@ -15,10 +15,11 @@ import (
 const githubPartitionReporter = "nvkr-partition-results"
 
 var (
-	githubPartitionSecret      = regexp.MustCompile(`(?i)\bsecrets\s*\.\s*([a-z_][a-z0-9_]*)`)
-	githubPartitionSecretIndex = regexp.MustCompile(`(?i)\bsecrets\s*\[\s*'([a-z_][a-z0-9_]*)'\s*\]`)
-	githubExpressionString     = regexp.MustCompile(`'(?:[^']|'')*'`)
-	githubPartitionSecretsWord = regexp.MustCompile(`(?i)\bsecrets\b`)
+	githubPartitionSecret         = regexp.MustCompile(`(?i)\bsecrets\s*\.\s*([a-z_][a-z0-9_]*)`)
+	githubPartitionSecretIndex    = regexp.MustCompile(`(?i)\bsecrets\s*\[\s*'([a-z_][a-z0-9_]*)'\s*\]`)
+	githubExpressionString        = regexp.MustCompile(`'(?:[^']|'')*'`)
+	githubPartitionSecretProperty = regexp.MustCompile(`(?i)\.\s*secrets\b`)
+	githubPartitionSecretsWord    = regexp.MustCompile(`(?i)\bsecrets\b`)
 )
 
 // renderGitHubPartition keeps original job IDs: shared action selection uses
@@ -109,7 +110,39 @@ func renderGitHubPartition(ctx context.Context, plan *Plan, raw []byte, partitio
 	return encoded, githubNeedsContext(ctx)
 }
 
-func githubPartitionSecretNames(node *yamlv3.Node) ([]string, error) {
+func githubPartitionSecretNames(workflow *yamlv3.Node) ([]string, error) {
+	names, err := githubPartitionScalarSecretNames(workflow)
+	if err != nil {
+		return nil, err
+	}
+	// GitHub evaluates job and step if values as expressions even without
+	// ${{ }}; other keys named if, such as env.if, remain data.
+	var conditions []*yamlv3.Node
+	if jobs := githubYAMLField(workflow, "jobs"); jobs != nil && jobs.Kind == yamlv3.MappingNode {
+		for index := 1; index < len(jobs.Content); index += 2 {
+			job := jobs.Content[index]
+			conditions = append(conditions, githubYAMLField(job, "if"))
+			if steps := githubYAMLField(job, "steps"); steps != nil && steps.Kind == yamlv3.SequenceNode {
+				for _, step := range steps.Content {
+					conditions = append(conditions, githubYAMLField(step, "if"))
+				}
+			}
+		}
+	}
+	for _, condition := range conditions {
+		if condition == nil || condition.Kind != yamlv3.ScalarNode || strings.Contains(condition.Value, "${{") {
+			continue
+		}
+		conditionNames, err := githubPartitionExpressionSecretNames(condition.Value)
+		if err != nil {
+			return nil, err
+		}
+		names = append(names, conditionNames...)
+	}
+	return uniqueSorted(names), nil
+}
+
+func githubPartitionScalarSecretNames(node *yamlv3.Node) ([]string, error) {
 	var names []string
 	if node.Kind == yamlv3.ScalarNode {
 		expressions, err := githubExpressions(node.Value)
@@ -124,24 +157,14 @@ func githubPartitionSecretNames(node *yamlv3.Node) ([]string, error) {
 			names = append(names, expressionNames...)
 		}
 	}
-	for index, child := range node.Content {
-		// GitHub evaluates an if value as an expression even without ${{ }}.
-		if node.Kind == yamlv3.MappingNode && index%2 == 1 && node.Content[index-1].Value == "if" &&
-			child.Kind == yamlv3.ScalarNode && !strings.Contains(child.Value, "${{") {
-			childNames, err := githubPartitionExpressionSecretNames(child.Value)
-			if err != nil {
-				return nil, err
-			}
-			names = append(names, childNames...)
-			continue
-		}
-		childNames, err := githubPartitionSecretNames(child)
+	for _, child := range node.Content {
+		childNames, err := githubPartitionScalarSecretNames(child)
 		if err != nil {
 			return nil, err
 		}
 		names = append(names, childNames...)
 	}
-	return uniqueSorted(names), nil
+	return names, nil
 }
 
 func githubPartitionExpressionSecretNames(expression string) ([]string, error) {
@@ -149,6 +172,8 @@ func githubPartitionExpressionSecretNames(expression string) ([]string, error) {
 	// text is neither a reference nor a refused dynamic lookup.
 	expression = githubPartitionSecretIndex.ReplaceAllString(expression, "secrets.$1")
 	expression = githubExpressionString.ReplaceAllString(expression, "''")
+	// A property named secrets, as in vars.secrets, is not the root context.
+	expression = githubPartitionSecretProperty.ReplaceAllString(expression, ".property")
 	var names []string
 	for _, match := range githubPartitionSecret.FindAllStringSubmatch(expression, -1) {
 		name := strings.ToUpper(match[1])

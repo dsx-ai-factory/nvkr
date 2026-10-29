@@ -54,6 +54,29 @@ func TestGitHubPartitionResultRewriteRequiresMarkers(t *testing.T) {
 	}
 }
 
+func TestGitHubPartitionCallerRefusesMissingResultMarkers(t *testing.T) {
+	plan := githubTestPlan(t)
+	bundle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := string(bundle.Files[bundle.WorkflowPath])
+	// Markers are replaced in their YAML-encoded form; the statuses marker is
+	// inside a single-quoted scalar, so its quotes are doubled.
+	for _, marker := range []string{"toJSON(needs)", "join(needs.*.result, '' '')"} {
+		t.Run(marker, func(t *testing.T) {
+			if !strings.Contains(raw, marker) {
+				t.Fatalf("rendered finalizer lacks %q", marker)
+			}
+			entry, workers, err := lowerGitHubPartitions(t.Context(), plan, []byte(strings.ReplaceAll(raw, marker, "github.job")))
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			if entry != nil || workers != nil {
+				t.Fatal("refused partition lowering returned partial output")
+			}
+		})
+	}
+}
+
 func TestGitHubPartitionActionlint(t *testing.T) {
 	testutil.RequireExtended(t)
 	tool, err := exec.LookPath("actionlint")

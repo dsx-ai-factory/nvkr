@@ -96,6 +96,10 @@ func TestGitHubPartitionSecretReferences(t *testing.T) {
 		{"${{ format('uses secrets: {0}', github.sha) }}", "", false},
 		{"${{ format('secrets.QUOTED {0}', secrets.REAL) }}", "REAL", false},
 		{"${{ format('it''s {0}', toJSON(secrets)) }}", "", true},
+		{"${{ vars.secrets }}", "", false},
+		{"${{ fromJSON('{\"secrets\":\"synthetic-value\"}').secrets }}", "", false},
+		{"${{ vars.secrets && secrets.REAL }}", "REAL", false},
+		{"${{ vars.secrets && toJSON(secrets) }}", "", true},
 	} {
 		t.Run(test.value, func(t *testing.T) {
 			names, err := githubPartitionSecretNames(githubYAMLString(test.value))
@@ -111,13 +115,25 @@ func TestGitHubPartitionSecretReferences(t *testing.T) {
 }
 
 func TestGitHubPartitionSecretReferencesInBareConditions(t *testing.T) {
-	names, err := githubPartitionSecretNames(githubYAMLMap("if", githubYAMLString("secrets.GATE != ''"),
-		"run", githubYAMLString("echo secrets.LITERAL")))
-	if err != nil || strings.Join(names, ",") != "GATE" {
+	workflow := func(jobIf, stepIf, envIf string) *yamlv3.Node {
+		return githubYAMLMap("jobs", githubYAMLMap("build", githubYAMLMap(
+			"if", githubYAMLString(jobIf),
+			"env", githubYAMLMap("if", githubYAMLString(envIf)),
+			"steps", &yamlv3.Node{Kind: yamlv3.SequenceNode, Content: []*yamlv3.Node{
+				githubYAMLMap("if", githubYAMLString(stepIf), "run", githubYAMLString("echo secrets.LITERAL")),
+			}})))
+	}
+	names, err := githubPartitionSecretNames(workflow("secrets.JOB != ''", "secrets.STEP != ''", "secrets.DATA"))
+	if err != nil || strings.Join(names, ",") != "JOB,STEP" {
 		t.Fatalf("secret names=%v error=%v", names, err)
 	}
-	_, err = githubPartitionSecretNames(githubYAMLMap("if", githubYAMLString("toJSON(secrets) != ''")))
-	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+	if _, err := githubPartitionSecretNames(workflow("true", "true", "secrets")); err != nil {
+		t.Fatalf("env.if data refused: %v", err)
+	}
+	for _, refused := range [][2]string{{"toJSON(secrets) != ''", "true"}, {"true", "toJSON(secrets) != ''"}} {
+		_, err = githubPartitionSecretNames(workflow(refused[0], refused[1], "data"))
+		assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+	}
 }
 
 func TestGitHubPartitionPreservesFailureAncestryThroughRecovery(t *testing.T) {
