@@ -17,6 +17,9 @@ The [native ARM64 SBOM tool](tools/sbom-arm64/README.md) supplies the scanner fo
 quickstart. Its tool pin is separate from the AMD64 scanner in the maintained release catalog;
 output-scoped selections retain the same NVKE release producers.
 
+[`nico`](nico/registry.yaml) owns the source-packaged NICo and NICo prerequisite charts, pinned
+independently of NVKE to one infra-controller release. NICo images remain consumer-supplied.
+
 ## Current-to-shared mapping
 
 Former paths below were relative to `definitions/` at upstream commit

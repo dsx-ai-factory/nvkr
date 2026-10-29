@@ -357,19 +357,28 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q is incomplete", jobID)
 		}
 		// The bootstrap must provision the Go toolchain via the pinned setup-go action rather
-		// than assume a preinstalled Go, and pin the version to the repo's .go-version so the
-		// toolchain and setup-go cannot drift.
-		if job.Steps[1].Uses != actions.SetupGo || job.Steps[1].With["go-version-file"] != ".go-version" ||
+		// than assume a preinstalled Go: the checkout's .go-version for a source build, or the
+		// released generator's own Go release for its pinned runner.
+		release, err := githubRunnerReleaseForGenerator()
+		if err != nil {
+			return err
+		}
+		key, value := githubSetupGoWith(release)
+		if job.Steps[1].Uses != actions.SetupGo || len(job.Steps[1].With) != 2 || job.Steps[1].With[key] != value ||
 			job.Steps[1].With["cache"] != "false" {
-			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q does not provision the pinned Go toolchain from .go-version", jobID)
+			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q does not provision the pinned Go toolchain", jobID)
 		}
 		bootstrapRuns := joinRuns(job.Steps)
 		linkerFlags, err := generatorLinkerFlags(plan.GeneratorVersion)
 		if err != nil {
 			return err
 		}
-		if !stepUses(job.Steps, actions.Upload) || !strings.Contains(bootstrapRuns, "go build -trimpath") ||
-			!strings.Contains(bootstrapRuns, "-ldflags "+shellQuote(linkerFlags)) ||
+		helperEnvironment, err := githubRunnerHelperEnvironment(plan, runner)
+		if err != nil {
+			return err
+		}
+		if !stepUses(job.Steps, actions.Upload) ||
+			!strings.Contains(bootstrapRuns, githubRunnerInstallCommand(helperEnvironment, linkerFlags, release)) ||
 			!strings.Contains(bootstrapRuns, command) {
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q does not build and transport the runner", jobID)
 		}
