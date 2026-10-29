@@ -164,6 +164,12 @@ func matchExactPublicationInputs(release Release, description delivery.Publicati
 		return ExactInputDescription{}, e.New(e.CodeVerifyFailed,
 			"verified publication does not bind the supplied Definition, Environment, and Plan")
 	}
+	// No implicit acceptance across forms: a member expectation never matches a
+	// composite Release, and a composite expectation never matches a plain one.
+	if !description.Metadata.Composition.Equal(expectation.prepared.Composition) {
+		return ExactInputDescription{}, e.New(e.CodeVerifyFailed,
+			"verified publication and exact-input expectation bind different Definition forms or composition records")
+	}
 	observed, err := bindObserved(expectation.prepared, release.Artifacts)
 	if err != nil {
 		return ExactInputDescription{}, err

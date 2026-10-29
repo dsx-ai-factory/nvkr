@@ -21,6 +21,8 @@ type VerificationPolicy = lifecycle.VerificationPolicy
 type DiskEvidenceRequirement = lifecycle.DiskEvidenceRequirement
 type ReleaseConsumerOptions = lifecycle.ConsumerOptions
 type DefinitionInput = lifecycle.DefinitionInput
+type MemberIdentity = lifecycle.MemberIdentity
+type MemberReleaseView = lifecycle.MemberReleaseView
 type DefinitionPinReport = lifecycle.DefinitionPinReport
 
 const (

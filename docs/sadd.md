@@ -68,8 +68,9 @@ retain their separate admission and result contracts; catalog registration grant
 Proposed [ADR-26](adr/0026-definition-composition.md) designs composite Definitions: complete member Definitions
 pinned by exact digest compile to one Plan, Run and Release whose membership is the exact union of their named
 outputs. Members keep independent ownership, Runs and Releases; a composite rebuilds every output and inherits
-no member Run, Release or lane. Development bundles are planned with generation; member Release reuse and
-composite qualification are deferred. Nothing is implemented.
+no member Run, Release or lane. Admission, merge, composite Plans, generation including named development
+bundles, Run and publication records and consumer expectations are implemented and contract-tested only; member
+Release reuse and composite qualification are deferred and refused, and no hosted composite Run exists.
 
 ## Assumptions {#assumptions}
 
@@ -266,7 +267,8 @@ Specialized byte-changing transformations remain explicit product intent.
 A proposed composite Definition (ADR-26) would enter this flow before the compiler: admission loads each
 digest-pinned member, rejects drift and conflicts, and derives one effective Definition that the same compiler
 consumes. Composition changes Definition, Plan, Run and Release identities and records every member digest and
-output attribution; it never changes an output's Build Digest. This path is designed, not implemented.
+output attribution; it never changes an output's Build Digest. This path is implemented and contract-tested,
+not externally exercised.
 
 The compiler derives each output's graph from its exact selected components and concrete
 target. `nvkr.build` identifies the logical projection of that validated graph. Output names, packaging and execution settings remain bound by their owning records. Equal Build

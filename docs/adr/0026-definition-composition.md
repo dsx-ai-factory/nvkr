@@ -1,9 +1,11 @@
 # ADR-26 — Definition composition
 
 - **Decision status:** Proposed (design only; pending named-decider ratification)
-- **Implementation maturity:** Partially implemented; `reconciliation.md` lists the implemented units.
-- **Acceptance-test maturity:** Contract suites only, for the implemented units below. No hosted Run,
-  composite publication or consumer verification exercises a composite.
+- **Implementation maturity:** U1–U7 implemented; U8 deferred, U9 waits on the result-reuse decision and U10
+  on a hosted composite Run. `reconciliation.md` records the implemented scope.
+- **Acceptance-test maturity:** Contract suites for U1–U7, including an opt-in extended identity-invariance
+  contract over the four NVKE families. No hosted Run, composite publication or consumer verification
+  exercises a composite.
 - **Deciders:** Pending; release-engineering, publication, catalog and qualification owners must be named before
   ratification.
 - **Index:** Proposed ADR-26 supplements ADR-01–22 and proposed ADR-23/24; it remains outside the consolidated
@@ -484,5 +486,9 @@ The questions left open by the first draft were decided on 2026-10-29:
 
 ## Acceptance evidence
 
-None yet. The unit tests above are the contract target. No hosted composite Run, composite publication or
-consumer verification exists, and no claim follows from the family pilot's or the combined candidate's evidence.
+Contract suites only. U1–U7 are implemented with table-driven contract tests that assert coded errors;
+`NVKR_TEST_EXTENDED=1` additionally compiles the worked example above against the combined Plan's resolved
+catalogs and shows identical Build Digests and native build records for all 69 outputs and 73 native builds,
+and identical worker partitions to the combined Definition under the same partitioned Environment. These are
+local contracts. No hosted composite Run, composite publication or consumer verification exists, and no claim
+follows from the family pilot's or the combined candidate's evidence.
