@@ -93,22 +93,27 @@ detection is not implemented.
 ### Setting NICo image values from the Release
 
 The `nico` chart is not image-bound. It renders `<repository>:<tag>`, so the consumer sets the values.
-Find the `nico-core-image` and `nico-flow-image` index digests with `nvkr release browse --reference "$RELEASE_REF"`. Then
+First authenticate the Release under your identity and issuer policy with `nvkr release verify`
+([Lifecycle](../../../docs/lifecycle.md)); `nvkr release browse` does not verify signatures or payloads.
+Take the `nico`, `nico-core-image` and `nico-flow-image` artifact digests from the verified Release. Then
 pass a digest-qualified tag, because Kubernetes pulls `name:tag@sha256:…` by digest. The subchart
 otherwise derives `<global.image.repository>/nico-flow`, so set Flow's own repository:
 
 ```sh
-helm install nico "oci://$PREFIX/releases-nico" --version 2.2.2 \
-  --set global.image.repository="$PREFIX/releases-nico-core-image" \
+helm install nico "oci://$PREFIX/nico" --version 2.2.2 \
+  --set global.image.repository="$PREFIX/nico-core-image" \
   --set global.image.tag="v2.2.2@$CORE_DIGEST" \
   --set nico-flow.enabled=true \
-  --set nico-flow.images.flow.repository="$PREFIX/releases-nico-flow-image" \
+  --set nico-flow.images.flow.repository="$PREFIX/nico-flow-image" \
   --set nico-flow.images.flow.tag="v2.2.2@$FLOW_DIGEST"
 ```
 
-`PREFIX` is the Environment's publication prefix. The chart's `2.2.2` tag is only a discovery hint
-(ADR-20), so pin the chart's Release digest when your Helm version accepts `oci://…@sha256:…`. The Core
-image serves every enabled service except Flow.
+`PREFIX` is the Environment's publication prefix. Each output is published at `$PREFIX/<output>`;
+`$PREFIX/releases-<output>` holds only its internal metadata root (ADR-20). The chart's `2.2.2` tag is only
+a discovery hint, so pin the `nico` chart manifest digest when your Helm version accepts
+`oci://…@sha256:…`. The Core image serves the umbrella chart's services that read `global.image`. The
+default-enabled `nico-ntp` subchart uses its own upstream image (`dockurr/chrony`), which this Release
+does not build; consumers must assess or relocate it.
 
 NKTP image-reference binding remains a nonblocking follow-up, not a completed deployment contract.
 The signed chart still contains upstream tags, whereas the separately delivered native images have exact
