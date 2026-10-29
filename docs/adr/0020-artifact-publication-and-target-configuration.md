@@ -450,10 +450,17 @@ the exact frozen locator under the originating Run/attempt and target in a recor
 process or runner loss. Confirm its exact-byte
 read-back before permitting the final request; failed or unconfirmed retention prevents that request.
 An acknowledged durable Run record or already retained job artifact may satisfy this requirement; process
-memory, logs, an ephemeral runner file or an artifact uploaded only after the commit cannot. Recovery access
-and retention must cover cancellation, timeout and indeterminate-result reconciliation. Before work, admit
-and record the recovery window and expiry, retaining the locator at least as long as its associated Run
-record; cleanup cannot remove it within that window while reconciliation remains outstanding. Expiry limits
+memory, logs, an ephemeral runner file or an artifact uploaded only after the commit cannot. A job artifact
+qualifies only when independently discoverable by provider run/attempt and target without a terminal Run
+record. Confirm its stored bytes, recovery access and service-reported expiry before the commit request.
+Before work, admit and record an absolute recovery deadline covering the latest permitted terminal Run-record
+publication plus its required retention period, even if that record is never written. The locator artifact's
+confirmed expiry must reach that deadline; a requested retention duration or a future finalizer upload is
+insufficient. [GitHub artifact metadata exposes expiry](https://docs.github.com/en/rest/actions/artifacts#get-an-artifact),
+and [artifact retention remains limited by provider policy](https://docs.github.com/en/actions/tutorials/store-and-share-data#configuring-a-custom-artifact-retention-period).
+Insufficient expiry or recovery access prevents commit. Recovery access and retention must cover cancellation,
+timeout and indeterminate-result reconciliation; cleanup cannot remove the locator within that window while
+reconciliation remains outstanding. Expiry limits
 recovery availability, never the validity of a surviving remote completion. The record supplies coordinates,
 never trust or a successful outcome. Reconciliation retrieves it independently of the producer and performs
 the locator's complete verification, without bucket scans or regenerated signatures. Before the final commit

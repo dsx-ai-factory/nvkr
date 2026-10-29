@@ -1261,6 +1261,9 @@ Cross-attempt signing also requires serialized predecessor reconciliation; an un
 cannot be bypassed by re-signing. Cleanup expiry requires separately bounded supervisor termination/reap
 observation, and ordering acceptance covers unsorted and mixed-type bindings independently of the comparator.
 These remain implementation and acceptance requirements, not exercised retry or process-lifetime evidence.
+Using a retained job artifact additionally requires confirmed expiry covering the pre-admitted absolute
+recovery deadline and independent discovery/access when no terminal Run record exists; a retention-days
+setting alone establishes neither guarantee. This locator-retention boundary remains unexercised.
 
 ## Support by owner
 

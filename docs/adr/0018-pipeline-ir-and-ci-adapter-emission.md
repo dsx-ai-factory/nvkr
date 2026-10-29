@@ -1576,7 +1576,9 @@ reuse preserves the original delivery invocation and records the current attempt
 The completion operation must depend on confirmed exact-byte retention of its frozen locator under the
 originating Run/attempt and target, accessible after producer or runner loss. A post-commit artifact-upload
 step or finalizer cannot satisfy that prerequisite. Admit the recovery access and retention before work;
-failed or unconfirmed retention prevents the commit request. The bundle locator omits its unknown version;
+an existing job artifact qualifies only with confirmed bytes/access and expiry covering the absolute recovery
+deadline in ADR-20, independently of whether a terminal Run record is ever written.
+Failed or unconfirmed retention prevents the commit request. The bundle locator omits its unknown version;
 independent recovery resolves the exact key and verifies the observed version as specified in ADR-20.
 
 Generated job admission also reserves the cleanup window and a separate termination/reap-observation
