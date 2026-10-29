@@ -1120,7 +1120,7 @@ interruption demonstrations remain M4-D.
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
 |---|---|---|
 | 01–03 Identity and errors | Canonical integer-only codec, frozen typed families, strict decoding, transport-free Build identity, whole-graph admission and stable coded errors | Independent-language corpus for every signed family; continuing external-failure contracts |
-| 04 Signing and consumption | Linux held-executable exact-byte signing/verification, pinned cosign keyless OCI adapter, policy-bound authenticity and artifact-publication consumers with separate capabilities; authenticity checks root/output signatures, production provenance and SBOM bundles without payloads; qualification predicate attachment/read-back verification with real local-key cosign interoperability | Authenticity has contract coverage only; no external consumer run recorded. Earlier independent cosign and public/private artifact-publication acceptance is recorded; qualification hosted OIDC, M2 independent full-payload disk consumption and root rotation remain unproved. Full release and qualified scopes remain closed |
+| 04 Signing and consumption | Linux held-executable exact-byte signing/verification, pinned cosign keyless OCI adapter, policy-bound authenticity and artifact-publication consumers with separate capabilities; authenticity checks root/output signatures, production provenance and SBOM bundles without payloads; qualification predicate attachment/read-back verification with real local-key cosign interoperability | Authenticity has contract coverage only; no external consumer run recorded. `release verify` reads signature bundles anonymously, so a private-registry Release fails closed, as recorded in [output-local publication](#output-local-publication-and-metadata-assembly). Earlier independent cosign and public/private artifact-publication acceptance is recorded; qualification hosted OIDC, M2 independent full-payload disk consumption and root rotation remain unproved. Full release and qualified scopes remain closed |
 | 05 Trust and membership | Subject-bound vectors, publisher evidence, required Inventory versus realized ReleaseSet, frozen lifecycle output slots | Signed cross-process publication of all authority records; governed coverage profiles |
 | 06 Status | Diagnostic document/checkpoint authentication, protected high-water reads and receipt-derived byte-CAS before withdrawal interpretation | Caller epoch is diagnostic. Production discovery, trusted-time/clearance integration, rotation, immutable v1 tags, revocation and channel concurrency are unimplemented |
 | 07–08 Reproduction | Linux stage-two helper/runtime/image and terminal-byte receipts, deterministic comparisons and profile matching | Provider receipts, other-platform authority, qualified helper images, independent two-machine bake-off and profile graduation |
@@ -2861,6 +2861,58 @@ under the GitHub Actions issuer. These are inspected hosted execution records, n
 local full-payload readback or qualification result. This establishes the successful full development
 execution path; full-product failure/cancellation recovery and production qualification remain unproven.
 The production workflow remains flat.
+
+On 2026-10-28/29, an independent consumer exercise read that same Release from Darwin ARM64, using NVKR
+built at `75f154fe4c6a81decca9942c07b347003a99e23e` with Go 1.27.3. It exercised the earlier-head Run above,
+not a hosted execution of the current head. Only read-only registry pulls were used. Anonymous access to
+the private root failed with `UNAUTHORIZED`, so metadata and payload reads used the operator's existing
+GHCR read access through the default keychain. `release export --reference <root>` checked the complete
+metadata closure. It reported Definition `sha256:20636464d35ad094ca1143832e9f62caf4e9acf15c98803e645220b4984a2e67`,
+Environment `sha256:5e8dd9cdf7d052deaa75ec08281b62f7536b3c2e4153c744b7531408d98faebf`, the Plan digest above,
+which also matches the committed development Plan at the Run commit, content subject
+`sha256:f09d12404c59f7f42c432cb7561002f57ca09565dacf4680f36c71fa2bf91836`, the Run's invocation ID and
+declared qualification `diagnostic`. It listed 69 named outputs: 56 OCI (including 4 aggregate
+indexes), 6 Helm, 4 disk and 3 executable, plus 120 evidence records. One root, one Plan and one invocation
+are consistent with partitioning that changes only execution organization.
+
+`release pull --reference <root> --output <name> --out <new dir>` then retrieved and integrity-checked five
+selected payload closures. They were `nvkectl-linux-arm64` (executable), `controller-chart` (Helm),
+`capi-controller-image` (Docker schema-2 image), `cwe` (two-platform aggregate index) and
+`nvke-node-image-arm64` (plain QCOW2 disk). An independent standard-library re-hash outside NVKR
+reproduced each byte identity against the exported description:
+
+- The `nvkectl` file (mode 0755) hashes to its Build Subject `sha256:889204e16350949560010aa1d153311acd9c6e285c59fa976b5b6e8a86b112f6`.
+- The chart archive hashes to its packaging SBOM's bound inspection input `sha256:46d02c099079defbe97b1e60009cdbfedce9496af6d9250c8438689572277938`.
+- Every layout blob hashes to its content address, with no missing closure descriptor.
+- The image's top manifest is its output digest `sha256:0bd9a073959ec3bf769ced2a5e0cde2d666f0be35ea03d334bb4529e851ce46a`.
+- The aggregate layout's `index.json` bytes hash to the output digest `sha256:110f8e8ca18822450cd6587d8a8061d8915ced452ec7cb337620945214aa7e4c`, and its children are exactly the two declared platform manifests.
+- The 3,344,171,008-byte disk hashes to its recorded (not here authenticated) disk-metadata payload digest `sha256:67f0060aec03753f3f3834656835cc194ad452f5f8f7888bdd421a5d740bad76` and begins with the QCOW2 magic.
+
+The disk pull failed closed twice with `NVKR-E-FETCH-FAILED` after an HTTP/2 peer `PROTOCOL_ERROR`, leaving
+no destination. A diagnostic pull with `GODEBUG=http2client=0` succeeded unchanged otherwise. Unlike
+the `delivery.Pull` path, `release pull` reads the output layer without the existing HTTP/2 peer-reset
+reacquisition, so large disk pulls remain transport-sensitive.
+
+Signature, provenance and membership authentication did not complete. `scripts/demo-release-consumer.sh
+--runtime docker` ran `pipeline-attested`/`artifact-publication` verification with the following inputs:
+
+- Identity `^https://github\.com/dsx-ai-factory/nvkr/\.github/workflows/nvkr-dev\.yml@refs/heads/codex/nvke-execution-partitioning$`, the authored development Environment pattern narrowed to the exercised branch.
+- Issuer `https://token.actions.githubusercontent.com`.
+- Cosign 3.1.3 Linux AMD64 `sha256:4629c757b7618056f8ddd7e2625ae9fdd94c0372a65049520bc7d9df9efc7f71`, as pinned by the development smoke workflow.
+- The existing inline registry configuration, mounted read-only.
+
+It failed closed with `NVKR-E-SIGNATURE-INVALID` while reading the root's OCI verification bundle, because
+that request was anonymous. `release verify` supplies no registry credential to its consumer, and the
+signature-bundle reader treats an empty credential as anonymous without consulting a keychain. Metadata
+and payload reads do use the keychain. The supported CLI therefore cannot authenticate a private-registry
+Release, and `authenticity` scope shares the same reader. `client/v1` accepts an explicit credential, but
+supplying one would mean extracting a registry secret, so that step was not taken.
+
+This exercise establishes independent consumer readback of the complete metadata closure and of five
+payload closures' exact bytes. It does not establish signer authentication, provenance or SBOM
+verification, membership authorization, an accepted Release, qualification, or deployment acceptance.
+Hosted verification records remain the only signature evidence for this Release. Development publications
+expire under attempt cleanup, so later repetition may be impossible.
 
 The execution-model extraction keeps scheduling semantics in factory's provider-independent graph:
 typed success/completion conditions, recovery prerequisites, disjoint operation membership, acyclic
