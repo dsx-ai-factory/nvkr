@@ -52,9 +52,9 @@ func TestNVKECompositeAdmission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	effective := composition.Effective()
-	if len(composition.Members()) != 4 || len(effective.Outputs) != 69 || len(composition.Attribution()) != 69 {
-		t.Fatalf("composite admits %d members and %d outputs, want 4 and 69", len(composition.Members()), len(effective.Outputs))
+	effective, want := composition.Effective(), len(combined.Outputs)+len(nvkeFamilyOnlyOutputs)
+	if len(composition.Members()) != 4 || len(effective.Outputs) != want || len(composition.Attribution()) != want {
+		t.Fatalf("composite admits %d members and %d outputs, want 4 and %d", len(composition.Members()), len(effective.Outputs), want)
 	}
 	if !bytes.Equal(mustCanonical(t, effective.Catalog), mustCanonical(t, combined.Catalog)) {
 		t.Fatal("rebasing beside the families changed the shared catalog stack")
@@ -111,10 +111,11 @@ func TestNVKECompositeIdentityInvariance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(plan.LifecycleOutputs) != 69 || len(plan.Builds) != 73 || len(plan.Composition.Members) != 4 {
-		t.Fatalf("composite Plan has %d outputs and %d native builds, want 69 and 73", len(plan.LifecycleOutputs), len(plan.Builds))
+	if len(plan.LifecycleOutputs) != 71 || len(plan.Builds) != 75 || len(plan.Composition.Members) != 4 {
+		t.Fatalf("composite Plan has %d outputs and %d native builds, want 71 and 75", len(plan.LifecycleOutputs), len(plan.Builds))
 	}
-	partitioned, err := compileDocumentsWithLoader(t.Context(), combined.DefinitionPath, combined.Definition, "inputs/environments/github-release.yaml",
+	// The combined Definition lacks family-only outputs, so the plain baseline is the effective Definition.
+	partitioned, err := compileDocumentsWithLoader(t.Context(), nvkeCompositePath, composition.Effective(), "inputs/environments/github-release.yaml",
 		environment, combined.GeneratorVersion, loadStack)
 	if err != nil {
 		t.Fatal(err)
@@ -158,9 +159,9 @@ func TestNVKECompositeIdentityInvariance(t *testing.T) {
 }
 
 // assertPartitionsIgnoreMembers requires the composite's worker partitions to
-// hold exactly the jobs of the combined Plan's partitions: partitions follow
-// dependency depth and capacity, never member boundaries.
-func assertPartitionsIgnoreMembers(t *testing.T, combined, composite *Plan) {
+// hold exactly the jobs of the same outputs compiled as one plain Definition:
+// partitions follow dependency depth and capacity, never member boundaries.
+func assertPartitionsIgnoreMembers(t *testing.T, plain, composite *Plan) {
 	t.Helper()
 	partitionJobs := func(plan *Plan) [][]string {
 		bundle, err := RenderGitHub(t.Context(), plan)
@@ -185,13 +186,13 @@ func assertPartitionsIgnoreMembers(t *testing.T, combined, composite *Plan) {
 		}
 		return partitions
 	}
-	want, got := partitionJobs(combined), partitionJobs(composite)
+	want, got := partitionJobs(plain), partitionJobs(composite)
 	if len(got) < 2 || len(got) != len(want) {
-		t.Fatalf("composite has %d partitions, combined has %d", len(got), len(want))
+		t.Fatalf("composite has %d partitions, plain Definition has %d", len(got), len(want))
 	}
 	for i := range want {
 		if !slices.Equal(got[i], want[i]) {
-			t.Fatalf("partition %d differs from the combined Plan's partition", i)
+			t.Fatalf("partition %d differs from the plain Definition's partition", i)
 		}
 	}
 }
