@@ -2886,7 +2886,10 @@ canceled collectors, are refused with `NVKR-E-INVALID-CATALOG` before any recove
 cancellation returns `NVKR-E-TIMEOUT`. A lost worker is refused as an unaccounted report; it is not
 recorded as a per-operation cancellation. GitHub cancellation timing, worker startup failure and runner
 cleanup are not shown by these contracts. No Run has yet exercised a full-product partitioned failure or
-cancellation.
+cancellation. The change passes the full local gate on Go 1.27.3 Darwin ARM64. That covers uncached
+`go test ./...`, with all CI factory and lifecycle shards inside the default 20-minute timeout, and
+golangci-lint 2.14.0 with zero issues. It also covers vet, formatting, license headers, shellcheck, the
+CI-tool tests and vulnerability scanning.
 
 Earlier flat-layout measurements recorded 564 original jobs and 16 collectors, down from
 596 original jobs and 16 collectors in the private-storage draft based on the same upstream code.
