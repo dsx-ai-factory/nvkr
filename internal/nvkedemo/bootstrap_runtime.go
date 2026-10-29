@@ -49,14 +49,36 @@ func admitBootstrapHost(platform string, env []string) error {
 }
 
 func bootstrapLimaPlatform(platform string) (string, []string, error) {
+	arch := runtime.GOARCH
+	if platform == "darwin" {
+		arch = "arm64" // The existing Mac backend supports only Apple silicon.
+	}
+	return bootstrapLimaPlatformForArchitecture(platform, arch)
+}
+
+func bootstrapLimaPlatformForArchitecture(platform, arch string) (string, []string, error) {
 	switch platform {
 	case "darwin":
+		if arch != "arm64" {
+			return "", nil, e.New(e.CodeEngineCapability, "unsupported Mac bootstrap architecture %q", arch)
+		}
 		return bootstrapLimaVersion, []string{"--vm-type=vz"}, nil
 	case "linux":
+		machine, err := nativeQEMUArchitecture(arch)
+		if err != nil {
+			return "", nil, err
+		}
+		// Exact official checksum records, fetched from each pinned release:
+		// https://cloud-images.ubuntu.com/releases/resolute/release-20260927/SHA256SUMS
+		// https://github.com/containerd/nerdctl/releases/download/v2.4.1/SHA256SUMS
+		imageDigest, archiveDigest := "63a93bd5a8d76e33b15ceb5daa3657bd79be804748051ab178e643b0f5da22e7", "2deffe14625f93866f90a8f265d0f59d6fa476c7dc54b98adb327b1b4613efd4"
+		if arch == "amd64" {
+			imageDigest, archiveDigest = "8800651811af9a85465ad1d552add729947bb16488dddb4a9b5305a3d97332b2", "ff018f11ac2f1354bf7b3aaaca6e0b52d81139c746a89134744d0b7be3a0e62f"
+		}
 		return bootstrapLinuxLimaVersion, []string{
-			"--vm-type=qemu", "--arch=aarch64", "--mount-type=9p",
-			"--set", `.images = [{"location":"https://cloud-images.ubuntu.com/releases/resolute/release-20260927/ubuntu-26.04-server-cloudimg-arm64.img","arch":"aarch64","digest":"sha256:63a93bd5a8d76e33b15ceb5daa3657bd79be804748051ab178e643b0f5da22e7","variant":"server"}]`,
-			"--set", `.containerd.archives = [{"location":"https://github.com/containerd/nerdctl/releases/download/v2.4.1/nerdctl-full-2.4.1-linux-arm64.tar.gz","arch":"aarch64","digest":"sha256:2deffe14625f93866f90a8f265d0f59d6fa476c7dc54b98adb327b1b4613efd4"}]`,
+			"--vm-type=qemu", "--arch=" + machine, "--mount-type=9p",
+			"--set", fmt.Sprintf(`.images = [{"location":"https://cloud-images.ubuntu.com/releases/resolute/release-20260927/ubuntu-26.04-server-cloudimg-%s.img","arch":%q,"digest":"sha256:%s","variant":"server"}]`, arch, machine, imageDigest),
+			"--set", fmt.Sprintf(`.containerd.archives = [{"location":"https://github.com/containerd/nerdctl/releases/download/v2.4.1/nerdctl-full-2.4.1-linux-%s.tar.gz","arch":%q,"digest":"sha256:%s"}]`, arch, machine, archiveDigest),
 		}, nil
 	default:
 		return "", nil, e.New(e.CodeEngineCapability, "unsupported bootstrap host %q", platform)

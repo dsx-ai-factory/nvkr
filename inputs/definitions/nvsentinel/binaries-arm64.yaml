@@ -1,0 +1,106 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+kind: Definition
+metadata:
+  name: nvsentinel-binaries-arm64-candidate
+catalog:
+  base: ../../catalogs/nvsentinel
+sbomTool: syft-arm64
+outputs:
+- name: csp-health-monitor
+  platform: linux/arm64
+  components:
+  - nvsentinel-csp-health-monitor-binary
+  format: executable
+- name: event-exporter
+  platform: linux/arm64
+  components:
+  - nvsentinel-event-exporter-binary
+  format: executable
+- name: fault-quarantine
+  platform: linux/arm64
+  components:
+  - nvsentinel-fault-quarantine-binary
+  format: executable
+- name: fault-remediation
+  platform: linux/arm64
+  components:
+  - nvsentinel-fault-remediation-binary
+  format: executable
+- name: health-events-analyzer
+  platform: linux/arm64
+  components:
+  - nvsentinel-health-events-analyzer-binary
+  format: executable
+- name: janitor
+  platform: linux/arm64
+  components:
+  - nvsentinel-janitor-binary
+  format: executable
+- name: janitor-provider
+  platform: linux/arm64
+  components:
+  - nvsentinel-janitor-provider-binary
+  format: executable
+- name: kubernetes-object-monitor
+  platform: linux/arm64
+  components:
+  - nvsentinel-kubernetes-object-monitor-binary
+  format: executable
+- name: labeler
+  platform: linux/arm64
+  components:
+  - nvsentinel-labeler-binary
+  format: executable
+- name: lifecycle-manager
+  platform: linux/arm64
+  components:
+  - nvsentinel-lifecycle-manager-binary
+  format: executable
+- name: maintenance-notifier
+  platform: linux/arm64
+  components:
+  - nvsentinel-maintenance-notifier-binary
+  format: executable
+- name: nccl-loopback-check
+  platform: linux/arm64
+  components:
+  - nvsentinel-nccl-loopback-check-binary
+  format: executable
+- name: nic-health-monitor
+  platform: linux/arm64
+  components:
+  - nvsentinel-nic-health-monitor-binary
+  format: executable
+- name: node-drainer
+  platform: linux/arm64
+  components:
+  - nvsentinel-node-drainer-binary
+  format: executable
+- name: nvcre-certification-monitor
+  platform: linux/arm64
+  components:
+  - nvsentinel-nvcre-certification-monitor-binary
+  format: executable
+- name: platform-connectors
+  platform: linux/arm64
+  components:
+  - nvsentinel-platform-connectors-binary
+  format: executable
+- name: plugins-slinky-drainer
+  platform: linux/arm64
+  components:
+  - nvsentinel-plugins-slinky-drainer-binary
+  format: executable
+- name: preflight
+  platform: linux/arm64
+  components:
+  - nvsentinel-preflight-binary
+  format: executable
+- name: slurm-drain-monitor
+  platform: linux/arm64
+  components:
+  - nvsentinel-slurm-drain-monitor-binary
+  format: executable

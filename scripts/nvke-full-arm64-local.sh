@@ -278,7 +278,7 @@ if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}"
     "Build graph: planned outputs: \(.lifecycleOutputs | length); producer steps: \([.builds[].executionGraph.nodes[]?] | length); producer dependency edges: \([.builds[].executionGraph.nodes[]?.needs[]?] | length)",
     (.lifecycleOutputs[]? | "  output: \(.name) [\(.kind)]: \(.components | join(", "))")
   ' "${bootstrap}/baseline-plan.json" >&2
-  jq -L scripts -e --arg lane "${lane}" 'include "nvke-os-plan"; local_toolchain_scopes($lane)' \
+  jq -L scripts -e --arg lane "${lane}" 'include "nvke-os-plan"; local_toolchain_scopes($lane; "arm64")' \
     "${bootstrap}/baseline-plan.json" >"${bootstrap}/toolchain-scopes.json"
   if [[ -n "${shared_bootstrap}" ]]; then
     # This is an explicit invocation-local tool selection, not a serialized

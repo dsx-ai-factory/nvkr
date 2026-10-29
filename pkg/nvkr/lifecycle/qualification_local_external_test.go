@@ -216,7 +216,6 @@ func TestExternalLocalM3Consumer(t *testing.T) {
 			if err == nil {
 				t.Fatal("missing payload passed verification")
 			}
-			// The transport owner maps missing content to its stable verification code.
 			assertCode(t, err, e.CodeVerifyFailed)
 		})
 	}

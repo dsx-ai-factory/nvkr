@@ -21,6 +21,9 @@ func derivePublication(definition authored.Definition, environment authored.Envi
 	packages := make([]packageSpec, 0, len(definition.Outputs))
 	closureInputs := make([]string, 0, len(definition.Outputs))
 	for _, output := range definition.Outputs {
+		if output.Format == authored.OutputDebianPackage {
+			continue
+		}
 		if output.Format == authored.OutputDiskImage {
 			// Local raw-output diagnostics retain their existing lifecycle subject.
 			// Publication adds a distinct wrapper rather than changing that subject.
@@ -359,7 +362,7 @@ func validateRouteCompatibility(route Route, target Target, artifact Artifact) e
 	switch target.Kind {
 	case TargetAPT:
 		return e.New(e.CodeEngineCapability,
-			"delivery route %q requires an APT server publication adapter; transport the apt-repository package or enclose it in an OCI root", route.Name)
+			"delivery route %q requires an APT repository publication adapter that is not implemented", route.Name)
 	case TargetObject:
 		return e.New(e.CodeEngineCapability,
 			"delivery route %q requires an object-store publication adapter that is not implemented", route.Name)

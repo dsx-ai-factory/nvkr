@@ -72,10 +72,6 @@ concurrency:
 
 jobs:
 
-  # ---------------------------------------------------------------------------
-  # Path classification — determines which checks run vs skip
-  # ---------------------------------------------------------------------------
-
   check-paths:
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -132,6 +128,8 @@ jobs:
               - 'internal/**'
               - 'pkg/**'
               - 'inputs/**'
+              # Watched so definitions-location-check runs on any re-addition.
+              - 'definitions/**'
               - 'docs/examples/**'
               - 'scripts/**'
               - 'demos/**'
@@ -213,9 +211,7 @@ jobs:
               - 'Makefile'
               - '.github/workflows/merge-gate.yaml'
 
-  # ---------------------------------------------------------------------------
   # Repository checks — the same gates `make check` runs locally, plus build
-  # ---------------------------------------------------------------------------
 
   check:
     needs: [check-paths]
@@ -234,6 +230,9 @@ jobs:
 
       - name: fmt-check
         run: make fmt-check
+
+      - name: definitions-location-check
+        run: make definitions-location-check
 
       - name: license-header-check
         run: make license-header-check
@@ -371,13 +370,11 @@ jobs:
     steps:
       - run: echo "No code changes — repository checks not required"
 
-  # ---------------------------------------------------------------------------
   # Workflow linting
   #
   # Highest value on this repository specifically: workflows here are generated
   # rather than hand-written, so a malformed emission should fail the gate
   # rather than land.
-  # ---------------------------------------------------------------------------
 
   actionlint:
     needs: [check-paths]
@@ -429,7 +426,6 @@ jobs:
     steps:
       - run: echo "No workflow/action changes — actionlint not required"
 
-  # ---------------------------------------------------------------------------
   # PLANNED: verify-licenses
   #
   # CONTRIBUTING.md names "Apache-clean" a load-bearing invariant — no
@@ -437,9 +433,7 @@ jobs:
   # enforces it. Needs a `make license-check` target first so the local gate
   # and CI stay equal. Add a `deps` path filter watching go.mod, go.sum,
   # Makefile, .go-version, and this workflow.
-  # ---------------------------------------------------------------------------
 
-  # ---------------------------------------------------------------------------
   # Generated-pipeline drift (ADR-21 §2)
   #
   # The committed Run workflow and its plan must equal what `run generate`
@@ -452,7 +446,6 @@ jobs:
   #
   # Per ADR-21 §2 this job lives OUTSIDE the emitted pipeline and does not
   # self-check recursively.
-  # ---------------------------------------------------------------------------
 
   workflows-regen:
     needs: [check-paths]
@@ -515,12 +508,10 @@ jobs:
           github.event.pull_request.head.repo.full_name == github.repository
         run: echo "No pipeline inputs changed — regeneration check not required"
 
-  # ---------------------------------------------------------------------------
   # Third-party notices drift — THIRD_PARTY_NOTICES.md must regenerate
   # byte-for-byte from the linked module set, the same "local equals CI" and
   # "generated files regenerate byte-for-byte" contract workflows-check
   # enforces. Adding a dependency without rerunning `make notices` fails here.
-  # ---------------------------------------------------------------------------
 
   notices-regen:
     needs: [check-paths]
@@ -548,7 +539,6 @@ jobs:
     steps:
       - run: echo "No dependency or notices inputs changed — notices check not required"
 
-  # ---------------------------------------------------------------------------
   # Fern docs — the operator-facing site published from docs/index.yml.
   #
   # `make docs-check` runs the MDX safety checker, `fern check`, `fern docs md
@@ -556,7 +546,6 @@ jobs:
   # fork PRs. The Fern CLI is intentionally installed unpinned (`@latest`), so
   # an upstream Fern release can fail this check without a change in this
   # repository; Node itself is pinned by setup-node.
-  # ---------------------------------------------------------------------------
 
   docs:
     needs: [check-paths]
@@ -587,7 +576,6 @@ jobs:
     steps:
       - run: echo "No docs or Fern inputs changed — docs check not required"
 
-  # ---------------------------------------------------------------------------
   # Static analysis (CodeQL)
   #
   # Uploading results needs `security-events: write`. On a private or internal
@@ -595,7 +583,6 @@ jobs:
   # is free, which is why a workflow copied from a public repository can pass
   # there and fail here. A fork PR never receives the scope, so this job must
   # be allowed to fail on fork runs or be reached via the copy-pr-bot mirror.
-  # ---------------------------------------------------------------------------
 
   analyze:
     needs: [check-paths]
@@ -657,16 +644,10 @@ jobs:
     steps:
       - run: echo "No code changes — CodeQL not required"
 
-  # ---------------------------------------------------------------------------
   # PLANNED: malware-scan (ClamAV)
   #
   # A port of AICR's 197-line composite action; kept separate because it
   # introduces a new local action rather than reusing an upstream one.
-  # ---------------------------------------------------------------------------
-
-  # ---------------------------------------------------------------------------
-  # Aggregate gate — the single required status check
-  # ---------------------------------------------------------------------------
 
   gate:
     if: always()

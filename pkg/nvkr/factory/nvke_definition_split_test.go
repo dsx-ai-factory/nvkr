@@ -22,11 +22,21 @@ var nvkeSplitFamilies = []struct {
 	name            string
 	outputs, native int
 }{
-	{"core", 20, 24},
+	{"core", 22, 26},
 	{"services", 28, 28},
 	{"telemetry", 17, 17},
 	{"disks", 4, 4},
 }
+
+// Family-only outputs are not in the combined Definition, whose flat workflow
+// has no remaining YAML parsing headroom.
+var nvkeFamilyOnlyOutputs = map[string]string{
+	"nico":         "core",
+	"nico-prereqs": "core",
+}
+
+// Family-only catalogs hold only public sources, so they load from disk.
+var nvkeFamilyOnlyCatalogs = map[string]bool{"../../catalogs/nico": true}
 
 func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 	nvkeSplitRepository(t)
@@ -51,6 +61,16 @@ func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 					t.Fatalf("output %q is required by both %s and %s", output.Name, previous, family.name)
 				}
 				seen[output.Name] = family.name
+				if owner, ok := nvkeFamilyOnlyOutputs[output.Name]; ok {
+					if owner != family.name {
+						t.Fatalf("family-only output %q belongs to %s, not %s", output.Name, owner, family.name)
+					}
+					if _, combinedAlso := original[output.Name]; combinedAlso {
+						t.Fatalf("family-only output %q is also in the combined Definition", output.Name)
+					}
+					native += max(1, len(output.Platforms))
+					continue
+				}
 				// The whole declaration includes catalog/overlay selection, exact
 				// material membership, native platforms and chart image bindings.
 				if !bytes.Equal(nvkeSplitCanonical(t, output), original[output.Name]) {
@@ -67,8 +87,8 @@ func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 			nativeTotal += native
 		})
 	}
-	if len(original) != 69 || len(seen) != len(original) || nativeTotal != 73 {
-		t.Fatalf("partition requires %d of %d original outputs and %d native targets; want 69/69 and 73", len(seen), len(original), nativeTotal)
+	if len(original) != 69 || len(seen) != len(original)+len(nvkeFamilyOnlyOutputs) || nativeTotal != 75 {
+		t.Fatalf("partition requires %d of %d original plus family-only outputs and %d native targets; want 71/69 and 75", len(seen), len(original), nativeTotal)
 	}
 }
 
@@ -205,11 +225,17 @@ func TestNVKEDefinitionSplitCompiledIdentityAndGeneratedBundles(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, build := range plan.Builds {
+				if _, familyOnly := nvkeFamilyOnlyOutputs[build.Name]; familyOnly {
+					continue
+				}
 				if !bytes.Equal(nvkeSplitCanonical(t, build), builds[build.Name]) {
 					t.Fatalf("native build %q changed its identity, catalog or complete producer graph", build.Name)
 				}
 			}
 			for _, output := range plan.LifecycleOutputs {
+				if _, familyOnly := nvkeFamilyOnlyOutputs[output.Name]; familyOnly {
+					continue
+				}
 				if !bytes.Equal(nvkeSplitCanonical(t, output), outputs[output.Name]) {
 					t.Fatalf("output %q changed its named artifact, evidence or native-child binding", output.Name)
 				}
@@ -258,8 +284,8 @@ func TestNVKEDefinitionSplitCompiledIdentityAndGeneratedBundles(t *testing.T) {
 				len(plan.LifecycleOutputs), len(plan.Builds), len(plan.Graph.Nodes), len(jobs), len(workflow), len(bundle.Files[bundle.PlanPath]), events)
 		})
 	}
-	if buildCount != 73 || outputCount != 69 {
-		t.Fatalf("compiled families retain %d native builds and %d outputs, want 73 and 69", buildCount, outputCount)
+	if buildCount != 75 || outputCount != 71 {
+		t.Fatalf("compiled families retain %d native builds and %d outputs, want 75 and 71", buildCount, outputCount)
 	}
 }
 
@@ -296,6 +322,9 @@ func nvkeSplitCatalogLoader(t *testing.T, combined *Plan) func(context.Context, 
 			return nil, e.Wrap(e.CodeTimeout, err, "split fixture catalog load canceled")
 		}
 		stack, ok := stacks[string(nvkeSplitCanonical(t, spec))]
+		if !ok && nvkeFamilyOnlyCatalogs[spec.Base] && len(spec.Overlays) == 0 {
+			return loadFactoryCatalogStack(ctx, "inputs/definitions/nvke/core.yaml", spec)
+		}
 		if !ok {
 			return nil, e.New(e.CodeInvalidCatalog, "split selected a catalog outside the combined baseline")
 		}

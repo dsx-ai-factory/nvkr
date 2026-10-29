@@ -8,15 +8,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/user"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -96,45 +93,6 @@ func TestExactSeedProjection(t *testing.T) {
 	}
 }
 
-// The optional nightly source suite retains its exact source-fixture guard.
-const SeedDigest = "e713b6e74e884bfba5a942b10eee142171565dcec2f24c6217cd9baecea03cac"
-
-type seedProjection struct {
-	SourceDigest  string `json:"sourceDigest"`
-	RuntimeDigest string `json:"runtimeDigest"`
-	InstanceType  string `json:"instanceType"`
-	VCPUs         int    `json:"vcpus"`
-	MemoryGiB     int    `json:"memoryGiB"`
-	DiskGiB       int    `json:"diskGiB"`
-}
-
-func projectSeed(ctx context.Context, work string) (seedProjection, error) {
-	var result seedProjection
-	if err := requireContext(ctx); err != nil {
-		return result, err
-	}
-	file, info, err := securepath.OpenRegular(filepath.Join(work, "internal/seed/default-seed.yaml"))
-	if err != nil {
-		return result, err
-	}
-	defer file.Close()
-	if !currentOwner(info) || info.Size() > 65536 {
-		return result, errors.New("source seed is not a bounded regular owned file")
-	}
-	raw, err := io.ReadAll(io.LimitReader(file, 65537))
-	if err != nil {
-		return result, err
-	}
-	projected, err := projectSeedBytes(raw)
-	if err != nil {
-		return result, err
-	}
-	if err = privateWrite(filepath.Join(work, "laptop-seed.yaml"), projected); err != nil {
-		return result, err
-	}
-	return seedProjection{"sha256:" + SeedDigest, "sha256:" + plainSHA(projected), TenantInstanceType, tenantDemoVCPUs, tenantDemoMemoryGiB, 60}, nil
-}
-func projectSeedBytes(raw []byte) ([]byte, error) { return projectSeedFixture(raw, SeedDigest) }
 func projectSeedFixture(raw []byte, digest string) ([]byte, error) {
 	block := []byte(fmt.Sprintf("  - id: %q\n    name: \"cpu4-mem6gb-disk60gb\"\n    site_id: %q\n    gpu_count: 0\n    cpu_count: 4\n    memory_gib: 6\n    disk_gib: 60\n", TenantInstanceType, SiteID))
 	// This is an exact-byte fixture projection, not a YAML parser. NICoSim owns
