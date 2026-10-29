@@ -2874,6 +2874,17 @@ all-owner workflow regeneration, and the targeted extended partition contracts i
 yamllint. Regeneration retains the exercised development bundle byte-for-byte. The hosted Run above
 predates this internal extraction; its evidence is not a separate hosted execution of the refactored code.
 
+Partition grouping now orders each dependency depth by the bounded finish time of declared job timeouts
+and splits a depth at the widest finish gaps up to a 30-worker target. The regenerated development bundle
+keeps its Plan bytes, moves from 21 to 30 workers and passes exact drift checks. Unit contracts cover
+ordering, gap splitting, pinned entry jobs and coded rejection of missing bounds or unknown pinned jobs.
+The [scheduling harness](../execution-partition-scheduling.md) simulates the maintained NVKE and hosted
+diagnostic Plans with estimated durations anchored to recorded disk, signing and verification timings; it
+estimates a 17–26% shorter development makespan across three assumed capacity scenarios and no makespan
+loss on any measured Plan. These are local simulated contracts, not hosted wall-time evidence. The hosted
+development Run above used the original depth grouping; the timeout grouping has not been externally
+exercised.
+
 Earlier flat-layout measurements recorded 564 original jobs and 16 collectors, down from
 596 original jobs and 16 collectors in the private-storage draft based on the same upstream code.
 The production dependency graph then had 1,375 edges, down from 1,438. Logical Plan identity and original

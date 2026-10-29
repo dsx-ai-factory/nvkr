@@ -1404,8 +1404,12 @@ and an acyclic contracted dependency graph. Semantic equivalence tests compare f
 with partitioned prerequisite-result evaluation under failure and cancellation. These are local contracts,
 not proof of provider cancellation timing or support for another CI adapter.
 
-The compiler groups lexically ordered jobs by dependency depth, with at most 64 original jobs per worker
-and at most 50 workers. Jobs requesting `id-token: write` remain in the entry workflow: Fulcio uses the
+The compiler groups jobs by dependency depth and orders each depth by bounded finish time, the longest
+path of declared job timeouts. It splits a depth where those finish times diverge, widest gap first, until
+it reaches 30 workers, with at most 64 original jobs per worker and at most 50 workers. Timeouts only order
+scheduling; they never change membership, conditions or identity. A local
+[scheduling harness](../execution-partition-scheduling.md) over the maintained Plans motivated this
+grouping with estimated durations; hosted wall time remains unmeasured. Jobs requesting `id-token: write` remain in the entry workflow: Fulcio uses the
 reusable workflow path for the certificate signer identity, so moving them would change the authored signer
 policy. Dependencies and result reports project both inline jobs and worker jobs without widening that policy.
 Original job IDs, operations, runner admission, per-job permissions and output slots

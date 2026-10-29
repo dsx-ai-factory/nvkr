@@ -95,6 +95,7 @@ Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-fea
 dispatch, separate generated development bundles, artifact downloads and short retention.
 Use [CI steps and logs](ci-step-and-log-readability.md) to investigate failures and
 [CI test performance](ci-test-performance.md) for the current profiling follow-up.
+[Execution partition scheduling](execution-partition-scheduling.md) records the partition layout measurement and decision.
 [CVE management](cve-management.md), [issue and PR management](github-issue-pr-management.md), and
 [contribution guidance](../CONTRIBUTING.md) own ongoing maintainer procedures.
 The [source-release procedure](../RELEASE.md) covers releasing NVKR itself,
