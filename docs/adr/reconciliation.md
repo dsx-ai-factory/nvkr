@@ -1257,13 +1257,18 @@ The contract also requires reviewed credential action/resource scopes, complete 
 ordering, and a cleanup budget covering cancellation and worker joining without abandoning workers.
 Negative boot acceptance explicitly includes mismatched EFI architecture and incompatible imager parameters.
 Provider policy evidence and these failure/rejection exercises remain outstanding.
-Cross-attempt signing also requires serialized predecessor reconciliation; an uncertain or expired locator
+Cross-Run signing also requires serialized predecessor reconciliation for repository, target and exact destination; an uncertain or expired locator
 cannot be bypassed by re-signing. Cleanup expiry requires separately bounded supervisor termination/reap
 observation, and ordering acceptance covers unsorted and mixed-type bindings independently of the comparator.
 These remain implementation and acceptance requirements, not exercised retry or process-lifetime evidence.
 Using a retained job artifact additionally requires confirmed expiry covering the pre-admitted absolute
 recovery deadline and independent discovery/access when no terminal Run record exists; a retention-days
-setting alone establishes neither guarantee. This locator-retention boundary remains unexercised.
+setting alone establishes neither guarantee. Recovery must retain exact root/bundle/locator bytes for
+same-key conditional replay, enforce a frozen terminal-publication cutoff and test expiry/discovery failures
+with coded errors before commit. A new provider Run ID cannot bypass pending state; terminally reconciled
+deliveries still allow later distinct versions. Persistent cross-Run pending state, exact-byte replay and
+these retention/cutoff guarantees remain implementation and acceptance work; a job artifact alone supplies
+neither serialization nor a persistent pending-state index. This boundary remains unexercised.
 
 ## Support by owner
 

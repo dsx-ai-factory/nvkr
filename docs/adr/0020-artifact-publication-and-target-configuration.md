@@ -418,50 +418,74 @@ fails admission, not a silent safety downgrade. The PUT/multipart retry distinct
 [AWS conditional-write behavior](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html);
 mandatory full-byte reconciliation is this contract's requirement for every admitted provider.
 
-Before another attempt signs or commits, `lifecycle` must establish serialized ownership for the authenticated
-GitHub repository, workflow, provider run ID and target name across attempts. The retry attempt is not part
-of that ownership key. Use the admitted provider's non-canceling single-writer boundary and the existing
-Run-record owner. Serialization must cover predecessor lookup, pending-attempt registration, signing,
-locator retention and commit disposition; durable CAS/no-replace records must preserve the attempt history.
-Concurrent attempts cannot both observe an
-empty state and acquire signing authority. Missing serialization or incomplete recovery history fails admission;
-this introduces no independently authored object or coordination service.
+Before signing or committing, `lifecycle` must establish serialized ownership for the authenticated repository,
+target name and exact destination tuple (`endpoint`, `region`, `bucket`, `prefix`, `addressing`) across all
+Runs and attempts. Workflow, provider run ID, attempt, source, Plan and policy identities are operation
+bindings, not parts of this pending-state key. A fresh dispatch therefore encounters the same unresolved
+operation. Use the admitted provider's non-canceling single-writer boundary and the Run-record owner;
+serialization covers predecessor lookup, registration, signing, recovery-byte retention and commit disposition.
+Durable CAS/no-replace state must preserve unresolved obligations even when a byte carrier expires.
+Concurrent callers cannot both observe an empty state and acquire signing authority. Missing serialization,
+missing state or incomplete recovery history fails admission; this requires no new public object or service.
 
-Retrieve and reconcile every retained pending or indeterminate locator in that lineage before authorizing
-new signing. Fully authenticate a completed delivery under current consumer policies and match its exact
-source, Plan, Environment and destination bindings; reuse its unchanged locator and original delivery
-invocation. Record the new attempt's observation separately, without rewriting the predecessor's outcome.
-These are separate immutable public Run attempts, not general Run resume. Changed inputs or destination
-bindings do not clear an unresolved predecessor. Missing, expired, inaccessible, conflicting or still-uncertain
-state blocks signing and completion publication; retention expiry cannot establish absence. A current-key
-absence observation and a stopped local writer do not prove that a previously dispatched request cannot
-still complete. Fresh signing is permitted for authenticated initial state with no predecessor. Otherwise it
-requires retained affirmative evidence that no predecessor completion request was dispatched, or another
-authenticated terminal disposition excluding a later predecessor commit.
-Neither a stored success flag, a new signature/key nor a bucket scan replaces reconciliation. This gate
-does not promise provider-wide exactly-once publication or an atomic transaction across targets.
+Authenticate a predecessor against its own frozen source, Plan, Environment, destination and invocation
+under current independent policies. If complete and the current request bindings match, reuse its unchanged
+locator and original invocation. If complete but the bindings differ, durably close that terminal operation
+before registering the distinct new delivery; its receipt cannot satisfy new outputs. Record each new
+attempt's observation separately without rewriting an earlier public Run. Uncertain, expired, inaccessible
+or conflicting pending state blocks fresh signing; expiry and a new provider run ID never create empty
+initial state. A current-key absence observation and a stopped local writer cannot exclude a late dispatched
+commit. Fresh signing requires authenticated initial state or a reconciled terminal predecessor disposition.
+Changing a signature or key cannot clear uncertainty. Multiple completed deliveries remain possible; this
+does not promise one physical S3 version, provider-wide exactly-once publication or an atomic transaction.
+
+For recovery after producer loss, retain the exact canonical root, original Sigstore bundle and frozen
+locator together before the first final PUT. Authenticate all three and the required remote closure into
+fresh held owners; the remote root and its `objects` must verify, but the final bundle may still be absent.
+Stored descriptions or success flags cannot restore authority. After serialized recovery
+ownership and confirmed joining of the prior local writer, recovery may conditionally PUT the identical
+retained final bundle at its original key without proving absence. This narrow final-bundle replay is the
+exception to the ordinary retry-on-authenticated-absence rule above, including a bounded `409` retry; it
+does not authorize other payload retries, multipart resume, re-signing or another key. The recovery operation's
+admitted request/upload limits and deadline bound replay. `403` proves neither absence nor success;
+`412` requires full equal-byte verification, and even an acknowledged PUT requires independent complete
+verification before success. Preserve the original root, signature, locator and signed invocation. Missing
+recovery bytes plus an unverifiable remote completion leaves the pending state blocked. Conditional writes
+can create another identical-byte version after a delete marker; recovery converges on the pinned bytes/key,
+not a promise of one stored version.
 
 After that gate, the state order is source authentication → upload payloads and proofs → verify every required
-storage object and boot URL → generate canonical root → detached signing → root upload and read-back → durable locator retention
+storage object and boot URL → generate canonical root → detached signing → root upload and read-back → durable recovery-byte retention
 → conditional bundle upload last → independent root and bundle authentication → producer success.
 Freeze the exact root, bundle and locator bytes before the final commit request. Exact-byte request retries
 preserve them; a new signature or key cannot bypass the predecessor gate. `lifecycle` must durably retain
-the exact frozen locator under the originating Run/attempt and target in a record retrievable after producer
-process or runner loss. Confirm its exact-byte
-read-back before permitting the final request; failed or unconfirmed retention prevents that request.
+the root, bundle and locator bytes under the originating Run/attempt and target, linked from the cross-Run
+pending state and retrievable after producer or runner loss. Admit bounds for the complete recovery package
+and confirm exact-byte read-back of every member before the final request; failed or unconfirmed retention
+prevents that request.
 An acknowledged durable Run record or already retained job artifact may satisfy this requirement; process
 memory, logs, an ephemeral runner file or an artifact uploaded only after the commit cannot. A job artifact
 qualifies only when independently discoverable by provider run/attempt and target without a terminal Run
-record. Confirm its stored bytes, recovery access and service-reported expiry before the commit request.
-Before work, admit and record an absolute recovery deadline covering the latest permitted terminal Run-record
-publication plus its required retention period, even if that record is never written. The locator artifact's
-confirmed expiry must reach that deadline; a requested retention duration or a future finalizer upload is
+record. Confirm all stored recovery bytes, recovery access and service-reported expiry before the commit request.
+Before work, the attempt owner must freeze a finite absolute terminal Run-record publication cutoff in the
+durable pending-attempt record, using the admitted execution/finalization deadline; the retained recovery
+package must bind that unchanged cutoff. The owner and record verifier
+must enforce it across queue delay, execution, cleanup, finalization and record upload. A relative finalizer
+job budget alone is insufficient; if an enforceable finite cutoff is unavailable, reject admission.
+Do not dispatch terminal publication after the cutoff or accept a late-visible record as that attempt's
+terminal publication; missing evidence of timely publication fails closed. Late bytes may remain diagnostic;
+no provider deletion or cancellation guarantee is assumed. Recovery uses a new explicit attempt and never
+extends the predecessor's cutoff or rewrites its outcome. The absolute recovery deadline is that fixed cutoff
+plus the required Run-record retention interval, even if no terminal Run record is written. Each recovery
+attempt admits its own cutoff and sufficient retention without changing the predecessor's signed bytes.
+The recovery package's confirmed expiry must reach its deadline; a requested duration or future finalizer upload is
 insufficient. [GitHub artifact metadata exposes expiry](https://docs.github.com/en/rest/actions/artifacts#get-an-artifact),
 and [artifact retention remains limited by provider policy](https://docs.github.com/en/actions/tutorials/store-and-share-data#configuring-a-custom-artifact-retention-period).
 Insufficient expiry or recovery access prevents commit. Recovery access and retention must cover cancellation,
 timeout and indeterminate-result reconciliation; cleanup cannot remove the locator within that window while
 reconciliation remains outstanding. Expiry limits
-recovery availability, never the validity of a surviving remote completion. The record supplies coordinates,
+recovery availability, never the validity of a surviving remote completion or absence of a pending obligation.
+The cutoff governs accepted Run-record publication, not revocation of a valid remote S3 completion. The record supplies coordinates,
 never trust or a successful outcome. Reconciliation retrieves it independently of the producer and performs
 the locator's complete verification, without bucket scans or regenerated signatures. Before the final commit
 request, failure cannot publish a completion. Its result can be indeterminate: a lost response or failed final read-back
@@ -543,9 +567,19 @@ Exercise denied and out-of-scope credential
 admission, cancellation during active transfer and a cleanup deadline expiring before worker join; no abort,
 restart, held payload/proof release or success may precede joining. On a versioned bucket, lose the final
 acknowledgement and recover the same frozen locator through version discovery and complete independent
-verification. A later attempt must reuse that authenticated completion without signing again; uncertain,
-expired or incomplete predecessor history must prevent new signing. Concurrent attempts must not both
-acquire signing authority. A cleanup expiry must trigger the separately bounded supervisor termination;
+verification. A new provider Run ID must not bypass an unresolved operation for the same repository, target
+and destination. Exercise death after recovery-byte retention both before and during final PUT, including a
+missing-object `403`: exact-bundle replay must converge without re-signing. Lost-acknowledgement replay must
+verify the same pinned bytes/key; missing recovery bytes and unverifiable remote state must block signing.
+A verified terminal predecessor must permit a genuinely different subsequent delivery. Uncertain, expired
+or incomplete pending history prevents new signing. Concurrent callers must not both acquire signing authority.
+With successful byte read-back, require coded failure and zero final commit requests for service expiry
+before the recovery deadline, sufficient requested retention capped to insufficient reported expiry,
+unverifiable expiry/access, or discovery requiring a terminal Run record that was never published.
+Confirmed expiry equal to the deadline is sufficient; a requested/reported difference alone is not failure
+when the confirmed expiry still covers the deadline. Delay a finalizer past the frozen publication cutoff:
+it must fail with a coded error, issue no new commit request and neither publish nor accept a terminal record
+for that old attempt. No retry may extend the old cutoff. A cleanup expiry must trigger bounded supervisor termination;
 an unconfirmed exit at its deadline must preserve blocked state, unsafe ownership and failure without success.
 Terminate the
 producer or runner after the bundle lands but before acknowledgement, then retrieve the pre-recorded locator

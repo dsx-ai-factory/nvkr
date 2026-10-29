@@ -1082,7 +1082,8 @@ Final Run records and production qualification handoffs retain seven days and di
 prevent finalization. Release finalizers have a dedicated two-hour job budget for bootstrap, bounded
 carrier acquisition/restoration, complete-release authentication and record uploads; the fifteen-minute
 utility-job budget does not apply. This bound is not evidence of successful hosted completion.
-Expired carriers require a complete new Run. Signed development uses per-attempt
+Expired carriers require a complete new Run. That does not clear an unresolved S3 delivery: ADR-20's
+cross-Run repository/target/destination gate must still reconcile it before fresh signing. Signed development uses per-attempt
 registry namespaces and the same authenticated earlier-attempt reuse as production.
 These retention periods govern provider locator records. Private carrier blobs have no automatic expiry
 in this implementation; registry retention must be managed separately, without removing active Run inputs.
@@ -1552,7 +1553,7 @@ ADR-20 specifies the S3 extension; its generated execution remains implementatio
 retain GitHub-only authority, the admitted source/signing branches and protected Environments, and the
 existing producer isolation. Derive required delivery nodes from typed targets and named outputs in the
 complete Plan. The graph orders source aggregate authentication, selected complete output checks, proof
-capture, upload/read-back, detached delivery signing, durable locator retention, completion publication and
+capture, upload/read-back, detached delivery signing, durable root/bundle/locator retention, completion publication and
 independent completion verification. Every required target result is a finalizer dependency; job success or
 an unverified locator cannot replace the authenticated result.
 
@@ -1568,16 +1569,20 @@ policies. Secret references may be recorded; secret values cannot be
 transported in plans, command arguments, boot scripts, artifacts or logs. Referenced authentication and
 provider capabilities must be admitted before producer, storage or publication work.
 
-Across attempts, the admitted non-canceling provider boundary and durable Run records must serialize
-predecessor reconciliation before
-new signing or commit. A retry cannot discard an unresolved locator by signing another bundle; authenticated
-reuse preserves the original delivery invocation and records the current attempt's observation separately.
+Across provider Runs and attempts, the admitted non-canceling provider boundary and durable Run state must
+serialize repository, target and exact destination before signing or commit. A fresh dispatch cannot discard
+an unresolved locator. Authenticated recovery can re-dispatch retained exact bundle bytes at their original
+conditional key, preserving the signed invocation and recording the recovery attempt separately. A verified
+terminal predecessor permits a later distinct delivery; its receipt cannot satisfy different required outputs.
 
-The completion operation must depend on confirmed exact-byte retention of its frozen locator under the
+The completion operation must depend on confirmed exact-byte retention of the frozen root, bundle and locator under the
 originating Run/attempt and target, accessible after producer or runner loss. A post-commit artifact-upload
 step or finalizer cannot satisfy that prerequisite. Admit the recovery access and retention before work;
 an existing job artifact qualifies only with confirmed bytes/access and expiry covering the absolute recovery
 deadline in ADR-20, independently of whether a terminal Run record is ever written.
+Admission must freeze and enforce an absolute terminal Run-record publication cutoff through scheduling,
+finalization and upload; queue delay cannot extend it. Late terminal publication is refused or rejected,
+and recovery uses a new explicit attempt. Recovery expiry covers that cutoff plus required Run retention.
 Failed or unconfirmed retention prevents the commit request. The bundle locator omits its unknown version;
 independent recovery resolves the exact key and verifies the observed version as specified in ADR-20.
 
