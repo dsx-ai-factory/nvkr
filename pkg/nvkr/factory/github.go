@@ -49,6 +49,11 @@ func githubLayoutFor(plan *Plan) generationLayout {
 }
 
 func githubWorkflowName(plan *Plan) string {
+	// Named bundles take their own name so same-Definition bundles never share
+	// a concurrency group; the fixed development layout keeps its name.
+	if plan.Environment.GitHubDevelopment && plan.Environment.GitHubBundle != "" {
+		return "nvkr-dev-project-" + plan.Environment.GitHubBundle
+	}
 	if plan.Environment.GitHubDevelopment {
 		return "nvkr-dev-" + plan.Name
 	}

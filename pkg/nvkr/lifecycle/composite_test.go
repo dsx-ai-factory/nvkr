@@ -186,6 +186,14 @@ func TestCompositeRunRecordContract(t *testing.T) {
 	if member, _ := run.Composition.MemberOf("beta-tools"); member != "beta" {
 		t.Fatal("composite Run omits per-output member attribution")
 	}
+	// A returned description owns its composition; mutating it leaves the
+	// frozen preparation unchanged.
+	description := prepared.Description()
+	description.Composition.Outputs[0].Member, description.Composition.Outputs[1].Member =
+		description.Composition.Outputs[1].Member, description.Composition.Outputs[0].Member
+	if !prepared.Description().Composition.Equal(prepared.plan.Composition) {
+		t.Fatal("prepared Run description shares its composition record")
+	}
 	plain, err := PrepareFiles(t.Context(), "defs/alpha.yaml", compositeTestEnv, "composite-test", "attempt-1")
 	if err != nil {
 		t.Fatal(err)

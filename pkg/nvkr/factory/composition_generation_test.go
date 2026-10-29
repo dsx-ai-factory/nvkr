@@ -187,6 +187,20 @@ func TestCompositeDevelopmentBundles(t *testing.T) {
 		}
 	}
 
+	// Two named bundles of one Definition have disjoint workflow concurrency.
+	second, err := signedComposite(t, false, compositeEnvironment(t, namedDevelopment(t, "second", "ghcr.io/example/nvkr/development-second")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := map[string]bool{}
+	for _, rendered := range []*GeneratedBundle{bundle, writeCheckedBundle(t, root, second), fixedBundle} {
+		name := regexp.MustCompile(`(?m)^name: (\S+)$`).FindStringSubmatch(string(rendered.Files[rendered.WorkflowPath]))
+		if name == nil || names[name[1]] {
+			t.Fatalf("development workflow %s repeats a workflow name: %v", rendered.WorkflowPath, name)
+		}
+		names[name[1]] = true
+	}
+
 	// Signer identities are disjoint, and neither is a production signer.
 	named := regexp.MustCompile(plan.Environment.Signing.Identity)
 	for subject, want := range map[string]bool{

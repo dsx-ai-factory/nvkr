@@ -258,6 +258,9 @@ Policy (ADR-04 §5), with the same lane and scope rules. The policy schema does 
 - A consumer may filter the authenticated Release view to one member's outputs. That filter is a description;
   it is not a member Release and grants no member-scoped capability.
 - Release description export (ADR-19 §3) includes the composition record and per-output member attribution.
+- A `per-output-v1` output-local publication carries the complete composition record with its one output;
+  it is not a Release. A consumer accepts a composite Release only when the record attributes exactly its
+  outputs, and assembly restores that exact membership before Release issuance.
 
 ### 11. Coded errors
 

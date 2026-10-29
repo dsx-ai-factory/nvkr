@@ -34,6 +34,39 @@ func NewCompositionRecord(composition Composition) (*CompositionRecord, error) {
 // definitionDigest and whose attribution names exactly outputs, in order, each
 // to a listed member, with no listed member left without an output.
 func (record CompositionRecord) ValidateMembership(definitionDigest string, outputs []string) error {
+	if err := record.validate(definitionDigest); err != nil {
+		return err
+	}
+	if len(record.Outputs) != len(outputs) {
+		return e.New(e.CodeUnverifiedRef, "composition record must attribute every output exactly once")
+	}
+	for i, output := range outputs {
+		if record.Outputs[i].Output != output {
+			return e.New(e.CodeUnverifiedRef, "composition record attribution for output %q is missing or out of order", output)
+		}
+	}
+	return nil
+}
+
+// ValidateOutputLocal requires the same complete record but lets outputs be the
+// non-empty subset one output-local publication carries. Final Release issuance
+// still requires ValidateMembership over the complete output set.
+func (record CompositionRecord) ValidateOutputLocal(definitionDigest string, outputs []string) error {
+	if err := record.validate(definitionDigest); err != nil {
+		return err
+	}
+	if len(outputs) == 0 {
+		return e.New(e.CodeUnverifiedRef, "composition record publication has no outputs")
+	}
+	for _, output := range outputs {
+		if _, ok := record.MemberOf(output); !ok {
+			return e.New(e.CodeUnverifiedRef, "composition record does not attribute output %q", output)
+		}
+	}
+	return nil
+}
+
+func (record CompositionRecord) validate(definitionDigest string) error {
 	if record.Kind != CompositeKind {
 		return e.New(e.CodeUnverifiedRef, "composition record has unsupported definition kind %q", record.Kind)
 	}
@@ -47,21 +80,19 @@ func (record CompositionRecord) ValidateMembership(definitionDigest string, outp
 	if !canonical.IsDigest(record.EffectiveDefinitionDigest) {
 		return e.New(e.CodeUnverifiedRef, "composition record has no exact effective Definition digest")
 	}
-	if len(record.Outputs) != len(outputs) {
-		return e.New(e.CodeUnverifiedRef, "composition record must attribute every output exactly once")
-	}
 	listed := make(map[string]int, len(record.Members))
 	for _, member := range record.Members {
 		listed[member.Name] = 0
 	}
-	for i, output := range outputs {
-		attribution := record.Outputs[i]
-		if attribution.Output != output {
-			return e.New(e.CodeUnverifiedRef, "composition record attribution for output %q is missing or out of order", output)
+	seen := make(map[string]bool, len(record.Outputs))
+	for _, attribution := range record.Outputs {
+		if seen[attribution.Output] {
+			return e.New(e.CodeUnverifiedRef, "composition record must attribute every output exactly once")
 		}
+		seen[attribution.Output] = true
 		count, ok := listed[attribution.Member]
 		if !ok {
-			return e.New(e.CodeUnverifiedRef, "output %q is attributed to unlisted member %q", output, attribution.Member)
+			return e.New(e.CodeUnverifiedRef, "output %q is attributed to unlisted member %q", attribution.Output, attribution.Member)
 		}
 		listed[attribution.Member] = count + 1
 	}

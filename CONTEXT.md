@@ -64,7 +64,8 @@ A Definition form that names complete member Definitions by locator and exact `n
 releases the exact union of their named outputs through one Plan, Run and Release. Output names are preserved;
 duplicates, divergent shared producers, differing base catalogs or tools, and digest drift are coded errors,
 never precedence. Members keep their own Runs and Releases; a composite neither references nor inherits them.
-Proposed [ADR-26](docs/adr/0026-definition-composition.md) designs it; it is not implemented.
+Proposed [ADR-26](docs/adr/0026-definition-composition.md) designs it; units U1–U7 are implemented and contract-tested
+only, with no hosted composite Run, publication or consumer verification yet.
 _Avoid_: Recipe, selection group, parent Release, association file, include
 
 **Effective Definition (proposed)**:

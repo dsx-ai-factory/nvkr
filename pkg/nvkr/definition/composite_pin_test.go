@@ -105,6 +105,52 @@ func TestCompositePinContract(t *testing.T) {
 	})
 }
 
+func TestCompositePinRewriteEdges(t *testing.T) {
+	t.Run("substituted guard symlink is refused without an outside write", func(t *testing.T) {
+		root, raw, _, _ := pinFixture(t)
+		outside := filepath.Join(t.TempDir(), "outside.lock")
+		if err := os.Symlink(outside, filepath.Join(root, "defs", ".composite.yaml.pin.lock")); err != nil {
+			t.Fatal(err)
+		}
+		_, err := PinComposite(t.Context(), root, "defs/composite.yaml", false)
+		requireCode(t, err, e.CodeInvalidCatalog)
+		if _, statErr := os.Lstat(outside); !os.IsNotExist(statErr) {
+			t.Fatalf("pin created the guard symlink target: %v", statErr)
+		}
+		if after, _ := os.ReadFile(filepath.Join(root, "defs", "composite.yaml")); !bytes.Equal(after, raw) {
+			t.Fatal("pin wrote through a substituted guard")
+		}
+	})
+	t.Run("stale digest repeated in a comment is refused unchanged", func(t *testing.T) {
+		root, raw, stale, _ := pinFixture(t)
+		commented := append([]byte("# previously "+stale+"\n"), raw...)
+		writeCompositeRaw(t, filepath.Join(root, "defs", "composite.yaml"), commented)
+		_, err := PinComposite(t.Context(), root, "defs/composite.yaml", false)
+		requireCode(t, err, e.CodeInvalidCatalog)
+		if after, _ := os.ReadFile(filepath.Join(root, "defs", "composite.yaml")); !bytes.Equal(after, commented) {
+			t.Fatal("pin rewrote an ambiguous digest spelling")
+		}
+	})
+	t.Run("swapped pins are each repaired once", func(t *testing.T) {
+		root, composite := compositeFixture(t)
+		alpha, beta := composite.Members[0].Digest, composite.Members[1].Digest
+		swapped := "apiVersion: nvkr.dev/composite-definition/v1\nkind: CompositeDefinition\nmetadata:\n  name: product\nmembers:\n" +
+			"  - name: alpha\n    definition: alpha.yaml\n    digest: " + beta + "\n" +
+			"  - name: beta\n    definition: beta.yaml\n    digest: " + alpha + "\n"
+		writeCompositeRaw(t, filepath.Join(root, "defs", "composite.yaml"), []byte(swapped))
+		if report, err := PinComposite(t.Context(), root, "defs/composite.yaml", false); err != nil || len(report.Drift) != 2 {
+			t.Fatalf("pin = %+v, %v", report, err)
+		}
+		repaired, err := LoadComposite(t.Context(), root, "defs/composite.yaml")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if members := repaired.Members(); members[0].Digest != alpha || members[1].Digest != beta {
+			t.Fatalf("swapped pins repaired to %+v", members)
+		}
+	})
+}
+
 func TestLoadDefinitionRefusesComposite(t *testing.T) {
 	root, composite := compositeFixture(t)
 	writeCompositeFile(t, filepath.Join(root, "defs", "composite.yaml"), composite)
@@ -126,4 +172,19 @@ func TestLoadDefinitionRefusesComposite(t *testing.T) {
 	if !strings.Contains(err.Error(), "beneath the working directory") {
 		t.Fatalf("outside composite refused for another reason: %v", err)
 	}
+	// Kind dispatch and composite admission agree on supported paths: an
+	// absolute in-root path admits, and a symlinked parent alias is refused.
+	working, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	absolute, err := LoadInput(t.Context(), filepath.Join(working, "defs", "composite.yaml"))
+	if err != nil || absolute.Digest != input.Digest {
+		t.Fatalf("absolute in-root composite = %+v, %v", absolute, err)
+	}
+	if err := os.Symlink("defs", "alias"); err != nil {
+		t.Fatal(err)
+	}
+	_, err = LoadInput(t.Context(), "alias/composite.yaml")
+	requireCode(t, err, e.CodeInvalidCatalog)
 }

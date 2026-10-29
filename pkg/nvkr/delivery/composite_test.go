@@ -59,6 +59,19 @@ func TestCompositePublicationRootContract(t *testing.T) {
 	if member, ok := description.Metadata.Composition.MemberOf("chart"); !ok || member != "charts" {
 		t.Fatal("release description export omits per-output member attribution")
 	}
+	outputs, err := MetadataOutputs(composite.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	held := &publicationState{inspection: composite, outputs: outputs}
+	detached, err := held.description(description.Reference)
+	if err != nil {
+		t.Fatal(err)
+	}
+	detached.Metadata.Composition.EffectiveDefinitionDigest = "sha256:" + strings.Repeat("9", 64)
+	if again, err := held.description(description.Reference); err != nil || !again.Metadata.Composition.Equal(record) {
+		t.Fatalf("detached description mutated its held composition: %v", err)
+	}
 
 	for _, tc := range []struct {
 		name   string

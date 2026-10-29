@@ -108,11 +108,15 @@ func replaceFileCAS(ctx context.Context, root, name string, expected, replacemen
 	if err != nil || !info.Mode().IsRegular() {
 		return e.New(e.CodeInvalidCatalog, "composite %s is not a regular file", name)
 	}
-	guard, err := os.OpenFile(filepath.Join(directory, "."+base+".pin.lock"), os.O_CREATE|os.O_RDWR, 0o600)
+	// The guard persists for kernel-released locking; never follow a substituted one.
+	guard, err := os.OpenFile(filepath.Join(directory, "."+base+".pin.lock"), os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW|syscall.O_CLOEXEC, 0o600)
 	if err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "opening composite pin guard")
 	}
 	defer guard.Close()
+	if guardInfo, err := guard.Stat(); err != nil || !guardInfo.Mode().IsRegular() || guardInfo.Mode().Perm()&0o077 != 0 {
+		return e.New(e.CodeInvalidCatalog, "composite pin guard for %s is not an owner-only regular file", name)
+	}
 	if err := syscall.Flock(int(guard.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		if errors.Is(err, syscall.EWOULDBLOCK) {
 			return e.New(e.CodeWriteConflict, "another composite pin writer is active for %s", name)

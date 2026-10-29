@@ -106,6 +106,7 @@ func bindObserved(run *Run, artifacts []Artifact) (*Run, error) {
 	}
 	copyRun := *run
 	copyRun.Expected = cloneRequired(run.Expected)
+	copyRun.Composition = run.Composition.Clone()
 	copyRun.Observed = nil
 	required := make(map[string]requiredOutput, len(run.Expected))
 	for _, slot := range run.Expected {
@@ -222,6 +223,7 @@ func validateRun(run *Run) error {
 func failedRun(run *Run, cause error) *Run {
 	copyRun := *run
 	copyRun.Expected = cloneRequired(run.Expected)
+	copyRun.Composition = run.Composition.Clone()
 	copyRun.Observed = nil
 	copyRun.diskInventories = nil
 	copyRun.Status = RunFailed

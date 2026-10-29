@@ -79,6 +79,7 @@ func (prepared *PreparedRun) Description() Run {
 	}
 	copyRun := *prepared.run
 	copyRun.Expected = cloneRequired(prepared.run.Expected)
+	copyRun.Composition = prepared.run.Composition.Clone()
 	copyRun.Observed = cloneArtifacts(prepared.run.Observed)
 	if prepared.run.Failure != nil {
 		failure := *prepared.run.Failure

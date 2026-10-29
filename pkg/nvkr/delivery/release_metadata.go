@@ -180,7 +180,9 @@ func validateReleaseMetadata(root PublicationRoot) error {
 		return e.New(e.CodeReleaseIncomplete, "release has no deliverables")
 	}
 	if m.Composition != nil {
-		if err := m.Composition.ValidateMembership(m.DefinitionDigest, slices.Sorted(maps.Keys(outputs))); err != nil {
+		// A per-output publication carries the complete Plan record but one output;
+		// consumers require complete membership when they issue the Release.
+		if err := m.Composition.ValidateOutputLocal(m.DefinitionDigest, slices.Sorted(maps.Keys(outputs))); err != nil {
 			return e.Wrap(e.CodeVerifyFailed, err, "release composition record")
 		}
 	}

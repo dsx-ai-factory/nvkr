@@ -162,3 +162,23 @@ func TestCompositeMemberViewGrantsNothing(t *testing.T) {
 	assertCode(t, err, e.CodeGateUnmet)
 	assertCode(t, forged.RequireMembers(plan.Composition.Members), e.CodeGateUnmet)
 }
+
+// An output-local publication carries the complete composition record with a
+// subset of outputs; Release issuance requires every composed output.
+func TestCompositeReleaseIssuanceRequiresEveryOutput(t *testing.T) {
+	composite, _ := compositeReleaseFixtures(t)
+	verified, _, _, plan := composite.open(t)
+	defer func() { _ = verified.Close() }()
+	description, err := verified.publication.Description(verified.release.Subject)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := requireCompleteComposition(description); err != nil {
+		t.Fatal(err)
+	}
+	if len(description.Outputs) != len(plan.Composition.Outputs) || len(description.Outputs) < 2 {
+		t.Fatalf("fixture does not carry every composed output: %d", len(description.Outputs))
+	}
+	description.Outputs = description.Outputs[:1]
+	assertCode(t, requireCompleteComposition(description), e.CodeReleaseIncomplete)
+}
