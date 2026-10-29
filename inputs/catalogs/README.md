@@ -20,6 +20,9 @@ output-scoped selections retain the same NVKE release producers.
 [`nico`](nico/registry.yaml) owns the source-packaged NICo and NICo prerequisite charts, pinned
 independently of NVKE to one infra-controller release. NICo images remain consumer-supplied.
 
+[`local-path-provisioner`](local-path-provisioner/registry.yaml) packages Rancher's chart from
+source, patched to accept image digests, and binds its acquired provisioner and helper images.
+
 The native local Go smoke inputs select AMD64 and ARM64 from the existing NVKE, CAPNICo,
 controller-profiles and native-tools catalogs. Architecture-specific tool acquisitions remain
 explicit members of the shared native-tools catalog; no copied AMD64 site catalog is required.
