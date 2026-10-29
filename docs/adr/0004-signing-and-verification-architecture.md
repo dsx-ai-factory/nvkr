@@ -144,8 +144,11 @@ HTTP response-body budget that includes failed candidates. Each required predica
 budget of 32 candidates and 8 MiB; an individual bundle is also bounded to 8 MiB. Standard OCI referrers
 tag-schema fallback is supported; legacy `.sig` and `.att` attachment lookup is not.
 Paginated discovery is refused until the adapter can read all pages within its bounds. Explicit
-credentials are confined to the selected registry, and an empty credential uses anonymous access rather
-than an ambient keychain. The existing operation deadline covers transport and cryptographic verification.
+credentials are confined to the selected registry. With no explicit credential, a consumer whose payload
+reads use the default keychain gives discovery that same keychain; anonymous or explicit-password
+transport leaves discovery anonymous. A registry 401 or 403 is a coded fetch failure, not a signature
+result. Cosign itself verifies the fetched bundles offline with an empty private Docker configuration.
+The existing operation deadline covers transport and cryptographic verification.
 Private temporary bundle files are checked for mutation and removed on success or failure. Unfetched
 historical or unrelated candidates are not claimed to be valid: this discovery requires an authenticated
 bundle for each required type, not validation of every registry referrer. Complete release payload and
