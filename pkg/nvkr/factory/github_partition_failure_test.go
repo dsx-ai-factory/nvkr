@@ -16,6 +16,9 @@ import (
 
 // partitionedRun is one complete partitioned Plan with its admitted execution
 // model. Provider behavior is simulated; these tests do not exercise GitHub.
+// Outcomes are evaluated over the model's partitions and handed to the
+// finalizer in collector shape. Rendered worker/inline placement, worker
+// guard expressions and worker report reconstruction are outside this boundary.
 type partitionedRun struct {
 	plan       *Plan
 	projection *githubNeedsProjection
@@ -166,9 +169,11 @@ func (run partitionedRun) providerResults(t *testing.T, outcomes map[string]exec
 
 func TestGitHubPartitionedRunPreservesOperationOutcomesThroughFinalization(t *testing.T) {
 	run := partitionedRecoveryRun(t)
+	// Terminal release verification fails after every output published.
+	const verified = "verification/release"
 	var producer, recovery, recoveredAncestor string
 	for _, artifact := range run.plan.Graph.Artifacts {
-		if finalizerArtifact(run.plan, artifact) && producer == "" {
+		if artifact.ID == verified && finalizerArtifact(run.plan, artifact) {
 			producer = run.nodeJobs[artifact.Producer]
 		}
 	}
@@ -207,9 +212,10 @@ func TestGitHubPartitionedRunPreservesOperationOutcomesThroughFinalization(t *te
 		injected map[string]executionOutcome
 		canceled map[string]bool
 		verbatim bool
+		failed   string
 	}{
 		{name: "complete success"},
-		{name: "producer failure", injected: map[string]executionOutcome{producer: executionFailed}},
+		{name: "release verification failure", injected: map[string]executionOutcome{producer: executionFailed}, failed: verified},
 		{name: "cancellation during execution", canceled: canceledLater},
 		{name: "recovery succeeds after ancestor failure", injected: map[string]executionOutcome{recoveredAncestor: executionFailed}},
 		{name: "recovery fails after ancestor failure", injected: map[string]executionOutcome{recoveredAncestor: executionFailed, recovery: executionFailed}},
@@ -252,6 +258,9 @@ func TestGitHubPartitionedRunPreservesOperationOutcomesThroughFinalization(t *te
 					assertRestoreOutcome(t, artifact.ID, map[bool]string{true: "restored:success", false: "job-failed"}[succeeded])
 				}
 			}
+			if test.failed != "" {
+				assertRestoreOutcome(t, test.failed, "job-failed")
+			}
 			err = ValidateHostedRestores(t.Context(), ".nvkr/factory", run.plan)
 			if complete {
 				if err != nil {
@@ -285,10 +294,11 @@ func assertRestoreOutcome(t *testing.T, id, want string) {
 // caller's fromJSON(... || '{}') projection, and an empty status entry.
 func TestGitHubPartitionedRunRefusesIncompleteReportsBeforeRecovery(t *testing.T) {
 	run := partitionedRecoveryRun(t)
-	if len(run.projection.Collectors) == 0 {
-		t.Fatal("fixture requires result collectors")
+	if len(run.projection.Collectors) < 2 {
+		t.Fatalf("fixture requires several result collectors, got %d", len(run.projection.Collectors))
 	}
 	collector := sortedKeys(run.projection.Collectors)[0]
+	other := sortedKeys(run.projection.Collectors)[len(run.projection.Collectors)-1]
 	member := run.projection.Collectors[collector][0]
 	valid := func(t *testing.T) map[string]any { return collectorTestReports(t, run.projection.Collectors, nil) }
 	setLeaves := func(reports map[string]any, leaves, statuses string) {
@@ -320,6 +330,12 @@ func TestGitHubPartitionedRunRefusesIncompleteReportsBeforeRecovery(t *testing.T
 			setLeaves(reports, leafReport(t, func(leaves map[string]any) { leaves[member] = nil }), successes[:strings.LastIndexByte(successes, ' ')+1])
 			return carrierTestJSON(t, reports)
 		}, e.CodeInvalidCatalog},
+		{"null member with consistent statuses", t.Context(), func(t *testing.T) string {
+			reports := valid(t)
+			// Single fault: only the null-member refusal can reject this report.
+			setLeaves(reports, leafReport(t, func(leaves map[string]any) { leaves[member] = nil }), "")
+			return carrierTestJSON(t, reports)
+		}, e.CodeInvalidCatalog},
 		{"missing member", t.Context(), func(t *testing.T) string {
 			reports := valid(t)
 			// Consistent statuses leave exact operation accounting as the only guard.
@@ -339,10 +355,6 @@ func TestGitHubPartitionedRunRefusesIncompleteReportsBeforeRecovery(t *testing.T
 		}, e.CodeInvalidCatalog},
 		{"member reported by foreign worker", t.Context(), func(t *testing.T) string {
 			reports := valid(t)
-			other := sortedKeys(run.projection.Collectors)[len(run.projection.Collectors)-1]
-			if other == collector {
-				t.Skip("fixture has one collector")
-			}
 			outputs := reports[other].(map[string]any)["outputs"].(map[string]string)
 			outputs["results"] = strings.TrimSuffix(outputs["results"], "}") + `,"` + member + `":{"result":"success"}}`
 			return carrierTestJSON(t, reports)

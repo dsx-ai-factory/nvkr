@@ -2874,9 +2874,13 @@ all-owner workflow regeneration, and the targeted extended partition contracts i
 yamllint. Regeneration retains the exercised development bundle byte-for-byte. The hosted Run above
 predates this internal extraction; its evidence is not a separate hosted execution of the refactored code.
 
-Full-product partitioned failure handling is contract-tested locally, not externally exercised. On a
-compiled partitioned per-output Plan, simulated provider outcomes for producer failure, cancellation after
-the first worker, successful and failed recovery after an ancestor failure, and skipped descendants match
+Partitioned failure handling is contract-tested locally on the reference Plan and its finalizer, not
+externally exercised. The fixture compiles six repeated reference outputs into 72 operations; it does not
+cover the maintained product's native-disk, aggregate or Helm stage diversity. The contract evaluates
+outcomes over the model's partitions and hands them to the finalizer in collector shape; rendered
+worker/inline placement, worker guard expressions and worker report reconstruction are outside it. On
+that compiled partitioned per-output Plan, simulated provider outcomes for release verification failure,
+cancellation after the first worker, successful and failed recovery after an ancestor failure, and skipped descendants match
 flat ancestor evaluation for every original operation. Those outcomes, in the caller's collector shape,
 pass through finalizer recovery: each restore outcome follows its exact producer result, and restore
 validation refuses every incomplete set with `NVKR-E-PROVENANCE-MISSING`. This includes an inconsistent
