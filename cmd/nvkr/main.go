@@ -20,10 +20,11 @@ import (
 )
 
 // version and commit are stamped at build time via -ldflags (see the Makefile).
-// They default to dev values for `go run` / `go build` without the Makefile.
+// Unstamped builds, including `go install …/cmd/nvkr@vX.Y.Z`, are labeled from
+// their build information by factory.GeneratorVersion.
 var (
-	version = "dev"
-	commit  = "unknown"
+	version = factory.UnstampedGeneratorVersion
+	commit  = factory.UnstampedGeneratorCommit
 )
 
 func main() {
@@ -38,12 +39,13 @@ func main() {
 	}
 }
 
+// newApp builds the CLI; `--version` prints the same generator label Plans record.
 func newApp() *cli.App {
 	var workCancel context.CancelFunc
 	app := &cli.App{
 		Name:                 "nvkr",
 		Usage:                "define, run, and verify immutable release workflows",
-		Version:              version + " (" + commit + ")",
+		Version:              factoryGeneratorVersion(),
 		HideHelpCommand:      true,
 		EnableBashCompletion: true,
 		OnUsageError:         codedUsageError,

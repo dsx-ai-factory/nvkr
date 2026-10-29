@@ -176,7 +176,9 @@ func cmdFactory() *cli.Command {
 	}
 }
 
-func factoryGeneratorVersion() string { return version + " (" + commit + ")" }
+// factoryGeneratorVersion is this binary's generator label: its linker stamps,
+// or for an unstamped build, the label the factory derives from build information.
+func factoryGeneratorVersion() string { return factory.GeneratorVersion(version, commit) }
 
 // Provider adapters supply selectors and diagnostics only. Plan admission and all
 // execution/transport behavior remain in the factory module.
