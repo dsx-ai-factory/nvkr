@@ -168,6 +168,20 @@ versionStamp:
 These are build inputs, not labels added after the build. For the pinned tag `v0.22.0`,
 `.ModuleTag` is `v0.22.0`; `.Version` is `0.22.0-beta.6`.
 
+## Debian packages
+
+A `host-package` component can produce a raw DEB using its existing command, pinned toolchain,
+platforms, private `writeDir` and `artifactPath`. A standalone `format: debian-package` output selects one
+such producer and an explicit platform. The existing session and producer-result authentication own the
+build; bounded file retention and lifecycle staging preserve the raw archive. It is not wrapped as an
+executable bundle or an APT repository. Signing, publication and hosted/direct-node execution remain gated.
+
+The [NVSentinel catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/nvsentinel/README.md)
+declares OCI, Helm, executable and Debian outputs. Its OS experiment places the same DEB in the existing
+composer/Packer `debs/` folder and regenerates the local APT index. Upstream source is unchanged. Placement
+does not install or enable NVSentinel; local composition metadata is not a full-content dependency SBOM,
+ABI proof or runtime acceptance. See [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md).
+
 ## Run the local lab
 
 Use macOS or Linux with Bash 3.2+, Git, Make, `jq`, GNU `timeout` or `gtimeout`, a SHA-256 utility

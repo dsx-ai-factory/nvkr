@@ -107,7 +107,6 @@ func TestBuildHelmChartArtifactProducesConformantChart(t *testing.T) {
 		t.Fatalf("artifact type: %s", manifest.ArtifactType)
 	}
 
-	// Read back via the updated delivery.ReadArtifact path.
 	descriptor, layerData, err := ReadArtifact(ctx, out)
 	if err != nil {
 		t.Fatal(err)

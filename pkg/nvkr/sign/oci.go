@@ -233,10 +233,7 @@ func (r VerificationRecord) Canonical() ([]byte, error) {
 	return canonical.Marshal(r)
 }
 
-// ---------------------------------------------------------------------------
-// argv construction (shared by every adapter so a dry run describes the truth)
-// ---------------------------------------------------------------------------
-
+// ociSignArgs is shared by every adapter so a dry run describes the truth.
 func ociSignArgs(ref string) []string {
 	return []string{"sign", "--yes", "--new-bundle-format", ref}
 }
@@ -300,10 +297,6 @@ func resolvePolicy(policy VerifyPolicy, identity, issuer string) (VerifyPolicy, 
 	}
 	return policy, nil
 }
-
-// ---------------------------------------------------------------------------
-// DryRunSigner
-// ---------------------------------------------------------------------------
 
 // DryRunSigner records what a real signer would run and executes nothing. It is
 // available on every platform because it has no execution path at all.
@@ -399,10 +392,6 @@ func (s *DryRunSigner) Verify(ctx context.Context, subject Subject, policy Verif
 	}
 	return record, nil
 }
-
-// ---------------------------------------------------------------------------
-// CosignOCISigner
-// ---------------------------------------------------------------------------
 
 // Credential is one registry credential. Direct reads scope it to the subject
 // registry; subprocesses receive it through a private Docker config file. It
@@ -849,10 +838,6 @@ func ociCosignEnvironment(base []string, dockerConfigDir string) []string {
 	return out
 }
 
-// ---------------------------------------------------------------------------
-// cosign JSON output
-// ---------------------------------------------------------------------------
-
 type inTotoStatement struct {
 	Predicate     json.RawMessage `json:"predicate"`
 	Type          string          `json:"_type"`
@@ -861,10 +846,6 @@ type inTotoStatement struct {
 		Digest map[string]string `json:"digest"`
 	} `json:"subject"`
 }
-
-// ---------------------------------------------------------------------------
-// private files
-// ---------------------------------------------------------------------------
 
 func newPrivateWorkspace(pattern string) (string, func(), error) {
 	dir, err := os.MkdirTemp("", pattern)

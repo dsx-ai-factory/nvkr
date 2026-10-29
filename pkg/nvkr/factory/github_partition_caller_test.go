@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/internal/testutil"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 
 	yamlv3 "go.yaml.in/yaml/v3"
 )
@@ -27,6 +28,53 @@ func TestGitHubPartitionCallerRetainsSingleFinalizer(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertGitHubPartitionMembership(t, plan, entry, workers)
+}
+
+func TestGitHubPartitionResultRewriteRequiresMarkers(t *testing.T) {
+	owners := map[string]string{"build": "partition-00"}
+	for _, test := range []struct {
+		name, value string
+		refuse      bool
+	}{
+		{"both markers", "${{ toJSON(needs) }} ${{ join(needs.*.result, ' ') }}", false},
+		{"missing statuses", "${{ toJSON(needs) }}", true},
+		{"missing results", "${{ join(needs.*.result, ' ') }}", true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			node := githubYAMLMap("run", githubYAMLString(test.value))
+			err := rewriteGitHubPartitionResults(node, []string{"build"}, owners)
+			if test.refuse {
+				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+				return
+			}
+			if err != nil || strings.Contains(githubYAMLValue(node, "run"), "needs)") || strings.Contains(githubYAMLValue(node, "run"), "needs.*") {
+				t.Fatalf("rewrite=%q error=%v", githubYAMLValue(node, "run"), err)
+			}
+		})
+	}
+}
+
+func TestGitHubPartitionCallerRefusesMissingResultMarkers(t *testing.T) {
+	plan := githubTestPlan(t)
+	bundle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := string(bundle.Files[bundle.WorkflowPath])
+	// Markers are replaced in their YAML-encoded form; the statuses marker is
+	// inside a single-quoted scalar, so its quotes are doubled.
+	for _, marker := range []string{"toJSON(needs)", "join(needs.*.result, '' '')"} {
+		t.Run(marker, func(t *testing.T) {
+			if !strings.Contains(raw, marker) {
+				t.Fatalf("rendered finalizer lacks %q", marker)
+			}
+			entry, workers, err := lowerGitHubPartitions(t.Context(), plan, []byte(strings.ReplaceAll(raw, marker, "github.job")))
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			if entry != nil || workers != nil {
+				t.Fatal("refused partition lowering returned partial output")
+			}
+		})
+	}
 }
 
 func TestGitHubPartitionActionlint(t *testing.T) {

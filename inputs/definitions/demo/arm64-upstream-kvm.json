@@ -11,7 +11,7 @@
   "outputs": [
     {
       "catalog": {
-        "base": "../../catalogs/capnico/local-arm64"
+        "base": "../../catalogs/capnico/local"
       },
       "components": [
         "capnico-controller"

@@ -1,0 +1,38 @@
+{
+  "apiVersion": "nvkr.dev/definition/v5",
+  "catalog": {
+    "base": "../../../catalogs/tools/native"
+  },
+  "kind": "Definition",
+  "metadata": {
+    "name": "nvke-native-linux-amd64-tools-complete"
+  },
+  "outputs": [
+    {
+      "components": [
+        "clusterctl-linux-amd64",
+        "helm-linux-amd64",
+        "kind-linux-amd64",
+        "kubectl-linux-amd64",
+        "nerdctl",
+        "nico-sim",
+        "nico-simctl",
+        "nvke-installer-sources",
+        "nvkectl",
+        "oras-linux-amd64"
+      ],
+      "format": "executable",
+      "name": "native-tools-linux-amd64",
+      "platform": "linux/amd64"
+    },
+    {
+      "components": [
+        "nerdctl",
+        "nvkr-site-identity-helper"
+      ],
+      "format": "executable",
+      "name": "site-startup-tools-amd64",
+      "platform": "linux/amd64"
+    }
+  ]
+}

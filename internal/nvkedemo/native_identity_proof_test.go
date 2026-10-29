@@ -299,7 +299,7 @@ func TestNativeIdentityInputsRequireUnmodifiedSelectedSources(t *testing.T) {
 			if tc.mutate != nil {
 				tc.mutate(tools, disk)
 			}
-			err := nativeIdentitySources(tools, disk, "tools-build", "disk-build", DiskOutputName)
+			err := nativeIdentitySources(tools, disk, "tools-build", "disk-build", DiskOutputName, "arm64")
 			if (err != nil) != tc.wantError {
 				t.Fatalf("source error=%v wantError=%v", err, tc.wantError)
 			}

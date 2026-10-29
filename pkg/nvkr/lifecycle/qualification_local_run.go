@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/qualificationprogress"
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -27,7 +28,14 @@ type LocalQualificationOptions struct {
 	CosignExecutable, RuntimeExecutable            string
 	Repository, Scratch, EvidenceOut               string
 	Registry                                       delivery.RegistryOptions
+	// Progress receives bounded descriptions synchronously and must return promptly.
+	// It supplies no authority; callback panics cannot interrupt owner cleanup.
+	Progress func(LocalQualificationProgress)
 }
+
+// LocalQualificationProgress is a bounded descriptive observation, not a
+// qualification receipt. Its public alias lets SDK callers install observers.
+type LocalQualificationProgress = qualificationprogress.Event
 
 // LocalQualificationReferences lists attempted destinations, including failures.
 // Serialized results describe completed checks; they cannot restore receipts.
@@ -91,6 +99,17 @@ func qualifyLocalRunWith(ctx context.Context, options LocalQualificationOptions,
 	if err := admitLocalEvidenceDestination(options.EvidenceOut); err != nil {
 		return result, err
 	}
+	ctx, activity := withLocalQualificationProgress(ctx, options.Progress)
+	activity.start(qualificationprogress.StageInputs)
+	// Registered before acquiring owners, so terminal progress follows their
+	// cleanup. A stage completion never substitutes for this function's result.
+	defer func() {
+		if err != nil {
+			activity.fail()
+		} else {
+			activity.finish()
+		}
+	}()
 	inputs, err := loadLocalQualificationInputs(ctx, options.Workspace)
 	if err != nil {
 		return result, err
@@ -118,6 +137,8 @@ func qualifyLocalRunWith(ctx context.Context, options LocalQualificationOptions,
 		return result, err
 	}
 	defer func() { err = errors.Join(err, capture.Close()) }()
+	activity.finish()
+	activity.start(qualificationprogress.StageBuilder)
 	built, err := signLocalBuildEvidence(ctx, inputs, capture, policy, options.CosignExecutable, keys[0])
 	if err != nil {
 		return result, err
@@ -137,6 +158,8 @@ func qualifyLocalRunWith(ctx context.Context, options LocalQualificationOptions,
 	if err := admitLocalPublicationScratch(ctx, build, options.Scratch); err != nil {
 		return result, err
 	}
+	activity.finish()
+	activity.start(qualificationprogress.StageSmoke)
 	smoke, err := smokeRun(ctx, build, NativeToolSmokeOptions{RuntimeExecutable: options.RuntimeExecutable})
 	if err != nil {
 		return result, err
@@ -155,6 +178,8 @@ func qualifyLocalRunWith(ctx context.Context, options LocalQualificationOptions,
 		return result, err
 	}
 	defer func() { err = errors.Join(err, verifiedSmoke.Close()) }()
+	activity.finish()
+	activity.start(qualificationprogress.StageQualifier)
 	gate, err := signLocalQualification(ctx, build, verifiedSmoke, options.CosignExecutable, keys[2])
 	if err != nil {
 		return result, err
@@ -171,6 +196,8 @@ func qualifyLocalRunWith(ctx context.Context, options LocalQualificationOptions,
 	if _, err := verifiedGate.writeEvidenceBundle(ctx, options.EvidenceOut); err != nil {
 		return result, err
 	}
+	activity.finish()
+	activity.start(qualificationprogress.StagePublish)
 	var consumer *localQualificationConsumer
 	result.Publication, consumer, err = publishLocalQualification(ctx, verifiedGate, options.Repository, options.Scratch, options.CosignExecutable, options.Registry)
 	if consumer != nil {

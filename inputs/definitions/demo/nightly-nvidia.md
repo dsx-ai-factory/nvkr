@@ -1,63 +1,58 @@
 # ARM64 nightly producer inputs
 
-This candidate selects the same 29 named outputs, components, platforms and Helm image bindings as
-`arm64-nvidia-tcg.json`. The CLI, controller image, controller chart and NKTP chart
-use the profile-owned [site catalog](../../catalogs/nvke/nightly-site-arm64/README.md); installer tools use the separate
-compatibility catalog described below. Other output selections retain their explicit catalogs. The root
-`../../catalogs/nvke/module-tags` supplies only the existing pinned GitHub Actions, Syft and cosign tools; it does not
-replace an output's producer selection. Acquired inputs and the mixed SPIRE source remain explicit.
+`arm64-nvidia-kvm.json` retains all 29 existing named outputs and adds five native
+runtime outputs: the CAPI init and exec-plugin images, the workload image, the
+complete Linux host-tool bundle and the guest startup-tool bundle. The resulting
+34-output producer remains in the existing `nvke-nightly-arm64` namespace; no
+second architecture producer is introduced.
 
-`../../catalogs/tools/installer-hosted-arm64` preserves the original clusterctl, kind, kubectl and ORAS source pins and
-build commands, declaring their actual executable outputs as `host-package`. Helm is the explicit
-acquired exception: the same upstream 4.2.4 ARM64 release, pinned by the catalog owner to its archive
-and executable hashes. Hosted source fetching rejects Helm's external test symlinks before its local
-diagnostic preparation could remove them. The profile does not weaken that fetch boundary or claim
-that acquired Helm is source-built. See the [tool evidence and security finding](../../catalogs/tools/installer-hosted-arm64/README.md).
+CLI, controller, provisioned-provider and chart outputs reuse
+`../../catalogs/nvke/native-site`. Simulator and host/site tool outputs reuse
+`../../catalogs/tools/native`. Controller profiles reuse
+`../../catalogs/controller-profiles/native-nvidia`. These are the existing
+native Go bootstrap inputs, not copied nightly catalogs. The retained
+`installer-tools-arm64` output continues to use the hosted installer catalog and
+its explicit acquired Helm exception.
 
-The disk selects the base M2 catalog's required-KVM ARM64 producer. `../../catalogs/node-images/variants/nvidia-kvm.json`
-retains three NVIDIA OVN replacements and their exact predecessor catalog digest, without the TCG-only
-disk replacement. These embedded producers still select 1.5.18; the local TCG overlay, standalone OVN
-outputs and selected profiles use 2.4.0. This unresolved content mismatch is preserved by the ownership
-move and requires a reviewed producer update before claiming matched NVIDIA runtime inputs.
-The alternative upstream OVN profile is authored separately in
-`arm64-upstream-kvm.json`; there is no automatic fallback between them.
+The disk applies the existing `native-nvidia.json` and `native-local-kvm.json`
+overlays to the release node-image catalog. Its NVIDIA OVN 2.4.2 producer agrees
+with the standalone OVN image and chart outputs. The overlays retain exact
+predecessor bindings and required native KVM execution; there is no upstream OVN
+fallback. The CAPI init output selects the separately reviewed current-main
+acquisition from the shared native-tools catalog. The tagged local demo retains
+its original acquisition.
 
-`../../environments/github-nightly-nvidia.json` selects the admitted native ARC KVM route and the M2 candidate's ARM64
-resource budgets, with `build-provenance-v1` disk evidence and `per-output-v1` signed publication.
-The workflow namespace is `nvke-nightly-arm64`; its exact main-branch signing identity is declared in
-the Environment. Publication uses `ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64`.
-These are authored candidate settings, not evidence of available runners, protected-environment
-admission, completed publication, runtime compatibility, FIPS/STIG compliance or qualification.
-The exact private OVN fork and NVKE source-access bindings pass the existing
-`NKE_SOURCE_TOKEN` only to their selected fetch steps. Public upstream OVN does
-not receive that binding.
+The existing `github-nightly-nvidia.json` Environment retains ARC ARM64 KVM disk
+production, `build-provenance-v1` evidence, private/internal artifact storage and
+`per-output-v1` signed publication. Its publication prefix remains
+`ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64`; its exact main-branch
+signing identity remains in the Environment. Source credentials are passed only
+to the selected fetch owners.
 
-Generate the initial reviewed workflow contract through the existing owner:
+Regenerate this existing bundle through its owner after changing output membership:
 
 ```sh
 bin/nvkr definition validate --definition inputs/definitions/demo/arm64-nvidia-kvm.json
-bin/nvkr run generate \
+bin/nvkr run generate --engine github \
   --definition inputs/definitions/demo/arm64-nvidia-kvm.json \
-  --environment inputs/environments/github-nightly-nvidia.json
+  --environment inputs/environments/github-nightly-nvidia.json --root .
 ```
 
-The Environment selects `githubRuntimePlan: true`. Routine catalog-pin updates are compiled on each
-producer dispatch and do not require another regeneration commit. The producer freezes one Plan for
-all jobs; `run generate --runtime --check` validates its unchanged workflow/action and Environment
-contract without writing files. Changes to that contract require normal regeneration and review.
+The Environment selects `githubRuntimePlan: true` and an explicit
+`githubRuntimeSource` policy for NVKE main. The coordinator resolves main once
+and passes its full commit through the generated producer's required
+`source_commit` dispatch input. The catalog owner authenticates that exact Git
+tree and applies it after existing overlays to every source-built NVKE product,
+including disk materials and the installer. Commands, toolchains and separately
+acquired dependencies retain their reviewed selections. No catalog lock or
+authored overlay is rewritten.
 
-The downstream nightly workflow owns executing the NVKE runtime suite. Definition validation and
-workflow generation establish neither runtime E2E success nor hardware acceptance. Runner capacity,
-toolchain access, source access and protected-environment policy require independent admission.
+Bootstrap freezes that source in the existing same-Run Plan transport. Secondary
+bootstrap and finalization recompile with the same exact commit; mixed-source or
+changed dispatch inputs fail. Routine source changes within the reviewed workflow
+contract do not require regeneration; changes to membership, scheduling or
+Environment policy do. This producer does not emit a qualification input handoff.
 
-`../../testing/nightly-profiles.json` selects this project's generated producer and exact NVKE suite revision.
-The coordinator checks supported native ARM64 runtime and OVN selections, authenticates the complete
-publication, and requires both test and cleanup verdicts. Checksum-pinned tool acquisition adds no
-vulnerability-clearance claim. The suite and all four site-product sources select
-`a8391755d12d99f859783c6cf390338debd1e085`, including its `^TestE2E$` runtime entrypoint
-selection and candidate-input fixes. This candidate comes from open NVKE PR #1580;
-it is not a merged-main or human-approval claim. The shared revision follows ADR-23's
-proposed matching-revision rule without establishing overall interface adoption.
-The [first scheduled attempt](https://github.com/dsx-ai-factory/nvkr/actions/runs/38676875690)
-failed during producer execution and skipped runtime tests. A successful combined
-cycle remains unrecorded; see the [nightly guide](../../../docs/nvke-nightly.md).
+The downstream native Go test consumes the completed, authenticated producer
+artifacts. Definition validation and Plan compilation prove neither successful
+publication nor VM bootstrap, cleanup, FIPS/STIG compliance or qualification.

@@ -14,10 +14,7 @@ import (
 
 const githubPartitionReporter = "nvkr-partition-results"
 
-var (
-	githubPartitionSecret      = regexp.MustCompile(`(?i)\bsecrets(?:\s*\.\s*([a-z_][a-z0-9_]*)|\s*\[\s*'([a-z_][a-z0-9_]*)'\s*\])`)
-	githubPartitionSecretsWord = regexp.MustCompile(`(?i)\bsecrets\b`)
-)
+var githubSecretName = regexp.MustCompile(`(?i)^[a-z_][a-z0-9_]*$`)
 
 // renderGitHubPartition keeps original job IDs: shared action selection uses
 // github.job to select parameters from the complete, unchanged Plan.
@@ -107,27 +104,189 @@ func renderGitHubPartition(ctx context.Context, plan *Plan, raw []byte, partitio
 	return encoded, githubNeedsContext(ctx)
 }
 
-func githubPartitionSecretNames(node *yamlv3.Node) ([]string, error) {
-	var names []string
-	if node.Kind == yamlv3.ScalarNode {
-		for _, match := range githubPartitionSecret.FindAllStringSubmatch(node.Value, -1) {
-			name := strings.ToUpper(match[1] + match[2])
-			if name != "GITHUB_TOKEN" {
-				names = append(names, name)
+func githubPartitionSecretNames(workflow *yamlv3.Node) ([]string, error) {
+	names, err := githubPartitionScalarSecretNames(workflow)
+	if err != nil {
+		return nil, err
+	}
+	// GitHub evaluates job and step if values as expressions even without
+	// ${{ }}; other keys named if, such as env.if, remain data.
+	var conditions []*yamlv3.Node
+	if jobs := githubYAMLField(workflow, "jobs"); jobs != nil && jobs.Kind == yamlv3.MappingNode {
+		for index := 1; index < len(jobs.Content); index += 2 {
+			job := jobs.Content[index]
+			conditions = append(conditions, githubYAMLField(job, "if"))
+			if steps := githubYAMLField(job, "steps"); steps != nil && steps.Kind == yamlv3.SequenceNode {
+				for _, step := range steps.Content {
+					conditions = append(conditions, githubYAMLField(step, "if"))
+				}
 			}
 		}
-		if githubPartitionSecretsWord.MatchString(githubPartitionSecret.ReplaceAllString(node.Value, "")) {
-			return nil, e.New(e.CodeEngineCapability, "GitHub partition requires statically named secret references")
+	}
+	for _, condition := range conditions {
+		if condition == nil || condition.Kind != yamlv3.ScalarNode || strings.Contains(condition.Value, "${{") {
+			continue
+		}
+		conditionNames, err := githubPartitionExpressionSecretNames(condition.Value)
+		if err != nil {
+			return nil, err
+		}
+		names = append(names, conditionNames...)
+	}
+	return uniqueSorted(names), nil
+}
+
+func githubPartitionScalarSecretNames(node *yamlv3.Node) ([]string, error) {
+	var names []string
+	if node.Kind == yamlv3.ScalarNode {
+		expressions, err := githubExpressions(node.Value)
+		if err != nil {
+			return nil, err
+		}
+		for _, expression := range expressions {
+			expressionNames, err := githubPartitionExpressionSecretNames(expression)
+			if err != nil {
+				return nil, err
+			}
+			names = append(names, expressionNames...)
 		}
 	}
 	for _, child := range node.Content {
-		childNames, err := githubPartitionSecretNames(child)
+		childNames, err := githubPartitionScalarSecretNames(child)
 		if err != nil {
 			return nil, err
 		}
 		names = append(names, childNames...)
 	}
-	return uniqueSorted(names), nil
+	return names, nil
+}
+
+// githubPartitionExpressionSecretNames lexes one expression: it skips string
+// literals and property identifiers, so only the root secrets context counts,
+// and it requires each root reference to name one static secret.
+func githubPartitionExpressionSecretNames(expression string) ([]string, error) {
+	var names []string
+	afterDot := false
+	for index := 0; index < len(expression); {
+		switch character := expression[index]; {
+		case character == '\'':
+			index = githubExpressionStringEnd(expression, index)
+			afterDot = false
+		case githubIdentifierStart(character):
+			end := githubIdentifierEnd(expression, index)
+			root := !afterDot && strings.EqualFold(expression[index:end], "secrets")
+			afterDot = false
+			index = end
+			if !root {
+				continue
+			}
+			name, next, ok := githubPartitionStaticSecret(expression, end)
+			if !ok {
+				return nil, e.New(e.CodeEngineCapability, "GitHub partition requires statically named secret references")
+			}
+			if name = strings.ToUpper(name); name != "GITHUB_TOKEN" {
+				names = append(names, name)
+			}
+			index = next
+		case character == ' ' || character == '\t' || character == '\n' || character == '\r':
+			index++
+		default:
+			afterDot = character == '.'
+			index++
+		}
+	}
+	return names, nil
+}
+
+// githubPartitionStaticSecret reads .NAME or ['NAME'] after a root secrets
+// identifier and returns the name and the index after it.
+func githubPartitionStaticSecret(expression string, index int) (string, int, bool) {
+	index = githubSkipSpace(expression, index)
+	if index < len(expression) && expression[index] == '.' {
+		start := githubSkipSpace(expression, index+1)
+		if start == len(expression) || !githubIdentifierStart(expression[start]) {
+			return "", 0, false
+		}
+		end := githubIdentifierEnd(expression, start)
+		return expression[start:end], end, githubSecretName.MatchString(expression[start:end])
+	}
+	if index < len(expression) && expression[index] == '[' {
+		start := githubSkipSpace(expression, index+1)
+		if start == len(expression) || expression[start] != '\'' {
+			return "", 0, false
+		}
+		end := githubExpressionStringEnd(expression, start)
+		if end <= start+1 || expression[end-1] != '\'' {
+			return "", 0, false
+		}
+		name := expression[start+1 : end-1]
+		bracket := githubSkipSpace(expression, end)
+		if bracket == len(expression) || expression[bracket] != ']' || !githubSecretName.MatchString(name) {
+			return "", 0, false
+		}
+		return name, bracket + 1, true
+	}
+	return "", 0, false
+}
+
+func githubExpressionStringEnd(expression string, index int) int {
+	for index++; index < len(expression); index++ {
+		if expression[index] == '\'' {
+			if index+1 < len(expression) && expression[index+1] == '\'' {
+				index++
+				continue
+			}
+			return index + 1
+		}
+	}
+	return len(expression)
+}
+
+func githubIdentifierStart(character byte) bool {
+	return character == '_' || ('a' <= character && character <= 'z') || ('A' <= character && character <= 'Z')
+}
+
+func githubIdentifierEnd(expression string, index int) int {
+	for index < len(expression) && (githubIdentifierStart(expression[index]) || expression[index] == '-' ||
+		('0' <= expression[index] && expression[index] <= '9')) {
+		index++
+	}
+	return index
+}
+
+func githubSkipSpace(expression string, index int) int {
+	for index < len(expression) && strings.ContainsRune(" \t\n\r", rune(expression[index])) {
+		index++
+	}
+	return index
+}
+
+// githubExpressions returns the bodies of ${{ }} spans. A closing }} inside a
+// single-quoted string literal does not end the span; an unterminated span is
+// refused rather than treated as literal text.
+func githubExpressions(value string) ([]string, error) {
+	var expressions []string
+	for {
+		start := strings.Index(value, "${{")
+		if start < 0 {
+			return expressions, nil
+		}
+		value = value[start+3:]
+		quoted, end := false, -1
+		for index := 0; index < len(value) && end < 0; index++ {
+			switch {
+			case value[index] == '\'':
+				quoted = !quoted
+			case !quoted && strings.HasPrefix(value[index:], "}}"):
+				end = index
+			}
+		}
+		if end < 0 {
+			return nil, e.New(e.CodeEngineCapability, "GitHub partition found an unterminated expression")
+		}
+		expressions = append(expressions, value[:end])
+		value = value[end+2:]
+	}
 }
 
 func projectGitHubPartitionJob(plan *Plan, id string, source *yamlv3.Node, parents []string, owners map[string]string, scheduling executionCondition) (*yamlv3.Node, error) {

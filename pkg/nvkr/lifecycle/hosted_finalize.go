@@ -36,10 +36,30 @@ func finalizeGenerated(ctx context.Context, definitionPath, environmentPath, pla
 	if workspace == "" {
 		return nil, e.New(e.CodeUsage, "hosted Run finalization requires a workspace")
 	}
+	// Preserve authored-input admission before reading a generated Plan. These
+	// bounded document reads do not compile catalogs or acquire source trees.
+	if _, err := LoadDefinition(ctx, definitionPath); err != nil {
+		return nil, err
+	}
+	if _, err := LoadEnvironment(ctx, environmentPath); err != nil {
+		return nil, err
+	}
 	var expectedPlan *factory.Plan
 	var inputs factory.InputSnapshot
 	var err error
-	if handoffPath != "" {
+	plan, err := factory.LoadPlanContext(ctx, planPath)
+	if err != nil {
+		return nil, err
+	}
+	if plan.Environment.GitHubRuntimeSource != nil && plan.RuntimeSourceCommit == "" {
+		return nil, e.New(e.CodeUnpinnedSource, "hosted source-policy Run lacks its frozen source commit")
+	}
+	if plan.RuntimeSourceCommit != "" && handoffPath != "" {
+		return nil, e.New(e.CodeEngineCapability, "runtime source selection has no qualification input-capture replay route")
+	}
+	if plan.RuntimeSourceCommit != "" {
+		expectedPlan, err = CompileRuntimeSourceFiles(ctx, definitionPath, environmentPath, generatorVersion, plan.RuntimeSourceCommit)
+	} else if handoffPath != "" {
 		expectedPlan, inputs, err = factory.CaptureCompileFiles(ctx, ".", definitionPath, environmentPath, generatorVersion)
 	} else {
 		expectedPlan, err = CompileFiles(ctx, definitionPath, environmentPath, generatorVersion)
@@ -48,10 +68,6 @@ func finalizeGenerated(ctx context.Context, definitionPath, environmentPath, pla
 		return nil, err
 	}
 	definition, environment := expectedPlan.Definition, expectedPlan.Environment
-	plan, err := factory.LoadPlanContext(ctx, planPath)
-	if err != nil {
-		return nil, err
-	}
 	want, err := expectedPlan.Digest()
 	if err != nil {
 		return nil, err
