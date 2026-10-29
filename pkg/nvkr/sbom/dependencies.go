@@ -25,10 +25,10 @@ func WithDependencies(bom *BOM, components []Component, method, scannerDigest st
 	if err != nil || artifact == "" || len(bom.Metadata.Component.Hashes) != 1 {
 		return nil, e.New(e.CodeProvenanceMissing, "dependency inventory requires a per-artifact subject")
 	}
-	if method != "helm-manifests/v1" && method != "syft-cyclonedx/v1" && method != "disk-reconciled/v1" && method != "disk-content/v1" && method != archiveContentMethod {
+	if !supportedDependencyMethod(method) {
 		return nil, e.New(e.CodeUnsupported, "unsupported dependency inspection method %q", method)
 	}
-	if method != "helm-manifests/v1" && method != archiveContentMethod && !canonical.IsDigest(scannerDigest) {
+	if dependencyMethodNeedsScanner(method) && !canonical.IsDigest(scannerDigest) {
 		return nil, e.New(e.CodeUnverifiedRef, "dependency inventory requires the scanner executable digest")
 	}
 	if len(components) == 0 {
@@ -132,12 +132,19 @@ func validateInventorySemantics(bom *BOM, artifact string) error {
 	if method == "disk-reconciled/v1" && bom.Metadata.Component.Type != "operating-system" {
 		return e.New(e.CodeVerifyFailed, "reconciled disk inventory requires an operating-system subject")
 	}
+	if method == BundleFilesMethod && artifact == "" {
+		return e.New(e.CodeVerifyFailed, "bundle inventory requires an exact per-artifact subject")
+	}
 	archivePaths := map[string]byte{}
 	for _, component := range bom.Components {
 		if archiveInventory && (component.Type != "file" || !archiveMemberPath(component.Name) || component.Version != "" || component.PURL != "" || len(component.Properties) != 0) {
 			return e.New(e.CodeVerifyFailed, "archive content inventory admits only member paths and exact file hashes")
 		}
-		if component.Type == "file" && !diskInventory && !archiveInventory {
+		if method == BundleFilesMethod {
+			if err := validateBundleFileComponent(component); err != nil {
+				return err
+			}
+		} else if component.Type == "file" && !diskInventory && !archiveInventory {
 			return e.New(e.CodeVerifyFailed, "file inventory requires its descriptive disk-content or reconciled disk method")
 		}
 		if archiveInventory {
@@ -169,11 +176,14 @@ func validateDependencies(bom *BOM) error {
 	if method == "" {
 		return e.New(e.CodeProvenanceMissing, "dependency inventory omits its inspection method")
 	}
-	if method != "helm-manifests/v1" && method != "syft-cyclonedx/v1" && method != "disk-reconciled/v1" && method != "disk-content/v1" && method != archiveContentMethod {
+	if !supportedDependencyMethod(method) {
 		return e.New(e.CodeUnsupported, "unsupported dependency inspection method %q", method)
 	}
-	if method != "helm-manifests/v1" && method != archiveContentMethod && !canonical.IsDigest(scanner) {
+	if dependencyMethodNeedsScanner(method) && !canonical.IsDigest(scanner) {
 		return e.New(e.CodeUnverifiedRef, "dependency inventory has no scanner pin")
+	}
+	if method == BundleFilesMethod && scanner != "" {
+		return e.New(e.CodeVerifyFailed, "bundle file inventory uses the internal archive reader, not an external scanner")
 	}
 	if len(bom.Metadata.Component.Hashes) != 1 || bom.Metadata.Component.BOMRef != "artifact:"+bom.Metadata.Component.Hashes[0].Content {
 		return e.New(e.CodeUnverifiedRef, "dependency SBOM must bind its root to the exact artifact")
@@ -187,4 +197,12 @@ func validateDependencies(bom *BOM) error {
 		}
 	}
 	return nil
+}
+
+func supportedDependencyMethod(method string) bool {
+	return method == "helm-manifests/v1" || method == "syft-cyclonedx/v1" || method == "disk-reconciled/v1" || method == "disk-content/v1" || method == archiveContentMethod || method == BundleFilesMethod
+}
+
+func dependencyMethodNeedsScanner(method string) bool {
+	return method != "helm-manifests/v1" && method != archiveContentMethod && method != BundleFilesMethod
 }

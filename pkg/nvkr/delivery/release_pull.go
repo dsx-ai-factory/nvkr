@@ -157,6 +157,12 @@ func pullOutput(ctx context.Context, reference, output, out, workspace string, o
 			return PulledOutput{}, err
 		}
 		result.Files = []PulledFile{file}
+	case outputFormatBundle:
+		file, err := pullBundleOutput(ctx, selected.Reference, out, layout, stage, object, options)
+		if err != nil {
+			return PulledOutput{}, err
+		}
+		result.Files = []PulledFile{file}
 	case "apt-repository":
 		if err := pullAPTOutput(ctx, selected.Reference, out, layout, stage, object, options); err != nil {
 			return PulledOutput{}, err

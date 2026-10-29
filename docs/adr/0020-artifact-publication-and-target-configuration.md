@@ -266,6 +266,7 @@ format-specific payload membership before exposing the new destination. The supp
 | `executable` | Exact regular bundle files by recorded name, SHA-256, size and mode; absolute installation suggestions are not followed |
 | `disk-image` | `<output-name>.qcow2` containing the exact plain or declared LUKS2-encrypted QCOW2 payload bytes; no decryption |
 | `helm-oci` | `<output-name>.tgz` containing the unchanged compressed chart archive |
+| `bundle-oci` | `<output-name>.tar.gz` containing the unchanged validated generic bundle archive; no extraction or execution |
 | `oci` | A standard OCI layout retaining exact native OCI or Docker schema-2 manifests, configs and layers; an aggregate OCI index includes every declared native platform and its full payload closure |
 | `apt-repository` | The complete checked repository tree of regular files and owner-readable, searchable directories; every file, including indexes, is digest-bound to the archive, and links and special files are rejected |
 

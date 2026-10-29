@@ -136,9 +136,9 @@ func metadataObjectPlatform(ctx context.Context, root string, object PublishedOb
 	}
 	if object.Output != nil {
 		switch object.Output.Format {
-		case outputFormatHelm:
+		case outputFormatHelm, outputFormatBundle:
 			if object.Output.TransportPath != "" {
-				return platform, e.New(e.CodeVerifyFailed, "Helm output has an unexpected transport path")
+				return platform, e.New(e.CodeVerifyFailed, "archive output has an unexpected transport path")
 			}
 			platform = publicationPlatform{OS: object.OS, Arch: object.Arch}
 		case "apt-repository":
