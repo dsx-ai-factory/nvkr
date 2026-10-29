@@ -1135,7 +1135,11 @@ identities rather than rebuilding those members merely to describe the compositi
 Incremental equality identifies candidates for reuse. Required named outputs remain independent even when their
 Build Digests match; no cross-output execution or evidence reuse is authorized by digest equality. Qualified
 reuse requires prior authenticated evidence rebound to the current policy and member; unused incremental and
-rollback helpers are removed and those workflows remain deferred (ADR-16). v1 production acceptance retains its AMD64 floor. Additional ARM64 candidate outputs remain mandatory
+rollback helpers are removed and those workflows remain deferred (ADR-16). Proposed ADR-25 designs
+pipeline-attested cross-Run reuse of complete named outputs: a Plan-derived key binding output, build inputs,
+toolchain profile, platform, evidence set, lane, origin and signer policy; untrusted discovery; owner-issued
+acceptance; and a `reused` Run origin that retains original provenance instead of claiming current execution.
+One frozen decision set serves every execution partition. It is not implemented. v1 production acceptance retains its AMD64 floor. Additional ARM64 candidate outputs remain mandatory
 when selected by the Definition. M2 and the M3 MVP retain producer-only disk evidence; strict inspection and
 material reconciliation are deferred hardening (ADR-13 §6). Organizational ratification remains separate.
 

@@ -90,6 +90,9 @@ adapter selection and artifact bindings across repositories, including its diagn
 The provisional local-plan CLI slice implements catalog discovery and versioned-profile execution;
 broader adapter and profile support remains deferred.
 
+Proposed [ADR-25: authenticated result reuse](adr/0025-authenticated-result-reuse.md) designs cross-Run reuse
+of complete named outputs and the test matrix for implementing it; reuse is not implemented.
+
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
 Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) covers branch
 dispatch, separate generated development bundles, artifact downloads and short retention.

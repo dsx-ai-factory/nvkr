@@ -84,6 +84,13 @@ A frozen requirement established from resolved intent before execution and later
 bytes for the exact named output and target. A successful sibling cannot satisfy it through digest equality.
 _Avoid_: Successful output, observed inventory
 
+**Result reuse (proposed)**:
+Satisfying a required output slot with a complete, previously published output of the same name after the owning
+module authenticates it under the current policy. Discovery only finds candidates; an acceptance receipt binds
+the output into the current Run as reused, with its original origin and provenance. Proposed
+[ADR-25](docs/adr/0025-authenticated-result-reuse.md) designs the pipeline-attested contract; it is not implemented.
+_Avoid_: Cache hit, Build Digest match, skipped job, sibling reuse
+
 **Generated build graph**:
 The compiler-derived build or acquisition closure for one output's exact producer selection, target and pins.
 It is validated as a complete executable graph before its logical identity is projected.
