@@ -7,6 +7,7 @@ import (
 	"context"
 	"runtime"
 
+	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
@@ -61,9 +62,6 @@ func admitExecutionNode(ctx context.Context, plan *Plan, nodeID string) (Node, e
 	if err := plan.Validate(); err != nil {
 		return Node{}, err
 	}
-	if err := rejectUnjoinedDebianPlan(plan, "factory execute-node"); err != nil {
-		return Node{}, err
-	}
 	if err := admitDevelopmentHostedContext(plan); err != nil {
 		return Node{}, err
 	}
@@ -75,6 +73,11 @@ func admitExecutionNode(ctx context.Context, plan *Plan, nodeID string) (Node, e
 	}
 	for _, node := range plan.Graph.Nodes {
 		if node.ID == nodeID {
+			for _, output := range plan.Definition.Outputs {
+				if output.Name == node.BuildTarget && output.Format == authored.OutputDebianPackage {
+					return Node{}, e.New(e.CodeEngineCapability, "raw Debian output operations require local lifecycle execution")
+				}
+			}
 			return node, nil
 		}
 	}

@@ -395,7 +395,7 @@ func packageMediaType(kind string) string {
 
 func artifactMediaType(kind string) string {
 	switch kind {
-	case "host-package", authored.OutputDebianPackage:
+	case "host-package":
 		return "application/vnd.debian.binary-package"
 	case "oci-image":
 		return "application/vnd.oci.image.manifest.v1+json"

@@ -111,11 +111,6 @@ test: ## Fast default tests for CI and agents (no extended fixtures or instrumen
 test-shard: go-version-check ## Reproduce one CI test shard (TEST_SHARD_GROUP and TEST_SHARD_INDEX required).
 	python3 -B scripts/ci-test-shard.py --group '$(TEST_SHARD_GROUP)' --index '$(TEST_SHARD_INDEX)' --timeout '$(GO_TEST_TIMEOUT)'
 
-.PHONY: test-debian-contracts
-test-debian-contracts: go-version-check ## Debian custody/content contracts with production capacity checks on Linux.
-	@test "$$(uname -s)" = Linux || { echo "Debian contract tests require Linux" >&2; exit 1; }
-	NVKR_TEST_DEBIAN_CONTENT_RUNTIME=1 NVKR_TEST_DEBIAN_DOCUMENT_LIMIT=1 go test -race -count=1 -p 1 -timeout 10m ./pkg/nvkr/factory -run '^TestDebian'
-
 .PHONY: test-race
 test-race: ## Opt-in race detection and coverage for the default suite.
 	go test -timeout 20m -race -covermode=atomic -coverprofile=coverage.out $(GO_TEST_FLAGS) $(PKG)

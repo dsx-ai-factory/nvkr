@@ -18,8 +18,7 @@ var (
 	// matches neither and fails closed (NVKR-FR-RC-024, NVKR-FR-BLD-010).
 	digestPinned   = regexp.MustCompile(`(?:@|^)sha256:[0-9a-f]{64}$`)
 	knownOutputSet = map[string]bool{
-		OutputDebianPackage: true,
-		"host-package":      true, "oci-image": true, "disk-image": true, "raw": true, "tarball": true,
+		"host-package": true, "oci-image": true, "disk-image": true, "raw": true, "tarball": true,
 	}
 	// prebuiltOutputSet constrains a prebuilt component's delivery form: URL bytes
 	// become a host-package, raw file, or tarball; an Image is itself the oci-image.
@@ -52,7 +51,6 @@ type registryDoc struct {
 // rawComponent is a component as authored: it references a source by name and
 // carries version-stamp templates, not resolved pins.
 type rawComponent struct {
-	Debian                 *DebianSpec         `json:"debian,omitempty"`
 	Embeds                 *EmbeddedComponents `json:"embeds,omitempty"`
 	Helm                   *HelmPackaging      `json:"helm,omitempty"`
 	PinnedBy               string              `json:"pinnedBy,omitempty"`

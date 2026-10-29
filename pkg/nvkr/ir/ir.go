@@ -11,7 +11,6 @@ package ir
 import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/material"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 // SchemaVersion identifies the IR shape; it participates in the digest so a schema
@@ -205,7 +204,6 @@ type Node struct {
 	Disk         *DiskSpec         `json:"disk,omitempty"`
 	Packer       *PackerConfig     `json:"packer,omitempty"`
 	Materials    []MaterialBinding `json:"materials,omitempty"`
-	Debian       *target.Debian    `json:"debian,omitempty"`
 	OutputType   string            `json:"outputType,omitempty"`   // host-package | oci-image | ...
 	ArtifactPath string            `json:"artifactPath,omitempty"` // built artifact, relative to Workdir
 	Version      string            `json:"version,omitempty"`      // component version (from the pin tag), for packaging

@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/environment/v1
+kind: Environment
+metadata:
+  name: nvsentinel-ubuntu-26.04-amd64-candidate
+utilityPlatform: linux/amd64
+utilityContainer: docker.io/library/nvkr-nvsentinel-ubuntu-26.04-amd64@sha256:fb19d5e7aa08d6d870eabff80fb012d6edf1c73cebad636f3d977bbbc7ad5eb8
+runtime:
+  runtime: docker
+  buildNetworkPolicy: producer-declared

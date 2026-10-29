@@ -19,7 +19,6 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/discoverytags"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 	"github.com/google/go-containerregistry/pkg/name"
 )
 
@@ -70,15 +69,14 @@ type Catalog struct {
 // DefinitionOutput is a named artifact slot frozen before a run. Components
 // selects exact outputs of one build; format selects the standard envelope.
 type DefinitionOutput struct {
-	Name       string        `json:"name"`
-	Platform   string        `json:"platform,omitempty"`
-	Platforms  []string      `json:"platforms,omitempty"`
-	Catalog    *Catalog      `json:"catalog,omitempty"`
-	Components []string      `json:"components,omitempty"`
-	Format     string        `json:"format"`
-	APT        *APTOutput    `json:"apt,omitempty"`
-	Debian     *DebianOutput `json:"debian,omitempty"`
-	Helm       *HelmOutput   `json:"helm,omitempty"`
+	Name       string      `json:"name"`
+	Platform   string      `json:"platform,omitempty"`
+	Platforms  []string    `json:"platforms,omitempty"`
+	Catalog    *Catalog    `json:"catalog,omitempty"`
+	Components []string    `json:"components,omitempty"`
+	Format     string      `json:"format"`
+	APT        *APTOutput  `json:"apt,omitempty"`
+	Helm       *HelmOutput `json:"helm,omitempty"`
 }
 
 // HelmOutput maps chart image slots to named OCI outputs. Repository locations
@@ -90,12 +88,6 @@ type HelmOutput struct {
 type APTOutput struct {
 	Distribution string `json:"distribution"`
 	Component    string `json:"component"`
-}
-
-// DebianOutput selects a source-owned distribution/ABI profile, independently of
-// an APT publication suite. Omission resolves the standalone default at compilation.
-type DebianOutput struct {
-	Distribution string `json:"distribution,omitempty"`
 }
 
 // Environment contains settings independently selected for one run. Publish
@@ -232,22 +224,8 @@ func (definition Definition) Validate() error {
 		if output.Format == OutputOCI && len(output.Components) != 1 {
 			return e.New(e.CodeInvalidCatalog, "definition OCI output %q requires exactly one image component", output.Name)
 		}
-		if output.Format == OutputDebianPackage {
-			if len(output.Components) != 1 {
-				return e.New(e.CodeInvalidCatalog, "Debian output %q requires one source producer", output.Name)
-			}
-			request := output.DebianTargetRequest()
-			if request.Distribution == "" {
-				request.Distribution = target.DefaultDebianDistribution
-			}
-			if request.Platform == "" {
-				request.Platform = target.DefaultDebianPlatform
-			}
-			if err := request.Validate(); err != nil {
-				return err
-			}
-		} else if output.Debian != nil {
-			return e.New(e.CodeInvalidCatalog, "output %q has Debian-only settings", output.Name)
+		if output.Format == OutputDebianPackage && len(output.Components) != 1 {
+			return e.New(e.CodeInvalidCatalog, "Debian output %q requires one source producer", output.Name)
 		}
 		if output.Format == OutputAPT {
 			if output.APT == nil || !namePattern.MatchString(output.APT.Distribution) || !namePattern.MatchString(output.APT.Component) {

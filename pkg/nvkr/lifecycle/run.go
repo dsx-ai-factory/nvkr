@@ -124,9 +124,6 @@ func bindObserved(run *Run, artifacts []Artifact) (*Run, error) {
 			return nil, e.New(e.CodeVerifyFailed,
 				"run disk artifact %q does not bind its frozen Plan identity", artifact.Name)
 		}
-		if artifact.Kind == OutputDebianPackage && artifact.Debian != nil && (artifact.Debian.PlanDigest != run.PlanDigest || artifact.Debian.Subject != slot.MemberArtifactID) {
-			return nil, e.New(e.CodeVerifyFailed, "run Debian artifact %q does not bind its frozen Plan and named output", artifact.Name)
-		}
 		seen[artifact.Name] = true
 		copyRun.Observed = append(copyRun.Observed, cloneArtifact(artifact))
 	}

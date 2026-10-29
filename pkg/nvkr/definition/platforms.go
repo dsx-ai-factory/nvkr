@@ -11,9 +11,6 @@ import (
 )
 
 func (output DefinitionOutput) validatePlatforms() error {
-	if output.Format == OutputDebianPackage && output.Platform == "" && output.Platforms == nil {
-		return nil
-	}
 	if output.Platforms == nil {
 		if output.Format == OutputExecutable {
 			return target.ValidateExecutablePlatform(output.Platform)
@@ -32,19 +29,7 @@ func (output DefinitionOutput) TargetPlatforms() []string {
 	if len(output.Platforms) > 0 {
 		return slices.Clone(output.Platforms)
 	}
-	if output.Format == OutputDebianPackage && output.Platform == "" {
-		return []string{target.DefaultDebianPlatform}
-	}
 	return []string{output.Platform}
-}
-
-// DebianTargetRequest describes authored target intent, before route admission.
-func (output DefinitionOutput) DebianTargetRequest() target.Debian {
-	request := target.Debian{Platform: output.Platform}
-	if output.Debian != nil {
-		request.Distribution = output.Debian.Distribution
-	}
-	return request
 }
 
 // SupportsPlatform checks whether the declared payload covers a chart's target.

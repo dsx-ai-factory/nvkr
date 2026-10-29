@@ -63,12 +63,6 @@ type RunOptions struct {
 	// sources is a run-owned single-flight cache for exact prepared source inputs.
 	// It is intentionally private: authority and lifetime cannot cross a Run call.
 	sources *preparedSourceCache
-	// Private retained-byte owner; public Debian Run admission remains closed.
-	debianArchives *debianArchiveOwner
-	debianBinding  *debianProducerBindingState
-	debianExecutor *DebianProducerExecutor
-	debianSubject  string
-	debianRuntime  *heldRuntimeExecutable
 	// fetchDirectory is the current fetch owner's held checkout, not a caller path.
 	fetchDirectory        *os.File
 	fetchGitDirectory     *os.File
@@ -115,8 +109,6 @@ const (
 // ArtifactResult records one built artifact and its content digest — the seed for
 // the expected-digests manifest (SRD §6.3).
 type ArtifactResult struct {
-	// This private live capability cannot be recreated from serialized results.
-	debian        *DebianProducerArchive
 	Component     string                `json:"component"`
 	OutputType    string                `json:"outputType"`
 	Qualification ArtifactQualification `json:"qualification"`

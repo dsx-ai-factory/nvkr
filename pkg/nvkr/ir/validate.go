@@ -68,12 +68,11 @@ var allowedBuildEnv = map[string]bool{
 }
 
 var knownOutputTypes = map[string]bool{
-	"host-package":   true,
-	"debian-package": true,
-	"oci-image":      true,
-	"disk-image":     true,
-	"raw":            true,
-	"tarball":        true,
+	"host-package": true,
+	"oci-image":    true,
+	"disk-image":   true,
+	"raw":          true,
+	"tarball":      true,
 }
 
 // Validate is the single semantic authority for executable IR. It deliberately
@@ -309,17 +308,6 @@ func VendorSpecIdentity(command []string, image string) (string, error) {
 }
 
 func validateBuildNode(n Node) error {
-	if n.OutputType == "debian-package" {
-		if n.Debian == nil || n.BuilderType != BuilderOCIHermetic || n.Debian.Platform != n.Platform || len(n.Materials) != 0 {
-			return e.New(e.CodeInvalidCatalog, "Debian build requires one exact target and OCI-hermetic source producer")
-		}
-		if err := n.Debian.Validate(); err != nil {
-			return err
-		}
-	} else if n.Debian != nil {
-		return e.New(e.CodeInvalidCatalog, "Debian target on non-Debian build")
-	}
-
 	if n.BuilderType == BuilderVMImage {
 		return validateVMImageNode(n)
 	}
@@ -328,7 +316,7 @@ func validateBuildNode(n Node) error {
 		"component", "builderType", "flakeRef", "flakeOutput", "flakeLockDigest",
 		"toolchain", "toolchainPlatform", "platform", "network", "env", "patches", "command", "workdir",
 		"sourceDest", "sourceCommit", "sourceTreeHash", "vendorSpecDigest",
-		"sourceReadOnly", "writeDir", "materials", "debian", "outputType", "artifactPath", "version")); err != nil {
+		"sourceReadOnly", "writeDir", "materials", "outputType", "artifactPath", "version")); err != nil {
 		return err
 	}
 	if n.ExecutionBinding != nil {

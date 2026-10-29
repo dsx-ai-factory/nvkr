@@ -28,5 +28,5 @@ func validateGraphIdentity(g *ir.Graph, buildDigest string) error {
 		return e.New(e.CodeVerifyFailed,
 			"pipeline buildDigest %q does not match validated graph digest %s", buildDigest, digest)
 	}
-	return rejectUnjoinedDebian(g.Nodes, "pipeline graph execution")
+	return nil
 }

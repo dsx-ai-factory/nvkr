@@ -10,7 +10,6 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 func TestGraphNVKECLIStampAdmissionAndIdentity(t *testing.T) {
@@ -164,31 +163,5 @@ func TestGraphValidateRejectsDuplicateDependenciesAndEnvironment(t *testing.T) {
 	graph.Nodes[0].Env = append(graph.Nodes[0].Env, graph.Nodes[0].Env[len(graph.Nodes[0].Env)-1])
 	if err := graph.Validate(); err == nil {
 		t.Fatal("duplicate build environment passed validation")
-	}
-}
-
-func TestDebianBuildNodeGuards(t *testing.T) {
-	for _, tc := range []struct {
-		name   string
-		mutate func(*Node)
-	}{
-		{"missing target", func(n *Node) { n.Debian = nil }},
-		{"foreign platform", func(n *Node) { n.Debian.Platform = "linux/arm64" }},
-		{"invalid distribution", func(n *Node) { n.Debian.Distribution = "" }},
-		{"non hermetic", func(n *Node) { n.BuilderType = BuilderNix }},
-		{"consumer materials", func(n *Node) { n.Materials = []MaterialBinding{{}} }},
-		{"target on ordinary output", func(n *Node) { n.OutputType = "executable" }},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			graph := sample()
-			node := &graph.Nodes[0]
-			node.OutputType = "debian-package"
-			node.Debian = &target.Debian{Distribution: "ubuntu-24.04", Platform: node.Platform}
-			if err := graph.Validate(); err != nil {
-				t.Fatal("valid Debian fixture", err)
-			}
-			tc.mutate(node)
-			assertIRCode(t, graph.Validate(), e.CodeInvalidCatalog)
-		})
 	}
 }

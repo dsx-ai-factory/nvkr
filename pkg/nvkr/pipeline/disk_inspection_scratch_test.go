@@ -25,6 +25,8 @@ type scratchTestRuntime struct {
 	commands                                       [][]string
 	warning, cleanupFailure                        bool
 	removed                                        int
+	inspectID, inspectImage, inspectDiagnostic     string
+	inspectErr                                     error
 }
 
 // This opt-in probe proves the actual private-volume preparation and cleanup,
@@ -134,11 +136,65 @@ func (runtime *scratchTestRuntime) Run(_ context.Context, _ io.Reader, output, d
 			_, _ = io.WriteString(diagnostic, "ignored memory limit")
 		}
 	case "container":
-		_, _ = fmt.Fprintf(output, `{"Id":%q,"Image":%q}`, strings.Repeat("a", 64), "sha256:"+strings.Repeat("a", 64))
+		id, image := runtime.inspectID, runtime.inspectImage
+		if id == "" {
+			id = strings.Repeat("a", 64)
+		}
+		if image == "" {
+			image = "sha256:" + strings.Repeat("a", 64)
+		}
+		_, _ = fmt.Fprintf(output, `{"Id":%q,"Image":%q}`, id, image)
+		_, _ = io.WriteString(diagnostic, runtime.inspectDiagnostic)
+		return runtime.inspectErr
 	case "start":
 		_, _ = io.WriteString(output, runtime.capacity)
 	}
 	return nil
+}
+
+func TestDiskInspectionScratchImageMismatchStopsBeforePreparation(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		runtime scratchTestRuntime
+		want    e.Code
+	}{
+		{"different image", scratchTestRuntime{inspectImage: "sha256:" + strings.Repeat("c", 64)}, e.CodeVerifyFailed},
+		{"different container", scratchTestRuntime{inspectID: strings.Repeat("c", 64)}, e.CodeVerifyFailed},
+		{"inspection error", scratchTestRuntime{inspectErr: errors.New("controlled observation failure")}, e.CodeEngineCapability},
+		{"inspection diagnostic", scratchTestRuntime{inspectDiagnostic: "unsupported inspection"}, e.CodeEngineCapability},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			selection := testDiskInspectionSelection(t)
+			selection.MaxFilesystemBytes, selection.ScratchStorage = 1<<20, "private-volume"
+			selection.Resources.EphemeralStorageMiB = 4
+			selection.GuestfishDigest, selection.ScannerDigest, selection.PackageReaderDigest = selection.InspectorDigest, selection.InspectorDigest, selection.InspectorDigest
+			tc.runtime.name, tc.runtime.capacity = "podman", "8192 4096"
+			attempt := strings.Repeat("b", 24)
+			scratch, err := openDiskInspectionScratch(t.Context(), &tc.runtime, selection, "sha256:"+strings.Repeat("a", 64), attempt)
+			if code(err) != tc.want || scratch != nil || tc.runtime.removed != 1 {
+				t.Fatalf("scratch=%v error=%v removed=%d; want %s and owned volume cleanup", scratch, err, tc.runtime.removed, tc.want)
+			}
+			var discovered, removed bool
+			for _, command := range tc.runtime.commands {
+				if command[0] != "--default-mounts-file=/dev/null" {
+					t.Fatalf("operation lost Podman mount suppression: %v", command)
+				}
+				args := command[1:]
+				if args[0] == "start" {
+					t.Fatal("unbound scratch preparer started")
+				}
+				if args[0] == "ps" {
+					discovered = slices.Contains(args, "label=nvkr.dev/inspection-attempt="+attempt)
+				}
+				if args[0] == "rm" {
+					removed = slices.Equal(args, []string{"rm", "--force", strings.Repeat("a", 64)})
+				}
+			}
+			if !discovered || !removed {
+				t.Fatal("failed image observation did not discover and remove its owned container")
+			}
+		})
+	}
 }
 
 func (runtime *scratchTestRuntime) Cleanup(_ context.Context, _ time.Duration, output, _ io.Writer, args ...string) error {

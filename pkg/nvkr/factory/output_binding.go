@@ -15,7 +15,7 @@ import (
 
 func lifecycleArtifactID(output authored.DefinitionOutput, components []catalog.NamedComponent) (string, error) {
 	if output.Format == authored.OutputDebianPackage {
-		if len(components) != 1 || components[0].OutputType != authored.OutputDebianPackage {
+		if len(components) != 1 || components[0].OutputType != "host-package" {
 			return "", e.New(e.CodeInvalidCatalog, "Debian output requires one archive producer")
 		}
 		return "artifact/" + output.Name + "/" + components[0].Name, nil
@@ -106,7 +106,7 @@ func (plan Plan) validateLifecyclePlans() error {
 			return e.New(e.CodeUnverifiedRef, "lifecycle output %q is malformed or not bound to its graph build", output.Name)
 		}
 		selection := plan.Definition.Outputs[i]
-		if (selection.Format != authored.OutputDebianPackage && build.Platform != selection.Platform) || !equalFactoryStrings(build.Components, selection.Components) {
+		if build.Platform != selection.Platform || !equalFactoryStrings(build.Components, selection.Components) {
 			return e.New(e.CodeUnverifiedRef, "output %q producer selection differs from its definition", output.Name)
 		}
 		previous = output.Name
@@ -124,8 +124,10 @@ func lifecyclePackageKind(kind string) string {
 		return PackageHelm
 	case "oci":
 		return PackageImage
-	case authored.OutputDiskImage, authored.OutputDebianPackage:
+	case authored.OutputDiskImage:
 		return kind
+	case authored.OutputDebianPackage:
+		return "host-package"
 	default:
 		return ""
 	}

@@ -1,0 +1,1020 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog/v3
+kind: SourceBuildRegistry
+metadata:
+  name: nvsentinel
+  description: NVSentinel development catalog for native executables, OCI images, Debian packages and the independent unchanged upstream Helm chart. No release, publication or complete deployment acceptance.
+sources:
+  nvsentinel:
+    repo: https://github.com/NVIDIA/NVSentinel
+    toolchainImagesByArch:
+      amd64: docker.io/library/nvkr-nvsentinel-ubuntu-24.04-amd64@sha256:1899450dc69deea10ed06d07de70fd2bf6b4d3cb6952c679d359cdcd6b6376e7
+      arm64: docker.io/library/nvkr-nvsentinel-ubuntu-24.04-arm64@sha256:3ebca79a900100ed1ef6ee9903b7d26a0ee45320a9dff49f91610142d8d11581
+    vendorCommand:
+      - sh
+      - -ec
+      - |
+        test "$(go env GOVERSION)" = go1.27.0
+        cd platform-connectors
+        GOTOOLCHAIN=local GOWORK=off go mod vendor
+        GOTOOLCHAIN=local GOWORK=off go mod verify
+  nvsentinel-ubuntu2604:
+    repo: https://github.com/NVIDIA/NVSentinel
+    toolchainImagesByArch:
+      amd64: docker.io/library/nvkr-nvsentinel-ubuntu-26.04-amd64@sha256:fb19d5e7aa08d6d870eabff80fb012d6edf1c73cebad636f3d977bbbc7ad5eb8
+      arm64: docker.io/library/nvkr-nvsentinel-ubuntu-26.04-arm64@sha256:257df633515584e9d56f9679042afb9f2ef2cd0c6c2d9d6f2691a6bbb31effcf
+    vendorCommand:
+      - sh
+      - -ec
+      - |
+        test "$(go env GOVERSION)" = go1.27.0
+        cd platform-connectors
+        GOTOOLCHAIN=local GOWORK=off go mod vendor
+        GOTOOLCHAIN=local GOWORK=off go mod verify
+  nvsentinel-binaries:
+    repo: https://github.com/NVIDIA/NVSentinel
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:eef6a67266eeed3c86dd47fd01b32faa8bf0229eb83eb3d4d466e80391bd3820
+      arm64: docker.io/library/golang@sha256:6c83d163c89d1dbe66f8fc466870d66fe6325d15bb5ad1730cdc0b482fab1eec
+    vendorCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off
+      for module in \
+        event-exporter \
+        fault-quarantine \
+        fault-remediation \
+        health-events-analyzer \
+        health-monitors/csp-health-monitor \
+        health-monitors/kubernetes-object-monitor \
+        health-monitors/nic-health-monitor \
+        health-monitors/nvcre-certification-monitor \
+        health-monitors/slurm-drain-monitor \
+        janitor \
+        janitor-provider \
+        labeler \
+        lifecycle-manager \
+        node-drainer \
+        platform-connectors \
+        plugins/slinky-drainer \
+        preflight \
+        preflight-checks/nccl-loopback; do
+        (cd "$module" && go mod vendor && go mod verify)
+      done
+  nvsentinel-content:
+    repo: https://github.com/NVIDIA/NVSentinel
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:eef6a67266eeed3c86dd47fd01b32faa8bf0229eb83eb3d4d466e80391bd3820
+      arm64: docker.io/library/golang@sha256:6c83d163c89d1dbe66f8fc466870d66fe6325d15bb5ad1730cdc0b482fab1eec
+  syft-amd64:
+    constraint: 1.51.1
+    repo: https://github.com/anchore/syft
+    tool:
+      executablePath: syft
+      format: tar-gzip
+      platform: linux/amd64
+      url: https://github.com/anchore/syft/releases/download/{{.Tag}}/syft_{{.Version}}_linux_amd64.tar.gz
+  syft-arm64:
+    constraint: 1.51.1
+    repo: https://github.com/anchore/syft
+    tool:
+      executablePath: syft
+      format: tar-gzip
+      platform: linux/arm64
+      url: https://github.com/anchore/syft/releases/download/{{.Tag}}/syft_{{.Version}}_linux_arm64.tar.gz
+components:
+  nvsentinel-platform-connectors-deb-ubuntu2404:
+    source: nvsentinel
+    fromSource: true
+    builderType: oci-hermetic
+    platforms: [linux/amd64, linux/arm64]
+    outputType: host-package
+    buildCommand:
+      - sh
+      - -ec
+      - &debian-package-build |
+        set -eu
+        umask 022
+        arch="$1"
+        distribution="$2"
+        case "$distribution" in
+          ubuntu-24.04) ubuntu_version=24.04 ;;
+          ubuntu-26.04) ubuntu_version=26.04 ;;
+          *) printf 'Unsupported Ubuntu target: %s\n' "$distribution" >&2; exit 1 ;;
+        esac
+        . /etc/os-release
+        test "$ID" = ubuntu
+        test "$VERSION_ID" = "$ubuntu_version"
+        : "${SOURCE_DATE_EPOCH:?compiled source date is required}"
+        test "$(go env GOVERSION)" = go1.27.0
+        test "$(go env GOARCH)" = "$arch"
+        test "$(dpkg --print-architecture)" = "$arch"
+        test -f /src/platform-connectors/vendor/modules.txt
+        out=/src/nvkr-output
+        root="$out/package"
+        mkdir -p "$root/DEBIAN" "$root/usr/lib/nvsentinel/bin" \
+          "$root/usr/share/doc/nvsentinel-platform-connectors" "$out/go-cache"
+        cat >"$root/DEBIAN/control" <<EOF
+        Package: nvsentinel-platform-connectors
+        Version: 0~git20261013.c159347735
+        Architecture: $arch
+        Maintainer: Ilya Kislenko <ikislenko@nvidia.com>
+        Section: admin
+        Priority: optional
+        Depends: ca-certificates
+        Homepage: https://github.com/NVIDIA/NVSentinel
+        Description: NVSentinel platform connector
+         Source-built platform connector; runtime configuration is supplied separately.
+        EOF
+        cd /src/platform-connectors
+        CGO_ENABLED=0 GOTOOLCHAIN=local GOWORK=off GOPROXY=off GOSUMDB=off \
+          GOCACHE="$out/go-cache" go build -mod=vendor -trimpath -buildvcs=false \
+          -o "$root/usr/lib/nvsentinel/bin/platform-connectors" .
+        install -m 0644 /src/LICENSE "$root/usr/share/doc/nvsentinel-platform-connectors/copyright"
+        find "$root" -exec touch -h -d "@$SOURCE_DATE_EPOCH" {} +
+        exec dpkg-deb --root-owner-group --uniform-compression -Zgzip -z9 \
+          --build "$root" "$out/nvsentinel-platform-connectors_$arch.deb"
+      - --
+      - "{{.Arch}}"
+      - ubuntu-24.04
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/nvsentinel-platform-connectors_{{.Arch}}.deb
+  nvsentinel-platform-connectors-deb-ubuntu2604:
+    source: nvsentinel-ubuntu2604
+    fromSource: true
+    builderType: oci-hermetic
+    platforms: [linux/amd64, linux/arm64]
+    outputType: host-package
+    buildCommand:
+      - sh
+      - -ec
+      - *debian-package-build
+      - --
+      - "{{.Arch}}"
+      - ubuntu-26.04
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/nvsentinel-platform-connectors_{{.Arch}}.deb
+  nvsentinel-csp-health-monitor-image:
+    <<: &nvsentinel-image-defaults
+      source: nvsentinel-content
+      fromSource: true
+      builderType: buildkit-rootless
+      platforms:
+      - linux/amd64
+      - linux/arm64
+      outputType: oci-image
+      toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
+      writeDir: nvkr-output
+    buildCommand:
+      - sh
+      - -ec
+      - &nvsentinel-go-image |
+        set -eu
+        program="$1"
+        module="$2"
+        main="$3"
+        title="$4"
+        arch="$5"
+        BUILD_DATE="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+        case "$arch" in
+          amd64)
+            sdk=docker.io/library/golang@sha256:eef6a67266eeed3c86dd47fd01b32faa8bf0229eb83eb3d4d466e80391bd3820
+            runtime=cgr.dev/chainguard/static@sha256:a40219f3b0c2719e4e4220310e80a2230a4b95881644292c130e3a8e8287fc6c
+            ;;
+          arm64)
+            sdk=docker.io/library/golang@sha256:6c83d163c89d1dbe66f8fc466870d66fe6325d15bb5ad1730cdc0b482fab1eec
+            runtime=cgr.dev/chainguard/static@sha256:daed076c904e5dc26f5ff87d77aa4cea8b7ca76e906b561915dafe5b086377dc
+            ;;
+          *) exit 2 ;;
+        esac
+        out=/src/nvkr-output
+        context="$out/image-context"
+        mkdir "$context"
+        mkdir -p "$context/$(dirname "$module")"
+        cp -R "/src/$module" "$context/$module"
+        for support in commons data-models store-client api fault-quarantine; do
+          if [ "$module" != "$support" ]; then cp -R "/src/$support" "$context/$support"; fi
+        done
+        ldflags="-s -w"
+        if [ "$program" != plugins-slinky-drainer ]; then
+          ldflags="$ldflags -X main.version=$BUILD_VERSION -X main.commit=$GIT_VERSION -X main.date=$BUILD_DATE"
+        fi
+        cat >"$context/Dockerfile" <<'EOF'
+        ARG SDK_IMAGE
+        ARG RUNTIME_IMAGE
+        FROM ${SDK_IMAGE} AS build
+        ARG TARGETARCH
+        ARG MODULE
+        ARG GO_MAIN
+        ARG LD_FLAGS
+        ARG SOURCE_DATE_EPOCH
+        WORKDIR /work/${MODULE}
+        COPY . /work/
+        RUN test "$(go env GOVERSION)" = go1.27.0 && \
+            test "$(go env GOARCH)" = "$TARGETARCH" && \
+            pins="$(sha256sum go.mod go.sum)" && \
+            GOTOOLCHAIN=local GOWORK=off timeout --kill-after=10s 600s go mod download && \
+            GOTOOLCHAIN=local GOWORK=off go mod verify && \
+            GOTOOLCHAIN=local GOWORK=off go mod vendor && \
+            printf '%s\n' "$pins" | sha256sum --quiet -c -
+        RUN --network=none CGO_ENABLED=0 GOTOOLCHAIN=local GOWORK=off GOPROXY=off GOSUMDB=off \
+            go build -mod=vendor -trimpath -buildvcs=false \
+            -ldflags "$LD_FLAGS" -o /out/program "$GO_MAIN"
+        FROM ${RUNTIME_IMAGE}
+        ARG BUILD_VERSION
+        ARG GIT_VERSION
+        ARG BUILD_DATE
+        ARG IMAGE_TITLE
+        COPY --from=build /out/program /ko-app/program
+        USER 65532:65532
+        ENTRYPOINT ["/ko-app/program"]
+        LABEL org.opencontainers.image.source="https://github.com/NVIDIA/NVSentinel" \
+              org.opencontainers.image.licenses="Apache-2.0" \
+              org.opencontainers.image.title="$IMAGE_TITLE" \
+              org.opencontainers.image.version="$BUILD_VERSION" \
+              org.opencontainers.image.revision="$GIT_VERSION" \
+              org.opencontainers.image.created="$BUILD_DATE"
+        EOF
+        exec buildctl-daemonless.sh build --frontend dockerfile.v0 \
+          --local "context=$context" --local "dockerfile=$context" \
+          --opt "platform=linux/$arch" \
+          --opt "build-arg:TARGETARCH=$arch" \
+          --opt "build-arg:MODULE=$module" --opt "build-arg:GO_MAIN=$main" \
+          --opt "build-arg:LD_FLAGS=$ldflags" --opt "build-arg:IMAGE_TITLE=$title" \
+          --opt "build-arg:SDK_IMAGE=$sdk" --opt "build-arg:RUNTIME_IMAGE=$runtime" \
+          --opt "build-arg:BUILD_VERSION=$BUILD_VERSION" --opt "build-arg:GIT_VERSION=$GIT_VERSION" \
+          --opt "build-arg:BUILD_DATE=$BUILD_DATE" --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
+          --output "type=oci,dest=$out/$program.oci.tar,oci-mediatypes=true,rewrite-timestamp=true"
+      - "--"
+      - "csp-health-monitor"
+      - "health-monitors/csp-health-monitor"
+      - "./cmd/csp-health-monitor"
+      - "NVSentinel CSP Health Monitor"
+      - "{{.Arch}}"
+    artifactPath: nvkr-output/csp-health-monitor.oci.tar
+    versionStamp: &nvsentinel-version-stamps
+      BUILD_VERSION: '{{.Tag}}'
+      GIT_VERSION: '{{.Commit}}'
+  nvsentinel-event-exporter-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+      - sh
+      - -ec
+      - *nvsentinel-go-image
+      - "--"
+      - "event-exporter"
+      - "event-exporter"
+      - "."
+      - "NVSentinel Event Exporter"
+      - "{{.Arch}}"
+    artifactPath: nvkr-output/event-exporter.oci.tar
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-fault-quarantine-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+      - sh
+      - -ec
+      - *nvsentinel-go-image
+      - "--"
+      - "fault-quarantine"
+      - "fault-quarantine"
+      - "."
+      - "NVSentinel Fault Quarantine Module"
+      - "{{.Arch}}"
+    artifactPath: nvkr-output/fault-quarantine.oci.tar
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-fault-remediation-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+      - sh
+      - -ec
+      - *nvsentinel-go-image
+      - "--"
+      - "fault-remediation"
+      - "fault-remediation"
+      - "."
+      - "NVSentinel Fault Remediation Module"
+      - "{{.Arch}}"
+    artifactPath: nvkr-output/fault-remediation.oci.tar
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-health-events-analyzer-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+      - sh
+      - -ec
+      - *nvsentinel-go-image
+      - "--"
+      - "health-events-analyzer"
+      - "health-events-analyzer"
+      - "."
+      - "NVSentinel Health Events Analyzer"
+      - "{{.Arch}}"
+    artifactPath: nvkr-output/health-events-analyzer.oci.tar
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-janitor-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+      - sh
+      - -ec
+      - *nvsentinel-go-image
+      - "--"
+      - "janitor"
+      - "janitor"
+      - "."
+      - "NVSentinel Janitor"
+      - "{{.Arch}}"
+    artifactPath: nvkr-output/janitor.oci.tar
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-janitor-provider-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+      - sh
+      - -ec
+      - *nvsentinel-go-image
+      - "--"
+      - "janitor-provider"
+      - "janitor-provider"
+      - "."
+      - "NVSentinel Janitor-Provider"
+      - "{{.Arch}}"
+    artifactPath: nvkr-output/janitor-provider.oci.tar
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-kubernetes-object-monitor-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+      - sh
+      - -ec
+      - *nvsentinel-go-image
+      - "--"
+      - "kubernetes-object-monitor"
+      - "health-monitors/kubernetes-object-monitor"
+      - "."
+      - "NVSentinel Kubernetes Object Monitor"
+      - "{{.Arch}}"
+    artifactPath: nvkr-output/kubernetes-object-monitor.oci.tar
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-labeler-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+      - sh
+      - -ec
+      - *nvsentinel-go-image
+      - "--"
+      - "labeler"
+      - "labeler"
+      - "."
+      - "NVSentinel Labeler Module"
+      - "{{.Arch}}"
+    artifactPath: nvkr-output/labeler.oci.tar
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-lifecycle-manager-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+      - sh
+      - -ec
+      - *nvsentinel-go-image
+      - "--"
+      - "lifecycle-manager"
+      - "lifecycle-manager"
+      - "."
+      - "NVSentinel Lifecycle Manager"
+      - "{{.Arch}}"
+    artifactPath: nvkr-output/lifecycle-manager.oci.tar
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-maintenance-notifier-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+      - sh
+      - -ec
+      - *nvsentinel-go-image
+      - "--"
+      - "maintenance-notifier"
+      - "health-monitors/csp-health-monitor"
+      - "./cmd/maintenance-notifier"
+      - "NVSentinel Maintenance Notifier"
+      - "{{.Arch}}"
+    artifactPath: nvkr-output/maintenance-notifier.oci.tar
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-nic-health-monitor-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+      - sh
+      - -ec
+      - *nvsentinel-go-image
+      - "--"
+      - "nic-health-monitor"
+      - "health-monitors/nic-health-monitor"
+      - "."
+      - "NVSentinel NIC Health Monitor"
+      - "{{.Arch}}"
+    artifactPath: nvkr-output/nic-health-monitor.oci.tar
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-node-drainer-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+      - sh
+      - -ec
+      - *nvsentinel-go-image
+      - "--"
+      - "node-drainer"
+      - "node-drainer"
+      - "."
+      - "NVSentinel Node Drainer Module"
+      - "{{.Arch}}"
+    artifactPath: nvkr-output/node-drainer.oci.tar
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-nvcre-certification-monitor-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+      - sh
+      - -ec
+      - *nvsentinel-go-image
+      - "--"
+      - "nvcre-certification-monitor"
+      - "health-monitors/nvcre-certification-monitor"
+      - "."
+      - "NVSentinel NVCRE Certification Monitor"
+      - "{{.Arch}}"
+    artifactPath: nvkr-output/nvcre-certification-monitor.oci.tar
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-platform-connectors-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+      - sh
+      - -ec
+      - *nvsentinel-go-image
+      - "--"
+      - "platform-connectors"
+      - "platform-connectors"
+      - "."
+      - "NVSentinel Platform Connectors"
+      - "{{.Arch}}"
+    artifactPath: nvkr-output/platform-connectors.oci.tar
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-plugins-slinky-drainer-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+      - sh
+      - -ec
+      - *nvsentinel-go-image
+      - "--"
+      - "plugins-slinky-drainer"
+      - "plugins/slinky-drainer"
+      - "."
+      - "NVSentinel Slinky Drainer Plugin"
+      - "{{.Arch}}"
+    artifactPath: nvkr-output/plugins-slinky-drainer.oci.tar
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-preflight-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+      - sh
+      - -ec
+      - *nvsentinel-go-image
+      - "--"
+      - "preflight"
+      - "preflight"
+      - "."
+      - "NVSentinel Preflight"
+      - "{{.Arch}}"
+    artifactPath: nvkr-output/preflight.oci.tar
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-slurm-drain-monitor-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+      - sh
+      - -ec
+      - *nvsentinel-go-image
+      - "--"
+      - "slurm-drain-monitor"
+      - "health-monitors/slurm-drain-monitor"
+      - "."
+      - "NVSentinel Slurm Drain Monitor"
+      - "{{.Arch}}"
+    artifactPath: nvkr-output/slurm-drain-monitor.oci.tar
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-chart:
+    source: nvsentinel-content
+    fromSource: true
+    builderType: oci-hermetic
+    platforms: [linux/amd64, linux/arm64]
+    outputType: tarball
+    buildCommand:
+      - sh
+      - -ec
+      - |
+        test -f /src/distros/kubernetes/nvsentinel/Chart.yaml
+        test -f /src/distros/kubernetes/nvsentinel/Chart.lock
+        tar --format=ustar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
+          --numeric-owner -C /src/distros/kubernetes -cf /src/nvkr-output/nvsentinel-chart.tar nvsentinel
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/nvsentinel-chart.tar
+  nvsentinel-fault-quarantine-binary:
+    <<: &nvsentinel-binary-defaults
+      source: nvsentinel-binaries
+      fromSource: true
+      builderType: oci-hermetic
+      cgo: false
+      platforms:
+      - linux/amd64
+      - linux/arm64
+      outputType: host-package
+      writeDir: nvkr-output
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+      cd /src/fault-quarantine
+      test -f vendor/modules.txt
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -ldflags "-s -w -X main.version=${BUILD_VERSION:?} -X main.commit=${GIT_VERSION:?} -X main.date=$build_date" \
+        -o /src/nvkr-output/fault-quarantine .
+    artifactPath: nvkr-output/fault-quarantine
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-fault-remediation-binary:
+    <<: *nvsentinel-binary-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+      cd /src/fault-remediation
+      test -f vendor/modules.txt
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -ldflags "-s -w -X main.version=${BUILD_VERSION:?} -X main.commit=${GIT_VERSION:?} -X main.date=$build_date" \
+        -o /src/nvkr-output/fault-remediation .
+    artifactPath: nvkr-output/fault-remediation
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-health-events-analyzer-binary:
+    <<: *nvsentinel-binary-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+      cd /src/health-events-analyzer
+      test -f vendor/modules.txt
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -ldflags "-s -w -X main.version=${BUILD_VERSION:?} -X main.commit=${GIT_VERSION:?} -X main.date=$build_date" \
+        -o /src/nvkr-output/health-events-analyzer .
+    artifactPath: nvkr-output/health-events-analyzer
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-csp-health-monitor-binary:
+    <<: *nvsentinel-binary-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+      cd /src/health-monitors/csp-health-monitor
+      test -f vendor/modules.txt
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -ldflags "-s -w -X main.version=${BUILD_VERSION:?} -X main.commit=${GIT_VERSION:?} -X main.date=$build_date" \
+        -o /src/nvkr-output/csp-health-monitor ./cmd/csp-health-monitor
+    artifactPath: nvkr-output/csp-health-monitor
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-maintenance-notifier-binary:
+    <<: *nvsentinel-binary-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+      cd /src/health-monitors/csp-health-monitor
+      test -f vendor/modules.txt
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -ldflags "-s -w -X main.version=${BUILD_VERSION:?} -X main.commit=${GIT_VERSION:?} -X main.date=$build_date" \
+        -o /src/nvkr-output/maintenance-notifier ./cmd/maintenance-notifier
+    artifactPath: nvkr-output/maintenance-notifier
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-labeler-binary:
+    <<: *nvsentinel-binary-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+      cd /src/labeler
+      test -f vendor/modules.txt
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -ldflags "-s -w -X main.version=${BUILD_VERSION:?} -X main.commit=${GIT_VERSION:?} -X main.date=$build_date" \
+        -o /src/nvkr-output/labeler .
+    artifactPath: nvkr-output/labeler
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-node-drainer-binary:
+    <<: *nvsentinel-binary-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+      cd /src/node-drainer
+      test -f vendor/modules.txt
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -ldflags "-s -w -X main.version=${BUILD_VERSION:?} -X main.commit=${GIT_VERSION:?} -X main.date=$build_date" \
+        -o /src/nvkr-output/node-drainer .
+    artifactPath: nvkr-output/node-drainer
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-janitor-binary:
+    <<: *nvsentinel-binary-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+      cd /src/janitor
+      test -f vendor/modules.txt
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -ldflags "-s -w -X main.version=${BUILD_VERSION:?} -X main.commit=${GIT_VERSION:?} -X main.date=$build_date" \
+        -o /src/nvkr-output/janitor .
+    artifactPath: nvkr-output/janitor
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-janitor-provider-binary:
+    <<: *nvsentinel-binary-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+      cd /src/janitor-provider
+      test -f vendor/modules.txt
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -ldflags "-s -w -X main.version=${BUILD_VERSION:?} -X main.commit=${GIT_VERSION:?} -X main.date=$build_date" \
+        -o /src/nvkr-output/janitor-provider .
+    artifactPath: nvkr-output/janitor-provider
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-platform-connectors-binary:
+    <<: *nvsentinel-binary-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+      cd /src/platform-connectors
+      test -f vendor/modules.txt
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -ldflags "-s -w -X main.version=${BUILD_VERSION:?} -X main.commit=${GIT_VERSION:?} -X main.date=$build_date" \
+        -o /src/nvkr-output/platform-connectors .
+    artifactPath: nvkr-output/platform-connectors
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-event-exporter-binary:
+    <<: *nvsentinel-binary-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+      cd /src/event-exporter
+      test -f vendor/modules.txt
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -ldflags "-s -w -X main.version=${BUILD_VERSION:?} -X main.commit=${GIT_VERSION:?} -X main.date=$build_date" \
+        -o /src/nvkr-output/event-exporter .
+    artifactPath: nvkr-output/event-exporter
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-plugins-slinky-drainer-binary:
+    <<: *nvsentinel-binary-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+      cd /src/plugins/slinky-drainer
+      test -f vendor/modules.txt
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -ldflags "-s -w" \
+        -o /src/nvkr-output/plugins-slinky-drainer .
+    artifactPath: nvkr-output/plugins-slinky-drainer
+  nvsentinel-preflight-binary:
+    <<: *nvsentinel-binary-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+      cd /src/preflight
+      test -f vendor/modules.txt
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -ldflags "-s -w -X main.version=${BUILD_VERSION:?} -X main.commit=${GIT_VERSION:?} -X main.date=$build_date" \
+        -o /src/nvkr-output/preflight .
+    artifactPath: nvkr-output/preflight
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-kubernetes-object-monitor-binary:
+    <<: *nvsentinel-binary-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+      cd /src/health-monitors/kubernetes-object-monitor
+      test -f vendor/modules.txt
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -ldflags "-s -w -X main.version=${BUILD_VERSION:?} -X main.commit=${GIT_VERSION:?} -X main.date=$build_date" \
+        -o /src/nvkr-output/kubernetes-object-monitor .
+    artifactPath: nvkr-output/kubernetes-object-monitor
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-nvcre-certification-monitor-binary:
+    <<: *nvsentinel-binary-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+      cd /src/health-monitors/nvcre-certification-monitor
+      test -f vendor/modules.txt
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -ldflags "-s -w -X main.version=${BUILD_VERSION:?} -X main.commit=${GIT_VERSION:?} -X main.date=$build_date" \
+        -o /src/nvkr-output/nvcre-certification-monitor .
+    artifactPath: nvkr-output/nvcre-certification-monitor
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-nic-health-monitor-binary:
+    <<: *nvsentinel-binary-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+      cd /src/health-monitors/nic-health-monitor
+      test -f vendor/modules.txt
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -ldflags "-s -w -X main.version=${BUILD_VERSION:?} -X main.commit=${GIT_VERSION:?} -X main.date=$build_date" \
+        -o /src/nvkr-output/nic-health-monitor .
+    artifactPath: nvkr-output/nic-health-monitor
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-slurm-drain-monitor-binary:
+    <<: *nvsentinel-binary-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+      cd /src/health-monitors/slurm-drain-monitor
+      test -f vendor/modules.txt
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -ldflags "-s -w -X main.version=${BUILD_VERSION:?} -X main.commit=${GIT_VERSION:?} -X main.date=$build_date" \
+        -o /src/nvkr-output/slurm-drain-monitor .
+    artifactPath: nvkr-output/slurm-drain-monitor
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-lifecycle-manager-binary:
+    <<: *nvsentinel-binary-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+      cd /src/lifecycle-manager
+      test -f vendor/modules.txt
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -ldflags "-s -w -X main.version=${BUILD_VERSION:?} -X main.commit=${GIT_VERSION:?} -X main.date=$build_date" \
+        -o /src/nvkr-output/lifecycle-manager .
+    artifactPath: nvkr-output/lifecycle-manager
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-nccl-loopback-check-binary:
+    <<: *nvsentinel-binary-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.27.0
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+      cd /src/preflight-checks/nccl-loopback
+      test -f vendor/modules.txt
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -ldflags "-s -w -X main.version=${BUILD_VERSION:?} -X main.commit=${GIT_VERSION:?} -X main.date=$build_date" \
+        -o /src/nvkr-output/nccl-loopback-check .
+    artifactPath: nvkr-output/nccl-loopback-check
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-syslog-health-monitor-binary:
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    outputType: host-package
+    exclusionReason: Native executable requires the source systemd build tag, CGO
+      compiler and libsystemd headers plus compatible runtime libraries. Their complete
+      pinned toolchain/runtime contract has not been verified; the source Dockerfile
+      image remains the supported build declaration.
+  nvsentinel-metadata-collector-binary:
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    outputType: host-package
+    exclusionReason: Source builds with CGO_ENABLED=1 and runs on its CUDA runtime
+      base. A matching native compiler and runtime ABI closure has not been verified;
+      the source Dockerfile image remains the supported build declaration.
+  nvsentinel-file-server-cleanup-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      exec buildctl-daemonless.sh build --frontend dockerfile.v0 \
+        --local context=/src --local dockerfile=/src/log-collector \
+        --opt filename=Dockerfile.cleanup --opt platform=linux/{{.Arch}} \
+        --opt "build-arg:SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:?}" \
+        --output type=oci,dest=/src/nvkr-output/file-server-cleanup.oci.tar,oci-mediatypes=true
+    artifactPath: nvkr-output/file-server-cleanup.oci.tar
+  nvsentinel-gpu-health-monitor-dcgm3-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      exec buildctl-daemonless.sh build --frontend dockerfile.v0 \
+        --local context=/src --local dockerfile=/src/health-monitors/gpu-health-monitor \
+        --opt filename=Dockerfile --opt platform=linux/{{.Arch}} \
+        --opt "build-arg:SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:?}" \
+        --opt build-arg:DCGM_VERSION=3.3.7-1-ubuntu22.04 \
+        --opt build-arg:PYTHONPATH=/usr/local/dcgm/bindings/python3 \
+        --output type=oci,dest=/src/nvkr-output/gpu-health-monitor-dcgm3.oci.tar,oci-mediatypes=true
+    artifactPath: nvkr-output/gpu-health-monitor-dcgm3.oci.tar
+  nvsentinel-gpu-health-monitor-dcgm4-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      exec buildctl-daemonless.sh build --frontend dockerfile.v0 \
+        --local context=/src --local dockerfile=/src/health-monitors/gpu-health-monitor \
+        --opt filename=Dockerfile --opt platform=linux/{{.Arch}} \
+        --opt "build-arg:SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:?}" \
+        --output type=oci,dest=/src/nvkr-output/gpu-health-monitor-dcgm4.oci.tar,oci-mediatypes=true
+    artifactPath: nvkr-output/gpu-health-monitor-dcgm4.oci.tar
+  nvsentinel-gpu-reset-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      exec buildctl-daemonless.sh build --frontend dockerfile.v0 \
+        --local context=/src --local dockerfile=/src/gpu-reset \
+        --opt filename=Dockerfile --opt platform=linux/{{.Arch}} \
+        --opt "build-arg:SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:?}" \
+        --output type=oci,dest=/src/nvkr-output/gpu-reset.oci.tar,oci-mediatypes=true
+    artifactPath: nvkr-output/gpu-reset.oci.tar
+  nvsentinel-log-collector-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      exec buildctl-daemonless.sh build --frontend dockerfile.v0 \
+        --local context=/src --local dockerfile=/src/log-collector \
+        --opt filename=Dockerfile --opt platform=linux/{{.Arch}} \
+        --opt "build-arg:SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:?}" \
+        --output type=oci,dest=/src/nvkr-output/log-collector.oci.tar,oci-mediatypes=true
+    artifactPath: nvkr-output/log-collector.oci.tar
+  nvsentinel-metadata-collector-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec buildctl-daemonless.sh build --frontend dockerfile.v0 \
+        --local context=/src --local dockerfile=/src/metadata-collector \
+        --opt filename=Dockerfile --opt platform=linux/{{.Arch}} \
+        --opt "build-arg:SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:?}" \
+        --opt "build-arg:VERSION=${BUILD_VERSION:?}" \
+        --opt "build-arg:GIT_COMMIT=${GIT_VERSION:?}" \
+        --opt "build-arg:BUILD_DATE=$build_date" \
+        --output type=oci,dest=/src/nvkr-output/metadata-collector.oci.tar,oci-mediatypes=true
+    artifactPath: nvkr-output/metadata-collector.oci.tar
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-preflight-dcgm-diag-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      exec buildctl-daemonless.sh build --frontend dockerfile.v0 \
+        --local context=/src --local dockerfile=/src/preflight-checks/dcgm-diag \
+        --opt filename=Dockerfile --opt platform=linux/{{.Arch}} \
+        --opt "build-arg:SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:?}" \
+        --opt build-arg:DCGM_VERSION=4.7.0-ubuntu24.04 \
+        --output type=oci,dest=/src/nvkr-output/preflight-dcgm-diag.oci.tar,oci-mediatypes=true
+    artifactPath: nvkr-output/preflight-dcgm-diag.oci.tar
+  nvsentinel-preflight-nccl-allreduce-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      exec buildctl-daemonless.sh build --frontend dockerfile.v0 \
+        --local context=/src --local dockerfile=/src/preflight-checks/nccl-allreduce \
+        --opt filename=Dockerfile --opt platform=linux/{{.Arch}} \
+        --opt "build-arg:SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:?}" \
+        --opt build-arg:PYTORCH_VERSION=26.04-py3 \
+        --output type=oci,dest=/src/nvkr-output/preflight-nccl-allreduce.oci.tar,oci-mediatypes=true
+    artifactPath: nvkr-output/preflight-nccl-allreduce.oci.tar
+  nvsentinel-preflight-nccl-loopback-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec buildctl-daemonless.sh build --frontend dockerfile.v0 \
+        --local context=/src --local dockerfile=/src/preflight-checks/nccl-loopback \
+        --opt filename=Dockerfile --opt platform=linux/{{.Arch}} \
+        --opt "build-arg:SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:?}" \
+        --opt "build-arg:VERSION=${BUILD_VERSION:?}" \
+        --opt "build-arg:GIT_COMMIT=${GIT_VERSION:?}" \
+        --opt "build-arg:BUILD_DATE=$build_date" \
+        --output type=oci,dest=/src/nvkr-output/preflight-nccl-loopback.oci.tar,oci-mediatypes=true
+    artifactPath: nvkr-output/preflight-nccl-loopback.oci.tar
+    versionStamp: *nvsentinel-version-stamps
+  nvsentinel-syslog-health-monitor-image:
+    <<: *nvsentinel-image-defaults
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      build_date="$(date -u -d "@${SOURCE_DATE_EPOCH:?}" +%Y-%m-%dT%H:%M:%SZ)"
+      exec buildctl-daemonless.sh build --frontend dockerfile.v0 \
+        --local context=/src --local dockerfile=/src/health-monitors/syslog-health-monitor \
+        --opt filename=Dockerfile --opt platform=linux/{{.Arch}} \
+        --opt "build-arg:SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:?}" \
+        --opt "build-arg:VERSION=${BUILD_VERSION:?}" \
+        --opt "build-arg:GIT_COMMIT=${GIT_VERSION:?}" \
+        --opt "build-arg:BUILD_DATE=$build_date" \
+        --output type=oci,dest=/src/nvkr-output/syslog-health-monitor.oci.tar,oci-mediatypes=true
+    artifactPath: nvkr-output/syslog-health-monitor.oci.tar
+    versionStamp: *nvsentinel-version-stamps

@@ -11,7 +11,6 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/material"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 	"sigs.k8s.io/yaml"
 )
 
@@ -53,7 +52,6 @@ type LogicalNode struct {
 	Disk              *DiskSpec          `json:"disk,omitempty"`
 	Packer            *PackerConfig      `json:"packer,omitempty"`
 	Materials         []MaterialBinding  `json:"materials,omitempty"`
-	Debian            *target.Debian     `json:"debian,omitempty"`
 	OutputType        string             `json:"outputType,omitempty"`
 	ArtifactPath      string             `json:"artifactPath,omitempty"`
 	Version           string             `json:"version,omitempty"`
@@ -118,7 +116,6 @@ var nodeBuildIdentityRules = map[string]buildIdentityFieldRule{
 	"Disk":              includeLogicalValueInBuildIdentity,
 	"Packer":            includeLogicalValueInBuildIdentity,
 	"Materials":         includeLogicalValueInBuildIdentity,
-	"Debian":            includeLogicalValueInBuildIdentity,
 	"OutputType":        includeLogicalValueInBuildIdentity,
 	"ArtifactPath":      includeLogicalValueInBuildIdentity,
 	"Version":           includeLogicalValueInBuildIdentity,
@@ -155,7 +152,6 @@ func (g Graph) normalizedCopy() Graph {
 	c := g
 	c.Nodes = append([]Node(nil), g.Nodes...)
 	for i := range c.Nodes {
-		c.Nodes[i].Debian = cloneDebianTarget(g.Nodes[i].Debian)
 		c.Nodes[i].Needs = append([]string(nil), g.Nodes[i].Needs...)
 		c.Nodes[i].Env = append([]EnvVar(nil), g.Nodes[i].Env...)
 		c.Nodes[i].Requirements = execution.Clone(g.Nodes[i].Requirements)
@@ -221,7 +217,6 @@ func (g Graph) logicalGraph() LogicalGraph {
 			SourceReadOnly: node.SourceReadOnly, WriteDir: node.WriteDir,
 			Disk: cloneDiskSpec(node.Disk), Packer: clonePackerConfig(node.Packer),
 			Materials:  append([]MaterialBinding(nil), node.Materials...),
-			Debian:     cloneDebianTarget(node.Debian),
 			OutputType: node.OutputType, ArtifactPath: node.ArtifactPath, Version: node.Version,
 		})
 	}
@@ -294,12 +289,4 @@ func (g Graph) Digest() (string, error) {
 		return "", err
 	}
 	return canonical.Digest(canonical.KindBuild, g.logicalGraph())
-}
-
-func cloneDebianTarget(value *target.Debian) *target.Debian {
-	if value == nil {
-		return nil
-	}
-	copy := *value
-	return &copy
 }

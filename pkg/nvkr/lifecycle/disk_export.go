@@ -4,7 +4,6 @@
 package lifecycle
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -13,12 +12,8 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 	"golang.org/x/sys/unix"
 )
 
@@ -192,7 +187,7 @@ func (transaction *diskExportTransaction) observe(ctx context.Context, slot requ
 			"durable disk export requires a held local execution result")
 	}
 	if slot.Kind == OutputDebianPackage {
-		return transaction.observeDebian(ctx, slot, plan, execution)
+		return transaction.observeDebian(ctx, slot, plan)
 	}
 	if slot.Kind != OutputDiskImage {
 		return Artifact{}, e.New(e.CodeInternal,
@@ -364,31 +359,24 @@ func (transaction *diskExportTransaction) openStage(path string) (*os.File, erro
 	return file, nil
 }
 
-type debianPayloadExporter interface {
-	ExportDebianLifecyclePayload(context.Context, *factory.Plan, factory.LifecycleOutputPlan, io.Writer) (factory.DebianOutputObservation, []byte, []byte, error)
-}
-
-func (transaction *diskExportTransaction) observeDebian(ctx context.Context, slot requiredOutput, plan *factory.Plan, execution diskPayloadExporter) (Artifact, error) {
+func (transaction *diskExportTransaction) observeDebian(ctx context.Context, slot requiredOutput, plan *factory.Plan) (Artifact, error) {
 	if ctx == nil {
-		return Artifact{}, e.New(e.CodeUsage, "native package staging requires context")
+		return Artifact{}, e.New(e.CodeUsage, "raw package staging requires context")
 	}
 	if err := ctx.Err(); err != nil {
-		return Artifact{}, e.Wrap(e.CodeTimeout, err, "native package staging canceled")
+		return Artifact{}, e.Wrap(e.CodeTimeout, err, "raw package staging canceled")
 	}
-	exporter, ok := execution.(debianPayloadExporter)
-	if !ok {
-		return Artifact{}, e.New(e.CodeEngineCapability, "native package staging requires original execution owner")
-	}
-	if !namePattern.MatchString(slot.Name) {
-		return Artifact{}, e.New(e.CodeVerifyFailed, "native package staging requires exact named output")
+	if !namePattern.MatchString(slot.Name) || slot.Kind != OutputDebianPackage {
+		return Artifact{}, e.New(e.CodeVerifyFailed, "raw package staging requires an exact named output")
 	}
 	path := filepath.Join(transaction.workspace, localDiskOutputDirectory, slot.Name+".deb")
 	file, err := transaction.openStage(path)
 	if err != nil {
 		return Artifact{}, err
 	}
-	expected := factory.LifecycleOutputPlan{Name: slot.Name, Kind: slot.Kind, ArtifactID: slot.MemberArtifactID, BuildDigest: slot.BuildDigest, Components: append([]string(nil), slot.Components...)}
-	observation, document, predicate, exportErr := exporter.ExportDebianLifecyclePayload(ctx, plan, expected, file)
+	expected := factory.LifecycleOutputPlan{Name: slot.Name, Kind: slot.Kind, ArtifactID: slot.MemberArtifactID,
+		BuildDigest: slot.BuildDigest, Components: append([]string(nil), slot.Components...)}
+	observation, exportErr := factory.ExportWorkspaceDebianPayload(ctx, plan, expected, transaction.workspace, file)
 	if exportErr == nil {
 		exportErr = finishNativeStage(file)
 	} else {
@@ -400,64 +388,10 @@ func (transaction *diskExportTransaction) observeDebian(ctx context.Context, slo
 		if errors.As(exportErr, &coded) {
 			code = coded.Code
 		}
-		if ctx.Err() != nil {
-			code = e.CodeTimeout
-			exportErr = errors.Join(exportErr, ctx.Err())
-		}
-		return Artifact{}, e.Wrap(code, exportErr, "staging native package output")
+		return Artifact{}, e.Wrap(code, exportErr, "staging raw package output")
 	}
-	if len(slot.Components) != 1 || observation.Component != slot.Components[0] || observation.Subject != slot.MemberArtifactID || observation.BuildDigest != slot.BuildDigest {
-		return Artifact{}, e.New(e.CodeVerifyFailed, "native package staging changes original named output")
-	}
-	if len(document) == 0 || len(predicate) == 0 {
-		return Artifact{}, e.New(e.CodeProvenanceMissing, "native package staging has incomplete evidence")
-	}
-	// The original exporter owns semantic inspection and receipt authentication.
-	// Recompute the existing typed document identity at the durable-copy boundary
-	// so sidecar bytes cannot silently differ from that terminal observation.
-	var bom sbom.BOM
-	if err := canonical.UnmarshalExact(document, &bom); err != nil {
-		return Artifact{}, e.Wrap(e.CodeVerifyFailed, err, "decoding staged Debian document")
-	}
-	encoded, err := canonical.Marshal(bom)
-	if err != nil {
-		return Artifact{}, e.Wrap(e.CodeVerifyFailed, err, "encoding staged Debian document")
-	}
-	digest, err := canonical.Digest(canonical.KindSBOM, bom)
-	if err != nil || digest != observation.SBOMDigest || !bytes.Equal(encoded, document) {
-		return Artifact{}, e.Wrap(e.CodeVerifyFailed, err, "staged Debian document differs from terminal SBOM binding")
-	}
-	for _, item := range []struct {
-		suffix string
-		data   []byte
-	}{{".cdx.json", document}, {".production-predicate.json", predicate}} {
-		if err := ctx.Err(); err != nil {
-			return Artifact{}, e.Wrap(e.CodeTimeout, err, "native package evidence canceled")
-		}
-		if len(item.data) == 0 {
-			return Artifact{}, e.New(e.CodeProvenanceMissing, "native package staging has incomplete evidence")
-		}
-		file, err := transaction.openStage(filepath.Join(transaction.workspace, localDiskOutputDirectory, slot.Name+item.suffix))
-		if err != nil {
-			return Artifact{}, err
-		}
-		written, writeErr := file.Write(item.data)
-		if writeErr == nil && written != len(item.data) {
-			writeErr = io.ErrShortWrite
-		}
-		if writeErr == nil {
-			writeErr = finishNativeStage(file)
-		} else {
-			writeErr = errors.Join(writeErr, file.Close())
-		}
-		if writeErr != nil {
-			return Artifact{}, e.Wrap(e.CodeVerifyFailed, writeErr, "staging native package evidence")
-		}
-	}
-	artifact := Artifact{Name: slot.Name, Kind: slot.Kind, Digest: observation.Digest, BuildDigest: observation.BuildDigest, Components: append([]string(nil), slot.Components...), Reference: path,
-		Debian: &delivery.DebianOutput{PlanDigest: observation.PlanDigest, Subject: observation.Subject,
-			Component: observation.Component, InputDigest: observation.InputDigest, Target: observation.Target,
-			Size: observation.Size, SBOMDigest: observation.SBOMDigest, PredicateDigest: pipeline.FileDigest(predicate)}}
+	artifact := Artifact{Name: slot.Name, Kind: slot.Kind, Digest: observation.SHA256, BuildDigest: slot.BuildDigest,
+		Components: append([]string(nil), slot.Components...), Reference: path}
 	if err := artifact.Validate(); err != nil {
 		return Artifact{}, err
 	}

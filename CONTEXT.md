@@ -103,13 +103,6 @@ The concrete platform for an output's bytes, currently `linux/amd64` or `linux/a
 selection must admit it explicitly, independently of the host on which a producer executes.
 _Avoid_: Host platform, query criterion
 
-**Debian target description**:
-An exact source-owned distribution/ABI profile key paired with a concrete artifact platform. Standalone
-omissions use the declared `ubuntu-24.04`/`linux/amd64` compatibility baseline; consumer inheritance is a
-value description. Neither proves an authenticated consumer join or ABI compatibility. See ADR-12 section 2
-for the contract and [reconciliation](docs/adr/reconciliation.md) for implementation and evidence.
-_Avoid_: APT suite, toolchain tag, package version, ABI proof
-
 **Execution plan**:
 The complete generated closure of admitted Definition and Environment values, independently required outputs,
 packaging, routes and executable dependencies for a Run. Producer operations reference the single executable

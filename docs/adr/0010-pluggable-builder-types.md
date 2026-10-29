@@ -477,41 +477,18 @@ remain the upstream build owner's duty. ADR-22's future curated-set derivation r
 **Neutral**
 - `buildDigest` changes for any component moved to `nix` — by design; a builder switch is a new build.
 
-### Standalone Debian producer
+### Raw Debian output
 
-An explicit `debian-package` source producer declares complete distribution/platform routes under
-ADR-12. Each route binds source-owned argv, an exact toolchain pin and the final archive path in a private
-output directory. It uses the existing OCI-hermetic substrate and preserves the source-created package;
-the loose-binary `host-package` wrapper is not part of this route.
+A Debian package is an output of the existing `host-package` source producer, not a new builder or runtime.
+The component declares its platform, pinned toolchain, command, private output directory and archive path
+through ordinary catalog fields. Distribution-specific commands and toolchains belong to explicit components;
+there is no separate target-profile resolver or inferred distribution/platform default.
 
-Local execution admits one standalone inspected Debian output on a matching native Linux host with a
-bounded context, complete private-volume inspection profile and matching catalog scanner. It freezes the
-complete Plan before blocking admission, admits the selected runtime and original exclusive producer
-binding before source/workspace work, and executes the compiled fetch/build/inspection/terminal graph.
-Direct-node, whole-pipeline, hosted, signing and publication routes remain separately gated.
-
-The original NodeSession owns authenticated source preparation, the held runtime executable and observed
-daemon/toolchain images, checked producer cleanup and retained archive bytes. Before work it reserves the
-full capture allowance, bounded to 1 GiB. Canonically frozen instructions execute against the original
-session; no caller facade, serialized result or equal-byte sibling can replace the named invocation. The
-collector opens the exact output without following links, seals an already-open descriptor, checks metadata
-before/after capture, and derives digest/length from those held bytes. A failed invocation or closed archive
-does not authorize replay. Checked removal and final runtime freshness precede completion transfer.
-
-The original local Run retains its complete Plan, named producer, prepared-source digest and exact bytes
-through profile-bound content inspection, terminal observation and export (ADR-13). Its confined workspace
-uses existing directory and no-replace publication owners for scheduler metadata. The borrowed inspection
-workspace descriptor stays live until the inspector closes. Run close synchronously cancels custody calls,
-closes and joins the original producer session, joins outer calls, then closes inspection and workspace
-handles. Arbitrary blocking writers must return before their exports can be joined.
-
-Lifecycle stages the exact archive, inspected CycloneDX document and unsigned local production predicate
-through its existing output/record transaction. Original Run cleanup must succeed before durable commit;
-failed joins or commits roll back the staged outputs. This supplies an unqualified local artifact, not a
-qualified execution, authenticated production provenance, release or publication receipt.
-
-Recorded fixture and external execution results belong to [reconciliation](reconciliation.md).
-They do not replace source/tool/ABI/install acceptance or authenticated OS consumer joins.
+A standalone `debian-package` Definition output selects one archive producer. The normal producer session
+executes it; existing producer-result authentication, bounded held files and lifecycle staging preserve exact
+bytes and rollback on failure. OS consumers use the ordinary material handoff. These local artifacts carry
+composition metadata only. Full-content inspection, independent architecture/ABI acceptance and authenticated
+provenance remain separate; direct-node/hosted raw-DEB execution, signing and publication remain gated.
 
 ## Alternatives considered
 

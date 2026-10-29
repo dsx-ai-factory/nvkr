@@ -87,13 +87,6 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 	}
 
 	for _, nc := range r.Components {
-		if nc.OutputType == catalog.OutputDebianPackage {
-			var err error
-			nc, err = selectedDebianRoute(nc, r.Debian)
-			if err != nil {
-				return nil, err
-			}
-		}
 		// Prebuilt (no-compile) lane: one pull node acquires a pinned, content-addressed
 		// artifact — no fetch, no toolchain, no build. Its Digest is the reproducibility
 		// pin (part of buildDigest); the runner verifies the acquired bytes against it.
@@ -316,7 +309,6 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 			Disk:              disk,
 			Packer:            packer,
 			Materials:         materials,
-			Debian:            cloneDebianTarget(r.Debian),
 			OutputType:        nc.OutputType,
 			ArtifactPath:      renderArch(nc.ArtifactPath, arch),
 			Version:           catalog.NormalizeVersion(nc.Tag),
@@ -526,12 +518,4 @@ func patchRefs(ps []catalog.Patch) []ir.PatchRef {
 		out[i] = ir.PatchRef{Name: p.Name, SHA256: p.SHA256, Content: p.Content}
 	}
 	return out
-}
-
-func cloneDebianTarget(value *target.Debian) *target.Debian {
-	if value == nil {
-		return nil
-	}
-	copy := *value
-	return &copy
 }

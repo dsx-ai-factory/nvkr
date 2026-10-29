@@ -26,17 +26,10 @@ func admitInputs(definition authored.Definition, environment authored.Environmen
 		}
 
 		if output.Format == authored.OutputDebianPackage && definition.SBOMTool != "" {
-			platforms := output.TargetPlatforms()
-			if len(platforms) != 1 || platforms[0] != environment.UtilityPlatform {
-				return e.New(e.CodeEngineCapability, "Debian scanner requires its exact native producer/utility platform before catalog work")
-			}
-			profile, ok := environment.DiskInspectionProfiles[environment.UtilityPlatform]
-			if !ok {
-				return e.New(e.CodeEngineCapability, "Debian scanner requires its complete native Environment inspection profile")
-			}
-			if err := requireProductionDiskScratch(profile); err != nil {
-				return err
-			}
+			return e.New(e.CodeEngineCapability, "Debian dependency inspection is not supported for raw package outputs")
+		}
+		if output.Format == authored.OutputDebianPackage && (len(environment.GitHubRunners) != 0 || environment.GitHubARC != "" || environment.GitHubDevelopment) {
+			return e.New(e.CodeEngineCapability, "raw Debian outputs currently require local execution")
 		}
 		if output.Platform == "darwin/arm64" && (environment.Signing != nil || environment.Publication != nil || len(environment.GitHubRunners) != 0 || environment.GitHubARC != "" || environment.GitHubDevelopment) {
 			return e.New(e.CodeEngineCapability, "native Mac executable acquisition currently requires a local environment without signing or publication")

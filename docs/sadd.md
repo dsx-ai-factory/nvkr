@@ -261,32 +261,11 @@ The compiler derives each output's graph from its exact selected components and 
 target. `nvkr.build` identifies the logical projection of that validated graph. Output names, packaging and execution settings remain bound by their owning records. Equal Build
 Digests do not merge producer jobs, restore results, observations or evidence across named outputs.
 
-The Debian target resolver admits configurable standalone profile/platform selection and exact consumer
-inheritance descriptions. Defaults are `ubuntu-24.04` and `linux/amd64` only for an explicit declared route.
-Source-owned route argv, toolchain and raw archive paths bind the target into logical Build identity without
-a binary/APT wrapper. Definition/factory snapshots rederive the complete selection and required output.
-Distribution labels do not prove ABI compatibility or an authenticated consumer target.
-
-Local execution admits one inspected Debian output on a matching native Linux host with a bounded context,
-complete private-volume profile and matching catalog scanner. It freezes the full Plan before blocking
-admission, then joins original session/source/toolchain/named invocation and sealed bytes through checked
-producer cleanup, retained-content SBOM, terminal observation and unsigned local provenance. Confined
-workspace handles own scheduler metadata and remain live through inspector/export cleanup. Run close
-cancels custody calls, joins the original session and outer work, then closes inspection/workspace handles.
-Equal bytes or serialized descriptions cannot replace those owners or replay an invocation.
-
-Lifecycle uses its existing output/record transaction to stage the exact raw package, CycloneDX document
-and unsigned predicate. Successful original Run cleanup precedes durable commit; failures roll back payload
-and evidence. Direct-node, whole-pipeline, hosted, signing and publication routes remain closed. Controlled
-native ARM64 scheduler and transaction fixtures establish ownership/bytes/cancellation/cleanup contracts,
-not a real Debian/NVSentinel package, daemon or installation, native AMD64 acceptance, authenticated
-production provenance or OS consumer/material/ABI compatibility.
-
-The selected NVSentinel inputs keep image, Helm and Debian producers separately selectable with
-coordinated source pins. The OS route separately builds an ordinary host-package material for the existing
-composer/Packer path. It does not consume the standalone Debian output receipt or its inspected evidence.
-[Reconciliation](adr/reconciliation.md) owns dated execution results and deferred acceptance; the
-[example](../definitions/nvsentinel/README.md) owns commands and exact local artifact identities.
+Raw Debian outputs select one ordinary `host-package` producer. Existing sessions, result authentication,
+held files and lifecycle staging own execution and archive retention; OS consumers use the existing material
+handoff. No separate Debian scheduler, target-profile resolver or receipt hierarchy is introduced.
+[ADR-10](adr/0010-pluggable-builder-types.md#raw-debian-output) defines the local evidence limits;
+[the NVSentinel catalog](../inputs/catalogs/nvsentinel/README.md) owns its four output families and commands.
 
 A `disk-image` named output explicitly selects one root producer with validated disk-image metadata and every
 component in that root's transitive material closure. Resolution rejects a missing or second disk root, an

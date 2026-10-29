@@ -25,9 +25,6 @@ func runContainerRuntime(opts RunOptions, args ...string) error {
 	if opts.execution != nil && opts.execution.runtime != nil {
 		return opts.execution.runtime.run(opts.ctx(), opts.Stdout, opts.Stderr, args...)
 	}
-	if opts.debianRuntime != nil {
-		return opts.debianRuntime.run(opts.ctx(), opts.Stdout, opts.Stderr, args...)
-	}
 	cmd := execCmd(opts, opts.Runtime, args...)
 	cmd.Stdout = opts.Stdout
 	cmd.Stderr = opts.Stderr
@@ -126,8 +123,8 @@ func (r *reaper) close() {
 	_ = r.closeChecked()
 }
 
-// The retained-producer boundary must observe cleanup failures before
-// transferring bytes. Legacy callers retain their best-effort close behavior.
+// Checked callers observe cleanup failures; legacy callers retain their
+// best-effort close behavior.
 func (r *reaper) closeChecked() error {
 	if r == nil {
 		return nil

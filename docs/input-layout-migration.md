@@ -18,14 +18,16 @@ The engineering contracts remain [ADR-19](adr/0019-clusterdefinition-and-provisi
 owns current implementation and external evidence. Product source, output membership and publication
 policy changes require their own explicit review, even when performed during this migration.
 
-## Retained candidate exception
+## NVSentinel ownership
 
-The [NVSentinel candidate](../definitions/nvsentinel/README.md) intentionally remains at
-`definitions/nvsentinel/` with its catalog, overlays, Environments and source patches together. It is a
-pre-migration local packaging experiment outside the maintained release/demo selections and the counts
-recorded for the relocation above. This exception preserves its reviewed paths and historical observations;
-it does not establish a preferred layout for new inputs. A later move to `inputs/experiments/` must update
-all references and rederive authored identities while preserving producer pins and output membership.
+The [NVSentinel development catalog](../inputs/catalogs/nvsentinel/README.md) now lives under
+`inputs/catalogs/nvsentinel/`. Its Definitions and Environments have separate owners under
+`inputs/definitions/nvsentinel/` and `inputs/environments/nvsentinel/`. The NVKE consumer catalog and
+predecessor-bound OS overlays remain an explicit [experiment](../inputs/experiments/nvsentinel/README.md).
+The old `definitions/nvsentinel/` candidate exception is retired. These additions sit outside the retained
+NVKE migration counts above; they do not change its maintained release selections or establish acceptance.
+Current producers leave upstream source unchanged. Retired patch-based Run observations remain historical
+in reconciliation; they do not validate the corrected recipes or reproduce their changed build identities.
 
 ## Conditional supported target inputs
 

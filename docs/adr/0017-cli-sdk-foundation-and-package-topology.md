@@ -66,33 +66,13 @@ strict inventory hardening, M3 qualification acceptance and organizational accep
 Definition v5, Run/Release v4, and compiled Run Plan/artifact graph v5 records reject the
 retired cluster, role, category and composition fields. Signer policy roles remain a distinct security concept.
 
-An explicit `debian-package` Definition output selects one source-created archive and source-declared
-resolved distribution/platform route (ADR-12). Factory snapshots the full authored selection/catalog and
-rederives its complete graph. Local Run execution now joins original producer bytes, retained-content SBOM,
-terminal observation and unsigned local provenance on a matching native Linux host. It requires a bounded
-context, complete private-volume inspection profile and exact selected scanner pin. The local CLI supplies
-an optional positive `--timeout` deadline, preserving earlier caller deadlines. Its default zero leaves existing local lanes unbounded at the CLI; native Debian execution still requires a bounded caller context or explicit timeout. Static profile/target
-admission precedes attempt reservation; factory producer admission precedes its workspace preparation,
-and workspace-bound inspector/capacity admission precedes source/production. Direct-node, GitHub,
-whole-pipeline, signing and publication paths
-remain gated; signing/publication still rejects before catalog reads.
-
-The original NodeSession and Run keep authenticated source, held runtime/toolchain observation, exclusive
-named invocation, sealed bytes and checked cleanup under their existing cancel/join lifetimes. The scheduler
-freezes the full Plan before any blocking admission and uses confined workspace handles for metadata and
-inspection. Run close cancels custody calls, closes/joins the original session, joins outer calls, closes the
-inspector and its borrowed workspace, then releases filesystem handles. Caller aliases, serialized results
-and equal-byte siblings cannot restore this authority.
-
-Lifecycle stages the exact raw package, inspected CycloneDX document and unsigned production predicate
-through its existing output/record transaction. The original Run must close successfully before durable
-commit; failures roll back payload and evidence. The resulting local artifact remains unqualified, without
-signing, authenticated production provenance, release authorization or OCI/APT publication.
-
-Controlled native ARM64 factory fixtures cover real pinned Git closure capture and fake runtime/archive/
-scanner reports through public scheduling and export, including mutation, cancellation, failed cleanup and
-revocation; transaction fixtures cover staging/rollback. They do not prove real Debian/NVSentinel tooling,
-installation, native AMD64 acceptance or authenticated OS-image consumer/material and ABI joins.
+An explicit `debian-package` output selects one ordinary from-source `host-package` producer on an
+explicit Linux platform (ADR-10/12). Local execution uses the existing producer session and source-only
+composition. Ordinary result authentication and bounded held files bind the raw archive to its exact
+named output; lifecycle retains it through the existing no-replace output transaction. Cancellation,
+cleanup and rollback remain with those owners. The archive supplies no package dependency inspection,
+standalone production predicate, installation or qualification proof. Direct-node, hosted, signing and
+publication routes remain capability-gated.
 
 Environment separately supplies runtime, runner, publication namespace, credential references and signing policy
 (ADR-20). Output-affecting tools stay in the build identity they affect.
@@ -441,10 +421,10 @@ External-module compile and no-work admission tests establish only that boundary
 and complete conformance remain separately evidenced operational acceptance.
 
 The producer `NodeSession` cancels admitted call contexts synchronously when `Close` starts, before exposing
-session cancellation, including private retained-archive reads, then joins active producers and readers
-and releases archives before source snapshots. Its private error-returning close preserves capability
-cleanup failures without changing the public void facade. Calls retain their caller's
-context values and deadline. An asynchronous cancellation callback alone cannot enforce this close ordering.
+session cancellation, then joins active producers and releases source snapshots. `CloseChecked` preserves
+capability cleanup failures for the owning Run while the existing void `Close` facade remains available.
+Calls retain their caller's context values and deadline. An asynchronous cancellation callback alone cannot
+enforce this close ordering.
 
 ### 6. One Run is one immutable attempt
 

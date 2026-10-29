@@ -19,7 +19,7 @@ import (
 
 // compileOutputBuild resolves one exact named output into its owned producer graph.
 func compileOutputBuild(target authored.DefinitionOutput, delivery authored.Environment, targetStack *catalog.Stack) (BuildPlan, error) {
-	resolved, err := buildgraph.Resolve(targetStack.Catalog, buildgraph.Selection{Components: target.Components, Platform: target.Platform, OutputFormat: target.Format, Debian: debianOutputRequest(target)})
+	resolved, err := buildgraph.Resolve(targetStack.Catalog, buildgraph.Selection{Components: target.Components, Platform: target.Platform, OutputFormat: target.Format})
 	if err != nil {
 		return BuildPlan{}, e.Wrap(e.CodeNoMatch, err, "factory build target %q", target.Name)
 	}
@@ -43,7 +43,7 @@ func compileOutputBuild(target authored.DefinitionOutput, delivery authored.Envi
 	}
 	return BuildPlan{Name: target.Name,
 		CatalogDigest: targetStack.Digest, AppliedOverlays: append([]catalog.AppliedOverlay(nil), targetStack.Applied...),
-		BuildDigest: buildDigest, Platform: resolved.Platform, Debian: cloneDebianTarget(resolved.Debian), CatalogSnapshot: snapshot.Catalog,
+		BuildDigest: buildDigest, Platform: target.Platform, CatalogSnapshot: snapshot.Catalog,
 		Components: selectedNames,
 		// The SBOM node bills the SELECTED (built) components: those are exactly the
 		// ones with a producer-result carrying an observed digest (ADR-13).
@@ -189,7 +189,7 @@ func (plan Plan) validatePlanBuilds() error {
 		}
 
 		selection, ok := plan.selectionForBuild(buildPlan.Name)
-		if !ok || (selection.Format != authored.OutputDebianPackage && selection.Platform != buildPlan.Platform) {
+		if !ok || selection.Platform != buildPlan.Platform {
 			return e.New(e.CodeUnverifiedRef, "native build %q graph identity is not selected by its Definition", buildPlan.Name)
 		}
 		if err := validateBuildCatalog(buildPlan, selection, plan.Environment); err != nil {
@@ -251,12 +251,12 @@ func validateBuildCatalog(build BuildPlan, output authored.DefinitionOutput, env
 	if digest != build.CatalogDigest {
 		return e.New(e.CodeUnverifiedRef, "output %q catalog snapshot differs", build.Name)
 	}
-	selection := buildgraph.Selection{Components: output.Components, Platform: output.Platform, OutputFormat: output.Format, Debian: debianOutputRequest(output)}
+	selection := buildgraph.Selection{Components: output.Components, Platform: output.Platform, OutputFormat: output.Format}
 	selected, err := buildgraph.Resolve(build.CatalogSnapshot, selection)
 	if err != nil {
 		return err
 	}
-	if selected.Platform != build.Platform || !reflect.DeepEqual(selected.Debian, build.Debian) || !reflect.DeepEqual(selected.Components, build.ResolvedComponents) {
+	if selected.Platform != build.Platform || !reflect.DeepEqual(selected.Components, build.ResolvedComponents) {
 		return e.New(e.CodeUnverifiedRef, "output %q resolved producers differ from catalog", build.Name)
 	}
 	graph, err := compileBuildGraph(selected, environment)

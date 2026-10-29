@@ -150,25 +150,11 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 			&cli.StringFlag{Name: "capture-inputs-root", Usage: "retain compiler inputs beneath this root; definition and environment paths must be repository-relative"},
 			&cli.IntFlag{Name: "jobs", Aliases: []string{"j"}, Value: 1}, &cli.StringFlag{Name: "runtime", Value: "docker"},
 			&cli.StringFlag{Name: "go", Value: "go"}, &cli.BoolFlag{Name: "publish"}, &cli.BoolFlag{Name: "dry-run"},
-			&cli.DurationFlag{Name: "timeout", Usage: "bound preparation, execution and output observation; 0 preserves the caller deadline (native Debian execution requires a deadline)"},
 			&cli.IntFlag{Name: "build-activity-fd", Hidden: true, Value: -1},
 			&cli.StringFlag{Name: "ui", Value: "auto", Usage: "auto, plain, or tui presentation"},
 			&cli.BoolFlag{Name: "json", Usage: "emit one safe descriptive local Run result"},
 			&cli.BoolFlag{Name: "no-color", Usage: "disable terminal colors (also honors NO_COLOR)"}), Action: func(c *cli.Context) error {
-			if c.Duration("timeout") < 0 {
-				return e.New(e.CodeUsage, "local run timeout must not be negative")
-			}
-			var ctx context.Context
-			var cancel context.CancelFunc
-			if c.Duration("timeout") > 0 {
-				ctx, cancel = context.WithTimeout(c.Context, c.Duration("timeout"))
-			} else {
-				ctx, cancel = context.WithCancel(c.Context)
-			}
-			defer cancel()
-			bounded := *c
-			bounded.Context = ctx
-			return runLocalCommand(&bounded, executeLocal)
+			return runLocalCommand(c, executeLocal)
 		}},
 	}}
 }

@@ -46,17 +46,8 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 			for _, name := range build.Components {
 				selected[name] = true
 			}
-			if err := addBuildDataflow(target, runsOn, build.Graph, selected, delivery.UtilityContainer, delivery.UtilityPlatform, delivery.Publication != nil || (target.Format == catalog.OutputDebianPackage && definition.SBOMTool != ""), nodes, artifacts); err != nil {
+			if err := addBuildDataflow(target, runsOn, build.Graph, selected, delivery.UtilityContainer, delivery.UtilityPlatform, delivery.Publication != nil, nodes, artifacts); err != nil {
 				return ArtifactGraph{}, err
-			}
-			if target.Format == catalog.OutputDebianPackage && definition.SBOMTool != "" {
-				profile, err := debianInspectionProfile(build, delivery, tools[definition.SBOMTool])
-				if err != nil {
-					return ArtifactGraph{}, err
-				}
-				node := nodes[target.Name+"/sbom"]
-				node.Container, node.Platform = profile.Image, build.Platform
-				nodes[node.ID] = node
 			}
 			if target.Format == "disk-image" && delivery.Publication != nil {
 				if err := admitDiskPublicationProducer(build); err != nil {

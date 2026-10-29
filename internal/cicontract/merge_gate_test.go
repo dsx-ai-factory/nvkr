@@ -58,8 +58,8 @@ func TestMergeGateRequiresEveryCodeJob(t *testing.T) {
 	if gate.If != "always()" {
 		t.Fatal("aggregate gate must always run, including after failed or skipped dependencies")
 	}
-	codeJobs := []string{"check", "lint", "vulnerabilities", "tests", "debian-contracts"}
-	for _, name := range append(slices.Clone(codeJobs), "check-skip", "debian-contracts-skip", "check-paths") {
+	codeJobs := []string{"check", "lint", "vulnerabilities", "tests"}
+	for _, name := range append(slices.Clone(codeJobs), "check-skip", "check-paths") {
 		if !slices.Contains(gate.Needs, name) {
 			t.Fatalf("gate does not depend on %s", name)
 		}
@@ -74,7 +74,6 @@ func TestMergeGateRequiresEveryCodeJob(t *testing.T) {
 		{"all code checks pass", "true", "", "", true},
 		{"unchanged code", "false", "", "", true},
 		{"missing skip companion", "false", "check-skip", "skipped", false},
-		{"missing Debian skip companion", "false", "debian-contracts-skip", "skipped", false},
 		{"classifier failed", "true", "check-paths", "failure", false},
 		{"another gate failed", "true", "docs", "failure", false},
 		{"unknown classification", "", "", "", false},
@@ -95,7 +94,6 @@ func TestMergeGateRequiresEveryCodeJob(t *testing.T) {
 			}
 			if tc.code == "true" {
 				needs["check-skip"]["result"] = "skipped"
-				needs["debian-contracts-skip"]["result"] = "skipped"
 			} else {
 				for _, job := range codeJobs {
 					needs[job]["result"] = "skipped"

@@ -168,38 +168,19 @@ versionStamp:
 These are build inputs, not labels added after the build. For the pinned tag `v0.22.0`,
 `.ModuleTag` is `v0.22.0`; `.Version` is `0.22.0-beta.6`.
 
-## Native Debian producers
+## Debian packages
 
-A `debian-package` component declares complete `debian.routes`, each with a distribution/platform `target`,
-digest-pinned `toolchainImage`, source-owned `buildCommand`, `artifactPath` and private `writeDir`.
-Commands and installation layout belong to the source. Common command/path/toolchain fields cannot compete
-with route fields. The complete route set must be sorted and unique and cover every declared platform.
-Source-specific distribution inputs belong in exact route arguments; only the existing `{{.Arch}}` token
-is substituted. A distribution profile key is separate from the APT publication suite and package version.
+A `host-package` component can produce a raw DEB using its existing command, pinned toolchain,
+platforms, private `writeDir` and `artifactPath`. A standalone `format: debian-package` output selects one
+such producer and an explicit platform. The existing session and producer-result authentication own the
+build; bounded file retention and lifecycle staging preserve the raw archive. It is not wrapped as an
+executable bundle or an APT repository. Signing, publication and hosted/direct-node execution remain gated.
 
-Direct compiler selection resolves standalone defaults to `ubuntu-24.04` and `linux/amd64` only when that
-exact route exists, then binds the selected target and source archive path into Build identity. A Definition
-may select one such producer with `format: debian-package`, optional `debian.distribution` and optional
-standalone `platform`. The compiled Plan retains and rederives the resolved target and required raw archive;
-local standalone execution additionally requires a matching native Linux host, bounded context, complete
-private-volume inspection profile and selected catalog scanner. Its original producer/content/terminal
-owners preserve package bytes and inspected evidence through the lifecycle transaction. Direct-node and
-GitHub execution remain gated. Actual OS/image dependency binding, ABI compatibility, signing, publication
-and installation acceptance remain deferred. See
-[ADR-12](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0012-criteria-model-and-aicr-activation.md)
-and [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md).
-
-The selected NVSentinel integration is a reusable catalog with separate image, Helm chart and native Debian
-producers sharing a coordinated source pin. A Definition chooses the required outputs; choosing Debian does
-not build or deploy the Kubernetes outputs implicitly. Image and chart producers retain their own source
-commands, dependency pins and image-slot contracts. Their schema names do not establish working NVSentinel
-builds, and a source-created Debian archive is not an image or a chart.
-
-The NVSentinel OS selections separately build an ordinary `host-package` material through the same source
-recipe and hand its raw archive to the existing composer and Packer provisioner. This route does not consume
-the standalone Debian receipt, content document or predicate. Authenticated consumer target/evidence joins
-and general ABI acceptance remain deferred. The [example](https://github.com/dsx-ai-factory/nvkr/blob/main/definitions/nvsentinel/README.md)
-and [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md) own dated results and remaining limits.
+The [NVSentinel catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/nvsentinel/README.md)
+declares OCI, Helm, executable and Debian outputs. Its OS experiment places the same DEB in the existing
+composer/Packer `debs/` folder and regenerates the local APT index. Upstream source is unchanged. Placement
+does not install or enable NVSentinel; local composition metadata is not a full-content dependency SBOM,
+ABI proof or runtime acceptance. See [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md).
 
 ## Run the local lab
 
