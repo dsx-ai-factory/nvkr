@@ -307,6 +307,9 @@ type Catalog struct {
 	// resolved catalog while still allowing read-only projections from the exact
 	// snapshot that produced this Catalog.
 	sourcePins map[string]Pin
+	// stampDeclarations retains loader-issued templates across defensive stack
+	// copies. Serialized resolved components cannot recreate this provenance.
+	stampDeclarations map[string]sourceStampDeclaration
 }
 
 // NamedComponent pairs a component with its registry key, for ordered iteration

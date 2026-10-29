@@ -6,6 +6,7 @@ package pipeline
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"math"
@@ -248,8 +249,9 @@ func (container *DiskInspectionContainer) observeBinding(ctx context.Context) er
 
 // BindingContext checks that the capability remains open and unchanged. Image
 // identity is the runtime-reported image ID, not an independently approved pin.
-// The recorded Podman config identity binds rootfs content; the unexercised
-// Docker route does not establish which image-store identity .Id represents.
+// The recorded Podman config identity binds rootfs content. Docker can report a
+// store-specific platform identity; launch uses the declared repository digest
+// rather than assuming that observed ID is also a locatable image reference.
 func (container *DiskInspectionContainer) BindingContext(ctx context.Context) (string, string, string, error) {
 	if err := requireRunContext(ctx, "disk inspection runtime binding"); err != nil {
 		return "", "", "", err
@@ -565,7 +567,7 @@ func runDiskInspectionContainerWithCleanupTimeout(ctx context.Context, runtime p
 	if selection.compositionKind != "" {
 		report.limit = MaxDiskContentReportBytes
 	}
-	if err := runtime.Run(ctx, nil, &created, &createDiagnostic, diskInspectionCommandArgs(runtime.RuntimeName(), diskInspectionCreateArgs(selection, imageID, name, attempt, subject)...)...); err != nil {
+	if err := runtime.Run(ctx, nil, &created, &createDiagnostic, diskInspectionCommandArgs(runtime.RuntimeName(), diskInspectionCreateArgs(selection, selection.Image, name, attempt, subject)...)...); err != nil {
 		return nil, runtimeCommandError(ctx, err, diskInspectionDiagnostic(createDiagnostic.Bytes()), e.CodeEngineCapability, "creating disk inspection container")
 	}
 	creationUncertain = false
@@ -577,6 +579,9 @@ func runDiskInspectionContainerWithCleanupTimeout(ctx context.Context, runtime p
 	ids := strings.Fields(created.String())
 	if len(ids) != 1 || !canonical.IsDigest("sha256:"+ids[0]) {
 		return nil, e.New(e.CodeVerifyFailed, "disk inspection creation returned no unique immutable container ID")
+	}
+	if err := observeDiskInspectionImage(ctx, runtime, selection, ids[0], imageID); err != nil {
+		return nil, err
 	}
 	reader, writer := io.Pipe()
 	done := make(chan error, 1)
@@ -594,6 +599,28 @@ func runDiskInspectionContainerWithCleanupTimeout(ctx context.Context, runtime p
 		return nil, e.New(e.CodeEnvelopeDecode, "disk inspection returned diagnostics or no report")
 	}
 	return bytes.Clone(report.Bytes()), nil
+}
+
+// Inspect the exact created container before starting the helper or streaming a
+// subject. Reuse the existing Docker legacy/containerd manifest binding rules;
+// a repository reference alone cannot establish the executed native image.
+func observeDiskInspectionImage(ctx context.Context, runtime packerContainerRuntime, selection DiskInspectionSelection, id, image string) error {
+	var output, diagnostic diskInspectionBuffer
+	output.limit, diagnostic.limit = toolSmokeControlBytes, toolSmokeControlBytes
+	if err := runtime.Run(ctx, nil, &output, &diagnostic, diskInspectionCommandArgs(runtime.RuntimeName(), "container", "inspect", "--format", "{{json .}}", id)...); err != nil {
+		return runtimeCommandError(ctx, err, diskInspectionDiagnostic(diagnostic.Bytes()), e.CodeEngineCapability, "observing disk inspection image")
+	}
+	if diagnostic.Len() != 0 {
+		return e.New(e.CodeEngineCapability, "disk inspection image observation returned diagnostics")
+	}
+	var observed toolSmokeInspection
+	if err := json.Unmarshal(output.Bytes(), &observed); err != nil {
+		return e.Wrap(e.CodeEnvelopeDecode, err, "decoding disk inspection container image")
+	}
+	if !canonical.IsDigest(image) || observed.ID != id || !toolSmokeImageMatches(observed, ToolSmokeSelection{Image: selection.Image, Platform: selection.Platform}, image) {
+		return e.New(e.CodeVerifyFailed, "created disk inspection container differs from admitted native image")
+	}
+	return nil
 }
 
 // Podman adds mounts.conf content at start, even when create reports no mounts.

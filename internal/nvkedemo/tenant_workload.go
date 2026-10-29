@@ -18,12 +18,20 @@ import (
 // Workload acceptance is identical for every execution host. The caller owns
 // command execution and private diagnostics; this function owns the checks.
 func runTenantWorkload(ctx context.Context, work, kubeconfig, kubectl, image string, capture func(context.Context, []string, string, time.Duration) ([]byte, error)) (json.RawMessage, error) {
+	return runTenantWorkloadForArchitecture(ctx, work, kubeconfig, kubectl, image, "arm64", capture)
+}
+
+func runTenantWorkloadForArchitecture(ctx context.Context, work, kubeconfig, kubectl, image, arch string, capture func(context.Context, []string, string, time.Duration) ([]byte, error)) (json.RawMessage, error) {
+	manifest, err := workloadJobForArchitecture(image, arch)
+	if err != nil {
+		return nil, err
+	}
 	digest, err := workloadImageDigest(image)
 	if err != nil {
 		return nil, err
 	}
 	job := filepath.Join(work, "workload.json")
-	if err := privateJSON(job, workloadJob(image)); err != nil {
+	if err := privateJSON(job, manifest); err != nil {
 		return nil, err
 	}
 	command := func(args ...string) []string {
@@ -44,7 +52,7 @@ func runTenantWorkload(ctx context.Context, work, kubeconfig, kubectl, image str
 		return nil, err
 	}
 	if !slices.Contains(strings.Split(strings.TrimSpace(string(raw)), "\n"), "NVKE_LOCAL_WORKLOAD_PASS") {
-		return nil, errors.New("workload did not report ARM64 execution and cluster DNS success")
+		return nil, errors.New("workload did not report selected native architecture execution and cluster DNS success")
 	}
 	raw, err = capture(ctx, command("get", "pods", "-l", "job-name=nvkr-smoke", "-o", "json"), "workload-pod", 30*time.Second)
 	if err != nil {

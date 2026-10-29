@@ -8,8 +8,8 @@ name: NVKR nightly NVKE end-to-end tests
     - cron: '17 3 * * *'
   workflow_dispatch:
     inputs:
-      source_contract_only:
-        description: Validate the pinned nightly handoff without builds or VM deployment
+      tenant_checks:
+        description: Also create a tenant and check workload and DNS after site bootstrap
         type: boolean
         default: false
       profile:
@@ -20,7 +20,6 @@ name: NVKR nightly NVKE end-to-end tests
         options:
           - all
           - nvke-nightly-arm64
-          - nvke-nightly-upstream-ovn-arm64
 
 permissions:
   contents: read
@@ -30,65 +29,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  source-contract:
-    if: github.event_name == 'workflow_dispatch' && inputs.source_contract_only && github.repository == 'dsx-ai-factory/nvkr'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 25
-    steps:
-      - name: Check out selected adapter
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - name: Read exact harness selection
-        id: harness
-        run: |
-          set -euo pipefail
-          commit=$(jq -er 'map(.harness_commit) | unique | if length == 1 and (.[0] | test("^[0-9a-f]{40}$")) then .[0] else error("ambiguous harness") end' inputs/testing/nightly-profiles.json)
-          printf 'commit=%s\n' "$commit" >> "$GITHUB_OUTPUT"
-      - name: Check out selected v0.22.0 CLI source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: dsx-ai-factory/nvke
-          ref: 400c24fb6465b042be883d6b62472528520d6291
-          path: .nvkr/source-contract/product
-          token: ${{ secrets.NKE_SOURCE_TOKEN }}
-          persist-credentials: false
-      - name: Check out exact compatible harness
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: dsx-ai-factory/nvke
-          ref: ${{ steps.harness.outputs.commit }}
-          path: .nvkr/source-contract/harness
-          token: ${{ secrets.NKE_SOURCE_TOKEN }}
-          persist-credentials: false
-      - name: Set up pinned Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: .go-version
-          cache: false
-      - name: Compile beta.6 CLI and exercise the exact candidate hook
-        env:
-          GOTOOLCHAIN: local
-        run: |
-          set -euo pipefail
-          root="$GITHUB_WORKSPACE"
-          cd "$root/.nvkr/source-contract/product/cli"
-          go build -o "$RUNNER_TEMP/nvkectl-beta6" ./cmd/nvkectl
-          cd "$root"
-          NVKR_NVKE_SOURCE_CONTRACT="$root/.nvkr/source-contract/product" \
-          NVKR_NVKE_SOURCE_CLI="$RUNNER_TEMP/nvkectl-beta6" \
-          NVKR_NVKE_NIGHTLY_SOURCE_CONTRACT="$root/.nvkr/source-contract/harness" \
-            go test ./internal/nvkedemo -run '^TestNightlyBeta(Site|.*Handoff)' -count=1 -timeout=5m
-          cd "$root/.nvkr/source-contract/harness/controller/test/e2e"
-          go test . -run '^TestUnit_CandidateStackConfigurationHandoff$' -count=1 -timeout=2m
-
   select:
-    if: github.repository == 'dsx-ai-factory/nvkr' && github.ref == 'refs/heads/main' && !inputs.source_contract_only
+    if: github.repository == 'dsx-ai-factory/nvkr' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
       matrix: ${{ steps.profiles.outputs.matrix }}
+      nvke_commit: ${{ steps.source.outputs.nvke_commit }}
     steps:
       - name: Check out the exact coordinator source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -102,22 +49,34 @@ jobs:
         run: |
           set -euo pipefail
           jq --arg profile "$PROFILE" '
-            [.[] | select($profile == "all" or .name == $profile) |
-              {name, harness_commit, runtime_target, network}]
+            [.[] | select(.network == "ovn") | select($profile == "all" or .name == $profile) |
+              {name, runtime_target, network}]
           ' inputs/testing/nightly-profiles.json > "$RUNNER_TEMP/nightly-selection.json"
           matrix=$(jq -ce --arg profile "$PROFILE" '
-            [.[] | select($profile == "all" or .name == $profile)] |
+            [.[] | select(.network == "ovn") | select($profile == "all" or .name == $profile)] |
             if length > 0 and all(.[];
-              (.name == "nvke-nightly-arm64" or
-                .name == "nvke-nightly-upstream-ovn-arm64") and
-              (.harness_commit | test("^[0-9a-f]{40}$")) and
+              (.name == "nvke-nightly-arm64") and
               .runtime_target == "native-arm64-vm" and
               (.network == "ovn" or .network == "upstream-ovn")) and
               (map(.name) | length == (unique | length)) then
-              {include: map({name, harness_commit})}
+              {include: map({name})}
             else error("invalid maintained nightly profile") end
           ' inputs/testing/nightly-profiles.json)
           printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
+      - name: Resolve NVKE main once for this nightly cycle
+        id: source
+        env:
+          GH_TOKEN: ${{ secrets.NKE_SOURCE_TOKEN }}
+        run: |
+          set -euo pipefail
+          : "${GH_TOKEN:?NVKE source resolution requires its read credential}"
+          source=$(timeout --kill-after=5s 60s gh api --hostname github.com \
+            -H 'X-GitHub-Api-Version: 2026-03-10' repos/dsx-ai-factory/nvke/git/ref/heads/main)
+          commit=$(jq -er '
+            if .ref == "refs/heads/main" and .object.type == "commit" and
+              (.object.sha | type == "string" and test("^[0-9a-f]{40}$")) then .object.sha
+            else error("invalid exact NVKE main revision") end' <<<"$source")
+          printf 'nvke_commit=%s\n' "$commit" >> "$GITHUB_OUTPUT"
       - name: Preserve public nightly selection report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
@@ -149,6 +108,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PROFILE: ${{ matrix.name }}
+          NVKE_COMMIT: ${{ needs.select.outputs.nvke_commit }}
         run: |
           set -euo pipefail
           bash scripts/nightly-build.sh inputs/testing/nightly-profiles.json "$PROFILE" \
@@ -186,8 +146,7 @@ jobs:
           profiles=$(jq -er '
             if (.include | type) == "array" and (.include | length) > 0 and
               all(.include[];
-                (.name == "nvke-nightly-arm64" or .name == "nvke-nightly-upstream-ovn-arm64") and
-                (.harness_commit | test("^[0-9a-f]{40}$"))) and
+                (.name == "nvke-nightly-arm64")) and
               (.include | map(.name) | length == (unique | length)) then
               .include[].name
             else error("invalid maintained runtime matrix") end
@@ -232,6 +191,10 @@ jobs:
       max-parallel: 1
       matrix: ${{ fromJSON(needs.select-runtime.outputs.matrix) }}
     steps:
+      - name: Reserve time for Go cleanup and the job verdict
+        run: |
+          set -euo pipefail
+          printf 'NVKR_JOB_DEADLINE=%s\n' "$(( $(date +%s) + 355 * 60 ))" >> "$GITHUB_ENV"
       - name: Check out the exact coordinator source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -243,11 +206,11 @@ jobs:
           go-version-file: .go-version
           cache: false
       - name: Build the existing network privilege probe
+        timeout-minutes: 20
         env:
           GOTOOLCHAIN: local
         run: |
-          make demo
-          CGO_ENABLED=0 go build -trimpath -o nvkr-exec ./cmd/nvkr
+          timeout --kill-after=10s 900s make demo
       - name: Admit the configured native runtime host
         env:
           GOTOOLCHAIN: local
@@ -274,81 +237,31 @@ jobs:
         with:
           name: nightly-build-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: .nightly-private/build
-      - name: Select this cycle's producer and planning policy
-        id: candidate
+      - name: Build the pinned temporary bootstrap backend from source
+        timeout-minutes: 20
         env:
-          PROFILE: ${{ matrix.name }}
+          GOENV: 'off'
+          GOWORK: 'off'
         run: |
           set -euo pipefail
-          producer=$(jq -er --arg profile "$PROFILE" --arg sha "$GITHUB_SHA" \
-            --arg run "$GITHUB_RUN_ID" --arg attempt "$GITHUB_RUN_ATTEMPT" '
-            if .profile.name == $profile and .sourceCommit == $sha and
-              .coordinatorRun == $run and .coordinatorAttempt == $attempt and
-              .producerAttempt == 1 and (.producerRun | type) == "number" and
-              .producerRun > 0 and .producerRun <= 9007199254740991 and
-              (.producerRun | floor) == .producerRun then .producerRun
-            else error("invalid exact-cycle producer") end
-          ' .nightly-private/build/build.json)
-          environment=$(jq -er --arg profile "$PROFILE" \
-            '[.[] | select(.name == $profile)] | if length == 1 then .[0].environment else error("invalid profile") end' \
-            inputs/testing/nightly-profiles.json)
-          runtime=$(jq -r '.githubRuntimePlan // false | if type == "boolean" then . else error("invalid runtime policy") end' "$environment")
-          printf 'producer_run=%s\nruntime_plan=%s\n' "$producer" "$runtime" >> "$GITHUB_OUTPUT"
-      - name: Download the producer's frozen runtime inputs
-        if: steps.candidate.outputs.runtime_plan == 'true'
-        uses: ./.github/nvkr-run/actions/ci-download
-        env:
-          NVKR_CI_STORAGE_READ_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
-        with:
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          name: nvkr-runtime-inputs
-          run-id: ${{ steps.candidate.outputs.producer_run }}
-          attempt: '1'
-          path: .nightly-private/runtime-inputs
-      - name: Select the suite revision from the frozen product sources
-        id: suite
-        env:
-          RUNTIME_PLAN: ${{ steps.candidate.outputs.runtime_plan }}
-          PINNED_SUITE: ${{ matrix.harness_commit }}
-          PROFILE: ${{ matrix.name }}
-        run: |
-          set -euo pipefail
-          suite="$PINNED_SUITE"
-          if [[ "$RUNTIME_PLAN" == true ]]; then
-            controller=$(jq -er --arg profile "$PROFILE" \
-              '.[] | select(.name == $profile) | .controller_output // "cwe"' inputs/testing/nightly-profiles.json)
-            suite=$(jq -er --arg controller "$controller" '
-              {nvkectl:"nvkectl", ($controller):"nvke-controller",
-                "controller-chart":"nvke-controller-chart", nktp:"nktp-chart"} as $roles |
-              [.builds[] | select($roles[.name] != null)] |
-              if length == 4 and (map(.name) | sort) == ($roles | keys) and
-                all(.[]; (.resolvedComponents | length) == 1 and
-                  .resolvedComponents[0].Name == $roles[.name]) then
-                map(.resolvedComponents[0])
-              else error("ambiguous site producers") end |
-              if all(.[]; .fromSource == true and
-                (.repo | test("^https://github[.]com/dsx-ai-factory/nvke([.]git)?$")) and
-                (.commit | test("^[0-9a-f]{40}$"))) and
-                (map(.commit) | unique | length) == 1 then .[0].commit
-              else error("site products require one exact NVKE suite revision") end
-            ' .nightly-private/runtime-inputs/plan.json)
-            if [[ "$suite" == 400c24fb6465b042be883d6b62472528520d6291 ]]; then
-              [[ "$PINNED_SUITE" == b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8 ]] || { echo "unrecognized retained suite pin" >&2; exit 1; }
-              suite="$PINNED_SUITE"
-            fi
-          fi
-          [[ "$suite" =~ ^[0-9a-f]{40}$ ]]
-          printf 'commit=%s\n' "$suite" >> "$GITHUB_OUTPUT"
-      - name: Check out the pinned NVKE end-to-end suite
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          repository: dsx-ai-factory/nvke
-          ref: ${{ steps.suite.outputs.commit }}
-          token: ${{ secrets.NKE_SOURCE_TOKEN }}
-          path: .nightly-private/nvke
-          fetch-depth: 1
-          persist-credentials: false
+          umask 077
+          source="$RUNNER_TEMP/nightly-lima-source"
+          prefix="$RUNNER_TEMP/nightly-lima"
+          test ! -e "$source" && test ! -L "$source"
+          test ! -e "$prefix" && test ! -L "$prefix"
+          git init "$source"
+          git -C "$source" remote add origin https://github.com/lima-vm/lima.git
+          timeout --kill-after=10s 180s git -C "$source" fetch --depth=1 origin f47461ed7d03f300297e01fd659e9aefc6c228b9
+          git -C "$source" checkout --detach FETCH_HEAD
+          test "$(git -C "$source" rev-parse HEAD)" = f47461ed7d03f300297e01fd659e9aefc6c228b9
+          test "$(git -C "$source" rev-parse 'HEAD^{tree}')" = 525cd5017b050291ab824892d624bbbacf7f8e7e
+          timeout --kill-after=30s 900s make -C "$source" native documentation install PREFIX="$prefix"
+          install -m 0644 "$source/NOTICE" "$prefix/share/doc/lima/NOTICE"
+          test "$("$prefix/bin/limactl" --version)" = 'limactl version f47461e'
+          test -x "$prefix/bin/nerdctl.lima"
+          printf '%s\n' "$prefix/bin" >> "$GITHUB_PATH"
       - name: Fetch and check the independent native verifier
+        timeout-minutes: 5
         run: |
           set -euo pipefail
           destination="$RUNNER_TEMP/nightly-cosign-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
@@ -362,7 +275,7 @@ jobs:
           chmod 0500 "$destination/cosign"
           printf 'NVKR_NIGHTLY_COSIGN=%s\n' "$destination/cosign" >> "$GITHUB_ENV"
           printf 'NVKR_NIGHTLY_COSIGN_DIGEST=sha256:%s\n' "$COSIGN_DIGEST" >> "$GITHUB_ENV"
-      - name: Authenticate the publication and run the existing NVKE Go suite
+      - name: Authenticate producer artifacts and run native Go E2E
         env:
           GOTOOLCHAIN: local
           GH_TOKEN: ${{ github.token }}
@@ -374,7 +287,7 @@ jobs:
           NVKR_NIGHTLY_PROFILE: ${{ matrix.name }}
           NVKR_NIGHTLY_PROFILES: ${{ github.workspace }}/inputs/testing/nightly-profiles.json
           NVKR_NIGHTLY_BUILD: ${{ github.workspace }}/.nightly-private/build/build.json
-          NVKR_NIGHTLY_SOURCE: ${{ github.workspace }}/.nightly-private/nvke
+          NVKR_NIGHTLY_TENANT: ${{ inputs.tenant_checks && '1' || '0' }}
           NVKR_NIGHTLY_NETWORK_HELPER: ${{ github.workspace }}/bin/nvke-demo
           NVKR_NIGHTLY_WORKSPACE: ${{ runner.temp }}/nightly-candidate-${{ matrix.name }}
           NVKR_NIGHTLY_REPORTS: ${{ runner.temp }}/nightly-reports-${{ matrix.name }}
@@ -382,7 +295,10 @@ jobs:
           set -euo pipefail
           go test ./internal/nvkedemo -list '^TestNightlyPublishedCandidate$' \
             | grep -Fx TestNightlyPublishedCandidate
-          go test ./internal/nvkedemo -run '^TestNightlyPublishedCandidate$' -timeout 330m -count=1 -v
+          [[ "$NVKR_JOB_DEADLINE" =~ ^[0-9]+$ ]]
+          remaining=$(( NVKR_JOB_DEADLINE - $(date +%s) ))
+          (( remaining > 125 * 60 ))
+          go test ./internal/nvkedemo -run '^TestNightlyPublishedCandidate$' -timeout "${remaining}s" -count=1 -v
           jq -e --arg profile "$NVKR_NIGHTLY_PROFILE" --arg run "$GITHUB_RUN_ID" \
             --arg attempt "$GITHUB_RUN_ATTEMPT" --arg sha "$GITHUB_SHA" '
             .profile == $profile and .phase == "runtime" and .runtimePassed == true and

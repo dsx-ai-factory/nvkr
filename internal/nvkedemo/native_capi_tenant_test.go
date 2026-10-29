@@ -33,7 +33,7 @@ func nativeCAPITenantFixture(t *testing.T, subnet, network string) nativeSiteAtt
 	}
 	return nativeSiteAttempt{network: network, boot: boot, api: "http://" + gateway.String() + ":18085",
 		bridge: nativeBridgeConfig{prefix: prefix, gateway: gateway},
-		assets: NativeAssets{Installer: root, installerSelection: selection, Images: map[string]NativeImageAsset{
+		assets: NativeAssets{arch: "arm64", Installer: root, installerSelection: selection, Images: map[string]NativeImageAsset{
 			"ovn":      {File: payload, ManifestDigest: digest, Reference: "localhost/nvke/ovn-kubernetes@" + digest},
 			"workload": {File: payload, Reference: "example.invalid/selected-workload@" + digest, ManifestDigest: digest},
 		}},

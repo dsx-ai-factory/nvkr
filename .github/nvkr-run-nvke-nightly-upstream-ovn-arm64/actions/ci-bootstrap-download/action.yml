@@ -47,7 +47,7 @@ runs:
       with:
         go-version-file: .go-version
         cache: "false"
-    - name: Build private transport helper from this checkout
+    - name: Build private transport helper
       shell: bash
       env:
         GOTOOLCHAIN: local
@@ -99,10 +99,10 @@ runs:
                 print("NVKR-E-TIMEOUT: private bootstrap child did not stop", file=sys.stderr, flush=True)
                 os._exit(31)
 
-        def run(args, env, deadline, capture=False):
+        def run(args, env, deadline, capture=False, cwd=None):
             check_deadline(deadline)
             output = [bytearray(), bytearray()]
-            child = subprocess.Popen(args, env=env, stdin=subprocess.DEVNULL,
+            child = subprocess.Popen(args, env=env, cwd=cwd, stdin=subprocess.DEVNULL,
                                      stdout=subprocess.PIPE if capture else None,
                                      stderr=subprocess.PIPE if capture else None, start_new_session=True)
             joined = False
@@ -186,29 +186,13 @@ runs:
                 raise ValueError("module acquisition omitted its results")
             return errors
 
-        def build(cache):
-            # Never pass repository, registry or OIDC credentials to either Go process.
-            env = {key: os.environ[key] for key in ("PATH", "HOME", "TMPDIR", "GOROOT") if key in os.environ}
-            env.update(CGO_ENABLED="0", GOTOOLCHAIN="local", GOENV="off", GOWORK="off",
-                       GOCACHE=os.path.join(cache, "build"), GOMODCACHE=os.path.join(cache, "modules"))
-            deadline = time.monotonic() + 900
-            check_deadline(deadline)
-            original = manifests()
-            # Go may normalize module manifests. Private copies keep the checked-out
-            # source untouched; both must remain byte-exact through download and build.
-            inputs = os.path.join(cache, "inputs")
-            os.mkdir(inputs)
-            for name, raw in zip(("go.mod", "go.sum"), original):
-                with open(os.path.join(inputs, name), "xb") as destination:
-                    destination.write(raw)
-            modfile = "-modfile=" + os.path.join(inputs, "go.mod")
+        def download(args, env, deadline, cwd, check):
             for attempt in range(3):
-                result, stdout, stderr = run(["go", "mod", "download", "-json", modfile], env, deadline, capture=True)
-                if manifests() != original or manifests(inputs) != original:
-                    raise ValueError("module acquisition changed source manifests")
+                result, stdout, stderr = run(["go", "mod", "download", "-json"] + args, env, deadline, capture=True, cwd=cwd)
+                check()
                 errors = module_errors(stdout)
                 if result == 0 and not errors and not stderr.strip():
-                    break
+                    return stdout
                 if result != 1 or not errors or not all(errors) or stderr.strip() or attempt == 2:
                     raise ValueError("module acquisition failed")
                 print("Retrying public Go module acquisition after an HTTP/2 peer error", file=sys.stderr)
@@ -216,13 +200,38 @@ runs:
                 while time.monotonic() < until:
                     check_deadline(deadline)
                     time.sleep(min(0.2, max(0, until - time.monotonic())))
+
+        def build(cache):
+            # Never pass repository, registry or OIDC credentials to either Go process.
+            env = {key: os.environ[key] for key in ("PATH", "HOME", "TMPDIR", "GOROOT") if key in os.environ}
+            env.update(CGO_ENABLED="0", GOTOOLCHAIN="local", GOENV="off", GOWORK="off",
+                       GOCACHE=os.path.join(cache, "build"), GOMODCACHE=os.path.join(cache, "modules"))
+            deadline = time.monotonic() + 900
+            check_deadline(deadline)
+            source = "."
+            original = manifests(source)
+            # Go may normalize module manifests. Private copies keep the source
+            # untouched; both must remain byte-exact through download and build.
+            inputs = os.path.join(cache, "inputs")
+            os.mkdir(inputs)
+            for name, raw in zip(("go.mod", "go.sum"), original):
+                with open(os.path.join(inputs, name), "xb") as destination:
+                    destination.write(raw)
+            modfile = "-modfile=" + os.path.join(inputs, "go.mod")
+
+            def unchanged():
+                if manifests(source) != original or manifests(inputs) != original:
+                    raise ValueError("module acquisition changed source manifests")
+
+            download([modfile], env, deadline, source, unchanged)
             # All module bytes were acquired and checked first. Compilation is attempted
             # once, with proxy and checksum-database network access disabled.
             env.update(GOPROXY="off", GOSUMDB="off")
             os.makedirs(".nvkr/ci-bootstrap", exist_ok=True)
+            output = os.path.abspath(".nvkr/ci-bootstrap/nvkr-exec")
             result, _stdout, _stderr = run(["go", "build", "-mod=readonly", modfile, "-trimpath", "-ldflags", sys.argv[1],
-                                          "-o", ".nvkr/ci-bootstrap/nvkr-exec", "./cmd/nvkr"], env, deadline)
-            if manifests() != original or manifests(inputs) != original or result != 0:
+                                          "-o", output, "./cmd/nvkr"], env, deadline, cwd=source)
+            if manifests(source) != original or manifests(inputs) != original or result != 0:
                 raise ValueError("private bootstrap compilation failed or changed source manifests")
             return 0
 

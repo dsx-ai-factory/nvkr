@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/qualificationprogress"
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -56,6 +57,7 @@ func publishLocalQualification(ctx context.Context, qualified *localVerifiedQual
 	if err := admitLocalPublicationScratch(operation, qualified.build, scratch); err != nil {
 		return report, nil, err
 	}
+	activity := localProgress(operation)
 	// Admit the actual consumer verifier before publication can leave remote bytes.
 	checked, err := verifyLocalQualification(operation, qualified.build, qualified.smoke, binary, []byte(qualified.raw), []byte(qualified.signature))
 	if err != nil {
@@ -78,7 +80,12 @@ func publishLocalQualification(ctx context.Context, qualified *localVerifiedQual
 		}
 	}()
 	ordinary := ""
+	completed, total := 0, len(names)+1 // Every disk and the evidence carrier.
 	if qualified.build.capture.ordinary != nil {
+		total++
+	}
+	if qualified.build.capture.ordinary != nil {
+		activity.startItem("ordinary-artifacts", completed, total)
 		ordinary = filepath.Join(stage, "ordinary-upload")
 		if err := qualified.build.capture.ordinary.WriteLayout(operation, ordinary); err != nil {
 			return report, nil, err
@@ -91,8 +98,11 @@ func publishLocalQualification(ctx context.Context, qualified *localVerifiedQual
 		if ref != report.Ordinary {
 			return report, nil, e.New(e.CodeVerifyFailed, "ordinary publication changed immutable identity")
 		}
+		activity.finishItem()
+		completed++
 	}
 	for _, disk := range names {
+		activity.startItem(disk, completed, total)
 		owner := qualified.build.capture.disks.members[disk]
 		report.Disks[disk] = repository + "/disk-" + disk + "@" + owner.Inspection().ManifestDigest
 		ref, pushErr := delivery.PushDiskArtifact(operation, owner, repository+"/disk-"+disk, stage, options)
@@ -102,29 +112,46 @@ func publishLocalQualification(ctx context.Context, qualified *localVerifiedQual
 		if ref != report.Disks[disk] {
 			return report, nil, e.New(e.CodeVerifyFailed, "disk publication changed immutable identity")
 		}
+		activity.finishItem()
+		completed++
 	}
+	activity.startItem("signed-evidence", completed, total)
 	report.Evidence, err = qualified.pushEvidence(operation, repository+"/evidence", options)
 	if err != nil {
 		return report, nil, err
 	}
+	activity.finishItem()
+	activity.finish()
+	activity.start(qualificationprogress.StageReadback)
+	completed, total = 0, total+1 // Fresh consumer verification is a separate item.
+	activity.startItem("signed-evidence", completed, total)
 	files, err := pullLocalEvidence(operation, report.Evidence, options)
 	if err != nil {
 		return report, nil, err
 	}
+	activity.finishItem()
+	completed++
 	if ordinary != "" {
+		activity.startItem("ordinary-artifacts", completed, total)
 		ordinary = filepath.Join(stage, "ordinary-download")
 		if _, err := delivery.Pull(operation, report.Ordinary, ordinary, options); err != nil {
 			return report, nil, err
 		}
+		activity.finishItem()
+		completed++
 	}
 	disks := map[string]string{}
 	for _, disk := range names {
+		activity.startItem(disk, completed, total)
 		view := qualified.build.capture.disks.members[disk].Inspection()
 		disks[disk] = filepath.Join(stage, "disk-"+disk)
 		if err := delivery.PullDiskArtifact(operation, report.Disks[disk], disks[disk], view.Platform, view.Size, options); err != nil {
 			return report, nil, err
 		}
+		activity.finishItem()
+		completed++
 	}
+	activity.startItem("independent-consumer", completed, total)
 	consumer, err = openLocalLayoutConsumer(operation, ordinary, disks, qualified.build.policy, binary, files)
 	if err != nil {
 		return report, nil, err
@@ -132,6 +159,7 @@ func publishLocalQualification(ctx context.Context, qualified *localVerifiedQual
 	if err := qualified.requireLive(operation); err != nil {
 		return report, consumer, err
 	}
+	activity.finishItem()
 	return report, consumer, nil
 }
 

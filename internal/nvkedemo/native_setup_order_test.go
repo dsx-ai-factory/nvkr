@@ -98,7 +98,7 @@ esac
 `), 0700)
 			handoff := &nativeHandoff{result: make(chan error, 1)}
 			handoff.result <- nil
-			attempt := nativeSiteAttempt{use: runNativeDemo, bridge: linuxNativeBridge(), bootstrap: &hostBootstrap{}, network: "upstream-ovn", handoff: handoff, files: filepath.Join(root, "files"), assets: NativeAssets{CLI: cli, HostTools: tools, Installer: installer, installerSelection: selection, Images: map[string]NativeImageAsset{
+			attempt := nativeSiteAttempt{use: runNativeDemo, bridge: linuxNativeBridge(), bootstrap: &hostBootstrap{}, network: "upstream-ovn", handoff: handoff, files: filepath.Join(root, "files"), assets: NativeAssets{arch: "arm64", CLI: cli, HostTools: tools, Installer: installer, installerSelection: selection, Images: map[string]NativeImageAsset{
 				"controller": {File: "controller.tar", Reference: "docker.io/library/controller:fixture"}, "provisioned-provider": {File: "provider.tar", Reference: "docker.io/library/provider:fixture"}, "profiles": {Reference: "docker.io/library/profiles:fixture"},
 			}}}
 			tenantFixture := nativeCAPITenantFixture(t, GuestCIDR, "upstream-ovn")
@@ -204,7 +204,7 @@ func TestNativeSiteContractRequiresReviewedSource(t *testing.T) {
 			installer := privateTestDir(t)
 			selection := nativeInstallerFixture(t, installer, "dfc817aa34205e8099dad91dfd05170499d00b60", "v1.13.6")
 			writeTenantFixture(t, filepath.Join(installer, "SOURCE_COMMIT"), []byte(tc.commit), 0600)
-			err := admitNativeSiteContract(t.Context(), NativeAssets{Installer: installer, installerSelection: selection})
+			err := admitNativeSiteContract(t.Context(), NativeAssets{arch: "arm64", Installer: installer, installerSelection: selection})
 			if (err == nil) != tc.valid {
 				t.Fatalf("source contract admission: %v", err)
 			}

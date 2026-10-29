@@ -14,6 +14,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 )
 
 // The fixture models a Linux launcher; the host gate also admits macOS gtimeout.
@@ -304,7 +307,7 @@ func TestSimulatorToolchainScope(t *testing.T) {
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
-			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", `include "nvke-os-plan"; simulator_toolchain_scope | toolchain_overlay("arm64"; .pin; "fresh"; .catalogDigest; .components)`)
+			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", `include "nvke-os-plan"; simulator_toolchain_scope("arm64") | toolchain_overlay("arm64"; .pin; "fresh"; .catalogDigest; .components)`)
 			cmd.Stdin = strings.NewReader(`{"builds":` + builds + `}`)
 			out, err := cmd.CombinedOutput()
 			if (err != nil) != tc.fail || !strings.Contains(string(out), tc.want) {
@@ -350,7 +353,7 @@ func TestSiteHelmToolchainScope(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
-			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", `include "nvke-os-plan"; site_helm_toolchain_scope | toolchain_overlay("arm64"; .pin; "fresh"; .catalogDigest; .components)`)
+			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", `include "nvke-os-plan"; site_helm_toolchain_scope("arm64") | toolchain_overlay("arm64"; .pin; "fresh"; .catalogDigest; .components)`)
 			cmd.Stdin = strings.NewReader(tc.input)
 			out, err := cmd.CombinedOutput()
 			if (err != nil) != tc.fail || !strings.Contains(string(out), tc.want) {
@@ -389,13 +392,19 @@ func TestAllLocalToolchainScopes(t *testing.T) {
 		fail              bool
 	}{
 		{"all three catalog predecessors", plan, "", false},
+		{"shared toolchain image", strings.ReplaceAll(plan, `"toolchainImages":{"arm64":"helm"}`, `"toolchainImage":"helm"`), "", false},
+		{"AMD64", strings.ReplaceAll(plan, "arm64", "amd64"), "", false},
 		{"overlapping catalogs rejected", strings.ReplaceAll(plan, `"catalogDigest":"simulator"`, `"catalogDigest":"os"`), "distinct catalogs", true},
 		{"missing simulator rejected", strings.ReplaceAll(plan, `"name":"nicosim-tools-arm64"`, `"name":"other"`), "expected one simulator tools build", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			arch := "arm64"
+			if tc.name == "AMD64" {
+				arch = "amd64"
+			}
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
-			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", `include "nvke-os-plan"; local_toolchain_scopes("all")`)
+			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", "--arg", "arch", arch, `include "nvke-os-plan"; local_toolchain_scopes("all"; $arch)`)
 			cmd.Stdin = strings.NewReader(tc.input)
 			out, err := cmd.CombinedOutput()
 			if (err != nil) != tc.fail || !strings.Contains(string(out), tc.want) {
@@ -413,8 +422,8 @@ func TestAllLocalToolchainScopes(t *testing.T) {
 			}
 			if len(scopes) != 3 || scopes[0].Pin != "packer" || scopes[1].Pin != "gcc" || scopes[2].Pin != "helm" ||
 				!slices.Equal(scopes[0].Components, []string{"nvke-node-image"}) ||
-				!slices.Equal(scopes[0].Outputs, []string{"nvke-node-image-arm64"}) ||
-				!slices.Equal(scopes[1].Outputs, []string{"nicosim-tools-arm64"}) ||
+				!slices.Equal(scopes[0].Outputs, []string{"nvke-node-image-" + arch}) ||
+				!slices.Equal(scopes[1].Outputs, []string{"nicosim-tools-" + arch}) ||
 				!slices.Equal(scopes[2].Outputs, []string{"controller-chart", "cwe", "nktp"}) {
 				t.Fatalf("unexpected catalog-scoped selection: %+v", scopes)
 			}
@@ -825,5 +834,40 @@ esac
 				}
 			}
 		})
+	}
+}
+
+func TestAMD64ToolchainScopesFromCompiledInputs(t *testing.T) {
+	t.Chdir("..")
+	plan, _, err := factory.CaptureCompileFiles(t.Context(), ".", "inputs/definitions/demo/amd64-nvidia-local-kvm.json", "inputs/environments/local-amd64-kvm.json", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := canonical.Marshal(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.CommandContext(t.Context(), "jq", "-L", "scripts", "-e", `include "nvke-os-plan"; local_toolchain_scopes("all"; "amd64")`)
+	cmd.Stdin = bytes.NewReader(raw)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("scopes: %s %v", out, err)
+	}
+	var scopes []struct {
+		Pin, CatalogDigest string
+		Outputs            []string
+	}
+	if err := json.Unmarshal(out, &scopes); err != nil {
+		t.Fatal(err)
+	}
+	if len(scopes) != 3 {
+		t.Fatalf("expected three original toolchain scopes: %+v", scopes)
+	}
+	seen := map[string]bool{}
+	for _, scope := range scopes {
+		if scope.Pin == "" || scope.CatalogDigest == "" || seen[scope.CatalogDigest] || len(scope.Outputs) == 0 {
+			t.Fatal("incomplete or colliding toolchain scope", scope)
+		}
+		seen[scope.CatalogDigest] = true
 	}
 }

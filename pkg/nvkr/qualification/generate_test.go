@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
@@ -645,6 +646,9 @@ func TestQualificationGenerationNamedProducerRefusesWithoutOutput(t *testing.T) 
 	}
 	inputs := t.TempDir()
 	environment := plan.Environment.Clone()
+	// YAML marshaling does not honor the JSON omission tag on Transports.
+	// Select OCI explicitly so the authored fixture reaches namespace admission.
+	environment.Publication.Transports = []string{definition.PublicationTransportOCI}
 	environmentPath := filepath.Join(inputs, "environment.yaml")
 	for name, value := range map[string]any{"environment.yaml": environment, "qualification.yaml": policy} {
 		raw, err := yaml.Marshal(value)

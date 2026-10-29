@@ -66,6 +66,14 @@ strict inventory hardening, M3 qualification acceptance and organizational accep
 Definition v5, Run/Release v4, and compiled Run Plan/artifact graph v5 records reject the
 retired cluster, role, category and composition fields. Signer policy roles remain a distinct security concept.
 
+An explicit `debian-package` output selects one ordinary from-source `host-package` producer on an
+explicit Linux platform (ADR-10/12). Local execution uses the existing producer session and source-only
+composition. Ordinary result authentication and bounded held files bind the raw archive to its exact
+named output; lifecycle retains it through the existing no-replace output transaction. Cancellation,
+cleanup and rollback remain with those owners. The archive supplies no package dependency inspection,
+standalone production predicate, installation or qualification proof. Direct-node, hosted, signing and
+publication routes remain capability-gated.
+
 Environment separately supplies runtime, runner, publication namespace, credential references and signing policy
 (ADR-20). Output-affecting tools stay in the build identity they affect.
 Changing transport or signing configuration cannot silently change logical Build identity.
@@ -153,8 +161,11 @@ only selects the use case and presents its result.
 `run qualify-local` delegates to `lifecycle.QualifyLocalRun`. It selects a completed captured attempt,
 independent local policy, three explicit private-key files, native runtime, pinned cosign, registry
 namespace, scratch and new evidence destination. Lifecycle owns the complete check/sign/smoke/publish/
-read-back sequence and cleanup; the command emits only its descriptive canonical result. This separate
-local lane accepts no hosted invocation and supplies no hosted qualification or release authority.
+read-back sequence and cleanup; stdout retains only its descriptive canonical result. An explicitly
+selected private pipe can carry bounded stage and public output/tool observations to the local demo.
+These optional descriptions contain no private paths, keys or subprocess logs and cannot grant
+qualification or deployment authority. Lost progress does not replace the owned command's result.
+This separate local lane accepts no hosted invocation and supplies no hosted qualification or release authority.
 ADR-16 owns verdict and publication rules, and reconciliation records the separate A/B/C implementation and
 acceptance boundaries.
 
@@ -458,7 +469,6 @@ record; absence of a record proves neither success nor absence of remote effects
 - **Keep orchestration in `main`, export helpers.** Rejected — blocks embedding and re-accretes logic.
 - **Options carry everything (no per-call request structs).** Rejected — conflates per-call inputs with
   process-lifetime config.
-
 
 ## Follow-ups
 
