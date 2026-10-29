@@ -128,6 +128,7 @@ changed shapes are:
 | Component catalog overlay | `nvkr.dev/catalog-overlay/v3` |
 | Executable and logical build graph | `nvkr.dev/ir/v4` |
 | Run plan and artifact graph | `nvkr.dev/run-plan/v5`, `nvkr.dev/artifact-graph/v5` |
+| Composite Run plan (proposed ADR-26) | `nvkr.dev/run-plan/v6`, carrying the composition record; plain Plans stay v5 |
 | Run and Release views | `nvkr.dev/run/v4`, `nvkr.dev/release/v4` |
 
 Definition v5 retains removal of cluster views and adds an explicit required platform set for an aggregate OCI image. Catalog v3 removes delivery categories and node-role affinities. IR v4
