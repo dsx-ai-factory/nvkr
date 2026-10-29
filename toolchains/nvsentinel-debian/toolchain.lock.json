@@ -32,7 +32,7 @@
       "goImage": "docker.io/library/golang@sha256:6c83d163c89d1dbe66f8fc466870d66fe6325d15bb5ad1730cdc0b482fab1eec",
       "ubuntuImage": "docker.io/library/ubuntu@sha256:3ad1c71aa6b7e477f7aa91445a5442fbb163742849393b511661a88081c3d7a2",
       "localImageID": "sha256:a9d6d674f464ee81202fae2c6ed62597109c1248e59a07753a45948c8f2804a8",
-      "image": "localhost/nvkr-nvsentinel-ubuntu-26.04-arm64@sha256:257df633515584e9d56f9679042afb9f2ef2cd0c6c2d9d6f2691a6bbb31effcf"
+      "image": "localhost/nvkr-nvsentinel-ubuntu-26.04-arm64@sha256:f6a0ffa4e29bf10f6d946742aabc868b00faaa5ff2c3c4b4fbdfdefdec71075b"
     }
   ]
 }
