@@ -71,8 +71,8 @@ sources:
   nvsentinel:
     repo: https://github.com/NVIDIA/NVSentinel
     toolchainImagesByArch:
-      amd64: docker.io/library/nvkr-nvsentinel-ubuntu-24.04-amd64@sha256:1899450dc69deea10ed06d07de70fd2bf6b4d3cb6952c679d359cdcd6b6376e7
-      arm64: docker.io/library/nvkr-nvsentinel-ubuntu-24.04-arm64@sha256:3ebca79a900100ed1ef6ee9903b7d26a0ee45320a9dff49f91610142d8d11581
+      amd64: localhost/nvkr-nvsentinel-ubuntu-24.04-amd64@sha256:1899450dc69deea10ed06d07de70fd2bf6b4d3cb6952c679d359cdcd6b6376e7
+      arm64: localhost/nvkr-nvsentinel-ubuntu-24.04-arm64@sha256:3ebca79a900100ed1ef6ee9903b7d26a0ee45320a9dff49f91610142d8d11581
     vendorCommand:
       - sh
       - -ec
@@ -84,8 +84,8 @@ sources:
   nvsentinel-ubuntu2604:
     repo: https://github.com/NVIDIA/NVSentinel
     toolchainImagesByArch:
-      amd64: docker.io/library/nvkr-nvsentinel-ubuntu-26.04-amd64@sha256:fb19d5e7aa08d6d870eabff80fb012d6edf1c73cebad636f3d977bbbc7ad5eb8
-      arm64: docker.io/library/nvkr-nvsentinel-ubuntu-26.04-arm64@sha256:257df633515584e9d56f9679042afb9f2ef2cd0c6c2d9d6f2691a6bbb31effcf
+      amd64: localhost/nvkr-nvsentinel-ubuntu-26.04-amd64@sha256:fb19d5e7aa08d6d870eabff80fb012d6edf1c73cebad636f3d977bbbc7ad5eb8
+      arm64: localhost/nvkr-nvsentinel-ubuntu-26.04-arm64@sha256:257df633515584e9d56f9679042afb9f2ef2cd0c6c2d9d6f2691a6bbb31effcf
     vendorCommand:
       - sh
       - -ec
@@ -249,7 +249,7 @@ components:
       test ! -e "$stage/debs/nvsentinel-platform-connectors.deb"
       install -m 0644 "$package" "$stage/debs/nvsentinel-platform-connectors.deb"
       install -m 0644 /src/os-image/files/99-disable-network-config.cfg "$stage/"
-      install -m 0600 /src/os-image/files/00-dhcp-all.yaml "$stage/"
+      install -m 0644 /src/os-image/files/00-dhcp-all.yaml "$stage/"
       total_bytes=$(find "$stage" -type f -name '*.deb' -printf '%s\n' | awk '{total += $1} END {printf "%.0f", total}')
       test "$total_bytes" -le 7516192768
       test "$(find "$stage/debs" -type f -name '*.deb' -printf '.\n' | wc -l)" -le 16384

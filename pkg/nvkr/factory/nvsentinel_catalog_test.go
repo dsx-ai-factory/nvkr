@@ -135,7 +135,7 @@ func TestNVSentinelCatalogInputs(t *testing.T) {
 			t.Fatal(err)
 		}
 		var lock struct {
-			Routes []struct{ Distribution, Platform, LocalRepositoryDigest string }
+			Routes []struct{ Distribution, Platform, Image string }
 		}
 		if err := json.Unmarshal(raw, &lock); err != nil {
 			t.Fatal(err)
@@ -148,8 +148,15 @@ func TestNVSentinelCatalogInputs(t *testing.T) {
 				t.Fatalf("unexpected or repeated toolchain route %q", key)
 			}
 			arch := strings.TrimPrefix(route.Platform, "linux/")
-			if route.LocalRepositoryDigest == "" || mainCatalog.Sources[source].ToolchainImagesByArch[arch] != route.LocalRepositoryDigest {
+			if !strings.HasPrefix(route.Image, "localhost/nvkr-nvsentinel-") || mainCatalog.Sources[source].ToolchainImagesByArch[arch] != route.Image {
 				t.Fatalf("toolchain route %q differs from its catalog source image", key)
+			}
+			env, err := definition.LoadEnvironment(t.Context(), filepath.Join(root, "inputs/environments/nvsentinel", route.Distribution+"-"+arch+".yaml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if env.UtilityContainer != route.Image {
+				t.Fatalf("toolchain route %q differs from its Debian Environment", key)
 			}
 			delete(want, key)
 		}

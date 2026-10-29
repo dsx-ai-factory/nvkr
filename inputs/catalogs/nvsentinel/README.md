@@ -54,7 +54,10 @@ Its command invokes the pinned NVKE composer unchanged, extracts its base archiv
 tree, copies the bound DEB into `debs/nvsentinel-platform-connectors.deb`, checks architecture and
 size/count budgets, regenerates `debs/Packages` with `dpkg-scanpackages --multiversion`, and creates a
 deterministic final archive. It also copies the two existing source network configurations omitted by
-NVKE `115d07c8`'s composer. No upstream Python, shell file or provisioner is patched.
+NVKE `115d07c8`'s composer. Both files enter the archive at mode `0644`, matching
+[NVKE's network-config staging fix](https://github.com/dsx-ai-factory/nvke/blob/1038286bd9b44489812f21572b201cc22d29c437/os-image/packer/scripts/compose-image-inputs.py#L259).
+The pinned provisioner still installs netplan at mode `0600`. No upstream Python, shell file or provisioner
+is patched; the consumer source pin is unchanged.
 
 Packer already stages all `debs/*.deb` into `/usr/lib/nvke/debs` and registers that local APT repository.
 Placement makes the package available; it does not install arbitrary packages or start services. The

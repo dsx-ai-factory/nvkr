@@ -38,7 +38,6 @@ analogue of "one IR, many CI adapters." Nix is **orchestrated as a subprocess** 
 linked into the core, exactly as other external tools are treated. That satisfies the Apache-2.0 linkage
 constraint, and Nix can enter the reproducibility boundary only after its execution and observation adapters pass acceptance.
 
-
 Local executable diagnostics may cross-compile CGO-free Darwin ARM64 host packages and tarballs in an
 explicitly recorded Linux ARM64 OCI toolchain. Payload and toolchain platforms remain separate identity
 fields (ADR-12). This does not admit Darwin images, disks, hosted execution, signing or qualified authority.
@@ -53,7 +52,6 @@ It declares host networking rather than claiming an enforced network sandbox. Sy
 Apple SDK remain host dependencies. This route is unqualified, local only, and rejects signing/publication;
 it does not provide hostile-same-UID protection or sealed-descriptor execution. It downloads no compiler.
 An output-scoped catalog overlay binds the measured toolchain without changing source pins or source bytes.
-
 
 1. **Taxonomy (two axes).** An acquisition **lane** — `from-source` XOR `prebuilt` XOR `exclusion` — remains the
    top-level discriminator. A **builder type** refines *from-source only*:

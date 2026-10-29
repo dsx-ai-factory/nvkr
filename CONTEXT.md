@@ -167,6 +167,12 @@ _Avoid_: Release publication root, native image manifest, qualification receipt
 An Artifact format containing exact executable files and their installation metadata.
 _Avoid_: Release, arbitrary archive
 
+**Debian package**:
+An Artifact format (`debian-package`) containing one raw Debian archive from an explicitly selected source
+producer. The same package bytes can be supplied as an OS build material. Local retention does not establish
+installation or runtime acceptance.
+_Avoid_: APT repository, installed package, builder type
+
 ## Evidence and authority
 
 **External test producer**:

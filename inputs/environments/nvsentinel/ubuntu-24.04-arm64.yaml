@@ -6,7 +6,7 @@ kind: Environment
 metadata:
   name: nvsentinel-ubuntu-24.04-arm64-candidate
 utilityPlatform: linux/arm64
-utilityContainer: docker.io/library/nvkr-nvsentinel-ubuntu-24.04-arm64@sha256:3ebca79a900100ed1ef6ee9903b7d26a0ee45320a9dff49f91610142d8d11581
+utilityContainer: localhost/nvkr-nvsentinel-ubuntu-24.04-arm64@sha256:3ebca79a900100ed1ef6ee9903b7d26a0ee45320a9dff49f91610142d8d11581
 runtime:
   runtime: docker
   buildNetworkPolicy: producer-declared
