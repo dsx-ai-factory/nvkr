@@ -10,6 +10,16 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.results }}
       statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
+      nvkr-partition-18:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-18 }}
+      nvkr-results-02:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-02 }}
+      nvkr-results-02-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-02-statuses }}
+      nvkr-results-0e:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0e }}
+      nvkr-results-0e-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0e-statuses }}
     secrets:
       NVKR_CI_STORAGE_READ_TOKEN:
         required: true
@@ -162,6 +172,11 @@ jobs:
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
+      nvkr-partition-18: ${{ format('"nvkr-verify-publication-output-nvke-node-fde-amd64":{0},"nvkr-verify-publication-output-nvke-node-fde-arm64":{1},"nvkr-verify-publication-output-nvke-node-image-amd64":{2},"nvkr-verify-publication-output-nvke-node-image-arm64":{3}', toJSON(needs['nvkr-verify-publication-output-nvke-node-fde-amd64']), toJSON(needs['nvkr-verify-publication-output-nvke-node-fde-arm64']), toJSON(needs['nvkr-verify-publication-output-nvke-node-image-amd64']), toJSON(needs['nvkr-verify-publication-output-nvke-node-image-arm64'])) }}
+      nvkr-results-02: ${{ format('"nvkr-verify-publication-output-nvke-node-fde-amd64":{0},"nvkr-verify-publication-output-nvke-node-image-amd64":{1}', toJSON(needs['nvkr-verify-publication-output-nvke-node-fde-amd64']), toJSON(needs['nvkr-verify-publication-output-nvke-node-image-amd64'])) }}
+      nvkr-results-02-statuses: ${{ format('{0} {1}', needs['nvkr-verify-publication-output-nvke-node-fde-amd64'].result, needs['nvkr-verify-publication-output-nvke-node-image-amd64'].result) }}
+      nvkr-results-0e: ${{ format('"nvkr-verify-publication-output-nvke-node-fde-arm64":{0},"nvkr-verify-publication-output-nvke-node-image-arm64":{1}', toJSON(needs['nvkr-verify-publication-output-nvke-node-fde-arm64']), toJSON(needs['nvkr-verify-publication-output-nvke-node-image-arm64'])) }}
+      nvkr-results-0e-statuses: ${{ format('{0} {1}', needs['nvkr-verify-publication-output-nvke-node-fde-arm64'].result, needs['nvkr-verify-publication-output-nvke-node-image-arm64'].result) }}
     steps:
       - name: Forward provider results
         run: ':'

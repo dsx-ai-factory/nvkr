@@ -53,8 +53,11 @@ func TestGitHubPartitionBundleAuthenticatesAllMembers(t *testing.T) {
 		{"changed worker command", e.CodeEngineCapability, func(files map[string][]byte) {
 			files[workers[0]] = bytes.Replace(files[workers[0]], []byte("run: ':'"), []byte("run: exit 0"), 1)
 		}},
+		{"worker mints OIDC", e.CodeEngineCapability, func(files map[string][]byte) {
+			files[workers[0]] = bytes.Replace(files[workers[0]], []byte("\npermissions:\n"), []byte("\npermissions:\n  id-token: write\n"), 1)
+		}},
 		{"caller dependency substitution", e.CodeEngineCapability, func(files map[string][]byte) {
-			files[bundle.WorkflowPath] = bytes.Replace(files[bundle.WorkflowPath], []byte("outputs.results"), []byte("outputs.forged"), 1)
+			files[bundle.WorkflowPath] = bytes.Replace(files[bundle.WorkflowPath], []byte(".outputs['"), []byte(".outputs['forged-"), 1)
 		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {

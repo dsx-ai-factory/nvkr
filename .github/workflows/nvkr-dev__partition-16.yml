@@ -10,6 +10,28 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.results }}
       statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
+      nvkr-partition-18:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-18 }}
+      nvkr-results-02:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-02 }}
+      nvkr-results-02-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-02-statuses }}
+      nvkr-results-05:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-05 }}
+      nvkr-results-05-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-05-statuses }}
+      nvkr-results-07:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-07 }}
+      nvkr-results-07-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-07-statuses }}
+      nvkr-results-09:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09 }}
+      nvkr-results-09-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09-statuses }}
+      nvkr-results-0b:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0b }}
+      nvkr-results-0b-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0b-statuses }}
     secrets:
       NVKR_CI_STORAGE_READ_TOKEN:
         required: true
@@ -195,6 +217,17 @@ jobs:
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
+      nvkr-partition-18: ${{ format('"nvkr-verify-publication-output-capnico-controller":{0},"nvkr-verify-publication-output-cluster-ap-5fb4884131f8":{1},"nvkr-verify-publication-output-cwe":{2},"nvkr-verify-publication-output-nico-refer-768f0a1fbfbe":{3},"nvkr-verify-publication-output-nvkectl-linux-arm64":{4}', toJSON(needs['nvkr-verify-publication-output-capnico-controller']), toJSON(needs['nvkr-verify-publication-output-cluster-ap-5fb4884131f8']), toJSON(needs['nvkr-verify-publication-output-cwe']), toJSON(needs['nvkr-verify-publication-output-nico-refer-768f0a1fbfbe']), toJSON(needs['nvkr-verify-publication-output-nvkectl-linux-arm64'])) }}
+      nvkr-results-02: ${{ format('"nvkr-verify-publication-output-capnico-controller":{0}', toJSON(needs['nvkr-verify-publication-output-capnico-controller'])) }}
+      nvkr-results-02-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-capnico-controller'].result) }}
+      nvkr-results-05: ${{ format('"nvkr-verify-publication-output-cwe":{0}', toJSON(needs['nvkr-verify-publication-output-cwe'])) }}
+      nvkr-results-05-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-cwe'].result) }}
+      nvkr-results-07: ${{ format('"nvkr-verify-publication-output-nvkectl-linux-arm64":{0}', toJSON(needs['nvkr-verify-publication-output-nvkectl-linux-arm64'])) }}
+      nvkr-results-07-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-nvkectl-linux-arm64'].result) }}
+      nvkr-results-09: ${{ format('"nvkr-verify-publication-output-nico-refer-768f0a1fbfbe":{0}', toJSON(needs['nvkr-verify-publication-output-nico-refer-768f0a1fbfbe'])) }}
+      nvkr-results-09-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-nico-refer-768f0a1fbfbe'].result) }}
+      nvkr-results-0b: ${{ format('"nvkr-verify-publication-output-cluster-ap-5fb4884131f8":{0}', toJSON(needs['nvkr-verify-publication-output-cluster-ap-5fb4884131f8'])) }}
+      nvkr-results-0b-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-cluster-ap-5fb4884131f8'].result) }}
     steps:
       - name: Forward provider results
         run: ':'

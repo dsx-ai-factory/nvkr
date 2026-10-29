@@ -10,6 +10,18 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.results }}
       statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
+      nvkr-results-03:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-03 }}
+      nvkr-results-03-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-03-statuses }}
+      nvkr-results-07:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-07 }}
+      nvkr-results-07-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-07-statuses }}
+      nvkr-results-0b:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0b }}
+      nvkr-results-0b-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0b-statuses }}
     secrets:
       NVKR_CI_STORAGE_READ_TOKEN:
         required: true
@@ -166,6 +178,12 @@ jobs:
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
+      nvkr-results-03: ${{ format('"nvkr-publish-output-nvke-node-image-amd64":{0}', toJSON(needs['nvkr-publish-output-nvke-node-image-amd64'])) }}
+      nvkr-results-03-statuses: ${{ format('{0}', needs['nvkr-publish-output-nvke-node-image-amd64'].result) }}
+      nvkr-results-07: ${{ format('"nvkr-publish-output-nvke-node-fde-amd64":{0},"nvkr-publish-output-nvke-node-fde-arm64":{1}', toJSON(needs['nvkr-publish-output-nvke-node-fde-amd64']), toJSON(needs['nvkr-publish-output-nvke-node-fde-arm64'])) }}
+      nvkr-results-07-statuses: ${{ format('{0} {1}', needs['nvkr-publish-output-nvke-node-fde-amd64'].result, needs['nvkr-publish-output-nvke-node-fde-arm64'].result) }}
+      nvkr-results-0b: ${{ format('"nvkr-publish-output-nvke-node-image-arm64":{0}', toJSON(needs['nvkr-publish-output-nvke-node-image-arm64'])) }}
+      nvkr-results-0b-statuses: ${{ format('{0}', needs['nvkr-publish-output-nvke-node-image-arm64'].result) }}
     steps:
       - name: Forward provider results
         run: ':'

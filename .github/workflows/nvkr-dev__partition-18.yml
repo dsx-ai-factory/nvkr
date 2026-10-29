@@ -10,6 +10,12 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.results }}
       statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
+      nvkr-partition-19:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-19 }}
+      nvkr-results-05:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-05 }}
+      nvkr-results-05-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-05-statuses }}
     secrets:
       NVKR_CI_STORAGE_READ_TOKEN:
         required: true
@@ -63,6 +69,9 @@ jobs:
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
+      nvkr-partition-19: ${{ format('"nvkr-package-release":{0}', toJSON(needs['nvkr-package-release'])) }}
+      nvkr-results-05: ${{ format('"nvkr-package-release":{0}', toJSON(needs['nvkr-package-release'])) }}
+      nvkr-results-05-statuses: ${{ format('{0}', needs['nvkr-package-release'].result) }}
     steps:
       - name: Forward provider results
         run: ':'

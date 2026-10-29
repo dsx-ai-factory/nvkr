@@ -93,24 +93,42 @@ func lowerGitHubPartitions(ctx context.Context, plan *Plan, raw []byte) ([]byte,
 	if err := model.validatePartitions(ctx, groups); err != nil {
 		return nil, nil, err
 	}
+	partitionParents := make([][]string, len(partitions))
+	consumers := []githubPartitionExport{}
+	for index, partition := range partitions {
+		var parents []string
+		for _, jobID := range partition.Jobs {
+			parents = append(parents, dependencies[jobID]...)
+		}
+		partitionParents[index] = uniqueSorted(parents)
+		consumers = append(consumers, githubPartitionExport{Name: githubPartitionID(index), Members: partitionParents[index]})
+	}
+	for _, id := range sortedKeys(projection.Collectors) {
+		consumers = append(consumers, githubPartitionExport{Name: id, Members: projection.Collectors[id], Statuses: true})
+	}
+	if len(projection.Collectors) == 0 {
+		consumers = append(consumers, githubPartitionExport{Name: githubFinalizerJobID, Members: projection.Full[githubFinalizerJobID], Statuses: true})
+	}
 	files := map[string][]byte{}
 	callerJobs := githubYAMLMap()
 	for index, partition := range partitions {
-		child, err := renderGitHubPartition(ctx, plan, raw, partition, model)
+		id := githubPartitionID(index)
+		child, err := renderGitHubPartition(ctx, plan, raw, partition, model, githubPartitionExports(id, consumers, owners))
 		if err != nil {
 			return nil, nil, err
 		}
-		id := githubPartitionID(index)
 		path := strings.TrimSuffix(githubLayoutFor(plan).workflowPath, ".yml") + fmt.Sprintf("__partition-%02d.yml", index)
 		files[path] = child
 		var childDocument yamlv3.Node
 		if err := yamlv3.Unmarshal(child, &childDocument); err != nil {
 			return nil, nil, e.Wrap(e.CodePipelineDrift, err, "decode generated partition")
 		}
+		if githubYAMLHasKey(&childDocument, "id-token") {
+			return nil, nil, e.New(e.CodeEngineCapability, "GitHub execution partition %s would mint OIDC tokens outside the admitted signer workflow", id)
+		}
 		permissions := githubYAMLMap("contents", githubYAMLString("read"))
-		var parents []string
+		parents := partitionParents[index]
 		for _, jobID := range partition.Jobs {
-			parents = append(parents, dependencies[jobID]...)
 			declared := githubYAMLField(githubYAMLField(jobs, jobID), "permissions")
 			if declared == nil {
 				continue
@@ -122,9 +140,11 @@ func lowerGitHubPartitions(ctx context.Context, plan *Plan, raw []byte) ([]byte,
 				}
 			}
 		}
-		parents = uniqueSorted(parents)
+		if githubYAMLField(permissions, "id-token") != nil {
+			return nil, nil, e.New(e.CodeEngineCapability, "GitHub execution partition %s caller would grant OIDC tokens outside the admitted signer workflow", id)
+		}
 		call := githubYAMLMap("uses", githubYAMLString("./"+path), "if", githubYAMLString("${{ always() && "+githubDispatchCondition(plan)+" }}"),
-			"permissions", permissions, "with", githubYAMLMap("dependencies", githubYAMLString("${{ "+githubPartitionResultsExpression(parents, owners)+" }}")))
+			"permissions", permissions, "with", githubYAMLMap("dependencies", githubYAMLString("${{ "+githubPartitionResultsExpression(id, parents, owners)+" }}")))
 		var needs []string
 		for _, parent := range parents {
 			needs = append(needs, owners[parent])
@@ -168,8 +188,8 @@ func lowerGitHubPartitions(ctx context.Context, plan *Plan, raw []byte) ([]byte,
 			needs = append(needs, owners[member])
 		}
 		githubYAMLSet(job, "needs", githubNeedsSequence(uniqueSorted(needs)))
-		githubYAMLSet(job, "outputs", githubYAMLMap("results", githubYAMLString("${{ "+githubPartitionResultsExpression(members, owners)+" }}"),
-			"statuses", githubYAMLString("${{ "+githubPartitionStatusesExpression(members, owners)+" }}")))
+		githubYAMLSet(job, "outputs", githubYAMLMap("results", githubYAMLString("${{ "+githubPartitionResultsExpression(id, members, owners)+" }}"),
+			"statuses", githubYAMLString("${{ "+githubPartitionStatusesExpression(id, members, owners)+" }}")))
 		githubYAMLSet(callerJobs, id, job)
 	}
 	if finalizer := githubYAMLField(jobs, githubFinalizerJobID); finalizer != nil {
@@ -181,7 +201,7 @@ func lowerGitHubPartitions(ctx context.Context, plan *Plan, raw []byte) ([]byte,
 				needs = append(needs, owners[member])
 			}
 			githubYAMLSet(finalizer, "needs", githubNeedsSequence(uniqueSorted(needs)))
-			rewriteGitHubPartitionResults(finalizer, members, owners)
+			rewriteGitHubPartitionResults(finalizer, githubFinalizerJobID, members, owners)
 		}
 		githubYAMLSet(callerJobs, githubFinalizerJobID, finalizer)
 	}
@@ -210,33 +230,130 @@ func githubPartitionResultExpression(id string, owners map[string]string) string
 	return "fromJSON(needs['" + owners[id] + "'].outputs.results || '{}')['" + id + "']"
 }
 
-func githubPartitionResultsExpression(ids []string, owners map[string]string) string {
-	if len(ids) == 0 {
-		return "'{}'"
+// githubPartitionExport is one consumer's slice of a worker's results. Workers
+// pre-project their members so the entry forwards one fragment per worker
+// instead of re-deriving every member from the worker's complete report.
+type githubPartitionExport struct {
+	Name     string
+	Members  []string
+	Statuses bool
+}
+
+func githubPartitionExports(worker string, consumers []githubPartitionExport, owners map[string]string) []githubPartitionExport {
+	var exports []githubPartitionExport
+	for _, consumer := range consumers {
+		var members []string
+		for _, id := range consumer.Members {
+			if owners[id] == worker {
+				members = append(members, id)
+			}
+		}
+		if len(members) != 0 {
+			exports = append(exports, githubPartitionExport{Name: consumer.Name, Members: members, Statuses: consumer.Statuses})
+		}
 	}
+	return exports
+}
+
+// githubPartitionResultsFragment renders comma-joined JSON members without
+// braces; the entry wraps one or more fragments into the original report.
+func githubPartitionResultsFragment(ids []string) string {
 	var fields, args []string
 	for n, id := range ids {
 		fields = append(fields, fmt.Sprintf(`"%s":{%d}`, id, n))
-		args = append(args, "toJSON("+githubPartitionResultExpression(id, owners)+")")
+		args = append(args, "toJSON(needs['"+id+"'])")
 	}
-	return "format('{{" + strings.Join(fields, ",") + "}}', " + strings.Join(args, ", ") + ")"
+	return "format('" + strings.Join(fields, ",") + "', " + strings.Join(args, ", ") + ")"
 }
 
-func githubPartitionStatusesExpression(ids []string, owners map[string]string) string {
+func githubPartitionStatusesFragment(ids []string) string {
 	var fields, args []string
 	for n, id := range ids {
 		fields = append(fields, fmt.Sprintf("{%d}", n))
-		args = append(args, githubPartitionResultExpression(id, owners)+".result")
+		args = append(args, "needs['"+id+"'].result")
 	}
 	return "format('" + strings.Join(fields, " ") + "', " + strings.Join(args, ", ") + ")"
 }
 
-func rewriteGitHubPartitionResults(node *yamlv3.Node, ids []string, owners map[string]string) {
+// githubPartitionForwarded groups ids by owner in first-use order: inline jobs
+// forward themselves, while each worker forwards one fragment of its members.
+func githubPartitionForwarded(ids []string, owners map[string]string) ([]string, map[string][]string) {
+	var order []string
+	members := map[string][]string{}
+	for _, id := range ids {
+		owner := owners[id]
+		if members[owner] == nil {
+			order = append(order, owner)
+		}
+		members[owner] = append(members[owner], id)
+	}
+	return order, members
+}
+
+// A worker that never reported yields the same null results and empty statuses
+// as the per-member projection it replaces, so outcome accounting is unchanged.
+func githubPartitionResultsExpression(consumer string, ids []string, owners map[string]string) string {
+	if len(ids) == 0 {
+		return "'{}'"
+	}
+	var fields, args []string
+	order, members := githubPartitionForwarded(ids, owners)
+	for _, owner := range order {
+		if owners[owner] == owner {
+			fields = append(fields, fmt.Sprintf(`"%s":{%d}`, owner, len(args)))
+			args = append(args, "toJSON(needs['"+owner+"'])")
+			continue
+		}
+		var missing []string
+		for _, id := range members[owner] {
+			missing = append(missing, `"`+id+`":null`)
+		}
+		fields = append(fields, fmt.Sprintf("{%d}", len(args)))
+		args = append(args, "(needs['"+owner+"'].outputs['"+consumer+"'] || '"+strings.Join(missing, ",")+"')")
+	}
+	return "format('{{" + strings.Join(fields, ",") + "}}', " + strings.Join(args, ", ") + ")"
+}
+
+func githubPartitionStatusesExpression(consumer string, ids []string, owners map[string]string) string {
+	var fields, args []string
+	order, members := githubPartitionForwarded(ids, owners)
+	for _, owner := range order {
+		fields = append(fields, fmt.Sprintf("{%d}", len(args)))
+		if owners[owner] == owner {
+			args = append(args, "needs['"+owner+"'].result")
+		} else {
+			args = append(args, "(needs['"+owner+"'].outputs['"+consumer+"-statuses'] || '"+strings.Repeat(" ", len(members[owner])-1)+"')")
+		}
+	}
+	return "format('" + strings.Join(fields, " ") + "', " + strings.Join(args, ", ") + ")"
+}
+
+func rewriteGitHubPartitionResults(node *yamlv3.Node, consumer string, ids []string, owners map[string]string) {
 	if node.Kind == yamlv3.ScalarNode {
-		node.Value = strings.ReplaceAll(node.Value, "toJSON(needs)", githubPartitionResultsExpression(ids, owners))
-		node.Value = strings.ReplaceAll(node.Value, "join(needs.*.result, ' ')", githubPartitionStatusesExpression(ids, owners))
+		node.Value = strings.ReplaceAll(node.Value, "toJSON(needs)", githubPartitionResultsExpression(consumer, ids, owners))
+		node.Value = strings.ReplaceAll(node.Value, "join(needs.*.result, ' ')", githubPartitionStatusesExpression(consumer, ids, owners))
 	}
 	for _, child := range node.Content {
-		rewriteGitHubPartitionResults(child, ids, owners)
+		rewriteGitHubPartitionResults(child, consumer, ids, owners)
 	}
+}
+
+// githubYAMLHasKey reports whether any mapping beneath node declares key.
+func githubYAMLHasKey(node *yamlv3.Node, key string) bool {
+	if node == nil {
+		return false
+	}
+	if node.Kind == yamlv3.MappingNode {
+		for n := 0; n+1 < len(node.Content); n += 2 {
+			if node.Content[n].Value == key {
+				return true
+			}
+		}
+	}
+	for _, child := range node.Content {
+		if githubYAMLHasKey(child, key) {
+			return true
+		}
+	}
+	return node.Kind == yamlv3.AliasNode && githubYAMLHasKey(node.Alias, key)
 }

@@ -21,7 +21,7 @@ var (
 
 // renderGitHubPartition keeps original job IDs: shared action selection uses
 // github.job to select parameters from the complete, unchanged Plan.
-func renderGitHubPartition(ctx context.Context, plan *Plan, raw []byte, partition githubExecutionPartition, model *executionGraph) ([]byte, error) {
+func renderGitHubPartition(ctx context.Context, plan *Plan, raw []byte, partition githubExecutionPartition, model *executionGraph, exports []githubPartitionExport) ([]byte, error) {
 	if err := githubNeedsContext(ctx); err != nil {
 		return nil, err
 	}
@@ -74,9 +74,28 @@ func renderGitHubPartition(ctx context.Context, plan *Plan, raw []byte, partitio
 		}
 		githubYAMLSet(childJobs, id, job)
 	}
-	githubYAMLSet(childJobs, githubPartitionReporter, githubResultCollectorYAML(plan, githubPartitionReporter, partition.Jobs))
+	reporter := githubResultCollectorYAML(plan, githubPartitionReporter, partition.Jobs)
+	reported := githubYAMLField(reporter, "outputs")
+	outputNames := []string{"results", "statuses"}
+	for _, export := range exports {
+		for _, id := range export.Members {
+			if !selected[id] {
+				return nil, e.New(e.CodePipelineDrift, "GitHub partition cannot export foreign job %q", id)
+			}
+		}
+		if export.Name == "results" || export.Name == "statuses" || githubYAMLField(reported, export.Name) != nil {
+			return nil, e.New(e.CodePipelineDrift, "GitHub partition export %q collides with another output", export.Name)
+		}
+		githubYAMLSet(reported, export.Name, githubYAMLString("${{ "+githubPartitionResultsFragment(export.Members)+" }}"))
+		outputNames = append(outputNames, export.Name)
+		if export.Statuses {
+			githubYAMLSet(reported, export.Name+"-statuses", githubYAMLString("${{ "+githubPartitionStatusesFragment(export.Members)+" }}"))
+			outputNames = append(outputNames, export.Name+"-statuses")
+		}
+	}
+	githubYAMLSet(childJobs, githubPartitionReporter, reporter)
 	outputs := githubYAMLMap()
-	for _, name := range []string{"results", "statuses"} {
+	for _, name := range outputNames {
 		githubYAMLSet(outputs, name, githubYAMLMap("value", githubYAMLString("${{ jobs."+githubPartitionReporter+".outputs."+name+" }}")))
 	}
 	call := githubYAMLMap("inputs", githubYAMLMap("dependencies", githubYAMLMap(

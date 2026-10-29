@@ -21,7 +21,7 @@ func TestGitHubPartitionWorkflowPreservesJobIdentityAndFailurePolicy(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	child, err := renderGitHubPartition(t.Context(), plan, raw, githubExecutionPartition{Jobs: []string{"build", "inspect"}}, model)
+	child, err := renderGitHubPartition(t.Context(), plan, raw, githubExecutionPartition{Jobs: []string{"build", "inspect"}}, model, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestGitHubPartitionWorkflowPreservesJobIdentityAndFailurePolicy(t *testing.
 		t.Fatal("worker must not compete with entry workflow concurrency")
 	}
 	for _, ids := range [][]string{{"missing"}, {"build", "build"}, {"source", "build"}, {githubPartitionReporter}} {
-		_, err := renderGitHubPartition(t.Context(), plan, raw, githubExecutionPartition{Jobs: ids}, model)
+		_, err := renderGitHubPartition(t.Context(), plan, raw, githubExecutionPartition{Jobs: ids}, model, nil)
 		assertFactoryErrorCode(t, err, e.CodePipelineDrift)
 	}
 }

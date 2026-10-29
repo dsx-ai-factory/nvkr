@@ -10,6 +10,24 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.results }}
       statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
+      nvkr-partition-01:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-01 }}
+      nvkr-partition-02:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-02 }}
+      nvkr-partition-03:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-03 }}
+      nvkr-results-00:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00 }}
+      nvkr-results-00-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00-statuses }}
+      nvkr-results-07:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-07 }}
+      nvkr-results-07-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-07-statuses }}
+      nvkr-results-09:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09 }}
+      nvkr-results-09-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09-statuses }}
     secrets:
       NKE_SOURCE_TOKEN:
         required: true
@@ -119,6 +137,15 @@ jobs:
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
+      nvkr-partition-01: ${{ format('"build-runner-ubuntu-24-04":{0},"build-runner-ubuntu-24-04-arm":{1}', toJSON(needs['build-runner-ubuntu-24-04']), toJSON(needs['build-runner-ubuntu-24-04-arm'])) }}
+      nvkr-partition-02: ${{ format('"build-runner-ubuntu-24-04":{0},"build-runner-ubuntu-24-04-arm":{1}', toJSON(needs['build-runner-ubuntu-24-04']), toJSON(needs['build-runner-ubuntu-24-04-arm'])) }}
+      nvkr-partition-03: ${{ format('"build-runner-arc-amd64-kvm":{0},"build-runner-arc-arm64-kvm":{1}', toJSON(needs['build-runner-arc-amd64-kvm']), toJSON(needs['build-runner-arc-arm64-kvm'])) }}
+      nvkr-results-00: ${{ format('"build-runner-ubuntu-24-04":{0}', toJSON(needs['build-runner-ubuntu-24-04'])) }}
+      nvkr-results-00-statuses: ${{ format('{0}', needs['build-runner-ubuntu-24-04'].result) }}
+      nvkr-results-07: ${{ format('"build-runner-ubuntu-24-04-arm":{0}', toJSON(needs['build-runner-ubuntu-24-04-arm'])) }}
+      nvkr-results-07-statuses: ${{ format('{0}', needs['build-runner-ubuntu-24-04-arm'].result) }}
+      nvkr-results-09: ${{ format('"build-runner-arc-amd64-kvm":{0},"build-runner-arc-arm64-kvm":{1}', toJSON(needs['build-runner-arc-amd64-kvm']), toJSON(needs['build-runner-arc-arm64-kvm'])) }}
+      nvkr-results-09-statuses: ${{ format('{0} {1}', needs['build-runner-arc-amd64-kvm'].result, needs['build-runner-arc-arm64-kvm'].result) }}
     steps:
       - name: Forward provider results
         run: ':'

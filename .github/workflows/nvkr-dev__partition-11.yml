@@ -10,6 +10,66 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.results }}
       statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
+      nvkr-results-00:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00 }}
+      nvkr-results-00-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00-statuses }}
+      nvkr-results-02:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-02 }}
+      nvkr-results-02-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-02-statuses }}
+      nvkr-results-03:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-03 }}
+      nvkr-results-03-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-03-statuses }}
+      nvkr-results-04:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-04 }}
+      nvkr-results-04-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-04-statuses }}
+      nvkr-results-05:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-05 }}
+      nvkr-results-05-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-05-statuses }}
+      nvkr-results-06:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-06 }}
+      nvkr-results-06-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-06-statuses }}
+      nvkr-results-07:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-07 }}
+      nvkr-results-07-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-07-statuses }}
+      nvkr-results-08:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-08 }}
+      nvkr-results-08-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-08-statuses }}
+      nvkr-results-09:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09 }}
+      nvkr-results-09-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09-statuses }}
+      nvkr-results-0a:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0a }}
+      nvkr-results-0a-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0a-statuses }}
+      nvkr-results-0b:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0b }}
+      nvkr-results-0b-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0b-statuses }}
+      nvkr-results-0c:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0c }}
+      nvkr-results-0c-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0c-statuses }}
+      nvkr-results-0d:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0d }}
+      nvkr-results-0d-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0d-statuses }}
+      nvkr-results-0e:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0e }}
+      nvkr-results-0e-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0e-statuses }}
+      nvkr-results-0f:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0f }}
+      nvkr-results-0f-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0f-statuses }}
     secrets:
       NVKR_CI_STORAGE_READ_TOKEN:
         required: true
@@ -1045,6 +1105,36 @@ jobs:
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
+      nvkr-results-00: ${{ format('"nvkr-publish-output-nktp-kube-state-metri-cecf76dda028":{0}', toJSON(needs['nvkr-publish-output-nktp-kube-state-metri-cecf76dda028'])) }}
+      nvkr-results-00-statuses: ${{ format('{0}', needs['nvkr-publish-output-nktp-kube-state-metri-cecf76dda028'].result) }}
+      nvkr-results-02: ${{ format('"nvkr-publish-output-spire-bash-image-arm64":{0},"nvkr-publish-output-temporal-server-image-arm64":{1}', toJSON(needs['nvkr-publish-output-spire-bash-image-arm64']), toJSON(needs['nvkr-publish-output-temporal-server-image-arm64'])) }}
+      nvkr-results-02-statuses: ${{ format('{0} {1}', needs['nvkr-publish-output-spire-bash-image-arm64'].result, needs['nvkr-publish-output-temporal-server-image-arm64'].result) }}
+      nvkr-results-03: ${{ format('"nvkr-publish-output-capi-kubeadm-bootstra-07670d07d213":{0},"nvkr-publish-output-nktp-collector-image-arm64":{1},"nvkr-publish-output-spire-server-image-arm64":{2}', toJSON(needs['nvkr-publish-output-capi-kubeadm-bootstra-07670d07d213']), toJSON(needs['nvkr-publish-output-nktp-collector-image-arm64']), toJSON(needs['nvkr-publish-output-spire-server-image-arm64'])) }}
+      nvkr-results-03-statuses: ${{ format('{0} {1} {2}', needs['nvkr-publish-output-capi-kubeadm-bootstra-07670d07d213'].result, needs['nvkr-publish-output-nktp-collector-image-arm64'].result, needs['nvkr-publish-output-spire-server-image-arm64'].result) }}
+      nvkr-results-04: ${{ format('"nvkr-package-publication-controller-chart":{0},"nvkr-publish-output-temporal-admin-tools-image-arm64":{1}', toJSON(needs['nvkr-package-publication-controller-chart']), toJSON(needs['nvkr-publish-output-temporal-admin-tools-image-arm64'])) }}
+      nvkr-results-04-statuses: ${{ format('{0} {1}', needs['nvkr-package-publication-controller-chart'].result, needs['nvkr-publish-output-temporal-admin-tools-image-arm64'].result) }}
+      nvkr-results-05: ${{ format('"nvkr-publish-output-spire-controller-mana-4c760c0ddb13":{0}', toJSON(needs['nvkr-publish-output-spire-controller-mana-4c760c0ddb13'])) }}
+      nvkr-results-05-statuses: ${{ format('{0}', needs['nvkr-publish-output-spire-controller-mana-4c760c0ddb13'].result) }}
+      nvkr-results-06: ${{ format('"nvkr-publish-output-capi-controller-image-arm64":{0},"nvkr-publish-output-capi-kubeadm-control-189e7620a1e0":{1},"nvkr-publish-output-cert-manager-controll-1c8e088fb6a6":{2},"nvkr-publish-output-csi-node-driver-regis-b17474c2d7cb":{3},"nvkr-publish-output-nktp-kubectl-image-arm64":{4},"nvkr-publish-output-nktp-node-exporter-image-arm64":{5}', toJSON(needs['nvkr-publish-output-capi-controller-image-arm64']), toJSON(needs['nvkr-publish-output-capi-kubeadm-control-189e7620a1e0']), toJSON(needs['nvkr-publish-output-cert-manager-controll-1c8e088fb6a6']), toJSON(needs['nvkr-publish-output-csi-node-driver-regis-b17474c2d7cb']), toJSON(needs['nvkr-publish-output-nktp-kubectl-image-arm64']), toJSON(needs['nvkr-publish-output-nktp-node-exporter-image-arm64'])) }}
+      nvkr-results-06-statuses: ${{ format('{0} {1} {2} {3} {4} {5}', needs['nvkr-publish-output-capi-controller-image-arm64'].result, needs['nvkr-publish-output-capi-kubeadm-control-189e7620a1e0'].result, needs['nvkr-publish-output-cert-manager-controll-1c8e088fb6a6'].result, needs['nvkr-publish-output-csi-node-driver-regis-b17474c2d7cb'].result, needs['nvkr-publish-output-nktp-kubectl-image-arm64'].result, needs['nvkr-publish-output-nktp-node-exporter-image-arm64'].result) }}
+      nvkr-results-07: ${{ format('"nvkr-publish-output-spire-agent-image-arm64":{0}', toJSON(needs['nvkr-publish-output-spire-agent-image-arm64'])) }}
+      nvkr-results-07-statuses: ${{ format('{0}', needs['nvkr-publish-output-spire-agent-image-arm64'].result) }}
+      nvkr-results-08: ${{ format('"nvkr-publish-output-nvkectl":{0}', toJSON(needs['nvkr-publish-output-nvkectl'])) }}
+      nvkr-results-08-statuses: ${{ format('{0}', needs['nvkr-publish-output-nvkectl'].result) }}
+      nvkr-results-09: ${{ format('"nvkr-publish-output-cert-manager-cainject-37550fcc232b":{0},"nvkr-publish-output-nktp-metrics-server-image-arm64":{1},"nvkr-publish-output-operator-tools":{2}', toJSON(needs['nvkr-publish-output-cert-manager-cainject-37550fcc232b']), toJSON(needs['nvkr-publish-output-nktp-metrics-server-image-arm64']), toJSON(needs['nvkr-publish-output-operator-tools'])) }}
+      nvkr-results-09-statuses: ${{ format('{0} {1} {2}', needs['nvkr-publish-output-cert-manager-cainject-37550fcc232b'].result, needs['nvkr-publish-output-nktp-metrics-server-image-arm64'].result, needs['nvkr-publish-output-operator-tools'].result) }}
+      nvkr-results-0a: ${{ format('"nvkr-publish-output-nktp-operator-image-arm64":{0}', toJSON(needs['nvkr-publish-output-nktp-operator-image-arm64'])) }}
+      nvkr-results-0a-statuses: ${{ format('{0}', needs['nvkr-publish-output-nktp-operator-image-arm64'].result) }}
+      nvkr-results-0b: ${{ format('"nvkr-publish-output-nktp-target-allocator-image-arm64":{0}', toJSON(needs['nvkr-publish-output-nktp-target-allocator-image-arm64'])) }}
+      nvkr-results-0b-statuses: ${{ format('{0}', needs['nvkr-publish-output-nktp-target-allocator-image-arm64'].result) }}
+      nvkr-results-0c: ${{ format('"nvkr-publish-output-nktp":{0},"nvkr-publish-output-nktp-lgtm-image-arm64":{1},"nvkr-publish-output-postgresql-image-arm64":{2}', toJSON(needs['nvkr-publish-output-nktp']), toJSON(needs['nvkr-publish-output-nktp-lgtm-image-arm64']), toJSON(needs['nvkr-publish-output-postgresql-image-arm64'])) }}
+      nvkr-results-0c-statuses: ${{ format('{0} {1} {2}', needs['nvkr-publish-output-nktp'].result, needs['nvkr-publish-output-nktp-lgtm-image-arm64'].result, needs['nvkr-publish-output-postgresql-image-arm64'].result) }}
+      nvkr-results-0d: ${{ format('"nvkr-publish-output-spire-oidc-image-arm64":{0},"nvkr-publish-output-spire-tpm-server-image-arm64":{1}', toJSON(needs['nvkr-publish-output-spire-oidc-image-arm64']), toJSON(needs['nvkr-publish-output-spire-tpm-server-image-arm64'])) }}
+      nvkr-results-0d-statuses: ${{ format('{0} {1}', needs['nvkr-publish-output-spire-oidc-image-arm64'].result, needs['nvkr-publish-output-spire-tpm-server-image-arm64'].result) }}
+      nvkr-results-0e: ${{ format('"nvkr-publish-output-cert-manager-webhook-image-arm64":{0}', toJSON(needs['nvkr-publish-output-cert-manager-webhook-image-arm64'])) }}
+      nvkr-results-0e-statuses: ${{ format('{0}', needs['nvkr-publish-output-cert-manager-webhook-image-arm64'].result) }}
+      nvkr-results-0f: ${{ format('"nvkr-publish-output-spiffe-csi-image-arm64":{0},"nvkr-publish-output-temporal-ui-image-arm64":{1}', toJSON(needs['nvkr-publish-output-spiffe-csi-image-arm64']), toJSON(needs['nvkr-publish-output-temporal-ui-image-arm64'])) }}
+      nvkr-results-0f-statuses: ${{ format('{0} {1}', needs['nvkr-publish-output-spiffe-csi-image-arm64'].result, needs['nvkr-publish-output-temporal-ui-image-arm64'].result) }}
     steps:
       - name: Forward provider results
         run: ':'
