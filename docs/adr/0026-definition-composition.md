@@ -1,10 +1,9 @@
 # ADR-26 — Definition composition
 
 - **Decision status:** Proposed (design only; pending named-decider ratification)
-- **Implementation maturity:** Designed, not implemented. No composite schema, loader, merge, Plan record,
-  publication binding or command exists; see `reconciliation.md`.
-- **Acceptance-test maturity:** None. The implementation units below name the contract suites that must pass;
-  no contract test, generated bundle, hosted Run or consumer verification exercises a composite.
+- **Implementation maturity:** Partially implemented; `reconciliation.md` lists the implemented units.
+- **Acceptance-test maturity:** Contract suites only, for the implemented units below. No hosted Run,
+  composite publication or consumer verification exercises a composite.
 - **Deciders:** Pending; release-engineering, publication, catalog and qualification owners must be named before
   ratification.
 - **Index:** Proposed ADR-26 supplements ADR-01–22 and proposed ADR-23/24; it remains outside the consolidated

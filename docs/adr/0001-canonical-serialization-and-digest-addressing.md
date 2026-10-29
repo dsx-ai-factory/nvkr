@@ -123,6 +123,7 @@ changed shapes are:
 | Object | Schema |
 |---|---|
 | Definition | `nvkr.dev/definition/v5` |
+| Composite Definition (proposed ADR-26) | `nvkr.dev/composite-definition/v1`, identity family `nvkr.composite-definition` |
 | Component catalog and snapshot | `nvkr.dev/catalog/v3`, `nvkr.dev/catalog-snapshot/v3` |
 | Component catalog overlay | `nvkr.dev/catalog-overlay/v3` |
 | Executable and logical build graph | `nvkr.dev/ir/v4` |

@@ -89,6 +89,7 @@ const (
 	KindRunPlan                 = "nvkr.run-plan/v1"              // static lowered execution plan
 	KindFactoryObservation      = "nvkr.factory-observation/v1"   // unqualified terminal byte observation
 	KindDefinition              = "nvkr.definition"               // simplified authored product definition (ADR-17 §6)
+	KindCompositeDefinition     = "nvkr.composite-definition"     // digest-pinned member Definitions (ADR-26 §4)
 	KindEnvironment             = "nvkr.environment"              // independently selected execution/delivery settings (ADR-20 §6)
 	KindVerificationPolicy      = "nvkr.verification-policy"      // consumer-selected release acceptance policy (ADR-04 §5)
 	KindReleaseContent          = "nvkr.release-content/v1"       // internal exact artifact content subject (ADR-17 §6)
@@ -128,7 +129,7 @@ var registeredKinds = [...]string{
 	KindDiskManifest, KindStagingManifest, KindBuildMaterialManifest,
 	KindSourceClosure, KindVendorSpec, KindSourceInput, KindResolvedInput, KindAICRBundle,
 	KindCatalogSnapshot, KindCatalogOverlay, KindArtifactGraph, KindExecutionSettings, KindCompileSpec, KindRunPlan, KindFactoryObservation,
-	KindDefinition, KindEnvironment, KindVerificationPolicy, KindReleaseContent, KindQualificationEvidence, KindReleaseManifest, KindQualificationPolicy, KindToolSmokeWorker, KindClusterRealization, KindLifecycleBinding,
+	KindDefinition, KindCompositeDefinition, KindEnvironment, KindVerificationPolicy, KindReleaseContent, KindQualificationEvidence, KindReleaseManifest, KindQualificationPolicy, KindToolSmokeWorker, KindClusterRealization, KindLifecycleBinding,
 	KindQualifiedReport, KindTerminalVerification, KindTerminalTree, KindNativeGoToolchain,
 	KindStatusCheckpointPolicy, KindQualifiedObservation, KindQualifiedPublication,
 	KindHostObservation, KindExecutionSelection, KindExecutionObservation, KindRuntimeIdentity,
