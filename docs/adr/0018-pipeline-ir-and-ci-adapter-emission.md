@@ -1429,9 +1429,10 @@ successful diagnostic dispatches.
 The opt-in Environment setting `githubExecutionPartitions: true` projects producer jobs into generated
 same-commit `workflow_call` workers. This is one Definition, complete Plan, provider Run and final Release;
 workers do not publish independent family Releases. Local generation contracts are implemented. A minimal
-hosted diagnostic exercised result forwarding on success, failure and cancellation. The full development
-Run recorded in reconciliation exercised generated-bundle execution and signing identity; qualification
-remains unestablished for this topology. The retained flat mode
+hosted diagnostic at commit `902f3febd10cd61abecb82571f66283857169851` exercised the earlier member-by-member
+result forwarding on success, failure and cancellation. The full development Run recorded in reconciliation
+exercised generated-bundle execution and signing identity with that earlier forwarding. Hosted execution of
+per-worker fragment forwarding (§8) is unrecorded, and qualification remains unestablished for this topology. The retained flat mode
 remains the default.
 
 Factory's provider-independent execution graph owns operation membership, admitted success/completion
