@@ -93,6 +93,10 @@ broader adapter and profile support remains deferred.
 Proposed [ADR-25: authenticated result reuse](adr/0025-authenticated-result-reuse.md) designs cross-Run reuse
 of complete named outputs and the test matrix for implementing it; reuse is not implemented.
 
+Proposed [ADR-26: Definition composition](adr/0026-definition-composition.md) designs composite Definitions
+that release several digest-pinned Definitions as one Release, with a worked NVKE four-family example and
+implementation units. It is design only.
+
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
 Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) covers branch
 dispatch, separate generated development bundles, artifact downloads and short retention.

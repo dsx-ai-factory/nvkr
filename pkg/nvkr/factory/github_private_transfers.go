@@ -162,7 +162,7 @@ func githubCITransferMode(plan *Plan, uses string) string {
 // githubCIPublishedSourcePython acquires the pinned published NVKR module for
 // the transport helper. Its arguments are the module path, version and checksum.
 const githubCIPublishedSourcePython = `def published_source(cache, env, deadline):
-    # A released generator pins the helper to its own published module.
+    # A module-installed generator pins the helper to its own published module.
     # Resolve it from the private cache root so the checkout's own go.mod and
     # toolchain lines cannot affect acquisition, and require the pinned version
     # and checksum. Go ignores go.mod beneath the module cache, so build from a
