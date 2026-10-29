@@ -108,9 +108,6 @@ func (s *nativeSiteAttempt) capiTenantCommands(ctx context.Context, request Tena
 			return "", errors.New("OVN import alias differs from selected manifest")
 		}
 		arch := s.assets.arch
-		if arch == "" {
-			arch = "arm64"
-		}
 		preload, err := nativeImagePreloadScriptForArchitecture(nativeImagePreload{
 			location: s.api + "/files/" + role + ".tar",
 			digest:   digest, file: "/var/lib/nvke-demo-" + role + ".tar", reference: reference,

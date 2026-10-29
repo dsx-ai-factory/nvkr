@@ -86,9 +86,6 @@ func SiteStartupUserData(ctx context.Context, cfg NativeSiteStartup) (string, er
 	if err := requireContext(ctx); err != nil {
 		return "", nvkrerr.Wrap(nvkrerr.CodeUsage, err, "site startup context")
 	}
-	if cfg.arch == "" {
-		cfg.arch = "arm64"
-	}
 	if _, err := nativeQEMUArchitecture(cfg.arch); err != nil {
 		return "", err
 	}
@@ -162,8 +159,8 @@ func SiteStartupUserData(ctx context.Context, cfg NativeSiteStartup) (string, er
 }
 
 func validateSiteStartup(cfg NativeSiteStartup) error {
-	if cfg.arch == "" {
-		cfg.arch = "arm64"
+	if _, err := nativeQEMUArchitecture(cfg.arch); err != nil {
+		return err
 	}
 	if !stableKubernetesVersion(cfg.KubernetesVersion) {
 		return fmt.Errorf("require an exact stable Kubernetes version selected by NVKE")

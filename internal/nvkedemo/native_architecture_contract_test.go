@@ -17,6 +17,23 @@ import (
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
+func TestMissingNativeArchitectureDoesNotDefaultToARM64(t *testing.T) {
+	cfg := startupDescription()
+	cfg.arch = ""
+	data, err := SiteStartupUserData(startupTestContext(t), cfg)
+	assertNightlyCode(t, err, nvkrerr.CodeEngineCapability)
+	if data != "" {
+		t.Fatal("missing architecture emitted executable startup")
+	}
+	attempt := nativeSiteAttempt{}
+	assertNightlyCode(t, attempt.prepareBoot(t.Context(), "http://172.30.0.1/disk.qcow2", "http://172.30.0.1"), nvkrerr.CodeEngineCapability)
+	if attempt.boot != nil {
+		t.Fatal("missing architecture selected an ARM64 boot fixture")
+	}
+	_, err = extractNativeInstaller(t.Context(), "/must-not-be-read", t.TempDir(), &nativeInstallerSelection{})
+	assertNightlyCode(t, err, nvkrerr.CodeVerifyFailed)
+}
+
 func TestDefaultDemoInputsBindHostAndGuestArchitecture(t *testing.T) {
 	for _, platform := range []string{"linux/arm64", "linux/amd64", "darwin/arm64"} {
 		t.Run(platform, func(t *testing.T) {

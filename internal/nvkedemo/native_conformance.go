@@ -28,9 +28,12 @@ import (
 // concrete local owner admits the complete captured Run and its held bytes.
 type nativeConformanceConfig struct{ repository, nvkr, run string }
 
-func selectNativeConformance(cfg Config) (*nativeConformanceConfig, error) {
+func selectNativeConformance(ctx context.Context, cfg Config, platform string) (*nativeConformanceConfig, error) {
 	if !cfg.Conformance {
 		return nil, nil
+	}
+	if err := requireContext(ctx); err != nil {
+		return nil, nvkrerr.Wrap(nvkrerr.CodeTimeout, err, "conformance input admission")
 	}
 	if !configString(cfg.Repository) || !configString(cfg.NVKR) {
 		return nil, configUsage("conformance requires repository and nvkr")
@@ -55,6 +58,31 @@ func selectNativeConformance(cfg Config) (*nativeConformanceConfig, error) {
 		absolute, err := resolveExisting(view)
 		if err != nil || absolute != root {
 			return nil, configUsage("conformance requires one combined artifact Run for every deployment view")
+		}
+	}
+	selectors, err := nativeConformanceSelectors(platform)
+	if err != nil {
+		return nil, err
+	}
+	plan, run, err := lifecycle.InspectLocalRunInputs(ctx, root)
+	if err != nil {
+		return nil, err
+	}
+	if run.Status != lifecycle.RunComplete {
+		return nil, nvkrerr.New(nvkrerr.CodeEngineCapability, "conformance requires a completed Run")
+	}
+	for _, required := range []struct{ name, kind, platform string }{
+		{selectors.Hydrophone.Output, "executable", selectors.Hydrophone.Platform},
+		{selectors.Kubectl.Output, "executable", selectors.Kubectl.Platform},
+		{selectors.ConformanceImage.Output, "oci", selectors.ConformanceImage.Platform},
+		{selectors.Busybox.Output, "oci", selectors.Busybox.Platform},
+	} {
+		observed, err := selectedRunOutput(run, required.name, required.kind)
+		if err != nil {
+			return nil, nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "conformance requires output %q before deployment", required.name)
+		}
+		if err := nativeOutputPlatform(plan, observed, required.platform); err != nil {
+			return nil, nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "conformance output %q has the wrong platform", required.name)
 		}
 	}
 	binary, err := filepath.Abs(cfg.NVKR)

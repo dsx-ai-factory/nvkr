@@ -14,6 +14,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 )
 
 // The fixture models a Linux launcher; the host gate also admits macOS gtimeout.
@@ -831,5 +834,40 @@ esac
 				}
 			}
 		})
+	}
+}
+
+func TestAMD64ToolchainScopesFromCompiledInputs(t *testing.T) {
+	t.Chdir("..")
+	plan, _, err := factory.CaptureCompileFiles(t.Context(), ".", "inputs/definitions/demo/amd64-nvidia-local-kvm.json", "inputs/environments/local-amd64-kvm.json", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := canonical.Marshal(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.CommandContext(t.Context(), "jq", "-L", "scripts", "-e", `include "nvke-os-plan"; local_toolchain_scopes("all"; "amd64")`)
+	cmd.Stdin = bytes.NewReader(raw)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("scopes: %s %v", out, err)
+	}
+	var scopes []struct {
+		Pin, CatalogDigest string
+		Outputs            []string
+	}
+	if err := json.Unmarshal(out, &scopes); err != nil {
+		t.Fatal(err)
+	}
+	if len(scopes) != 3 {
+		t.Fatalf("expected three original toolchain scopes: %+v", scopes)
+	}
+	seen := map[string]bool{}
+	for _, scope := range scopes {
+		if scope.Pin == "" || scope.CatalogDigest == "" || seen[scope.CatalogDigest] || len(scope.Outputs) == 0 {
+			t.Fatal("incomplete or colliding toolchain scope", scope)
+		}
+		seen[scope.CatalogDigest] = true
 	}
 }

@@ -92,7 +92,7 @@ func TestNativeCatalogsShareLinuxArchitectures(t *testing.T) {
 		{"nvke/native-site-arm64", []string{"nvkectl", "nvke-controller", "cluster-api-provider-provisioned", "nvke-controller-chart", "nktp-chart"}},
 		{"capnico/local-arm64", []string{"capnico-controller"}},
 		{"controller-profiles/native-nvidia-arm64", []string{"nvke-local-profiles"}},
-		{"tools/native", []string{"nerdctl", "nico-sim", "nico-simctl", "nvke-installer-sources", "nvkectl", "nvkr-site-identity-helper", "native-capi-exec-init-image", "native-capi-exec-init-image-main", "native-capi-exec-plugin-image", "native-workload-image"}},
+		{"tools/native", []string{"nerdctl", "nico-sim", "nico-simctl", "nvke-installer-sources", "nvkectl", "nvkr-site-identity-helper", "native-capi-exec-init-image", "native-capi-exec-plugin-image", "native-workload-image"}},
 	} {
 		t.Run(tc.directory, func(t *testing.T) {
 			cat, err := LoadContext(t.Context(), Dir(filepath.Join("../../../inputs/catalogs", tc.directory)))
@@ -139,8 +139,41 @@ func TestNativeAMD64AcquisitionsKeepReleaseAndPlatform(t *testing.T) {
 			}
 		})
 	}
-	legacy, current := cat.Components["native-capi-exec-init-image"], cat.Components["native-capi-exec-init-image-main"]
-	if legacy.Prebuilt.ImageParentDigest != "sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6" || current.Prebuilt.ImageParentDigest != "sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a" {
-		t.Fatal("reviewed CAPI init parents changed")
+	selected := cat.Components["native-capi-exec-init-image"]
+	if selected.Prebuilt.ImageParentDigest != "sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6" {
+		t.Fatal("release CAPI init parent changed")
+	}
+}
+
+func TestNativeHelmVendorPinsMatchTheSharedTools(t *testing.T) {
+	site, err := LoadContext(t.Context(), Dir("../../../inputs/catalogs/nvke/native-site-arm64"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tools, err := LoadContext(t.Context(), Dir("../../../inputs/catalogs/tools/native"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, component := range []string{"nvke-controller-chart", "nktp-chart"} {
+		t.Run(component, func(t *testing.T) {
+			command := site.Components[component].VendorCommand
+			if len(command) != 3 {
+				t.Fatal("expected the source-owned vendor script")
+			}
+			for _, tool := range []string{"helm-linux", "helm-linux-amd64"} {
+				selected := tools.Components[tool]
+				if selected.Prebuilt == nil || selected.Prebuilt.Executable == nil {
+					t.Fatal("shared Helm acquisition is absent")
+				}
+				pin := selected.Prebuilt.Executable
+				if !strings.Contains(command[2], strings.TrimPrefix(pin.ArchiveDigest, "sha256:")) || !strings.Contains(command[2], "helm-"+selected.Tag+"-linux-") {
+					t.Fatal("vendor Helm diverged from the shared tool pin", tool)
+				}
+			}
+			cmd := exec.CommandContext(t.Context(), "sh", "-n", "-c", strings.ReplaceAll(command[2], "{{.Arch}}", "amd64"))
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("vendor shell syntax: %s %v", out, err)
+			}
+		})
 	}
 }

@@ -4,8 +4,10 @@
 package nvkedemo
 
 import (
+	"cmp"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -30,15 +32,17 @@ func writeCanonicalRunFixture(t *testing.T, path string, value any) {
 // boundaries. Sources and observations are synthetic; no build is executed.
 func capturedArtifactRunFixture(t *testing.T, root string, outputs []lifecycle.DefinitionOutput, observed map[string]lifecycle.Artifact) (*factory.Plan, lifecycle.Run) {
 	t.Helper()
+	outputs = slices.Clone(outputs)
+	slices.SortFunc(outputs, func(a, b lifecycle.DefinitionOutput) int { return cmp.Compare(a.Name, b.Name) })
 	inputsRoot := privateTestDir(t)
 	host := execution.HostPlatformLinuxARM64
 	if len(outputs) > 0 && outputs[0].Platform == "linux/amd64" {
 		host = execution.HostPlatformLinuxAMD64
 	}
 	components := map[string]any{
-		"tool": map[string]any{"source": "fixture", "platforms": []string{"linux/arm64"}, "fromSource": true,
+		"tool": map[string]any{"source": "fixture", "platforms": []string{"darwin/arm64", "linux/amd64", "linux/arm64"}, "fromSource": true,
 			"outputType": "host-package", "buildCommand": []string{"make", "tool"}, "artifactPath": "out/tool", "writeDir": "out"},
-		"image": map[string]any{"source": "fixture", "platforms": []string{"linux/arm64"}, "fromSource": true,
+		"image": map[string]any{"source": "fixture", "platforms": []string{"linux/amd64", "linux/arm64"}, "fromSource": true,
 			"outputType": "oci-image", "buildCommand": []string{"make", "image"}, "artifactPath": "out/image", "writeDir": "out"},
 		"disk": map[string]any{"source": "fixture", "platforms": []string{"linux/amd64", "linux/arm64"}, "fromSource": true,
 			"builderType": catalog.BuilderVMImage, "outputType": "disk-image", "disk": catalog.DiskSpec{Format: "qcow2", Encryption: "none"},

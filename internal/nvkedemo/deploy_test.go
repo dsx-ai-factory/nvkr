@@ -129,10 +129,12 @@ func TestNativeTenantWorkersRefusedBeforeWork(t *testing.T) {
 func TestDeploymentRejectsUnsupportedHostBeforeArtifactIO(t *testing.T) {
 	for _, tc := range []struct{ platform, accelerator string }{{"linux/arm64", "tcg"}, {"darwin/arm64", "kvm"}, {"windows/arm64", ""}} {
 		t.Run(tc.platform+tc.accelerator, func(t *testing.T) {
-			_, err := nativeDeploymentConfig(t.Context(), Config{Accelerator: tc.accelerator}, tc.platform)
-			var coded *nvkrerr.Error
-			if !errors.As(err, &coded) || coded.Code != nvkrerr.CodeEngineCapability {
-				t.Fatalf("unsupported host reached artifact work: %v", err)
+			for _, conformance := range []bool{false, true} {
+				_, err := nativeDeploymentConfig(t.Context(), Config{Accelerator: tc.accelerator, Conformance: conformance}, tc.platform)
+				var coded *nvkrerr.Error
+				if !errors.As(err, &coded) || coded.Code != nvkrerr.CodeEngineCapability {
+					t.Fatalf("unsupported host reached artifact work: %v", err)
+				}
 			}
 		})
 	}

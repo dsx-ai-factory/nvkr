@@ -79,6 +79,9 @@ AMD64's committed default inputs currently cover NVIDIA OVN without conformance.
 Matching AMD64 upstream and conformance Definitions are not supplied; those missing
 inputs fail before build execution. Shared conformance selectors use the host
 architecture, but a completed AMD64 conformance run is not recorded.
+A conformance deployment also checks the selected completed Run for native
+Hydrophone/kubectl and matching Linux conformance/BusyBox outputs before guest
+creation. An ordinary Run without those outputs is rejected at admission.
 Local qualification retains its separate ARM64 evidence lane. Architecture contract tests and Plan compilation do not
 establish a completed AMD64 KVM deployment.
 A complete fresh Mac/Linux build, deployment and cleanup result has not yet been

@@ -6,7 +6,7 @@
     "description": "Native AMD64 KVM site bootstrap inputs using the shared NVKE, native tools and NVIDIA OVN producers. Local diagnostic build and deployment; no publication or signing."
   },
   "catalog": {
-    "base": "../../catalogs/nvke/module-cli-arm64"
+    "base": "../../catalogs/tools/native"
   },
   "outputs": [
     {

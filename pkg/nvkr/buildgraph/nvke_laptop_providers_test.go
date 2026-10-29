@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
@@ -62,6 +63,38 @@ func TestLaptopCAPNICoSourceBuild(t *testing.T) {
 			}
 			if builds != 1 {
 				t.Fatalf("build nodes=%d want 1", builds)
+			}
+		})
+	}
+}
+
+func TestNativeHelmVendoringBindsTargetArchitecture(t *testing.T) {
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/nvke/native-site-arm64"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, component := range []string{"nvke-controller-chart", "nktp-chart"} {
+		t.Run(component, func(t *testing.T) {
+			identities := map[string]bool{}
+			for _, arch := range target.Arches() {
+				resolved, err := Resolve(cat, Selection{Components: []string{component}, Platform: "linux/" + arch, OutputFormat: definition.OutputHelm})
+				if err != nil {
+					t.Fatal(err)
+				}
+				graph := mustCompile(t, resolved)
+				for _, node := range graph.Nodes {
+					if node.Kind != ir.KindFetch {
+						continue
+					}
+					command := strings.Join(node.VendorCmd, " ")
+					if !strings.Contains(command, "target_arch="+arch) || !strings.Contains(command, `cp "/tmp/linux-$target_arch/helm" .nvkr-tools/helm`) || identities[node.VendorSpecDigest] {
+						t.Fatalf("vendored Helm target is not independently bound: %s %s", arch, node.VendorSpecDigest)
+					}
+					identities[node.VendorSpecDigest] = true
+				}
+			}
+			if len(identities) != len(target.Arches()) {
+				t.Fatal("missing target-specific vendor identity")
 			}
 		})
 	}

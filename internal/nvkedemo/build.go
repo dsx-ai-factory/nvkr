@@ -135,7 +135,7 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	runner := Runner{Env: env, Progress: cfg.Progress, output: cfg.Progress}
 	// All host checks and fresh-path checks precede the first bootstrap. The
 	// script remains authoritative for exact runtime/toolchain admission.
-	for _, root := range []string{"runs", "laptop-bootstrap", "native-tools/runs"} {
+	for _, root := range []string{"runs", "laptop-bootstrap", "native-tools/runs", "mac-build", "native-build"} {
 		owned := filepath.Join(repo, ".nvkr", root, cfg.AttemptPrefix)
 		if cfg.Prepared && root == "laptop-bootstrap" {
 			info, readErr := os.Lstat(owned)

@@ -143,11 +143,11 @@ func nativeDeploymentConfig(ctx context.Context, cfg Config, platform string) (N
 		return NativeConfig{}, err
 	}
 
-	conformance, err := selectNativeConformance(cfg)
+	accelerator, err := nativeAccelerator(platform, cfg.Accelerator)
 	if err != nil {
 		return NativeConfig{}, err
 	}
-	accelerator, err := nativeAccelerator(platform, cfg.Accelerator)
+	conformance, err := selectNativeConformance(ctx, cfg, platform)
 	if err != nil {
 		return NativeConfig{}, err
 	}

@@ -151,7 +151,7 @@ esac
 			t.Fatal("normal Mac preparation must use source-compatible TCG without replacing its kernel")
 		}
 	}
-	sequence := []string{"probe:go:env GOVERSION", "probe:docker:buildx version", "probe:docker:version --format {{.Server.Version}}", "probe:clang:--version", "nvkr:factory prepare-native-packer ", "nvkr:factory prepare-native-packer-inputs --definition inputs/definitions/demo/arm64-nvidia-local-kvm.json --environment inputs/environments/local-native-mac.json", "nvkr:run plan ", "local_toolchain_scopes", "utility:toolchains/nvkr-packer/build.sh --arch arm64 --diagnostic-local --print-validated-image-id", "toolchain_overlay", "local_toolchain_definition", "nvkr:run local --definition .nvkr/mac-build/first/definition.json --environment .nvkr/mac-build/first/packer-inputs/environment.json"}
+	sequence := []string{"probe:go:env GOVERSION", "probe:docker:buildx version", "probe:docker:version --format {{.Server.Os}}/{{.Server.Arch}}", "probe:clang:--version", "nvkr:factory prepare-native-packer ", "nvkr:factory prepare-native-packer-inputs --definition inputs/definitions/demo/arm64-nvidia-local-kvm.json --environment inputs/environments/local-native-mac.json", "nvkr:run plan ", "local_toolchain_scopes", "utility:toolchains/nvkr-packer/build.sh --arch arm64 --diagnostic-local --print-validated-image-id", "toolchain_overlay", "local_toolchain_definition", "nvkr:run local --definition .nvkr/mac-build/first/definition.json --environment .nvkr/mac-build/first/packer-inputs/environment.json"}
 	rest := string(observed)
 	for _, expected := range sequence {
 		_, remaining, found := strings.Cut(rest, expected)
@@ -183,7 +183,7 @@ func TestDefaultAMDPreparationBuildsAndBindsLocalToolchain(t *testing.T) {
 				t.Fatal(err)
 			}
 			for name, body := range map[string]string{
-				"docker": "#!/bin/sh\nexit 99\n",
+				"docker": "#!/bin/sh\ncase \"$1\" in buildx) echo buildx;; version) echo linux/amd64;; *) exit 99;; esac\n",
 				"nvkr":   "#!/bin/sh\nset -eu\ntest \"$1:$2\" = run:plan\nprintf '%s\\n' \"nvkr:$*\" >>\"$CALLS\"\ncat \"$FIXTURE_PLAN\"\n",
 				"bash":   "#!/bin/sh\nset -eu\ntest \"$1\" = toolchains/nvkr-packer/build.sh\ntest \"$2:$3\" = --arch:amd64\nprintf '%s\\n' \"bootstrap:$*\" >>\"$CALLS\"\nprintf '%s\\n' \"$IMAGE_ID\"\n",
 				"jq": `#!/bin/sh
@@ -200,6 +200,9 @@ esac
 				if err := os.WriteFile(filepath.Join(bin, name), []byte(body), 0700); err != nil {
 					t.Fatal(err)
 				}
+			}
+			for _, tool := range []string{"git", "timeout"} {
+				writeTenantFixture(t, filepath.Join(bin, tool), []byte("#!/bin/sh\nexit 99\n"), 0700)
 			}
 			image := "sha256:" + strings.Repeat("a", 64)
 			if !valid {
@@ -229,10 +232,10 @@ esac
 
 func TestDefaultLinuxPreparationRejectsMissingPrerequisitesBeforeWriting(t *testing.T) {
 	for _, platform := range []string{"linux/arm64", "linux/amd64"} {
-		for _, missing := range []string{"jq", "docker", "bash"} {
+		for _, missing := range []string{"jq", "git", "bash", "docker", "timeout"} {
 			t.Run(platform+"/"+missing, func(t *testing.T) {
 				repo, bin := t.TempDir(), t.TempDir()
-				for _, tool := range []string{"jq", "docker", "bash"} {
+				for _, tool := range []string{"jq", "git", "bash", "docker", "timeout"} {
 					if tool != missing {
 						writeTenantFixture(t, filepath.Join(bin, tool), []byte("#!/bin/sh\nexit 99\n"), 0700)
 					}
@@ -245,6 +248,41 @@ func TestDefaultLinuxPreparationRejectsMissingPrerequisitesBeforeWriting(t *test
 				}
 				if _, err := os.Lstat(filepath.Join(repo, ".nvkr")); !os.IsNotExist(err) {
 					t.Fatal("missing prerequisite created attempt state", err)
+				}
+			})
+		}
+	}
+}
+
+func TestDefaultLinuxPreparationRejectsBrokenDockerBeforeWriting(t *testing.T) {
+	for _, platform := range []string{"linux/arm64", "linux/amd64"} {
+		for _, mode := range []string{"buildx", "daemon", "foreign", "empty"} {
+			t.Run(platform+"/"+mode, func(t *testing.T) {
+				repo, bin := t.TempDir(), t.TempDir()
+				for _, tool := range []string{"jq", "git", "bash", "timeout"} {
+					writeTenantFixture(t, filepath.Join(bin, tool), []byte("#!/bin/sh\nexit 99\n"), 0700)
+				}
+				docker := `#!/bin/sh
+set -eu
+if [ "$1" = buildx ]; then
+  [ "$PROBE_FAIL" != buildx ] || exit 1
+  printf '%s\n' buildx
+else
+  [ "$PROBE_FAIL" != daemon ] || exit 1
+  case "$PROBE_FAIL" in
+    foreign) printf '%s\n' windows/amd64;;
+    empty) :;;
+    *) printf '%s\n' "$TEST_DOCKER_PLATFORM";;
+  esac
+fi
+`
+				writeTenantFixture(t, filepath.Join(bin, "docker"), []byte(docker), 0700)
+				cfg := BuildConfig{Repository: repo, AttemptPrefix: "first", NVKR: "/forbidden/nvkr"}
+				runner := Runner{Env: []string{"PATH=" + bin, "PROBE_FAIL=" + mode, "TEST_DOCKER_PLATFORM=" + platform}}
+				err := prepareDefaultNativeBuild(t.Context(), runner, &cfg, platform)
+				assertNightlyCode(t, err, e.CodeEngineCapability)
+				if _, err := os.Lstat(filepath.Join(repo, ".nvkr")); !os.IsNotExist(err) {
+					t.Fatal("broken Docker created attempt state", err)
 				}
 			})
 		}
@@ -310,7 +348,7 @@ test "${PROBE_FAIL:-}" != go
 printf '%s\n' "$TEST_GO_VERSION"`,
 		"docker": `case "$*" in
  'buildx version') test "${PROBE_FAIL:-}" != buildx; printf '%s\n' buildx;;
- 'version --format {{.Server.Version}}') test "${PROBE_FAIL:-}" != daemon; printf '%s\n' server;;
+ 'version --format {{.Server.Os}}/{{.Server.Arch}}') test "${PROBE_FAIL:-}" != daemon; printf '%s\n' linux/arm64;;
  *) exit 29;;
 esac`,
 		"clang": `test "$*" = --version
@@ -321,6 +359,9 @@ printf '%s\n' clang`,
 		if err := os.WriteFile(filepath.Join(bin, name), []byte(body), 0700); err != nil {
 			t.Fatal(err)
 		}
+	}
+	for _, tool := range []string{"jq", "git", "bash"} {
+		writeTenantFixture(t, filepath.Join(bin, tool), []byte("#!/bin/sh\nexit 99\n"), 0700)
 	}
 	return []string{"PATH=" + bin, "TEST_GO_VERSION=go" + strings.TrimSpace(string(pin))},
 		strings.TrimPrefix(loaded.Components["packer"].Tag, "v"), filepath.Base(loaded.Tools["packer-plugin-qemu"].ExecutablePath)

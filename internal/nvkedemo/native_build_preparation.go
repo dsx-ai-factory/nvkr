@@ -174,14 +174,27 @@ func discoverMacPackerFiles(ctx context.Context, runner Runner, repository strin
 // These bounded metadata probes admit basic installed-command usability before
 // any attempt state. NativeGo retains SDK/compiler measurement ownership; a
 // successful Clang version query does not prove Apple SDK headers or linking.
-func admitMacBuildPrerequisites(ctx context.Context, runner Runner, repository string) error {
-	pin, err := boundedRegularRead(filepath.Join(repository, ".go-version"), 64)
-	if err != nil {
-		return e.Wrap(e.CodeEngineCapability, err, "read required installed Go version")
+func admitBuildPrerequisites(ctx context.Context, runner Runner, repository, platform string) error {
+	hostOS, arch, _ := strings.Cut(platform, "/")
+	tools := []string{"jq", "git", "bash", "docker"}
+	if hostOS == "linux" {
+		tools = append(tools, "timeout")
 	}
-	version := strings.TrimSpace(string(pin))
-	if version == "" {
-		return e.New(e.CodeEngineCapability, "repository Go version pin is empty")
+	for _, tool := range tools {
+		if _, err := commandPath(tool, runner.Env); err != nil {
+			return e.Wrap(e.CodeEngineCapability, err, "native BUILD requires %s", tool)
+		}
+	}
+	version := ""
+	if hostOS == "darwin" {
+		pin, err := boundedRegularRead(filepath.Join(repository, ".go-version"), 64)
+		if err != nil {
+			return e.Wrap(e.CodeEngineCapability, err, "read required installed Go version")
+		}
+		version = strings.TrimSpace(string(pin))
+		if version == "" {
+			return e.New(e.CodeEngineCapability, "repository Go version pin is empty")
+		}
 	}
 	runner.Env = SetEnv(runner.Env, map[string]string{"GOTOOLCHAIN": "local", "GOENV": "off", "GOWORK": "off"})
 	for _, probe := range []struct {
@@ -190,9 +203,12 @@ func admitMacBuildPrerequisites(ctx context.Context, runner Runner, repository s
 	}{
 		{"go", "native-build-go-prerequisite", []string{"env", "GOVERSION"}},
 		{"docker", "native-build-buildx-prerequisite", []string{"buildx", "version"}},
-		{"docker", "native-build-daemon-prerequisite", []string{"version", "--format", "{{.Server.Version}}"}},
+		{"docker", "native-build-daemon-prerequisite", []string{"version", "--format", "{{.Server.Os}}/{{.Server.Arch}}"}},
 		{"clang", "native-build-clang-prerequisite", []string{"--version"}},
 	} {
+		if hostOS != "darwin" && probe.name != "docker" {
+			continue
+		}
 		command, err := commandPath(probe.name, runner.Env)
 		if err != nil {
 			return e.Wrap(e.CodeEngineCapability, err, "%s unavailable", probe.phase)
@@ -204,6 +220,9 @@ func admitMacBuildPrerequisites(ctx context.Context, runner Runner, repository s
 		actual := strings.TrimSpace(string(raw))
 		if actual == "" {
 			return e.New(e.CodeEngineCapability, "%s returned no installed-tool metadata", probe.phase)
+		}
+		if probe.phase == "native-build-daemon-prerequisite" && actual != "linux/"+arch {
+			return e.New(e.CodeEngineCapability, "native BUILD requires Docker daemon platform linux/%s; observed %q", arch, actual)
 		}
 		if probe.name == "go" && actual != "go"+version {
 			return e.New(e.CodeEngineCapability, "installed Go must match repository .go-version (%s)", version)
@@ -224,21 +243,14 @@ func prepareDefaultNativeBuild(ctx context.Context, runner Runner, cfg *BuildCon
 	}
 	runner.Env = env
 	runner.Env = SetEnv(runner.Env, map[string]string{"CHECKPOINT_DISABLE": "1"})
+	if err := admitBuildPrerequisites(ctx, runner, cfg.Repository, platform); err != nil {
+		return err
+	}
 	var request delivery.BinaryBundleRequest
 	if hostOS == "darwin" {
-		if err := admitMacBuildPrerequisites(ctx, runner, cfg.Repository); err != nil {
-			return err
-		}
 		request, err = discoverMacPackerFiles(ctx, runner, cfg.Repository)
 		if err != nil {
 			return err
-		}
-	}
-	if hostOS == "linux" {
-		for _, tool := range []string{"jq", "docker", "bash"} {
-			if _, err := commandPath(tool, runner.Env); err != nil {
-				return e.Wrap(e.CodeEngineCapability, err, "native Linux BUILD requires %s", tool)
-			}
 		}
 	}
 	root := filepath.Join(".nvkr", "mac-build", cfg.AttemptPrefix)

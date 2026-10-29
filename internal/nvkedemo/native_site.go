@@ -523,9 +523,6 @@ func (s *nativeSiteAttempt) prepareBoot(ctx context.Context, imageURL, api strin
 		return err
 	}
 	arch := s.assets.arch
-	if arch == "" {
-		arch = "arm64"
-	}
 	if _, err := nativeQEMUArchitecture(arch); err != nil {
 		return err
 	}
@@ -593,9 +590,6 @@ func (s *nativeSiteAttempt) observeGuestDomains(ctx context.Context, runner Runn
 		return nil, nil // Mac observations remain with the native QEMU owner.
 	}
 	arch := s.assets.arch
-	if arch == "" {
-		arch = "arm64"
-	}
 	resources, err := selectedNativeResources(s.resources)
 	if err != nil {
 		return nil, err
@@ -781,9 +775,6 @@ func (s *nativeSiteAttempt) runTenantRequest(ctx context.Context, runner Runner,
 			}
 			observed = nodes.Items
 			arch := s.assets.arch
-			if arch == "" {
-				arch = "arm64"
-			}
 			ready, err := readyNativeTenantNodesForArchitecture(nodes.Items, request.Kubernetes, s.tenantNodeCount(), arch)
 			if err != nil {
 				return err
@@ -806,9 +797,6 @@ func (s *nativeSiteAttempt) runTenantRequest(ctx context.Context, runner Runner,
 	}
 	progress.update(time.Now(), "tenant-cloud-init", observed)
 	arch := s.assets.arch
-	if arch == "" {
-		arch = "arm64"
-	}
 	if err := runNativeCloudInitForArchitecture(budget, out, tenantConfig, kubectl, request.Kubernetes, workloadImage, s.tenantNodeCount(), observed, arch, capture); err != nil {
 		return err
 	}

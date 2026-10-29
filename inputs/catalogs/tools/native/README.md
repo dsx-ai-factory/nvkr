@@ -38,7 +38,3 @@ The Linux Lima candidate remains restricted to the explicitly approved private d
 binary-scan finding is not cleared by tool compilation or demo checks. Installing the CLI does not create a
 containerd daemon or make Docker's API a containerd endpoint. Tool acquisition, native compilation and daemon
 readiness remain separate from complete demo acceptance.
-
-The separately reviewed `native-capi-exec-init-image-main` acquisition retains a
-current-main CAPI init image parent. The ordinary demo selects the tagged-release
-`native-capi-exec-init-image`; it does not select the alternate acquisition.

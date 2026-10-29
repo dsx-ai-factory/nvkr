@@ -15,6 +15,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/testresults"
 )
 
@@ -44,9 +45,16 @@ func TestNativeConformanceUsesOneRepositoryRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	root := filepath.Join(repo, ".nvkr", "runs", "fresh")
-	if err := os.MkdirAll(root, 0700); err != nil {
+	selectors, err := nativeConformanceSelectors(runtime.GOOS + "/" + runtime.GOARCH)
+	if err != nil {
 		t.Fatal(err)
 	}
+	capturedArtifactRunFixture(t, root, []lifecycle.DefinitionOutput{
+		{Name: selectors.Hydrophone.Output, Platform: selectors.Hydrophone.Platform, Format: definition.OutputExecutable, Components: []string{"tool"}},
+		{Name: selectors.Kubectl.Output, Platform: selectors.Kubectl.Platform, Format: definition.OutputExecutable, Components: []string{"tool"}},
+		{Name: selectors.ConformanceImage.Output, Platform: selectors.ConformanceImage.Platform, Format: definition.OutputOCI, Components: []string{"image"}},
+		{Name: selectors.Busybox.Output, Platform: selectors.Busybox.Platform, Format: definition.OutputOCI, Components: []string{"image"}},
+	}, nil)
 	for _, row := range []struct {
 		name string
 		edit func(*Config)
@@ -62,7 +70,7 @@ func TestNativeConformanceUsesOneRepositoryRun(t *testing.T) {
 		t.Run(row.name, func(t *testing.T) {
 			cfg := Config{Conformance: true, Repository: repo, NVKR: filepath.Join(repo, "nvkr"), Runs: RunInputs{OS: root, Components: root, Providers: root, Site: root, Profiles: root}}
 			row.edit(&cfg)
-			selected, err := selectNativeConformance(cfg)
+			selected, err := selectNativeConformance(t.Context(), cfg, runtime.GOOS+"/"+runtime.GOARCH)
 			if row.want {
 				if err != nil || selected.run != ".nvkr/runs/fresh" || selected.repository != repo {
 					t.Fatalf("selected=%+v err=%v", selected, err)
@@ -72,8 +80,57 @@ func TestNativeConformanceUsesOneRepositoryRun(t *testing.T) {
 			}
 		})
 	}
-	if selected, err := selectNativeConformance(Config{}); err != nil || selected != nil {
+	if selected, err := selectNativeConformance(t.Context(), Config{}, runtime.GOOS+"/"+runtime.GOARCH); err != nil || selected != nil {
 		t.Fatalf("disabled conformance changed ordinary demo: %v", err)
+	}
+}
+
+func TestNativeConformanceAdmitsOnlyCompleteMatchingRunBeforeDeployment(t *testing.T) {
+	for _, arch := range []string{"amd64", "arm64"} {
+		for _, mode := range []string{"complete", "ordinary Run", "missing tool", "missing image", "foreign platform"} {
+			t.Run(arch+"/"+mode, func(t *testing.T) {
+				repo, err := resolveExisting(t.TempDir())
+				if err != nil {
+					t.Fatal(err)
+				}
+				run := filepath.Join(repo, ".nvkr", "runs", "suite")
+				platform := "linux/" + arch
+				outputs := []lifecycle.DefinitionOutput{
+					{Name: "hydrophone-" + arch, Platform: platform, Format: definition.OutputExecutable, Components: []string{"tool"}},
+					{Name: "kubectl-" + arch, Platform: platform, Format: definition.OutputExecutable, Components: []string{"tool"}},
+					{Name: "conformance-image-" + arch, Platform: platform, Format: definition.OutputOCI, Components: []string{"image"}},
+					{Name: "busybox-image-" + arch, Platform: platform, Format: definition.OutputOCI, Components: []string{"image"}},
+				}
+				switch mode {
+				case "ordinary Run":
+					outputs = []lifecycle.DefinitionOutput{{Name: "workload", Platform: platform, Format: definition.OutputOCI, Components: []string{"image"}}}
+				case "missing tool":
+					outputs = outputs[1:]
+				case "missing image":
+					outputs = outputs[:3]
+				case "foreign platform":
+					outputs[0].Platform = "linux/" + map[string]string{"amd64": "arm64", "arm64": "amd64"}[arch]
+				}
+				capturedArtifactRunFixture(t, run, outputs, nil)
+				cfg := Config{Conformance: true, Repository: repo, NVKR: filepath.Join(repo, "nvkr"), Runs: RunInputs{OS: run}, Out: filepath.Join(repo, "must-not-create")}
+				selected, err := selectNativeConformance(t.Context(), cfg, platform)
+				if mode == "complete" {
+					if err != nil || selected == nil {
+						t.Fatal("complete matching suite rejected", err)
+					}
+					return
+				}
+				assertNightlyCode(t, err, nvkrerr.CodeEngineCapability)
+				if selected != nil {
+					t.Fatal("incomplete suite admitted")
+				}
+				_, err = nativeDeploymentConfig(t.Context(), cfg, platform)
+				assertNightlyCode(t, err, nvkrerr.CodeEngineCapability)
+				if _, err := os.Stat(cfg.Out); !os.IsNotExist(err) {
+					t.Fatal("incomplete suite created deployment state", err)
+				}
+			})
+		}
 	}
 }
 

@@ -632,11 +632,8 @@ func extractNativeInstaller(ctx context.Context, archive, installer string, sele
 	checked := *selection
 	selection = &checked
 	arch := selection.arch
-	if arch == "" {
-		arch = "arm64"
-	}
 	if !target.ValidArch(arch) {
-		return nil, errors.New("installer extraction requires an admitted native architecture")
+		return nil, nvkrerr.New(nvkrerr.CodeVerifyFailed, "installer extraction requires an admitted native architecture")
 	}
 	releasePrefix := "controller/test/fixtures/releases/nvke-nico-vms-24.04-" + arch + "-fde-"
 	if err := safeExtractAssets(ctx, archive, installer, []string{
