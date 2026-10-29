@@ -48,7 +48,7 @@ func recheckPreparedQualificationPlan(ctx context.Context, runner Runner, cfg Bu
 	return policy.RequirePlan(&plan)
 }
 
-// QualificationFile opts a build into the complete local rehearsal. These are
+// QualificationFile opts a build into local qualification. These are
 // explicit locators, not trust receipts; nvkr owns all signing and verification.
 type QualificationFile struct {
 	BuilderKey   string `yaml:"builderKey"`
@@ -93,11 +93,13 @@ func preflightDemoQualification(ctx context.Context, cfg BuildConfig, plan *fact
 
 // Qualification runs before BuildArtifacts returns paths to deployment. A
 // decoded result cannot enable this gate: the owned child must also succeed.
-func qualifyBuiltArtifacts(ctx context.Context, cfg BuildConfig) error {
+func qualifyBuiltArtifacts(ctx context.Context, cfg BuildConfig) (resultErr error) {
 	q := cfg.Qualification
 	if q == (QualificationFile{}) {
 		return nil
 	}
+	boundary := beginProgress(cfg.Progress, "qualification", LaneStarted, LaneFinished, LaneFailed)
+	defer func() { boundary.finish(resultErr) }()
 	if err := q.validate(cfg.QualificationPolicy); err != nil {
 		return err
 	}
@@ -138,14 +140,22 @@ func qualifyBuiltArtifacts(ctx context.Context, cfg BuildConfig) error {
 	if err := os.Mkdir(diagnostics, 0o700); err != nil {
 		return nvkrerr.Wrap(nvkrerr.CodeBuildFailed, errors.Join(err, transcript.Close()), "cannot reserve private qualification diagnostics; qualification and deployment refused")
 	}
-	raw, runErr := (Runner{Work: diagnostics, directory: cfg.Repository, Env: env, Progress: cfg.Progress}).Capture(ctx, args, "qualify-local", 4*time.Hour)
+	raw, runErr := (Runner{Work: diagnostics, directory: cfg.Repository, Env: env, Progress: cfg.Progress}).CaptureQualification(ctx, args, 4*time.Hour)
 	// This diagnostic transcript is deliberately separate from signed evidence.
 	// Preserve failed results too; never reuse or overwrite an earlier transcript.
 	_, writeErr := transcript.Write(raw)
 	if err := errors.Join(runErr, writeErr, transcript.Close()); err != nil {
-		return nvkrerr.Wrap(nvkrerr.CodeBuildFailed, err, "local M3 qualification or result retention failed; deployment refused")
+		return nvkrerr.Wrap(nvkrerr.CodeBuildFailed, err, "local qualification failed or its result could not be saved; deployment refused")
 	}
 	return ValidateLocalQualificationResult(raw, cfg.AttemptPrefix)
+}
+
+// CaptureQualification opts the owned qualify-local child into private typed
+// progress. Its stdout is still an unauthenticated description; callers must
+// require both successful completion and ValidateLocalQualificationResult.
+func (r Runner) CaptureQualification(ctx context.Context, args []string, timeout time.Duration) ([]byte, error) {
+	r.qualificationProgress = true
+	return r.Capture(ctx, args, "qualify-local", timeout)
 }
 
 // ValidateLocalQualificationResult checks the CLI's descriptive result framing

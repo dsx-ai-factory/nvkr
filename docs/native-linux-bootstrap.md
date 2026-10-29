@@ -24,7 +24,7 @@ release archive were not built. The selected ARM64 limactl is SHA256
 `3c9f2b85164973a53a08e5bb1beb9a10eca27a8723cab6db2c802d46334370a3`.
 This is a local diagnostic build record, not an upstream release signature.
 
-## Install from public source on Ubuntu ARM64
+## Install from public source on Ubuntu ARM64 or AMD64
 
 Use the Go version in the NVKR checkout's `.go-version`, with Go, Make, GCC and
 Git on `PATH`. The Ubuntu prerequisite packages in the
@@ -50,7 +50,7 @@ command -v nerdctl.lima
 ```
 
 The version must report `f47461e`. These commands use upstream's native build
-and installation targets to install the matching host tools, ARM64 guest agent
+and installation targets to install the matching host tools, native guest agent
 and templates together. They require no previously prepared NVKR tool bundle.
 Keep the exported `PATH` in each terminal used for the demo. The CLI reports a
 missing or incompatible prerequisite before its E2E build; it does not install Lima.
@@ -102,7 +102,9 @@ cannot be used:
 | Material | Exact source selection |
 | --- | --- |
 | Ubuntu ARM64 server image | `https://cloud-images.ubuntu.com/releases/resolute/release-20260927/ubuntu-26.04-server-cloudimg-arm64.img`, SHA256 `63a93bd5a8d76e33b15ceb5daa3657bd79be804748051ab178e643b0f5da22e7` |
+| Ubuntu AMD64 server image | `https://cloud-images.ubuntu.com/releases/resolute/release-20260927/ubuntu-26.04-server-cloudimg-amd64.img`, SHA256 `8800651811af9a85465ad1d552add729947bb16488dddb4a9b5305a3d97332b2` |
 | nerdctl-full 2.4.1 ARM64 | `https://github.com/containerd/nerdctl/releases/download/v2.4.1/nerdctl-full-2.4.1-linux-arm64.tar.gz`, SHA256 `2deffe14625f93866f90a8f265d0f59d6fa476c7dc54b98adb327b1b4613efd4` |
+| nerdctl-full 2.4.1 AMD64 | `https://github.com/containerd/nerdctl/releases/download/v2.4.1/nerdctl-full-2.4.1-linux-amd64.tar.gz`, SHA256 `ff018f11ac2f1354bf7b3aaaca6e0b52d81139c746a89134744d0b7be3a0e62f` |
 
 These are acquisition pins, not completed downloads or security clearance for
 every component inside an image/archive. QEMU, firmware and native libraries

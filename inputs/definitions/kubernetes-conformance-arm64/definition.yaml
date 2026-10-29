@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+catalog:
+  base: ../../catalogs/kubernetes-conformance/hydrophone
+kind: Definition
+metadata:
+  name: kubernetes-conformance-tools-arm64
+outputs:
+  - catalog:
+      base: ../../catalogs/kubernetes-conformance/images
+    components:
+      - busybox-image
+    format: oci
+    name: busybox-image-arm64
+    platform: linux/arm64
+  - catalog:
+      base: ../../catalogs/kubernetes-conformance/images
+    components:
+      - conformance-image
+    format: oci
+    name: conformance-image-arm64
+    platform: linux/arm64
+  - components:
+      - hydrophone
+    format: executable
+    name: hydrophone-arm64
+    platform: linux/arm64
+  - catalog:
+      base: ../../catalogs/kubernetes-conformance/kubectl
+    components:
+      - kubectl
+    format: executable
+    name: kubectl-arm64
+    platform: linux/arm64

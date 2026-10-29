@@ -150,10 +150,12 @@ func runLocalToolSmokeWith(ctx context.Context, build *localVerifiedBuild, optio
 			receipt = nil
 		}
 	}()
-	for _, member := range members {
+	for index, member := range members {
 		if err := build.requireLive(ctx); err != nil {
 			return nil, err
 		}
+		activity := localProgress(ctx)
+		activity.startItem(member.Output+"/"+member.Member, index, len(members))
 		observed, err := runHeldSmokeMember(ctx, build.capture.ordinary, owner, member)
 		if err != nil {
 			return nil, err
@@ -167,6 +169,7 @@ func runLocalToolSmokeWith(ctx context.Context, build *localVerifiedBuild, optio
 		}
 		report.RuntimeImage, report.RuntimeIdentity = observed.Image(), observed.RuntimeIdentity()
 		report.Members = append(report.Members, evaluated)
+		activity.finishItem()
 	}
 	err = owner.Close()
 	closed = true

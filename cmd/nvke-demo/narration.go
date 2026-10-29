@@ -6,8 +6,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -26,9 +28,13 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 	if ctx == nil || out == nil {
 		return nvkrerr.New(nvkrerr.CodeUsage, "walkthrough introduction requires a context and writer")
 	}
-	definitionName, environmentName, err := nvkedemo.LocalArtifactInputsFor(cfg.Network, cfg.Conformance, runtime.GOOS)
-	if err != nil {
-		return err
+	definitionName, environmentName := cfg.Definition, cfg.Environment
+	if definitionName == "" {
+		var err error
+		definitionName, environmentName, err = nvkedemo.LocalArtifactInputsForPlatform(cfg.Network, cfg.Conformance, runtime.GOOS+"/"+runtime.GOARCH)
+		if err != nil {
+			return err
+		}
 	}
 	selected := filepath.Base(definitionName)
 	network := "NVIDIA OVN (default)"
@@ -57,10 +63,13 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 		environmentName = environmentPath
 	}
 	authored, err := definition.LoadDefinition(ctx, definitionPath)
-	if err != nil {
-		return err
+	if err == nil {
+		_, err = definition.LoadEnvironment(ctx, environmentPath)
 	}
-	if _, err := definition.LoadEnvironment(ctx, environmentPath); err != nil {
+	if err != nil {
+		if cfg.Definition == "" && errors.Is(err, os.ErrNotExist) {
+			return nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "default demo BUILD inputs are unavailable for %s", runtime.GOOS+"/"+runtime.GOARCH)
+		}
 		return err
 	}
 	// An output-specific catalog is a complete stack, not an inherited patch.
@@ -91,7 +100,12 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 	}
 	slices.Sort(paths)
 	var text bytes.Buffer
-	fmt.Fprintln(&text, "NVKR → NVKE walkthrough: catalog + Environment → build → local publication → cluster")
+	qualificationEnabled := cfg.QualifyLocal || cfg.Qualification != (nvkedemo.QualificationFile{})
+	if qualificationEnabled {
+		fmt.Fprintln(&text, "NVKR → NVKE walkthrough: catalog + Environment → build → qualification → local publication → cluster")
+	} else {
+		fmt.Fprintln(&text, "NVKR → NVKE walkthrough: catalog + Environment → build → local publication → cluster")
+	}
 	fmt.Fprintf(&text, "Networking: %s\n", network)
 	fmt.Fprintln(&text, "Relative paths below use the checkout selected by --repo; absolute selections retain their location.")
 	fmt.Fprintf(&text, "1. Definition requests %d named outputs: %q\n", len(authored.Outputs), filepath.Join(visibleRoot, selected))
@@ -104,6 +118,10 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 	fmt.Fprintln(&text, "4. NVKR compiles the selection into a generated Plan, then records each required output's result.")
 	fmt.Fprintf(&text, "   Attempt Plan, created during preparation: %q\n", filepath.Join(".nvkr", "laptop-bootstrap", cfg.AttemptPrefix, "selected-plan.json"))
 	fmt.Fprintf(&text, "   Run record, written by execution: %q\n", filepath.Join(".nvkr", "runs", cfg.AttemptPrefix, "lifecycle.json"))
+	if qualificationEnabled {
+		fmt.Fprintln(&text, "   Qualification verifies every output, runs delivered tools, signs evidence with separate local keys,")
+		fmt.Fprintln(&text, "   then downloads and independently verifies registry contents before deployment.")
+	}
 	fmt.Fprintln(&text, "5. Local publication distributes exact artifacts to NVKE; it is not a signed or qualified Release.")
 	fmt.Fprintln(&text, "6. NVKE installs management services, boots the tenant VMs, checks workload/DNS, then follows the selected lifetime policy.")
 	if cfg.Conformance {

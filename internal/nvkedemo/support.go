@@ -21,6 +21,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/buildactivity"
 	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
+	"github.com/dsx-ai-factory/nvkr/internal/qualificationprogress"
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/internal/sourcegit"
 	nvkrerrors "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -75,9 +76,11 @@ type Runner struct {
 	// Opted in only for the directly executed final nvkr local Run. Bootstrap
 	// shells and every source/utility command receive no inherited activity FD.
 	buildActivity bool
-	directory     string     // Command cwd, independent of private diagnostic storage.
-	extraFiles    []*os.File // Explicitly owned local helper descriptors; never ambient FDs.
-	input         *os.File   // Private held regular input; lifetime stays with the caller through join.
+	// Only the owned qualify-local child receives this isolated metadata pipe.
+	qualificationProgress bool
+	directory             string     // Command cwd, independent of private diagnostic storage.
+	extraFiles            []*os.File // Explicitly owned local helper descriptors; never ambient FDs.
+	input                 *os.File   // Private held regular input; lifetime stays with the caller through join.
 }
 
 // SudoAuthorizer is an optional terminal bridge on a downstream progress writer.
@@ -179,6 +182,7 @@ type OwnedProcess struct {
 	processWriter   io.Writer
 	processExitOnce sync.Once
 	activity        *buildactivity.Receiver
+	qualification   *qualificationprogress.Receiver
 	localGitFetch   bool
 	outputPipes     []*ownedOutputPipe
 }
@@ -329,6 +333,14 @@ func (p *OwnedProcess) finish() {
 			joinErr = errors.Join(joinErr, fmt.Errorf("%w: build activity reader: %w", ErrUnjoined, activityErr))
 		}
 	}
+	if p.qualification != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		progressErr := p.qualification.Finish(ctx)
+		cancel()
+		if progressErr != nil {
+			joinErr = errors.Join(joinErr, fmt.Errorf("%w: qualification progress reader: %w", ErrUnjoined, progressErr))
+		}
+	}
 	if p.log != nil {
 		_ = p.log.Close()
 	}
@@ -345,10 +357,10 @@ func (p *OwnedProcess) waitOwned(ctx context.Context) error {
 	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
 	for {
-		p.reportBuildActivity()
+		p.reportActivity()
 		select {
 		case <-p.done:
-			p.reportBuildActivity()
+			p.reportActivity()
 			return nil
 		case <-ticker.C:
 			continue
@@ -362,7 +374,10 @@ func (p *OwnedProcess) waitOwned(ctx context.Context) error {
 	}
 }
 
-func (p *OwnedProcess) reportBuildActivity() {
+func (p *OwnedProcess) reportActivity() {
+	for _, event := range p.qualification.Drain() {
+		reportProgress(p.processWriter, ProgressEvent{Kind: QualificationProgress, Qualification: event})
+	}
 	for _, record := range p.activity.Drain() {
 		reportProgress(p.processWriter, ProgressEvent{Kind: OSBuildLogs, BuildLogs: record})
 	}
@@ -399,7 +414,7 @@ func RunAuthenticationCommand(ctx context.Context, cmd *exec.Cmd) error {
 func (p *OwnedProcess) Stop(ctx context.Context) (result error) {
 	var observedExit error
 	defer func() {
-		p.reportBuildActivity()
+		p.reportActivity()
 		p.observeProcessExit()
 		if p.progress != nil {
 			p.progress.finish(errors.Join(result, observedExit))
@@ -549,7 +564,7 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 	if err := requireContext(ctx); err != nil {
 		return nil, err
 	}
-	if !safePhase(phase) || len(args) == 0 || args[0] == "" || r.Env == nil {
+	if !safePhase(phase) || len(args) == 0 || args[0] == "" || r.Env == nil || (r.buildActivity && r.qualificationProgress) {
 		return nil, errors.New("require safe phase, command and explicit environment")
 	}
 	path, err := commandPath(args[0], r.Env)
@@ -682,7 +697,7 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 		_, _ = fmt.Fprintf(r.Progress, "Demo phase: %s\n", phase)
 	}
 	var activityWriter *os.File
-	if r.buildActivity {
+	if r.buildActivity || r.qualificationProgress {
 		p.processWriter = r.Progress
 		reader, writer, pipeErr := os.Pipe()
 		if pipeErr != nil {
@@ -694,7 +709,11 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 			}
 			return nil, &CommandError{Phase: phase, ExitCode: -1, Cause: pipeErr}
 		}
-		p.activity, err = buildactivity.NewReceiver(ctx, reader)
+		if r.buildActivity {
+			p.activity, err = buildactivity.NewReceiver(ctx, reader)
+		} else {
+			p.qualification, err = qualificationprogress.NewReceiver(ctx, reader)
+		}
 		if err != nil {
 			_ = reader.Close()
 			_ = writer.Close()
@@ -708,7 +727,11 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 		}
 		activityWriter = writer
 		cmd.ExtraFiles = []*os.File{writer}
-		cmd.Args = append(cmd.Args, "--build-activity-fd", "3")
+		if r.buildActivity {
+			cmd.Args = append(cmd.Args, "--build-activity-fd", "3")
+		} else {
+			cmd.Args = append(cmd.Args, "--qualification-progress-fd", "3")
+		}
 	}
 	err = requireContext(ctx)
 	if err == nil {
@@ -721,6 +744,11 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 		if p.activity != nil {
 			closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 			err = errors.Join(err, p.activity.Close(closeCtx))
+			cancel()
+		}
+		if p.qualification != nil {
+			closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			err = errors.Join(err, p.qualification.Close(closeCtx))
 			cancel()
 		}
 		if p.log != nil {

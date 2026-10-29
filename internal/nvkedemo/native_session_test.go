@@ -54,8 +54,8 @@ func nativeSessionFixture(t *testing.T, conformance bool, workers int) (nativeSi
 		runner.Env = append(runner.Env, "SESSION_SUITE=1")
 		run := filepath.Join(root, "conformance-run")
 		capturedArtifactRunFixture(t, run, []lifecycle.DefinitionOutput{
-			{Name: "busybox-image-arm64", Platform: "linux/arm64", Format: "oci", Components: []string{"image"}},
-			{Name: "conformance-image-arm64", Platform: "linux/arm64", Format: "oci", Components: []string{"image"}},
+			{Name: "busybox-image-" + runtime.GOARCH, Platform: "linux/" + runtime.GOARCH, Format: "oci", Components: []string{"image"}},
+			{Name: "conformance-image-" + runtime.GOARCH, Platform: "linux/" + runtime.GOARCH, Format: "oci", Components: []string{"image"}},
 		}, nil)
 		nvkr := filepath.Join(root, "nvkr")
 		writeTenantFixture(t, nvkr, []byte("#!/bin/sh\nexec \"$SESSION_TOOL\" -test.run='^TestNativeSessionConformanceTool$' -- \"$@\"\n"), 0700)
