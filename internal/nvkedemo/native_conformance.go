@@ -68,9 +68,6 @@ func selectNativeConformance(ctx context.Context, cfg Config, platform string) (
 	if err != nil {
 		return nil, err
 	}
-	if run.Status != lifecycle.RunComplete {
-		return nil, nvkrerr.New(nvkrerr.CodeEngineCapability, "conformance requires a completed Run")
-	}
 	for _, required := range []struct{ name, kind, platform string }{
 		{selectors.Hydrophone.Output, "executable", selectors.Hydrophone.Platform},
 		{selectors.Kubectl.Output, "executable", selectors.Kubectl.Platform},

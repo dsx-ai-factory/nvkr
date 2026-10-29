@@ -87,7 +87,7 @@ func TestNativeConformanceUsesOneRepositoryRun(t *testing.T) {
 
 func TestNativeConformanceAdmitsOnlyCompleteMatchingRunBeforeDeployment(t *testing.T) {
 	for _, arch := range []string{"amd64", "arm64"} {
-		for _, mode := range []string{"complete", "ordinary Run", "missing tool", "missing image", "foreign platform"} {
+		for _, mode := range []string{"complete", "failed Run", "unfinished with observations", "ordinary Run", "missing tool", "missing image", "foreign platform"} {
 			t.Run(arch+"/"+mode, func(t *testing.T) {
 				repo, err := resolveExisting(t.TempDir())
 				if err != nil {
@@ -111,7 +111,17 @@ func TestNativeConformanceAdmitsOnlyCompleteMatchingRunBeforeDeployment(t *testi
 				case "foreign platform":
 					outputs[0].Platform = "linux/" + map[string]string{"amd64": "arm64", "arm64": "amd64"}[arch]
 				}
-				capturedArtifactRunFixture(t, run, outputs, nil)
+				_, recorded := capturedArtifactRunFixture(t, run, outputs, nil)
+				if mode == "failed Run" || mode == "unfinished with observations" {
+					recorded.Status = lifecycle.RunFailed
+					if mode == "failed Run" {
+						recorded.Observed, recorded.ContentSubject = nil, ""
+					}
+					if err := json.Unmarshal([]byte(`{"code":"NVKR-E-BUILD-FAILED","message":"fixture build failed"}`), &recorded.Failure); err != nil {
+						t.Fatal(err)
+					}
+					writeCanonicalRunFixture(t, filepath.Join(run, "lifecycle.json"), recorded)
+				}
 				cfg := Config{Conformance: true, Repository: repo, NVKR: filepath.Join(repo, "nvkr"), Runs: RunInputs{OS: run}, Out: filepath.Join(repo, "must-not-create")}
 				selected, err := selectNativeConformance(t.Context(), cfg, platform)
 				if mode == "complete" {
@@ -120,12 +130,19 @@ func TestNativeConformanceAdmitsOnlyCompleteMatchingRunBeforeDeployment(t *testi
 					}
 					return
 				}
-				assertNightlyCode(t, err, nvkrerr.CodeEngineCapability)
+				wantCode := nvkrerr.CodeEngineCapability
+				switch mode {
+				case "failed Run":
+					wantCode = nvkrerr.CodeGateUnmet
+				case "unfinished with observations":
+					wantCode = nvkrerr.CodeVerifyFailed
+				}
+				assertNightlyCode(t, err, wantCode)
 				if selected != nil {
 					t.Fatal("incomplete suite admitted")
 				}
 				_, err = nativeDeploymentConfig(t.Context(), cfg, platform)
-				assertNightlyCode(t, err, nvkrerr.CodeEngineCapability)
+				assertNightlyCode(t, err, wantCode)
 				if _, err := os.Stat(cfg.Out); !os.IsNotExist(err) {
 					t.Fatal("incomplete suite created deployment state", err)
 				}

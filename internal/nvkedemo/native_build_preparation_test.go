@@ -170,23 +170,24 @@ esac
 	}
 }
 
-func TestDefaultAMDPreparationBuildsAndBindsLocalToolchain(t *testing.T) {
-	for _, valid := range []bool{true, false} {
-		t.Run(map[bool]string{true: "validated image", false: "invalid image ID"}[valid], func(t *testing.T) {
-			repo, bin := t.TempDir(), t.TempDir()
-			plan, err := canonical.Marshal(nativeCapturedBuildPlanFixture(t))
-			if err != nil {
-				t.Fatal(err)
-			}
-			planPath := filepath.Join(repo, "fixture-plan.json")
-			if err := os.WriteFile(planPath, plan, 0600); err != nil {
-				t.Fatal(err)
-			}
-			for name, body := range map[string]string{
-				"docker": "#!/bin/sh\ncase \"$1\" in buildx) echo buildx;; version) echo linux/amd64;; *) exit 99;; esac\n",
-				"nvkr":   "#!/bin/sh\nset -eu\ntest \"$1:$2\" = run:plan\nprintf '%s\\n' \"nvkr:$*\" >>\"$CALLS\"\ncat \"$FIXTURE_PLAN\"\n",
-				"bash":   "#!/bin/sh\nset -eu\ntest \"$1\" = toolchains/nvkr-packer/build.sh\ntest \"$2:$3\" = --arch:amd64\nprintf '%s\\n' \"bootstrap:$*\" >>\"$CALLS\"\nprintf '%s\\n' \"$IMAGE_ID\"\n",
-				"jq": `#!/bin/sh
+func TestDefaultLinuxPreparationBuildsAndBindsLocalToolchain(t *testing.T) {
+	for _, arch := range []string{"amd64", "arm64"} {
+		for _, valid := range []bool{true, false} {
+			t.Run(arch+"/"+map[bool]string{true: "validated image", false: "invalid image ID"}[valid], func(t *testing.T) {
+				repo, bin := t.TempDir(), t.TempDir()
+				plan, err := canonical.Marshal(nativeCapturedBuildPlanFixture(t))
+				if err != nil {
+					t.Fatal(err)
+				}
+				planPath := filepath.Join(repo, "fixture-plan.json")
+				if err := os.WriteFile(planPath, plan, 0600); err != nil {
+					t.Fatal(err)
+				}
+				for name, body := range map[string]string{
+					"docker": "#!/bin/sh\ncase \"$1\" in buildx) echo buildx;; version) echo linux/" + arch + ";; *) exit 99;; esac\n",
+					"nvkr":   "#!/bin/sh\nset -eu\ntest \"$1:$2\" = run:plan\nprintf '%s\\n' \"nvkr:$*\" >>\"$CALLS\"\ncat \"$FIXTURE_PLAN\"\n",
+					"bash":   "#!/bin/sh\nset -eu\ntest \"$1\" = toolchains/nvkr-packer/build.sh\ntest \"$2:$3\" = --arch:" + arch + "\nprintf '%s\\n' \"bootstrap:$*\" >>\"$CALLS\"\nprintf '%s\\n' \"$IMAGE_ID\"\n",
+					"jq": `#!/bin/sh
 set -eu
 printf '%s\n' "projection:$*" >>"$CALLS"
 case "$*" in
@@ -196,37 +197,38 @@ case "$*" in
  *) exit 23;;
 esac
 `,
-			} {
-				if err := os.WriteFile(filepath.Join(bin, name), []byte(body), 0700); err != nil {
-					t.Fatal(err)
+				} {
+					if err := os.WriteFile(filepath.Join(bin, name), []byte(body), 0700); err != nil {
+						t.Fatal(err)
+					}
 				}
-			}
-			for _, tool := range []string{"git", "timeout"} {
-				writeTenantFixture(t, filepath.Join(bin, tool), []byte("#!/bin/sh\nexit 99\n"), 0700)
-			}
-			image := "sha256:" + strings.Repeat("a", 64)
-			if !valid {
-				image = "mutable:tag"
-			}
-			calls := filepath.Join(repo, "calls")
-			cfg := BuildConfig{Repository: repo, AttemptPrefix: "first", NVKR: filepath.Join(bin, "nvkr"), Definition: "inputs/definitions/demo/amd64-nvidia-local-kvm.json", Environment: "inputs/environments/local-amd64-kvm.json"}
-			runner := Runner{Env: SetEnv(os.Environ(), map[string]string{"PATH": bin + string(os.PathListSeparator) + os.Getenv("PATH"), "CALLS": calls, "IMAGE_ID": image, "FIXTURE_PLAN": planPath})}
-			err = prepareDefaultNativeBuild(t.Context(), runner, &cfg, "linux/amd64")
-			if !valid {
-				var coded *e.Error
-				if !errors.As(err, &coded) || coded.Code != e.CodeVerifyFailed || cfg.Definition != "inputs/definitions/demo/amd64-nvidia-local-kvm.json" {
-					t.Fatalf("invalid toolchain image was accepted: %v", err)
+				for _, tool := range []string{"git", "timeout"} {
+					writeTenantFixture(t, filepath.Join(bin, tool), []byte("#!/bin/sh\nexit 99\n"), 0700)
 				}
-				return
-			}
-			if err != nil || cfg.Definition != ".nvkr/native-build/first/definition.json" || cfg.Environment != "inputs/environments/local-amd64-kvm.json" {
-				t.Fatalf("AMD64 toolchain preparation: %+v %v", cfg, err)
-			}
-			raw, err := os.ReadFile(calls)
-			if err != nil || !strings.Contains(string(raw), "--arg arch amd64") || strings.Contains(string(raw), "factory prepare-native-packer") {
-				t.Fatalf("architecture-specific preparation: %s %v", raw, err)
-			}
-		})
+				image := "sha256:" + strings.Repeat("a", 64)
+				if !valid {
+					image = "mutable:tag"
+				}
+				calls := filepath.Join(repo, "calls")
+				cfg := BuildConfig{Repository: repo, AttemptPrefix: "first", NVKR: filepath.Join(bin, "nvkr"), Definition: "inputs/definitions/demo/" + arch + "-nvidia-local-kvm.json", Environment: "inputs/environments/local-" + arch + "-kvm.json"}
+				runner := Runner{Env: SetEnv(os.Environ(), map[string]string{"PATH": bin + string(os.PathListSeparator) + os.Getenv("PATH"), "CALLS": calls, "IMAGE_ID": image, "FIXTURE_PLAN": planPath})}
+				err = prepareDefaultNativeBuild(t.Context(), runner, &cfg, "linux/"+arch)
+				if !valid {
+					var coded *e.Error
+					if !errors.As(err, &coded) || coded.Code != e.CodeVerifyFailed || cfg.Definition != "inputs/definitions/demo/"+arch+"-nvidia-local-kvm.json" {
+						t.Fatalf("invalid toolchain image was accepted: %v", err)
+					}
+					return
+				}
+				if err != nil || cfg.Definition != ".nvkr/native-build/first/definition.json" || cfg.Environment != "inputs/environments/local-"+arch+"-kvm.json" {
+					t.Fatalf("Linux toolchain preparation: %+v %v", cfg, err)
+				}
+				raw, err := os.ReadFile(calls)
+				if err != nil || !strings.Contains(string(raw), "--arg arch "+arch) || strings.Contains(string(raw), "factory prepare-native-packer") {
+					t.Fatalf("architecture-specific preparation: %s %v", raw, err)
+				}
+			})
+		}
 	}
 }
 
@@ -256,7 +258,7 @@ func TestDefaultLinuxPreparationRejectsMissingPrerequisitesBeforeWriting(t *test
 
 func TestDefaultLinuxPreparationRejectsBrokenDockerBeforeWriting(t *testing.T) {
 	for _, platform := range []string{"linux/arm64", "linux/amd64"} {
-		for _, mode := range []string{"buildx", "daemon", "foreign", "empty"} {
+		for _, mode := range []string{"buildx", "daemon", "foreign", "cross-arch", "empty"} {
 			t.Run(platform+"/"+mode, func(t *testing.T) {
 				repo, bin := t.TempDir(), t.TempDir()
 				for _, tool := range []string{"jq", "git", "bash", "timeout"} {
@@ -271,6 +273,7 @@ else
   [ "$PROBE_FAIL" != daemon ] || exit 1
   case "$PROBE_FAIL" in
     foreign) printf '%s\n' windows/amd64;;
+    cross-arch) printf '%s\n' "$TEST_OTHER_DOCKER_PLATFORM";;
     empty) :;;
     *) printf '%s\n' "$TEST_DOCKER_PLATFORM";;
   esac
@@ -278,7 +281,7 @@ fi
 `
 				writeTenantFixture(t, filepath.Join(bin, "docker"), []byte(docker), 0700)
 				cfg := BuildConfig{Repository: repo, AttemptPrefix: "first", NVKR: "/forbidden/nvkr"}
-				runner := Runner{Env: []string{"PATH=" + bin, "PROBE_FAIL=" + mode, "TEST_DOCKER_PLATFORM=" + platform}}
+				runner := Runner{Env: []string{"PATH=" + bin, "PROBE_FAIL=" + mode, "TEST_DOCKER_PLATFORM=" + platform, "TEST_OTHER_DOCKER_PLATFORM=" + map[string]string{"linux/amd64": "linux/arm64", "linux/arm64": "linux/amd64"}[platform]}}
 				err := prepareDefaultNativeBuild(t.Context(), runner, &cfg, platform)
 				assertNightlyCode(t, err, e.CodeEngineCapability)
 				if _, err := os.Lstat(filepath.Join(repo, ".nvkr")); !os.IsNotExist(err) {

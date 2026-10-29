@@ -336,7 +336,7 @@ Add `--nvke-clone /absolute/path/to/nvke` when supplying local source objects.
 placeholders. Keep the artifact attempt, native-tool attempt and output paths
 fresh. Deleting one directory does not clean resources or make an old attempt new.
 
-NVIDIA OVN is the default. Both hosts retain the selected NVKE source's ARM64
+NVIDIA OVN is the default. The ARM64 selections on Linux and Mac retain NVKE's
 `linux-nvidia-64k` kernel. Linux requires KVM. Explicit Mac `--accelerator tcg`
 uses the standard QEMU `max` CPU and is slower than hardware virtualization.
 Default Mac build preparation gives the Ubuntu installer a three-hour wait for
@@ -349,8 +349,8 @@ so the default HVF selection cannot run this image. HVF remains available for
 independently compatible images; there is no automatic fallback or kernel
 substitution. Device probes alone do not establish guest boot or full acceptance.
 
-The site uses the source-selected ARM64 MachineImage boot script with the
-current local disk URL. NICoSim owns its parsing, image boot and DHCP identity
+For these ARM64 selections, the site uses the source-selected MachineImage boot
+script with the current local disk URL. NICoSim owns its parsing, image boot and DHCP identity
 registration; the URL itself is not content authentication.
 
 Before site or tenant agents start, the adapter imports the selected named OVN
@@ -791,12 +791,13 @@ race-test coverage; a real site-reuse test remains externally unverified.
 
 ## Private site identity operation helper
 
-The shared site-startup tool catalog builds a fixed Linux ARM64 helper for
-execution in an existing admitted NVKE controller container. `pkg/nvkr/siteidentity` owns its
+The shared site-startup tool catalog builds a Linux helper matching the selected
+guest architecture for execution in an existing admitted NVKE controller container. `pkg/nvkr/siteidentity` owns its
 mTLS probe, upstream SPIRE reconfiguration and authenticated fresh-peer observation;
 the executable only adapts bounded standard input/output and coded errors.
-Both native host selections consume the same Linux ARM64 helper through the
-shared site-startup tool output. It is built from catalog-selected source;
+ARM64 guests consume `site-startup-tools-arm64`; AMD64 guests consume
+`site-startup-tools-amd64`. The Mac host uses the Linux ARM64 companion for its
+ARM64 guest. It is built from catalog-selected source;
 the normal startup owner invokes it in its existing admitted controller container.
 Building the helper alone
 does not deploy, import SPIRE policy or repair a site.

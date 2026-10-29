@@ -60,6 +60,11 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	if cfg.Conformance && (cfg.QualifyLocal || cfg.Prepared || cfg.QualificationPolicy != "") {
 		return BuiltInputs{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "demo conformance selects a fresh unsigned diagnostic Run; prepared or local-signing combinations are not admitted")
 	}
+	if cfg.Prepared || cfg.QualifyLocal || cfg.QualificationPolicy != "" {
+		if err := admitQualificationHost(runtime.GOOS + "/" + runtime.GOARCH); err != nil {
+			return BuiltInputs{}, err
+		}
+	}
 	if err := cfg.Qualification.validate(cfg.QualificationPolicy); err != nil {
 		return BuiltInputs{}, err
 	}
@@ -111,6 +116,9 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 			return BuiltInputs{}, err
 		}
 	} else if err := resolveSelectedBuild(ctx, repo, &cfg); err != nil {
+		if nativeDefault && errors.Is(err, os.ErrNotExist) {
+			return BuiltInputs{}, nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "default demo BUILD inputs or adjacent NVKR are unavailable for %s", runtime.GOOS+"/"+runtime.GOARCH)
+		}
 		return BuiltInputs{}, err
 	}
 	combinedTools := false

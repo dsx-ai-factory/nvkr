@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -52,11 +53,56 @@ func TestDefaultBuildMissingInputsDoesNotCreateAttemptState(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, err := BuildArtifacts(t.Context(), BuildConfig{Repository: repo, AttemptPrefix: "fresh", Jobs: 1})
+	assertNightlyCode(t, err, nvkrerr.CodeEngineCapability)
 	if err == nil || !strings.Contains(err.Error(), filepath.Base(selected)) || got != (BuiltInputs{}) {
 		t.Fatalf("missing authored inputs did not fail before work: %+v %v", got, err)
 	}
 	if _, err := os.Lstat(filepath.Join(repo, ".nvkr")); !os.IsNotExist(err) {
 		t.Fatal("missing authored inputs created attempt state", err)
+	}
+}
+
+func TestDefaultBuildRejectsUnavailableAMD64LanesBeforeWork(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("exercises the actual Linux AMD64 public build boundary")
+	}
+	repo, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, cfg := range []BuildConfig{
+		{Network: "upstream-ovn"}, {Conformance: true},
+		{Prepared: true, QualificationPolicy: "/must-not-be-read"},
+		{QualifyLocal: true}, {QualificationPolicy: "/must-not-be-read"},
+	} {
+		t.Run(fmt.Sprintf("%+v", cfg), func(t *testing.T) {
+			cfg.Repository, cfg.AttemptPrefix, cfg.Jobs = repo, "unsupported-amd64", 1
+			got, err := BuildArtifacts(t.Context(), cfg)
+			assertNightlyCode(t, err, nvkrerr.CodeEngineCapability)
+			if got != (BuiltInputs{}) {
+				t.Fatal("unsupported lane returned build outputs")
+			}
+			for _, root := range []string{"runs", "laptop-bootstrap", "native-build"} {
+				if _, err := os.Lstat(filepath.Join(repo, ".nvkr", root, cfg.AttemptPrefix)); !os.IsNotExist(err) {
+					t.Fatal("unsupported lane created attempt state", err)
+				}
+			}
+		})
+	}
+}
+
+func TestBuildQualificationHostAdmission(t *testing.T) {
+	for _, platform := range []string{"linux/arm64", "linux/amd64", "darwin/arm64"} {
+		t.Run(platform, func(t *testing.T) {
+			err := admitQualificationHost(platform)
+			if platform == "linux/arm64" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				assertNightlyCode(t, err, nvkrerr.CodeEngineCapability)
+			}
+		})
 	}
 }
 

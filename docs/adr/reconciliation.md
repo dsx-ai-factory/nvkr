@@ -157,7 +157,9 @@ Ordinary Mac and Linux BUILD now share default input selection and local toolcha
 preparation. The demo delegates platform-domain admission to NVKR's target owner,
 derives Linux input and conformance-output names from that platform, and uses one
 host-tool membership/alias path. Platform-specific virtualization prerequisites
-remain backend checks. Shared prerequisite admission checks command availability,
+remain backend checks. Missing default input files return a capability refusal;
+qualification retains its Linux ARM64 host admission before the launcher. Shared
+prerequisite admission checks command availability,
 Buildx and a matching Linux Docker daemon before preparation state. Empty guest
 architecture bindings are refused rather than assigned an ARM64 default. Optional
 conformance admits the exact named host tools and Linux suite outputs from the

@@ -111,7 +111,7 @@ func TestNativeCAPIInitSelectsAllThreeProvidersAndWaits(t *testing.T) {
 
 func nativeCapturedToolsFixture(t *testing.T) (string, string, *factory.Plan) {
 	t.Helper()
-	plan, inputs, err := factory.CaptureCompileFiles(t.Context(), filepath.Join("..", ".."), "inputs/definitions/demo/tools/linux-arm64.json", "inputs/environments/local-native-linux.json", "native-selection-test")
+	plan, inputs, err := factory.CaptureCompileFiles(t.Context(), filepath.Join("..", ".."), "inputs/definitions/demo/tools/linux-arm64.json", "inputs/environments/local-arm64-kvm.json", "native-selection-test")
 	if err != nil {
 		t.Fatal(err)
 	}
