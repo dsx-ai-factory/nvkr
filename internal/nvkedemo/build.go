@@ -25,6 +25,7 @@ import (
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 	"golang.org/x/sys/unix"
 )
 
@@ -41,19 +42,17 @@ type BuiltInputs struct {
 func BuildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	result, err := buildArtifacts(ctx, cfg)
 	if err != nil {
+		var coded *nvkrerr.Error
+		if errors.As(err, &coded) && coded.Code == nvkrerr.CodeEngineCapability {
+			return BuiltInputs{}, err
+		}
 		return BuiltInputs{}, nvkrerr.Wrap(nvkrerr.CodeBuildFailed, err, "local NVKE artifact build")
 	}
 	return result, nil
 }
 func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
-	if err := validateAutomaticQualification(cfg.QualifyLocal, cfg.Prepared, cfg.QualificationPolicy, cfg.Qualification); err != nil {
+	if err := AdmitDemoBuild(ctx, cfg); err != nil {
 		return BuiltInputs{}, err
-	}
-	if err := requireContext(ctx); err != nil {
-		return BuiltInputs{}, err
-	}
-	if cfg.Conformance && (cfg.QualifyLocal || cfg.Prepared || cfg.QualificationPolicy != "") {
-		return BuiltInputs{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "demo conformance selects a fresh unsigned diagnostic Run; prepared or local-signing combinations are not admitted")
 	}
 	if err := cfg.Qualification.validate(cfg.QualificationPolicy); err != nil {
 		return BuiltInputs{}, err
@@ -65,11 +64,8 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	if err != nil {
 		return BuiltInputs{}, err
 	}
-	if err := validateSelectedBuild(cfg.Definition, cfg.Environment, cfg.NVKR, cfg.Prepared || cfg.QualifyLocal || cfg.QualificationPolicy != ""); err != nil {
+	if err := admitNativeBuildHost(runtime.GOOS + "/" + runtime.GOARCH); err != nil {
 		return BuiltInputs{}, err
-	}
-	if runtime.GOARCH != "arm64" || runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
-		return BuiltInputs{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "artifact builds require native Mac or Linux ARM64")
 	}
 	repo, err := resolveExisting(cfg.Repository)
 	if err != nil {
@@ -82,12 +78,19 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 		return BuiltInputs{}, errors.New("jobs must be positive")
 	}
 	nativeDefault := false
-	if runtime.GOOS == "darwin" && cfg.Definition == "" {
-		executable, err := os.Executable()
-		if err != nil {
-			return BuiltInputs{}, nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "select native NVKR distribution")
+	if cfg.Definition == "" && !(runtime.GOOS == "linux" && (cfg.Prepared || cfg.QualifyLocal || cfg.QualificationPolicy != "")) {
+		executable := cfg.DemoExecutable
+		if executable == "" {
+			executable, err = os.Executable()
+			if err != nil {
+				return BuiltInputs{}, nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "select native NVKR distribution")
+			}
+		} else if !filepath.IsAbs(executable) || filepath.Clean(executable) != executable {
+			return BuiltInputs{}, configUsage("native distribution executable requires an absolute clean path")
 		}
-		nativeDefault, err = defaultMacBuild(&cfg, runtime.GOOS+"/"+runtime.GOARCH, executable)
+		var selected bool
+		selected, err = defaultNativeBuild(&cfg, runtime.GOOS+"/"+runtime.GOARCH, executable)
+		nativeDefault = selected
 		if err != nil {
 			return BuiltInputs{}, err
 		}
@@ -99,7 +102,18 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 			return BuiltInputs{}, err
 		}
 	} else if err := resolveSelectedBuild(ctx, repo, &cfg); err != nil {
+		if nativeDefault && errors.Is(err, os.ErrNotExist) {
+			return BuiltInputs{}, nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "default demo BUILD inputs or adjacent NVKR are unavailable for %s", runtime.GOOS+"/"+runtime.GOARCH)
+		}
 		return BuiltInputs{}, err
+	}
+	combinedTools := false
+	if cfg.Definition != "" {
+		cfg.Repository = repo
+		combinedTools, err = selectedBuildIncludesNativeTools(ctx, cfg, runtime.GOOS+"/"+runtime.GOARCH)
+		if err != nil {
+			return BuiltInputs{}, err
+		}
 	}
 	env, err := localBuildEnvironment(ctx)
 	if err != nil {
@@ -115,7 +129,7 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	runner := Runner{Env: env, Progress: cfg.Progress, output: cfg.Progress}
 	// All host checks and fresh-path checks precede the first bootstrap. The
 	// script remains authoritative for exact runtime/toolchain admission.
-	for _, root := range []string{"runs", "laptop-bootstrap", "native-tools/runs"} {
+	for _, root := range []string{"runs", "laptop-bootstrap", "native-tools/runs", "mac-build", "native-build"} {
 		owned := filepath.Join(repo, ".nvkr", root, cfg.AttemptPrefix)
 		if cfg.Prepared && root == "laptop-bootstrap" {
 			info, readErr := os.Lstat(owned)
@@ -143,7 +157,7 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	}
 	cfg.Repository = repo
 	if nativeDefault {
-		if err := prepareDefaultMacBuild(ctx, runner, &cfg); err != nil {
+		if err := prepareDefaultNativeBuild(ctx, runner, &cfg, runtime.GOOS+"/"+runtime.GOARCH); err != nil {
 			return BuiltInputs{}, err
 		}
 	}
@@ -153,6 +167,12 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	})
 	if err != nil {
 		return BuiltInputs{}, err
+	}
+	if combinedTools {
+		// The explicit Definition already built these named outputs. Their
+		// consumers authenticate the completed Run before extracting them.
+		built.Runs.Tools = built.Runs.OS
+		return built, nil
 	}
 	toolsRun, err := buildTools(ctx, ToolConfig{
 		Repository: repo, NVKR: built.NVKR, NVKEClone: cfg.NVKEClone, Attempt: cfg.AttemptPrefix, Jobs: cfg.Jobs,
@@ -164,6 +184,13 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	}
 	built.Runs.Tools = toolsRun
 	return built, nil
+}
+
+func admitNativeBuildHost(platform string) error {
+	if err := target.ValidateExecutablePlatform(platform); err != nil {
+		return nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "native demo build target")
+	}
+	return nil
 }
 
 // The private seam joins admitted operations without replacing their authority
@@ -379,31 +406,38 @@ func LocalArtifactInputs(network string) (definition, environment string, err er
 	return LocalArtifactInputsFor(network, false, "linux")
 }
 
-// LocalArtifactInputsFor selects the shared product Definition and the host
-// Environment. Conformance adds version-matched diagnostic tools to the SAME Run.
-// Host architecture and execution capabilities remain admitted by the build owner.
+// LocalArtifactInputsFor retains the ARM64 input selection for OS-only callers.
+// New callers with a concrete host use LocalArtifactInputsForPlatform.
 func LocalArtifactInputsFor(network string, conformance bool, hostOS string) (definition, environment string, err error) {
+	return LocalArtifactInputsForPlatform(network, conformance, hostOS+"/arm64")
+}
+
+// LocalArtifactInputsForPlatform selects authored inputs for the exact host.
+// Build and walkthrough share this selection; runtime admission remains separate.
+func LocalArtifactInputsForPlatform(network string, conformance bool, platform string) (definition, environment string, err error) {
 	mode, err := normalizeNetwork(network)
 	if err != nil {
 		return "", "", err
 	}
-	definition = "inputs/definitions/demo/arm64-nvidia-local-kvm.json"
-	if mode == "upstream-ovn" {
-		definition = "inputs/definitions/demo/arm64-upstream-local-kvm.json"
+	if err := admitNativeBuildHost(platform); err != nil {
+		return "", "", err
 	}
+	hostOS, arch, _ := strings.Cut(platform, "/")
+	variant := "nvidia"
+	if mode == "upstream-ovn" {
+		variant = "upstream"
+	}
+	definition = "inputs/definitions/demo/" + arch + "-" + variant + "-local-kvm"
 	if conformance {
 		if mode == "kind-calico" {
 			return "", "", configUsage("conformance requires the selected OVN demo")
 		}
-		definition = strings.TrimSuffix(definition, ".json") + "-conformance.json"
+		definition += "-conformance"
 	}
-	switch hostOS {
-	case "linux":
-		environment = "inputs/environments/local-arm64-kvm.json"
-	case "darwin":
+	definition += ".json"
+	environment = "inputs/environments/local-" + arch + "-kvm.json"
+	if hostOS == "darwin" {
 		environment = "inputs/environments/local-native-mac.json"
-	default:
-		return "", "", nvkrerr.New(nvkrerr.CodeEngineCapability, "local demo input selection does not support host OS %q", hostOS)
 	}
 	return definition, environment, nil
 }

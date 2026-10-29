@@ -10,7 +10,7 @@
   },
   "outputs": [
     {
-      "catalog": {"base": "../../../catalogs/capnico/local-arm64"},
+      "catalog": {"base": "../../../catalogs/capnico/local"},
       "components": ["capnico-controller"],
       "format": "oci",
       "name": "capnico-controller-arm64",

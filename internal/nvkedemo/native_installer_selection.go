@@ -12,6 +12,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 	"github.com/google/go-containerregistry/pkg/name"
 	"go.yaml.in/yaml/v3"
 )
@@ -22,6 +23,7 @@ import (
 type nativeInstallerSelection struct {
 	repo, commit, capiVersion, versionsDigest, siteSpecDigest string
 	sourceDate                                                int64
+	arch                                                      string
 }
 
 func nativeInstallerSelectionFromRun(ctx context.Context, root, bundle string) (*nativeInstallerSelection, error) {
@@ -40,6 +42,10 @@ func nativeInstallerSelectionFromPlan(plan *factory.Plan, bundle, buildDigest st
 		if build.BuildDigest != buildDigest {
 			return nil, errors.New("native tool output differs from its selected source build")
 		}
+		if err := target.ValidateExecutablePlatform(build.Platform); err != nil {
+			return nil, err
+		}
+		arch := target.ExecutableArch(build.Platform)
 		components := make(map[string]catalog.Component, len(build.ResolvedComponents))
 		for _, item := range build.ResolvedComponents {
 			components[item.Name] = item.Component
@@ -55,7 +61,7 @@ func nativeInstallerSelectionFromPlan(plan *factory.Plan, bundle, buildDigest st
 			}
 		}
 		var version string
-		for _, name := range []string{"clusterctl", "clusterctl-linux"} {
+		for _, name := range []string{"clusterctl", "clusterctl-linux", "clusterctl-linux-amd64"} {
 			if component, ok := components[name]; ok {
 				if version != "" {
 					return nil, errors.New("native tool Run selects ambiguous clusterctl versions")
@@ -67,7 +73,7 @@ func nativeInstallerSelectionFromPlan(plan *factory.Plan, bundle, buildDigest st
 		if err != nil || version != "v"+parsed.String() || parsed.Prerelease() != "" || parsed.Metadata() != "" {
 			return nil, errors.New("native tool Run requires an exact stable CAPI provider version")
 		}
-		return &nativeInstallerSelection{repo: installer.Repo, commit: installer.Commit, sourceDate: installer.SourceDate, capiVersion: version}, nil
+		return &nativeInstallerSelection{repo: installer.Repo, commit: installer.Commit, sourceDate: installer.SourceDate, capiVersion: version, arch: arch}, nil
 	}
 	return nil, errors.New("native tool Run omits the selected host bundle build")
 }
@@ -77,8 +83,8 @@ const nativeSiteSpecPath = "cli/internal/bootstrap/sitespec/template.yaml"
 // NVKE's manifest release owns the tag its unchanged deployment expects. This
 // projection selects only the local import alias; NVKE still validates and
 // installs its complete release declaration, and delivery verifies image bytes.
-func nativeCAPNICoReference(ctx context.Context, installer string) (string, error) {
-	raw, err := readRunFile(ctx, installer, "deploy/nico/capnico/release.yaml", 64<<10)
+func (assets *NativeAssets) prepareCAPNICoImport(ctx context.Context) (string, error) {
+	raw, err := readRunFile(ctx, assets.Installer, "deploy/nico/capnico/release.yaml", 64<<10)
 	if err != nil {
 		return "", err
 	}
@@ -90,6 +96,7 @@ func nativeCAPNICoReference(ctx context.Context, installer string) (string, erro
 	if err != nil || release.Artifact != "capnico-controller" || !nativeImageReferenceIsCanonical(ref, release.Image) {
 		return "", errors.New("CAPNICo import requires the source-owned manifest image and artifact")
 	}
+	assets.importTags = map[string]string{"capnico": release.Image}
 	return release.Image, nil
 }
 

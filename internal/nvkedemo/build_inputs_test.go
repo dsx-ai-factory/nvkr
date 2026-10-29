@@ -33,16 +33,16 @@ func TestLocalKVMInputsPreserveSelectedOutputsAndSources(t *testing.T) {
 			// The native NVIDIA selection deliberately moves the NVKE closure
 			// together. Historical TCG inputs retain their original source scope.
 			modern := map[string]definition.Catalog{
-				"cluster-api-provider-provisioned-arm64": {Base: "../../catalogs/nvke/native-site-arm64"},
-				"controller-chart":                       {Base: "../../catalogs/nvke/native-site-arm64"},
-				"controller-profiles":                    {Base: "../../catalogs/controller-profiles/native-nvidia-arm64"},
-				"cwe":                                    {Base: "../../catalogs/nvke/native-site-arm64"},
-				"nktp":                                   {Base: "../../catalogs/nvke/native-site-arm64"},
-				"nvkectl":                                {Base: "../../catalogs/nvke/native-site-arm64"},
+				"cluster-api-provider-provisioned-arm64": {Base: "../../catalogs/nvke/native-site"},
+				"controller-chart":                       {Base: "../../catalogs/nvke/native-site"},
+				"controller-profiles":                    {Base: "../../catalogs/controller-profiles/native-nvidia"},
+				"cwe":                                    {Base: "../../catalogs/nvke/native-site"},
+				"nktp":                                   {Base: "../../catalogs/nvke/native-site"},
+				"nvkectl":                                {Base: "../../catalogs/nvke/native-site"},
 				"nvke-node-image-arm64":                  {Base: "../../catalogs/node-images/release", Overlays: []string{"../../catalogs/node-images/variants/native-nvidia.json", "../../catalogs/node-images/variants/native-local-kvm.json"}},
 			}
 			for _, name := range []string{"postgresql", "spire", "spire-crds", "temporal"} {
-				modern[name] = definition.Catalog{Base: "../../catalogs/nvke/native-site-arm64"}
+				modern[name] = definition.Catalog{Base: "../../catalogs/nvke/native-site"}
 			}
 			for _, name := range []string{"csi-node-driver-registrar", "postgresql", "spiffe-csi", "spire-agent", "spire-bash", "spire-controller-manager", "spire-oidc", "spire-server", "spire-tpm-server", "temporal-admin-tools", "temporal-server", "temporal-ui"} {
 				modern[name+"-image-arm64"] = definition.Catalog{Base: "../../catalogs/runtime-dependencies"}

@@ -87,20 +87,15 @@ func executeHelmPackage(ctx context.Context, plan *Plan, node Node, output Artif
 	if err != nil {
 		return err
 	}
-	// archive is a carrier inside root, a fresh MkdirTemp directory helmPackageTree
-	// owns and cleanup() above removes wholesale; it needs no reclaim-on-rerun
-	// logic or defer of its own (unlike legacyCarrier above, which sits beside
-	// the graph output and outlives any one run).
+	// Unlike legacyCarrier, archive lives inside root, so cleanup() reclaims it.
 	archive := filepath.Join(root, "bundle.tar")
 	if err := transportarchive.Pack(ctx, archive, root, []string{relative}); err != nil {
 		return err
 	}
 	// The Helm OCI chart-content layer is exactly what `helm package` produces: a
 	// tar rooted at the chart's own name (Chart.yaml one level in), gzip-
-	// compressed with a fixed header so the compressed bytes are a function of
-	// chart content and the pinned Go toolchain that compresses them (the DEFLATE
-	// stream itself is not guaranteed byte-stable across toolchain versions; see
-	// .go-version). The transport archive just packed may carry the chart under a
+	// compressed with a fixed header (see rerootHelmChartLayer for toolchain
+	// byte-stability). The transport archive just packed may carry the chart under a
 	// deeper, carrier-specific prefix (chartPrefix); re-root it onto a single
 	// <chartName>/ entry instead of writing into the (possibly shared, not
 	// node-owned) source tree to relocate it on disk. A bound tree may carry

@@ -4,360 +4,280 @@
 package cicontract
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"sigs.k8s.io/yaml"
 )
 
-type nightlyCoordinatorDocument struct {
-	Name        string                     `json:"name"`
-	On          map[string]json.RawMessage `json:"on"`
-	Permissions map[string]string          `json:"permissions"`
-	Concurrency struct {
-		Group            string `json:"group"`
-		CancelInProgress bool   `json:"cancel-in-progress"`
-	} `json:"concurrency"`
-	Jobs map[string]struct {
-		Name           string            `json:"name"`
-		RunsOn         string            `json:"runs-on"`
-		Needs          []string          `json:"needs"`
-		If             string            `json:"if"`
-		Environment    string            `json:"environment"`
-		TimeoutMinutes int               `json:"timeout-minutes"`
-		Permissions    map[string]string `json:"permissions"`
-		Env            map[string]string `json:"env"`
-		// Authored action inputs use GitHub's Boolean/integer/string scalars;
-		// the generated workflow's string-only With model is intentionally narrower.
-		Steps []struct {
-			ID   string            `json:"id"`
-			Name string            `json:"name"`
-			Run  string            `json:"run"`
-			Uses string            `json:"uses"`
-			If   string            `json:"if"`
-			Env  map[string]string `json:"env"`
-			With map[string]any    `json:"with"`
-		} `json:"steps"`
-		Outputs     map[string]string `json:"outputs"`
-		Strategy    json.RawMessage   `json:"strategy"`
-		Concurrency struct {
-			Group            string `json:"group"`
-			CancelInProgress bool   `json:"cancel-in-progress"`
-		} `json:"concurrency"`
-	} `json:"jobs"`
+func TestNightlyFreezesAuthenticatedNVKEMainOnce(t *testing.T) {
+	selection := nightlyCoordinatorFixture(t).Jobs["select"]
+	var resolver nightlyCoordinatorStep
+	for _, step := range selection.Steps {
+		if step.Name == "Resolve NVKE main once for this nightly cycle" {
+			resolver = step
+		}
+	}
+	if selection.Outputs["nvke_commit"] != "${{ steps.source.outputs.nvke_commit }}" || resolver.Env["GH_TOKEN"] != "${{ secrets.NKE_SOURCE_TOKEN }}" {
+		t.Fatal("source resolution lost its authenticated bounded owner")
+	}
+	const commit = "dddddddddddddddddddddddddddddddddddddddd"
+	for _, test := range []struct {
+		name, kind, sha string
+		apiOK, valid    bool
+	}{
+		{"exact commit", "commit", commit, true, true},
+		{"mutable source", "commit", "main", true, false},
+		{"tag object", "tag", commit, true, false},
+		{"API failure", "commit", commit, false, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			timeout, err := exec.LookPath("timeout")
+			if err != nil {
+				timeout, err = exec.LookPath("gtimeout")
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(timeout, filepath.Join(root, "timeout")); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := json.Marshal(map[string]any{"ref": "refs/heads/main", "object": map[string]string{"type": test.kind, "sha": test.sha}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(root, "response.json"), raw, 0600); err != nil {
+				t.Fatal(err)
+			}
+			stub := "#!/bin/sh\nset -eu\nprintf '%s\\n' \"$*\" >>\"$SOURCE_FIXTURE/calls\"\n[ \"$SOURCE_API_OK\" = true ]\ncat \"$SOURCE_FIXTURE/response.json\"\n"
+			if err := os.WriteFile(filepath.Join(root, "gh"), []byte(stub), 0700); err != nil {
+				t.Fatal(err)
+			}
+			output := filepath.Join(root, "outputs")
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			command := exec.CommandContext(ctx, "bash", "-c", resolver.Run)
+			command.Env = []string{"PATH=" + root + string(os.PathListSeparator) + os.Getenv("PATH"), "GH_TOKEN=synthetic-source-read", "SOURCE_FIXTURE=" + root, "SOURCE_API_OK=" + map[bool]string{true: "true", false: "false"}[test.apiOK], "GITHUB_OUTPUT=" + output}
+			log, runErr := command.CombinedOutput()
+			raw, readErr := os.ReadFile(output)
+			if test.valid {
+				if runErr != nil || readErr != nil || string(raw) != "nvke_commit="+commit+"\n" {
+					t.Fatalf("exact source not frozen: %v %v %s %s", runErr, readErr, raw, log)
+				}
+			} else if runErr == nil || !os.IsNotExist(readErr) {
+				t.Fatalf("rejected source emitted output: %v %v %s", runErr, readErr, raw)
+			}
+			calls, err := os.ReadFile(filepath.Join(root, "calls"))
+			if err != nil || len(strings.Split(strings.TrimSpace(string(calls)), "\n")) != 1 || !strings.Contains(string(calls), "repos/dsx-ai-factory/nvke/git/ref/heads/main") {
+				t.Fatalf("source resolution retried or used a different source: %s %v", calls, err)
+			}
+		})
+	}
 }
 
-func nightlyCoordinatorFixture(t *testing.T) (nightlyCoordinatorDocument, []map[string]string) {
+type nightlyCoordinatorStep struct {
+	Name string            `json:"name"`
+	Run  string            `json:"run"`
+	Uses string            `json:"uses"`
+	Env  map[string]string `json:"env"`
+	With map[string]any    `json:"with"`
+}
+type nightlyCoordinatorJob struct {
+	Outputs        map[string]string        `json:"outputs"`
+	Needs          []string                 `json:"needs"`
+	TimeoutMinutes int                      `json:"timeout-minutes"`
+	Permissions    map[string]string        `json:"permissions"`
+	Steps          []nightlyCoordinatorStep `json:"steps"`
+}
+type nightlyCoordinatorDocument struct {
+	On          map[string]json.RawMessage       `json:"on"`
+	Permissions map[string]string                `json:"permissions"`
+	Jobs        map[string]nightlyCoordinatorJob `json:"jobs"`
+	Concurrency struct {
+		CancelInProgress bool `json:"cancel-in-progress"`
+	} `json:"concurrency"`
+}
+
+func nightlyCoordinatorFixture(t *testing.T) nightlyCoordinatorDocument {
 	t.Helper()
 	raw, err := os.ReadFile("../../.github/workflows/nvkr-nightly.yml")
 	if err != nil {
 		t.Fatal(err)
 	}
 	var workflow nightlyCoordinatorDocument
-	if err := yaml.UnmarshalStrict(raw, &workflow); err != nil {
+	if err := yaml.Unmarshal(raw, &workflow); err != nil {
 		t.Fatal(err)
 	}
-	raw, err = os.ReadFile("../../inputs/testing/nightly-profiles.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var profiles []map[string]string
-	if err := json.Unmarshal(raw, &profiles); err != nil {
-		t.Fatal(err)
-	}
-	return workflow, profiles
+	return workflow
 }
-
-func TestNightlyCoordinatorMaintainsExplicitProducerAndRuntimeBoundary(t *testing.T) {
-	workflow, profiles := nightlyCoordinatorFixture(t)
-	if len(workflow.On) != 2 || workflow.On["schedule"] == nil || workflow.On["workflow_dispatch"] == nil ||
-		!reflect.DeepEqual(workflow.Permissions, map[string]string{"contents": "read"}) ||
-		workflow.Concurrency.CancelInProgress || workflow.Concurrency.Group != "nvkr-nightly-main" {
-		t.Fatal("nightly triggers, concurrency or root permissions changed")
+func TestNightlyDispatchesGeneratedProducerBeforeNativeConsumer(t *testing.T) {
+	workflow := nightlyCoordinatorFixture(t)
+	var schedule []struct {
+		Cron string `json:"cron"`
 	}
-	build, runtime := workflow.Jobs["build"], workflow.Jobs["runtime-test"]
-	selection := workflow.Jobs["select-runtime"]
-	if selection.RunsOn != "ubuntu-24.04" ||
-		!reflect.DeepEqual(selection.Permissions, map[string]string{"contents": "read", "actions": "read"}) ||
-		!reflect.DeepEqual(runtime.Needs, []string{"select-runtime"}) ||
-		!strings.Contains(runtime.If, "needs.select-runtime.outputs.available == 'true'") {
-		t.Fatal("runtime target allocated before completed candidate selection")
+	if err := json.Unmarshal(workflow.On["schedule"], &schedule); err != nil || len(schedule) != 1 || schedule[0].Cron != "17 3 * * *" || workflow.On["workflow_dispatch"] == nil {
+		t.Fatalf("daily/manual trigger changed: %+v %v", schedule, err)
 	}
-	if !reflect.DeepEqual(build.Permissions, map[string]string{"contents": "read", "actions": "write"}) ||
-		!reflect.DeepEqual(runtime.Permissions, map[string]string{"contents": "read", "actions": "read"}) ||
-		runtime.RunsOn != "arc-arm64-kvm" || runtime.Environment != "nvkr-arc" ||
-		runtime.Concurrency.CancelInProgress || runtime.Concurrency.Group != "nvkr-nightly-native-arm64-runtime" ||
-		runtime.TimeoutMinutes != 360 {
-		t.Fatal("dispatch credentials escaped into native runtime or shared target admission changed")
+	if len(workflow.On) != 2 || len(workflow.Jobs) != 4 || workflow.Concurrency.CancelInProgress || !reflect.DeepEqual(workflow.Permissions, map[string]string{"contents": "read"}) {
+		t.Fatal("nightly lost its bounded generated-producer/consumer orchestration")
 	}
-	executed, checkedSource, publicUpload := false, false, false
+	for name, job := range workflow.Jobs {
+		if job.TimeoutMinutes <= 0 || job.TimeoutMinutes > 360 {
+			t.Fatalf("job %s has no bounded deadline", name)
+		}
+	}
+	build := workflow.Jobs["build"]
+	if !reflect.DeepEqual(build.Needs, []string{"select"}) || build.Permissions["actions"] != "write" {
+		t.Fatal("producer dispatch lost selection or dispatch permission")
+	}
+	dispatched, sourceBound := false, false
+	for _, step := range build.Steps {
+		dispatched = dispatched || strings.Contains(step.Run, "bash scripts/nightly-build.sh")
+		sourceBound = sourceBound || step.Env["NVKE_COMMIT"] == "${{ needs.select.outputs.nvke_commit }}"
+		if strings.Contains(step.Run, "run local") || strings.Contains(step.Run, "TestEndToEnd") {
+			t.Fatal("coordinator rebuilt products instead of dispatching the generated producer")
+		}
+	}
+	runtime := workflow.Jobs["runtime-test"]
+	if !dispatched || !sourceBound || !reflect.DeepEqual(runtime.Needs, []string{"select-runtime"}) || runtime.Permissions["actions"] != "read" {
+		t.Fatal("consumer omitted exact completed-producer selection")
+	}
+	ran, deadline := false, false
 	for _, step := range runtime.Steps {
 		if step.With["repository"] == "dsx-ai-factory/nvke" {
-			checkedSource = step.With["ref"] == "${{ steps.suite.outputs.commit }}" &&
-				step.With["persist-credentials"] == false && step.With["path"] == ".nightly-private/nvke"
+			t.Fatal("artifact consumer must use the source-owned installer, not a second NVKE checkout")
 		}
-		if strings.Contains(step.Run, "go test ./internal/nvkedemo -run '^TestNightlyPublishedCandidate$'") {
-			executed = step.Env["NVKR_NIGHTLY_ENABLE"] == "1" &&
-				step.Env["NVKR_NIGHTLY_NETWORK_HELPER"] == "${{ github.workspace }}/bin/nvke-demo" &&
-				strings.Contains(step.Run, "-list '^TestNightlyPublishedCandidate$'") &&
-				strings.Contains(step.Run, "-timeout 330m -count=1 -v") &&
-				strings.Contains(step.Run, `.phase == "runtime" and .runtimePassed == true`) &&
-				strings.Contains(step.Run, `.coordinatorRun == $run and .coordinatorAttempt == $attempt`) &&
-				strings.Contains(step.Run, `.sourceCommit == $sha`)
+		if nightlyRuntimeDownloadsPrivateInputs(step) {
+			t.Fatal("the Go handoff owner restores and authenticates private inputs; do not add a redundant workflow download")
 		}
-		if strings.HasPrefix(step.Uses, "actions/upload-artifact@") {
-			publicUpload = step.If == "always()" &&
-				step.With["path"] == "${{ runner.temp }}/nightly-reports-${{ matrix.name }}/cycle.json"
-		}
-	}
-	if !executed || !checkedSource || !publicUpload || len(profiles) != 2 {
-		t.Fatal("nightly omitted real suite execution, exact source or private/public report separation")
-	}
-	for _, profile := range profiles {
-		input, err := definition.LoadDefinition(t.Context(), filepath.Join("../..", profile["definition"]))
-		if err != nil {
-			t.Fatal(err)
-		}
-		environment, err := definition.LoadEnvironment(t.Context(), filepath.Join("../..", profile["environment"]))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if environment.GitHubBundle != profile["bundle"] ||
-			profile["name"] != profile["bundle"] || profile["build_workflow"] != "nvkr-run-"+profile["bundle"]+".yml" ||
-			profile["plan"] != ".github/nvkr-run-"+profile["bundle"]+"/plan.json" {
-			t.Fatal("nightly reduced output membership or changed the exact generated producer")
-		}
-		plan, err := factory.LoadPlanContext(t.Context(), filepath.Join("../..", profile["plan"]))
-		if err != nil {
-			t.Fatal(err)
-		}
-		membership := make(map[string]bool, len(plan.LifecycleOutputs))
-		for _, output := range plan.LifecycleOutputs {
-			membership[output.Name] = true
-		}
-		if len(input.Outputs) != len(membership) {
-			t.Fatal("generated Plan changed Definition output membership")
-		}
-		disk, images := false, false
-		for _, output := range input.Outputs {
-			if !membership[output.Name] {
-				t.Fatalf("output %q absent from generated Plan", output.Name)
+		deadline = deadline || strings.Contains(step.Run, "355 * 60") && strings.Contains(step.Run, "NVKR_JOB_DEADLINE")
+		if strings.Contains(step.Run, "go test ./internal/nvkedemo -run") {
+			ran = strings.Contains(step.Run, "^TestNightlyPublishedCandidate$") && strings.Contains(step.Run, "-timeout \"${remaining}s\"") && strings.Contains(step.Run, "remaining > 125 * 60")
+			if step.Env["NVKR_NIGHTLY_ENABLE"] != "1" || step.Env["NVKR_NIGHTLY_BUILD"] == "" || step.Env["NVKR_NIGHTLY_NETWORK_HELPER"] == "" {
+				t.Fatal("consumer omitted authenticated producing Run or existing network helper")
 			}
-			disk = disk || output.Name == profile["disk_output"]
-			images = images || output.Name == profile["profiles_output"]
+			if step.Env["NVKR_CI_STORAGE_TOKEN"] != "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}" || step.Env["NVKR_CI_STORAGE_USER"] != "${{ vars.NVKR_CI_STORAGE_READ_USER }}" {
+				t.Fatal("Go handoff owner requires the independent private storage reader")
+			}
 		}
-		if !disk || !images {
-			t.Fatal("profile selects absent disk or controller profile output")
+		if strings.Contains(step.Run, "run local") || strings.Contains(step.Run, "^TestEndToEnd$") {
+			t.Fatal("runtime job must consume artifacts without rebuilding NVKE")
 		}
+	}
+	if !ran || !deadline {
+		t.Fatal("consumer lost exact private frozen inputs, direct Go test or owned cleanup reserve")
 	}
 }
 
-func TestNightlyCoordinatorSelectionFailsClosedBeforeDispatch(t *testing.T) {
-	workflow, profiles := nightlyCoordinatorFixture(t)
-	for _, tool := range []string{"bash", "jq"} {
-		if _, err := exec.LookPath(tool); err != nil {
-			t.Fatalf("nightly contract tests require %s: %v", tool, err)
-		}
+func nightlyRuntimeDownloadsPrivateInputs(step nightlyCoordinatorStep) bool {
+	if _, forwardsReader := step.With["nvkr-ci-storage-read-token"]; forwardsReader {
+		return true
 	}
-	var script string
-	for _, step := range workflow.Jobs["select"].Steps {
-		if step.ID == "profiles" {
-			script = step.Run
-		}
+	namespace, action, found := strings.Cut(path.Clean(step.Uses), "/actions/")
+	bundle := path.Base(namespace)
+	if !found || path.Dir(namespace) != ".github" || (bundle != "nvkr-run" && bundle != "nvkr-dev" && !strings.HasPrefix(bundle, "nvkr-run-")) {
+		return false
 	}
-	if script == "" {
-		t.Fatal("nightly select job omitted maintained profile admission")
+	switch action {
+	case "ci-download", "ci-bootstrap-download", "shared/download-carriers":
+		return true
+	default:
+		return false
+	}
+}
+
+func TestNightlyRuntimePrivateDownloadGuard(t *testing.T) {
+	for _, uses := range []string{
+		"./.github/nvkr-run/actions/ci-download",
+		"./.github/nvkr-run/actions/ci-bootstrap-download",
+		"./.github/nvkr-run/actions/shared/download-carriers",
+		"./.github/nvkr-run-nvke-nightly-arm64/actions/ci-download",
+		"./.github/nvkr-run-nvke-nightly-arm64/actions/ci-bootstrap-download",
+		"./.github/nvkr-run-nvke-nightly-arm64/actions/shared/download-carriers",
+		"./.github/nvkr-dev/actions/shared/download-carriers",
+	} {
+		for _, suffix := range []string{"", "/"} {
+			t.Run(uses+suffix, func(t *testing.T) {
+				if !nightlyRuntimeDownloadsPrivateInputs(nightlyCoordinatorStep{Uses: uses + suffix}) {
+					t.Fatal("generated private download escaped the runtime guard")
+				}
+			})
+		}
 	}
 	for _, test := range []struct {
-		name      string
-		selection string
-		mutation  string
-		want      int
+		name    string
+		step    nightlyCoordinatorStep
+		blocked bool
 	}{
-		{"maintained all", "all", "", 2},
-		{"maintained one", "nvke-nightly-arm64", "", 1},
-		{"unknown", "unknown", "", 0},
-		{"unreviewed harness", "all", "harness_commit", 0},
-		{"unsupported runtime", "all", "runtime_target", 0},
-		{"unsupported network", "all", "network", 0},
-		{"duplicate profile", "all", "duplicate", 0},
+		{"forwarded reader", nightlyCoordinatorStep{Uses: "./.github/other/action", With: map[string]any{"nvkr-ci-storage-read-token": "synthetic-read-token"}}, true},
+		{"empty reader", nightlyCoordinatorStep{Uses: "./.github/other/action", With: map[string]any{"nvkr-ci-storage-read-token": ""}}, true},
+		{"null reader", nightlyCoordinatorStep{With: map[string]any{"nvkr-ci-storage-read-token": nil}}, true},
+		{"metadata download", nightlyCoordinatorStep{Uses: "actions/download-artifact@pinned-fixture"}, false},
+		{"upload interface", nightlyCoordinatorStep{Uses: "./.github/nvkr-run/actions/ci-upload"}, false},
+		{"toolchain reader", nightlyCoordinatorStep{Uses: "./.github/nvkr-run/actions/shared/prepare-images", With: map[string]any{"nvkr-toolchain-read-token": "synthetic-read-token"}}, false},
+		{"Go handoff owner", nightlyCoordinatorStep{Run: "go test ./internal/nvkedemo", Env: map[string]string{"NVKR_CI_STORAGE_TOKEN": "synthetic-read-token"}}, false},
+		{"unrelated download action", nightlyCoordinatorStep{Uses: "./.github/other/actions/ci-download"}, false},
+		{"namespace lookalike", nightlyCoordinatorStep{Uses: "./.github/nvkr-runner/actions/ci-download"}, false},
+		{"nested directory", nightlyCoordinatorStep{Uses: "./.github/nvkr-run-extra/nested/actions/ci-download"}, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			root := t.TempDir()
-			fixture := make([]map[string]string, len(profiles))
-			for i, profile := range profiles {
-				fixture[i] = make(map[string]string, len(profile))
-				for key, value := range profile {
-					fixture[i][key] = value
-				}
-			}
-			if test.mutation == "duplicate" {
-				fixture = append(fixture, fixture[0])
-			} else if test.mutation != "" {
-				fixture[0][test.mutation] = "unsupported"
-			}
-			raw, err := json.Marshal(fixture)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := os.MkdirAll(filepath.Join(root, "inputs/testing"), 0o700); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(filepath.Join(root, "inputs/testing/nightly-profiles.json"), raw, 0o600); err != nil {
-				t.Fatal(err)
-			}
-			output := filepath.Join(root, "outputs")
-			command := exec.CommandContext(t.Context(), "bash", "-c", script)
-			command.Dir = root
-			command.Env = []string{"PATH=" + os.Getenv("PATH"), "PROFILE=" + test.selection,
-				"GITHUB_OUTPUT=" + output, "RUNNER_TEMP=" + root}
-			log, err := command.CombinedOutput()
-			if test.want == 0 {
-				if err == nil {
-					t.Fatal("invalid profile emitted a runtime matrix")
-				}
-				if _, err := os.Stat(output); !os.IsNotExist(err) {
-					t.Fatal("rejected selection emitted outputs before dispatch")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("read-only fixture selection failed: %v %s", err, log)
-			}
-			raw, err = os.ReadFile(output)
-			if err != nil {
-				t.Fatal(err)
-			}
-			var matrix struct {
-				Include []map[string]string `json:"include"`
-			}
-			if err := json.Unmarshal([]byte(strings.TrimPrefix(strings.TrimSpace(string(raw)), "matrix=")), &matrix); err != nil || len(matrix.Include) != test.want {
-				t.Fatalf("selected wrong profile closure: %v %s", err, raw)
+			if got := nightlyRuntimeDownloadsPrivateInputs(test.step); got != test.blocked {
+				t.Fatalf("blocked=%v, want %v", got, test.blocked)
 			}
 		})
 	}
 }
 
-func TestNightlyRuntimeSelectionDoesNotAllocateUnavailableCandidates(t *testing.T) {
-	workflow, profiles := nightlyCoordinatorFixture(t)
+func TestNightlySelectionExecutesOnlySupportedNVIDIAConsumer(t *testing.T) {
+	workflow := nightlyCoordinatorFixture(t)
 	var script string
-	for _, step := range workflow.Jobs["select-runtime"].Steps {
-		if step.ID == "completed" {
+	for _, step := range workflow.Jobs["select"].Steps {
+		if step.Name == "Select maintained nightly projects" {
 			script = step.Run
 		}
 	}
 	if script == "" {
-		t.Fatal("completed candidate selector missing")
+		t.Fatal("missing profile selection")
 	}
-	for _, tool := range []string{"bash", "jq"} {
-		if _, err := exec.LookPath(tool); err != nil {
-			t.Fatalf("nightly contract tests require %s: %v", tool, err)
-		}
-	}
-	for _, test := range []struct {
-		name      string
-		available int
-		mutation  string
-		reject    bool
-	}{
-		{"no locator", 0, "", false},
-		{"one completed project", 1, "", false},
-		{"both completed projects", 2, "", false},
-		{"wrong source", 1, "sha", true},
-		{"expired locator", 1, "expired", true},
-		{"duplicate locator", 1, "duplicate", true},
-		{"unknown matrix", 1, "matrix", true},
-	} {
-		t.Run(test.name, func(t *testing.T) {
+	for _, row := range []struct {
+		profile string
+		valid   bool
+	}{{"all", true}, {"nvke-nightly-arm64", true}, {"nvke-nightly-upstream-ovn-arm64", false}, {"foreign", false}} {
+		t.Run(row.profile, func(t *testing.T) {
 			root := t.TempDir()
-			bin := filepath.Join(root, "bin")
-			if err := os.Mkdir(bin, 0o700); err != nil {
-				t.Fatal(err)
-			}
-			fake := `#!/usr/bin/env bash
-set -euo pipefail
-for argument in "$@"; do
-  if [[ "$argument" == repos/* ]]; then
-    case "$argument" in
-      *name=nightly-build-nvke-nightly-arm64-101-3\&per_page=100) cat "$FAKE_GH_ROOT/0.json"; exit ;;
-      *name=nightly-build-nvke-nightly-upstream-ovn-arm64-101-3\&per_page=100) cat "$FAKE_GH_ROOT/1.json"; exit ;;
-      *) exit 99 ;;
-    esac
-  fi
-done
-exit 99
-`
-			if err := os.WriteFile(filepath.Join(bin, "gh"), []byte(fake), 0o700); err != nil {
-				t.Fatal(err)
-			}
-			matrix := make([]map[string]string, len(profiles))
-			for i, p := range profiles {
-				matrix[i] = map[string]string{"name": p["name"], "harness_commit": p["harness_commit"]}
-				artifacts := []map[string]any{}
-				if i < test.available {
-					artifact := map[string]any{"name": "nightly-build-" + p["name"] + "-101-3", "expired": false,
-						"workflow_run": map[string]string{"head_sha": nightlySHA}}
-					if test.mutation == "sha" {
-						artifact["workflow_run"] = map[string]string{"head_sha": strings.Repeat("b", 40)}
-					}
-					if test.mutation == "expired" {
-						artifact["expired"] = true
-					}
-					artifacts = append(artifacts, artifact)
-					if test.mutation == "duplicate" {
-						artifacts = append(artifacts, artifact)
-					}
-				}
-				fixtureJSON(t, filepath.Join(root, string(rune('0'+i))+".json"), map[string]any{"total_count": len(artifacts), "artifacts": artifacts})
-			}
-			if test.mutation == "matrix" {
-				matrix[0]["name"] = "foreign"
-			}
-			raw, err := json.Marshal(map[string]any{"include": matrix})
-			if err != nil {
-				t.Fatal(err)
-			}
-			out := filepath.Join(root, "outputs")
-			command := exec.CommandContext(t.Context(), "bash", "-c", script)
-			command.Env = []string{"PATH=" + bin + string(os.PathListSeparator) + os.Getenv("PATH"), "FAKE_GH_ROOT=" + root,
-				"GITHUB_OUTPUT=" + out, "GITHUB_REPOSITORY=example/nvkr", "GITHUB_RUN_ID=101", "GITHUB_RUN_ATTEMPT=3",
-				"GITHUB_SHA=" + nightlySHA, "MATRIX=" + string(raw)}
+			output := filepath.Join(root, "outputs")
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			command := exec.CommandContext(ctx, "bash", "-c", script)
+			command.Dir = "../.."
+			command.Env = append(os.Environ(), "PROFILE="+row.profile, "RUNNER_TEMP="+root, "GITHUB_OUTPUT="+output)
 			log, err := command.CombinedOutput()
-			if test.reject {
-				if err == nil {
-					t.Fatalf("invalid locator admitted: %s", log)
-				}
-				if _, err := os.Stat(out); !os.IsNotExist(err) {
-					t.Fatal("rejected locator emitted runtime matrix")
+			raw, readErr := os.ReadFile(output)
+			if !row.valid {
+				if err == nil || !os.IsNotExist(readErr) {
+					t.Fatalf("unsupported profile emitted matrix: %v %v %s %s", err, readErr, raw, log)
 				}
 				return
 			}
-			if err != nil {
-				t.Fatalf("selector failed: %v %s", err, log)
+			if err != nil || readErr != nil {
+				t.Fatalf("selection failed: %v %v %s", err, readErr, log)
 			}
-			raw, err = os.ReadFile(out)
-			if err != nil {
-				t.Fatal(err)
+			var matrix struct {
+				Include []struct {
+					Name string `json:"name"`
+				} `json:"include"`
 			}
-			lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
-			var selected struct {
-				Include []map[string]string `json:"include"`
-			}
-			if len(lines) != 2 {
-				t.Fatalf("invalid selector output: %s", raw)
-			}
-			if err := json.Unmarshal([]byte(strings.TrimPrefix(lines[0], "matrix=")), &selected); err != nil {
-				t.Fatal(err)
-			}
-			if len(selected.Include) != test.available || lines[1] != "available="+map[bool]string{true: "true", false: "false"}[test.available > 0] {
-				t.Fatalf("wrong runtime eligibility: %s", raw)
+			if err := json.Unmarshal([]byte(strings.TrimSpace(strings.TrimPrefix(string(raw), "matrix="))), &matrix); err != nil || len(matrix.Include) != 1 || matrix.Include[0].Name != "nvke-nightly-arm64" {
+				t.Fatalf("unexpected selection: %s %v", raw, err)
 			}
 		})
 	}

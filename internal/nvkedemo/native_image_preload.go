@@ -52,6 +52,13 @@ func nativeImageReferenceIsCanonical(ref name.Reference, original string) bool {
 }
 
 func nativeImageImportScript(file, reference string) (string, error) {
+	return nativeImageImportScriptForArchitecture(file, reference, "arm64")
+}
+
+func nativeImageImportScriptForArchitecture(file, reference, arch string) (string, error) {
+	if _, err := nativeQEMUArchitecture(arch); err != nil {
+		return "", err
+	}
 	ref, err := name.NewDigest(reference, name.StrictValidation)
 	if err != nil {
 		return "", errors.New("native preload requires an exact canonical image digest reference")
@@ -64,15 +71,30 @@ func nativeImageImportScript(file, reference string) (string, error) {
 	// pre-setting that label suppresses alias creation in containerd.
 	repository := strings.TrimSuffix(reference, "@"+ref.DigestStr())
 	// The enclosing guest preparation command enforces the caller deadline.
-	return "ctr --address /run/containerd/containerd.sock --namespace k8s.io --timeout 0s images import --local --digests --base-name " + operatorQuote(repository) + " --platform linux/arm64 " + operatorQuote(file) +
+	return "ctr --address /run/containerd/containerd.sock --namespace k8s.io --timeout 0s images import --local --digests --base-name " + operatorQuote(repository) + " --platform linux/" + arch + " " + operatorQuote(file) +
 		"; crictl --runtime-endpoint unix:///run/containerd/containerd.sock --image-endpoint unix:///run/containerd/containerd.sock --timeout 10s inspecti --quiet " + operatorQuote(reference) + " >/dev/null", nil
 }
 
-func nativeImagePreloadScript(image nativeImagePreload) (string, error) {
+// A source-owned tag is only an alias for an already imported exact manifest.
+// CRI reads the alias back before the owning guest preparation can proceed.
+func nativeImageTagScriptForArchitecture(reference, alias, arch string) (string, error) {
+	if _, err := nativeImageImportScriptForArchitecture("unused", reference, arch); err != nil {
+		return "", err
+	}
+	digest, _ := name.NewDigest(reference, name.StrictValidation)
+	tag, err := name.NewTag(alias, name.StrictValidation)
+	if err != nil || !nativeImageReferenceIsCanonical(tag, alias) || tag.Context().Name() != digest.Context().Name() {
+		return "", errors.New("native image alias requires an explicit tag in the selected manifest repository")
+	}
+	return "ctr --address /run/containerd/containerd.sock --namespace k8s.io --timeout 0s images tag --force " + operatorQuote(reference) + " " + operatorQuote(alias) +
+		"; nvkr_image_digests=$(crictl --runtime-endpoint unix:///run/containerd/containerd.sock --image-endpoint unix:///run/containerd/containerd.sock --timeout 10s inspecti --output go-template --template " + operatorQuote("{{range .status.repoDigests}}{{println .}}{{end}}") + " " + operatorQuote(alias) + "); printf '%s\\n' \"$nvkr_image_digests\" | grep -Fx -- " + operatorQuote(reference) + " >/dev/null", nil
+}
+
+func nativeImagePreloadScriptForArchitecture(image nativeImagePreload, arch string) (string, error) {
 	if !canonical.IsDigest(image.digest) || !configString(image.location) {
 		return "", errors.New("native preload requires exact transport integrity and location")
 	}
-	imported, err := nativeImageImportScript(image.file, image.reference)
+	imported, err := nativeImageImportScriptForArchitecture(image.file, image.reference, arch)
 	if err != nil {
 		return "", err
 	}
@@ -94,8 +116,22 @@ func nativeOVNValues(version, reference string) (string, error) {
 		// The pinned chart must read the actual kube-dns Service during install.
 		// Skipping lookup selects its fixed DNS address even for a different service CIDR.
 		// Replacement values must also preserve the VM package's hostPort enablement.
-		values = map[string]any{"global": map[string]any{"skipCallToK8s": false, "enablePodHostPort": true, "imagePullSecretName": "", "useImageDigest": true,
-			"image": map[string]any{"repository": ref.Repository.Name(), "tag": "nvkr", "sha256": strings.TrimPrefix(ref.DigestStr(), "sha256:")}}}
+		values = map[string]any{"global": map[string]any{"skipCallToK8s": false, "enablePodHostPort": true, "imagePullSecretName": "", "useImageDigest": true}}
+		for _, binding := range []struct{ component, workload string }{
+			{"ovnkube-control-plane", "ovnkubeControlPlane"},
+			{"ovnkube-single-node-zone", "ovnkubeSingleNodeZone"},
+			{"ovnkube-single-node-zone", "ovnkubeSingleNodeZoneNbdb"},
+			{"ovnkube-single-node-zone", "ovnkubeSingleNodeZoneSbdb"},
+			{"ovnkube-single-node-zone", "ovnkubeSingleNodeZoneNorthd"},
+			{"ovnkube-single-node-zone", "ovnkubeSingleNodeZoneOvnHost"},
+		} {
+			component, _ := values[binding.component].(map[string]any)
+			if component == nil {
+				component = make(map[string]any)
+				values[binding.component] = component
+			}
+			component[binding.workload] = map[string]any{"image": map[string]any{"repository": ref.Repository.Name(), "tag": "nvkr", "sha256": strings.TrimPrefix(ref.DigestStr(), "sha256:")}}
+		}
 	case upstreamSiteOVNVersion:
 		values = map[string]any{"skipCallToK8s": true, "global": map[string]any{"enableOvnKubeIdentity": false,
 			"image": map[string]any{"repository": ref.Repository.Name() + "@sha256", "tag": strings.TrimPrefix(ref.DigestStr(), "sha256:"), "pullPolicy": "IfNotPresent"}}}

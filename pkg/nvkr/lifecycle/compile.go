@@ -22,6 +22,20 @@ func CompileFiles(ctx context.Context, definitionPath, environmentPath, generato
 	return Compile(ctx, definitionPath, definition, environmentPath, environment, generatorVersion)
 }
 
+// CompileRuntimeSourceFiles re-authenticates the exact frozen repository tree
+// and recompiles the current authored selection through its owning modules.
+func CompileRuntimeSourceFiles(ctx context.Context, definitionPath, environmentPath, generatorVersion, commit string) (*factory.Plan, error) {
+	definition, err := LoadDefinition(ctx, definitionPath)
+	if err != nil {
+		return nil, err
+	}
+	environment, err := LoadEnvironment(ctx, environmentPath)
+	if err != nil {
+		return nil, err
+	}
+	return factory.CompileRuntimeSourceDocuments(ctx, definitionPath, definition, environmentPath, environment, generatorVersion, commit)
+}
+
 // Compile returns the compiler's complete plan without a lifecycle enrichment pass.
 func Compile(ctx context.Context, definitionPath string, definition Definition, environmentPath string, environment Environment, generatorVersion string) (*factory.Plan, error) {
 	return factory.CompileDocuments(ctx, definitionPath, definition, environmentPath, environment, generatorVersion)

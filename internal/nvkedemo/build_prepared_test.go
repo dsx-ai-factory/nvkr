@@ -15,13 +15,33 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
 
 func TestPreparedBuildRecompilesBeforeProducers(t *testing.T) {
-	profile, build := nightlyIdentityFixture()
-	plan, _ := nightlyCompiledFixture(t, profile, build)
+	// This regression exercises the CLI qualification gate, independently of the
+	// nightly cohort fixture's additional package-shaped executable outputs.
+	catalog, err := filepath.Abs("../../inputs/catalogs/nvke/module-tags")
+	if err != nil {
+		t.Fatal(err)
+	}
+	declared := definition.Definition{
+		APIVersion: definition.DefinitionAPIVersion, Kind: definition.DefinitionKind,
+		Metadata: definition.Metadata{Name: "prepared-build"}, Catalog: definition.Catalog{Base: catalog},
+		SBOMTool: "syft", CosignTool: "cosign",
+		Outputs: []definition.DefinitionOutput{{Name: "nvkectl", Platform: "linux/arm64", Format: definition.OutputExecutable, Components: []string{"nvkectl"}}},
+	}
+	environment, err := definition.LoadEnvironment(t.Context(), "../../docs/examples/nvke-tutorial/environment-github.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := factory.CompileDocuments(t.Context(), "definitions/prepared-build/definition.json", declared, "definitions/prepared-build/environment-github.json", environment, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
 	digest, err := plan.Digest()
 	if err != nil {
 		t.Fatal(err)

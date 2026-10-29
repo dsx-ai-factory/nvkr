@@ -43,14 +43,15 @@ func load(ctx context.Context, p DataProvider) (*Catalog, error) {
 	}
 
 	cat := &Catalog{
-		APIVersion: reg.APIVersion,
-		Kind:       reg.Kind,
-		Metadata:   reg.Metadata,
-		Sources:    reg.Sources,
-		Components: map[string]Component{},
-		Tools:      map[string]ToolPin{},
-		Actions:    map[string]ActionPin{},
-		sourcePins: make(map[string]Pin, len(lock.Pins)),
+		APIVersion:        reg.APIVersion,
+		Kind:              reg.Kind,
+		Metadata:          reg.Metadata,
+		Sources:           reg.Sources,
+		Components:        map[string]Component{},
+		Tools:             map[string]ToolPin{},
+		Actions:           map[string]ActionPin{},
+		sourcePins:        make(map[string]Pin, len(lock.Pins)),
+		stampDeclarations: make(map[string]sourceStampDeclaration, len(reg.Components)),
 	}
 
 	for name, pin := range lock.Pins {
@@ -82,6 +83,9 @@ func load(ctx context.Context, p DataProvider) (*Catalog, error) {
 			return nil, err
 		}
 		cat.Components[name] = c
+		if c.FromSource {
+			cat.stampDeclarations[name] = sourceStampDeclarationFor(c, reg.Components[name].VersionStamp)
+		}
 	}
 
 	if err := cat.Validate(); err != nil {

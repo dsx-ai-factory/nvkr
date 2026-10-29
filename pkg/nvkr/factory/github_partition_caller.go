@@ -201,7 +201,9 @@ func lowerGitHubPartitions(ctx context.Context, plan *Plan, raw []byte) ([]byte,
 				needs = append(needs, owners[member])
 			}
 			githubYAMLSet(finalizer, "needs", githubNeedsSequence(uniqueSorted(needs)))
-			rewriteGitHubPartitionResults(finalizer, githubFinalizerJobID, members, owners)
+			if err := rewriteGitHubPartitionResults(finalizer, githubFinalizerJobID, members, owners); err != nil {
+				return nil, nil, err
+			}
 		}
 		githubYAMLSet(callerJobs, githubFinalizerJobID, finalizer)
 	}
@@ -328,14 +330,32 @@ func githubPartitionStatusesExpression(consumer string, ids []string, owners map
 	return "format('" + strings.Join(fields, " ") + "', " + strings.Join(args, ", ") + ")"
 }
 
-func rewriteGitHubPartitionResults(node *yamlv3.Node, consumer string, ids []string, owners map[string]string) {
-	if node.Kind == yamlv3.ScalarNode {
-		node.Value = strings.ReplaceAll(node.Value, "toJSON(needs)", githubPartitionResultsExpression(consumer, ids, owners))
-		node.Value = strings.ReplaceAll(node.Value, "join(needs.*.result, ' ')", githubPartitionStatusesExpression(consumer, ids, owners))
+func rewriteGitHubPartitionResults(node *yamlv3.Node, consumer string, ids []string, owners map[string]string) error {
+	markers := map[string]string{
+		"toJSON(needs)":             githubPartitionResultsExpression(consumer, ids, owners),
+		"join(needs.*.result, ' ')": githubPartitionStatusesExpression(consumer, ids, owners),
 	}
-	for _, child := range node.Content {
-		rewriteGitHubPartitionResults(child, consumer, ids, owners)
+	seen := map[string]bool{}
+	var rewrite func(*yamlv3.Node)
+	rewrite = func(node *yamlv3.Node) {
+		if node.Kind == yamlv3.ScalarNode {
+			for marker, expression := range markers {
+				if strings.Contains(node.Value, marker) {
+					seen[marker] = true
+					node.Value = strings.ReplaceAll(node.Value, marker, expression)
+				}
+			}
+		}
+		for _, child := range node.Content {
+			rewrite(child)
+		}
 	}
+	rewrite(node)
+	// A finalizer refactor that drops a marker would otherwise leave its needs projection unrewritten.
+	if len(seen) != len(markers) {
+		return e.New(e.CodeEngineCapability, "GitHub partition finalizer lacks its result projection markers")
+	}
+	return nil
 }
 
 // githubYAMLHasKey reports whether any mapping beneath node declares key.

@@ -36,7 +36,7 @@
         ],
         "sourceDateEpoch": 1792548398,
         "versionStamp": {
-          "BUILD_VERSION": "400c24fb6465b042be883d6b62472528520d6291"
+          "BUILD_VERSION": "{{.Commit}}"
         }
       }
     },
