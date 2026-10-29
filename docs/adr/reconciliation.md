@@ -3218,7 +3218,9 @@ one producer per architecture, because BuildKit admits no material inputs. A col
 fit the generated 60-minute hosted build job, and hosted routes admit no longer execution budget; a hosted
 Run must establish it. Both producers are designed and contract-tested by catalog validation, the
 family membership/compiled-identity matrix and the regenerated core bundle. The Flow build command built both
-architectures locally in the pinned BuildKit image (AMD64 under emulation); Core was not built. No hosted Run
+architectures locally in the pinned BuildKit image (AMD64 under emulation). A local ARM64 Core attempt with the
+exact catalog command built both source-owned bases, bound them by digest and compiled for about 220 seconds before
+the compiler was killed by signal 9 in an 8 GiB Docker VM; no Core image was produced. No hosted Run
 has built, published or signed either image.
 
 Current Definition v5/catalog v3/IR v4/Plan and artifact-graph v5 reject retired recipe, cluster, category,
