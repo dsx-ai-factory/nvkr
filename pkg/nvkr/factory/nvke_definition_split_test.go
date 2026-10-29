@@ -22,7 +22,7 @@ var nvkeSplitFamilies = []struct {
 	name            string
 	outputs, native int
 }{
-	{"core", 22, 26},
+	{"core", 23, 28},
 	{"services", 28, 28},
 	{"telemetry", 17, 17},
 	{"disks", 4, 4},
@@ -31,8 +31,9 @@ var nvkeSplitFamilies = []struct {
 // Family-only outputs are not in the combined Definition, whose flat workflow
 // has no remaining YAML parsing headroom.
 var nvkeFamilyOnlyOutputs = map[string]string{
-	"nico":         "core",
-	"nico-prereqs": "core",
+	"nico":            "core",
+	"nico-flow-image": "core",
+	"nico-prereqs":    "core",
 }
 
 // Family-only catalogs hold only public sources, so they load from disk.
@@ -87,8 +88,8 @@ func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 			nativeTotal += native
 		})
 	}
-	if len(original) != 69 || len(seen) != len(original)+len(nvkeFamilyOnlyOutputs) || nativeTotal != 75 {
-		t.Fatalf("partition requires %d of %d original plus family-only outputs and %d native targets; want 71/69 and 75", len(seen), len(original), nativeTotal)
+	if len(original) != 69 || len(seen) != len(original)+len(nvkeFamilyOnlyOutputs) || nativeTotal != 77 {
+		t.Fatalf("partition requires %d of %d original plus family-only outputs and %d native targets; want 72/69 and 77", len(seen), len(original), nativeTotal)
 	}
 }
 
@@ -225,7 +226,8 @@ func TestNVKEDefinitionSplitCompiledIdentityAndGeneratedBundles(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, build := range plan.Builds {
-				if _, familyOnly := nvkeFamilyOnlyOutputs[build.Name]; familyOnly {
+				// Multi-platform outputs name each native build <output>/<os>/<arch>.
+				if _, familyOnly := nvkeFamilyOnlyOutputs[strings.SplitN(build.Name, "/", 2)[0]]; familyOnly {
 					continue
 				}
 				if !bytes.Equal(nvkeSplitCanonical(t, build), builds[build.Name]) {
@@ -284,8 +286,8 @@ func TestNVKEDefinitionSplitCompiledIdentityAndGeneratedBundles(t *testing.T) {
 				len(plan.LifecycleOutputs), len(plan.Builds), len(plan.Graph.Nodes), len(jobs), len(workflow), len(bundle.Files[bundle.PlanPath]), events)
 		})
 	}
-	if buildCount != 75 || outputCount != 71 {
-		t.Fatalf("compiled families retain %d native builds and %d outputs, want 75 and 71", buildCount, outputCount)
+	if buildCount != 77 || outputCount != 72 {
+		t.Fatalf("compiled families retain %d native builds and %d outputs, want 77 and 72", buildCount, outputCount)
 	}
 }
 

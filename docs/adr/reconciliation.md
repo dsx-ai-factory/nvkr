@@ -3210,6 +3210,17 @@ preserve vendor isolation and the source-owned Dockerfile. The two missing-artif
 and final completeness rejection were downstream effects; aggregate publication was skipped. A fresh
 complete hosted Run is still required to establish the corrected candidate's execution and publication.
 
+The NICo catalog additionally declares source-built `nico-flow-image` and `nico-core-image` producers
+from the infra-controller `v2.2.2` pin, on the generic rootless BuildKit route with index-digest-bound bases.
+Only the core family selects `nico-flow-image`, the one REST image its packaged charts reference.
+Core chains the source's native build, runtime and release Dockerfiles in one producer per architecture,
+because BuildKit admits no material inputs. It is declared but unselected: a cold Rust workspace build cannot
+fit the generated 60-minute hosted build job, and hosted routes admit no longer execution budget, so the Core
+image stays consumer-supplied. Both producers are designed and contract-tested by catalog validation, the
+family membership/compiled-identity matrix and the regenerated core bundle. The Flow build command built both
+architectures locally in the pinned BuildKit image (AMD64 under emulation); Core was not built. No hosted Run
+has built, published or signed either image.
+
 Current Definition v5/catalog v3/IR v4/Plan and artifact-graph v5 reject retired recipe, cluster, category,
 role, composition and staging fields, including empty legacy fields. Runs/Releases use v4 and validation vectors retain v3; publication roots and Inventory/ReleaseSet use v4; disk manifests use v2. Removed compiler-handoff,
 execution-settings, AICR, release-authorization/reproduction-result/waiver and qualified-publication families

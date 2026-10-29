@@ -17,8 +17,12 @@ The [native ARM64 SBOM tool](tools/sbom-arm64/README.md) supplies the scanner fo
 quickstart. Its tool pin is separate from the AMD64 scanner in the maintained release catalog;
 output-scoped selections retain the same NVKE release producers.
 
-[`nico`](nico/registry.yaml) owns the source-packaged NICo and NICo prerequisite charts, pinned
-independently of NVKE to one infra-controller release. NICo images remain consumer-supplied.
+[`nico`](nico/registry.yaml) owns the source-packaged NICo and NICo prerequisite charts and the
+source-built NICo Core and Flow images, pinned independently of NVKE to one infra-controller release.
+Both images use the generic rootless BuildKit route with digest-pinned bases. Core chains the source's
+native build, runtime and release Dockerfiles in one producer per architecture. The core family selects
+only Flow; Core is cataloged but not selected because its cold Rust build exceeds the hosted build-job
+budget, so the Core image remains consumer-supplied.
 
 ## Current-to-shared mapping
 

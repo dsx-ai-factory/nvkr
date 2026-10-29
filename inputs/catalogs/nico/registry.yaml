@@ -5,7 +5,7 @@ apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
   name: nico
-  description: Source-packaged NICo umbrella and prerequisite charts from one infra-controller release pin; NICo images remain consumer-supplied.
+  description: Source-packaged NICo umbrella and prerequisite charts, plus source-built NICo Core and Flow images, from one infra-controller release pin.
 components:
   # Subcharts are vendored as local directories, so packaging needs no repository access.
   nico-chart:
@@ -24,6 +24,75 @@ components:
     buildCommand: ['package', 'helm-prereqs', '--version=2.2.2', '--app-version=v2.2.2', '--destination=charts/']
     outputType: tarball
     platforms: [linux/amd64, linux/arm64]
+  # The one image behind the umbrella chart's global.image.repository/tag. The source-owned
+  # native build and runtime base Dockerfiles are built first and bound into the release
+  # Dockerfile by digest, because rootless BuildKit admits no material inputs.
+  nico-core-image:
+    fromSource: true
+    source: nico
+    builderType: buildkit-rootless
+    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
+    artifactPath: bin/nico-core-{{.Arch}}.oci.tar
+    writeDir: bin
+    platforms: [linux/amd64, linux/arm64]
+    outputType: oci-image
+    buildCommand:
+      - sh
+      - -euc
+      - |
+        case '{{.Arch}}' in
+          amd64) suffix=x86_64; arg=X86_64
+            rust='rust:1.97.1-slim-bookworm=docker-image://docker.io/library/rust@sha256:2775a09d208ff0d7c1f50490c45b62db929e87ba1dcbc3f2132ac71a704bcdd3'
+            debian='debian:12-slim=docker-image://docker.io/library/debian@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3' ;;
+          arm64) suffix=aarch64; arg=AARCH64
+            rust='arm64v8/rust:1.97.1-slim-bookworm=docker-image://docker.io/arm64v8/rust@sha256:5da9de501c1aef013c94009b16d860aa51b098fc238ab7b8b1a82866bdce02b9'
+            debian='arm64v8/debian:12-slim=docker-image://docker.io/arm64v8/debian@sha256:acad2f5f6d93d7a3d5e2e2c74c62176a08b7b95721801c752ecaab0885dd136d' ;;
+          *) echo 'Unsupported NICo Core architecture' >&2; exit 1 ;;
+        esac
+        layouts="$(mktemp -d)"
+        for base in build:"$rust" runtime:"$debian"; do
+          buildctl-daemonless.sh build --frontend dockerfile.v0 \
+            --local context=/src/. --local dockerfile=/src/dev/docker \
+            --opt "filename=Dockerfile.${base%%:*}-container-$suffix" \
+            --opt 'platform=linux/{{.Arch}}' \
+            --opt "context:${base#*:}" \
+            --output "type=oci,dest=$layouts/${base%%:*},tar=false" \
+            --metadata-file "$layouts/${base%%:*}.json"
+        done
+        digest() { grep -o '"containerimage.digest": *"sha256:[0-9a-f]*"' "$layouts/$1.json" | grep -o 'sha256:[0-9a-f]*'; }
+        buildctl-daemonless.sh build --frontend dockerfile.v0 \
+          --local context=/src/. --local dockerfile=/src/dev/docker \
+          --opt "filename=Dockerfile.release-container-$suffix" \
+          --opt 'platform=linux/{{.Arch}}' \
+          --oci-layout "build=$layouts/build" --oci-layout "runtime=$layouts/runtime" \
+          --opt "build-arg:CONTAINER_BUILD_$arg=nico-core-build" \
+          --opt "context:nico-core-build=oci-layout://build@$(digest build)" \
+          --opt "build-arg:CONTAINER_RUNTIME_$arg=nico-core-runtime" \
+          --opt "context:nico-core-runtime=oci-layout://runtime@$(digest runtime)" \
+          --opt build-arg:VERSION=v2.2.2 \
+          --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
+          --output 'type=oci,dest=/src/bin/nico-core-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true'
+  # The optional nico-flow subchart's image; the standalone REST charts are not packaged here.
+  nico-flow-image:
+    fromSource: true
+    source: nico
+    builderType: buildkit-rootless
+    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
+    artifactPath: bin/nico-flow-{{.Arch}}.oci.tar
+    writeDir: bin
+    platforms: [linux/amd64, linux/arm64]
+    outputType: oci-image
+    buildCommand:
+      - sh
+      - -ec
+      - >-
+        buildctl-daemonless.sh build --frontend dockerfile.v0
+        --local context=/src/rest-api --local dockerfile=/src/rest-api/docker/production
+        --opt filename=Dockerfile.nico-flow --opt platform=linux/{{.Arch}}
+        --opt context:golang:1.26.4=docker-image://docker.io/library/golang@sha256:f96cc555eb8db430159a3aa6797cd5bae561945b7b0fe7d0e284c63a3b291609
+        --opt context:nvcr.io/nvidia/distroless/go:v4.0.8=docker-image://nvcr.io/nvidia/distroless/go@sha256:938bd28ce4ddb800118a951774203e7563c2067a72b20ae6b85d2c7da165a178
+        --opt build-arg:VERSION=v2.2.2 --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
+        --output type=oci,dest=/src/bin/nico-flow-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true
 sources:
   nico:
     repo: https://github.com/dsx-ai-factory/infra-controller
