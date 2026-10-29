@@ -13,8 +13,10 @@ import (
 
 var legacyGitHubWorkflowTemplateName = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$`)
 
+var githubPartitionWorkflowSuffix = regexp.MustCompile(`__partition-[0-4][0-9]\.yml$`)
+
 // IsLegacyGeneratedGitHubChildWorkflowPath identifies names reserved for retiring
-// prior producer-owned workflows. New generated bundles cannot contain them.
+// prior producer-owned workflows, including the admitted partition subset.
 func IsLegacyGeneratedGitHubChildWorkflowPath(relative string) bool {
 	_, ok := legacyGitHubChildWorkflowOwner(relative)
 	return ok
@@ -55,7 +57,9 @@ func generatedMemberInNamespace(bundle *GeneratedBundle, member string) bool {
 	if !safeGeneratedPath(member) || member == bundle.ManifestPath || member == bundle.ManifestPath+".lease" {
 		return false
 	}
-	return member == bundle.WorkflowPath || strings.HasPrefix(member, path.Dir(bundle.ManifestPath)+"/")
+	owner, sibling := legacyGitHubChildWorkflowOwner(member)
+	return member == bundle.WorkflowPath || strings.HasPrefix(member, path.Dir(bundle.ManifestPath)+"/") ||
+		(sibling && owner == bundle.WorkflowPath && githubPartitionWorkflowSuffix.MatchString(member))
 }
 
 // Legacy child paths are admitted only from a prior manifest for retirement.

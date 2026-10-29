@@ -141,99 +141,11 @@ func githubResultCollectorID(job string) string {
 	return fmt.Sprintf("nvkr-results-%02x", hash.Sum64()%githubResultBucketCount)
 }
 
-// A DAG has a unique transitive reduction. Compute ancestor sets once, then
-// remove only an edge already supplied by another direct dependency. Conditions,
-// execution bodies and all original ancestor relationships remain unchanged.
 func reduceGitHubNeeds(ctx context.Context, full map[string][]string) (map[string][]string, error) {
-	if err := githubNeedsContext(ctx); err != nil {
-		return nil, err
-	}
-	ordered := sortedKeys(full)
-	dependencies := make(map[string][]string, len(full))
-	for _, id := range ordered {
-		if err := githubNeedsContext(ctx); err != nil {
-			return nil, err
-		}
-		if id == "" {
-			return nil, e.New(e.CodeInvalidCatalog, "GitHub dependency graph has an empty job")
-		}
-		dependencies[id] = uniqueSorted(full[id])
-		if len(dependencies[id]) != len(full[id]) {
-			return nil, e.New(e.CodeInvalidCatalog, "GitHub job %q repeats a dependency", id)
-		}
-		for _, parent := range dependencies[id] {
-			if _, exists := full[parent]; !exists || parent == id {
-				return nil, e.New(e.CodeInvalidCatalog, "GitHub job %q has an unknown or self dependency", id)
-			}
-		}
-	}
-	ancestors := make(map[string]map[string]bool, len(full))
-	visiting := map[string]bool{}
-	var visit func(string) error
-	visit = func(id string) error {
-		if err := githubNeedsContext(ctx); err != nil {
-			return err
-		}
-		if _, done := ancestors[id]; done {
-			return nil
-		}
-		if visiting[id] {
-			return e.New(e.CodeInvalidCatalog, "GitHub dependency graph contains a cycle")
-		}
-		visiting[id] = true
-		parents := map[string]bool{}
-		for _, parent := range dependencies[id] {
-			if err := visit(parent); err != nil {
-				return err
-			}
-			parents[parent] = true
-			for ancestor := range ancestors[parent] {
-				if err := githubNeedsContext(ctx); err != nil {
-					return err
-				}
-				parents[ancestor] = true
-			}
-		}
-		delete(visiting, id)
-		ancestors[id] = parents
-		return nil
-	}
-	for _, id := range ordered {
-		if err := visit(id); err != nil {
-			return nil, err
-		}
-	}
-	reduced := make(map[string][]string, len(full))
-	for _, id := range ordered {
-		reduced[id] = nil
-		for _, parent := range dependencies[id] {
-			if err := githubNeedsContext(ctx); err != nil {
-				return nil, err
-			}
-			redundant := false
-			for _, other := range dependencies[id] {
-				if other != parent && ancestors[other][parent] {
-					redundant = true
-					break
-				}
-			}
-			if !redundant {
-				reduced[id] = append(reduced[id], parent)
-			}
-		}
-	}
-	return reduced, githubNeedsContext(ctx)
+	return reduceExecutionDependencies(ctx, full)
 }
 
-func githubNeedsContext(ctx context.Context) error {
-	if ctx == nil {
-		return e.New(e.CodeUsage, "GitHub dependency projection requires context")
-	}
-	if err := ctx.Err(); err != nil {
-		return e.Wrap(e.CodeTimeout, err, "GitHub dependency projection canceled")
-	}
-	return nil
-}
+func githubNeedsContext(ctx context.Context) error { return executionContext(ctx) }
 
 func githubResultCollector(plan *Plan, id string, members []string) githubJob {
 	return githubJob{

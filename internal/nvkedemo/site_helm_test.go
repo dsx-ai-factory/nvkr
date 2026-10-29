@@ -4,6 +4,7 @@
 package nvkedemo
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -12,6 +13,7 @@ import (
 	"io/fs"
 	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -20,10 +22,167 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"go.yaml.in/yaml/v3"
 	"golang.org/x/sys/unix"
 )
+
+func TestSiteHelmRendererCleanupSurvivesRepeatedTermination(t *testing.T) {
+	out := privateTestDir(t)
+	tools := filepath.Join(out, "tools")
+	if err := os.Mkdir(tools, 0700); err != nil {
+		t.Fatal(err)
+	}
+	actualRM, err := exec.LookPath("rm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	holds := make([]*os.File, 0, 2)
+	for _, name := range []string{"kubectl-hold", "cleanup-release"} {
+		path := filepath.Join(out, name)
+		if err := unix.Mkfifo(path, 0600); err != nil {
+			t.Fatal(err)
+		}
+		file, err := os.OpenFile(path, os.O_RDWR, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		holds = append(holds, file)
+		defer func() { _ = file.Close() }()
+	}
+	// Both subprocesses report entry through an inherited pipe. FIFO handshakes
+	// hold each exact phase until the test sends the next process-group signal.
+	writeTenantFixture(t, filepath.Join(tools, "kubectl"), []byte(`#!/bin/sh
+set -eu
+printf 'kubectl:%s:%s\n' "$$" "$2" >&3
+IFS= read -r token < "$KUBECTL_HOLD"
+test "$token" = proceed
+`), 0700)
+	writeTenantFixture(t, filepath.Join(tools, "rm"), []byte(`#!/bin/sh
+set -eu
+test "$#" = 2 && test "$1" = -rf
+printf 'cleanup:%s:%s\n' "$$" "$2" >&3
+IFS= read -r token < "$CLEANUP_RELEASE"
+test "$token" = proceed
+exec "$ACTUAL_RM" "$@"
+`), 0700)
+	runner, args, err := prepareSiteHelm(ctx, Runner{Env: []string{"PATH=" + tools + ":/usr/bin:/bin"}}, tools, out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plugin := filepath.Join(environmentValue(runner.Env, "HELM_PLUGINS"), args[len(args)-1])
+	events, childEvents, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = events.Close() }()
+	defer func() { _ = childEvents.Close() }()
+	command := exec.CommandContext(ctx, "/bin/sh", filepath.Join(plugin, "render.sh"))
+	command.Env = SetEnv(runner.Env, map[string]string{
+		"HELM_PLUGIN_DIR": plugin, "ACTUAL_RM": actualRM,
+		"KUBECTL_HOLD": holds[0].Name(), "CLEANUP_RELEASE": holds[1].Name(),
+	})
+	command.Stdin = strings.NewReader("apiVersion: v1\nkind: ConfigMap\nmetadata: {name: synthetic-input}\n")
+	command.ExtraFiles = []*os.File{childEvents}
+	var output bytes.Buffer
+	command.Stdout, command.Stderr = &output, &output
+	if err := ownedcmd.ConfigureCancellation(command, time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if err := command.Start(); err != nil {
+		t.Fatal(err)
+	}
+	if err := childEvents.Close(); err != nil {
+		t.Fatal(err)
+	}
+	joined := make(chan error, 1)
+	go func() { joined <- command.Wait() }()
+	waited := false
+	defer func() {
+		if !waited {
+			// A failed handshake must not leave the intentionally blocked,
+			// signal-ignoring cleanup fixture behind after the test returns.
+			_ = unix.Kill(-command.Process.Pid, unix.SIGKILL)
+		}
+		cancel()
+		if !waited {
+			<-joined
+		}
+	}()
+	lines := make(chan string, 2)
+	readDone := make(chan struct{})
+	go func() {
+		defer close(readDone)
+		scanner := bufio.NewScanner(events)
+		for scanner.Scan() {
+			select {
+			case lines <- scanner.Text():
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	defer func() { _ = events.Close(); <-readDone }()
+	readPhase := func(phase string) (int, string) {
+		t.Helper()
+		select {
+		case line := <-lines:
+			fields := strings.SplitN(line, ":", 3)
+			if len(fields) != 3 || fields[0] != phase {
+				t.Fatalf("expected %s handshake, got %q", phase, line)
+			}
+			pid, err := strconv.Atoi(fields[1])
+			if err != nil || pid <= 0 {
+				t.Fatalf("invalid %s child PID: %q", phase, line)
+			}
+			return pid, fields[2]
+		case <-ctx.Done():
+			t.Fatalf("renderer did not reach %s handshake: %v", phase, ctx.Err())
+			return 0, ""
+		}
+	}
+	kubectlPID, scratch := readPhase("kubectl")
+	// Signal the waiting renderer, then finish kubectl successfully. This
+	// forces its TERM handler's status 1 rather than racing set -e against
+	// a simultaneously terminated child's shell-specific status 128+TERM.
+	if err := unix.Kill(command.Process.Pid, unix.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.WriteString(holds[0], "proceed\n"); err != nil {
+		t.Fatal(err)
+	}
+	cleanupPID, cleanupScratch := readPhase("cleanup")
+	if cleanupScratch != scratch {
+		t.Fatal("cleanup changed its owned scratch directory")
+	}
+	if err := unix.Kill(-command.Process.Pid, unix.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.WriteString(holds[1], "proceed\n"); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-joined:
+		waited = true
+		var exit *exec.ExitError
+		if !errors.As(err, &exit) || exit.ExitCode() != 1 {
+			t.Fatalf("renderer lost termination status: %v, %s", err, output.String())
+		}
+	case <-ctx.Done():
+		t.Fatal("renderer did not finish and join after cleanup release", ctx.Err())
+	}
+	if _, err := os.Lstat(scratch); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatal("repeated termination interrupted scratch cleanup", err)
+	}
+	for _, pid := range []int{kubectlPID, cleanupPID} {
+		if err := unix.Kill(pid, 0); !errors.Is(err, unix.ESRCH) {
+			t.Fatalf("renderer returned without joining child %d: %v", pid, err)
+		}
+	}
+}
 
 func TestPrepareSiteHelmRejectsUnavailableBudgetBeforeFiles(t *testing.T) {
 	canceled, cancel := context.WithTimeout(t.Context(), time.Minute)

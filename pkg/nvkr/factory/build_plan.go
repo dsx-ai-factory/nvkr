@@ -192,8 +192,7 @@ func (plan Plan) validatePlanBuilds() error {
 		if !ok || selection.Platform != buildPlan.Platform {
 			return e.New(e.CodeUnverifiedRef, "native build %q graph identity is not selected by its Definition", buildPlan.Name)
 		}
-		outputFormat := selection.Format
-		if err := validateBuildCatalog(buildPlan, outputFormat, plan.Environment); err != nil {
+		if err := validateBuildCatalog(buildPlan, selection, plan.Environment); err != nil {
 			return err
 		}
 		for _, node := range buildPlan.Graph.Nodes {
@@ -202,18 +201,49 @@ func (plan Plan) validatePlanBuilds() error {
 			}
 		}
 	}
+	// Catalog loading re-derives every declared pin set from its pinned Git tree,
+	// including acquired-only outputs whose executable graph has no fetch node.
+	// Admit the same exact repositories used by catalog revalidation credentials.
+	for source := range plan.catalogPinSetRepositories() {
+		resolvedSources[source] = true
+	}
 	for source := range plan.Environment.SourceAccess {
 		if !resolvedSources[source] {
 			return e.New(e.CodeInvalidCatalog,
-				"execution settings sourceAccess %q does not match a resolved fetch source", source)
+				"execution settings sourceAccess %q does not match a resolved fetch or catalog pin-set source", source)
 		}
 	}
 	return nil
 }
 
+// catalogPinSetRepositories is shared by source-access admission and the scoped
+// GitHub catalog revalidation steps. Ordinary unselected catalog sources are not
+// credential consumers. Plan validation binds these snapshots before admission.
+func (plan *Plan) catalogPinSetRepositories() map[string]bool {
+	repositories := map[string]bool{}
+	if plan.Environment.GitHubRuntimeSource != nil {
+		repositories[plan.Environment.GitHubRuntimeSource.Repository] = true
+	}
+	collect := func(snapshot *catalog.Catalog) {
+		if snapshot == nil {
+			return
+		}
+		for _, source := range snapshot.Sources {
+			if source.PinSet != nil {
+				repositories[source.Repo] = true
+			}
+		}
+	}
+	collect(plan.CatalogSnapshot)
+	for _, build := range plan.Builds {
+		collect(build.CatalogSnapshot)
+	}
+	return repositories
+}
+
 // validateBuildCatalog binds the complete executable graph to its catalog and
 // Environment. Logical identity alone excludes transport and execution metadata.
-func validateBuildCatalog(build BuildPlan, outputFormat string, environment authored.Environment) error {
+func validateBuildCatalog(build BuildPlan, output authored.DefinitionOutput, environment authored.Environment) error {
 	if build.CatalogSnapshot == nil {
 		return e.New(e.CodeUnverifiedRef, "output %q has no catalog snapshot", build.Name)
 	}
@@ -224,12 +254,12 @@ func validateBuildCatalog(build BuildPlan, outputFormat string, environment auth
 	if digest != build.CatalogDigest {
 		return e.New(e.CodeUnverifiedRef, "output %q catalog snapshot differs", build.Name)
 	}
-	selection := buildgraph.Selection{Components: build.Components, Platform: build.Platform, OutputFormat: outputFormat}
+	selection := buildgraph.Selection{Components: output.Components, Platform: output.Platform, OutputFormat: output.Format}
 	selected, err := buildgraph.Resolve(build.CatalogSnapshot, selection)
 	if err != nil {
 		return err
 	}
-	if !reflect.DeepEqual(selected.Components, build.ResolvedComponents) {
+	if selected.Platform != build.Platform || !reflect.DeepEqual(selected.Components, build.ResolvedComponents) {
 		return e.New(e.CodeUnverifiedRef, "output %q resolved producers differ from catalog", build.Name)
 	}
 	graph, err := compileBuildGraph(selected, environment)

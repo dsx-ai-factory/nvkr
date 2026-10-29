@@ -4,6 +4,18 @@ The release index and its metadata live in `<publication.repositoryPrefix>/relea
 SBOM attestations live in sibling repositories named after the Definition outputs. For NVKE these are
 `<publication.repositoryPrefix>/nvkectl`, `…/cwe`, and `…/nvke-helm`.
 
+## Required publication transports
+
+The Environment can explicitly select OCI with `publication.transports: [oci]`. Omitting `transports`
+preserves the existing OCI behavior and authored identity. The existing `repositoryPrefix` and credential
+settings still apply to this route; output repositories remain compiler-derived.
+
+The recognized APT-only selection is `[apt]`, and both transports are selected as `[apt, oci]` in that
+sorted order. Every selected route is required. Direct APT publication is not implemented: either selection
+currently returns `engine-capability` before catalog, generation or execution work, without an OCI fallback.
+APT-only does not require OCI settings to report this capability gap. A local unsigned APT layout or its OCI
+upload does not satisfy a request for a signed, installable APT repository.
+
 ## Registry graph
 
 Solid arrows are OCI descriptors within a repository. Dashed metadata arrows bind exact sibling locations

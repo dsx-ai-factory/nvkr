@@ -120,6 +120,11 @@ func (cat *Catalog) Validate() error {
 	if cat == nil {
 		return e.New(e.CodeInvalidCatalog, "catalog is nil")
 	}
+	for _, name := range sortedSourceNames(cat.Sources) {
+		if err := validatePinSetDeclaration(name, cat.Sources[name]); err != nil {
+			return err
+		}
+	}
 	for _, pin := range cat.Actions {
 		if err := pin.Validate(); err != nil {
 			return err

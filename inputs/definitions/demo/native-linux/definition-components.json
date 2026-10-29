@@ -11,7 +11,7 @@
   "outputs": [
     {
       "catalog": {
-        "base": "../../../catalogs/capnico/local-arm64"
+        "base": "../../../catalogs/capnico/local"
       },
       "components": [
         "capnico-controller"
@@ -22,7 +22,7 @@
     },
     {
       "catalog": {
-        "base": "../../../catalogs/nvke/native-site-arm64"
+        "base": "../../../catalogs/nvke/native-site"
       },
       "components": [
         "cluster-api-provider-provisioned"
@@ -33,7 +33,7 @@
     },
     {
       "catalog": {
-        "base": "../../../catalogs/controller-profiles/native-nvidia-arm64"
+        "base": "../../../catalogs/controller-profiles/native-nvidia"
       },
       "components": [
         "nvke-local-profiles"
@@ -44,7 +44,7 @@
     },
     {
       "catalog": {
-        "base": "../../../catalogs/nvke/native-site-arm64"
+        "base": "../../../catalogs/nvke/native-site"
       },
       "components": [
         "nvke-controller"

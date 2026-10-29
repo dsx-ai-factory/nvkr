@@ -43,23 +43,9 @@ the reviewed workflow/action and Environment contract, so routine source-version
 regeneration commit. CI checks that contract with `run generate --runtime --check`; changes to the
 execution contract still require normal regeneration and review.
 
-The downstream nightly workflow owns the real NVKE suite and its cleanup. Generating this producer
-workflow does not execute that suite or establish operational acceptance.
-
-`../../testing/nightly-profiles.json` selects this project's generated producer and exact NVKE suite revision.
-The coordinator checks supported native ARM64 runtime and OVN selections, authenticates the complete
-publication, and requires both test and cleanup verdicts. Checksum-pinned tool acquisition adds no
-vulnerability-clearance claim. All four site-product sources select
-NVKE v0.22.0 at `400c24fb6465b042be883d6b62472528520d6291`. The SPIRE OS package uses the same release source and Debian revision 4.
-The test-only suite selects `b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8`, an explicit
-user-approved exception to ADR-23's proposed matching-revision rule. Product sources select the exact main commit.
-
-The adapter now projects authenticated profile bytes into current `MachineImage`, `ClusterRelease`
-and `NodePoolRelease` resources, preserving the exact disk binding and the candidate suite's
-fixed profile name. It renders the current site-specification shape with private tenant credentials.
-These paths are contract-tested, without a recorded runtime cycle.
-
-The selected test source retains the candidate entrypoint omitted from the selected product source. It accepts the
-verified publication without rebuilding products. This separate test pin does not establish
-runtime compatibility or operational acceptance.
-The first combined nightly cycle remains unrecorded.
+This generated workflow remains a manually dispatched publication diagnostic.
+The scheduled [nightly Go test](../../../docs/nvke-nightly.md) resolves latest NVKE
+main, dispatches the NVIDIA ARM64 producer and tests that exact Run's authenticated
+published artifacts through the native Go site owner. It does not dispatch this
+upstream OVN producer or consume its publication. Definition validation and
+generation do not establish a successful build, VM runtime or hardware acceptance.

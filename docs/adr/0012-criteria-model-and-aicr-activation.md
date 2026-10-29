@@ -48,6 +48,12 @@ model; Darwin executable cross-builds use the explicit exception above. A foreig
 its admitted execution mechanism. The typed `{{.Arch}}` producer token is resolved
 from the explicit target. Other command values are never inferred from deployment context.
 
+Debian packages use the same explicit platform and producer selection. A distribution-specific component
+owns its existing command and architecture-specific toolchain mapping. The raw output format selects one
+`host-package` producer; it does not add distribution/ABI profiles or omission defaults. Source pins,
+commands and toolchains already enter Build identity. Package placement in an OS material folder does not
+establish installation or runtime compatibility. See [ADR-10](0010-pluggable-builder-types.md#raw-debian-output).
+
 ### 2. Retired AICR profile model
 
 This ADR previously also owned an accelerated-runtime rendering path: a catalog-declared `aicrProfiles` map, an

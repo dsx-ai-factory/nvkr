@@ -34,8 +34,29 @@ cross-environment byte-identity.
 
 ### 2. Target configuration surface
 
-Environment (`nvkr.dev/environment/v1`) owns runtime settings, one optional OCI publication namespace,
-credential references and signing identity/issuer policy. `publication.repositoryPrefix` is an explicitly
+Environment (`nvkr.dev/environment/v1`) owns runtime settings, required publication transport selection,
+the admitted OCI publication namespace, credential references and signing identity/issuer policy.
+`publication.transports`, when present, is a nonempty, sorted, unique selection of `apt`, `oci`, or both.
+Omission preserves the existing OCI selection and canonical bytes. Every selected transport is required;
+availability of OCI cannot satisfy an APT selection. The current input owner recognizes APT but rejects
+any selection containing it with `CodeEngineCapability` before catalog or execution work, without requiring
+OCI namespace or credentials for an APT-only request. Plan validation, generation and execution repeat
+that admission. Direct APT service destinations, credentials, repository signing and authenticated read-back
+remain unimplemented; selection is not an enabled publisher or service approval.
+Future APT publication keeps signing customer-controlled through Environment configuration.
+Publication signing defaults are the existing cosign path for OCI and standard OpenPGP/GPG repository
+metadata signing for APT. The OCI path retains explicit customer identity/issuer policy; APT must retain
+customer signing-service/key references and exact public-key trust bindings. Private signing keys are not
+catalog or Plan data. Consumer verification policy separately authenticates the expected signer and payload.
+NVIDIA-specific services are optional adapters, not hard-coded signing authorities. Local development without
+publication/signing remains explicitly unsigned and unqualified. Required publication must fail before work
+when signing or trust inputs are absent; it cannot silently downgrade to unsigned output. APT/GPG adapter
+configuration, key management and authenticated read-back remain deferred, so these defaults do not admit
+APT publication today.
+
+Explicit OCI selection is independently bound to Environment and Plan identity without changing native or
+aggregate logical Build identity. Compiler snapshots own the selection independently of caller mutations.
+`publication.repositoryPrefix` is an explicitly
 qualified, untagged repository prefix; credentials, anonymous access and plain HTTP are transport settings.
 When publication is configured, the release index and metadata publish under
 `<repositoryPrefix>/releases`. Each deliverable and its SBOM attestation bundles publish in
@@ -80,6 +101,10 @@ Environment may also map a canonical source URL to an HTTPS fetch mirror and a G
 through `sourceAccess`. This changes transport and Environment identity, not the canonical source, pinned
 commit/tree, or build identity. The current adapter binds credentials to the matching GitHub fetch execution step and, for private
 pin-set sources, the bootstrap regeneration and Run finalization steps that re-read pinned Git trees.
+Admission permits an entry when its canonical repository is used by a compiled fetch or by a pin-set
+source in a catalog snapshot that compilation revalidates. An acquired-chart-only selection can therefore
+retain its pin-set source credential without inventing a producer fetch. Unused repository entries remain
+errors; revalidation credentials are not passed to artifact acquisition, build or publication steps.
 Production jobs require dispatch on the default branch or an exact `githubDispatchBranches` entry (ADR-18).
 The separate development mode admits manual branch dispatch with the same fixed source-read steps.
 Signed development uses the explicit isolated publication contract below; arbitrary job setup and variables

@@ -42,7 +42,7 @@ func TestDiskInspectionProgressDoesNotRelaxDiagnosticGate(t *testing.T) {
 				runtime.cancel = cancel
 				runtime.scanErr = context.Canceled
 			}
-			raw, err := runDiskInspectionContainer(ctx, runtime, selection, "image", subject)
+			raw, err := runDiskInspectionContainer(ctx, runtime, selection, "sha256:"+strings.Repeat("a", 64), subject)
 			if code(err) != test.want || (raw != nil) != (test.want == "") {
 				t.Fatalf("raw=%q err=%v", raw, err)
 			}

@@ -17,7 +17,7 @@ func baseEnvironment() authored.Environment {
 	return env
 }
 
-// TestDeliveryRuntimeValidation covers ADR-18 §8 §1's Environment.Runtime home for the
+// TestDeliveryRuntimeValidation covers ADR-18 §8's Environment.Runtime home for the
 // runtime env: it is optional, defaults to podman, and demands digest-pinned images.
 func TestDeliveryRuntimeValidation(t *testing.T) {
 	if baseEnvironment().RuntimeBinary() != "podman" {

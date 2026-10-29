@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/environment/v1
+kind: Environment
+metadata:
+  name: nvke-telemetry-github
+  description: Signed NVKE telemetry candidate publication in its independent workflow and registry namespace.
+githubBundle: nvke-telemetry
+githubRunners:
+  linux/amd64: ubuntu-24.04
+  linux/arm64: ubuntu-24.04-arm
+publication:
+  mode: per-output-v1
+  credentialRef: github:NVKR_REGISTRY_WRITE
+  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/telemetry
+runtime:
+  runtime: docker
+  buildNetworkPolicy: producer-declared
+signing:
+  identity: ^https://github\.com/dsx-ai-factory/nvkr/\.github/workflows/nvkr-run-nvke-telemetry\.yml@refs/heads/main$
+  issuer: https://token.actions.githubusercontent.com
+  mode: cosign
+sourceAccess:
+  https://github.com/dsx-ai-factory/nvke:
+    credentialRef: github:NKE_SOURCE_TOKEN
+    mirror: https://github.com/dsx-ai-factory/nvke
+utilityContainer: busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1
+utilityPlatform: linux/amd64

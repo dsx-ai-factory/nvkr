@@ -107,6 +107,16 @@ func TestPrivateToolchainPublicationBoundary(t *testing.T) {
 		want                     bool
 	}{
 		{"current", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
+		{"disk family current subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
+		{"disk family prefix lookalike", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-mirror", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
+		{"disk family child prefix", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks/other", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
+		{"core family prefix", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/core", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
+		{"services family prefix", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/services", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
+		{"telemetry family prefix", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/telemetry", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
+		{"foreign disk family owner", "ghcr.io/other/nvkr/m2-candidate/disks", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
+		{"disk family foreign toolchain owner", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks", "ghcr.io/other/nvkr/m2-candidate/toolchains/packer", false, false},
+		{"disk family unsupported repository", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false, false},
+		{"disk family non-toolchain subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/other/packer", false, false},
 		{"unsupported repository", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false, false},
 		{"nightly current subject", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
 		{"nightly unsupported repository", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false, false},
@@ -142,6 +152,56 @@ func TestPrivateToolchainPublicationBoundary(t *testing.T) {
 	if githubPrivateToolchain(plan, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:"+strings.Repeat("a", 64)) {
 		t.Fatal("unsupported ARC policy received private image preparation")
 	}
+}
+
+// The extended split matrix calls this on each actual non-disk family bundle,
+// avoiding another full render matrix in the default suite. Publication readers
+// remain legitimate; this assertion concerns only private toolchain preparation.
+func assertNoPrivateToolchainPreparation(t *testing.T, bundle *GeneratedBundle) {
+	t.Helper()
+	workflow := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath])
+	for id, job := range workflow.Jobs {
+		for _, step := range job.Steps {
+			for _, input := range []string{"nvkr-toolchain-read-token", "nvkr-toolchain-read-user"} {
+				if _, exists := step.With[input]; exists {
+					t.Fatalf("non-disk family passes toolchain reader input in %s/%s", id, step.ID)
+				}
+			}
+		}
+	}
+	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
+	assertNoReader := func(scope string, environment map[string]string) {
+		for _, key := range []string{githubImageToken, githubImageUser} {
+			if _, exists := environment[key]; exists {
+				t.Fatalf("non-disk family exposes toolchain reader in %s", scope)
+			}
+		}
+	}
+	assertNoReader("workflow", document.Env)
+	for id, job := range document.Jobs {
+		assertNoReader(id, job.Env)
+		for _, step := range job.Steps {
+			assertNoReader(id+"/"+step.ID, step.Env)
+			if strings.Contains(step.Run, "factory github prepare-images ") ||
+				strings.Contains(step.Run, githubImageToken) || strings.Contains(step.Run, githubImageUser) {
+				t.Fatalf("non-disk family retained private toolchain preparation in %s/%s", id, step.ID)
+			}
+		}
+	}
+}
+
+func TestMaintainedNamedPrivateImageCredentialBoundary(t *testing.T) {
+	// The combined and nightly bundles share their assertions with
+	// TestMaintainedGitHubBundles. Keep the disks-family namespace covered too.
+	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke-disks/plan.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertGitHubPrivateImageCredentialBoundary(t, plan, bundle, 4)
 }
 
 // Maintained product checks share their already-rendered bundle with the entry

@@ -22,8 +22,6 @@ import (
 	"time"
 )
 
-// ── deterministic tar + gzip helpers ─────────────────────────────────────────
-
 type tarEntry struct {
 	name string
 	mode int64
@@ -71,8 +69,6 @@ func gzipBytes(in []byte) []byte {
 }
 
 func sha256hex(b []byte) string { s := sha256.Sum256(b); return hex.EncodeToString(s[:]) }
-
-// ── OCI image ────────────────────────────────────────────────────────────────
 
 // OCIImage diagnostically assembles a single-layer OCI image placing the binary at
 // /usr/local/bin/<name> with entrypoint set, writes it as an OCI layout under
@@ -181,8 +177,6 @@ type ociIndex struct {
 	MediaType     string          `json:"mediaType"`
 	Manifests     []ociDescriptor `json:"manifests"`
 }
-
-// ── .deb ─────────────────────────────────────────────────────────────────────
 
 // Deb diagnostically assembles a deterministic Debian package placing the binary at /usr/bin/<name>,
 // writes it to outPath, and returns its sha256 digest. arch is the Debian architecture

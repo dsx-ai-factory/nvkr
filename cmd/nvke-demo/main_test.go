@@ -18,6 +18,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/nvkedemo"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 func TestRunActionSelectsOwnExecutableForBothLifetimeModes(t *testing.T) {
@@ -657,7 +658,7 @@ func TestProductionRunCannotSelectKindSiteWorkflow(t *testing.T) {
 		t.Fatal("missing artifacts unexpectedly started deployment")
 	}
 	platform := runtime.GOOS + "/" + runtime.GOARCH
-	if platform != "darwin/arm64" && platform != "linux/arm64" {
+	if target.ValidateExecutablePlatform(platform) != nil {
 		assertCode(t, err, nvkrerr.CodeEngineCapability)
 		if !strings.Contains(err.Error(), "native demo does not support host") {
 			t.Fatalf("unsupported host selected another deployment owner: %v", err)
@@ -680,6 +681,97 @@ func TestProductionRunCannotSelectKindSiteWorkflow(t *testing.T) {
 	}
 	if _, err := os.Lstat(filepath.Join(root, "demo")); !os.IsNotExist(err) {
 		t.Fatal("missing native artifacts reached deployment work", err)
+	}
+}
+
+func TestE2EBuildAdmissionPrecedesRuntimeAndPresentation(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		flags []string
+	}{
+		{"missing-default", nil},
+		{"upstream-ovn", []string{"--network", "upstream-ovn"}},
+		{"conformance", []string{"--conformance"}},
+		{"prepared", []string{"--prepared", "--qualification-policy", "/must-not-read"}},
+		{"qualify-local", []string{"--qualify-local"}},
+		{"policy", []string{"--qualification-policy", "/must-not-read"}},
+	} {
+		if tc.name != "missing-default" && (runtime.GOOS != "linux" || runtime.GOARCH != "amd64") {
+			continue
+		}
+		for _, walkthrough := range []bool{false, true} {
+			t.Run(tc.name+map[bool]string{false: "/plain", true: "/walkthrough"}[walkthrough], func(t *testing.T) {
+				repo, temporary := t.TempDir(), t.TempDir()
+				t.Setenv("TMPDIR", temporary)
+				var out, diagnostics bytes.Buffer
+				actions := defaultDemoActions()
+				actions.admit = func(context.Context, nvkedemo.Config) error {
+					t.Fatal("unsupported build reached runtime admission")
+					return nil
+				}
+				actions.build = func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
+					t.Fatal("unsupported build reached producer work")
+					return nvkedemo.BuiltInputs{}, nil
+				}
+				actions.run = func(context.Context, nvkedemo.Config) error {
+					t.Fatal("unsupported build reached deployment")
+					return nil
+				}
+				args := append([]string{"e2e", "--repo", repo, "--attempt", "unsupported", "--out", filepath.Join(repo, "out")}, tc.flags...)
+				if walkthrough {
+					args = append(args, "--walkthrough")
+				}
+				err := executeRoot(t.Context(), newCommand(&out, &diagnostics, actions), args)
+				assertCode(t, err, nvkrerr.CodeEngineCapability)
+				if out.Len() != 0 || diagnostics.Len() != 0 {
+					t.Fatal("unsupported build emitted narration, sudo diagnostics or progress")
+				}
+				for _, root := range []string{repo, temporary} {
+					entries, err := os.ReadDir(root)
+					if err != nil || len(entries) != 0 {
+						t.Fatal("unsupported build wrote attempt state or a progress log", entries, err)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestBuildStaticAdmissionPrecedesProgress(t *testing.T) {
+	repo, temporary := t.TempDir(), t.TempDir()
+	t.Setenv("TMPDIR", temporary)
+	var out, diagnostics bytes.Buffer
+	actions := defaultDemoActions()
+	actions.build = func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error) {
+		t.Fatal("unsupported selection reached build")
+		return nvkedemo.BuiltInputs{}, nil
+	}
+	err := executeRoot(t.Context(), newCommand(&out, &diagnostics, actions), []string{"build", "--repo", repo, "--attempt", "unsupported"})
+	assertCode(t, err, nvkrerr.CodeEngineCapability)
+	if out.Len() != 0 || diagnostics.Len() != 0 {
+		t.Fatal("unsupported build emitted progress")
+	}
+	for _, root := range []string{repo, temporary} {
+		entries, err := os.ReadDir(root)
+		if err != nil || len(entries) != 0 {
+			t.Fatal("unsupported build wrote state or progress logs", entries, err)
+		}
+	}
+}
+
+func TestE2EStaticBuildAdmissionKeepsSupportedSelection(t *testing.T) {
+	repo := narrationRepository(t)
+	var out bytes.Buffer
+	actions := defaultDemoActions()
+	calls := 0
+	actions.admit = func(context.Context, nvkedemo.Config) error {
+		calls++
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "bounded runtime admission")
+	}
+	err := executeRoot(t.Context(), newCommand(&out, io.Discard, actions), []string{"e2e", "--repo", repo, "--attempt", "fresh", "--out", filepath.Join(repo, "out"), "--walkthrough"})
+	assertCode(t, err, nvkrerr.CodeEngineCapability)
+	if calls != 1 || !strings.Contains(err.Error(), "bounded runtime admission") || out.Len() != 0 {
+		t.Fatal("supported build did not reach runtime admission before narration", calls, err)
 	}
 }
 
@@ -780,10 +872,12 @@ func narrationRepository(t *testing.T) string {
 	repo := t.TempDir()
 	for _, relative := range []string{
 		"inputs/definitions/demo/arm64-nvidia-local-kvm.json",
+		"inputs/definitions/demo/amd64-nvidia-local-kvm.json",
 		"inputs/definitions/demo/arm64-upstream-local-kvm.json",
 		"inputs/definitions/demo/arm64-nvidia-local-kvm-conformance.json",
 		"inputs/definitions/demo/arm64-upstream-local-kvm-conformance.json",
 		"inputs/environments/local-arm64-kvm.json",
+		"inputs/environments/local-amd64-kvm.json",
 		"inputs/environments/local-native-mac.json",
 	} {
 		if err := os.MkdirAll(filepath.Dir(filepath.Join(repo, relative)), 0o700); err != nil {
@@ -809,7 +903,7 @@ func TestDemoNarrationFailuresBeforeExecution(t *testing.T) {
 		code nvkrerr.Code
 	}{
 		{"unknown network", nvkedemo.BuildConfig{Repository: "/must-not-read", Network: "unknown"}, &bytes.Buffer{}, nvkrerr.CodeUsage},
-		{"missing inputs", nvkedemo.BuildConfig{Repository: t.TempDir()}, &bytes.Buffer{}, nvkrerr.CodeInvalidCatalog},
+		{"missing inputs", nvkedemo.BuildConfig{Repository: t.TempDir()}, &bytes.Buffer{}, nvkrerr.CodeEngineCapability},
 		{"nil writer", nvkedemo.BuildConfig{Repository: repo}, nil, nvkrerr.CodeUsage},
 		{"write error", nvkedemo.BuildConfig{Repository: repo}, failedProgressWriter{}, nvkrerr.CodePreflightFailed},
 		{"short write", nvkedemo.BuildConfig{Repository: repo}, failedProgressWriter{short: true}, nvkrerr.CodePreflightFailed},
@@ -832,11 +926,11 @@ func TestDemoNarrationFailuresBeforeExecution(t *testing.T) {
 }
 
 func TestDemoNarrationInvalidAuthoredInputsEmitNothing(t *testing.T) {
-	environment := "inputs/environments/local-arm64-kvm.json"
-	if runtime.GOOS == "darwin" {
-		environment = "inputs/environments/local-native-mac.json"
+	selected, environment, err := nvkedemo.LocalArtifactInputsForPlatform("ovn", false, runtime.GOOS+"/"+runtime.GOARCH)
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, name := range []string{"inputs/definitions/demo/arm64-nvidia-local-kvm.json", environment} {
+	for _, name := range []string{selected, environment} {
 		t.Run(name, func(t *testing.T) {
 			repo := narrationRepository(t)
 			if err := os.WriteFile(filepath.Join(repo, name), []byte(`{"unknown":"rejected"}`), 0o600); err != nil {
@@ -866,6 +960,11 @@ func TestE2EWalkthroughIntroductionAdmissionAndOrder(t *testing.T) {
 		{name: "output failure", outputFailure: true},
 	} {
 		t.Run(row.name, func(t *testing.T) {
+			if !row.explicit {
+				row.definition = strings.Replace(row.definition, "arm64-", runtime.GOARCH+"-", 1)
+			}
+			_, missingErr := os.Stat(filepath.Join(repo, "inputs/definitions/demo", row.definition))
+			missingInputs := os.IsNotExist(missingErr)
 			var out bytes.Buffer
 			var writer io.Writer = &out
 			if row.outputFailure {
@@ -881,6 +980,9 @@ func TestE2EWalkthroughIntroductionAdmissionAndOrder(t *testing.T) {
 				environment := "inputs/environments/local-arm64-kvm.json"
 				if runtime.GOOS == "darwin" {
 					environment = "inputs/environments/local-native-mac.json"
+				}
+				if runtime.GOOS == "linux" {
+					environment = "inputs/environments/local-" + runtime.GOARCH + "-kvm.json"
 				}
 				if row.explicit {
 					if cfg.Definition != definition || cfg.Environment != "inputs/environments/local-arm64-kvm.json" || cfg.NVKR != "/explicit/nvkr" {
@@ -916,7 +1018,7 @@ func TestE2EWalkthroughIntroductionAdmissionAndOrder(t *testing.T) {
 				want = nvkrerr.CodePreflightFailed
 			}
 			assertCode(t, err, want)
-			if calls != map[bool]int{true: 0, false: 1}[row.invalid || row.outputFailure] {
+			if calls != map[bool]int{true: 0, false: 1}[row.invalid || row.outputFailure || missingInputs] {
 				t.Fatal("unexpected execution", calls)
 			}
 			if row.invalid && out.Len() != 0 {

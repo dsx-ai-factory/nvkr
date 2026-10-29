@@ -17,8 +17,9 @@ Ordinary `InspectDependencies` and held-only `InspectHeldDependencies` retain hi
 factory callers use those dependency APIs. The separate diagnostic's private `.deb` discovery hint supplies
 no format, target-architecture or payload-coverage authority. The existing
 digest-pinned `dpkg-deb` material reader owns authoritative Debian expansion and platform checks for disks.
-Standalone Debian delivery and declared-format propagation remain deferred; this diagnostic does not admit
-source-created packages through the executable/APT wrapper routes.
+Raw Debian output retains the source-created archive through ordinary file authentication and staging.
+It emits declaration-only composition metadata, not an inspected dependency SBOM; this diagnostic does not
+supply payload inspection, installation acceptance or publication authority.
 
 The scanner executable is authenticated before use. Subject bytes must match the producer digest. Its output
 is normalized into CycloneDX 1.5: deterministic identities/order, package URLs, versions and artifact dependency

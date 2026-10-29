@@ -80,10 +80,8 @@ func TestGitHubDevelopmentRenderingSeparatesPolicyAndLayout(t *testing.T) {
 				t.Fatal("fixture omits finalizer")
 			}
 			for id, job := range document.Jobs {
-				if development || !strings.HasPrefix(id, "build-runner-") {
-					if !strings.Contains(job.If, wantCondition) {
-						t.Fatalf("job %s omits exact execution policy: %s", id, job.If)
-					}
+				if !strings.Contains(job.If, wantCondition) {
+					t.Fatalf("job %s omits exact execution policy: %s", id, job.If)
 				}
 				if job.Environment != "" || job.Permissions["id-token"] != "" || job.Permissions["packages"] == "write" {
 					t.Fatalf("build-only job %s has publication authority: %+v", id, job)

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
@@ -28,9 +29,7 @@ func AdmitDemoDeployment(ctx context.Context, cfg Config) error {
 		return err
 	}
 	if cfg.Conformance {
-		if runtime.GOARCH != "arm64" || runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
-			return nvkrerr.New(nvkrerr.CodeEngineCapability, "local demo conformance requires native Mac or Linux ARM64")
-		}
+
 		if !configString(cfg.Repository) {
 			return configUsage("conformance requires the repository containing its captured artifact Run")
 		}
@@ -99,10 +98,10 @@ func AdmitNativeDeployment(ctx context.Context, accelerator string) error {
 
 func nativeAccelerator(platform, requested string) (string, error) {
 	if requested == "" {
-		switch platform {
-		case "darwin/arm64":
+		switch hostOS, _, _ := strings.Cut(platform, "/"); hostOS {
+		case "darwin":
 			requested = "hvf"
-		case "linux/arm64":
+		case "linux":
 			requested = "kvm"
 		}
 	}
@@ -143,21 +142,20 @@ func nativeDeploymentConfig(ctx context.Context, cfg Config, platform string) (N
 	if _, err := nativeDeploymentNetwork(cfg.Network); err != nil {
 		return NativeConfig{}, err
 	}
-	if cfg.Conformance && platform != "linux/arm64" && platform != "darwin/arm64" {
-		return NativeConfig{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "local demo conformance requires native Mac or Linux ARM64")
-	}
-	conformance, err := selectNativeConformance(cfg)
+
+	accelerator, err := nativeAccelerator(platform, cfg.Accelerator)
 	if err != nil {
 		return NativeConfig{}, err
 	}
-	accelerator, err := nativeAccelerator(platform, cfg.Accelerator)
+	conformance, err := selectNativeConformance(ctx, cfg, platform)
 	if err != nil {
 		return NativeConfig{}, err
 	}
 	if cfg.Runs.OS == "" {
 		return NativeConfig{}, nvkrerr.New(nvkrerr.CodeUsage, "deployment requires a completed OS Run")
 	}
-	name, err := selectedDiskOutput(cfg.Network)
+	_, arch, _ := strings.Cut(platform, "/")
+	name, err := selectedDiskOutputForArchitecture(cfg.Network, arch)
 	if err != nil {
 		return NativeConfig{}, err
 	}
@@ -165,8 +163,11 @@ func nativeDeploymentConfig(ctx context.Context, cfg Config, platform string) (N
 	if err != nil {
 		return NativeConfig{}, err
 	}
-	_, image, err := nativeSelectedRunPlan(ctx, root, name, "disk-image")
+	plan, image, err := nativeSelectedRunPlan(ctx, root, name, "disk-image")
 	if err != nil {
+		return NativeConfig{}, err
+	}
+	if err := nativeOutputPlatform(plan, image, "linux/"+arch); err != nil {
 		return NativeConfig{}, err
 	}
 	if image.Disk == nil || image.Disk.Format != "qcow2" || image.Disk.Encryption != "none" || image.Disk.Outcome != "succeeded" || image.Disk.PayloadDigest != image.Digest || image.Disk.Size <= 0 {

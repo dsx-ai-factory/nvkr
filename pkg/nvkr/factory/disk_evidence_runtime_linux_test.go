@@ -560,6 +560,7 @@ case "volume":switch a[1]{case "create":name:=a[len(a)-1];labels:=map[string]str
 case "inspect":_,err:=os.Stdout.Write(read("volume-"+a[len(a)-1]));fail(err)
 case "rm":fail(os.Remove(filepath.Join(fixtureRoot,"volume-"+a[len(a)-1])))
 default:os.Exit(96)}
+case "container":name:=a[len(a)-1];fail(json.NewEncoder(os.Stdout).Encode(map[string]any{"Id":name,"Image":pin}))
 case "create":name:=value(a,"--name");put("container-"+name,a);put("container-"+id(name),a);fmt.Print(id(name))
 case "cp":if a[1]=="-"{_,err:=io.Copy(io.Discard,os.Stdin);fail(err);break};source:=a[1];switch {case strings.Contains(source,"capture.tar"):carrier("capture.tar",read("capture.tar"));case strings.Contains(source,".qcow2"):carrier(filepath.Base(source),read("node.qcow2"));default:carrier("serial.log",[]byte("controlled serial diagnostic"))}
 case "start":args:=container(a[len(a)-1]);name:=value(args,"--name");switch {

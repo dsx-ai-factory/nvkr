@@ -60,15 +60,19 @@ func checkLocalQualificationPayloadsWith(ctx context.Context, workspace string, 
 		if want.Name != slot.Name {
 			return e.New(e.CodeVerifyFailed, "local output observations are not in canonical slot order")
 		}
+		activity := localProgress(ctx)
+		activity.startItem(slot.Name, index, len(inputs.run.Expected))
 		if slot.Kind == OutputDiskImage {
 			if err := checkLocalQualificationDisk(ctx, workspace, inputs.plan, slot, want, observeDisk); err != nil {
 				return err
 			}
+			activity.finishItem()
 			continue
 		}
 		if err := checkOrdinary(ctx, slot, want, artifacts); err != nil {
 			return err
 		}
+		activity.finishItem()
 	}
 	return nil
 }

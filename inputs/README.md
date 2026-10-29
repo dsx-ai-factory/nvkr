@@ -1,8 +1,10 @@
 # Authored inputs
 
-This directory owns the repository's NVKE and AICR build and release inputs. Definitions select named outputs
+This directory owns the repository's NVKE, NVSentinel and AICR build and release inputs. Definitions select named outputs
 from pinned catalog producers; Environments select execution and publication policy. The maintained
 release candidate starts at [the NVKE Definition](definitions/nvke/definition.yaml).
+The [four-family pilot](definitions/nvke/README.md#four-family-pilot) supplies independent core, services,
+telemetry and disk Definitions alongside that combined candidate.
 
 ```text
 inputs/
@@ -29,13 +31,19 @@ the move preserves each file's existing format.
 |---|---|---|
 | [`definitions/nvke/definition.yaml`](definitions/nvke/definition.yaml) | [`environments/github-release.yaml`](environments/github-release.yaml) | Maintained 69-output release candidate; existing main-only signed publication |
 | Same NVKE Definition | [`environments/github-development.yaml`](environments/github-development.yaml) | Separate signed development bundle and publication namespace |
+| [`definitions/nvke/core.yaml`](definitions/nvke/core.yaml) | [`environments/github-nvke-core.yaml`](environments/github-nvke-core.yaml) | 20-output core pilot with its own named production bundle and publication namespace |
+| [`definitions/nvke/services.yaml`](definitions/nvke/services.yaml) | [`environments/github-nvke-services.yaml`](environments/github-nvke-services.yaml) | 28-output supporting-services pilot |
+| [`definitions/nvke/telemetry.yaml`](definitions/nvke/telemetry.yaml) | [`environments/github-nvke-telemetry.yaml`](environments/github-nvke-telemetry.yaml) | 17-output telemetry pilot |
+| [`definitions/nvke/disks.yaml`](definitions/nvke/disks.yaml) | [`environments/github-nvke-disks.yaml`](environments/github-nvke-disks.yaml) | Four-output native plain/public-bootstrap FDE disk pilot |
 | [`definitions/demo/arm64-nvidia-tcg.json`](definitions/demo/arm64-nvidia-tcg.json) | [`environments/local-arm64-tcg.json`](environments/local-arm64-tcg.json) | Local 32-output NVIDIA OVN demo |
 | [`definitions/demo/arm64-upstream-tcg.json`](definitions/demo/arm64-upstream-tcg.json) | Same local TCG Environment | Local 32-output upstream OVN diagnostic demo |
 | [`definitions/demo/arm64-nvidia-kvm.json`](definitions/demo/arm64-nvidia-kvm.json) | [`environments/github-nightly-nvidia.json`](environments/github-nightly-nvidia.json) | Named NVIDIA nightly producer; current content differences remain explicit |
+| [`definitions/demo/amd64-nvidia-local-kvm.json`](definitions/demo/amd64-nvidia-local-kvm.json) | [`environments/local-amd64-kvm.json`](environments/local-amd64-kvm.json) | Native AMD64 local build and Go site-bootstrap smoke inputs; build and runtime acceptance require a completed Run |
 | [`definitions/demo/arm64-upstream-kvm.json`](definitions/demo/arm64-upstream-kvm.json) | [`environments/github-nightly-upstream.json`](environments/github-nightly-upstream.json) | Separately signed upstream nightly producer |
 | [`definitions/diagnostics/os-amd64.yaml`](definitions/diagnostics/os-amd64.yaml) | [`environments/local-linux-amd64-kvm.yaml`](environments/local-linux-amd64-kvm.yaml) | Native AMD64 plain-disk diagnostic |
 | [`definitions/diagnostics/os-arm64.yaml`](definitions/diagnostics/os-arm64.yaml) | [`environments/local-linux-arm64-kvm.yaml`](environments/local-linux-arm64-kvm.yaml) | Native ARM64 plain-disk diagnostic |
 | [`definitions/diagnostics/fde-amd64.yaml`](definitions/diagnostics/fde-amd64.yaml) | [`environments/github-diagnostics.yaml`](environments/github-diagnostics.yaml) | Build-only public-bootstrap FDE diagnostic; existing branch allowlist |
+| [`definitions/kubernetes-conformance-arm64/definition.yaml`](definitions/kubernetes-conformance-arm64/definition.yaml) | [`environments/local-conformance-tools-arm64.yaml`](environments/local-conformance-tools-arm64.yaml) | Local four-output ARM64 Kubernetes conformance tools; [1.34 variant](definitions/kubernetes-conformance-arm64/demo-1.34/README.md) uses the same Environment |
 
 The native local KVM Environments retain their existing diagnostic capacity and utility pins. The
 table does not imply that they can run the complete nightly demo unchanged. TCG/KVM differences affect
@@ -46,7 +54,8 @@ producer inputs as well as runtime admission, so the explicit demo Definitions r
 The additional [Mac](definitions/demo/native-mac/README.md) and
 [Linux](definitions/demo/native-linux/README.md) selections use one
 [shared native tool catalog](catalogs/tools/native/README.md). Their local policies
-are `environments/local-native-mac.json` and `environments/local-native-linux.json`.
+are `environments/local-native-mac.json` and the matching `environments/local-<arch>-kvm.json`.
+Host tool Definitions live in `definitions/demo/tools/<os>-<arch>.json`.
 QCOW builds use NVKR's existing disk-image Definitions listed above.
 The recorded Mac runtime uses an existing QCOW, upstream OVN and TCG. These inputs
 do not imply fresh-machine or full native Linux runtime acceptance.
@@ -57,6 +66,13 @@ The hosted variants use the matching `environments/github-ubuntu24-<arch>.yaml` 
 and remain build-only; they do not change maintained release membership or Ubuntu 26 defaults.
 
 ## Focused inputs and examples
+
+The [dedicated NVSentinel catalog](catalogs/nvsentinel/README.md) declares OCI images, Helm, executable
+binaries and DEB packages. Its focused callers live under `definitions/nvsentinel/`, with local execution
+policies under `environments/nvsentinel/`. The [NVKE OS material experiment](experiments/nvsentinel/README.md)
+keeps separate Debian producer copies with byte-identical commands, matching source declarations and pins,
+and the existing composer/Packer folder handoff. These development inputs do not
+change the maintained NVKE release or demonstrate current NVSentinel build/runtime acceptance.
 
 The [AICR example](definitions/aicr/README.md) selects six deployment-bundle formats
 from one pinned catalog with a local build-only Environment.
@@ -78,11 +94,16 @@ together. Maintain pins through `catalog pin`/`catalog bump`; use
 [catalog maintenance](../docs/catalog-maintenance.md) for the complete workflow. Definition reuse is
 explicit producer selection, without inheritance or execution-time output filtering.
 
-`make workflows-generate` regenerates the maintained release, development, nightly and qualification
-bundles. `make workflows-check` checks their exact recorded inputs. Generated bundles remain under
+`make workflows-generate` regenerates the maintained release, family-pilot, development, nightly and qualification
+bundles. `make workflows-check` checks their exact recorded inputs. The family-only targets are
+`make nvke-split-generate` and `make nvke-split-check`. Generated bundles remain under
 `.github/`; Run records and release artifacts remain with their execution/publication owners.
 
+The pilot retains the combined production/development/qualification paths pending consumer and
+qualification cutover. Its family Releases require separate digest-pinned verification and downstream-owned
+association; no parent Release, automatic association file or hosted acceptance is supplied by the split.
+
 The [qualification policy](policies/nvke-qualification.yaml) and
-[nightly coordinator configuration](testing/nightly-profiles.json) have independent owners and scopes.
+[nightly build/test workflow](../.github/workflows/nvkr-nightly.yml) have independent owners and scopes.
 [Reconciliation](../docs/adr/reconciliation.md) remains the evidence ledger for implementation and
 external acceptance.

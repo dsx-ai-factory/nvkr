@@ -1,9 +1,56 @@
-# Combined NVKE M2 candidate
+# NVKE release candidate and family pilot
 
-This is the Definition used by the committed `nvkr-run.yml`. It joins independently pinned NVKE CLI,
+The combined [Definition](definition.yaml) is used by the committed `nvkr-run.yml`. It joins independently pinned NVKE CLI,
 controller and chart builds, operator executables, native node images and third-party deployment images
 into one release with **69 named outputs**. This remains a candidate; completed pipeline delivery and
 full product acceptance are separate facts.
+
+## Four-family pilot
+
+Four independent Definitions partition the combined candidate's exact named outputs. The core family also
+selects the NICo charts, which the combined Definition omits because its flat workflow has no remaining YAML
+parsing headroom. They reuse the
+shared catalogs and pins; they do not import each other or change the combined Definition into a parent.
+
+| Definition | Outputs | Membership | Environment |
+|---|---:|---|---|
+| [Core](core.yaml) | 22 | CLI/operator tools, controller and bound chart, NICo charts, providers/reference fixture, CAPI and cert-manager images | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) |
+| [Services](services.yaml) | 28 | SPIRE, PostgreSQL and Temporal charts and native images | [github-nvke-services.yaml](../../environments/github-nvke-services.yaml) |
+| [Telemetry](telemetry.yaml) | 17 | NKTP chart and native runtime images | [github-nvke-telemetry.yaml](../../environments/github-nvke-telemetry.yaml) |
+| [Disks](disks.yaml) | 4 | Native AMD64/ARM64 plain and public-bootstrap FDE disks, each with its complete material closure | [github-nvke-disks.yaml](../../environments/github-nvke-disks.yaml) |
+
+Each Environment selects `githubBundle: nvke-<family>`, the corresponding
+`.github/workflows/nvkr-run-nvke-<family>.yml`, an explicit main-only signer identity, and publication prefix
+`ghcr.io/dsx-ai-factory/nvkr/m2-candidate/<family>`. Its Release publishes by digest beneath that prefix's
+`releases` repository. Source-access and disk settings are scoped to the family's selected producers.
+All four families retain the maintained production registry policy: `NVKR_REGISTRY_WRITE` handles
+publication, and `NVKR_REGISTRY_READ` with `NVKR_REGISTRY_READ_USER` handles publication verification.
+Only the disks family also uses that reader for private native toolchain preparation. These credentials
+require the same operator provisioning as the combined candidate; generation does not verify package access.
+
+From the repository root:
+
+```sh
+make nvke-split-generate
+make nvke-split-check
+```
+
+The repository-wide `make workflows-generate` and `make workflows-check` also include these bundles.
+Generated Plans, actions and manifests retain their normal ownership; edit the authored inputs and
+regenerate. Generation and drift checking do not build, publish or qualify any family.
+
+This is a reversible pilot alongside the combined production, development and qualification workflows.
+Named production bundles have no generated qualification pair, and named development bundles remain
+unsupported. The existing combined qualification policies do not cover four independent family Runs.
+Keep the combined path until the consumer and qualification cutover has its own accepted contract.
+
+Consumers select each exact digest-pinned family Release and verify it under independently chosen policy.
+Any record associating those references belongs to the downstream consumer; this pilot emits no automatic
+association file, native parent Release or cross-Release compatibility verdict. Family output publication
+still requires every output and its exact evidence within that Definition. No hosted family build,
+publication or independent consumer acceptance is established here. The
+[partitioning strategy](../../../docs/definition-partitioning-strategy.md) records the rationale,
+historical capacity measurements and remaining cutover work.
 
 ## Selected artifacts and their owners
 
@@ -15,6 +62,7 @@ full product acceptance are separate facts.
 | Node images | `../../catalogs/node-images/release`, `../../catalogs/node-images/variants/native-toolchains.yaml` | Separate native AMD64 and ARM64 plain and public-bootstrap FDE QCOW2s, with explicit material producers |
 | Deployment images | `../../catalogs/runtime-dependencies` | Twelve non-test runtime images for each native architecture: PostgreSQL, eight SPIRE images and three Temporal images |
 | CAPNICo | `../../catalogs/nvke/release-components` | Source-built `capnico-controller`, one OCI index requiring AMD64 and ARM64 |
+| NICo charts (core family only) | `../../catalogs/nico` | Source-packaged `nico` umbrella and `nico-prereqs` charts from one infra-controller `v2.2.2` pin, each stamped `2.2.2` |
 | Provisioned infrastructure provider | `../../catalogs/nvke/release` | Existing source-built `cluster-api-provider-provisioned`, independently delivered for both architectures; not CAPNICo or CAPI core |
 | Reference-profile fixture | `../../catalogs/nvke/release-components` | `nico-reference-profiles-fixture`, one AMD64/ARM64 content image containing the two NICO test config profiles and their runbooks, not production fleet configuration or the demo's runnable `controller-profiles` |
 | Telemetry | `../../catalogs/nvke/release-components` | Source-packaged `nktp` with its three vendored dependencies; eight required/optional runtime images for each native architecture, including the enabled Target Allocator and the uninstall hook's kubectl |
@@ -30,6 +78,7 @@ built OCI exports only. The architecture-independent NKTP chart is packaged once
 | Member | Selection mirrored from pinned upstream inputs | Boundary |
 |---|---|---|
 | CAPNICo | NVKE's selected `deploy/nico/capnico/capnico.yaml` names controller `v0.0.45`; CAPNICo's own Dockerfile builds it | Independent source pin and source build, not the provisioned infrastructure provider |
+| NICo charts | Not selected by NVKE's pin set; the site installs `nico` and `nico-prereqs` from infra-controller's `helm` and `helm-prereqs` directories. `v2.2.2` is the latest non-candidate release; subcharts are vendored as local directories, so packaging is offline | Charts only. Core service image repository and tag default to empty and remain consumer-supplied; building NICo images and the prerequisite chart's helmfile-installed operators are not selected |
 | NKTP chart and dependencies | The same NVKE `v0.22.0` source as the maintained controller; `nktp/deploy/charts/nktp/Chart.yaml` and `Chart.lock` select three exact dependencies; packaging stamps chart `0.22.0` | Fetch verifies Helm `v4.2.4` and all three acquired chart archives; packaging uses the retained closure with no network |
 | NKTP images | Selected source values and authenticated dependency charts: collector `0.162.0`, operator `0.159.0`, LGTM `0.32.0`, kube-state-metrics `v2.20.0`, node-exporter `v1.12.1`, optional metrics-server `v0.8.1`, uninstall kubectl `v1.34.1`; Operator `0.159.0`'s `versions.txt` selects Target Allocator `0.159.0` | Acquired images, not source builds; native subjects and parent indexes are lock-owned. Helm test-only BusyBox is excluded. Images are delivered separately; chart references are not automatically rewritten to publication repositories |
 | Reference-profile fixture | The selected NVKE fixture Dockerfile, `nico-vms-cp.yaml`, `nico-vms-worker.yaml` and sibling runbooks | Explicitly named `nico-reference-profiles-fixture`: the control-plane profile skips its pre-join reboot. It must not be installed as production fleet configuration. No empty/failure-test config profile, placeholder example, copied OSProfile or new Dockerfile/patch is added |
@@ -123,8 +172,9 @@ The [toolchain preparation guide](../../../toolchains/nvkr-packer/README.md)
 lists repository-owned native preparation and measurement commands, their current
 toolchain license/security gates, and the missing production inputs. The inspector's source
 README gives separate AMD64 and ARM64 assembly commands. The generated workflow uses isolated
-read-only image preparation with the ephemeral GitHub token; grant this repository Read under
-each internal toolchain package's Manage Actions access settings. Maintained manual dispatch and
+read-only image preparation with `NVKR_REGISTRY_READ` and `NVKR_REGISTRY_READ_USER`; provision access
+independently of the repository token, as described in the
+[production credential setup](../../../docs/generate-pipeline.md). Maintained manual dispatch and
 signing admit only `main`. The October 7 branch attempt at `562a609` used a temporary exact
 `codex/m2-native-arc-foundation` authored exception; it was cancelled after GitHub environment
 protection rejected that branch before attestation, disk execution and finalization steps ran
@@ -195,8 +245,10 @@ producer completion with mixed original attempts. Successful independent retry q
 Only admitted source retrieval and pinned-source revalidation steps receive `NKE_SOURCE_TOKEN` for NVKE;
 native build jobs receive source bytes without that
 credential. Internal toolchain preparation uses separate ephemeral read-only package access, removed
-before producer execution. Grant the workflow repository Actions Read access on each internal toolchain
-package. Restrict `nvkr-arc`, `nvkr-release` and the signing identity to the selected refs. Maintained inputs
+before producer execution. Grant the dedicated reader account only its required package roles and retire
+source-repository Actions access after migrating and validating the new workflow, as described in the
+[production credential setup](../../../docs/generate-pipeline.md). Restrict `nvkr-arc`, `nvkr-release`
+and the signing identity to the selected refs. Maintained inputs
 admit `main` only and contain no validation-branch dispatch exception. Ephemeral runner isolation and
 provider access restrictions remain operator obligations.
 

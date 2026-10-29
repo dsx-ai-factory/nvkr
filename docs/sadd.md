@@ -51,12 +51,13 @@ NVKR does not operate a registry, provision clusters, or manage fleet lifecycle.
 access, registry retention, runtime acceptance and deployment policy. NVKR offers explicit descriptive local
 diagnostics under ADR-16 §6; these do not qualify a cluster. Downstream systems consume accepted artifact
 references and own deployment descriptions and acceptance decisions (ADR-19/20).
-A separately authored repository CI adapter schedules producer Runs and invokes
-NVKE's suite in a separate downstream job outside this product lifecycle and v1
-qualification acceptance (ADR-16/18). NVKE owns guest/cluster provisioning,
-assertions and teardown; the parent harness owns host admission, outer leases,
-disk service and journaled network-control restoration. These trusted-code CI
-diagnostics do not add runtime authority to the artifact-verification core.
+A separately authored nightly CI workflow resolves one NVKE main commit and
+dispatches the existing generated producer. Its ARM64 NVIDIA consumer authenticates
+that Run's artifacts and invokes existing native Go site bootstrap, readiness and
+joined VM/backend/network cleanup owners, without rebuilding products. Binary
+transport/publication remains private; public coordinator attachments contain
+constructed JSON metadata only. These trusted-code integration results remain
+outside product lifecycle and v1 qualification acceptance (ADR-16/18).
 
 Proposed [ADR-24](adr/0024-imported-validator-catalog.md) separates imported-validator discovery from upstream
 test ownership and binds named artifact roles through explicit diagnostic profiles. The provisional CLI
@@ -64,6 +65,12 @@ slice implements strict loading/discovery and frozen local-plan dispatch through
 owners; native upstream catalog execution remains unexercised. Shared schema stabilization, published
 adapters and controller/chart integration are deferred. Existing CLI and legacy validation diagnostics
 retain their separate admission and result contracts; catalog registration grants no qualification authority.
+
+Proposed [ADR-26](adr/0026-definition-composition.md) designs composite Definitions: complete member Definitions
+pinned by exact digest compile to one Plan, Run and Release whose membership is the exact union of their named
+outputs. Members keep independent ownership, Runs and Releases; a composite rebuilds every output and inherits
+no member Run, Release or lane. Development bundles are planned with generation; member Release reuse and
+composite qualification are deferred. Nothing is implemented.
 
 ## Assumptions {#assumptions}
 
@@ -261,9 +268,20 @@ publication routes, and required output slots, then joins independently observed
 Required membership exists before execution, so omitting a failed output cannot make a partial run complete.
 Specialized byte-changing transformations remain explicit product intent.
 
+A proposed composite Definition (ADR-26) would enter this flow before the compiler: admission loads each
+digest-pinned member, rejects drift and structural conflicts, and derives one effective Definition that the same
+compiler consumes; the compiler rejects divergent cross-member producers once catalogs are resolved. Composition changes Definition, Plan, Run and Release identities and records every member digest and
+output attribution; it never changes an output's Build Digest. This path is designed, not implemented.
+
 The compiler derives each output's graph from its exact selected components and concrete
 target. `nvkr.build` identifies the logical projection of that validated graph. Output names, packaging and execution settings remain bound by their owning records. Equal Build
 Digests do not merge producer jobs, restore results, observations or evidence across named outputs.
+
+Raw Debian outputs select one ordinary `host-package` producer. Existing sessions, result authentication,
+held files and lifecycle staging own execution and archive retention; OS consumers use the existing material
+handoff. No separate Debian scheduler, target-profile resolver or receipt hierarchy is introduced.
+[ADR-10](adr/0010-pluggable-builder-types.md#raw-debian-output) defines the local evidence limits;
+[the NVSentinel catalog](../inputs/catalogs/nvsentinel/README.md) owns its four output families and commands.
 
 A `disk-image` named output explicitly selects one root producer with validated disk-image metadata and every
 component in that root's transitive material closure. Resolution rejects a missing or second disk root, an
@@ -505,11 +523,15 @@ selects independently tagged modules in a monorepo. Outputs select exact compone
 platforms. Artifact kinds and producer metadata govern format admission directly (ADR-11/12/22).
 
 A Definition selects producers and output-affecting settings directly on named outputs. An Environment supplies
-runtime settings, runner routes and execution classes, publication namespace, credential references, and signing
-identity/issuer policy. The compiler derives routine packaging and routes. Regeneration records the exact
+runtime settings, runner routes and execution classes, required publication transports and namespace,
+credential references, and signing identity/issuer policy. The compiler derives routine packaging and routes.
+Regeneration records the exact
 Definition and Environment input paths.
 Changing an Environment can change prepared execution and generated bytes without changing a resolved build graph;
 output-affecting build inputs remain bound to the identity they affect (ADR-17 §1).
+The current publication input owner admits omitted or explicit OCI selection and rejects APT-only or
+combined APT/OCI selection before catalog, generation or execution work. Required selections never fall back
+to another transport; a direct APT publisher and its service/signing contract remain deferred (ADR-20 §2).
 
 The qualified lane additionally consumes signed builder profiles, immutable promotion and evidence policies,
 and an operator trust store. It generates the exact Inventory compatibility form only after authenticated
@@ -569,8 +591,9 @@ material where applicable. These dependencies cannot be replaced by caller-suppl
 Compilation resolves the selected Definition, Environment, and component catalogs into a plan, validates the
 complete artifact graph, and renders only admitted engines and lanes. The committed bundle is regenerated from
 the same inputs and engine; missing, extra or changed owned files cause drift failure (ADR-21).
-GitHub keeps named jobs, prerequisite closure and conditions visible in the entry workflow. All jobs retain
-their runner, permissions and time bounds inline. Manifest-owned composite actions expose fixed interfaces
+In the default flat projection, GitHub keeps named jobs, prerequisite closure and conditions visible in the
+entry workflow, and all jobs retain their runner, permissions and time bounds inline. Opt-in partitioning
+moves them, with those controls, into workers described below. Manifest-owned composite actions expose fixed interfaces
 for node/source execution, preparation, output collection and transport. Grouped jobs reuse the node interface; optional slots and
 individual transfer calls preserve arbitrary admitted output counts without new action variants. One canonical
 invocation-data member holds parameters with named operation roles. The runtime descriptor operation
@@ -582,7 +605,8 @@ Before checkout or input transfer, disk producers reject missing, symlink or non
 If the runner cannot open the fixed device read/write, one bounded noninteractive permission bootstrap
 sets mode 0666 and requires a successful open afterward. Failed mutation or access remains a capability
 rejection. Full helper-owned capacity and held KVM API admission remain required before work.
-Operator setup, timed producers and steps with referenced outcomes/outputs remain inline in the entry workflow.
+In the default flat projection, operator setup, timed producers and steps with referenced outcomes/outputs
+remain inline in the entry workflow; opt-in partition workers carry those jobs instead, except OIDC signers.
 This includes finalization and the final Run upload used by the
 closing summary; shared recovery precedes inline finalization. Static Plan/manifest references and source scheduling by target/consumer cohort
 reduce routine pin churn without changing executable Plan/IR identities. Workflow bytes remain stable only
@@ -621,13 +645,23 @@ a bounded two-hour budget for setup, transport, authentication and final record 
 Carrier and GHCR publication admission use the automatic repository token for source metadata, separately
 from the credential that accesses package metadata and registry bytes. Producers receive neither through
 these admission paths.
-Admission bounds expanded YAML parsing events as well as file bytes. No producer acquires a new cross-output barrier. Redundant dependency edges are removed only with the full
+Admission bounds expanded YAML parsing events as well as file bytes. The default flat projection adds no cross-output barrier. Redundant dependency edges are removed only with the full
 prerequisite closure preserved; authored setup, runtime variables, images or services that mention the
 direct dependency context retain the original lists.
 Large finalizers receive exact original job results through fixed, bounded collectors. A collector must
 succeed and report its complete Plan-derived membership before recovery; its aggregate status never replaces
-individual producer outcomes. Producer matrix and reusable callable scheduling remain deferred
-(ADR-18 §8); ADR-21 separately admits the fixed native qualification worker and its selected-platform matrix.
+individual producer outcomes. Opt-in execution partitioning groups dependency layers into same-commit callable
+workers, with original job IDs and per-job controls. OIDC-signing jobs stay in the entry workflow to preserve
+the authored signer identity policy. Partitions may delay independent work behind an earlier
+group, but original prerequisite results govern ordinary job admission. One complete Plan and one finalizer
+retain the Run and Release boundary. Exact regeneration admits every worker and caller connection under the
+same ownership manifest. Factory's provider-independent execution graph owns operation membership,
+success/completion conditions, recovery prerequisites, partition validation and exact outcome accounting;
+GitHub renders the typed model rather than deriving scheduling semantics from YAML. Reconciliation records
+full development execution and hosted signing/verification evidence. Local equivalence contracts cover
+failure and cancellation; full-product provider recovery and qualification remain unproven (ADR-18 §8).
+Producer matrices remain deferred; ADR-21 separately
+admits the fixed native qualification worker and its selected-platform matrix.
 
 An explicit GitHub development Environment selects a separate fixed bundle. It shares the
 compiler, helper and complete output checks with production, while keeping its Plan, workflow and
@@ -1166,6 +1200,7 @@ already obtained.
 | Qualified provider observation, Nix, authority/discovery adapters and operational exercises | Qualified-lane module owners | Qualified production acceptance |
 | Qualified helper-image admission | Execution/trust owners | Exact executable/runtime receipt protocol; image pin alone is insufficient |
 | Deferred release registration transport | Registry/integration owners | Optional downstream discovery |
+| Proposed ADR-26 composite Definitions, then member Release reuse and composite qualification | Release-engineering, catalog, qualification and result-reuse owners | One combined Release from independently owned Definitions without a hand-maintained combined copy |
 
 Qualified helper-image use remains unavailable until it satisfies ADR-07/18's executable/runtime admission.
 Source bootstrap records only the identities that actually participated; delivery by image cannot imply

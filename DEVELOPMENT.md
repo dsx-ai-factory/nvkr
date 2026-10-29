@@ -88,6 +88,13 @@ Definition/Environment paths recorded in the committed Plan. A `make build` CLI 
 Use [scratch generation](docs/generate-pipeline.md) for v1, deploy, or other examples; generating them with
 `--root .` would replace the M2 workflow.
 
+The [NVKE family selections](inputs/definitions/nvke/README.md) split the same outputs into core, services,
+telemetry and disks. Each uses its own named production bundle and publication prefix. Regenerate or
+check just these bundles with `make nvke-split-generate` and `make nvke-split-check`; the full
+`workflows-generate` and `workflows-check` targets include them. Shared catalog maintenance enrolls all four
+pairs so a pin update regenerates every affected bundle in the same refresh. The combined selection remains the
+qualification and development baseline until named qualification is supported and independently exercised.
+
 ## Test pipeline changes on a feature branch
 
 The committed `nvkr-dev.yml` runs the **same 69-output M2 Definition** as the maintained production

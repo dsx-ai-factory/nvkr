@@ -3,8 +3,8 @@
 
 package factory
 
-// execute_sbom.go owns the per-build SBOM node. ADR-13 §1 (re-entered into v1
-// by ADR-13) requires a deterministic CycloneDX SBOM per built artifact plus
+// execute_sbom.go owns the per-build SBOM node. ADR-13 §1 requires a
+// deterministic CycloneDX SBOM per built artifact plus
 // an aggregate index. pkg/nvkr/sbom owns the document shape and its validation;
 // what this file owns is the JOIN: reading each built component's observed digest
 // from the producer-result this build already wrote, pairing it with the plan's

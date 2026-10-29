@@ -1,0 +1,84 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/environment/v1
+kind: Environment
+metadata:
+  name: nvke-disks-github
+  description: Signed NVKE disks candidate publication in its independent workflow and registry namespace. Native disks retain build provenance; deep inspection and material reconciliation remain deferred.
+githubBundle: nvke-disks
+githubARC: native-kvm-v1
+githubRunners:
+  linux/amd64: ubuntu-24.04
+  linux/arm64: ubuntu-24.04-arm
+diskEvidence: build-provenance-v1
+executionClasses:
+  - name: arc-amd64-kvm
+    runsOn: arc-amd64-kvm
+    hostPlatform: linux/amd64
+    resources:
+      cpuMillis: 8000
+      memoryMiB: 36864
+      ephemeralStorageMiB: 229376
+    maxTimeoutSeconds: 21600
+    capabilities: [kvm]
+  - name: arc-arm64-kvm
+    runsOn: arc-arm64-kvm
+    hostPlatform: linux/arm64
+    resources:
+      cpuMillis: 8000
+      memoryMiB: 36864
+      ephemeralStorageMiB: 229376
+    maxTimeoutSeconds: 21600
+    capabilities: [kvm]
+# Executable pins are native measurements. Budgets cover the existing 8 GiB
+# subject / 16 GiB filesystem limits, not a measured full M2 execution.
+# Private-volume admission requires 12*filesystem + 2*subject + 2 GiB scratch;
+# memory covers 2*subject + appliance + scanner/report headroom. Host capacity
+# includes the additional held subject snapshot.
+diskInspectionProfiles:
+  linux/amd64:
+    image: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector-native@sha256:aa4fbd23fd6e0ddeb3f94201bd1a9cc7083d1a1ff1720f7ce0cfa996e9ca5ed3
+    inspectorDigest: sha256:31f25fbb70ef79d8c5487c0d8a41613b6db5c93eb391b73f990ddaa04e6ba052
+    codecDigest: sha256:634320b91165669917123e8e79cce1c4d00cee0a4aa4d662d7c0a8186479b3fb
+    guestfishDigest: sha256:65739abd86dbf919cbdff5ef9bb144079bd0e97dc4c9023c9455d6b8538add8c
+    scannerDigest: sha256:abca2def61de9952fa06d3977bb1e064818facb9badfce502b450d3d6846a91f
+    packageReaderDigest: sha256:fc9dde782ca8309b65ab92e61d13318bf463cd1aa71daa8967b87b81b48b63d2
+    resources:
+      cpuMillis: 8000
+      memoryMiB: 28672
+      ephemeralStorageMiB: 229376
+    timeoutSeconds: 600
+    maxFilesystemBytes: 17179869184
+    scratchStorage: private-volume
+  linux/arm64:
+    image: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector-native@sha256:db9e17bd3cd94008ba58291b47774601e3b06c5bc741a25974de67c72e79b6bc
+    inspectorDigest: sha256:e95525c7c92f9581c79c8ecc0893109519fbfbb4607a341bf473e942215bfd7b
+    codecDigest: sha256:f26da24f8a7fd880ab13f6fcabf42d099fb68ea86df5de0c55e6faadfe2d9a6e
+    guestfishDigest: sha256:db1f245febce9e588902858806fc63b7878cc2c02ad9651e9a87102bbebe2feb
+    scannerDigest: sha256:617cef943234e0cae184b4901414ca4059ad6c6923a9c9decb46f49f6a2c6573
+    packageReaderDigest: sha256:3cf93403af757e938bda51322774697b8ff1e1d030b333008b2308e0b79a8dd6
+    resources:
+      cpuMillis: 8000
+      memoryMiB: 28672
+      ephemeralStorageMiB: 229376
+    timeoutSeconds: 600
+    maxFilesystemBytes: 17179869184
+    scratchStorage: private-volume
+publication:
+  mode: per-output-v1
+  credentialRef: github:NVKR_REGISTRY_WRITE
+  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks
+runtime:
+  runtime: docker
+  buildNetworkPolicy: producer-declared
+signing:
+  identity: ^https://github\.com/dsx-ai-factory/nvkr/\.github/workflows/nvkr-run-nvke-disks\.yml@refs/heads/main$
+  issuer: https://token.actions.githubusercontent.com
+  mode: cosign
+sourceAccess:
+  https://github.com/dsx-ai-factory/nvke.git:
+    credentialRef: github:NKE_SOURCE_TOKEN
+    mirror: https://github.com/dsx-ai-factory/nvke
+utilityContainer: busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1
+utilityPlatform: linux/amd64

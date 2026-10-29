@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -254,45 +255,144 @@ func TestGitHubSourceRefusesEmptyCredential(t *testing.T) {
 
 func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 	testutil.RequireExtended(t)
-	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
+	for _, fixture := range []struct {
+		name, bundle string
+		pinSet       bool
+	}{
+		{"combined", "nvkr-run", true},
+		{"core", "nvkr-run-nvke-core", true},
+		{"services", "nvkr-run-nvke-services", true},
+		{"telemetry", "nvkr-run-nvke-telemetry", false},
+		{"disks", "nvkr-run-nvke-disks", false},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			plan, err := LoadPlanContext(t.Context(), "../../../.github/"+fixture.bundle+"/plan.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantRepositories := map[string]bool{}
+			if fixture.pinSet {
+				wantRepositories["https://github.com/dsx-ai-factory/nvke"] = true
+			}
+			if !maps.Equal(plan.catalogPinSetRepositories(), wantRepositories) {
+				t.Fatal("maintained catalog revalidation repository selection changed")
+			}
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertMaintainedPinSetCredentialScope(t, plan, bundle, fixture.pinSet)
+			if fixture.name == "combined" {
+				assertMaintainedPinSetCredentialMutations(t, plan, bundle)
+			}
+		})
+	}
+}
+
+func assertMaintainedPinSetCredentialScope(t *testing.T, plan *Plan, bundle *GeneratedBundle, wantPinSet bool) {
+	t.Helper()
+	wantEnvironment := map[string]string{
+		"NVKR_PIN_SOURCE_TOKEN_0": "${{ secrets.NKE_SOURCE_TOKEN }}",
+		"GIT_TERMINAL_PROMPT":     "0",
+		"GIT_CONFIG_NOSYSTEM":     "1",
+		"GIT_CONFIG_GLOBAL":       "/dev/null",
+		"GIT_CONFIG_COUNT":        "4",
+		"GIT_CONFIG_KEY_0":        "credential.helper",
+		"GIT_CONFIG_VALUE_0":      "",
+		"GIT_CONFIG_KEY_1":        "credential.useHttpPath",
+		"GIT_CONFIG_VALUE_1":      "true",
+		"GIT_CONFIG_KEY_2":        "url.https://github.com/dsx-ai-factory/nvke.insteadOf",
+		"GIT_CONFIG_VALUE_2":      "https://github.com/dsx-ai-factory/nvke",
+		"GIT_CONFIG_KEY_3":        "credential.https://github.com/dsx-ai-factory/nvke.helper",
+		"GIT_CONFIG_VALUE_3":      strings.ReplaceAll(sourceCredentialHelper, sourceTokenEnv, "NVKR_PIN_SOURCE_TOKEN_0"),
+	}
+	hasPinCredential := func(environment map[string]string) bool {
+		for key, value := range environment {
+			if strings.HasPrefix(key, "NVKR_PIN_SOURCE_TOKEN_") || strings.Contains(value, "NVKR_PIN_SOURCE_TOKEN_") {
+				return true
+			}
+		}
+		return false
+	}
+	const sourceCredential = "${{ secrets.NKE_SOURCE_TOKEN }}"
+	hasSourceSecret := func(environment map[string]string) bool {
+		for _, value := range environment {
+			if strings.Contains(value, "secrets.NKE_SOURCE_TOKEN") {
+				return true
+			}
+		}
+		return false
+	}
+	_, nodeJobs, err := githubStages(plan)
 	if err != nil {
 		t.Fatal(err)
 	}
-	bundle, err := RenderGitHub(t.Context(), plan)
-	if err != nil {
-		t.Fatal(err)
+	allowedFetches := map[string]map[string]bool{}
+	for _, node := range plan.Graph.Nodes {
+		if node.Kind != NodeFetch || githubSourceEnvironment(plan, node)[sourceTokenEnv] != sourceCredential {
+			continue
+		}
+		jobID := nodeJobs[node.ID]
+		if allowedFetches[jobID] == nil {
+			allowedFetches[jobID] = map[string]bool{}
+		}
+		allowedFetches[jobID][githubJobID(node.ID)] = true
 	}
 	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
+	if hasPinCredential(document.Env) || hasSourceSecret(document.Env) {
+		t.Fatal("workflow-scoped pin credential")
+	}
 	found := map[string]int{}
 	bootstraps := 0
 	for id, job := range document.Jobs {
-		if strings.HasPrefix(id, "build-runner-") {
+		bootstrap := strings.HasPrefix(id, "build-runner-")
+		if bootstrap {
 			bootstraps++
 		}
-		for key := range job.Env {
-			if strings.HasPrefix(key, "NVKR_PIN_SOURCE_TOKEN_") {
-				t.Fatal("job-scoped pin credential")
-			}
+		if hasPinCredential(job.Env) || hasSourceSecret(job.Env) {
+			t.Fatalf("job-scoped pin credential in %s", id)
 		}
 		for _, step := range job.Steps {
-			if step.Env["NVKR_PIN_SOURCE_TOKEN_0"] == "" {
+			if strings.Contains(step.Run, "secrets.NKE_SOURCE_TOKEN") {
+				t.Fatalf("source secret entered command text in %s/%s", id, step.ID)
+			}
+			// Source fetches may independently receive this secret, but only
+			// under the source token key on their exact mapped fetch step.
+			if !hasPinCredential(step.Env) && !strings.Contains(step.Run, "NVKR_PIN_SOURCE_TOKEN_") {
+				if hasSourceSecret(step.Env) {
+					if !allowedFetches[id][step.ID] || step.Env[sourceTokenEnv] != sourceCredential {
+						t.Fatalf("source secret escaped catalog or selected fetch steps: %s/%s", id, step.ID)
+					}
+					for key, value := range step.Env {
+						if key != sourceTokenEnv && strings.Contains(value, "secrets.NKE_SOURCE_TOKEN") {
+							t.Fatalf("source secret appeared under an unrelated key in %s/%s", id, step.ID)
+						}
+					}
+				}
 				continue
 			}
 			found[step.ID]++
-			if step.ID != "validate-catalog" && step.ID != "finalize-catalog" {
-				t.Fatalf("credential leaked to %s", step.Name)
+			if !wantPinSet || !maps.Equal(step.Env, wantEnvironment) {
+				t.Fatalf("catalog token, repository helper or mirror changed in %s/%s", id, step.ID)
 			}
-			if !strings.Contains(job.If, githubDispatchCondition(plan)) {
-				t.Fatal("catalog credential exposed outside admitted branch dispatch")
+			if !(bootstrap && step.ID == "validate-catalog") && !(id == "nvkr-lifecycle-run" && step.ID == "finalize-catalog") {
+				t.Fatalf("catalog credential escaped revalidation: %s/%s", id, step.ID)
 			}
-			if strings.Contains(step.Run, "secrets.") {
-				t.Fatal("credential embedded in command")
+			if !strings.Contains(job.If, githubDispatchCondition(plan)) ||
+				!strings.Contains(step.Run, strings.ReplaceAll(requireSourceToken, sourceTokenEnv, "NVKR_PIN_SOURCE_TOKEN_0")) ||
+				strings.Contains(step.Run, "secrets.") {
+				t.Fatal("catalog credential lost dispatch/presence guards or entered command text")
 			}
 		}
 	}
-	if bootstraps == 0 || found["validate-catalog"] != bootstraps || found["finalize-catalog"] != 1 {
-		t.Fatalf("catalog revalidation credentials missing: %v", found)
+	if bootstraps == 0 || wantPinSet && (found["validate-catalog"] != bootstraps || found["finalize-catalog"] != 1) ||
+		!wantPinSet && len(found) != 0 {
+		t.Fatalf("unexpected catalog revalidation credential steps: %v", found)
 	}
+}
+
+func assertMaintainedPinSetCredentialMutations(t *testing.T, plan *Plan, bundle *GeneratedBundle) {
+	t.Helper()
 	for _, tc := range []struct {
 		name, old, replacement string
 		allOccurrences         bool
@@ -328,7 +428,7 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 				t.Fatal(err)
 			}
 			changed := relowerGitHubTestBundle(t, plan, bundle, raw)
-			if err := validateGitHubWorkflowSize(changed.Files[GitHubWorkflowPath]); err != nil {
+			if err := validateGitHubWorkflowSize(changed.Files[bundle.WorkflowPath]); err != nil {
 				t.Fatal(err)
 			}
 			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), e.CodeEngineCapability)

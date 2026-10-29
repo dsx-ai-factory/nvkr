@@ -7,6 +7,7 @@ metadata:
   description: Full feature-branch development pipeline; isolated signed publications expire after their completed attempt becomes eligible for cleanup.
   name: nvke-m2-github-dev
 githubDevelopment: true
+githubExecutionPartitions: true
 githubARC: native-kvm-v1
 githubRunners:
   linux/amd64: ubuntu-24.04

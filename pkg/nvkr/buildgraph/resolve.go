@@ -38,12 +38,15 @@ func (selection Selection) Validate() error {
 	}
 	switch selection.OutputFormat {
 	case "", definition.OutputExecutable, definition.OutputOCI, definition.OutputAPT,
-		definition.OutputHelm, definition.OutputBundle, definition.OutputDiskImage:
+		definition.OutputHelm, definition.OutputBundle, definition.OutputDiskImage, definition.OutputDebianPackage:
 	default:
 		return e.New(e.CodeInvalidCatalog, "output format %q is unsupported", selection.OutputFormat)
 	}
 	if len(selection.Components) == 0 {
 		return e.New(e.CodeInvalidCatalog, "output must select at least one component")
+	}
+	if selection.OutputFormat == definition.OutputDebianPackage && len(selection.Components) != 1 {
+		return e.New(e.CodeInvalidCatalog, "Debian output requires exactly one source producer")
 	}
 	seen := make(map[string]bool, len(selection.Components))
 	for _, name := range selection.Components {
@@ -81,6 +84,9 @@ func Resolve(cat *catalog.Catalog, selection Selection) (*Resolved, error) {
 		component, ok := cat.Components[name]
 		if !ok {
 			return nil, e.New(e.CodeInvalidCatalog, "unknown selected component %q", name)
+		}
+		if selection.OutputFormat == definition.OutputDebianPackage && (!component.FromSource || component.OutputType != "host-package") {
+			return nil, e.New(e.CodeInvalidCatalog, "Debian output requires a from-source host-package producer")
 		}
 		if err := requireComponentRoute(name, component, selection.Platform); err != nil {
 			return nil, err

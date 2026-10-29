@@ -8,13 +8,16 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualification"
 )
 
 const developmentFixtureEnvironment = "environment-dev.yaml"
@@ -202,10 +205,11 @@ func TestClosureAllowlistIsExactInBothPlaces(t *testing.T) {
 	}
 }
 
-// The committed policy and Plans give the real qualification pair and named
-// nightly Runs; their files must be in the allowlist. This proves the listing
-// only; regenerating a pair after a pin change is exercised on a fixture in
-// closure_qualification_test.go.
+// The committed policy and Plans give the real qualification pairs and named
+// family and nightly Runs; their complete committed file inventories must be in
+// the allowlist even without private source access. This checks local snapshots,
+// not source authentication or regeneration; the real compile/refresh owner is
+// exercised on fixtures in closure_qualification_test.go and by workflows-check.
 func TestClosureListsTheMaintainedBundles(t *testing.T) {
 	root, err := filepath.Abs("../../..")
 	if err != nil {
@@ -219,36 +223,144 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 	if cfg.DevelopmentEnvironment == "" || cfg.QualificationPolicy == "" || cfg.DevelopmentQualificationPolicy == "" {
 		t.Fatal("the maintained policy does not name its dependent bundles")
 	}
-	plan, err := lifecycle.CompileFiles(t.Context(), cfg.Definition, cfg.Environment, "dev (unknown)")
-	if err != nil {
-		t.Skipf("committed Plan does not compile offline: %v", err)
+	wantAdditional := []RunInput{
+		{Definition: "inputs/definitions/nvke/core.yaml", Environment: "inputs/environments/github-nvke-core.yaml"},
+		{Definition: "inputs/definitions/nvke/services.yaml", Environment: "inputs/environments/github-nvke-services.yaml"},
+		{Definition: "inputs/definitions/nvke/telemetry.yaml", Environment: "inputs/environments/github-nvke-telemetry.yaml"},
+		{Definition: "inputs/definitions/nvke/disks.yaml", Environment: "inputs/environments/github-nvke-disks.yaml"},
+		{Definition: "inputs/definitions/demo/arm64-nvidia-kvm.json", Environment: "inputs/environments/github-nightly-nvidia.json"},
+		{Definition: "inputs/definitions/demo/arm64-upstream-kvm.json", Environment: "inputs/environments/github-nightly-upstream.json"},
 	}
-	production, err := factory.Render(t.Context(), plan, factory.EngineGitHub)
+	if len(cfg.AdditionalRuns) != len(wantAdditional) {
+		t.Fatalf("maintained policy selects %d additional Runs, want %d", len(cfg.AdditionalRuns), len(wantAdditional))
+	}
+	for _, want := range wantAdditional {
+		if !slices.Contains(cfg.AdditionalRuns, want) {
+			t.Fatalf("maintained policy omits additional Run %+v", want)
+		}
+	}
+	planPaths, err := filepath.Glob(committedPlanGlob)
 	if err != nil {
 		t.Fatal(err)
 	}
-	members, err := buildClosure(t.Context(), cfg, "dev (unknown)", plan, production, "")
-	if err != nil {
-		t.Fatal(err)
+	wantRuns := append([]RunInput{{Definition: cfg.Definition, Environment: cfg.Environment}}, otherRuns(cfg)...)
+	if len(planPaths) != len(wantRuns) {
+		t.Fatalf("maintained closure has %d committed Plans, want %d", len(planPaths), len(wantRuns))
+	}
+	members := &closure{}
+	plans := make(map[RunInput]*factory.Plan, len(wantRuns))
+	for _, planPath := range planPaths {
+		plan, bundle := committedClosureRun(t, filepath.ToSlash(planPath))
+		input := RunInput{Definition: plan.DefinitionPath, Environment: plan.EnvironmentPath}
+		if !slices.Contains(wantRuns, input) || plans[input] != nil {
+			t.Fatalf("committed Plan %s has an unexpected or duplicate policy selection %+v", planPath, input)
+		}
+		plans[input] = plan
+		if input == wantRuns[0] {
+			members.production = bundle
+		} else {
+			members.runs = append(members.runs, closureRun{bundle: bundle, plan: plan})
+		}
+	}
+	for _, input := range wantRuns {
+		if plans[input] == nil {
+			t.Fatalf("maintenance policy selection %+v has no committed Plan", input)
+		}
+	}
+	for _, selected := range []struct {
+		policyPath string
+		input      RunInput
+		target     **qualification.GeneratedWorkflows
+	}{
+		{cfg.QualificationPolicy, wantRuns[0], &members.qualification},
+		{cfg.DevelopmentQualificationPolicy, RunInput{Definition: cfg.Definition, Environment: cfg.DevelopmentEnvironment}, &members.developmentQualification},
+	} {
+		policy, err := lifecycle.LoadQualificationPolicy(t.Context(), selected.policyPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pair, err := qualification.RenderWorkflows(t.Context(), plans[selected.input], policy, selected.policyPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := qualification.CheckWorkflows(t.Context(), ".", pair); err != nil {
+			t.Fatalf("committed qualification owner %s: %v", selected.policyPath, err)
+		}
+		*selected.target = pair
 	}
 	directories, files := members.paths()
-	for _, want := range []string{".github/nvkr-dev", ".github/nvkr-dev-qualification", ".github/nvkr-qualification", ".github/nvkr-run", ".github/nvkr-run-nvke-nightly-arm64", ".github/nvkr-run-nvke-nightly-upstream-ovn-arm64"} {
-		if !contains(directories, want) {
-			t.Fatalf("directories %v lack %s", directories, want)
-		}
+	wantDirectories := []string{
+		".github/nvkr-dev",
+		".github/nvkr-dev-qualification",
+		".github/nvkr-qualification",
+		".github/nvkr-run",
+		".github/nvkr-run-nvke-core",
+		".github/nvkr-run-nvke-disks",
+		".github/nvkr-run-nvke-nightly-arm64",
+		".github/nvkr-run-nvke-nightly-upstream-ovn-arm64",
+		".github/nvkr-run-nvke-services",
+		".github/nvkr-run-nvke-telemetry",
 	}
-	for _, want := range []string{".github/workflows/nvkr-dev.yml", ".github/workflows/nvkr-dev-qualify.yml", ".github/workflows/nvkr-dev-smoke.yml", ".github/workflows/nvkr-qualify.yml", ".github/workflows/nvkr-run-nvke-nightly-arm64.yml", ".github/workflows/nvkr-run-nvke-nightly-upstream-ovn-arm64.yml", ".github/workflows/nvkr-run.yml", ".github/workflows/nvkr-smoke.yml"} {
-		if !contains(files, want) {
-			t.Fatalf("files %v lack %s", files, want)
-		}
+	if !slices.Equal(directories, wantDirectories) {
+		t.Fatalf("closure directories = %v, want %v", directories, wantDirectories)
+	}
+	wantFiles := []string{
+		".github/workflows/nvkr-dev-qualify.yml",
+		".github/workflows/nvkr-dev-smoke.yml",
+		".github/workflows/nvkr-dev.yml",
+		".github/workflows/nvkr-qualify.yml",
+		".github/workflows/nvkr-run-nvke-core.yml",
+		".github/workflows/nvkr-run-nvke-disks.yml",
+		".github/workflows/nvkr-run-nvke-nightly-arm64.yml",
+		".github/workflows/nvkr-run-nvke-nightly-upstream-ovn-arm64.yml",
+		".github/workflows/nvkr-run-nvke-services.yml",
+		".github/workflows/nvkr-run-nvke-telemetry.yml",
+		".github/workflows/nvkr-run.yml",
+		".github/workflows/nvkr-smoke.yml",
+	}
+	if !slices.Equal(files, wantFiles) {
+		t.Fatalf("closure workflow files = %v, want %v", files, wantFiles)
+	}
+	allowed := make(map[string]bool, len(directories))
+	for _, directory := range directories {
+		allowed[directory] = true
+	}
+	if err := refuseUnnamedBundles(allowed); err != nil {
+		t.Fatal(err)
 	}
 }
 
-func contains(values []string, want string) bool {
-	for _, value := range values {
-		if value == want {
-			return true
-		}
+// Reconstitute only the committed description; the factory owner checks every
+// member's bytes/mode, exact manifest and complete namespace inventory. Rendering
+// every family here would repeat the separate extended regeneration matrix.
+func committedClosureRun(t *testing.T, planPath string) (*factory.Plan, *factory.GeneratedBundle) {
+	t.Helper()
+	plan, err := factory.LoadPlanContext(t.Context(), planPath)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return false
+	manifestPath := filepath.ToSlash(filepath.Join(filepath.Dir(planPath), "manifest.json"))
+	var manifest factory.GeneratedManifest
+	if err := canonical.UnmarshalExact(bytes.TrimSuffix(readFixture(t, manifestPath), []byte("\n")), &manifest); err != nil {
+		t.Fatalf("committed manifest %s: %v", manifestPath, err)
+	}
+	digest, err := plan.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.PlanDigest != digest {
+		t.Fatalf("committed manifest %s does not bind its Plan", manifestPath)
+	}
+	bundle := &factory.GeneratedBundle{
+		Engine: manifest.Engine, WorkflowPath: manifest.WorkflowPath, PlanPath: planPath,
+		ManifestPath: manifestPath, PlanDigest: digest, WorkflowDigest: manifest.WorkflowDigest,
+		Files: make(map[string][]byte, len(manifest.Members)),
+	}
+	for _, member := range manifest.Members {
+		bundle.Files[member.Path] = readFixture(t, member.Path)
+	}
+	if err := factory.CheckGeneratedBundle(t.Context(), ".", bundle); err != nil {
+		t.Fatalf("committed producer owner %s: %v", manifestPath, err)
+	}
+	return plan, bundle
 }

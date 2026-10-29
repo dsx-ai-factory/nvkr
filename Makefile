@@ -48,8 +48,6 @@ info: ## Print version / toolchain info.
 	@echo "go:          $(GO_VERSION)"
 	@echo "gotoolchain: $(GOTOOLCHAIN)"
 
-# --- build ------------------------------------------------------------------
-
 .PHONY: build
 build: go-version-check ## Compile the nvkr binary.
 	go build -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/nvkr
@@ -70,8 +68,6 @@ install: ## Install nvkr into $$(go env GOBIN).
 .PHONY: nvkr-exec-helper
 nvkr-exec-helper: ## Reproducibly build the ADR-18 nvkr-exec helper binaries + write the lock (ARGS=--image also assembles the image).
 	@bash toolchains/nvkr-exec/build-nvkr-exec.sh $(ARGS)
-
-# --- quality ----------------------------------------------------------------
 
 .PHONY: go-version-check
 go-version-check: ## Require the exact Go patch pinned in .go-version.
@@ -186,11 +182,12 @@ LICENSE_HOLDER     := NVIDIA CORPORATION & AFFILIATES
 LICENSE_IGNORES := -ignore '**/testdata/**' -ignore '**/pins.lock.yaml' \
 	-ignore '.github/workflows/nvkr-run.yml' -ignore '.github/workflows/nvkr-qualify.yml' \
 	-ignore '.github/workflows/nvkr-run-*.yml' \
+	-ignore '.github/workflows/nvkr-*__partition-[0-9][0-9].yml' \
 	-ignore '.github/workflows/nvkr-dev-qualify.yml' -ignore '.github/workflows/nvkr-dev-smoke.yml' \
 	-ignore '.github/workflows/nvkr-smoke.yml' -ignore '.github/workflows/nvkr-dev.yml' -ignore '**/*.tmpl' \
 	-ignore 'docs/evidence/**' -ignore 'docs/**/*.yaml' -ignore 'docs/**/*.yml' \
 	-ignore '.nvkr/**' -ignore '.nvkr-inputs/**' -ignore '.claude/**' -ignore 'bin/**'
-LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-(run(-[a-z0-9-]+)?|qualify|smoke|dev(-qualify|-smoke)?)\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
+LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-(run(-[a-z0-9-]+)?|qualify|smoke|dev(-qualify|-smoke)?)(__partition-[0-9]{2})?\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
 ADDLICENSE := go run github.com/google/addlicense@$(ADDLICENSE_VERSION)
 # addlicense walks every directory under its argument, including untracked ones
 # such as other worktrees, so hand it Git's file list instead of ".".
@@ -199,6 +196,12 @@ LICENSE_FILES := git ls-files -z --cached --others --exclude-standard
 .PHONY: license
 license: ## Add the SPDX license header to source files that lack one.
 	$(LICENSE_FILES) | xargs -0 $(ADDLICENSE) -f scripts/license-header.tmpl -c "$(LICENSE_HOLDER)" $(LICENSE_IGNORES)
+
+.PHONY: definitions-location-check
+definitions-location-check: ## Fail when a file is tracked under the retired top-level definitions/ directory.
+	@files=$$(git ls-files -- ':/definitions') || exit 1; \
+	if [ -n "$$files" ]; then printf '%s\n' "$$files" >&2; \
+		echo "ERROR: authored Definitions belong under inputs/ (see inputs/README.md), not top-level definitions/" >&2; exit 1; fi
 
 .PHONY: license-header-check
 license-header-check: ## Fail when a source file has no license header.
@@ -225,7 +228,7 @@ workflow-generator: go-version-check
 		-o bin/nvkr-exec ./cmd/nvkr
 
 .PHONY: workflows-check
-workflows-check: workflow-generator pipeline-dev-check catalog-refresh-check ## Check committed producer, qualification, development bundles and the catalog refresh workflow for drift.
+workflows-check: workflow-generator pipeline-dev-check nvke-split-check catalog-refresh-check ## Check committed producer, qualification, development and family bundles and the catalog refresh workflow for drift.
 	@# Repeat the committed Plan's authored selection, including focused feature-branch
 	@# Definitions. The generator still authenticates the complete bundle and inputs.
 	@definition="$$(jq -er '.definitionPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
@@ -264,7 +267,7 @@ catalog-refresh-generate: workflow-generator ## Regenerate the installed catalog
 	 chmod 0644 "$$rendered" && mv "$$rendered" .github/workflows/catalog-refresh.yaml
 
 .PHONY: workflows-generate
-workflows-generate: workflow-generator pipeline-dev-generate ## Regenerate producer, qualification and development bundles with their canonical generator stamp.
+workflows-generate: workflow-generator pipeline-dev-generate nvke-split-generate ## Regenerate producer, qualification, development and family bundles with their canonical generator stamp.
 	@definition="$$(jq -er '.definitionPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
 	 environment="$$(jq -er '.environmentPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
 	 bin/nvkr-exec run generate --engine github \
@@ -277,6 +280,23 @@ workflows-generate: workflow-generator pipeline-dev-generate ## Regenerate produ
 	bin/nvkr-exec run generate --engine github \
 		--definition inputs/definitions/demo/arm64-upstream-kvm.json \
 		--environment inputs/environments/github-nightly-upstream.json --root .
+	$(MAKE) catalog-refresh-generate
+
+.PHONY: nvke-split-generate
+nvke-split-generate: workflow-generator ## Regenerate the four independent NVKE family bundles.
+	@set -e; for family in core services telemetry disks; do \
+		bin/nvkr-exec run generate --engine github \
+			--definition "inputs/definitions/nvke/$$family.yaml" \
+			--environment "inputs/environments/github-nvke-$$family.yaml" --root .; \
+	done
+
+.PHONY: nvke-split-check
+nvke-split-check: workflow-generator ## Check the four independent NVKE family bundles without changing files.
+	@set -e; for family in core services telemetry disks; do \
+		bin/nvkr-exec run generate --engine github \
+			--definition "inputs/definitions/nvke/$$family.yaml" \
+			--environment "inputs/environments/github-nvke-$$family.yaml" --root . --check; \
+	done
 
 .PHONY: pipeline-dev-generate
 pipeline-dev-generate: workflow-generator ## Regenerate the full feature-branch development pipeline.
@@ -297,9 +317,7 @@ pipeline-dev-run: pipeline-dev-check ## Dispatch the clean, pushed current branc
 	python3 scripts/pipeline-dev.py --repo "$$PIPELINE_DEV_REPO"
 
 .PHONY: check
-check: go-version-check fmt-check license-header-check vet lint shellcheck test-ci-tools test vulncheck ## Full local gate — run before pushing.
-
-# --- housekeeping -----------------------------------------------------------
+check: go-version-check fmt-check definitions-location-check license-header-check vet lint shellcheck test-ci-tools test vulncheck ## Full local gate — run before pushing.
 
 .PHONY: clean
 clean: ## Remove build output, coverage, and the local engine workspace.

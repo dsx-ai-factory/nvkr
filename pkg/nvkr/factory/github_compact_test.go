@@ -352,12 +352,16 @@ func TestOvercomplexWorkflowCannotWriteGeneratedBundle(t *testing.T) {
 }
 
 func TestMaintainedGitHubBundles(t *testing.T) {
-	for _, planPath := range []string{
-		FactoryPlanPath,
-		GitHubDevelopmentPlanPath,
-		".github/nvkr-run-nvke-nightly-arm64/plan.json",
-		".github/nvkr-run-nvke-nightly-upstream-ovn-arm64/plan.json",
+	for _, selected := range []struct {
+		planPath             string
+		privateDiskProducers int // -1 explicitly exempts the separate development credential policy.
+	}{
+		{FactoryPlanPath, 4},
+		{GitHubDevelopmentPlanPath, -1},
+		{".github/nvkr-run-nvke-nightly-arm64/plan.json", 1},
+		{".github/nvkr-run-nvke-nightly-upstream-ovn-arm64/plan.json", 1},
 	} {
+		planPath := selected.planPath
 		t.Run(planPath, func(t *testing.T) {
 			plan, err := LoadPlanContext(t.Context(), "../../../"+planPath)
 			if err != nil {
@@ -388,19 +392,36 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 				if nodes > maxGitHubWorkflowYAMLNodes*95/100 {
 					t.Fatalf("maintained workflow has less than 5%% YAML parsing headroom (%d of %d events); compact semantic calls before expanding membership", nodes, maxGitHubWorkflowYAMLNodes)
 				}
-				assertGitHubPrivateImageCredentialBoundary(t, plan, bundle, 4)
-			} else if planPath != GitHubDevelopmentPlanPath {
-				assertGitHubPrivateImageCredentialBoundary(t, plan, bundle, 1)
 			}
-			for name := range bundle.Files {
+			if selected.privateDiskProducers >= 0 {
+				assertGitHubPrivateImageCredentialBoundary(t, plan, bundle, selected.privateDiskProducers)
+			}
+			workers := map[string][]byte{}
+			for name, raw := range bundle.Files {
 				if strings.HasPrefix(name, ".github/workflows/") && name != bundle.WorkflowPath {
-					t.Fatalf("producer bundle emitted an additional workflow %s", name)
+					if !plan.Environment.GitHubExecutionPartitions || !githubPartitionWorkflowSuffix.MatchString(name) {
+						t.Fatalf("producer bundle emitted an unexpected additional workflow %s", name)
+					}
+					workers[name] = raw
 				}
 			}
-			workflow := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath])
-			if _, dispatch := workflow.On["workflow_dispatch"]; !dispatch || len(workflow.On) != 1 {
+			var document yamlv3.Node
+			if err := yamlv3.Unmarshal(bundle.Files[bundle.WorkflowPath], &document); err != nil {
+				t.Fatal(err)
+			}
+			triggers := githubYAMLField(document.Content[0], "on")
+			if githubYAMLField(triggers, "workflow_dispatch") == nil || githubYAMLLength(triggers) != 2 {
 				t.Fatal("producer entry must expose only its manual dispatch trigger")
 			}
+			if plan.Environment.GitHubExecutionPartitions {
+				if len(workers) == 0 {
+					t.Fatal("partitioned producer bundle omitted its workers")
+				}
+				assertGitHubPartitionMembership(t, plan, bundle.Files[bundle.WorkflowPath], workers)
+				t.Logf("one entry: %d bytes, %d workers with exact original membership", len(bundle.Files[bundle.WorkflowPath]), len(workers))
+				return
+			}
+			workflow := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath])
 			projection, err := githubNeedsForPlan(t.Context(), plan)
 			if err != nil {
 				t.Fatal(err)

@@ -8,6 +8,9 @@ inputs:
   nvkr-pin-source-token-0:
     description: Caller value for step environment NVKR_PIN_SOURCE_TOKEN_0
     required: true
+  nvkr-pin-source-token-1:
+    description: Caller value for step environment NVKR_PIN_SOURCE_TOKEN_1
+    required: true
   runner-artifact:
     description: Same-Run helper artifact name
     required: true
@@ -25,8 +28,12 @@ runs:
       with:
         go-version-file: '.go-version'
         cache: 'false'
-    - name: Build runner from this checkout
-      run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags '-X main.version=dev -X main.commit=unknown' -o nvkr-exec ./cmd/nvkr
+    - name: 'Install NVKR runner'
+      run: |
+        set -eu
+        export CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOBIN="$RUNNER_TEMP/nvkr-runner"
+        go install -trimpath -ldflags '-X main.version=dev -X main.commit=unknown' ./cmd/nvkr
+        mv "$GOBIN/nvkr" nvkr-exec
       shell: bash -e {0}
     - name: 'Download NVKR runtime inputs'
       uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/ci-download
@@ -41,23 +48,30 @@ runs:
     - name: Verify committed Run generation is current
       id: validate-catalog
       env:
-        GIT_CONFIG_COUNT: '4'
+        GIT_CONFIG_COUNT: '6'
         GIT_CONFIG_GLOBAL: '/dev/null'
         GIT_CONFIG_KEY_0: 'credential.helper'
         GIT_CONFIG_KEY_1: 'credential.useHttpPath'
         GIT_CONFIG_KEY_2: 'url.https://github.com/dsx-ai-factory/nvke.insteadOf'
         GIT_CONFIG_KEY_3: 'credential.https://github.com/dsx-ai-factory/nvke.helper'
+        GIT_CONFIG_KEY_4: 'url.https://github.com/dsx-ai-factory/nvke.insteadOf'
+        GIT_CONFIG_KEY_5: 'credential.https://github.com/dsx-ai-factory/nvke.helper'
         GIT_CONFIG_NOSYSTEM: '1'
         GIT_CONFIG_VALUE_0: ''
         GIT_CONFIG_VALUE_1: 'true'
         GIT_CONFIG_VALUE_2: 'https://github.com/dsx-ai-factory/nvke'
         GIT_CONFIG_VALUE_3: '!f() { if [ "$1" = get ]; then printf ''%s\n'' ''username=x-access-token'' "password=$NVKR_PIN_SOURCE_TOKEN_0"; fi; }; f'
+        GIT_CONFIG_VALUE_4: 'https://github.com/dsx-ai-factory/nvke.git'
+        GIT_CONFIG_VALUE_5: '!f() { if [ "$1" = get ]; then printf ''%s\n'' ''username=x-access-token'' "password=$NVKR_PIN_SOURCE_TOKEN_1"; fi; }; f'
         GIT_TERMINAL_PROMPT: '0'
         NVKR_PIN_SOURCE_TOKEN_0: ${{ inputs.nvkr-pin-source-token-0 }}
+        NVKR_PIN_SOURCE_TOKEN_1: ${{ inputs.nvkr-pin-source-token-1 }}
+        NVKR_RUNTIME_SOURCE_COMMIT: '${{ github.event.inputs.source_commit }}'
       run: |
         set -eu
         [ -n "${NVKR_PIN_SOURCE_TOKEN_0:-}" ] || { printf '%s\n' 'nvkr: [NVKR-E-FETCH-FAILED] source credential is empty' >&2; exit 20; }
-        ./nvkr-exec run generate --engine github --definition inputs/definitions/demo/arm64-nvidia-kvm.json --environment inputs/environments/github-nightly-nvidia.json --root . --check
+        [ -n "${NVKR_PIN_SOURCE_TOKEN_1:-}" ] || { printf '%s\n' 'nvkr: [NVKR-E-FETCH-FAILED] source credential is empty' >&2; exit 20; }
+        ./nvkr-exec run generate --engine github --definition inputs/definitions/demo/arm64-nvidia-kvm.json --environment inputs/environments/github-nightly-nvidia.json --root . --runtime --source-commit "$NVKR_RUNTIME_SOURCE_COMMIT" --check
       shell: bash -e {0}
     - name: 'Upload NVKR runner'
       uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/ci-upload
