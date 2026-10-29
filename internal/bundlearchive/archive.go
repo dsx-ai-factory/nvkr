@@ -153,7 +153,8 @@ func inspect(ctx context.Context, source io.Reader, compressedLimit, expandedLim
 
 // ValidPath admits one canonical platform-independent relative archive path.
 func ValidPath(name string) bool {
-	return name != "" && name != "." && len(name) <= maxPathBytes && utf8.ValidString(name) &&
+	// Outer whitespace is refused, matching the SBOM component-name domain.
+	return name != "" && name != "." && len(name) <= maxPathBytes && utf8.ValidString(name) && strings.TrimSpace(name) == name &&
 		!strings.ContainsAny(name, "\\:") && !strings.HasPrefix(name, "/") && path.Clean(name) == name &&
 		name != ".." && !strings.HasPrefix(name, "../") && strings.IndexFunc(name, unicode.IsControl) < 0
 }

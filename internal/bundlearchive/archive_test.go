@@ -71,6 +71,10 @@ func TestInspectRejectsUnsafeArchives(t *testing.T) {
 		{"backslash", []tar.Header{{Name: "a\\file", Mode: 0o644, Typeflag: tar.TypeReg}}},
 		{"drive", []tar.Header{{Name: "C:file", Mode: 0o644, Typeflag: tar.TypeReg}}},
 		{"control", []tar.Header{{Name: "a\nfile", Mode: 0o644, Typeflag: tar.TypeReg}}},
+		{"leading space", []tar.Header{{Name: " leading.txt", Mode: 0o644, Typeflag: tar.TypeReg}}},
+		{"trailing space", []tar.Header{{Name: "trailing.txt ", Mode: 0o644, Typeflag: tar.TypeReg}}},
+		{"leading nbsp", []tar.Header{{Name: "\u00a0leading.txt", Mode: 0o644, Typeflag: tar.TypeReg}}},
+		{"trailing nbsp", []tar.Header{{Name: "trailing.txt\u00a0", Mode: 0o644, Typeflag: tar.TypeReg}}},
 		{"symlink", []tar.Header{{Name: "link", Linkname: "entry", Mode: 0o777, Typeflag: tar.TypeSymlink}}},
 		{"hardlink", []tar.Header{{Name: "link", Linkname: "entry", Mode: 0o644, Typeflag: tar.TypeLink}}},
 		{"fifo", []tar.Header{{Name: "fifo", Mode: 0o644, Typeflag: tar.TypeFifo}}},
@@ -91,6 +95,11 @@ func TestInspectBoundsAndFraming(t *testing.T) {
 	archive := archiveFixture(t, tar.Header{Name: "file", Mode: 0o644, Typeflag: tar.TypeReg, Size: 20})
 	badChecksum := append([]byte(nil), archive...)
 	badChecksum[len(badChecksum)-5] ^= 1
+	shallow := archiveFixture(t, tar.Header{Name: "a b/c\u00a0d/file one", Mode: 0o644, Typeflag: tar.TypeReg, Size: 1})
+	deep := archiveFixture(t, tar.Header{Name: "a/b/c/file", Mode: 0o644, Typeflag: tar.TypeReg, Size: 1})
+	if _, err := inspect(t.Context(), bytes.NewReader(shallow), 4096, 4096, 2); err != nil {
+		t.Fatalf("implicit parents at the directory bound: %v", err)
+	}
 	for _, test := range []struct {
 		name                 string
 		raw                  []byte
@@ -101,6 +110,7 @@ func TestInspectBoundsAndFraming(t *testing.T) {
 		{"compressed bound", archive, int64(len(archive)) - 1, 2048, 1},
 		{"expanded bound", archive, int64(len(archive)), 1024, 1},
 		{"entry bound", archive, int64(len(archive)), 2048, 0},
+		{"directory bound", deep, 4096, 4096, 2},
 		{"checksum", badChecksum, 4096, 4096, 10},
 		{"truncated gzip", archive[:len(archive)-1], 4096, 4096, 10},
 		{"second gzip", append(append([]byte(nil), archive...), archive...), 4096, 4096, 10},

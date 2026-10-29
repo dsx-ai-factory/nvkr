@@ -27,6 +27,8 @@ consumer-owned destinations, credentials and policy.
 transported as generic bundles here. Native `helm-oci` remains available through
 its existing genuine-chart contract. Consumers authenticate the artifact before
 extracting it and following upstream deployment instructions; NVKR does not apply it.
+Admission and integrity preserve exact archive names. Extraction owners must handle
+case-insensitive, Unicode-normalization or reserved-name collisions on their destination filesystem.
 
 The pinned source is `fa705ec263a54eeb0ca25cb24c9f20c5d8504dca`. Other coordinates
 are ordinary catalog selections, not NVKR capabilities or hardware guarantees.

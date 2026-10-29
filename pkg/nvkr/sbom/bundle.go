@@ -51,7 +51,7 @@ func validateBundleFileComponent(component Component) error {
 	mode, modeErr := strconv.ParseInt(modeText, 8, 64)
 	size, sizeErr := strconv.ParseInt(sizeText, 10, 64)
 	if modeErr != nil || mode < 0 || mode > 0o777 || fmt.Sprintf("%04o", mode) != modeText ||
-		sizeErr != nil || size < 0 || size > bundlearchive.MaxArchiveBytes || strconv.FormatInt(size, 10) != sizeText {
+		sizeErr != nil || size < 0 || size > bundlearchive.MaxExpandedBytes || strconv.FormatInt(size, 10) != sizeText {
 		return e.New(e.CodeVerifyFailed, "bundle inventory has invalid file mode or size")
 	}
 	return nil
