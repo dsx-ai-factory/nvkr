@@ -29,16 +29,34 @@ var nvkeSplitFamilies = []struct {
 }
 
 // Family-only outputs are not in the combined Definition, whose flat workflow
-// has no remaining YAML parsing headroom.
-var nvkeFamilyOnlyOutputs = map[string]string{
-	"local-path-helper-image":            "services",
-	"local-path-helper-image-arm64":      "services",
-	"local-path-provisioner":             "services",
-	"local-path-provisioner-arm64":       "services",
-	"local-path-provisioner-image":       "services",
-	"local-path-provisioner-image-arm64": "services",
-	"nico":                               "core",
-	"nico-prereqs":                       "core",
+// has no remaining YAML parsing headroom. Each declaration is pinned exactly so a
+// valid but unintended selection fails here rather than only after regeneration.
+var nvkeFamilyOnlyOutputs = map[string]struct {
+	family string
+	output definition.DefinitionOutput
+}{
+	"local-path-helper-image":            {"services", nvkeFamilyOnlyOutput("local-path-helper-image", "linux/amd64", "local-path-provisioner", definition.OutputOCI, "local-path-helper-image", nil)},
+	"local-path-helper-image-arm64":      {"services", nvkeFamilyOnlyOutput("local-path-helper-image-arm64", "linux/arm64", "local-path-provisioner", definition.OutputOCI, "local-path-helper-image", nil)},
+	"local-path-provisioner":             {"services", nvkeFamilyOnlyOutput("local-path-provisioner", "linux/amd64", "local-path-provisioner", definition.OutputHelm, "local-path-provisioner-chart", map[string]string{"helper": "local-path-helper-image", "provisioner": "local-path-provisioner-image"})},
+	"local-path-provisioner-arm64":       {"services", nvkeFamilyOnlyOutput("local-path-provisioner-arm64", "linux/arm64", "local-path-provisioner", definition.OutputHelm, "local-path-provisioner-chart", map[string]string{"helper": "local-path-helper-image-arm64", "provisioner": "local-path-provisioner-image-arm64"})},
+	"local-path-provisioner-image":       {"services", nvkeFamilyOnlyOutput("local-path-provisioner-image", "linux/amd64", "local-path-provisioner", definition.OutputOCI, "local-path-provisioner-image", nil)},
+	"local-path-provisioner-image-arm64": {"services", nvkeFamilyOnlyOutput("local-path-provisioner-image-arm64", "linux/arm64", "local-path-provisioner", definition.OutputOCI, "local-path-provisioner-image", nil)},
+	"nico":                               {"core", nvkeFamilyOnlyOutput("nico", "linux/amd64", "nico", definition.OutputHelm, "nico-chart", nil)},
+	"nico-prereqs":                       {"core", nvkeFamilyOnlyOutput("nico-prereqs", "linux/amd64", "nico", definition.OutputHelm, "nico-prereqs-chart", nil)},
+}
+
+func nvkeFamilyOnlyOutput(name, platform, catalog, format, component string, images map[string]string) definition.DefinitionOutput {
+	output := definition.DefinitionOutput{
+		Name:       name,
+		Platform:   platform,
+		Catalog:    &definition.Catalog{Base: "../../catalogs/" + catalog},
+		Components: []string{component},
+		Format:     format,
+	}
+	if images != nil {
+		output.Helm = &definition.HelmOutput{Images: images}
+	}
+	return output
 }
 
 // Family-only catalogs hold only public sources, so they load from disk.
@@ -67,9 +85,12 @@ func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 					t.Fatalf("output %q is required by both %s and %s", output.Name, previous, family.name)
 				}
 				seen[output.Name] = family.name
-				if owner, ok := nvkeFamilyOnlyOutputs[output.Name]; ok {
-					if owner != family.name {
-						t.Fatalf("family-only output %q belongs to %s, not %s", output.Name, owner, family.name)
+				if want, ok := nvkeFamilyOnlyOutputs[output.Name]; ok {
+					if want.family != family.name {
+						t.Fatalf("family-only output %q belongs to %s, not %s", output.Name, want.family, family.name)
+					}
+					if !bytes.Equal(nvkeSplitCanonical(t, output), nvkeSplitCanonical(t, want.output)) {
+						t.Fatalf("family-only output %q changed its declared selection", output.Name)
 					}
 					if _, combinedAlso := original[output.Name]; combinedAlso {
 						t.Fatalf("family-only output %q is also in the combined Definition", output.Name)

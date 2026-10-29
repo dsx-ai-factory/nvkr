@@ -2,3 +2,4 @@
 docs/evidence/2026-10-03-ci-log-readability/injected-failure-summary.md whitespace=-blank-at-eof
 # Unified patch context preserves source whitespace and a leading context marker.
 inputs/catalogs/nicosim/patches/version-interface.patch -whitespace
+inputs/catalogs/local-path-provisioner/patches/chart-image-digest.patch -whitespace
