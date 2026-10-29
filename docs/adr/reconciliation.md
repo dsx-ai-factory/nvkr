@@ -2857,8 +2857,8 @@ missing, extra, failed, skipped, canceled, oversized and inconsistent reports, i
 
 An opt-in `githubExecutionPartitions` projection now generates bounded same-commit workers beneath one
 Definition/Plan/Run/Release. Focused local tests cover deterministic grouping, original job membership,
-worker/caller generation, exact-member tamper refusal and manifest retirement. The maintained 580-job
-input projects to 21 workers with a 374,795-byte entry. OIDC-signing jobs remain inline to preserve the
+worker/caller generation, exact-member tamper refusal and manifest retirement. The maintained development
+input projects to 21 workers with a 368,371-byte entry. OIDC-signing jobs remain inline to preserve the
 entry certificate identity; generated caller/workers pass actionlint. These are
 local generation measurements, not product execution evidence. A separate minimal diagnostic at commit
 `902f3febd10cd61abecb82571f66283857169851` observed successful result forwarding on
@@ -2889,8 +2889,9 @@ verification record reports the same for publication root
 `ghcr.io/dsx-ai-factory/nvkr/development/runs/40727132359/attempts/1/releases@sha256:6a430259c9fbe2d169f0ec966fcf0405937c948198f5bec081a086ecc1e83a46`.
 The observed signer is the entry workflow `nvkr-dev.yml@refs/heads/codex/nvke-execution-partitioning`
 under the GitHub Actions issuer. These are inspected hosted execution records, not a new independent
-local full-payload readback or qualification result. This establishes the successful full development
-execution path; full-product failure/cancellation recovery and production qualification remain unproven.
+local full-payload readback or qualification result. This is earlier-head evidence: it establishes the
+successful full development execution path at `28df1359`, not at the current branch head. Full-product
+failure/cancellation recovery and production qualification remain unproven.
 The production workflow remains flat.
 
 The execution-model extraction keeps scheduling semantics in factory's provider-independent graph:
@@ -2902,8 +2903,10 @@ success, failure, cancellation and skipped operation outcomes with and without R
 These contracts do not establish another adapter or full-product provider cancellation recovery.
 The extraction passes the full local gate with uncached tests on Go 1.27.3 Darwin ARM64, build,
 all-owner workflow regeneration, and the targeted extended partition contracts including actionlint and
-yamllint. Regeneration retains the exercised development bundle byte-for-byte. The hosted Run above
-predates this internal extraction; its evidence is not a separate hosted execution of the refactored code.
+yamllint. Regeneration retains the exercised development bundle byte-for-byte, including its Plan digest,
+through the current head. The hosted Run above predates this internal extraction and executed earlier helper
+code; bundle identity does not make it a hosted execution of the refactored code. No hosted Run of the
+current head is recorded.
 
 Earlier flat-layout measurements recorded 564 original jobs and 16 collectors, down from
 596 original jobs and 16 collectors in the private-storage draft based on the same upstream code.
