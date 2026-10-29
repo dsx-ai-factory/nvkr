@@ -4,7 +4,9 @@
 package factory
 
 import (
+	"cmp"
 	"context"
+	"maps"
 	"slices"
 	"strconv"
 
@@ -108,19 +110,41 @@ func executionContext(ctx context.Context) error {
 // A partition schedules jobs from one dependency depth. It does not replace
 // their individual result slots or grant artifact acceptance.
 type executionPartition struct {
-	Jobs  []string
-	Needs []int
+	Jobs []string
 }
 
-func partitionExecutionGraph(ctx context.Context, dependencies map[string][]string, maxJobs int) ([]executionPartition, error) {
-	if maxJobs < 1 {
+// executionPartitioning shapes provider scheduling only. Bounds are declared
+// per-operation time limits; they order work, never membership or identity.
+type executionPartitioning struct {
+	Bounds  map[string]int
+	Pinned  map[string]bool // operations the adapter runs outside every partition
+	MaxJobs int
+	Target  int // partition count up to which layers split where bounds diverge
+}
+
+// Members of one depth are independent and every edge increases depth, so any
+// split of a layer remains an exact, acyclic cover. Splitting where the bounded
+// finish times diverge stops short work from waiting on long siblings.
+func partitionExecutionGraph(ctx context.Context, dependencies map[string][]string, options executionPartitioning) ([]executionPartition, error) {
+	if options.MaxJobs < 1 {
 		return nil, e.New(e.CodeEngineCapability, "execution partition requires a positive job capacity")
 	}
 	// Reuse the complete provider-DAG admission, including cancellation and cycles.
 	if _, err := reduceExecutionDependencies(ctx, dependencies); err != nil {
 		return nil, err
 	}
+	for id := range dependencies {
+		if options.Bounds[id] < 1 {
+			return nil, e.New(e.CodeInvalidCatalog, "execution operation %q has no positive time bound", id)
+		}
+	}
+	for id := range options.Pinned {
+		if _, known := dependencies[id]; !known {
+			return nil, e.New(e.CodeInvalidCatalog, "pinned execution operation %q is unknown", id)
+		}
+	}
 	depths := make(map[string]int, len(dependencies))
+	finish := make(map[string]int, len(dependencies))
 	var depth func(string) (int, error)
 	depth = func(id string) (int, error) {
 		if err := executionContext(ctx); err != nil {
@@ -129,15 +153,15 @@ func partitionExecutionGraph(ctx context.Context, dependencies map[string][]stri
 		if value, ok := depths[id]; ok {
 			return value, nil
 		}
-		value := 0
+		value, start := 0, 0
 		for _, parent := range dependencies[id] {
 			parentDepth, err := depth(parent)
 			if err != nil {
 				return 0, err
 			}
-			value = max(value, parentDepth+1)
+			value, start = max(value, parentDepth+1), max(start, finish[parent])
 		}
-		depths[id] = value
+		depths[id], finish[id] = value, start+options.Bounds[id]
 		return value, nil
 	}
 	layers := map[int][]string{}
@@ -146,28 +170,41 @@ func partitionExecutionGraph(ctx context.Context, dependencies map[string][]stri
 		if err != nil {
 			return nil, err
 		}
-		layers[value] = append(layers[value], id)
+		if !options.Pinned[id] {
+			layers[value] = append(layers[value], id)
+		}
 	}
-	var partitions []executionPartition
-	owners := make(map[string]int, len(dependencies))
-	for level := 0; level < len(layers); level++ {
-		for jobs := layers[level]; len(jobs) != 0; {
-			if err := executionContext(ctx); err != nil {
-				return nil, err
-			}
-			n := min(maxJobs, len(jobs))
-			partition := executionPartition{Jobs: slices.Clone(jobs[:n])}
-			for _, id := range partition.Jobs {
-				owners[id] = len(partitions)
-				for _, parent := range dependencies[id] {
-					partition.Needs = append(partition.Needs, owners[parent])
+	var groups [][]string
+	for _, level := range slices.Sorted(maps.Keys(layers)) {
+		jobs := layers[level]
+		slices.SortStableFunc(jobs, func(a, b string) int { return cmp.Compare(finish[a], finish[b]) })
+		for chunk := range slices.Chunk(jobs, options.MaxJobs) {
+			groups = append(groups, chunk)
+		}
+	}
+	// Split the widest bounded-finish gap first; ties keep the earliest group and cut.
+	for len(groups) < options.Target {
+		if err := executionContext(ctx); err != nil {
+			return nil, err
+		}
+		group, cut, gap := -1, 0, 0
+		for n, jobs := range groups {
+			for i := 1; i < len(jobs); i++ {
+				if delta := finish[jobs[i]] - finish[jobs[i-1]]; delta > gap {
+					group, cut, gap = n, i, delta
 				}
 			}
-			slices.Sort(partition.Needs)
-			partition.Needs = slices.Compact(partition.Needs)
-			partitions = append(partitions, partition)
-			jobs = jobs[n:]
 		}
+		if group < 0 {
+			break
+		}
+		jobs := groups[group]
+		groups = slices.Insert(groups, group+1, jobs[cut:])
+		groups[group] = jobs[:cut]
+	}
+	partitions := make([]executionPartition, 0, len(groups))
+	for _, jobs := range groups {
+		partitions = append(partitions, executionPartition{Jobs: slices.Clone(jobs)})
 	}
 	return partitions, nil
 }
