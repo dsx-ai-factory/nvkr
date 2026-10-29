@@ -183,6 +183,8 @@ func partitionExecutionGraph(ctx context.Context, dependencies map[string][]stri
 		}
 	}
 	// Split the widest bounded-finish gap first; ties keep the earliest group and cut.
+	// Rescanning per cut assumes a small Target (provider worker budgets of tens);
+	// a much larger Target would warrant a priority queue of gaps.
 	for len(groups) < options.Target {
 		if err := executionContext(ctx); err != nil {
 			return nil, err

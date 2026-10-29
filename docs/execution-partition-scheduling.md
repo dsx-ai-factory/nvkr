@@ -34,13 +34,15 @@ node kind (fetch 1, acquire 2, build 6, terminal observation 1, SBOM 1.5, packag
 SBOM attestation, signing and publication verification 0.5 each, release assembly 3 minutes), plus
 1.5 minutes of runner start per job and 3 minutes for runner bootstrap jobs. Each layout is scored at the
 estimate and at eight deterministic perturbations that scale every job independently by 0.5–1.5. Layouts
-see only the estimate, never the perturbed durations they are scored against.
+are selected before any duration is known: the adopted layout uses declared job timeouts and the other
+candidates use the estimate. Perturbed durations only score a layout and never select one.
 
 ### Capacity assumptions
 
 Three capacity scenarios are assumptions, not measured limits: unbounded; 60 concurrent hosted jobs with
 two runners in each native ARC pool; and 20 concurrent hosted jobs with one runner in each ARC pool.
-Hosted Linux AMD64 and ARM64 runners share one account-wide pool.
+Hosted Linux AMD64 and ARM64 runners share one account-wide pool. Runner bootstrap jobs for native ARC
+targets run on the hosted runner the workflow renders, so they count against the hosted pool.
 
 ## Layouts compared
 
@@ -61,6 +63,15 @@ The harness also checks each candidate against the generator's partition validat
 
 ## Results
 
+These numbers were measured on 2026-10-29 against the committed Plans at that date and reproduce with:
+
+```sh
+go test ./pkg/nvkr/factory -run TestExecutionScheduleHarness -count=1 -v
+```
+
+Edits to maintained Definitions, Environments or the estimate table can change them, and can change the
+adoption result, without a generator change. Remeasure before comparing a later run against this page.
+
 For the development Plan, the only maintained Environment that enables partitioning (563 operations, 139 of
 them entry-pinned signers), ranges cover the estimate and eight perturbations:
 
@@ -75,8 +86,8 @@ them entry-pinned signers), ranges cover the estimate and eight perturbations:
 
 Across every Plan, capacity and perturbation the other layouts changed makespan against depth as follows:
 finish-ordered −2.6% to +1.5%; resource-aware −10.6% to 0%; duration ≤30 and ≤50 −32.1% to 0%;
-resource + duration ≤30 −26.7% to 0%; capacity ≤30 −23.6% to 0%. The adopted layout ranged from
-−26.3% to 0%. Family Plans gained up to 11.5% (core), 8.8% (services) and 8.1% (telemetry), and the
+resource + duration ≤30 −32.1% to 0%; capacity ≤30 −25.9% to 0%. The adopted layout ranged from
+−26.3% to 0%. Family Plans gained up to 19.4% (core), 8.8% (services) and 8.1% (telemetry), and the
 OVN diagnostic up to 9.8%. The disks family and the three disk diagnostics, whose layers have uniform
 timeouts, kept the original grouping.
 
@@ -108,3 +119,9 @@ qualification evidence. The recorded hosted development Run in reconciliation us
 layout; the adopted layout has not been externally exercised. Confirming the gain requires a dispatched
 development Run of the regenerated bundle and its recorded per-job timings, which then become recorded
 anchors for this harness. Reusable-workflow call start, runner pickup and ARC pool sizes remain assumptions.
+
+The model charges each worker only its members' operations plus the call start. It excludes each worker's
+hosted result-reporter job, whose pickup, runtime and queueing a worker call also waits for. Both layouts pay
+one reporter delay per worker on the critical path, but the adopted layout can chain more workers and adds
+nine reporter jobs, over the original 21, to hosted load. The reported gain is therefore an upper bound
+under this model. The harness does not show that the excluded cost removes the gain.

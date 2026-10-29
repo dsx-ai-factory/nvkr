@@ -155,7 +155,8 @@ func harnessGraphFor(t *testing.T, name string, plan *Plan) harnessGraph {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ops["build-runner-"+shortStableName(resolved.RunsOn)] = harnessOp{pool: harnessPool(resolved.RunsOn), minutes: harnessBootstrapMinutes}
+		// Bootstraps for ARC targets run on the hosted runner the workflow renders.
+		ops["build-runner-"+shortStableName(resolved.RunsOn)] = harnessOp{pool: harnessPool(githubBootstrapRunner(resolved.RunsOn)), minutes: harnessBootstrapMinutes}
 	}
 	for id := range deps {
 		if _, ok := ops[id]; !ok {
@@ -513,7 +514,14 @@ func harnessAdmit(t *testing.T, graph harnessGraph, groups [][]string) error {
 	return graph.model.validatePartitions(t.Context(), all)
 }
 
+const harnessFinding = "docs/execution-partition-scheduling.md"
+
 func TestExecutionScheduleHarness(t *testing.T) {
+	for _, runner := range []string{"arc-amd64-kvm", "arc-arm64-kvm"} {
+		if pool := harnessPool(githubBootstrapRunner(runner)); pool != "hosted" {
+			t.Fatalf("%s bootstrap modeled in pool %q, want hosted", runner, pool)
+		}
+	}
 	graphs := loadHarnessGraphs(t)
 	// Relative makespan change against the original depth layout, over every
 	// plan, capacity and duration seed: the best and worst cases decide adoption.
@@ -598,12 +606,16 @@ func TestExecutionScheduleHarness(t *testing.T) {
 						capacity.name, candidate.name, partitions, slices.Min(makespans), slices.Max(makespans),
 						slices.Min(costs), slices.Max(costs), slices.Min(waits), slices.Max(waits),
 						100*slices.Min(changes), 100*slices.Max(changes))
+					// The adoption rule is a performance decision over maintained inputs and
+					// estimates, so an input edit can fail it without a generator change.
 					if candidate.name == "timeout (adopted)" {
 						if slices.Max(changes) > harnessRegressionTolerance {
-							t.Fatalf("adopted layout regresses %s by %.1f%%", capacity.name, 100*slices.Max(changes))
+							t.Fatalf("adopted layout regresses %s by %.1f%%; remeasure and review the decision in %s before changing thresholds",
+								capacity.name, 100*slices.Max(changes), harnessFinding)
 						}
 						if graph.partitioned && slices.Max(changes) > -harnessClearImprovement {
-							t.Fatalf("adopted layout gains less than %.0f%% under %s", 100*harnessClearImprovement, capacity.name)
+							t.Fatalf("adopted layout gains less than %.0f%% under %s; remeasure and review the decision in %s before changing thresholds",
+								100*harnessClearImprovement, capacity.name, harnessFinding)
 						}
 					}
 				}

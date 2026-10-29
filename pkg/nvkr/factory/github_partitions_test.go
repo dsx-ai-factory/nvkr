@@ -5,6 +5,7 @@ package factory
 
 import (
 	"context"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -25,6 +26,10 @@ func TestGitHubExecutionPartitions(t *testing.T) {
 	bounded.Bounds["b"] = 10
 	pinned := unitExecutionLayout(map[string][]string{"a": nil, "b": nil, "c": {"b"}}, 64, 0)
 	pinned.Pinned = map[string]bool{"b": true}
+	layer := map[string][]string{"a": nil, "b": nil, "c": nil, "d": nil}
+	gaps := func(maxJobs, target int, bounds map[string]int) executionPartitioning {
+		return executionPartitioning{Bounds: bounds, MaxJobs: maxJobs, Target: target}
+	}
 	for _, test := range []struct {
 		name   string
 		graph  map[string][]string
@@ -47,6 +52,14 @@ func TestGitHubExecutionPartitions(t *testing.T) {
 			[]githubExecutionPartition{{Jobs: []string{"a", "c"}}, {Jobs: []string{"b"}}, {Jobs: []string{"d"}}}},
 		{"target without bound gap", split, unitExecutionLayout(split, 64, 50),
 			[]githubExecutionPartition{{Jobs: []string{"a", "b", "c"}}, {Jobs: []string{"d"}}}},
+		{"equal gaps cut earliest", layer, gaps(64, 2, map[string]int{"a": 1, "b": 2, "c": 3, "d": 4}),
+			[]githubExecutionPartition{{Jobs: []string{"a"}}, {Jobs: []string{"b", "c", "d"}}}},
+		{"repeated cuts widest first", layer, gaps(64, 4, map[string]int{"a": 1, "b": 5, "c": 20, "d": 22}),
+			[]githubExecutionPartition{{Jobs: []string{"a"}}, {Jobs: []string{"b"}}, {Jobs: []string{"c"}}, {Jobs: []string{"d"}}}},
+		{"target stops with gaps left", layer, gaps(64, 2, map[string]int{"a": 1, "b": 5, "c": 20, "d": 22}),
+			[]githubExecutionPartition{{Jobs: []string{"a", "b"}}, {Jobs: []string{"c", "d"}}}},
+		{"cuts within capacity chunks", layer, gaps(2, 3, map[string]int{"a": 1, "b": 9, "c": 10, "d": 30}),
+			[]githubExecutionPartition{{Jobs: []string{"a", "b"}}, {Jobs: []string{"c"}}, {Jobs: []string{"d"}}}},
 		{"pinned operation", map[string][]string{"a": nil, "b": nil, "c": {"b"}}, pinned,
 			[]githubExecutionPartition{{Jobs: []string{"a"}}, {Jobs: []string{"c"}}}},
 	} {
@@ -85,4 +98,51 @@ func TestGitHubExecutionPartitionsRejectInvalidGraph(t *testing.T) {
 	cancel()
 	_, err = partitionGitHubJobs(ctx, map[string][]string{"a": nil}, unitExecutionLayout(map[string][]string{"a": nil}, 64, 0))
 	assertFactoryErrorCode(t, err, e.CodeTimeout)
+}
+
+// Partition bounds must be the timeouts the rendered jobs actually declare.
+func TestGitHubExecutionBoundsMatchRenderedTimeouts(t *testing.T) {
+	repo, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(repo)
+	kinds := map[string]bool{}
+	for _, path := range []string{FactoryPlanPath, ".github/nvkr-run-nvke-disks/plan.json"} {
+		plan, err := LoadPlanContext(t.Context(), path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		projection, err := githubNeedsForPlan(t.Context(), plan)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, layout, err := githubExecutionModel(t.Context(), plan, projection)
+		if err != nil {
+			t.Fatal(err)
+		}
+		stages, _, err := githubStages(plan)
+		if err != nil {
+			t.Fatal(err)
+		}
+		bundle, err := RenderGitHub(t.Context(), plan)
+		if err != nil {
+			t.Fatal(err)
+		}
+		jobs := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle)).Jobs
+		for _, id := range sortedKeys(layout.Bounds) {
+			job, ok := jobs[id]
+			if !ok || job.TimeoutMinutes != layout.Bounds[id] {
+				t.Fatalf("%s: %s bound %d, rendered timeout %d (present %t)", path, id, layout.Bounds[id], job.TimeoutMinutes, ok)
+			}
+			kind := "bootstrap"
+			if stage, ok := byNodeForJob(stages, id); ok {
+				kind = map[bool]string{true: "disk", false: "ordinary"}[stage.DiskOutput != ""]
+			}
+			kinds[kind] = true
+		}
+	}
+	if len(kinds) != 3 {
+		t.Fatalf("bound kinds covered = %v, want bootstrap, disk and ordinary", kinds)
+	}
 }
