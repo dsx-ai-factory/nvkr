@@ -812,7 +812,7 @@ func TestDemoNarrationFailuresBeforeExecution(t *testing.T) {
 		code nvkrerr.Code
 	}{
 		{"unknown network", nvkedemo.BuildConfig{Repository: "/must-not-read", Network: "unknown"}, &bytes.Buffer{}, nvkrerr.CodeUsage},
-		{"missing inputs", nvkedemo.BuildConfig{Repository: t.TempDir()}, &bytes.Buffer{}, nvkrerr.CodeInvalidCatalog},
+		{"missing inputs", nvkedemo.BuildConfig{Repository: t.TempDir()}, &bytes.Buffer{}, nvkrerr.CodeEngineCapability},
 		{"nil writer", nvkedemo.BuildConfig{Repository: repo}, nil, nvkrerr.CodeUsage},
 		{"write error", nvkedemo.BuildConfig{Repository: repo}, failedProgressWriter{}, nvkrerr.CodePreflightFailed},
 		{"short write", nvkedemo.BuildConfig{Repository: repo}, failedProgressWriter{short: true}, nvkrerr.CodePreflightFailed},
@@ -925,9 +925,6 @@ func TestE2EWalkthroughIntroductionAdmissionAndOrder(t *testing.T) {
 			}
 			if row.outputFailure {
 				want = nvkrerr.CodePreflightFailed
-			}
-			if missingInputs {
-				want = nvkrerr.CodeInvalidCatalog
 			}
 			assertCode(t, err, want)
 			if calls != map[bool]int{true: 0, false: 1}[row.invalid || row.outputFailure || missingInputs] {

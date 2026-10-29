@@ -6,8 +6,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -61,10 +63,13 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 		environmentName = environmentPath
 	}
 	authored, err := definition.LoadDefinition(ctx, definitionPath)
-	if err != nil {
-		return err
+	if err == nil {
+		_, err = definition.LoadEnvironment(ctx, environmentPath)
 	}
-	if _, err := definition.LoadEnvironment(ctx, environmentPath); err != nil {
+	if err != nil {
+		if cfg.Definition == "" && errors.Is(err, os.ErrNotExist) {
+			return nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "default demo BUILD inputs are unavailable for %s", runtime.GOOS+"/"+runtime.GOARCH)
+		}
 		return err
 	}
 	// An output-specific catalog is a complete stack, not an inherited patch.
