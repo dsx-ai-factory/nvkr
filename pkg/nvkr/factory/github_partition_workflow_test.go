@@ -14,7 +14,7 @@ import (
 func TestGitHubPartitionWorkflowPreservesJobIdentityAndFailurePolicy(t *testing.T) {
 	plan := githubTestPlan(t)
 	condition := githubDispatchCondition(plan)
-	raw := []byte("permissions: {contents: read}\njobs:\n  source:\n    runs-on: ubuntu-24.04\n  build:\n    needs: [source]\n    if: ${{ " + condition + " }}\n    runs-on: ubuntu-24.04\n    timeout-minutes: 30\n    steps:\n      - run: echo build\n        env:\n          TOKEN: ${{ secrets.BUILD_TOKEN }}\n  inspect:\n    needs: [source]\n    if: ${{ always() && " + condition + " }}\n    runs-on: ubuntu-24.04\n    timeout-minutes: 30\n    steps:\n      - run: echo inspect\n")
+	raw := []byte("permissions: {contents: read}\njobs:\n  source:\n    runs-on: ubuntu-24.04\n  build:\n    needs: [source]\n    if: ${{ " + condition + " }}\n    runs-on: ubuntu-24.04\n    timeout-minutes: 30\n    steps:\n      - run: echo build\n        env:\n          TOKEN: ${{ secrets.BUILD_TOKEN }}\n          PUBLISH: ${{ secrets['SECRETS'] }}\n  inspect:\n    needs: [source]\n    if: ${{ always() && " + condition + " }}\n    runs-on: ubuntu-24.04\n    timeout-minutes: 30\n    steps:\n      - run: echo inspect\n")
 	model, err := newExecutionGraph(t.Context(), map[string]executionOperation{
 		"source": {}, "build": {Needs: []string{"source"}}, "inspect": {Needs: []string{"source"}, Condition: executionAfterCompletion},
 	})
@@ -49,7 +49,9 @@ func TestGitHubPartitionWorkflowPreservesJobIdentityAndFailurePolicy(t *testing.
 		t.Fatal("report does not preserve original outcomes")
 	}
 	call := githubYAMLField(githubYAMLField(root, "on"), "workflow_call")
-	if githubYAMLField(githubYAMLField(call, "secrets"), "BUILD_TOKEN") == nil {
+	// The caller forwards exactly these declarations.
+	if declared := githubYAMLField(call, "secrets"); len(declared.Content) != 4 ||
+		githubYAMLField(declared, "BUILD_TOKEN") == nil || githubYAMLField(declared, "SECRETS") == nil {
 		t.Fatal("worker omitted its explicit credential contract")
 	}
 	if githubYAMLField(root, "concurrency") != nil {
@@ -100,6 +102,15 @@ func TestGitHubPartitionSecretReferences(t *testing.T) {
 		{"${{ fromJSON('{\"secrets\":\"synthetic-value\"}').secrets }}", "", false},
 		{"${{ vars.secrets && secrets.REAL }}", "REAL", false},
 		{"${{ vars.secrets && toJSON(secrets) }}", "", true},
+		{"${{ secrets.SECRETS }}", "SECRETS", false},
+		{"${{ secrets['SECRETS'] }}", "SECRETS", false},
+		{"${{ Secrets [ 'secrets' ] }}", "SECRETS", false},
+		{"${{ secrets . Secrets }}", "SECRETS", false},
+		{"${{ vars.secrets.SECRETS && secrets.REAL }}", "REAL", false},
+		{"${{ secrets['it''s'] }}", "", true},
+		{"${{ secrets[' }}", "", true},
+		{"${{ secrets }}", "", true},
+		{"${{ my-secrets.VALUE }}", "", false},
 	} {
 		t.Run(test.value, func(t *testing.T) {
 			names, err := githubPartitionSecretNames(githubYAMLString(test.value))

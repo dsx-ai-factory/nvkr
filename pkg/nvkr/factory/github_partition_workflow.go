@@ -14,13 +14,7 @@ import (
 
 const githubPartitionReporter = "nvkr-partition-results"
 
-var (
-	githubPartitionSecret         = regexp.MustCompile(`(?i)\bsecrets\s*\.\s*([a-z_][a-z0-9_]*)`)
-	githubPartitionSecretIndex    = regexp.MustCompile(`(?i)\bsecrets\s*\[\s*'([a-z_][a-z0-9_]*)'\s*\]`)
-	githubExpressionString        = regexp.MustCompile(`'(?:[^']|'')*'`)
-	githubPartitionSecretProperty = regexp.MustCompile(`(?i)\.\s*secrets\b`)
-	githubPartitionSecretsWord    = regexp.MustCompile(`(?i)\bsecrets\b`)
-)
+var githubSecretName = regexp.MustCompile(`(?i)^[a-z_][a-z0-9_]*$`)
 
 // renderGitHubPartition keeps original job IDs: shared action selection uses
 // github.job to select parameters from the complete, unchanged Plan.
@@ -167,24 +161,104 @@ func githubPartitionScalarSecretNames(node *yamlv3.Node) ([]string, error) {
 	return names, nil
 }
 
+// githubPartitionExpressionSecretNames lexes one expression: it skips string
+// literals and property identifiers, so only the root secrets context counts,
+// and it requires each root reference to name one static secret.
 func githubPartitionExpressionSecretNames(expression string) ([]string, error) {
-	// Normalize static index lookups before dropping string literals, so quoted
-	// text is neither a reference nor a refused dynamic lookup.
-	expression = githubPartitionSecretIndex.ReplaceAllString(expression, "secrets.$1")
-	expression = githubExpressionString.ReplaceAllString(expression, "''")
-	// A property named secrets, as in vars.secrets, is not the root context.
-	expression = githubPartitionSecretProperty.ReplaceAllString(expression, ".property")
 	var names []string
-	for _, match := range githubPartitionSecret.FindAllStringSubmatch(expression, -1) {
-		name := strings.ToUpper(match[1])
-		if name != "GITHUB_TOKEN" {
-			names = append(names, name)
+	afterDot := false
+	for index := 0; index < len(expression); {
+		switch character := expression[index]; {
+		case character == '\'':
+			index = githubExpressionStringEnd(expression, index)
+			afterDot = false
+		case githubIdentifierStart(character):
+			end := githubIdentifierEnd(expression, index)
+			root := !afterDot && strings.EqualFold(expression[index:end], "secrets")
+			afterDot = false
+			index = end
+			if !root {
+				continue
+			}
+			name, next, ok := githubPartitionStaticSecret(expression, end)
+			if !ok {
+				return nil, e.New(e.CodeEngineCapability, "GitHub partition requires statically named secret references")
+			}
+			if name = strings.ToUpper(name); name != "GITHUB_TOKEN" {
+				names = append(names, name)
+			}
+			index = next
+		case character == ' ' || character == '\t' || character == '\n' || character == '\r':
+			index++
+		default:
+			afterDot = character == '.'
+			index++
 		}
 	}
-	if githubPartitionSecretsWord.MatchString(githubPartitionSecret.ReplaceAllString(expression, "")) {
-		return nil, e.New(e.CodeEngineCapability, "GitHub partition requires statically named secret references")
-	}
 	return names, nil
+}
+
+// githubPartitionStaticSecret reads .NAME or ['NAME'] after a root secrets
+// identifier and returns the name and the index after it.
+func githubPartitionStaticSecret(expression string, index int) (string, int, bool) {
+	index = githubSkipSpace(expression, index)
+	if index < len(expression) && expression[index] == '.' {
+		start := githubSkipSpace(expression, index+1)
+		if start == len(expression) || !githubIdentifierStart(expression[start]) {
+			return "", 0, false
+		}
+		end := githubIdentifierEnd(expression, start)
+		return expression[start:end], end, githubSecretName.MatchString(expression[start:end])
+	}
+	if index < len(expression) && expression[index] == '[' {
+		start := githubSkipSpace(expression, index+1)
+		if start == len(expression) || expression[start] != '\'' {
+			return "", 0, false
+		}
+		end := githubExpressionStringEnd(expression, start)
+		if end <= start+1 || expression[end-1] != '\'' {
+			return "", 0, false
+		}
+		name := expression[start+1 : end-1]
+		bracket := githubSkipSpace(expression, end)
+		if bracket == len(expression) || expression[bracket] != ']' || !githubSecretName.MatchString(name) {
+			return "", 0, false
+		}
+		return name, bracket + 1, true
+	}
+	return "", 0, false
+}
+
+func githubExpressionStringEnd(expression string, index int) int {
+	for index++; index < len(expression); index++ {
+		if expression[index] == '\'' {
+			if index+1 < len(expression) && expression[index+1] == '\'' {
+				index++
+				continue
+			}
+			return index + 1
+		}
+	}
+	return len(expression)
+}
+
+func githubIdentifierStart(character byte) bool {
+	return character == '_' || ('a' <= character && character <= 'z') || ('A' <= character && character <= 'Z')
+}
+
+func githubIdentifierEnd(expression string, index int) int {
+	for index < len(expression) && (githubIdentifierStart(expression[index]) || expression[index] == '-' ||
+		('0' <= expression[index] && expression[index] <= '9')) {
+		index++
+	}
+	return index
+}
+
+func githubSkipSpace(expression string, index int) int {
+	for index < len(expression) && strings.ContainsRune(" \t\n\r", rune(expression[index])) {
+		index++
+	}
+	return index
 }
 
 // githubExpressions returns the bodies of ${{ }} spans. A closing }} inside a
