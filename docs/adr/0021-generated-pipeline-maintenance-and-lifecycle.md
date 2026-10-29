@@ -50,8 +50,9 @@ the default `nvkr-run-<Definition name>` and development `nvkr-dev-<Definition n
 This keeps same-Definition bundles separate under GitHub's workflow-based concurrency
 and prevents a named producer from matching the default qualifier's display-name trigger.
 That separation is not a destination-wide lock. ADR-20's S3 extension restricts each enrolled physical
-namespace to one workflow/bundle, exact ref and evaluated non-canceling group; another bundle or alias
-cannot share it under a different owner. The extension's admission remains implementation work.
+namespace to one repository, workflow path, display name/bundle, exact ref and evaluated non-canceling
+group. Another repository, workflow, bundle, ref or transport alias cannot bypass that enrolled owner.
+The extension's admission remains implementation work.
 Workflow file paths and explicit signing identities retain the namespace contract above.
 Every generated execution, recovery and utility-container command selects that exact
 Plan path; validation rejects a bundle whose paths differ from the admitted Environment.

@@ -1269,7 +1269,8 @@ with coded errors before commit. A new provider Run ID cannot bypass pending sta
 deliveries still allow later distinct versions. Persistent cross-Run pending state, exact-byte replay and
 these retention/cutoff guarantees remain implementation and acceptance work; a job artifact alone supplies
 neither serialization nor a persistent pending-state index. The proposed namespace identity excludes target
-names and transport aliases, with explicit operator enrollment and one workflow/ref/concurrency-group owner.
+names and transport aliases, with explicit operator enrollment and one owning repository, workflow path,
+display name/bundle, exact dispatch ref and evaluated non-canceling concurrency group.
 Preparing-state CAS permits proven-undispatched closure; unrecoverable authorized state requires recorded
 retirement and a separately enrolled disjoint prefix. Exact-bundle replay does not require joining a lost
 runner, while current workers remain owned through stop/join. First-use, alias/owner collisions, closure races,
