@@ -23,6 +23,7 @@ import (
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/layout"
@@ -322,7 +323,7 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 	if err != nil {
 		return assets, err
 	}
-	capnico, err := nativeCAPNICoReference(ctx, assets.Installer)
+	capnico, err := assets.prepareCAPNICoImport(ctx)
 	if err != nil {
 		return assets, err
 	}
@@ -396,7 +397,7 @@ func nativeAcquiredImage(plan *factory.Plan, selected nativeImageSelection) (nam
 		return name.Digest{}, errors.New("acquired image requires its replayed Run plan")
 	}
 	arch := strings.TrimPrefix(selected.platform, "linux/")
-	if selected.platform != "linux/arm64" && selected.platform != "linux/amd64" {
+	if target.ValidatePlatform(selected.platform) != nil {
 		return name.Digest{}, errors.New("acquired image requires its native Linux output")
 	}
 	var component *catalog.Component
@@ -512,7 +513,7 @@ func sitePreparationMembers(components []string) ([]string, error) {
 }
 
 func prepareNativeImage(ctx context.Context, selection nativeImageSelection, work, files string) (NativeImageAsset, error) {
-	if selection.platform != "linux/arm64" && selection.platform != "linux/amd64" {
+	if target.ValidatePlatform(selection.platform) != nil {
 		return NativeImageAsset{}, nvkrerr.New(nvkrerr.CodeVerifyFailed, "native image requires its admitted Linux platform")
 	}
 	root, err := layout.FromPath(filepath.Join(selection.root, "packages", selection.output))
@@ -634,7 +635,7 @@ func extractNativeInstaller(ctx context.Context, archive, installer string, sele
 	if arch == "" {
 		arch = "arm64"
 	}
-	if arch != "arm64" && arch != "amd64" {
+	if !target.ValidArch(arch) {
 		return nil, errors.New("installer extraction requires an admitted native architecture")
 	}
 	releasePrefix := "controller/test/fixtures/releases/nvke-nico-vms-24.04-" + arch + "-fde-"

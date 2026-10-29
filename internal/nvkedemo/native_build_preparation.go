@@ -24,8 +24,11 @@ import (
 // Select authored inputs and the adjacent NVKR distribution. Explicit customer
 // inputs retain their meaning; only Mac subsequently binds installed Packer tools.
 func defaultNativeBuild(cfg *BuildConfig, platform, executable string) (bool, error) {
-	if (platform != "darwin/arm64" && platform != "linux/amd64") || cfg.Definition != "" || cfg.Environment != "" || cfg.NVKR != "" {
+	if cfg.Definition != "" || cfg.Environment != "" || cfg.NVKR != "" {
 		return false, nil
+	}
+	if err := admitNativeBuildHost(platform); err != nil {
+		return false, err
 	}
 	if cfg.Prepared || cfg.QualifyLocal || cfg.QualificationPolicy != "" {
 		return false, e.New(e.CodeEngineCapability, "default native BUILD supports unsigned local execution")
@@ -210,10 +213,10 @@ func admitMacBuildPrerequisites(ctx context.Context, runner Runner, repository s
 }
 
 func prepareDefaultNativeBuild(ctx context.Context, runner Runner, cfg *BuildConfig, platform string) error {
-	if platform != "darwin/arm64" && platform != "linux/amd64" {
-		return e.New(e.CodeEngineCapability, "unsupported default native preparation host %q", platform)
+	if err := admitNativeBuildHost(platform); err != nil {
+		return err
 	}
-	_, arch, _ := strings.Cut(platform, "/")
+	hostOS, arch, _ := strings.Cut(platform, "/")
 	runner.directory = cfg.Repository
 	env, err := localBuildSourceEnvironment(runner.Env, environmentValue(runner.Env, "NVKE_LOCAL_CLONE"))
 	if err != nil {
@@ -222,7 +225,7 @@ func prepareDefaultNativeBuild(ctx context.Context, runner Runner, cfg *BuildCon
 	runner.Env = env
 	runner.Env = SetEnv(runner.Env, map[string]string{"CHECKPOINT_DISABLE": "1"})
 	var request delivery.BinaryBundleRequest
-	if platform == "darwin/arm64" {
+	if hostOS == "darwin" {
 		if err := admitMacBuildPrerequisites(ctx, runner, cfg.Repository); err != nil {
 			return err
 		}
@@ -231,8 +234,15 @@ func prepareDefaultNativeBuild(ctx context.Context, runner Runner, cfg *BuildCon
 			return err
 		}
 	}
+	if hostOS == "linux" {
+		for _, tool := range []string{"jq", "docker", "bash"} {
+			if _, err := commandPath(tool, runner.Env); err != nil {
+				return e.Wrap(e.CodeEngineCapability, err, "native Linux BUILD requires %s", tool)
+			}
+		}
+	}
 	root := filepath.Join(".nvkr", "mac-build", cfg.AttemptPrefix)
-	if platform == "linux/amd64" {
+	if hostOS == "linux" {
 		root = filepath.Join(".nvkr", "native-build", cfg.AttemptPrefix)
 	}
 	absolute := filepath.Join(cfg.Repository, root)
@@ -255,7 +265,7 @@ func prepareDefaultNativeBuild(ctx context.Context, runner Runner, cfg *BuildCon
 		return json.Unmarshal(raw, into)
 	}
 	prepared := factory.NativeBuildPreparation{Definition: cfg.Definition, Environment: cfg.Environment}
-	if platform == "darwin/arm64" {
+	if hostOS == "darwin" {
 		manifest := filepath.Join(root, "native-packer-files.json")
 		if err := privateJSON(filepath.Join(cfg.Repository, manifest), request); err != nil {
 			return err

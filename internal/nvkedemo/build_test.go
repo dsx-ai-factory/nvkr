@@ -23,6 +23,43 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+func TestBuildArtifactsPreservesCapabilityErrors(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		cfg  BuildConfig
+		code nvkrerr.Code
+	}{
+		{"unsupported combination", BuildConfig{Conformance: true, Prepared: true}, nvkrerr.CodeEngineCapability},
+		{"ordinary build error", BuildConfig{Repository: filepath.Join(t.TempDir(), "missing")}, nvkrerr.CodeBuildFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := BuildArtifacts(t.Context(), tc.cfg)
+			assertNightlyCode(t, err, tc.code)
+			if got != (BuiltInputs{}) {
+				t.Fatal("failed build returned outputs", got)
+			}
+		})
+	}
+}
+
+func TestDefaultBuildMissingInputsDoesNotCreateAttemptState(t *testing.T) {
+	repo := t.TempDir()
+	selected, _, err := LocalArtifactInputsForPlatform("ovn", false, runtime.GOOS+"/"+runtime.GOARCH)
+	if err != nil {
+		t.Skip("host is outside the compiler's executable target domain")
+	}
+	if err := os.MkdirAll(filepath.Join(repo, filepath.Dir(selected)), 0700); err != nil {
+		t.Fatal(err)
+	}
+	got, err := BuildArtifacts(t.Context(), BuildConfig{Repository: repo, AttemptPrefix: "fresh", Jobs: 1})
+	if err == nil || !strings.Contains(err.Error(), filepath.Base(selected)) || got != (BuiltInputs{}) {
+		t.Fatalf("missing authored inputs did not fail before work: %+v %v", got, err)
+	}
+	if _, err := os.Lstat(filepath.Join(repo, ".nvkr")); !os.IsNotExist(err) {
+		t.Fatal("missing authored inputs created attempt state", err)
+	}
+}
+
 func TestBuildOnlyPreservesDeveloperGitHome(t *testing.T) {
 	buildDockerFixture(t, "")
 	t.Setenv("GIT_CONFIG_COUNT", "0")

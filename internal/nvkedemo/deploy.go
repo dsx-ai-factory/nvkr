@@ -29,9 +29,7 @@ func AdmitDemoDeployment(ctx context.Context, cfg Config) error {
 		return err
 	}
 	if cfg.Conformance {
-		if runtime.GOARCH != "arm64" || runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
-			return nvkrerr.New(nvkrerr.CodeEngineCapability, "local demo conformance requires native Mac or Linux ARM64")
-		}
+
 		if !configString(cfg.Repository) {
 			return configUsage("conformance requires the repository containing its captured artifact Run")
 		}
@@ -100,10 +98,10 @@ func AdmitNativeDeployment(ctx context.Context, accelerator string) error {
 
 func nativeAccelerator(platform, requested string) (string, error) {
 	if requested == "" {
-		switch platform {
-		case "darwin/arm64":
+		switch hostOS, _, _ := strings.Cut(platform, "/"); hostOS {
+		case "darwin":
 			requested = "hvf"
-		case "linux/arm64", "linux/amd64":
+		case "linux":
 			requested = "kvm"
 		}
 	}
@@ -144,9 +142,7 @@ func nativeDeploymentConfig(ctx context.Context, cfg Config, platform string) (N
 	if _, err := nativeDeploymentNetwork(cfg.Network); err != nil {
 		return NativeConfig{}, err
 	}
-	if cfg.Conformance && platform != "linux/arm64" && platform != "darwin/arm64" {
-		return NativeConfig{}, nvkrerr.New(nvkrerr.CodeEngineCapability, "local demo conformance requires native Mac or Linux ARM64")
-	}
+
 	conformance, err := selectNativeConformance(cfg)
 	if err != nil {
 		return NativeConfig{}, err

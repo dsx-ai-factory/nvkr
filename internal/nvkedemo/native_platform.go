@@ -16,18 +16,23 @@ import (
 	"time"
 
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 // admitNativeHost keeps backend and accelerator admission ahead of I/O. The
 // Linux libvirt backend selects KVM when /dev/kvm exists; require usable KVM
 // rather than silently promising an explicit TCG selection it cannot honor.
 func admitNativeHost(platform, accelerator string) error {
-	switch platform {
-	case "darwin/arm64":
+	if err := target.ValidateExecutablePlatform(platform); err != nil {
+		return nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "native VM target")
+	}
+	hostOS, _, _ := strings.Cut(platform, "/")
+	switch hostOS {
+	case "darwin":
 		if accelerator == "hvf" || accelerator == "tcg" {
 			return nil
 		}
-	case "linux/arm64", "linux/amd64":
+	case "linux":
 		if accelerator == "kvm" {
 			return nil
 		}

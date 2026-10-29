@@ -29,6 +29,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 	"golang.org/x/sys/unix"
 )
 
@@ -149,8 +150,8 @@ func networkPlatform() error {
 }
 
 func admitNetworkPlatform(goos, goarch string) error {
-	if goos != "linux" || (goarch != "arm64" && goarch != "amd64") {
-		return nvkrerr.New(nvkrerr.CodeEngineCapability, "local networking requires native ARM64 or AMD64 Linux")
+	if goos != "linux" || target.ValidatePlatform(goos+"/"+goarch) != nil {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "local networking requires a supported native Linux target")
 	}
 	return nil
 }

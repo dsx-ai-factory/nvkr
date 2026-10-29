@@ -18,6 +18,26 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/testresults"
 )
 
+func TestNativeConformanceSelectorsFollowTheSelectedPlatform(t *testing.T) {
+	for _, tc := range []struct{ platform, suffix, arch string }{
+		{"linux/arm64", "arm64", "arm64"},
+		{"linux/amd64", "amd64", "amd64"},
+		{"darwin/arm64", "darwin-arm64", "arm64"},
+		{"windows/amd64", "", ""},
+	} {
+		t.Run(tc.platform, func(t *testing.T) {
+			got, err := nativeConformanceSelectors(tc.platform)
+			if tc.suffix == "" {
+				assertNightlyCode(t, err, nvkrerr.CodeEngineCapability)
+				return
+			}
+			if err != nil || got.Hydrophone.Output != "hydrophone-"+tc.suffix || got.Kubectl.Output != "kubectl-"+tc.suffix || got.Hydrophone.Platform != tc.platform || got.Kubectl.Platform != tc.platform || got.ConformanceImage.Output != "conformance-image-"+tc.arch || got.Busybox.Output != "busybox-image-"+tc.arch || got.ConformanceImage.Platform != "linux/"+tc.arch || got.Busybox.Platform != "linux/"+tc.arch {
+				t.Fatalf("host and guest selectors differ: %+v %v", got, err)
+			}
+		})
+	}
+}
+
 func TestNativeConformanceUsesOneRepositoryRun(t *testing.T) {
 	repo, err := resolveExisting(t.TempDir())
 	if err != nil {

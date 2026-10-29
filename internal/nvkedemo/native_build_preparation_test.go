@@ -25,11 +25,11 @@ func TestDefaultNativeBuildRetainsTheProductSelectionAndExplicitInputs(t *testin
 	}{
 		{name: "NVIDIA", platform: "darwin/arm64", wantDefault: true},
 		{name: "matched upstream", platform: "darwin/arm64", network: "upstream-ovn", wantDefault: true},
-		{name: "Linux retained", platform: "linux/arm64"},
+		{name: "Linux ARM64 default", platform: "linux/arm64", wantDefault: true},
 		{name: "AMD64 NVIDIA", platform: "linux/amd64", wantDefault: true},
 		{name: "AMD64 explicit inputs retained", platform: "linux/amd64", definition: "customer.json", environment: "customer-env.json", nvkr: "/explicit/nvkr"},
-		{name: "AMD64 unsupported conformance", platform: "linux/amd64", conformance: true, reject: true},
-		{name: "AMD64 unsupported upstream selection", platform: "linux/amd64", network: "upstream-ovn", reject: true},
+		{name: "AMD64 conformance input selection", platform: "linux/amd64", conformance: true, wantDefault: true},
+		{name: "AMD64 upstream input selection", platform: "linux/amd64", network: "upstream-ovn", wantDefault: true},
 		{name: "explicit prepared retained", platform: "darwin/arm64", definition: ".nvkr/explicit/definition.json", environment: ".nvkr/explicit/environment.json", nvkr: "/explicit/nvkr"},
 		{name: "Mac conformance", platform: "darwin/arm64", conformance: true, wantDefault: true},
 		{name: "Mac upstream conformance", platform: "darwin/arm64", network: "upstream-ovn", conformance: true, wantDefault: true},
@@ -183,8 +183,9 @@ func TestDefaultAMDPreparationBuildsAndBindsLocalToolchain(t *testing.T) {
 				t.Fatal(err)
 			}
 			for name, body := range map[string]string{
-				"nvkr": "#!/bin/sh\nset -eu\ntest \"$1:$2\" = run:plan\nprintf '%s\\n' \"nvkr:$*\" >>\"$CALLS\"\ncat \"$FIXTURE_PLAN\"\n",
-				"bash": "#!/bin/sh\nset -eu\ntest \"$1\" = toolchains/nvkr-packer/build.sh\ntest \"$2:$3\" = --arch:amd64\nprintf '%s\\n' \"bootstrap:$*\" >>\"$CALLS\"\nprintf '%s\\n' \"$IMAGE_ID\"\n",
+				"docker": "#!/bin/sh\nexit 99\n",
+				"nvkr":   "#!/bin/sh\nset -eu\ntest \"$1:$2\" = run:plan\nprintf '%s\\n' \"nvkr:$*\" >>\"$CALLS\"\ncat \"$FIXTURE_PLAN\"\n",
+				"bash":   "#!/bin/sh\nset -eu\ntest \"$1\" = toolchains/nvkr-packer/build.sh\ntest \"$2:$3\" = --arch:amd64\nprintf '%s\\n' \"bootstrap:$*\" >>\"$CALLS\"\nprintf '%s\\n' \"$IMAGE_ID\"\n",
 				"jq": `#!/bin/sh
 set -eu
 printf '%s\n' "projection:$*" >>"$CALLS"
@@ -223,6 +224,30 @@ esac
 				t.Fatalf("architecture-specific preparation: %s %v", raw, err)
 			}
 		})
+	}
+}
+
+func TestDefaultLinuxPreparationRejectsMissingPrerequisitesBeforeWriting(t *testing.T) {
+	for _, platform := range []string{"linux/arm64", "linux/amd64"} {
+		for _, missing := range []string{"jq", "docker", "bash"} {
+			t.Run(platform+"/"+missing, func(t *testing.T) {
+				repo, bin := t.TempDir(), t.TempDir()
+				for _, tool := range []string{"jq", "docker", "bash"} {
+					if tool != missing {
+						writeTenantFixture(t, filepath.Join(bin, tool), []byte("#!/bin/sh\nexit 99\n"), 0700)
+					}
+				}
+				cfg := BuildConfig{Repository: repo, AttemptPrefix: "first", NVKR: "/forbidden/nvkr"}
+				err := prepareDefaultNativeBuild(t.Context(), Runner{Env: []string{"PATH=" + bin}}, &cfg, platform)
+				assertNightlyCode(t, err, e.CodeEngineCapability)
+				if !strings.Contains(err.Error(), "requires "+missing) {
+					t.Fatal("missing prerequisite was not identified", err)
+				}
+				if _, err := os.Lstat(filepath.Join(repo, ".nvkr")); !os.IsNotExist(err) {
+					t.Fatal("missing prerequisite created attempt state", err)
+				}
+			})
+		}
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 	"github.com/google/go-containerregistry/pkg/name"
 	"go.yaml.in/yaml/v3"
 )
@@ -41,15 +42,10 @@ func nativeInstallerSelectionFromPlan(plan *factory.Plan, bundle, buildDigest st
 		if build.BuildDigest != buildDigest {
 			return nil, errors.New("native tool output differs from its selected source build")
 		}
-		var arch string
-		switch build.Platform {
-		case "darwin/arm64", "linux/arm64":
-			arch = "arm64"
-		case "linux/amd64":
-			arch = "amd64"
-		default:
-			return nil, errors.New("native tool output requires an admitted host platform")
+		if err := target.ValidateExecutablePlatform(build.Platform); err != nil {
+			return nil, err
 		}
+		arch := target.ExecutableArch(build.Platform)
 		components := make(map[string]catalog.Component, len(build.ResolvedComponents))
 		for _, item := range build.ResolvedComponents {
 			components[item.Name] = item.Component
@@ -87,8 +83,8 @@ const nativeSiteSpecPath = "cli/internal/bootstrap/sitespec/template.yaml"
 // NVKE's manifest release owns the tag its unchanged deployment expects. This
 // projection selects only the local import alias; NVKE still validates and
 // installs its complete release declaration, and delivery verifies image bytes.
-func nativeCAPNICoReference(ctx context.Context, installer string) (string, error) {
-	raw, err := readRunFile(ctx, installer, "deploy/nico/capnico/release.yaml", 64<<10)
+func (assets *NativeAssets) prepareCAPNICoImport(ctx context.Context) (string, error) {
+	raw, err := readRunFile(ctx, assets.Installer, "deploy/nico/capnico/release.yaml", 64<<10)
 	if err != nil {
 		return "", err
 	}
@@ -100,6 +96,7 @@ func nativeCAPNICoReference(ctx context.Context, installer string) (string, erro
 	if err != nil || release.Artifact != "capnico-controller" || !nativeImageReferenceIsCanonical(ref, release.Image) {
 		return "", errors.New("CAPNICo import requires the source-owned manifest image and artifact")
 	}
+	assets.importTags = map[string]string{"capnico": release.Image}
 	return release.Image, nil
 }
 

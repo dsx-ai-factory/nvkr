@@ -60,16 +60,21 @@ func toolPreparationError(err error) error {
 }
 
 func nativeToolSelection(platform string) (definition, environment, bundle string, members []string, err error) {
-	switch platform {
-	case "darwin/arm64":
-		return "inputs/definitions/demo/native-mac/definition-tools.json", "inputs/environments/local-native-mac.json", "native-tools-darwin-arm64", []string{"clusterctl", "helm", "kind", "kubectl", "nerdctl", "nico-sim", "nico-simctl", "nvke-installer-sources", "nvkectl", "oras", "vmnet-client", "vmnet-helper"}, nil
-	case "linux/arm64":
-		return "inputs/definitions/demo/native-linux/definition-tools.json", "inputs/environments/local-native-linux.json", "native-tools-linux-arm64", []string{"clusterctl", "helm", "kind", "kubectl", "nerdctl", "nico-sim", "nico-simctl", "nvke-installer-sources", "nvkectl", "oras"}, nil
-	case "linux/amd64":
-		return "inputs/definitions/demo/native-linux-amd64/definition-tools.json", "inputs/environments/local-amd64-kvm.json", "native-tools-linux-amd64", []string{"clusterctl", "helm", "kind", "kubectl", "nerdctl", "nico-sim", "nico-simctl", "nvke-installer-sources", "nvkectl", "oras"}, nil
-	default:
-		return "", "", "", nil, nvkrerr.New(nvkrerr.CodeEngineCapability, "native demo tools do not support host %q", platform)
+	if err = admitNativeBuildHost(platform); err != nil {
+		return "", "", "", nil, err
 	}
+	_, environment, err = LocalArtifactInputsForPlatform("ovn", false, platform)
+	if err != nil {
+		return "", "", "", nil, err
+	}
+	hostOS, arch, _ := strings.Cut(platform, "/")
+	definition = "inputs/definitions/demo/tools/" + hostOS + "-" + arch + ".json"
+	bundle = "native-tools-" + hostOS + "-" + arch
+	members = []string{"clusterctl", "helm", "kind", "kubectl", "nerdctl", "nico-sim", "nico-simctl", "nvke-installer-sources", "nvkectl", "oras"}
+	if hostOS == "darwin" {
+		members = append(members, "vmnet-client", "vmnet-helper")
+	}
+	return definition, environment, bundle, members, nil
 }
 
 func nativeRuntimeToolMembers(platform string) ([]string, error) {
@@ -83,7 +88,7 @@ type companionToolBundle struct {
 }
 
 func siteStartupToolBundles(platform string) []companionToolBundle {
-	if platform != "darwin/arm64" && platform != "linux/arm64" && platform != "linux/amd64" {
+	if err := admitNativeBuildHost(platform); err != nil {
 		return nil
 	}
 	return []companionToolBundle{
@@ -280,21 +285,19 @@ func prepareTools(ctx context.Context, cfg ToolConfig, platform string) (string,
 			return "", err
 		}
 	}
-	if platform == "darwin/arm64" || platform == "linux/arm64" || platform == "linux/amd64" {
-		installer := filepath.Join(out, "installer")
-		if err := os.Mkdir(installer, 0o700); err != nil {
-			return "", err
-		}
-		// NVKR has already verified the archive's exact bundle member. Reuse
-		// the existing bounded standard-library decoder and held writes; these
-		// are source-owned files, not a second deployment implementation.
-		selection, err := nativeInstallerSelectionFromPlan(produced.plan, bundle, produced.hostOutput.BuildDigest)
-		if err != nil {
-			return "", err
-		}
-		if _, err := extractNativeInstaller(ctx, filepath.Join(directory, "nvke-installer-sources"), installer, selection); err != nil {
-			return "", err
-		}
+	installer := filepath.Join(out, "installer")
+	if err := os.Mkdir(installer, 0o700); err != nil {
+		return "", err
+	}
+	// NVKR has already verified the archive's exact bundle member. Reuse
+	// the existing bounded standard-library decoder and held writes; these
+	// are source-owned files, not a second deployment implementation.
+	selection, err := nativeInstallerSelectionFromPlan(produced.plan, bundle, produced.hostOutput.BuildDigest)
+	if err != nil {
+		return "", err
+	}
+	if _, err := extractNativeInstaller(ctx, filepath.Join(directory, "nvke-installer-sources"), installer, selection); err != nil {
+		return "", err
 	}
 	return directory, nil
 }

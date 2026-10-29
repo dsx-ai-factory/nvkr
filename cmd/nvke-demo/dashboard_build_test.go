@@ -114,7 +114,7 @@ func TestDashboardSelectedPlansReplaceRunState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tools, _, err := factory.CaptureCompileFiles(t.Context(), ".", "inputs/definitions/demo/native-linux/definition-tools.json", "inputs/environments/local-native-linux.json", "test")
+	tools, _, err := factory.CaptureCompileFiles(t.Context(), ".", "inputs/definitions/demo/tools/linux-arm64.json", "inputs/environments/local-native-linux.json", "test")
 	if err != nil {
 		t.Fatal(err)
 	}

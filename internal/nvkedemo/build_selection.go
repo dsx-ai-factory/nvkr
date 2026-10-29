@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
@@ -74,21 +75,17 @@ func definitionIncludesNativeTools(definition authored.Definition, platform stri
 	if err != nil {
 		return false
 	}
-	want := map[string]bool{host: false}
+	want := map[string]string{host: platform}
+	_, arch, _ := strings.Cut(platform, "/")
 	for _, companion := range siteStartupToolBundles(platform) {
-		want[companion.name] = false
+		want[companion.name] = "linux/" + arch
 	}
 	for _, output := range definition.Outputs {
-		if _, needed := want[output.Name]; needed && output.Platform == platform && output.Format == authored.OutputExecutable {
-			want[output.Name] = true
+		if expected, needed := want[output.Name]; needed && output.Platform == expected && output.Format == authored.OutputExecutable {
+			delete(want, output.Name)
 		}
 	}
-	for _, found := range want {
-		if !found {
-			return false
-		}
-	}
-	return true
+	return len(want) == 0
 }
 
 func selectedBuildIncludesNativeTools(ctx context.Context, cfg BuildConfig, platform string) (bool, error) {

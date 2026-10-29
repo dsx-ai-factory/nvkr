@@ -305,9 +305,23 @@ func TestNativeCAPNICoReferenceFollowsSelectedInstaller(t *testing.T) {
 			if tc.canceled {
 				cancel()
 			}
-			got, err := nativeCAPNICoReference(ctx, root)
+			assets := NativeAssets{Installer: root}
+			got, err := assets.prepareCAPNICoImport(ctx)
 			if (err != nil) != tc.fail || !tc.fail && got != tc.image {
 				t.Fatalf("selected source alias=%q error=%v", got, err)
+			}
+			if tc.fail {
+				if len(assets.importTags) != 0 {
+					t.Fatal("failed source admission retained an import alias")
+				}
+			} else {
+				cfg := startupDescription()
+				cfg.ImageImports["capnico"] = strings.Split(tc.image, ":")[0] + "@sha256:" + strings.Repeat("a", 64)
+				cfg.imageTags = assets.importTags
+				startup, err := SiteStartupUserData(startupTestContext(t), cfg)
+				if err != nil || !strings.Contains(startup, "images tag --force") || !strings.Contains(startup, tc.image) {
+					t.Fatalf("prepared source alias did not reach startup: %v", err)
+				}
 			}
 			if tc.canceled && !errors.Is(err, context.Canceled) {
 				t.Fatal("source projection lost cancellation", err)

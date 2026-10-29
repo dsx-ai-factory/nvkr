@@ -11,6 +11,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 const nativeIdentityHelper = "nvkr-site-identity-helper"
@@ -59,7 +60,7 @@ func nativeIdentityComponentForPlatform(plan *factory.Plan, output, buildDigest,
 }
 
 func nativeIdentitySources(tools, disk *factory.Plan, toolDigest, diskDigest, diskOutput, arch string) error {
-	if arch != "arm64" && arch != "amd64" {
+	if !target.ValidArch(arch) {
 		return errors.New("identity sources require a native architecture")
 	}
 	if _, err := nativeIdentityComponentForPlatform(tools, "site-startup-tools-"+arch, toolDigest, nativeIdentityHelper, "linux/"+arch); err != nil {

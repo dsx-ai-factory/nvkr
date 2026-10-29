@@ -73,6 +73,20 @@ func TestSelectedBuildReusesOnlyCompleteNativeToolOutputs(t *testing.T) {
 	}
 }
 
+func TestSelectedBuildReusesDarwinHostAndLinuxSiteTools(t *testing.T) {
+	doc := definition.Definition{Outputs: []definition.DefinitionOutput{
+		{Name: "native-tools-darwin-arm64", Platform: "darwin/arm64", Format: definition.OutputExecutable},
+		{Name: "site-startup-tools-arm64", Platform: "linux/arm64", Format: definition.OutputExecutable},
+	}}
+	if !definitionIncludesNativeTools(doc, "darwin/arm64") {
+		t.Fatal("matching Darwin host and Linux companion would be rebuilt")
+	}
+	doc.Outputs[1].Platform = "darwin/arm64"
+	if definitionIncludesNativeTools(doc, "darwin/arm64") {
+		t.Fatal("Darwin executable was selected for the Linux site")
+	}
+}
+
 func TestSelectedBuildRequiresCompleteLocalSelection(t *testing.T) {
 	for _, row := range []struct {
 		name, definition, environment, nvkr string

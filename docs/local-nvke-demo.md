@@ -66,15 +66,20 @@ Its allowance follows the remaining operation budget; see the
 [implementation and evidence limits](adr/reconciliation.md#local-arm64-demo-presentation).
 
 The native path remains a local diagnostic.
-On Linux AMD64, ordinary `build` and `e2e` automatically select the AMD64
-Definition and Environment and the `nvkr` executable beside `nvke-demo`.
+Ordinary `build` and `e2e` select the host-matched Definition and Environment
+and the `nvkr` executable beside `nvke-demo` on both Linux architectures and Mac.
+NVKR's existing target owner defines the compiler platform domain. The demo derives
+input filenames and output names from that target instead of maintaining another
+architecture allowlist. Tool Definitions use `inputs/definitions/demo/tools/<os>-<arch>.json`.
 Its images, QCOW2, tool bundles, bootstrap backend and node checks use AMD64
 through the same deployment owner. Default AMD64 preparation builds and validates
 the local Packer toolchain, then binds its exact image ID through the existing
 catalog overlays; it does not require access to the older published toolchain.
-AMD64's default inputs currently cover NVIDIA
-OVN without conformance; upstream OVN and local qualification remain separate
-unsupported selections. Architecture contract tests and Plan compilation do not
+AMD64's committed default inputs currently cover NVIDIA OVN without conformance.
+Matching AMD64 upstream and conformance Definitions are not supplied; those missing
+inputs fail before build execution. Shared conformance selectors use the host
+architecture, but a completed AMD64 conformance run is not recorded.
+Local qualification retains its separate ARM64 evidence lane. Architecture contract tests and Plan compilation do not
 establish a completed AMD64 KVM deployment.
 A complete fresh Mac/Linux build, deployment and cleanup result has not yet been
 established for this candidate. See [current implementation and evidence](adr/reconciliation.md)

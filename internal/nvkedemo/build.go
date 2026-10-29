@@ -25,6 +25,7 @@ import (
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 	"golang.org/x/sys/unix"
 )
 
@@ -41,6 +42,10 @@ type BuiltInputs struct {
 func BuildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	result, err := buildArtifacts(ctx, cfg)
 	if err != nil {
+		var coded *nvkrerr.Error
+		if errors.As(err, &coded) && coded.Code == nvkrerr.CodeEngineCapability {
+			return BuiltInputs{}, err
+		}
 		return BuiltInputs{}, nvkrerr.Wrap(nvkrerr.CodeBuildFailed, err, "local NVKE artifact build")
 	}
 	return result, nil
@@ -82,7 +87,7 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 		return BuiltInputs{}, errors.New("jobs must be positive")
 	}
 	nativeDefault := false
-	if (runtime.GOOS == "darwin" || runtime.GOARCH == "amd64") && cfg.Definition == "" {
+	if cfg.Definition == "" && !(runtime.GOOS == "linux" && (cfg.Prepared || cfg.QualifyLocal || cfg.QualificationPolicy != "")) {
 		executable := cfg.DemoExecutable
 		if executable == "" {
 			executable, err = os.Executable()
@@ -188,11 +193,10 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 }
 
 func admitNativeBuildHost(platform string) error {
-	switch platform {
-	case "darwin/arm64", "linux/arm64", "linux/amd64":
-		return nil
+	if err := target.ValidateExecutablePlatform(platform); err != nil {
+		return nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "native demo build target")
 	}
-	return nvkrerr.New(nvkrerr.CodeEngineCapability, "artifact builds require Apple Silicon Mac or Linux ARM64/AMD64")
+	return nil
 }
 
 // The private seam joins admitted operations without replacing their authority
@@ -424,26 +428,21 @@ func LocalArtifactInputsForPlatform(network string, conformance bool, platform s
 	if err := admitNativeBuildHost(platform); err != nil {
 		return "", "", err
 	}
-	if platform == "linux/amd64" {
-		if conformance || mode != "ovn" {
-			return "", "", nvkrerr.New(nvkrerr.CodeEngineCapability, "default AMD64 inputs support the NVIDIA OVN demo without conformance")
-		}
-		return "inputs/definitions/demo/amd64-nvidia-local-kvm.json", "inputs/environments/local-amd64-kvm.json", nil
-	}
-	definition = "inputs/definitions/demo/arm64-nvidia-local-kvm.json"
+	hostOS, arch, _ := strings.Cut(platform, "/")
+	variant := "nvidia"
 	if mode == "upstream-ovn" {
-		definition = "inputs/definitions/demo/arm64-upstream-local-kvm.json"
+		variant = "upstream"
 	}
+	definition = "inputs/definitions/demo/" + arch + "-" + variant + "-local-kvm"
 	if conformance {
 		if mode == "kind-calico" {
 			return "", "", configUsage("conformance requires the selected OVN demo")
 		}
-		definition = strings.TrimSuffix(definition, ".json") + "-conformance.json"
+		definition += "-conformance"
 	}
-	switch platform {
-	case "linux/arm64":
-		environment = "inputs/environments/local-arm64-kvm.json"
-	case "darwin/arm64":
+	definition += ".json"
+	environment = "inputs/environments/local-" + arch + "-kvm.json"
+	if hostOS == "darwin" {
 		environment = "inputs/environments/local-native-mac.json"
 	}
 	return definition, environment, nil
