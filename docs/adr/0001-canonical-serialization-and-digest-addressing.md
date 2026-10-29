@@ -146,8 +146,9 @@ v5 retains that reference contract and freezes every native child build, produce
 The logical image-index build projection uses `nvkr.dev/image-index-build/v1` inside the existing
 `nvkr.build` family: sorted `requiredPlatforms` plus sorted children containing only `platform`, `buildDigest`
 and `component`. It is distinct from native IR v4 and from OCI manifest observations. Native IR bytes and
-binary-bundle v1 remain unchanged. Publication-root metadata and media use v4 (ADR-20); Definition v4,
-Plan/artifact-graph v4 and Run/Release v3 are rejected rather than reinterpreted with aggregate membership.
+binary-bundle v1 remain unchanged. Plain publication-root metadata and media use v4 (ADR-20); composite roots
+use v5 metadata with unchanged media types (proposed ADR-26). Definition v4, Plan/artifact-graph v4 and
+Run/Release v3 are rejected rather than reinterpreted with aggregate membership.
 
 Production SLSA build-type URIs use `/v2` for the replacement of compiler-handoff parameters by the original
 `definitionDigest` and `environmentDigest`. SLSA provenance/v1 and in-toto Statement/v1 remain unchanged.

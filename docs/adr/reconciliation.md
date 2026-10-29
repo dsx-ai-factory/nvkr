@@ -16,8 +16,8 @@ actual upstream catalog execution. Published-profile migration and controller/ch
 [ADR-26](0026-definition-composition.md) proposes composite Definitions: complete member Definitions pinned by
 `nvkr.definition` digest, joined into one effective Definition, one Plan, one Run and one Release whose
 membership is the exact union of member outputs. Implemented, contract-tested units are listed in its row
-below; no hosted composite Run, composite publication or consumer verification exists. Development bundles
-are planned with generation (U5). Qualification and member Release reuse remain deferred and must fail closed
+below, including named composite development bundles (U5); no hosted composite Run, composite publication or
+consumer verification exists. Qualification and member Release reuse remain deferred and must fail closed
 when implemented; reuse follows the separately drafted result-reuse decision. Retiring the combined NVKE
 Definition is a separate cutover gated on a hosted composite Run and consumer verification.
 
@@ -3264,7 +3264,7 @@ references and own any required association or compatibility decision. See the
 [pilot inputs](../../inputs/definitions/nvke/README.md#four-family-pilot) and
 [partitioning strategy](../definition-partitioning-strategy.md) for scope and historical measurements.
 Proposed [ADR-26](0026-definition-composition.md) designs a composite of these four families as one Release;
-it is designed, not implemented, and adds no authored input.
+units U1–U7 are implemented and contract-tested only, and it adds no authored input.
 
 The 2026-10-20 integration of upstream `9857feeda03d2e7f529e1baef2b4a331a011e54c` reproduced
 `CodePipelineDrift` in all four family bundles. Regeneration through `make nvke-split-generate` refreshed
