@@ -132,6 +132,8 @@ ReleaseSet selection and tag resolution remain deferred; no standalone selector 
   trusted-time checks are always fresh. That authenticated cache protocol is not implemented, and the unused
   declaration-diff helper is removed. Equal Build Digests across named
   outputs likewise grant no execution/evidence reuse: every frozen output use must independently complete.
+  Proposed ADR-25 designs pipeline-attested cross-Run output reuse; it is not implemented and adds no
+  qualified reuse or clearance shortcut.
 - **Rollback (UC-15, deferred).** A future rollback adapter must make a **previously verified set re-selectable
   and re-verifiable by immutable digest** and re-run the clearance path using a fresh opaque
   `CheckpointReceipt`. The checkpoint must target the exact candidate and must already have passed current

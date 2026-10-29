@@ -891,6 +891,8 @@ Every admitted Run retains component operations and an **unconditional terminal 
 same failure behavior before it is admitted. Equal logical build identities do not collapse named output executions
 or their evidence slots. The current Definition path performs no general reuse of prior builds or verification;
 any future reuse needs an authenticated prior result bound to the exact output, members, policy, status and time.
+Proposed ADR-25 designs that pipeline-attested contract, including a distinct `reused` execution outcome and one
+frozen reuse decision set shared by every partition; it is not implemented.
 
 The terminal signature verifier is itself an authenticated execution input. An emitted qualified pipeline must
 name a committed workspace-relative `cosign` executable and carry its exact lowercase `sha256` byte digest. The
