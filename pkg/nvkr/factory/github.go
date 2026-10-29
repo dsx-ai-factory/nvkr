@@ -10,6 +10,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"path/filepath"
+	"regexp"
+	"runtime/debug"
 	"sort"
 	"strings"
 
@@ -113,6 +115,10 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	if err != nil {
 		return nil, err
 	}
+	release, err := githubRunnerReleaseForGenerator()
+	if err != nil {
+		return nil, err
+	}
 	layout := githubLayoutFor(plan)
 	needsProjection, err := githubNeedsForPlan(ctx, plan)
 	if err != nil {
@@ -167,16 +173,12 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			writeGitHubRunSummary(&body, githubRunStartSummary(plan))
 		}
 		actions.writeCheckoutStep(&body)
-		actions.writeSetupGoStep(&body)
-		helperEnvironment := "CGO_ENABLED=0"
-		if len(plan.Environment.GitHubRunners) > 0 {
-			platform, err := authored.GitHubRunnerPlatform(githubBootstrapRunner(runner))
-			if err != nil {
-				return nil, err
-			}
-			helperEnvironment += " GOOS=linux GOARCH=" + strings.TrimPrefix(platform, "linux/")
+		actions.writeSetupGoStep(&body, release)
+		helperEnvironment, err := githubRunnerHelperEnvironment(plan, runner)
+		if err != nil {
+			return nil, err
 		}
-		fmt.Fprintf(&body, "      - name: Build runner from this checkout\n        run: %s go build -trimpath -ldflags %s -o nvkr-exec ./cmd/nvkr\n", helperEnvironment, shellQuote(linkerFlags))
+		writeGitHubShellStep(&body, githubRunnerInstallStep, []string{githubRunnerInstallCommand(helperEnvironment, linkerFlags, release)})
 		command := generationCommand(plan, EngineGitHub)
 		if plan.Environment.GitHubRuntimePlan {
 			if runner == sortedKeys(bootstrapJobs)[0] {
@@ -600,14 +602,97 @@ func (actions githubActionRefs) writeCheckoutStep(out *bytes.Buffer) {
 	fmt.Fprintf(out, "      - name: Check out workflow source\n        uses: %s\n        with:\n          persist-credentials: 'false'\n", actions.Checkout)
 }
 
-// writeSetupGoStep provisions the Go toolchain on the runner before the bootstrap `go build`,
+const githubRunnerInstallStep = "Install NVKR runner"
+
+var (
+	githubGoVersionPattern       = regexp.MustCompile(`^go(1\.[0-9]+(?:\.[0-9]+)?)$`)
+	githubReleaseVersionPattern  = regexp.MustCompile(`^v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$`)
+	githubPseudoVersionPattern   = regexp.MustCompile(`[0-9]{14}-[0-9a-f]{12}$`)
+	githubModuleSumPattern       = regexp.MustCompile(`^h1:[A-Za-z0-9+/]{43}=$`)
+	readGitHubGeneratorBuildInfo = debug.ReadBuildInfo
+)
+
+// githubRunnerRelease is the exact published NVKR module whose runner generated
+// workflows install. The zero value means the generator is a development build,
+// so workflows build the runner from the checkout's own NVKR source instead.
+type githubRunnerRelease struct {
+	Version, Sum, GoVersion string
+}
+
+// githubRunnerReleaseForGenerator pins generated workflows to the generator's
+// own release. Only a module-mode install of an exact release (for example
+// `go install github.com/dsx-ai-factory/nvkr/cmd/nvkr@v1.2.3`) records both a
+// release version and a module checksum; every other build, including a tagged
+// local checkout, is a development build that builds the runner from source.
+func githubRunnerReleaseForGenerator() (githubRunnerRelease, error) {
+	info, ok := readGitHubGeneratorBuildInfo()
+	if !ok || info.Main.Path != githubRunnerModule || info.Main.Sum == "" ||
+		!githubReleaseVersionPattern.MatchString(info.Main.Version) || githubPseudoVersionPattern.MatchString(info.Main.Version) {
+		return githubRunnerRelease{}, nil
+	}
+	if !githubModuleSumPattern.MatchString(info.Main.Sum) {
+		return githubRunnerRelease{}, e.New(e.CodeEngineCapability, "released generator %s records an unsupported module checksum", info.Main.Version)
+	}
+	goVersion := githubGoVersionPattern.FindStringSubmatch(info.GoVersion)
+	if goVersion == nil {
+		return githubRunnerRelease{}, e.New(e.CodeEngineCapability, "released generator %s was built with unreleased Go toolchain %s", info.Main.Version, info.GoVersion)
+	}
+	return githubRunnerRelease{Version: info.Main.Version, Sum: info.Main.Sum, GoVersion: goVersion[1]}, nil
+}
+
+// githubRunnerModule is the module that owns nvkrRunnerPackage.
+var githubRunnerModule = strings.TrimSuffix(nvkrRunnerPackage, "/cmd/nvkr")
+
+// githubRunnerHelperEnvironment is the build environment of one bootstrap's
+// runner: native, or the exact Linux platform of a native hosted runner route.
+func githubRunnerHelperEnvironment(plan *Plan, runner string) (string, error) {
+	if len(plan.Environment.GitHubRunners) == 0 {
+		return "CGO_ENABLED=0", nil
+	}
+	platform, err := authored.GitHubRunnerPlatform(githubBootstrapRunner(runner))
+	if err != nil {
+		return "", err
+	}
+	return "CGO_ENABLED=0 GOOS=linux GOARCH=" + strings.TrimPrefix(platform, "linux/"), nil
+}
+
+// githubRunnerInstallCommand builds the runner from the checkout's NVKR source,
+// or installs the pinned release and requires its recorded module version and
+// checksum to match the pin before the runner is used.
+func githubRunnerInstallCommand(helperEnvironment, linkerFlags string, release githubRunnerRelease) string {
+	command := "set -eu\n" +
+		"export " + helperEnvironment + " GOBIN=\"$RUNNER_TEMP/nvkr-runner\"\n"
+	if release.Version == "" {
+		return command +
+			"go install -trimpath -ldflags " + shellQuote(linkerFlags) + " ./cmd/nvkr\n" +
+			"mv \"$GOBIN/nvkr\" nvkr-exec"
+	}
+	return command +
+		"go install -trimpath -ldflags " + shellQuote(linkerFlags) + " " + nvkrRunnerPackage + "@" + release.Version + "\n" +
+		"installed=$(go version -m \"$GOBIN/nvkr\" | awk '$1 == \"mod\" {print $2, $3, $4}')\n" +
+		"printf 'Installed NVKR runner module: %s\\n' \"$installed\"\n" +
+		"test \"$installed\" = " + shellQuote(githubRunnerModule+" "+release.Version+" "+release.Sum) + "\n" +
+		"mv \"$GOBIN/nvkr\" nvkr-exec"
+}
+
+// githubSetupGoWith returns setup-go's inputs: the checkout's .go-version for a
+// source build, or the released generator's own Go release for a pinned install.
+func githubSetupGoWith(release githubRunnerRelease) (key, value string) {
+	if release.Version == "" {
+		return "go-version-file", ".go-version"
+	}
+	return "go-version", release.GoVersion
+}
+
+// writeSetupGoStep provisions the Go toolchain on the runner before the bootstrap `go install`,
 // so the workflow does not silently depend on a preinstalled Go (true on GitHub-hosted
-// ubuntu-latest, but not on a minimal or self-hosted runner). The version is read from the
-// checked-out repo's .go-version, so setup-go and the actual build toolchain cannot drift.
-func (actions githubActionRefs) writeSetupGoStep(out *bytes.Buffer) {
+// ubuntu-latest, but not on a minimal or self-hosted runner). A source build reads the
+// checkout's .go-version, so setup-go and the actual build toolchain cannot drift.
+func (actions githubActionRefs) writeSetupGoStep(out *bytes.Buffer, release githubRunnerRelease) {
 	// Candidate diagnostic jobs can write the main branch's Actions cache. Do
 	// not restore executable build inputs from that cache into a trusted helper.
-	fmt.Fprintf(out, "      - name: Set up Go\n        uses: %s\n        with:\n          go-version-file: '.go-version'\n          cache: 'false'\n", actions.SetupGo)
+	key, value := githubSetupGoWith(release)
+	fmt.Fprintf(out, "      - name: Set up Go\n        uses: %s\n        with:\n          %s: %s\n          cache: 'false'\n", actions.SetupGo, key, yamlSingle(value))
 }
 
 // prepareHelperStepName and prepareHelperRun are the ONE definition of the helper

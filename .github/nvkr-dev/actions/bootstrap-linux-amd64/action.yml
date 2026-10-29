@@ -22,8 +22,12 @@ runs:
       with:
         go-version-file: '.go-version'
         cache: 'false'
-    - name: Build runner from this checkout
-      run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags '-X main.version=dev -X main.commit=unknown' -o nvkr-exec ./cmd/nvkr
+    - name: 'Install NVKR runner'
+      run: |
+        set -eu
+        export CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOBIN="$RUNNER_TEMP/nvkr-runner"
+        go install -trimpath -ldflags '-X main.version=dev -X main.commit=unknown' ./cmd/nvkr
+        mv "$GOBIN/nvkr" nvkr-exec
       shell: bash -e {0}
     - name: Verify committed Run generation is current
       id: validate-catalog
