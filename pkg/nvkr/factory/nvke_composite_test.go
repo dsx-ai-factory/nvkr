@@ -114,6 +114,12 @@ func TestNVKECompositeIdentityInvariance(t *testing.T) {
 	if len(plan.LifecycleOutputs) != 69 || len(plan.Builds) != 73 || len(plan.Composition.Members) != 4 {
 		t.Fatalf("composite Plan has %d outputs and %d native builds, want 69 and 73", len(plan.LifecycleOutputs), len(plan.Builds))
 	}
+	partitioned, err := compileDocumentsWithLoader(t.Context(), combined.DefinitionPath, combined.Definition, "inputs/environments/github-release.yaml",
+		environment, combined.GeneratorVersion, loadStack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertPartitionsIgnoreMembers(t, partitioned, plan)
 	baselines := []*Plan{combined}
 	for _, family := range nvkeSplitFamilies {
 		definitionPath, environmentPath := nvkeSplitPaths(family.name)
@@ -147,6 +153,45 @@ func TestNVKECompositeIdentityInvariance(t *testing.T) {
 			if !bytes.Equal(mustCanonical(t, output), outputs[output.Name]) {
 				t.Fatalf("composition changed output %q relative to %s", output.Name, baseline.Name)
 			}
+		}
+	}
+}
+
+// assertPartitionsIgnoreMembers requires the composite's worker partitions to
+// hold exactly the jobs of the combined Plan's partitions: partitions follow
+// dependency depth and capacity, never member boundaries.
+func assertPartitionsIgnoreMembers(t *testing.T, combined, composite *Plan) {
+	t.Helper()
+	partitionJobs := func(plan *Plan) [][]string {
+		bundle, err := RenderGitHub(t.Context(), plan)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var names []string
+		for name := range bundle.Files {
+			if githubPartitionWorkflowSuffix.MatchString(name) {
+				names = append(names, name)
+			}
+		}
+		slices.Sort(names)
+		var partitions [][]string
+		for _, name := range names {
+			var jobs []string
+			for id := range decodeGitHubWorkflow(t, bundle.Files[name]).Jobs {
+				jobs = append(jobs, id)
+			}
+			slices.Sort(jobs)
+			partitions = append(partitions, jobs)
+		}
+		return partitions
+	}
+	want, got := partitionJobs(combined), partitionJobs(composite)
+	if len(got) < 2 || len(got) != len(want) {
+		t.Fatalf("composite has %d partitions, combined has %d", len(got), len(want))
+	}
+	for i := range want {
+		if !slices.Equal(got[i], want[i]) {
+			t.Fatalf("partition %d differs from the combined Plan's partition", i)
 		}
 	}
 }

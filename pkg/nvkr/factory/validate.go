@@ -87,6 +87,9 @@ func (plan Plan) validatePlanInputs() ([]packageSpec, error) {
 	if err := admitInputs(plan.Definition, plan.Environment); err != nil {
 		return nil, err
 	}
+	if err := admitDefinitionForm(plan.Environment, plan.Composition); err != nil {
+		return nil, err
+	}
 	definitionDigest, err := plan.Definition.Digest()
 	if err != nil {
 		return nil, err

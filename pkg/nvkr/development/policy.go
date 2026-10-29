@@ -26,27 +26,51 @@ const (
 	ReadUserVariable      = "NVKR_DEV_REGISTRY_READ_USER"
 )
 
-var namespacePattern = regexp.MustCompile(`^ghcr\.io/([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)/([a-z0-9](?:[a-z0-9._-]*[a-z0-9])?)/development$`)
+var namespacePattern = regexp.MustCompile(`^ghcr\.io/([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)/([a-z0-9](?:[a-z0-9._-]*[a-z0-9])?)/development(?:-([a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?))?$`)
+
+// reservedBundles would collide with the fixed development qualification
+// workflows and manifest directory.
+var reservedBundles = map[string]bool{"qualify": true, "smoke": true, "qualification": true}
 var leafPattern = regexp.MustCompile(`^[a-z0-9]+(?:[._-][a-z0-9]+)*$`)
 
-// Namespace is an admitted repository-owned development namespace.
-type Namespace struct{ prefix, repository string }
+// Namespace is an admitted repository-owned development namespace. A named
+// namespace (development-<bundle>) belongs to one named development bundle
+// with its own producer workflow and signer identity.
+type Namespace struct{ prefix, repository, bundle string }
 
 func ParseNamespace(prefix string) (Namespace, error) {
 	parts := namespacePattern.FindStringSubmatch(prefix)
-	if parts == nil {
-		return Namespace{}, e.New(e.CodeEngineCapability, "development publication requires ghcr.io/<owner>/<repo>/development")
+	if parts == nil || reservedBundles[parts[3]] {
+		return Namespace{}, e.New(e.CodeEngineCapability, "development publication requires ghcr.io/<owner>/<repo>/development or an unreserved development-<bundle>")
 	}
-	return Namespace{prefix: prefix, repository: parts[1] + "/" + parts[2]}, nil
+	return Namespace{prefix: prefix, repository: parts[1] + "/" + parts[2], bundle: parts[3]}, nil
+}
+
+// ProducerWorkflowFor returns the fixed producer workflow of a development
+// bundle; the empty name is the original fixed layout.
+func ProducerWorkflowFor(bundle string) string {
+	if bundle == "" {
+		return ProducerWorkflow
+	}
+	return ".github/workflows/nvkr-dev-" + bundle + ".yml"
+}
+
+// ValidateBundle refuses development bundle names reserved by fixed workflows.
+func ValidateBundle(bundle string) error {
+	if reservedBundles[bundle] {
+		return e.New(e.CodeEngineCapability, "development bundle name %q is reserved", bundle)
+	}
+	return nil
 }
 
 func (namespace Namespace) Prefix() string     { return namespace.prefix }
 func (namespace Namespace) Repository() string { return namespace.repository }
+func (namespace Namespace) Bundle() string     { return namespace.bundle }
 func (namespace Namespace) Identity() string {
 	if namespace.prefix == "" {
 		return ""
 	}
-	return "^" + regexp.QuoteMeta("https://github.com/"+namespace.repository+"/.github/workflows/nvkr-dev.yml@refs/heads/") + "[^[:space:]]+$"
+	return "^" + regexp.QuoteMeta("https://github.com/"+namespace.repository+"/"+ProducerWorkflowFor(namespace.bundle)+"@refs/heads/") + "[^[:space:]]+$"
 }
 
 // Reference describes one repository in exactly one disposable run attempt.

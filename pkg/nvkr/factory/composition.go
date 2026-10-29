@@ -133,18 +133,26 @@ func compileComposition(ctx context.Context, composition authored.Composition, e
 		stacks[key] = stack
 		return stack, nil
 	}
-	plan, err := compileDocumentsWithLoader(ctx, composition.Path(), composition.Effective(), environmentPath, environment, generatorVersion, loadOnce)
+	plan, err := compileDocumentsFor(ctx, composition.Path(), composition.Effective(), environmentPath, environment, generatorVersion, loadOnce, record)
 	if err != nil {
 		return nil, err
+	}
+	if plan.DefinitionDigest != composition.Digest() {
+		return nil, e.New(e.CodeUnverifiedRef, "composite Plan does not bind the admitted composite digest")
 	}
 	if err := checkCrossMemberProducers(*plan, record); err != nil {
 		return nil, err
 	}
-	plan.SchemaVersion, plan.DefinitionDigest, plan.Composition = CompositePlanSchemaVersion, composition.Digest(), record
-	if err := plan.Validate(); err != nil {
-		return nil, err
-	}
 	return plan, nil
+}
+
+// admitDefinitionForm keeps named development bundles composite-only: the
+// single fixed development layout belongs to plain Definitions (ADR-26 §9).
+func admitDefinitionForm(environment authored.Environment, record *CompositionRecord) error {
+	if record == nil && environment.GitHubDevelopment && environment.GitHubBundle != "" {
+		return e.New(e.CodeEngineCapability, "githubDevelopment does not support a named githubBundle for a plain Definition")
+	}
+	return nil
 }
 
 // admitCompositeEnvironment refuses execution modes ADR-26 does not admit for
