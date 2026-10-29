@@ -105,6 +105,9 @@ func runLocalCommandWithServices(c *cli.Context, execute localLifecycleExecutor,
 	if c.Args().Present() {
 		return e.New(e.CodeUsage, "run local accepts flags only")
 	}
+	if c.String("attempts-root") == "" {
+		return e.New(e.CodeUsage, "--attempts-root must not be empty")
+	}
 	if view.tui || view.json {
 		defer checkedOutputSignals()()
 	}

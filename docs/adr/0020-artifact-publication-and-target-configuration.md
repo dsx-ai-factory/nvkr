@@ -44,7 +44,7 @@ OCI namespace or credentials for an APT-only request. Plan validation, generatio
 that admission. Direct APT service destinations, credentials, repository signing and authenticated read-back
 remain unimplemented; selection is not an enabled publisher or service approval.
 Future APT publication keeps signing customer-controlled through Environment configuration.
-Its disclosed transport defaults are the existing cosign path for OCI and standard OpenPGP/GPG repository
+Publication signing defaults are the existing cosign path for OCI and standard OpenPGP/GPG repository
 metadata signing for APT. The OCI path retains explicit customer identity/issuer policy; APT must retain
 customer signing-service/key references and exact public-key trust bindings. Private signing keys are not
 catalog or Plan data. Consumer verification policy separately authenticates the expected signer and payload.

@@ -421,9 +421,8 @@ External-module compile and no-work admission tests establish only that boundary
 and complete conformance remain separately evidenced operational acceptance.
 
 The producer `NodeSession` cancels admitted call contexts synchronously when `Close` starts, before exposing
-session cancellation, then joins active producers and releases source snapshots.
-Calls retain their caller's context values and deadline. An asynchronous cancellation callback alone cannot
-enforce this close ordering.
+session cancellation, then joins active producers and releases source snapshots. Calls retain their caller's
+context values and deadline. An asynchronous cancellation callback alone cannot enforce this close ordering.
 
 ### 6. One Run is one immutable attempt
 
