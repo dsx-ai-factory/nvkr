@@ -99,6 +99,9 @@ the receipt. `delivery` owns byte-preserving member projection and authenticated
 `sign` owns retained proofs and detached signing/verification. The lifecycle owner joins their exact subjects
 and owns cancellation/Close through stop and join. CLI and SDK adapt the same use case without implementing
 another scheduler or upload mechanism. Legacy monolithic-root subset consumption remains unsupported.
+The S3 retry gate serializes the authenticated provider run lineage and target across attempts, as specified
+in ADR-20. Each public Run remains one immutable attempt; reuse records a new observation of an authenticated
+predecessor completion with its original invocation, without rewriting that attempt or minting another signature.
 
 `pkg/nvkr/definition` owns authored Definition/Environment loading, validation and identity. `factory.Compile`
 accepts those exact inputs and owns the complete Plan, output joins and evidence requirements. It returns no

@@ -1568,11 +1568,22 @@ policies. Secret references may be recorded; secret values cannot be
 transported in plans, command arguments, boot scripts, artifacts or logs. Referenced authentication and
 provider capabilities must be admitted before producer, storage or publication work.
 
+Across attempts, the admitted non-canceling provider boundary and durable Run records must serialize
+predecessor reconciliation before
+new signing or commit. A retry cannot discard an unresolved locator by signing another bundle; authenticated
+reuse preserves the original delivery invocation and records the current attempt's observation separately.
+
 The completion operation must depend on confirmed exact-byte retention of its frozen locator under the
 originating Run/attempt and target, accessible after producer or runner loss. A post-commit artifact-upload
 step or finalizer cannot satisfy that prerequisite. Admit the recovery access and retention before work;
 failed or unconfirmed retention prevents the commit request. The bundle locator omits its unknown version;
 independent recovery resolves the exact key and verifies the observed version as specified in ADR-20.
+
+Generated job admission also reserves the cleanup window and a separate termination/reap-observation
+window no larger than `cleanupTimeoutSeconds`, as specified in ADR-20. Cleanup expiry requires supervisor
+termination under that second bound; it cannot become indefinite joining or rely on the hosted job timeout.
+A missing supervisor capability fails admission; an unconfirmed exit fails teardown and leaves authority blocked.
+
 The finalizer reports no successful required delivery for failed or indeterminate completion. A valid remote
 commit can survive lost acknowledgement, cancellation or finalizer failure; retrieve its preserved locator
 for independent reconciliation rather than claiming rollback. Existing OCI publication may remain successful

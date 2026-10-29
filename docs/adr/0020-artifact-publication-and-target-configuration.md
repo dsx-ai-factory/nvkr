@@ -345,8 +345,8 @@ retain distinct authenticated descriptor or parent-archive bindings.
 | `type` | Exact remaining fields and meaning | Ordering and uniqueness tuple |
 | --- | --- | --- |
 | `control` | `publicationReference`, `sha256`: an original control/evidence blob or verified detached proof for that exact publication subject. | `(type, publicationReference, sha256)` |
-| `payload` | `publicationReference`, `outputName`, `descriptorDigest`, `payloadSHA256`: the exact whole payload bound by that output's authenticated wrapper. | `(type, publicationReference, outputName, descriptorDigest, payloadSHA256)` |
 | `member` | `publicationReference`, `outputName`, `parentSHA256`, `memberName`, `memberSHA256`: the original held file/archive and its exact canonical regular member. | `(type, publicationReference, outputName, parentSHA256, memberName, memberSHA256)` |
+| `payload` | `publicationReference`, `outputName`, `descriptorDigest`, `payloadSHA256`: the exact whole payload bound by that output's authenticated wrapper. | `(type, publicationReference, outputName, descriptorDigest, payloadSHA256)` |
 
 The owning verifier derives every binding from authenticated source controls, proof bytes and held payloads.
 The binding's selected byte digest must equal the destination object's `sha256`. A member must match its
@@ -418,12 +418,36 @@ fails admission, not a silent safety downgrade. The PUT/multipart retry distinct
 [AWS conditional-write behavior](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html);
 mandatory full-byte reconciliation is this contract's requirement for every admitted provider.
 
-The state order is source authentication → upload payloads and proofs → verify every required storage object
-and boot URL → generate canonical root → detached signing → root upload and read-back → durable locator retention
+Before another attempt signs or commits, `lifecycle` must establish serialized ownership for the authenticated
+GitHub repository, workflow, provider run ID and target name across attempts. The retry attempt is not part
+of that ownership key. Use the admitted provider's non-canceling single-writer boundary and the existing
+Run-record owner. Serialization must cover predecessor lookup, pending-attempt registration, signing,
+locator retention and commit disposition; durable CAS/no-replace records must preserve the attempt history.
+Concurrent attempts cannot both observe an
+empty state and acquire signing authority. Missing serialization or incomplete recovery history fails admission;
+this introduces no independently authored object or coordination service.
+
+Retrieve and reconcile every retained pending or indeterminate locator in that lineage before authorizing
+new signing. Fully authenticate a completed delivery under current consumer policies and match its exact
+source, Plan, Environment and destination bindings; reuse its unchanged locator and original delivery
+invocation. Record the new attempt's observation separately, without rewriting the predecessor's outcome.
+These are separate immutable public Run attempts, not general Run resume. Changed inputs or destination
+bindings do not clear an unresolved predecessor. Missing, expired, inaccessible, conflicting or still-uncertain
+state blocks signing and completion publication; retention expiry cannot establish absence. A current-key
+absence observation and a stopped local writer do not prove that a previously dispatched request cannot
+still complete. Fresh signing is permitted for authenticated initial state with no predecessor. Otherwise it
+requires retained affirmative evidence that no predecessor completion request was dispatched, or another
+authenticated terminal disposition excluding a later predecessor commit.
+Neither a stored success flag, a new signature/key nor a bucket scan replaces reconciliation. This gate
+does not promise provider-wide exactly-once publication or an atomic transaction across targets.
+
+After that gate, the state order is source authentication → upload payloads and proofs → verify every required
+storage object and boot URL → generate canonical root → detached signing → root upload and read-back → durable locator retention
 → conditional bundle upload last → independent root and bundle authentication → producer success.
-Freeze the exact root, bundle and locator bytes before the final commit request; retries never silently
-re-sign under the same key. `lifecycle` must durably retain the exact frozen locator under the originating
-Run/attempt and target in a record retrievable after producer process or runner loss. Confirm its exact-byte
+Freeze the exact root, bundle and locator bytes before the final commit request. Exact-byte request retries
+preserve them; a new signature or key cannot bypass the predecessor gate. `lifecycle` must durably retain
+the exact frozen locator under the originating Run/attempt and target in a record retrievable after producer
+process or runner loss. Confirm its exact-byte
 read-back before permitting the final request; failed or unconfirmed retention prevents that request.
 An acknowledged durable Run record or already retained job artifact may satisfy this requirement; process
 memory, logs, an ephemeral runner file or an artifact uploaded only after the commit cannot. Recovery access
@@ -447,10 +471,18 @@ and close owned active bodies/transport resources as needed; confirm worker join
 restarting an upload or releasing held payload/proof owners. Abort/list verification uses the remaining
 cleanup budget, not a second full timeout. If that budget expires before joining, record cleanup failure
 and retain lifetime ownership: do not abort/list, restart, release held payload/proof owners or report producer
-success. Continue supervised joining or terminate and join the owning execution process; a timed-out wait
-cannot establish that workers stopped or authorize detached workers. An adapter without bounded cancellation
-and teardown is not admitted. Remote leftovers remain subject to operator expiration; that policy cannot
-replace local worker ownership. Once joined and within the remaining budget, abort every remaining owned
+success. The enclosing supervisor must immediately terminate the owning execution process and its descendants,
+escalating from graceful to forced termination and observing exit under a separate bound of at most
+`cleanupTimeoutSeconds`. Admission and generated job headroom must reserve both windows before work;
+the second is exclusively termination/reap observation, never another upload, abort/list budget or retry.
+Continued unbounded joining and reliance on the hosted job timeout are not permitted. A termination signal
+or timed-out wait is not proof of joining. If exit remains unconfirmed at the second deadline, record a
+terminal infrastructure/cleanup failure and keep the delivery state blocked and unsafe owners under the
+enclosing supervisor; no ordinary detached-worker return, abort/list, upload restart, held payload/proof
+release or producer success is authorized. An adapter without that finite supervisor capability is not
+admitted; a platform failure to reap is reported explicitly, not as successful bounded teardown.
+Remote leftovers remain subject to operator expiration; that policy cannot replace local worker ownership.
+Once joined and within the remaining cleanup budget, abort every remaining owned
 incomplete upload ID and verify that its parts are gone, repeating bounded abort/list operations when
 necessary. Never abort a known completed upload or delete a completed object. An absent upload ID does not
 establish whether completion succeeded: reconcile ambiguous completion against the exact object key,
@@ -492,12 +524,23 @@ Required tests cover corrupt or missing proof or boot files, EFI or script subst
 wrong architectures or digests, incompatible imager parameters, equal or conflicting existing objects,
 concurrent writes, lost commit acknowledgements, denied access, interrupted multipart transfers and failed
 boot or installation. Exercise unchanged Debian names containing `+` through actual emitted URLs, including
-distinct space and literal-percent names. Verify complete binding tuples retain distinct descriptor/parent
-membership for equal payload bytes and reject exact duplicates. Exercise denied and out-of-scope credential
+distinct space and literal-percent names. Ordering contracts must accept the literal type sequence
+`[control, member, payload]` and reject `[control, payload, member]`, `[payload, member]` and other unsorted
+permutations. Fix expected order independently of the producer/verifier comparator, table positions and enum
+ordinals. Within each variant, tie earlier fields and vary each applicable field; specifically exercise
+`descriptorDigest` for `payload` and `parentSHA256` for `member` before later fields, ensuring that later
+fields cannot override the first difference. Where the admitted name grammar
+permits it, include UTF-8 names distinguishing byte order from locale or UTF-16 order. Equal payload bytes
+must retain distinct authenticated descriptor/parent bindings; exact full-tuple duplicates fail.
+Exercise denied and out-of-scope credential
 admission, cancellation during active transfer and a cleanup deadline expiring before worker join; no abort,
 restart, held payload/proof release or success may precede joining. On a versioned bucket, lose the final
 acknowledgement and recover the same frozen locator through version discovery and complete independent
-verification. Terminate the
+verification. A later attempt must reuse that authenticated completion without signing again; uncertain,
+expired or incomplete predecessor history must prevent new signing. Concurrent attempts must not both
+acquire signing authority. A cleanup expiry must trigger the separately bounded supervisor termination;
+an unconfirmed exit at its deadline must preserve blocked state, unsafe ownership and failure without success.
+Terminate the
 producer or runner after the bundle lands but before acknowledgement, then retrieve the pre-recorded locator
 and reconcile without the producer's memory or files. Failed durable retention or its read-back must prevent
 the final commit request. Delivery success, boot readiness and qualification remain separate results. Record

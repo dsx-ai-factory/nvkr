@@ -1257,6 +1257,10 @@ The contract also requires reviewed credential action/resource scopes, complete 
 ordering, and a cleanup budget covering cancellation and worker joining without abandoning workers.
 Negative boot acceptance explicitly includes mismatched EFI architecture and incompatible imager parameters.
 Provider policy evidence and these failure/rejection exercises remain outstanding.
+Cross-attempt signing also requires serialized predecessor reconciliation; an uncertain or expired locator
+cannot be bypassed by re-signing. Cleanup expiry requires separately bounded supervisor termination/reap
+observation, and ordering acceptance covers unsorted and mixed-type bindings independently of the comparator.
+These remain implementation and acceptance requirements, not exercised retry or process-lifetime evidence.
 
 ## Support by owner
 

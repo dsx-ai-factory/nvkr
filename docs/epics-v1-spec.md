@@ -472,6 +472,8 @@ Acceptance of this extension requires:
    is reconciled or reported as indeterminate; already stored valid evidence is not described as rolled back.
    The exact completion reference remains retrievable after producer or runner loss and permits independent
    recovery on versioned storage. Failure to retain and confirm that reference prevents the final commit.
+   A retry must reconcile earlier uncertain completion before creating another signed completion; a valid
+   prior completion is reused with its original proof, and unresolved history cannot be bypassed.
 5. Successful delivery, demonstrated boot readiness and release qualification are distinct results.
    The supported service, compatibility set and observed limits are recorded before enablement.
 
