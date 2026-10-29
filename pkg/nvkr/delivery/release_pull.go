@@ -286,7 +286,8 @@ func fetchPullLayer(ctx context.Context, reference string, descriptor Descriptor
 }
 
 // Each attempt hashes the complete layer from its first byte. Only a peer reset
-// before the declared size, after the partial download is removed, authorizes
+// before the declared size, after its handles close cleanly and the partial
+// download is removed, authorizes
 // the caller's bounded reacquisition.
 func fetchPullLayerAttempt(ctx context.Context, ref name.Digest, descriptor Descriptor, path string, options RegistryOptions) (*os.File, bool, error) {
 	layer, err := remote.Layer(ref.Context().Digest(descriptor.Digest), registryOptions(ctx, options)...)
@@ -297,7 +298,12 @@ func fetchPullLayerAttempt(ctx context.Context, ref name.Digest, descriptor Desc
 	if err != nil {
 		return nil, false, metadataFetchError(ctx, err, "open output layer")
 	}
-	defer func() { _ = reader.Close() }()
+	bodyClosed := false
+	defer func() {
+		if !bodyClosed {
+			_ = reader.Close()
+		}
+	}()
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return nil, false, e.Wrap(e.CodeImmutableViolation, err, "creating private output download")
@@ -319,8 +325,15 @@ func fetchPullLayerAttempt(ctx context.Context, ref name.Digest, descriptor Desc
 	}
 	if copyErr != nil {
 		if written < descriptor.Size && isPeerProtocolReset(copyErr) {
-			_ = file.Close()
-			complete = true
+			// Close failures are not interrupted bodies and never authorize reacquisition.
+			bodyClosed, complete = true, true
+			if err := reader.Close(); err != nil {
+				_ = file.Close()
+				return nil, false, e.Wrap(e.CodeVerifyFailed, err, "closing interrupted output layer body")
+			}
+			if err := file.Close(); err != nil {
+				return nil, false, e.Wrap(e.CodeImmutableViolation, err, "closing interrupted output download")
+			}
 			if err := os.Remove(path); err != nil {
 				return nil, false, e.Wrap(e.CodeImmutableViolation, err, "removing interrupted output download")
 			}

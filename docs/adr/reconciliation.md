@@ -3437,8 +3437,10 @@ Consumer signature, provenance and SBOM bundle reads resolve registry access lik
 reads. With neither `--anonymous` nor explicit transport credentials, the bundle reader consults the same
 default keychain; an explicit signing credential still takes precedence, and explicit transport passwords
 are not widened to it. Bundle verification by cosign stays offline against an empty private Docker
-configuration. A registry 401 or 403 during bundle discovery reports `NVKR-E-FETCH-FAILED`, distinct from
-`NVKR-E-SIGNATURE-INVALID`. Contract tests with an `httptest` registry cover keychain-authenticated
+configuration. A registry 401 or 403 on the referrers index reports `NVKR-E-FETCH-FAILED`, distinct from
+`NVKR-E-SIGNATURE-INVALID`. A denied candidate does not end the search: later valid evidence still
+authenticates, and with none the last candidate failure sets the code, so a sole denied candidate reports
+`NVKR-E-FETCH-FAILED` while a later malformed candidate reports `NVKR-E-SIGNATURE-INVALID`. Contract tests with an `httptest` registry cover keychain-authenticated
 reads, anonymous-only reads with and without a keychain, a missing or rejected keychain credential, and
 the credential-plus-keychain conflict. No private-registry consumer verification has been re-run since
 this change; the earlier private GHCR readback that failed with `NVKR-E-SIGNATURE-INVALID` remains the

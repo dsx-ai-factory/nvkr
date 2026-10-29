@@ -146,8 +146,10 @@ tag-schema fallback is supported; legacy `.sig` and `.att` attachment lookup is 
 Paginated discovery is refused until the adapter can read all pages within its bounds. Explicit
 credentials are confined to the selected registry. With no explicit credential, a consumer whose payload
 reads use the default keychain gives discovery that same keychain; anonymous or explicit-password
-transport leaves discovery anonymous. A registry 401 or 403 is a coded fetch failure, not a signature
-result. Cosign itself verifies the fetched bundles offline with an empty private Docker configuration.
+transport leaves discovery anonymous. A registry 401 or 403 on the referrers index is a coded fetch
+failure, not a signature result. A denied candidate manifest or bundle is one unusable candidate: the
+search continues, a later valid candidate can still satisfy the type, and when none does the last
+candidate failure determines the code, so a sole denied candidate reports a fetch failure. Cosign itself verifies the fetched bundles offline with an empty private Docker configuration.
 The existing operation deadline covers transport and cryptographic verification.
 Private temporary bundle files are checked for mutation and removed on success or failure. Unfetched
 historical or unrelated candidates are not claimed to be valid: this discovery requires an authenticated

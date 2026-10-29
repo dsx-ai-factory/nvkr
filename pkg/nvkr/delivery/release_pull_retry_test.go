@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -62,6 +63,13 @@ func (body *releasePullResetBody) Read(buffer []byte) (int, error) {
 	n, err := body.ReadCloser.Read(buffer[:min(len(buffer), body.remaining)])
 	body.remaining -= n
 	return n, err
+}
+
+type releasePullCloseFailureBody struct{ *releasePullResetBody }
+
+func (body releasePullCloseFailureBody) Close() error {
+	_ = body.releasePullResetBody.Close()
+	return errors.New("synthetic response close failure")
 }
 
 type releasePullTamperedBody struct{ io.ReadCloser }
@@ -130,6 +138,45 @@ func TestReleasePullLayerRecoversPeerResetAndReverifies(t *testing.T) {
 			entries, err := os.ReadDir(workspace)
 			if err != nil || len(entries) != 1 {
 				t.Fatalf("recovery left partial downloads: %v %v", entries, err)
+			}
+		})
+	}
+}
+
+func TestReleasePullLayerCleanupFailureRefusesReacquisition(t *testing.T) {
+	payload := bytes.Repeat([]byte("nvkr disk payload "), 4096)
+	sum := sha256.Sum256(payload)
+	digest := "sha256:" + hex.EncodeToString(sum[:])
+	for _, test := range []struct {
+		name string
+		body func(workspace string, real io.ReadCloser) io.ReadCloser
+		code e.Code
+	}{
+		{"response close failure", func(_ string, real io.ReadCloser) io.ReadCloser {
+			return releasePullCloseFailureBody{&releasePullResetBody{ReadCloser: real, remaining: len(payload) / 2}}
+		}, e.CodeVerifyFailed},
+		// A non-empty directory cannot be removed even when tests run as root.
+		{"partial removal failure", func(workspace string, real io.ReadCloser) io.ReadCloser {
+			return &releasePullResetBody{ReadCloser: real, remaining: len(payload) / 2, onReset: func() {
+				path := filepath.Join(workspace, "payload-"+strings.TrimPrefix(digest, "sha256:"))
+				if err := os.Remove(path); err != nil {
+					t.Error(err)
+				}
+				if err := os.MkdirAll(filepath.Join(path, "occupied"), 0o700); err != nil {
+					t.Error(err)
+				}
+			}}
+		}, e.CodeImmutableViolation},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			workspace := t.TempDir()
+			transport, reference := releasePullBlobFixture(t, payload, digest, func(_ int, real io.ReadCloser) io.ReadCloser {
+				return test.body(workspace, real)
+			})
+			file, err := fetchPullLayer(t.Context(), reference, Descriptor{MediaType: string(types.OCILayer), Digest: digest, Size: int64(len(payload))}, workspace, RegistryOptions{PlainHTTP: true, Anonymous: true})
+			assertRegistryCode(t, err, test.code)
+			if file != nil || transport.reads.Load() != 1 {
+				t.Fatalf("cleanup failure reacquired or returned a payload: reads=%d", transport.reads.Load())
 			}
 		})
 	}
