@@ -268,7 +268,7 @@ func checkedRunWrite(out io.Writer, raw []byte) error {
 	return nil
 }
 
-// printLocalRunResult reports the returned Run and owner-derived disk paths.
+// printLocalRunResult reports the returned Run and owner-derived payload paths.
 // Dry-run output omits paths to records and payloads that were never retained.
 func printLocalRunResult(c *cli.Context, result *lifecycle.Run) error {
 	if result == nil {
@@ -280,14 +280,22 @@ func printLocalRunResult(c *cli.Context, result *lifecycle.Run) error {
 	if !c.Bool("dry-run") {
 		fmt.Fprintf(&out, "record: %s\n", filepath.Join(workspace, "lifecycle.json"))
 		for _, observed := range result.Observed {
-			if observed.Kind != lifecycle.OutputDiskImage {
+			var label, path string
+			var err error
+			switch observed.Kind {
+			case lifecycle.OutputDiskImage:
+				label = "disk"
+				path, err = lifecycle.LocalDiskOutputPath(workspace, observed.Name)
+			case lifecycle.OutputDebianPackage:
+				label = "package"
+				path, err = lifecycle.LocalDebianOutputPath(workspace, observed.Name)
+			default:
 				continue
 			}
-			path, err := lifecycle.LocalDiskOutputPath(workspace, observed.Name)
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(&out, "disk: %s\n", path)
+			fmt.Fprintf(&out, "%s: %s\n", label, path)
 		}
 	}
 	return checkedRunWrite(commandOutput(c), []byte(out.String()))

@@ -620,9 +620,10 @@ composition metadata does not claim payload dependency inspection or runtime/ABI
 The OS experiment invokes unchanged NVKE composer code and adds the exact package to its private `debs/`
 folder, regenerates the APT index and copies the two required source network files. Existing Packer code stages
 that folder; placement does not install or enable NVSentinel. Current commands add no service unit and
-modify no upstream source. A controlled native fixture exercised real `dpkg-deb`, composer, index generation
-and unchanged consumer staging with a synthetic executable. Repeated package/archive bytes matched; wrong
-architecture and missing configuration failed before a final archive. This was not a current product build.
+modify no upstream source. Reports of real-tool fixture checks remain unpublished developer-local
+observations, without a shared Run/artifact record or a committed test of these commands. They do not
+establish independently verifiable OS-material placement or a current product build. Offline input
+compilation and catalog-copy checks establish only the authored selections and bindings.
 
 Historical observations used the retired patched recipes and extra Debian execution protocol. Standalone
 package/image/chart payloads were removed during authorized cleanup. Their identities and observation scope

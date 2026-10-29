@@ -88,10 +88,14 @@ func TestRawPackageStagingUsesOneExistingTransaction(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(transaction.stages) != 1 || artifact.Kind != OutputDebianPackage || artifact.Digest != pipeline.FileDigest(payload) || artifact.BuildDigest != slot.BuildDigest {
+			if len(transaction.stages) != 1 || artifact.Kind != OutputDebianPackage || artifact.Digest != pipeline.FileDigest(payload) || artifact.BuildDigest != slot.BuildDigest || artifact.Reference != "" {
 				t.Fatal("raw artifact acquired a wrapper or extra evidence stages")
 			}
-			if _, err := os.Stat(artifact.Reference); !errors.Is(err, os.ErrNotExist) {
+			path, err := LocalDebianOutputPath(transaction.workspace, artifact.Name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
 				t.Fatal("staged output became visible", err)
 			}
 			if mode != "rollback staged" {
@@ -103,15 +107,15 @@ func TestRawPackageStagingUsesOneExistingTransaction(t *testing.T) {
 				t.Fatal(err)
 			}
 			if mode == "commit" {
-				got, err := os.ReadFile(artifact.Reference)
+				got, err := os.ReadFile(path)
 				if err != nil || !bytes.Equal(got, payload) {
 					t.Fatal("committed bytes changed", err)
 				}
-				info, err := os.Stat(artifact.Reference)
+				info, err := os.Stat(path)
 				if err != nil || info.Mode().Perm() != 0444 {
 					t.Fatal("committed mode changed", err)
 				}
-			} else if _, err := os.Stat(artifact.Reference); !errors.Is(err, os.ErrNotExist) {
+			} else if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
 				t.Fatal("rollback left committed output", err)
 			}
 			entries, err := os.ReadDir(filepath.Join(transaction.workspace, localDiskOutputDirectory))
@@ -198,5 +202,134 @@ func TestRawPackageObservationRequiresDurableStaging(t *testing.T) {
 	var coded *e.Error
 	if artifact.Name != "" || !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
 		t.Fatalf("ordinary raw-package observation = %v, want %s and no artifact", err, e.CodeEngineCapability)
+	}
+}
+
+func TestLocalDebianOutputPath(t *testing.T) {
+	for _, test := range []struct {
+		name, workspace, output, want string
+		invalid                       bool
+	}{
+		{name: "relative", workspace: ".nvkr/runs/attempt", output: "agent", want: ".nvkr/runs/attempt/outputs/agent.deb"},
+		{name: "absolute", workspace: t.TempDir(), output: "agent"},
+		{name: "missing workspace", output: "agent", invalid: true},
+		{name: "missing name", workspace: ".nvkr/runs/attempt", invalid: true},
+		{name: "traversal", workspace: ".nvkr/runs/attempt", output: "../agent", invalid: true},
+		{name: "nested", workspace: ".nvkr/runs/attempt", output: "nested/agent", invalid: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := LocalDebianOutputPath(test.workspace, test.output)
+			if test.invalid {
+				assertCode(t, err, e.CodeUsage)
+				if got != "" {
+					t.Fatalf("invalid output returned path %q", got)
+				}
+				return
+			}
+			want := test.want
+			if want == "" {
+				want = filepath.Join(test.workspace, "outputs", test.output+".deb")
+			}
+			if err != nil || got != want {
+				t.Fatalf("local package path = %q, %v; want %q", got, err, want)
+			}
+		})
+	}
+}
+
+func TestExecuteLocalRawPackageCommitsAndRollsBack(t *testing.T) {
+	for _, mode := range []string{"complete", "record write failure", "linked record sync failure"} {
+		t.Run(mode, func(t *testing.T) {
+			fixture, slot, plan, payload, _ := rawPackageStageFixture(t)
+			description, err := PrepareRun(plan.Definition, plan.Environment, plan, "package-attempt")
+			if err != nil {
+				t.Fatal(err)
+			}
+			prepared := &PreparedRun{plan: plan, run: description}
+			workspace := filepath.Join(".nvkr", "runs", description.Attempt)
+			path, err := LocalDebianOutputPath(workspace, slot.Name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			exporter := &fakeDiskExporter{}
+			factoryCalled, commitCalled, recordCalled := false, false, false
+			cause := e.New(e.CodeImmutableViolation, "synthetic package record write failure")
+			run, err := executeLocalWithDependencies(t.Context(), prepared,
+				LocalOptions{AttemptsRoot: ".nvkr/runs"}, localExecutionDependencies{
+					admitLocal: func(context.Context, *factory.Plan, factory.LocalRunOptions) error { return nil },
+					runFactory: func(_ context.Context, got *factory.Plan, options factory.LocalRunOptions) (localExecutionResult, error) {
+						factoryCalled = true
+						if got != plan || options.Workspace != filepath.ToSlash(workspace) {
+							t.Fatal("local executor received a different Plan or workspace")
+						}
+						if err := os.CopyFS(options.Workspace, os.DirFS(fixture.workspace)); err != nil {
+							t.Fatal(err)
+						}
+						return exporter, nil
+					},
+					beginDiskCommit: func(workspace string) (*diskAttemptTransaction, error) {
+						commitCalled = true
+						return beginDiskAttemptTransaction(workspace)
+					},
+					writeRecordState: func(ctx context.Context, recordPath string, bound *Run) (bool, error) {
+						recordCalled = true
+						if bound.Status != RunComplete || len(bound.Observed) != 1 ||
+							bound.Observed[0].Kind != OutputDebianPackage || bound.Observed[0].Reference != "" || bound.ContentSubject == "" {
+							t.Fatalf("record did not bind the exact local package: %+v", bound)
+						}
+						if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, payload) {
+							t.Fatalf("record write preceded raw package commit: %q, %v", got, err)
+						}
+						if _, err := os.Stat(filepath.Join(workspace, diskAttemptMarker)); err != nil {
+							t.Fatalf("record write has no attempt transaction marker: %v", err)
+						}
+						switch mode {
+						case "record write failure":
+							return false, cause
+						case "linked record sync failure":
+							return writeRunRecordStateWithSync(ctx, recordPath, bound, func(*os.File) error { return cause })
+						default:
+							return writeRunRecordState(ctx, recordPath, bound)
+						}
+					},
+				})
+			if !factoryCalled || !commitCalled || !recordCalled || !exporter.closed || exporter.exports != 0 {
+				t.Fatalf("raw local transaction ownership: factory=%t commit=%t record=%t closed=%t diskExports=%d",
+					factoryCalled, commitCalled, recordCalled, exporter.closed, exporter.exports)
+			}
+			wantStatus, wantOutputs := RunComplete, 1
+			if mode == "complete" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				info, statErr := os.Stat(path)
+				if statErr != nil || info.Mode().Perm() != 0444 {
+					t.Fatalf("committed package is not read-only: %v", statErr)
+				}
+			} else {
+				wantStatus, wantOutputs = RunFailed, 0
+				assertCode(t, err, e.CodeImmutableViolation)
+				if !errors.Is(err, cause) {
+					t.Fatalf("record failure lost its cause: %v", err)
+				}
+				if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
+					t.Fatalf("record failure left committed package: %v", statErr)
+				}
+			}
+			if run == nil || run.Status != wantStatus || run.Lane != factory.TierLocalExecution.String() || len(run.Observed) != wantOutputs {
+				t.Fatalf("local package Run = %+v, want %s with %d outputs", run, wantStatus, wantOutputs)
+			}
+			if _, err := os.Stat(filepath.Join(workspace, diskAttemptMarker)); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("local transaction marker remained: %v", err)
+			}
+			entries, err := os.ReadDir(filepath.Dir(path))
+			if err != nil || len(entries) != wantOutputs {
+				t.Fatalf("raw package transaction leaked output files: %v, %v", entries, err)
+			}
+			record, err := os.ReadFile(filepath.Join(workspace, "lifecycle.json"))
+			if err != nil || !bytes.Contains(record, []byte(`"status":"`+wantStatus+`"`)) || bytes.Contains(record, []byte(`"reference"`)) {
+				t.Fatalf("durable raw package Run record = %q, %v", record, err)
+			}
+		})
 	}
 }

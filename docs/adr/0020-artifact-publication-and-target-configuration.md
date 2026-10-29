@@ -43,7 +43,7 @@ any selection containing it with `CodeEngineCapability` before catalog or execut
 OCI namespace or credentials for an APT-only request. Plan validation, generation and execution repeat
 that admission. Direct APT service destinations, credentials, repository signing and authenticated read-back
 remain unimplemented; selection is not an enabled publisher or service approval.
-The native Debian extension keeps signing customer-controlled through Environment configuration.
+Future APT publication keeps signing customer-controlled through Environment configuration.
 Its disclosed transport defaults are the existing cosign path for OCI and standard OpenPGP/GPG repository
 metadata signing for APT. The OCI path retains explicit customer identity/issuer policy; APT must retain
 customer signing-service/key references and exact public-key trust bindings. Private signing keys are not

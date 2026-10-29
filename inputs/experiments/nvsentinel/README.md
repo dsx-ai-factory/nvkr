@@ -1,7 +1,8 @@
 # NVSentinel package in NVKE OS inputs
 
-This experiment selects the same Debian producer as the
-[dedicated NVSentinel catalog](../../catalogs/nvsentinel/README.md). Its private archive assembly adds
+This experiment keeps separate Debian producer copies with byte-identical commands and matching source
+declarations and pins from the [dedicated NVSentinel catalog](../../catalogs/nvsentinel/README.md).
+The offline catalog regression checks both copies and their callers together. Its private archive assembly adds
 the raw package to the existing `debs/` folder, regenerates the APT index and passes it to unchanged Packer
 code. Placement makes the package available in the guest local APT repository; it does not install or enable it.
 

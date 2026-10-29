@@ -68,7 +68,8 @@ and remain build-only; they do not change maintained release membership or Ubunt
 The [dedicated NVSentinel catalog](catalogs/nvsentinel/README.md) declares OCI images, Helm, executable
 binaries and DEB packages. Its focused callers live under `definitions/nvsentinel/`, with local execution
 policies under `environments/nvsentinel/`. The [NVKE OS material experiment](experiments/nvsentinel/README.md)
-uses the same Debian producer and existing composer/Packer folder handoff. These development inputs do not
+keeps separate Debian producer copies with byte-identical commands, matching source declarations and pins,
+and the existing composer/Packer folder handoff. These development inputs do not
 change the maintained NVKE release or demonstrate current NVSentinel build/runtime acceptance.
 
 `definitions/diagnostics/demo-arm64/` retains the existing components, OS, profiles, providers,

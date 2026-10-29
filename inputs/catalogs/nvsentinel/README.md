@@ -39,12 +39,17 @@ bin/nvkr run local --definition inputs/definitions/nvsentinel/debian-ubuntu-26.0
 Local execution requires a matching native Linux host and the selected tool images. Ordinary
 producer-result authentication and lifecycle staging retain the raw package. This route supplies no
 package-content inspection, dependency SBOM, standalone production predicate or installation proof.
+The read-only local archive is retained at `<attempts-root>/<attempt>/outputs/<output-name>.deb`;
+the plain result prints `package:` with that location. Its Artifact transport reference stays empty,
+and the local output remains unqualified, unsigned and unpublished.
 The [toolchain guide](../../../toolchains/nvsentinel-debian/README.md) owns SDK construction and local
 image lookup limits; native AMD64 package execution remains unverified.
 
 ## OS material placement
 
-The [OS experiment](../../experiments/nvsentinel/README.md) consumes those same package producers.
+The [OS experiment](../../experiments/nvsentinel/README.md) keeps separate, byte-identical copies of
+the Debian producer commands, with matching declarations, source blocks and pins. The offline catalog
+regression checks those copies and all Definition/Environment pairs together.
 Its command invokes the pinned NVKE composer unchanged, extracts its base archive into its own output
 tree, copies the bound DEB into `debs/nvsentinel-platform-connectors.deb`, checks architecture and
 size/count budgets, regenerates `debs/Packages` with `dpkg-scanpackages --multiversion`, and creates a
@@ -94,11 +99,18 @@ bin/nvkr run plan --definition inputs/definitions/nvsentinel/helm-arm64.yaml \
 ```
 
 All four NVSentinel source aliases share the same commit, tree and source epoch. Review them together
-when updating source; write locks through the pin owner:
+when updating source; write locks through the pin owner in both catalog directories. The OS experiment
+copies only the two Debian source aliases. After repinning, update the experiment's copied resolved
+producers and predecessor-bound OS overlays, then run `TestNVSentinelCatalogInputs`:
 
 ```sh
-for source in nvsentinel nvsentinel-ubuntu2604 nvsentinel-binaries nvsentinel-content; do
-  bin/nvkr catalog pin --dir inputs/catalogs/nvsentinel \
-    --commit c1593477357299ab93dd5246f5b2cd236f8f07c8 --timeout 5m "$source"
+for directory in inputs/catalogs/nvsentinel inputs/experiments/nvsentinel/catalog; do
+  for source in nvsentinel nvsentinel-ubuntu2604 nvsentinel-binaries nvsentinel-content; do
+    if [ "$directory" = inputs/experiments/nvsentinel/catalog ]; then
+      case "$source" in nvsentinel-binaries|nvsentinel-content) continue ;; esac
+    fi
+    bin/nvkr catalog pin --dir "$directory" \
+      --commit c1593477357299ab93dd5246f5b2cd236f8f07c8 --timeout 5m "$source"
+  done
 done
 ```

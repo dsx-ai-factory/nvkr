@@ -5,32 +5,12 @@ package pipeline
 
 import (
 	"context"
-	"errors"
 	"sort"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 )
-
-func TestReaperCheckedCloseRetainsEveryRemovalFailure(t *testing.T) {
-	first, second := errors.New("first removal failed"), errors.New("second removal failed")
-	reaper := newReaper(t.Context(), "unused-runtime")
-	reaper.cleanupCommand = func(_ context.Context, _ time.Duration, _ string, _ *heldRuntimeExecutable, names []string) error {
-		if names[0] == "a" {
-			return first
-		}
-		return second
-	}
-	reaper.add("b")
-	reaper.add("a")
-	for range 2 {
-		err := reaper.closeChecked()
-		if !errors.Is(err, first) || !errors.Is(err, second) || strings.Index(err.Error(), "first removal failed") > strings.Index(err.Error(), "second removal failed") {
-			t.Fatal("cleanup lost or reordered failures", err)
-		}
-	}
-}
 
 func TestReaperCloseStopsWaiterAndIsConcurrentIdempotent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())

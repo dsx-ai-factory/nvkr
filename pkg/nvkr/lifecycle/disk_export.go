@@ -325,6 +325,18 @@ func LocalDiskOutputPath(workspace, outputName string) (string, error) {
 	return filepath.Join(workspace, localDiskOutputDirectory, outputName+".qcow2"), nil
 }
 
+// LocalDebianOutputPath returns the deterministic descriptive path for a raw
+// package inside one already-reserved local attempt workspace. It grants no
+// filesystem or artifact authority; lifecycle execution commits the package
+// beneath its held attempt directory.
+func LocalDebianOutputPath(workspace, outputName string) (string, error) {
+	if workspace == "" || !namePattern.MatchString(outputName) {
+		return "", e.New(e.CodeUsage,
+			"local Debian output requires an attempt workspace and canonical output name")
+	}
+	return filepath.Join(workspace, localDiskOutputDirectory, outputName+".deb"), nil
+}
+
 func (transaction *diskExportTransaction) openStage(path string) (*os.File, error) {
 	relative, err := filepath.Rel(transaction.workspace, path)
 	if err != nil {
@@ -369,7 +381,10 @@ func (transaction *diskExportTransaction) observeDebian(ctx context.Context, slo
 	if !namePattern.MatchString(slot.Name) || slot.Kind != OutputDebianPackage {
 		return Artifact{}, e.New(e.CodeVerifyFailed, "raw package staging requires an exact named output")
 	}
-	path := filepath.Join(transaction.workspace, localDiskOutputDirectory, slot.Name+".deb")
+	path, err := LocalDebianOutputPath(transaction.workspace, slot.Name)
+	if err != nil {
+		return Artifact{}, err
+	}
 	file, err := transaction.openStage(path)
 	if err != nil {
 		return Artifact{}, err
@@ -391,7 +406,7 @@ func (transaction *diskExportTransaction) observeDebian(ctx context.Context, slo
 		return Artifact{}, e.Wrap(code, exportErr, "staging raw package output")
 	}
 	artifact := Artifact{Name: slot.Name, Kind: slot.Kind, Digest: observation.SHA256, BuildDigest: slot.BuildDigest,
-		Components: append([]string(nil), slot.Components...), Reference: path}
+		Components: append([]string(nil), slot.Components...)}
 	if err := artifact.Validate(); err != nil {
 		return Artifact{}, err
 	}

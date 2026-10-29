@@ -125,7 +125,7 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 		return nil
 	}
 
-	// SBOM node (ADR-13 §1 / ADR-13): one per build target, gated on the
+	// SBOM node (ADR-13 §1): one per build target, gated on the
 	// terminal observation, binding a CycloneDX SBOM per built component to that
 	// component's producer-result digest. It bills only what was built.
 	resultInputs := make([]string, 0, len(producerOutputs))

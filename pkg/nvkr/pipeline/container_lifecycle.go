@@ -5,7 +5,6 @@ package pipeline
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -45,7 +44,6 @@ type reaper struct {
 	stop           chan struct{}
 	done           chan struct{}
 	stopOnce       sync.Once
-	cleanupErr     error
 }
 
 const (
@@ -120,18 +118,11 @@ func (r *reaper) setRuntime(runtimePath string, runtime *heldRuntimeExecutable) 
 }
 
 func (r *reaper) close() {
-	_ = r.closeChecked()
-}
-
-// Checked callers observe cleanup failures; legacy callers retain their
-// best-effort close behavior.
-func (r *reaper) closeChecked() error {
 	if r == nil {
-		return nil
+		return
 	}
 	r.stopOnce.Do(func() { close(r.stop) })
 	<-r.done
-	return r.cleanupErr
 }
 
 // cleanup takes one closed-world snapshot under the registry mutex, then performs
@@ -169,7 +160,6 @@ func (r *reaper) cleanup() {
 		grace = remaining / 2
 	}
 	if grace <= 0 {
-		r.cleanupErr = e.New(e.CodeTimeout, "container cleanup has no remaining termination budget")
 		return
 	}
 	// Every registered container receives an independent removal attempt under the
@@ -178,18 +168,14 @@ func (r *reaper) cleanup() {
 	commandCtx, commandCancel := context.WithDeadline(ctx, deadline.Add(-grace))
 	defer commandCancel()
 	var cleanup sync.WaitGroup
-	failures := make([]error, len(names))
 	cleanup.Add(len(names))
-	for index, name := range names {
+	for _, name := range names {
 		go func() {
 			defer cleanup.Done()
-			if err := cleanupCommand(commandCtx, grace, docker, runtimeExecutable, []string{name}); err != nil {
-				failures[index] = e.Wrap(e.CodeBuildFailed, err, "removing owned container %q", name)
-			}
+			_ = cleanupCommand(commandCtx, grace, docker, runtimeExecutable, []string{name})
 		}()
 	}
 	cleanup.Wait()
-	r.cleanupErr = errors.Join(failures...)
 }
 
 type reaperCleanupCommand func(context.Context, time.Duration, string, *heldRuntimeExecutable, []string) error

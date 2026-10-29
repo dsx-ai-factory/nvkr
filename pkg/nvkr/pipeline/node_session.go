@@ -5,7 +5,6 @@ package pipeline
 
 import (
 	"context"
-	"errors"
 	"path/filepath"
 	"sync"
 
@@ -33,7 +32,6 @@ type nodeSessionState struct {
 	calls         map[context.Context]context.CancelFunc
 	sources       map[string]*preparedSourceCache
 	packerRuntime *nodeSessionPackerRuntime
-	closeErr      error
 }
 
 func NewNodeSession(ctx context.Context) (*NodeSession, error) {
@@ -103,21 +101,15 @@ func (handle *NodeSession) ExecNode(node ir.Node, options RunOptions) (*Artifact
 }
 
 func (handle *NodeSession) Close() {
-	_ = handle.closeOwned()
-}
-
-// Preserve runtime cleanup errors for the owning boundary.
-// The existing public session facade keeps its void Close contract.
-func (handle *NodeSession) closeOwned() error {
 	if handle == nil || handle.state == nil {
-		return nil
+		return
 	}
 	session := handle.state
 	session.mu.Lock()
 	if session.closed {
 		session.mu.Unlock()
 		<-session.done
-		return session.closeErr
+		return
 	}
 	session.closed = true
 	// AfterFunc propagates owner-parent cancellation, but its callback is
@@ -129,25 +121,14 @@ func (handle *NodeSession) closeOwned() error {
 	session.cancel()
 	session.mu.Unlock()
 	session.active.Wait()
-	var closeErr error
 	for _, cache := range session.sources {
 		cache.close()
 	}
 	if session.packerRuntime != nil {
 		<-session.packerRuntime.ready
 		if session.packerRuntime.runtime != nil && session.packerRuntime.runtime.capability != nil {
-			closeErr = errors.Join(closeErr, session.packerRuntime.runtime.close())
+			_ = session.packerRuntime.runtime.close()
 		}
 	}
-	if closeErr != nil {
-		closeErr = e.Wrap(e.CodeInternal, closeErr, "closing producer session capabilities")
-	}
-	session.closeErr = closeErr
 	close(session.done)
-	return closeErr
 }
-
-// CloseChecked cancels and joins the same session lifetime as Close and preserves
-// capability cleanup failures for an owning Run. The existing void Close facade
-// remains unchanged.
-func (handle *NodeSession) CloseChecked() error { return handle.closeOwned() }
