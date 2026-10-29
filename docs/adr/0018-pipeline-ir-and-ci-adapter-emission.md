@@ -1407,7 +1407,8 @@ not proof of provider cancellation timing or support for another CI adapter.
 The compiler groups lexically ordered jobs by dependency depth, with at most 64 original jobs per worker
 and at most 50 workers. Jobs requesting `id-token: write` remain in the entry workflow: Fulcio uses the
 reusable workflow path for the certificate signer identity, so moving them would change the authored signer
-policy. Dependencies and result reports project both inline jobs and worker jobs without widening that policy.
+policy (see the proposed migration below). Dependencies and result reports project both inline jobs and worker
+jobs without widening that policy.
 Original job IDs, operations, runner admission, per-job permissions and output slots
 remain intact. A partition may wait for unrelated jobs sharing an earlier partition; it must not turn their
 failure into a false prerequisite failure. Ordinary jobs require `!cancelled()` and check their original
@@ -1419,11 +1420,64 @@ refused until their context can be projected exactly. Matrix scheduling remains 
 Workers have no concurrency group competing with the entry workflow. Callers pass explicit required
 secrets and sufficient permissions; individual jobs retain their original narrower permissions. Secret references
 must name a static secret through dot or quoted bracket syntax; dynamic selection is refused before emission. Each worker
-has a credential-free, unconditional result collector. The entry reconstructs the original collector reports
-from those exact job results, retaining failure, cancellation and skipping. Missing or malformed reports
+has a credential-free, unconditional result collector. That collector also exports one fragment per entry
+consumer: for each original result collector, worker caller or collector-free finalizer, the exact
+`toJSON` results and statuses of only its members owned by that worker. The entry reconstructs each
+original collector report and worker dependency input by joining one fragment per worker with inline
+jobs' direct results, retaining failure, cancellation and skipping. If a worker never reports, its fragment
+falls back to null member results and empty statuses. These are the values the per-member projection
+produced, so dependency admission and collector accounting are unchanged. Missing or malformed reports
 cannot authorize publication. The original finalizer, complete Plan, same-Run transfer authentication and
 artifact/evidence acceptance gates remain unchanged. Generated worker membership and caller wiring must
 match deterministic regeneration exactly before the existing flat semantic validator admits the logical graph.
+Lowering refuses any worker or worker caller that declares `id-token`, and maintained-bundle contracts
+require every committed producer's OIDC jobs to remain in the entry workflow named by its signer policy.
+
+#### Proposed: signer relocation requires an explicit identity migration
+
+This subsection is proposed design, not implemented behavior. Today every `id-token: write` job stays
+inline, and no code path relocates a signer. Local measurements of the committed bundles show where those
+jobs fall. In the partitioned development entry, the 139 inline signing and SBOM-attestation jobs account
+for 10,984 of 12,998 expanded YAML parsing events and 104,357 of 252,486 bytes. In the flat default
+producer, the same jobs account for 10,984 of 47,055 events. That producer is at 94.1% of the 50,000-event
+parser bound, the binding constraint today. These are local generation measurements, not provider
+evidence.
+
+Relocation is not a scheduling change. For GitHub OIDC, Fulcio sets the certificate SAN and Build Signer
+URI from `job_workflow_ref`, which names the called reusable workflow, not the entry workflow. Build Config
+URI carries the top-level `workflow_ref`. Moving a signer into a worker therefore changes the identity
+that every current signer policy (`^https://github.com/<repo>/.github/workflows/<entry>.yml@<ref>$`) and every
+consumer verification policy authenticates. Partition indexes depend on grouping, so a worker-path identity
+would also churn with unrelated topology changes. Any relocation must ship together with all of the following:
+
+1. **One fixed signer workflow.** A generator-owned `<entry-stem>__signer.yml` would be the only file that
+   requests `id-token`, whatever the partition count. Each signing operation would call it with an explicit
+   Plan-derived operation selector, because `github.job` no longer names the original job. Signer jobs would
+   never share a file with producer jobs.
+2. **Caller binding in the trust policy.** Any workflow allowed to call a reusable workflow can mint the same
+   SAN. The policy must therefore pin the signer workflow SAN, the Build Config URI of the exact entry
+   workflow and ref, the `workflow_dispatch` trigger and the issuer. Verification must reject a certificate
+   whose caller differs. Current verification matches SAN and issuer only, so this verifier capability (ADR-04)
+   must be implemented and contract-tested first. Provenance `builder.id` comes from `GITHUB_WORKFLOW_REF`,
+   which stays the caller's entry workflow (ADR-09). Development publication admission matches its workflow identity
+   against that `builder.id` and would then diverge from the SAN. The migration must define `builder.id` as the
+   Build Config URI and match the caller and signer identities separately, in the same change.
+3. **An authored Environment migration.** The signer and caller identities become distinct, anchored
+   Environment fields. They enter Environment and Plan identity but not logical Build identity. Generation
+   relocates signers only when the admitted Environment selects that policy, and it refuses a policy that
+   also admits the entry, any worker or any other workflow file.
+4. **No silent dual acceptance.** Each Release remains bound to the identity that signed it. Consumers adopt
+   the new identity by an explicit verification-policy change (ADR-16). Previously verified Releases keep
+   their original policy, and no verifier widens a regex to accept both identities.
+5. **Evidence before adoption.** A signed development Run must be verified under the new policy, including a
+   negative check that a foreign caller's certificate is refused. Production adoption then needs its own
+   recorded Run and qualification decision. Until then, the flat production producer and the inline-signer
+   partition layout remain the only admitted forms.
+
+Relocation would leave one Definition, one complete Plan, one logical Run and one Release. It changes only
+who mints certificates, which is why it is a signer-identity decision rather than an execution-organization
+decision. Selecting partitioned execution for the flat producer is a separate Environment decision that does
+not move signers.
 
 Every generated run script, including scripts inside composite actions, remains checked against GitHub's
 21,000-character ceiling, conservatively measured as UTF-8 bytes, including explicit operator setup and

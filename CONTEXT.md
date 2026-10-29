@@ -123,7 +123,8 @@ Large finalizers collect the exact original per-job results through fixed, bound
 collector success never substitutes for producer success. Neither scripts supplied as data nor separately
 authored lifecycle inputs are admitted.
 Opt-in execution partitioning moves original jobs into bounded same-commit worker workflows under the same
-manifest; OIDC-signing jobs remain in the entry to preserve signer identity. A partition is generated
+manifest; OIDC-signing jobs remain in the entry to preserve signer identity. Moving them requires an explicit
+certificate-identity and trust-policy migration, which is proposed but not implemented. A partition is generated
 scheduling structure, not a Definition, Run or Release. It forwards original
 job results to the single finalizer; it does not authorize artifact acceptance. The complete Plan and required
 output set remain shared. The provider-independent execution graph owns membership, dependency conditions,

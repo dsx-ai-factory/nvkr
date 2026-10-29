@@ -61,7 +61,13 @@ callable trigger. By default every producer job remains in its bundle's entry wo
 belong to this entry's current manifest; arbitrary reusable workflows and another owner's siblings remain
 outside its namespace. Every worker receives the same per-file size and parsing bounds as the entry.
 The root manifest binds every worker's exact bytes. Regeneration checks and retirement cover the complete
-worker inventory, including changed or unowned leftovers. Workers share one complete Plan and do not add
+worker inventory, including changed or unowned leftovers. Workers export per-consumer result fragments so the
+entry does not repeat member-by-member projections (ADR-18 §8). This moved most result-forwarding bytes into
+workers. The maintained development entry measured 368,371 bytes before the change and 252,486 after, with
+the largest worker at 162,024 bytes and unchanged signer jobs. These are local generation measurements.
+Workers never contain OIDC jobs. A fixed `<entry-stem>__signer.yml` signer workflow is proposed only
+together with ADR-18 §8's explicit certificate-identity and trust-policy migration. It is not an admitted
+member name; the reserved child-namespace rules below fail closed on such a file. Workers share one complete Plan and do not add
 an authored lifecycle object or a child Release. ADR-18 owns scheduling and result propagation; hosted
 acceptance of this opt-in topology remains unrecorded. Optional qualification
 generation separately emits the admitted `workflow_run` qualifier and fixed `workflow_call` smoke pair (§4).
