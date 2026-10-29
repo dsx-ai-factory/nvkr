@@ -88,6 +88,11 @@ func TestGitHubPartitionSecretReferences(t *testing.T) {
 		{"${{ secrets.GITHUB_TOKEN }}", "", false},
 		{"${{ secrets[inputs.name] }}", "", true},
 		{"${{ toJSON(secrets) }}", "", true},
+		{"printf '%s\\n' secrets", "", false},
+		{"echo secrets.CONFIG ${{ github.sha }}", "", false},
+		{"${{ format('}}', secrets.LATE) }}", "LATE", false},
+		{"${{ format('}}', toJSON(secrets)) }}", "", true},
+		{"${{ secrets.OPEN", "", true},
 	} {
 		t.Run(test.value, func(t *testing.T) {
 			names, err := githubPartitionSecretNames(githubYAMLString(test.value))
@@ -100,6 +105,16 @@ func TestGitHubPartitionSecretReferences(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGitHubPartitionSecretReferencesInBareConditions(t *testing.T) {
+	names, err := githubPartitionSecretNames(githubYAMLMap("if", githubYAMLString("secrets.GATE != ''"),
+		"run", githubYAMLString("echo secrets.LITERAL")))
+	if err != nil || strings.Join(names, ",") != "GATE" {
+		t.Fatalf("secret names=%v error=%v", names, err)
+	}
+	_, err = githubPartitionSecretNames(githubYAMLMap("if", githubYAMLString("toJSON(secrets) != ''")))
+	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
 }
 
 func TestGitHubPartitionPreservesFailureAncestryThroughRecovery(t *testing.T) {

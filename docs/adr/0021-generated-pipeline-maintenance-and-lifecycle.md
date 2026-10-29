@@ -62,8 +62,10 @@ belong to this entry's current manifest; arbitrary reusable workflows and anothe
 outside its namespace. Every worker receives the same per-file size and parsing bounds as the entry.
 The root manifest binds every worker's exact bytes. Regeneration checks and retirement cover the complete
 worker inventory, including changed or unowned leftovers. Workers share one complete Plan and do not add
-an authored lifecycle object or a child Release. ADR-18 owns scheduling and result propagation; hosted
-acceptance of this opt-in topology remains unrecorded. Optional qualification
+an authored lifecycle object or a child Release. ADR-18 owns scheduling and result propagation. [Reconciliation](reconciliation.md#output-local-publication-and-metadata-assembly)
+records one successful earlier-head full development execution of this opt-in topology; it predates the core
+execution-model extraction and proves neither current-head worker execution, full-product failure/cancellation
+recovery nor production qualification. Optional qualification
 generation separately emits the admitted `workflow_run` qualifier and fixed `workflow_call` smoke pair (§4).
 That pair currently admits the default producer workflow only; named producer
 qualification is not part of this namespace contract.
