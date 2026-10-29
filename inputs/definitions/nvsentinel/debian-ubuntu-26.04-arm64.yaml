@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+kind: Definition
+metadata:
+  name: nvsentinel-ubuntu-26.04-arm64-candidate
+catalog:
+  base: ../../catalogs/nvsentinel
+outputs:
+  - name: platform-connectors
+    platform: linux/arm64
+    components: [nvsentinel-platform-connectors-deb-ubuntu2604]
+    format: debian-package

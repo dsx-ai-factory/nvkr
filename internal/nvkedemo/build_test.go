@@ -23,6 +23,90 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+func TestBuildArtifactsPreservesCapabilityErrors(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		cfg  BuildConfig
+		code nvkrerr.Code
+	}{
+		{"unsupported combination", BuildConfig{Conformance: true, Prepared: true}, nvkrerr.CodeEngineCapability},
+		{"ordinary build error", BuildConfig{Repository: filepath.Join(t.TempDir(), "missing")}, nvkrerr.CodeBuildFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := BuildArtifacts(t.Context(), tc.cfg)
+			assertNightlyCode(t, err, tc.code)
+			if got != (BuiltInputs{}) {
+				t.Fatal("failed build returned outputs", got)
+			}
+		})
+	}
+}
+
+func TestDefaultBuildMissingInputsDoesNotCreateAttemptState(t *testing.T) {
+	repo := t.TempDir()
+	selected, _, err := LocalArtifactInputsForPlatform("ovn", false, runtime.GOOS+"/"+runtime.GOARCH)
+	if err != nil {
+		t.Skip("host is outside the compiler's executable target domain")
+	}
+	if err := os.MkdirAll(filepath.Join(repo, filepath.Dir(selected)), 0700); err != nil {
+		t.Fatal(err)
+	}
+	got, err := BuildArtifacts(t.Context(), BuildConfig{Repository: repo, AttemptPrefix: "fresh", Jobs: 1})
+	assertNightlyCode(t, err, nvkrerr.CodeEngineCapability)
+	if err == nil || !strings.Contains(err.Error(), filepath.Base(selected)) || got != (BuiltInputs{}) {
+		t.Fatalf("missing authored inputs did not fail before work: %+v %v", got, err)
+	}
+	if _, err := os.Lstat(filepath.Join(repo, ".nvkr")); !os.IsNotExist(err) {
+		t.Fatal("missing authored inputs created attempt state", err)
+	}
+}
+
+func TestDefaultBuildRejectsUnavailableAMD64LanesBeforeWork(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("exercises the actual Linux AMD64 public build boundary")
+	}
+	for _, tc := range []struct {
+		name string
+		cfg  BuildConfig
+	}{
+		{"upstream-ovn", BuildConfig{Network: "upstream-ovn"}},
+		{"conformance", BuildConfig{Conformance: true}},
+		{"prepared", BuildConfig{Prepared: true, QualificationPolicy: "/must-not-be-read"}},
+		{"qualify-local", BuildConfig{QualifyLocal: true}},
+		{"policy", BuildConfig{QualificationPolicy: "/must-not-be-read"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := t.TempDir()
+			cfg := tc.cfg
+			cfg.Repository, cfg.AttemptPrefix, cfg.Jobs = repo, "unsupported-amd64", 1
+			assertNightlyCode(t, AdmitDemoBuild(t.Context(), cfg), nvkrerr.CodeEngineCapability)
+			got, err := BuildArtifacts(t.Context(), cfg)
+			assertNightlyCode(t, err, nvkrerr.CodeEngineCapability)
+			if got != (BuiltInputs{}) {
+				t.Fatal("unsupported lane returned build outputs")
+			}
+			if _, err := os.Lstat(filepath.Join(repo, ".nvkr")); !os.IsNotExist(err) {
+				t.Fatal("unsupported lane created attempt state", err)
+			}
+		})
+	}
+}
+
+func TestBuildQualificationHostAdmission(t *testing.T) {
+	for _, platform := range []string{"linux/arm64", "linux/amd64", "darwin/arm64"} {
+		t.Run(platform, func(t *testing.T) {
+			err := admitQualificationHost(platform)
+			if platform == "linux/arm64" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				assertNightlyCode(t, err, nvkrerr.CodeEngineCapability)
+			}
+		})
+	}
+}
+
 func TestBuildOnlyPreservesDeveloperGitHome(t *testing.T) {
 	buildDockerFixture(t, "")
 	t.Setenv("GIT_CONFIG_COUNT", "0")

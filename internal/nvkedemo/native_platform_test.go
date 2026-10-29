@@ -17,7 +17,8 @@ func TestNativeHostRejectsUnsupportedBackendBeforeWork(t *testing.T) {
 	}{
 		{"darwin/arm64", "hvf", true}, {"darwin/arm64", "tcg", true}, {"linux/arm64", "kvm", true},
 		{"linux/arm64", "hvf", false}, {"linux/arm64", "tcg", false}, {"darwin/arm64", "kvm", false},
-		{"linux/amd64", "kvm", false}, {"windows/arm64", "kvm", false}, {"linux/arm64", "", false},
+		{"linux/amd64", "kvm", true}, {"linux/amd64", "tcg", false}, {"linux/amd64", "hvf", false},
+		{"darwin/amd64", "hvf", false}, {"linux/386", "kvm", false}, {"windows/arm64", "kvm", false}, {"linux/arm64", "", false},
 	} {
 		t.Run(tc.platform+"/"+tc.accelerator, func(t *testing.T) {
 			err := admitNativeHost(tc.platform, tc.accelerator)

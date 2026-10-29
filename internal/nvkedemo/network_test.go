@@ -77,8 +77,37 @@ func TestRecoveryProducerDiagnosticsMatchExactExecutable(t *testing.T) {
 	}
 }
 
+func TestNetworkPlatformAdmission(t *testing.T) {
+	for _, test := range []struct {
+		os, arch string
+		pass     bool
+	}{
+		{"linux", "arm64", true},
+		{"linux", "amd64", true},
+		{"darwin", "arm64", false},
+		{"darwin", "amd64", false},
+		{"windows", "amd64", false},
+		{"linux", "386", false},
+		{"linux", "riscv64", false},
+	} {
+		t.Run(test.os+"/"+test.arch, func(t *testing.T) {
+			err := admitNetworkPlatform(test.os, test.arch)
+			if test.pass {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				var coded *nvkrerr.Error
+				if !errors.As(err, &coded) || coded.Code != nvkrerr.CodeEngineCapability {
+					t.Fatalf("unsupported network platform admitted: %v", err)
+				}
+			}
+		})
+	}
+}
+
 func TestNetworkPlatformBeforeFilesystemOrCommands(t *testing.T) {
-	if runtime.GOOS == "linux" && runtime.GOARCH == "arm64" {
+	if networkPlatform() == nil {
 		t.Skip("native admitted platform exercised by opt-in real E2E")
 	}
 	for _, recovery := range []bool{false, true} {
@@ -1304,7 +1333,7 @@ func TestNetworkPrivilegedProbeFixedTargetsAndFailure(t *testing.T) {
 	if err := ProbeNetworkPrivilegedPorts(nilContext); err == nil {
 		t.Fatal("nil helper context admitted")
 	}
-	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
+	if networkPlatform() != nil {
 		var coded *nvkrerr.Error
 		if err := ProbeNetworkPrivilegedPorts(t.Context()); !errors.As(err, &coded) || coded.Code != nvkrerr.CodeEngineCapability {
 			t.Fatalf("helper platform admission=%v", err)

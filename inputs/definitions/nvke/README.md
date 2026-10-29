@@ -7,12 +7,14 @@ full product acceptance are separate facts.
 
 ## Four-family pilot
 
-Four independent Definitions partition the combined candidate's exact named outputs. They reuse the
+Four independent Definitions partition the combined candidate's exact named outputs. The core family also
+selects the NICo charts, which the combined Definition omits because its flat workflow has no remaining YAML
+parsing headroom. They reuse the
 shared catalogs and pins; they do not import each other or change the combined Definition into a parent.
 
 | Definition | Outputs | Membership | Environment |
 |---|---:|---|---|
-| [Core](core.yaml) | 20 | CLI/operator tools, controller and bound chart, providers/reference fixture, CAPI and cert-manager images | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) |
+| [Core](core.yaml) | 22 | CLI/operator tools, controller and bound chart, NICo charts, providers/reference fixture, CAPI and cert-manager images | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) |
 | [Services](services.yaml) | 28 | SPIRE, PostgreSQL and Temporal charts and native images | [github-nvke-services.yaml](../../environments/github-nvke-services.yaml) |
 | [Telemetry](telemetry.yaml) | 17 | NKTP chart and native runtime images | [github-nvke-telemetry.yaml](../../environments/github-nvke-telemetry.yaml) |
 | [Disks](disks.yaml) | 4 | Native AMD64/ARM64 plain and public-bootstrap FDE disks, each with its complete material closure | [github-nvke-disks.yaml](../../environments/github-nvke-disks.yaml) |
@@ -60,6 +62,7 @@ historical capacity measurements and remaining cutover work.
 | Node images | `../../catalogs/node-images/release`, `../../catalogs/node-images/variants/native-toolchains.yaml` | Separate native AMD64 and ARM64 plain and public-bootstrap FDE QCOW2s, with explicit material producers |
 | Deployment images | `../../catalogs/runtime-dependencies` | Twelve non-test runtime images for each native architecture: PostgreSQL, eight SPIRE images and three Temporal images |
 | CAPNICo | `../../catalogs/nvke/release-components` | Source-built `capnico-controller`, one OCI index requiring AMD64 and ARM64 |
+| NICo charts (core family only) | `../../catalogs/nico` | Source-packaged `nico` umbrella and `nico-prereqs` charts from one infra-controller `v2.2.2` pin, each stamped `2.2.2` |
 | Provisioned infrastructure provider | `../../catalogs/nvke/release` | Existing source-built `cluster-api-provider-provisioned`, independently delivered for both architectures; not CAPNICo or CAPI core |
 | Reference-profile fixture | `../../catalogs/nvke/release-components` | `nico-reference-profiles-fixture`, one AMD64/ARM64 content image containing the two NICO test config profiles and their runbooks, not production fleet configuration or the demo's runnable `controller-profiles` |
 | Telemetry | `../../catalogs/nvke/release-components` | Source-packaged `nktp` with its three vendored dependencies; eight required/optional runtime images for each native architecture, including the enabled Target Allocator and the uninstall hook's kubectl |
@@ -75,6 +78,7 @@ built OCI exports only. The architecture-independent NKTP chart is packaged once
 | Member | Selection mirrored from pinned upstream inputs | Boundary |
 |---|---|---|
 | CAPNICo | NVKE's selected `deploy/nico/capnico/capnico.yaml` names controller `v0.0.45`; CAPNICo's own Dockerfile builds it | Independent source pin and source build, not the provisioned infrastructure provider |
+| NICo charts | Not selected by NVKE's pin set; the site installs `nico` and `nico-prereqs` from infra-controller's `helm` and `helm-prereqs` directories. `v2.2.2` is the latest non-candidate release; subcharts are vendored as local directories, so packaging is offline | Charts only. Core service image repository and tag default to empty and remain consumer-supplied; building NICo images and the prerequisite chart's helmfile-installed operators are not selected |
 | NKTP chart and dependencies | The same NVKE `v0.22.0` source as the maintained controller; `nktp/deploy/charts/nktp/Chart.yaml` and `Chart.lock` select three exact dependencies; packaging stamps chart `0.22.0` | Fetch verifies Helm `v4.2.4` and all three acquired chart archives; packaging uses the retained closure with no network |
 | NKTP images | Selected source values and authenticated dependency charts: collector `0.162.0`, operator `0.159.0`, LGTM `0.32.0`, kube-state-metrics `v2.20.0`, node-exporter `v1.12.1`, optional metrics-server `v0.8.1`, uninstall kubectl `v1.34.1`; Operator `0.159.0`'s `versions.txt` selects Target Allocator `0.159.0` | Acquired images, not source builds; native subjects and parent indexes are lock-owned. Helm test-only BusyBox is excluded. Images are delivered separately; chart references are not automatically rewritten to publication repositories |
 | Reference-profile fixture | The selected NVKE fixture Dockerfile, `nico-vms-cp.yaml`, `nico-vms-worker.yaml` and sibling runbooks | Explicitly named `nico-reference-profiles-fixture`: the control-plane profile skips its pre-join reboot. It must not be installed as production fleet configuration. No empty/failure-test config profile, placeholder example, copied OSProfile or new Dockerfile/patch is added |

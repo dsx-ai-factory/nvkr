@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"sort"
 	"strings"
@@ -123,6 +124,9 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 	}
 	if _, ok := document.On["workflow_dispatch"]; !ok {
 		return e.New(e.CodeInvalidCatalog, "GitHub workflow omits workflow_dispatch")
+	}
+	if err := validateGitHubRuntimeSourceDispatch(plan, document.On["workflow_dispatch"]); err != nil {
+		return err
 	}
 	if len(document.On) != 1 || document.Concurrency.Group != "nvkr-run-${{ github.workflow }}-${{ github.ref }}" || document.Concurrency.CancelInProgress != githubCancelInProgress(plan) {
 		return e.New(e.CodeEngineCapability, "GitHub Run requires manual dispatch only and concurrency matching its development policy")
@@ -273,8 +277,15 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 				}
 				continue
 			}
-			if len(catalogEnv) > 0 && ((strings.HasPrefix(jobID, "build-runner-") && step.ID == "validate-catalog") || (jobID == "nvkr-lifecycle-run" && step.ID == "finalize-catalog")) {
-				if !reflect.DeepEqual(step.Env, catalogEnv) {
+			wantCatalogEnv := maps.Clone(catalogEnv)
+			if plan.Environment.GitHubRuntimeSource != nil && strings.HasPrefix(jobID, "build-runner-") && step.ID == "validate-catalog" {
+				if wantCatalogEnv == nil {
+					wantCatalogEnv = make(map[string]string)
+				}
+				wantCatalogEnv["NVKR_RUNTIME_SOURCE_COMMIT"] = "${{ github.event.inputs.source_commit }}"
+			}
+			if len(wantCatalogEnv) > 0 && ((strings.HasPrefix(jobID, "build-runner-") && step.ID == "validate-catalog") || (jobID == "nvkr-lifecycle-run" && step.ID == "finalize-catalog")) {
+				if !reflect.DeepEqual(step.Env, wantCatalogEnv) {
 					return e.New(e.CodeEngineCapability, "catalog source environment differs")
 				}
 				for key := range catalogEnv {
@@ -347,6 +358,9 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 				command = githubRuntimeGenerationCommand(plan)
 			} else {
 				wantSteps = 7
+				if plan.Environment.GitHubRuntimeSource != nil {
+					command = githubRuntimeGenerationCommand(plan) + " --check"
+				}
 				if !strings.Contains(joinRuns(job.Steps), githubRuntimeInstallCommand(plan)) {
 					return e.New(e.CodeInvalidCatalog, "secondary GitHub bootstrap omits runtime input installation")
 				}
@@ -357,19 +371,28 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q is incomplete", jobID)
 		}
 		// The bootstrap must provision the Go toolchain via the pinned setup-go action rather
-		// than assume a preinstalled Go, and pin the version to the repo's .go-version so the
-		// toolchain and setup-go cannot drift.
-		if job.Steps[1].Uses != actions.SetupGo || job.Steps[1].With["go-version-file"] != ".go-version" ||
+		// than assume a preinstalled Go: the checkout's .go-version for a source build, or the
+		// released generator's own Go release for its pinned runner.
+		release, err := githubRunnerReleaseForGenerator()
+		if err != nil {
+			return err
+		}
+		key, value := githubSetupGoWith(release)
+		if job.Steps[1].Uses != actions.SetupGo || len(job.Steps[1].With) != 2 || job.Steps[1].With[key] != value ||
 			job.Steps[1].With["cache"] != "false" {
-			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q does not provision the pinned Go toolchain from .go-version", jobID)
+			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q does not provision the pinned Go toolchain", jobID)
 		}
 		bootstrapRuns := joinRuns(job.Steps)
 		linkerFlags, err := generatorLinkerFlags(plan.GeneratorVersion)
 		if err != nil {
 			return err
 		}
-		if !stepUses(job.Steps, actions.Upload) || !strings.Contains(bootstrapRuns, "go build -trimpath") ||
-			!strings.Contains(bootstrapRuns, "-ldflags "+shellQuote(linkerFlags)) ||
+		helperEnvironment, err := githubRunnerHelperEnvironment(plan, runner)
+		if err != nil {
+			return err
+		}
+		if !stepUses(job.Steps, actions.Upload) ||
+			!strings.Contains(bootstrapRuns, githubRunnerInstallCommand(helperEnvironment, linkerFlags, release)) ||
 			!strings.Contains(bootstrapRuns, command) {
 			return e.New(e.CodeInvalidCatalog, "GitHub runner bootstrap %q does not build and transport the runner", jobID)
 		}

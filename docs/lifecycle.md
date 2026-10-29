@@ -95,6 +95,12 @@ selected attempts root; the default root is `.nvkr/runs`. The attempts root must
 path under `.nvkr`. Publication is a separately enabled operation. The
 implementation record distinguishes contract tests from external execution.
 
+A local `debian-package` output is retained as a read-only archive at
+`<attempts-root>/<attempt>/outputs/<output-name>.deb`. The plain result prints its
+location as `package:` separately from the Artifact's transport reference, which
+stays empty. The local archive remains unqualified and supplies no installation,
+signing or publication proof. Dry-runs retain no package and print no package path.
+
 ### Choose local Run presentation
 
 `run local --ui=auto` selects a terminal dashboard only with interactive standard

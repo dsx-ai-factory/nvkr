@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/environment/v1
+kind: Environment
+metadata:
+  name: nvsentinel-os-amd64-local
+  description: Docker and KVM on a local Linux AMD64 development host; not a production
+    runner profile.
+utilityContainer: docker.io/library/golang@sha256:2d658507a011f1eadc0114d7a421b312b2e77d9042a24036a26e267cc9231677
+utilityPlatform: linux/amd64
+executionClasses:
+- name: linux-amd64-kvm-local-docker
+  runsOn: local-linux-amd64-docker-kvm
+  hostPlatform: linux/amd64
+  resources:
+    cpuMillis: 8000
+    memoryMiB: 10240
+    ephemeralStorageMiB: 65536
+  maxTimeoutSeconds: 21600
+  capabilities:
+  - kvm
+runtime:
+  runtime: docker
+  buildNetworkPolicy: producer-declared

@@ -41,6 +41,22 @@ func inspectionCompleteRun(t *testing.T) *Run {
 	return run
 }
 
+func inspectionDebianRun(t *testing.T, status string) *Run {
+	t.Helper()
+	run := testRun()
+	run.Expected[0].Kind = OutputDebianPackage
+	if status == RunFailed {
+		return failedRun(run, e.New(e.CodeBuildFailed, "fixture failed"))
+	}
+	if status == RunComplete {
+		complete := inspectionCompleteRun(t)
+		complete.Expected[0].Kind = OutputDebianPackage
+		complete.Observed[0].Kind = OutputDebianPackage
+		return complete
+	}
+	return run
+}
+
 func TestInspectRunMetadataAndMissingRecordRefusal(t *testing.T) {
 	for _, test := range []struct {
 		name    string
@@ -49,6 +65,9 @@ func TestInspectRunMetadataAndMissingRecordRefusal(t *testing.T) {
 		missing bool
 	}{
 		{"pending", testRun(), false, false},
+		{"Debian pending", inspectionDebianRun(t, RunPending), false, false},
+		{"Debian complete", inspectionDebianRun(t, RunComplete), false, false},
+		{"Debian failed", inspectionDebianRun(t, RunFailed), false, false},
 		{"complete", inspectionCompleteRun(t), false, false},
 		{"complete with cleanup", inspectionCompleteRun(t), true, false},
 		{"failed", failedRun(testRun(), e.New(e.CodeBuildFailed, "private-provider /private/secret token")), false, false},

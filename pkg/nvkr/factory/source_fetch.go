@@ -23,7 +23,7 @@ import (
 // authority. Its matching SourceAccess credential is admitted only for Git's
 // existing repository-scoped helper; the downstream job receives source bytes and
 // a receipt which its producer must independently rehash before consumption.
-// Hosted run-node fetch dispatch now uses this admission. Ordinary ExecuteNode
+// Hosted run-node fetch dispatch uses this admission. Ordinary ExecuteNode
 // and RunLocal retain their existing developer-fetch behavior; they do not acquire
 // this route's additional environment and held-directory isolation guarantees.
 // Live fetching requires Linux's inherited-directory path. Dependency vendoring

@@ -1,0 +1,102 @@
+{
+  "apiVersion": "nvkr.dev/catalog-overlay/v3",
+  "kind": "CatalogOverlay",
+  "name": "nvke-native-local-amd64-kvm",
+  "requiresCatalogDigest": "sha256:8a057c640202961148f774b352850be00e7ea98e408e2c3442bf701175d698ec",
+  "components": {
+    "nvke-node-image-amd64": {
+      "component": {
+        "artifactPath": "non-fde/nvke-node.qcow2",
+        "buildNetwork": "default",
+        "buildRequirements": {
+          "allowedHostPlatforms": [
+            "linux/amd64"
+          ],
+          "capabilities": [
+            {
+              "name": "kvm",
+              "policy": "required"
+            }
+          ],
+          "resources": {
+            "cpuMillis": 4000,
+            "ephemeralStorageMiB": 65536,
+            "memoryMiB": 10240
+          },
+          "timeoutSeconds": 21600
+        },
+        "builderType": "vm-image",
+        "commit": "400c24fb6465b042be883d6b62472528520d6291",
+        "disk": {
+          "encryption": "none",
+          "format": "qcow2"
+        },
+        "fromSource": true,
+        "materials": {
+          "image-inputs": "nvke-image-inputs",
+          "installer-iso": "nvke-patched-installer-iso-amd64"
+        },
+        "outputType": "disk-image",
+        "packer": {
+          "acceleratorVariable": "accelerator",
+          "acquisitionArchive": "non-fde/apt-acquisitions.tar",
+          "architectureVariable": "architecture",
+          "buildLogDirectoryVariable": "build_log_directory",
+          "buildName": "nvke-node-non-fde.qemu.nvke-non-fde",
+          "materialManifest": {
+            "kinds": {
+              "image-inputs": "archive",
+              "installer-iso": "disk-image"
+            },
+            "schemaVersion": "nvke.nvidia.com/os-image-materials/v1"
+          },
+          "materialManifestVariable": "material_manifest",
+          "outputDirectoryVariable": "output_directory",
+          "packerVersion": "1.15.4",
+          "projectPath": "os-image/packer",
+          "sshPrivateKeyVariable": "ssh_private_key_file",
+          "sshPublicKeyVariable": "ssh_public_key_file",
+          "variables": {
+            "capture_apt_acquisitions": "true",
+            "efi_firmware_code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+            "efi_firmware_vars": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+            "ssh_timeout": "180m",
+            "ubuntu_series": "26.04"
+          }
+        },
+        "platforms": [
+          "linux/amd64"
+        ],
+        "repo": "https://github.com/dsx-ai-factory/nvke.git",
+        "sourceDateEpoch": 1792548398,
+        "tag": "v0.22.0",
+        "toolchainImages": {
+          "amd64": "sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0",
+          "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3"
+        },
+        "treeHash": "f3afc02f5c92f4aacda3a1655836a91bef093bfe",
+        "vendorCommand": [
+          "bash",
+          "-ec",
+          "cd agent\nexport GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\npins=\"$(sha256sum go.mod go.sum)\"\n# Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.\n# Go owns transport fallback; checksum failures never select another proxy.\n# Keep direct fallback limited to a missing proxy module (404/410).\nproxy=https://proxy.golang.org\nGOPROXY=\"${proxy}|${proxy}/|${proxy}//,direct\" \\\n  timeout --kill-after=10s 540s go mod download || {\n    status=$?; echo 'agent module download failed or exceeded 540s' >&2; exit \"$status\";\n  }\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during download' >&2; exit 1;\n}\n# Offline verification and vendoring run once, after acquisition succeeds.\nGOPROXY=off timeout --kill-after=10s 60s go mod verify || {\n  status=$?; echo 'agent module cache verification failed or exceeded 60s' >&2; exit \"$status\";\n}\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor || {\n  status=$?; echo 'agent offline vendoring failed or exceeded 180s' >&2; exit \"$status\";\n}\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during vendoring' >&2; exit 1;\n}\n"
+        ]
+      }
+    }
+  },
+  "toolchainSubstitutions": [
+    {
+      "arch": "amd64",
+      "from": "sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0",
+      "to": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:1415193ed0c50cd9c3d5b3bbd6207728262db3469c6ccd36717d47a6f50e3c0e",
+      "components": [
+        "nvke-agent",
+        "nvke-cni-calico",
+        "nvke-image-inputs",
+        "nvke-kubeadm-distro",
+        "nvke-node-image-amd64",
+        "nvke-patched-installer-iso-amd64",
+        "nvke-spire-agent"
+      ]
+    }
+  ]
+}

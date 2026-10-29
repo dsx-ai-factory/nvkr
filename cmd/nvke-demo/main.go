@@ -37,8 +37,13 @@ func main() {
 	os.Exit(nvkrerr.ExitCode(err))
 }
 func execute(ctx context.Context, args []string, out, diagnostics io.Writer) error {
-	return executeRoot(ctx, newCommand(out, diagnostics, demoActions{
-		run: withOwnDemoExecutable(nvkedemo.DeployArtifacts),
+	return executeRoot(ctx, newCommand(out, diagnostics, defaultDemoActions()), args)
+}
+
+func defaultDemoActions() demoActions {
+	return demoActions{
+		admitBuild: nvkedemo.AdmitDemoBuild,
+		run:        withOwnDemoExecutable(nvkedemo.DeployArtifacts),
 		admit: func(ctx context.Context, cfg nvkedemo.Config) error {
 			return nvkedemo.AdmitDemoDeployment(ctx, cfg)
 		},
@@ -47,7 +52,7 @@ func execute(ctx context.Context, args []string, out, diagnostics io.Writer) err
 		restore: nvkedemo.Restore, load: nvkedemo.LoadDemoFile,
 		status: nvkedemo.RetainedStatus, cleanup: nvkedemo.CleanupRetained,
 		owner: nvkedemo.ServeRetained,
-	}), args)
+	}
 }
 
 // Both lifetime modes select this CLI's executable before entering the owning
@@ -66,16 +71,17 @@ func withOwnDemoExecutable(action func(context.Context, nvkedemo.Config) error) 
 // Actions stay typed library calls; injection lets command tests prove help,
 // completion and invalid input do not reach configuration I/O or runtime work.
 type demoActions struct {
-	admit   func(context.Context, nvkedemo.Config) error
-	run     func(context.Context, nvkedemo.Config) error
-	build   func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error)
-	tools   func(context.Context, nvkedemo.ToolConfig) (string, error)
-	guest   func(context.Context, nvkedemo.NativeGuestConfig) error
-	restore func(context.Context, string, io.Writer) error
-	load    func(context.Context, string) (nvkedemo.DemoFile, error)
-	status  func(context.Context, string, io.Writer) error
-	cleanup func(context.Context, string, io.Writer) error
-	owner   func(context.Context, string) error
+	admitBuild func(context.Context, nvkedemo.BuildConfig) error
+	admit      func(context.Context, nvkedemo.Config) error
+	run        func(context.Context, nvkedemo.Config) error
+	build      func(context.Context, nvkedemo.BuildConfig) (nvkedemo.BuiltInputs, error)
+	tools      func(context.Context, nvkedemo.ToolConfig) (string, error)
+	guest      func(context.Context, nvkedemo.NativeGuestConfig) error
+	restore    func(context.Context, string, io.Writer) error
+	load       func(context.Context, string) (nvkedemo.DemoFile, error)
+	status     func(context.Context, string, io.Writer) error
+	cleanup    func(context.Context, string, io.Writer) error
+	owner      func(context.Context, string) error
 }
 
 func executeRoot(ctx context.Context, root *cobra.Command, args []string) error {
@@ -177,6 +183,11 @@ func newBuildCommand(out io.Writer, actions demoActions, config *string) *cobra.
 			if err != nil {
 				return err
 			}
+			if actions.admitBuild != nil {
+				if err := actions.admitBuild(cmd.Context(), cfg); err != nil {
+					return err
+				}
+			}
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			plain, _ := cmd.Flags().GetBool("plain")
 			return runBuildProgress(cmd.Context(), out, verbose, plain, func(ctx context.Context, progress io.Writer) error {
@@ -243,6 +254,11 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 			if err != nil {
 				return err
 			}
+			if actions.admitBuild != nil {
+				if err := actions.admitBuild(cmd.Context(), build); err != nil {
+					return err
+				}
+			}
 			if actions.admit != nil {
 				if err := actions.admit(cmd.Context(), run); err != nil {
 					return err
@@ -286,7 +302,7 @@ func newE2ECommand(out io.Writer, actions demoActions, config *string) *cobra.Co
 }
 func addBuildFlags(command *cobra.Command, cfg *nvkedemo.BuildFile) {
 	flags := command.Flags()
-	flags.BoolVar(&cfg.QualifyLocal, "qualify-local", false, "automatically prepare local M3 trust, qualify outputs and stop the owned registry")
+	flags.BoolVar(&cfg.QualifyLocal, "qualify-local", false, "verify outputs, check tools, sign evidence with local keys and verify registry read-back; stop the registry afterward")
 	flags.BoolVar(&cfg.Prepared, "prepared", false, "use an existing prepare-only bootstrap; requires a matching qualification policy and no existing Run")
 	flags.StringVar(&cfg.Repo, "repo", "", "native host repository path")
 	flags.StringVar(&cfg.Definition, "definition", "", "NVKR Definition inside repo; requires environment and nvkr")
@@ -294,7 +310,7 @@ func addBuildFlags(command *cobra.Command, cfg *nvkedemo.BuildFile) {
 	flags.StringVar(&cfg.NVKR, "nvkr", "", "native NVKR executable for explicitly selected build inputs")
 	flags.StringVar(&cfg.NVKEClone, "nvke-clone", "", "optional local source Git clone")
 	flags.StringVar(&cfg.Attempt, "attempt", "", "fresh name for the combined artifact Run")
-	flags.StringVar(&cfg.QualificationPolicy, "qualification-policy", "", "admit the prepared Plan against a local M3 policy before building; does not sign or qualify outputs")
+	flags.StringVar(&cfg.QualificationPolicy, "qualification-policy", "", "check the prepared Plan against a local qualification policy before building; does not sign or qualify outputs")
 	flags.IntVar(&cfg.Jobs, "jobs", 1, "maximum concurrent dependency-ready NVKR operations")
 }
 func addRunFlags(command *cobra.Command, cfg *nvkedemo.RunFile, existing bool) {

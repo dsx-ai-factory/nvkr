@@ -80,7 +80,6 @@ func TestAuthoredPrivateConsumersUseReadCredential(t *testing.T) {
 		workflow, job, name, artifact, path string
 	}{
 		{"nvke-os-validation.yaml", "validate-full", "Download exact NVKE source handoff", "nvke-os-source-${{ github.run_id }}", ".trusted-transfer"},
-		{"nvkr-nightly.yml", "runtime-test", "Download the producer's frozen runtime inputs", "nvkr-runtime-inputs", ".nightly-private/runtime-inputs"},
 	} {
 		t.Run(test.workflow, func(t *testing.T) {
 			workflow := readPrivateStorageWorkflow(t, test.workflow)
@@ -98,39 +97,36 @@ func TestAuthoredPrivateConsumersUseReadCredential(t *testing.T) {
 				step.With["name"] != test.artifact || step.With["path"] != test.path {
 				t.Fatal("private download changed its credential or locator handoff")
 			}
-			if test.workflow == "nvkr-nightly.yml" {
-				if step.With["run-id"] != "${{ steps.candidate.outputs.producer_run }}" || step.With["attempt"] != "1" {
-					t.Fatal("nightly runtime input locator lost its exact producer attempt")
-				}
-				consumers := 0
-				for _, step := range job.Steps {
-					if token, ok := step.Env["NVKR_CI_STORAGE_TOKEN"]; ok {
-						consumers++
-						if step.Env["NVKR_REGISTRY_READ"] != "${{ secrets.NVKR_REGISTRY_READ }}" || step.Env["NVKR_REGISTRY_READ_USER"] != "${{ vars.NVKR_REGISTRY_READ_USER }}" {
-							t.Fatal("nightly publication consumer lost independent registry reader")
-						}
-						if token != "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}" || step.Env["NVKR_CI_STORAGE_USER"] != "${{ vars.NVKR_CI_STORAGE_READ_USER }}" {
-							t.Fatal("nightly consumer has no dedicated read credential")
-						}
-					}
-				}
-				if consumers != 1 || job.Permissions["packages"] != "" {
-					t.Fatal("nightly publication authentication lost its separate read authority")
-				}
-				publicReports := 0
-				for _, step := range job.Steps {
-					if strings.HasPrefix(step.Uses, "actions/upload-artifact@") {
-						publicReports++
-						if step.With["path"] != "${{ runner.temp }}/nightly-reports-${{ matrix.name }}/cycle.json" {
-							t.Fatal("nightly public retention must exclude raw candidate reports")
-						}
-					}
-				}
-				if publicReports != 1 {
-					t.Fatal("nightly must preserve its trusted runtime verdict")
+		})
+	}
+}
+
+func TestNightlyPublicUploadsContainOnlyExplicitMetadata(t *testing.T) {
+	workflow := readPrivateStorageWorkflow(t, "nvkr-nightly.yml")
+	public := map[string]string{
+		"select":       "${{ runner.temp }}/nightly-selection.json",
+		"build":        "${{ runner.temp }}/nightly-build-${{ matrix.name }}/build.json",
+		"runtime-test": "${{ runner.temp }}/nightly-reports-${{ matrix.name }}/cycle.json",
+	}
+	for name, job := range workflow.Jobs {
+		for permission, level := range job.Permissions {
+			if permission == "packages" || permission == "id-token" || level == "write" && (name != "build" || permission != "actions") {
+				t.Fatalf("nightly job %s grants publication authority: %s=%s", name, permission, level)
+			}
+		}
+		for _, step := range job.Steps {
+			if strings.HasPrefix(step.Uses, "actions/upload-artifact@") && (public[name] == "" || step.With["path"] != public[name]) {
+				t.Fatalf("nightly job %s publicly uploads something other than its exact metadata file", name)
+			}
+			for _, action := range []string{"actions/cache@", "docker/build-push-action@", "./.github/nvkr-run/actions/ci-upload"} {
+				if strings.HasPrefix(step.Uses, action) {
+					t.Fatalf("nightly coordinator %s exports product artifacts through %s", name, step.Uses)
 				}
 			}
-		})
+			if strings.HasPrefix(step.Uses, "actions/setup-go@") && step.With["cache"] != false {
+				t.Fatalf("nightly job %s enables shared build cache", name)
+			}
+		}
 	}
 }
 

@@ -18,8 +18,8 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 )
 
-// sbomTestPlan compiles the explicit node-worker catalog used by the other compile tests
-// use, so every resolved component carries real, SBOM-valid source identity.
+// sbomTestPlan compiles the explicit node-worker catalog used by the other compile tests,
+// so every resolved component carries real, SBOM-valid source identity.
 func sbomTestPlan(t *testing.T) *Plan {
 	t.Helper()
 	base, err := catalog.LoadContext(context.Background(), testCatalogProvider(t))

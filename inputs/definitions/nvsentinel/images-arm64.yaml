@@ -1,0 +1,151 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+kind: Definition
+metadata:
+  name: nvsentinel-images-arm64-candidate
+catalog:
+  base: ../../catalogs/nvsentinel
+sbomTool: syft-arm64
+outputs:
+- name: csp-health-monitor-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-csp-health-monitor-image
+- name: event-exporter-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-event-exporter-image
+- name: fault-quarantine-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-fault-quarantine-image
+- name: fault-remediation-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-fault-remediation-image
+- name: file-server-cleanup-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-file-server-cleanup-image
+- name: gpu-health-monitor-dcgm3-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-gpu-health-monitor-dcgm3-image
+- name: gpu-health-monitor-dcgm4-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-gpu-health-monitor-dcgm4-image
+- name: gpu-reset-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-gpu-reset-image
+- name: health-events-analyzer-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-health-events-analyzer-image
+- name: janitor-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-janitor-image
+- name: janitor-provider-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-janitor-provider-image
+- name: kubernetes-object-monitor-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-kubernetes-object-monitor-image
+- name: labeler-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-labeler-image
+- name: lifecycle-manager-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-lifecycle-manager-image
+- name: log-collector-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-log-collector-image
+- name: maintenance-notifier-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-maintenance-notifier-image
+- name: metadata-collector-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-metadata-collector-image
+- name: nic-health-monitor-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-nic-health-monitor-image
+- name: node-drainer-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-node-drainer-image
+- name: nvcre-certification-monitor-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-nvcre-certification-monitor-image
+- name: platform-connectors-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-platform-connectors-image
+- name: plugins-slinky-drainer-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-plugins-slinky-drainer-image
+- name: preflight-dcgm-diag-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-preflight-dcgm-diag-image
+- name: preflight-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-preflight-image
+- name: preflight-nccl-allreduce-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-preflight-nccl-allreduce-image
+- name: preflight-nccl-loopback-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-preflight-nccl-loopback-image
+- name: slurm-drain-monitor-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-slurm-drain-monitor-image
+- name: syslog-health-monitor-image
+  platform: linux/arm64
+  format: oci
+  components:
+  - nvsentinel-syslog-health-monitor-image
