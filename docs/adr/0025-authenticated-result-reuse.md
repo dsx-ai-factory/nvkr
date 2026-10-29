@@ -166,13 +166,17 @@ One decision set serves exactly one GitHub run attempt, which ADR-17 §6 already
 A new attempt, including an ADR-20 §6 partial retry, repeats admission with its own reference instant and
 freezes a new set; it never inherits an earlier attempt's decisions.
 
-The decision set is a description, not authority, and the admission step's receipts end with its process. Each
-receiving process checks that the set it holds binds the current Plan digest, run ID and run attempt, and fails
-the Run before producer work otherwise. A process that only omits a reused output's operations needs nothing
-more. Any process that consumes a reused output's closure (a descendant operation, Run record binding or
-publication copy) repeats §3 acceptance from bytes for exactly the recorded candidate and output and holds its
-own receipt. A re-acceptance that refuses, or that selects a different candidate, fails the Run rather than
-reverting to execution, because the producer operations have already been omitted.
+The decision set is a description, not authority, and the admission step's receipts end with its process. The set
+carries the admission step's verified OIDC token, requested with an NVKR-only audience that no cloud trust policy
+admits. Each receiving process verifies the current Plan digest and re-verifies the token's signature, issuer,
+audience, repository, workflow, run ID and run attempt against the set and its own run, ignoring only token
+expiry; any mismatch or verification failure fails the Run before producer work. A process that only omits a
+reused output's operations needs nothing more. Any process that consumes a reused output's closure (a descendant
+operation, Run record binding or publication copy) repeats §3 acceptance from bytes for exactly the recorded
+candidate and output, evaluates step 6 at that token's issued-at instant rather than a new one, and holds its own
+receipt, so a delayed re-acceptance reaches admission's freshness result. A re-acceptance that refuses, or that
+selects a different candidate, fails the Run rather than reverting to execution, because the producer operations
+have already been omitted.
 
 For a reused output:
 
@@ -213,7 +217,8 @@ For a reused output:
 **Negative / costs**
 - Acceptance retrieves the complete payload closure, which costs registry bandwidth for large disk outputs, and
   every process that consumes a reused closure repeats that retrieval.
-- Freshness requires the admission step to obtain a GitHub OIDC token.
+- Freshness requires the admission step to obtain a GitHub OIDC token, which the decision set retains so later
+  processes reproduce the same reference instant.
 - A new key family, Run slot origin, execution outcome and publication copy step must be implemented and
   versioned.
 - Until production status discovery exists (ADR-06), staleness relies on the maximum-age bound.
@@ -291,9 +296,10 @@ asserts the stable coded error.
 | 41 | Same payload, different origins | Two authenticated candidates with equal payload digests from different original Runs | `conflict`; output executes |
 | 42 | Copy of one origin | Original publication and a later Run's digest-preserving copy both survive | Receipt issued; lowest reference used for transport; original origin recorded |
 | 43 | Fresh-process re-acceptance | Finalizer or consuming worker repeats acceptance in a new process; candidate bytes replaced between admission and re-acceptance | Run fails before binding; no fallback to execution |
-| 44 | Decision set replay | Worker receives a valid set from another run ID, attempt or Plan | Run fails before producer work |
+| 44 | Decision set replay | Worker receives a valid set from another repository, workflow, run ID, attempt or Plan | Run fails before producer work |
 | 45 | Reference instant | OIDC token missing, unverifiable or bound to another attempt; candidate exactly at and just past the age bound | Token failure refuses every candidate as `stale`; boundary candidate accepted, one past it `stale` |
 | 46 | Retry attempt | Same run, new attempt after candidate ages past bound | New attempt freezes its own set; candidate refused `stale`; earlier attempt's set rejected |
+| 47 | Delayed re-acceptance | Consumer re-accepts after the candidate has aged past the bound measured from a new token; separately, the set carries an expired admission token, a token from another attempt, or one with a non-NVKR audience | Freshness evaluated at the admission token's issued-at; candidate accepted despite token expiry; foreign-attempt or wrong-audience token fails the Run before producer work |
 
-Rows 2, 32, 33 and 37–46 also need one hosted development Run before reconciliation may claim the path was
+Rows 2, 32, 33 and 37–47 also need one hosted development Run before reconciliation may claim the path was
 externally exercised. No qualified or production claim follows from these tests.
