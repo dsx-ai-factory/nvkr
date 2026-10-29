@@ -76,9 +76,12 @@ distinguishes source fixes from actual startup acceptance. Explicit `--network u
 matched upstream alternative for image, site and tenant; it does not validate the NVIDIA fork.
 
 The [shared native path](../../../docs/local-nvke-demo.md#native-linux-and-mac-path) runs the Go CLIs and
-TUI on Linux ARM64 or Apple Silicon macOS, with one QEMU site, one tenant control plane,
+TUI on Linux ARM64/AMD64 or Apple Silicon macOS, with one QEMU site, one tenant control plane,
 and one tenant worker ordinarily. Conformance requires two workers in the same worker pool:
-three tenant guests and four QEMU guests in total on either host. Tools are prepared
+three tenant guests and four QEMU guests in total on its admitted ARM64 hosts.
+AMD64 default inputs select NVIDIA OVN without conformance; they reuse the host/site
+tools built in the artifact Run. Shared selection derives architecture from NVKR's target owner;
+AMD64 upstream/conformance default Definitions are not supplied. A completed AMD64 KVM E2E is not yet recorded. Tools are prepared
 through NVKR's shared catalog; host virtualization prerequisites remain separate. The October 15 Mac runtime
 record covers existing artifacts, upstream OVN and TCG on a pre-integration draft, not fresh-machine or Linux
 full runtime acceptance. Standard `run` and `e2e` select that same native deployment owner;

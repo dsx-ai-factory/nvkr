@@ -108,7 +108,7 @@ func nativeCloudInitPodManifest(namespace, name, node, image string) map[string]
 // runNativeCloudInit observes the installed host command on each exact fresh
 // node. The Pods have no API token, network need, host namespaces or writeable
 // host mount. Their CLI output is diagnostic evidence, never release authority.
-func runNativeCloudInit(ctx context.Context, work, kubeconfig, kubectl, kubernetes, image string, expectedCount int, expected []tenantNode,
+func runNativeCloudInitForArchitecture(ctx context.Context, work, kubeconfig, kubectl, kubernetes, image string, expectedCount int, expected []tenantNode, arch string,
 	capture func(context.Context, []string, string, time.Duration) ([]byte, error)) (result error) {
 	if err := requireContext(ctx); err != nil {
 		return err
@@ -116,7 +116,7 @@ func runNativeCloudInit(ctx context.Context, work, kubeconfig, kubectl, kubernet
 	if _, err := workloadImageDigest(image); err != nil {
 		return err
 	}
-	ready, err := readyNativeTenantNodes(expected, kubernetes, expectedCount)
+	ready, err := readyNativeTenantNodesForArchitecture(expected, kubernetes, expectedCount, arch)
 	if err != nil || !ready {
 		return errors.Join(err, errors.New("cloud-init observation requires the exact requested fresh Ready tenant nodes"))
 	}
@@ -135,7 +135,7 @@ func runNativeCloudInit(ctx context.Context, work, kubeconfig, kubectl, kubernet
 		if err := json.Unmarshal(raw, &nodes); err != nil {
 			return nil, "", err
 		}
-		ready, err := readyNativeTenantNodes(nodes.Items, kubernetes, expectedCount)
+		ready, err := readyNativeTenantNodesForArchitecture(nodes.Items, kubernetes, expectedCount, arch)
 		if err != nil || !ready {
 			return nil, "", errors.Join(err, errors.New("cloud-init check requires the same requested Ready nodes"))
 		}

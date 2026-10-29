@@ -53,7 +53,8 @@ producer inputs as well as runtime admission, so the explicit demo Definitions r
 The additional [Mac](definitions/demo/native-mac/README.md) and
 [Linux](definitions/demo/native-linux/README.md) selections use one
 [shared native tool catalog](catalogs/tools/native/README.md). Their local policies
-are `environments/local-native-mac.json` and `environments/local-native-linux.json`.
+are `environments/local-native-mac.json` and the matching `environments/local-<arch>-kvm.json`.
+Host tool Definitions live in `definitions/demo/tools/<os>-<arch>.json`.
 QCOW builds use NVKR's existing disk-image Definitions listed above.
 The recorded Mac runtime uses an existing QCOW, upstream OVN and TCG. These inputs
 do not imply fresh-machine or full native Linux runtime acceptance.

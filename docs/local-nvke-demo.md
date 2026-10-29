@@ -37,6 +37,7 @@ flowchart TD
 | Host | CLI and simulator | Kubernetes guest runtime |
 | --- | --- | --- |
 | Ubuntu ARM64 | Native Linux executables | QEMU/KVM through session libvirt |
+| Ubuntu AMD64 | Native Linux executables | QEMU/KVM through session libvirt |
 | Apple Silicon Mac | Native Darwin executables | Host QEMU with explicit TCG for the selected 64K image, and vmnet |
 
 Both hosts use Docker for artifact builds and a separate private Lima
@@ -48,7 +49,9 @@ forwards SPIRE port 30081 to the observed demo gateway, and removes that backend
 before provisioning tenant guests. It does not adopt existing instances or mount
 the simulator state/QCOW directory into Lima.
 
-`build` creates an artifact Run and native-tool Run. `run` consumes explicitly
+`build` creates an artifact Run and, when not already included in that Definition,
+a native-tool Run. The default AMD64 Definition includes both host and site tools,
+so they are built once in the artifact Run. `run` consumes explicitly
 selected completed Runs. `e2e` calls those same stages in sequence. NVKR owns
 builds, acquisition, observation and artifact verification; NVKE owns bootstrap,
 site deployment and tenant operations. Both hosts derive the Kubernetes version
@@ -63,13 +66,31 @@ Its allowance follows the remaining operation budget; see the
 [implementation and evidence limits](adr/reconciliation.md#local-arm64-demo-presentation).
 
 The native path remains a local diagnostic.
+Ordinary `build` and `e2e` select the host-matched Definition and Environment
+and the `nvkr` executable beside `nvke-demo` on both Linux architectures and Mac.
+NVKR's existing target owner defines the compiler platform domain. The demo derives
+input filenames and output names from that target instead of maintaining another
+architecture allowlist. Tool Definitions use `inputs/definitions/demo/tools/<os>-<arch>.json`.
+On Ubuntu AMD64, the selected images, QCOW2, tool bundles, bootstrap backend and
+node checks use AMD64 through the shared deployment owner. Default AMD64
+preparation builds and validates the local Packer toolchain, then binds its exact image ID through the existing
+catalog overlays; it does not require access to the older published toolchain.
+AMD64's committed default inputs currently cover NVIDIA OVN without conformance.
+Matching AMD64 upstream and conformance Definitions are not supplied; those missing
+inputs fail before build execution. Shared conformance selectors use the host
+architecture, but a completed AMD64 conformance run is not recorded.
+A conformance deployment also checks the selected completed Run for native
+Hydrophone/kubectl and matching Linux conformance/BusyBox outputs before guest
+creation. An ordinary Run without those outputs is rejected at admission.
+Local qualification retains its separate ARM64 evidence lane. Architecture contract tests and Plan compilation do not
+establish a completed AMD64 KVM deployment.
 A complete fresh Mac/Linux build, deployment and cleanup result has not yet been
 established for this candidate. See [current implementation and evidence](adr/reconciliation.md)
 and [remaining source-build gaps](full-nvke-source-build.md).
 
 ## 1. Choose your Linux execution host
 
-Use a dedicated trusted Ubuntu ARM64 host with usable KVM and sufficient native
+Use a dedicated trusted Ubuntu ARM64 or AMD64 host with usable KVM and sufficient native
 storage for source builds, OCI outputs, the QCOW2 and guest overlays. The native
 workflow allocates **6 CPUs / 12 GiB to the site and 6 CPUs / 12 GiB to each
 tenant**: 36 GiB with one tenant worker or 48 GiB with two workers, before host,
@@ -155,15 +176,25 @@ prerequisite package selection is:
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends \
   git make gcc libc6-dev jq coreutils python3 openssh-client bash curl openssl \
-  libvirt-daemon-system libvirt-clients qemu-system-arm qemu-utils \
-  qemu-efi-aarch64 cloud-image-utils swtpm swtpm-tools gnutls-bin ipxe-qemu \
+  libvirt-daemon-system libvirt-clients qemu-utils \
+  cloud-image-utils swtpm swtpm-tools gnutls-bin ipxe-qemu \
   dnsmasq-base iptables iproute2 libcap2-bin e2fsprogs kmod
+```
+
+Install firmware and the QEMU system executable for the host architecture:
+
+```sh
+case "$(uname -m)" in
+  aarch64) sudo apt-get install -y qemu-system-arm qemu-efi-aarch64 ;;
+  x86_64) sudo apt-get install -y qemu-system-x86 ovmf ;;
+  *) echo 'Unsupported demo host architecture' >&2; exit 1 ;;
+esac
 ```
 
 The CLI refuses conflicting resources and overlapping networks; it does not
 install those packages or delete an existing libvirt session. Linux bootstrap
 additionally requires the source-built Lima `f47461e` distribution and matched
-helpers. Follow the [public source installation procedure](native-linux-bootstrap.md#install-from-public-source-on-ubuntu-arm64)
+helpers. Follow the [public source installation procedure](native-linux-bootstrap.md#install-from-public-source-on-ubuntu-arm64-or-amd64)
 once, keeping its installation directory on `PATH` in the terminal used below.
 That candidate's binary vulnerability findings and bounded pilot scope remain
 visible there; a backend-only pilot is not full native runtime acceptance.
@@ -305,7 +336,7 @@ Add `--nvke-clone /absolute/path/to/nvke` when supplying local source objects.
 placeholders. Keep the artifact attempt, native-tool attempt and output paths
 fresh. Deleting one directory does not clean resources or make an old attempt new.
 
-NVIDIA OVN is the default. Both hosts retain the selected NVKE source's ARM64
+NVIDIA OVN is the default. The ARM64 selections on Linux and Mac retain NVKE's
 `linux-nvidia-64k` kernel. Linux requires KVM. Explicit Mac `--accelerator tcg`
 uses the standard QEMU `max` CPU and is slower than hardware virtualization.
 Default Mac build preparation gives the Ubuntu installer a three-hour wait for
@@ -318,8 +349,8 @@ so the default HVF selection cannot run this image. HVF remains available for
 independently compatible images; there is no automatic fallback or kernel
 substitution. Device probes alone do not establish guest boot or full acceptance.
 
-The site uses the source-selected ARM64 MachineImage boot script with the
-current local disk URL. NICoSim owns its parsing, image boot and DHCP identity
+For these ARM64 selections, the site uses the source-selected MachineImage boot
+script with the current local disk URL. NICoSim owns its parsing, image boot and DHCP identity
 registration; the URL itself is not content authentication.
 
 Before site or tenant agents start, the adapter imports the selected named OVN
@@ -760,12 +791,13 @@ race-test coverage; a real site-reuse test remains externally unverified.
 
 ## Private site identity operation helper
 
-The shared site-startup tool catalog builds a fixed Linux ARM64 helper for
-execution in an existing admitted NVKE controller container. `pkg/nvkr/siteidentity` owns its
+The shared site-startup tool catalog builds a Linux helper matching the selected
+guest architecture for execution in an existing admitted NVKE controller container. `pkg/nvkr/siteidentity` owns its
 mTLS probe, upstream SPIRE reconfiguration and authenticated fresh-peer observation;
 the executable only adapts bounded standard input/output and coded errors.
-Both native host selections consume the same Linux ARM64 helper through the
-shared site-startup tool output. It is built from catalog-selected source;
+ARM64 guests consume `site-startup-tools-arm64`; AMD64 guests consume
+`site-startup-tools-amd64`. The Mac host uses the Linux ARM64 companion for its
+ARM64 guest. It is built from catalog-selected source;
 the normal startup owner invokes it in its existing admitted controller container.
 Building the helper alone
 does not deploy, import SPIRE policy or repair a site.

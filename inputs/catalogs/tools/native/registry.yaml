@@ -2,6 +2,51 @@
 # SPDX-License-Identifier: Apache-2.0
 apiVersion: nvkr.dev/catalog/v3
 components:
+    oras-linux-amd64:
+      outputType: host-package
+      platforms:
+      - linux/amd64
+      prebuilt:
+        evidence:
+          none: true
+        releaseExecutable: true
+      source: oras-linux-amd64
+    kubectl-linux-amd64:
+      outputType: host-package
+      platforms:
+      - linux/amd64
+      prebuilt:
+        evidence:
+          none: true
+        releaseExecutable: true
+      source: kubectl-linux-amd64
+    kind-linux-amd64:
+      outputType: host-package
+      platforms:
+      - linux/amd64
+      prebuilt:
+        evidence:
+          none: true
+        releaseExecutable: true
+      source: kind-linux-amd64
+    helm-linux-amd64:
+      outputType: host-package
+      platforms:
+      - linux/amd64
+      prebuilt:
+        evidence:
+          none: true
+        releaseExecutable: true
+      source: helm-linux-amd64
+    clusterctl-linux-amd64:
+      outputType: host-package
+      platforms:
+      - linux/amd64
+      prebuilt:
+        evidence:
+          none: true
+        releaseExecutable: true
+      source: clusterctl-linux-amd64
     clusterctl:
         outputType: host-package
         platforms:
@@ -77,6 +122,7 @@ components:
     native-capi-exec-init-image:
         outputType: oci-image
         platforms:
+            - linux/amd64
             - linux/arm64
         prebuilt:
             evidence:
@@ -86,6 +132,7 @@ components:
     native-capi-exec-plugin-image:
         outputType: oci-image
         platforms:
+            - linux/amd64
             - linux/arm64
         prebuilt:
             evidence:
@@ -95,11 +142,12 @@ components:
     native-workload-image:
         outputType: oci-image
         platforms:
+            - linux/amd64
             - linux/arm64
         prebuilt:
             evidence:
                 none: true
-            image: docker.io/library/alpine@sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d
+            image: docker.io/library/alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
         source: nvke-deploy
     nerdctl:
         artifactPath: _output/nerdctl
@@ -114,6 +162,7 @@ components:
         outputType: host-package
         platforms:
             - darwin/arm64
+            - linux/amd64
             - linux/arm64
         source: nerdctl-site
         versionStamp:
@@ -144,6 +193,7 @@ components:
         outputType: host-package
         platforms:
             - darwin/arm64
+            - linux/amd64
             - linux/arm64
         source: nvke-nicosim
         writeDir: controller/nico-sim/bin
@@ -164,6 +214,7 @@ components:
         outputType: tarball
         platforms:
             - darwin/arm64
+            - linux/amd64
             - linux/arm64
         source: nvke-nicosim
         writeDir: controller/nico-sim/bin
@@ -181,6 +232,7 @@ components:
         outputType: host-package
         platforms:
             - darwin/arm64
+            - linux/amd64
             - linux/arm64
         source: nvke-nicosim
         writeDir: controller/nico-sim/bin
@@ -197,6 +249,7 @@ components:
         fromSource: true
         outputType: host-package
         platforms:
+            - linux/amd64
             - linux/arm64
         source: nvkr-site-identity
         writeDir: bin
@@ -227,6 +280,7 @@ components:
         outputType: tarball
         platforms:
             - darwin/arm64
+            - linux/amd64
             - linux/arm64
         source: nvke-deploy
         versionStamp:
@@ -250,6 +304,7 @@ components:
         outputType: host-package
         platforms:
             - darwin/arm64
+            - linux/amd64
             - linux/arm64
         source: nvke-cli
         versionStamp:
@@ -332,11 +387,50 @@ kind: SourceBuildRegistry
 metadata:
     name: nvke-native-tools
 sources:
+    oras-linux-amd64:
+      constraint: 1.3.3
+      repo: https://github.com/oras-project/oras
+      tool:
+        executablePath: oras
+        format: tar-gzip
+        platform: linux/amd64
+        url: https://github.com/oras-project/oras/releases/download/{{.Tag}}/oras_{{.Version}}_linux_amd64.tar.gz
+    kubectl-linux-amd64:
+      constraint: 1.35.9
+      repo: https://github.com/kubernetes/kubernetes
+      tool:
+        executablePath: kubectl
+        format: raw
+        platform: linux/amd64
+        url: https://dl.k8s.io/release/{{.Tag}}/bin/linux/amd64/kubectl
+    kind-linux-amd64:
+      constraint: 0.32.0
+      repo: https://github.com/kubernetes-sigs/kind
+      tool:
+        executablePath: kind
+        format: raw
+        platform: linux/amd64
+        url: https://github.com/kubernetes-sigs/kind/releases/download/{{.Tag}}/kind-linux-amd64
+    helm-linux-amd64:
+      constraint: 4.2.4
+      repo: https://github.com/helm/helm
+      tool:
+        executablePath: linux-amd64/helm
+        format: tar-gzip
+        platform: linux/amd64
+        url: https://get.helm.sh/helm-{{.Tag}}-linux-amd64.tar.gz
+    clusterctl-linux-amd64:
+      constraint: 1.13.6
+      repo: https://github.com/kubernetes-sigs/cluster-api
+      tool:
+        executablePath: clusterctl
+        format: raw
+        platform: linux/amd64
+        url: https://github.com/kubernetes-sigs/cluster-api/releases/download/{{.Tag}}/clusterctl-linux-amd64
     nvkr-site-identity:
         constraint: '*'
         repo: https://github.com/dsx-ai-factory/nvkr.git
-        toolchainImagesByArch:
-            arm64: golang@sha256:288557fbc328e4ef9a78bae2eb44f24447029ff08667be883d79eeaa9029cf0c
+        toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
         vendorCommand:
             - bash
             - -euc
@@ -447,8 +541,7 @@ sources:
     nerdctl-site:
         constraint: 2.4.1
         repo: https://github.com/containerd/nerdctl
-        toolchainImagesByArch:
-            arm64: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
+        toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
         vendorCommand:
             - bash
             - -euc
@@ -463,15 +556,14 @@ sources:
     nvke-cli:
         constraint: v0.22.0
         repo: https://github.com/dsx-ai-factory/nvke.git
-        toolchainImagesByArch:
-            arm64: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+        toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
         vendorCommand:
             - bash
             - -euc
             - |
               cd cli
               export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
-              pins="$(sha256sum go.mod go.sum)"
+              pins="$(sha256sum go.mod go.sum ../controller/api/go.mod ../controller/api/go.sum ../controller/deploy/charts/go.mod ../management-engine/go.mod ../management-engine/go.sum)"
               timeout --kill-after=10s 540s go mod download
               printf '%s\n' "$pins" | sha256sum --quiet -c -
               GOPROXY=off timeout --kill-after=10s 60s go mod verify
@@ -480,12 +572,12 @@ sources:
     nvke-deploy:
         constraint: v0.22.0
         repo: https://github.com/dsx-ai-factory/nvke.git
-        toolchainImagesByArch:
-            arm64: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+        toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
     nvke-nicosim:
         constraint: v0.22.0
         repo: https://github.com/dsx-ai-factory/nvke.git
         toolchainImagesByArch:
+            amd64: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
             arm64: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
         vendorCommand:
             - bash

@@ -1,10 +1,10 @@
 # Shared native NVKE tool catalog
 
-This directory owns one source registry and machine-managed lock for both native demo hosts. The Mac and Linux Definitions select platform-specific outputs from this same catalog. Deployment orchestration remains shared Go code.
+This directory owns one source registry and machine-managed lock for Mac ARM64 and Linux ARM64/AMD64. The Mac and Linux Definitions select platform-specific outputs from this same catalog. Deployment orchestration remains shared Go code.
 
 The retired standalone simulator catalog is consolidated here: Linux and Mac demo selections use the same producer and source lock. The SQLite server requires CGO. Linux uses its static source build; local Mac preparation binds the installed Go SDK and Apple Clang through NVKR before the same tool Run. The demo dependency owner invokes that preparation automatically on Mac. It downloads no compiler, and the native Go execution lane cannot publish or sign. The API-only simulator CLI remains CGO-free. The source-owned installer archive and Linux site runtime are shared. Source producers consume their pinned upstream code and module files unchanged; dependency preparation verifies those module files before and after vendoring.
 
-Upstream acquired executables have distinct Linux producer IDs (`clusterctl-linux`, `helm-linux`, `kind-linux`, `kubectl-linux`, `oras-linux`) because each asset has one exact platform and digest. After NVKR verifies and extracts the selected bundle, one downstream adapter creates a private view with conventional command names. It retains the original extraction and verifies every copied file against its bundle entry. Immutable Run outputs are never renamed or rewritten. Mac-only vmnet producers are not selected by Linux outputs.
+Upstream acquired executables have distinct Linux producer IDs (`clusterctl-linux`, `helm-linux`, `kind-linux`, `kubectl-linux`, `oras-linux`) for ARM64 and corresponding `-linux-amd64` IDs for AMD64, because each asset has one exact platform and digest. After NVKR verifies and extracts the selected bundle, one downstream adapter creates a private view with conventional command names. It retains the original extraction and verifies every copied file against its bundle entry. Immutable Run outputs are never renamed or rewritten. Mac-only vmnet producers are not selected by Linux outputs.
 
 The installer archive includes NVKE’s shipped site-spec template. The native adapter reads its Kubernetes default from the verified installer payload and rechecks the original bytes before site startup and tenant operations; the version is not a CLI constant. Site packages, tenant requests, node readiness and the conformance configuration use that same selection.
 
@@ -30,7 +30,7 @@ has canonical-main provenance. A PR-branch self-pin does not establish that prov
 
 Packer 1.15.4 and its QEMU plugin 1.1.6 have separate Darwin and Linux ARM64 acquisitions in this same catalog, using the versions already selected by the Packer toolchain lock. Their ZIP carriers and selected executable bytes have independent CLI-managed pins. These acquisitions do not by themselves admit native Mac image execution or establish a successful QCOW build. They do not install tools globally or publish artifacts.
 
-The same pinned `nerdctl` source producer supports Darwin ARM64 and Linux ARM64. Both host tool bundles
+The same pinned `nerdctl` source producer supports Darwin ARM64 and Linux ARM64/AMD64. Both host tool bundles
 select it under its conventional command name; the site-startup bundle separately selects Linux guest bytes.
 The native CLI requires a containerd endpoint. Both hosts use an owned private Lima backend through
 its upstream `nerdctl.lima` entry point for temporary bootstrap; NVKE and Kind orchestration remain on the host.

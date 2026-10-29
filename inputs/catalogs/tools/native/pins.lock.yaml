@@ -3,18 +3,21 @@ apiVersion: nvkr.dev/lock/v1
 artifacts:
   native-capi-exec-init-image:
     digests:
+      amd64: sha256:d56c381f961d307a21b3ca004cf1e3910f106644aefb1f43e654c8a56c4fd395
       arm64: sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d
     imageParentDigest: sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
     tag: v0.22.0
   native-capi-exec-plugin-image:
     digests:
+      amd64: sha256:ef6f2f3c6eb41017fec9b5bdfeb87bea402d606606e16b788305dc9557c85892
       arm64: sha256:a8904bb463d669541a195ee013937e9a5a457dc999b3245da222858b526660fa
     imageParentDigest: sha256:e30e90774e5951f84eb6dfb36f972fead08b64c3bfdc0912c5b15f988e79de3a
     tag: v0.22.0
   native-workload-image:
     digests:
+      amd64: sha256:d56c381f961d307a21b3ca004cf1e3910f106644aefb1f43e654c8a56c4fd395
       arm64: sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d
-    imageParentDigest: sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d
+    imageParentDigest: sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
     tag: v0.22.0
 kind: PinLock
 pins:
@@ -42,6 +45,18 @@ pins:
       platform: linux/arm64
       url: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.13.6/clusterctl-linux-arm64
     treeHash: 8c584c260a47253fb8ebc5681a7eb894798ace7a
+  clusterctl-linux-amd64:
+    commit: bd8162edfe045c1bb490d431b3acddd568bdb887
+    sourceDateEpoch: 1788866431
+    tag: v1.13.6
+    tool:
+      archiveDigest: sha256:1e4019b8ef30fa13993716d28b9fec4072fee1e17ea2cc69cb7c8f232d9b8c2f
+      executableDigest: sha256:1e4019b8ef30fa13993716d28b9fec4072fee1e17ea2cc69cb7c8f232d9b8c2f
+      executablePath: clusterctl
+      format: raw
+      platform: linux/amd64
+      url: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.13.6/clusterctl-linux-amd64
+    treeHash: 8c584c260a47253fb8ebc5681a7eb894798ace7a
   helm:
     commit: 3900f434fd3ef2b84065dc04508df48f288dba00
     sourceDateEpoch: 1786632363
@@ -65,6 +80,18 @@ pins:
       format: tar-gzip
       platform: linux/arm64
       url: https://get.helm.sh/helm-v4.2.4-linux-arm64.tar.gz
+    treeHash: 16e7ec45b01a241f5011caad2fe8751208a7ba94
+  helm-linux-amd64:
+    commit: 3900f434fd3ef2b84065dc04508df48f288dba00
+    sourceDateEpoch: 1786632363
+    tag: v4.2.4
+    tool:
+      archiveDigest: sha256:c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3
+      executableDigest: sha256:92e191314f44aac173711bb0247c38c727f3ddf65ad16a01c0861d509a63a9e1
+      executablePath: linux-amd64/helm
+      format: tar-gzip
+      platform: linux/amd64
+      url: https://get.helm.sh/helm-v4.2.4-linux-amd64.tar.gz
     treeHash: 16e7ec45b01a241f5011caad2fe8751208a7ba94
   kind:
     commit: cda67ef8588f6bfdac5358233f2471cb2149ecaf
@@ -92,6 +119,19 @@ pins:
       platform: linux/arm64
       url: https://github.com/kubernetes-sigs/kind/releases/download/v0.32.0/kind-linux-arm64
     treeHash: be4d44635ebcab72f70760c8e04684cbd98d3969
+  kind-linux-amd64:
+    commit: cda67ef8588f6bfdac5358233f2471cb2149ecaf
+    goVersion: 1.26.3
+    sourceDateEpoch: 1780417734
+    tag: v0.32.0
+    tool:
+      archiveDigest: sha256:50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54
+      executableDigest: sha256:50030de23cf40a18505f20426f6a8506bedf13c6e509244bd1fa9463721b0f54
+      executablePath: kind
+      format: raw
+      platform: linux/amd64
+      url: https://github.com/kubernetes-sigs/kind/releases/download/v0.32.0/kind-linux-amd64
+    treeHash: be4d44635ebcab72f70760c8e04684cbd98d3969
   kubectl:
     commit: 329000efd0b26bd78155e51e4df449130f0fca00
     goVersion: 1.26.8
@@ -117,6 +157,19 @@ pins:
       format: raw
       platform: linux/arm64
       url: https://dl.k8s.io/release/v1.35.9/bin/linux/arm64/kubectl
+    treeHash: 125da0aec19fa2c7f9f8d834db1ba7fa70e952ed
+  kubectl-linux-amd64:
+    commit: 329000efd0b26bd78155e51e4df449130f0fca00
+    goVersion: 1.26.8
+    sourceDateEpoch: 1790183268
+    tag: v1.35.9
+    tool:
+      archiveDigest: sha256:3cfeaf80be482b435b0aa214aff6e0b2c312ee23c0ff20810c75517b6004c6eb
+      executableDigest: sha256:3cfeaf80be482b435b0aa214aff6e0b2c312ee23c0ff20810c75517b6004c6eb
+      executablePath: kubectl
+      format: raw
+      platform: linux/amd64
+      url: https://dl.k8s.io/release/v1.35.9/bin/linux/amd64/kubectl
     treeHash: 125da0aec19fa2c7f9f8d834db1ba7fa70e952ed
   nerdctl-site:
     commit: 9039d5272eb8646d35322b9f4413bdf18ce7231a
@@ -167,6 +220,18 @@ pins:
       format: tar-gzip
       platform: linux/arm64
       url: https://github.com/oras-project/oras/releases/download/v1.3.3/oras_1.3.3_linux_arm64.tar.gz
+    treeHash: a4b0547c6e18c9abc9b1eac5fb8add27a7c4ce2f
+  oras-linux-amd64:
+    commit: 210747c29c1d38732b3194878dfd8b5a6b9ad7eb
+    sourceDateEpoch: 1783708065
+    tag: v1.3.3
+    tool:
+      archiveDigest: sha256:9ce999f8d2de03fc03968b29d743077a58783e545e5eaa53917ca177352d0e59
+      executableDigest: sha256:a9c7694677a72251c89c176331d41b2198d8e85cbaece038bcbc8da0679e1139
+      executablePath: oras
+      format: tar-gzip
+      platform: linux/amd64
+      url: https://github.com/oras-project/oras/releases/download/v1.3.3/oras_1.3.3_linux_amd64.tar.gz
     treeHash: a4b0547c6e18c9abc9b1eac5fb8add27a7c4ce2f
   packer:
     commit: 9f42be3f6686a9c00b3b1325fcecbba337b8b93b

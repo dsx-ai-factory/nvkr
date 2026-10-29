@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: nvke-native-nvidia-profiles-arm64
+  name: nvke-native-nvidia-profiles
   description: Native demo profiles using the renamed NVKE packages and services with explicit NVIDIA OVN 2.4.2. Diagnostic payload, not fleet configuration.
 sources:
   nvke-profiles:
@@ -21,6 +21,7 @@ components:
     writeDir: bin
     outputType: oci-image
     platforms:
+    - linux/amd64
     - linux/arm64
     buildCommand:
     - sh
@@ -41,6 +42,6 @@ components:
         --local context=/src/bin/profiles-context \
         --local dockerfile=/src/controller/profiles/example \
         --opt platform=linux/{{.Arch}} \
-        --opt context:alpine:3.24.1=docker-image://docker.io/library/alpine@sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d \
+        --opt context:alpine:3.24.1=docker-image://docker.io/library/alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 \
         --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
         --output type=oci,dest=/src/bin/nvke-local-profiles-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true

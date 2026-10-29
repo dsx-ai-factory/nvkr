@@ -20,6 +20,7 @@ components:
     - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/. --local dockerfile=/src --opt platform=linux/{{.Arch}} --output type=oci,dest=/src/bin/capnico-controller-{{.Arch}}.oci.tar,oci-mediatypes=true
     outputType: oci-image
     platforms:
+    - linux/amd64
     - linux/arm64
 sources:
   capnico:

@@ -18,14 +18,18 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-func TestDefaultMacBuildRetainsTheProductSelectionAndExplicitInputs(t *testing.T) {
+func TestDefaultNativeBuildRetainsTheProductSelectionAndExplicitInputs(t *testing.T) {
 	for _, tc := range []struct {
 		name, platform, network, definition, environment, nvkr string
 		conformance, wantDefault, reject                       bool
 	}{
 		{name: "NVIDIA", platform: "darwin/arm64", wantDefault: true},
 		{name: "matched upstream", platform: "darwin/arm64", network: "upstream-ovn", wantDefault: true},
-		{name: "Linux retained", platform: "linux/arm64"},
+		{name: "Linux ARM64 default", platform: "linux/arm64", wantDefault: true},
+		{name: "AMD64 NVIDIA", platform: "linux/amd64", wantDefault: true},
+		{name: "AMD64 explicit inputs retained", platform: "linux/amd64", definition: "customer.json", environment: "customer-env.json", nvkr: "/explicit/nvkr"},
+		{name: "AMD64 conformance input selection", platform: "linux/amd64", conformance: true, wantDefault: true},
+		{name: "AMD64 upstream input selection", platform: "linux/amd64", network: "upstream-ovn", wantDefault: true},
 		{name: "explicit prepared retained", platform: "darwin/arm64", definition: ".nvkr/explicit/definition.json", environment: ".nvkr/explicit/environment.json", nvkr: "/explicit/nvkr"},
 		{name: "Mac conformance", platform: "darwin/arm64", conformance: true, wantDefault: true},
 		{name: "Mac upstream conformance", platform: "darwin/arm64", network: "upstream-ovn", conformance: true, wantDefault: true},
@@ -34,7 +38,7 @@ func TestDefaultMacBuildRetainsTheProductSelectionAndExplicitInputs(t *testing.T
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := BuildConfig{Network: tc.network, Definition: tc.definition, Environment: tc.environment, NVKR: tc.nvkr, Conformance: tc.conformance}
 			original := cfg
-			selected, err := defaultMacBuild(&cfg, tc.platform, "/distribution/bin/nvke-demo")
+			selected, err := defaultNativeBuild(&cfg, tc.platform, "/distribution/bin/nvke-demo")
 			if selected != tc.wantDefault || (err != nil) != tc.reject {
 				t.Fatalf("selection=%v error=%v", selected, err)
 			}
@@ -51,8 +55,8 @@ func TestDefaultMacBuildRetainsTheProductSelectionAndExplicitInputs(t *testing.T
 				}
 				return
 			}
-			definition, _, err := LocalArtifactInputsFor(tc.network, tc.conformance, "darwin")
-			if err != nil || cfg.Definition != definition || cfg.Environment != "inputs/environments/local-native-mac.json" || cfg.NVKR != "/distribution/bin/nvkr" {
+			definition, environment, err := LocalArtifactInputsForPlatform(tc.network, tc.conformance, tc.platform)
+			if err != nil || cfg.Definition != definition || cfg.Environment != environment || cfg.NVKR != "/distribution/bin/nvkr" {
 				t.Fatalf("default substituted product inputs: %+v, %v", cfg, err)
 			}
 		})
@@ -103,8 +107,7 @@ case "$*" in
  *) exit 23;;
 esac
 `, 0700)
-	profile, build := nightlyIdentityFixture()
-	plan, _ := nightlyCompiledFixture(t, profile, build)
+	plan := nativeCapturedBuildPlanFixture(t)
 	raw, err := canonical.Marshal(plan)
 	if err != nil {
 		t.Fatal(err)
@@ -126,7 +129,7 @@ esac
 	work := filepath.Join(repo, ".nvkr/mac-build/first")
 	runner := Runner{Env: append(probeEnv, "PLUGIN="+plugin, "CALLS="+calls, "PLAN="+planPath, "UTILITY="+pin, "EXPECTED_WORK="+work, "EXPECTED_REPOSITORY="+repo)}
 	cfg := BuildConfig{Repository: repo, Definition: "inputs/definitions/demo/arm64-nvidia-local-kvm.json", Environment: "inputs/environments/local-native-mac.json", NVKR: nvkr, AttemptPrefix: "first", Jobs: 2}
-	if err := prepareDefaultMacBuild(t.Context(), runner, &cfg); err != nil {
+	if err := prepareDefaultNativeBuild(t.Context(), runner, &cfg, "darwin/arm64"); err != nil {
 		t.Fatal(err)
 	}
 	if info, err := os.Stat(work); err != nil || !info.IsDir() || info.Mode().Perm() != 0700 {
@@ -148,7 +151,7 @@ esac
 			t.Fatal("normal Mac preparation must use source-compatible TCG without replacing its kernel")
 		}
 	}
-	sequence := []string{"probe:go:env GOVERSION", "probe:docker:buildx version", "probe:docker:version --format {{.Server.Version}}", "probe:clang:--version", "nvkr:factory prepare-native-packer ", "nvkr:factory prepare-native-packer-inputs --definition inputs/definitions/demo/arm64-nvidia-local-kvm.json --environment inputs/environments/local-native-mac.json", "nvkr:run plan ", "local_toolchain_scopes", "utility:toolchains/nvkr-packer/build.sh --arch arm64 --diagnostic-local --print-validated-image-id", "toolchain_overlay", "local_toolchain_definition", "nvkr:run local --definition .nvkr/mac-build/first/definition.json --environment .nvkr/mac-build/first/packer-inputs/environment.json"}
+	sequence := []string{"probe:go:env GOVERSION", "probe:docker:buildx version", "probe:docker:version --format {{.Server.Os}}/{{.Server.Arch}}", "probe:clang:--version", "nvkr:factory prepare-native-packer ", "nvkr:factory prepare-native-packer-inputs --definition inputs/definitions/demo/arm64-nvidia-local-kvm.json --environment inputs/environments/local-native-mac.json", "nvkr:run plan ", "local_toolchain_scopes", "utility:toolchains/nvkr-packer/build.sh --arch arm64 --diagnostic-local --print-validated-image-id", "toolchain_overlay", "local_toolchain_definition", "nvkr:run local --definition .nvkr/mac-build/first/definition.json --environment .nvkr/mac-build/first/packer-inputs/environment.json"}
 	rest := string(observed)
 	for _, expected := range sequence {
 		_, remaining, found := strings.Cut(rest, expected)
@@ -164,6 +167,128 @@ esac
 	var files struct{ Files []json.RawMessage }
 	if err := json.Unmarshal(manifest, &files); err != nil || len(files.Files) != 40 {
 		t.Fatalf("captured dependency description files=%d error=%v", len(files.Files), err)
+	}
+}
+
+func TestDefaultLinuxPreparationBuildsAndBindsLocalToolchain(t *testing.T) {
+	for _, arch := range []string{"amd64", "arm64"} {
+		for _, valid := range []bool{true, false} {
+			t.Run(arch+"/"+map[bool]string{true: "validated image", false: "invalid image ID"}[valid], func(t *testing.T) {
+				repo, bin := t.TempDir(), t.TempDir()
+				plan, err := canonical.Marshal(nativeCapturedBuildPlanFixture(t))
+				if err != nil {
+					t.Fatal(err)
+				}
+				planPath := filepath.Join(repo, "fixture-plan.json")
+				if err := os.WriteFile(planPath, plan, 0600); err != nil {
+					t.Fatal(err)
+				}
+				for name, body := range map[string]string{
+					"docker": "#!/bin/sh\ncase \"$1\" in buildx) echo buildx;; version) echo linux/" + arch + ";; *) exit 99;; esac\n",
+					"nvkr":   "#!/bin/sh\nset -eu\ntest \"$1:$2\" = run:plan\nprintf '%s\\n' \"nvkr:$*\" >>\"$CALLS\"\ncat \"$FIXTURE_PLAN\"\n",
+					"bash":   "#!/bin/sh\nset -eu\ntest \"$1\" = toolchains/nvkr-packer/build.sh\ntest \"$2:$3\" = --arch:" + arch + "\nprintf '%s\\n' \"bootstrap:$*\" >>\"$CALLS\"\nprintf '%s\\n' \"$IMAGE_ID\"\n",
+					"jq": `#!/bin/sh
+set -eu
+printf '%s\n' "projection:$*" >>"$CALLS"
+case "$*" in
+ *local_toolchain_scopes*|*local_toolchain_substitutions*) printf '%s\n' '[{}]';;
+ *toolchain_overlay*) printf '%s\n' '{}';;
+ *local_toolchain_definition*) printf '%s\n' '{"catalog":{},"outputs":[]}';;
+ *) exit 23;;
+esac
+`,
+				} {
+					if err := os.WriteFile(filepath.Join(bin, name), []byte(body), 0700); err != nil {
+						t.Fatal(err)
+					}
+				}
+				for _, tool := range []string{"git", "timeout"} {
+					writeTenantFixture(t, filepath.Join(bin, tool), []byte("#!/bin/sh\nexit 99\n"), 0700)
+				}
+				image := "sha256:" + strings.Repeat("a", 64)
+				if !valid {
+					image = "mutable:tag"
+				}
+				calls := filepath.Join(repo, "calls")
+				cfg := BuildConfig{Repository: repo, AttemptPrefix: "first", NVKR: filepath.Join(bin, "nvkr"), Definition: "inputs/definitions/demo/" + arch + "-nvidia-local-kvm.json", Environment: "inputs/environments/local-" + arch + "-kvm.json"}
+				runner := Runner{Env: SetEnv(os.Environ(), map[string]string{"PATH": bin + string(os.PathListSeparator) + os.Getenv("PATH"), "CALLS": calls, "IMAGE_ID": image, "FIXTURE_PLAN": planPath})}
+				err = prepareDefaultNativeBuild(t.Context(), runner, &cfg, "linux/"+arch)
+				if !valid {
+					var coded *e.Error
+					if !errors.As(err, &coded) || coded.Code != e.CodeVerifyFailed || cfg.Definition != "inputs/definitions/demo/"+arch+"-nvidia-local-kvm.json" {
+						t.Fatalf("invalid toolchain image was accepted: %v", err)
+					}
+					return
+				}
+				if err != nil || cfg.Definition != ".nvkr/native-build/first/definition.json" || cfg.Environment != "inputs/environments/local-"+arch+"-kvm.json" {
+					t.Fatalf("Linux toolchain preparation: %+v %v", cfg, err)
+				}
+				raw, err := os.ReadFile(calls)
+				if err != nil || !strings.Contains(string(raw), "--arg arch "+arch) || strings.Contains(string(raw), "factory prepare-native-packer") {
+					t.Fatalf("architecture-specific preparation: %s %v", raw, err)
+				}
+			})
+		}
+	}
+}
+
+func TestDefaultLinuxPreparationRejectsMissingPrerequisitesBeforeWriting(t *testing.T) {
+	for _, platform := range []string{"linux/arm64", "linux/amd64"} {
+		for _, missing := range []string{"jq", "git", "bash", "docker", "timeout"} {
+			t.Run(platform+"/"+missing, func(t *testing.T) {
+				repo, bin := t.TempDir(), t.TempDir()
+				for _, tool := range []string{"jq", "git", "bash", "docker", "timeout"} {
+					if tool != missing {
+						writeTenantFixture(t, filepath.Join(bin, tool), []byte("#!/bin/sh\nexit 99\n"), 0700)
+					}
+				}
+				cfg := BuildConfig{Repository: repo, AttemptPrefix: "first", NVKR: "/forbidden/nvkr"}
+				err := prepareDefaultNativeBuild(t.Context(), Runner{Env: []string{"PATH=" + bin}}, &cfg, platform)
+				assertNightlyCode(t, err, e.CodeEngineCapability)
+				if !strings.Contains(err.Error(), "requires "+missing) {
+					t.Fatal("missing prerequisite was not identified", err)
+				}
+				if _, err := os.Lstat(filepath.Join(repo, ".nvkr")); !os.IsNotExist(err) {
+					t.Fatal("missing prerequisite created attempt state", err)
+				}
+			})
+		}
+	}
+}
+
+func TestDefaultLinuxPreparationRejectsBrokenDockerBeforeWriting(t *testing.T) {
+	for _, platform := range []string{"linux/arm64", "linux/amd64"} {
+		for _, mode := range []string{"buildx", "daemon", "foreign", "cross-arch", "empty"} {
+			t.Run(platform+"/"+mode, func(t *testing.T) {
+				repo, bin := t.TempDir(), t.TempDir()
+				for _, tool := range []string{"jq", "git", "bash", "timeout"} {
+					writeTenantFixture(t, filepath.Join(bin, tool), []byte("#!/bin/sh\nexit 99\n"), 0700)
+				}
+				docker := `#!/bin/sh
+set -eu
+if [ "$1" = buildx ]; then
+  [ "$PROBE_FAIL" != buildx ] || exit 1
+  printf '%s\n' buildx
+else
+  [ "$PROBE_FAIL" != daemon ] || exit 1
+  case "$PROBE_FAIL" in
+    foreign) printf '%s\n' windows/amd64;;
+    cross-arch) printf '%s\n' "$TEST_OTHER_DOCKER_PLATFORM";;
+    empty) :;;
+    *) printf '%s\n' "$TEST_DOCKER_PLATFORM";;
+  esac
+fi
+`
+				writeTenantFixture(t, filepath.Join(bin, "docker"), []byte(docker), 0700)
+				cfg := BuildConfig{Repository: repo, AttemptPrefix: "first", NVKR: "/forbidden/nvkr"}
+				runner := Runner{Env: []string{"PATH=" + bin, "PROBE_FAIL=" + mode, "TEST_DOCKER_PLATFORM=" + platform, "TEST_OTHER_DOCKER_PLATFORM=" + map[string]string{"linux/amd64": "linux/arm64", "linux/arm64": "linux/amd64"}[platform]}}
+				err := prepareDefaultNativeBuild(t.Context(), runner, &cfg, platform)
+				assertNightlyCode(t, err, e.CodeEngineCapability)
+				if _, err := os.Lstat(filepath.Join(repo, ".nvkr")); !os.IsNotExist(err) {
+					t.Fatal("broken Docker created attempt state", err)
+				}
+			})
+		}
 	}
 }
 
@@ -187,7 +312,7 @@ func TestDefaultMacPreparationRejectsMissingPrerequisitesBeforeWriting(t *testin
 				}
 			}
 			cfg := BuildConfig{Repository: repo, AttemptPrefix: "first"}
-			err := prepareDefaultMacBuild(t.Context(), Runner{Env: env}, &cfg)
+			err := prepareDefaultNativeBuild(t.Context(), Runner{Env: env}, &cfg, "darwin/arm64")
 			var coded *e.Error
 			if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability || !strings.Contains(err.Error(), want) {
 				t.Fatalf("prerequisite error=%v", err)
@@ -226,7 +351,7 @@ test "${PROBE_FAIL:-}" != go
 printf '%s\n' "$TEST_GO_VERSION"`,
 		"docker": `case "$*" in
  'buildx version') test "${PROBE_FAIL:-}" != buildx; printf '%s\n' buildx;;
- 'version --format {{.Server.Version}}') test "${PROBE_FAIL:-}" != daemon; printf '%s\n' server;;
+ 'version --format {{.Server.Os}}/{{.Server.Arch}}') test "${PROBE_FAIL:-}" != daemon; printf '%s\n' linux/arm64;;
  *) exit 29;;
 esac`,
 		"clang": `test "$*" = --version
@@ -237,6 +362,9 @@ printf '%s\n' clang`,
 		if err := os.WriteFile(filepath.Join(bin, name), []byte(body), 0700); err != nil {
 			t.Fatal(err)
 		}
+	}
+	for _, tool := range []string{"jq", "git", "bash"} {
+		writeTenantFixture(t, filepath.Join(bin, tool), []byte("#!/bin/sh\nexit 99\n"), 0700)
 	}
 	return []string{"PATH=" + bin, "TEST_GO_VERSION=go" + strings.TrimSpace(string(pin))},
 		strings.TrimPrefix(loaded.Components["packer"].Tag, "v"), filepath.Base(loaded.Tools["packer-plugin-qemu"].ExecutablePath)
@@ -267,7 +395,7 @@ func TestDefaultMacPreparationRejectsBrokenSDKAndRuntimeBeforeWork(t *testing.T)
 				env = SetEnv(env, map[string]string{"TEST_GO_VERSION": "go0.0.0"})
 			}
 			cfg := BuildConfig{Repository: repo, AttemptPrefix: "first", NVKR: "/forbidden/source-preparation"}
-			err := prepareDefaultMacBuild(t.Context(), Runner{Env: env}, &cfg)
+			err := prepareDefaultNativeBuild(t.Context(), Runner{Env: env}, &cfg, "darwin/arm64")
 			var coded *e.Error
 			if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
 				t.Fatalf("prerequisite failure=%v", err)

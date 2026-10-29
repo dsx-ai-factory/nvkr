@@ -27,13 +27,14 @@ import (
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 )
 
 func TestNativeToolSelectionKeepsExplicitOSBundles(t *testing.T) {
 	for _, tc := range []struct{ platform, bundle string }{
 		{"darwin/arm64", "native-tools-darwin-arm64"}, {"linux/arm64", "native-tools-linux-arm64"},
-		{"linux/amd64", ""}, {"windows/arm64", ""}, {"", ""},
+		{"linux/amd64", "native-tools-linux-amd64"}, {"windows/arm64", ""}, {"", ""},
 	} {
 		t.Run(tc.platform, func(t *testing.T) {
 			definition, environment, bundle, members, err := nativeToolSelection(tc.platform)
@@ -48,7 +49,7 @@ func TestNativeToolSelectionKeepsExplicitOSBundles(t *testing.T) {
 				t.Fatalf("selection %q, %q, %v", definition, bundle, err)
 			}
 			if tc.platform == "darwin/arm64" {
-				if definition != "inputs/definitions/demo/native-mac/definition-tools.json" || len(members) != 12 || !slices.Contains(members, "nvke-installer-sources") || !slices.Contains(members, "nerdctl") {
+				if definition != "inputs/definitions/demo/tools/darwin-arm64.json" || len(members) != 12 || !slices.Contains(members, "nvke-installer-sources") || !slices.Contains(members, "nerdctl") {
 					t.Fatalf("Mac dependency preparation omitted source tools: %s %v", definition, members)
 				}
 			}
@@ -418,7 +419,11 @@ func TestSiteStartupToolsAreSeparateFromHostExecutables(t *testing.T) {
 
 // The complete selection is the authored owner of both tool bundles.
 func TestNativeToolDefinitionsMatchHostAndSiteSelections(t *testing.T) {
-	for _, platform := range []string{"linux/arm64", "darwin/arm64"} {
+	platforms := []string{"darwin/arm64"}
+	for _, arch := range target.Arches() {
+		platforms = append(platforms, "linux/"+arch)
+	}
+	for _, platform := range platforms {
 		t.Run(platform, func(t *testing.T) {
 			path, _, hostBundle, members, err := nativeToolSelection(platform)
 			if err != nil {
@@ -438,14 +443,19 @@ func TestNativeToolDefinitionsMatchHostAndSiteSelections(t *testing.T) {
 			if len(siteBundles) != 1 {
 				t.Fatal("native site requires one owner-selected companion bundle")
 			}
+			hostOS, arch, _ := strings.Cut(platform, "/")
 			expected := map[string]definition.DefinitionOutput{
-				hostBundle:                 {Name: hostBundle, Platform: platform, Format: definition.OutputExecutable, Components: slices.Clone(members)},
-				"site-startup-tools-arm64": {Name: "site-startup-tools-arm64", Platform: "linux/arm64", Format: definition.OutputExecutable, Components: slices.Clone(siteBundles[0].members)},
+				hostBundle:                   {Name: hostBundle, Platform: platform, Format: definition.OutputExecutable, Components: slices.Clone(members)},
+				"site-startup-tools-" + arch: {Name: "site-startup-tools-" + arch, Platform: "linux/" + arch, Format: definition.OutputExecutable, Components: slices.Clone(siteBundles[0].members)},
 			}
-			if platform == "linux/arm64" {
+			if hostOS == "linux" {
+				suffix := "-linux"
+				if arch != "arm64" {
+					suffix += "-" + arch
+				}
 				for i, member := range expected[hostBundle].Components {
 					if slices.Contains([]string{"clusterctl", "helm", "kind", "kubectl", "oras"}, member) {
-						expected[hostBundle].Components[i] += "-linux"
+						expected[hostBundle].Components[i] += suffix
 					}
 				}
 			}
