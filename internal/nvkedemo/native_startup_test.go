@@ -24,7 +24,7 @@ func startupTestContext(t *testing.T) context.Context {
 }
 
 func startupDescription() NativeSiteStartup {
-	cfg := NativeSiteStartup{
+	cfg := NativeSiteStartup{arch: "arm64",
 		Name: "nvke-native-site", Gateway: "172.30.0.1", KubernetesVersion: "1.34.2",
 		ControllerImage: "docker.io/library/nke-controller:latest",
 		ProviderImage:   "docker.io/library/cluster-api-provider-provisioned:latest",

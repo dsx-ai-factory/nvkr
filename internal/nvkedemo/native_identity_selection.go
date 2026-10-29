@@ -11,6 +11,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 const nativeIdentityHelper = "nvkr-site-identity-helper"
@@ -32,14 +33,14 @@ func nativeSelectedRunPlan(ctx context.Context, root, outputName, format string)
 // Its hashes bind extracted bytes, not a new release or build identity.
 type nativeIdentityAssets struct{ helperSHA string }
 
-func nativeIdentityComponent(plan *factory.Plan, output, buildDigest, component string) (catalog.Component, error) {
+func nativeIdentityComponentForPlatform(plan *factory.Plan, output, buildDigest, component, platform string) (catalog.Component, error) {
 	var selected *catalog.Component
 	for _, build := range plan.Builds {
 		if build.Name != output {
 			continue
 		}
-		if build.BuildDigest != buildDigest || build.Platform != "linux/arm64" {
-			return catalog.Component{}, errors.New("identity input differs from the selected ARM64 output")
+		if build.BuildDigest != buildDigest || build.Platform != platform {
+			return catalog.Component{}, errors.New("identity input differs from the selected native output")
 		}
 		for _, item := range build.ResolvedComponents {
 			if item.Name != component {
@@ -58,11 +59,14 @@ func nativeIdentityComponent(plan *factory.Plan, output, buildDigest, component 
 	return *selected, nil
 }
 
-func nativeIdentitySources(tools, disk *factory.Plan, toolDigest, diskDigest, diskOutput string) error {
-	if _, err := nativeIdentityComponent(tools, "site-startup-tools-arm64", toolDigest, nativeIdentityHelper); err != nil {
+func nativeIdentitySources(tools, disk *factory.Plan, toolDigest, diskDigest, diskOutput, arch string) error {
+	if !target.ValidArch(arch) {
+		return errors.New("identity sources require a native architecture")
+	}
+	if _, err := nativeIdentityComponentForPlatform(tools, "site-startup-tools-"+arch, toolDigest, nativeIdentityHelper, "linux/"+arch); err != nil {
 		return err
 	}
-	_, err := nativeIdentityComponent(disk, diskOutput, diskDigest, "nvke-spire-agent")
+	_, err := nativeIdentityComponentForPlatform(disk, diskOutput, diskDigest, "nvke-spire-agent", "linux/"+arch)
 	if err != nil {
 		return err
 	}

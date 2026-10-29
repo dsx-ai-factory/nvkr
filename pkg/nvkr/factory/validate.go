@@ -16,6 +16,9 @@ import (
 // Validate admits the complete Plan in dependency order. Local checks retain
 // their coded diagnostics; rederivation finally checks every executable byte.
 func (plan Plan) Validate() error {
+	if err := plan.validateRuntimeSourceSelection(); err != nil {
+		return err
+	}
 	packages, err := plan.validatePlanInputs()
 	if err != nil {
 		return err

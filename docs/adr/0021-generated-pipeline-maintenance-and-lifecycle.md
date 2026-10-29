@@ -62,8 +62,10 @@ belong to this entry's current manifest; arbitrary reusable workflows and anothe
 outside its namespace. Every worker receives the same per-file size and parsing bounds as the entry.
 The root manifest binds every worker's exact bytes. Regeneration checks and retirement cover the complete
 worker inventory, including changed or unowned leftovers. Workers share one complete Plan and do not add
-an authored lifecycle object or a child Release. ADR-18 owns scheduling and result propagation; hosted
-acceptance of this opt-in topology remains unrecorded. Optional qualification
+an authored lifecycle object or a child Release. ADR-18 owns scheduling and result propagation. [Reconciliation](reconciliation.md#output-local-publication-and-metadata-assembly)
+records one successful earlier-head full development execution of this opt-in topology; it predates the core
+execution-model extraction and proves neither current-head worker execution, full-product failure/cancellation
+recovery nor production qualification. Optional qualification
 generation separately emits the admitted `workflow_run` qualifier and fixed `workflow_call` smoke pair (§4).
 That pair currently admits the default producer workflow only; named producer
 qualification is not part of this namespace contract.
@@ -116,9 +118,10 @@ it is not a substitute for validating the complete manifest-owned execution clos
 
 The producer entry workflow is bounded to 500,000 UTF-8 bytes before output work. Shared action interfaces
 and descriptive YAML aliases compact repeated operations without introducing callable producer workflows.
-New bundles reject producer child workflows. For migration only, a prior v1 manifest may own files in its
-entry workflow's reserved `<entry-stem>__*.yml` namespace. Regeneration retires those files only after
-checking their exact prior bytes and modes. Changed or unowned siblings fail closed and are preserved;
+The default flat projection rejects producer child workflows. A current manifest may own only the opt-in
+`<entry-stem>__partition-NN.yml` workers described above. Any other file in the entry workflow's
+reserved `<entry-stem>__*.yml` namespace is admitted only from a prior v1 manifest, for migration.
+Regeneration retires prior-owned files only after checking their exact prior bytes and modes. Changed or unowned siblings fail closed and are preserved;
 other bundle namespaces and handwritten workflows retain their separate ownership.
 
 Identical complete semantic calls without provider controls may share descriptive YAML anchors after
@@ -173,7 +176,8 @@ The dependency projection preserves each existing prerequisite closure and condi
 are diagnostic accounting, not execution groups: fixed buckets do not move existing members when a new output is added, and their
 complete membership is derived from the current Plan. Crossing the direct-result threshold changes finalizer
 accounting only. ADR-18 §8 owns collector bounds, exact result normalization and authored-context preservation.
-Producer matrices and callable producer interfaces remain deferred.
+Producer matrices and general callable producer interfaces remain deferred; the opt-in partition workers
+above are generated scheduling structure, not an authored callable interface.
 
 ### 2. Drift detection is a fail-closed `--check` twin, run by a separate generated gate
 

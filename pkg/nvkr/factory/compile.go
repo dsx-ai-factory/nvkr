@@ -26,8 +26,9 @@ func CompileDocuments(ctx context.Context, definitionPath string, definition aut
 func compileDocumentsWithLoader(ctx context.Context, definitionPath string, definition authored.Definition,
 	environmentPath string, delivery authored.Environment, generatorVersion string,
 	loadStack func(context.Context, authored.Catalog) (*catalog.Stack, error),
+	runtimeSourceCommit ...string,
 ) (*Plan, error) {
-	return compileDocumentsFor(ctx, definitionPath, definition, environmentPath, delivery, generatorVersion, loadStack, nil)
+	return compileDocumentsFor(ctx, definitionPath, definition, environmentPath, delivery, generatorVersion, loadStack, nil, runtimeSourceCommit...)
 }
 
 // compileDocumentsFor compiles a plain Definition (nil record) or a composite's
@@ -35,6 +36,7 @@ func compileDocumentsWithLoader(ctx context.Context, definitionPath string, defi
 func compileDocumentsFor(ctx context.Context, definitionPath string, definition authored.Definition,
 	environmentPath string, delivery authored.Environment, generatorVersion string,
 	loadStack func(context.Context, authored.Catalog) (*catalog.Stack, error), record *CompositionRecord,
+	runtimeSourceCommit ...string,
 ) (*Plan, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "definition compilation requires a context")
@@ -61,7 +63,7 @@ func compileDocumentsFor(ctx context.Context, definitionPath string, definition 
 		targetStacks[target.Name] = targetStack
 	}
 	return compileWithTargetStacksFor(ctx, definition, delivery, stack, targetStacks, generatorVersion,
-		filepath.ToSlash(filepath.Clean(definitionPath)), filepath.ToSlash(filepath.Clean(environmentPath)), record)
+		filepath.ToSlash(filepath.Clean(definitionPath)), filepath.ToSlash(filepath.Clean(environmentPath)), record, runtimeSourceCommit...)
 
 }
 
@@ -106,12 +108,13 @@ func Compile(ctx context.Context, definition authored.Definition, delivery autho
 }
 
 func compileWithTargetStacks(ctx context.Context, definition authored.Definition, delivery authored.Environment, stack *catalog.Stack,
-	targetStacks map[string]*catalog.Stack, generatorVersion, definitionPath, environmentPath string) (*Plan, error) {
-	return compileWithTargetStacksFor(ctx, definition, delivery, stack, targetStacks, generatorVersion, definitionPath, environmentPath, nil)
+	targetStacks map[string]*catalog.Stack, generatorVersion, definitionPath, environmentPath string, runtimeSourceCommit ...string) (*Plan, error) {
+	return compileWithTargetStacksFor(ctx, definition, delivery, stack, targetStacks, generatorVersion, definitionPath, environmentPath, nil, runtimeSourceCommit...)
 }
 
 func compileWithTargetStacksFor(ctx context.Context, definition authored.Definition, delivery authored.Environment, stack *catalog.Stack,
-	targetStacks map[string]*catalog.Stack, generatorVersion, definitionPath, environmentPath string, record *CompositionRecord) (*Plan, error) {
+	targetStacks map[string]*catalog.Stack, generatorVersion, definitionPath, environmentPath string, record *CompositionRecord,
+	runtimeSourceCommit ...string) (*Plan, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "factory compilation requires a context")
 	}
@@ -152,6 +155,12 @@ func compileWithTargetStacksFor(ctx context.Context, definition authored.Definit
 		DefinitionPath: definitionPath, EnvironmentPath: environmentPath,
 		CatalogDigest: stack.Digest, CatalogSnapshot: snapshot.Catalog, AppliedOverlays: append([]catalog.AppliedOverlay(nil), stack.Applied...),
 		Graph: ArtifactGraph{SchemaVersion: ArtifactGraphSchema}}
+	if len(runtimeSourceCommit) > 1 {
+		return nil, e.New(e.CodeUsage, "compilation accepts one exact runtime source commit")
+	}
+	if len(runtimeSourceCommit) == 1 {
+		plan.RuntimeSourceCommit = runtimeSourceCommit[0]
+	}
 	for _, target := range definition.Outputs {
 		if err := ctx.Err(); err != nil {
 			return nil, e.Wrap(e.CodeTimeout, err, "factory compilation canceled")

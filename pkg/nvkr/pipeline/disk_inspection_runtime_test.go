@@ -6,6 +6,7 @@ package pipeline
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"os"
@@ -40,14 +41,15 @@ func TestDiagnosticContentKindParity(t *testing.T) {
 
 type diskInspectionRunRuntime struct {
 	packerContainerRuntime
-	name                                     string
-	commands                                 [][]string
-	createDiagnostic, scanDiagnostic, report string
-	createErr, scanErr, cleanupErr           error
-	createID                                 string
-	cancel                                   context.CancelFunc
-	started, copied                          bool
-	absent                                   bool
+	name                                                 string
+	commands                                             [][]string
+	createDiagnostic, scanDiagnostic, report             string
+	createErr, scanErr, cleanupErr                       error
+	createID, inspectImage, inspectID, inspectDiagnostic string
+	inspectErr                                           error
+	cancel                                               context.CancelFunc
+	started, copied                                      bool
+	absent                                               bool
 }
 
 func (runtime *diskInspectionRunRuntime) RuntimeName() string {
@@ -70,6 +72,18 @@ func (runtime *diskInspectionRunRuntime) Run(_ context.Context, input io.Reader,
 		}
 		_, _ = io.WriteString(output, id)
 		return runtime.createErr
+	}
+	if args[0] == "container" {
+		id, image := runtime.inspectID, runtime.inspectImage
+		if id == "" {
+			id = strings.Repeat("a", 64)
+		}
+		if image == "" {
+			image = "sha256:" + strings.Repeat("a", 64)
+		}
+		_, _ = fmt.Fprintf(output, `{"Id":%q,"Image":%q}`, id, image)
+		_, _ = io.WriteString(diagnostic, runtime.inspectDiagnostic)
+		return runtime.inspectErr
 	}
 	runtime.started = true
 	if runtime.cancel != nil {
@@ -115,11 +129,11 @@ func TestDiskInspectionCommandsSuppressPodmanAutomaticMounts(t *testing.T) {
 			runtime := &diskInspectionRunRuntime{name: runtimeName, report: "report"}
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
-			raw, err := runDiskInspectionContainer(ctx, runtime, testDiskInspectionSelection(t), "image", subject)
+			raw, err := runDiskInspectionContainer(ctx, runtime, testDiskInspectionSelection(t), "sha256:"+strings.Repeat("a", 64), subject)
 			if err != nil || string(raw) != "report" || !runtime.copied {
 				t.Fatalf("inspection did not complete its streaming and cleanup: %q, %v", raw, err)
 			}
-			wantCommands := []string{"create", "start", "ps", "rm"}
+			wantCommands := []string{"create", "container", "start", "ps", "rm"}
 			if len(runtime.commands) != len(wantCommands) {
 				t.Fatalf("unexpected operation sequence: %v", runtime.commands)
 			}
@@ -134,6 +148,9 @@ func TestDiskInspectionCommandsSuppressPodmanAutomaticMounts(t *testing.T) {
 				}
 				if args[0] != wantCommands[index] {
 					t.Fatalf("operation %d = %v, want %s", index, args, wantCommands[index])
+				}
+				if args[0] == "create" && !slices.Contains(args, testDiskInspectionSelection(t).Image) {
+					t.Fatalf("inspection launch lost its admitted repository reference: %v", args)
 				}
 				if args[0] == "start" && args[len(args)-1] != strings.Repeat("a", 64) {
 					t.Fatalf("start did not use immutable create ID: %v", args)
@@ -185,7 +202,7 @@ func TestDiskInspectionRunJoinsStreamingAndCleanup(t *testing.T) {
 				tt.runtime.cancel = cancel
 			}
 			started := time.Now()
-			raw, err := runDiskInspectionContainerWithCleanupTimeout(ctx, &tt.runtime, testDiskInspectionSelection(t), "image", subject, 100*time.Millisecond)
+			raw, err := runDiskInspectionContainerWithCleanupTimeout(ctx, &tt.runtime, testDiskInspectionSelection(t), "sha256:"+strings.Repeat("a", 64), subject, 100*time.Millisecond)
 			if code(err) != tt.want || tt.runtime.started != tt.wantStart || (raw != nil) != tt.wantReport {
 				t.Fatalf("raw=%q error=%v started=%t", raw, err, tt.runtime.started)
 			}
@@ -301,7 +318,7 @@ func TestDiskInspectionRunPreservesHelperErrorClasses(t *testing.T) {
 			if tt.cancel {
 				runtime.cancel = cancel
 			}
-			raw, err := runDiskInspectionContainer(ctx, runtime, testDiskInspectionSelection(t), "image", subject)
+			raw, err := runDiskInspectionContainer(ctx, runtime, testDiskInspectionSelection(t), "sha256:"+strings.Repeat("a", 64), subject)
 			if raw != nil || code(err) != tt.want || !errors.As(err, &exit) {
 				t.Fatalf("helper status=%s returned raw=%q err=%v", tt.status, raw, err)
 			}
@@ -378,7 +395,7 @@ func TestDiskInspectionLauncherSelectsContentReportBound(t *testing.T) {
 					selection.compositionKind, selection.consumerPlatform = "disk-image", "linux/amd64"
 				}
 				runtime := &diskInspectionRunRuntime{name: runtimeName, report: strings.Repeat("x", MaxDiskInspectionReportBytes+1)}
-				raw, err := runDiskInspectionContainer(t.Context(), runtime, selection, "image", subject)
+				raw, err := runDiskInspectionContainer(t.Context(), runtime, selection, "sha256:"+strings.Repeat("a", 64), subject)
 				if composition {
 					if err != nil || len(raw) != len(runtime.report) || !runtime.copied {
 						t.Fatalf("composition report was truncated or used diagnostic policy: bytes=%d error=%v", len(raw), err)
@@ -1075,5 +1092,33 @@ func TestDiskInspectionResourceBudgetIncludesEntireContainerGrant(t *testing.T) 
 	facts := execution.ObservedHostFacts{Platform: execution.HostPlatformLinuxAMD64, Resources: execution.ResourceCapacity{CPUMillis: 1000, MemoryMiB: math.MaxUint64, EphemeralStorageMiB: 1024}}
 	if err := validateDiskInspectionResources(selection, facts, 1, true); code(err) != e.CodeEngineCapability {
 		t.Fatalf("overflow budget accepted: %v", err)
+	}
+}
+
+func TestDiskInspectionImageMismatchStopsBeforeStreaming(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		runtime diskInspectionRunRuntime
+		want    e.Code
+	}{
+		{"different image", diskInspectionRunRuntime{inspectImage: "sha256:" + strings.Repeat("b", 64)}, e.CodeVerifyFailed},
+		{"different container", diskInspectionRunRuntime{inspectID: strings.Repeat("b", 64)}, e.CodeVerifyFailed},
+		{"unreadable", diskInspectionRunRuntime{inspectErr: errors.New("controlled observation failure")}, e.CodeEngineCapability},
+		{"warning", diskInspectionRunRuntime{inspectDiagnostic: "unsupported inspection"}, e.CodeEngineCapability},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			subject, err := heldfile.FromBytesContext(t.Context(), []byte("subject"), heldfile.Options{Label: "fixture", MaxBytes: 128})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer subject.Close()
+			raw, err := runDiskInspectionContainer(t.Context(), &tc.runtime, testDiskInspectionSelection(t), "sha256:"+strings.Repeat("a", 64), subject)
+			if code(err) != tc.want || raw != nil || tc.runtime.started || tc.runtime.copied {
+				t.Fatal("unbound image executed", err)
+			}
+			if tc.runtime.commands[len(tc.runtime.commands)-1][0] != "rm" {
+				t.Fatal("unbound container was not removed")
+			}
+		})
 	}
 }

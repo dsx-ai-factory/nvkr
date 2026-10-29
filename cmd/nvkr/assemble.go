@@ -134,12 +134,10 @@ func verifyDecode(c *cli.Context, want *attest.Manifest, envelope string) error 
 func cmdAssemble() *cli.Command {
 	flags := []cli.Flag{
 		&cli.StringFlag{Name: "format", Required: true, Usage: "raw | iso | qcow2 for existing-byte measurement; producer formats currently fail closed"},
-		// disk (raw/qcow2/iso)
 		&cli.BoolFlag{Name: "boot", Usage: "reserved; fails closed until a qualified boot-observation adapter exists"},
 		&cli.IntFlag{Name: "boot-timeout", Value: 900},
 		&cli.BoolFlag{Name: "encrypt", Usage: "reserved; fails closed until a qualified post-attestation encryption adapter exists"},
 		&cli.StringFlag{Name: "from", Usage: "reserved input for the disabled --encrypt adapter"},
-		// Unified DiskManifest for existing disk bytes (ADR-14 §1).
 		&cli.StringFlag{Name: "from-raw", Usage: "emit a unified DiskManifest for this canonical RAW/ISO stream (ADR-14 §1)"},
 		&cli.StringFlag{Name: "envelope", Usage: "with --from-raw: also verify this derived envelope decodes to the canonical logical digest and record it as provenance"},
 		&cli.IntFlag{Name: "block-size", Value: 1 << 20,

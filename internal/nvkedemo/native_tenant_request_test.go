@@ -84,7 +84,7 @@ func TestNativeTenantRequestSelectsReviewedAPI(t *testing.T) {
 func TestNativeTenantRequestRejectsCanceledSourceRead(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	attempt := nativeSiteAttempt{network: "upstream-ovn", assets: NativeAssets{Installer: privateTestDir(t)}}
+	attempt := nativeSiteAttempt{network: "upstream-ovn", assets: NativeAssets{arch: "arm64", Installer: privateTestDir(t)}}
 	request, err := attempt.namedTenantRequest(ctx, "native-demo-tenant")
 	if !errors.Is(err, context.Canceled) || !reflect.DeepEqual(request, TenantRequest{}) {
 		t.Fatalf("canceled intent: %+v %v", request, err)

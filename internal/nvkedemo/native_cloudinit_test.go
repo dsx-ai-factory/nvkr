@@ -45,11 +45,17 @@ func TestNativeCloudInitBindsActualExecutionAndJoinsUIDCleanup(t *testing.T) {
 
 func nativeCloudInitExecutionCases(t *testing.T, count int) {
 	image := "example.invalid/selected-workload@sha256:" + strings.Repeat("b", 64)
-	for _, mode := range []string{"accepted", "host failure", "recoverable error", "missing RRO", "restarted", "missing exit", "missing restarts", "wrong image", "Pod replaced", "node replaced", "node rebooted", "cluster replaced", "mutated command", "lifecycle", "startupProbe", "livenessProbe", "readinessProbe", "cleanup replacement", "cancel", "unjoined"} {
+	for _, mode := range []string{"accepted", "accepted AMD64", "host failure", "recoverable error", "missing RRO", "restarted", "missing exit", "missing restarts", "wrong image", "Pod replaced", "node replaced", "node rebooted", "cluster replaced", "mutated command", "lifecycle", "startupProbe", "livenessProbe", "readinessProbe", "cleanup replacement", "cancel", "unjoined"} {
 		t.Run(mode, func(t *testing.T) {
 			root := privateTestDir(t)
 			nodes := nativeTopologyNodes(count)
+			arch := "arm64"
+			accepted := strings.HasPrefix(mode, "accepted")
+			if mode == "accepted AMD64" {
+				arch = "amd64"
+			}
 			for i := range nodes {
+				nodes[i].Status.NodeInfo.Architecture = arch
 				nodes[i].Metadata.UID = fmt.Sprintf("node-uid-%d", i)
 				nodes[i].Status.NodeInfo.BootID = fmt.Sprintf("boot-id-%d", i)
 			}
@@ -196,11 +202,11 @@ func nativeCloudInitExecutionCases(t *testing.T, count int) {
 				t.Fatalf("unexpected command: %s %v", phase, args)
 				return nil, nil
 			}
-			err := runNativeCloudInit(ctx, root, "tenant.config", "kubectl", "1.34.2", image, count, nodes, capture)
-			if (err == nil) != (mode == "accepted") {
+			err := runNativeCloudInitForArchitecture(ctx, root, "tenant.config", "kubectl", "1.34.2", image, count, nodes, arch, capture)
+			if (err == nil) != accepted {
 				t.Fatalf("observation result=%v", err)
 			}
-			if mode == "accepted" && (creates != count || logReads != count || !deleted) {
+			if accepted && (creates != count || logReads != count || !deleted) {
 				t.Fatalf("lost zero-retry all-node observation: creates=%d logs=%d deleted=%v", creates, logReads, deleted)
 			}
 			if mode == "unjoined" {
@@ -213,7 +219,7 @@ func nativeCloudInitExecutionCases(t *testing.T, count int) {
 			if mode == "cancel" && (!errors.Is(err, original) || !errors.Is(err, context.Canceled)) {
 				t.Fatal("lost original cancellation cause", err)
 			}
-			if mode == "accepted" {
+			if accepted {
 				for i := range nodes {
 					name := fmt.Sprintf("status-%d", i)
 					raw, readErr := os.ReadFile(filepath.Join(root, "cloud-init-"+name+"-stdout.json"))

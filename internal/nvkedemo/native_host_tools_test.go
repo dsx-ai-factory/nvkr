@@ -25,6 +25,7 @@ func TestNativeHostToolViewPreservesOriginalBundleAndBytes(t *testing.T) {
 		{"Mac", "darwin/arm64", false},
 		{"Linux shared catalog", "linux/arm64", true},
 		{"retained Linux bundle", "linux/arm64", false},
+		{"AMD64 catalog", "linux/amd64", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			source, publication, originalNames := hostToolViewFixture(t, tc.platform, tc.aliases)
@@ -171,6 +172,9 @@ func hostToolViewFixture(t *testing.T, platform string, aliases bool) (string, s
 			switch member {
 			case "clusterctl", "helm", "kind", "kubectl", "oras":
 				name += "-linux"
+				if platform == "linux/amd64" {
+					name += "-amd64"
+				}
 			}
 		}
 		path := filepath.Join(root, name)

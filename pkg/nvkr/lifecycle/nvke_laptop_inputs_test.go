@@ -320,3 +320,51 @@ func TestLaptopARM64OSExecutionClassAdmission(t *testing.T) {
 		})
 	}
 }
+
+func TestLaptopAMD64OSExecutionClassAdmission(t *testing.T) {
+	t.Chdir("../../..")
+	definitionPath := "inputs/definitions/demo/amd64-nvidia-local-kvm.json"
+	d, err := authored.LoadDefinition(t.Context(), definitionPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	environmentPath := "inputs/environments/local-amd64-kvm.json"
+	env, err := authored.LoadEnvironment(t.Context(), environmentPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name   string
+		change func(*authored.Environment)
+	}{
+		{name: "complete AMD64 KVM declaration"},
+		{name: "missing VM class", change: func(env *authored.Environment) { env.ExecutionClasses = nil }},
+		{name: "foreign execution host", change: func(env *authored.Environment) { env.ExecutionClasses[0].HostPlatform = "linux/arm64" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			selected := env.Clone()
+			if tc.change != nil {
+				tc.change(&selected)
+			}
+			plan, err := factory.CompileDocuments(t.Context(), definitionPath, d, environmentPath, selected, "test")
+			if tc.change != nil {
+				var coded *e.Error
+				if plan != nil || !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
+					t.Fatalf("plan=%v err=%v", plan != nil, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(plan.LifecycleOutputs) != 34 {
+				t.Fatal("AMD64 output closure changed", len(plan.LifecycleOutputs))
+			}
+			for _, build := range plan.Builds {
+				if build.Platform != "linux/amd64" {
+					t.Fatal("foreign build in AMD64 Plan", build.Name, build.Platform)
+				}
+			}
+		})
+	}
+}

@@ -16,7 +16,9 @@ A proposed composite Definition is a form of this object, not a seventh lifecycl
 _Avoid_: Factory, FactoryDefinition, cluster definition
 
 **Environment**:
-Separately selected execution settings, publication namespace, credential references, and signing identity policy.
+Separately selected execution settings, required publication transports and namespace, credential references,
+and signing identity policy. Selecting an unavailable transport fails before work; a supported sibling cannot
+substitute for it.
 Native hosted platform routes are explicit execution settings; they do not change logical Build identity
 or prove provider allocation. Tool releases are catalog-owned dependencies selected by purpose in the Definition. GitHub action releases
 are also catalog dependencies; the workflow adapter consumes their locked commits.
@@ -190,6 +192,12 @@ _Avoid_: Release publication root, native image manifest, qualification receipt
 An Artifact format containing exact executable files and their installation metadata.
 _Avoid_: Release, arbitrary archive
 
+**Debian package**:
+An Artifact format (`debian-package`) containing one raw Debian archive from an explicitly selected source
+producer. The same package bytes can be supplied as an OS build material. Local retention does not establish
+installation or runtime acceptance.
+_Avoid_: APT repository, installed package, builder type
+
 ## Evidence and authority
 
 **External test producer**:
@@ -316,12 +324,13 @@ Qualified release-gate acceptance is deferred; no retained clearance implementat
 _Avoid_: Generic pass result, cluster qualification
 
 **Downstream test coordinator**:
-A separately authored repository CI adapter outside the NVKR product lifecycle
-that joins exact project producer Runs, consumes authenticated publication bytes
-and invokes NVKE's suite in a separate job. NVKE owns guest/cluster provisioning,
-assertions and teardown; the parent harness owns host admission, outer leases,
-disk service and network-control restoration. Its unsigned reports are diagnostics,
-not qualified conformance receipts or a seventh public lifecycle object (ADR-16/18).
+A separately authored repository CI workflow outside the NVKR product lifecycle.
+The nightly resolves one NVKE main commit, dispatches the existing generated
+producer, and consumes that Run's authenticated artifacts through native Go
+bootstrap/readiness tests. It currently uses the ARM64 NVIDIA target, without a
+second product build. VM, backend and network cleanup must join before success.
+Its unsigned outcomes are diagnostics, not release qualification or a seventh
+lifecycle object (ADR-16/18).
 _Avoid_: Nightly qualification, qualified runtime, product fleet operator
 
 **Clearance**:

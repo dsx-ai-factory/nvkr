@@ -9,26 +9,28 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/buildactivity"
+	"github.com/dsx-ai-factory/nvkr/internal/qualificationprogress"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/planview"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/progress"
 )
 
 const (
-	LaneStarted        = "lane-started"
-	LaneFinished       = "lane-finished"
-	LaneFailed         = "lane-failed"
-	PhaseStarted       = "phase-started"
-	PhaseFinished      = "phase-finished"
-	PhaseFailed        = "phase-failed"
-	DeploymentStarted  = "deployment-started"
-	DeploymentFinished = "deployment-finished"
-	DeploymentFailed   = "deployment-failed"
-	TenantWaiting      = "tenant-waiting"
-	TenantGuests       = "tenant-guests"
-	NativeDeployment   = "native-deployment"
-	OSBuildLogs        = "os-build-logs"
-	BuildPlanSelected  = "build-plan-selected"
+	QualificationProgress = "qualification-progress"
+	LaneStarted           = "lane-started"
+	LaneFinished          = "lane-finished"
+	LaneFailed            = "lane-failed"
+	PhaseStarted          = "phase-started"
+	PhaseFinished         = "phase-finished"
+	PhaseFailed           = "phase-failed"
+	DeploymentStarted     = "deployment-started"
+	DeploymentFinished    = "deployment-finished"
+	DeploymentFailed      = "deployment-failed"
+	TenantWaiting         = "tenant-waiting"
+	TenantGuests          = "tenant-guests"
+	NativeDeployment      = "native-deployment"
+	OSBuildLogs           = "os-build-logs"
+	BuildPlanSelected     = "build-plan-selected"
 )
 
 // Guest observations describe infrastructure and console activity only. They
@@ -116,6 +118,7 @@ type ProgressEvent struct {
 	Remaining       time.Duration
 	Guests          [3]TenantGuestObservation
 	BuildLogs       buildactivity.Record
+	Qualification   qualificationprogress.Event
 	// Foreground-only descriptions; never expand the retained progress protocol.
 	BuildPlan  *progress.Snapshot `json:"-"`
 	BuildGraph *planview.Graph    `json:"-"`

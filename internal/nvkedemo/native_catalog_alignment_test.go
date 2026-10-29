@@ -27,15 +27,15 @@ func TestNativeNVIDIADefinitionsAlignRenamedSourceContracts(t *testing.T) {
 	// Compare compiled source identities with the owning locks. Pin updates
 	// remain data changes without another revision list in Go.
 	locks := make(map[string]map[string]catalog.Pin)
-	for _, dir := range []string{"node-images/release", "nvke/native-site-arm64", "controller-profiles/native-nvidia-arm64", "ovn-nvidia"} {
+	for _, dir := range []string{"node-images/release", "nvke/native-site", "controller-profiles/native-nvidia", "ovn-nvidia"} {
 		lock, err := catalog.LoadLockContext(t.Context(), filepath.Join(repo, "inputs/catalogs", dir))
 		if err != nil {
 			t.Fatal(err)
 		}
 		locks[dir] = lock.Pins
 	}
-	osPins, sitePins := locks["node-images/release"], locks["nvke/native-site-arm64"]
-	profilePins, ovnPins := locks["controller-profiles/native-nvidia-arm64"], locks["ovn-nvidia"]
+	osPins, sitePins := locks["node-images/release"], locks["nvke/native-site"]
+	profilePins, ovnPins := locks["controller-profiles/native-nvidia"], locks["ovn-nvidia"]
 	for _, conformance := range []bool{false, true} {
 		name := "demo"
 		if conformance {
@@ -127,8 +127,8 @@ func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
 		sources []string
 	}{
 		{"node-images/release", []string{"nvke-os", "nvke-cni-calico-source", "nvke-kubeadm-distro-source", "nvke-spire-agent-source"}},
-		{"nvke/native-site-arm64", []string{"nvke-cli", "nvke-controller", "nvke-controller-helm", "nvke-nktp-helm", "nvke-deploy"}},
-		{"controller-profiles/native-nvidia-arm64", []string{"nvke-profiles"}},
+		{"nvke/native-site", []string{"nvke-cli", "nvke-controller", "nvke-controller-helm", "nvke-nktp-helm", "nvke-deploy"}},
+		{"controller-profiles/native-nvidia", []string{"nvke-profiles"}},
 		{"tools/native", []string{"nvke-cli", "nvke-deploy", "nvke-nicosim"}},
 		{"runtime-dependencies", []string{"nvke-deployment-selection"}},
 	} {
@@ -154,13 +154,13 @@ func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		expected := map[string]string{"nvke-node-image-arm64": "inputs/catalogs/node-images/release", "cwe": "inputs/catalogs/nvke/native-site-arm64", "nvkectl": "inputs/catalogs/nvke/native-site-arm64", "controller-chart": "inputs/catalogs/nvke/native-site-arm64", "controller-profiles": "inputs/catalogs/controller-profiles/native-nvidia-arm64"}
+		expected := map[string]string{"nvke-node-image-arm64": "inputs/catalogs/node-images/release", "cwe": "inputs/catalogs/nvke/native-site", "nvkectl": "inputs/catalogs/nvke/native-site", "controller-chart": "inputs/catalogs/nvke/native-site", "controller-profiles": "inputs/catalogs/controller-profiles/native-nvidia"}
 		hostPlatforms := map[string]string{}
 		if conformance {
-			expected["conformance-image-arm64"] = "definitions/kubernetes-conformance-arm64/demo-1.36/image-catalog"
+			expected["conformance-image-arm64"] = "inputs/catalogs/kubernetes-conformance/images-1.36"
 			for _, host := range []struct{ suffix, platform string }{{"arm64", "linux/arm64"}, {"darwin-arm64", "darwin/arm64"}} {
-				expected["hydrophone-"+host.suffix] = "definitions/kubernetes-conformance-arm64/hydrophone-catalog"
-				expected["kubectl-"+host.suffix] = "definitions/kubernetes-conformance-arm64/kubectl-catalog"
+				expected["hydrophone-"+host.suffix] = "inputs/catalogs/kubernetes-conformance/hydrophone"
+				expected["kubectl-"+host.suffix] = "inputs/catalogs/kubernetes-conformance/kubectl"
 				hostPlatforms["hydrophone-"+host.suffix] = host.platform
 				hostPlatforms["kubectl-"+host.suffix] = host.platform
 			}
@@ -224,7 +224,7 @@ func TestNativeNVIDIAProducerRequirementsOffline(t *testing.T) {
 	if !reflect.DeepEqual(disk.Materials, map[string]string{"image-inputs": "nvke-image-inputs", "installer-iso": "nvke-patched-installer-iso"}) {
 		t.Fatal("native disk material selection changed")
 	}
-	profiles, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(root, "controller-profiles/native-nvidia-arm64")))
+	profiles, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(root, "controller-profiles/native-nvidia")))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -176,6 +176,13 @@ type tenantNode struct {
 }
 
 func readyNodesForCountVersion(nodes []tenantNode, version string, expected int) (bool, error) {
+	return readyNodesForCountVersionArchitecture(nodes, version, expected, "arm64")
+}
+
+func readyNodesForCountVersionArchitecture(nodes []tenantNode, version string, expected int, arch string) (bool, error) {
+	if _, err := nativeQEMUArchitecture(arch); err != nil {
+		return false, err
+	}
 	if expected != nativeTenantNodeCount(false) && expected != nativeTenantNodeCount(true) {
 		return false, errors.New("unsupported tenant node count")
 	}
@@ -221,8 +228,8 @@ func readyNodesForCountVersion(nodes []tenantNode, version string, expected int)
 		if !ready {
 			return false, nil
 		}
-		if node.Status.NodeInfo.Architecture != "arm64" || node.Status.NodeInfo.KubeletVersion != "v"+version {
-			return false, fmt.Errorf("tenant node differs from required ARM64 Kubernetes%s", version)
+		if node.Status.NodeInfo.Architecture != arch || node.Status.NodeInfo.KubeletVersion != "v"+version {
+			return false, fmt.Errorf("tenant node differs from required %s Kubernetes%s", arch, version)
 		}
 	}
 	if control != 1 {
@@ -316,6 +323,15 @@ type workload struct {
 }
 
 func workloadJob(image string) workload {
+	job, _ := workloadJobForArchitecture(image, "arm64")
+	return job
+}
+
+func workloadJobForArchitecture(image, arch string) (workload, error) {
+	machine, err := nativeQEMUArchitecture(arch)
+	if err != nil {
+		return workload{}, err
+	}
 	job := workload{APIVersion: "batch/v1", Kind: "Job"}
 	job.Metadata.Name = "nvkr-smoke"
 	job.Spec.Deadline = 180
@@ -324,8 +340,8 @@ func workloadJob(image string) workload {
 		Name    string   `json:"name"`
 		Image   string   `json:"image"`
 		Command []string `json:"command"`
-	}{"smoke", image, []string{"sh", "-ec", "test $(uname -m) = aarch64; nslookup kubernetes.default.svc.cluster.local; echo NVKE_LOCAL_WORKLOAD_PASS"}})
-	return job
+	}{"smoke", image, []string{"sh", "-ec", "test $(uname -m) = " + machine + "; nslookup kubernetes.default.svc.cluster.local; echo NVKE_LOCAL_WORKLOAD_PASS"}})
+	return job, nil
 }
 
 type domainEvidence struct {

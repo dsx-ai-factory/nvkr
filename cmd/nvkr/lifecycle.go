@@ -143,16 +143,22 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 			&cli.StringFlag{Name: "root", Value: ".", Usage: "repository root receiving generated files"},
 			&cli.StringFlag{Name: "qualification-policy", Usage: "also generate hosted qualification from this independent policy"},
 			&cli.BoolFlag{Name: "runtime", Usage: "refresh named production Plan data within its reviewed workflow contract"},
+			&cli.StringFlag{Name: "source-commit", Usage: "freeze one exact source commit under the authored GitHub runtime source policy (requires --runtime)"},
 			&cli.BoolFlag{Name: "check", Usage: "write nothing; fail on generated drift"}), Action: func(c *cli.Context) error {
 			view, err := selectCommandPresentation(c)
 			if err != nil {
 				return err
 			}
 			var digest string
+			if c.IsSet("source-commit") && !c.Bool("runtime") {
+				return e.New(e.CodeUsage, "--source-commit requires --runtime")
+			}
 			if c.Bool("runtime") && c.IsSet("qualification-policy") {
 				return e.New(e.CodeUsage, "runtime Plan preparation does not generate qualification workflows")
 			}
-			if c.Bool("runtime") {
+			if c.Bool("runtime") && c.IsSet("source-commit") {
+				digest, err = lifecycle.GenerateRuntimeSourceFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("engine"), c.String("root"), c.String("source-commit"), c.Bool("check"))
+			} else if c.Bool("runtime") {
 				digest, err = lifecycle.GenerateRuntimeFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("engine"), c.String("root"), c.Bool("check"))
 			} else if c.IsSet("qualification-policy") {
 				digest, err = qualification.GenerateFiles(c.Context, c.String("definition"), c.String("environment"), c.String("qualification-policy"), factoryGeneratorVersion(), c.String("engine"), c.String("root"), c.Bool("check"))

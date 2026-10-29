@@ -41,8 +41,8 @@ const (
 	NodeAcquire = "acquire"
 	NodeVerify  = "terminal-observe"
 	// NodeSBOM emits a deterministic CycloneDX SBOM per built artifact plus an
-	// aggregate index for one build target (ADR-13 §1, re-entered into v1 by
-	// ADR-13). It runs after that target's terminal observation because it binds
+	// aggregate index for one build target (ADR-13 §1). It runs after that
+	// target's terminal observation because it binds
 	// each component's SBOM to the runner-observed artifact digest that observation
 	// gates. It asserts composition only, never signature or reproduction.
 	NodeSBOM      = "sbom"
@@ -126,19 +126,20 @@ type Route struct {
 }
 
 type Plan struct {
-	Actions           map[string]catalog.ActionPin `json:"actions,omitempty"`
-	SchemaVersion     string                       `json:"schemaVersion"`
-	Name              string                       `json:"name"`
-	GeneratorVersion  string                       `json:"generatorVersion"`
-	DefinitionPath    string                       `json:"definitionPath,omitempty"`
-	DefinitionDigest  string                       `json:"definitionDigest,omitempty"`
-	EnvironmentPath   string                       `json:"environmentPath,omitempty"`
-	Qualification     EvidenceTier                 `json:"qualification"`
-	CatalogDigest     string                       `json:"catalogDigest"`
-	CatalogSnapshot   *catalog.Catalog             `json:"catalogSnapshot"`
-	AppliedOverlays   []catalog.AppliedOverlay     `json:"appliedOverlays,omitempty"`
-	EnvironmentDigest string                       `json:"environmentDigest,omitempty"`
-	Definition        definition.Definition        `json:"definition"`
+	Actions             map[string]catalog.ActionPin `json:"actions,omitempty"`
+	SchemaVersion       string                       `json:"schemaVersion"`
+	Name                string                       `json:"name"`
+	GeneratorVersion    string                       `json:"generatorVersion"`
+	DefinitionPath      string                       `json:"definitionPath,omitempty"`
+	DefinitionDigest    string                       `json:"definitionDigest,omitempty"`
+	EnvironmentPath     string                       `json:"environmentPath,omitempty"`
+	RuntimeSourceCommit string                       `json:"runtimeSourceCommit,omitempty"`
+	Qualification       EvidenceTier                 `json:"qualification"`
+	CatalogDigest       string                       `json:"catalogDigest"`
+	CatalogSnapshot     *catalog.Catalog             `json:"catalogSnapshot"`
+	AppliedOverlays     []catalog.AppliedOverlay     `json:"appliedOverlays,omitempty"`
+	EnvironmentDigest   string                       `json:"environmentDigest,omitempty"`
+	Definition          definition.Definition        `json:"definition"`
 	// Composition is present exactly for CompositePlanSchemaVersion Plans,
 	// whose definitionDigest names the composite and Definition is effective.
 	Composition      *CompositionRecord     `json:"composition,omitempty"`
@@ -187,8 +188,7 @@ type BuildPlan struct {
 	// ResolvedComponents is the exact resolved catalog component set this build
 	// compiled from. It is persisted so the SBOM node (ADR-13) can build a
 	// faithful CycloneDX document at node-execution time, where the catalog is not
-	// reachable — the container-isolated executor only ever sees this plan. Adding
-	// it is the reason the plan identity digest moved when SBOM re-entered v1.
+	// reachable — the container-isolated executor only ever sees this plan.
 	ResolvedComponents []catalog.NamedComponent `json:"resolvedComponents,omitempty"`
 	Graph              *ir.Graph                `json:"executionGraph"`
 }

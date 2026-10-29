@@ -66,7 +66,7 @@ func TestGitHubNativePlatformRoutesAndHelper(t *testing.T) {
 		if len(bootstrap.Steps) == 0 || strings.TrimSpace(bootstrap.Steps[0].Run) != command {
 			t.Fatalf("missing %s bootstrap preflight", tc.platform)
 		}
-		if !strings.Contains(joinRuns(bootstrap.Steps), "go build -trimpath") {
+		if !strings.Contains(joinRuns(bootstrap.Steps), "go install -trimpath") {
 			t.Fatalf("missing native %s helper build", tc.platform)
 		}
 		count := 0
