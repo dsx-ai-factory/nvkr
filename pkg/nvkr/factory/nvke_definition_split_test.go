@@ -22,7 +22,7 @@ var nvkeSplitFamilies = []struct {
 	name            string
 	outputs, native int
 }{
-	{"core", 23, 28},
+	{"core", 24, 30},
 	{"services", 28, 28},
 	{"telemetry", 17, 17},
 	{"disks", 4, 4},
@@ -32,6 +32,7 @@ var nvkeSplitFamilies = []struct {
 // has no remaining YAML parsing headroom.
 var nvkeFamilyOnlyOutputs = map[string]string{
 	"nico":            "core",
+	"nico-core-image": "core",
 	"nico-flow-image": "core",
 	"nico-prereqs":    "core",
 }
@@ -88,8 +89,8 @@ func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 			nativeTotal += native
 		})
 	}
-	if len(original) != 69 || len(seen) != len(original)+len(nvkeFamilyOnlyOutputs) || nativeTotal != 77 {
-		t.Fatalf("partition requires %d of %d original plus family-only outputs and %d native targets; want 72/69 and 77", len(seen), len(original), nativeTotal)
+	if len(original) != 69 || len(seen) != len(original)+len(nvkeFamilyOnlyOutputs) || nativeTotal != 79 {
+		t.Fatalf("partition requires %d of %d original plus family-only outputs and %d native targets; want 73/69 and 79", len(seen), len(original), nativeTotal)
 	}
 }
 
@@ -286,8 +287,8 @@ func TestNVKEDefinitionSplitCompiledIdentityAndGeneratedBundles(t *testing.T) {
 				len(plan.LifecycleOutputs), len(plan.Builds), len(plan.Graph.Nodes), len(jobs), len(workflow), len(bundle.Files[bundle.PlanPath]), events)
 		})
 	}
-	if buildCount != 77 || outputCount != 72 {
-		t.Fatalf("compiled families retain %d native builds and %d outputs, want 77 and 72", buildCount, outputCount)
+	if buildCount != 79 || outputCount != 73 {
+		t.Fatalf("compiled families retain %d native builds and %d outputs, want 79 and 73", buildCount, outputCount)
 	}
 }
 

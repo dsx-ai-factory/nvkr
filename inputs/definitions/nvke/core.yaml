@@ -114,8 +114,7 @@ outputs:
     format: oci
     components:
       - nvke-controller
-  # NICo charts are site-installed outside NVKE's pin set. The Core image is cataloged but not
-  # selected: its cold Rust build exceeds the hosted build-job budget.
+  # NICo charts and images are site-installed outside NVKE's pin set.
   - name: nico
     platform: linux/amd64
     catalog:
@@ -123,6 +122,13 @@ outputs:
     format: helm-oci
     components:
       - nico-chart
+  - name: nico-core-image
+    platforms: [linux/amd64, linux/arm64]
+    catalog:
+      base: ../../catalogs/nico
+    format: oci
+    components:
+      - nico-core-image
   - name: nico-flow-image
     platforms: [linux/amd64, linux/arm64]
     catalog:

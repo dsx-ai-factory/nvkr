@@ -31,7 +31,7 @@ jobs:
           [ ! -L "$GITHUB_STEP_SUMMARY" ] || exit 0
           [ ! -e "$GITHUB_STEP_SUMMARY" ] || [ -f "$GITHUB_STEP_SUMMARY" ] || exit 0
           {
-            printf '%s\n' '## NVKR Run started' '' '<code>nvke-core</code> · 23 planned outputs · <code>linux/amd64, linux/arm64</code>' '' 'Lane: <code>pipeline-attested</code>. Execution and completeness checks are pending.' ''
+            printf '%s\n' '## NVKR Run started' '' '<code>nvke-core</code> · 24 planned outputs · <code>linux/amd64, linux/arm64</code>' '' 'Lane: <code>pipeline-attested</code>. Execution and completeness checks are pending.' ''
           } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
       - &checkout-workflow-source
         name: Check out workflow source
@@ -518,6 +518,56 @@ jobs:
     permissions:
       actions: read
       contents: read
+  nvkr-nico-core-image-linux-amd64-fetch-ni-72e3ba3ee44a:
+    name: 'Fetch pinned source for nico-core-image (nico-core-image/linux/amd64)'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [build-runner-ubuntu-24-04]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-nico-core-image-linux-amd64-89c3aa2212c1:
+    name: 'Build and prepare nico-core-image/linux/amd64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 120
+    needs: [nvkr-nico-core-image-linux-amd64-fetch-ni-72e3ba3ee44a]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
+  nvkr-nico-core-image-linux-arm64-fetch-ni-c585d2e25e50:
+    name: 'Fetch pinned source for nico-core-image (nico-core-image/linux/arm64)'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 60
+    needs: [build-runner-ubuntu-24-04-arm]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-nico-core-image-linux-arm64-build-ni-12b022c65acc:
+    name: 'Build nico-core-image (nico-core-image/linux/arm64)'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 60
+    needs: [nvkr-nico-core-image-linux-arm64-fetch-ni-c585d2e25e50]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-nico-core-image-linux-arm64-286c843f3c31:
+    name: 'Verify artifacts and generate SBOMs: nico-core-image/linux/arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-nico-core-image-linux-arm64-build-ni-12b022c65acc, nvkr-tool-syft]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-nico-flow-image-linux-amd64-fetch-ni-7ccf73a928e1:
     name: 'Fetch pinned source for nico-flow-image (nico-flow-image/linux/amd64)'
     runs-on: 'ubuntu-24.04'
@@ -972,6 +1022,16 @@ jobs:
     permissions:
       actions: read
       contents: read
+  nvkr-nico-core-image-linux-amd64-sbom:
+    name: 'Generate SBOMs: nico-core-image/linux/amd64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-process-nico-core-image-linux-amd64-89c3aa2212c1, nvkr-tool-syft]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-nico-flow-image-linux-amd64-sbom:
     name: 'Generate SBOMs: nico-flow-image/linux/amd64'
     runs-on: 'ubuntu-24.04'
@@ -1057,6 +1117,16 @@ jobs:
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-cwe, nvkr-process-controller-chart-build-nvke-9024d4709c1b]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-package-nico-core-image:
+    name: 'Package container image: nico-core-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-nico-core-image-linux-amd64-sbom, nvkr-process-nico-core-image-linux-arm64-286c843f3c31]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
     permissions:
@@ -1456,6 +1526,28 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+  nvkr-package-publication-nico-core-image:
+    name: 'Package publication bundle: publication-nico-core-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-package-nico-core-image]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-attest-sboms-output-nico-core-image:
+    name: 'Create and verify SBOM attestations: output-nico-core-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-package-publication-nico-core-image, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps: *steps-ubuntu-24-04-node
   nvkr-package-publication-nico-flow-image:
     name: 'Package publication bundle: publication-nico-flow-image'
     runs-on: 'ubuntu-24.04'
@@ -1843,6 +1935,21 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
+  nvkr-publish-output-nico-core-image:
+    name: 'Publish output-nico-core-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-attest-sboms-output-nico-core-image]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-nico-flow-image:
     name: 'Publish output-nico-flow-image'
     runs-on: 'ubuntu-24.04'
@@ -2188,6 +2295,21 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
+  nvkr-sign-output-nico-core-image:
+    name: 'Sign and attest release and deliverables: output-nico-core-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-publish-output-nico-core-image]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps: *steps-ubuntu-24-04-node
   nvkr-sign-output-nico-flow-image:
     name: 'Sign and attest release and deliverables: output-nico-flow-image'
     runs-on: 'ubuntu-24.04'
@@ -2516,6 +2638,20 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
+  nvkr-verify-publication-output-nico-core-image:
+    name: 'Verify release and deliverable signatures: output-nico-core-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-sign-output-nico-core-image]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-nico-flow-image:
     name: 'Verify release and deliverable signatures: output-nico-flow-image'
     runs-on: 'ubuntu-24.04'
@@ -2604,7 +2740,7 @@ jobs:
     name: 'Assemble release from verified output references'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-verify-publication-output-capi-contr-a309e0dde6c8, nvkr-verify-publication-output-capi-controller-image, nvkr-verify-publication-output-capi-kubea-400c7177454b, nvkr-verify-publication-output-capi-kubea-459a501ddf86, nvkr-verify-publication-output-capi-kubea-8c536327dae9, nvkr-verify-publication-output-capi-kubea-a1d9f5feb0f6, nvkr-verify-publication-output-capnico-controller, nvkr-verify-publication-output-cert-manag-02f76d39d687, nvkr-verify-publication-output-cert-manag-9a8734354915, nvkr-verify-publication-output-cert-manag-b56eb8b59b49, nvkr-verify-publication-output-cert-manag-d72fce3ac728, nvkr-verify-publication-output-cert-manag-eecf216a547d, nvkr-verify-publication-output-cert-manag-f1997a85223a, nvkr-verify-publication-output-cluster-ap-5fb4884131f8, nvkr-verify-publication-output-controller-chart, nvkr-verify-publication-output-cwe, nvkr-verify-publication-output-nico, nvkr-verify-publication-output-nico-flow-image, nvkr-verify-publication-output-nico-prereqs, nvkr-verify-publication-output-nico-refer-768f0a1fbfbe, nvkr-verify-publication-output-nvkectl, nvkr-verify-publication-output-nvkectl-linux-arm64, nvkr-verify-publication-output-operator-tools]
+    needs: [nvkr-verify-publication-output-capi-contr-a309e0dde6c8, nvkr-verify-publication-output-capi-controller-image, nvkr-verify-publication-output-capi-kubea-400c7177454b, nvkr-verify-publication-output-capi-kubea-459a501ddf86, nvkr-verify-publication-output-capi-kubea-8c536327dae9, nvkr-verify-publication-output-capi-kubea-a1d9f5feb0f6, nvkr-verify-publication-output-capnico-controller, nvkr-verify-publication-output-cert-manag-02f76d39d687, nvkr-verify-publication-output-cert-manag-9a8734354915, nvkr-verify-publication-output-cert-manag-b56eb8b59b49, nvkr-verify-publication-output-cert-manag-d72fce3ac728, nvkr-verify-publication-output-cert-manag-eecf216a547d, nvkr-verify-publication-output-cert-manag-f1997a85223a, nvkr-verify-publication-output-cluster-ap-5fb4884131f8, nvkr-verify-publication-output-controller-chart, nvkr-verify-publication-output-cwe, nvkr-verify-publication-output-nico, nvkr-verify-publication-output-nico-core-image, nvkr-verify-publication-output-nico-flow-image, nvkr-verify-publication-output-nico-prereqs, nvkr-verify-publication-output-nico-refer-768f0a1fbfbe, nvkr-verify-publication-output-nvkectl, nvkr-verify-publication-output-nvkectl-linux-arm64, nvkr-verify-publication-output-operator-tools]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -2662,7 +2798,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-00'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [build-runner-ubuntu-24-04, nvkr-attest-sboms-output-cert-manager-cai-f039262ad3e2, nvkr-cwe-linux-amd64-sbom, nvkr-nico-flow-image-linux-arm64-fetch-ni-5ec3f7c60135, nvkr-package-nico-reference-profiles-fixture, nvkr-package-publication-capi-controller-image-arm64, nvkr-package-publication-nvkectl-linux-arm64, nvkr-process-capnico-controller-linux-arm-7ed4de380f4f, nvkr-process-cert-manager-webhook-image-a-45233856fc27, nvkr-process-cwe-linux-amd64-build-nvke-c-b347800ecb65, nvkr-process-nico-build-nico-chart-nico-t-29d406651977, nvkr-sign-output-capi-kubeadm-bootstrap-image-arm64]
+    needs: [build-runner-ubuntu-24-04, nvkr-attest-sboms-output-cert-manager-cai-f039262ad3e2, nvkr-cwe-linux-amd64-sbom, nvkr-nico-flow-image-linux-arm64-fetch-ni-5ec3f7c60135, nvkr-package-nico-reference-profiles-fixture, nvkr-package-publication-capi-controller-image-arm64, nvkr-package-publication-nvkectl-linux-arm64, nvkr-process-capnico-controller-linux-arm-7ed4de380f4f, nvkr-process-cert-manager-webhook-image-a-45233856fc27, nvkr-process-cwe-linux-amd64-build-nvke-c-b347800ecb65, nvkr-process-nico-build-nico-chart-nico-t-29d406651977, nvkr-publish-output-nico-core-image, nvkr-sign-output-capi-kubeadm-bootstrap-image-arm64]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2675,7 +2811,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-01'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-cert-manager-webhook-image-arm64-pul-d76818de582f, nvkr-nico-prereqs-sbom, nvkr-package-controller-chart, nvkr-package-publication-cert-manager-con-552847309ea5, nvkr-process-cert-manager-controller-imag-0f45c83b6091, nvkr-process-nico-flow-image-linux-arm64-ea75375bea75, nvkr-publish-output-capi-kubeadm-bootstrap-image, nvkr-publish-output-capi-kubeadm-control-plane-image, nvkr-publish-output-nico-reference-profiles-fixture, nvkr-verify-publication-output-cert-manag-b56eb8b59b49, nvkr-verify-publication-output-controller-chart, nvkr-verify-publication-output-nvkectl]
+    needs: [nvkr-attest-sboms-output-nico-core-image, nvkr-cert-manager-webhook-image-arm64-pul-d76818de582f, nvkr-nico-prereqs-sbom, nvkr-package-controller-chart, nvkr-package-publication-cert-manager-con-552847309ea5, nvkr-process-cert-manager-controller-imag-0f45c83b6091, nvkr-process-nico-flow-image-linux-arm64-ea75375bea75, nvkr-publish-output-capi-kubeadm-bootstrap-image, nvkr-publish-output-capi-kubeadm-control-plane-image, nvkr-publish-output-nico-reference-profiles-fixture, nvkr-verify-publication-output-cert-manag-b56eb8b59b49, nvkr-verify-publication-output-controller-chart, nvkr-verify-publication-output-nvkectl]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2714,7 +2850,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-04'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-cert-manager-con-d67471e4f0b4, nvkr-capnico-controller-linux-amd64-fetch-d7e509f127ef, nvkr-cert-manager-cainjector-image-sbom, nvkr-cert-manager-controller-image-sbom, nvkr-cluster-api-provider-provisioned-lin-233fabd1edbc, nvkr-controller-chart-sbom, nvkr-nico-reference-profiles-fixture-linu-29120e898ac9, nvkr-operator-tools-pull-kubectl, nvkr-package-publication-controller-chart, nvkr-publish-output-cwe, nvkr-sign-output-nico, nvkr-sign-output-nvkectl, nvkr-verify-publication-output-capi-kubea-459a501ddf86]
+    needs: [nvkr-attest-sboms-output-cert-manager-con-d67471e4f0b4, nvkr-capnico-controller-linux-amd64-fetch-d7e509f127ef, nvkr-cert-manager-cainjector-image-sbom, nvkr-cert-manager-controller-image-sbom, nvkr-cluster-api-provider-provisioned-lin-233fabd1edbc, nvkr-controller-chart-sbom, nvkr-nico-core-image-linux-amd64-sbom, nvkr-nico-reference-profiles-fixture-linu-29120e898ac9, nvkr-operator-tools-pull-kubectl, nvkr-package-publication-controller-chart, nvkr-publish-output-cwe, nvkr-sign-output-nico, nvkr-sign-output-nvkectl, nvkr-verify-publication-output-capi-kubea-459a501ddf86]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2727,7 +2863,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-05'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-controller-chart, nvkr-nvkectl-fetch-nvkectl, nvkr-package-cert-manager-webhook-image-arm64, nvkr-package-cwe, nvkr-package-publication-cert-manager-cai-2887e3e2c736, nvkr-package-publication-cert-manager-webhook-image, nvkr-package-publication-nico-reference-p-ee3d0b71da16, nvkr-package-release, nvkr-sign-output-capi-kubeadm-control-plane-image, nvkr-sign-output-capnico-controller, nvkr-verify-publication-output-capi-contr-a309e0dde6c8, nvkr-verify-publication-output-cwe, nvkr-verify-publication-release]
+    needs: [nvkr-attest-sboms-output-controller-chart, nvkr-nvkectl-fetch-nvkectl, nvkr-package-cert-manager-webhook-image-arm64, nvkr-package-cwe, nvkr-package-nico-core-image, nvkr-package-publication-cert-manager-cai-2887e3e2c736, nvkr-package-publication-cert-manager-webhook-image, nvkr-package-publication-nico-reference-p-ee3d0b71da16, nvkr-package-release, nvkr-process-nico-core-image-linux-amd64-89c3aa2212c1, nvkr-sign-output-capi-kubeadm-control-plane-image, nvkr-sign-output-capnico-controller, nvkr-verify-publication-output-capi-contr-a309e0dde6c8, nvkr-verify-publication-output-cwe, nvkr-verify-publication-output-nico-core-image, nvkr-verify-publication-release]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2740,7 +2876,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-06'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-operator-tools-pull-helm, nvkr-package-cert-manager-controller-image-arm64, nvkr-package-publication-cwe, nvkr-publish-output-capi-controller-image-arm64, nvkr-publish-output-capi-kubeadm-control-189e7620a1e0, nvkr-publish-output-cert-manager-controll-1c8e088fb6a6, nvkr-sign-output-nvkectl-linux-arm64, nvkr-verify-publication-output-cert-manag-f1997a85223a, nvkr-verify-publication-output-nico-prereqs]
+    needs: [nvkr-operator-tools-pull-helm, nvkr-package-cert-manager-controller-image-arm64, nvkr-package-publication-cwe, nvkr-package-publication-nico-core-image, nvkr-publish-output-capi-controller-image-arm64, nvkr-publish-output-capi-kubeadm-control-189e7620a1e0, nvkr-publish-output-cert-manager-controll-1c8e088fb6a6, nvkr-sign-output-nvkectl-linux-arm64, nvkr-verify-publication-output-cert-manag-f1997a85223a, nvkr-verify-publication-output-nico-prereqs]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2805,7 +2941,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0b'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-capi-controller-image-arm64, nvkr-capi-controller-image-arm64-pull-cap-d90f4e1c295e, nvkr-capi-controller-image-sbom, nvkr-capnico-controller-linux-arm64-build-f87f1492b304, nvkr-cluster-api-provider-provisioned-lin-3474f127ab2d, nvkr-package-publication-capi-kubeadm-bootstrap-image, nvkr-package-publication-cert-manager-web-d17d677e59de, nvkr-publish-output-capi-controller-image, nvkr-verify-publication-output-cert-manag-9a8734354915, nvkr-verify-publication-output-cert-manag-eecf216a547d, nvkr-verify-publication-output-cluster-ap-5fb4884131f8, nvkr-verify-publication-output-nico]
+    needs: [nvkr-attest-sboms-output-capi-controller-image-arm64, nvkr-capi-controller-image-arm64-pull-cap-d90f4e1c295e, nvkr-capi-controller-image-sbom, nvkr-capnico-controller-linux-arm64-build-f87f1492b304, nvkr-cluster-api-provider-provisioned-lin-3474f127ab2d, nvkr-nico-core-image-linux-arm64-fetch-ni-c585d2e25e50, nvkr-package-publication-capi-kubeadm-bootstrap-image, nvkr-package-publication-cert-manager-web-d17d677e59de, nvkr-process-nico-core-image-linux-arm64-286c843f3c31, nvkr-publish-output-capi-controller-image, nvkr-verify-publication-output-cert-manag-9a8734354915, nvkr-verify-publication-output-cert-manag-eecf216a547d, nvkr-verify-publication-output-cluster-ap-5fb4884131f8, nvkr-verify-publication-output-nico]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2818,7 +2954,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0c'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-cert-manager-webhook-image, nvkr-attest-sboms-output-nico-reference-p-bcab49542eb0, nvkr-controller-chart-fetch-nvke-controller-chart, nvkr-nico-flow-image-linux-arm64-build-ni-fa5169c9de57, nvkr-package-cluster-api-provider-provisioned, nvkr-package-publication-capi-kubeadm-con-4fe0740f8f62, nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77, nvkr-process-cert-manager-controller-imag-8684e5f78b05, nvkr-process-nico-prereqs-build-nico-prer-da726cca8264, nvkr-process-nico-reference-profiles-fixt-795da7fc5df7]
+    needs: [nvkr-attest-sboms-output-cert-manager-webhook-image, nvkr-attest-sboms-output-nico-reference-p-bcab49542eb0, nvkr-controller-chart-fetch-nvke-controller-chart, nvkr-nico-core-image-linux-amd64-fetch-ni-72e3ba3ee44a, nvkr-nico-flow-image-linux-arm64-build-ni-fa5169c9de57, nvkr-package-cluster-api-provider-provisioned, nvkr-package-publication-capi-kubeadm-con-4fe0740f8f62, nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77, nvkr-process-cert-manager-controller-imag-8684e5f78b05, nvkr-process-nico-prereqs-build-nico-prer-da726cca8264, nvkr-process-nico-reference-profiles-fixt-795da7fc5df7, nvkr-sign-output-nico-core-image]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2844,7 +2980,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0e'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-capi-controller-image, nvkr-attest-sboms-output-capnico-controller, nvkr-nico-sbom, nvkr-nvkectl-sbom, nvkr-package-nico-flow-image, nvkr-package-operator-tools, nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd, nvkr-process-cert-manager-webhook-image-p-eb1305472075, nvkr-process-controller-chart-build-nvke-9024d4709c1b, nvkr-process-cwe-linux-arm64-terminal-obs-9bd89bc60f40, nvkr-publish-output-cert-manager-cainjector-image, nvkr-publish-output-cert-manager-controller-image, nvkr-publish-output-cert-manager-webhook-image-arm64, nvkr-publish-output-controller-chart, nvkr-sign-release, nvkr-tool-syft, nvkr-verify-publication-output-nico-flow-image, nvkr-verify-publication-output-operator-tools]
+    needs: [nvkr-attest-sboms-output-capi-controller-image, nvkr-attest-sboms-output-capnico-controller, nvkr-nico-core-image-linux-arm64-build-ni-12b022c65acc, nvkr-nico-sbom, nvkr-nvkectl-sbom, nvkr-package-nico-flow-image, nvkr-package-operator-tools, nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd, nvkr-process-cert-manager-webhook-image-p-eb1305472075, nvkr-process-controller-chart-build-nvke-9024d4709c1b, nvkr-process-cwe-linux-arm64-terminal-obs-9bd89bc60f40, nvkr-publish-output-cert-manager-cainjector-image, nvkr-publish-output-cert-manager-controller-image, nvkr-publish-output-cert-manager-webhook-image-arm64, nvkr-publish-output-controller-chart, nvkr-sign-release, nvkr-tool-syft, nvkr-verify-publication-output-nico-flow-image, nvkr-verify-publication-output-operator-tools]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2975,7 +3111,7 @@ jobs:
             status=Failed
           elif [ "$skipped" -gt 0 ] || [ "${NVKR_FINALIZE_OUTCOME:-}" = skipped ]; then
             status='Incomplete (skipped)'
-          elif [ "$total" -eq 209 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
+          elif [ "$total" -eq 221 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
             status=Completed
           fi
           {

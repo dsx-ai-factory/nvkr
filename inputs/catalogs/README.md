@@ -21,8 +21,7 @@ output-scoped selections retain the same NVKE release producers.
 source-built NICo Core and Flow images, pinned independently of NVKE to one infra-controller release.
 Both images use the generic rootless BuildKit route with digest-pinned bases. Core chains the source's
 native build, runtime and release Dockerfiles in one producer per architecture. The core family selects
-only Flow; Core is cataloged but not selected because its cold Rust build exceeds the hosted build-job
-budget, so the Core image remains consumer-supplied.
+both images. A cold Core build may exceed the generated hosted build-job budget; no hosted Run has built it.
 
 ## Current-to-shared mapping
 

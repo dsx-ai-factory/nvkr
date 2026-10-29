@@ -8,13 +8,13 @@ full product acceptance are separate facts.
 ## Four-family pilot
 
 Four independent Definitions partition the combined candidate's exact named outputs. The core family also
-selects the NICo charts and NICo Flow image, which the combined Definition omits because its flat workflow has no remaining YAML
+selects the NICo charts and NICo Core and Flow images, which the combined Definition omits because its flat workflow has no remaining YAML
 parsing headroom. They reuse the
 shared catalogs and pins; they do not import each other or change the combined Definition into a parent.
 
 | Definition | Outputs | Membership | Environment |
 |---|---:|---|---|
-| [Core](core.yaml) | 23 | CLI/operator tools, controller and bound chart, NICo charts and Flow image, providers/reference fixture, CAPI and cert-manager images | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) |
+| [Core](core.yaml) | 24 | CLI/operator tools, controller and bound chart, NICo charts and Core/Flow images, providers/reference fixture, CAPI and cert-manager images | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) |
 | [Services](services.yaml) | 28 | SPIRE, PostgreSQL and Temporal charts and native images | [github-nvke-services.yaml](../../environments/github-nvke-services.yaml) |
 | [Telemetry](telemetry.yaml) | 17 | NKTP chart and native runtime images | [github-nvke-telemetry.yaml](../../environments/github-nvke-telemetry.yaml) |
 | [Disks](disks.yaml) | 4 | Native AMD64/ARM64 plain and public-bootstrap FDE disks, each with its complete material closure | [github-nvke-disks.yaml](../../environments/github-nvke-disks.yaml) |
@@ -63,7 +63,7 @@ historical capacity measurements and remaining cutover work.
 | Deployment images | `../../catalogs/runtime-dependencies` | Twelve non-test runtime images for each native architecture: PostgreSQL, eight SPIRE images and three Temporal images |
 | CAPNICo | `../../catalogs/nvke/release-components` | Source-built `capnico-controller`, one OCI index requiring AMD64 and ARM64 |
 | NICo charts (core family only) | `../../catalogs/nico` | Source-packaged `nico` umbrella and `nico-prereqs` charts from one infra-controller `v2.2.2` pin, each stamped `2.2.2` |
-| NICo Flow image (core family only) | `../../catalogs/nico` | Source-built `nico-flow-image`, one OCI index requiring AMD64 and ARM64, from the same infra-controller pin |
+| NICo images (core family only) | `../../catalogs/nico` | Source-built `nico-core-image` and `nico-flow-image`, each one OCI index requiring AMD64 and ARM64, from the same infra-controller pin |
 | Provisioned infrastructure provider | `../../catalogs/nvke/release` | Existing source-built `cluster-api-provider-provisioned`, independently delivered for both architectures; not CAPNICo or CAPI core |
 | Reference-profile fixture | `../../catalogs/nvke/release-components` | `nico-reference-profiles-fixture`, one AMD64/ARM64 content image containing the two NICO test config profiles and their runbooks, not production fleet configuration or the demo's runnable `controller-profiles` |
 | Telemetry | `../../catalogs/nvke/release-components` | Source-packaged `nktp` with its three vendored dependencies; eight required/optional runtime images for each native architecture, including the enabled Target Allocator and the uninstall hook's kubectl |
@@ -79,8 +79,8 @@ built OCI exports only. The architecture-independent NKTP chart is packaged once
 | Member | Selection mirrored from pinned upstream inputs | Boundary |
 |---|---|---|
 | CAPNICo | NVKE's selected `deploy/nico/capnico/capnico.yaml` names controller `v0.0.45`; CAPNICo's own Dockerfile builds it | Independent source pin and source build, not the provisioned infrastructure provider |
-| NICo charts | Not selected by NVKE's pin set; the site installs `nico` and `nico-prereqs` from infra-controller's `helm` and `helm-prereqs` directories. `v2.2.2` is the latest non-candidate release; subcharts are vendored as local directories, so packaging is offline | Charts plus the Flow image. The Core image remains consumer-supplied; the prerequisite chart's helmfile-installed operators and third-party images are not selected |
-| NICo images | infra-controller `v2.2.2`'s own Dockerfiles. Flow: `rest-api/docker/production/Dockerfile.nico-flow` with `golang:1.26.4` and `nvcr.io/nvidia/distroless/go:v4.0.8`, both bound by index digest. Core: `dev/docker/Dockerfile.release-container-{x86_64,aarch64}` on bases built from the native `Dockerfile.build-container-*` and `Dockerfile.runtime-container-*`, bound by digest | Flow is the only REST image the packaged charts reference; the standalone REST charts are excluded from the umbrella package and not selected. Core is cataloged as `nico-core-image` but not selected, because its cold Rust build exceeds the hosted build-job budget. Both bases also install unpinned public packages and tools at build time |
+| NICo charts | Not selected by NVKE's pin set; the site installs `nico` and `nico-prereqs` from infra-controller's `helm` and `helm-prereqs` directories. `v2.2.2` is the latest non-candidate release; subcharts are vendored as local directories, so packaging is offline | Charts plus the Core and Flow images. The prerequisite chart's helmfile-installed operators and third-party images are not selected |
+| NICo images | infra-controller `v2.2.2`'s own Dockerfiles. Flow: `rest-api/docker/production/Dockerfile.nico-flow` with `golang:1.26.4` and `nvcr.io/nvidia/distroless/go:v4.0.8`, both bound by index digest. Core: `dev/docker/Dockerfile.release-container-{x86_64,aarch64}` on bases built from the native `Dockerfile.build-container-*` and `Dockerfile.runtime-container-*`, bound by digest | Flow is the only REST image the packaged charts reference; the standalone REST charts are excluded from the umbrella package and not selected. A cold Core Rust build may exceed the generated hosted build-job budget; a hosted Run must prove it. Both bases also install unpinned public packages and tools at build time |
 | NKTP chart and dependencies | The same NVKE `v0.22.0` source as the maintained controller; `nktp/deploy/charts/nktp/Chart.yaml` and `Chart.lock` select three exact dependencies; packaging stamps chart `0.22.0` | Fetch verifies Helm `v4.2.4` and all three acquired chart archives; packaging uses the retained closure with no network |
 | NKTP images | Selected source values and authenticated dependency charts: collector `0.162.0`, operator `0.159.0`, LGTM `0.32.0`, kube-state-metrics `v2.20.0`, node-exporter `v1.12.1`, optional metrics-server `v0.8.1`, uninstall kubectl `v1.34.1`; Operator `0.159.0`'s `versions.txt` selects Target Allocator `0.159.0` | Acquired images, not source builds; native subjects and parent indexes are lock-owned. Helm test-only BusyBox is excluded. Images are delivered separately; chart references are not automatically rewritten to publication repositories |
 | Reference-profile fixture | The selected NVKE fixture Dockerfile, `nico-vms-cp.yaml`, `nico-vms-worker.yaml` and sibling runbooks | Explicitly named `nico-reference-profiles-fixture`: the control-plane profile skips its pre-join reboot. It must not be installed as production fleet configuration. No empty/failure-test config profile, placeholder example, copied OSProfile or new Dockerfile/patch is added |
@@ -93,23 +93,22 @@ detection is not implemented.
 ### Setting NICo image values from the Release
 
 The `nico` chart is not image-bound. It renders `<repository>:<tag>`, so the consumer sets the values.
-Find the `nico-flow-image` index digest with `nvkr release browse --reference "$RELEASE_REF"`. Then
+Find the `nico-core-image` and `nico-flow-image` index digests with `nvkr release browse --reference "$RELEASE_REF"`. Then
 pass a digest-qualified tag, because Kubernetes pulls `name:tag@sha256:…` by digest. The subchart
 otherwise derives `<global.image.repository>/nico-flow`, so set Flow's own repository:
 
 ```sh
 helm install nico "oci://$PREFIX/releases-nico" --version 2.2.2 \
-  --set global.image.repository="$CORE_REPOSITORY" \
-  --set global.image.tag="$CORE_TAG" \
+  --set global.image.repository="$PREFIX/releases-nico-core-image" \
+  --set global.image.tag="v2.2.2@$CORE_DIGEST" \
   --set nico-flow.enabled=true \
   --set nico-flow.images.flow.repository="$PREFIX/releases-nico-flow-image" \
   --set nico-flow.images.flow.tag="v2.2.2@$FLOW_DIGEST"
 ```
 
 `PREFIX` is the Environment's publication prefix. The chart's `2.2.2` tag is only a discovery hint
-(ADR-20), so pin the chart's Release digest when your Helm version accepts `oci://…@sha256:…`. `global.image.repository` and `global.image.tag` still select a
-consumer-supplied Core image, which every enabled service except Flow uses. This Release supplies
-no Core image.
+(ADR-20), so pin the chart's Release digest when your Helm version accepts `oci://…@sha256:…`. The Core
+image serves every enabled service except Flow.
 
 NKTP image-reference binding remains a nonblocking follow-up, not a completed deployment contract.
 The signed chart still contains upstream tags, whereas the separately delivered native images have exact
