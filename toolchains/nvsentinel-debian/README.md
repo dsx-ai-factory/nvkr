@@ -39,6 +39,9 @@ sdk=localhost/nvkr-nvsentinel-ubuntu-26.04-arm64@sha256:f6a0ffa4e29bf10f6d946742
 test "$(docker image inspect "$sdk" --format '{{.Os}}/{{.Architecture}}')" = linux/arm64
 docker image inspect "$sdk" \
   --format '{{.Id}} {{.Os}}/{{.Architecture}} {{json .RepoDigests}}'
+repo_digests=$(docker image inspect "$sdk" \
+  --format '{{range .RepoDigests}}{{println .}}{{end}}')
+printf '%s\n' "$repo_digests" | grep -Fx -- "$sdk"
 docker run --rm --pull=never --network=none --read-only \
   --user "$(id -u):$(id -g)" --cap-drop=ALL --security-opt=no-new-privileges \
   "$sdk" sh -ec '
