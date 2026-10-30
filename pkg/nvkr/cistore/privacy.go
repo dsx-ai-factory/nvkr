@@ -109,7 +109,7 @@ func (b *backend) checkPackagePrivacy(ctx context.Context, packageName string, s
 	// https://docs.github.com/en/rest/packages/packages#get-a-package-for-an-organization
 	if len(record.Repository) != 0 && !bytes.Equal(bytes.TrimSpace(record.Repository), []byte("null")) {
 		if requireUnlinked {
-			return false, e.New(e.CodeTrustPolicyMissing, "CI transfer requires an unlinked private/internal package")
+			return false, e.New(e.CodeTrustPolicyMissing, "GHCR package %q must be private/internal and unlinked from repositories", packageName)
 		}
 		var linked repositoryRecord
 		if err := json.Unmarshal(record.Repository, &linked); err != nil || linked.ID == 0 || linked.FullName == "" || linked.Private == nil || !*linked.Private || !privateRepositoryVisibility(linked.Visibility) {

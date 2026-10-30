@@ -273,19 +273,40 @@ func fetchPullLayer(ctx context.Context, reference string, descriptor Descriptor
 	if err != nil {
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "opening exact output repository")
 	}
+	path := filepath.Join(workspace, "payload-"+strings.TrimPrefix(descriptor.Digest, "sha256:"))
+	var file *os.File
+	err = retryInterruptedRead(ctx, waitForPullRead, func() (retry bool, attemptErr error) {
+		file, retry, attemptErr = fetchPullLayerAttempt(ctx, ref, descriptor, path, options)
+		return retry, attemptErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	return file, nil
+}
+
+// Each attempt hashes the complete layer from its first byte. Only a peer reset
+// before the declared size, after its handles close cleanly and the partial
+// download is removed, authorizes
+// the caller's bounded reacquisition.
+func fetchPullLayerAttempt(ctx context.Context, ref name.Digest, descriptor Descriptor, path string, options RegistryOptions) (*os.File, bool, error) {
 	layer, err := remote.Layer(ref.Context().Digest(descriptor.Digest), registryOptions(ctx, options)...)
 	if err != nil {
-		return nil, metadataFetchError(ctx, err, "fetch output layer")
+		return nil, false, metadataFetchError(ctx, err, "fetch output layer")
 	}
 	reader, err := layer.Compressed()
 	if err != nil {
-		return nil, metadataFetchError(ctx, err, "open output layer")
+		return nil, false, metadataFetchError(ctx, err, "open output layer")
 	}
-	defer func() { _ = reader.Close() }()
-	path := filepath.Join(workspace, "payload-"+strings.TrimPrefix(descriptor.Digest, "sha256:"))
+	bodyClosed := false
+	defer func() {
+		if !bodyClosed {
+			_ = reader.Close()
+		}
+	}()
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
-		return nil, e.Wrap(e.CodeImmutableViolation, err, "creating private output download")
+		return nil, false, e.Wrap(e.CodeImmutableViolation, err, "creating private output download")
 	}
 	complete := false
 	defer func() {
@@ -296,23 +317,38 @@ func fetchPullLayer(ctx context.Context, reference string, descriptor Descriptor
 	hash := sha256.New()
 	written, copyErr := io.Copy(io.MultiWriter(file, hash), io.LimitReader(contextReader{ctx: ctx, reader: reader}, descriptor.Size+1))
 	if err := deliveryContext(ctx); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	got := "sha256:" + hex.EncodeToString(hash.Sum(nil))
 	if written > descriptor.Size || written == descriptor.Size && got != descriptor.Digest {
-		return nil, e.New(e.CodeVerifyFailed, "output layer differs from its exact descriptor")
+		return nil, false, e.New(e.CodeVerifyFailed, "output layer differs from its exact descriptor")
 	}
 	if copyErr != nil {
-		return nil, metadataFetchError(ctx, copyErr, "read output layer")
+		if written < descriptor.Size && isPeerProtocolReset(copyErr) {
+			// Close failures are not interrupted bodies and never authorize reacquisition.
+			bodyClosed, complete = true, true
+			if err := reader.Close(); err != nil {
+				_ = file.Close()
+				return nil, false, e.Wrap(e.CodeVerifyFailed, err, "closing interrupted output layer body")
+			}
+			if err := file.Close(); err != nil {
+				return nil, false, e.Wrap(e.CodeImmutableViolation, err, "closing interrupted output download")
+			}
+			if err := os.Remove(path); err != nil {
+				return nil, false, e.Wrap(e.CodeImmutableViolation, err, "removing interrupted output download")
+			}
+			return nil, true, e.Wrap(e.CodeUnavailable, &interruptedPullBody{}, "read output layer")
+		}
+		return nil, false, metadataFetchError(ctx, copyErr, "read output layer")
 	}
 	if written != descriptor.Size || got != descriptor.Digest {
-		return nil, e.New(e.CodeVerifyFailed, "output layer differs from its exact descriptor")
+		return nil, false, e.New(e.CodeVerifyFailed, "output layer differs from its exact descriptor")
 	}
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return nil, e.Wrap(e.CodeImmutableViolation, err, "rewinding private output download")
+		return nil, false, e.Wrap(e.CodeImmutableViolation, err, "rewinding private output download")
 	}
 	complete = true
-	return file, nil
+	return file, false, nil
 }
 
 func extractPulledExecutable(ctx context.Context, held *heldfile.File, out string, bundle BinaryBundle) error {

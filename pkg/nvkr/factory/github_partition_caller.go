@@ -41,7 +41,7 @@ func lowerGitHubPartitions(ctx context.Context, plan *Plan, raw []byte) ([]byte,
 	if !githubYAMLOnlyFields(jobs, sortedKeys(projection.Reduced)...) || githubYAMLLength(jobs) != 2*len(projection.Reduced) {
 		return nil, nil, e.New(e.CodePipelineDrift, "GitHub partitioning requires the complete projected jobs")
 	}
-	model, inline, err := githubExecutionModel(ctx, plan, projection)
+	model, layout, err := githubExecutionModel(ctx, plan, projection)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -49,28 +49,17 @@ func lowerGitHubPartitions(ctx context.Context, plan *Plan, raw []byte) ([]byte,
 	if err != nil {
 		return nil, nil, err
 	}
-	partitions, err := partitionGitHubJobs(ctx, dependencies, githubMaximumResultInputs)
+	// Keep OIDC signers in the entry: Fulcio's certificate SAN follows the
+	// reusable workflow path, so moving these jobs would change signer policy.
+	inline := layout.Pinned
+	partitions, err := partitionGitHubJobs(ctx, dependencies, layout)
 	if err != nil {
 		return nil, nil, err
 	}
-	// Keep OIDC signers in the entry: Fulcio's certificate SAN follows the
-	// reusable workflow path, so moving these jobs would change signer policy.
 	owners := map[string]string{}
-	var workers []githubExecutionPartition
-	for _, partition := range partitions {
-		var memberIDs []string
-		for _, id := range partition.Jobs {
-			if inline[id] {
-				owners[id] = id
-			} else {
-				memberIDs = append(memberIDs, id)
-			}
-		}
-		if len(memberIDs) != 0 {
-			workers = append(workers, githubExecutionPartition{Jobs: memberIDs})
-		}
+	for id := range inline {
+		owners[id] = id
 	}
-	partitions = workers
 	if len(partitions) > githubMaximumExecutionPartitions {
 		return nil, nil, e.New(e.CodeEngineCapability, "GitHub Run exceeds %d reusable execution partitions", githubMaximumExecutionPartitions)
 	}

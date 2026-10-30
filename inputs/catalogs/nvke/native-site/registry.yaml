@@ -77,8 +77,12 @@ sources:
       curl --fail --location --max-time 120 --output /tmp/helm.tar.gz "https://get.helm.sh/helm-v4.2.4-linux-$arch.tar.gz"
       printf '%s  %s\n' "$digest" /tmp/helm.tar.gz | sha256sum -c -
       tar --no-same-owner -xzf /tmp/helm.tar.gz -C /tmp "linux-$arch/helm"
+      # The vendor sandbox's /tmp is noexec; only the held source volume executes.
+      host_tools=$(mktemp -d .nvkr-helm-host.XXXXXX)
+      trap 'rm -rf -- "$host_tools"' EXIT
+      cp "/tmp/linux-$arch/helm" "$host_tools/helm"
       pins="$(sha256sum controller/deploy/charts/controller/Chart.yaml)"
-      timeout --kill-after=10s 120s "/tmp/linux-$arch/helm" dependency build controller/deploy/charts/controller
+      timeout --kill-after=10s 120s "$host_tools/helm" dependency build controller/deploy/charts/controller
       printf '%s\n' "$pins" | sha256sum -c -
       # The captured source bytes and vendor identity bind the build target,
       # independently of the utility host used to resolve chart dependencies.
@@ -117,15 +121,19 @@ sources:
       curl --fail --location --max-time 120 --output /tmp/helm.tar.gz "https://get.helm.sh/helm-v4.2.4-linux-$arch.tar.gz"
       printf '%s  %s\n' "$digest" /tmp/helm.tar.gz | sha256sum -c -
       tar --no-same-owner -xzf /tmp/helm.tar.gz -C /tmp "linux-$arch/helm"
+      # The vendor sandbox's /tmp is noexec; only the held source volume executes.
+      host_tools=$(mktemp -d .nvkr-helm-host.XXXXXX)
+      trap 'rm -rf -- "$host_tools"' EXIT
+      cp "/tmp/linux-$arch/helm" "$host_tools/helm"
       export HELM_REPOSITORY_CONFIG=/tmp/nktp-repositories.yaml
       export HELM_REPOSITORY_CACHE=/tmp/nktp-cache
       # These are the three exact URLs in the selected source's Chart.yaml.
       # Helm, not a custom parser, validates Chart.yaml against Chart.lock.
       pins="$(sha256sum nktp/deploy/charts/nktp/Chart.yaml nktp/deploy/charts/nktp/Chart.lock)"
-      "/tmp/linux-$arch/helm" repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts
-      "/tmp/linux-$arch/helm" repo add nktp-prometheus https://prometheus-community.github.io/helm-charts
-      "/tmp/linux-$arch/helm" repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/
-      "/tmp/linux-$arch/helm" dependency build nktp/deploy/charts/nktp --skip-refresh
+      "$host_tools/helm" repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts
+      "$host_tools/helm" repo add nktp-prometheus https://prometheus-community.github.io/helm-charts
+      "$host_tools/helm" repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/
+      "$host_tools/helm" dependency build nktp/deploy/charts/nktp --skip-refresh
       printf '%s\n' "$pins" | sha256sum -c -
       # The captured source bytes and vendor identity bind the build target,
       # independently of the utility host used to resolve chart dependencies.

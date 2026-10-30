@@ -16,6 +16,8 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-02 }}
       nvkr-partition-03:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-03 }}
+      nvkr-partition-08:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-08 }}
       nvkr-results-00:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00 }}
       nvkr-results-00-statuses:
@@ -138,8 +140,9 @@ jobs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
       nvkr-partition-01: ${{ format('"build-runner-ubuntu-24-04":{0},"build-runner-ubuntu-24-04-arm":{1}', toJSON(needs['build-runner-ubuntu-24-04']), toJSON(needs['build-runner-ubuntu-24-04-arm'])) }}
-      nvkr-partition-02: ${{ format('"build-runner-ubuntu-24-04":{0},"build-runner-ubuntu-24-04-arm":{1}', toJSON(needs['build-runner-ubuntu-24-04']), toJSON(needs['build-runner-ubuntu-24-04-arm'])) }}
-      nvkr-partition-03: ${{ format('"build-runner-arc-amd64-kvm":{0},"build-runner-arc-arm64-kvm":{1}', toJSON(needs['build-runner-arc-amd64-kvm']), toJSON(needs['build-runner-arc-arm64-kvm'])) }}
+      nvkr-partition-02: ${{ format('"build-runner-ubuntu-24-04":{0}', toJSON(needs['build-runner-ubuntu-24-04'])) }}
+      nvkr-partition-03: ${{ format('"build-runner-ubuntu-24-04":{0}', toJSON(needs['build-runner-ubuntu-24-04'])) }}
+      nvkr-partition-08: ${{ format('"build-runner-arc-amd64-kvm":{0},"build-runner-arc-arm64-kvm":{1}', toJSON(needs['build-runner-arc-amd64-kvm']), toJSON(needs['build-runner-arc-arm64-kvm'])) }}
       nvkr-results-00: ${{ format('"build-runner-ubuntu-24-04":{0}', toJSON(needs['build-runner-ubuntu-24-04'])) }}
       nvkr-results-00-statuses: ${{ format('{0}', needs['build-runner-ubuntu-24-04'].result) }}
       nvkr-results-07: ${{ format('"build-runner-ubuntu-24-04-arm":{0}', toJSON(needs['build-runner-ubuntu-24-04-arm'])) }}

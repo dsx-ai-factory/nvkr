@@ -1,0 +1,83 @@
+diff --git a/deploy/chart/local-path-provisioner/templates/_helpers.tpl b/deploy/chart/local-path-provisioner/templates/_helpers.tpl
+index cc8429e..bc5f2ff 100644
+--- a/deploy/chart/local-path-provisioner/templates/_helpers.tpl
++++ b/deploy/chart/local-path-provisioner/templates/_helpers.tpl
+@@ -80,3 +80,14 @@ cluster.local/{{ template "local-path-provisioner.fullname" . -}}
+ {{- define "local-path-provisioner.secret" }}
+ {{- printf "{\"auths\": {\"%s\": {\"auth\": \"%s\"}}}" .Values.privateRegistry.registryUrl (printf "%s:%s" .Values.privateRegistry.registryUser .Values.privateRegistry.registryPasswd | b64enc) | b64enc }}
+ {{- end }}
++
++{{/*
++Reference an image by digest when one is set, otherwise by tag.
++*/}}
++{{- define "local-path-provisioner.imageSuffix" -}}
++{{- if .digest -}}
++@{{ .digest }}
++{{- else -}}
++:{{ .tag }}
++{{- end -}}
++{{- end -}}
+diff --git a/deploy/chart/local-path-provisioner/templates/configmap.yaml b/deploy/chart/local-path-provisioner/templates/configmap.yaml
+index bc626e0..aea9040 100644
+--- a/deploy/chart/local-path-provisioner/templates/configmap.yaml
++++ b/deploy/chart/local-path-provisioner/templates/configmap.yaml
+@@ -59,9 +59,9 @@ data:
+       containers:
+         - name: helper-pod
+           {{- if .Values.privateRegistry.registryUrl }}
+-          image: {{ .Values.privateRegistry.registryUrl }}/{{ .Values.helperImage.repository }}:{{ .Values.helperImage.tag }}
++          image: {{ .Values.privateRegistry.registryUrl }}/{{ .Values.helperImage.repository }}{{ include "local-path-provisioner.imageSuffix" .Values.helperImage }}
+           {{- else }}
+-          image: {{ .Values.helperImage.repository }}:{{ .Values.helperImage.tag }}
++          image: {{ .Values.helperImage.repository }}{{ include "local-path-provisioner.imageSuffix" .Values.helperImage }}
+           {{- end }}
+           imagePullPolicy: {{ .Values.image.pullPolicy }}
+           resources:
+diff --git a/deploy/chart/local-path-provisioner/templates/deployment.yaml b/deploy/chart/local-path-provisioner/templates/deployment.yaml
+index 8bf442d..748a28d 100644
+--- a/deploy/chart/local-path-provisioner/templates/deployment.yaml
++++ b/deploy/chart/local-path-provisioner/templates/deployment.yaml
+@@ -36,9 +36,9 @@ spec:
+           securityContext:
+             {{- toYaml .Values.securityContext | nindent 12 }}
+         {{- if .Values.privateRegistry.registryUrl }}
+-          image: "{{ .Values.privateRegistry.registryUrl }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
++          image: "{{ .Values.privateRegistry.registryUrl }}/{{ .Values.image.repository }}{{ include "local-path-provisioner.imageSuffix" .Values.image }}"
+         {{- else }}
+-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
++          image: "{{ .Values.image.repository }}{{ include "local-path-provisioner.imageSuffix" .Values.image }}"
+         {{- end }}
+           imagePullPolicy: {{ .Values.image.pullPolicy }}
+           command:
+@@ -55,9 +55,9 @@ spec:
+             - {{ template "local-path-provisioner.provisionerName" . }}
+             - --helper-image
+           {{- if .Values.privateRegistry.registryUrl }}
+-            - "{{ .Values.privateRegistry.registryUrl }}/{{ .Values.helperImage.repository }}:{{ .Values.helperImage.tag }}"
++            - "{{ .Values.privateRegistry.registryUrl }}/{{ .Values.helperImage.repository }}{{ include "local-path-provisioner.imageSuffix" .Values.helperImage }}"
+           {{- else }}
+-            - "{{ .Values.helperImage.repository }}:{{ .Values.helperImage.tag }}"
++            - "{{ .Values.helperImage.repository }}{{ include "local-path-provisioner.imageSuffix" .Values.helperImage }}"
+           {{- end }}
+             - --configmap-name
+             - {{ .Values.configmap.name }}
+diff --git a/deploy/chart/local-path-provisioner/values.yaml b/deploy/chart/local-path-provisioner/values.yaml
+index 1511601..0e98397 100644
+--- a/deploy/chart/local-path-provisioner/values.yaml
++++ b/deploy/chart/local-path-provisioner/values.yaml
+@@ -7,11 +7,15 @@ namespaceOverride: ""
+ image:
+   repository: docker.io/rancher/local-path-provisioner
+   tag: v0.0.37
++  # When set, the image is referenced by digest instead of tag.
++  digest: ""
+   pullPolicy: IfNotPresent
+ 
+ helperImage:
+   repository: docker.io/library/busybox
+   tag: latest
++  # When set, the image is referenced by digest instead of tag.
++  digest: ""
+ 
+ defaultSettings:
+   registrySecret: ~

@@ -21,6 +21,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 // TestNightlyPublishedCandidate consumes the existing producer's authenticated
@@ -95,8 +96,8 @@ func nightlyTestAdmission(enable, actions, profile string) (bool, error) {
 }
 
 func runNightlyPublishedCandidate(ctx context.Context, timing nightlyTiming) (resultErr error) {
-	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" || os.Getenv("GITHUB_REF") != "refs/heads/main" || os.Getenv("GITHUB_SERVER_URL") != "https://github.com" {
-		return e.New(e.CodeEngineCapability, "nightly runtime requires the protected main GitHub workflow on native Linux ARM64")
+	if runtime.GOOS != "linux" || os.Getenv("GITHUB_REF") != "refs/heads/main" || os.Getenv("GITHUB_SERVER_URL") != "https://github.com" {
+		return e.New(e.CodeEngineCapability, "nightly runtime requires the protected main GitHub workflow on native Linux")
 	}
 	profile, err := loadNightlyProfile(ctx, os.Getenv("NVKR_NIGHTLY_PROFILES"), os.Getenv("NVKR_NIGHTLY_PROFILE"))
 	if err != nil {
@@ -154,6 +155,10 @@ func runNightlyPublishedCandidate(ctx context.Context, timing nightlyTiming) (re
 	if err != nil {
 		return err
 	}
+	platform, err := nightlyRuntimePlatform(profile, plan, runtime.GOOS+"/"+runtime.GOARCH)
+	if err != nil {
+		return err
+	}
 	workspace, err := freshDestination(os.Getenv("NVKR_NIGHTLY_WORKSPACE"))
 	if err != nil || !filepath.IsAbs(os.Getenv("NVKR_NIGHTLY_WORKSPACE")) {
 		return e.New(e.CodeUsage, "nightly requires a fresh absolute private workspace")
@@ -168,7 +173,7 @@ func runNightlyPublishedCandidate(ctx context.Context, timing nightlyTiming) (re
 	if err := AdmitDemoDeployment(ctx, cfg); err != nil {
 		return err
 	}
-	if err := admitNativeQEMUAdapter("linux/arm64", "kvm", cfg.DemoExecutable, true); err != nil {
+	if err := admitNativeQEMUAdapter(platform, "kvm", cfg.DemoExecutable, true); err != nil {
 		return err
 	}
 	inputs, err := newNightlyInputs(ctx, profile, build, plan, definition, environment, workspace)
@@ -176,6 +181,9 @@ func runNightlyPublishedCandidate(ctx context.Context, timing nightlyTiming) (re
 		return err
 	}
 	plan = inputs.Plan
+	if _, err := nightlyRuntimePlatform(profile, plan, platform); err != nil {
+		return err
+	}
 	nvkeCommit, err := nightlyPlanHarnessCommit(plan, profile)
 	if err != nil {
 		return err
@@ -220,6 +228,42 @@ func runNightlyPublishedCandidate(ctx context.Context, timing nightlyTiming) (re
 		}
 		return nil
 	})
+}
+
+// Profile and Plan descriptions admit only a matching execution route here.
+// Publication authenticity and payload access remain with lifecycle receipts.
+func nightlyRuntimePlatform(profile NightlyProfile, plan *factory.Plan, hostPlatform string) (string, error) {
+	platform, err := nightlyRuntimeTargetPlatform(profile.RuntimeTarget)
+	if err != nil {
+		return "", err
+	}
+	if target.ValidatePlatform(hostPlatform) != nil || hostPlatform != platform {
+		return "", e.New(e.CodeEngineCapability, "nightly runtime host %q differs from selected native platform %q", hostPlatform, platform)
+	}
+	diskOutput, err := selectedDiskOutputForArchitecture(profile.Network, target.Arch(platform))
+	if err != nil {
+		return "", err
+	}
+	if profile.DiskOutput != diskOutput {
+		return "", e.New(e.CodeVerifyFailed, "nightly profile disk %q differs from selected native disk %q", profile.DiskOutput, diskOutput)
+	}
+	if plan == nil || profile.DiskOutput == "" {
+		return "", e.New(e.CodeVerifyFailed, "nightly runtime requires its selected disk Plan")
+	}
+	found := false
+	for _, build := range plan.Builds {
+		if build.Name != profile.DiskOutput {
+			continue
+		}
+		if found || target.ValidatePlatform(build.Platform) != nil || build.Platform != platform {
+			return "", e.New(e.CodeVerifyFailed, "nightly selected disk differs from its native runtime platform")
+		}
+		found = true
+	}
+	if !found {
+		return "", e.New(e.CodeVerifyFailed, "nightly Plan omits its selected disk output")
+	}
+	return platform, nil
 }
 
 func writeNightlyCycle(ctx context.Context, public string, profile NightlyProfile, build NightlyBuild, subject, phase string, resultErr error) error {

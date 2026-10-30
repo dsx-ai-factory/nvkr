@@ -9,9 +9,12 @@ license and certificate bundle. No Debian runtime libraries or package manager a
 Ubuntu. This first component disables CGO and establishes no native library or GPU/DCGM compatibility.
 
 Each route's `image` is an expected content-pinned local preparation reference under `localhost/`,
-shared by the catalogs and Debian Environments. The four content pins are unchanged; the new lookup
-names have not been exercised. `localImageID` retains historical native-platform configuration IDs,
-which establish neither current availability nor byte-for-byte SDK reproduction.
+shared by the catalogs and Debian Environments. The Ubuntu 26.04 ARM64 route selects the existing
+`sha256:f6a0ffa4…` image measured on October 29, 2026. Its exact local reference passed a native,
+non-root, network-disabled run with Ubuntu 26.04, Go 1.27.0 and ARM64 `dpkg`. The other three
+routes remain unexercised. `localImageID` retains historical native-platform configuration IDs;
+neither those IDs nor this one-daemon observation establish availability on another host or
+byte-for-byte SDK reproduction. No SDK rebuild or registry publication is implied.
 
 To build an SDK, select the route's exact input values and a matching native host. This ARM64
 Ubuntu 24.04 example creates an explicit local tag:
@@ -26,17 +29,53 @@ docker buildx build --load --network=none --platform linux/arm64 \
   toolchains/nvsentinel-debian
 ```
 
-Before a Run, verify that the exact locked reference resolves. A tag or image ID alone does not
-establish that binding. BuildKit iidfiles and platform-less inspection can identify an OCI index
-instead of the native configuration. After rebuilding, measure both the configuration and selected
-manifest/index. If either differs, update the lock, catalog and Environment references and experiment
-overlays together through their owners; a rebuild does not automatically reproduce the old digest.
+Before a Run, verify that the exact locked reference resolves on the execution host. For Ubuntu
+26.04 ARM64, use the current lock's complete reference:
+
+```sh
+(
+set -eu
+sdk=localhost/nvkr-nvsentinel-ubuntu-26.04-arm64@sha256:f6a0ffa4e29bf10f6d946742aabc868b00faaa5ff2c3c4b4fbdfdefdec71075b
+image_platform=$(docker image inspect "$sdk" --format '{{.Os}}/{{.Architecture}}')
+test "$image_platform" = linux/arm64
+docker image inspect "$sdk" \
+  --format '{{.Id}} {{.Os}}/{{.Architecture}} {{json .RepoDigests}}'
+repo_digests=$(docker image inspect "$sdk" \
+  --format '{{range .RepoDigests}}{{println .}}{{end}}')
+printf '%s\n' "$repo_digests" | grep -Fx -- "$sdk"
+docker run --rm --pull=never --network=none --read-only \
+  --user "$(id -u):$(id -g)" --cap-drop=ALL --security-opt=no-new-privileges \
+  "$sdk" sh -ec '
+    . /etc/os-release
+    test "$ID" = ubuntu
+    test "$VERSION_ID" = 26.04
+    test "$(go env GOVERSION)" = go1.27.0
+    test "$(go env GOARCH)" = arm64
+    test "$(dpkg --print-architecture)" = arm64
+    dpkg-deb --version
+  '
+)
+```
+
+An absent image fails locally because `--pull=never` forbids fetching it. If the exact image is
+already present under another local tag, the containerd image store was exercised with
+`docker tag <existing-tag> localhost/nvkr-nvsentinel-ubuntu-26.04-arm64:local`. The destination
+repository must match the locked `localhost/nvkr-nvsentinel-ubuntu-26.04-arm64` name exactly.
+This does not rebuild or publish the image. Classic-store behavior was not tested. If an image has
+no `RepoDigests`, adding a tag alone does not establish the required manifest binding.
+Repeat both checks with the locked digest; NVKR also requires that the daemon
+report that manifest digest in `RepoDigests`. Tagging never makes different bytes match a pin.
+A tag or image ID alone does not establish that binding. BuildKit `--iidfile` output and portable
+inspection can identify an OCI index instead of the native configuration. After rebuilding, measure
+both the configuration and selected manifest/index. If either differs, update the lock, catalog and
+Environment references and experiment overlays together through their owners; a rebuild does not
+automatically reproduce the old digest.
 
 The Dockerfile checks Ubuntu's exact version, selected architecture, Go version and required package
 tools. Its final ambient environment contains only PATH. BuildKit acquires the pinned base inputs;
 the Dockerfile's build commands have no network access or package installation. SDK and base-image
 security acceptance remain separate from these assertions. No toolchain publication, production
-signing or package execution is established here. Native AMD64 package execution remains unverified;
-dated ARM64 observations used retired recipes and retain their scope in
-[reconciliation](../../docs/adr/reconciliation.md#nvsentinel-catalog-and-package-inputs). The current
-ordinary producer route retains only the raw package, without dependency inspection or installation proof.
+signing or package execution is established here. Native AMD64 package execution remains unverified.
+[Reconciliation](../../docs/adr/reconciliation.md#nvsentinel-catalog-and-package-inputs) distinguishes
+the developer-local SDK/package observation from retired recipes' observations. The current
+route retains only the raw package, without dependency inspection or installation proof.

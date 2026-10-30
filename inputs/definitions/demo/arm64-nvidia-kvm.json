@@ -169,7 +169,8 @@
         "base": "../../catalogs/node-images/release",
         "overlays": [
           "../../catalogs/node-images/variants/native-nvidia.json",
-          "../../catalogs/node-images/variants/native-local-kvm.json"
+          "../../catalogs/node-images/variants/native-local-kvm.json",
+          "../../catalogs/node-images/variants/current-main-doca-ovs.json"
         ]
       },
       "components": [

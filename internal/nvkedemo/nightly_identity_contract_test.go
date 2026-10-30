@@ -33,6 +33,36 @@ func nightlyIdentityFixture() (NightlyProfile, NightlyBuild) {
 	return profile, build
 }
 
+func TestNightlyProfileAdmitsSupportedNativeTargets(t *testing.T) {
+	for _, test := range []struct {
+		target, platform string
+	}{
+		{"native-arm64-vm", "linux/arm64"},
+		{"native-amd64-vm", "linux/amd64"},
+		{"native-s390x-vm", ""},
+		{"native-ARM64-vm", ""},
+		{"native-arm64-vm-extra", ""},
+		{"linux/amd64", ""},
+	} {
+		t.Run(test.target, func(t *testing.T) {
+			profile, _ := nightlyIdentityFixture()
+			profile.RuntimeTarget = test.target
+			platform, err := nightlyRuntimeTargetPlatform(test.target)
+			if test.platform == "" {
+				assertNightlyCode(t, err, e.CodeEngineCapability)
+				assertNightlyCode(t, validateNightlyProfile(profile), e.CodeEngineCapability)
+				return
+			}
+			if err != nil || platform != test.platform {
+				t.Fatalf("platform=%q error=%v, want %q", platform, err, test.platform)
+			}
+			if err := validateNightlyProfile(profile); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestNightlyCycleBindsCoordinatorSourceProfileAndProducer(t *testing.T) {
 	profile, base := nightlyIdentityFixture()
 	for _, test := range []struct {
@@ -40,6 +70,7 @@ func TestNightlyCycleBindsCoordinatorSourceProfileAndProducer(t *testing.T) {
 		change func(*NightlyBuild)
 	}{
 		{"profile substitution", func(b *NightlyBuild) { b.Profile.HarnessCommit = strings.Repeat("c", 40) }},
+		{"runtime architecture substitution", func(b *NightlyBuild) { b.Profile.RuntimeTarget = "native-amd64-vm" }},
 		{"mutable NVKE source", func(b *NightlyBuild) { b.NVKECommit = "main" }},
 		{"uppercase NVKE source", func(b *NightlyBuild) { b.NVKECommit = strings.Repeat("D", 40) }},
 		{"head substitution", func(b *NightlyBuild) { b.SourceCommit = strings.Repeat("c", 40) }},

@@ -6,6 +6,7 @@ package factory
 import (
 	"bytes"
 	"io"
+	"strings"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	yamlv3 "go.yaml.in/yaml/v3"
@@ -69,6 +70,9 @@ func countGitHubWorkflowYAMLNodes(raw []byte) (int, error) {
 		switch node.Kind {
 		case yamlv3.ScalarNode:
 			cost = 1
+			if err := validateGitHubExpressionLengths(node.Value); err != nil {
+				return err
+			}
 		case yamlv3.DocumentNode, yamlv3.MappingNode, yamlv3.SequenceNode:
 			cost = 2
 		default:
@@ -87,4 +91,34 @@ func countGitHubWorkflowYAMLNodes(raw []byte) (int, error) {
 	}
 	err := visit(&document, 1)
 	return nodes, err
+}
+
+// GitHub rejects a workflow when one ${{ }} expression exceeds 21,000
+// characters. Bound UTF-8 bytes conservatively.
+const maxGitHubExpressionBytes = 21000
+
+// validateGitHubExpressionLengths measures each expression to the first closing
+// braces outside a single-quoted literal, so format() templates such as
+// '{{"a":{0}}}' do not end the expression early.
+func validateGitHubExpressionLengths(value string) error {
+	for {
+		start := strings.Index(value, "${{")
+		if start < 0 {
+			return nil
+		}
+		value = value[start+3:]
+		end, quoted := len(value), false
+		for i := 0; i < len(value); i++ {
+			if value[i] == '\'' {
+				quoted = !quoted // an escaped '' toggles twice
+			} else if !quoted && strings.HasPrefix(value[i:], "}}") {
+				end = i
+				break
+			}
+		}
+		if end > maxGitHubExpressionBytes {
+			return e.New(e.CodeEngineCapability, "generated workflow expression is %d bytes; GitHub permits at most %d", end, maxGitHubExpressionBytes)
+		}
+		value = value[end:]
+	}
 }

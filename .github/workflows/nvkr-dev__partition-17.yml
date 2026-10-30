@@ -10,34 +10,23 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.results }}
       statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
-      nvkr-partition-18:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-18 }}
-      nvkr-results-01:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-01 }}
-      nvkr-results-01-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-01-statuses }}
+      nvkr-results-00:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00 }}
+      nvkr-results-00-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00-statuses }}
     secrets:
       NVKR_CI_STORAGE_READ_TOKEN:
         required: true
       NVKR_CI_STORAGE_WRITE_TOKEN:
         required: true
-      NVKR_DEV_REGISTRY_READ:
-        required: true
 permissions:
   contents: read
 jobs:
-  nvkr-verify-publication-output-controller-chart:
-    name: 'Verify release and deliverable signatures: output-controller-chart'
+  nvkr-package-publication-nvkectl-linux-arm64:
+    name: 'Package publication bundle: publication-nvkectl-linux-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-sign-output-controller-chart'].result == 'success' }}
-    environment: 'nvkr-dev-release'
-    permissions:
-      actions: read
-      contents: read
-    env:
-      NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_READ }}'
-      NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_READ_USER }}'
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-package-nvkectl-linux-arm64'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -59,19 +48,21 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
   nvkr-partition-results:
     name: 'Collect provider results: nvkr-partition-results'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-verify-publication-output-controller-chart]
+    needs: [nvkr-package-publication-nvkectl-linux-arm64]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     permissions: {}
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
-      nvkr-partition-18: ${{ format('"nvkr-verify-publication-output-controller-chart":{0}', toJSON(needs['nvkr-verify-publication-output-controller-chart'])) }}
-      nvkr-results-01: ${{ format('"nvkr-verify-publication-output-controller-chart":{0}', toJSON(needs['nvkr-verify-publication-output-controller-chart'])) }}
-      nvkr-results-01-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-controller-chart'].result) }}
+      nvkr-results-00: ${{ format('"nvkr-package-publication-nvkectl-linux-arm64":{0}', toJSON(needs['nvkr-package-publication-nvkectl-linux-arm64'])) }}
+      nvkr-results-00-statuses: ${{ format('{0}', needs['nvkr-package-publication-nvkectl-linux-arm64'].result) }}
     steps:
       - name: Forward provider results
         run: ':'

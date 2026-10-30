@@ -1,0 +1,47 @@
+{
+  "apiVersion": "nvkr.dev/catalog-overlay/v3",
+  "kind": "CatalogOverlay",
+  "name": "nvke-current-main-doca-ovs",
+  "requiresCatalogDigest": "sha256:6092474987a1be81eddc72fcb0e2eb29d6aa1396e33a8680b8ace5db5f3b4b8c",
+  "components": {
+    "nvke-image-inputs": {
+      "component": {
+        "platforms": [
+          "linux/amd64",
+          "linux/arm64"
+        ],
+        "fromSource": true,
+        "builderType": "oci-hermetic",
+        "repo": "https://github.com/dsx-ai-factory/nvke.git",
+        "tag": "82c8b7e8a3d4fa0ca301cb8eead4a6abea043755",
+        "commit": "82c8b7e8a3d4fa0ca301cb8eead4a6abea043755",
+        "treeHash": "94b1b7a18148ef98bdc1bee6118cdcdcf2632df5",
+        "toolchainImages": {
+          "amd64": "sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0",
+          "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3"
+        },
+        "outputType": "tarball",
+        "buildCommand": [
+          "bash",
+          "-ec",
+          "# Keep DHCP identity stable when NVKE moves L3 to its OVS bridge.\n# Stage authored VM configuration; never modify the pinned source tree.\nreadonly files=/src/nvkr-output/native-image-files\nmkdir -p \"$files\"\ncp -a /src/os-image/files/. \"$files/\"\ncat >\"$files/00-dhcp-all.yaml\" <<'NETPLAN'\nnetwork:\n  version: 2\n  renderer: networkd\n  ethernets:\n    all-en:\n      match:\n        name: \"e*\"\n      dhcp4: true\n      dhcp6: true\n      dhcp-identifier: mac\n      optional: true\nNETPLAN\nreadonly out=/src/nvkr-output\nreadonly materials=\"$out/materials\"\nmkdir -p \"$materials\"\n# The composer refuses symlinks. Copy into this private writable view while\n# preserving every original read-only material unchanged.\nfor binding in agent calico kubeadm-distro ovn spire-agent; do\n  cp --reflink=auto \"/nvkr/inputs/materials/$binding\" \"$materials/$binding\"\ndone\n# The composer accepts only .deb archive members, not the Make-generated index.\n(cd /src/os-image/packages/doca-ovs/nvkr-debs \u0026\u0026 \\\n  tar --format=ustar --sort=name --mtime=\"@$SOURCE_DATE_EPOCH\" \\\n    --owner=0 --group=0 --numeric-owner \\\n    -cf \"$materials/doca-ovs\" -- *.deb)\nexec python3 /src/os-image/packer/scripts/compose-image-inputs.py \\\n  --architecture {{.Arch}} \\\n  --materials-dir \"$materials\" \\\n  --source-files-dir \"$files\" \\\n  --output \"$out/image-inputs.tar\" \\\n  --source-date-epoch \"$SOURCE_DATE_EPOCH\"\n"
+        ],
+        "materials": {
+          "agent": "nvke-agent",
+          "calico": "nvke-cni-calico",
+          "kubeadm-distro": "nvke-kubeadm-distro",
+          "ovn": "nvke-cni-ovn",
+          "spire-agent": "nvke-spire-agent"
+        },
+        "artifactPath": "nvkr-output/image-inputs.tar",
+        "writeDir": "nvkr-output",
+        "vendorCommand": [
+          "bash",
+          "-ec",
+          "test ! -e os-image/packages/doca-ovs/nvkr-debs\ntest ! -L os-image/packages/doca-ovs/nvkr-debs\n# The source Makefile owns the DOCA version, package set and committed lock.\n# Stage beside the checkout; protected vendors mount /tmp with noexec.\nbundle_root=\"$(mktemp -d \"$(dirname \"$PWD\")/nvkr-doca.XXXXXXXX\")\"\ntrap 'rm -rf -- \"$bundle_root\"' EXIT\ntimeout --kill-after=10s 540s make -C os-image/packages/doca-ovs debs \\\n  ARCH={{.Arch}} UBUNTU_SERIES=26.04 \\\n  DIST_DIR=\"$bundle_root/dist\" OUT_DIR=\"$bundle_root/debs\"\nmkdir os-image/packages/doca-ovs/nvkr-debs\ncp \"$bundle_root/debs/\"*.deb os-image/packages/doca-ovs/nvkr-debs/\n"
+        ],
+        "sourceDateEpoch": 1793307557
+      }
+    }
+  }
+}

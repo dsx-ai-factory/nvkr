@@ -184,3 +184,133 @@ func TestNativeHelmVendorPinsMatchTheSharedTools(t *testing.T) {
 		})
 	}
 }
+
+func TestNativeHelmVendorsExecuteHostFromWorkspace(t *testing.T) {
+	site, err := LoadContext(t.Context(), Dir("../../../inputs/catalogs/nvke/native-site"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	realCopy, err := exec.LookPath("cp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, component := range []string{"nvke-controller-chart", "nktp-chart"} {
+		for _, tc := range []struct{ name, host, target, failure string }{
+			{"native amd64", "amd64", "amd64", ""},
+			{"native arm64", "arm64", "arm64", ""},
+			{"amd64 host arm64 target", "amd64", "arm64", ""},
+			{"arm64 host amd64 target", "arm64", "amd64", ""},
+			{"dependency failure cleans host", "arm64", "amd64", "helm"},
+			{"archive rejection precedes execution", "arm64", "arm64", "checksum"},
+		} {
+			t.Run(component+"/"+tc.name, func(t *testing.T) {
+				root := t.TempDir()
+				bin, fixtures := filepath.Join(root, "bin"), filepath.Join(root, "fixtures")
+				write := func(name, body string, mode os.FileMode) {
+					t.Helper()
+					if err := os.MkdirAll(filepath.Dir(name), 0o700); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(name, []byte(body), mode); err != nil {
+						t.Fatal(err)
+					}
+				}
+				const chart = "synthetic owning chart\n"
+				for _, name := range []string{"controller/deploy/charts/controller/Chart.yaml", "nktp/deploy/charts/nktp/Chart.yaml", "nktp/deploy/charts/nktp/Chart.lock"} {
+					write(filepath.Join(root, name), chart, 0o600)
+				}
+				for _, arch := range []string{"amd64", "arm64"} {
+					// This executable models only Helm's invocation and output files.
+					// Archive digests below are request stubs, not artifact integrity proof.
+					helper := `#!/bin/sh
+set -eu
+workspace=$(pwd -P)
+case "$0" in .nvkr-helm-host.*/helm|"$workspace"/.nvkr-helm-host.*/helm) ;; *) exit 44 ;; esac
+[ "$NVKR_HOST_ARCH" = @ARCH@ ] || exit 45
+printf '%s %s\n' "$0" "$*" >> "$NVKR_HELM_CALLS"
+[ "$NVKR_FAILURE" != helm ] || exit 42
+if [ "$1" = dependency ] && [ "$3" = nktp/deploy/charts/nktp ]; then
+  mkdir -p nktp/deploy/charts/nktp/charts
+  for archive in metrics-server-3.13.1 prometheus-node-exporter-4.56.1 opentelemetry-kube-stack-0.25.1; do
+    printf 'synthetic chart\n' > "nktp/deploy/charts/nktp/charts/$archive.tgz"
+  done
+fi
+`
+					write(filepath.Join(fixtures, "linux-"+arch, "helm"), strings.ReplaceAll(helper, "@ARCH@", arch), 0o700)
+				}
+				machine := "aarch64"
+				if tc.host == "amd64" {
+					machine = "x86_64"
+				}
+				stubs := map[string]string{
+					"uname":   "printf '%s\\n' " + machine + "\n",
+					"curl":    "exit 0\n",
+					"tar":     "exit 0\n",
+					"timeout": "shift\nshift\nexec \"$@\"\n",
+					"cp": `case "$1" in /tmp/linux-*/helm) source="$NVKR_HELM_FIXTURES/${1#/tmp/}" ;; *) exit 46 ;; esac
+exec "$NVKR_REAL_COPY" "$source" "$2"
+`,
+					"sha256sum": `if [ "$1" = -c ]; then
+  request=$(cat)
+  printf '%s\n' "$request" >> "$NVKR_CHECK_REQUESTS"
+  [ "$NVKR_FAILURE" != checksum ] || exit 43
+else
+  for file in "$@"; do printf 'synthetic-pin  %s\n' "$file"; done
+fi
+`,
+				}
+				for name, body := range stubs {
+					write(filepath.Join(bin, name), "#!/bin/sh\nset -eu\n"+body, 0o700)
+				}
+				calls := filepath.Join(root, "helm-calls")
+				command := site.Components[component].VendorCommand
+				child := exec.CommandContext(t.Context(), command[0], command[1], strings.ReplaceAll(command[2], "{{.Arch}}", tc.target))
+				child.Dir = root
+				child.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+					"NVKR_HOST_ARCH="+tc.host, "NVKR_FAILURE="+tc.failure, "NVKR_HELM_FIXTURES="+fixtures,
+					"NVKR_REAL_COPY="+realCopy, "NVKR_HELM_CALLS="+calls, "NVKR_CHECK_REQUESTS="+filepath.Join(root, "checks"))
+				output, vendorErr := child.CombinedOutput()
+				if (vendorErr != nil) != (tc.failure != "") {
+					t.Fatalf("vendor execution: %v: %s", vendorErr, output)
+				}
+				leftovers, err := filepath.Glob(filepath.Join(root, ".nvkr-helm-host.*"))
+				if err != nil || len(leftovers) != 0 {
+					t.Fatalf("temporary host tools survived vendor completion: %v %v", leftovers, err)
+				}
+				if tc.failure != "" {
+					wantExit := 42
+					if tc.failure == "checksum" {
+						wantExit = 43
+					}
+					if exit, ok := vendorErr.(*exec.ExitError); !ok || exit.ExitCode() != wantExit {
+						t.Fatalf("vendor did not propagate the selected failure: %v: %s", vendorErr, output)
+					}
+					if _, err := os.Stat(filepath.Join(root, ".nvkr-tools", "helm")); !os.IsNotExist(err) {
+						t.Fatal("failed vendoring captured target Helm", err)
+					}
+					if tc.failure == "checksum" {
+						if _, err := os.Stat(calls); !os.IsNotExist(err) {
+							t.Fatal("Helm executed before archive checksum admission", err)
+						}
+					}
+					return
+				}
+				if raw, err := os.ReadFile(calls); err != nil || len(raw) == 0 {
+					t.Fatal("host Helm did not execute from the source workspace", err)
+				}
+				got, err := os.ReadFile(filepath.Join(root, ".nvkr-tools", "helm"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				want, err := os.ReadFile(filepath.Join(fixtures, "linux-"+tc.target, "helm"))
+				if err != nil || string(got) != string(want) {
+					t.Fatal("captured Helm differs from the selected target bytes", err)
+				}
+				members, err := os.ReadDir(filepath.Join(root, ".nvkr-tools"))
+				if err != nil || len(members) != 1 || members[0].Name() != "helm" {
+					t.Fatal("captured tools contain temporary host artifacts", err)
+				}
+			})
+		}
+	}
+}

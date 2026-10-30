@@ -1449,8 +1449,12 @@ and an acyclic contracted dependency graph. Semantic equivalence tests compare f
 with partitioned prerequisite-result evaluation under failure and cancellation. These are local contracts,
 not proof of provider cancellation timing or support for another CI adapter.
 
-The compiler groups lexically ordered jobs by dependency depth, with at most 64 original jobs per worker
-and at most 50 workers. Jobs requesting `id-token: write` remain in the entry workflow: Fulcio uses the
+The compiler groups jobs by dependency depth and orders each depth by bounded finish time, the longest
+path of declared job timeouts. It splits a depth where those finish times diverge, widest gap first, until
+it reaches 30 workers, with at most 64 original jobs per worker and at most 50 workers. Timeouts only order
+scheduling; they never change membership, conditions or identity. A local
+[scheduling harness](../execution-partition-scheduling.md) over the maintained Plans motivated this
+grouping with estimated durations; hosted wall time remains unmeasured. Jobs requesting `id-token: write` remain in the entry workflow: Fulcio uses the
 reusable workflow path for the certificate signer identity, so moving them would change the authored signer
 policy (see the proposed migration below). Dependencies and result reports project both inline jobs and worker
 jobs without widening that policy.
@@ -1483,7 +1487,7 @@ require every committed producer's OIDC jobs to remain in the entry workflow nam
 This subsection is proposed design, not implemented behavior. Today every `id-token: write` job stays
 inline, and no code path relocates a signer. Local measurements of the committed bundles show where those
 jobs fall. In the partitioned development entry, the 139 inline signing and SBOM-attestation jobs account
-for 10,984 of 12,998 expanded YAML parsing events and 104,357 of 252,486 bytes. In the flat default
+for 10,984 of 13,308 expanded YAML parsing events and 104,357 of 264,038 bytes. In the flat default
 producer, the same jobs account for 10,984 of 47,055 events. That producer is at 94.1% of the 50,000-event
 parser bound, the binding constraint today. These are local generation measurements, not provider
 evidence.
