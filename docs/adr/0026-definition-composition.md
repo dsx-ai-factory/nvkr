@@ -523,5 +523,5 @@ Contract suites only. U1–U7 are implemented with table-driven contract tests t
 catalogs and shows that every composite output and native build keeps the Build Digest and native build records
 of the combined Definition and the four families, including family-only outputs the combined Definition lacks,
 and that its worker partitions equal those of its effective Definition compiled plainly under the same
-partitioned Environment. These are local contracts. No hosted composite Run, composite publication or consumer verification exists, and no claim
-follows from the family pilot's or the combined candidate's evidence.
+partitioned Environment. These are local contracts. No hosted composite Run, composite publication or consumer verification
+has been exercised or recorded, and no claim follows from the family pilot's or the combined candidate's evidence.
