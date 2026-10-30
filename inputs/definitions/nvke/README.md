@@ -98,16 +98,20 @@ The `nico` chart is not image-bound. It renders `<repository>:<tag>`, so the con
 First authenticate the Release under your identity and issuer policy with `nvkr release verify`
 ([Lifecycle](../../../docs/lifecycle.md)); `nvkr release browse` does not verify signatures or payloads.
 Take the `nico`, `nico-core-image` and `nico-flow-image` artifact digests from the verified Release. Then
-pass a digest-qualified tag, because Kubernetes pulls `name:tag@sha256:…` by digest. The subchart
-otherwise derives `<global.image.repository>/nico-flow`, so set Flow's own repository:
+pass a digest-qualified tag, because Kubernetes pulls `name:tag@sha256:…` by digest. Upstream installs
+Flow as its own `flow` release in namespace `flow`, where `nico-prereqs` delivers its database
+credentials and the site agent expects `flow.flow.svc.cluster.local:50051`; the umbrella keeps
+`nico-flow.enabled=false`. Install it from the `charts/nico-flow` directory inside the `nico` package and
+set Flow's own repository, which otherwise derives `<global.image.repository>/nico-flow`:
 
 ```sh
-helm install nico "oci://$PREFIX/nico" --version 2.2.2 \
+helm pull "oci://$PREFIX/nico" --version 2.2.2 --untar
+helm install nico ./nico \
   --set global.image.repository="$PREFIX/nico-core-image" \
-  --set global.image.tag="v2.2.2@$CORE_DIGEST" \
-  --set nico-flow.enabled=true \
-  --set nico-flow.images.flow.repository="$PREFIX/nico-flow-image" \
-  --set nico-flow.images.flow.tag="v2.2.2@$FLOW_DIGEST"
+  --set global.image.tag="v2.2.2@$CORE_DIGEST"
+helm install flow ./nico/charts/nico-flow --namespace flow --create-namespace \
+  --set images.flow.repository="$PREFIX/nico-flow-image" \
+  --set images.flow.tag="v2.2.2@$FLOW_DIGEST"
 ```
 
 `PREFIX` is the Environment's publication prefix. Each output is published at `$PREFIX/<output>`;
