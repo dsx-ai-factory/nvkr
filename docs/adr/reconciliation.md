@@ -1273,11 +1273,19 @@ names and transport aliases, with explicit operator enrollment and one owning re
 display name/bundle, exact dispatch ref and evaluated non-canceling concurrency group.
 New enrollment must exclude equal, ancestor and descendant prefixes of enrolled or retired reservations on
 the same provider/resource and bucket, with serialized overlap checking and no-replace creation.
+An authenticated exact retry reuses the unchanged non-retired enrollment before new-enrollment overlap
+rejection; a different repository or other owner field at an equal prefix is rejected, and retirement still
+blocks a same-owner retry. Required tests cover lost enrollment acknowledgements and repository-only mismatch.
 Preparing-state CAS permits proven-undispatched closure; unrecoverable authorized state requires recorded
 retirement and a separately enrolled disjoint prefix. Exact-bundle replay does not require joining a lost
 runner, while current workers remain owned through stop/join. First-use, alias/owner collisions, overlapping
-enrollment races, workflow/group/cancellation mismatches, closure races,
-retirement and missing/queue-expired cutoff tests are required. These boundaries remain unimplemented/unexercised.
+enrollment races, repository/workflow/group/cancellation mismatches, closure races,
+retirement and missing/queue-expired cutoff tests are required. Independently authenticated completion must
+be durably recorded and confirmed through a generation-checked `verified-complete` transition before producer
+success, bound to the original operation, namespace, Run/attempt/target, exact locator/root/bundle and enforced
+policies. Persistence failure, lost-acknowledgement recovery and stale/substituted transition bindings require
+explicit tests; remote completion remains recoverable and later consumers still authenticate its closure.
+These boundaries remain unimplemented/unexercised.
 
 ## Support by owner
 

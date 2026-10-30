@@ -429,18 +429,24 @@ Operator-authorized no-replace enrollment through the Run-record owner initializ
 a dedicated unused physical namespace. The initial profile admits neither owner migration nor reinitialization
 of a previously enrolled namespace. Enrollment records
 the resource mapping, recovery capabilities and one owning repository, workflow path, display name/bundle,
-exact dispatch ref and evaluated non-canceling concurrency group. Admit only that owner. Another bundle,
-workflow or ref cannot share the namespace under a different group; the current per-workflow groups are not
+exact dispatch ref and evaluated non-canceling concurrency group. Admit only that owner. Another repository,
+bundle, workflow or ref cannot share the namespace under a different group; the current per-workflow groups are not
 a repository-wide lock. Ordinary publication cannot initialize or reset missing state. Concurrent enrollment
 has one winner; retries authenticate the existing record rather than overwrite it. Missing enrolled state,
 an attempted migration/reset or ownership/resource ambiguity fails admission before producer or delivery work.
+
+Before new-enrollment overlap admission, an exact retry must authenticate and reuse the existing non-retired
+enrollment for the same physical namespace and complete recorded owner tuple. Reuse leaves the record unchanged
+and neither initializes/resets state nor clears pending obligations, including after a lost enrollment
+acknowledgement. An equal prefix with any different owner field fails admission. A retired namespace remains
+blocked even for the same owner.
 
 New enrollment must reject a prefix equal to, containing, or contained by any enrolled or retired namespace
 on the same admitted provider/resource and bucket. Compare canonical literal prefix subtrees at `/` key-segment
 boundaries: `nvke` contains `nvke/os`, but not `nvke2`. The enrollment owner must serialize the complete
 overlap check and no-replace creation so concurrent overlapping enrollments cannot both succeed; missing or
-incomplete reservation state fails admission. An exact retry may authenticate the existing enrollment without
-creating or resetting state. Empty and bucket-root prefixes remain rejected by the authored prefix grammar.
+incomplete reservation state fails admission. The authenticated existing-record retry above is not a new
+enrollment. Empty and bucket-root prefixes remain rejected by the authored prefix grammar.
 
 Across Runs and attempts, `lifecycle` and the Run-record owner serialize that enrolled physical namespace;
 serialization covers predecessor lookup, registration, signing, recovery-byte retention and commit disposition.
@@ -494,7 +500,18 @@ This exception authorizes no fresh signature, other-key write, payload replay or
 
 After that gate, the state order is source authentication → upload payloads and proofs → verify every required
 storage object and boot URL → generate canonical root → detached signing → root upload and read-back → durable recovery-byte retention
-→ conditional bundle upload last → independent root and bundle authentication → producer success.
+→ conditional bundle upload last → independent root, bundle and required-closure authentication
+→ durable generation-checked `verified-complete` transition and confirmation → producer success.
+Using the live verification receipt, `lifecycle` and the Run-record owner must atomically transition the exact
+`commit-authorized` operation/generation to `verified-complete`. Bind the enrolled physical namespace,
+originating Run/attempt and target, unchanged locator and exact root/bundle identities, and the policies
+actually enforced. Confirm the durable terminal record before reporting producer success. A conflicting
+generation, persistence failure or unconfirmed result returns a coded error while preserving recoverable
+state and any valid remote completion. Resolve a lost transition acknowledgement through authoritative
+exact-state read-back; never overwrite conflicting or retired state or substitute a stored success flag.
+Recovery records its own observation without rewriting the originating Run or extending its cutoff. Later
+reconciliation still authenticates the required remote closure under independent policies; this internal
+terminal record is not portable verification authority.
 Freeze the exact root, bundle and locator bytes before the final commit request. Exact-byte request retries
 preserve them; a new signature or key cannot bypass the predecessor gate. `lifecycle` must durably retain
 the root, bundle and locator bytes under the originating Run/attempt and target, linked from the cross-Run
@@ -608,9 +625,14 @@ acknowledgement and recover the same frozen locator through version discovery an
 verification. A new provider Run ID must not bypass an unresolved operation for the same enrolled physical
 namespace. Target rename, endpoint alias and addressing-mode changes must select the same state.
 Test first-use enrollment, a conflicting second owner/bundle/ref, missing enrolled state, concurrent initialization
-and attempted migration/reset. With bundle and dispatch ref unchanged, reject a changed workflow path,
-changed evaluated concurrency group and `cancel-in-progress: true`. Reject equal, ancestor and descendant
-prefixes against both enrolled and retired reservations on the same provider/resource and bucket; race
+and attempted migration/reset. Reject a different owning repository, including a fork, while keeping workflow
+path, display name/bundle, dispatch ref and evaluated concurrency group unchanged. With bundle and dispatch
+ref unchanged, reject a changed workflow path, changed evaluated concurrency group and `cancel-in-progress: true`.
+After a lost enrollment acknowledgement, an exact retry with the same physical namespace and complete owner
+tuple must authenticate and reuse the unchanged non-retired record before new-enrollment overlap rejection.
+For an equal prefix, vary each owner field individually and require refusal; a retired namespace also rejects
+a same-owner retry. Reject new equal, ancestor and descendant prefixes against both enrolled and retired
+reservations on the same provider/resource and bucket; race
 concurrent parent/child enrollments so only one can succeed. Include disjoint sibling prefixes as a positive
 case, and reject empty/bucket-root prefixes under the existing grammar. Each invalid delivery admission must
 return a coded error with zero producer
@@ -627,6 +649,13 @@ replay cannot require an impossible old-runner join. Missing recovery bytes and 
 must block signing except for the explicit retirement/new-namespace path.
 A verified terminal predecessor must permit a genuinely different subsequent delivery. Uncertain, expired
 or incomplete pending history prevents new signing. Concurrent callers must not both acquire signing authority.
+After successful remote authentication, failed or unconfirmed terminal persistence must prevent producer
+success while retaining recovery of the existing completion. Lose the terminal CAS acknowledgement: matching
+durable exact-state read-back must resolve it without re-signing. Crash before that CAS, then recover by
+authenticating the existing completion and recording its terminal disposition. Stale generations, retirement
+winning the transition race, and substituted origin, target, locator or verification-policy bindings must return coded refusals.
+Verify that a later Run reconciles the durable terminal predecessor through the existing reuse/new-delivery
+rules without treating the stored disposition as portable proof or rewriting the originating attempt.
 With successful byte read-back, require coded failure and zero final commit requests for service expiry
 before the recovery deadline, sufficient requested retention capped to insufficient reported expiry,
 unverifiable expiry/access, or discovery requiring a terminal Run record that was never published.
