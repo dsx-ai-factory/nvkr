@@ -101,11 +101,24 @@ signatures or payloads. The maintained candidate publishes to private GHCR packa
 `--anonymous`, `release verify` reads signature, provenance and SBOM bundles with the same registry
 keychain as payloads, so log in first. That private read is contract-tested only; no private-registry
 verification has been re-run since it changed ([consumer acceptance scopes](../../../docs/adr/reconciliation.md#consumer-acceptance-scopes)).
+`release verify` writes the verified Release to stdout, so save it:
 
-Take each digest from the verified Release's `.artifacts[]` record with the matching `name`. `nico` is
+```sh
+nvkr release verify \
+  --reference "$RELEASE_REF" \
+  --lane pipeline-attested --scope artifact-publication \
+  --identity "$BUILD_IDENTITY_REGEXP" --issuer "$OIDC_ISSUER" \
+  --cosign "$COSIGN_PATH" --cosign-digest "$COSIGN_DIGEST" > release.json
+```
+
+Take each digest from the verified Release's `.artifacts[]` record with the matching `name`; with the
+exact-input flags, the Release is under `.release`, so read `.release.artifacts[]`. `nico` is
 the chart manifest digest, and `nico-core-image` and `nico-flow-image` are their two-platform OCI image
 index digests, not the Release root or a per-platform child manifest. Then pass a digest-qualified tag,
-because Kubernetes pulls `name:tag@sha256:…` by digest. Upstream installs Flow as its own `flow` release in
+because Kubernetes pulls `name:tag@sha256:…` by digest. Upstream's
+[setup](https://github.com/dsx-ai-factory/infra-controller/blob/80d131a5cd3280f9cef3131fa0c5647bdf3e79d0/helm-prereqs/setup.sh)
+installs Core as `nico` in namespace `nico-system`, which its prerequisite phases prepare and Flow addresses
+as `nico-api.nico-system.svc.cluster.local:1079`. It installs Flow as its own `flow` release in
 namespace `flow`, where `nico-prereqs` delivers its database credentials and the site agent expects
 `flow.flow.svc.cluster.local:50051`; the umbrella keeps `nico-flow.enabled=false`. Install it from the
 `charts/nico-flow` directory inside the `nico` package and set Flow's own repository, which otherwise
@@ -117,7 +130,7 @@ CHART_DIGEST="$(digest nico)"
 CORE_DIGEST="$(digest nico-core-image)"
 FLOW_DIGEST="$(digest nico-flow-image)"
 helm pull "oci://$PREFIX/nico@$CHART_DIGEST" --untar
-helm install nico ./nico \
+helm install nico ./nico --namespace nico-system --create-namespace \
   --set global.image.repository="$PREFIX/nico-core-image" \
   --set global.image.tag="v2.2.2@$CORE_DIGEST"
 helm install flow ./nico/charts/nico-flow --namespace flow --create-namespace \
@@ -126,10 +139,9 @@ helm install flow ./nico/charts/nico-flow --namespace flow --create-namespace \
 ```
 
 `PREFIX` is the Environment's publication prefix. Each output is published at `$PREFIX/<output>`;
-`$PREFIX/releases-<output>` holds only its internal metadata root (ADR-20). `release.json` is the verified
-Release that `release verify` writes. The chart's `2.2.2` tag is only a discovery hint; use
-`helm pull "oci://$PREFIX/nico" --version 2.2.2` only when your Helm version rejects `oci://…@sha256:…`,
-and then compare the pulled chart's manifest digest with `CHART_DIGEST` before installing. The Core image
+`$PREFIX/releases-<output>` holds only its internal metadata root (ADR-20). The chart's `2.2.2` tag is
+only a discovery hint; use `helm pull "oci://$PREFIX/nico" --version 2.2.2` only when your Helm version
+rejects `oci://…@sha256:…`, and then compare the pulled chart's manifest digest with `CHART_DIGEST` before installing. The Core image
 serves the umbrella chart's services that read `global.image`. The default-enabled `nico-ntp` subchart uses
 its own upstream image (`dockurr/chrony`), which this Release does not build; consumers must assess or
 relocate it.
