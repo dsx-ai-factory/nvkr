@@ -33,29 +33,39 @@ Before a Run, verify that the exact locked reference resolves on the execution h
 26.04 ARM64, use the current lock's complete reference:
 
 ```sh
+(
+set -eu
 sdk=localhost/nvkr-nvsentinel-ubuntu-26.04-arm64@sha256:f6a0ffa4e29bf10f6d946742aabc868b00faaa5ff2c3c4b4fbdfdefdec71075b
-docker image inspect --platform linux/arm64 "$sdk" \
+test "$(docker image inspect "$sdk" --format '{{.Os}}/{{.Architecture}}')" = linux/arm64
+docker image inspect "$sdk" \
   --format '{{.Id}} {{.Os}}/{{.Architecture}} {{json .RepoDigests}}'
 docker run --rm --pull=never --network=none --read-only \
   --user "$(id -u):$(id -g)" --cap-drop=ALL --security-opt=no-new-privileges \
   "$sdk" sh -ec '
     . /etc/os-release
-    test "$ID" = ubuntu && test "$VERSION_ID" = 26.04
+    test "$ID" = ubuntu
+    test "$VERSION_ID" = 26.04
     test "$(go env GOVERSION)" = go1.27.0
     test "$(go env GOARCH)" = arm64
     test "$(dpkg --print-architecture)" = arm64
     dpkg-deb --version
   '
+)
 ```
 
 An absent image fails locally because `--pull=never` forbids fetching it. If the exact image is
-already present under another local tag, `docker tag <existing-tag> <localhost-tag>` can add its
-local name without rebuilding or publishing. Then repeat both checks with the locked digest;
-tagging never makes different bytes match a pin. A tag or image ID alone does not establish that
-binding. BuildKit iidfiles and platform-less inspection can identify an OCI index
-instead of the native configuration. After rebuilding, measure both the configuration and selected
-manifest/index. If either differs, update the lock, catalog and Environment references and experiment
-overlays together through their owners; a rebuild does not automatically reproduce the old digest.
+already present under another local tag, the containerd image store was exercised with
+`docker tag <existing-tag> localhost/nvkr-nvsentinel-ubuntu-26.04-arm64:local`. The destination
+repository must match the locked `localhost/nvkr-nvsentinel-ubuntu-26.04-arm64` name exactly.
+This does not rebuild or publish the image. Classic-store behavior was not tested. If an image has
+no `RepoDigests`, adding a tag alone does not establish the required manifest binding.
+Repeat both checks with the locked digest; NVKR also requires that the daemon
+report that manifest digest in `RepoDigests`. Tagging never makes different bytes match a pin.
+A tag or image ID alone does not establish that binding. BuildKit `--iidfile` output and portable
+inspection can identify an OCI index instead of the native configuration. After rebuilding, measure
+both the configuration and selected manifest/index. If either differs, update the lock, catalog and
+Environment references and experiment overlays together through their owners; a rebuild does not
+automatically reproduce the old digest.
 
 The Dockerfile checks Ubuntu's exact version, selected architecture, Go version and required package
 tools. Its final ambient environment contains only PATH. BuildKit acquires the pinned base inputs;
@@ -63,5 +73,5 @@ the Dockerfile's build commands have no network access or package installation. 
 security acceptance remain separate from these assertions. No toolchain publication, production
 signing or package execution is established here. Native AMD64 package execution remains unverified.
 [Reconciliation](../../docs/adr/reconciliation.md#nvsentinel-catalog-and-package-inputs) distinguishes
-the October 29 ordinary-producer ARM64 DEB build from retired recipes' observations. The current
+the developer-local SDK/package observation from retired recipes' observations. The current
 route retains only the raw package, without dependency inspection or installation proof.

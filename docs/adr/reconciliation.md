@@ -652,20 +652,11 @@ observations, without a shared Run/artifact record or a committed test of these 
 establish independently verifiable OS-material placement or a current product build. Offline input
 compilation and catalog-copy checks establish only the authored selections and bindings.
 
-On October 29, 2026, local Run `ubuntu26-arm64-followup-20261029-01` completed the simplified
-Ubuntu 26.04 ARM64 Debian Definition on native Linux ARM64 with NVKR main `946e9da1` plus the
-reviewed SDK-reference and overlay-predecessor changes. The selected existing SDK was
-`localhost/nvkr-nvsentinel-ubuntu-26.04-arm64@sha256:f6a0ffa4e29bf10f6d946742aabc868b00faaa5ff2c3c4b4fbdfdefdec71075b`;
-its exact local lookup and non-root, network-disabled version checks passed without rebuilding it.
-Plan `eca0a17f8237e6949f6e8ea86966f192e29d5381416961e16efd7fd8d59a11c9` retained one
-33,923,674-byte DEB at mode `0444`, SHA-256
-`2ad53f91ca94e29c66db3c35d6fac69005fc52f84ec31d710ac5001ef54515b7`, matching the terminal
-lifecycle observation. Independent read-only `dpkg-deb` checks confirmed version
-`0~git20261013.c159347735`, architecture `arm64`, the executable and license, with no service unit
-or maintainer scripts. Captured inputs, Run records and package bytes remain developer-local;
-no shared immutable artifact reference is available. This establishes one current raw-package build,
-not reproduction, OS-material assembly, installation, dependency inspection or runtime acceptance.
-The other SDK routes remain unexercised; signing and publication remain deferred.
+The simplified Ubuntu 26.04 ARM64 SDK/package exercise remains a developer-local operator observation
+in the `unqualified-local-execution` lane. No shared immutable Run or artifact reference is available;
+local measurements do not establish an independently verifiable current build, reproduction,
+OS-material assembly, installation, dependency inspection or runtime acceptance. The other SDK routes
+remain unexercised; signing and publication remain deferred.
 
 Historical observations used the retired patched recipes and extra Debian execution protocol. Standalone
 package/image/chart payloads were removed during authorized cleanup. Their identities and observation scope
