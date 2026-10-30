@@ -1278,8 +1278,10 @@ Negative boot acceptance explicitly includes mismatched EFI architecture and inc
 Provider policy evidence and these failure/rejection exercises remain outstanding.
 In-run retries preserve held bytes, key and conditional creation without requiring absent-object proof or
 bucket-listing permission. Retryable completion failures reuse the same upload ID and frozen part list;
-completion `409` requires joined cleanup and a fresh upload, while `412`/`NoSuchUpload` require full-byte
-reconciliation. SDK and owner retries share request limits; whole-object PUT replays and fresh multipart
+completion `409` first reconciles full bytes and reuses equal authenticated bytes; conflicting bytes fail.
+If reconciliation cannot authenticate equal bytes and establishes no conflict, stop new work, cancel active
+requests and join transfer workers before abort/list cleanup and a fresh upload. `412`/`NoSuchUpload` require
+full-byte reconciliation. SDK and owner retries share request limits; whole-object PUT replays and fresh multipart
 uploads also consume the upload bound. These retry and budget-exhaustion cases remain unimplemented/unexercised.
 Both the state order and generated job dependencies require confirmed generation-checked `commit-authorized`
 promotion after recovery retention and before final PUT. Every final-bundle dispatch/retry requires current
