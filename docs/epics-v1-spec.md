@@ -471,7 +471,10 @@ Acceptance of this extension requires:
    and failed boot/install cannot yield a successful required operation. A lost completion acknowledgement
    is reconciled or reported as indeterminate; already stored valid evidence is not described as rolled back.
    The exact completion reference remains retrievable after producer or runner loss and permits independent
-   recovery on versioned storage. Failure to retain and confirm that reference prevents the final commit.
+   recovery through version-specific retrieval or, when the admitted storage profile does not support it,
+   through conditional retrieval of the exact completion object with complete-byte verification. Denied or failed
+   version retrieval cannot authorize the alternate read path. Failure to retain and confirm that reference
+   prevents the final commit.
    A retry must reconcile earlier uncertain completion before creating another signed completion; a valid
    prior completion is reused with its original proof, and unresolved history cannot be bypassed.
    Starting a new Run does not clear uncertainty for an enrolled physical namespace. Recovery preserves

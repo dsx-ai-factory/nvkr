@@ -711,8 +711,16 @@ upload and resend all parts without an absence prerequisite. Permanent validatio
 Exhaust combined SDK/owner request attempts and whole-object upload attempts independently, including PUT
 replays, and reject budget resets or deadline extensions. On a versioned bucket, lose the final
 acknowledgement and recover the same frozen locator through version discovery and complete independent
-verification. A new provider Run ID must not bypass an unresolved operation for the same enrolled physical
-namespace. Target rename, endpoint alias and addressing-mode changes must select the same state.
+verification. When the admitted storage profile does not support version reads, also lose the final
+acknowledgement and recover through bounded HEAD at the frozen bundle key followed by GET with `If-Match`
+bound to the returned ETag. Require complete digest/size verification and independent authentication of the
+bundle, root and required closure; retain the conditional-read binding in the receipt without rewriting the
+locator. Reject a missing/unusable ETag, a changed ETag between HEAD and GET, denied reads, truncated bodies
+and digest/size mismatches with coded errors and no success. Denied or failed exact-version reads in a profile
+that supports them must issue no fallback unversioned GET; missing conditional-read capability also fails
+admission rather than downgrading to an unconditional read. A new provider Run ID must not bypass an unresolved
+operation for the same enrolled physical namespace. Target rename, endpoint alias and addressing-mode changes
+must select the same state.
 Test first-use enrollment, a conflicting second owner/bundle/ref, missing enrolled state, concurrent initialization
 and attempted migration/reset. Reject a different owning repository, including a fork, while keeping workflow
 path, display name/bundle, dispatch ref and evaluated concurrency group unchanged. With bundle and dispatch
