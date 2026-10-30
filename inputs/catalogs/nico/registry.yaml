@@ -59,17 +59,25 @@ components:
             --output "type=oci,dest=$layouts/${base%%:*},tar=false" \
             --metadata-file "$layouts/${base%%:*}.json"
         done
-        digest() { grep -o '"containerimage.digest": *"sha256:[0-9a-f]*"' "$layouts/$1.json" | grep -o 'sha256:[0-9a-f]*'; }
+        # Assignments, not inline substitutions, so set -e stops on a missing or ambiguous digest.
+        digest() {
+          found="$(grep -o '"containerimage.digest": *"sha256:[0-9a-f]*"' "$layouts/$1.json" | grep -o 'sha256:[0-9a-f]*')" || found=
+          [ "$(printf '%s\n' "$found" | grep -cx 'sha256:[0-9a-f]\{64\}')" = 1 ] && [ "$(printf '%s\n' "$found" | wc -l)" -eq 1 ] || {
+            echo "NICo Core $1 base metadata must name exactly one sha256 image digest" >&2; exit 1; }
+          printf '%s\n' "$found"
+        }
+        build_digest="$(digest build)"
+        runtime_digest="$(digest runtime)"
         buildctl-daemonless.sh build --frontend dockerfile.v0 \
           --local context=/src/. --local dockerfile=/src/dev/docker \
           --opt "filename=Dockerfile.release-container-$suffix" \
           --opt 'platform=linux/{{.Arch}}' \
           --oci-layout "build=$layouts/build" --oci-layout "runtime=$layouts/runtime" \
           --opt "build-arg:CONTAINER_BUILD_$arg=nico-core-build" \
-          --opt "context:nico-core-build=oci-layout://build@$(digest build)" \
+          --opt "context:nico-core-build=oci-layout://build@$build_digest" \
           --opt "build-arg:CONTAINER_RUNTIME_$arg=nico-core-runtime" \
-          --opt "context:nico-core-runtime=oci-layout://runtime@$(digest runtime)" \
-          --opt build-arg:VERSION=v2.2.2 \
+          --opt "context:nico-core-runtime=oci-layout://runtime@$runtime_digest" \
+          --opt build-arg:VERSION=v2.2.2 --opt build-arg:CI_COMMIT_SHORT_SHA=80d131a5 \
           --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
           --output 'type=oci,dest=/src/bin/nico-core-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true'
   # The optional nico-flow subchart's image; the standalone REST charts are not packaged here.
