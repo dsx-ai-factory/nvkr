@@ -36,7 +36,8 @@ Before a Run, verify that the exact locked reference resolves on the execution h
 (
 set -eu
 sdk=localhost/nvkr-nvsentinel-ubuntu-26.04-arm64@sha256:f6a0ffa4e29bf10f6d946742aabc868b00faaa5ff2c3c4b4fbdfdefdec71075b
-test "$(docker image inspect "$sdk" --format '{{.Os}}/{{.Architecture}}')" = linux/arm64
+image_platform=$(docker image inspect "$sdk" --format '{{.Os}}/{{.Architecture}}')
+test "$image_platform" = linux/arm64
 docker image inspect "$sdk" \
   --format '{{.Id}} {{.Os}}/{{.Architecture}} {{json .RepoDigests}}'
 repo_digests=$(docker image inspect "$sdk" \
