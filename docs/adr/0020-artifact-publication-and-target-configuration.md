@@ -303,6 +303,13 @@ and owning validator, not the filename. The existing archive owner admits safe d
 rejects duplicate normalized names, traversal, links, special files, ambiguous or empty membership and
 unsupported content before publication.
 
+For `kind: deb` with `representation: file`, select the ordinary from-source `host-package` producer route
+used by `debian-package`, retaining its original raw DEB bytes and catalog-declared `artifactPath` binding
+for this exact named output. No additional Debian output, output-to-output selection, second producer or APT
+reconstruction is introduced. Archive representations retain the complete parent/member rules above and
+require their own admission and evidence joins; current local raw Debian export does not establish those
+joins or hosted/signing/publication capability.
+
 Reserve `nvkr.dev/native-file/v1` with the new `nvkr.native-file` digest family. Its closed canonical object
 contains `schemaVersion`, `platform`, `producer` and sorted `files`. `producer` binds exact `artifactID`,
 `component`, `buildDigest`, source blob `sha256`, `size` and `representation`. Each file binds `name`, `kind`,
@@ -338,8 +345,8 @@ digest family. The generated canonical delivery root has exactly these top-level
 | `source` | Aggregate `reference`, `index`, `rootConfig`, `definitionDigest`, `environmentDigest`, `planDigest` and `invocation`. `index` contains raw OCI index `sha256`, `size` and `mediaType`; its digest must equal the pinned reference. `rootConfig` contains canonical PublicationRoot config `sha256`, `size` and its distinct `semanticDigest`, reached through that index's checked manifest/config descriptors. |
 | `delivery` | Target `name`, `environmentDigest`, `planDigest`, `invocation`, publisher `sourcePolicyDigest` and `deliveryPolicyDigest`. Source and delivery identities remain separate even when the initial integrated operation uses the same Run. |
 | `destination` | Exact admitted `endpoint`, `region`, `bucket`, `prefix` and `addressing`. |
-| `outputs` | Sorted selected output records: `name`, `platform`, `format`, `buildDigest`, original `publicationReference`, `preparationInvocation`, `signingInvocation`, wrapper `descriptorDigest`, and exhaustive sorted `objects` key references. `format` is exactly the Definition format (`file`, `executable` or `disk-image`); `fileKind` is required only for `file` and must match its native manifest kind. |
-| `objects` | Sorted exhaustive object records: `key`, `sha256`, `size`, `mediaType`, `role`, `sourceBindings`, `readback`, and optional `versionId`/`readURL`/`urlReadback`. `urlReadback` is required exactly when `readURL` is present. Roles are `payload`, `manifest`, `signature`, `provenance` or `sbom`; `manifest` covers indexes/configs/control JSON with their exact media types. Source bindings use the closed variants below. |
+| `outputs` | Sorted selected output records: `name`, `platform`, `format`, `buildDigest`, original `publicationReference`, `preparationInvocation`, `signingInvocation`, wrapper `descriptorDigest`, and exhaustive sorted `objects` key references. `format` is exactly the Definition format (`file`, `executable` or `disk-image`). `fileKind` and `nativeManifest` are required exactly for `file` and forbidden otherwise; `nativeManifest` is the exact `objects.key` of that output's native-file manifest, also included in its own `objects` list. `fileKind` must match every file kind in that manifest. |
+| `objects` | Sorted exhaustive object records: `key`, `sha256`, `size`, `mediaType`, `role`, `sourceBindings`, `readback`, and optional `versionId`/`readURL`/`urlReadback`. Both URL fields are mandatory for every selected boot payload defined below; `urlReadback` is required exactly when `readURL` is present. Roles are `payload`, `manifest`, `signature`, `provenance` or `sbom`; `manifest` covers indexes/configs/control JSON with their exact media types. Source bindings use the closed variants below. |
 
 Each `sourceBindings` record contains exactly the fields of its `type` variant. All digests below are raw
 blob SHA-256 values; structured semantic digests are never substituted. Compare bindings field by field,
@@ -358,11 +365,24 @@ The owning verifier derives every binding from authenticated source controls, pr
 The binding's selected byte digest must equal the destination object's `sha256`. A member must match its
 source manifest's exact size/mode/kind and parent identity. Object references resolve by complete exact `key`,
 not basename, array position or caller-asserted checksum; every selected output's required objects must resolve.
+The `nativeManifest` key must resolve to a `manifest` object with media type
+`application/vnd.nvkr.native-file.v1+json`. Authenticate its exact bytes and complete membership against that
+output's original source publication/wrapper and selected producer, not merely its kind or basename. Another
+output's same-kind manifest cannot substitute for this binding.
+
+Selected boot payloads are the raw QCOW2 of each selected `disk-image` output and every projected regular
+native file of selected `file` outputs with kind `efi`, `ipxe`, `kernel`, `initrd` or `iso`. Kernel/initrd/ISO
+selection is required when the installer protocol references them; once selected, the same URL rule applies.
+Derive the exact object keys from authenticated output and native-manifest membership, not filenames or
+media types. Every such key requires both `readURL` and `urlReadback`, including a key shared with a non-boot
+output. Retained parent archives, indexes/configs and evidence/proof objects do not enter this set merely
+through the required closure; they retain mandatory API verification. Any additional object actually
+selected as an installer download also requires both URL fields. Other objects may omit both.
 
 `readback` records the full-byte API observation (`sha256`, `size`, and the exact `versionId` or conditional-read
 `etag` used); its digest, size and version must match the corresponding object binding. The owner must
 derive it from completed reads, never deserialize it as authority. Objects are sorted by unique exact key;
-outputs and native files are sorted by unique name. An object's optional `readURL` is the exact clean boot
+outputs and native files are sorted by unique name. An object's conditionally required `readURL` is the exact clean boot
 or file URL. Its required `urlReadback` contains exactly `readURL`, `sha256` and `size`, derived from a complete
 read of that URL; its `readURL` must equal the object's exact URL. Both the API and URL observations must
 match the object's exact `sha256` and `size` before root generation or signing; reading and hashing different
@@ -431,13 +451,25 @@ fails admission, not a silent safety downgrade. The PUT/multipart retry distinct
 [AWS conditional-write behavior](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html);
 mandatory full-byte reconciliation is this contract's requirement for every admitted provider.
 
+`lifecycle` is the sole owner of the specified private durable **delivery-namespace store**, distinct from
+immutable public Run/attempt records and retained payload/proof carriers. It owns authenticated enrollment
+and overlap reservations, operation/generation registration and phase transitions, verified completion,
+closure and operator retirement. The store's atomic boundary covers overlap checking plus no-replace
+enrollment across the admitted provider/resource and bucket, and generation-checked state changes for each
+enrolled namespace. `factory` schedules execution and `delivery` authenticates bytes/storage receipts;
+neither independently issues namespace-transition authority. The backend must provide authenticated
+cross-Run persistence, serialization and exact-state read-back after runner loss. A per-attempt local
+transaction, workflow group or expiring job artifact cannot supply that store. No backend or hosted service
+is admitted by this contract; its implementation and capability admission remain required before work.
+Without an admitted backend profile, return `CodeEngineCapability` before producer or delivery work.
+
 Before work, admit a physical namespace identity: provider/resource identity, bucket and canonical literal
 key prefix. Establish equivalent endpoints and addressing forms through the admitted SDK/service profile
 and recorded authoritative operator resource evidence; URL normalization alone is not proof. Unknown or
 ambiguous mappings fail admission. Target names, endpoint spelling, addressing mode and Run IDs are not
 parts of the pending-state key. Renaming a target or changing transport configuration cannot clear a predecessor.
 
-Operator-authorized no-replace enrollment through the Run-record owner initializes authenticated state for
+Operator-authorized no-replace enrollment through `lifecycle`'s delivery-namespace store initializes authenticated state for
 a dedicated unused physical namespace. The initial profile admits neither owner migration nor reinitialization
 of a previously enrolled namespace. Enrollment records
 the resource mapping, recovery capabilities and one owning repository, workflow path, display name/bundle,
@@ -460,7 +492,7 @@ overlap check and no-replace creation so concurrent overlapping enrollments cann
 incomplete reservation state fails admission. The authenticated existing-record retry above is not a new
 enrollment. Empty and bucket-root prefixes remain rejected by the authored prefix grammar.
 
-Across Runs and attempts, `lifecycle` and the Run-record owner serialize that enrolled physical namespace;
+Across Runs and attempts, `lifecycle`'s delivery-namespace store serializes that enrolled physical namespace;
 serialization covers predecessor lookup, registration, signing, recovery-byte retention and commit disposition.
 Durable CAS/no-replace state must preserve unresolved obligations even when a byte carrier expires.
 Concurrent callers cannot both observe an empty state and acquire signing authority. Missing serialization,
@@ -478,7 +510,7 @@ operation, locator and unknown remote fate. Retirement never proves absence, can
 revokes an old signature. The old physical namespace remains blocked through every alias; continued delivery
 requires explicit enrollment of a dedicated non-overlapping new prefix. This is not same-prefix reset or
 automatic expiry cleanup. Operator authority, the retirement reason and its durable disposition must be
-authenticated by the record owner; a caller boolean cannot clear the obligation.
+authenticated by the delivery-namespace store owner; a caller boolean cannot clear the obligation.
 
 Authenticate a predecessor against its own frozen source, Plan, Environment, destination and invocation
 under current independent policies. If complete and the current request bindings match, reuse its unchanged
@@ -514,7 +546,7 @@ After that gate, the state order is source authentication → upload payloads an
 storage object and boot URL → generate canonical root → detached signing → root upload and read-back → durable recovery-byte retention
 → conditional bundle upload last → independent root, bundle and required-closure authentication
 → durable generation-checked `verified-complete` transition and confirmation → producer success.
-Using the live verification receipt, `lifecycle` and the Run-record owner must atomically transition the exact
+Using the live verification receipt, `lifecycle`'s delivery-namespace store must atomically transition the exact
 `commit-authorized` operation/generation to `verified-complete`. Bind the enrolled physical namespace,
 originating Run/attempt and target, unchanged locator and exact root/bundle identities, and the policies
 actually enforced. Confirm the durable terminal record before reporting producer success. A conflicting
@@ -627,6 +659,16 @@ require coded refusal before signing or final commit when a `readURL` serves sam
 a truncated body. Require a positive case with distinct API and URL routes returning identical complete bytes;
 reject missing, unexpected or malformed `urlReadback` records, changed recorded URLs and mismatched observed
 digests or sizes. An API observation alone must not satisfy URL-readback admission. Exercise
+all boot kinds, multiple projected members and shared boot/non-boot keys: a missing base URL fails admission
+before producer work, and a missing URL pair on any boot payload fails before root signing or final commit
+even with valid API read-back. Accept a complete boot set whose retained proof/control closure uses API-only
+reads, and ordinary non-boot file delivery without URL fields. An archive selected as an installer download
+must carry the URL pair. With two same-kind file outputs, reject a missing, wrong-kind or wrong-output
+`nativeManifest` key, including manifest substitution and omission from that output's `objects` list.
+For direct DEBs, require the exact selected host-package producer/result and catalog artifact path; reject
+an extra-output dependency, substituted producer/path or reconstructed package as that source. Missing
+cross-Run backend admission must return `CodeEngineCapability` before work; an immutable attempt transaction alone cannot
+satisfy namespace-state admission. Exercise
 unchanged Debian names containing `+` through actual emitted URLs, including
 distinct space and literal-percent names. Ordering contracts must accept the literal type sequence
 `[control, member, payload]` and reject `[control, payload, member]`, `[payload, member]` and other unsorted

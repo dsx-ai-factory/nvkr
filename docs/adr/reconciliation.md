@@ -1245,6 +1245,17 @@ exactly the matching URL and digest/size observations and is present exactly wit
 consumers still verify the bytes. Media-type and API/URL mismatch positive/negative cases remain
 implementation/acceptance work.
 
+Every selected raw QCOW2 and projected EFI/iPXE/kernel/initrd/ISO payload requires the URL pair, including
+shared boot/non-boot keys. API-only proof/control closure remains allowed unless an object is itself selected
+as an installer download. Each file output binds an exact `nativeManifest` object key authenticated for its
+original output/producer; a same-kind manifest is not an interchangeable choice. Direct DEB projection uses
+the existing ordinary host-package producer/raw-byte/artifact-path contract, without output-to-output
+selection or APT reconstruction; archive joins and hosted authority remain separately gated.
+`lifecycle` exclusively owns the proposed private durable delivery-namespace store and its atomic enrollment,
+overlap reservations, phase/completion transitions and retirement. The immutable local attempt store and
+retained artifacts are not this cross-Run store. No backend/service is admitted; implementation and capability
+admission remain outstanding, including the new URL/manifest/producer-binding positive and negative cases.
+
 The required supported set includes selected AMD64/ARM64 QCOW2, compatible EFI/iPXE assets and original
 Debian packages. The pinned NVKE source [documents](https://github.com/dsx-ai-factory/nvke/blob/ff21ba8c07cafff74b68e238a8876af11e5beded/os-image/efi/README.md#L36)
 the public/fleet imager parameter mismatch; compatibility must be resolved and exercised rather than inferred

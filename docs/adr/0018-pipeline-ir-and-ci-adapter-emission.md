@@ -1576,9 +1576,9 @@ provider capabilities must be admitted before producer, storage or publication w
 
 Generated admission must enforce the exact enrolled repository/workflow/bundle/ref and evaluated non-canceling
 group under ADR-20. Current per-workflow groups are not a repository-wide lock; reject another namespace owner
-rather than infer shared serialization. Signing and commit jobs depend on the owning module's authenticated
-cross-Run predecessor admission. Generated dispatch, retry and recovery paths must delegate to ADR-20's
-state owner; provider job status cannot clear its unresolved obligations.
+rather than infer shared serialization. Signing and commit jobs depend on authenticated cross-Run predecessor
+admission from `lifecycle`'s private delivery-namespace store (ADR-20). Generated dispatch, retry and recovery
+paths delegate to that store owner; provider job status cannot clear its unresolved obligations.
 
 The final bundle-upload job must depend on ADR-20's confirmed exact-byte recovery-package retention receipt
 for the frozen root, bundle and locator under the originating Run/attempt and target. Failed or unconfirmed

@@ -53,6 +53,8 @@ That separation is not a destination-wide lock. ADR-20's S3 extension restricts 
 namespace to one repository, workflow path, display name/bundle, exact ref and evaluated non-canceling
 group. Another repository, workflow, bundle, ref or transport alias cannot bypass that enrolled owner.
 The extension's admission remains implementation work.
+Cross-Run namespace serialization and atomic completion belong exclusively to `lifecycle`'s private
+delivery-namespace store (ADR-20); the workflow concurrency group is not that store.
 The enrolled workflow path is the bundle's entry workflow. Its exact manifest-owned partition workers remain
 within that entry's closure; they grant no second namespace owner or competing concurrency group. ADR-18's
 rule keeping OIDC jobs in the entry workflow remains in force.
