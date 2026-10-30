@@ -1549,19 +1549,24 @@ Finalizers are scheduled unconditionally and fail on failed/missing producers, f
 artifacts, malformed or substituted observations/SBOMs, and wrong production predicates. The platform may prevent
 the finalizer itself from starting; inspect provider status when no Run record exists (ADR-17).
 
-ADR-20 specifies the S3 extension; its generated execution remains implementation work. That execution must
+ADR-20's [S3 file-delivery contract](0020-artifact-publication-and-target-configuration.md#s3-file-delivery-contract)
+owns the normative wire formats, storage, namespace, recovery, retention, cleanup and completion protocol.
+Its generated execution remains implementation work. That execution must
 retain GitHub-only authority, the admitted source/signing branches and protected Environments, and the
 existing producer isolation. Derive required delivery nodes from typed targets and named outputs in the
-complete Plan. The graph orders source aggregate authentication, selected complete output checks, proof
-capture, upload/read-back, detached delivery signing, durable root/bundle/locator retention, completion publication and
-independent completion verification. Every required target result is a finalizer dependency; job success or
-an unverified locator cannot replace the authenticated result.
+complete Plan. The graph preserves ADR-20's required order: source aggregate authentication, selected complete
+output checks and proof capture → payload/proof upload and full read-back → required-object and boot-URL
+verification → canonical root generation and detached signing → root upload/read-back → durable root/bundle/locator
+retention → conditional bundle upload last → independent root, bundle and required-closure authentication
+→ durable generation-checked `verified-complete` confirmation → producer success. The remote bundle commit
+precedes independent post-commit verification; durable completion and producer success follow it. Every
+required target result is a finalizer dependency; job success or an unverified locator cannot replace the
+authenticated result.
 
 Source, build and ARC jobs must receive no S3 credentials. Only admitted transfer and completion operations
 may resolve writer credential references or obtain federated write credentials; verifier access must be
-independently scoped to read-only operations. Writer credentials must be limited to the configured target
-bucket, key prefix and the admitted action/resource profile in ADR-20. Its operator policy review remains
-an enablement prerequisite; successful SDK calls cannot prove that effective grants are least-privilege.
+independently scoped to read-only operations. Generated credential bindings must satisfy ADR-20's admitted
+action/resource profile and operator policy-review gate; successful SDK calls cannot establish that gate.
 A new S3 OIDC consumer requires explicit
 renderer and bundle-validator admission, not removal of existing signing-only token checks. No OIDC or storage
 credentials are available to arbitrary jobs, PRs or forks. The consumer selects its own read identity and
@@ -1569,28 +1574,19 @@ policies. Secret references may be recorded; secret values cannot be
 transported in plans, command arguments, boot scripts, artifacts or logs. Referenced authentication and
 provider capabilities must be admitted before producer, storage or publication work.
 
-The S3 extension admits one enrolled physical namespace to one repository/workflow/bundle/ref and its exact
-non-canceling concurrency group. Current per-workflow groups cannot serialize two different bundle owners
-of one namespace; reject such ownership rather than assume a repository-wide lock. Across Runs and attempts,
-that admitted boundary and durable Run state must serialize the physical namespace before signing or commit.
-A fresh dispatch or transport alias cannot discard
-an unresolved locator. Authenticated recovery can re-dispatch retained exact bundle bytes at their original
-conditional key, preserving the signed invocation and recording the recovery attempt separately. A verified
-terminal predecessor permits a later distinct delivery; its receipt cannot satisfy different required outputs.
-Exact-bundle replay may race a lost runner's identical original request; only workers started by the current
-operation require its local stop/join ownership. Preparing-state closure and operator retirement follow ADR-20;
-retirement leaves the old namespace indeterminate and blocked, requiring a newly enrolled disjoint prefix.
+Generated admission must enforce the exact enrolled repository/workflow/bundle/ref and evaluated non-canceling
+group under ADR-20. Current per-workflow groups are not a repository-wide lock; reject another namespace owner
+rather than infer shared serialization. Signing and commit jobs depend on the owning module's authenticated
+cross-Run predecessor admission. Generated dispatch, retry and recovery paths must delegate to ADR-20's
+state owner; provider job status cannot clear its unresolved obligations.
 
-The completion operation must depend on confirmed exact-byte retention of the frozen root, bundle and locator under the
-originating Run/attempt and target, accessible after producer or runner loss. A post-commit artifact-upload
-step or finalizer cannot satisfy that prerequisite. Admit the recovery access and retention before work;
-an existing job artifact qualifies only with confirmed bytes/access and expiry covering the absolute recovery
-deadline in ADR-20, independently of whether a terminal Run record is ever written.
-Admission must freeze and enforce an absolute terminal Run-record publication cutoff through scheduling,
-finalization and upload; queue delay cannot extend it. Late terminal publication is refused or rejected,
-and recovery uses a new explicit attempt. Recovery expiry covers that cutoff plus required Run retention.
-Failed or unconfirmed retention prevents the commit request. The bundle locator omits its unknown version;
-independent recovery resolves the exact key and verifies the observed version as specified in ADR-20.
+The final bundle-upload job must depend on ADR-20's confirmed exact-byte recovery-package retention receipt
+for the frozen root, bundle and locator under the originating Run/attempt and target. Failed or unconfirmed
+retention prevents the commit request; a post-commit artifact-upload step or finalizer cannot satisfy that
+prerequisite. Admit the required recovery access and retention before producer or delivery work.
+Admission must freeze and enforce ADR-20's absolute terminal Run-record publication cutoff across scheduling
+and queue delay, execution, cleanup, finalization and record upload. Queue delay cannot extend it. Late terminal
+publication is refused or rejected, and recovery uses a new explicit attempt under ADR-20's cutoff rules.
 
 Generated job admission also reserves the cleanup window and a separate termination/reap-observation
 window no larger than `cleanupTimeoutSeconds`, as specified in ADR-20. Cleanup expiry requires supervisor

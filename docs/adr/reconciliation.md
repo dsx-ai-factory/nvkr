@@ -1237,6 +1237,14 @@ registrations or accepted wire schemas. Release v4 keeps its unchanged OCI sourc
 selected completion and separate policies belong to generated delivery records and receipts. Existing native
 package metadata diagnostics and archive inventories cannot satisfy package payload dependency evidence.
 
+The native-file and file-delivery canonical JSON records reserve exact media types
+`application/vnd.nvkr.native-file.v1+json` and `application/vnd.nvkr.file-delivery.v1+json`; generic or swapped
+record media types are rejected by the specified contract. API `readback` and URL-specific `urlReadback`
+must both match the object's exact digest/size before root generation or signing. `urlReadback` contains
+exactly the matching URL and digest/size observations and is present exactly with `readURL`; independent
+consumers still verify the bytes. Media-type and API/URL mismatch positive/negative cases remain
+implementation/acceptance work.
+
 The required supported set includes selected AMD64/ARM64 QCOW2, compatible EFI/iPXE assets and original
 Debian packages. The pinned NVKE source [documents](https://github.com/dsx-ai-factory/nvke/blob/ff21ba8c07cafff74b68e238a8876af11e5beded/os-image/efi/README.md#L36)
 the public/fleet imager parameter mismatch; compatibility must be resolved and exercised rather than inferred

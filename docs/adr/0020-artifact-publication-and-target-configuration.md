@@ -213,6 +213,11 @@ and required delivery completion. Their older versions retain their existing fie
 and completion rules; they must never silently interpret native-file or S3 delivery semantics. Existing
 source publications remain immutable and are authenticated under their original versioned contracts.
 
+Reserve the exact media types `application/vnd.nvkr.native-file.v1+json` for the canonical native-file manifest
+and `application/vnd.nvkr.file-delivery.v1+json` for the canonical file-delivery root. These describe the JSON
+record bytes, not the surrounding OCI index or manifest. The new-record media types and schemas must match;
+generic JSON or the other record's media type is not an interchangeable declaration.
+
 The `nvkr.dev/release/v4` public view retains its OCI source subject, artifact references, content subject
 and single effective source-policy digest. Native-file details remain bound by the new manifest and OCI
 wrapper. The S3 locator, selected delivery completion and separate effective source/delivery policies
@@ -334,7 +339,7 @@ digest family. The generated canonical delivery root has exactly these top-level
 | `delivery` | Target `name`, `environmentDigest`, `planDigest`, `invocation`, publisher `sourcePolicyDigest` and `deliveryPolicyDigest`. Source and delivery identities remain separate even when the initial integrated operation uses the same Run. |
 | `destination` | Exact admitted `endpoint`, `region`, `bucket`, `prefix` and `addressing`. |
 | `outputs` | Sorted selected output records: `name`, `platform`, `format`, `buildDigest`, original `publicationReference`, `preparationInvocation`, `signingInvocation`, wrapper `descriptorDigest`, and exhaustive sorted `objects` key references. `format` is exactly the Definition format (`file`, `executable` or `disk-image`); `fileKind` is required only for `file` and must match its native manifest kind. |
-| `objects` | Sorted exhaustive object records: `key`, `sha256`, `size`, `mediaType`, `role`, `sourceBindings`, `readback`, and optional `versionId`/`readURL`. Roles are `payload`, `manifest`, `signature`, `provenance` or `sbom`; `manifest` covers indexes/configs/control JSON with their exact media types. Source bindings use the closed variants below. |
+| `objects` | Sorted exhaustive object records: `key`, `sha256`, `size`, `mediaType`, `role`, `sourceBindings`, `readback`, and optional `versionId`/`readURL`/`urlReadback`. `urlReadback` is required exactly when `readURL` is present. Roles are `payload`, `manifest`, `signature`, `provenance` or `sbom`; `manifest` covers indexes/configs/control JSON with their exact media types. Source bindings use the closed variants below. |
 
 Each `sourceBindings` record contains exactly the fields of its `type` variant. All digests below are raw
 blob SHA-256 values; structured semantic digests are never substituted. Compare bindings field by field,
@@ -354,12 +359,19 @@ The binding's selected byte digest must equal the destination object's `sha256`.
 source manifest's exact size/mode/kind and parent identity. Object references resolve by complete exact `key`,
 not basename, array position or caller-asserted checksum; every selected output's required objects must resolve.
 
-`readback` records the full-byte observation (`sha256`, `size`, and the exact `versionId` or conditional-read
+`readback` records the full-byte API observation (`sha256`, `size`, and the exact `versionId` or conditional-read
 `etag` used); its digest, size and version must match the corresponding object binding. The owner must
 derive it from completed reads, never deserialize it as authority. Objects are sorted by unique exact key;
 outputs and native files are sorted by unique name. An object's optional `readURL` is the exact clean boot
-or file URL, whose contents must be fully read and rehashed before signing. Source control and evidence
-objects needed to independently authenticate aggregate membership and every selected output are mandatory
+or file URL. Its required `urlReadback` contains exactly `readURL`, `sha256` and `size`, derived from a complete
+read of that URL; its `readURL` must equal the object's exact URL. Both the API and URL observations must
+match the object's exact `sha256` and `size` before root generation or signing; reading and hashing different
+URL bytes is a failure, not successful read-back.
+`urlReadback` must be absent when `readURL` is absent. The owning verifier derives both observations from
+its own separate completed reads; a version-pinned API read or HTTP metadata cannot replace the URL read.
+Signed observations do not replace the consumer's independent byte verification.
+Source control and evidence objects needed to independently authenticate aggregate membership and every
+selected output are mandatory
 even when they are not payloads. Unknown fields, empty object sets, missing required objects, duplicate
 bindings and subject/format confusion fail strict canonical validation.
 
@@ -609,7 +621,13 @@ mutually exclusive package versions use separate test cases, not one impossible 
 Required tests cover corrupt or missing proof or boot files, EFI or script substitution after verification,
 wrong architectures or digests, incompatible imager parameters, equal or conflicting existing objects,
 concurrent writes, lost commit acknowledgements, denied access, interrupted multipart transfers and failed
-boot or installation. Exercise unchanged Debian names containing `+` through actual emitted URLs, including
+boot or installation. Accept the exact reserved native-file and file-delivery JSON media types with their
+matching schemas; reject omitted, generic, swapped or unknown record media types. With matching API bytes,
+require coded refusal before signing or final commit when a `readURL` serves same-length corrupted bytes or
+a truncated body. Require a positive case with distinct API and URL routes returning identical complete bytes;
+reject missing, unexpected or malformed `urlReadback` records, changed recorded URLs and mismatched observed
+digests or sizes. An API observation alone must not satisfy URL-readback admission. Exercise
+unchanged Debian names containing `+` through actual emitted URLs, including
 distinct space and literal-percent names. Ordering contracts must accept the literal type sequence
 `[control, member, payload]` and reject `[control, payload, member]`, `[payload, member]` and other unsorted
 permutations. Fix expected order independently of the producer/verifier comparator, table positions and enum
