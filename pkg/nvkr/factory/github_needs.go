@@ -58,7 +58,7 @@ func githubNeedsForPlan(ctx context.Context, plan *Plan) (*githubNeedsProjection
 		bootstrap[resolved.RunsOn] = id
 		full[id] = nil
 	}
-	if plan.Environment.GitHubRuntimePlan {
+	if plan.Environment.UsesGitHubRuntimePlan() {
 		first := bootstrap[sortedKeys(bootstrap)[0]]
 		for _, id := range bootstrap {
 			if id != first {

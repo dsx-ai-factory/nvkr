@@ -97,6 +97,34 @@ Direct `nvkr run local` callers can request the same capture with
 `--capture-inputs-root .` and repository-relative Definition and Environment paths.
 Dry runs retain no attempt or input snapshot.
 
+To build one Run from a different upstream revision without editing the
+catalog or its lock, declare the source as overridable in the Environment, as
+the tutorial's `environment-local.yaml` does for NVKE:
+
+```yaml
+overridable:
+  sources:
+    nvke:
+      repository: https://github.com/dsx-ai-factory/nvke
+```
+
+Then pass `--source-override NAME=REQUEST` to `nvkr run local`. The request is
+a version constraint (`0.23.x`, `v0.22.0`) or a full commit, which need not be
+on any branch:
+
+```sh
+nvkr run local --definition <definition> --environment <environment> --attempt <attempt> \
+  --source-override nvke=<full-commit-or-constraint>
+```
+
+The flag is repeatable; the development workflow accepts the same names as
+dispatch inputs. A constraint selects the newest stable matching tag. The
+resolved tag and commit are frozen in the attempt's Plan. Only source revisions
+change; build commands, patches, toolchains and acquired dependencies keep their
+reviewed pins. An undeclared name, malformed request or unmatched constraint
+fails before any build. Overrides cannot be combined with
+`--capture-inputs-root`, so such Runs cannot be qualified.
+
 ## Qualify local artifacts
 
 On native Linux, `run qualify-local` verifies every output of a completed captured Run, signs and verifies

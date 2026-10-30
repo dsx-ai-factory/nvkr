@@ -39,8 +39,8 @@ func admitGitHubRuntimeInputs(ctx context.Context, plan *Plan, root string) erro
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "runtime GitHub input check canceled")
 	}
-	if !plan.Environment.GitHubRuntimePlan || plan.Environment.GitHubBundle == "" || plan.Environment.GitHubDevelopment {
-		return e.New(e.CodeEngineCapability, "runtime GitHub input check requires an opted-in named production bundle")
+	if !githubRuntimePlanBundle(plan.Environment) {
+		return e.New(e.CodeEngineCapability, "runtime GitHub input check requires an opted-in named production bundle or development overridable sources")
 	}
 	if err := plan.Validate(); err != nil {
 		return err

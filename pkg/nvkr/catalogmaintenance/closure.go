@@ -37,7 +37,7 @@ type closureRun struct {
 	plan   *factory.Plan
 }
 
-func (run closureRun) runtime() bool { return run.plan.Environment.GitHubRuntimePlan }
+func (run closureRun) runtime() bool { return run.plan.Environment.UsesGitHubRuntimePlan() }
 
 // otherRuns lists the policy's Run selections besides production, in policy order.
 func otherRuns(config Config) []RunInput {
@@ -293,7 +293,7 @@ func generateClosure(ctx context.Context, config Config, generatorVersion string
 			return "", err
 		}
 		owner := generate
-		if environment.GitHubRuntimePlan {
+		if environment.UsesGitHubRuntimePlan() {
 			owner = lifecycle.GenerateRuntimeFiles
 		}
 		if _, err := owner(ctx, run.Definition, run.Environment, generatorVersion, factory.EngineGitHub, ".", check); err != nil {

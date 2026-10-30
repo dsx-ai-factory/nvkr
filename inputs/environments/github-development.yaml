@@ -7,6 +7,17 @@ metadata:
   description: Full feature-branch development pipeline; isolated signed publications expire after their completed attempt becomes eligible for cleanup.
   name: nvke-m2-github-dev
 githubDevelopment: true
+# Each overridable source becomes an optional dispatch input that can build its
+# repository at a constraint or exact commit; the first runner bootstrap
+# freezes the selection.
+overridable:
+  sources:
+    capnico:
+      repository: https://github.com/dsx-ai-factory/cluster-api-provider-nico
+    nvke:
+      repository: https://github.com/dsx-ai-factory/nvke
+    ovn-kubernetes:
+      repository: https://github.com/ovn-kubernetes/ovn-kubernetes
 githubExecutionPartitions: true
 githubARC: native-kvm-v1
 githubRunners:

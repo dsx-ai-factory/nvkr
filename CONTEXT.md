@@ -27,6 +27,9 @@ native disk and pipeline-attested stages with separate signer policy, credential
 registry namespaces. Cleanup admits only internal-visibility packages in those namespaces.
 Unsigned development remains static-unqualified. Neither setting grants production
 acceptance, provider access or qualified evidence.
+An Environment may declare overridable sources: from-source repositories that one local or development Run
+may build at an operator-selected version constraint or commit instead of the reviewed pins. The selection is
+frozen in that Run's Plan, and such Runs are diagnostics that cannot be qualified.
 _Avoid_: Delivery profile, component catalog, build identity
 
 **Run**:

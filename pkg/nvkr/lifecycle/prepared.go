@@ -59,6 +59,36 @@ func PrepareFiles(ctx context.Context, definitionPath, environmentPath, generato
 	return &PreparedRun{plan: plan, run: run}, nil
 }
 
+// SourceOverrideRequest selects one of the Environment's overridable sources by
+// name and asks to build it at a version constraint or full commit instead of
+// its reviewed pin.
+type SourceOverrideRequest = factory.SourceOverrideRequest
+
+// PrepareSourceOverrideFiles prepares one local Run whose requested overridable
+// sources use an operator-selected constraint or exact commit instead of their
+// reviewed pins. Requests pass the same intake as development dispatch before
+// any source work; each is resolved once and frozen in the Plan. Such Runs
+// retain no captured compiler inputs and cannot feed qualification.
+func PrepareSourceOverrideFiles(ctx context.Context, definitionPath, environmentPath, generatorVersion, attempt string, requests []SourceOverrideRequest) (*PreparedRun, error) {
+	definition, environment, err := loadAuthoredFiles(ctx, definitionPath, environmentPath)
+	if err != nil {
+		return nil, err
+	}
+	admitted, err := factory.AdmitSourceOverrideRequests(environment, requests)
+	if err != nil {
+		return nil, err
+	}
+	plan, err := factory.CompileLocalSourceOverrideDocuments(ctx, definitionPath, definition, environmentPath, environment, generatorVersion, admitted)
+	if err != nil {
+		return nil, err
+	}
+	run, err := PrepareRun(definition, environment, plan, attempt)
+	if err != nil {
+		return nil, err
+	}
+	return &PreparedRun{plan: plan, run: run}, nil
+}
+
 func (prepared *PreparedRun) Description() Run {
 	if prepared == nil || prepared.run == nil {
 		return Run{}

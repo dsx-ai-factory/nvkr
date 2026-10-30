@@ -11,10 +11,21 @@ runs:
       uses: ./.github/nvkr-dev/actions/ci-bootstrap-download
       with:
         name: ${{ inputs.runner-artifact }}
-        path: '.'
+        path: '.nvkr/runtime-runner'
         nvkr-ci-storage-read-token: ${{ inputs.nvkr-ci-storage-read-token }}
     - name: Prepare helper
-      run: chmod +x ./nvkr-exec
+      run: |
+        set -eu
+        [ -f .nvkr/runtime-runner/nvkr-exec ] && [ ! -L .nvkr/runtime-runner/nvkr-exec ] || { printf 'nvkr: [NVKR-E-PIPELINE-DRIFT] incomplete runtime input carrier\n' >&2; exit 51; }
+        [ -f .nvkr/runtime-runner/.github/nvkr-dev/plan.json ] && [ ! -L .nvkr/runtime-runner/.github/nvkr-dev/plan.json ] || { printf 'nvkr: [NVKR-E-PIPELINE-DRIFT] incomplete runtime input carrier\n' >&2; exit 51; }
+        [ -f .nvkr/runtime-runner/.github/nvkr-dev/action-data.json ] && [ ! -L .nvkr/runtime-runner/.github/nvkr-dev/action-data.json ] || { printf 'nvkr: [NVKR-E-PIPELINE-DRIFT] incomplete runtime input carrier\n' >&2; exit 51; }
+        [ -f .nvkr/runtime-runner/.github/nvkr-dev/manifest.json ] && [ ! -L .nvkr/runtime-runner/.github/nvkr-dev/manifest.json ] || { printf 'nvkr: [NVKR-E-PIPELINE-DRIFT] incomplete runtime input carrier\n' >&2; exit 51; }
+        mv -- .nvkr/runtime-runner/nvkr-exec nvkr-exec
+        mv -- .nvkr/runtime-runner/.github/nvkr-dev/plan.json .github/nvkr-dev/plan.json
+        mv -- .nvkr/runtime-runner/.github/nvkr-dev/action-data.json .github/nvkr-dev/action-data.json
+        mv -- .nvkr/runtime-runner/.github/nvkr-dev/manifest.json .github/nvkr-dev/manifest.json
+        chmod +x ./nvkr-exec
+        ./nvkr-exec factory github check-runtime-inputs --plan .github/nvkr-dev/plan.json
       shell: bash -e {0}
 inputs:
   runner-artifact:

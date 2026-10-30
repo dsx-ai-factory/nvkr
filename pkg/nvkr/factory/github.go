@@ -78,6 +78,9 @@ func RenderGitHub(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 
 // validate=false is private to the validator's exact regeneration comparison.
 func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBundle, error) {
+	if plan != nil && !plan.Environment.GitHubDevelopment && (plan.Environment.Overridable != nil || len(plan.SourceOverrides) != 0) {
+		return nil, e.New(e.CodeEngineCapability, "GitHub execution admits overridable sources only for development")
+	}
 	bundle, err := renderGitHubFlat(ctx, plan, false)
 	if err != nil {
 		return nil, err
@@ -179,8 +182,17 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 	fmt.Fprintf(&body, "# plan: %s\n# manifest: %s\n", layout.planPath, layout.manifestPath)
 	fmt.Fprintf(&body, "# qualification: %s (runtime receipts are not fabricated)\n", plan.Qualification)
 	fmt.Fprintf(&body, "name: %s\n", githubWorkflowName(plan))
+	overrides, err := DeclaredSourceOverrides(plan)
+	if err != nil {
+		return nil, err
+	}
 	if plan.Environment.GitHubRuntimeSource != nil {
 		fmt.Fprint(&body, "'on':\n  workflow_dispatch:\n    inputs:\n      source_commit:\n        description: Exact source commit frozen by the coordinating main workflow\n        type: string\n        required: true\n")
+	} else if len(overrides) != 0 {
+		fmt.Fprint(&body, "'on':\n  workflow_dispatch:\n    inputs:\n")
+		for _, input := range overrides {
+			fmt.Fprintf(&body, "      %s:\n        description: %s\n        type: string\n        required: false\n        default: ''\n", input.Name, yamlSingle(githubSourceOverrideDescription(input)))
+		}
 	} else {
 		fmt.Fprintf(&body, "'on':\n  workflow_dispatch: {}\n")
 	}
@@ -193,7 +205,7 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 		fmt.Fprintf(&body, "    name: %s\n", yamlSingle("Prepare NVKR runner ("+runner+")"))
 		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(githubBootstrapRunner(runner)))
 		fmt.Fprintf(&body, "    timeout-minutes: %d\n", githubSupportJobTimeoutMinutes)
-		if plan.Environment.GitHubRuntimePlan && runner != sortedKeys(bootstrapJobs)[0] {
+		if plan.Environment.UsesGitHubRuntimePlan() && runner != sortedKeys(bootstrapJobs)[0] {
 			fmt.Fprintf(&body, "    needs: [%s]\n", bootstrapJobs[sortedKeys(bootstrapJobs)[0]])
 		}
 		fmt.Fprintf(&body, "    if: ${{ %s }}\n", githubDispatchCondition(plan))
@@ -212,19 +224,19 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 		}
 		writeGitHubShellStep(&body, githubRunnerInstallStep, []string{githubRunnerInstallCommand(helperEnvironment, linkerFlags, release)})
 		command := generationCommand(plan, EngineGitHub)
-		if plan.Environment.GitHubRuntimePlan {
+		if plan.Environment.UsesGitHubRuntimePlan() {
 			if runner == sortedKeys(bootstrapJobs)[0] {
 				command = githubRuntimeGenerationCommand(plan)
 			} else {
 				actions.writeDownloadStep(&body, "NVKR runtime inputs", githubRuntimeInputsArtifact, githubRuntimeInputDirectory)
 				writeGitHubShellStep(&body, "Install NVKR runtime inputs", []string{githubRuntimeInstallCommand(plan)})
-				if plan.Environment.GitHubRuntimeSource != nil {
+				if githubRuntimeChecksSelection(plan) {
 					command = githubRuntimeGenerationCommand(plan) + " --check"
 				}
 			}
 		}
 		writeCatalogValidationStep(&body, plan, "Verify committed Run generation is current", "validate-catalog", command)
-		if plan.Environment.GitHubRuntimePlan && runner == sortedKeys(bootstrapJobs)[0] {
+		if plan.Environment.UsesGitHubRuntimePlan() && runner == sortedKeys(bootstrapJobs)[0] {
 			writeGitHubRuntimeInputsUpload(&body, plan, actions)
 		}
 		actions.writeUploadStep(&body, plan, "NVKR runner", "nvkr-exec-"+shortStableName(runner), "nvkr-exec")
@@ -601,7 +613,7 @@ func (actions githubActionRefs) writeUploadStep(out *bytes.Buffer, plan *Plan, l
 	if githubCancelInProgress(plan) {
 		days = 1
 	}
-	if plan.Environment.GitHubRuntimePlan && label == "NVKR runner" {
+	if plan.Environment.UsesGitHubRuntimePlan() && label == "NVKR runner" {
 		fmt.Fprintf(out, "      - name: %s\n        uses: %s\n        with:\n          name: %s\n          path: |\n            nvkr-exec\n", yamlSingle("Upload "+label), actions.Upload, yamlSingle(name))
 		for _, member := range githubRuntimeInputPaths(plan) {
 			fmt.Fprintf(out, "            %s\n", member)
@@ -628,7 +640,33 @@ func githubRuntimeGenerationCommand(plan *Plan) string {
 	if plan.Environment.GitHubRuntimeSource != nil {
 		command += ` --source-commit "$NVKR_RUNTIME_SOURCE_COMMIT"`
 	}
+	if plan.Environment.Overridable != nil {
+		command += ` --source-overrides "$NVKR_SOURCE_OVERRIDES"`
+	}
 	return command
+}
+
+// githubRuntimeChecksSelection reports whether secondary bootstraps must replay
+// the first bootstrap's dispatch-time source selection instead of current pins.
+func githubRuntimeChecksSelection(plan *Plan) bool {
+	return plan.Environment.GitHubRuntimeSource != nil || plan.Environment.Overridable != nil
+}
+
+// githubRuntimeSelectionEnvironment returns the dispatch values a runtime
+// generation step receives. Workflow input values reach the command only as data.
+func githubRuntimeSelectionEnvironment(plan *Plan) map[string]string {
+	env := map[string]string{}
+	if plan.Environment.GitHubRuntimeSource != nil {
+		env["NVKR_RUNTIME_SOURCE_COMMIT"] = "${{ github.event.inputs.source_commit }}"
+	}
+	if plan.Environment.Overridable != nil {
+		env["NVKR_SOURCE_OVERRIDES"] = "${{ toJSON(github.event.inputs) }}"
+	}
+	return env
+}
+
+func githubSourceOverrideDescription(input DeclaredSourceOverride) string {
+	return "Version constraint (such as 1.2.x) or full commit for " + input.Repository + "; empty keeps the reviewed pins"
 }
 
 func writeGitHubRuntimeInputsUpload(out *bytes.Buffer, plan *Plan, actions githubActionRefs) {
@@ -763,14 +801,14 @@ func writePrepareHelperStep(out *bytes.Buffer) {
 }
 
 func githubHelperDownloadPath(plan *Plan) string {
-	if plan.Environment.GitHubRuntimePlan {
+	if plan.Environment.UsesGitHubRuntimePlan() {
 		return ".nvkr/runtime-runner"
 	}
 	return "."
 }
 
 func prepareHelperRunFor(plan *Plan) string {
-	if plan == nil || !plan.Environment.GitHubRuntimePlan {
+	if plan == nil || !plan.Environment.UsesGitHubRuntimePlan() {
 		return prepareHelperRun
 	}
 	var command strings.Builder
@@ -789,7 +827,7 @@ func prepareHelperRunFor(plan *Plan) string {
 }
 
 func writeGitHubPrepareHelperStep(out *bytes.Buffer, plan *Plan) {
-	if !plan.Environment.GitHubRuntimePlan {
+	if !plan.Environment.UsesGitHubRuntimePlan() {
 		writePrepareHelperStep(out)
 		return
 	}

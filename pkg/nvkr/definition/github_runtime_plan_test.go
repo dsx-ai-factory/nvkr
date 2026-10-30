@@ -13,21 +13,31 @@ import (
 
 func TestGitHubRuntimePlanAdmission(t *testing.T) {
 	for _, test := range []struct {
-		name, bundle         string
-		runtime, development bool
-		code                 e.Code
+		name, bundle                    string
+		runtime, development, overrides bool
+		code                            e.Code
 	}{
 		{name: "existing default"},
 		{name: "existing named", bundle: "project"},
 		{name: "runtime named", bundle: "project", runtime: true},
 		{name: "runtime default", runtime: true, code: e.CodeEngineCapability},
 		{name: "runtime development", bundle: "project", runtime: true, development: true, code: e.CodeEngineCapability},
+		{name: "explicit runtime development", runtime: true, development: true, code: e.CodeEngineCapability},
+		{name: "development overridable sources", development: true, overrides: true},
+		{name: "explicit runtime with overridable sources", runtime: true, development: true, overrides: true, code: e.CodeEngineCapability},
+		{name: "local overridable sources", overrides: true},
+		{name: "production overridable sources", bundle: "project", runtime: true, overrides: true, code: e.CodeEngineCapability},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			var overridable *Overridable
+			if test.overrides {
+				overridable = &Overridable{Sources: map[string]OverridableSource{"nvke": {Repository: "https://github.com/dsx-ai-factory/nvke"}}}
+			}
 			env := Environment{APIVersion: EnvironmentAPIVersion, Kind: EnvironmentKind,
 				Metadata: Metadata{Name: "test"}, UtilityPlatform: "linux/amd64",
 				UtilityContainer: "busybox@sha256:" + strings.Repeat("a", 64),
-				GitHubBundle:     test.bundle, GitHubRuntimePlan: test.runtime, GitHubDevelopment: test.development}
+				GitHubBundle:     test.bundle, GitHubRuntimePlan: test.runtime, GitHubDevelopment: test.development,
+				Overridable: overridable}
 			err := env.Validate()
 			if test.code == "" {
 				if err != nil {

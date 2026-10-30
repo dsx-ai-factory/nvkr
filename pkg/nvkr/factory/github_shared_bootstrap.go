@@ -97,7 +97,7 @@ func shareGitHubBootstrap(plan *Plan, files map[string][]byte, oldPath string, c
 		return err
 	}
 	path := githubActionsDirectoryFor(plan) + "bootstrap-" + variant
-	if plan.Environment.GitHubRuntimePlan {
+	if plan.Environment.UsesGitHubRuntimePlan() {
 		for _, step := range steps.Content {
 			if githubYAMLValue(step, "name") == "Upload NVKR runtime inputs" {
 				path += "-runtime-plan"

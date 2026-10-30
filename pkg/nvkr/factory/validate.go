@@ -19,6 +19,9 @@ func (plan Plan) Validate() error {
 	if err := plan.validateRuntimeSourceSelection(); err != nil {
 		return err
 	}
+	if err := plan.validateSourceOverrides(); err != nil {
+		return err
+	}
 	packages, err := plan.validatePlanInputs()
 	if err != nil {
 		return err

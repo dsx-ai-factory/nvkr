@@ -278,11 +278,11 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 				continue
 			}
 			wantCatalogEnv := maps.Clone(catalogEnv)
-			if plan.Environment.GitHubRuntimeSource != nil && strings.HasPrefix(jobID, "build-runner-") && step.ID == "validate-catalog" {
+			if selection := githubRuntimeSelectionEnvironment(plan); len(selection) != 0 && strings.HasPrefix(jobID, "build-runner-") && step.ID == "validate-catalog" {
 				if wantCatalogEnv == nil {
 					wantCatalogEnv = make(map[string]string)
 				}
-				wantCatalogEnv["NVKR_RUNTIME_SOURCE_COMMIT"] = "${{ github.event.inputs.source_commit }}"
+				maps.Copy(wantCatalogEnv, selection)
 			}
 			if len(wantCatalogEnv) > 0 && ((strings.HasPrefix(jobID, "build-runner-") && step.ID == "validate-catalog") || (jobID == "nvkr-lifecycle-run" && step.ID == "finalize-catalog")) {
 				if !reflect.DeepEqual(step.Env, wantCatalogEnv) {
@@ -352,13 +352,13 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 		job, ok := document.Jobs[jobID]
 		wantSteps := 5
 		command := generationCommand(plan, EngineGitHub)
-		if plan.Environment.GitHubRuntimePlan {
+		if plan.Environment.UsesGitHubRuntimePlan() {
 			wantSteps = 6
 			if runner == sortedKeys(bootstrap)[0] {
 				command = githubRuntimeGenerationCommand(plan)
 			} else {
 				wantSteps = 7
-				if plan.Environment.GitHubRuntimeSource != nil {
+				if githubRuntimeChecksSelection(plan) {
 					command = githubRuntimeGenerationCommand(plan) + " --check"
 				}
 				if !strings.Contains(joinRuns(job.Steps), githubRuntimeInstallCommand(plan)) {

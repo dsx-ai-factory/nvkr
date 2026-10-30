@@ -17,6 +17,9 @@ func AdmitDevelopmentQualification(plan *Plan) error {
 	if plan == nil {
 		return e.New(e.CodeUsage, "development qualification requires an original Plan")
 	}
+	if len(plan.SourceOverrides) != 0 {
+		return e.New(e.CodeEngineCapability, "development qualification rejects source overrides; such Runs are diagnostics")
+	}
 	if !plan.Environment.GitHubDevelopment || plan.Environment.Signing == nil || plan.Environment.Signing.Mode != SigningModeCosign || !PerOutputPublication(plan) {
 		return e.New(e.CodeEngineCapability, "development qualification requires signed per-output development publication")
 	}

@@ -110,8 +110,9 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 		{Name: "generate", Usage: "generate and statically validate a hosted CI run", Flags: append(generationFlags,
 			&cli.StringFlag{Name: "root", Value: ".", Usage: "repository root receiving generated files"},
 			&cli.StringFlag{Name: "qualification-policy", Usage: "also generate hosted qualification from this independent policy"},
-			&cli.BoolFlag{Name: "runtime", Usage: "refresh named production Plan data within its reviewed workflow contract"},
+			&cli.BoolFlag{Name: "runtime", Usage: "refresh named production or development overridable-source Plan data within its reviewed workflow contract"},
 			&cli.StringFlag{Name: "source-commit", Usage: "freeze one exact source commit under the authored GitHub runtime source policy (requires --runtime)"},
+			&cli.StringFlag{Name: "source-overrides", Usage: "freeze the dispatch's JSON inputs for the Environment's overridable sources (requires --runtime)"},
 			&cli.BoolFlag{Name: "check", Usage: "write nothing; fail on generated drift"}), Action: func(c *cli.Context) error {
 			view, err := selectCommandPresentation(c)
 			if err != nil {
@@ -121,10 +122,15 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 			if c.IsSet("source-commit") && !c.Bool("runtime") {
 				return e.New(e.CodeUsage, "--source-commit requires --runtime")
 			}
+			if c.IsSet("source-overrides") && (!c.Bool("runtime") || c.IsSet("source-commit")) {
+				return e.New(e.CodeUsage, "--source-overrides requires --runtime and excludes --source-commit")
+			}
 			if c.Bool("runtime") && c.IsSet("qualification-policy") {
 				return e.New(e.CodeUsage, "runtime Plan preparation does not generate qualification workflows")
 			}
-			if c.Bool("runtime") && c.IsSet("source-commit") {
+			if c.Bool("runtime") && c.IsSet("source-overrides") {
+				digest, err = lifecycle.GenerateSourceOverrideFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("engine"), c.String("root"), c.String("source-overrides"), c.Bool("check"))
+			} else if c.Bool("runtime") && c.IsSet("source-commit") {
 				digest, err = lifecycle.GenerateRuntimeSourceFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("engine"), c.String("root"), c.String("source-commit"), c.Bool("check"))
 			} else if c.Bool("runtime") {
 				digest, err = lifecycle.GenerateRuntimeFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("engine"), c.String("root"), c.Bool("check"))
@@ -154,6 +160,7 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 			&cli.StringFlag{Name: "attempt", Required: true, Usage: "new immutable attempt name"},
 			&cli.StringFlag{Name: "attempts-root", Value: ".nvkr/runs"}, &cli.StringFlag{Name: "runner-source", Value: "."},
 			&cli.StringFlag{Name: "capture-inputs-root", Usage: "retain compiler inputs beneath this root; definition and environment paths must be repository-relative"},
+			&cli.StringSliceFlag{Name: "source-override", Usage: "build the Environment's overridable source NAME=REQUEST at a version constraint (1.2.x, v1.2.0) or full commit instead of its pin; repeatable, excludes --capture-inputs-root"},
 			&cli.IntFlag{Name: "jobs", Aliases: []string{"j"}, Value: 1}, &cli.StringFlag{Name: "runtime", Value: "docker"},
 			&cli.StringFlag{Name: "go", Value: "go"}, &cli.BoolFlag{Name: "publish"}, &cli.BoolFlag{Name: "dry-run"},
 			&cli.IntFlag{Name: "build-activity-fd", Hidden: true, Value: -1},

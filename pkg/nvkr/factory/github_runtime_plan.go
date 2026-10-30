@@ -9,8 +9,21 @@ import (
 	"slices"
 	"strings"
 
+	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
+
+// githubRuntimePlanBundle admits the reviewed workflows that refresh Plan data
+// at dispatch: named production bundles and development overridable sources.
+func githubRuntimePlanBundle(environment authored.Environment) bool {
+	if !environment.UsesGitHubRuntimePlan() {
+		return false
+	}
+	if environment.GitHubDevelopment {
+		return environment.Overridable != nil && environment.GitHubBundle == ""
+	}
+	return environment.GitHubBundle != "" && environment.Overridable == nil
+}
 
 // PrepareGitHubRuntimeBundle admits a freshly compiled Plan against the complete
 // committed bundle. Only Plan and descriptive action data may change; every
@@ -24,8 +37,8 @@ func PrepareGitHubRuntimeBundle(ctx context.Context, freshPlan *Plan, root strin
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "runtime GitHub preparation canceled")
 	}
-	if !freshPlan.Environment.GitHubRuntimePlan || freshPlan.Environment.GitHubBundle == "" || freshPlan.Environment.GitHubDevelopment {
-		return e.New(e.CodeEngineCapability, "runtime GitHub preparation requires an opted-in named production bundle")
+	if !githubRuntimePlanBundle(freshPlan.Environment) {
+		return e.New(e.CodeEngineCapability, "runtime GitHub preparation requires an opted-in named production bundle or development overridable sources")
 	}
 	if err := freshPlan.Validate(); err != nil {
 		return err
@@ -77,4 +90,17 @@ func PrepareGitHubRuntimeBundle(ctx context.Context, freshPlan *Plan, root strin
 		return nil
 	}
 	return WriteGeneratedBundle(ctx, root, fresh)
+}
+
+// LoadGeneratedGitHubPlan loads the Plan currently installed at the bundle path
+// the given Plan selects. It is a description until the caller replays it.
+func LoadGeneratedGitHubPlan(ctx context.Context, plan *Plan, root string) (*Plan, error) {
+	if ctx == nil || plan == nil || strings.TrimSpace(root) == "" {
+		return nil, e.New(e.CodeUsage, "loading a generated Plan requires context, Plan and repository root")
+	}
+	path, err := generatedDestination(root, githubLayoutFor(plan).planPath)
+	if err != nil {
+		return nil, err
+	}
+	return LoadPlanContext(ctx, path)
 }

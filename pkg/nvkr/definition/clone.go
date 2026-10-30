@@ -43,6 +43,10 @@ func (input Environment) Clone() Environment {
 		input.GitHubRuntimeSource = &value
 	}
 	input.GitHubRunners = maps.Clone(input.GitHubRunners)
+	if input.Overridable != nil {
+		value := Overridable{Sources: maps.Clone(input.Overridable.Sources)}
+		input.Overridable = &value
+	}
 	input.GitHubDispatchBranches = append([]string(nil), input.GitHubDispatchBranches...)
 	input.ExecutionClasses = execution.CloneClasses(input.ExecutionClasses)
 	input.DiskInspectionProfiles = maps.Clone(input.DiskInspectionProfiles)

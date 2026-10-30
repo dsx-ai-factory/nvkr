@@ -6,6 +6,12 @@ kind: Environment
 metadata:
   description: Local development registry and dry-run signing policy.
   name: nvke-local
+# `nvkr run local --source-override nvke=<constraint-or-commit>` builds NVKE at
+# another version for one Run; other sources keep their reviewed pins.
+overridable:
+  sources:
+    nvke:
+      repository: https://github.com/dsx-ai-factory/nvke
 publication:
   anonymous: true
   plainHTTP: true

@@ -1055,6 +1055,43 @@ Combining this fixed development workflow with a nonempty `githubBundle` is
 unsupported and returns `CodeEngineCapability` before catalog resolution or
 generated-output work; optional named bundles select production workflows only.
 
+`Environment.overridable.sources` lets one local or development Run build declared from-source
+repositories at another version. It maps each override name to `{repository}`, one canonical HTTPS
+repository URL, and is rejected with a named bundle, an explicit `githubRuntimePlan` or a runtime
+source policy. The Environment, not the shared Definition, owns this allowlist because the release
+and development bundles compile the same Definition. Names follow GitHub's input grammar, so one
+name serves as a dispatch input and as a local flag value; a repository may appear once, and a
+development Environment admits at most 25 sources. Undeclared repositories keep their reviewed
+pins, and a request that names a declared source no selected output builds from source fails
+closed. A development Environment with overridable sources implies the runtime-Plan path below:
+each source becomes an optional dispatch input whose description carries the full URL. Inputs
+depend only on the authored declaration, so the runtime-Plan contract keeps workflow and action
+bytes fixed when pins change. GitHub generation rejects overridable sources outside development.
+
+An empty input keeps the reviewed lock. A non-empty value is either the dotted constraint grammar
+`catalog bump` uses (`1.2.x`, `v0.22.0`), resolved to the newest stable tag carrying the
+source's tag prefix, or a full lowercase commit, which need not be reachable from any branch or tag.
+A constraint for a repository whose selected catalogs declare different tag prefixes is rejected;
+a commit remains admissible. The first runner bootstrap receives the dispatch inputs as JSON data,
+resolves each request once through the catalog pin owner and freezes `{request, tag, commit}` per
+repository in the Plan's `sourceOverrides`. Like the runtime source policy, the overlay replaces
+only tag, commit, tree and source date and re-renders owned version stamps; commands, patches,
+toolchains and acquired dependencies keep their reviewed pins, so a selection that needs a newer
+toolchain fails at build time. Other bootstraps and finalization replay the frozen tag or commit
+without resolving constraints again; a moved tag, rewritten commit or mismatched producer fails
+before a Run record is issued. Declaring overridable sources does not affect input capture; a Run
+that used an override is rejected by qualification handoff and development qualification. Such
+Runs are diagnostics and never promotion candidates.
+
+Local execution uses the same declaration, request intake, resolution and freeze. The operator
+selects declared sources by name with `run local --source-override NAME=REQUEST`; the Environment
+must not select GitHub development, and the baseline Plan passes static local admission before any
+source is fetched. Each request is resolved once with the grammar above and frozen in the local
+Plan's `sourceOverrides`, so the attempt's Plan digest and records identify the overridden
+revisions. For both lanes, Plan validation admits a frozen override only for a source declared in
+`overridable`. Local overrides exclude compiler-input capture, so these Runs cannot feed local
+qualification.
+
 Unsigned development omits both publication and signing, remains `static-unqualified`, and cannot use
 ARC or disk evidence. Signed development requires real cosign, the GitHub issuer, `per-output-v1`, the
 reserved development namespace and exact development workflow identity in ADR-20. It retains the

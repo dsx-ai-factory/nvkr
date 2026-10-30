@@ -98,6 +98,7 @@ type Environment struct {
 	GitHubBundle string `json:"githubBundle,omitempty"`
 	// GitHubRuntimePlan compiles current catalog pins at dispatch while retaining
 	// the reviewed named production workflow and its complete execution policy.
+	// Development implies it from Overridable; use UsesGitHubRuntimePlan.
 	GitHubRuntimePlan bool `json:"githubRuntimePlan,omitempty"`
 	// GitHubExecutionPartitions distributes one Run across same-commit worker
 	// workflows while preserving the Definition's single release boundary.
@@ -126,6 +127,9 @@ type Environment struct {
 	// GitHubRunners selects explicit native hosted routes by execution platform.
 	GitHubRunners map[string]string `json:"githubRunners,omitempty"`
 
+	// Overridable names the from-source repositories one Run may build at an
+	// operator-selected version instead of the reviewed pins.
+	Overridable  *Overridable            `json:"overridable,omitempty"`
 	SourceAccess map[string]SourceAccess `json:"sourceAccess,omitempty"`
 	Publication  *Publication            `json:"publication,omitempty"`
 	Runtime      Runtime                 `json:"runtime,omitempty"`
@@ -285,8 +289,11 @@ func (environment Environment) Validate() error {
 	if environment.GitHubDevelopment && environment.GitHubBundle != "" {
 		return e.New(e.CodeEngineCapability, "githubDevelopment does not support a named githubBundle")
 	}
+	if err := environment.validateOverridable(); err != nil {
+		return err
+	}
 	if environment.GitHubRuntimePlan && (environment.GitHubDevelopment || environment.GitHubBundle == "") {
-		return e.New(e.CodeEngineCapability, "githubRuntimePlan requires a named production githubBundle")
+		return e.New(e.CodeEngineCapability, "githubRuntimePlan requires a named production githubBundle; development implies it from overridable sources")
 	}
 	if err := environment.validateGitHubRuntimeSource(); err != nil {
 		return err

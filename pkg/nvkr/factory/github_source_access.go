@@ -6,6 +6,7 @@ package factory
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 
@@ -93,11 +94,11 @@ func githubCatalogSourceEnvironment(plan *Plan) map[string]string {
 func writeCatalogValidationStep(out *bytes.Buffer, plan *Plan, name, id, command string) {
 	fmt.Fprintf(out, "      - name: %s\n        id: %s\n", name, id)
 	env := githubCatalogSourceEnvironment(plan)
-	if plan.Environment.GitHubRuntimeSource != nil && (command == githubRuntimeGenerationCommand(plan) || command == githubRuntimeGenerationCommand(plan)+" --check") {
+	if selection := githubRuntimeSelectionEnvironment(plan); len(selection) != 0 && (command == githubRuntimeGenerationCommand(plan) || command == githubRuntimeGenerationCommand(plan)+" --check") {
 		if env == nil {
 			env = make(map[string]string)
 		}
-		env["NVKR_RUNTIME_SOURCE_COMMIT"] = "${{ github.event.inputs.source_commit }}"
+		maps.Copy(env, selection)
 	}
 	if len(env) == 0 {
 		fmt.Fprintf(out, "        run: %s\n", command)

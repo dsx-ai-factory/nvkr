@@ -10,12 +10,10 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.results }}
       statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
-      nvkr-partition-09:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-09 }}
-      nvkr-partition-13:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-13 }}
-      nvkr-partition-14:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-14 }}
+      nvkr-partition-07:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-07 }}
+      nvkr-partition-08:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-08 }}
       nvkr-results-00:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00 }}
       nvkr-results-00-statuses:
@@ -36,6 +34,14 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-04 }}
       nvkr-results-04-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-04-statuses }}
+      nvkr-results-05:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-05 }}
+      nvkr-results-05-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-05-statuses }}
+      nvkr-results-06:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-06 }}
+      nvkr-results-06-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-06-statuses }}
       nvkr-results-07:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-07 }}
       nvkr-results-07-statuses:
@@ -44,10 +50,10 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-08 }}
       nvkr-results-08-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-08-statuses }}
-      nvkr-results-09:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09 }}
-      nvkr-results-09-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09-statuses }}
+      nvkr-results-0a:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0a }}
+      nvkr-results-0a-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0a-statuses }}
       nvkr-results-0b:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0b }}
       nvkr-results-0b-statuses:
@@ -76,156 +82,11 @@ name: NVKR execution partition
 permissions:
   contents: read
 jobs:
-  nvkr-capnico-controller-linux-arm64-build-f87f1492b304:
-    name: 'Build capnico-controller (capnico-controller/linux/arm64)'
-    runs-on: 'ubuntu-24.04-arm'
-    timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-capnico-controller-linux-arm64-fetch-f1d49285dcf0'].result == 'success' }}
-    steps:
-      - name: Check native runner platform
-        run: |
-          set -eu
-          if [ "$(uname -s)/$(uname -m)" != Linux/aarch64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/arm64 runner\n' >&2; exit 29; fi
-      - name: Check out workflow source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: 'false'
-      - name: Prepare NVKR runner and job parameters
-        id: nvkr-context
-        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
-        with:
-          runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute node part-1
-        uses: ./.github/nvkr-dev/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
-  nvkr-cluster-api-provider-provisioned-lin-768a4d08b436:
-    name: 'Build cluster-api-provider-provisioned (cluster-api-provider-provisioned/linux/arm64)'
-    runs-on: 'ubuntu-24.04-arm'
-    timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-cluster-api-provider-provisioned-lin-233fabd1edbc'].result == 'success' }}
-    steps:
-      - name: Check native runner platform
-        run: |
-          set -eu
-          if [ "$(uname -s)/$(uname -m)" != Linux/aarch64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/arm64 runner\n' >&2; exit 29; fi
-      - name: Check out workflow source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: 'false'
-      - name: Prepare NVKR runner and job parameters
-        id: nvkr-context
-        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
-        with:
-          runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute node part-1
-        uses: ./.github/nvkr-dev/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
-  nvkr-cwe-linux-arm64-build-nvke-controller:
-    name: 'Build nvke-controller (cwe/linux/arm64)'
-    runs-on: 'ubuntu-24.04-arm'
-    timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-cwe-linux-arm64-fetch-nvke-controller'].result == 'success' }}
-    steps:
-      - name: Check native runner platform
-        run: |
-          set -eu
-          if [ "$(uname -s)/$(uname -m)" != Linux/aarch64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/arm64 runner\n' >&2; exit 29; fi
-      - name: Check out workflow source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: 'false'
-      - name: Prepare NVKR runner and job parameters
-        id: nvkr-context
-        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
-        with:
-          runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute node part-1
-        uses: ./.github/nvkr-dev/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
-  nvkr-nico-reference-profiles-fixture-linu-cd99e6119686:
-    name: 'Build nvke-nico-reference-profiles (nico-reference-profiles-fixture/linux/arm64)'
-    runs-on: 'ubuntu-24.04-arm'
-    timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-nico-reference-profiles-fixture-linu-29120e898ac9'].result == 'success' }}
-    steps:
-      - name: Check native runner platform
-        run: |
-          set -eu
-          if [ "$(uname -s)/$(uname -m)" != Linux/aarch64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/arm64 runner\n' >&2; exit 29; fi
-      - name: Check out workflow source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: 'false'
-      - name: Prepare NVKR runner and job parameters
-        id: nvkr-context
-        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
-        with:
-          runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute node part-1
-        uses: ./.github/nvkr-dev/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
-  nvkr-nvkectl-linux-arm64-build-nvkectl:
-    name: 'Build nvkectl (nvkectl-linux-arm64)'
-    runs-on: 'ubuntu-24.04-arm'
-    timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-nvkectl-linux-arm64-fetch-nvkectl'].result == 'success' }}
-    steps:
-      - name: Check native runner platform
-        run: |
-          set -eu
-          if [ "$(uname -s)/$(uname -m)" != Linux/aarch64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/arm64 runner\n' >&2; exit 29; fi
-      - name: Check out workflow source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: 'false'
-      - name: Prepare NVKR runner and job parameters
-        id: nvkr-context
-        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
-        with:
-          runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute node part-1
-        uses: ./.github/nvkr-dev/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
-  nvkr-process-capi-controller-image-arm64-7043f52cb345:
-    name: 'Verify artifacts and generate SBOMs: capi-controller-image-arm64'
+  nvkr-process-capi-controller-image-pull-c-d7d51b217a77:
+    name: 'Acquire and prepare capi-controller-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -253,14 +114,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6:
-    name: 'Verify artifacts and generate SBOMs: capi-kubeadm-bootstrap-image-arm64'
+  nvkr-process-capi-kubeadm-bootstrap-image-8c3aef4dafbd:
+    name: 'Acquire and prepare capi-kubeadm-bootstrap-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -288,14 +155,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd:
-    name: 'Verify artifacts and generate SBOMs: capi-kubeadm-control-plane-image-arm64'
+  nvkr-process-capi-kubeadm-control-plane-i-b88cd1c6d916:
+    name: 'Acquire and prepare capi-kubeadm-control-plane-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -323,14 +196,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77:
-    name: 'Verify artifacts and generate SBOMs: cert-manager-cainjector-image-arm64'
+  nvkr-process-cert-manager-cainjector-imag-7e2df585c811:
+    name: 'Acquire and prepare cert-manager-cainjector-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -358,14 +237,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-cert-manager-controller-imag-8684e5f78b05:
-    name: 'Verify artifacts and generate SBOMs: cert-manager-controller-image-arm64'
+  nvkr-process-cert-manager-controller-imag-0f45c83b6091:
+    name: 'Acquire and prepare cert-manager-controller-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -393,14 +278,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-cert-manager-webhook-image-a-45233856fc27:
-    name: 'Verify artifacts and generate SBOMs: cert-manager-webhook-image-arm64'
+  nvkr-process-cert-manager-webhook-image-p-eb1305472075:
+    name: 'Acquire and prepare cert-manager-webhook-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -428,14 +319,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-csi-node-driver-registrar-im-11c07063ce1a:
-    name: 'Verify artifacts and generate SBOMs: csi-node-driver-registrar-image-arm64'
+  nvkr-process-csi-node-driver-registrar-im-8d5f23c6457d:
+    name: 'Acquire and prepare csi-node-driver-registrar-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -463,14 +360,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c:
-    name: 'Verify artifacts and generate SBOMs: nktp-collector-image-arm64'
+  nvkr-process-nktp-collector-image-pull-nk-7f8d9f4dfc62:
+    name: 'Acquire and prepare nktp-collector-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -498,14 +401,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-nktp-kube-state-metrics-imag-280f7d54b4e3:
-    name: 'Verify artifacts and generate SBOMs: nktp-kube-state-metrics-image-arm64'
+  nvkr-process-nktp-kube-state-metrics-imag-a2ce640c149c:
+    name: 'Acquire and prepare nktp-kube-state-metrics-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -533,14 +442,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-nktp-kubectl-image-arm64-ter-1a058c510d19:
-    name: 'Verify artifacts and generate SBOMs: nktp-kubectl-image-arm64'
+  nvkr-process-nktp-kubectl-image-pull-nktp-06529eed07dc:
+    name: 'Acquire and prepare nktp-kubectl-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -568,14 +483,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5:
-    name: 'Verify artifacts and generate SBOMs: nktp-lgtm-image-arm64'
+  nvkr-process-nktp-lgtm-image-pull-nktp-lg-823a7d93b02e:
+    name: 'Acquire and prepare nktp-lgtm-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -603,14 +524,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-nktp-metrics-server-image-ar-45096e344430:
-    name: 'Verify artifacts and generate SBOMs: nktp-metrics-server-image-arm64'
+  nvkr-process-nktp-metrics-server-image-pu-4cb3efc71983:
+    name: 'Acquire and prepare nktp-metrics-server-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -638,14 +565,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-nktp-node-exporter-image-arm-645d2587ce1d:
-    name: 'Verify artifacts and generate SBOMs: nktp-node-exporter-image-arm64'
+  nvkr-process-nktp-node-exporter-image-pul-6ff61df1db22:
+    name: 'Acquire and prepare nktp-node-exporter-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -673,14 +606,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-nktp-operator-image-arm64-te-4ccc4b61df9d:
-    name: 'Verify artifacts and generate SBOMs: nktp-operator-image-arm64'
+  nvkr-process-nktp-operator-image-pull-nkt-4f8772e3694e:
+    name: 'Acquire and prepare nktp-operator-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -708,14 +647,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-nktp-target-allocator-image-3ea850cfd8b9:
-    name: 'Verify artifacts and generate SBOMs: nktp-target-allocator-image-arm64'
+  nvkr-process-nktp-target-allocator-image-98482bd26a86:
+    name: 'Acquire and prepare nktp-target-allocator-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -743,14 +688,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-operator-tools-terminal-obse-ad40acf7eeda:
-    name: 'Verify artifacts and generate SBOMs: operator-tools'
+  nvkr-process-postgresql-image-pull-postgr-262baf89b239:
+    name: 'Acquire and prepare postgresql-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -778,14 +729,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79:
-    name: 'Verify artifacts and generate SBOMs: postgresql-image-arm64'
+  nvkr-process-postgresql-pull-postgresql-c-047f8d633203:
+    name: 'Acquire and prepare postgresql'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -813,14 +770,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f:
-    name: 'Verify artifacts and generate SBOMs: spiffe-csi-image-arm64'
+  nvkr-process-spiffe-csi-image-pull-spiffe-2ee250ddfce9:
+    name: 'Acquire and prepare spiffe-csi-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -848,14 +811,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd:
-    name: 'Verify artifacts and generate SBOMs: spire-agent-image-arm64'
+  nvkr-process-spire-agent-image-pull-spire-f26b98a935d5:
+    name: 'Acquire and prepare spire-agent-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -883,14 +852,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6:
-    name: 'Verify artifacts and generate SBOMs: spire-bash-image-arm64'
+  nvkr-process-spire-bash-image-pull-spire-72c313316c1d:
+    name: 'Acquire and prepare spire-bash-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -918,14 +893,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-spire-controller-manager-ima-3e5db62fee30:
-    name: 'Verify artifacts and generate SBOMs: spire-controller-manager-image-arm64'
+  nvkr-process-spire-controller-manager-ima-0262ec0b780f:
+    name: 'Acquire and prepare spire-controller-manager-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -953,14 +934,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b:
-    name: 'Verify artifacts and generate SBOMs: spire-oidc-image-arm64'
+  nvkr-process-spire-crds-pull-spire-crds-c-11103d63a93b:
+    name: 'Acquire and prepare spire-crds'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -988,14 +975,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-spire-server-image-arm64-ter-78345db78e5c:
-    name: 'Verify artifacts and generate SBOMs: spire-server-image-arm64'
+  nvkr-process-spire-oidc-image-pull-spire-ae9fdd6c5262:
+    name: 'Acquire and prepare spire-oidc-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -1023,14 +1016,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7:
-    name: 'Verify artifacts and generate SBOMs: spire-tpm-server-image-arm64'
+  nvkr-process-spire-pull-spire-chart-spire-33c1dfd25a91:
+    name: 'Acquire and prepare spire'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -1058,14 +1057,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-temporal-admin-tools-image-a-2e37748f989e:
-    name: 'Verify artifacts and generate SBOMs: temporal-admin-tools-image-arm64'
+  nvkr-process-spire-server-image-pull-spir-240af0efc28c:
+    name: 'Acquire and prepare spire-server-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -1093,14 +1098,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-temporal-server-image-arm64-a7b9faf98be2:
-    name: 'Verify artifacts and generate SBOMs: temporal-server-image-arm64'
+  nvkr-process-spire-tpm-server-image-pull-5e4c8bd40631:
+    name: 'Acquire and prepare spire-tpm-server-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -1128,14 +1139,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
-  nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360:
-    name: 'Verify artifacts and generate SBOMs: temporal-ui-image-arm64'
+  nvkr-process-temporal-admin-tools-image-p-89b69e6994ff:
+    name: 'Acquire and prepare temporal-admin-tools-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -1161,6 +1178,135 @@ jobs:
         uses: ./.github/nvkr-dev/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-temporal-pull-temporal-chart-e02b82483e4b:
+    name: 'Acquire and prepare temporal'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-2
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-temporal-server-image-pull-t-8ac10b1a7911:
+    name: 'Acquire and prepare temporal-server-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-2
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-temporal-ui-image-pull-tempo-fb82f86e5756:
+    name: 'Acquire and prepare temporal-ui-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 180
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-2
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: execute node part-3
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
@@ -1170,41 +1316,44 @@ jobs:
     name: 'Collect provider results: nvkr-partition-results'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-capnico-controller-linux-arm64-build-f87f1492b304, nvkr-cluster-api-provider-provisioned-lin-768a4d08b436, nvkr-cwe-linux-arm64-build-nvke-controller, nvkr-nico-reference-profiles-fixture-linu-cd99e6119686, nvkr-nvkectl-linux-arm64-build-nvkectl, nvkr-process-capi-controller-image-arm64-7043f52cb345, nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6, nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd, nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77, nvkr-process-cert-manager-controller-imag-8684e5f78b05, nvkr-process-cert-manager-webhook-image-a-45233856fc27, nvkr-process-csi-node-driver-registrar-im-11c07063ce1a, nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c, nvkr-process-nktp-kube-state-metrics-imag-280f7d54b4e3, nvkr-process-nktp-kubectl-image-arm64-ter-1a058c510d19, nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5, nvkr-process-nktp-metrics-server-image-ar-45096e344430, nvkr-process-nktp-node-exporter-image-arm-645d2587ce1d, nvkr-process-nktp-operator-image-arm64-te-4ccc4b61df9d, nvkr-process-nktp-target-allocator-image-3ea850cfd8b9, nvkr-process-operator-tools-terminal-obse-ad40acf7eeda, nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79, nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f, nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd, nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6, nvkr-process-spire-controller-manager-ima-3e5db62fee30, nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b, nvkr-process-spire-server-image-arm64-ter-78345db78e5c, nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7, nvkr-process-temporal-admin-tools-image-a-2e37748f989e, nvkr-process-temporal-server-image-arm64-a7b9faf98be2, nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360]
+    needs: [nvkr-process-capi-controller-image-pull-c-d7d51b217a77, nvkr-process-capi-kubeadm-bootstrap-image-8c3aef4dafbd, nvkr-process-capi-kubeadm-control-plane-i-b88cd1c6d916, nvkr-process-cert-manager-cainjector-imag-7e2df585c811, nvkr-process-cert-manager-controller-imag-0f45c83b6091, nvkr-process-cert-manager-webhook-image-p-eb1305472075, nvkr-process-csi-node-driver-registrar-im-8d5f23c6457d, nvkr-process-nktp-collector-image-pull-nk-7f8d9f4dfc62, nvkr-process-nktp-kube-state-metrics-imag-a2ce640c149c, nvkr-process-nktp-kubectl-image-pull-nktp-06529eed07dc, nvkr-process-nktp-lgtm-image-pull-nktp-lg-823a7d93b02e, nvkr-process-nktp-metrics-server-image-pu-4cb3efc71983, nvkr-process-nktp-node-exporter-image-pul-6ff61df1db22, nvkr-process-nktp-operator-image-pull-nkt-4f8772e3694e, nvkr-process-nktp-target-allocator-image-98482bd26a86, nvkr-process-postgresql-image-pull-postgr-262baf89b239, nvkr-process-postgresql-pull-postgresql-c-047f8d633203, nvkr-process-spiffe-csi-image-pull-spiffe-2ee250ddfce9, nvkr-process-spire-agent-image-pull-spire-f26b98a935d5, nvkr-process-spire-bash-image-pull-spire-72c313316c1d, nvkr-process-spire-controller-manager-ima-0262ec0b780f, nvkr-process-spire-crds-pull-spire-crds-c-11103d63a93b, nvkr-process-spire-oidc-image-pull-spire-ae9fdd6c5262, nvkr-process-spire-pull-spire-chart-spire-33c1dfd25a91, nvkr-process-spire-server-image-pull-spir-240af0efc28c, nvkr-process-spire-tpm-server-image-pull-5e4c8bd40631, nvkr-process-temporal-admin-tools-image-p-89b69e6994ff, nvkr-process-temporal-pull-temporal-chart-e02b82483e4b, nvkr-process-temporal-server-image-pull-t-8ac10b1a7911, nvkr-process-temporal-ui-image-pull-tempo-fb82f86e5756]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     permissions: {}
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
-      nvkr-partition-09: ${{ format('"nvkr-capnico-controller-linux-arm64-build-f87f1492b304":{0},"nvkr-cluster-api-provider-provisioned-lin-768a4d08b436":{1},"nvkr-cwe-linux-arm64-build-nvke-controller":{2},"nvkr-nico-reference-profiles-fixture-linu-cd99e6119686":{3},"nvkr-nvkectl-linux-arm64-build-nvkectl":{4},"nvkr-process-capi-controller-image-arm64-7043f52cb345":{5},"nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6":{6},"nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd":{7},"nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77":{8},"nvkr-process-cert-manager-controller-imag-8684e5f78b05":{9},"nvkr-process-cert-manager-webhook-image-a-45233856fc27":{10},"nvkr-process-csi-node-driver-registrar-im-11c07063ce1a":{11},"nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c":{12},"nvkr-process-nktp-kube-state-metrics-imag-280f7d54b4e3":{13},"nvkr-process-nktp-kubectl-image-arm64-ter-1a058c510d19":{14},"nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5":{15},"nvkr-process-nktp-metrics-server-image-ar-45096e344430":{16},"nvkr-process-nktp-node-exporter-image-arm-645d2587ce1d":{17},"nvkr-process-nktp-operator-image-arm64-te-4ccc4b61df9d":{18},"nvkr-process-nktp-target-allocator-image-3ea850cfd8b9":{19},"nvkr-process-operator-tools-terminal-obse-ad40acf7eeda":{20},"nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79":{21},"nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f":{22},"nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd":{23},"nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6":{24},"nvkr-process-spire-controller-manager-ima-3e5db62fee30":{25},"nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b":{26},"nvkr-process-spire-server-image-arm64-ter-78345db78e5c":{27},"nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7":{28},"nvkr-process-temporal-admin-tools-image-a-2e37748f989e":{29},"nvkr-process-temporal-server-image-arm64-a7b9faf98be2":{30},"nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360":{31}', toJSON(needs['nvkr-capnico-controller-linux-arm64-build-f87f1492b304']), toJSON(needs['nvkr-cluster-api-provider-provisioned-lin-768a4d08b436']), toJSON(needs['nvkr-cwe-linux-arm64-build-nvke-controller']), toJSON(needs['nvkr-nico-reference-profiles-fixture-linu-cd99e6119686']), toJSON(needs['nvkr-nvkectl-linux-arm64-build-nvkectl']), toJSON(needs['nvkr-process-capi-controller-image-arm64-7043f52cb345']), toJSON(needs['nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6']), toJSON(needs['nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd']), toJSON(needs['nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77']), toJSON(needs['nvkr-process-cert-manager-controller-imag-8684e5f78b05']), toJSON(needs['nvkr-process-cert-manager-webhook-image-a-45233856fc27']), toJSON(needs['nvkr-process-csi-node-driver-registrar-im-11c07063ce1a']), toJSON(needs['nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c']), toJSON(needs['nvkr-process-nktp-kube-state-metrics-imag-280f7d54b4e3']), toJSON(needs['nvkr-process-nktp-kubectl-image-arm64-ter-1a058c510d19']), toJSON(needs['nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5']), toJSON(needs['nvkr-process-nktp-metrics-server-image-ar-45096e344430']), toJSON(needs['nvkr-process-nktp-node-exporter-image-arm-645d2587ce1d']), toJSON(needs['nvkr-process-nktp-operator-image-arm64-te-4ccc4b61df9d']), toJSON(needs['nvkr-process-nktp-target-allocator-image-3ea850cfd8b9']), toJSON(needs['nvkr-process-operator-tools-terminal-obse-ad40acf7eeda']), toJSON(needs['nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79']), toJSON(needs['nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f']), toJSON(needs['nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd']), toJSON(needs['nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6']), toJSON(needs['nvkr-process-spire-controller-manager-ima-3e5db62fee30']), toJSON(needs['nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b']), toJSON(needs['nvkr-process-spire-server-image-arm64-ter-78345db78e5c']), toJSON(needs['nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7']), toJSON(needs['nvkr-process-temporal-admin-tools-image-a-2e37748f989e']), toJSON(needs['nvkr-process-temporal-server-image-arm64-a7b9faf98be2']), toJSON(needs['nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360'])) }}
-      nvkr-partition-13: ${{ format('"nvkr-nvkectl-linux-arm64-build-nvkectl":{0}', toJSON(needs['nvkr-nvkectl-linux-arm64-build-nvkectl'])) }}
-      nvkr-partition-14: ${{ format('"nvkr-capnico-controller-linux-arm64-build-f87f1492b304":{0},"nvkr-cluster-api-provider-provisioned-lin-768a4d08b436":{1},"nvkr-cwe-linux-arm64-build-nvke-controller":{2},"nvkr-nico-reference-profiles-fixture-linu-cd99e6119686":{3}', toJSON(needs['nvkr-capnico-controller-linux-arm64-build-f87f1492b304']), toJSON(needs['nvkr-cluster-api-provider-provisioned-lin-768a4d08b436']), toJSON(needs['nvkr-cwe-linux-arm64-build-nvke-controller']), toJSON(needs['nvkr-nico-reference-profiles-fixture-linu-cd99e6119686'])) }}
-      nvkr-results-00: ${{ format('"nvkr-process-cert-manager-webhook-image-a-45233856fc27":{0}', toJSON(needs['nvkr-process-cert-manager-webhook-image-a-45233856fc27'])) }}
-      nvkr-results-00-statuses: ${{ format('{0}', needs['nvkr-process-cert-manager-webhook-image-a-45233856fc27'].result) }}
-      nvkr-results-01: ${{ format('"nvkr-process-nktp-node-exporter-image-arm-645d2587ce1d":{0},"nvkr-process-nktp-target-allocator-image-3ea850cfd8b9":{1},"nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360":{2}', toJSON(needs['nvkr-process-nktp-node-exporter-image-arm-645d2587ce1d']), toJSON(needs['nvkr-process-nktp-target-allocator-image-3ea850cfd8b9']), toJSON(needs['nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360'])) }}
-      nvkr-results-01-statuses: ${{ format('{0} {1} {2}', needs['nvkr-process-nktp-node-exporter-image-arm-645d2587ce1d'].result, needs['nvkr-process-nktp-target-allocator-image-3ea850cfd8b9'].result, needs['nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360'].result) }}
-      nvkr-results-02: ${{ format('"nvkr-process-operator-tools-terminal-obse-ad40acf7eeda":{0},"nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f":{1},"nvkr-process-spire-controller-manager-ima-3e5db62fee30":{2}', toJSON(needs['nvkr-process-operator-tools-terminal-obse-ad40acf7eeda']), toJSON(needs['nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f']), toJSON(needs['nvkr-process-spire-controller-manager-ima-3e5db62fee30'])) }}
-      nvkr-results-02-statuses: ${{ format('{0} {1} {2}', needs['nvkr-process-operator-tools-terminal-obse-ad40acf7eeda'].result, needs['nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f'].result, needs['nvkr-process-spire-controller-manager-ima-3e5db62fee30'].result) }}
-      nvkr-results-03: ${{ format('"nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6":{0}', toJSON(needs['nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6'])) }}
-      nvkr-results-03-statuses: ${{ format('{0}', needs['nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6'].result) }}
-      nvkr-results-04: ${{ format('"nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79":{0}', toJSON(needs['nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79'])) }}
-      nvkr-results-04-statuses: ${{ format('{0}', needs['nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79'].result) }}
-      nvkr-results-07: ${{ format('"nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7":{0}', toJSON(needs['nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7'])) }}
-      nvkr-results-07-statuses: ${{ format('{0}', needs['nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7'].result) }}
-      nvkr-results-08: ${{ format('"nvkr-nico-reference-profiles-fixture-linu-cd99e6119686":{0},"nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd":{1},"nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b":{2}', toJSON(needs['nvkr-nico-reference-profiles-fixture-linu-cd99e6119686']), toJSON(needs['nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd']), toJSON(needs['nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b'])) }}
-      nvkr-results-08-statuses: ${{ format('{0} {1} {2}', needs['nvkr-nico-reference-profiles-fixture-linu-cd99e6119686'].result, needs['nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd'].result, needs['nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b'].result) }}
-      nvkr-results-09: ${{ format('"nvkr-cwe-linux-arm64-build-nvke-controller":{0},"nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6":{1},"nvkr-process-csi-node-driver-registrar-im-11c07063ce1a":{2},"nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5":{3},"nvkr-process-spire-server-image-arm64-ter-78345db78e5c":{4},"nvkr-process-temporal-server-image-arm64-a7b9faf98be2":{5}', toJSON(needs['nvkr-cwe-linux-arm64-build-nvke-controller']), toJSON(needs['nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6']), toJSON(needs['nvkr-process-csi-node-driver-registrar-im-11c07063ce1a']), toJSON(needs['nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5']), toJSON(needs['nvkr-process-spire-server-image-arm64-ter-78345db78e5c']), toJSON(needs['nvkr-process-temporal-server-image-arm64-a7b9faf98be2'])) }}
-      nvkr-results-09-statuses: ${{ format('{0} {1} {2} {3} {4} {5}', needs['nvkr-cwe-linux-arm64-build-nvke-controller'].result, needs['nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6'].result, needs['nvkr-process-csi-node-driver-registrar-im-11c07063ce1a'].result, needs['nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5'].result, needs['nvkr-process-spire-server-image-arm64-ter-78345db78e5c'].result, needs['nvkr-process-temporal-server-image-arm64-a7b9faf98be2'].result) }}
-      nvkr-results-0b: ${{ format('"nvkr-capnico-controller-linux-arm64-build-f87f1492b304":{0},"nvkr-process-nktp-kubectl-image-arm64-ter-1a058c510d19":{1}', toJSON(needs['nvkr-capnico-controller-linux-arm64-build-f87f1492b304']), toJSON(needs['nvkr-process-nktp-kubectl-image-arm64-ter-1a058c510d19'])) }}
-      nvkr-results-0b-statuses: ${{ format('{0} {1}', needs['nvkr-capnico-controller-linux-arm64-build-f87f1492b304'].result, needs['nvkr-process-nktp-kubectl-image-arm64-ter-1a058c510d19'].result) }}
-      nvkr-results-0c: ${{ format('"nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77":{0},"nvkr-process-cert-manager-controller-imag-8684e5f78b05":{1}', toJSON(needs['nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77']), toJSON(needs['nvkr-process-cert-manager-controller-imag-8684e5f78b05'])) }}
-      nvkr-results-0c-statuses: ${{ format('{0} {1}', needs['nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77'].result, needs['nvkr-process-cert-manager-controller-imag-8684e5f78b05'].result) }}
-      nvkr-results-0d: ${{ format('"nvkr-cluster-api-provider-provisioned-lin-768a4d08b436":{0},"nvkr-process-capi-controller-image-arm64-7043f52cb345":{1}', toJSON(needs['nvkr-cluster-api-provider-provisioned-lin-768a4d08b436']), toJSON(needs['nvkr-process-capi-controller-image-arm64-7043f52cb345'])) }}
-      nvkr-results-0d-statuses: ${{ format('{0} {1}', needs['nvkr-cluster-api-provider-provisioned-lin-768a4d08b436'].result, needs['nvkr-process-capi-controller-image-arm64-7043f52cb345'].result) }}
-      nvkr-results-0e: ${{ format('"nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd":{0},"nvkr-process-nktp-kube-state-metrics-imag-280f7d54b4e3":{1},"nvkr-process-nktp-metrics-server-image-ar-45096e344430":{2},"nvkr-process-nktp-operator-image-arm64-te-4ccc4b61df9d":{3}', toJSON(needs['nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd']), toJSON(needs['nvkr-process-nktp-kube-state-metrics-imag-280f7d54b4e3']), toJSON(needs['nvkr-process-nktp-metrics-server-image-ar-45096e344430']), toJSON(needs['nvkr-process-nktp-operator-image-arm64-te-4ccc4b61df9d'])) }}
-      nvkr-results-0e-statuses: ${{ format('{0} {1} {2} {3}', needs['nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd'].result, needs['nvkr-process-nktp-kube-state-metrics-imag-280f7d54b4e3'].result, needs['nvkr-process-nktp-metrics-server-image-ar-45096e344430'].result, needs['nvkr-process-nktp-operator-image-arm64-te-4ccc4b61df9d'].result) }}
-      nvkr-results-0f: ${{ format('"nvkr-nvkectl-linux-arm64-build-nvkectl":{0},"nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c":{1},"nvkr-process-temporal-admin-tools-image-a-2e37748f989e":{2}', toJSON(needs['nvkr-nvkectl-linux-arm64-build-nvkectl']), toJSON(needs['nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c']), toJSON(needs['nvkr-process-temporal-admin-tools-image-a-2e37748f989e'])) }}
-      nvkr-results-0f-statuses: ${{ format('{0} {1} {2}', needs['nvkr-nvkectl-linux-arm64-build-nvkectl'].result, needs['nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c'].result, needs['nvkr-process-temporal-admin-tools-image-a-2e37748f989e'].result) }}
+      nvkr-partition-07: ${{ format('"nvkr-process-capi-controller-image-pull-c-d7d51b217a77":{0},"nvkr-process-capi-kubeadm-bootstrap-image-8c3aef4dafbd":{1},"nvkr-process-capi-kubeadm-control-plane-i-b88cd1c6d916":{2},"nvkr-process-cert-manager-cainjector-imag-7e2df585c811":{3},"nvkr-process-cert-manager-controller-imag-0f45c83b6091":{4},"nvkr-process-cert-manager-webhook-image-p-eb1305472075":{5},"nvkr-process-csi-node-driver-registrar-im-8d5f23c6457d":{6},"nvkr-process-nktp-collector-image-pull-nk-7f8d9f4dfc62":{7},"nvkr-process-nktp-kube-state-metrics-imag-a2ce640c149c":{8},"nvkr-process-nktp-kubectl-image-pull-nktp-06529eed07dc":{9},"nvkr-process-nktp-lgtm-image-pull-nktp-lg-823a7d93b02e":{10},"nvkr-process-nktp-metrics-server-image-pu-4cb3efc71983":{11},"nvkr-process-nktp-node-exporter-image-pul-6ff61df1db22":{12},"nvkr-process-nktp-operator-image-pull-nkt-4f8772e3694e":{13},"nvkr-process-nktp-target-allocator-image-98482bd26a86":{14},"nvkr-process-postgresql-image-pull-postgr-262baf89b239":{15},"nvkr-process-postgresql-pull-postgresql-c-047f8d633203":{16},"nvkr-process-spiffe-csi-image-pull-spiffe-2ee250ddfce9":{17},"nvkr-process-spire-agent-image-pull-spire-f26b98a935d5":{18},"nvkr-process-spire-bash-image-pull-spire-72c313316c1d":{19},"nvkr-process-spire-controller-manager-ima-0262ec0b780f":{20},"nvkr-process-spire-crds-pull-spire-crds-c-11103d63a93b":{21},"nvkr-process-spire-oidc-image-pull-spire-ae9fdd6c5262":{22},"nvkr-process-spire-pull-spire-chart-spire-33c1dfd25a91":{23},"nvkr-process-spire-server-image-pull-spir-240af0efc28c":{24}', toJSON(needs['nvkr-process-capi-controller-image-pull-c-d7d51b217a77']), toJSON(needs['nvkr-process-capi-kubeadm-bootstrap-image-8c3aef4dafbd']), toJSON(needs['nvkr-process-capi-kubeadm-control-plane-i-b88cd1c6d916']), toJSON(needs['nvkr-process-cert-manager-cainjector-imag-7e2df585c811']), toJSON(needs['nvkr-process-cert-manager-controller-imag-0f45c83b6091']), toJSON(needs['nvkr-process-cert-manager-webhook-image-p-eb1305472075']), toJSON(needs['nvkr-process-csi-node-driver-registrar-im-8d5f23c6457d']), toJSON(needs['nvkr-process-nktp-collector-image-pull-nk-7f8d9f4dfc62']), toJSON(needs['nvkr-process-nktp-kube-state-metrics-imag-a2ce640c149c']), toJSON(needs['nvkr-process-nktp-kubectl-image-pull-nktp-06529eed07dc']), toJSON(needs['nvkr-process-nktp-lgtm-image-pull-nktp-lg-823a7d93b02e']), toJSON(needs['nvkr-process-nktp-metrics-server-image-pu-4cb3efc71983']), toJSON(needs['nvkr-process-nktp-node-exporter-image-pul-6ff61df1db22']), toJSON(needs['nvkr-process-nktp-operator-image-pull-nkt-4f8772e3694e']), toJSON(needs['nvkr-process-nktp-target-allocator-image-98482bd26a86']), toJSON(needs['nvkr-process-postgresql-image-pull-postgr-262baf89b239']), toJSON(needs['nvkr-process-postgresql-pull-postgresql-c-047f8d633203']), toJSON(needs['nvkr-process-spiffe-csi-image-pull-spiffe-2ee250ddfce9']), toJSON(needs['nvkr-process-spire-agent-image-pull-spire-f26b98a935d5']), toJSON(needs['nvkr-process-spire-bash-image-pull-spire-72c313316c1d']), toJSON(needs['nvkr-process-spire-controller-manager-ima-0262ec0b780f']), toJSON(needs['nvkr-process-spire-crds-pull-spire-crds-c-11103d63a93b']), toJSON(needs['nvkr-process-spire-oidc-image-pull-spire-ae9fdd6c5262']), toJSON(needs['nvkr-process-spire-pull-spire-chart-spire-33c1dfd25a91']), toJSON(needs['nvkr-process-spire-server-image-pull-spir-240af0efc28c'])) }}
+      nvkr-partition-08: ${{ format('"nvkr-process-spire-tpm-server-image-pull-5e4c8bd40631":{0},"nvkr-process-temporal-admin-tools-image-p-89b69e6994ff":{1},"nvkr-process-temporal-pull-temporal-chart-e02b82483e4b":{2},"nvkr-process-temporal-server-image-pull-t-8ac10b1a7911":{3},"nvkr-process-temporal-ui-image-pull-tempo-fb82f86e5756":{4}', toJSON(needs['nvkr-process-spire-tpm-server-image-pull-5e4c8bd40631']), toJSON(needs['nvkr-process-temporal-admin-tools-image-p-89b69e6994ff']), toJSON(needs['nvkr-process-temporal-pull-temporal-chart-e02b82483e4b']), toJSON(needs['nvkr-process-temporal-server-image-pull-t-8ac10b1a7911']), toJSON(needs['nvkr-process-temporal-ui-image-pull-tempo-fb82f86e5756'])) }}
+      nvkr-results-00: ${{ format('"nvkr-process-nktp-kubectl-image-pull-nktp-06529eed07dc":{0},"nvkr-process-nktp-node-exporter-image-pul-6ff61df1db22":{1}', toJSON(needs['nvkr-process-nktp-kubectl-image-pull-nktp-06529eed07dc']), toJSON(needs['nvkr-process-nktp-node-exporter-image-pul-6ff61df1db22'])) }}
+      nvkr-results-00-statuses: ${{ format('{0} {1}', needs['nvkr-process-nktp-kubectl-image-pull-nktp-06529eed07dc'].result, needs['nvkr-process-nktp-node-exporter-image-pul-6ff61df1db22'].result) }}
+      nvkr-results-01: ${{ format('"nvkr-process-cert-manager-controller-imag-0f45c83b6091":{0},"nvkr-process-postgresql-pull-postgresql-c-047f8d633203":{1}', toJSON(needs['nvkr-process-cert-manager-controller-imag-0f45c83b6091']), toJSON(needs['nvkr-process-postgresql-pull-postgresql-c-047f8d633203'])) }}
+      nvkr-results-01-statuses: ${{ format('{0} {1}', needs['nvkr-process-cert-manager-controller-imag-0f45c83b6091'].result, needs['nvkr-process-postgresql-pull-postgresql-c-047f8d633203'].result) }}
+      nvkr-results-02: ${{ format('"nvkr-process-capi-controller-image-pull-c-d7d51b217a77":{0}', toJSON(needs['nvkr-process-capi-controller-image-pull-c-d7d51b217a77'])) }}
+      nvkr-results-02-statuses: ${{ format('{0}', needs['nvkr-process-capi-controller-image-pull-c-d7d51b217a77'].result) }}
+      nvkr-results-03: ${{ format('"nvkr-process-capi-kubeadm-bootstrap-image-8c3aef4dafbd":{0},"nvkr-process-spire-bash-image-pull-spire-72c313316c1d":{1},"nvkr-process-spire-controller-manager-ima-0262ec0b780f":{2}', toJSON(needs['nvkr-process-capi-kubeadm-bootstrap-image-8c3aef4dafbd']), toJSON(needs['nvkr-process-spire-bash-image-pull-spire-72c313316c1d']), toJSON(needs['nvkr-process-spire-controller-manager-ima-0262ec0b780f'])) }}
+      nvkr-results-03-statuses: ${{ format('{0} {1} {2}', needs['nvkr-process-capi-kubeadm-bootstrap-image-8c3aef4dafbd'].result, needs['nvkr-process-spire-bash-image-pull-spire-72c313316c1d'].result, needs['nvkr-process-spire-controller-manager-ima-0262ec0b780f'].result) }}
+      nvkr-results-04: ${{ format('"nvkr-process-nktp-collector-image-pull-nk-7f8d9f4dfc62":{0},"nvkr-process-spire-server-image-pull-spir-240af0efc28c":{1}', toJSON(needs['nvkr-process-nktp-collector-image-pull-nk-7f8d9f4dfc62']), toJSON(needs['nvkr-process-spire-server-image-pull-spir-240af0efc28c'])) }}
+      nvkr-results-04-statuses: ${{ format('{0} {1}', needs['nvkr-process-nktp-collector-image-pull-nk-7f8d9f4dfc62'].result, needs['nvkr-process-spire-server-image-pull-spir-240af0efc28c'].result) }}
+      nvkr-results-05: ${{ format('"nvkr-process-temporal-pull-temporal-chart-e02b82483e4b":{0},"nvkr-process-temporal-ui-image-pull-tempo-fb82f86e5756":{1}', toJSON(needs['nvkr-process-temporal-pull-temporal-chart-e02b82483e4b']), toJSON(needs['nvkr-process-temporal-ui-image-pull-tempo-fb82f86e5756'])) }}
+      nvkr-results-05-statuses: ${{ format('{0} {1}', needs['nvkr-process-temporal-pull-temporal-chart-e02b82483e4b'].result, needs['nvkr-process-temporal-ui-image-pull-tempo-fb82f86e5756'].result) }}
+      nvkr-results-06: ${{ format('"nvkr-process-nktp-lgtm-image-pull-nktp-lg-823a7d93b02e":{0}', toJSON(needs['nvkr-process-nktp-lgtm-image-pull-nktp-lg-823a7d93b02e'])) }}
+      nvkr-results-06-statuses: ${{ format('{0}', needs['nvkr-process-nktp-lgtm-image-pull-nktp-lg-823a7d93b02e'].result) }}
+      nvkr-results-07: ${{ format('"nvkr-process-capi-kubeadm-control-plane-i-b88cd1c6d916":{0},"nvkr-process-cert-manager-cainjector-imag-7e2df585c811":{1},"nvkr-process-nktp-kube-state-metrics-imag-a2ce640c149c":{2}', toJSON(needs['nvkr-process-capi-kubeadm-control-plane-i-b88cd1c6d916']), toJSON(needs['nvkr-process-cert-manager-cainjector-imag-7e2df585c811']), toJSON(needs['nvkr-process-nktp-kube-state-metrics-imag-a2ce640c149c'])) }}
+      nvkr-results-07-statuses: ${{ format('{0} {1} {2}', needs['nvkr-process-capi-kubeadm-control-plane-i-b88cd1c6d916'].result, needs['nvkr-process-cert-manager-cainjector-imag-7e2df585c811'].result, needs['nvkr-process-nktp-kube-state-metrics-imag-a2ce640c149c'].result) }}
+      nvkr-results-08: ${{ format('"nvkr-process-spire-oidc-image-pull-spire-ae9fdd6c5262":{0}', toJSON(needs['nvkr-process-spire-oidc-image-pull-spire-ae9fdd6c5262'])) }}
+      nvkr-results-08-statuses: ${{ format('{0}', needs['nvkr-process-spire-oidc-image-pull-spire-ae9fdd6c5262'].result) }}
+      nvkr-results-0a: ${{ format('"nvkr-process-temporal-admin-tools-image-p-89b69e6994ff":{0},"nvkr-process-temporal-server-image-pull-t-8ac10b1a7911":{1}', toJSON(needs['nvkr-process-temporal-admin-tools-image-p-89b69e6994ff']), toJSON(needs['nvkr-process-temporal-server-image-pull-t-8ac10b1a7911'])) }}
+      nvkr-results-0a-statuses: ${{ format('{0} {1}', needs['nvkr-process-temporal-admin-tools-image-p-89b69e6994ff'].result, needs['nvkr-process-temporal-server-image-pull-t-8ac10b1a7911'].result) }}
+      nvkr-results-0b: ${{ format('"nvkr-process-csi-node-driver-registrar-im-8d5f23c6457d":{0},"nvkr-process-spire-agent-image-pull-spire-f26b98a935d5":{1}', toJSON(needs['nvkr-process-csi-node-driver-registrar-im-8d5f23c6457d']), toJSON(needs['nvkr-process-spire-agent-image-pull-spire-f26b98a935d5'])) }}
+      nvkr-results-0b-statuses: ${{ format('{0} {1}', needs['nvkr-process-csi-node-driver-registrar-im-8d5f23c6457d'].result, needs['nvkr-process-spire-agent-image-pull-spire-f26b98a935d5'].result) }}
+      nvkr-results-0c: ${{ format('"nvkr-process-nktp-operator-image-pull-nkt-4f8772e3694e":{0},"nvkr-process-postgresql-image-pull-postgr-262baf89b239":{1},"nvkr-process-spire-pull-spire-chart-spire-33c1dfd25a91":{2},"nvkr-process-spire-tpm-server-image-pull-5e4c8bd40631":{3}', toJSON(needs['nvkr-process-nktp-operator-image-pull-nkt-4f8772e3694e']), toJSON(needs['nvkr-process-postgresql-image-pull-postgr-262baf89b239']), toJSON(needs['nvkr-process-spire-pull-spire-chart-spire-33c1dfd25a91']), toJSON(needs['nvkr-process-spire-tpm-server-image-pull-5e4c8bd40631'])) }}
+      nvkr-results-0c-statuses: ${{ format('{0} {1} {2} {3}', needs['nvkr-process-nktp-operator-image-pull-nkt-4f8772e3694e'].result, needs['nvkr-process-postgresql-image-pull-postgr-262baf89b239'].result, needs['nvkr-process-spire-pull-spire-chart-spire-33c1dfd25a91'].result, needs['nvkr-process-spire-tpm-server-image-pull-5e4c8bd40631'].result) }}
+      nvkr-results-0d: ${{ format('"nvkr-process-nktp-target-allocator-image-98482bd26a86":{0},"nvkr-process-spiffe-csi-image-pull-spiffe-2ee250ddfce9":{1}', toJSON(needs['nvkr-process-nktp-target-allocator-image-98482bd26a86']), toJSON(needs['nvkr-process-spiffe-csi-image-pull-spiffe-2ee250ddfce9'])) }}
+      nvkr-results-0d-statuses: ${{ format('{0} {1}', needs['nvkr-process-nktp-target-allocator-image-98482bd26a86'].result, needs['nvkr-process-spiffe-csi-image-pull-spiffe-2ee250ddfce9'].result) }}
+      nvkr-results-0e: ${{ format('"nvkr-process-cert-manager-webhook-image-p-eb1305472075":{0}', toJSON(needs['nvkr-process-cert-manager-webhook-image-p-eb1305472075'])) }}
+      nvkr-results-0e-statuses: ${{ format('{0}', needs['nvkr-process-cert-manager-webhook-image-p-eb1305472075'].result) }}
+      nvkr-results-0f: ${{ format('"nvkr-process-nktp-metrics-server-image-pu-4cb3efc71983":{0},"nvkr-process-spire-crds-pull-spire-crds-c-11103d63a93b":{1}', toJSON(needs['nvkr-process-nktp-metrics-server-image-pu-4cb3efc71983']), toJSON(needs['nvkr-process-spire-crds-pull-spire-crds-c-11103d63a93b'])) }}
+      nvkr-results-0f-statuses: ${{ format('{0} {1}', needs['nvkr-process-nktp-metrics-server-image-pu-4cb3efc71983'].result, needs['nvkr-process-spire-crds-pull-spire-crds-c-11103d63a93b'].result) }}
     steps:
       - name: Forward provider results
         run: ':'

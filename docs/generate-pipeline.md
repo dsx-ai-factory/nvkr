@@ -105,8 +105,31 @@ committed bundle and current authored inputs, then install them through the gene
 Routine source-version updates therefore do not require a regenerated bundle commit. CI uses the same
 inputs with `--runtime --check`: it checks baseline integrity and unchanged workflow/action bytes,
 membership and Environment policy without writing files. Changes outside that contract require normal
-regeneration and review. This mode neither follows floating upstream versions nor changes the default
-or development bundle contract; ordinary `--check` remains a complete byte comparison.
+regeneration and review. This mode does not follow floating upstream versions or change the default
+bundle contract; ordinary `--check` remains a complete byte comparison.
+
+A development Environment can declare overridable sources, which implies the same runtime-Plan
+path; do not set `githubRuntimePlan` there. Each source name becomes one optional dispatch input
+for the from-source repository it overrides:
+
+```yaml
+overridable:
+  sources:
+    nvke:
+      repository: https://github.com/dsx-ai-factory/nvke
+```
+
+Leave an input empty to build the reviewed pin, or set a version constraint (`0.23.x`, `v0.22.0`)
+or a full commit:
+
+```sh
+gh workflow run nvkr-dev.yml --ref <branch> -f nvke=<full-commit-or-constraint>
+```
+
+The first bootstrap resolves each value once, records the requested value, tag and commit in the
+Plan, and every later job and the finalizer replay that exact selection. A constraint picks the
+newest stable tag; a moved tag or rewritten commit fails the Run. Overrides change source
+revisions only, never build commands or toolchains, and such Runs cannot feed qualification.
 
 Generated GitHub transfers keep validated metadata in Actions artifacts using the workflow identity.
 Provenance, SBOMs, signing/verification records and control layouts must pass their exact schemas and

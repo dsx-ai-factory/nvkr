@@ -10,68 +10,46 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.results }}
       statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
-      nvkr-results-01:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-01 }}
-      nvkr-results-01-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-01-statuses }}
+      nvkr-partition-13:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-13 }}
       nvkr-results-05:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-05 }}
       nvkr-results-05-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-05-statuses }}
+      nvkr-results-07:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-07 }}
+      nvkr-results-07-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-07-statuses }}
+      nvkr-results-08:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-08 }}
+      nvkr-results-08-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-08-statuses }}
       nvkr-results-09:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09 }}
       nvkr-results-09-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09-statuses }}
-      nvkr-results-0d:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0d }}
-      nvkr-results-0d-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0d-statuses }}
+      nvkr-results-0e:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0e }}
+      nvkr-results-0e-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0e-statuses }}
     secrets:
       NVKR_CI_STORAGE_READ_TOKEN:
         required: true
       NVKR_CI_STORAGE_WRITE_TOKEN:
         required: true
-      NVKR_REGISTRY_READ:
-        required: true
 permissions:
   contents: read
 jobs:
-  nvkr-disk-nvke-node-fde-amd64:
-    name: 'Build and package producer evidence for nvke-node-fde-amd64'
-    runs-on: 'arc-amd64-kvm'
-    timeout-minutes: 1045
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-arc-amd64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-nvke-agent-dc6f3464c691'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-nvke-cni-calico'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-nvke-kubeadm-distro'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-nvke-spire-agent'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-ovn-kube-ubuntu'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-ovn-kubernetes-chart'].result == 'success' }}
-    environment: 'nvkr-dev-arc'
-    permissions:
-      actions: read
-      contents: read
+  nvkr-spire-tpm-server-image-sbom:
+    name: 'Generate SBOMs: spire-tpm-server-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-process-spire-tpm-server-image-pull-5e4c8bd40631'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
           set -eu
           if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
-      - name: Prepare KVM access before transfer
-        timeout-minutes: 1
-        run: |-
-          set -eu
-          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
-            printf 'NVKR-E-ENGINE-CAPABILITY: native disk runner lacks /dev/kvm\n' >&2
-            exit 29
-          fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-) 2>/dev/null; then
-            printf 'Preparing /dev/kvm access on the operator-trusted ARC runner\n'
-            if ! /usr/bin/timeout --kill-after=5s 15s /usr/bin/sudo -n -- /usr/bin/chmod 0666 /dev/kvm; then
-              printf 'NVKR-E-ENGINE-CAPABILITY: unable to prepare /dev/kvm access\n' >&2
-              exit 29
-            fi
-          fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-); then
-            printf 'NVKR-E-ENGINE-CAPABILITY: runner still cannot open /dev/kvm read/write\n' >&2
-            id >&2 || true
-            stat -c 'uid=%u gid=%g mode=%a' /dev/kvm >&2 || true
-            exit 29
-          fi
-          stat -c 'KVM ready: uid=%u gid=%g mode=%a' /dev/kvm || true
       - name: Check out workflow source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -80,274 +58,27 @@ jobs:
         id: nvkr-context
         uses: ./.github/nvkr-dev/actions/shared/prepare-stage
         with:
-          runner-artifact: 'nvkr-exec-arc-amd64-kvm'
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: prepare inputs part-1
-        uses: ./.github/nvkr-dev/actions/shared/prepare-inputs
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: prepare images part-2
-        uses: ./.github/nvkr-dev/actions/shared/prepare-images
-        with:
-          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
-          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
-      - name: 'Build and package producer evidence for nvke-node-fde-amd64'
-        id: run-disk
-        run: ./nvkr-exec factory github run-disk --plan .github/nvkr-dev/plan.json --output nvke-node-fde-amd64
-      - name: Upload failed Packer diagnostics
-        uses: ./.github/nvkr-dev/actions/shared/upload-carrier
-        with:
-          with-path: '${{ steps.run-disk.outputs.packer_diagnostics }}'
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['transfer-1'] }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-        if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
-        timeout-minutes: 5
-      - name: collect node outputs part-3
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-4
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-4'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-5
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-5'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-6
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-6'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-7
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-7'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-8
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-8'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-9
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-9'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-10
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-10'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-11
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-11'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-12
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-12'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-13
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-13'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-14
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-14'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-15
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-15'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-16
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-16'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-  nvkr-disk-nvke-node-fde-arm64:
-    name: 'Build and package producer evidence for nvke-node-fde-arm64'
-    runs-on: 'arc-arm64-kvm'
-    timeout-minutes: 1045
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-arc-arm64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-nvke-agent-e713dcd879bc'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-nvke-cni-calico'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-nvke-kubeadm-distro'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-nvke-spire-agent'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-ovn-kube-ubuntu'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-ovn-kubernetes-chart'].result == 'success' }}
-    environment: 'nvkr-dev-arc'
     permissions:
       actions: read
       contents: read
-    steps:
-      - name: Check native runner platform
-        run: |
-          set -eu
-          if [ "$(uname -s)/$(uname -m)" != Linux/aarch64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/arm64 runner\n' >&2; exit 29; fi
-      - name: Prepare KVM access before transfer
-        timeout-minutes: 1
-        run: |-
-          set -eu
-          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
-            printf 'NVKR-E-ENGINE-CAPABILITY: native disk runner lacks /dev/kvm\n' >&2
-            exit 29
-          fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-) 2>/dev/null; then
-            printf 'Preparing /dev/kvm access on the operator-trusted ARC runner\n'
-            if ! /usr/bin/timeout --kill-after=5s 15s /usr/bin/sudo -n -- /usr/bin/chmod 0666 /dev/kvm; then
-              printf 'NVKR-E-ENGINE-CAPABILITY: unable to prepare /dev/kvm access\n' >&2
-              exit 29
-            fi
-          fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-); then
-            printf 'NVKR-E-ENGINE-CAPABILITY: runner still cannot open /dev/kvm read/write\n' >&2
-            id >&2 || true
-            stat -c 'uid=%u gid=%g mode=%a' /dev/kvm >&2 || true
-            exit 29
-          fi
-          stat -c 'KVM ready: uid=%u gid=%g mode=%a' /dev/kvm || true
-      - name: Check out workflow source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: 'false'
-      - name: Prepare NVKR runner and job parameters
-        id: nvkr-context
-        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
-        with:
-          runner-artifact: 'nvkr-exec-arc-arm64-kvm'
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: prepare inputs part-1
-        uses: ./.github/nvkr-dev/actions/shared/prepare-inputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: prepare images part-2
-        uses: ./.github/nvkr-dev/actions/shared/prepare-images
-        with:
-          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
-          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
-      - name: 'Build and package producer evidence for nvke-node-fde-arm64'
-        id: run-disk
-        run: ./nvkr-exec factory github run-disk --plan .github/nvkr-dev/plan.json --output nvke-node-fde-arm64
-      - name: Upload failed Packer diagnostics
-        uses: ./.github/nvkr-dev/actions/shared/upload-carrier
-        with:
-          with-path: '${{ steps.run-disk.outputs.packer_diagnostics }}'
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['transfer-1'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-        if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
-        timeout-minutes: 5
-      - name: collect node outputs part-3
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-4
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-4'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-5
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-5'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-6
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-6'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-7
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-7'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-8
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-8'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-9
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-9'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-10
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-10'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-11
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-11'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-12
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-12'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-13
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-13'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-14
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-14'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-15
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-15'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-16
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-16'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-  nvkr-disk-nvke-node-image-amd64:
-    name: 'Build and package producer evidence for nvke-node-image-amd64'
-    runs-on: 'arc-amd64-kvm'
-    timeout-minutes: 1045
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-arc-amd64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-nvke-age-0c826a20a7b4'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart'].result == 'success' }}
-    environment: 'nvkr-dev-arc'
-    permissions:
-      actions: read
-      contents: read
+  nvkr-temporal-admin-tools-image-sbom:
+    name: 'Generate SBOMs: temporal-admin-tools-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-process-temporal-admin-tools-image-p-89b69e6994ff'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
           set -eu
           if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
-      - name: Prepare KVM access before transfer
-        timeout-minutes: 1
-        run: |-
-          set -eu
-          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
-            printf 'NVKR-E-ENGINE-CAPABILITY: native disk runner lacks /dev/kvm\n' >&2
-            exit 29
-          fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-) 2>/dev/null; then
-            printf 'Preparing /dev/kvm access on the operator-trusted ARC runner\n'
-            if ! /usr/bin/timeout --kill-after=5s 15s /usr/bin/sudo -n -- /usr/bin/chmod 0666 /dev/kvm; then
-              printf 'NVKR-E-ENGINE-CAPABILITY: unable to prepare /dev/kvm access\n' >&2
-              exit 29
-            fi
-          fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-); then
-            printf 'NVKR-E-ENGINE-CAPABILITY: runner still cannot open /dev/kvm read/write\n' >&2
-            id >&2 || true
-            stat -c 'uid=%u gid=%g mode=%a' /dev/kvm >&2 || true
-            exit 29
-          fi
-          stat -c 'KVM ready: uid=%u gid=%g mode=%a' /dev/kvm || true
       - name: Check out workflow source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -356,136 +87,27 @@ jobs:
         id: nvkr-context
         uses: ./.github/nvkr-dev/actions/shared/prepare-stage
         with:
-          runner-artifact: 'nvkr-exec-arc-amd64-kvm'
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: prepare inputs part-1
-        uses: ./.github/nvkr-dev/actions/shared/prepare-inputs
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: prepare images part-2
-        uses: ./.github/nvkr-dev/actions/shared/prepare-images
-        with:
-          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
-          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
-      - name: 'Build and package producer evidence for nvke-node-image-amd64'
-        id: run-disk
-        run: ./nvkr-exec factory github run-disk --plan .github/nvkr-dev/plan.json --output nvke-node-image-amd64
-      - name: Upload failed Packer diagnostics
-        uses: ./.github/nvkr-dev/actions/shared/upload-carrier
-        with:
-          with-path: '${{ steps.run-disk.outputs.packer_diagnostics }}'
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['transfer-1'] }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-        if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
-        timeout-minutes: 5
-      - name: collect node outputs part-3
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-4
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-4'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-5
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-5'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-6
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-6'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-7
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-7'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-8
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-8'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-9
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-9'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-10
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-10'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-11
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-11'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-12
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-12'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-13
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-13'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-14
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-14'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-15
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-15'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-16
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-16'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-  nvkr-disk-nvke-node-image-arm64:
-    name: 'Build and package producer evidence for nvke-node-image-arm64'
-    runs-on: 'arc-arm64-kvm'
-    timeout-minutes: 1045
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-arc-arm64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-nvke-age-aee9fbaecda2'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart'].result == 'success' }}
-    environment: 'nvkr-dev-arc'
     permissions:
       actions: read
       contents: read
+  nvkr-temporal-sbom:
+    name: 'Generate SBOMs: temporal'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-process-temporal-pull-temporal-chart-e02b82483e4b'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
           set -eu
-          if [ "$(uname -s)/$(uname -m)" != Linux/aarch64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/arm64 runner\n' >&2; exit 29; fi
-      - name: Prepare KVM access before transfer
-        timeout-minutes: 1
-        run: |-
-          set -eu
-          if [ -L /dev/kvm ] || [ ! -c /dev/kvm ]; then
-            printf 'NVKR-E-ENGINE-CAPABILITY: native disk runner lacks /dev/kvm\n' >&2
-            exit 29
-          fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-) 2>/dev/null; then
-            printf 'Preparing /dev/kvm access on the operator-trusted ARC runner\n'
-            if ! /usr/bin/timeout --kill-after=5s 15s /usr/bin/sudo -n -- /usr/bin/chmod 0666 /dev/kvm; then
-              printf 'NVKR-E-ENGINE-CAPABILITY: unable to prepare /dev/kvm access\n' >&2
-              exit 29
-            fi
-          fi
-          if ! (exec 3<>/dev/kvm && exec 3>&-); then
-            printf 'NVKR-E-ENGINE-CAPABILITY: runner still cannot open /dev/kvm read/write\n' >&2
-            id >&2 || true
-            stat -c 'uid=%u gid=%g mode=%a' /dev/kvm >&2 || true
-            exit 29
-          fi
-          stat -c 'KVM ready: uid=%u gid=%g mode=%a' /dev/kvm || true
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
       - name: Check out workflow source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -494,118 +116,96 @@ jobs:
         id: nvkr-context
         uses: ./.github/nvkr-dev/actions/shared/prepare-stage
         with:
-          runner-artifact: 'nvkr-exec-arc-arm64-kvm'
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: prepare inputs part-1
-        uses: ./.github/nvkr-dev/actions/shared/prepare-inputs
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: prepare images part-2
-        uses: ./.github/nvkr-dev/actions/shared/prepare-images
-        with:
-          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
-          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
-      - name: 'Build and package producer evidence for nvke-node-image-arm64'
-        id: run-disk
-        run: ./nvkr-exec factory github run-disk --plan .github/nvkr-dev/plan.json --output nvke-node-image-arm64
-      - name: Upload failed Packer diagnostics
-        uses: ./.github/nvkr-dev/actions/shared/upload-carrier
-        with:
-          with-path: '${{ steps.run-disk.outputs.packer_diagnostics }}'
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['transfer-1'] }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-        if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
-        timeout-minutes: 5
-      - name: collect node outputs part-3
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
+    permissions:
+      actions: read
+      contents: read
+  nvkr-temporal-server-image-sbom:
+    name: 'Generate SBOMs: temporal-server-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-process-temporal-server-image-pull-t-8ac10b1a7911'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-4
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
         with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-4'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-5
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
         with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-5'] }}
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-6
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
+    permissions:
+      actions: read
+      contents: read
+  nvkr-temporal-ui-image-sbom:
+    name: 'Generate SBOMs: temporal-ui-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-process-temporal-ui-image-pull-tempo-fb82f86e5756'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-6'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-7
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
         with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-7'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-8
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
         with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-8'] }}
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-9
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-9'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-10
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-10'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-11
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-11'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-12
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-12'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-13
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-13'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-14
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-14'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-15
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-15'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: collect node outputs part-16
-        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-16'] }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
   nvkr-partition-results:
     name: 'Collect provider results: nvkr-partition-results'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-disk-nvke-node-fde-amd64, nvkr-disk-nvke-node-fde-arm64, nvkr-disk-nvke-node-image-amd64, nvkr-disk-nvke-node-image-arm64]
+    needs: [nvkr-spire-tpm-server-image-sbom, nvkr-temporal-admin-tools-image-sbom, nvkr-temporal-sbom, nvkr-temporal-server-image-sbom, nvkr-temporal-ui-image-sbom]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     permissions: {}
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
-      nvkr-results-01: ${{ format('"nvkr-disk-nvke-node-fde-amd64":{0}', toJSON(needs['nvkr-disk-nvke-node-fde-amd64'])) }}
-      nvkr-results-01-statuses: ${{ format('{0}', needs['nvkr-disk-nvke-node-fde-amd64'].result) }}
-      nvkr-results-05: ${{ format('"nvkr-disk-nvke-node-image-amd64":{0}', toJSON(needs['nvkr-disk-nvke-node-image-amd64'])) }}
-      nvkr-results-05-statuses: ${{ format('{0}', needs['nvkr-disk-nvke-node-image-amd64'].result) }}
-      nvkr-results-09: ${{ format('"nvkr-disk-nvke-node-image-arm64":{0}', toJSON(needs['nvkr-disk-nvke-node-image-arm64'])) }}
-      nvkr-results-09-statuses: ${{ format('{0}', needs['nvkr-disk-nvke-node-image-arm64'].result) }}
-      nvkr-results-0d: ${{ format('"nvkr-disk-nvke-node-fde-arm64":{0}', toJSON(needs['nvkr-disk-nvke-node-fde-arm64'])) }}
-      nvkr-results-0d-statuses: ${{ format('{0}', needs['nvkr-disk-nvke-node-fde-arm64'].result) }}
+      nvkr-partition-13: ${{ format('"nvkr-spire-tpm-server-image-sbom":{0},"nvkr-temporal-admin-tools-image-sbom":{1},"nvkr-temporal-sbom":{2},"nvkr-temporal-server-image-sbom":{3},"nvkr-temporal-ui-image-sbom":{4}', toJSON(needs['nvkr-spire-tpm-server-image-sbom']), toJSON(needs['nvkr-temporal-admin-tools-image-sbom']), toJSON(needs['nvkr-temporal-sbom']), toJSON(needs['nvkr-temporal-server-image-sbom']), toJSON(needs['nvkr-temporal-ui-image-sbom'])) }}
+      nvkr-results-05: ${{ format('"nvkr-temporal-sbom":{0}', toJSON(needs['nvkr-temporal-sbom'])) }}
+      nvkr-results-05-statuses: ${{ format('{0}', needs['nvkr-temporal-sbom'].result) }}
+      nvkr-results-07: ${{ format('"nvkr-temporal-server-image-sbom":{0}', toJSON(needs['nvkr-temporal-server-image-sbom'])) }}
+      nvkr-results-07-statuses: ${{ format('{0}', needs['nvkr-temporal-server-image-sbom'].result) }}
+      nvkr-results-08: ${{ format('"nvkr-temporal-ui-image-sbom":{0}', toJSON(needs['nvkr-temporal-ui-image-sbom'])) }}
+      nvkr-results-08-statuses: ${{ format('{0}', needs['nvkr-temporal-ui-image-sbom'].result) }}
+      nvkr-results-09: ${{ format('"nvkr-temporal-admin-tools-image-sbom":{0}', toJSON(needs['nvkr-temporal-admin-tools-image-sbom'])) }}
+      nvkr-results-09-statuses: ${{ format('{0}', needs['nvkr-temporal-admin-tools-image-sbom'].result) }}
+      nvkr-results-0e: ${{ format('"nvkr-spire-tpm-server-image-sbom":{0}', toJSON(needs['nvkr-spire-tpm-server-image-sbom'])) }}
+      nvkr-results-0e-statuses: ${{ format('{0}', needs['nvkr-spire-tpm-server-image-sbom'].result) }}
     steps:
       - name: Forward provider results
         run: ':'

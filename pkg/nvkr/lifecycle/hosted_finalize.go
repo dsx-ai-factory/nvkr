@@ -57,8 +57,13 @@ func finalizeGenerated(ctx context.Context, definitionPath, environmentPath, pla
 	if plan.RuntimeSourceCommit != "" && handoffPath != "" {
 		return nil, e.New(e.CodeEngineCapability, "runtime source selection has no qualification input-capture replay route")
 	}
+	if len(plan.SourceOverrides) != 0 && handoffPath != "" {
+		return nil, e.New(e.CodeEngineCapability, "source overrides have no qualification input-capture replay route")
+	}
 	if plan.RuntimeSourceCommit != "" {
 		expectedPlan, err = CompileRuntimeSourceFiles(ctx, definitionPath, environmentPath, generatorVersion, plan.RuntimeSourceCommit)
+	} else if len(plan.SourceOverrides) != 0 {
+		expectedPlan, err = ReplayDevelopmentSourceOverrideFiles(ctx, definitionPath, environmentPath, generatorVersion, plan.SourceOverrides)
 	} else if handoffPath != "" {
 		expectedPlan, inputs, err = factory.CaptureCompileFiles(ctx, ".", definitionPath, environmentPath, generatorVersion)
 	} else {

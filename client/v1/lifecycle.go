@@ -14,12 +14,15 @@ import (
 // plans, graphs, inventories, and authority receipts remain behind methods.
 type Definition = lifecycle.Definition
 type Environment = lifecycle.Environment
+type Overridable = lifecycle.Overridable
+type OverridableSource = lifecycle.OverridableSource
 type Run = lifecycle.Run
 type Artifact = lifecycle.Artifact
 type Release = lifecycle.Release
 type VerificationPolicy = lifecycle.VerificationPolicy
 type DiskEvidenceRequirement = lifecycle.DiskEvidenceRequirement
 type ReleaseConsumerOptions = lifecycle.ConsumerOptions
+type SourceOverrideRequest = lifecycle.SourceOverrideRequest
 
 const (
 	DiskEvidenceStrict          = lifecycle.DiskEvidenceStrict
@@ -50,6 +53,16 @@ func (c *Client) PrepareLifecycleRun(ctx context.Context, definitionPath, enviro
 		return nil, err
 	}
 	return lifecycle.PrepareFiles(ctx, definitionPath, environmentPath, generatorVersion, attempt)
+}
+
+// PrepareLifecycleRunWithSourceOverrides prepares one local attempt whose
+// requests select the Environment's overridable sources by name at a version
+// constraint or full commit. Each is resolved once and frozen in the internal Plan.
+func (c *Client) PrepareLifecycleRunWithSourceOverrides(ctx context.Context, definitionPath, environmentPath, generatorVersion, attempt string, requests []SourceOverrideRequest) (*PreparedRun, error) {
+	if err := c.ready(ctx, "lifecycle run preparation"); err != nil {
+		return nil, err
+	}
+	return lifecycle.PrepareSourceOverrideFiles(ctx, definitionPath, environmentPath, generatorVersion, attempt, requests)
 }
 
 func (c *Client) ExecuteLifecycleRun(ctx context.Context, prepared *PreparedRun, options LocalRunOptions) (*Run, error) {

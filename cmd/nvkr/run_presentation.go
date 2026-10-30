@@ -122,8 +122,17 @@ func runLocalCommandWithServices(c *cli.Context, execute localLifecycleExecutor,
 		}
 		defer func() { _ = activity.Close() }()
 	}
+	overrides, err := parseSourceOverrideFlags(c.StringSlice("source-override"))
+	if err != nil {
+		return err
+	}
+	if len(overrides) != 0 && c.IsSet("capture-inputs-root") {
+		return e.New(e.CodeUsage, "--source-override excludes --capture-inputs-root; overridden Runs cannot feed qualification")
+	}
 	var prepared *lifecycle.PreparedRun
-	if c.IsSet("capture-inputs-root") {
+	if len(overrides) != 0 {
+		prepared, err = lifecycle.PrepareSourceOverrideFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("attempt"), overrides)
+	} else if c.IsSet("capture-inputs-root") {
 		prepared, err = lifecycle.PrepareCapturedFiles(c.Context, c.String("capture-inputs-root"), c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("attempt"))
 	} else {
 		prepared, err = lifecycle.PrepareFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("attempt"))
@@ -186,6 +195,20 @@ func runLocalCommandWithServices(c *cli.Context, execute localLifecycleExecutor,
 		return replayRunDiagnostics(c, &diagnostics, err)
 	}
 	return err
+}
+
+// parseSourceOverrideFlags splits NAME=REQUEST flags into requests. Lifecycle
+// admits them against the Environment through the shared intake.
+func parseSourceOverrideFlags(values []string) ([]lifecycle.SourceOverrideRequest, error) {
+	requests := make([]lifecycle.SourceOverrideRequest, 0, len(values))
+	for _, value := range values {
+		name, request, found := strings.Cut(value, "=")
+		if !found || name == "" || request == "" {
+			return nil, e.New(e.CodeUsage, "--source-override %q must be NAME=REQUEST", value)
+		}
+		requests = append(requests, lifecycle.SourceOverrideRequest{Name: name, Request: request})
+	}
+	return requests, nil
 }
 
 // replayRunDiagnostics reports a private bounded tail only after a failed session
