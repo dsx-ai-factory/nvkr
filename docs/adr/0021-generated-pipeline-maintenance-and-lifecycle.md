@@ -49,6 +49,15 @@ The named producer's workflow display name is `nvkr-project-<name>`, disjoint fr
 the default `nvkr-run-<Definition name>` and development `nvkr-dev-<Definition name>`.
 This keeps same-Definition bundles separate under GitHub's workflow-based concurrency
 and prevents a named producer from matching the default qualifier's display-name trigger.
+That separation is not a destination-wide lock. ADR-20's S3 extension restricts each enrolled physical
+namespace to one repository, workflow path, display name/bundle, exact ref and evaluated non-canceling
+group. Another repository, workflow, bundle, ref or transport alias cannot bypass that enrolled owner.
+The extension's admission remains implementation work.
+Cross-Run namespace serialization and atomic completion belong exclusively to `lifecycle`'s private
+delivery-namespace store (ADR-20); the workflow concurrency group is not that store.
+The enrolled workflow path is the bundle's entry workflow. Its exact manifest-owned partition workers remain
+within that entry's closure; they grant no second namespace owner or competing concurrency group. ADR-18's
+rule keeping OIDC jobs in the entry workflow remains in force.
 Workflow file paths and explicit signing identities retain the namespace contract above.
 Every generated execution, recovery and utility-container command selects that exact
 Plan path; validation rejects a bundle whose paths differ from the admitted Environment.

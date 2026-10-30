@@ -1082,7 +1082,8 @@ Final Run records and production qualification handoffs retain seven days and di
 prevent finalization. Release finalizers have a dedicated two-hour job budget for bootstrap, bounded
 carrier acquisition/restoration, complete-release authentication and record uploads; the fifteen-minute
 utility-job budget does not apply. This bound is not evidence of successful hosted completion.
-Expired carriers require a complete new Run. Signed development uses per-attempt
+Expired carriers require a complete new Run. That does not clear an unresolved S3 delivery: ADR-20's
+cross-Run physical-namespace gate must still reconcile it before fresh signing. Signed development uses per-attempt
 registry namespaces and the same authenticated earlier-attempt reuse as production.
 These retention periods govern provider locator records. Private carrier blobs have no automatic expiry
 in this implementation; registry retention must be managed separately, without removing active Run inputs.
@@ -1547,6 +1548,61 @@ still prevent finalization.
 Finalizers are scheduled unconditionally and fail on failed/missing producers, failed restore, omitted required
 artifacts, malformed or substituted observations/SBOMs, and wrong production predicates. The platform may prevent
 the finalizer itself from starting; inspect provider status when no Run record exists (ADR-17).
+
+ADR-20's [S3 file-delivery contract](0020-artifact-publication-and-target-configuration.md#s3-file-delivery-contract)
+owns the normative wire formats, storage, namespace, recovery, retention, cleanup and completion protocol.
+Its generated execution remains implementation work. That execution must
+retain GitHub-only authority, the admitted source/signing branches and protected Environments, and the
+existing producer isolation. Derive required delivery nodes from typed targets and named outputs in the
+complete Plan. The graph preserves ADR-20's required order: source aggregate authentication, selected complete
+output checks and proof capture → payload/proof upload and full read-back → required-object and boot-URL
+verification → canonical root generation and detached signing → root upload/read-back → durable root/bundle/locator
+retention → confirmed generation-checked `commit-authorized` promotion → conditional bundle upload last
+→ independent root, bundle and required-closure authentication
+→ durable generation-checked `verified-complete` confirmation → producer success. The remote bundle commit
+precedes independent post-commit verification; durable completion and producer success follow it. Every
+required target result is a finalizer dependency; job success or an unverified locator cannot replace the
+authenticated result.
+
+Source, build and ARC jobs must receive no S3 credentials. Only admitted transfer and completion operations
+may resolve writer credential references or obtain federated write credentials; verifier access must be
+independently scoped to read-only operations. Generated credential bindings must satisfy ADR-20's admitted
+action/resource profile and operator policy-review gate; successful SDK calls cannot establish that gate.
+A new S3 OIDC consumer requires explicit
+renderer and bundle-validator admission, not removal of existing signing-only token checks. No OIDC or storage
+credentials are available to arbitrary jobs, PRs or forks. The consumer selects its own read identity and
+policies. Secret references may be recorded; secret values cannot be
+transported in plans, command arguments, boot scripts, artifacts or logs. Referenced authentication and
+provider capabilities must be admitted before producer, storage or publication work.
+
+Generated admission must enforce the exact enrolled repository/workflow/bundle/ref and evaluated non-canceling
+group under ADR-20. Current per-workflow groups are not a repository-wide lock; reject another namespace owner
+rather than infer shared serialization. Signing and commit jobs depend on authenticated cross-Run predecessor
+admission from `lifecycle`'s private delivery-namespace store (ADR-20). Generated dispatch, retry and recovery
+paths delegate to that store owner; provider job status cannot clear its unresolved obligations.
+
+The final bundle-upload job must depend on ADR-20's confirmed exact-byte recovery-package retention receipt
+for the frozen root, bundle and locator under the originating Run/attempt and target, and on the confirmed
+`commit-authorized` promotion for that exact operation and generation. Each dispatch or retry must obtain
+`lifecycle`'s live namespace authorization for those bindings; queued job status or a stored retention receipt
+cannot bypass winning closure, supersession or retirement. Failed or unconfirmed retention or promotion
+prevents the commit request; a post-commit artifact-upload step or finalizer cannot satisfy these prerequisites.
+Admit the required recovery access and retention before producer or delivery work.
+Admission must freeze and enforce ADR-20's absolute terminal Run-record publication cutoff across scheduling
+and queue delay, execution, cleanup, finalization and record upload. Queue delay cannot extend it. Late terminal
+publication is refused or rejected, and recovery uses a new explicit attempt under ADR-20's cutoff rules.
+
+Generated job admission also reserves the cleanup window and a separate termination/reap-observation
+window no larger than `cleanupTimeoutSeconds`, as specified in ADR-20. Cleanup expiry requires supervisor
+termination under that second bound; it cannot become indefinite joining or rely on the hosted job timeout.
+A missing supervisor capability fails admission; an unconfirmed exit fails teardown and leaves authority blocked.
+
+The finalizer reports no successful required delivery for failed or indeterminate completion. A valid remote
+commit can survive lost acknowledgement, cancellation or finalizer failure; retrieve its preserved locator
+for independent reconciliation rather than claiming rollback. Existing OCI publication may remain successful
+while its required S3 delivery fails. Native EFI production needs its own admitted Linux/mkosi/material
+capability; existing ARC disk admission does not implicitly authorize it. Boot/install acceptance is a
+downstream exercise of delivered artifacts, not a new generated provisioning engine or qualification verdict.
 
 ## Consequences
 

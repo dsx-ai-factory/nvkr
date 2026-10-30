@@ -443,6 +443,51 @@ verification, vulnerability scanning, deployment topology, cluster E2E qualifica
 builder-profile reproduction and byte-identity guarantees. GitHub is the sole hosted workflow,
 publication and signing provider. Per-built-artifact SBOM composition remains in scope.
 
+The proposed S3 boot and package delivery extension remains outside current v1 scope pending scope
+ratification. It is not part of completed v1 acceptance; implementation and operational acceptance remain
+outstanding. Its contract requires the complete selected artifact set for both supported native
+architectures: disk images, compatible EFI imagers, iPXE assets and original Debian packages,
+together with their authenticated provenance and required inventories. Installer kernels, initial RAM
+filesystems and media belong to the set when the selected boot method needs them. Deployment owns
+machine-specific configuration, network services, firmware and instance metadata; those prerequisites must
+be exercised with the delivery.
+
+Acceptance of this extension requires:
+
+1. Every required artifact and proof is obtained and verified by an independent read-only consumer without
+   registry access or producer files. Original package/image bytes and evidence subjects are preserved.
+2. Actual boot clients retrieve assets from immutable boot URLs, chainload the compatible EFI, reject a
+   wrong image digest, install to the intended disposable disk, reboot and complete first-boot services.
+   Negative cases reject an architecture-mismatched EFI and incompatible imager parameters, including
+   disk-selection parameters, without reporting a successful installation.
+   Direct VM boot of the delivered disk is exercised separately on each supported architecture and profile.
+   Executed boot scripts and imagers are bound to authenticated assets; substitution of either after
+   verification must be rejected.
+3. Each delivered package is installed on a matching clean system with dependency and runtime checks.
+   Mutually exclusive package versions are tested as alternatives. A list of package metadata or files
+   cannot replace evidence covering the actual package payload. Package filenames containing plus signs remain
+   unchanged and retrievable by intended clients, distinct from filenames containing spaces or percent signs.
+4. Conflicting objects, missing/corrupt evidence, denied access, concurrent publication, interrupted transfer
+   and failed boot/install cannot yield a successful required operation. A lost completion acknowledgement
+   is reconciled or reported as indeterminate; already stored valid evidence is not described as rolled back.
+   The exact completion reference remains retrievable after producer or runner loss and permits independent
+   recovery through version-specific retrieval or, when the admitted storage profile does not support it,
+   through conditional retrieval of the exact completion object with complete-byte verification. Denied or failed
+   version retrieval cannot authorize the alternate read path. Failure to retain and confirm that reference
+   prevents the final commit.
+   A retry must reconcile earlier uncertain completion before creating another signed completion; a valid
+   prior completion is reused with its original proof, and unresolved history cannot be bypassed.
+   Starting a new Run does not clear uncertainty for an enrolled physical namespace. Recovery preserves
+   the original proof bytes and permits safe replay; inadequate retention, unavailable recovery data or
+   delayed finalization beyond the fixed publication deadline cannot yield a successful completion.
+   Renaming a target or changing its access method cannot bypass unresolved state. A provably undispatched
+   operation can be closed; an unrecoverable destination requires recorded operator retirement. The old
+   physical namespace remains blocked; continued delivery requires a newly enrolled physical namespace with
+   a non-overlapping prefix, without claiming that the old completion is absent or revoked.
+   New destinations cannot overlap enrolled or retired physical namespaces.
+5. Successful delivery, demonstrated boot readiness and release qualification are distinct results.
+   The supported service, compatibility set and observed limits are recorded before enablement.
+
 A downstream nightly end-to-end test is customer CI infrastructure, outside v1
 product acceptance. It can exercise delivered artifacts without expanding the
 build/evidence qualification milestone or supplying independently signed conformance.
