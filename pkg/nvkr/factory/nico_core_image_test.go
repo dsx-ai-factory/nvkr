@@ -63,6 +63,7 @@ func TestNICoCoreImageChainsNativeBases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	const digestDiagnostic = "base metadata must name exactly one sha256 image digest"
 	buildDigest, runtimeDigest := "sha256:"+strings.Repeat("a", 64), "sha256:"+strings.Repeat("b", 64)
 	for _, arch := range []struct{ name, suffix, arg string }{
 		{"amd64", "x86_64", "X86_64"},
@@ -71,13 +72,16 @@ func TestNICoCoreImageChainsNativeBases(t *testing.T) {
 		for _, tc := range []struct {
 			name, build, runtime string
 			fails                bool
+			// A base command failure stops before digest selection, so only
+			// metadata failures report the digest diagnostic.
+			diagnostic string
 		}{
-			{"complete", nicoCoreMetadata(buildDigest), nicoCoreMetadata(runtimeDigest), false},
-			{"failed build base", "fail", nicoCoreMetadata(runtimeDigest), true},
-			{"failed runtime base", nicoCoreMetadata(buildDigest), "fail", true},
-			{"missing digest", nicoCoreMetadata(buildDigest), nicoCoreMetadata(), true},
-			{"duplicate digest", nicoCoreMetadata(buildDigest, buildDigest), nicoCoreMetadata(runtimeDigest), true},
-			{"short digest", nicoCoreMetadata(buildDigest), nicoCoreMetadata("sha256:bbbb"), true},
+			{"complete", nicoCoreMetadata(buildDigest), nicoCoreMetadata(runtimeDigest), false, ""},
+			{"failed build base", "fail", nicoCoreMetadata(runtimeDigest), true, ""},
+			{"failed runtime base", nicoCoreMetadata(buildDigest), "fail", true, ""},
+			{"missing digest", nicoCoreMetadata(buildDigest), nicoCoreMetadata(), true, "NICo Core runtime " + digestDiagnostic},
+			{"duplicate digest", nicoCoreMetadata(buildDigest, buildDigest), nicoCoreMetadata(runtimeDigest), true, "NICo Core build " + digestDiagnostic},
+			{"short digest", nicoCoreMetadata(buildDigest), nicoCoreMetadata("sha256:bbbb"), true, "NICo Core runtime " + digestDiagnostic},
 		} {
 			t.Run(arch.name+"/"+tc.name, func(t *testing.T) {
 				fixture, stub := t.TempDir(), t.TempDir()
@@ -110,6 +114,12 @@ func TestNICoCoreImageChainsNativeBases(t *testing.T) {
 				if tc.fails {
 					if err == nil {
 						t.Fatalf("invalid base stage reached a successful Core build:\n%s", out)
+					}
+					if tc.diagnostic == "" && strings.Contains(string(out), digestDiagnostic) {
+						t.Fatalf("base command failure reached digest selection:\n%s", out)
+					}
+					if !strings.Contains(string(out), tc.diagnostic) {
+						t.Fatalf("Core build did not report %q:\n%s", tc.diagnostic, out)
 					}
 					for _, call := range calls {
 						if slices.Contains(call, "filename=Dockerfile.release-container-"+arch.suffix) {
