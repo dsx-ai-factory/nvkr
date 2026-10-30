@@ -3458,12 +3458,22 @@ The NICo catalog additionally declares source-built `nico-flow-image` and `nico-
 from the infra-controller `v2.2.2` pin, on the generic rootless BuildKit route with index-digest-bound bases.
 Only the core family selects them: Core backs the umbrella chart's `global.image`, and Flow is the one REST
 image its packaged charts reference. Core chains the source's native build, runtime and release Dockerfiles in
-one producer per architecture, because BuildKit admits no material inputs. A cold Rust workspace build may not
-fit the generated 60-minute hosted build job, and hosted routes admit no longer execution budget; a hosted
-Run must establish it. Both producers are designed and contract-tested by catalog validation, the
-family membership/compiled-identity matrix and the regenerated core bundle. The Flow build command built both
+one producer per architecture, because BuildKit admits no material inputs. The generated hosted budgets
+differ by architecture: the ARM64 Core build has its own 60-minute job, while AMD64 build and preparation share
+one 120-minute job. A cold Rust workspace build may not fit either, and hosted routes admit no longer
+execution budget; a hosted Run must establish it. Both producers are designed and contract-tested by catalog validation, the
+family membership/compiled-identity matrix and the regenerated core bundle. A recording-stub contract runs the
+Core command for both architectures: it checks the native Dockerfile selection, the handoff of each base's OCI
+layout and digest to the release stage, and that a failed base or a missing, duplicate or malformed
+intermediate digest stops before the release stage. BuildKit execution is not exercised. NVKR source snapshots
+omit `.git`, but the release Dockerfile's `cargo new` creates an empty Git repository. A reproduction of the
+pinned upstream version crate in that state stamps the `VERSION` and `CI_COMMIT_SHORT_SHA` arguments, which
+the Core command passes as `v2.2.2` and `80d131a5`, and leaves the build date blank. The timestamp argument
+from upstream [#6896](https://github.com/dsx-ai-factory/infra-controller/pull/6896) is not in `v2.2.2`
+([infra-controller#8494](https://github.com/dsx-ai-factory/infra-controller/issues/8494)). No completed Core
+image has confirmed this metadata. The Flow build command built both
 architectures locally in the pinned BuildKit image (AMD64 under emulation). A local ARM64 Core attempt with the
-exact catalog command built both source-owned bases, bound them by digest and compiled for about 220 seconds before
+catalog command as it was before intermediate-digest validation built both source-owned bases, bound them by digest and compiled for about 220 seconds before
 the compiler was killed by signal 9 in an 8 GiB Docker VM; no Core image was produced. No hosted Run
 has built, published or signed either image.
 

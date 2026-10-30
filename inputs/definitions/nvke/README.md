@@ -81,7 +81,7 @@ built OCI exports only. The architecture-independent NKTP chart is packaged once
 |---|---|---|
 | CAPNICo | NVKE's selected `deploy/nico/capnico/capnico.yaml` names controller `v0.0.45`; CAPNICo's own Dockerfile builds it | Independent source pin and source build, not the provisioned infrastructure provider |
 | NICo charts | Not selected by NVKE's pin set; the site installs `nico` and `nico-prereqs` from infra-controller's `helm` and `helm-prereqs` directories. `v2.2.2` is the latest non-candidate release; subcharts are vendored as local directories, so packaging is offline | Charts plus the Core and Flow images. The prerequisite chart's helmfile-installed operators and third-party images are not selected |
-| NICo images | infra-controller `v2.2.2`'s own Dockerfiles. Flow: `rest-api/docker/production/Dockerfile.nico-flow` with `golang:1.26.4` and `nvcr.io/nvidia/distroless/go:v4.0.8`, both bound by index digest. Core: `dev/docker/Dockerfile.release-container-{x86_64,aarch64}` on bases built from the native `Dockerfile.build-container-*` and `Dockerfile.runtime-container-*`, bound by digest | Flow is the only REST image the packaged charts reference; the standalone REST charts are excluded from the umbrella package and not selected. A cold Core Rust build may exceed the generated hosted build-job budget; a hosted Run must prove it. Both bases also install unpinned public packages and tools at build time |
+| NICo images | infra-controller `v2.2.2`'s own Dockerfiles. Flow: `rest-api/docker/production/Dockerfile.nico-flow` with `golang:1.26.4` and `nvcr.io/nvidia/distroless/go:v4.0.8`, both bound by index digest. Core: `dev/docker/Dockerfile.release-container-{x86_64,aarch64}` on bases built from the native `Dockerfile.build-container-*` and `Dockerfile.runtime-container-*`, bound by digest | Flow is the only REST image the packaged charts reference; the standalone REST charts are excluded from the umbrella package and not selected. A cold Core Rust build may exceed the generated hosted build-job budget; a hosted Run must prove it. Both bases also install unpinned public packages and tools at build time. Core stamps version `v2.2.2` and revision `80d131a5` from build arguments, but its build date is blank at this pin: the release Dockerfile's `cargo new` leaves an empty Git repository with no commit to date, and the timestamp argument from upstream [#6896](https://github.com/dsx-ai-factory/infra-controller/pull/6896) is not in `v2.2.2` ([infra-controller#8494](https://github.com/dsx-ai-factory/infra-controller/issues/8494)) |
 | Default StorageClass | Rancher publishes `rancher/local-path-provisioner` images but no Helm repository; the chart is packaged from `deploy/chart/local-path-provisioner` at `v0.0.37`, whose values select image `v0.0.37`. The chart's `busybox:latest` helper is replaced by an explicit `1.37.0` selection | A hashed source patch adds empty `image.digest` and `helperImage.digest` values that render `@digest` when set; unset renders are unchanged. Acquired images are native outputs, so each chart binds one architecture's digests; a mixed-architecture cluster needs a source-built image index |
 | NKTP chart and dependencies | The same NVKE `v0.22.0` source as the maintained controller; `nktp/deploy/charts/nktp/Chart.yaml` and `Chart.lock` select three exact dependencies; packaging stamps chart `0.22.0` | Fetch verifies Helm `v4.2.4` and all three acquired chart archives; packaging uses the retained closure with no network |
 | NKTP images | Selected source values and authenticated dependency charts: collector `0.162.0`, operator `0.159.0`, LGTM `0.32.0`, kube-state-metrics `v2.20.0`, node-exporter `v1.12.1`, optional metrics-server `v0.8.1`, uninstall kubectl `v1.34.1`; Operator `0.159.0`'s `versions.txt` selects Target Allocator `0.159.0` | Acquired images, not source builds; native subjects and parent indexes are lock-owned. Helm test-only BusyBox is excluded. Images are delivered separately; chart references are not automatically rewritten to publication repositories |
@@ -95,17 +95,28 @@ detection is not implemented.
 ### Setting NICo image values from the Release
 
 The `nico` chart is not image-bound. It renders `<repository>:<tag>`, so the consumer sets the values.
-First authenticate the Release under your identity and issuer policy with `nvkr release verify`
-([Lifecycle](../../../docs/lifecycle.md)); `nvkr release browse` does not verify signatures or payloads.
-Take the `nico`, `nico-core-image` and `nico-flow-image` artifact digests from the verified Release. Then
-pass a digest-qualified tag, because Kubernetes pulls `name:tag@sha256:…` by digest. Upstream installs
-Flow as its own `flow` release in namespace `flow`, where `nico-prereqs` delivers its database
-credentials and the site agent expects `flow.flow.svc.cluster.local:50051`; the umbrella keeps
-`nico-flow.enabled=false`. Install it from the `charts/nico-flow` directory inside the `nico` package and
-set Flow's own repository, which otherwise derives `<global.image.repository>/nico-flow`:
+First authenticate the Release under your identity and issuer policy with `nvkr release verify --scope
+artifact-publication` ([Lifecycle](../../../docs/lifecycle.md)); `nvkr release browse` does not verify
+signatures or payloads. The maintained candidate publishes to private GHCR packages. Without
+`--anonymous`, `release verify` reads signature, provenance and SBOM bundles with the same registry
+keychain as payloads, so log in first. That private read is contract-tested only; no private-registry
+verification has been re-run since it changed ([consumer acceptance scopes](../../../docs/adr/reconciliation.md#consumer-acceptance-scopes)).
+
+Take each digest from the verified Release's `.artifacts[]` record with the matching `name`. `nico` is
+the chart manifest digest, and `nico-core-image` and `nico-flow-image` are their two-platform OCI image
+index digests, not the Release root or a per-platform child manifest. Then pass a digest-qualified tag,
+because Kubernetes pulls `name:tag@sha256:…` by digest. Upstream installs Flow as its own `flow` release in
+namespace `flow`, where `nico-prereqs` delivers its database credentials and the site agent expects
+`flow.flow.svc.cluster.local:50051`; the umbrella keeps `nico-flow.enabled=false`. Install it from the
+`charts/nico-flow` directory inside the `nico` package and set Flow's own repository, which otherwise
+derives `<global.image.repository>/nico-flow`:
 
 ```sh
-helm pull "oci://$PREFIX/nico" --version 2.2.2 --untar
+digest() { jq -er --arg n "$1" '[.artifacts[] | select(.name == $n)] | if length == 1 then .[0].digest else error("want one \($n)") end' release.json; }
+CHART_DIGEST="$(digest nico)"
+CORE_DIGEST="$(digest nico-core-image)"
+FLOW_DIGEST="$(digest nico-flow-image)"
+helm pull "oci://$PREFIX/nico@$CHART_DIGEST" --untar
 helm install nico ./nico \
   --set global.image.repository="$PREFIX/nico-core-image" \
   --set global.image.tag="v2.2.2@$CORE_DIGEST"
@@ -115,11 +126,13 @@ helm install flow ./nico/charts/nico-flow --namespace flow --create-namespace \
 ```
 
 `PREFIX` is the Environment's publication prefix. Each output is published at `$PREFIX/<output>`;
-`$PREFIX/releases-<output>` holds only its internal metadata root (ADR-20). The chart's `2.2.2` tag is only
-a discovery hint, so pin the `nico` chart manifest digest when your Helm version accepts
-`oci://…@sha256:…`. The Core image serves the umbrella chart's services that read `global.image`. The
-default-enabled `nico-ntp` subchart uses its own upstream image (`dockurr/chrony`), which this Release
-does not build; consumers must assess or relocate it.
+`$PREFIX/releases-<output>` holds only its internal metadata root (ADR-20). `release.json` is the verified
+Release that `release verify` writes. The chart's `2.2.2` tag is only a discovery hint; use
+`helm pull "oci://$PREFIX/nico" --version 2.2.2` only when your Helm version rejects `oci://…@sha256:…`,
+and then compare the pulled chart's manifest digest with `CHART_DIGEST` before installing. The Core image
+serves the umbrella chart's services that read `global.image`. The default-enabled `nico-ntp` subchart uses
+its own upstream image (`dockurr/chrony`), which this Release does not build; consumers must assess or
+relocate it.
 
 NKTP image-reference binding remains a nonblocking follow-up, not a completed deployment contract.
 The signed chart still contains upstream tags, whereas the separately delivered native images have exact
