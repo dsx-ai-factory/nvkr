@@ -438,7 +438,7 @@ only that carrier, not recursively validate its embedded references.
 Proposed [ADR-26](adr/0026-definition-composition.md) takes a narrower path than a parent Release: a composite
 Definition pins the family Definitions by digest and rebuilds their exact union in one Run and one flat Release,
 without importing family Releases. Reusing published family outputs is deferred to authenticated result reuse.
-It is designed, not implemented.
+Units U1–U7 are implemented and contract-tested only; no hosted composite Run exists.
 
 Any accepted native design must update ADR-17/19/20 and lane/policy contracts in ADR-04/16, reconciliation,
 SADD and domain vocabulary. Required negative contracts include missing/extra/duplicate children,

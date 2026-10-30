@@ -7,15 +7,23 @@ import (
 	"context"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"sigs.k8s.io/yaml"
 )
 
 const maxDocumentBytes = int64(4 << 20)
 
+// LoadDefinition admits a plain Definition. A composite is refused with
+// engine-capability: callers that admit composites dispatch through LoadInput.
 func LoadDefinition(ctx context.Context, path string) (Definition, error) {
+	raw, err := readBounded(ctx, path, "definition")
+	if err != nil {
+		return Definition{}, err
+	}
+	if kind, err := DocumentKind(raw); err == nil && kind == CompositeKind {
+		return Definition{}, e.New(e.CodeEngineCapability, "%s is a composite Definition; this use admits only a plain Definition", path)
+	}
 	var definition Definition
-	if err := loadStrict(ctx, path, "definition", &definition); err != nil {
+	if err := decodeStrict(raw, "definition", &definition); err != nil {
 		return Definition{}, err
 	}
 	if err := definition.Validate(); err != nil {
@@ -36,23 +44,9 @@ func LoadEnvironment(ctx context.Context, path string) (Environment, error) {
 }
 
 func loadStrict(ctx context.Context, path, label string, output any) error {
-	if ctx == nil {
-		return e.New(e.CodeUsage, "%s load requires a context", label)
-	}
-	held, err := heldfile.OpenContext(ctx, path, heldfile.Options{Label: label, MaxBytes: maxDocumentBytes})
+	raw, err := readBounded(ctx, path, label)
 	if err != nil {
-		if ctx.Err() != nil {
-			return e.Wrap(e.CodeTimeout, ctx.Err(), "%s load canceled", label)
-		}
-		return e.Wrap(e.CodeInvalidCatalog, err, "loading %s %s", label, path)
-	}
-	defer func() { _ = held.Close() }()
-	raw, err := held.ReadAllContext(ctx, maxDocumentBytes)
-	if err != nil {
-		if ctx.Err() != nil {
-			return e.Wrap(e.CodeTimeout, ctx.Err(), "%s read canceled", label)
-		}
-		return e.Wrap(e.CodeInvalidCatalog, err, "reading %s %s", label, path)
+		return err
 	}
 	return decodeStrict(raw, label, output)
 }

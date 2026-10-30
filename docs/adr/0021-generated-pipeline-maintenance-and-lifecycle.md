@@ -81,6 +81,9 @@ ownership are outside generation (ADR-16/18).
 
 The Environment's explicit GitHub development mode selects a second fixed generated layout:
 `.github/workflows/nvkr-dev.yml`, `.github/nvkr-dev/plan.json`, and `.github/nvkr-dev/manifest.json`.
+Proposed ADR-26 §9 additionally admits, for composite Definitions only, a named signed development layout
+`.github/workflows/nvkr-dev-<name>.yml` and `.github/nvkr-dev-<name>/`, published under its own
+`development-<name>` namespace with a signer bound to that workflow; it never shares the fixed layout.
 The default production layout remains `.github/workflows/nvkr-run.yml` and `.github/nvkr-run/`. Both use the same
 compiler, renderer, exact validation and writer. The admitted Environment selects these paths; callers
 cannot relocate one bundle into the other layout. Each manifest owns only its own payloads and lock, so
@@ -92,8 +95,9 @@ run-attempt destinations are derived by the execution owner under ADR-20; runtim
 rewrite generated inputs or bypass drift checks. The maintained development bundle uses the complete M2
 Definition with its separate development Environment.
 
-`githubDevelopment: true` with a nonempty `githubBundle` is unsupported and
-returns `CodeEngineCapability` before catalog resolution or generated-output work.
+For a plain Definition, `githubDevelopment: true` with a nonempty `githubBundle` is unsupported and
+returns `CodeEngineCapability` before catalog resolution or generated-output work. A composite without
+`githubBundle` is refused the same way, because the fixed layout is reserved (ADR-26 §9).
 Unnamed development and named production remain separate supported selections.
 
 Execution identity and transaction identity are separate. The Plan binds authored inputs and every executable

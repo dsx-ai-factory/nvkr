@@ -27,6 +27,7 @@ func TestLegacyGeneratedGitHubChildWorkflowNamespace(t *testing.T) {
 		{".github/workflows/nvkr-run__Host.yml", ""},
 		{".github/workflows/nvkr-run-__host.yml", ""},
 		{".github/workflows/nvkr-dev-nightly__host.yml", ""},
+		{".github/workflows/nvkr-dev-qualify__partition-00.yml", ""},
 		{".github/workflows/nvkr-smoke__host.yml", ""},
 		{".github/workflows/../workflows/nvkr-run__host.yml", ""},
 		{"/.github/workflows/nvkr-run__host.yml", ""},

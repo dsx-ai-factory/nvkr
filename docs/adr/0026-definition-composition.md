@@ -1,10 +1,11 @@
 # ADR-26 — Definition composition
 
 - **Decision status:** Proposed (design only; pending named-decider ratification)
-- **Implementation maturity:** Designed, not implemented. No composite schema, loader, merge, Plan record,
-  publication binding or command exists; see `reconciliation.md`.
-- **Acceptance-test maturity:** None. The implementation units below name the contract suites that must pass;
-  no contract test, generated bundle, hosted Run or consumer verification exercises a composite.
+- **Implementation maturity:** U1–U7 implemented; U8 deferred, U9 waits on the result-reuse decision and U10
+  on a hosted composite Run. `reconciliation.md` records the implemented scope.
+- **Acceptance-test maturity:** Contract suites for U1–U7, including an opt-in extended identity-invariance
+  contract over the four NVKE families. No hosted Run, composite publication or consumer verification
+  exercises a composite.
 - **Deciders:** Pending; release-engineering, publication, catalog and qualification owners must be named before
   ratification.
 - **Index:** Proposed ADR-26 supplements ADR-01–22 and proposed ADR-23/24; it remains outside the consolidated
@@ -232,7 +233,7 @@ Plan, workflow and publication bounds stay with their existing owners (§5).
 | `run plan`, `run graph`, `run diff`, dry-run | Supported once implemented |
 | `run local` | Static-unqualified only, as for any Definition |
 | `run generate` for a production bundle, flat or partitioned | Supported once implemented; `pipeline-attested` |
-| `githubDevelopment: true` | Supported once U5 is implemented; signed development stays `pipeline-attested` with its own signer and disposable namespaces, unsigned stays `static-unqualified`, and neither grants production acceptance. The single fixed development layout belongs to the combined candidate until cutover, so U5 admits a named development bundle for composites, with its own manifest, workflow, signer identity and namespace under ADR-21. The existing refusal of `githubDevelopment` with `githubBundle` for plain Definitions is unchanged |
+| `githubDevelopment: true` | Supported by U5; signed development stays `pipeline-attested` with its own signer and disposable namespaces and grants no production acceptance. The single fixed development layout belongs to the combined candidate until cutover, so U5 admits a named development bundle for composites only and refuses a composite without `githubBundle` with `engine-capability` before any member read and at saved-Plan validation: `githubBundle: <name>` with publication under `ghcr.io/<owner>/<repo>/development-<name>`, workflow `.github/workflows/nvkr-dev-<name>.yml`, its own manifest and Plan under `.github/nvkr-dev-<name>/`, and a signer identity bound to that workflow. Names that collide with the fixed development qualification files (`qualify`, `smoke`, `qualification`) are refused. A named development bundle requires that isolated signed publication; an unsigned named development bundle is refused with `engine-capability`, because an unsigned build has no namespace to isolate. The existing refusal of `githubDevelopment` with `githubBundle` for plain Definitions is unchanged and now applies at compilation, where the Definition kind is known |
 | `run check-artifacts`, `run qualify`, qualification generation, release manifest issuance | Deferred; `engine-capability` before work |
 | Member Release reuse | Deferred (§6); `engine-capability` |
 | Nested or remote members | Rejected (§8, §1) |
@@ -259,6 +260,9 @@ Policy (ADR-04 §5), with the same lane and scope rules. The policy schema does 
 - A consumer may filter the authenticated Release view to one member's outputs. That filter is a description;
   it is not a member Release and grants no member-scoped capability.
 - Release description export (ADR-19 §3) includes the composition record and per-output member attribution.
+- A `per-output-v1` output-local publication carries the complete composition record with its one output;
+  it is not a Release. A consumer accepts a composite Release only when the record attributes exactly its
+  outputs, and assembly restores that exact membership before Release issuance.
 
 ### 11. Coded errors
 
@@ -514,5 +518,10 @@ The questions left open by the first draft were decided on 2026-10-29:
 
 ## Acceptance evidence
 
-None yet. The unit tests above are the contract target. No hosted composite Run, composite publication or
-consumer verification exists, and no claim follows from the family pilot's or the combined candidate's evidence.
+Contract suites only. U1–U7 are implemented with table-driven contract tests that assert coded errors;
+`NVKR_TEST_EXTENDED=1` additionally compiles the worked example above against the combined Plan's resolved
+catalogs and shows that every composite output and native build keeps the Build Digest and native build records
+of the combined Definition and the four families, including family-only outputs the combined Definition lacks,
+and that its worker partitions equal those of its effective Definition compiled plainly under the same
+partitioned Environment. These are local contracts. No hosted composite Run, composite publication or consumer verification
+has been exercised or recorded, and no claim follows from the family pilot's or the combined candidate's evidence.

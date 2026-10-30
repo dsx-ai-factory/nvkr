@@ -86,7 +86,7 @@ func admitEvidenceMetadata(plan *Plan, route Route, inspection delivery.Inspecti
 		return err
 	}
 	metadata := inspection.Root.Release
-	if metadata == nil || metadata.PlanDigest != digest || metadata.DefinitionDigest != plan.DefinitionDigest || metadata.EnvironmentDigest != plan.EnvironmentDigest {
+	if metadata == nil || metadata.PlanDigest != digest || metadata.DefinitionDigest != plan.DefinitionDigest || metadata.EnvironmentDigest != plan.EnvironmentDigest || !metadata.Composition.Equal(plan.Composition) {
 		return e.New(e.CodeVerifyFailed, "SBOM controls differ from the exact preparation Plan")
 	}
 	run, err := publicationRunContext(plan, digest, time.Now().UTC(), time.Now().UTC())

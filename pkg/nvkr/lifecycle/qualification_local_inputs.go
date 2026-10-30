@@ -138,6 +138,9 @@ func replayLocalQualificationInputs(ctx context.Context, rawPlan, rawRun, rawInp
 	if err := original.Validate(); err != nil {
 		return nil, err
 	}
+	if original.Composition != nil {
+		return nil, e.New(e.CodeEngineCapability, "qualification of a composite Definition Run is deferred (ADR-26 §7)")
+	}
 	compiled, err := factory.CompileSnapshot(ctx, inputs, original.GeneratorVersion)
 	if err != nil {
 		return nil, err

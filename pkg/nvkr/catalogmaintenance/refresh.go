@@ -157,10 +157,13 @@ func prepare(ctx context.Context, config Config, generatorVersion, sourceReposit
 // Definition selects, at the top level and per output; overlays are admitted as
 // paths only.
 func definitionCatalogs(ctx context.Context, definitionPath string) (map[string]bool, error) {
-	def, err := definition.LoadDefinition(ctx, definitionPath)
+	// A composite contributes its effective Definition, whose catalog locators
+	// are already rebased to the composite's directory.
+	input, err := definition.LoadInput(ctx, definitionPath)
 	if err != nil {
 		return nil, err
 	}
+	def := input.Definition
 	catalogs := map[string]bool{}
 	selections := []definition.Catalog{def.Catalog}
 	for _, output := range def.Outputs {

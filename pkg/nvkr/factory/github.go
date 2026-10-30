@@ -45,12 +45,17 @@ var githubDevelopmentLayout = generationLayout{workflowPath: GitHubDevelopmentWo
 // directories so either can regenerate without retiring the other's members.
 func githubLayoutFor(plan *Plan) generationLayout {
 	if plan.Environment.GitHubDevelopment {
-		return githubDevelopmentLayout
+		return githubDevelopmentBundleLayout(plan.Environment.GitHubBundle)
 	}
 	return githubBundleLayout(plan.Environment.GitHubBundle)
 }
 
 func githubWorkflowName(plan *Plan) string {
+	// Named bundles take their own name so same-Definition bundles never share
+	// a concurrency group; the fixed development layout keeps its name.
+	if plan.Environment.GitHubDevelopment && plan.Environment.GitHubBundle != "" {
+		return "nvkr-dev-project-" + plan.Environment.GitHubBundle
+	}
 	if plan.Environment.GitHubDevelopment {
 		return "nvkr-dev-" + plan.Name
 	}
@@ -58,6 +63,17 @@ func githubWorkflowName(plan *Plan) string {
 		return "nvkr-project-" + plan.Environment.GitHubBundle
 	}
 	return "nvkr-run-" + plan.Name
+}
+
+// githubDevelopmentBundleLayout gives a named composite development bundle its
+// own workflow, manifest and Plan beside the fixed development layout.
+func githubDevelopmentBundleLayout(name string) generationLayout {
+	if name == "" {
+		return githubDevelopmentLayout
+	}
+	root := ".github/nvkr-dev-" + name
+	return generationLayout{workflowPath: development.ProducerWorkflowFor(name),
+		manifestPath: root + "/manifest.json", planPath: root + "/plan.json"}
 }
 
 func githubBundleLayout(name string) generationLayout {

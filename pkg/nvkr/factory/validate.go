@@ -60,7 +60,8 @@ func (plan Plan) validatePlanInputs() ([]packageSpec, error) {
 			return nil, err
 		}
 	}
-	if plan.SchemaVersion != PlanSchemaVersion || !canonicalName.MatchString(plan.Name) {
+	if (plan.SchemaVersion != PlanSchemaVersion && plan.SchemaVersion != CompositePlanSchemaVersion) ||
+		(plan.SchemaVersion == CompositePlanSchemaVersion) != (plan.Composition != nil) || !canonicalName.MatchString(plan.Name) {
 		return nil, e.New(e.CodeInvalidCatalog, "run plan schema/name is invalid")
 	}
 	if strings.TrimSpace(plan.GeneratorVersion) == "" {
@@ -89,6 +90,9 @@ func (plan Plan) validatePlanInputs() ([]packageSpec, error) {
 	if err := admitInputs(plan.Definition, plan.Environment); err != nil {
 		return nil, err
 	}
+	if err := admitDefinitionForm(plan.Environment, plan.Composition); err != nil {
+		return nil, err
+	}
 	definitionDigest, err := plan.Definition.Digest()
 	if err != nil {
 		return nil, err
@@ -97,7 +101,14 @@ func (plan Plan) validatePlanInputs() ([]packageSpec, error) {
 	if err != nil {
 		return nil, err
 	}
-	if definitionDigest != plan.DefinitionDigest || plan.Name != plan.Definition.Metadata.Name {
+	if plan.Composition != nil {
+		if err := plan.Composition.Validate(plan.Definition, plan.DefinitionDigest); err != nil {
+			return nil, err
+		}
+	} else if definitionDigest != plan.DefinitionDigest {
+		return nil, e.New(e.CodeUnverifiedRef, "run plan definition does not match definitionDigest")
+	}
+	if plan.Name != plan.Definition.Metadata.Name {
 		return nil, e.New(e.CodeUnverifiedRef, "run plan definition does not match definitionDigest")
 	}
 	if environmentDigest != plan.EnvironmentDigest {

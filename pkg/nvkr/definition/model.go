@@ -283,7 +283,9 @@ func (environment Environment) Validate() error {
 		return e.New(e.CodeInvalidCatalog, "environment has unsupported apiVersion/kind or invalid name")
 	}
 	if environment.GitHubDevelopment && environment.GitHubBundle != "" {
-		return e.New(e.CodeEngineCapability, "githubDevelopment does not support a named githubBundle")
+		if err := environment.admitNamedDevelopment(); err != nil {
+			return err
+		}
 	}
 	if environment.GitHubRuntimePlan && (environment.GitHubDevelopment || environment.GitHubBundle == "") {
 		return e.New(e.CodeEngineCapability, "githubRuntimePlan requires a named production githubBundle")
@@ -414,6 +416,21 @@ func (environment Environment) Validate() error {
 	return nil
 }
 
+// admitNamedDevelopment admits a named development bundle only with signed
+// publication in its own development-<bundle> namespace (ADR-26 §9). Plain
+// Definitions are refused by the compiler, which knows the Definition kind.
+func (environment Environment) admitNamedDevelopment() error {
+	publication := environment.Publication
+	if publication == nil || environment.Signing == nil {
+		return e.New(e.CodeEngineCapability, "githubDevelopment with a named githubBundle requires isolated signed publication")
+	}
+	namespace, err := development.ParseNamespace(publication.RepositoryPrefix)
+	if err != nil || namespace.Bundle() != environment.GitHubBundle {
+		return e.New(e.CodeEngineCapability, "githubDevelopment with githubBundle %q requires its own development-%s publication namespace", environment.GitHubBundle, environment.GitHubBundle)
+	}
+	return nil
+}
+
 func (environment Environment) validateGitHubDevelopment() error {
 	if len(environment.GitHubDispatchBranches) != 0 {
 		return e.New(e.CodeEngineCapability, "githubDevelopment does not support githubDispatchBranches")
@@ -432,6 +449,9 @@ func (environment Environment) validateGitHubDevelopment() error {
 	namespace, err := development.ParseNamespace(publication.RepositoryPrefix)
 	if err != nil {
 		return err
+	}
+	if namespace.Bundle() != environment.GitHubBundle {
+		return e.New(e.CodeEngineCapability, "development namespace %s does not belong to githubBundle %q", publication.RepositoryPrefix, environment.GitHubBundle)
 	}
 	if signing.Identity != namespace.Identity() || signing.Issuer != development.Issuer {
 		return e.New(e.CodeEngineCapability, "development signing requires its exact repository nvkr-dev workflow identity and GitHub issuer")

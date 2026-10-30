@@ -147,6 +147,13 @@ func helmMetadataLayoutFixture(t *testing.T) (string, []byte) {
 
 func helmPublicationFixture(t *testing.T, arch, configVersion string) (string, string) {
 	t.Helper()
+	return helmPublicationFixtureWith(t, arch, configVersion, nil)
+}
+
+// helmPublicationFixtureWith lets a test adjust the release metadata, such as
+// a composite record, before the root is built.
+func helmPublicationFixtureWith(t *testing.T, arch, configVersion string, release func(*ReleaseMetadata)) (string, string) {
+	t.Helper()
 	layout, archive := helmMetadataLayoutFixture(t)
 	index, manifest := fixtureManifest(t, layout)
 	if configVersion != "" {
@@ -224,6 +231,9 @@ func helmPublicationFixture(t *testing.T, arch, configVersion string) (string, s
 				Evidence: &EvidenceBinding{Outputs: []string{"chart"}, Component: "chart", Stage: "packaging", SubjectKind: "helm-bundle",
 					SubjectDigest: descriptor.Digest, InspectionInputDigest: archiveDigest}},
 		},
+	}
+	if release != nil {
+		release(request.Release)
 	}
 	root := filepath.Join(t.TempDir(), "publication")
 	result, err := BuildPublicationRoot(t.Context(), root, request)

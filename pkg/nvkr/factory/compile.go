@@ -28,10 +28,23 @@ func compileDocumentsWithLoader(ctx context.Context, definitionPath string, defi
 	loadStack func(context.Context, authored.Catalog) (*catalog.Stack, error),
 	runtimeSourceCommit ...string,
 ) (*Plan, error) {
+	return compileDocumentsFor(ctx, definitionPath, definition, environmentPath, delivery, generatorVersion, loadStack, nil, runtimeSourceCommit...)
+}
+
+// compileDocumentsFor compiles a plain Definition (nil record) or a composite's
+// effective Definition, binding the composition record before Plan validation.
+func compileDocumentsFor(ctx context.Context, definitionPath string, definition authored.Definition,
+	environmentPath string, delivery authored.Environment, generatorVersion string,
+	loadStack func(context.Context, authored.Catalog) (*catalog.Stack, error), record *CompositionRecord,
+	runtimeSourceCommit ...string,
+) (*Plan, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "definition compilation requires a context")
 	}
 	if err := admitInputs(definition, delivery); err != nil {
+		return nil, err
+	}
+	if err := admitDefinitionForm(delivery, record); err != nil {
 		return nil, err
 	}
 	stack, err := loadStack(ctx, definition.Catalog)
@@ -49,8 +62,8 @@ func compileDocumentsWithLoader(ctx context.Context, definitionPath string, defi
 		}
 		targetStacks[target.Name] = targetStack
 	}
-	return compileWithTargetStacks(ctx, definition, delivery, stack, targetStacks, generatorVersion,
-		filepath.ToSlash(filepath.Clean(definitionPath)), filepath.ToSlash(filepath.Clean(environmentPath)), runtimeSourceCommit...)
+	return compileWithTargetStacksFor(ctx, definition, delivery, stack, targetStacks, generatorVersion,
+		filepath.ToSlash(filepath.Clean(definitionPath)), filepath.ToSlash(filepath.Clean(environmentPath)), record, runtimeSourceCommit...)
 
 }
 
@@ -96,6 +109,12 @@ func Compile(ctx context.Context, definition authored.Definition, delivery autho
 
 func compileWithTargetStacks(ctx context.Context, definition authored.Definition, delivery authored.Environment, stack *catalog.Stack,
 	targetStacks map[string]*catalog.Stack, generatorVersion, definitionPath, environmentPath string, runtimeSourceCommit ...string) (*Plan, error) {
+	return compileWithTargetStacksFor(ctx, definition, delivery, stack, targetStacks, generatorVersion, definitionPath, environmentPath, nil, runtimeSourceCommit...)
+}
+
+func compileWithTargetStacksFor(ctx context.Context, definition authored.Definition, delivery authored.Environment, stack *catalog.Stack,
+	targetStacks map[string]*catalog.Stack, generatorVersion, definitionPath, environmentPath string, record *CompositionRecord,
+	runtimeSourceCommit ...string) (*Plan, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "factory compilation requires a context")
 	}
@@ -106,6 +125,9 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 		return nil, e.New(e.CodeInvalidCatalog, "factory compilation requires a resolved catalog stack")
 	}
 	if err := admitInputs(definition, delivery); err != nil {
+		return nil, err
+	}
+	if err := admitDefinitionForm(delivery, record); err != nil {
 		return nil, err
 	}
 	// Hold independent authored input values so callers cannot change executable identity.
@@ -175,6 +197,12 @@ func compileWithTargetStacks(ctx context.Context, definition authored.Definition
 	plan.Graph, err = compileArtifactGraph(*plan, tools, packageSpecs)
 	if err != nil {
 		return nil, err
+	}
+	if record != nil {
+		if plan.DefinitionDigest, err = authored.CompositeDigest(record.Metadata, record.Members); err != nil {
+			return nil, err
+		}
+		plan.SchemaVersion, plan.Composition = CompositePlanSchemaVersion, record.Clone()
 	}
 	if err := plan.Validate(); err != nil {
 		return nil, err

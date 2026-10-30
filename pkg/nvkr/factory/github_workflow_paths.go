@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
 )
 
 var legacyGitHubWorkflowTemplateName = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$`)
@@ -31,6 +32,11 @@ func legacyGitHubChildWorkflowOwner(relative string) (string, bool) {
 		return "", false
 	}
 	entry := stem + ".yml"
+	// Named development bundles postdate legacy producer children; they own
+	// only their execution partition workers.
+	if strings.HasPrefix(entry, ".github/workflows/nvkr-dev-") && !githubPartitionWorkflowSuffix.MatchString(relative) {
+		return "", false
+	}
 	_, ok = githubWorkflowNamespace(entry)
 	return entry, ok
 }
@@ -41,6 +47,13 @@ func githubWorkflowNamespace(entry string) (generationLayout, bool) {
 	}
 	if entry == GitHubDevelopmentWorkflowPath {
 		return githubDevelopmentLayout, true
+	}
+	if name, ok := strings.CutPrefix(entry, ".github/workflows/nvkr-dev-"); ok && strings.HasSuffix(name, ".yml") {
+		name = strings.TrimSuffix(name, ".yml")
+		if definition.ValidateGitHubBundleName(name) != nil || development.ValidateBundle(name) != nil {
+			return generationLayout{}, false
+		}
+		return githubDevelopmentBundleLayout(name), true
 	}
 	const prefix = ".github/workflows/nvkr-run-"
 	if !strings.HasPrefix(entry, prefix) || !strings.HasSuffix(entry, ".yml") {

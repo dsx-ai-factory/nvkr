@@ -105,6 +105,9 @@ func compileInputState(ctx context.Context, state *inputState, definitionPath, e
 	if err != nil {
 		return nil, err
 	}
+	if kind, err := authored.DocumentKind(rawDefinition); err == nil && kind == authored.CompositeKind {
+		return compileCompositeInputState(ctx, state, definitionPath, rawDefinition, environmentPath, generatorVersion)
+	}
 	definition, err := authored.DecodeDefinition(rawDefinition)
 	if err != nil {
 		return nil, err
@@ -123,6 +126,33 @@ func compileInputState(ctx context.Context, state *inputState, definitionPath, e
 	return compileDocumentsWithLoader(ctx, definitionPath, definition, environmentPath, environment, generatorVersion,
 		func(ctx context.Context, spec authored.Catalog) (*catalog.Stack, error) {
 			return state.loadStack(ctx, definitionPath, spec)
+		})
+}
+
+// compileCompositeInputState admits every member through the same captured
+// reader, so capture records member files and replay needs no checkout.
+func compileCompositeInputState(ctx context.Context, state *inputState, compositePath string, raw []byte,
+	environmentPath, generatorVersion string,
+) (*Plan, error) {
+	rawEnvironment, err := state.readFile(ctx, environmentPath)
+	if err != nil {
+		return nil, err
+	}
+	environment, err := authored.DecodeEnvironment(rawEnvironment)
+	if err != nil {
+		return nil, err
+	}
+	// Refuse unadmitted composite modes before any member is read.
+	if err := admitCompositeEnvironment(environment); err != nil {
+		return nil, err
+	}
+	composition, err := authored.AdmitComposite(ctx, compositePath, raw, state.readFile)
+	if err != nil {
+		return nil, err
+	}
+	return compileComposition(ctx, composition, environmentPath, environment, generatorVersion,
+		func(ctx context.Context, spec authored.Catalog) (*catalog.Stack, error) {
+			return state.loadStack(ctx, compositePath, spec)
 		})
 }
 

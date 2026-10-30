@@ -268,25 +268,21 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 						_, err := (&lifecycle.Consumer{}).Verify(c.Context, c.String("reference"), policy)
 						return err
 					}
-					var definition lifecycle.Definition
-					var environment lifecycle.Environment
-					var plan *factory.Plan
 					var expectation *lifecycle.ExactInputExpectation
 					if exactInputCount == 3 {
-						var err error
-						definition, err = lifecycle.LoadDefinition(c.Context, c.String("definition"))
+						input, err := lifecycle.LoadDefinitionInput(c.Context, c.String("definition"))
 						if err != nil {
 							return err
 						}
-						environment, err = lifecycle.LoadEnvironment(c.Context, c.String("environment"))
+						environment, err := lifecycle.LoadEnvironment(c.Context, c.String("environment"))
 						if err != nil {
 							return err
 						}
-						plan, err = factory.LoadPlanContext(c.Context, c.String("plan"))
+						plan, err := factory.LoadPlanContext(c.Context, c.String("plan"))
 						if err != nil {
 							return err
 						}
-						expectation, err = lifecycle.PrepareExactInputs(definition, environment, plan)
+						expectation, err = lifecycle.PrepareInputExactInputs(input, environment, plan)
 						if err != nil {
 							return err
 						}

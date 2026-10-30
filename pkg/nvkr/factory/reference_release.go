@@ -89,7 +89,7 @@ func authenticateReferenceMetadata(ctx context.Context, plan *Plan, route Route,
 	}
 	metadata := inspection.Root.Release
 	if metadata == nil || metadata.PlanDigest != digest ||
-		metadata.DefinitionDigest != plan.DefinitionDigest || metadata.EnvironmentDigest != plan.EnvironmentDigest {
+		metadata.DefinitionDigest != plan.DefinitionDigest || metadata.EnvironmentDigest != plan.EnvironmentDigest || !metadata.Composition.Equal(plan.Composition) {
 		return fail(e.New(e.CodeVerifyFailed, "publication metadata belongs to another Plan or Run"))
 	}
 	if err := admitReferenceInvocation(metadata.InvocationID, invocation); err != nil {
@@ -186,7 +186,7 @@ func assembleReferenceRelease(ctx context.Context, plan *Plan, out string, recei
 	if err != nil {
 		return err
 	}
-	root := delivery.PublicationRoot{SchemaVersion: delivery.PublicationRootSchema, Qualification: delivery.QualificationDiagnostic}
+	root := delivery.PublicationRoot{SchemaVersion: delivery.PublicationRootSchemaFor(&delivery.ReleaseMetadata{Composition: plan.Composition}), Qualification: delivery.QualificationDiagnostic}
 	sources := map[string]string{}
 	objects := map[string]delivery.PublishedObject{}
 	var outputs []delivery.Output
@@ -199,7 +199,8 @@ func assembleReferenceRelease(ctx context.Context, plan *Plan, out string, recei
 			root.Release = &value
 		}
 		if root.Release.PlanDigest != receipt.inspection.Root.Release.PlanDigest ||
-			root.Release.DefinitionDigest != receipt.inspection.Root.Release.DefinitionDigest || root.Release.EnvironmentDigest != receipt.inspection.Root.Release.EnvironmentDigest {
+			root.Release.DefinitionDigest != receipt.inspection.Root.Release.DefinitionDigest || root.Release.EnvironmentDigest != receipt.inspection.Root.Release.EnvironmentDigest ||
+			!root.Release.Composition.Equal(receipt.inspection.Root.Release.Composition) || !root.Release.Composition.Equal(plan.Composition) {
 			return e.New(e.CodeVerifyFailed, "output metadata belongs to different release plans")
 		}
 		if err := admitReferenceInvocation(receipt.origin.SignedInvocationID, run.InvocationID()); err != nil {
