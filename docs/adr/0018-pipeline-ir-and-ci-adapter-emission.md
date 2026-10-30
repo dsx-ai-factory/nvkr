@@ -1557,7 +1557,8 @@ existing producer isolation. Derive required delivery nodes from typed targets a
 complete Plan. The graph preserves ADR-20's required order: source aggregate authentication, selected complete
 output checks and proof capture → payload/proof upload and full read-back → required-object and boot-URL
 verification → canonical root generation and detached signing → root upload/read-back → durable root/bundle/locator
-retention → conditional bundle upload last → independent root, bundle and required-closure authentication
+retention → confirmed generation-checked `commit-authorized` promotion → conditional bundle upload last
+→ independent root, bundle and required-closure authentication
 → durable generation-checked `verified-complete` confirmation → producer success. The remote bundle commit
 precedes independent post-commit verification; durable completion and producer success follow it. Every
 required target result is a finalizer dependency; job success or an unverified locator cannot replace the
@@ -1581,9 +1582,12 @@ admission from `lifecycle`'s private delivery-namespace store (ADR-20). Generate
 paths delegate to that store owner; provider job status cannot clear its unresolved obligations.
 
 The final bundle-upload job must depend on ADR-20's confirmed exact-byte recovery-package retention receipt
-for the frozen root, bundle and locator under the originating Run/attempt and target. Failed or unconfirmed
-retention prevents the commit request; a post-commit artifact-upload step or finalizer cannot satisfy that
-prerequisite. Admit the required recovery access and retention before producer or delivery work.
+for the frozen root, bundle and locator under the originating Run/attempt and target, and on the confirmed
+`commit-authorized` promotion for that exact operation and generation. Each dispatch or retry must obtain
+`lifecycle`'s live namespace authorization for those bindings; queued job status or a stored retention receipt
+cannot bypass winning closure, supersession or retirement. Failed or unconfirmed retention or promotion
+prevents the commit request; a post-commit artifact-upload step or finalizer cannot satisfy these prerequisites.
+Admit the required recovery access and retention before producer or delivery work.
 Admission must freeze and enforce ADR-20's absolute terminal Run-record publication cutoff across scheduling
 and queue delay, execution, cleanup, finalization and record upload. Queue delay cannot extend it. Late terminal
 publication is refused or rejected, and recovery uses a new explicit attempt under ADR-20's cutoff rules.

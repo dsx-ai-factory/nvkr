@@ -273,13 +273,15 @@ Denied or unsupported operations fail closed. A successful request or credential
 the absence of broader grants; this contract promises no comprehensive effective-IAM introspection.
 The initial profile requires no bucket listing. In particular, [missing-object HEAD may return `403` without
 `s3:ListBucket`](https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadObject.html); such a result remains
-unknown, never authenticated absence authorizing a retry. If the admitted permissions cannot establish
-absence, fail or retain the indeterminate result rather than expanding access or guessing.
+unknown, never authenticated absence or success. Identical conditional write retries below require no
+absence proof; an unverifiable final result still fails or remains indeterminate. Do not expand access or guess.
 
-`maxRequestAttempts` counts the initial request and all SDK retries for each API call. `maxUploadAttempts`
-counts the initial single PUT or multipart upload and each fresh whole-object restart; it does not reset the
-operation deadline. `maxObjectBytes`, `maxTotalBytes` and `maxObjects` bound the final set of unique stored
-objects for one target, including parent archives, original proof/control objects, the delivery root and
+`maxRequestAttempts` counts the initial request and all SDK or owner-managed retries of each logical API
+request; calling the SDK again cannot reset that budget. `maxUploadAttempts` counts the initial single PUT
+or multipart upload, every whole-object PUT replay (including SDK retries), and each fresh multipart restart.
+Completion retries for the same upload ID consume the shared request budget, not another whole-upload slot.
+Neither budget resets the operation deadline. `maxObjectBytes`, `maxTotalBytes` and `maxObjects` bound the final
+set of unique stored objects for one target, including parent archives, original proof/control objects, the delivery root and
 its detached bundle. Multiple source bindings for the same object key count as one stored object. Reserve
 bounded capacity for the root and bundle before upload and reject any resulting size that exceeds it before
 committing. Repeated transfers and read-backs do not increase that stored-byte inventory, but are bounded
@@ -437,19 +439,33 @@ The root cannot nominate its trusted signer, weaken disk evidence, or upgrade th
 Full Release qualification, revocation and offline acceptance remain outside this artifact-publication contract.
 
 **Transfer, commit and interruption.** Use conditional creation (`If-None-Match: *`) for PUT and multipart
-completion. A `412` requires authenticated full GET/digest/size reconciliation before equal bytes may be
-reused; conflicting bytes fail. A `409` from either operation requires the same key reconciliation. Reuse
-equal bytes, fail on conflicting bytes, and retry only on authenticated absence within `maxRequestAttempts`,
-`maxUploadAttempts` and the unchanged operation deadline. For PUT, retry the same held bytes with the same
-conditional creation. For multipart completion, clean up the abandoned owned upload as specified below,
-then initiate a fresh multipart upload and upload every part again; do not retry completion using the
-previous upload ID. SDK retries must not bypass these reconciliation transitions. Access denied does not
-prove absence. Lost PUT/completion responses require the same reconciliation; status codes, ETags and
-provider checksum metadata are not payload identity. Use exact version reads where supported; otherwise
-admit explicit ETag-conditional reads with full rehash. A provider unable to meet a selected requirement
-fails admission, not a silent safety downgrade. The PUT/multipart retry distinction follows
-[AWS conditional-write behavior](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html);
-mandatory full-byte reconciliation is this contract's requirement for every admitted provider.
+completion. Retain the same authenticated held bytes, physical key, namespace authority and unchanged operation
+deadline through every retry. On `412`, authenticate the exact key through full GET/digest/size reconciliation:
+reuse equal bytes, fail on conflicting bytes, and fail or retain an indeterminate result when verification
+is unavailable. Lost PUT/completion responses and `409` require the same reconciliation attempt before retry;
+an unknown read result supplies neither success nor absence, but does not prohibit the identical conditional
+replays below. A denied write or permanent validation error fails rather than retrying.
+
+For PUT, a retryable failure, lost response or `409` permits reissuing the identical held bytes at the same key
+with `If-None-Match: *`, without proving absence. For retryable multipart-completion failures, including
+transport loss, retryable `5xx` and retryable errors embedded in `200` responses, retry completion with the same
+owned upload ID, frozen complete ordered part list and conditional header. The admitted SDK must interpret the
+complete response; `200` headers alone cannot establish completion. `NoSuchUpload` requires the same full-byte
+key reconciliation as `412`: the upload may already have completed, and an unverifiable result cannot authorize
+a fresh upload. A completion `409` instead requires abandoning that upload ID. If reconciliation cannot
+authenticate equal bytes and establishes no conflict, stop/join and clean up the owned incomplete upload under
+the rules below, then initiate a fresh upload and resend every part within `maxUploadAttempts`. This restart
+needs no absence proof and preserves the same held bytes, key and conditional completion. Do not retry the old
+upload ID after `409`. All SDK and owner-managed retries obey the shared request/upload budgets and deadline;
+SDK retries must not bypass reconciliation, cleanup or authorization gates.
+
+Even an acknowledged write requires complete-byte verification. Status codes, ETags and provider checksum
+metadata are not payload identity. Use exact version reads where supported; otherwise admit explicit
+ETag-conditional reads with full rehash. A provider unable to meet a selected requirement fails admission.
+The conditional retry/restart distinction follows [AWS conditional-write behavior](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html)
+and [PUT](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html);
+same-upload completion retries and embedded-error handling follow [the completion API](https://docs.aws.amazon.com/AmazonS3/latest/API/API_CompleteMultipartUpload.html).
+Mandatory full-byte reconciliation is this contract's requirement for every admitted provider.
 
 `lifecycle` is the sole owner of the specified private durable **delivery-namespace store**, distinct from
 immutable public Run/attempt records and retained payload/proof carriers. It owns authenticated enrollment
@@ -500,8 +516,10 @@ missing state or incomplete recovery history fails admission; this requires no n
 
 The pending operation binds an exact operation ID and generation. In `preparing`, final PUT is forbidden.
 Only atomic promotion to `commit-authorized`, after confirmed recovery-package retention/read-back, may
-issue authority for its exact frozen bundle and key. Exact-state CAS can instead close `preparing` as
-`closed-never-dispatched`; that winning close fences stale promotion and PUT authority, including after
+issue authority for its exact frozen bundle and key. Every in-run final-bundle dispatch or retry requires
+`lifecycle` to authenticate that current operation/generation's live `commit-authorized` state under namespace
+serialization; retention or a prior job receipt alone cannot authorize it. Exact-state CAS can instead close
+`preparing` as `closed-never-dispatched`; that winning close fences stale promotion and PUT authority, including after
 a replacement operation starts. If promotion wins or its outcome is uncertain, do not classify the operation
 as undispatched. Recover the durable phase; lost acknowledgements are not proof of a failed transition.
 
@@ -528,9 +546,11 @@ locator together before the first final PUT. Authenticate all three and the requ
 fresh held owners; the remote root and its `objects` must verify, but the final bundle may still be absent.
 Stored descriptions or success flags cannot restore authority. After serialized recovery
 ownership, recovery may conditionally PUT the identical
-retained final bundle at its original key without proving absence. This narrow final-bundle replay is the
-exception to the ordinary retry-on-authenticated-absence rule above, including a bounded `409` retry; it
-does not authorize other payload retries, multipart resume, re-signing or another key. The recovery operation's
+retained final bundle at its original key without proving absence, including a bounded `409` retry. This is
+the only cross-Run write replay admitted here: it does not extend in-run transfer retries to cross-Run
+payload replay or multipart resume, and permits no re-signing or another key. Authenticate the original
+operation/generation's current `commit-authorized` state before each recovery dispatch; closed, completed,
+superseded or retired state supplies no replay authority. The recovery operation's
 admitted request/upload limits and deadline bound replay. `403` proves neither absence nor success;
 `412` requires full equal-byte verification, and even an acknowledged PUT requires independent complete
 verification before success. Preserve the original root, signature, locator and signed invocation. Missing
@@ -543,8 +563,9 @@ conditions remain, including stop/join ownership of workers started by the curre
 This exception authorizes no fresh signature, other-key write, payload replay or multipart work.
 
 After that gate, the state order is source authentication → upload payloads and proofs → verify every required
-storage object and boot URL → generate canonical root → detached signing → root upload and read-back → durable recovery-byte retention
-→ conditional bundle upload last → independent root, bundle and required-closure authentication
+storage object and boot URL → generate canonical root → detached signing → root upload and read-back → confirmed durable recovery-byte retention
+→ confirmed generation-checked `commit-authorized` promotion → conditional bundle upload last
+→ independent root, bundle and required-closure authentication
 → durable generation-checked `verified-complete` transition and confirmation → producer success.
 Using the live verification receipt, `lifecycle`'s delivery-namespace store must atomically transition the exact
 `commit-authorized` operation/generation to `verified-complete`. Bind the enrolled physical namespace,
@@ -680,7 +701,15 @@ permits it, include UTF-8 names distinguishing byte order from locale or UTF-16 
 must retain distinct authenticated descriptor/parent bindings; exact full-tuple duplicates fail.
 Exercise denied and out-of-scope credential
 admission, cancellation during active transfer and a cleanup deadline expiring before worker join; no abort,
-restart, held payload/proof release or success may precede joining. On a versioned bucket, lose the final
+restart, held payload/proof release or success may precede joining. Lose a PUT response or return `409`
+with a missing-key reconciliation `403`: identical conditional PUT replay must remain possible without
+accepting the unknown read as proof. Exercise completion transport loss, retryable
+`5xx` and retryable embedded errors with unchanged upload ID, part list and conditional header; `200` headers
+alone must not authorize success. Require full-byte reconciliation on `412` and `NoSuchUpload`, with no fresh
+upload for an unverifiable `NoSuchUpload` result. Completion `409` must use joined cleanup before a fresh
+upload and resend all parts without an absence prerequisite. Permanent validation/authorization errors fail.
+Exhaust combined SDK/owner request attempts and whole-object upload attempts independently, including PUT
+replays, and reject budget resets or deadline extensions. On a versioned bucket, lose the final
 acknowledgement and recover the same frozen locator through version discovery and complete independent
 verification. A new provider Run ID must not bypass an unresolved operation for the same enrolled physical
 namespace. Target rename, endpoint alias and addressing-mode changes must select the same state.
@@ -699,7 +728,10 @@ return a coded error with zero producer
 execution, payload/proof transfer, signing or final PUTs; control-record inspection/enrollment is separate.
 Test death in `preparing` before recovery retention: exact-state closure must permit
 the next operation without a possible stale commit. Race closure against promotion; only the winning transition
-may authorize its outcome, and stale generations cannot promote or PUT. Test expired/unrecoverable authorized
+may authorize its outcome, and stale generations cannot promote or PUT. Test retained bytes without
+confirmed promotion: zero final-bundle requests may dispatch. A queued bundle-upload job or retry with a
+stale authorization/retention receipt must also refuse dispatch after
+closure, supersession or retirement. Test expired/unrecoverable authorized
 state: only authenticated retirement may close its active obligation, the old physical namespace stays blocked,
 and a separately enrolled non-overlapping prefix permits continued delivery without claiming old absence.
 Exercise death after recovery-byte retention both before and during final PUT, including a

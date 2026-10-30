@@ -1276,6 +1276,14 @@ The contract also requires reviewed credential action/resource scopes, complete 
 ordering, and a cleanup budget covering cancellation and worker joining without abandoning workers.
 Negative boot acceptance explicitly includes mismatched EFI architecture and incompatible imager parameters.
 Provider policy evidence and these failure/rejection exercises remain outstanding.
+In-run retries preserve held bytes, key and conditional creation without requiring absent-object proof or
+bucket-listing permission. Retryable completion failures reuse the same upload ID and frozen part list;
+completion `409` requires joined cleanup and a fresh upload, while `412`/`NoSuchUpload` require full-byte
+reconciliation. SDK and owner retries share request limits; whole-object PUT replays and fresh multipart
+uploads also consume the upload bound. These retry and budget-exhaustion cases remain unimplemented/unexercised.
+Both the state order and generated job dependencies require confirmed generation-checked `commit-authorized`
+promotion after recovery retention and before final PUT. Every final-bundle dispatch/retry requires current
+authorization for the exact operation/generation; retention alone cannot bypass closure or retirement.
 Cross-Run signing also requires serialized predecessor reconciliation for the enrolled physical namespace; an uncertain or expired locator
 cannot be bypassed by re-signing. Cleanup expiry requires separately bounded supervisor termination/reap
 observation, and ordering acceptance covers unsorted and mixed-type bindings independently of the comparator.
