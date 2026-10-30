@@ -69,6 +69,9 @@ func TestLocalPresentationModeAdmissionBeforeInputs(t *testing.T) {
 		{"redirected explicit", []string{"--ui=tui"}},
 		{"JSON conflict", []string{"--ui=tui", "--json"}},
 		{"positional", []string{"unexpected"}},
+		{"empty attempts root", []string{"--attempts-root="}},
+		{"empty attempts root JSON", []string{"--attempts-root=", "--json"}},
+		{"empty attempts root dry run", []string{"--attempts-root=", "--dry-run"}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var out bytes.Buffer

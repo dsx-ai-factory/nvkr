@@ -23,6 +23,13 @@ Both images use the generic rootless BuildKit route with digest-pinned bases. Co
 native build, runtime and release Dockerfiles in one producer per architecture. The core family selects
 both images. A cold Core build may exceed the generated hosted build-job budget; no hosted Run has built it.
 
+[`local-path-provisioner`](local-path-provisioner/registry.yaml) packages Rancher's chart from
+source, patched to accept image digests, and binds its acquired provisioner and helper images.
+
+The native local Go smoke inputs select AMD64 and ARM64 from the existing NVKE, CAPNICo,
+controller-profiles and native-tools catalogs. Architecture-specific tool acquisitions remain
+explicit members of the shared native-tools catalog; no copied AMD64 site catalog is required.
+
 ## Current-to-shared mapping
 
 Former paths below were relative to `definitions/` at upstream commit
@@ -36,7 +43,7 @@ Former paths below were relative to `definitions/` at upstream commit
 | `nvke-local-dev-arm64/site-catalog` | [`nvke/local-site-arm64`](nvke/local-site-arm64/registry.yaml) | Local CLI, controller and chart source/interface baseline |
 | `nvke-nightly-arm64/site-catalog` | [`nvke/nightly-site-arm64`](nvke/nightly-site-arm64/registry.yaml) | Nightly site producers aligned with the selected downstream suite |
 | `nvke-m2/release-catalog` | [`nvke/release-components`](nvke/release-components/registry.yaml) | Mixed CAPNICo, NKTP, reference profiles and runtime-image cohort awaiting a deliberate split |
-| `nvke-local-dev-arm64/capnico-catalog` | [`capnico/local-arm64`](capnico/local-arm64/registry.yaml) | Local/nightly native CAPNICo producer |
+| `nvke-local-dev-arm64/capnico-catalog` | [`capnico/local`](capnico/local/registry.yaml) | Local/nightly native CAPNICo producer |
 | `nvke-m2/os-catalog` | [`node-images/release`](node-images/release/registry.yaml) | Plain/FDE disk roots and complete material closure |
 | `nvke-os/catalog` | [`node-images/diagnostic`](node-images/diagnostic/registry.yaml) | Existing plain-disk diagnostic baseline |
 | `nvke-ovn-source/catalog` | [`ovn-nvidia`](ovn-nvidia/registry.yaml) | NVIDIA OVN standalone image/chart and package producers |
@@ -87,8 +94,8 @@ ordered NVIDIA and native KVM overlays. Their other selections are:
 | Catalog | Contract |
 |---|---|
 | [`node-images/variants/native-local-kvm.json`](node-images/variants/native-local-kvm.json) | Native demo selection over the shared release catalog: agent stamp, MAC-stable DHCP staging and native KVM settings |
-| [`nvke/native-site-arm64`](nvke/native-site-arm64/registry.yaml) | Source-aligned CLI, controller, provisioned provider and chart producers; acquired deployment charts derived from the same source pin set |
-| [`controller-profiles/native-nvidia-arm64`](controller-profiles/native-nvidia-arm64/registry.yaml) | Unchanged upstream config profiles and runbooks; releases are registered by the consumer |
+| [`nvke/native-site`](nvke/native-site/registry.yaml) | Source-aligned CLI, controller, provisioned provider and chart producers; acquired deployment charts derived from the same source pin set |
+| [`controller-profiles/native-nvidia`](controller-profiles/native-nvidia/registry.yaml) | Unchanged upstream config profiles and runbooks; releases are registered by the consumer |
 | [`runtime-dependencies`](runtime-dependencies/registry.yaml) | Shared release and native demo runtime acquisitions from the same NVKE deployment selection |
 | [`kubernetes-conformance/`](kubernetes-conformance/hydrophone/registry.yaml) | Hydrophone (with its bounded-download patch), kubectl and conformance/BusyBox image producers shared by the [conformance tool Definitions](../definitions/kubernetes-conformance-arm64/README.md) and the native conformance demo |
 
@@ -98,3 +105,11 @@ snapshot. The native KVM overlay binds the resulting NVIDIA stack. The release,
 upstream, TCG and hosted nightly selections retain their source pin cohorts.
 Package metadata checks and Plan compilation establish input
 alignment; a fresh package/disk build and full native runtime acceptance remain required.
+
+## NVSentinel development catalog
+
+[`nvsentinel/`](nvsentinel/README.md) separately owns the pinned NVSentinel image, chart, executable and
+Debian producers. It uses existing format handlers and adds no upstream script patches. Its local
+Definitions do not change the maintained NVKE release. The separate
+[NVKE OS material experiment](../experiments/nvsentinel/README.md) retains its existing consumer source
+cohort and stages the package through the ordinary material folder.

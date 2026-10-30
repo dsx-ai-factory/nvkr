@@ -1,0 +1,23 @@
+{
+  "apiVersion": "nvkr.dev/catalog-overlay/v3",
+  "components": {
+    "native-capi-exec-init-image": {
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:c26612752c78b18faacd63c7d50f4592c2e7b0f25e0e20e82bd74e465c57ab0d",
+          "arm64": "sha256:e311ae748be7f56ae5cba304bc488f0786df68ee507513f654a5cc8597cffb42"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "docker.io/library/alpine@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a",
+        "imageParentDigest": "sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a"
+      },
+      "sourceDateEpoch": 1792548398,
+      "version": "v0.22.0"
+    }
+  },
+  "kind": "CatalogOverlay",
+  "name": "nvke-native-main-capi",
+  "requiresCatalogDigest": "sha256:1608c17013f82834a73f5bc380000bb65db4e59e35ec6c8504266b5aa06f7042"
+}

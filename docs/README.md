@@ -90,11 +90,16 @@ adapter selection and artifact bindings across repositories, including its diagn
 The provisional local-plan CLI slice implements catalog discovery and versioned-profile execution;
 broader adapter and profile support remains deferred.
 
+Proposed [ADR-26: Definition composition](adr/0026-definition-composition.md) designs composite Definitions
+that release several digest-pinned Definitions as one Release, with a worked NVKE four-family example and
+implementation units. It is design only.
+
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
 Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) covers branch
 dispatch, separate generated development bundles, artifact downloads and short retention.
 Use [CI steps and logs](ci-step-and-log-readability.md) to investigate failures and
 [CI test performance](ci-test-performance.md) for the current profiling follow-up.
+[Execution partition scheduling](execution-partition-scheduling.md) records the partition layout measurement and decision.
 [CVE management](cve-management.md), [issue and PR management](github-issue-pr-management.md), and
 [contribution guidance](../CONTRIBUTING.md) own ongoing maintainer procedures.
 The [source-release procedure](../RELEASE.md) covers releasing NVKR itself,

@@ -6,12 +6,37 @@
   "kind": "Definition",
   "metadata": {
     "name": "nvke-nightly-arm64",
-    "description": "Pipeline-attested ARM64 nightly candidate selecting the complete 29-output local-demo artifact set with NVIDIA-fork OVN, source-built components and explicitly acquired inputs plus the mixed SPIRE-source exception. Required-KVM disk production uses build-provenance-v1; no qualified, runtime compatibility, FIPS/STIG or hardware acceptance claim."
+    "description": "Pipeline-attested ARM64 nightly producer with the existing NVIDIA OVN 2.4.2 native site bootstrap closure and complete host/site tools. All 29 prior output names remain; five native runtime outputs are added. Publication, VM bootstrap, cleanup and qualification require independent recorded evidence."
   },
   "outputs": [
     {
+      "name": "capi-exec-init-image-arm64",
+      "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/capnico/local-arm64"
+        "base": "../../catalogs/tools/native",
+        "overlays": [
+          "../../catalogs/tools/native/current-main-capi.json"
+        ]
+      },
+      "components": [
+        "native-capi-exec-init-image"
+      ],
+      "format": "oci"
+    },
+    {
+      "name": "capi-exec-plugin-image-arm64",
+      "platform": "linux/arm64",
+      "catalog": {
+        "base": "../../catalogs/tools/native"
+      },
+      "components": [
+        "native-capi-exec-plugin-image"
+      ],
+      "format": "oci"
+    },
+    {
+      "catalog": {
+        "base": "../../catalogs/capnico/local"
       },
       "components": [
         "capnico-controller"
@@ -22,7 +47,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke/native-site"
       },
       "components": [
         "cluster-api-provider-provisioned"
@@ -33,7 +58,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/nightly-site-arm64"
+        "base": "../../catalogs/nvke/native-site"
       },
       "components": [
         "nvke-controller-chart"
@@ -49,7 +74,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/controller-profiles/nvidia-arm64"
+        "base": "../../catalogs/controller-profiles/native-nvidia"
       },
       "components": [
         "nvke-local-profiles"
@@ -71,7 +96,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/nightly-site-arm64"
+        "base": "../../catalogs/nvke/native-site"
       },
       "components": [
         "nvke-controller"
@@ -96,8 +121,28 @@
       "platform": "linux/arm64"
     },
     {
+      "name": "native-tools-linux-arm64",
+      "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/nicosim"
+        "base": "../../catalogs/tools/native"
+      },
+      "components": [
+        "clusterctl-linux",
+        "helm-linux",
+        "kind-linux",
+        "kubectl-linux",
+        "nerdctl",
+        "nico-sim",
+        "nico-simctl",
+        "nvke-installer-sources",
+        "nvkectl",
+        "oras-linux"
+      ],
+      "format": "executable"
+    },
+    {
+      "catalog": {
+        "base": "../../catalogs/tools/native"
       },
       "components": [
         "nico-sim",
@@ -110,7 +155,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/nightly-site-arm64"
+        "base": "../../catalogs/nvke/native-site"
       },
       "components": [
         "nktp-chart"
@@ -123,7 +168,9 @@
       "catalog": {
         "base": "../../catalogs/node-images/release",
         "overlays": [
-          "../../catalogs/node-images/variants/nvidia-kvm.json"
+          "../../catalogs/node-images/variants/native-nvidia.json",
+          "../../catalogs/node-images/variants/native-local-kvm.json",
+          "../../catalogs/node-images/variants/current-main-doca-ovs.json"
         ]
       },
       "components": [
@@ -145,7 +192,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/nightly-site-arm64"
+        "base": "../../catalogs/nvke/native-site"
       },
       "components": [
         "nvkectl"
@@ -200,7 +247,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke/native-site"
       },
       "components": [
         "postgresql-chart"
@@ -221,6 +268,18 @@
       "platform": "linux/arm64"
     },
     {
+      "name": "site-startup-tools-arm64",
+      "platform": "linux/arm64",
+      "catalog": {
+        "base": "../../catalogs/tools/native"
+      },
+      "components": [
+        "nerdctl",
+        "nvkr-site-identity-helper"
+      ],
+      "format": "executable"
+    },
+    {
       "catalog": {
         "base": "../../catalogs/runtime-dependencies"
       },
@@ -233,7 +292,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke/native-site"
       },
       "components": [
         "spire-chart"
@@ -277,7 +336,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke/native-site"
       },
       "components": [
         "spire-crds-chart"
@@ -321,7 +380,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke/native-site"
       },
       "components": [
         "temporal-chart"
@@ -362,6 +421,17 @@
       "format": "oci",
       "name": "temporal-ui-image-arm64",
       "platform": "linux/arm64"
+    },
+    {
+      "name": "workload-image-arm64",
+      "platform": "linux/arm64",
+      "catalog": {
+        "base": "../../catalogs/tools/native"
+      },
+      "components": [
+        "native-workload-image"
+      ],
+      "format": "oci"
     }
   ],
   "sbomTool": "syft",

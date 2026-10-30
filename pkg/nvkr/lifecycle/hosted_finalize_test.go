@@ -40,6 +40,33 @@ func TestFinalizeGeneratedRejectsEmptyWorkspaceBeforeInputsOrOutput(t *testing.T
 	}
 }
 
+func TestFinalizeGeneratedAdmitsAuthoredDocumentsBeforePlan(t *testing.T) {
+	root := t.TempDir()
+	definitionPath := filepath.Join(root, "definition.json")
+	definition := testDefinition(t)
+	// Document admission must not compile this deliberately absent catalog.
+	definition.Catalog.Base = "missing-catalog-must-not-open"
+	writeCanonicalTestFile(t, definitionPath, definition)
+	for _, test := range []struct {
+		name, definitionPath, environmentPath string
+	}{
+		{"missing Definition", filepath.Join(root, "missing-definition.json"), filepath.Join(root, "missing-environment.json")},
+		{"missing Environment", definitionPath, filepath.Join(root, "missing-environment.json")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			outputPath := filepath.Join(root, test.name+"-run.json")
+			run, err := FinalizeGenerated(t.Context(), test.definitionPath, test.environmentPath, "", "test", "attempt", root, outputPath)
+			assertCode(t, err, nvkrerr.CodeInvalidCatalog)
+			if run != nil {
+				t.Fatal("invalid authored inputs created a Run")
+			}
+			if _, err := os.Stat(outputPath); !os.IsNotExist(err) {
+				t.Fatalf("authored-input admission created output: %v", err)
+			}
+		})
+	}
+}
+
 func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *testing.T) {
 	old, err := os.Getwd()
 	if err != nil {

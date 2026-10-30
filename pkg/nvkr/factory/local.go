@@ -142,6 +142,9 @@ func AdmitLocal(ctx context.Context, plan *Plan, options LocalRunOptions) error 
 	if err := admitLocalPlanBase(ctx, plan); err != nil {
 		return err
 	}
+	if err := admitLocalDebianHost(plan, options); err != nil {
+		return err
+	}
 	if err := validateLocalWorkspace(options.Workspace, plan); err != nil {
 		return err
 	}
@@ -225,6 +228,9 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	returnErr error,
 ) {
 	if err := admitLocalPlanBase(ctx, plan); err != nil {
+		return nil, err
+	}
+	if err := admitLocalDebianHost(plan, options); err != nil {
 		return nil, err
 	}
 	if err := validateLocalWorkspace(options.Workspace, plan); err != nil {
@@ -845,10 +851,18 @@ func executeLocalFactoryNode(ctx context.Context, plan *Plan, node Node, options
 		return executeLocalProducer(ctx, plan, node, options, run)
 	}
 
-	// Terminal observation reopens and hashes the local producer's host bytes;
-	// it executes no producer code. Use the same filesystem view as collection,
-	// rather than a VM bind-mount view after private BuildKit output promotion.
-	if node.Network == ir.NetworkNone && node.Kind != NodeVerify {
+	rawPackage := false
+	if plan != nil {
+		for _, output := range plan.Definition.Outputs {
+			if output.Name == node.BuildTarget && output.Format == authored.OutputDebianPackage {
+				rawPackage = true
+			}
+		}
+	}
+	// Terminal observation reopens local producer bytes. A raw package's
+	// source-only composition also uses these host records; neither executes
+	// producer code or grants the gated direct-node entry point.
+	if node.Network == ir.NetworkNone && node.Kind != NodeVerify && !(rawPackage && node.Kind == NodeSBOM && plan.Definition.SBOMTool == "") {
 		if _, ok := runners[node.Platform]; !ok {
 			return e.New(e.CodeEngineCapability, "factory node %s has no linux runner for %s", node.ID, node.Platform)
 		}
@@ -874,6 +888,14 @@ func executeLocalFactoryNode(ctx context.Context, plan *Plan, node Node, options
 	relocated, err := relocateFactoryPlan(plan, options.Workspace)
 	if err != nil {
 		return err
+	}
+	if rawPackage && node.Kind == NodeVerify {
+		_, artifacts := planIndex(relocated)
+		return executeObservation(ctx, relocated, node, artifacts)
+	}
+	if rawPackage && node.Kind == NodeSBOM && plan.Definition.SBOMTool == "" {
+		_, artifacts := planIndex(relocated)
+		return executeSBOM(ctx, relocated, node, artifacts, options.Stdout)
 	}
 	return ExecuteNode(ctx, relocated, node.ID, options.Stdout, options.Stderr)
 }

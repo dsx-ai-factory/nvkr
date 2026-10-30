@@ -55,6 +55,10 @@ type Config struct {
 // BuildConfig selects the existing local launcher, which bootstraps and invokes
 // nvkr. It does not introduce a second build engine or in-process SDK path.
 type BuildConfig struct {
+	// DemoExecutable identifies the existing native distribution for Go embedding.
+	// Default Mac builds locate the adjacent nvkr through it; empty uses this process.
+	// It is supplied by code, never authored YAML or a source-selection override.
+	DemoExecutable string
 	// QualifyLocal provisions disposable trust and owns registry shutdown.
 	QualifyLocal bool
 	// QualificationPolicy optionally admits the prepared Plan's complete qualification

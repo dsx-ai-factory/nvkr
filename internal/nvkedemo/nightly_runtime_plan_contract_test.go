@@ -29,7 +29,7 @@ import (
 
 // Controlled source descriptions exercise real compilation and consumer joins;
 // these package-shaped fixtures do not claim a completed upstream source build.
-func nightlyRuntimeCompiledFixture(t *testing.T, profile NightlyProfile, build NightlyBuild, commit string) (*factory.Plan, lifecycle.Run) {
+func nightlyRuntimeCompiledFixture(t *testing.T, profile NightlyProfile, build NightlyBuild, commit string, sourcePolicy ...bool) (*factory.Plan, lifecycle.Run) {
 	t.Helper()
 	root, err := filepath.Abs("../../inputs/catalogs/nvke/module-tags")
 	if err != nil {
@@ -44,6 +44,9 @@ func nightlyRuntimeCompiledFixture(t *testing.T, profile NightlyProfile, build N
 	for _, name := range []string{"nvkectl", "nvke-controller", "nvke-controller-chart", "nktp-chart"} {
 		component := producer
 		component.Commit, component.TreeHash = commit, commit
+		if len(sourcePolicy) != 0 && sourcePolicy[0] {
+			component.Tag = commit
+		}
 		base.Components[name] = component
 	}
 	stack, err := catalog.ApplyStack(base)
@@ -59,6 +62,9 @@ func nightlyRuntimeCompiledFixture(t *testing.T, profile NightlyProfile, build N
 		t.Fatal(err)
 	}
 	environment.GitHubBundle, environment.GitHubRuntimePlan = profile.Bundle, true
+	if len(sourcePolicy) != 0 && sourcePolicy[0] {
+		environment.GitHubRuntimeSource = &definition.GitHubRuntimeSource{Repository: "https://github.com/dsx-ai-factory/nvke", Ref: "refs/heads/main"}
+	}
 	environment.Publication.Mode, environment.Publication.RepositoryPrefix = "per-output-v1", "ghcr.io/example/nvkr/nightly/fixture"
 	environment.Signing.Identity = "^https://github\\.com/example/nvkr/\\.github/workflows/" + profile.BuildWorkflow + "@refs/heads/main$"
 	plan, err := factory.Compile(t.Context(), declared, environment, stack, "test")
@@ -66,6 +72,9 @@ func nightlyRuntimeCompiledFixture(t *testing.T, profile NightlyProfile, build N
 		t.Fatal(err)
 	}
 	plan.DefinitionPath, plan.EnvironmentPath = profile.Definition, profile.Environment
+	if environment.GitHubRuntimeSource != nil {
+		plan.RuntimeSourceCommit = commit
+	}
 	run, err := lifecycle.PrepareRun(declared, environment, plan, fmt.Sprintf("%d-%d", build.ProducerRun, build.ProducerAttempt))
 	if err != nil {
 		t.Fatal(err)
@@ -114,9 +123,21 @@ func nightlyRuntimeZIPFixture(t *testing.T, plan []byte, scenario string) []byte
 }
 
 func TestNightlyRuntimePlanHandoffUsesFreshFrozenSourcePins(t *testing.T) {
+	for _, sourcePolicy := range []bool{false, true} {
+		t.Run(map[bool]string{false: "catalog pins", true: "cycle source policy"}[sourcePolicy], func(t *testing.T) {
+			testNightlyRuntimePlanHandoff(t, sourcePolicy)
+		})
+	}
+}
+
+func testNightlyRuntimePlanHandoff(t *testing.T, sourcePolicy bool) {
+	t.Helper()
 	profile, build := nightlyIdentityFixture()
-	baseline, _ := nightlyRuntimeCompiledFixture(t, profile, build, strings.Repeat("c", 40))
-	fresh, freshRun := nightlyRuntimeCompiledFixture(t, profile, build, strings.Repeat("d", 40))
+	if sourcePolicy {
+		build.NVKECommit = strings.Repeat("d", 40)
+	}
+	baseline, _ := nightlyRuntimeCompiledFixture(t, profile, build, strings.Repeat("c", 40), sourcePolicy)
+	fresh, freshRun := nightlyRuntimeCompiledFixture(t, profile, build, strings.Repeat("d", 40), sourcePolicy)
 	baselineDigest, err := baseline.Digest()
 	if err != nil {
 		t.Fatal(err)
@@ -125,8 +146,18 @@ func TestNightlyRuntimePlanHandoffUsesFreshFrozenSourcePins(t *testing.T) {
 	if err != nil || baselineDigest == freshDigest {
 		t.Fatalf("fixture did not change exact source pins: %s, %s, %v", baselineDigest, freshDigest, err)
 	}
-	for _, scenario := range []string{"fresh", "current trusted Definition", "stale Plan", "mismatched Run", "substituted Environment", "substituted Definition", "substituted Plan path", "invalid Plan", "malformed Plan", "oversized Plan", "wrong runtime origin", "replaced runtime artifact", "corrupt runtime ZIP", "extra runtime member", "duplicate runtime member"} {
+	for _, scenario := range []string{"fresh", "current trusted Definition", "stale Plan", "mismatched Run", "substituted Environment", "substituted Definition", "substituted Plan path", "invalid Plan", "malformed Plan", "oversized Plan", "wrong runtime origin", "replaced runtime artifact", "corrupt runtime ZIP", "extra runtime member", "duplicate runtime member", "wrong cycle source", "missing cycle source"} {
 		t.Run(scenario, func(t *testing.T) {
+			locator := build
+			if scenario == "wrong cycle source" || scenario == "missing cycle source" {
+				if !sourcePolicy {
+					t.Skip("catalog-pin policy does not require a cycle source selection")
+				}
+				locator.NVKECommit = ""
+				if scenario == "wrong cycle source" {
+					locator.NVKECommit = strings.Repeat("e", 40)
+				}
+			}
 			selectedPlan := fresh
 			expectedDigest := freshDigest
 			run := freshRun
@@ -221,7 +252,7 @@ func TestNightlyRuntimePlanHandoffUsesFreshFrozenSourcePins(t *testing.T) {
 			if err := os.Chmod(workspace, 0o700); err != nil {
 				t.Fatal(err)
 			}
-			inputs, err := newNightlyInputsWithCapture(t.Context(), profile, build, baseline, trustedDefinition, trustedEnvironment, workspace, "example/nvkr", "123", build.SourceCommit, "100", "2", capture)
+			inputs, err := newNightlyInputsWithCapture(t.Context(), profile, locator, baseline, trustedDefinition, trustedEnvironment, workspace, "example/nvkr", "123", build.SourceCommit, "100", "2", capture)
 			if scenario == "fresh" || scenario == "current trusted Definition" {
 				if err != nil || inputs == nil || inputs.Plan == baseline || inputs.Run.PlanDigest != expectedDigest || inputs.HarnessCommit != strings.Repeat("d", 40) {
 					t.Fatalf("fresh frozen Plan not consumed: %+v, %v", inputs, err)
@@ -232,6 +263,9 @@ func TestNightlyRuntimePlanHandoffUsesFreshFrozenSourcePins(t *testing.T) {
 				t.Fatal("invalid runtime Plan handoff admitted", inputs, err)
 			}
 			code := e.CodeVerifyFailed
+			if sourcePolicy && scenario == "stale Plan" {
+				code = e.CodeUnpinnedInput
+			}
 			switch scenario {
 			case "malformed Plan", "substituted Plan path":
 				code = e.CodePipelineDrift
@@ -239,7 +273,7 @@ func TestNightlyRuntimePlanHandoffUsesFreshFrozenSourcePins(t *testing.T) {
 				code = e.CodeInvalidCatalog
 			case "substituted Environment", "substituted Definition":
 				code = e.CodeUnverifiedRef
-			case "wrong runtime origin", "replaced runtime artifact":
+			case "wrong runtime origin", "replaced runtime artifact", "wrong cycle source", "missing cycle source":
 				code = e.CodeUnpinnedInput
 			}
 			assertNightlyCode(t, err, code)

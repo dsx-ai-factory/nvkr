@@ -12,10 +12,13 @@ intent. An output directly selects components. Packaging intent may bind catalog
 deployment repository remains transport configuration. Catalog-owned digest representation
 may retain the full OCI digest or supply SHA-256 hex to a template that owns the algorithm prefix;
 this does not change the authenticated image identity or rewrite templates.
+A proposed composite Definition is a form of this object, not a seventh lifecycle object (below).
 _Avoid_: Factory, FactoryDefinition, cluster definition
 
 **Environment**:
-Separately selected execution settings, publication namespace, credential references, and signing identity policy.
+Separately selected execution settings, required publication transports and namespace, credential references,
+and signing identity policy. Selecting an unavailable transport fails before work; a supported sibling cannot
+substitute for it.
 Native hosted platform routes are explicit execution settings; they do not change logical Build identity
 or prove provider allocation. Tool releases are catalog-owned dependencies selected by purpose in the Definition. GitHub action releases
 are also catalog dependencies; the workflow adapter consumes their locked commits.
@@ -57,6 +60,20 @@ Consumer-owned requirements defining the acceptance scope, identities, evidence,
 _Avoid_: Signing configuration, verification result, producer assertion
 
 ## Definition and production relationships
+
+**Composite Definition (proposed)**:
+A Definition form that names complete member Definitions by locator and exact `nvkr.definition` digest and
+releases the exact union of their named outputs through one Plan, Run and Release. Output names are preserved;
+duplicates, divergent shared producers, differing base catalogs or tools, and digest drift are coded errors,
+never precedence. Members keep their own Runs and Releases; a composite neither references nor inherits them.
+Proposed [ADR-26](docs/adr/0026-definition-composition.md) designs it; it is not implemented.
+_Avoid_: Recipe, selection group, parent Release, association file, include
+
+**Effective Definition (proposed)**:
+The derived ordinary Definition that composite admission produces by merging its members, with every output's
+catalog stack made explicit. It is an internal record, recorded by digest in the composite's Plan; it is never
+authored or selected as input.
+_Avoid_: Flattened file, combined candidate, authored Definition
 
 **Named output**:
 A Definition's declaration of exact selected producers, concrete target platform or explicit aggregate image
@@ -117,11 +134,21 @@ byte-exact drift gate. Actions expose fixed semantic interfaces for Plan operati
 interfaces without generating group-size or output-count variants. Named invocation parameters are recomputed
 from the admitted Plan at runtime. Identical admitted step sequences can share descriptive YAML aliases;
 expansion preserves independent job parameters, policies and exact result membership. Every job retains its
-ID, runner, timeout, permissions and condition in the entry workflow. Redundant scheduling edges may be
+ID, runner, timeout, permissions and condition in the default entry workflow. Redundant scheduling edges may be
 removed while preserving the prerequisite closure.
 Large finalizers collect the exact original per-job results through fixed, bounded diagnostic buckets;
 collector success never substitutes for producer success. Neither scripts supplied as data nor separately
 authored lifecycle inputs are admitted.
+Opt-in execution partitioning moves original jobs into bounded same-commit worker workflows under the same
+manifest; OIDC-signing jobs remain in the entry to preserve signer identity. Moving them requires an explicit
+certificate-identity and trust-policy migration, which is proposed but not implemented. A partition is generated
+scheduling structure, not a Definition, Run or Release, and never follows proposed composite member
+boundaries. It forwards original
+job results to the single finalizer; it does not authorize artifact acceptance. The complete Plan and required
+output set remain shared. The provider-independent execution graph owns membership, dependency conditions,
+partition validation and exact outcome accounting; adapters project this internal structure. Reconciliation
+records the full development execution and its hosted verification evidence. Qualification and full-product
+failure/cancellation recovery remain unproven.
 Production and development partial retries may transport retained same-Run artifacts from earlier attempts while preserving
 their original source bindings. Same-name candidates are bounded and authenticated before selecting the
 newest source attempt, with ties rejected. Transport admission does not replace consumer evidence or completeness checks;
@@ -164,6 +191,12 @@ _Avoid_: Release publication root, native image manifest, qualification receipt
 **Binary bundle**:
 An Artifact format containing exact executable files and their installation metadata.
 _Avoid_: Release, arbitrary archive
+
+**Debian package**:
+An Artifact format (`debian-package`) containing one raw Debian archive from an explicitly selected source
+producer. The same package bytes can be supplied as an OS build material. Local retention does not establish
+installation or runtime acceptance.
+_Avoid_: APT repository, installed package, builder type
 
 ## Evidence and authority
 
@@ -291,12 +324,13 @@ Qualified release-gate acceptance is deferred; no retained clearance implementat
 _Avoid_: Generic pass result, cluster qualification
 
 **Downstream test coordinator**:
-A separately authored repository CI adapter outside the NVKR product lifecycle
-that joins exact project producer Runs, consumes authenticated publication bytes
-and invokes NVKE's suite in a separate job. NVKE owns guest/cluster provisioning,
-assertions and teardown; the parent harness owns host admission, outer leases,
-disk service and network-control restoration. Its unsigned reports are diagnostics,
-not qualified conformance receipts or a seventh public lifecycle object (ADR-16/18).
+A separately authored repository CI workflow outside the NVKR product lifecycle.
+The nightly resolves one NVKE main commit, dispatches the existing generated
+producer, and consumes that Run's authenticated artifacts through native Go
+bootstrap/readiness tests. It currently uses the ARM64 NVIDIA target, without a
+second product build. VM, backend and network cleanup must join before success.
+Its unsigned outcomes are diagnostics, not release qualification or a seventh
+lifecycle object (ADR-16/18).
 _Avoid_: Nightly qualification, qualified runtime, product fleet operator
 
 **Clearance**:

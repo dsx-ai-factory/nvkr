@@ -16,6 +16,7 @@ done
 [[ ${GITHUB_SERVER_URL:-} == https://github.com && ${GITHUB_REF:-} == refs/heads/main ]] ||
   fail NVKR-E-ENGINE-CAPABILITY 'nightly production requires the GitHub main workflow' 29
 : "${GITHUB_REPOSITORY:?}" "${GITHUB_REPOSITORY_ID:?}" "${GITHUB_SHA:?}" "${GITHUB_RUN_ID:?}" "${GITHUB_RUN_ATTEMPT:?}"
+[[ ${NVKE_COMMIT:-} =~ ^[0-9a-f]{40}$ ]] || fail NVKR-E-UNPINNED-INPUT 'nightly requires the cycle-resolved exact NVKE main revision' 49
 selection=$(jq -ce --arg name "$profile" '[.[] | select(.name == $name)] | if length == 1 then .[0] else error("unknown or ambiguous profile") end' "$profiles") ||
   fail NVKR-E-USAGE 'select one maintained nightly profile' 2
 workflow=$(jq -er '.build_workflow' <<<"$selection")
@@ -73,13 +74,14 @@ jq -e --arg repo "$GITHUB_REPOSITORY" --arg id "$GITHUB_REPOSITORY_ID" \
 api "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}" >"$out/workflow.json"
 jq -e --arg path ".github/workflows/$workflow" '.path == $path and .state == "active"' "$out/workflow.json" >/dev/null ||
   fail NVKR-E-ENGINE-CAPABILITY 'maintained producer workflow is unavailable' 29
-jq -n '{ref:"main"}' >"$out/request.json"
+jq -n --arg source "$NVKE_COMMIT" '{ref:"main",inputs:{source_commit:$source}}' >"$out/request.json"
 # A failed/ambiguous POST is never retried: it may already have created a run.
 api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/dispatches" \
   --input "$out/request.json" >"$out/dispatch.json" ||
   fail NVKR-E-UNAVAILABLE 'dispatch outcome is ambiguous; do not retry or guess the producing run' 30
 run_id=$(jq -er '.workflow_run_id | select(type == "number" and . > 0 and . <= 9007199254740991 and floor == .) | tostring' "$out/dispatch.json") ||
   fail NVKR-E-UNAVAILABLE 'dispatch returned no exact run ID; no latest-run fallback is allowed' 30
+printf 'Producing Run: https://github.com/%s/actions/runs/%s\n' "$GITHUB_REPOSITORY" "$run_id"
 # Reserve thirty minutes below the 360-minute job for admission and cleanup.
 deadline=$((SECONDS + 19800))
 while (( SECONDS < deadline )); do
@@ -96,8 +98,9 @@ while (( SECONDS < deadline )); do
       fail NVKR-E-BUILD-FAILED 'exact nightly producer did not succeed' 21
     jq -n --argjson profile "$selection" --argjson producer "$(cat "$out/producer-run.json")" \
       --arg coordinator "$GITHUB_RUN_ID" --arg attempt "$GITHUB_RUN_ATTEMPT" \
+      --arg nvke "$NVKE_COMMIT" \
       '{profile:$profile,coordinatorRun:$coordinator,coordinatorAttempt:$attempt,
-        producerRun:$producer.id,producerAttempt:$producer.run_attempt,sourceCommit:$producer.head_sha,
+        producerRun:$producer.id,producerAttempt:$producer.run_attempt,sourceCommit:$producer.head_sha,nvkeCommit:$nvke,
         producerURL:$producer.html_url,trust:"github-run-facts; publication-not-yet-verified"}' >"$out/build.json"
     exit 0
   fi

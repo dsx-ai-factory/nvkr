@@ -31,7 +31,7 @@ jobs:
           [ ! -L "$GITHUB_STEP_SUMMARY" ] || exit 0
           [ ! -e "$GITHUB_STEP_SUMMARY" ] || [ -f "$GITHUB_STEP_SUMMARY" ] || exit 0
           {
-            printf '%s\n' '## NVKR Run started' '' '<code>nvke-services</code> · 28 planned outputs · <code>linux/amd64, linux/arm64</code>' '' 'Lane: <code>pipeline-attested</code>. Execution and completeness checks are pending.' ''
+            printf '%s\n' '## NVKR Run started' '' '<code>nvke-services</code> · 34 planned outputs · <code>linux/amd64, linux/arm64</code>' '' 'Lane: <code>pipeline-attested</code>. Execution and completeness checks are pending.' ''
           } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
       - &checkout-workflow-source
         name: Check out workflow source
@@ -136,17 +136,179 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-package-csi-node-driver-registrar-image-arm64:
-    name: 'Package container image: csi-node-driver-registrar-image-arm64'
+  nvkr-local-path-helper-image-arm64-pull-l-370a1cbcb788:
+    name: 'Acquire pinned local-path-helper-image-arm64/pull-local-path-helper-image'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 60
+    needs: [build-runner-ubuntu-24-04-arm]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-local-path-helper-image-arm6-3713b364b1fa:
+    name: 'Verify artifacts and generate SBOMs: local-path-helper-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-process-csi-node-driver-registrar-im-11c07063ce1a]
+    needs: [nvkr-local-path-helper-image-arm64-pull-l-370a1cbcb788, nvkr-tool-syft]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-local-path-helper-image-pull-7b77e923b737:
+    name: 'Acquire and prepare local-path-helper-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 180
+    needs: [build-runner-ubuntu-24-04]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
+      - *operation-execute-node-part-3
+    permissions:
+      actions: read
+      contents: read
+  nvkr-local-path-provisioner-arm64-fetch-l-e2d85fefbdbb:
+    name: 'Fetch pinned source for local-path-provisioner-chart (local-path-provisioner-arm64)'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 60
+    needs: [build-runner-ubuntu-24-04-arm]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-local-path-provisioner-arm64-build-l-8a6f3d006255:
+    name: 'Build local-path-provisioner-chart (local-path-provisioner-arm64)'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 60
+    needs: [nvkr-local-path-provisioner-arm64-fetch-l-e2d85fefbdbb]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-local-path-provisioner-arm64-bfa59a3a7bf0:
+    name: 'Verify artifacts and generate SBOMs: local-path-provisioner-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-local-path-provisioner-arm64-build-l-8a6f3d006255, nvkr-tool-syft]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
+  nvkr-local-path-provisioner-image-arm64-p-4aebf421bc73:
+    name: 'Acquire pinned local-path-provisioner-image-arm64/pull-local-path-provisioner-image'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 60
+    needs: [build-runner-ubuntu-24-04-arm]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-local-path-provisioner-image-aea052087333:
+    name: 'Verify artifacts and generate SBOMs: local-path-provisioner-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-local-path-provisioner-image-arm64-p-4aebf421bc73, nvkr-tool-syft]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-local-path-provisioner-image-2634c0a8ad70:
+    name: 'Acquire and prepare local-path-provisioner-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 180
+    needs: [build-runner-ubuntu-24-04]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
+      - *operation-execute-node-part-3
+    permissions:
+      actions: read
+      contents: read
+  nvkr-local-path-provisioner-fetch-local-p-2e12183b2196:
+    name: 'Fetch pinned source for local-path-provisioner-chart (local-path-provisioner)'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: &steps-ubuntu-24-04-node
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
       - *operation-execute-node-part-1
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-local-path-provisioner-build-70de0d069de6:
+    name: 'Build and prepare local-path-provisioner'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 120
+    needs: [nvkr-local-path-provisioner-fetch-local-p-2e12183b2196]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
+  nvkr-package-csi-node-driver-registrar-image-arm64:
+    name: 'Package container image: csi-node-driver-registrar-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-process-csi-node-driver-registrar-im-11c07063ce1a]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-package-local-path-helper-image-arm64:
+    name: 'Package container image: local-path-helper-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-process-local-path-helper-image-arm6-3713b364b1fa]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-package-local-path-provisioner:
+    name: 'Bind image digest and package Helm: local-path-provisioner'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-process-local-path-helper-image-pull-7b77e923b737, nvkr-process-local-path-provisioner-build-70de0d069de6, nvkr-process-local-path-provisioner-image-2634c0a8ad70]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-package-local-path-provisioner-image-arm64:
+    name: 'Package container image: local-path-provisioner-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-process-local-path-provisioner-image-aea052087333]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-package-local-path-provisioner-arm64:
+    name: 'Bind image digest and package Helm: local-path-provisioner-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-package-local-path-helper-image-arm64, nvkr-package-local-path-provisioner-image-arm64, nvkr-process-local-path-provisioner-arm64-bfa59a3a7bf0]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
     permissions:
       actions: read
       contents: read
@@ -750,6 +912,36 @@ jobs:
     permissions:
       actions: read
       contents: read
+  nvkr-local-path-helper-image-sbom:
+    name: 'Generate SBOMs: local-path-helper-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-process-local-path-helper-image-pull-7b77e923b737, nvkr-tool-syft]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-local-path-provisioner-image-sbom:
+    name: 'Generate SBOMs: local-path-provisioner-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-process-local-path-provisioner-image-2634c0a8ad70, nvkr-tool-syft]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-local-path-provisioner-sbom:
+    name: 'Generate SBOMs: local-path-provisioner'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-process-local-path-provisioner-build-70de0d069de6, nvkr-tool-syft]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
   nvkr-package-publication-csi-node-driver-75d8004e6ab4:
     name: 'Package publication bundle: publication-csi-node-driver-registrar-image'
     runs-on: 'ubuntu-24.04'
@@ -787,6 +979,138 @@ jobs:
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-package-publication-csi-node-driver-02a78ae16d16, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps: *steps-ubuntu-24-04-node
+  nvkr-package-publication-local-path-helper-image:
+    name: 'Package publication bundle: publication-local-path-helper-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-local-path-helper-image-sbom]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-attest-sboms-output-local-path-helper-image:
+    name: 'Create and verify SBOM attestations: output-local-path-helper-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-package-publication-local-path-helper-image, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps: *steps-ubuntu-24-04-node
+  nvkr-package-publication-local-path-helpe-6a7fb09add1d:
+    name: 'Package publication bundle: publication-local-path-helper-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-package-local-path-helper-image-arm64]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-attest-sboms-output-local-path-helpe-d7c0ec47aa04:
+    name: 'Create and verify SBOM attestations: output-local-path-helper-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-package-publication-local-path-helpe-6a7fb09add1d, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps: *steps-ubuntu-24-04-node
+  nvkr-package-publication-local-path-provisioner:
+    name: 'Package publication bundle: publication-local-path-provisioner'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-local-path-helper-image-sbom, nvkr-local-path-provisioner-image-sbom, nvkr-local-path-provisioner-sbom, nvkr-package-local-path-provisioner]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-attest-sboms-output-local-path-provisioner:
+    name: 'Create and verify SBOM attestations: output-local-path-provisioner'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-package-publication-local-path-provisioner, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps: *steps-ubuntu-24-04-node
+  nvkr-package-publication-local-path-provisioner-arm64:
+    name: 'Package publication bundle: publication-local-path-provisioner-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-package-local-path-provisioner-arm64]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-attest-sboms-output-local-path-provisioner-arm64:
+    name: 'Create and verify SBOM attestations: output-local-path-provisioner-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-package-publication-local-path-provisioner-arm64, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps: *steps-ubuntu-24-04-node
+  nvkr-package-publication-local-path-provisioner-image:
+    name: 'Package publication bundle: publication-local-path-provisioner-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-local-path-provisioner-image-sbom]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-attest-sboms-output-local-path-provisioner-image:
+    name: 'Create and verify SBOM attestations: output-local-path-provisioner-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-package-publication-local-path-provisioner-image, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps: *steps-ubuntu-24-04-node
+  nvkr-package-publication-local-path-provi-77db8aabee7a:
+    name: 'Package publication bundle: publication-local-path-provisioner-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-package-local-path-provisioner-image-arm64]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-attest-sboms-output-local-path-provi-f4e417812ca4:
+    name: 'Create and verify SBOM attestations: output-local-path-provisioner-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-package-publication-local-path-provi-77db8aabee7a, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -910,6 +1234,96 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
+  nvkr-publish-output-local-path-helper-image:
+    name: 'Publish output-local-path-helper-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-attest-sboms-output-local-path-helper-image]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps: *steps-ubuntu-24-04-node
+  nvkr-publish-output-local-path-helper-image-arm64:
+    name: 'Publish output-local-path-helper-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-attest-sboms-output-local-path-helpe-d7c0ec47aa04]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps: *steps-ubuntu-24-04-node
+  nvkr-publish-output-local-path-provisioner:
+    name: 'Publish output-local-path-provisioner'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-attest-sboms-output-local-path-provisioner]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps: *steps-ubuntu-24-04-node
+  nvkr-publish-output-local-path-provisioner-arm64:
+    name: 'Publish output-local-path-provisioner-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-attest-sboms-output-local-path-provisioner-arm64]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps: *steps-ubuntu-24-04-node
+  nvkr-publish-output-local-path-provisioner-image:
+    name: 'Publish output-local-path-provisioner-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-attest-sboms-output-local-path-provisioner-image]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps: *steps-ubuntu-24-04-node
+  nvkr-publish-output-local-path-provisione-dd2308ec32df:
+    name: 'Publish output-local-path-provisioner-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-attest-sboms-output-local-path-provi-f4e417812ca4]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-postgresql:
     name: 'Publish output-postgresql'
     runs-on: 'ubuntu-24.04'
@@ -975,6 +1389,96 @@ jobs:
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-publish-output-csi-node-driver-regis-b17474c2d7cb]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps: *steps-ubuntu-24-04-node
+  nvkr-sign-output-local-path-helper-image:
+    name: 'Sign and attest release and deliverables: output-local-path-helper-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-publish-output-local-path-helper-image]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps: *steps-ubuntu-24-04-node
+  nvkr-sign-output-local-path-helper-image-arm64:
+    name: 'Sign and attest release and deliverables: output-local-path-helper-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-publish-output-local-path-helper-image-arm64]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps: *steps-ubuntu-24-04-node
+  nvkr-sign-output-local-path-provisioner:
+    name: 'Sign and attest release and deliverables: output-local-path-provisioner'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-publish-output-local-path-provisioner]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps: *steps-ubuntu-24-04-node
+  nvkr-sign-output-local-path-provisioner-arm64:
+    name: 'Sign and attest release and deliverables: output-local-path-provisioner-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-publish-output-local-path-provisioner-arm64]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps: *steps-ubuntu-24-04-node
+  nvkr-sign-output-local-path-provisioner-image:
+    name: 'Sign and attest release and deliverables: output-local-path-provisioner-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-publish-output-local-path-provisioner-image]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps: *steps-ubuntu-24-04-node
+  nvkr-sign-output-local-path-provisioner-image-arm64:
+    name: 'Sign and attest release and deliverables: output-local-path-provisioner-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-publish-output-local-path-provisione-dd2308ec32df]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -2384,6 +2888,90 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
+  nvkr-verify-publication-output-local-path-c572611510ec:
+    name: 'Verify release and deliverable signatures: output-local-path-helper-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-sign-output-local-path-helper-image]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps: *steps-ubuntu-24-04-node
+  nvkr-verify-publication-output-local-path-15c3e80b49ce:
+    name: 'Verify release and deliverable signatures: output-local-path-helper-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-sign-output-local-path-helper-image-arm64]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps: *steps-ubuntu-24-04-node
+  nvkr-verify-publication-output-local-path-provisioner:
+    name: 'Verify release and deliverable signatures: output-local-path-provisioner'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-sign-output-local-path-provisioner]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps: *steps-ubuntu-24-04-node
+  nvkr-verify-publication-output-local-path-208ce6c5e08d:
+    name: 'Verify release and deliverable signatures: output-local-path-provisioner-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-sign-output-local-path-provisioner-arm64]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps: *steps-ubuntu-24-04-node
+  nvkr-verify-publication-output-local-path-e9f81d84678d:
+    name: 'Verify release and deliverable signatures: output-local-path-provisioner-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-sign-output-local-path-provisioner-image]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps: *steps-ubuntu-24-04-node
+  nvkr-verify-publication-output-local-path-b7cdb9064846:
+    name: 'Verify release and deliverable signatures: output-local-path-provisioner-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-sign-output-local-path-provisioner-image-arm64]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-postgresql:
     name: 'Verify release and deliverable signatures: output-postgresql'
     runs-on: 'ubuntu-24.04'
@@ -2752,7 +3340,7 @@ jobs:
     name: 'Assemble release from verified output references'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-verify-publication-output-csi-node-d-914d7376ead0, nvkr-verify-publication-output-csi-node-d-ed501e7759bf, nvkr-verify-publication-output-postgresql, nvkr-verify-publication-output-postgresql-image, nvkr-verify-publication-output-postgresql-image-arm64, nvkr-verify-publication-output-spiffe-csi-image, nvkr-verify-publication-output-spiffe-csi-image-arm64, nvkr-verify-publication-output-spire, nvkr-verify-publication-output-spire-agen-690d58615fef, nvkr-verify-publication-output-spire-agent-image, nvkr-verify-publication-output-spire-bash-image, nvkr-verify-publication-output-spire-bash-image-arm64, nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91, nvkr-verify-publication-output-spire-cont-81ba1c1e8041, nvkr-verify-publication-output-spire-crds, nvkr-verify-publication-output-spire-oidc-image, nvkr-verify-publication-output-spire-oidc-image-arm64, nvkr-verify-publication-output-spire-serv-2ffabff52266, nvkr-verify-publication-output-spire-server-image, nvkr-verify-publication-output-spire-tpm-fdd5a5adf925, nvkr-verify-publication-output-spire-tpm-server-image, nvkr-verify-publication-output-temporal, nvkr-verify-publication-output-temporal-a-325229721989, nvkr-verify-publication-output-temporal-a-9109bef2fded, nvkr-verify-publication-output-temporal-s-030929bd4981, nvkr-verify-publication-output-temporal-server-image, nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac, nvkr-verify-publication-output-temporal-ui-image]
+    needs: [nvkr-verify-publication-output-csi-node-d-914d7376ead0, nvkr-verify-publication-output-csi-node-d-ed501e7759bf, nvkr-verify-publication-output-local-path-15c3e80b49ce, nvkr-verify-publication-output-local-path-208ce6c5e08d, nvkr-verify-publication-output-local-path-b7cdb9064846, nvkr-verify-publication-output-local-path-c572611510ec, nvkr-verify-publication-output-local-path-e9f81d84678d, nvkr-verify-publication-output-local-path-provisioner, nvkr-verify-publication-output-postgresql, nvkr-verify-publication-output-postgresql-image, nvkr-verify-publication-output-postgresql-image-arm64, nvkr-verify-publication-output-spiffe-csi-image, nvkr-verify-publication-output-spiffe-csi-image-arm64, nvkr-verify-publication-output-spire, nvkr-verify-publication-output-spire-agen-690d58615fef, nvkr-verify-publication-output-spire-agent-image, nvkr-verify-publication-output-spire-bash-image, nvkr-verify-publication-output-spire-bash-image-arm64, nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91, nvkr-verify-publication-output-spire-cont-81ba1c1e8041, nvkr-verify-publication-output-spire-crds, nvkr-verify-publication-output-spire-oidc-image, nvkr-verify-publication-output-spire-oidc-image-arm64, nvkr-verify-publication-output-spire-serv-2ffabff52266, nvkr-verify-publication-output-spire-server-image, nvkr-verify-publication-output-spire-tpm-fdd5a5adf925, nvkr-verify-publication-output-spire-tpm-server-image, nvkr-verify-publication-output-temporal, nvkr-verify-publication-output-temporal-a-325229721989, nvkr-verify-publication-output-temporal-a-9109bef2fded, nvkr-verify-publication-output-temporal-s-030929bd4981, nvkr-verify-publication-output-temporal-server-image, nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac, nvkr-verify-publication-output-temporal-ui-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -2810,7 +3398,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-00'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [build-runner-ubuntu-24-04, nvkr-csi-node-driver-registrar-image-sbom, nvkr-package-publication-spiffe-csi-image, nvkr-package-publication-spire, nvkr-package-publication-temporal-ui-image, nvkr-package-spire-server-image-arm64, nvkr-sign-output-postgresql-image-arm64, nvkr-sign-output-temporal-admin-tools-image-arm64, nvkr-spire-agent-image-sbom, nvkr-verify-publication-output-temporal-a-325229721989]
+    needs: [build-runner-ubuntu-24-04, nvkr-attest-sboms-output-local-path-provisioner-image, nvkr-csi-node-driver-registrar-image-sbom, nvkr-package-local-path-provisioner, nvkr-package-publication-spiffe-csi-image, nvkr-package-publication-spire, nvkr-package-publication-temporal-ui-image, nvkr-package-spire-server-image-arm64, nvkr-sign-output-postgresql-image-arm64, nvkr-sign-output-temporal-admin-tools-image-arm64, nvkr-spire-agent-image-sbom, nvkr-verify-publication-output-local-path-15c3e80b49ce, nvkr-verify-publication-output-local-path-provisioner, nvkr-verify-publication-output-temporal-a-325229721989]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2823,7 +3411,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-01'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-spiffe-csi-image, nvkr-attest-sboms-output-spire-server-image, nvkr-package-spire-bash-image-arm64, nvkr-postgresql-image-sbom, nvkr-postgresql-sbom, nvkr-process-postgresql-pull-postgresql-c-047f8d633203, nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360, nvkr-publish-output-spire-crds, nvkr-publish-output-temporal-admin-tools-image, nvkr-sign-output-temporal, nvkr-spire-oidc-image-arm64-pull-spire-oidc-image, nvkr-spire-server-image-arm64-pull-spire-server-image, nvkr-verify-publication-output-spire-bash-image-arm64]
+    needs: [nvkr-attest-sboms-output-spiffe-csi-image, nvkr-attest-sboms-output-spire-server-image, nvkr-local-path-helper-image-arm64-pull-l-370a1cbcb788, nvkr-package-local-path-provisioner-image-arm64, nvkr-package-publication-local-path-provisioner, nvkr-package-publication-local-path-provisioner-image, nvkr-package-spire-bash-image-arm64, nvkr-postgresql-image-sbom, nvkr-postgresql-sbom, nvkr-process-postgresql-pull-postgresql-c-047f8d633203, nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360, nvkr-publish-output-spire-crds, nvkr-publish-output-temporal-admin-tools-image, nvkr-sign-output-local-path-helper-image, nvkr-sign-output-temporal, nvkr-spire-oidc-image-arm64-pull-spire-oidc-image, nvkr-spire-server-image-arm64-pull-spire-server-image, nvkr-verify-publication-output-spire-bash-image-arm64]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2836,7 +3424,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-02'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-spire-tpm-server-image-arm64, nvkr-attest-sboms-output-temporal, nvkr-package-csi-node-driver-registrar-image-arm64, nvkr-package-publication-postgresql-image-arm64, nvkr-package-publication-spire-oidc-image, nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f, nvkr-process-spire-controller-manager-ima-3e5db62fee30, nvkr-publish-output-spiffe-csi-image, nvkr-publish-output-spire-bash-image-arm64, nvkr-publish-output-temporal-server-image-arm64, nvkr-publish-output-temporal-ui-image, nvkr-publish-release, nvkr-sign-output-spire, nvkr-spire-controller-manager-image-arm64-92b22b7f2333, nvkr-verify-publication-output-postgresql, nvkr-verify-publication-output-postgresql-image]
+    needs: [nvkr-attest-sboms-output-spire-tpm-server-image-arm64, nvkr-attest-sboms-output-temporal, nvkr-package-csi-node-driver-registrar-image-arm64, nvkr-package-publication-postgresql-image-arm64, nvkr-package-publication-spire-oidc-image, nvkr-process-local-path-provisioner-image-aea052087333, nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f, nvkr-process-spire-controller-manager-ima-3e5db62fee30, nvkr-publish-output-local-path-provisione-dd2308ec32df, nvkr-publish-output-spiffe-csi-image, nvkr-publish-output-spire-bash-image-arm64, nvkr-publish-output-temporal-server-image-arm64, nvkr-publish-output-temporal-ui-image, nvkr-publish-release, nvkr-sign-output-spire, nvkr-spire-controller-manager-image-arm64-92b22b7f2333, nvkr-verify-publication-output-postgresql, nvkr-verify-publication-output-postgresql-image]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2849,7 +3437,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-03'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-postgresql-image-arm64, nvkr-attest-sboms-output-temporal-admin-t-9e993584a415, nvkr-package-publication-csi-node-driver-02a78ae16d16, nvkr-package-publication-temporal-admin-tools-image, nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6, nvkr-process-spire-bash-image-pull-spire-72c313316c1d, nvkr-process-spire-controller-manager-ima-0262ec0b780f, nvkr-publish-output-spire-controller-manager-image, nvkr-publish-output-spire-server-image-arm64, nvkr-sign-output-spire-bash-image, nvkr-sign-output-temporal-server-image, nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-spire-controller-manager-image-sbom, nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-tool-cosign, nvkr-verify-publication-output-csi-node-d-914d7376ead0, nvkr-verify-publication-output-spire, nvkr-verify-publication-output-temporal-ui-image]
+    needs: [nvkr-attest-sboms-output-postgresql-image-arm64, nvkr-attest-sboms-output-temporal-admin-t-9e993584a415, nvkr-package-publication-csi-node-driver-02a78ae16d16, nvkr-package-publication-local-path-helpe-6a7fb09add1d, nvkr-package-publication-temporal-admin-tools-image, nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6, nvkr-process-spire-bash-image-pull-spire-72c313316c1d, nvkr-process-spire-controller-manager-ima-0262ec0b780f, nvkr-publish-output-spire-controller-manager-image, nvkr-publish-output-spire-server-image-arm64, nvkr-sign-output-local-path-provisioner, nvkr-sign-output-spire-bash-image, nvkr-sign-output-temporal-server-image, nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-spire-controller-manager-image-sbom, nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-tool-cosign, nvkr-verify-publication-output-csi-node-d-914d7376ead0, nvkr-verify-publication-output-spire, nvkr-verify-publication-output-temporal-ui-image]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2862,7 +3450,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-04'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-spiffe-csi-image-arm64, nvkr-attest-sboms-output-spire-controller-f3890ce97c17, nvkr-attest-sboms-output-spire-server-image-arm64, nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79, nvkr-process-spire-server-image-pull-spir-240af0efc28c, nvkr-publish-output-temporal-admin-tools-image-arm64, nvkr-sign-output-spire-oidc-image, nvkr-sign-output-spire-tpm-server-image, nvkr-verify-publication-output-temporal-a-9109bef2fded]
+    needs: [nvkr-attest-sboms-output-local-path-provisioner, nvkr-attest-sboms-output-spiffe-csi-image-arm64, nvkr-attest-sboms-output-spire-controller-f3890ce97c17, nvkr-attest-sboms-output-spire-server-image-arm64, nvkr-local-path-provisioner-arm64-fetch-l-e2d85fefbdbb, nvkr-local-path-provisioner-image-arm64-p-4aebf421bc73, nvkr-package-publication-local-path-provi-77db8aabee7a, nvkr-package-publication-local-path-provisioner-arm64, nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79, nvkr-process-spire-server-image-pull-spir-240af0efc28c, nvkr-publish-output-temporal-admin-tools-image-arm64, nvkr-sign-output-local-path-helper-image-arm64, nvkr-sign-output-spire-oidc-image, nvkr-sign-output-spire-tpm-server-image, nvkr-verify-publication-output-temporal-a-9109bef2fded]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2875,7 +3463,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-05'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-package-publication-spiffe-csi-image-arm64, nvkr-package-publication-temporal-server-image, nvkr-package-publication-temporal-ui-image-arm64, nvkr-package-release, nvkr-package-spire-controller-manager-image-arm64, nvkr-postgresql-image-arm64-pull-postgresql-image, nvkr-process-temporal-pull-temporal-chart-e02b82483e4b, nvkr-process-temporal-ui-image-pull-tempo-fb82f86e5756, nvkr-publish-output-spire-controller-mana-4c760c0ddb13, nvkr-sign-output-csi-node-driver-registra-1ee01f3e15c9, nvkr-sign-output-spire-crds, nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image, nvkr-temporal-sbom, nvkr-verify-publication-output-spiffe-csi-image, nvkr-verify-publication-release]
+    needs: [nvkr-package-local-path-helper-image-arm64, nvkr-package-local-path-provisioner-arm64, nvkr-package-publication-spiffe-csi-image-arm64, nvkr-package-publication-temporal-server-image, nvkr-package-publication-temporal-ui-image-arm64, nvkr-package-release, nvkr-package-spire-controller-manager-image-arm64, nvkr-postgresql-image-arm64-pull-postgresql-image, nvkr-process-local-path-helper-image-pull-7b77e923b737, nvkr-process-temporal-pull-temporal-chart-e02b82483e4b, nvkr-process-temporal-ui-image-pull-tempo-fb82f86e5756, nvkr-publish-output-local-path-helper-image, nvkr-publish-output-spire-controller-mana-4c760c0ddb13, nvkr-sign-output-csi-node-driver-registra-1ee01f3e15c9, nvkr-sign-output-spire-crds, nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image, nvkr-temporal-sbom, nvkr-verify-publication-output-local-path-b7cdb9064846, nvkr-verify-publication-output-spiffe-csi-image, nvkr-verify-publication-release]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2888,7 +3476,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-06'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-csi-node-driver-13d6b4ada789, nvkr-attest-sboms-output-postgresql, nvkr-attest-sboms-output-postgresql-image, nvkr-attest-sboms-output-spire-oidc-image-arm64, nvkr-package-spire-agent-image-arm64, nvkr-package-spire-tpm-server-image-arm64, nvkr-publish-output-csi-node-driver-regis-b17474c2d7cb, nvkr-publish-output-spire, nvkr-publish-output-spire-server-image, nvkr-sign-output-csi-node-driver-registrar-image]
+    needs: [nvkr-attest-sboms-output-csi-node-driver-13d6b4ada789, nvkr-attest-sboms-output-postgresql, nvkr-attest-sboms-output-postgresql-image, nvkr-attest-sboms-output-spire-oidc-image-arm64, nvkr-package-spire-agent-image-arm64, nvkr-package-spire-tpm-server-image-arm64, nvkr-process-local-path-provisioner-arm64-bfa59a3a7bf0, nvkr-publish-output-csi-node-driver-regis-b17474c2d7cb, nvkr-publish-output-spire, nvkr-publish-output-spire-server-image, nvkr-sign-output-csi-node-driver-registrar-image]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2901,7 +3489,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-07'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [build-runner-ubuntu-24-04-arm, nvkr-attest-sboms-output-spire-tpm-server-image, nvkr-attest-sboms-output-temporal-server-image-arm64, nvkr-package-publication-postgresql-image, nvkr-package-publication-spire-tpm-server-image-arm64, nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7, nvkr-publish-output-spire-agent-image-arm64, nvkr-publish-output-spire-bash-image, nvkr-publish-output-temporal-server-image, nvkr-sign-output-spire-server-image-arm64, nvkr-spire-bash-image-sbom, nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d, nvkr-temporal-server-image-sbom]
+    needs: [build-runner-ubuntu-24-04-arm, nvkr-attest-sboms-output-spire-tpm-server-image, nvkr-attest-sboms-output-temporal-server-image-arm64, nvkr-local-path-provisioner-arm64-build-l-8a6f3d006255, nvkr-package-publication-postgresql-image, nvkr-package-publication-spire-tpm-server-image-arm64, nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7, nvkr-publish-output-spire-agent-image-arm64, nvkr-publish-output-spire-bash-image, nvkr-publish-output-temporal-server-image, nvkr-sign-output-spire-server-image-arm64, nvkr-spire-bash-image-sbom, nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d, nvkr-temporal-server-image-sbom]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2914,7 +3502,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-08'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-spire-bash-image, nvkr-package-publication-spire-agent-image, nvkr-package-publication-spire-server-image, nvkr-package-publication-temporal-server-image-arm64, nvkr-package-spiffe-csi-image-arm64, nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd, nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b, nvkr-process-spire-oidc-image-pull-spire-ae9fdd6c5262, nvkr-publish-output-spire-oidc-image, nvkr-publish-output-spire-tpm-server-image, nvkr-spiffe-csi-image-sbom, nvkr-temporal-ui-image-sbom, nvkr-verify-publication-output-spiffe-csi-image-arm64]
+    needs: [nvkr-attest-sboms-output-spire-bash-image, nvkr-local-path-provisioner-fetch-local-p-2e12183b2196, nvkr-package-publication-spire-agent-image, nvkr-package-publication-spire-server-image, nvkr-package-publication-temporal-server-image-arm64, nvkr-package-spiffe-csi-image-arm64, nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd, nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b, nvkr-process-spire-oidc-image-pull-spire-ae9fdd6c5262, nvkr-publish-output-local-path-helper-image-arm64, nvkr-publish-output-spire-oidc-image, nvkr-publish-output-spire-tpm-server-image, nvkr-spiffe-csi-image-sbom, nvkr-temporal-ui-image-sbom, nvkr-verify-publication-output-spiffe-csi-image-arm64]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2927,7 +3515,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-09'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-package-publication-csi-node-driver-75d8004e6ab4, nvkr-package-publication-spire-bash-image, nvkr-process-csi-node-driver-registrar-im-11c07063ce1a, nvkr-process-spire-server-image-arm64-ter-78345db78e5c, nvkr-process-temporal-server-image-arm64-a7b9faf98be2, nvkr-publish-output-postgresql, nvkr-publish-output-postgresql-image, nvkr-sign-output-spire-oidc-image-arm64, nvkr-sign-output-spire-tpm-server-image-arm64, nvkr-spire-crds-sbom, nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3, nvkr-temporal-admin-tools-image-sbom, nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29, nvkr-verify-publication-output-spire-agen-690d58615fef, nvkr-verify-publication-output-spire-serv-2ffabff52266]
+    needs: [nvkr-attest-sboms-output-local-path-provisioner-arm64, nvkr-package-publication-csi-node-driver-75d8004e6ab4, nvkr-package-publication-spire-bash-image, nvkr-process-csi-node-driver-registrar-im-11c07063ce1a, nvkr-process-local-path-provisioner-build-70de0d069de6, nvkr-process-local-path-provisioner-image-2634c0a8ad70, nvkr-process-spire-server-image-arm64-ter-78345db78e5c, nvkr-process-temporal-server-image-arm64-a7b9faf98be2, nvkr-publish-output-postgresql, nvkr-publish-output-postgresql-image, nvkr-sign-output-spire-oidc-image-arm64, nvkr-sign-output-spire-tpm-server-image-arm64, nvkr-spire-crds-sbom, nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3, nvkr-temporal-admin-tools-image-sbom, nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29, nvkr-verify-publication-output-local-path-208ce6c5e08d, nvkr-verify-publication-output-spire-agen-690d58615fef, nvkr-verify-publication-output-spire-serv-2ffabff52266]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2940,7 +3528,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0a'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-spire-agent-image-arm64, nvkr-attest-sboms-output-temporal-admin-tools-image, nvkr-attest-sboms-output-temporal-server-image, nvkr-attest-sboms-output-temporal-ui-image-arm64, nvkr-package-publication-spire-tpm-server-image, nvkr-package-spire-oidc-image-arm64, nvkr-process-temporal-admin-tools-image-p-89b69e6994ff, nvkr-process-temporal-server-image-pull-t-8ac10b1a7911, nvkr-publish-output-csi-node-driver-registrar-image, nvkr-publish-output-spire-agent-image, nvkr-sign-output-spire-controller-manager-image-arm64, nvkr-sign-output-spire-server-image, nvkr-verify-publication-output-spire-cont-81ba1c1e8041, nvkr-verify-publication-output-spire-crds, nvkr-verify-publication-output-spire-oidc-image-arm64]
+    needs: [nvkr-attest-sboms-output-spire-agent-image-arm64, nvkr-attest-sboms-output-temporal-admin-tools-image, nvkr-attest-sboms-output-temporal-server-image, nvkr-attest-sboms-output-temporal-ui-image-arm64, nvkr-package-publication-spire-tpm-server-image, nvkr-package-spire-oidc-image-arm64, nvkr-process-temporal-admin-tools-image-p-89b69e6994ff, nvkr-process-temporal-server-image-pull-t-8ac10b1a7911, nvkr-publish-output-csi-node-driver-registrar-image, nvkr-publish-output-local-path-provisioner-arm64, nvkr-publish-output-spire-agent-image, nvkr-sign-output-local-path-provisioner-image-arm64, nvkr-sign-output-spire-controller-manager-image-arm64, nvkr-sign-output-spire-server-image, nvkr-verify-publication-output-local-path-e9f81d84678d, nvkr-verify-publication-output-spire-cont-81ba1c1e8041, nvkr-verify-publication-output-spire-crds, nvkr-verify-publication-output-spire-oidc-image-arm64]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2953,7 +3541,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0b'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-spire-controller-aebdd6dca7a8, nvkr-attest-sboms-output-spire-oidc-image, nvkr-package-publication-postgresql, nvkr-package-publication-spire-controller-5481257fcee6, nvkr-package-publication-spire-crds, nvkr-package-publication-temporal, nvkr-package-publication-temporal-admin-t-619203c9c277, nvkr-package-temporal-admin-tools-image-arm64, nvkr-package-temporal-server-image-arm64, nvkr-process-csi-node-driver-registrar-im-8d5f23c6457d, nvkr-process-spire-agent-image-pull-spire-f26b98a935d5, nvkr-sign-output-spiffe-csi-image-arm64, nvkr-sign-output-spire-agent-image-arm64, nvkr-sign-output-temporal-ui-image-arm64, nvkr-verify-publication-output-spire-agent-image, nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91, nvkr-verify-publication-output-spire-tpm-server-image, nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac]
+    needs: [nvkr-attest-sboms-output-local-path-provi-f4e417812ca4, nvkr-attest-sboms-output-spire-controller-aebdd6dca7a8, nvkr-attest-sboms-output-spire-oidc-image, nvkr-local-path-provisioner-image-sbom, nvkr-package-publication-postgresql, nvkr-package-publication-spire-controller-5481257fcee6, nvkr-package-publication-spire-crds, nvkr-package-publication-temporal, nvkr-package-publication-temporal-admin-t-619203c9c277, nvkr-package-temporal-admin-tools-image-arm64, nvkr-package-temporal-server-image-arm64, nvkr-process-csi-node-driver-registrar-im-8d5f23c6457d, nvkr-process-spire-agent-image-pull-spire-f26b98a935d5, nvkr-publish-output-local-path-provisioner-image, nvkr-sign-output-spiffe-csi-image-arm64, nvkr-sign-output-spire-agent-image-arm64, nvkr-sign-output-temporal-ui-image-arm64, nvkr-verify-publication-output-local-path-c572611510ec, nvkr-verify-publication-output-spire-agent-image, nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91, nvkr-verify-publication-output-spire-tpm-server-image, nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2966,7 +3554,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0c'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e, nvkr-package-publication-spire-bash-image-arm64, nvkr-process-postgresql-image-pull-postgr-262baf89b239, nvkr-process-spire-pull-spire-chart-spire-33c1dfd25a91, nvkr-process-spire-tpm-server-image-pull-5e4c8bd40631, nvkr-publish-output-postgresql-image-arm64, nvkr-spire-sbom, nvkr-spire-server-image-sbom, nvkr-verify-publication-output-spire-bash-image, nvkr-verify-publication-output-temporal-s-030929bd4981]
+    needs: [nvkr-attest-sboms-output-local-path-helpe-d7c0ec47aa04, nvkr-attest-sboms-output-local-path-helper-image, nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e, nvkr-package-publication-spire-bash-image-arm64, nvkr-process-local-path-helper-image-arm6-3713b364b1fa, nvkr-process-postgresql-image-pull-postgr-262baf89b239, nvkr-process-spire-pull-spire-chart-spire-33c1dfd25a91, nvkr-process-spire-tpm-server-image-pull-5e4c8bd40631, nvkr-publish-output-postgresql-image-arm64, nvkr-spire-sbom, nvkr-spire-server-image-sbom, nvkr-verify-publication-output-spire-bash-image, nvkr-verify-publication-output-temporal-s-030929bd4981]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2979,7 +3567,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0d'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-csi-node-driver-ca2c548b7442, nvkr-attest-sboms-output-spire-bash-image-arm64, nvkr-package-publication-spire-agent-image-arm64, nvkr-package-publication-spire-server-image-arm64, nvkr-process-spiffe-csi-image-pull-spiffe-2ee250ddfce9, nvkr-publish-output-spire-oidc-image-arm64, nvkr-publish-output-spire-tpm-server-image-arm64, nvkr-publish-output-temporal, nvkr-sign-output-postgresql, nvkr-sign-output-postgresql-image, nvkr-sign-output-temporal-admin-tools-image, nvkr-spire-bash-image-arm64-pull-spire-bash-image, nvkr-verify-publication-output-spire-server-image]
+    needs: [nvkr-attest-sboms-output-csi-node-driver-ca2c548b7442, nvkr-attest-sboms-output-spire-bash-image-arm64, nvkr-local-path-helper-image-sbom, nvkr-package-publication-spire-agent-image-arm64, nvkr-package-publication-spire-server-image-arm64, nvkr-process-spiffe-csi-image-pull-spiffe-2ee250ddfce9, nvkr-publish-output-spire-oidc-image-arm64, nvkr-publish-output-spire-tpm-server-image-arm64, nvkr-publish-output-temporal, nvkr-sign-output-postgresql, nvkr-sign-output-postgresql-image, nvkr-sign-output-temporal-admin-tools-image, nvkr-spire-bash-image-arm64-pull-spire-bash-image, nvkr-verify-publication-output-spire-server-image]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -2992,7 +3580,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0e'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-spire-crds, nvkr-package-publication-spire-controller-14366a611047, nvkr-package-temporal-ui-image-arm64, nvkr-sign-output-spiffe-csi-image, nvkr-sign-output-spire-agent-image, nvkr-sign-output-spire-bash-image-arm64, nvkr-sign-output-temporal-server-image-arm64, nvkr-sign-output-temporal-ui-image, nvkr-sign-release, nvkr-spire-oidc-image-sbom, nvkr-spire-tpm-server-image-sbom, nvkr-tool-syft, nvkr-verify-publication-output-csi-node-d-ed501e7759bf, nvkr-verify-publication-output-spire-tpm-fdd5a5adf925, nvkr-verify-publication-output-temporal, nvkr-verify-publication-output-temporal-server-image]
+    needs: [nvkr-attest-sboms-output-spire-crds, nvkr-package-publication-spire-controller-14366a611047, nvkr-package-temporal-ui-image-arm64, nvkr-sign-output-local-path-provisioner-arm64, nvkr-sign-output-spiffe-csi-image, nvkr-sign-output-spire-agent-image, nvkr-sign-output-spire-bash-image-arm64, nvkr-sign-output-temporal-server-image-arm64, nvkr-sign-output-temporal-ui-image, nvkr-sign-release, nvkr-spire-oidc-image-sbom, nvkr-spire-tpm-server-image-sbom, nvkr-tool-syft, nvkr-verify-publication-output-csi-node-d-ed501e7759bf, nvkr-verify-publication-output-spire-tpm-fdd5a5adf925, nvkr-verify-publication-output-temporal, nvkr-verify-publication-output-temporal-server-image]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -3005,7 +3593,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0f'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-spire, nvkr-attest-sboms-output-spire-agent-image, nvkr-attest-sboms-output-temporal-ui-image, nvkr-package-postgresql-image-arm64, nvkr-package-publication-spire-oidc-image-arm64, nvkr-process-spire-crds-pull-spire-crds-c-11103d63a93b, nvkr-process-temporal-admin-tools-image-a-2e37748f989e, nvkr-publish-output-spiffe-csi-image-arm64, nvkr-publish-output-temporal-ui-image-arm64, nvkr-sign-output-spire-controller-manager-image, nvkr-verify-publication-output-postgresql-image-arm64, nvkr-verify-publication-output-spire-oidc-image]
+    needs: [nvkr-attest-sboms-output-spire, nvkr-attest-sboms-output-spire-agent-image, nvkr-attest-sboms-output-temporal-ui-image, nvkr-local-path-provisioner-sbom, nvkr-package-postgresql-image-arm64, nvkr-package-publication-local-path-helper-image, nvkr-package-publication-spire-oidc-image-arm64, nvkr-process-spire-crds-pull-spire-crds-c-11103d63a93b, nvkr-process-temporal-admin-tools-image-a-2e37748f989e, nvkr-publish-output-local-path-provisioner, nvkr-publish-output-spiffe-csi-image-arm64, nvkr-publish-output-temporal-ui-image-arm64, nvkr-sign-output-local-path-provisioner-image, nvkr-sign-output-spire-controller-manager-image, nvkr-verify-publication-output-postgresql-image-arm64, nvkr-verify-publication-output-spire-oidc-image]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -3123,7 +3711,7 @@ jobs:
             status=Failed
           elif [ "$skipped" -gt 0 ] || [ "${NVKR_FINALIZE_OUTCOME:-}" = skipped ]; then
             status='Incomplete (skipped)'
-          elif [ "$total" -eq 216 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
+          elif [ "$total" -eq 264 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
             status=Completed
           fi
           {

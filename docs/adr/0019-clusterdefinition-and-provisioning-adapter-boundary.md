@@ -25,6 +25,9 @@ A Definition selects named outputs, their exact producers, concrete target platf
 byte-changing packaging relationships. There is no authored cluster view, tenant/operator type, node role,
 role affinity, deployment category, cluster context, CNI declaration or cluster validation-requirement list.
 Different deliverable sets can use separate Definitions. No replacement grouping object is introduced.
+Proposed [ADR-26](0026-definition-composition.md) designs, but does not implement, a composite Definition
+whose Release membership is the exact union of complete member Definitions' named outputs; it selects,
+overrides and deduplicates nothing.
 
 Each output remains an independent required use even if another output has the same Build Digest. Preparation
 freezes the exact required set; execution and hosted finalization join producer results, terminal observations,

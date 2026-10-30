@@ -37,6 +37,14 @@ intended work; it does not establish that the step succeeded.
 
 ## Generate and check the bundle
 
+For one Definition whose generated workflow is too large, the Environment can select
+`githubExecutionPartitions: true`. Generation then emits an entry workflow and bounded sibling workers;
+all belong to one generated manifest, use one complete Plan and feed one Run finalizer and Release.
+Jobs requiring an OIDC token stay in the entry workflow to preserve their signing identity policy.
+Do not edit or dispatch workers independently. The default remains the flat workflow. This opt-in topology
+has local generation contracts; hosted execution, signing and failure/cancellation behavior still require
+external validation before production adoption.
+
 ```sh
 mkdir "$NVKR_PIPELINE_DIR/generated"
 bin/nvkr run generate \

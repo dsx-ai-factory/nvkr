@@ -1,4 +1,9 @@
 # Preserve the exact generated summary captured as diagnostic evidence.
 docs/evidence/2026-10-03-ci-log-readability/injected-failure-summary.md whitespace=-blank-at-eof
+
+# Retained upstream discussion proposals preserve unified-diff context whitespace.
+docs/proposals/nvsentinel/*.patch whitespace=-blank-at-eol,-space-before-tab
+
 # Unified patch context preserves source whitespace and a leading context marker.
 inputs/catalogs/nicosim/patches/version-interface.patch -whitespace
+inputs/catalogs/local-path-provisioner/patches/chart-image-digest.patch -whitespace

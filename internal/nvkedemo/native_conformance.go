@@ -28,9 +28,12 @@ import (
 // concrete local owner admits the complete captured Run and its held bytes.
 type nativeConformanceConfig struct{ repository, nvkr, run string }
 
-func selectNativeConformance(cfg Config) (*nativeConformanceConfig, error) {
+func selectNativeConformance(ctx context.Context, cfg Config, platform string) (*nativeConformanceConfig, error) {
 	if !cfg.Conformance {
 		return nil, nil
+	}
+	if err := requireContext(ctx); err != nil {
+		return nil, nvkrerr.Wrap(nvkrerr.CodeTimeout, err, "conformance input admission")
 	}
 	if !configString(cfg.Repository) || !configString(cfg.NVKR) {
 		return nil, configUsage("conformance requires repository and nvkr")
@@ -57,11 +60,52 @@ func selectNativeConformance(cfg Config) (*nativeConformanceConfig, error) {
 			return nil, configUsage("conformance requires one combined artifact Run for every deployment view")
 		}
 	}
+	selectors, err := nativeConformanceSelectors(platform)
+	if err != nil {
+		return nil, err
+	}
+	plan, run, err := lifecycle.InspectLocalRunInputs(ctx, root)
+	if err != nil {
+		return nil, err
+	}
+	for _, required := range []struct{ name, kind, platform string }{
+		{selectors.Hydrophone.Output, "executable", selectors.Hydrophone.Platform},
+		{selectors.Kubectl.Output, "executable", selectors.Kubectl.Platform},
+		{selectors.ConformanceImage.Output, "oci", selectors.ConformanceImage.Platform},
+		{selectors.Busybox.Output, "oci", selectors.Busybox.Platform},
+	} {
+		observed, err := selectedRunOutput(run, required.name, required.kind)
+		if err != nil {
+			return nil, nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "conformance requires output %q before deployment", required.name)
+		}
+		if err := nativeOutputPlatform(plan, observed, required.platform); err != nil {
+			return nil, nvkrerr.Wrap(nvkrerr.CodeEngineCapability, err, "conformance output %q has the wrong platform", required.name)
+		}
+	}
 	binary, err := filepath.Abs(cfg.NVKR)
 	if err != nil {
 		return nil, err
 	}
 	return &nativeConformanceConfig{repository: repo, nvkr: binary, run: filepath.ToSlash(relative)}, nil
+}
+
+// Select host tools and Linux suite images from the same architecture. The
+// conformance owner authenticates their exact named outputs in the selected Run.
+func nativeConformanceSelectors(platform string) (conformance.Options, error) {
+	if err := admitNativeBuildHost(platform); err != nil {
+		return conformance.Options{}, err
+	}
+	hostOS, arch, _ := strings.Cut(platform, "/")
+	toolSuffix := arch
+	if hostOS != "linux" {
+		toolSuffix = hostOS + "-" + arch
+	}
+	return conformance.Options{
+		Hydrophone:       conformance.ExecutableSelector{Output: "hydrophone-" + toolSuffix, Member: "hydrophone", Platform: platform},
+		Kubectl:          conformance.ExecutableSelector{Output: "kubectl-" + toolSuffix, Member: "kubectl", Platform: platform},
+		ConformanceImage: conformance.ImageSelector{Output: "conformance-image-" + arch, Platform: "linux/" + arch},
+		Busybox:          conformance.ImageSelector{Output: "busybox-image-" + arch, Platform: "linux/" + arch},
+	}, nil
 }
 
 // Only read-only API selection happens here. The conformance owner subsequently
@@ -147,22 +191,23 @@ func (s *nativeSiteAttempt) runConformance(ctx context.Context, runner Runner, t
 	if err != nil {
 		return err
 	}
-	_, ovnOutput, _, err := selectedOVNOutputs(s.network)
+	platform := runtime.GOOS + "/" + runtime.GOARCH
+	selectors, err := nativeConformanceSelectors(platform)
 	if err != nil {
 		return err
 	}
-	platform := runtime.GOOS + "/" + runtime.GOARCH
-	hydrophoneOutput, kubectlOutput := "hydrophone-arm64", "kubectl-arm64"
-	if platform == "darwin/arm64" {
-		hydrophoneOutput, kubectlOutput = "hydrophone-darwin-arm64", "kubectl-darwin-arm64"
+	arch := selectors.ConformanceImage.Platform[len("linux/"):]
+	_, ovnOutput, _, err := selectedOVNOutputsForArchitecture(s.network, arch)
+	if err != nil {
+		return err
 	}
 	local := conformance.LocalConfiguration{ToolsWorkspace: cfg.run, Runner: conformance.Options{
-		Hydrophone: conformance.ExecutableSelector{Output: hydrophoneOutput, Member: "hydrophone", Platform: platform},
-		Kubectl:    conformance.ExecutableSelector{Output: kubectlOutput, Member: "kubectl", Platform: platform},
+		Hydrophone: selectors.Hydrophone,
+		Kubectl:    selectors.Kubectl,
 		Kubeconfig: conformance.Tool{Path: kubeconfig, Digest: kubeDigest}, Context: kube.Current,
 		CNINamespace: "ovn-kubernetes", CNISelector: "app=ovnkube-node", ImageVersion: kubernetes, SuiteName: "kubernetes-conformance", Role: "local", DisposableCluster: true,
-		ConformanceImage: conformance.ImageSelector{Output: "conformance-image-arm64", Platform: "linux/arm64"},
-		Busybox:          conformance.ImageSelector{Output: "busybox-image-arm64", Platform: "linux/arm64"},
+		ConformanceImage: selectors.ConformanceImage,
+		Busybox:          selectors.Busybox,
 		Targets:          []conformance.DeploymentTarget{{Output: ovnOutput, Namespace: "ovn-kubernetes", LabelSelector: "app=ovnkube-node", Container: "ovnkube-controller", RequiredReplicas: nativeTenantNodeCount(true)}},
 	}, Bindings: conformance.LocalBindings{ProductImages: []conformance.LocalImageBinding{{Output: ovnOutput, Reference: alias}}}}
 	timeout, err := remainingWork(ctx)
@@ -174,7 +219,7 @@ func (s *nativeSiteAttempt) runConformance(ctx context.Context, runner Runner, t
 	if err != nil {
 		return err
 	}
-	for _, tool := range []struct{ output, repository string }{{"conformance-image-arm64", "registry.k8s.io/conformance"}, {"busybox-image-arm64", "registry.k8s.io/e2e-test-images/busybox"}} {
+	for _, tool := range []struct{ output, repository string }{{selectors.ConformanceImage.Output, "registry.k8s.io/conformance"}, {selectors.Busybox.Output, "registry.k8s.io/e2e-test-images/busybox"}} {
 		observed, err := selectedRunOutput(run, tool.output, "oci")
 		if err != nil {
 			return err

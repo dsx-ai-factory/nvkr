@@ -23,22 +23,46 @@ var nvkeSplitFamilies = []struct {
 	outputs, native int
 }{
 	{"core", 24, 30},
-	{"services", 28, 28},
+	{"services", 34, 34},
 	{"telemetry", 17, 17},
 	{"disks", 4, 4},
 }
 
 // Family-only outputs are not in the combined Definition, whose flat workflow
-// has no remaining YAML parsing headroom.
-var nvkeFamilyOnlyOutputs = map[string]string{
-	"nico":            "core",
-	"nico-core-image": "core",
-	"nico-flow-image": "core",
-	"nico-prereqs":    "core",
+// has no remaining YAML parsing headroom. Each declaration is pinned exactly so a
+// valid but unintended selection fails here rather than only after regeneration.
+var nvkeFamilyOnlyOutputs = map[string]struct {
+	family string
+	output definition.DefinitionOutput
+}{
+	"local-path-helper-image":            {"services", nvkeFamilyOnlyOutput("local-path-helper-image", "linux/amd64", "local-path-provisioner", definition.OutputOCI, "local-path-helper-image", nil)},
+	"local-path-helper-image-arm64":      {"services", nvkeFamilyOnlyOutput("local-path-helper-image-arm64", "linux/arm64", "local-path-provisioner", definition.OutputOCI, "local-path-helper-image", nil)},
+	"local-path-provisioner":             {"services", nvkeFamilyOnlyOutput("local-path-provisioner", "linux/amd64", "local-path-provisioner", definition.OutputHelm, "local-path-provisioner-chart", map[string]string{"helper": "local-path-helper-image", "provisioner": "local-path-provisioner-image"})},
+	"local-path-provisioner-arm64":       {"services", nvkeFamilyOnlyOutput("local-path-provisioner-arm64", "linux/arm64", "local-path-provisioner", definition.OutputHelm, "local-path-provisioner-chart", map[string]string{"helper": "local-path-helper-image-arm64", "provisioner": "local-path-provisioner-image-arm64"})},
+	"local-path-provisioner-image":       {"services", nvkeFamilyOnlyOutput("local-path-provisioner-image", "linux/amd64", "local-path-provisioner", definition.OutputOCI, "local-path-provisioner-image", nil)},
+	"local-path-provisioner-image-arm64": {"services", nvkeFamilyOnlyOutput("local-path-provisioner-image-arm64", "linux/arm64", "local-path-provisioner", definition.OutputOCI, "local-path-provisioner-image", nil)},
+	"nico":                               {"core", nvkeFamilyOnlyOutput("nico", "linux/amd64", "nico", definition.OutputHelm, "nico-chart", nil)},
+	"nico-core-image":                    {"core", definition.DefinitionOutput{Name: "nico-core-image", Platforms: []string{"linux/amd64", "linux/arm64"}, Catalog: &definition.Catalog{Base: "../../catalogs/nico"}, Components: []string{"nico-core-image"}, Format: definition.OutputOCI}},
+	"nico-flow-image":                    {"core", definition.DefinitionOutput{Name: "nico-flow-image", Platforms: []string{"linux/amd64", "linux/arm64"}, Catalog: &definition.Catalog{Base: "../../catalogs/nico"}, Components: []string{"nico-flow-image"}, Format: definition.OutputOCI}},
+	"nico-prereqs":                       {"core", nvkeFamilyOnlyOutput("nico-prereqs", "linux/amd64", "nico", definition.OutputHelm, "nico-prereqs-chart", nil)},
+}
+
+func nvkeFamilyOnlyOutput(name, platform, catalog, format, component string, images map[string]string) definition.DefinitionOutput {
+	output := definition.DefinitionOutput{
+		Name:       name,
+		Platform:   platform,
+		Catalog:    &definition.Catalog{Base: "../../catalogs/" + catalog},
+		Components: []string{component},
+		Format:     format,
+	}
+	if images != nil {
+		output.Helm = &definition.HelmOutput{Images: images}
+	}
+	return output
 }
 
 // Family-only catalogs hold only public sources, so they load from disk.
-var nvkeFamilyOnlyCatalogs = map[string]bool{"../../catalogs/nico": true}
+var nvkeFamilyOnlyCatalogs = map[string]bool{"../../catalogs/local-path-provisioner": true, "../../catalogs/nico": true}
 
 func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 	nvkeSplitRepository(t)
@@ -63,9 +87,12 @@ func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 					t.Fatalf("output %q is required by both %s and %s", output.Name, previous, family.name)
 				}
 				seen[output.Name] = family.name
-				if owner, ok := nvkeFamilyOnlyOutputs[output.Name]; ok {
-					if owner != family.name {
-						t.Fatalf("family-only output %q belongs to %s, not %s", output.Name, owner, family.name)
+				if want, ok := nvkeFamilyOnlyOutputs[output.Name]; ok {
+					if want.family != family.name {
+						t.Fatalf("family-only output %q belongs to %s, not %s", output.Name, want.family, family.name)
+					}
+					if !bytes.Equal(nvkeSplitCanonical(t, output), nvkeSplitCanonical(t, want.output)) {
+						t.Fatalf("family-only output %q changed its declared selection", output.Name)
 					}
 					if _, combinedAlso := original[output.Name]; combinedAlso {
 						t.Fatalf("family-only output %q is also in the combined Definition", output.Name)
@@ -89,8 +116,8 @@ func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 			nativeTotal += native
 		})
 	}
-	if len(original) != 69 || len(seen) != len(original)+len(nvkeFamilyOnlyOutputs) || nativeTotal != 79 {
-		t.Fatalf("partition requires %d of %d original plus family-only outputs and %d native targets; want 73/69 and 79", len(seen), len(original), nativeTotal)
+	if len(original) != 69 || len(seen) != len(original)+len(nvkeFamilyOnlyOutputs) || nativeTotal != 85 {
+		t.Fatalf("partition requires %d of %d original plus family-only outputs and %d native targets; want 79/69 and 85", len(seen), len(original), nativeTotal)
 	}
 }
 
@@ -287,8 +314,8 @@ func TestNVKEDefinitionSplitCompiledIdentityAndGeneratedBundles(t *testing.T) {
 				len(plan.LifecycleOutputs), len(plan.Builds), len(plan.Graph.Nodes), len(jobs), len(workflow), len(bundle.Files[bundle.PlanPath]), events)
 		})
 	}
-	if buildCount != 79 || outputCount != 73 {
-		t.Fatalf("compiled families retain %d native builds and %d outputs, want 79 and 73", buildCount, outputCount)
+	if buildCount != 85 || outputCount != 79 {
+		t.Fatalf("compiled families retain %d native builds and %d outputs, want 85 and 79", buildCount, outputCount)
 	}
 }
 

@@ -33,14 +33,20 @@ The maintained GitHub adapter and local runner use the same producer IR. GitLab,
 are unavailable; their unused adapters are removed, as are the separate qualified GitHub/GitLab renderers.
 The former GitLab-only `runtime.builderImage` schema field has no retained adapter and any nonempty value
 fails capability admission. GitHub uses its pinned setup-go action for source bootstrap. The generator's
-own build selects how bootstraps obtain the runner. A development build, which includes any build of a local
-checkout, emits bootstraps that install `./cmd/nvkr` from the checkout with its `.go-version`; they require
-NVKR source. A module-mode install of an exact release (`go install …/cmd/nvkr@vX.Y.Z`, whose build
-information records that version and its module checksum) emits bootstraps that install exactly that
-release with the generator's Go release and refuse a runner whose recorded module version or checksum
-differs, so repositories without NVKR source, such as a customer recipes repository, run the release that
-generated them. The committed-generation check guards rendering differences between NVKR revisions; it is
-not a trust control over the runner, which the exact version and checksum pin provides.
+own build selects how bootstraps obtain the runner. Any build of a local checkout emits bootstraps that install
+`./cmd/nvkr` from the checkout with its `.go-version`; they require NVKR source. A module-mode install of an
+exact module version, either a release (`go install …/cmd/nvkr@vX.Y.Z`) or a commit
+(`go install …/cmd/nvkr@<commit>`, recorded as a pseudo-version), records that version and its module checksum
+in its build information. It emits bootstraps that install exactly that module version with the generator's Go
+release and refuse a runner whose recorded module version or checksum differs, so repositories without NVKR
+source, such as a customer recipes repository, run the module version that generated them. The
+committed-generation check guards rendering differences between NVKR revisions; it is not a trust control over
+the runner, which the exact version and checksum pin provides. Such an install carries no linker stamps, so its
+generator version label comes from the same build information, which records no VCS revision: a release is
+labeled with its version and an `unknown` commit, and a commit install is labeled `dev` with the 12-character
+revision its pseudo-version encodes. Linker stamps still take precedence, and unstamped checkout builds keep
+the fixed `dev (unknown)` label so committed bundles do not depend on the checked-out commit. The label is
+descriptive and grants no authority.
 A future provider must satisfy its evidence admission before receiving an implementation. Adapters map **job/step
 topology and artifact transport only**, never build semantics. Adding an engine is one thin adapter; adding a
 component is one catalog entry and no code. Definition v5 names each output and its exact catalog producers.
@@ -508,29 +514,38 @@ belong to Environment/profile configuration; component toolchains remain produce
 
 #### Repository NVKE E2E adapter outside generated execution
 
-The separately authored repository CI adapter uses `arc-arm64-kvm` and `nvkr-arc`
-for kind management plus native KVM tenant guests. This engineering contract is
-outside generated Run execution and v1 product qualification acceptance; it adds
-no Environment runtime engine, public runtime API or qualified runner claim.
-The generated adapter's native disk policy above remains unchanged. Other labels
-and downstream runtime targets are unsupported by this E2E adapter.
+The separately authored nightly coordinator resolves one NVKE main commit and
+dispatches the existing generated ARM64 NVIDIA producer with that exact source
+selection. The producer retains build, private transport, publication, signing,
+verification and frozen-Plan ownership. No parallel AMD64 producer is added.
+The admitted runtime source policy binds preparation, every source-built
+NVKE component and finalization to the cycle selection without a version-bump
+commit; independently acquired dependencies retain their reviewed pins.
 
-NVKE owns guest and cluster provisioning, assertions and guest/cluster teardown.
-The parent repository harness owns host admission, serialization, the disk service,
-outer leases, network-control mutation and journaled restoration. It requires
-native architecture, KVM, host packages, exact source and private workspace before
-host mutation and joins both owners before reporting a successful cycle. Missing
-cleanup evidence retains recovery controls and fails the cycle.
+The consumer retrieves the exact producing Run and same-Run Plan, authenticates
+the complete publication under the Environment's policy and requires the issued
+exact-input receipt plus producing invocation. It rejects a Plan that differs
+from the coordinator's NVKE commit. Existing Go native owners consume those
+published artifacts directly, invoke the built CLI to bootstrap a real site VM
+through a temporary kind/Lima backend, check the live API and Ready node, and
+join VM/backend/network cleanup. The nightly performs no second product build
+and fabricates no local Run. Tenant workload/DNS checks are explicit manual
+opt-ins. Local developer build-and-test integration retains its separate scope.
 
-The pinned NVKE suite is fully trusted code. Its sudo and Docker access are
-root-equivalent on the runner; running under the parent's UID means it can access
-the parent's read-only job token despite environment scrubbing. Private paths
-and separate workflow jobs do not establish an independent sandbox or signer.
-The suite's unsigned outcomes therefore remain diagnostics, including its own
-pass verdict. A label, configured schedule or local contract test proves neither
-pool access nor combined runtime acceptance. Provider admission and the first
-combined cycle remain external evidence in reconciliation; no organizational
-tool approval or named-decider ratification is inferred.
+Runtime uses `arc-arm64-kvm` and `nvkr-arc`; a public AMD64 lane awaits admitted
+artifact production support. Native KVM and actual capacity remain admission
+requirements. Jobs and blocking operations have bounded lifetimes; the runtime
+test reserves 125 minutes for native cleanup, reporting and margin within its
+six-hour job. Coordinator public attachments contain only constructed selection,
+producing-Run locator and cycle-verdict JSON. Binary products and raw diagnostics
+remain under private transport/publication policies; the runtime has no writer
+or OIDC permission and no shared Actions build cache.
+
+This downstream CI remains outside v1 qualified acceptance. Trusted NVKE code has
+sudo and Docker access; private paths and environment scrubbing provide no
+independent sandbox. Outcomes are unsigned diagnostics. Existing generated ARC
+disk policies and exact producer result accounting retain their owners. A
+completed hosted producer/bootstrap/cleanup cycle remains separate evidence.
 
 ### 4. Runner provenance and conditional self-hosting bootstrap
 
@@ -1320,6 +1335,25 @@ no new execution receipt. CI uses `run generate --runtime --check` to admit unch
 policy without requiring current source pins in the committed baseline. Ordinary `--check` remains
 byte-exact, including after bootstrap restoration. Default and development generation remain unchanged.
 
+An optional `githubRuntimeSource` policy names one canonical GitHub repository and
+`refs/heads/main` for the coordinator's selection. The coordinator resolves that ref once;
+the generated producer requires its full commit as dispatch input. The catalog owner
+fetches the configured main ref and admits only equality or Git-proven ancestry of the
+selected commit, allowing main to advance between selection and replay. Equality uses
+a depth-one acquisition; ancestry is bounded to 64 commits and retains the existing Git
+byte and time limits. An off-main commit or unavailable bounded proof fails closed.
+The owner authenticates that exact Git tree and applies it after existing catalog overlays to every
+matching source-built producer, retaining reviewed commands, toolchains and independent
+acquisition pins. The Plan records the frozen commit. Bootstrap and finalization replay
+that same revision; a missing or mixed revision fails before producer acceptance.
+Finalization repeats the proof against the then-current `main`. A delayed retry outside
+the 64-commit fetch window, or a ref rewrite that removes the frozen commit, fails closed
+before a Run record is issued even if signing and publication already completed. This
+changes frozen Plan data, not the authored catalog files or workflow between source pins.
+The committed baseline is generation input, not an executable source selection. Ordinary
+input capture and qualification handoff have no replay contract for this lane and reject it;
+published artifact authentication remains separate from downstream runtime acceptance.
+
 Native preflight and pinned checkout remain explicit steps in their entry-workflow execution job.
 Operator-authored environment setup, timed producer execution and steps whose outcomes or outputs are
 referenced by the caller remain inline. Keeping setup inline preserves its caller contexts and action-path environment; arbitrary setup
@@ -1398,13 +1432,103 @@ Local expansion is contract evidence; provider dispatch and result propagation r
 hosted evidence. GitHub's internal graph-processing limits are not inferred as a numerical contract from
 successful diagnostic dispatches.
 
-Producer matrix scheduling and reusable `workflow_call` pipelines remain deferred. The separately
-owned fixed native qualification worker and its exact selected-platform matrix are admitted by ADR-21 §4;
-that exception does not admit arbitrary producer scheduling. A producer matrix changes dependency
-barriers and the provider-result shape used by finalization; a callable workflow adds execution-context,
-credential and identity contracts. Neither is a presentation-only substitution for the current exact named
-jobs. Future admission must preserve each named output's execution/evidence slots, failure behavior and
-complete result accounting before either form is emitted.
+The opt-in Environment setting `githubExecutionPartitions: true` projects producer jobs into generated
+same-commit `workflow_call` workers. This is one Definition, complete Plan, provider Run and final Release;
+workers do not publish independent family Releases. Local generation contracts are implemented. A minimal
+hosted diagnostic at commit `902f3febd10cd61abecb82571f66283857169851` exercised the earlier member-by-member
+result forwarding on success, failure and cancellation. The full development Run recorded in reconciliation
+exercised generated-bundle execution and signing identity with that earlier forwarding. Hosted execution of
+per-worker fragment forwarding (§8) is unrecorded, and qualification remains unestablished for this topology. The retained flat mode
+remains the default.
+
+Factory's provider-independent execution graph owns operation membership, admitted success/completion
+conditions, prerequisite results through recovery, and exact outcome accounting. GitHub derives this model
+from typed stages before rendering; rendered YAML supplies execution bodies, not scheduling semantics.
+The core validates the final worker and inline layout as an exact disjoint cover with independent members
+and an acyclic contracted dependency graph. Semantic equivalence tests compare flat ancestor evaluation
+with partitioned prerequisite-result evaluation under failure and cancellation. These are local contracts,
+not proof of provider cancellation timing or support for another CI adapter.
+
+The compiler groups jobs by dependency depth and orders each depth by bounded finish time, the longest
+path of declared job timeouts. It splits a depth where those finish times diverge, widest gap first, until
+it reaches 30 workers, with at most 64 original jobs per worker and at most 50 workers. Timeouts only order
+scheduling; they never change membership, conditions or identity. A local
+[scheduling harness](../execution-partition-scheduling.md) over the maintained Plans motivated this
+grouping with estimated durations; hosted wall time remains unmeasured. Jobs requesting `id-token: write` remain in the entry workflow: Fulcio uses the
+reusable workflow path for the certificate signer identity, so moving them would change the authored signer
+policy (see the proposed migration below). Dependencies and result reports project both inline jobs and worker
+jobs without widening that policy.
+Original job IDs, operations, runner admission, per-job permissions and output slots
+remain intact. A partition may wait for unrelated jobs sharing an earlier partition; it must not turn their
+failure into a false prerequisite failure. Ordinary jobs require `!cancelled()` and check their original
+prerequisites' reported success, including ancestors reached through `always()` recovery jobs. A successful
+recovery must not hide an earlier failure from an ordinary descendant. Jobs with the admitted `always()`
+policy retain that policy. Arbitrary authored `needs` observations are
+refused until their context can be projected exactly. Matrix scheduling remains deferred.
+
+Workers have no concurrency group competing with the entry workflow. Callers pass explicit required
+secrets and sufficient permissions; individual jobs retain their original narrower permissions. Secret references
+must name a static secret through dot or quoted bracket syntax; dynamic selection is refused before emission. Each worker
+has a credential-free, unconditional result collector. That collector also exports one fragment per entry
+consumer: for each original result collector, worker caller or collector-free finalizer, the exact
+`toJSON` results and statuses of only its members owned by that worker. The entry reconstructs each
+original collector report and worker dependency input by joining one fragment per worker with inline
+jobs' direct results, retaining failure, cancellation and skipping. If a worker never reports, its fragment
+falls back to null member results and empty statuses. These are the values the per-member projection
+produced, so dependency admission and collector accounting are unchanged. Missing or malformed reports
+cannot authorize publication. The original finalizer, complete Plan, same-Run transfer authentication and
+artifact/evidence acceptance gates remain unchanged. Generated worker membership and caller wiring must
+match deterministic regeneration exactly before the existing flat semantic validator admits the logical graph.
+Lowering refuses any worker or worker caller that declares `id-token`, and maintained-bundle contracts
+require every committed producer's OIDC jobs to remain in the entry workflow named by its signer policy.
+
+#### Proposed: signer relocation requires an explicit identity migration
+
+This subsection is proposed design, not implemented behavior. Today every `id-token: write` job stays
+inline, and no code path relocates a signer. Local measurements of the committed bundles show where those
+jobs fall. In the partitioned development entry, the 139 inline signing and SBOM-attestation jobs account
+for 10,984 of 13,308 expanded YAML parsing events and 104,357 of 264,038 bytes. In the flat default
+producer, the same jobs account for 10,984 of 47,055 events. That producer is at 94.1% of the 50,000-event
+parser bound, the binding constraint today. These are local generation measurements, not provider
+evidence.
+
+Relocation is not a scheduling change. For GitHub OIDC, Fulcio sets the certificate SAN and Build Signer
+URI from `job_workflow_ref`, which names the called reusable workflow, not the entry workflow. Build Config
+URI carries the top-level `workflow_ref`. Moving a signer into a worker therefore changes the identity
+that every current signer policy (`^https://github.com/<repo>/.github/workflows/<entry>.yml@<ref>$`) and every
+consumer verification policy authenticates. Partition indexes depend on grouping, so a worker-path identity
+would also churn with unrelated topology changes. Any relocation must ship together with all of the following:
+
+1. **One fixed signer workflow.** A generator-owned `<entry-stem>__signer.yml` would be the only file that
+   requests `id-token`, whatever the partition count. Each signing operation would call it with an explicit
+   Plan-derived operation selector, because `github.job` no longer names the original job. Signer jobs would
+   never share a file with producer jobs.
+2. **Caller binding in the trust policy.** Any workflow allowed to call a reusable workflow can mint the same
+   SAN. The policy must therefore pin the signer workflow SAN, the Build Config URI of the exact entry
+   workflow and ref, the `workflow_dispatch` trigger and the issuer. Verification must reject a certificate
+   whose caller differs. Current OCI signature verification matches SAN and issuer only, so this verifier
+   capability (ADR-04) must be implemented for the OCI path and contract-tested first. Detached-document
+   verification already checks the exact Build Config URI, Build Config digest and Run invocation (ADR-04); it
+   is the owning context to extend, but it does not implement this trigger and caller policy or signer relocation. Provenance `builder.id` comes from `GITHUB_WORKFLOW_REF`,
+   which stays the caller's entry workflow (ADR-09). Development publication admission matches its workflow identity
+   against that `builder.id` and would then diverge from the SAN. The migration must define `builder.id` as the
+   Build Config URI and match the caller and signer identities separately, in the same change.
+3. **An authored Environment migration.** The signer and caller identities become distinct, anchored
+   Environment fields. They enter Environment and Plan identity but not logical Build identity. Generation
+   relocates signers only when the admitted Environment selects that policy, and it refuses a policy that
+   also admits the entry, any worker or any other workflow file.
+4. **No silent dual acceptance.** Each Release remains bound to the identity that signed it. Consumers adopt
+   the new identity by an explicit verification-policy change (ADR-16). Previously verified Releases keep
+   their original policy, and no verifier widens a regex to accept both identities.
+5. **Evidence before adoption.** A signed development Run must be verified under the new policy, including a
+   negative check that a foreign caller's certificate is refused. Production adoption then needs its own
+   recorded Run and qualification decision. Until then, the flat production producer and the inline-signer
+   partition layout remain the only admitted forms.
+
+Relocation would leave one Definition, one complete Plan, one logical Run and one Release. It changes only
+who mints certificates, which is why it is a signer-identity decision rather than an execution-organization
+decision. Selecting partitioned execution for the flat producer is a separate Environment decision that does
+not move signers.
 
 Every generated run script, including scripts inside composite actions, remains checked against GitHub's
 21,000-character ceiling, conservatively measured as UTF-8 bytes, including explicit operator setup and

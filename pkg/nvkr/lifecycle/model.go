@@ -38,6 +38,7 @@ const (
 	OutputAPT                = definition.OutputAPT
 	OutputHelm               = definition.OutputHelm
 	OutputDiskImage          = definition.OutputDiskImage
+	OutputDebianPackage      = definition.OutputDebianPackage
 	LaneQualified            = "qualified"
 	LanePipeline             = "pipeline-attested"
 	LaneUnqualified          = "static-unqualified"

@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"sort"
 	"strings"
@@ -59,15 +60,38 @@ type githubStep struct {
 // contact GitHub. The checks tie every job dependency back to an artifact producer,
 // enforce pinned actions and offline build commands, and verify all generated inputs.
 func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBundle) error {
+	if plan == nil || !plan.Environment.GitHubExecutionPartitions {
+		return validateGitHubBundleFlat(ctx, plan, bundle)
+	}
+	if _, err := validateGeneratedInputs(ctx, plan, bundle); err != nil {
+		return err
+	}
+	expected, err := renderGitHub(ctx, plan, false)
+	if err != nil {
+		return err
+	}
+	if err := validateGitHubExactMembers(bundle, expected); err != nil {
+		return err
+	}
+	flat, err := renderGitHubFlat(ctx, plan, false)
+	if err != nil {
+		return err
+	}
+	return validateGitHubBundleFlat(ctx, plan, flat)
+}
+
+func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *GeneratedBundle) error {
 	workflow, err := validateGeneratedInputs(ctx, plan, bundle)
 	if err != nil {
 		return err
 	}
 
-	if err := validateGitHubWorkflowSize(workflow); err != nil {
-		return err
+	if !plan.Environment.GitHubExecutionPartitions {
+		if err := validateGitHubWorkflowSize(workflow); err != nil {
+			return err
+		}
 	}
-	expected, err := renderGitHub(ctx, plan, false)
+	expected, err := renderGitHubFlat(ctx, plan, false)
 	if err != nil {
 		return err
 	}
@@ -100,6 +124,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	}
 	if _, ok := document.On["workflow_dispatch"]; !ok {
 		return e.New(e.CodeInvalidCatalog, "GitHub workflow omits workflow_dispatch")
+	}
+	if err := validateGitHubRuntimeSourceDispatch(plan, document.On["workflow_dispatch"]); err != nil {
+		return err
 	}
 	if len(document.On) != 1 || document.Concurrency.Group != "nvkr-run-${{ github.workflow }}-${{ github.ref }}" || document.Concurrency.CancelInProgress != githubCancelInProgress(plan) {
 		return e.New(e.CodeEngineCapability, "GitHub Run requires manual dispatch only and concurrency matching its development policy")
@@ -250,8 +277,15 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				}
 				continue
 			}
-			if len(catalogEnv) > 0 && ((strings.HasPrefix(jobID, "build-runner-") && step.ID == "validate-catalog") || (jobID == "nvkr-lifecycle-run" && step.ID == "finalize-catalog")) {
-				if !reflect.DeepEqual(step.Env, catalogEnv) {
+			wantCatalogEnv := maps.Clone(catalogEnv)
+			if plan.Environment.GitHubRuntimeSource != nil && strings.HasPrefix(jobID, "build-runner-") && step.ID == "validate-catalog" {
+				if wantCatalogEnv == nil {
+					wantCatalogEnv = make(map[string]string)
+				}
+				wantCatalogEnv["NVKR_RUNTIME_SOURCE_COMMIT"] = "${{ github.event.inputs.source_commit }}"
+			}
+			if len(wantCatalogEnv) > 0 && ((strings.HasPrefix(jobID, "build-runner-") && step.ID == "validate-catalog") || (jobID == "nvkr-lifecycle-run" && step.ID == "finalize-catalog")) {
+				if !reflect.DeepEqual(step.Env, wantCatalogEnv) {
 					return e.New(e.CodeEngineCapability, "catalog source environment differs")
 				}
 				for key := range catalogEnv {
@@ -324,6 +358,9 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 				command = githubRuntimeGenerationCommand(plan)
 			} else {
 				wantSteps = 7
+				if plan.Environment.GitHubRuntimeSource != nil {
+					command = githubRuntimeGenerationCommand(plan) + " --check"
+				}
 				if !strings.Contains(joinRuns(job.Steps), githubRuntimeInstallCommand(plan)) {
 					return e.New(e.CodeInvalidCatalog, "secondary GitHub bootstrap omits runtime input installation")
 				}
@@ -335,7 +372,7 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 		}
 		// The bootstrap must provision the Go toolchain via the pinned setup-go action rather
 		// than assume a preinstalled Go: the checkout's .go-version for a source build, or the
-		// released generator's own Go release for its pinned runner.
+		// module-installed generator's own Go release for its pinned runner.
 		release, err := githubRunnerReleaseForGenerator()
 		if err != nil {
 			return err
@@ -521,6 +558,10 @@ func ValidateGitHubBundle(ctx context.Context, plan *Plan, bundle *GeneratedBund
 	// Semantic checks above produce useful coded diagnostics. Exact regeneration
 	// additionally rejects unrecognized steps, appended shell commands and ambient
 	// authority on any job; substring checks alone cannot authorize an entire job.
+	return validateGitHubExactMembers(bundle, expected)
+}
+
+func validateGitHubExactMembers(bundle, expected *GeneratedBundle) error {
 	if len(bundle.Files) != len(expected.Files) {
 		return e.New(e.CodePipelineDrift, "GitHub bundle member set differs from its admitted rendering")
 	}

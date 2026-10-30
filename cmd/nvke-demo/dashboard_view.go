@@ -991,7 +991,7 @@ func (d *dashboard) draw(screen tcell.Screen, now time.Time, canceling bool) {
 	palette := tuitheme.Colors(false)
 	screen.SetStyle(tcell.StyleDefault.Background(palette.Background).Foreground(palette.Foreground))
 	screen.Clear()
-	d.header.SetText(fmt.Sprintf("[lightcyan::b] NVKE · local ARM64 build & demo[-::-]    %s elapsed\n [goldenrod]UNQUALIFIED local diagnostic · not a signed Release[-]", max(time.Duration(0), now.Sub(s.started)).Truncate(time.Second)))
+	d.header.SetText(fmt.Sprintf("[lightcyan::b] NVKE · local build & demo[-::-]    %s elapsed\n [goldenrod]UNQUALIFIED local diagnostic · not a signed Release[-]", max(time.Duration(0), now.Sub(s.started)).Truncate(time.Second)))
 	if s.operatorPage != "" && !canceling && !s.confirmCancel && !s.confirmForce {
 		d.activityView.SetTitle(" Recorded kubectl walkthrough · actual observations ")
 		d.activityView.SetWrap(false)

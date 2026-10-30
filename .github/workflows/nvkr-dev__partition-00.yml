@@ -1,0 +1,157 @@
+name: NVKR execution partition
+'on':
+  workflow_call:
+    inputs:
+      dependencies:
+        type: string
+        required: true
+    outputs:
+      results:
+        value: ${{ jobs.nvkr-partition-results.outputs.results }}
+      statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
+      nvkr-partition-01:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-01 }}
+      nvkr-partition-02:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-02 }}
+      nvkr-partition-03:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-03 }}
+      nvkr-partition-08:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-08 }}
+      nvkr-results-00:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00 }}
+      nvkr-results-00-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00-statuses }}
+      nvkr-results-07:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-07 }}
+      nvkr-results-07-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-07-statuses }}
+      nvkr-results-09:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09 }}
+      nvkr-results-09-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09-statuses }}
+    secrets:
+      NKE_SOURCE_TOKEN:
+        required: true
+      NVKR_CI_STORAGE_WRITE_TOKEN:
+        required: true
+permissions:
+  contents: read
+jobs:
+  build-runner-arc-amd64-kvm:
+    name: 'Prepare NVKR runner (arc-amd64-kvm)'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 15
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Summarize Run start
+        id: summarize-run-start
+        if: ${{ success() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+        continue-on-error: true
+        run: |
+          [ -n "${GITHUB_STEP_SUMMARY:-}" ] || exit 0
+          [ ! -L "$GITHUB_STEP_SUMMARY" ] || exit 0
+          [ ! -e "$GITHUB_STEP_SUMMARY" ] || [ -f "$GITHUB_STEP_SUMMARY" ] || exit 0
+          {
+            printf '%s\n' '## NVKR Run started' '' '<code>nvke-m2</code> · 69 planned outputs · <code>linux/amd64, linux/arm64</code>' '' 'Lane: <code>pipeline-attested</code>. Execution and completeness checks are pending.' ''
+          } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner (arc-amd64-kvm)
+        uses: ./.github/nvkr-dev/actions/bootstrap-linux-amd64
+        with:
+          nvkr-pin-source-token-0: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          runner-artifact: 'nvkr-exec-arc-amd64-kvm'
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+  build-runner-arc-arm64-kvm:
+    name: 'Prepare NVKR runner (arc-arm64-kvm)'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 15
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/aarch64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/arm64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner (arc-arm64-kvm)
+        uses: ./.github/nvkr-dev/actions/bootstrap-linux-arm64
+        with:
+          nvkr-pin-source-token-0: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          runner-artifact: 'nvkr-exec-arc-arm64-kvm'
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+  build-runner-ubuntu-24-04:
+    name: 'Prepare NVKR runner (ubuntu-24.04)'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 15
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner (ubuntu-24.04)
+        uses: ./.github/nvkr-dev/actions/bootstrap-linux-amd64
+        with:
+          nvkr-pin-source-token-0: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+  build-runner-ubuntu-24-04-arm:
+    name: 'Prepare NVKR runner (ubuntu-24.04-arm)'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 15
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/aarch64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/arm64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner (ubuntu-24.04-arm)
+        uses: ./.github/nvkr-dev/actions/bootstrap-linux-arm64
+        with:
+          nvkr-pin-source-token-0: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+  nvkr-partition-results:
+    name: 'Collect provider results: nvkr-partition-results'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs: [build-runner-arc-amd64-kvm, build-runner-arc-arm64-kvm, build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    permissions: {}
+    outputs:
+      results: ${{ toJSON(needs) }}
+      statuses: ${{ join(needs.*.result, ' ') }}
+      nvkr-partition-01: ${{ format('"build-runner-ubuntu-24-04":{0},"build-runner-ubuntu-24-04-arm":{1}', toJSON(needs['build-runner-ubuntu-24-04']), toJSON(needs['build-runner-ubuntu-24-04-arm'])) }}
+      nvkr-partition-02: ${{ format('"build-runner-ubuntu-24-04":{0}', toJSON(needs['build-runner-ubuntu-24-04'])) }}
+      nvkr-partition-03: ${{ format('"build-runner-ubuntu-24-04":{0}', toJSON(needs['build-runner-ubuntu-24-04'])) }}
+      nvkr-partition-08: ${{ format('"build-runner-arc-amd64-kvm":{0},"build-runner-arc-arm64-kvm":{1}', toJSON(needs['build-runner-arc-amd64-kvm']), toJSON(needs['build-runner-arc-arm64-kvm'])) }}
+      nvkr-results-00: ${{ format('"build-runner-ubuntu-24-04":{0}', toJSON(needs['build-runner-ubuntu-24-04'])) }}
+      nvkr-results-00-statuses: ${{ format('{0}', needs['build-runner-ubuntu-24-04'].result) }}
+      nvkr-results-07: ${{ format('"build-runner-ubuntu-24-04-arm":{0}', toJSON(needs['build-runner-ubuntu-24-04-arm'])) }}
+      nvkr-results-07-statuses: ${{ format('{0}', needs['build-runner-ubuntu-24-04-arm'].result) }}
+      nvkr-results-09: ${{ format('"build-runner-arc-amd64-kvm":{0},"build-runner-arc-arm64-kvm":{1}', toJSON(needs['build-runner-arc-amd64-kvm']), toJSON(needs['build-runner-arc-arm64-kvm'])) }}
+      nvkr-results-09-statuses: ${{ format('{0} {1}', needs['build-runner-arc-amd64-kvm'].result, needs['build-runner-arc-arm64-kvm'].result) }}
+    steps:
+      - name: Forward provider results
+        run: ':'
+env:
+  NVKR_CI_STORAGE_READ_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
+  NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}

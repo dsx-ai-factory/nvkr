@@ -28,6 +28,15 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
+// The local qualification lane has its own exercised host boundary, independent
+// of the ordinary diagnostic build/deployment platform domain.
+func admitQualificationHost(platform string) error {
+	if platform != "linux/arm64" {
+		return e.New(e.CodeEngineCapability, "local qualification requires native Linux ARM64")
+	}
+	return nil
+}
+
 // SetupQualification provisions disposable local trust for an explicitly
 // selected prepared demo. It creates descriptions, never verification receipts.
 // Existing keys, policy files, registries and evidence are never reused.
@@ -37,8 +46,8 @@ func SetupQualification(ctx context.Context, file DemoFile, out string, progress
 	if err := requireContext(ctx); err != nil {
 		return "", err
 	}
-	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
-		return "", e.New(e.CodeEngineCapability, "qualification setup requires native Linux ARM64")
+	if err := admitQualificationHost(runtime.GOOS + "/" + runtime.GOARCH); err != nil {
+		return "", err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancel()
@@ -241,8 +250,8 @@ func StopQualificationRegistry(ctx context.Context, out string) error {
 	if err := requireContext(ctx); err != nil {
 		return e.Wrap(e.CodeUsage, err, "qualification registry context")
 	}
-	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
-		return e.New(e.CodeEngineCapability, "qualification registry stop requires native Linux ARM64")
+	if err := admitQualificationHost(runtime.GOOS + "/" + runtime.GOARCH); err != nil {
+		return err
 	}
 	root, err := resolveExisting(out)
 	if err != nil {

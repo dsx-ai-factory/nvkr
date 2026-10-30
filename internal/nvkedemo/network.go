@@ -29,6 +29,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 	"golang.org/x/sys/unix"
 )
 
@@ -145,8 +146,12 @@ type NetworkGuard struct {
 }
 
 func networkPlatform() error {
-	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
-		return nvkrerr.New(nvkrerr.CodeEngineCapability, "local networking requires dedicated ARM64 Linux/Colima")
+	return admitNetworkPlatform(runtime.GOOS, runtime.GOARCH)
+}
+
+func admitNetworkPlatform(goos, goarch string) error {
+	if goos != "linux" || target.ValidatePlatform(goos+"/"+goarch) != nil {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "local networking requires a supported native Linux target")
 	}
 	return nil
 }

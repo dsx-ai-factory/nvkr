@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -87,10 +88,12 @@ func nativeHostToolBindings(bundle delivery.BinaryBundle, platform string, membe
 	bindings := make(map[string]delivery.BinaryEntry, len(members))
 	for _, entry := range bundle.Entries {
 		member := entry.Name
-		if platform == "linux/arm64" {
+		if hostOS, arch, _ := strings.Cut(platform, "/"); hostOS == "linux" {
 			switch member {
+			case "clusterctl-linux-" + arch, "helm-linux-" + arch, "kind-linux-" + arch, "kubectl-linux-" + arch, "oras-linux-" + arch:
+				member = strings.TrimSuffix(member, "-linux-"+arch)
 			case "clusterctl-linux", "helm-linux", "kind-linux", "kubectl-linux", "oras-linux":
-				member = member[:len(member)-len("-linux")]
+				member = strings.TrimSuffix(member, "-linux")
 			}
 		}
 		if !slices.Contains(members, member) || bindings[member].Name != "" {

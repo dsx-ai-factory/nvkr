@@ -14,9 +14,9 @@ import (
 func TestNVKEReleasePinsStayAligned(t *testing.T) {
 	for _, directory := range []string{
 		"nvke/release", "nvke/release-components", "nvke/module-tags", "nvke/module-cli-arm64",
-		"nvke/local-site-arm64", "nvke/native-site-arm64", "nvke/nightly-site-arm64",
+		"nvke/local-site-arm64", "nvke/native-site", "nvke/nightly-site-arm64",
 		"node-images/release", "node-images/diagnostic",
-		"controller-profiles/nvidia-arm64", "controller-profiles/upstream-arm64", "controller-profiles/native-nvidia-arm64",
+		"controller-profiles/nvidia-arm64", "controller-profiles/upstream-arm64", "controller-profiles/native-nvidia",
 		"nicosim", "tools/native", "runtime-dependencies",
 	} {
 		t.Run(directory, func(t *testing.T) {
@@ -58,13 +58,24 @@ func TestNVKEOverlayPinsStayAligned(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			tag, commit := "v0.22.0", "400c24fb6465b042be883d6b62472528520d6291"
+			tree, epoch := "f3afc02f5c92f4aacda3a1655836a91bef093bfe", int64(1792548398)
+			if filepath.Base(path) == "current-main-doca-ovs.json" {
+				if overlay.Name != "nvke-current-main-doca-ovs" || len(overlay.Components) != 1 || overlay.Components["nvke-image-inputs"].Component == nil {
+					t.Fatal("current-main DOCA overlay must replace only image composition")
+				}
+				// This reviewed Git revision is the static baseline for the
+				// nightly-only overlay. Runtime source selection rebinds it.
+				tag, commit = "82c8b7e8a3d4fa0ca301cb8eead4a6abea043755", "82c8b7e8a3d4fa0ca301cb8eead4a6abea043755"
+				tree, epoch = "94b1b7a18148ef98bdc1bee6118cdcdcf2632df5", 1793307557
+			}
 			for name, replacement := range overlay.Components {
 				c := replacement.Component
 				if c == nil || strings.TrimSuffix(c.Repo, ".git") != "https://github.com/dsx-ai-factory/nvke" {
 					continue
 				}
-				if c.Tag != "v0.22.0" || c.Commit != "400c24fb6465b042be883d6b62472528520d6291" || c.TreeHash != "f3afc02f5c92f4aacda3a1655836a91bef093bfe" || c.SourceDate != 1792548398 {
-					t.Fatalf("%s replaces the v0.22.0 source identity", name)
+				if c.Tag != tag || c.Commit != commit || c.TreeHash != tree || c.SourceDate != epoch {
+					t.Fatalf("%s replaces the reviewed %s source identity", name, tag)
 				}
 			}
 		})

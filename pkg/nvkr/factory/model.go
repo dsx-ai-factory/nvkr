@@ -126,25 +126,26 @@ type Route struct {
 }
 
 type Plan struct {
-	Actions           map[string]catalog.ActionPin `json:"actions,omitempty"`
-	SchemaVersion     string                       `json:"schemaVersion"`
-	Name              string                       `json:"name"`
-	GeneratorVersion  string                       `json:"generatorVersion"`
-	DefinitionPath    string                       `json:"definitionPath,omitempty"`
-	DefinitionDigest  string                       `json:"definitionDigest,omitempty"`
-	EnvironmentPath   string                       `json:"environmentPath,omitempty"`
-	Qualification     EvidenceTier                 `json:"qualification"`
-	CatalogDigest     string                       `json:"catalogDigest"`
-	CatalogSnapshot   *catalog.Catalog             `json:"catalogSnapshot"`
-	AppliedOverlays   []catalog.AppliedOverlay     `json:"appliedOverlays,omitempty"`
-	EnvironmentDigest string                       `json:"environmentDigest,omitempty"`
-	Definition        definition.Definition        `json:"definition"`
-	Environment       definition.Environment       `json:"environment"`
-	Targets           map[string]Target            `json:"targets,omitempty"`
-	Routes            []Route                      `json:"routes,omitempty"`
-	Builds            []BuildPlan                  `json:"builds"`
-	LifecycleOutputs  []LifecycleOutputPlan        `json:"lifecycleOutputs,omitempty"`
-	Graph             ArtifactGraph                `json:"graph"`
+	Actions             map[string]catalog.ActionPin `json:"actions,omitempty"`
+	SchemaVersion       string                       `json:"schemaVersion"`
+	Name                string                       `json:"name"`
+	GeneratorVersion    string                       `json:"generatorVersion"`
+	DefinitionPath      string                       `json:"definitionPath,omitempty"`
+	DefinitionDigest    string                       `json:"definitionDigest,omitempty"`
+	EnvironmentPath     string                       `json:"environmentPath,omitempty"`
+	RuntimeSourceCommit string                       `json:"runtimeSourceCommit,omitempty"`
+	Qualification       EvidenceTier                 `json:"qualification"`
+	CatalogDigest       string                       `json:"catalogDigest"`
+	CatalogSnapshot     *catalog.Catalog             `json:"catalogSnapshot"`
+	AppliedOverlays     []catalog.AppliedOverlay     `json:"appliedOverlays,omitempty"`
+	EnvironmentDigest   string                       `json:"environmentDigest,omitempty"`
+	Definition          definition.Definition        `json:"definition"`
+	Environment         definition.Environment       `json:"environment"`
+	Targets             map[string]Target            `json:"targets,omitempty"`
+	Routes              []Route                      `json:"routes,omitempty"`
+	Builds              []BuildPlan                  `json:"builds"`
+	LifecycleOutputs    []LifecycleOutputPlan        `json:"lifecycleOutputs,omitempty"`
+	Graph               ArtifactGraph                `json:"graph"`
 
 	// identityDigest is the digest of this plan AS COMPILED, carried across the local
 	// runner's workspace relocation. It is deliberately unexported: it never reaches the

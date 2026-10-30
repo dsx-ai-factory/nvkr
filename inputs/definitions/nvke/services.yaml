@@ -25,6 +25,53 @@ outputs:
     format: oci
     components:
       - csi-node-driver-registrar-image
+  - name: local-path-helper-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/local-path-provisioner
+    format: oci
+    components: [local-path-helper-image]
+  - name: local-path-helper-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/local-path-provisioner
+    format: oci
+    components: [local-path-helper-image]
+  # Acquired images bind native digests, so each architecture gets its own chart.
+  - name: local-path-provisioner
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/local-path-provisioner
+    format: helm-oci
+    components:
+      - local-path-provisioner-chart
+    helm:
+      images:
+        helper: local-path-helper-image
+        provisioner: local-path-provisioner-image
+  - name: local-path-provisioner-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/local-path-provisioner
+    format: helm-oci
+    components:
+      - local-path-provisioner-chart
+    helm:
+      images:
+        helper: local-path-helper-image-arm64
+        provisioner: local-path-provisioner-image-arm64
+  - name: local-path-provisioner-image
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/local-path-provisioner
+    format: oci
+    components: [local-path-provisioner-image]
+  - name: local-path-provisioner-image-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/local-path-provisioner
+    format: oci
+    components: [local-path-provisioner-image]
   - name: postgresql
     platform: linux/amd64
     catalog:
