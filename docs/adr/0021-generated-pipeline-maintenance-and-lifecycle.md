@@ -89,8 +89,9 @@ run-attempt destinations are derived by the execution owner under ADR-20; runtim
 rewrite generated inputs or bypass drift checks. The maintained development bundle uses the complete M2
 Definition with its separate development Environment.
 
-`githubDevelopment: true` with a nonempty `githubBundle` is unsupported and
-returns `CodeEngineCapability` before catalog resolution or generated-output work.
+For a plain Definition, `githubDevelopment: true` with a nonempty `githubBundle` is unsupported and
+returns `CodeEngineCapability` before catalog resolution or generated-output work. A composite without
+`githubBundle` is refused the same way, because the fixed layout is reserved (ADR-26 §9).
 Unnamed development and named production remain separate supported selections.
 
 Execution identity and transaction identity are separate. The Plan binds authored inputs and every executable

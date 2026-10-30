@@ -65,6 +65,9 @@ func TestCompositeCompilationContract(t *testing.T) {
 		{name: "runtime Plan refused before members", code: e.CodeEngineCapability, env: func(environment *authored.Environment) {
 			environment.GitHubBundle, environment.GitHubRuntimePlan = "product", true
 		}},
+		{name: "fixed development layout refused before members", code: e.CodeEngineCapability, env: func(environment *authored.Environment) {
+			environment.GitHubDevelopment = true
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root, _ := compositeFactoryFixture(t, tc.mutate)
@@ -193,6 +196,9 @@ func TestCompositePlanRecordValidation(t *testing.T) {
 		}},
 		{name: "plain definition digest", code: e.CodeUnverifiedRef, mutate: func(plan *Plan) {
 			plan.DefinitionDigest = plan.Composition.EffectiveDefinitionDigest
+		}},
+		{name: "fixed development layout", code: e.CodeEngineCapability, mutate: func(plan *Plan) {
+			plan.Environment.GitHubDevelopment, plan.Environment.GitHubBundle = true, ""
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

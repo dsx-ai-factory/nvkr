@@ -225,6 +225,7 @@ func TestCompositeDevelopmentAdmission(t *testing.T) {
 			environment.GitHubDevelopment, environment.GitHubBundle = true, "product"
 		}},
 		{name: "fixed development namespace", mutate: namedDevelopment(t, "product", "ghcr.io/example/nvkr/development")},
+		{name: "composite in the fixed development layout", mutate: namedDevelopment(t, "", "ghcr.io/example/nvkr/development")},
 		{name: "another bundle's namespace", mutate: namedDevelopment(t, "product", "ghcr.io/example/nvkr/development-other")},
 		{name: "reserved bundle name", mutate: namedDevelopment(t, "qualify", "ghcr.io/example/nvkr/development-qualify")},
 		{name: "named namespace without bundle", mutate: func(environment *authored.Environment) {
