@@ -180,10 +180,14 @@ rename or reduced file count alone does not satisfy these conditions.
 
 At the recorded base, main uses CLI `ed9fb09b` and controller/NKTP/fixture `33fb71b2`; local site/profiles
 use `8fb2d533`; nightly site and suite use `a8391755`. Main's profile output is explicitly
-`nico-reference-profiles-fixture`, not the demo's `controller-profiles`. Main embeds upstream OVN 1.4.0;
-local and standalone NVIDIA OVN use 2.4.0, while the nightly KVM overlay still embeds 1.5.18.
-The selected local profile asks for 2.4.0 packages. These differences require reviewed corrections,
+`nico-reference-profiles-fixture`, not the demo's `controller-profiles`. Main embedded upstream OVN 1.4.0;
+local and standalone NVIDIA OVN used 2.4.0, while the nightly KVM overlay still embeds 1.5.18.
+The selected local profile asked for 2.4.0 packages. These differences require reviewed corrections,
 not path rewriting or an assumption that equal output counts establish parity.
+
+The maintained release disks now embed the NVIDIA OVN fork `v2.4.2` (`8af51273`), matching NVKE
+`v0.22.0`'s default tenant `cniVersion` and the native NVIDIA demo's producers. The upstream 1.4.0 demo
+variants remain explicit overlays, and the nightly KVM overlay drift remains open.
 
 NKTP still needs digest-bound deployment references, and the SPIRE packaging rollback omits the required
 DSX IMDS payload; the blocked DSX producer and its credentials were removed before the base commit.

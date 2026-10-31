@@ -3312,6 +3312,17 @@ references and own any required association or compatibility decision. See the
 Proposed [ADR-26](0026-definition-composition.md) designs a composite of these four families as one Release;
 it is designed, not implemented, and adds no authored input.
 
+The maintained release node-image catalog selects the NVIDIA OVN fork `v2.4.2`
+(`8af51273d52dfa07454435d18d37230e582d797a`) for `ovn-kube-ubuntu`, `ovn-kubernetes-chart` and
+`nvke-cni-ovn`. It reuses the native NVIDIA demo producers and pins, so the release disks stage
+`nvke-cni-ovn-{charts,images}-2.4.2`, which NVKE `v0.22.0` requests for its default tenant `cniVersion`.
+The native NVIDIA overlay now leaves the release snapshot unchanged. Dependent overlay predecessor
+digests and generated bundles were regenerated, and the upstream 1.4.0 demo overlays still replace all
+three producers. The release, development, disks, diagnostics and Ubuntu 24 Environments grant the
+fork source access through `NKE_SOURCE_TOKEN`. Catalog validation, Plan generation and contract tests
+cover this selection. No hosted or local disk build, package-index inspection or default-version tenant
+OVN create has exercised it.
+
 The 2026-10-20 integration of upstream `9857feeda03d2e7f529e1baef2b4a331a011e54c` reproduced
 `CodePipelineDrift` in all four family bundles. Regeneration through `make nvke-split-generate` refreshed
 eleven JSON files, including all four Plans and manifests; family Environments, entry workflows and action

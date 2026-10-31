@@ -45,19 +45,25 @@ const ovnForkStream = "2.4.2"
 const ovnGoBuilder = "quay.io/projectquay/golang@sha256:d5acf07940fb5e6e2d07542abd853cece623d95ffd364769ec825aab5471d3b8"
 
 func TestNVKEOVNBuilderPinBindings(t *testing.T) {
-	for _, path := range []string{
-		"../../../inputs/catalogs/ovn-upstream",
-		"../../../inputs/catalogs/node-images/release",
-		"../../../inputs/catalogs/node-images/diagnostic",
+	for _, tc := range []struct {
+		path     string
+		upstream bool
+	}{
+		{"../../../inputs/catalogs/ovn-upstream", true},
+		{"../../../inputs/catalogs/node-images/release", false},
+		{"../../../inputs/catalogs/node-images/diagnostic", true},
 	} {
-		t.Run(path, func(t *testing.T) {
-			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(path))
+		t.Run(tc.path, func(t *testing.T) {
+			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(tc.path))
 			if err != nil {
 				t.Fatal(err)
 			}
 			command := strings.Join(cat.Components["ovn-kube-ubuntu"].BuildCommand, "\n")
-			if !strings.Contains(command, "build-arg:BUILDER_IMAGE="+ovnGoBuilder) {
-				t.Fatal("OVN producer lost the compatible digest-pinned Go builder")
+			if got := strings.Contains(command, "build-arg:BUILDER_IMAGE="+ovnGoBuilder); got != tc.upstream {
+				t.Fatalf("upstream Go builder override present=%t, want %t", got, tc.upstream)
+			}
+			if !tc.upstream && !strings.Contains(command, "filename=Dockerfile.ubuntu.nv") {
+				t.Fatal("release OVN producer must build the fork's Dockerfile")
 			}
 		})
 	}

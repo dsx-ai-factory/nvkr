@@ -3,7 +3,8 @@
 Candidate, selectable CNI producer catalog for the
 `[dsx-ai-factory/ovn-kubernetes](https://github.com/dsx-ai-factory/ovn-kubernetes)` fork.
 It does not remove Calico or change the maintained
-OS/M2 Definitions. Do not stack it blindly with the old OS catalog: `ovn-kube-ubuntu`
+OS/M2 Definitions. The maintained release node-image catalog now selects the same
+fork pin with `nvke-*` Debian package names; this catalog keeps the earlier `nke-*` packaging. Do not stack it blindly with the old OS catalog: `ovn-kube-ubuntu`
 and `nvke-cni-ovn` are authored component names; packaged Debian names remain source-owned. A maintained
 replacement must use the predecessor-digest-bound catalog overlay contract and
 regenerate its dependent inputs.
@@ -11,7 +12,7 @@ regenerate its dependent inputs.
 ## Before and after
 
 
-| Boundary         | Existing OS catalog                                     | This candidate option                                                        |
+| Boundary         | Former upstream OS catalog                              | This candidate option                                                        |
 | ---------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | Source           | Upstream `ovn-kubernetes/ovn-kubernetes`, 1.4.x         | DSX fork tag `v2.4.2`, commit `8af51273d52dfa07454435d18d37230e582d797a` |
 | Image            | Source-owned upstream Ubuntu Dockerfile                 | Fork's source-owned `dist/images/Dockerfile.ubuntu.nv`                       |
