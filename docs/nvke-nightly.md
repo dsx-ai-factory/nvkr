@@ -77,15 +77,16 @@ static source failure-context labels are presented; identities and raw messages
 remain private. Context labels describe literal source phrases, not a decoded
 Temporal error or proven root cause. Initialization observations also select closed
 nested activity labels and Kubernetes init-phase, preflight-check, wait and
-client-transport labels
-from private condition messages and already retained owned serial snapshots. Raw
-error details remain private; these literal observations may be absent for unknown
+client-transport labels from private condition messages and already retained owned
+serial snapshots. Raw error details remain private; these literal observations may be absent for unknown
 failures. Unknown failures stay unclassified.
 Logging-only service drop-ins route kubelet and containerd output to the private
 owned serial console when those services start or restart. Transport labels
 observe fixed phrases anywhere in that snapshot; they do not establish why the
-API request failed. Raw terminal errors have no public dispatch option and remain
-private.
+API request failed. Owned serial snapshots also yield closed Linux OOM-kill
+observations, without process identities or raw kernel messages. Missing markers
+do not prove the absence of memory pressure. Raw terminal errors have no public
+dispatch option and remain private.
 The Go E2E presenter queues these observations without blocking cleanup; it may
 drop them under backpressure. Plain writers retain bootstrap diagnostics privately.
 Ordinary diagnostic loss preserves the original failure; an unjoined observation
@@ -114,15 +115,30 @@ reached that gate after preparing the installer ISO, with 48,748 MiB available
 against 65,536 MiB required. The cleanup change still needs a complete hosted run
 to establish sufficient space for disk build and deployment.
 
-The hosted profile selects a 4-GiB site VM, 4 GiB per tenant VM,
-two vCPUs per guest and 1 GiB of host/QEMU headroom. Runtime admission observes
-actual available capacity; these settings are an initial experiment, not a proven
-minimum. The previous 2-GiB tenant selection could not fit the requested
-reservations: the control plane requests 1 GiB for the system and the
-[selected NVKE source defaults Kubernetes reservation to 2 GiB](https://github.com/dsx-ai-factory/nvke/blob/ca3f7c025c1474d9b0b9a19a830a3006168c6de7/controller/internal/kubeadmconfig/render.go#L367).
-The worker requests 1 GiB for each. The 4-GiB selection removes that contradiction;
-it does not prove adequate scheduling headroom or explain the separate site-init
-failure. The earlier [hosted experiment](https://github.com/depohmel/nvkr/actions/runs/40578231640)
+The hosted workflow explicitly selects `resources.profile: small`, a 4-GiB site
+VM, 4 GiB per tenant VM, four vCPUs per guest and 1 GiB of host/QEMU headroom.
+An empty profile preserves the existing demo configuration. The small profile is
+a functional-test candidate; its settings are not proven hardware minima or a
+performance qualification. Host admission still checks actual available capacity.
+
+The profile selects 256 MiB for system and Kubernetes memory reservations through
+the supported NVKE request fields and the installed kubelet package's documented
+operator override. The complete Kubernetes reservation map preserves the source's
+CPU and ephemeral-storage entries. The operator file is checked with systemd's
+own parser; a private candidate preserving its original bytes is checked before
+replacement. Existing nonempty operator arguments are rejected rather than lost.
+The existing demo path does not change that file when the profile is unset.
+
+The small profile keeps every telemetry and NVIDIA OVN component, image, feature,
+memory limit and replica setting. It selects 64-MiB collector and target-allocator
+memory requests and 128-MiB requests for the two selected OVN containers. These
+are explicit test scheduling settings; actual memory use remains to be measured.
+The source-default profile cannot fit this host selection: its seven collector
+main containers alone request 2.75 GiB, while the former site reservations left
+less than 1 GiB allocatable. That later scheduling contradiction does not prove
+the cause of the earlier kubeadm initialization failure.
+
+The earlier [hosted experiment](https://github.com/depohmel/nvkr/actions/runs/40578231640)
 demonstrated AMD64 KVM, a disk build and NVKE's separate VM test harness, but
 does not prove this native NVKR topology or its cleanup. That experiment also
 encountered severe disk pressure. A completed run of this exact workflow is

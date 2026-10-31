@@ -70,6 +70,13 @@ func (s *nativeSiteAttempt) capiTenantCommands(ctx context.Context, request Tena
 	if err := requireContext(ctx); err != nil {
 		return "", err
 	}
+	if err := admitNativeResourceProfile(s.resources.Profile, request.CNIVersion); err != nil {
+		return "", err
+	}
+	kubeletPreparation, err := nativeKubeletProfilePreparation(ctx, s.resources.Profile)
+	if err != nil {
+		return "", err
+	}
 	if request.CNI != "ovn-kubernetes" || request.Kubernetes == "" || request.CNIVersion == "" {
 		return "", errors.New("native CAPI tenant requires selected Kubernetes and OVN packages")
 	}
@@ -86,7 +93,7 @@ func (s *nativeSiteAttempt) capiTenantCommands(ctx context.Context, request Tena
 		"test ! -e /run/nvkr-native-tenant-preparation.ready\nsystemctl daemon-reload\n" +
 		"systemctl stop nvke-agent.service spire-agent.service\n" +
 		"NVKE_AGENT_SKIP_START=1 DEBIAN_FRONTEND=noninteractive apt-get install -y -o DPkg::Lock::Timeout=600 nvke-agent " + operatorQuote("nvke-kubeadm-distro-"+request.Kubernetes) + " spire-agent " + operatorQuote("nvke-cni-ovn-images-"+request.CNIVersion) + " " + operatorQuote("nvke-cni-ovn-charts-"+request.CNIVersion) + "\n" +
-		"test ! -e /etc/nke/spire.env\n" +
+		kubeletPreparation + "test ! -e /etc/nke/spire.env\n" +
 		"test -s /etc/spire-agent/agent.conf\n" +
 		"test -s /etc/spire-agent/initial-trust-bundle.pem\n" +
 		"install -d -m 0755 -o spire -g spire /tmp/spire-agent /tmp/spire-agent/public\n" +
@@ -117,7 +124,7 @@ func (s *nativeSiteAttempt) capiTenantCommands(ctx context.Context, request Tena
 		}
 		script += preload + "\n"
 	}
-	values, err := nativeOVNValuesScript(request.CNIVersion, s.assets.Images["ovn"].Reference)
+	values, err := nativeOVNValuesScriptForProfile(request.CNIVersion, s.assets.Images["ovn"].Reference, s.resources.Profile)
 	if err != nil {
 		return "", err
 	}

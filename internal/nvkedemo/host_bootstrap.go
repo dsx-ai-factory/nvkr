@@ -39,7 +39,7 @@ printf '%s  %s\n' {{quote (sha .Digest)}} {{quote (printf "downloads/%s" .Name)}
 install -m 0755 downloads/nerdctl bin/nerdctl
 export PATH="$work/bin:$PATH"
 DEBIAN_FRONTEND=noninteractive NVKE_AGENT_SKIP_START=1 apt-get install -y -o DPkg::Lock::Timeout=600 \
-  nvke-agent spire-agent nvke-kubeadm-distro-{{.KubernetesVersion}} nvke-cni-ovn-images-{{.OVNVersion}} nvke-cni-ovn-charts-{{.OVNVersion}}
+  nvke-agent spire-agent nvke-kubeadm-distro-{{.KubernetesVersion}} nvke-cni-ovn-images-{{.OVNVersion}} nvke-cni-ovn-charts-{{.OVNVersion}}{{kubeletProfile}}
 # Cloud-init wrote logging-only drop-ins before package installation. Reload
 # even when APT finds the packages already installed and runs no postinst.
 systemctl daemon-reload
@@ -141,7 +141,7 @@ func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, 
 	args := []string{cli, "generate", "sitespec", "nvke-native-site", "--nodes", filepath.Join(out, "hosts.csv"),
 		"--set", "cluster.k8sVersion=" + kubernetes, "--set", "cluster.cniName=ovn-kubernetes", "--set", "cluster.cniVersion=" + version,
 		"--set", "cluster.podCidr=" + managementPodCIDR, "--set", "cluster.serviceCidr=" + managementServiceCIDR,
-		"--set", "cluster.kubeletConfig.systemReservedMemory=1Gi", "--set", "spire.trustDomain=nvke-native-site.nke.local",
+		"--set", "cluster.kubeletConfig.systemReservedMemory=" + nativeReservedMemory(s.resources.Profile), "--set", "spire.trustDomain=nvke-native-site.nke.local",
 		"--set", "spire.upstreamCA=true"}
 	runner = bindNativeSpireCA(runner, caRoot)
 	spec, err := s.capture(ctx, runner, "generate-sitespec", args...)
@@ -235,7 +235,7 @@ volumeBindingMode: Immediate
 	if _, err := s.capture(ctx, runner, "validate-sitespec", cli, "validate", "sitespec", "--sitespec", specPath); err != nil {
 		return err
 	}
-	telemetry, err := demoTelemetryValues()
+	telemetry, err := demoTelemetryValuesForProfile(s.resources.Profile)
 	if err != nil {
 		return err
 	}
@@ -411,9 +411,22 @@ func nativeCAPIInitArgs(tools, kubeconfig, version string) []string {
 // node. Use its supported values to keep one collector per role with small
 // CPU requests; authentication, probes and memory limits remain source-owned.
 func demoTelemetryValues() ([]byte, error) {
+	return demoTelemetryValuesForProfile("")
+}
+
+func demoTelemetryValuesForProfile(profile string) ([]byte, error) {
+	if err := admitNativeResourceProfile(profile, siteOVNVersion); err != nil {
+		return nil, err
+	}
 	values := map[string]any{"otel-lgtm": map[string]any{"enabled": false}}
 	for _, role := range []string{"watchdog", "gateway_logs", "gateway_metrics", "gateway_traces", "large_target_metrics", "cluster_events", "daemonset"} {
-		resources := func() map[string]any { return map[string]any{"requests": map[string]any{"cpu": "25m"}} }
+		resources := func() map[string]any {
+			requests := map[string]any{"cpu": "25m"}
+			if profile == "small" {
+				requests["memory"] = "64Mi"
+			}
+			return map[string]any{"requests": requests}
+		}
 		settings := map[string]any{"resources": resources()}
 		if role != "daemonset" {
 			settings["replicas"] = 1

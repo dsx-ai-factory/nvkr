@@ -168,3 +168,19 @@ func nativeBootstrapKubeadmSummary(message string) string {
 	}
 	return result.String()
 }
+
+// Linux's oom_kill.c emits these fixed prefixes. Observe only their presence
+// in the owned private serial snapshot, without publishing process identities
+// or attributing the bootstrap failure to a kill. Missing text proves nothing.
+func nativeBootstrapMemorySummary(console string) string {
+	var result strings.Builder
+	for _, item := range []struct{ phrase, label string }{
+		{"Memory cgroup out of memory: Killed process ", "cgroup-oom-kill"},
+		{"Out of memory: Killed process ", "kernel-oom-kill"},
+	} {
+		if strings.Contains(console, item.phrase) {
+			fmt.Fprintf(&result, "Bootstrap memory observation: %s\n", item.label)
+		}
+	}
+	return result.String()
+}

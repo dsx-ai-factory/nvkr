@@ -373,7 +373,8 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 						for _, suffix := range []string{".log", "-ttyS0.log", "-ttyS1.log"} {
 							raw, readErr := readRunFile(cleanup, out, "native-console-"+row.ID+suffix, 8<<20)
 							if readErr == nil {
-								reportNativeBootstrapObservation(runner, nativeBootstrapKubeadmSummary(string(raw)))
+								console := string(raw)
+								reportNativeBootstrapObservation(runner, nativeBootstrapKubeadmSummary(console)+nativeBootstrapMemorySummary(console))
 							}
 						}
 					}

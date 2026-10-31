@@ -150,3 +150,22 @@ func TestNativeBootstrapKubeadmClientObservationsKeepTransportPrivate(t *testing
 		})
 	}
 }
+
+func TestNativeBootstrapMemoryObservationsKeepConsolePrivate(t *testing.T) {
+	const cgroup = "Memory cgroup out of memory: Killed process 123 (PRIVATE_PROCESS) total-vm:456kB PRIVATE_CREDENTIAL"
+	const kernel = "Out of memory: Killed process 789 (PRIVATE_PROCESS) total-vm:456kB PRIVATE_CREDENTIAL"
+	for _, tc := range []struct{ name, console, want string }{
+		{"cgroup", cgroup, "Bootstrap memory observation: cgroup-oom-kill\n"},
+		{"kernel", kernel, "Bootstrap memory observation: kernel-oom-kill\n"},
+		{"both", kernel + "\n" + cgroup, "Bootstrap memory observation: cgroup-oom-kill\nBootstrap memory observation: kernel-oom-kill\n"},
+		{"unclassified", "PRIVATE_UNKNOWN_FAILURE", ""},
+		{"unrelated memory text", "Memory cgroup out of memory: PRIVATE_NOTE", ""},
+		{"unknown marker", "Out of memory planning note PRIVATE_NOTE", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := nativeBootstrapMemorySummary(tc.console); got != tc.want || strings.Contains(got, "PRIVATE_") {
+				t.Fatalf("unsafe or incorrect memory observation: %q", got)
+			}
+		})
+	}
+}

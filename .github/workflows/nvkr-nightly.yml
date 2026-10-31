@@ -140,10 +140,11 @@ jobs:
             timeoutSeconds: 3600
             tenantWorkers: 1
             resources:
+              profile: small
               siteMemoryGiB: 4
               tenantMemoryGiB: 4
               headroomMiB: 1024
-              vcpus: 2
+              vcpus: 4
           EOF
           printf 'NVKR_NVKE_E2E_CONFIG=%s/nightly-e2e.yaml\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Build NVKE and run the existing Go site and tenant E2E with cleanup

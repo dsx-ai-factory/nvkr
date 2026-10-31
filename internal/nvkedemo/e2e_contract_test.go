@@ -212,7 +212,7 @@ esac
 			runner.Env = append(runner.Env, "API_REPLY="+row.api, "NODE_REPLY="+row.nodes, "WAIT_EXIT="+row.wait)
 			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 			defer cancel()
-			attempt := &nativeSiteAttempt{guard: &NetworkGuard{}, assets: NativeAssets{arch: arch}, simulatorWork: work, diskDigest: digest, resources: NativeResources{4, 4, 1024, 4}}
+			attempt := &nativeSiteAttempt{guard: &NetworkGuard{}, assets: NativeAssets{arch: arch}, simulatorWork: work, diskDigest: digest, resources: NativeResources{4, 4, 1024, 4, ""}}
 			err = withNativeSiteScope(ctx, attempt, runner, root, root, nativeE2ESiteSmoke)
 			if (err == nil) != row.valid {
 				t.Fatalf("error=%v", err)

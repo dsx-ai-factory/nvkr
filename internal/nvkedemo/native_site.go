@@ -86,6 +86,9 @@ func runNativeSite(ctx context.Context, cfg NativeConfig, use func(context.Conte
 			result = nvkrerr.Wrap(nvkrerr.CodePreflightFailed, result, "native NVKE demo")
 		}
 	}()
+	if err := admitNativeResourcesForNetwork(cfg.Resources, cfg.Network); err != nil {
+		return err
+	}
 	if err := requireContext(ctx); err != nil {
 		return err
 	}
@@ -311,7 +314,7 @@ func (s *nativeSiteAttempt) startup(ctx context.Context, api, diskURL, out strin
 		ControllerImage: s.assets.Images["controller"].Reference, ProviderImage: s.assets.Images["provisioned-provider"].Reference,
 		HandoffURL: handoff.URL, HandoffToken: handoff.Token, HandoffCertificate: handoff.Certificate,
 		Deployment: &NativeSiteDeployment{NicoURL: api, ImageURL: diskURL, ProfilesImage: s.assets.Images["profiles"].Reference},
-		arch:       s.assets.arch, imageTags: s.assets.importTags,
+		arch:       s.assets.arch, imageTags: s.assets.importTags, resourceProfile: s.resources.Profile,
 	}
 	cfg.ImageImports = make(map[string]string)
 	for role, image := range s.assets.Images {
@@ -628,15 +631,22 @@ func (s *nativeSiteAttempt) namedTenantRequest(ctx context.Context, name string)
 	if err != nil {
 		return TenantRequest{}, err
 	}
+	ovnVersion, _, _, err := selectedOVNOutputs(mode)
+	if err != nil {
+		return TenantRequest{}, err
+	}
+	if err := admitNativeResourceProfile(s.resources.Profile, ovnVersion); err != nil {
+		return TenantRequest{}, err
+	}
 	version, err := nativeKubernetesVersion(ctx, s.assets)
 	if err != nil {
 		return TenantRequest{}, err
 	}
 	request := TenantRequest{
 		Name: name, Kubernetes: version, CNI: "ovn-kubernetes", CNIVersion: siteOVNVersion,
-		ControlPlane: ControlPlaneIntent{Count: 1, Reserved: "1Gi", DisableMonitor: true},
+		ControlPlane: ControlPlaneIntent{Count: 1, Reserved: nativeReservedMemory(s.resources.Profile), DisableMonitor: true},
 		NodePools: []NodePoolIntent{{Name: "worker", Prefix: "w", Count: s.tenantNodeCount() - 1,
-			SystemReserved: "1Gi", KubeReserved: "1Gi", DisableAuto: true, DisableMonitor: true}},
+			SystemReserved: nativeReservedMemory(s.resources.Profile), KubeReserved: nativeReservedMemory(s.resources.Profile), DisableAuto: true, DisableMonitor: true}},
 	}
 	switch mode {
 	case "ovn":

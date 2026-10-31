@@ -36,6 +36,7 @@ type StartupAsset struct {
 type NativeSiteStartup struct {
 	arch                                          string
 	imageTags                                     map[string]string
+	resourceProfile                               string
 	Name, Gateway, ControllerImage, ProviderImage string
 	OVNVersion, OVNImage, KubernetesVersion       string
 	Assets                                        []StartupAsset
@@ -92,6 +93,9 @@ func SiteStartupUserData(ctx context.Context, cfg NativeSiteStartup) (string, er
 	if cfg.OVNVersion == "" {
 		cfg.OVNVersion = siteOVNVersion
 	}
+	if err := admitNativeResourceProfile(cfg.resourceProfile, cfg.OVNVersion); err != nil {
+		return "", err
+	}
 	if err := validateSiteStartup(cfg); err != nil {
 		return "", nvkrerr.Wrap(nvkrerr.CodeUsage, err, "site startup configuration")
 	}
@@ -99,9 +103,13 @@ func SiteStartupUserData(ctx context.Context, cfg NativeSiteStartup) (string, er
 	if err != nil {
 		return "", nvkrerr.Wrap(nvkrerr.CodeUsage, err, "site OVN import")
 	}
-	valuesOVN, err := nativeOVNValuesScript(cfg.OVNVersion, cfg.OVNImage)
+	valuesOVN, err := nativeOVNValuesScriptForProfile(cfg.OVNVersion, cfg.OVNImage, cfg.resourceProfile)
 	if err != nil {
 		return "", nvkrerr.Wrap(nvkrerr.CodeUsage, err, "site OVN values")
+	}
+	kubeletPreparation, err := nativeKubeletProfilePreparation(ctx, cfg.resourceProfile)
+	if err != nil {
+		return "", err
 	}
 	assets := slices.Clone(cfg.Assets)
 	slices.SortFunc(assets, func(a, b StartupAsset) int { return strings.Compare(a.Name, b.Name) })
@@ -112,7 +120,13 @@ func SiteStartupUserData(ctx context.Context, cfg NativeSiteStartup) (string, er
 		"configureSpire":   func() string { return siteSpireConfigurationScript },
 		"spireEnvironment": func(cfg NativeSiteStartup) string { return string(nativeBootstrapSpireEnvironment(cfg)) },
 		"prepareOVN":       func() string { return importOVN + "; " + valuesOVN },
-		"sha":              func(value string) string { return strings.TrimPrefix(value, "sha256:") },
+		"kubeletProfile": func() string {
+			if kubeletPreparation != "" {
+				return "\n" + strings.TrimSuffix(kubeletPreparation, "\n")
+			}
+			return ""
+		},
+		"sha": func(value string) string { return strings.TrimPrefix(value, "sha256:") },
 		"importImage": func(file, reference string) (string, error) {
 			return nativeImageImportScriptForArchitecture(file, reference, cfg.arch)
 		},
