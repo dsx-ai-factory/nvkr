@@ -359,7 +359,7 @@ func TestPublisherEvidenceIsMirrorInvariant(t *testing.T) {
 	buildEvidence := func(resolved *buildgraph.Resolved, graph *ir.Graph,
 		report *pipeline.Report,
 	) *PublisherEvidence {
-		verifiedSBOMs, err := sbom.BuildVerifiedFromReport(context.Background(), resolved, report, nil)
+		verifiedSBOMs, err := sbom.BuildVerifiedFromReport(context.Background(), resolved, report, nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

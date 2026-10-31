@@ -15,6 +15,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/profile"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/trust"
 	"github.com/urfave/cli/v2"
 )
@@ -32,7 +33,7 @@ type qualifiedVerifyDependencies struct {
 	// concrete SBOM/provenance recomputation below. It receives the authenticated
 	// vector receipt and opaque terminal report rather than decoded values or caller
 	// digests, so a test seam cannot accidentally become production authority.
-	VerifyEvidence func(context.Context, trust.DocumentReceipt, *buildgraph.Resolved, *pipeline.Report) error
+	VerifyEvidence func(context.Context, trust.DocumentReceipt, *buildgraph.Resolved, *pipeline.Report, sbom.EvidenceBundleVerifier) error
 }
 
 func defaultQualifiedVerifyDependencies() qualifiedVerifyDependencies {
@@ -297,7 +298,11 @@ func runQualifiedVerify(c *cli.Context, deps qualifiedVerifyDependencies) error 
 
 	strictErr := want.VerifyQualifiedAgainst(c.Context, got)
 	if strictErr == nil {
-		if err := deps.VerifyEvidence(c.Context, vectorReceipt, res, report); err != nil {
+		evidenceVerifier, err := evidenceBundleVerifier(c)
+		if err != nil {
+			return err
+		}
+		if err := deps.VerifyEvidence(c.Context, vectorReceipt, res, report, evidenceVerifier); err != nil {
 			_ = writeQualifiedEvidence(c, want.BuildEvidence(got, attest.VerdictRejected, profileDivs))
 			return err
 		}

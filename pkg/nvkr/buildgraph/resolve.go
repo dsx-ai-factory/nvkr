@@ -236,6 +236,10 @@ func cloneComponent(component catalog.Component) catalog.Component {
 		}
 		if copy.Evidence != nil {
 			evidence := *copy.Evidence
+			if evidence.Signer != nil {
+				signer := *evidence.Signer
+				evidence.Signer = &signer
+			}
 			copy.Evidence = &evidence
 		}
 		component.Prebuilt = &copy

@@ -211,13 +211,24 @@ type Prebuilt struct {
 // ExternalEvidence references the upstream's external SBOM/provenance for a prebuilt
 // (no-compile) artifact (ADR-13 §2/§9). Each Ref, when present, must carry a pinned
 // Digest the referenced bytes must hash to. None=true is the honest "no upstream
-// evidence exists" marker; it is mutually exclusive with any Ref.
+// evidence exists" marker; it is mutually exclusive with any Ref. A Ref is
+// file://, https://, or archive:<member> inside a release executable's pinned
+// archive. Signer is required exactly when the provenance is a Sigstore bundle.
 type ExternalEvidence struct {
-	None             bool   `json:"none,omitempty"`
-	SBOMRef          string `json:"sbomRef,omitempty"`
-	SBOMDigest       string `json:"sbomDigest,omitempty"`
-	ProvenanceRef    string `json:"provenanceRef,omitempty"`
-	ProvenanceDigest string `json:"provenanceDigest,omitempty"`
+	None             bool            `json:"none,omitempty"`
+	SBOMRef          string          `json:"sbomRef,omitempty"`
+	SBOMDigest       string          `json:"sbomDigest,omitempty"`
+	ProvenanceRef    string          `json:"provenanceRef,omitempty"`
+	ProvenanceDigest string          `json:"provenanceDigest,omitempty"`
+	Signer           *EvidenceSigner `json:"signer,omitempty"`
+}
+
+// EvidenceSigner is the keyless identity policy for upstream Sigstore provenance.
+// Identity accepts the prebuilt URL version templates and is rendered from the
+// source pin at load, so a tag bump cannot keep an older release's identity.
+type EvidenceSigner struct {
+	Issuer   string `json:"issuer"`
+	Identity string `json:"identity"`
 }
 
 // Component is a fully-resolved SourceBuildRegistry entry: either a from-source

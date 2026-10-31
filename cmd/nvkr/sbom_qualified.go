@@ -15,6 +15,8 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
+	"github.com/urfave/cli/v2"
 	"golang.org/x/sys/unix"
 )
 
@@ -145,20 +147,31 @@ func (reader evidenceContextReader) Read(buffer []byte) (int, error) {
 	return reader.source.Read(buffer)
 }
 
+// evidenceBundleVerifier selects the pinned cosign verifier for signed upstream
+// evidence. Without --cosign-digest it is nil: signed upstream provenance then
+// fails closed, while unsigned digest-pinned declarations behave as before.
+func evidenceBundleVerifier(c *cli.Context) (sbom.EvidenceBundleVerifier, error) {
+	digest := strings.TrimSpace(c.String("cosign-digest"))
+	if digest == "" {
+		return nil, nil
+	}
+	return sign.NewCosignEvidenceVerifier(strings.TrimSpace(c.String("cosign")), digest, nil)
+}
+
 func buildVerifiedSBOM(ctx context.Context, resolved *buildgraph.Resolved, buildDigest string,
-	artifactHashes map[string]string,
+	artifactHashes map[string]string, verifier sbom.EvidenceBundleVerifier,
 ) (*sbom.VerifiedSet, error) {
-	return sbom.BuildVerified(ctx, resolved, buildDigest, artifactHashes, commandEvidenceReader{})
+	return sbom.BuildVerified(ctx, resolved, buildDigest, artifactHashes, commandEvidenceReader{}, verifier)
 }
 
 func buildDiagnosticSelectedSBOM(ctx context.Context, resolved *buildgraph.Resolved, buildDigest string,
-	artifactHashes map[string]string,
+	artifactHashes map[string]string, verifier sbom.EvidenceBundleVerifier,
 ) (*sbom.VerifiedSet, error) {
-	return sbom.BuildDiagnosticSelected(ctx, resolved, buildDigest, artifactHashes, commandEvidenceReader{})
+	return sbom.BuildDiagnosticSelected(ctx, resolved, buildDigest, artifactHashes, commandEvidenceReader{}, verifier)
 }
 
 func buildVerifiedSBOMFromReport(ctx context.Context, resolved *buildgraph.Resolved,
-	report *pipeline.Report,
+	report *pipeline.Report, verifier sbom.EvidenceBundleVerifier,
 ) (*sbom.VerifiedSet, error) {
-	return sbom.BuildVerifiedFromReport(ctx, resolved, report, commandEvidenceReader{})
+	return sbom.BuildVerifiedFromReport(ctx, resolved, report, commandEvidenceReader{}, verifier)
 }

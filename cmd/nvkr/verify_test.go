@@ -24,6 +24,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/profile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/provenance"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/trust"
 	"github.com/urfave/cli/v2"
 )
@@ -100,7 +101,7 @@ func prebuiltVector(artifactDigest string) *attest.Manifest {
 	}
 }
 
-func acceptTestEvidence(context.Context, trust.DocumentReceipt, *buildgraph.Resolved, *pipeline.Report) error {
+func acceptTestEvidence(context.Context, trust.DocumentReceipt, *buildgraph.Resolved, *pipeline.Report, sbom.EvidenceBundleVerifier) error {
 	return nil
 }
 
@@ -199,7 +200,7 @@ func TestVerifyEvidenceUsesAuthenticatedVectorAndTerminalPublisherAuthority(t *t
 		t.Fatal(err)
 	}
 	report := prebuiltReport(t, testArtifactDigest)
-	verifiedSBOM, err := buildVerifiedSBOMFromReport(ctx, resolved, report)
+	verifiedSBOM, err := buildVerifiedSBOMFromReport(ctx, resolved, report, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +224,7 @@ func TestVerifyEvidenceUsesAuthenticatedVectorAndTerminalPublisherAuthority(t *t
 		t.Fatal(err)
 	}
 	receipt := authenticateVectorReceipt(t, raw)
-	if err := verifyEvidenceDigests(ctx, receipt, resolved, report); err != nil {
+	if err := verifyEvidenceDigests(ctx, receipt, resolved, report, nil); err != nil {
 		t.Fatalf("matching authenticated publisher evidence failed: %v", err)
 	}
 
@@ -236,10 +237,10 @@ func TestVerifyEvidenceUsesAuthenticatedVectorAndTerminalPublisherAuthority(t *t
 		t.Fatal(err)
 	}
 	wrongReceipt := authenticateVectorReceipt(t, wrongRaw)
-	if err := verifyEvidenceDigests(ctx, wrongReceipt, resolved, report); cliErrorCode(err) != nvkrerr.CodeVerifyFailed {
+	if err := verifyEvidenceDigests(ctx, wrongReceipt, resolved, report, nil); cliErrorCode(err) != nvkrerr.CodeVerifyFailed {
 		t.Fatalf("signed but false publisher evidence was not rejected: %v", err)
 	}
-	if err := verifyEvidenceDigests(ctx, trust.DocumentReceipt{}, resolved, report); cliErrorCode(err) != nvkrerr.CodeSignatureInvalid {
+	if err := verifyEvidenceDigests(ctx, trust.DocumentReceipt{}, resolved, report, nil); cliErrorCode(err) != nvkrerr.CodeSignatureInvalid {
 		t.Fatalf("zero authenticated-vector receipt was not rejected: %v", err)
 	}
 }

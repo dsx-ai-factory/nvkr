@@ -92,7 +92,7 @@ func TestBuildVerifiedReadsAndHashesExternalEvidence(t *testing.T) {
 		}
 	})
 	set, err := BuildVerified(context.Background(), resolved, buildDigest,
-		map[string]string{"prebuilt": artifactDigest}, reader)
+		map[string]string{"prebuilt": artifactDigest}, reader, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,24 +134,24 @@ func TestBuildVerifiedRejectsTamperedAbsentAndUnpinnedMaterial(t *testing.T) {
 	artifacts := map[string]string{"prebuilt": artifactDigest}
 
 	tampered := EvidenceReaderFunc(func(context.Context, string) ([]byte, error) { return []byte("tampered"), nil })
-	if _, err := BuildVerified(context.Background(), resolved, buildDigest, artifacts, tampered); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
+	if _, err := BuildVerified(context.Background(), resolved, buildDigest, artifacts, tampered, nil); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
 		t.Fatalf("tampered external evidence must fail closed, got %v", err)
 	}
-	if _, err := BuildVerified(context.Background(), resolved, buildDigest, artifacts, nil); sbomCode(err) != nvkrerr.CodeUnavailable {
+	if _, err := BuildVerified(context.Background(), resolved, buildDigest, artifacts, nil, nil); sbomCode(err) != nvkrerr.CodeUnavailable {
 		t.Fatalf("missing reader must fail closed, got %v", err)
 	}
-	if _, err := BuildVerified(context.Background(), resolved, buildDigest, nil, tampered); sbomCode(err) != nvkrerr.CodeProvenanceMissing {
+	if _, err := BuildVerified(context.Background(), resolved, buildDigest, nil, tampered, nil); sbomCode(err) != nvkrerr.CodeProvenanceMissing {
 		t.Fatalf("missing artifact digest must fail closed, got %v", err)
 	}
 	if _, err := BuildVerified(context.Background(), resolved, buildDigest,
-		map[string]string{"prebuilt": "sha256:" + strings.Repeat("f", 64)}, tampered); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
+		map[string]string{"prebuilt": "sha256:" + strings.Repeat("f", 64)}, tampered, nil); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
 		t.Fatalf("caller subject differing from the build-pinned prebuilt artifact must fail closed, got %v", err)
 	}
 	unpinned := *evidence
 	unpinned.SBOMDigest = "latest"
 	resolved.Components[0].Prebuilt.Evidence = &unpinned
 	if _, err := BuildVerified(context.Background(), resolved, buildDigest,
-		map[string]string{"prebuilt": artifactDigest}, tampered); sbomCode(err) != nvkrerr.CodeUnpinnedSource {
+		map[string]string{"prebuilt": artifactDigest}, tampered, nil); sbomCode(err) != nvkrerr.CodeUnpinnedSource {
 		t.Fatalf("unpinned external evidence must fail closed, got %v", err)
 	}
 }
@@ -159,7 +159,7 @@ func TestBuildVerifiedRejectsTamperedAbsentAndUnpinnedMaterial(t *testing.T) {
 func TestEvidenceNoneIsWaiverSignalNeverReceipt(t *testing.T) {
 	resolved, buildDigest, artifactDigest := prebuiltResolved(t, &catalog.ExternalEvidence{None: true})
 	set, err := BuildVerified(context.Background(), resolved, buildDigest,
-		map[string]string{"prebuilt": artifactDigest}, nil)
+		map[string]string{"prebuilt": artifactDigest}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func TestBuildVerifiedHonorsContext(t *testing.T) {
 	cancel()
 	reader := EvidenceReaderFunc(func(context.Context, string) ([]byte, error) { return body, nil })
 	if _, err := BuildVerified(ctx, resolved, buildDigest,
-		map[string]string{"prebuilt": artifactDigest}, reader); sbomCode(err) != nvkrerr.CodeTimeout {
+		map[string]string{"prebuilt": artifactDigest}, reader, nil); sbomCode(err) != nvkrerr.CodeTimeout {
 		t.Fatalf("canceled acquisition must return timeout, got %v", err)
 	}
 }
@@ -205,11 +205,11 @@ func TestBuildVerifiedRequiresExactArtifactSetAndCanonicalReferences(t *testing.
 	})
 
 	if _, err := BuildVerified(nil, resolved, buildDigest, //nolint:staticcheck // verifies the nil-context fail-closed contract
-		map[string]string{"prebuilt": artifactDigest}, reader); sbomCode(err) != nvkrerr.CodeUsage {
+		map[string]string{"prebuilt": artifactDigest}, reader, nil); sbomCode(err) != nvkrerr.CodeUsage {
 		t.Fatalf("nil context must fail as usage, got %v", err)
 	}
 	if _, err := BuildVerified(context.Background(), resolved, buildDigest,
-		map[string]string{"prebuilt": artifactDigest, "unselected": artifactDigest}, reader); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
+		map[string]string{"prebuilt": artifactDigest, "unselected": artifactDigest}, reader, nil); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
 		t.Fatalf("an extra artifact identity must fail closed, got %v", err)
 	}
 	if readerCalls != 0 {
@@ -220,7 +220,7 @@ func TestBuildVerifiedRequiresExactArtifactSetAndCanonicalReferences(t *testing.
 	badRef.SBOMRef += " "
 	resolved, buildDigest, artifactDigest = prebuiltResolved(t, &badRef)
 	if _, err := BuildVerified(context.Background(), resolved, buildDigest,
-		map[string]string{"prebuilt": artifactDigest}, reader); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
+		map[string]string{"prebuilt": artifactDigest}, reader, nil); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
 		t.Fatalf("non-canonical evidence reference must fail closed, got %v", err)
 	}
 	if readerCalls != 0 {
@@ -236,7 +236,7 @@ func TestBuildDiagnosticSelectedScopesCallerObservationWithoutMintingAuthority(t
 	}
 	hashes := map[string]string{"beta": report.Artifacts[0].SHA256}
 
-	set, err := BuildDiagnosticSelected(context.Background(), resolved, report.BuildDigest, hashes, nil)
+	set, err := BuildDiagnosticSelected(context.Background(), resolved, report.BuildDigest, hashes, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,11 +250,11 @@ func TestBuildDiagnosticSelectedScopesCallerObservationWithoutMintingAuthority(t
 	if _, err := set.LocalReceipts(); sbomCode(err) != nvkrerr.CodePreflightFailed {
 		t.Fatalf("diagnostic subset minted publisher authority: %v", err)
 	}
-	if _, err := BuildVerified(context.Background(), resolved, report.BuildDigest, hashes, nil); sbomCode(err) != nvkrerr.CodeProvenanceMissing {
+	if _, err := BuildVerified(context.Background(), resolved, report.BuildDigest, hashes, nil, nil); sbomCode(err) != nvkrerr.CodeProvenanceMissing {
 		t.Fatalf("exhaustive BuildVerified silently accepted a subset: %v", err)
 	}
 	if _, err := BuildDiagnosticSelected(context.Background(), resolved, report.BuildDigest,
-		map[string]string{"unknown": report.Artifacts[0].SHA256}, nil); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
+		map[string]string{"unknown": report.Artifacts[0].SHA256}, nil, nil); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
 		t.Fatalf("unknown diagnostic artifact was accepted: %v", err)
 	}
 }
@@ -274,7 +274,7 @@ func TestBuildVerifiedSnapshotsCallerInputsBeforeExternalIO(t *testing.T) {
 		return body, nil
 	})
 
-	set, err := BuildVerified(context.Background(), resolved, buildDigest, hashes, reader)
+	set, err := BuildVerified(context.Background(), resolved, buildDigest, hashes, reader, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +300,7 @@ func TestBuildVerifiedRejectsUntypedOrWrongSubjectExternalBytes(t *testing.T) {
 			resolved, buildDigest, artifactDigest := prebuiltResolved(t, evidence)
 			reader := EvidenceReaderFunc(func(context.Context, string) ([]byte, error) { return body, nil })
 			if _, err := BuildVerified(context.Background(), resolved, buildDigest,
-				map[string]string{"prebuilt": artifactDigest}, reader); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
+				map[string]string{"prebuilt": artifactDigest}, reader, nil); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
 				t.Fatalf("external bytes without a matching typed subject produced authority: %v", err)
 			}
 		})
@@ -332,7 +332,7 @@ func TestExternalCycloneDXCannotReplayOneSubjectAcrossConflictingArtifactHashes(
 				return append([]byte(nil), body...), nil
 			})
 			if _, err := BuildVerified(context.Background(), resolved, buildDigest,
-				map[string]string{"prebuilt": artifactDigest}, reader); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
+				map[string]string{"prebuilt": artifactDigest}, reader, nil); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
 				t.Fatalf("conflicting SHA-256 rows minted external evidence for %s: %v", artifactDigest, err)
 			}
 		})
@@ -343,7 +343,7 @@ func TestBuildVerifiedRejectsDuplicateResolvedComponents(t *testing.T) {
 	resolved, buildDigest, artifactDigest := prebuiltResolved(t, &catalog.ExternalEvidence{None: true})
 	resolved.Components = append(resolved.Components, resolved.Components[0])
 	if _, err := BuildVerified(context.Background(), resolved, buildDigest,
-		map[string]string{"prebuilt": artifactDigest}, nil); sbomCode(err) != nvkrerr.CodeInvalidCatalog {
+		map[string]string{"prebuilt": artifactDigest}, nil, nil); sbomCode(err) != nvkrerr.CodeInvalidCatalog {
 		t.Fatalf("duplicate resolved component must fail closed, got %v", err)
 	}
 }
@@ -360,7 +360,7 @@ func TestBuildVerifiedFromReportIssuesExactFullAndSubsetPublisherReceipts(t *tes
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			resolved, report := qualifiedSBOMReport(t, test.only, nil)
-			set, err := BuildVerifiedFromReport(context.Background(), resolved, report, nil)
+			set, err := BuildVerifiedFromReport(context.Background(), resolved, report, nil, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -416,11 +416,11 @@ func TestBuildVerifiedFromReportSBOMIndexIsMirrorInvariant(t *testing.T) {
 			onlineReport.BuildDigest, mirrorReport.BuildDigest)
 	}
 
-	online, err := BuildVerifiedFromReport(context.Background(), onlineResolved, onlineReport, nil)
+	online, err := BuildVerifiedFromReport(context.Background(), onlineResolved, onlineReport, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mirror, err := BuildVerifiedFromReport(context.Background(), mirrorResolved, mirrorReport, nil)
+	mirror, err := BuildVerifiedFromReport(context.Background(), mirrorResolved, mirrorReport, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -490,7 +490,7 @@ func TestBuildVerifiedSeparatesExternalVerificationFromPublisherAuthority(t *tes
 		}
 	})
 	set, err := BuildVerified(context.Background(), resolved, buildDigest,
-		map[string]string{"prebuilt": artifactDigest}, reader)
+		map[string]string{"prebuilt": artifactDigest}, reader, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -508,19 +508,19 @@ func TestBuildVerifiedFromReportRejectsFabricationAndCallbackMutation(t *testing
 		BuildDigest: report.BuildDigest,
 		Artifacts:   append([]pipeline.ArtifactResult(nil), report.Artifacts...),
 	}
-	if _, err := BuildVerifiedFromReport(context.Background(), resolved, assembled, nil); sbomCode(err) != nvkrerr.CodePreflightFailed {
+	if _, err := BuildVerifiedFromReport(context.Background(), resolved, assembled, nil, nil); sbomCode(err) != nvkrerr.CodePreflightFailed {
 		t.Fatalf("caller-assembled report minted publisher SBOM authority: %v", err)
 	}
 
 	missing := *report
 	missing.Artifacts = nil
-	if _, err := BuildVerifiedFromReport(context.Background(), resolved, &missing, nil); sbomCode(err) != nvkrerr.CodeVerifyFailed {
+	if _, err := BuildVerifiedFromReport(context.Background(), resolved, &missing, nil, nil); sbomCode(err) != nvkrerr.CodeVerifyFailed {
 		t.Fatalf("report artifact omission did not fail its opaque receipt: %v", err)
 	}
 
 	wrongResolved, _ := snapshotResolved(resolved)
 	wrongResolved.Components[0].Prebuilt.Digests["amd64"] = "sha256:" + strings.Repeat("9", 64)
-	if _, err := BuildVerifiedFromReport(context.Background(), wrongResolved, report, nil); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
+	if _, err := BuildVerifiedFromReport(context.Background(), wrongResolved, report, nil, nil); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
 		t.Fatalf("caller build projection substitution did not fail closed: %v", err)
 	}
 
@@ -534,7 +534,7 @@ func TestBuildVerifiedFromReportRejectsFabricationAndCallbackMutation(t *testing
 		report.Artifacts[0].SHA256 = "sha256:" + strings.Repeat("f", 64)
 		return body, nil
 	})
-	if _, err := BuildVerifiedFromReport(context.Background(), resolved, report, reader); sbomCode(err) != nvkrerr.CodeVerifyFailed {
+	if _, err := BuildVerifiedFromReport(context.Background(), resolved, report, reader, nil); sbomCode(err) != nvkrerr.CodeVerifyFailed {
 		t.Fatalf("external callback mutated qualified report without invalidating authority: %v", err)
 	}
 }
