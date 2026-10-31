@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -215,6 +216,17 @@ func downloadReleaseExecutableWithClient(ctx context.Context, node ir.Node, root
 	defer func() { _ = held.Close() }()
 	if held.Digest() != node.ExecutableArchive.Digest {
 		return "", 0, e.New(e.CodeVerifyFailed, "release carrier digest %s does not match pinned %s", held.Digest(), node.ExecutableArchive.Digest)
+	}
+	// Companions publish before the executable, so a present executable implies
+	// every pinned companion beside it was verified and written.
+	for _, companion := range node.ExecutableArchive.Companions {
+		content, err := releaseasset.Select(ctx, held, held.Size(), node.ExecutableArchive.Format, companion.Member, releaseasset.ToolLimits())
+		if err != nil {
+			return "", 0, err
+		}
+		if _, _, err := writeVerifiedDownload(ctx, bytes.NewReader(content), node.Artifact, root, path.Base(companion.Member), companion.Digest, maxReleaseBytes); err != nil {
+			return "", 0, err
+		}
 	}
 	member, err := releaseasset.Select(ctx, held, held.Size(), node.ExecutableArchive.Format, node.ExecutableArchive.Member, releaseasset.ToolLimits())
 	if err != nil {

@@ -532,6 +532,15 @@ func resolvedDependencies(plan *Plan) []provenance.Dependency {
 						byURI[memberURI] = provenance.Dependency{URI: memberURI,
 							Digest: map[string]string{"sha256": strings.TrimPrefix(node.Digest, "sha256:")}}
 					}
+					for _, companion := range node.ExecutableArchive.Companions {
+						companionURI := "nvkr:prebuilt/" + url.PathEscape(node.Component) + "?" + url.Values{
+							"archive": {node.Artifact}, "member": {companion.Member},
+						}.Encode()
+						if _, seen := byURI[companionURI]; !seen {
+							byURI[companionURI] = provenance.Dependency{URI: companionURI,
+								Digest: map[string]string{"sha256": strings.TrimPrefix(companion.Digest, "sha256:")}}
+						}
+					}
 				}
 				dependency = provenance.Dependency{URI: node.Artifact,
 					Digest: map[string]string{"sha256": strings.TrimPrefix(digest, "sha256:")}}

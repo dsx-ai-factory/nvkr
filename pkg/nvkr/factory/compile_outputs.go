@@ -5,6 +5,7 @@ package factory
 
 import (
 	"path/filepath"
+	"reflect"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
@@ -103,7 +104,7 @@ func selectedTools(definition authored.Definition, environment authored.Environm
 		if pin.Platform != environment.UtilityPlatform {
 			return e.New(e.CodeEngineCapability, "tool %q platform %s does not match utility platform %s", name, pin.Platform, environment.UtilityPlatform)
 		}
-		if previous, exists := tools[name]; exists && previous != pin {
+		if previous, exists := tools[name]; exists && !reflect.DeepEqual(previous, pin) {
 			return e.New(e.CodeUnpinnedSource, "selected catalog tool %q has conflicting pins", name)
 		}
 		tools[name] = pin

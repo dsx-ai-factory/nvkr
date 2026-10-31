@@ -260,6 +260,20 @@ func expandSelectors(selectors []string, artifacts map[string]Artifact) ([]strin
 	return expanded, nil
 }
 
+// releaseCompanionInputs delivers each selected release executable's pinned
+// companions with it; they are never selected independently.
+func releaseCompanionInputs(inputs []string, nodes map[string]Node, artifacts map[string]Artifact) []string {
+	var companions []string
+	for _, input := range inputs {
+		for _, output := range nodes[artifacts[input].Producer].Outputs {
+			if artifacts[output].Kind == ArtifactReleaseCompanion {
+				companions = append(companions, output)
+			}
+		}
+	}
+	return companions
+}
+
 func observationInputs(inputs []string, artifacts map[string]Artifact) []string {
 	seen := map[string]bool{}
 	for _, input := range inputs {

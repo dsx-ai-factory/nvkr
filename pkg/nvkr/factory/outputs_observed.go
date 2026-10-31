@@ -7,6 +7,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 
@@ -54,7 +55,7 @@ func ObserveWorkspaceLifecyclePayload(ctx context.Context, plan *Plan, expected 
 
 // observeProducerPayload owns the same-output join. Pipeline owns decoding the
 // selected record and rechecking bytes against the exact producer instruction.
-func observeProducerPayload(ctx context.Context, plan *Plan, input Artifact, artifacts map[string]Artifact) (pipeline.ArtifactResult, error) {
+func producerInstructionFor(plan *Plan, input Artifact) (ir.Node, error) {
 	var instruction ir.Node
 	producers := 0
 	for _, build := range plan.Builds {
@@ -69,7 +70,41 @@ func observeProducerPayload(ctx context.Context, plan *Plan, input Artifact, art
 		}
 	}
 	if producers != 1 || instruction.OutputType != input.Kind {
-		return pipeline.ArtifactResult{}, e.New(e.CodeVerifyFailed, "output %q has no unique declared producer for %q", input.BuildTarget, input.Component)
+		return ir.Node{}, e.New(e.CodeVerifyFailed, "output %q has no unique declared producer for %q", input.BuildTarget, input.Component)
+	}
+	return instruction, nil
+}
+
+// observeReleaseCompanions authenticates each pinned companion of input's
+// release executable and returns its digest by delivered name.
+func observeReleaseCompanions(ctx context.Context, plan *Plan, input Artifact, artifacts map[string]Artifact) (map[string]string, error) {
+	instruction, err := producerInstructionFor(plan, input)
+	if err != nil || instruction.ExecutableArchive == nil {
+		return nil, err
+	}
+	digests := make(map[string]string, len(instruction.ExecutableArchive.Companions))
+	for _, companion := range instruction.ExecutableArchive.Companions {
+		name := path.Base(companion.Member)
+		artifact, ok := artifacts[releaseCompanionID(input.BuildTarget, input.Component, name)]
+		if !ok || artifact.Kind != ArtifactReleaseCompanion || artifact.Producer != input.Producer {
+			return nil, e.New(e.CodeReleaseIncomplete, "output %q omits pinned companion %q of %q", input.BuildTarget, name, input.Component)
+		}
+		digest, err := digestFactoryPath(ctx, artifact.Path)
+		if err != nil {
+			return nil, classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "observing companion %s", artifact.ID))
+		}
+		if digest != companion.Digest {
+			return nil, e.New(e.CodeVerifyFailed, "companion %q of %q differs from its archive member pin", name, input.Component)
+		}
+		digests[name] = digest
+	}
+	return digests, nil
+}
+
+func observeProducerPayload(ctx context.Context, plan *Plan, input Artifact, artifacts map[string]Artifact) (pipeline.ArtifactResult, error) {
+	instruction, err := producerInstructionFor(plan, input)
+	if err != nil {
+		return pipeline.ArtifactResult{}, err
 	}
 	var record Artifact
 	matches := 0
@@ -125,11 +160,12 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 		return LifecyclePayloadObservation{}, e.New(e.CodeReleaseIncomplete, "lifecycle output %q has no exact build", expected.Name)
 	}
 	checkedResults := make(map[string]pipeline.ArtifactResult, len(expected.Components))
+	companions := map[string]string{}
 	verifyRawResults := func() error {
 		seen := map[string]bool{}
 		for _, inputID := range node.Inputs {
 			input := artifacts[inputID]
-			if input.BuildTarget == "" || input.Component == "" || input.Kind == "producer-result" {
+			if input.BuildTarget == "" || input.Component == "" || input.Kind == "producer-result" || input.Kind == ArtifactReleaseCompanion {
 				continue
 			}
 			if input.BuildTarget != buildName {
@@ -144,6 +180,16 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 				return err
 			}
 			checkedResults[input.Component] = result
+			pinned, err := observeReleaseCompanions(ctx, plan, input, artifacts)
+			if err != nil {
+				return err
+			}
+			for name, digest := range pinned {
+				if _, exists := companions[name]; exists {
+					return e.New(e.CodeVerifyFailed, "lifecycle output %q repeats companion %q", expected.Name, name)
+				}
+				companions[name] = digest
+			}
 		}
 		if len(seen) != len(expected.Components) {
 			return e.New(e.CodeVerifyFailed, "lifecycle output %q producer membership differs from its plan binding", expected.Name)
@@ -184,14 +230,22 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "lifecycle output %q bundle platform differs from its exact build target", expected.Name)
 		}
 		components = components[:0]
+		delivered := 0
 		for _, entry := range bundle.Entries {
+			if digest, ok := companions[entry.Name]; ok {
+				if entry.SHA256 != digest || entry.Mode&0o111 != 0 {
+					return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "lifecycle output %q companion %q differs from its pin", expected.Name, entry.Name)
+				}
+				delivered++
+				continue
+			}
 			components = append(components, entry.Name)
 			resultRecord, ok := checkedResults[entry.Name]
 			if !ok || resultRecord.SHA256 != entry.SHA256 || resultRecord.Size != entry.Size {
 				return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "lifecycle output %q component %q has no exact producer result", expected.Name, entry.Name)
 			}
 		}
-		if !equalFactoryStrings(components, expected.Components) {
+		if !equalFactoryStrings(components, expected.Components) || delivered != len(companions) {
 			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "lifecycle output %q members differ from its plan binding", expected.Name)
 		}
 		descriptor, err := delivery.PayloadDescriptor(ctx, artifact.Path)

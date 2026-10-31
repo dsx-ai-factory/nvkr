@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"io/fs"
+	"path"
 	"reflect"
 	"regexp"
 	"slices"
@@ -745,6 +746,9 @@ func validatePullNode(n Node) error {
 			!safeRelativePath(n.ExecutableArchive.Member) || !canonical.IsDigest(n.ExecutableArchive.Digest) {
 			return e.New(e.CodeInvalidCatalog, "release executable %q requires a pinned HTTPS archive and exact regular member", n.ID)
 		}
+		if err := validateArchiveCompanions(n); err != nil {
+			return err
+		}
 	}
 	switch n.OutputType {
 	case "oci-image":
@@ -905,6 +909,20 @@ func platformArch(platform string) (string, bool) {
 		return "", false
 	}
 	return target.Arch(platform), true
+}
+
+// Companions land beside the executable under their base names; every
+// delivered name must be distinct and every member exactly pinned.
+func validateArchiveCompanions(n Node) error {
+	names := map[string]bool{n.Component: true, path.Base(n.ExecutableArchive.Member): true}
+	for i, companion := range n.ExecutableArchive.Companions {
+		if !safeRelativePath(companion.Member) || !canonical.IsDigest(companion.Digest) ||
+			(i > 0 && n.ExecutableArchive.Companions[i-1].Member >= companion.Member) || names[path.Base(companion.Member)] {
+			return e.New(e.CodeInvalidCatalog, "release executable %q requires sorted, distinct and pinned companion members", n.ID)
+		}
+		names[path.Base(companion.Member)] = true
+	}
+	return nil
 }
 
 func safeRelativePath(value string) bool {

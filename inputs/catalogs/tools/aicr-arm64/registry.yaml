@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog/v3
+kind: SourceBuildRegistry
+metadata:
+  name: aicr-arm64
+  description: Native Linux ARM64 AICR CLI release with its binary attestation delivered beside the executable.
+components:
+  aicr:
+    source: aicr
+    platforms: [linux/arm64]
+    outputType: host-package
+    prebuilt:
+      releaseExecutable: true
+      evidence:
+        none: true
+sources:
+  aicr:
+    repo: https://github.com/NVIDIA/aicr
+    constraint: 1.1.x
+    tool:
+      format: tar-gzip
+      url: https://github.com/NVIDIA/aicr/releases/download/{{.Tag}}/aicr_{{.Version}}_linux_arm64.tar.gz
+      platform: linux/arm64
+      executablePath: aicr
+      companions: [aicr-attestation.sigstore.json]
