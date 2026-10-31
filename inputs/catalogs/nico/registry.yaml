@@ -36,6 +36,10 @@ components:
     writeDir: bin
     platforms: [linux/amd64, linux/arm64]
     outputType: oci-image
+    # Pin-derived, so a pin update restamps the version and revision without editing the command.
+    versionStamp:
+      NICO_VERSION: "{{.Tag}}"
+      NICO_COMMIT: "{{.Commit}}"
     buildCommand:
       - sh
       - -euc
@@ -49,6 +53,7 @@ components:
             debian='arm64v8/debian:12-slim=docker-image://docker.io/arm64v8/debian@sha256:acad2f5f6d93d7a3d5e2e2c74c62176a08b7b95721801c752ecaab0885dd136d' ;;
           *) echo 'Unsupported NICo Core architecture' >&2; exit 1 ;;
         esac
+        revision="$(printf '%.8s' "$NICO_COMMIT")"
         layouts="$(mktemp -d)"
         for base in build:"$rust" runtime:"$debian"; do
           buildctl-daemonless.sh build --frontend dockerfile.v0 \
@@ -77,7 +82,7 @@ components:
           --opt "context:nico-core-build=oci-layout://build@$build_digest" \
           --opt "build-arg:CONTAINER_RUNTIME_$arg=nico-core-runtime" \
           --opt "context:nico-core-runtime=oci-layout://runtime@$runtime_digest" \
-          --opt build-arg:VERSION=v2.2.2 --opt build-arg:CI_COMMIT_SHORT_SHA=80d131a5 \
+          --opt "build-arg:VERSION=$NICO_VERSION" --opt "build-arg:CI_COMMIT_SHORT_SHA=$revision" \
           --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
           --output 'type=oci,dest=/src/bin/nico-core-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true'
   # The optional nico-flow subchart's image; the standalone REST charts are not packaged here.
@@ -90,16 +95,19 @@ components:
     writeDir: bin
     platforms: [linux/amd64, linux/arm64]
     outputType: oci-image
+    # The Flow Dockerfile declares no revision argument, so only the version is stamped.
+    versionStamp:
+      NICO_VERSION: "{{.Tag}}"
     buildCommand:
       - sh
-      - -ec
+      - -euc
       - >-
         buildctl-daemonless.sh build --frontend dockerfile.v0
         --local context=/src/rest-api --local dockerfile=/src/rest-api/docker/production
         --opt filename=Dockerfile.nico-flow --opt platform=linux/{{.Arch}}
         --opt context:golang:1.26.4=docker-image://docker.io/library/golang@sha256:f96cc555eb8db430159a3aa6797cd5bae561945b7b0fe7d0e284c63a3b291609
         --opt context:nvcr.io/nvidia/distroless/go:v4.0.8=docker-image://nvcr.io/nvidia/distroless/go@sha256:938bd28ce4ddb800118a951774203e7563c2067a72b20ae6b85d2c7da165a178
-        --opt build-arg:VERSION=v2.2.2 --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
+        --opt "build-arg:VERSION=$NICO_VERSION" --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
         --output type=oci,dest=/src/bin/nico-flow-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true
 sources:
   nico:
