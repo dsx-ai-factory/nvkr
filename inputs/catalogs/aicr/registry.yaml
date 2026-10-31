@@ -1,0 +1,174 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog/v3
+kind: SourceBuildRegistry
+metadata:
+  name: aicr-bundles
+  description: Pinned AICR renders packaged as OCI deployment bundles; no cluster execution or hardware qualification.
+sources:
+  aicr:
+    repo: https://github.com/NVIDIA/aicr
+    # Existing measured Go 1.27.2 image; GNU tar/gzip are part of these pinned bytes.
+    toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
+    vendorCommand:
+      - bash
+      - -euo
+      - pipefail
+      - -c
+      - |
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=readonly
+        pins="$(sha256sum go.mod go.sum)"
+        timeout --kill-after=10s 900s go mod download
+        timeout --kill-after=10s 180s go mod verify
+        GOPROXY=off timeout --kill-after=10s 900s go mod vendor
+        printf '%s\n' "$pins" | sha256sum -c -
+components:
+  aicr-gb300-generic-training-argocd:
+    fromSource: true
+    source: aicr
+    cgo: false
+    platforms: [linux/amd64, linux/arm64]
+    outputType: tarball
+    artifactPath: bin/nvkr-aicr/bundle.tar.gz
+    writeDir: bin/nvkr-aicr
+    versionStamp:
+      BUILD_VERSION: '0.0.0-nvkr.{{slice .Commit 0 12}}'
+      GIT_VERSION: '{{.Commit}}'
+    buildCommand:
+      - bash
+      - -euo
+      - pipefail
+      - -c
+      - &render-aicr-bundle |
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off
+        build_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
+        out=/src/bin/nvkr-aicr
+        mkdir -p "$out"
+        timeout --kill-after=10s 900s go build -mod=vendor -trimpath -buildvcs=false \
+          -ldflags "-s -w -buildid= -X github.com/NVIDIA/aicr/pkg/cli.version=$BUILD_VERSION -X github.com/NVIDIA/aicr/pkg/cli.commit=$GIT_VERSION -X github.com/NVIDIA/aicr/pkg/cli.date=$build_date" \
+          -o "$out/aicr" ./cmd/aicr
+        timeout --kill-after=10s 120s "$out/aicr" recipe \
+          --service "$1" --accelerator "$2" \
+          --os ubuntu --intent training --output "$out/recipe.yaml"
+        timeout --kill-after=10s 120s "$out/aicr" bundle \
+          --recipe "$out/recipe.yaml" --deployer "$3" \
+          --output "$out/bundle"
+        timeout --kill-after=10s 120s "$out/aicr" verify "$out/bundle"
+        (
+          cd "$out/bundle"
+          find . -mindepth 1 -printf '%P\0' | LC_ALL=C sort -z | \
+            tar --null --no-recursion --files-from=- --format=pax \
+              --pax-option=exthdr.name=%d/PaxHeaders/%f,delete=atime,delete=ctime --mtime="@$SOURCE_DATE_EPOCH" \
+              --owner=0 --group=0 --numeric-owner -cf "$out/bundle.tar"
+        )
+        gzip -n -c "$out/bundle.tar" > "$out/bundle.tar.gz"
+      - nvkr-aicr-bundle
+      - generic
+      - gb300
+      - argocd
+  aicr-gb300-generic-training-argocd-helm:
+    fromSource: true
+    source: aicr
+    cgo: false
+    platforms: [linux/amd64, linux/arm64]
+    outputType: tarball
+    artifactPath: bin/nvkr-aicr/bundle.tar.gz
+    writeDir: bin/nvkr-aicr
+    versionStamp:
+      BUILD_VERSION: '0.0.0-nvkr.{{slice .Commit 0 12}}'
+      GIT_VERSION: '{{.Commit}}'
+    buildCommand:
+      - bash
+      - -euo
+      - pipefail
+      - -c
+      - *render-aicr-bundle
+      - nvkr-aicr-bundle
+      - generic
+      - gb300
+      - argocd-helm
+  aicr-gb300-generic-training-flux:
+    fromSource: true
+    source: aicr
+    cgo: false
+    platforms: [linux/amd64, linux/arm64]
+    outputType: tarball
+    artifactPath: bin/nvkr-aicr/bundle.tar.gz
+    writeDir: bin/nvkr-aicr
+    versionStamp:
+      BUILD_VERSION: '0.0.0-nvkr.{{slice .Commit 0 12}}'
+      GIT_VERSION: '{{.Commit}}'
+    buildCommand:
+      - bash
+      - -euo
+      - pipefail
+      - -c
+      - *render-aicr-bundle
+      - nvkr-aicr-bundle
+      - generic
+      - gb300
+      - flux
+  aicr-gb300-generic-training-helm:
+    fromSource: true
+    source: aicr
+    cgo: false
+    platforms: [linux/amd64, linux/arm64]
+    outputType: tarball
+    artifactPath: bin/nvkr-aicr/bundle.tar.gz
+    writeDir: bin/nvkr-aicr
+    versionStamp:
+      BUILD_VERSION: '0.0.0-nvkr.{{slice .Commit 0 12}}'
+      GIT_VERSION: '{{.Commit}}'
+    buildCommand:
+      - bash
+      - -euo
+      - pipefail
+      - -c
+      - *render-aicr-bundle
+      - nvkr-aicr-bundle
+      - generic
+      - gb300
+      - helm
+  aicr-gb300-generic-training-helmfile:
+    fromSource: true
+    source: aicr
+    cgo: false
+    platforms: [linux/amd64, linux/arm64]
+    outputType: tarball
+    artifactPath: bin/nvkr-aicr/bundle.tar.gz
+    writeDir: bin/nvkr-aicr
+    versionStamp:
+      BUILD_VERSION: '0.0.0-nvkr.{{slice .Commit 0 12}}'
+      GIT_VERSION: '{{.Commit}}'
+    buildCommand:
+      - bash
+      - -euo
+      - pipefail
+      - -c
+      - *render-aicr-bundle
+      - nvkr-aicr-bundle
+      - generic
+      - gb300
+      - helmfile
+  aicr-gb300-generic-training-terraform:
+    fromSource: true
+    source: aicr
+    cgo: false
+    platforms: [linux/amd64, linux/arm64]
+    outputType: tarball
+    artifactPath: bin/nvkr-aicr/bundle.tar.gz
+    writeDir: bin/nvkr-aicr
+    versionStamp:
+      BUILD_VERSION: '0.0.0-nvkr.{{slice .Commit 0 12}}'
+      GIT_VERSION: '{{.Commit}}'
+    buildCommand:
+      - bash
+      - -euo
+      - pipefail
+      - -c
+      - *render-aicr-bundle
+      - nvkr-aicr-bundle
+      - generic
+      - gb300
+      - terraform

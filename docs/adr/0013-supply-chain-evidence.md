@@ -139,10 +139,16 @@ catalog. Adding those declarations or outputs changes canonical plan identity an
 The internal index uses `nvkr.dev/sbom-index/v2`; generated CycloneDX properties bind `nvkr:buildDigest`.
 Replacing the former Recipe binding changes document identity; old evidence is not silently translated.
 
+A generic `bundle-oci` output always receives the internal `bundle-files/v1` inventory defined by
+[ADR-25](0025-generic-oci-bundles-and-aicr-producers.md), even without `sbomTool`. It binds every regular
+archive file's relative path, exact hash, size and mode to the observed archive. Packaging evidence separately
+binds the final OCI manifest and that archive's inspection digest. Referenced charts, images, Terraform
+providers and runtime packages are not downloaded or inspected; this is delivered-file coverage only.
+
 A Definition may select a catalog-pinned Syft executable through `sbomTool`. Both maintained NVKE
 Environments require it. The graph then requires each observed payload and the acquired scanner as explicit
 SBOM inputs. Missing payloads, missing scanner pins, unsupported formats, mismatched bytes, scanner errors and
-empty inventories fail closed. Without `sbomTool`, ordinary declaration-only documents provide source
+empty inventories fail closed. Without `sbomTool`, ordinary non-bundle declaration-only documents provide source
 metadata; they do not claim dependency inspection. The separate full-disk profile pins its own scanner
 and does not require a second catalog scanner selection; when both select the same native platform their
 pins must agree. A catalog scanner for another platform does not replace the native inspection-profile pin.
@@ -216,8 +222,8 @@ an exact observed version: equal names with unknown versions do not prove identi
 Per-material mixed scanner/package-reader/file-walk documents use the descriptive `disk-content/v1`
 inspection method, not `syft-cyclonedx/v1`. Only the final correspondence operation uses
 `disk-reconciled/v1` with an `operating-system` subject. File dependency inventories are admitted only
-for these per-artifact disk methods and the separately scoped `archive-content/v1` method below,
-not ordinary Helm/Syft dependency documents. Source declarations
+for these per-artifact disk methods, the separately scoped `archive-content/v1` method below, and
+ADR-25's `bundle-files/v1` method, not ordinary Helm/Syft dependency documents. Source declarations
 cannot relabel the inspected disk subject. This is descriptive vocabulary validation: neither a subject
 type nor a method string restores a runtime receipt or grants publication authority.
 

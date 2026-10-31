@@ -379,6 +379,15 @@ func inspectOutputs(ctx context.Context, layout string, inspection Inspection, s
 		}
 		members := append([]string(nil), output.Components...)
 		switch output.Kind {
+		case outputFormatBundle:
+			manifest, err := flatManifest(ctx, layout, object)
+			if err != nil {
+				return nil, err
+			}
+			if err := inspectBundleMetadata(ctx, layout, manifest, &object); err != nil {
+				return nil, err
+			}
+			platforms[output.Name] = publicationPlatform{OS: object.OS, Arch: object.Arch}
 		case "disk-image":
 			observed, found := disks[object.DescriptorDigest]
 			if !found || observed.ManifestDigest != object.DescriptorDigest || observed.ArtifactType != object.ArtifactType ||

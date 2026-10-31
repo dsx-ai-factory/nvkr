@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/bundlearchive"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
@@ -93,10 +94,10 @@ func inspectPathDependencies(ctx context.Context, artifactPath, artifactDigest, 
 	if !canonical.IsDigest(artifactDigest) {
 		return DependencyInventory{}, e.New(e.CodeUnverifiedRef, "dependency inspection requires an exact artifact digest")
 	}
-	if kind != "host-package" && kind != "oci-image" && kind != "tarball" && kind != "file-archive" {
+	if kind != "host-package" && kind != "oci-image" && kind != "tarball" && kind != "file-archive" && kind != "bundle-archive" {
 		return DependencyInventory{}, e.New(e.CodeEngineCapability, "dependency inspection does not support artifact kind %q", kind)
 	}
-	if kind != "tarball" && kind != "file-archive" {
+	if kind != "tarball" && kind != "file-archive" && kind != "bundle-archive" {
 		if !canonical.IsDigest(scanner.Digest) || scanner.Path == "" {
 			return DependencyInventory{}, e.New(e.CodeProvenanceMissing, "dependency inspection requires a pinned Syft executable")
 		}
@@ -106,7 +107,11 @@ func inspectPathDependencies(ctx context.Context, artifactPath, artifactDigest, 
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
-	subject, err := heldfile.OpenContext(ctx, artifactPath, heldfile.Options{Label: "sbom-subject", MaxBytes: maxInspectionBytes})
+	maxBytes := maxInspectionBytes
+	if kind == "bundle-archive" {
+		maxBytes = bundlearchive.MaxArchiveBytes
+	}
+	subject, err := heldfile.OpenContext(ctx, artifactPath, heldfile.Options{Label: "sbom-subject", MaxBytes: maxBytes})
 	if err != nil {
 		return DependencyInventory{}, e.Wrap(e.CodeVerifyFailed, err, "opening SBOM subject")
 	}
@@ -163,6 +168,9 @@ func InspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind s
 // Debian metadata diagnostics select archive discovery without supplying byte authority.
 func inspectHeldDependencies(ctx context.Context, subject *heldfile.File, kind string, scanner Scanner, debianArchiveMetadata bool) (DependencyInventory, error) {
 	artifactDigest := subject.Digest()
+	if kind == "bundle-archive" {
+		return inspectBundleArchive(ctx, io.NewSectionReader(subject, 0, subject.Size()))
+	}
 	if kind == "file-archive" {
 		components, err := inspectArchiveContents(ctx, io.NewSectionReader(subject, 0, subject.Size()))
 		return DependencyInventory{Components: components, Method: archiveContentMethod}, err

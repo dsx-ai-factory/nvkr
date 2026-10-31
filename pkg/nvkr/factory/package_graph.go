@@ -73,6 +73,8 @@ func derivePublication(definition authored.Definition, environment authored.Envi
 			spec.Component = output.APT.Component
 		case authored.OutputHelm:
 			spec.Kind = PackageHelm
+		case authored.OutputBundle:
+			spec.Kind = PackageBundle
 		}
 
 		if output.Format == authored.OutputHelm {
@@ -123,7 +125,7 @@ func packageProducerResults(inputs []string, nodes map[string]Node, artifacts ma
 		seen[inputID] = true
 		input := artifacts[inputID]
 		switch input.Kind {
-		case PackageBinaryBundle, PackageAPT, PackageHelm, PackageImage, PackageDiskImage:
+		case PackageBinaryBundle, PackageAPT, PackageHelm, PackageBundle, PackageImage, PackageDiskImage:
 		default:
 			continue
 		}
@@ -312,6 +314,9 @@ func validatePackageInputs(spec packageSpec, inputs []string, artifacts map[stri
 	if spec.Kind == PackageHelm && len(inputs) != 1 {
 		return e.New(e.CodeInvalidCatalog, "Helm package %q requires exactly one tree or source archive", spec.Name)
 	}
+	if spec.Kind == PackageBundle && len(inputs) != 1 {
+		return e.New(e.CodeInvalidCatalog, "bundle package %q requires exactly one source archive", spec.Name)
+	}
 	if spec.Kind == PackageImage && spec.ImageIndex == nil && len(inputs) != 1 {
 		return e.New(e.CodeInvalidCatalog, "container image package %q requires exactly one OCI export", spec.Name)
 	}
@@ -337,6 +342,10 @@ func validatePackageInputs(spec packageSpec, inputs []string, artifacts map[stri
 	for _, id := range inputs {
 		artifact := artifacts[id]
 		switch spec.Kind {
+		case PackageBundle:
+			if artifact.Kind != "tarball" || artifact.BuildTarget != spec.Name || artifact.Component == "" {
+				return e.New(e.CodeInvalidCatalog, "bundle package %q requires its exact source archive producer", spec.Name)
+			}
 		case PackageDiskImage:
 			if artifact.Kind != PackageDiskImage || artifact.BuildTarget != spec.Name || artifact.Component == "" {
 				return e.New(e.CodeInvalidCatalog, "disk package %q requires its exact raw producer subject", spec.Name)
@@ -368,7 +377,7 @@ func validateRouteCompatibility(route Route, target Target, artifact Artifact) e
 			"delivery route %q requires an object-store publication adapter that is not implemented", route.Name)
 	case TargetOCI:
 		switch artifact.Kind {
-		case PackageBinaryBundle, PackageOCI, PackageHelm, PackageImage, PackageDiskImage, "oci-image":
+		case PackageBinaryBundle, PackageOCI, PackageHelm, PackageBundle, PackageImage, PackageDiskImage, "oci-image":
 		default:
 			return e.New(e.CodeInvalidCatalog, "delivery route %q sends unsupported %q to OCI target", route.Name, artifact.Kind)
 		}
@@ -388,6 +397,8 @@ func packageMediaType(kind string) string {
 		return "application/vnd.nvkr.apt-repository.v1"
 	case PackageHelm:
 		return "application/vnd.nvkr.helm-bundle.v1"
+	case PackageBundle:
+		return delivery.MediaBundle
 	default:
 		return delivery.MediaPublicationRoot
 	}

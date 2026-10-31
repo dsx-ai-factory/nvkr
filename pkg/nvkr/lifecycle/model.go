@@ -37,6 +37,7 @@ const (
 	OutputOCI                = definition.OutputOCI
 	OutputAPT                = definition.OutputAPT
 	OutputHelm               = definition.OutputHelm
+	OutputBundle             = definition.OutputBundle
 	OutputDiskImage          = definition.OutputDiskImage
 	OutputDebianPackage      = definition.OutputDebianPackage
 	LaneQualified            = "qualified"

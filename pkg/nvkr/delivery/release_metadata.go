@@ -131,6 +131,11 @@ func validateReleaseMetadata(root PublicationRoot) error {
 			}
 		case outputFormatHelm:
 			kind, media = outputFormatHelm, "application/vnd.nvkr.helm-bundle.v1"
+		case outputFormatBundle:
+			kind, media = outputFormatBundle, MediaBundle
+			if len(o.Output.Components) != 1 || o.Output.TransportPath != "" || o.SemanticDigest != o.BlobDigest {
+				return e.New(e.CodeVerifyFailed, "bundle output requires one producer and exact archive binding")
+			}
 		case "apt-repository":
 			kind, media = "apt-repository", "application/vnd.nvkr.apt-repository.v1"
 		case "disk-image":

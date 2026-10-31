@@ -76,7 +76,8 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 			continue
 		}
 		disk := plan.hasCompiledDiskTarget(node.BuildTarget, artifacts)
-		if !disk && definition.SBOMTool == "" {
+		bundle := plan.hasBundleTarget(node.BuildTarget)
+		if !disk && !bundle && definition.SBOMTool == "" {
 			continue
 		}
 		components := map[string]bool{}
@@ -90,7 +91,7 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 				node.Inputs = append(node.Inputs, artifact.ID)
 			}
 		}
-		if !disk {
+		if !disk && definition.SBOMTool != "" {
 			node.Inputs = append(node.Inputs, "tool/"+definition.SBOMTool)
 		}
 		node.Inputs = uniqueSorted(node.Inputs)
@@ -141,6 +142,13 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 				input := artifacts[inputs[0]]
 				inputs = append(inputs, "result/"+input.BuildTarget+"/"+input.Component)
 			}
+		}
+		if spec.Kind == PackageBundle {
+			input := artifacts[inputs[0]]
+			if nodes[input.Producer].Kind != NodeBuild {
+				return ArtifactGraph{}, e.New(e.CodeInvalidCatalog, "bundle package %q requires a source build", spec.Name)
+			}
+			inputs = append(inputs, "result/"+input.BuildTarget+"/"+input.Component)
 		}
 		// Packaging is explicitly gated by each target's terminal observation as a
 		// separate input, rather than hiding the policy edge in scheduler needs.

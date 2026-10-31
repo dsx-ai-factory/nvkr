@@ -75,8 +75,8 @@ func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 	if len(boms) == 0 {
 		return e.New(e.CodePipelineDrift, "factory sbom node %q produced no per-artifact SBOM", node.ID)
 	}
-	if tool := plan.Definition.SBOMTool; tool != "" {
-		if !containsString(node.Inputs, "tool/"+tool) || artifacts["tool/"+tool].Kind != "pipeline-tool" {
+	if tool := plan.Definition.SBOMTool; tool != "" || plan.hasBundleTarget(node.BuildTarget) {
+		if tool != "" && (!containsString(node.Inputs, "tool/"+tool) || artifacts["tool/"+tool].Kind != "pipeline-tool") {
 			return e.New(e.CodeProvenanceMissing, "SBOM node omits pinned scanner input")
 		}
 		scanner := sbom.Scanner{Path: artifacts["tool/"+tool].Path, Digest: toolExecutableDigest(plan, tool)}
@@ -117,7 +117,7 @@ func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(stdout, "Inspected %s: %d dependency components (%s)\n", entry.Artifact, len(bom.Components), inventory.Method)
+			fmt.Fprintf(stdout, "Inspected %s: %d inventory entries (%s)\n", entry.Artifact, len(bom.Components), inventory.Method)
 		}
 	}
 	// Validate binds the index's exact subject and evidence digests before any bytes
@@ -164,7 +164,7 @@ func (plan *Plan) validateSBOMGraph() error {
 			continue
 		}
 		disk := plan.hasCompiledDiskTarget(artifact.BuildTarget, artifacts)
-		if tool == "" && !disk {
+		if tool == "" && !disk && !plan.hasBundleTarget(artifact.BuildTarget) {
 			continue
 		}
 		if disk {
@@ -202,10 +202,10 @@ func (plan *Plan) validateSBOMGraph() error {
 			}
 			continue
 		}
-		if tool == "" {
+		if tool == "" && !plan.hasBundleTarget(node.BuildTarget) {
 			continue
 		}
-		if node.Network != ir.NetworkNone || node.Container == "" || !containsString(node.Inputs, "tool/"+tool) {
+		if node.Network != ir.NetworkNone || node.Container == "" || (tool != "" && !containsString(node.Inputs, "tool/"+tool)) {
 			return e.New(e.CodeEngineCapability, "SBOM inspection must be offline with explicit scanner input")
 		}
 		for _, input := range node.Inputs {
@@ -221,7 +221,7 @@ func (plan *Plan) validateSBOMGraph() error {
 					if err != nil {
 						return err
 					}
-					if kind != "host-package" && kind != "oci-image" && kind != "tarball" && kind != "file-archive" {
+					if kind != "host-package" && kind != "oci-image" && kind != "tarball" && kind != "file-archive" && kind != "bundle-archive" {
 						return e.New(e.CodeEngineCapability, "SBOM dependency inspection does not support %q", candidate.Kind)
 					}
 					matches++
@@ -301,11 +301,21 @@ func readProducerResult(ctx context.Context, path string) (pipeline.ArtifactResu
 	return result, nil
 }
 
-// sbomPayloadKind preserves the strict Helm reader and admits generic archive
-// contents only for an exact tarball component selected in an executable bundle.
-// Other wrappers can carry charts without Helm image mappings; their existing
-// interpretation cannot be downgraded by a filename or a failed Helm parse.
+// sbomPayloadKind dispatches archive readers only through exact output and
+// producer selections. Bundle, executable-asset and Helm inventories stay distinct.
 func (plan *Plan) sbomPayloadKind(payload Artifact) (string, error) {
+	if plan.hasBundleTarget(payload.BuildTarget) {
+		for _, output := range plan.Definition.Outputs {
+			if output.Name != payload.BuildTarget || output.Format != authored.OutputBundle || len(output.Components) != 1 || output.Components[0] != payload.Component {
+				continue
+			}
+			producer := planNode(plan, payload.Producer)
+			if payload.Kind == "tarball" && producer.Kind == NodeBuild && producer.BuildTarget == payload.BuildTarget && containsString(producer.Outputs, payload.ID) {
+				return "bundle-archive", nil
+			}
+		}
+		return "", e.New(e.CodeEngineCapability, "bundle SBOM payload %q is not its exact source archive", payload.ID)
+	}
 	if payload.Kind == "tarball" {
 		for _, output := range plan.Definition.Outputs {
 			if output.Name != payload.BuildTarget || output.Format != authored.OutputExecutable || !containsString(output.Components, payload.Component) {

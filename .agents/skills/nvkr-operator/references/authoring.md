@@ -6,6 +6,11 @@ reference](../../../../docs/user-concepts.md), [input index](../../../../inputs/
 [reconciliation](../../../../docs/adr/reconciliation.md) for execution/evidence limits. Customer requests for
 "recipes" usually mean catalog producers; do not introduce a retired authored Recipe schema.
 
+For AICR, read the [maintained bundle inputs](../../../../inputs/definitions/aicr/README.md). Select exact upstream
+recipe coordinates and renderer producers through `bundle-oci`; upstream AICR recipes remain producer
+inputs. Preserve preview and hardware support limits. Generic Helm deployment bundles are distinct from
+native `helm-oci` chart artifacts, and file inventories do not establish deployment or air-gap readiness.
+
 | Requested change | Authored owner |
 |---|---|
 | Outputs, components, platforms, formats, default and per-output catalog stacks (base + ordered overlays), purpose-selected tools, Helm/APT bindings | Definition |

@@ -54,7 +54,7 @@ owns its existing command and architecture-specific toolchain mapping. The raw o
 commands and toolchains already enter Build identity. Package placement in an OS material folder does not
 establish installation or runtime compatibility. See [ADR-10](0010-pluggable-builder-types.md#raw-debian-output).
 
-### 2. AICR rendering — deferred
+### 2. Retired AICR profile model
 
 This ADR previously also owned an accelerated-runtime rendering path: a catalog-declared `aicrProfiles` map, an
 output-owned `aicr` producer selecting a pinned upstream profile and generator, output-owned `aicr.bundle`
@@ -64,8 +64,10 @@ removed: it had no concrete consumer, and the rendering/publication boundary (§
 closed end-to-end. `canonical.KindAICRBundle` remains a permanently reserved, retired digest domain (ADR-01 §3) so
 no future family can silently reuse its identity.
 
-Reintroducing accelerated-runtime rendering requires a new decision once a concrete use case exists; it is not
-implicitly re-admitted by this ADR.
+[ADR-25](0025-generic-oci-bundles-and-aicr-producers.md) admits current AICR rendering through ordinary
+pinned source producers and the generic `bundle-oci` artifact format. It does not restore these retired
+fields, the old qualified adapter or its digest domain. Upstream hardware recipe support and deployment
+acceptance remain explicit limitations of the selected inputs.
 
 ## Consequences
 

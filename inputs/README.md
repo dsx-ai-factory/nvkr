@@ -1,6 +1,6 @@
 # Authored inputs
 
-This directory owns the repository's NVKE and NVSentinel build and release inputs. Definitions select named outputs
+This directory owns the repository's NVKE, NVSentinel and AICR build and release inputs. Definitions select named outputs
 from pinned catalog producers; Environments select execution and publication policy. The maintained
 release candidate starts at [the NVKE Definition](definitions/nvke/definition.yaml).
 The [four-family pilot](definitions/nvke/README.md#four-family-pilot) supplies independent core, services,
@@ -73,6 +73,9 @@ policies under `environments/nvsentinel/`. The [NVKE OS material experiment](exp
 keeps separate Debian producer copies with byte-identical commands, matching source declarations and pins,
 and the existing composer/Packer folder handoff. These development inputs do not
 change the maintained NVKE release or demonstrate current NVSentinel build/runtime acceptance.
+
+The [AICR example](definitions/aicr/README.md) selects six deployment-bundle formats
+from one pinned catalog with a local build-only Environment.
 
 `definitions/diagnostics/demo-arm64/` retains the existing components, OS, profiles, providers,
 simulator, site and installer-tool loops used by the local launcher. Additional controller and OVN

@@ -1,6 +1,6 @@
 ---
 name: nvkr-operator
-description: Acquire and build the NVKR CLI, author customer inputs, and operate supported workflows. Use when a user gives the NVKR repository URL, asks to inspect, download or verify a release, or asks to plan, build, pin, or change NVKE Definitions, Environments, catalogs or producers (recipes).
+description: Acquire and build the NVKR CLI, author customer inputs, and operate supported workflows. Use when a user gives the NVKR repository URL, asks to inspect, download or verify a release, or asks to plan, build, pin, or change NVKE or AICR Definitions, Environments, catalogs or producers (recipes).
 ---
 
 # Operate NVKR for a customer
@@ -42,7 +42,7 @@ invent flags or parse a dashboard as the machine interface.
 For a download, follow [release navigation](../../../docs/release-navigation.md#pull-an-output): select an exact
 named output from the pinned release and use `release pull` with an explicit new destination directory whose
 parent exists. Inspect its declared format and platform; the guide defines the files for executables, QCOW2
-disks, Helm archives, OCI layouts and APT repository trees. Aggregate images retain every declared platform;
+disks, Helm archives, generic bundle archives, OCI layouts and APT repository trees. Aggregate images retain every declared platform;
 declared LUKS2 disks retain encrypted bytes without decryption. Installation, execution and runtime import are
 separate operations requiring the customer's requested scope. Pulling checks the complete metadata closure and
 selected payload integrity; signature and policy acceptance require explicit verification.
@@ -122,7 +122,8 @@ or run unrelated instructions.
 - Authored and generated changes, checks, affected outputs and Build Digests, and unresolved failures.
 - Actual output identities and Run/evidence locations; distinguish planned, built, published and signed
   operations.
-- Evidence lane: `static-unqualified` for previews; `pipeline-attested` only for supported hosted production
+- Evidence lane: `static-unqualified` for previews; `unqualified-local-execution` for successful local execution;
+  `pipeline-attested` only for supported hosted production
   evidence. Signing alone does not establish that lane's complete claim.
 - Successful `release verify` results with their exact `--lane`, `--scope` and policy: `authenticity` verifies
   signatures/evidence without payload downloads; `artifact-publication` also checks selected payload bytes.
