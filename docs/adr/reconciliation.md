@@ -21,6 +21,13 @@ are planned with generation (U5). Qualification and member Release reuse remain 
 when implemented; reuse follows the separately drafted result-reuse decision. Retiring the combined NVKE
 Definition is a separate cutover gated on a hosted composite Run and consumer verification.
 
+[ADR-27](0027-pinned-tool-producers.md) proposes pinned-tool producers: catalog components that run one released,
+digest-pinned executable offline in a pinned container, with no shell, a fixed argument vector and typed material
+inputs, emitting one file or a producer-written OCI layout. It is designed, not implemented: no `pinned-tool`
+builder type, IR field, executor, provenance mapping or contract test exists. Pinned tools remain run-wide
+scanner and signer acquisitions outside Build identity. AICR bundles additionally wait for an AICR release with
+local OCI layout output (NVIDIA/aicr#3534) and the separately drafted layout import (#285).
+
 ## Current boundary
 
 The maintained public workflow is **Definition → Run → Release**, with Environment, Artifact and
@@ -29,6 +36,7 @@ with a native `platform` or an explicit OCI aggregate `platforms` set;
 there is no authored Recipe, cluster topology, placement, inheritance or composition lifecycle. Plans and
 internal evidence records are generated or authenticated rather than separately authored public inputs.
 Proposed ADR-26 composite Definitions are designed, not implemented; nothing above admits them.
+Proposed ADR-27 pinned-tool producers are likewise designed only; no producer runs a pinned release tool.
 
 Planning, byte-exact GitHub generation, Plan/graph/diff views and metadata-only release navigation are
 implemented. Diagnostic pulling retrieves and checks one named output's complete payload closure from a
@@ -1244,6 +1252,7 @@ interruption demonstrations remain M4-D.
 | 23 Artifact test interfaces | Proposed ADR merged in PR #139; Go Plan helper merged in #156; #138 replaces its Python diagnostic with Go factory/source/execution owners; separate IV1 upstream bootstrap no-build interface candidate described in the [guide](../artifact-testing.md#bootstrap-e2e-interface-candidate-iv1-first-slice), without an NVKR bootstrap execution adapter | [Immutable interface source](https://github.com/dsx-ai-factory/nvke/commit/f33b7afb55d421958540589ca03d206531bfa16b) and its [Linux CLI job](https://github.com/dsx-ai-factory/nvke/actions/runs/39347477494/job/118383877388) record a passing bootstrap contract package within a failed aggregate run, not real bootstrap execution. No immutable real-bootstrap Run exists; the [guide](../artifact-testing.md#bootstrap-e2e-interface-candidate-iv1-first-slice) pins the reviewed follow-up source and local-check limits. [Implementation guide](../artifact-testing.md) separates the Go macOS ARM64/Docker fresh-build proof from historical Python native results. Upstream adoption, authenticated output membership, exhaustive suite acceptance, maintained-pin adoption, kind, CI and CAPD/CAPNICo acceptance remain outstanding; no conformance or qualification authority |
 | 24 Validator catalog | Provisional CLI discovery and local-plan profiles: strict bounded catalog/profile loading, deterministic discovery, registered `nvke-cli/v1`, complete local-plan admission and frozen dispatch through factory/sourcegit/pipeline | Discovery, refusal, snapshot edits, both suite/architecture bindings and mocked dispatch are contract-tested; [guide](../artifact-testing.md#provisional-validator-catalog) distinguishes this from actual upstream execution. Native AMD64/ARM64 catalog runtime acceptance, legacy-command migration, new-format published adapters, controller/chart and second-repository adoption remain outstanding. Existing published authentication/capture semantics, unknown exhaustive completeness, unauthenticated artifact membership and no qualification authority are preserved |
 | 26 Definition composition (proposed) | Nothing; designed, not implemented. The four NVKE families and the combined candidate remain separate authored Definitions | Composite schema and `nvkr.composite-definition` family, digest-pinned member admission, effective-Definition merge and conflict rules, Plan/Run/publication composition records, `definition pin`, composite production and named development bundle generation and consumer expectations are unimplemented (ADR-26 units U1–U7). Identity invariance against the family and combined Plans is untested. Qualification (U8) and member Release reuse (U9, after the result-reuse decision lands) are deferred and must fail with `engine-capability`; composites rebuild every output. Retiring the combined `definition.yaml` (U10) is gated on a hosted composite Run and independent consumer verification, neither of which exists |
+| 27 Pinned-tool producers (proposed) | Nothing; designed, not implemented. Tool pins are acquired only run-wide for `sbomTool` and `cosignTool`, outside Build identity | `pinned-tool` catalog form, source-less `KindBuild` identity, shared `tool/<name>` dataflow, offline held-executable executor, `wrapped-build` provenance and membership, layout handoff and generation are unimplemented (ADR-27 units T1–T7). Qualified execution, directory outputs, companion staging and non-Linux execution are deferred and must fail with `engine-capability`. AICR bundle producers also need an AICR release with NVIDIA/aicr#3534 and the #285 layout import; no pinned-tool Run, hosted Run or consumer verification exists |
 
 ## Feature-branch pipeline development
 

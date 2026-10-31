@@ -361,6 +361,14 @@ A catalog declaration describing how to build or acquire a named component from 
 platforms it supports. It carries build or acquisition instructions, never a deployment placement taxonomy.
 _Avoid_: Named output, artifact, authored build group
 
+**Pinned-tool producer**:
+A component producer that runs one released executable, pinned by archive and executable digest, once with a fixed
+argument vector, no shell, no network and only typed material inputs, inside a digest-pinned container. Its
+result is one file or a producer-written OCI layout; build identity covers the tool, arguments, inputs and
+container. It is a `wrapped-build` producer, not an acquisition of the tool. Proposed in
+[ADR-27](docs/adr/0027-pinned-tool-producers.md); not implemented.
+_Avoid_: Run-wide pipeline tool, release executable output, build script
+
 **Component catalog overlay**:
 An ordered, predecessor-bound catalog change replacing a complete component producer or performing an exact
 toolchain-pin substitution for an explicit sorted component set and host architecture. Substitution fails if
