@@ -81,6 +81,42 @@ func validateToolPin(pin ToolPin) error {
 	}
 	return nil
 }
+
+// ArchiveMemberRefPrefix marks an evidence or companion reference that names a
+// regular member of a release executable's pinned archive, beside the executable.
+const ArchiveMemberRefPrefix = "archive:"
+
+// ArchiveMemberRef reports the member named by an archive: reference.
+func ArchiveMemberRef(ref string) (string, bool) {
+	return strings.CutPrefix(ref, ArchiveMemberRefPrefix)
+}
+
+// ArchiveMember authenticates transport bytes against the pin's exact archive
+// digest, then returns one bounded regular companion member. The caller fetches
+// the bytes from pin.URL; this method is the only identity check, so a transport
+// adapter cannot substitute an archive or a member. The selected bytes carry no
+// identity of their own: callers verify them against a separately pinned digest.
+func (pin ToolPin) ArchiveMember(ctx context.Context, archive []byte, member string, maxBytes int64) ([]byte, error) {
+	if ctx == nil {
+		return nil, e.New(e.CodeUsage, "release archive member selection requires a context")
+	}
+	if err := validateToolPin(pin); err != nil {
+		return nil, err
+	}
+	if pin.Format == "raw" || !safeToolPath(member) || member == pin.ExecutablePath ||
+		maxBytes <= 0 || maxBytes > maxToolArchiveBytes {
+		return nil, e.New(e.CodeInvalidCatalog,
+			"release archive companion %q must be a bounded non-executable member of an archive", member)
+	}
+	if got := fmt.Sprintf("sha256:%x", sha256.Sum256(archive)); got != pin.ArchiveDigest {
+		return nil, e.New(e.CodeVerifyFailed,
+			"release archive hashes to %s, not pinned %s", got, pin.ArchiveDigest)
+	}
+	limits := toolArchiveLimits()
+	limits.ExecutableBytes = maxBytes
+	return releaseasset.Select(ctx, bytes.NewReader(archive), int64(len(archive)), pin.Format, member, limits)
+}
+
 func checkToolPin(source *ToolSource, pin Pin) error {
 	if source == nil {
 		if pin.Tool != nil {

@@ -6,6 +6,7 @@ package catalog
 import (
 	"crypto/sha256"
 	"fmt"
+	"net/url"
 	"slices"
 	"sort"
 	"strings"
@@ -566,21 +567,23 @@ func validatePrebuilt(name string, c Component) error {
 				"prebuilt component %q: digest for arch %q (%q) is not pinned by sha256:<64-hex>", name, a, p.Digests[a])
 		}
 	}
-	return validateExternalEvidence(name, p.Evidence)
+	return validateExternalEvidence(name, p)
 }
 
 // validateExternalEvidence enforces ADR-13 §2: a prebuilt component must declare its
 // external evidence explicitly — either `none: true` or a reference whose bytes are
 // pinned by a bare sha256 digest — so acquired evidence is never silently absent, and
-// a reference is never unpinned.
-func validateExternalEvidence(name string, ev *ExternalEvidence) error {
+// a reference is never unpinned. An archive: reference names a member of the
+// component's own pinned release archive, and a signer policy needs provenance.
+func validateExternalEvidence(name string, p *Prebuilt) error {
+	ev := p.Evidence
 	if ev == nil {
 		return e.New(e.CodeProvenanceMissing,
 			"prebuilt component %q: no external evidence declared — set prebuilt.evidence.none:true or a digest-pinned sbomRef/provenanceRef (ADR-13 §2)", name)
 	}
 	if ev.None {
-		if ev.SBOMRef != "" || ev.ProvenanceRef != "" {
-			return e.New(e.CodeInvalidCatalog, "prebuilt component %q: evidence.none is mutually exclusive with a ref", name)
+		if ev.SBOMRef != "" || ev.ProvenanceRef != "" || ev.Signer != nil {
+			return e.New(e.CodeInvalidCatalog, "prebuilt component %q: evidence.none is mutually exclusive with a ref or signer", name)
 		}
 		return nil
 	}
@@ -593,6 +596,23 @@ func validateExternalEvidence(name string, ev *ExternalEvidence) error {
 	}
 	if ev.ProvenanceRef != "" && !canonical.IsDigest(ev.ProvenanceDigest) {
 		return e.New(e.CodeUnpinnedSource, "prebuilt component %q: provenanceRef is not pinned by provenanceDigest sha256:<64-hex>", name)
+	}
+	for _, ref := range []string{ev.SBOMRef, ev.ProvenanceRef} {
+		member, archived := ArchiveMemberRef(ref)
+		if archived && (p.Executable == nil || p.Executable.Format == "raw" || !safeToolPath(member) ||
+			member == p.Executable.ExecutablePath) {
+			return e.New(e.CodeInvalidCatalog,
+				"prebuilt component %q: %q must name a companion member of its pinned release archive", name, ref)
+		}
+	}
+	if signer := ev.Signer; signer != nil {
+		issuer, err := url.Parse(signer.Issuer)
+		if ev.ProvenanceRef == "" || err != nil || issuer.Scheme != "https" || issuer.Host == "" ||
+			strings.TrimSpace(signer.Identity) != signer.Identity || signer.Identity == "" ||
+			strings.ContainsAny(signer.Identity+signer.Issuer, "{}\r\n\t ") {
+			return e.New(e.CodeTrustPolicyMissing,
+				"prebuilt component %q: evidence.signer needs provenanceRef, an https issuer and a rendered exact identity", name)
+		}
 	}
 	return nil
 }

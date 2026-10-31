@@ -65,6 +65,27 @@ closed**. Where no upstream evidence exists, the component declares an explicit 
 silent absence. That is **distinct from a Tier-4 exclusion** (`fromSource:false` plus a reason). One owning
 schema defines the reference, consumed by both the acquire lane and the SBOM emitter.
 
+A reference may also be `archive:<member>`: a regular companion member of a release executable's pinned
+archive, read only after the archive bytes hash to the source pin's archive digest. The member must differ
+from the executable, and its own declared digest is still checked.
+
+Upstream evidence is validated, never merged or converted. NVKR records only the reference and digest beside its
+own CycloneDX document; it has no reason to require CycloneDX input. The SBOM may be CycloneDX 1.4–1.6 JSON or
+SPDX 2.3 JSON. An SPDX document must describe exactly one element whose name is the subject and which carries
+exactly one SHA256 checksum equal to the artifact digest. SPDX 3.0, SPDX tag-value and other formats fail
+closed. Provenance is an in-toto Statement v0.1 or v1 with an SLSA provenance v1 predicate and exactly one
+subject with that name and digest. The subject name is the release executable's file name for a release
+executable, otherwise the component name.
+
+Provenance may be an unsigned digest-pinned statement or a Sigstore v0.3 DSSE bundle. A bundle requires a
+declared keyless signer policy, an exact OIDC issuer and certificate identity, whose identity is rendered from
+the source pin (for example `…/on-tag.yaml@refs/tags/{{.Tag}}`). NVKR checks the statement subject first, then
+a digest-pinned cosign verifies the signature, identity, issuer and transparency evidence against the
+public-good Sigstore trust root. A bundle without a policy, a policy over an unsigned statement, a wrong signer
+and an unavailable verifier all fail closed. A digest-pinned trusted root for offline or air-gapped verification
+is a follow-up. The SBOM is trusted through its digest pin and subject check; an upstream signature over the
+SBOM file is not consumed.
+
 `evidence: none` is an honest statement about an acquisition. It is **not evidence and never satisfies an
 evidence-required promotion gate**. If release policy permits a missing evidence class, the exception is an
 explicit, authenticated waiver naming the exact artifact digest, missing evidence types, policy
@@ -477,8 +498,9 @@ or unbound documents and stages. Finalization compares the published documents w
 handoffs and final package inventory. The current consumer has no old-layout fallback. This establishes
 pipeline artifact-publication evidence, not qualified receipts, vulnerability clearance or signed completion.
 
-SBOMs remain `static-unqualified` in dry-run. Generation alone is no signature or reproduction proof. Acquired components retain `evidence: none` unless pinned upstream evidence is declared. V1 does not
-verify upstream signatures/provenance on acquisition. Vulnerability scanning stays outside v1.
+SBOMs remain `static-unqualified` in dry-run. Generation alone is no signature or reproduction proof. Acquired components retain `evidence: none` unless pinned upstream evidence is declared. Declared upstream
+evidence is verified as §2 states, including Sigstore provenance signatures when a signer policy is declared;
+air-gapped signature verification is not yet supported. Vulnerability scanning stays outside v1.
 Curated/embedded aggregates use dependency edges from aggregate to members (ADR-10/22).
 
 ## Consequences
@@ -495,6 +517,7 @@ Curated/embedded aggregates use dependency edges from aggregate to members (ADR-
 - Vuln-report determinism requires provisioning and mirroring a pinned scanner DB/policy — an infra dependency
   for air-gap.
 - External-evidence conventions vary per upstream; some references degrade to `evidence: none`.
+- Signed upstream evidence depends on a pinned cosign and online access to the public-good Sigstore trust root.
 - Persisted and cross-boundary receipt issuers and waiver approvers require explicit trust-policy roles and
   key-rotation procedures; same-process capabilities require careful private-state and mutation-isolation tests.
 

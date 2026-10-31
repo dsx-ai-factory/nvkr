@@ -4,10 +4,14 @@
 package sbom
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"path"
 	"sort"
 	"strings"
 	"unicode"
@@ -34,6 +38,25 @@ type EvidenceReaderFunc func(context.Context, string) ([]byte, error)
 
 func (fn EvidenceReaderFunc) ReadEvidence(ctx context.Context, ref string) ([]byte, error) {
 	return fn(ctx, ref)
+}
+
+// SLSAProvenanceV1PredicateType is the only accepted upstream provenance predicate.
+const SLSAProvenanceV1PredicateType = "https://slsa.dev/provenance/v1"
+
+// EvidenceBundlePolicy is the exact keyless signer and subject an upstream
+// Sigstore provenance bundle must satisfy.
+type EvidenceBundlePolicy struct {
+	SubjectDigest string
+	PredicateType string
+	Issuer        string
+	Identity      string
+}
+
+// EvidenceBundleVerifier authenticates one upstream Sigstore bundle: signature,
+// certificate identity and issuer, and transparency evidence. It returns no
+// claims; this module separately decodes and checks the statement it accepts.
+type EvidenceBundleVerifier interface {
+	VerifyEvidenceBundle(ctx context.Context, bundle []byte, policy EvidenceBundlePolicy) error
 }
 
 // LocalEvidenceReceipt is the artifact-scoped capability for an NVKR-generated
@@ -132,7 +155,7 @@ type VerifiedSet struct {
 // producer observed those artifact bytes, so this path cannot issue LocalReceipts
 // or qualify publisher evidence. Use BuildVerifiedFromReport for publisher output.
 func BuildVerified(ctx context.Context, res *buildgraph.Resolved, buildDigest string,
-	artifactHashes map[string]string, reader EvidenceReader,
+	artifactHashes map[string]string, reader EvidenceReader, verifier EvidenceBundleVerifier,
 ) (*VerifiedSet, error) {
 	if err := validateSBOMContext(ctx); err != nil {
 		return nil, err
@@ -156,7 +179,7 @@ func BuildVerified(ctx context.Context, res *buildgraph.Resolved, buildDigest st
 	if err := bindDeclaredPrebuiltSubjects(graph, hashes); err != nil {
 		return nil, err
 	}
-	return buildVerifiedSet(ctx, snapshot, buildDigest, components, hashes, reader, false)
+	return buildVerifiedSet(ctx, snapshot, buildDigest, components, hashes, reader, verifier, false)
 }
 
 // BuildDiagnosticSelected verifies the full resolved build identity, then emits a
@@ -168,7 +191,7 @@ func BuildVerified(ctx context.Context, res *buildgraph.Resolved, buildDigest st
 // evidence bytes, but it cannot issue LocalEvidenceReceipts or publisher authority.
 // Qualified publisher output must use BuildVerifiedFromReport instead.
 func BuildDiagnosticSelected(ctx context.Context, res *buildgraph.Resolved, buildDigest string,
-	artifactHashes map[string]string, reader EvidenceReader,
+	artifactHashes map[string]string, reader EvidenceReader, verifier EvidenceBundleVerifier,
 ) (*VerifiedSet, error) {
 	if err := validateSBOMContext(ctx); err != nil {
 		return nil, err
@@ -190,7 +213,7 @@ func BuildDiagnosticSelected(ctx context.Context, res *buildgraph.Resolved, buil
 	if err != nil {
 		return nil, err
 	}
-	return buildVerifiedSet(ctx, snapshot, buildDigest, components, hashes, reader, false)
+	return buildVerifiedSet(ctx, snapshot, buildDigest, components, hashes, reader, verifier, false)
 }
 
 // BuildVerifiedFromReport is the sole local producer-to-SBOM authority seam. It
@@ -199,7 +222,7 @@ func BuildDiagnosticSelected(ctx context.Context, res *buildgraph.Resolved, buil
 // names and hashes are derived from that report, never accepted as caller input.
 // External evidence remains independently verified by reading its exact bytes.
 func BuildVerifiedFromReport(ctx context.Context, res *buildgraph.Resolved, report *pipeline.Report,
-	reader EvidenceReader,
+	reader EvidenceReader, verifier EvidenceBundleVerifier,
 ) (*VerifiedSet, error) {
 	if err := validateSBOMContext(ctx); err != nil {
 		return nil, err
@@ -223,11 +246,11 @@ func BuildVerifiedFromReport(ctx context.Context, res *buildgraph.Resolved, repo
 	if err != nil {
 		return nil, err
 	}
-	set, err := buildVerifiedSet(ctx, snapshot, report.BuildDigest, components, hashes, reader, true)
+	set, err := buildVerifiedSet(ctx, snapshot, report.BuildDigest, components, hashes, reader, verifier, true)
 	if err != nil {
 		return nil, err
 	}
-	// An evidence reader is an untrusted callback. Revalidate the report and its
+	// Evidence readers and verifiers are untrusted callbacks. Revalidate the report and its
 	// live terminal artifact bytes after all external I/O before issuing authority.
 	if err := report.RequireQualified(ctx); err != nil {
 		return nil, err
@@ -465,7 +488,7 @@ func qualifiedReportArtifactSelection(snapshot *buildgraph.Resolved, graph *ir.G
 
 func buildVerifiedSet(ctx context.Context, snapshot *buildgraph.Resolved, buildDigest string,
 	components []catalog.NamedComponent, hashes map[string]string, reader EvidenceReader,
-	publisherQualified bool,
+	verifier EvidenceBundleVerifier, publisherQualified bool,
 ) (*VerifiedSet, error) {
 	verifiedProps := make(map[string][]Property)
 	gaps := make([]EvidenceGap, 0)
@@ -477,7 +500,7 @@ func buildVerifiedSet(ctx context.Context, snapshot *buildgraph.Resolved, buildD
 		if component.Prebuilt == nil {
 			continue
 		}
-		props, componentGaps, err := verifyExternalEvidence(ctx, component, artifactDigest, reader)
+		props, componentGaps, err := verifyExternalEvidence(ctx, component, artifactDigest, reader, verifier)
 		if err != nil {
 			return nil, err
 		}
@@ -545,7 +568,7 @@ func buildVerifiedSet(ctx context.Context, snapshot *buildgraph.Resolved, buildD
 }
 
 func verifyExternalEvidence(ctx context.Context, component catalog.NamedComponent, artifactDigest string,
-	reader EvidenceReader,
+	reader EvidenceReader, verifier EvidenceBundleVerifier,
 ) ([]Property, []EvidenceGap, error) {
 	ev := component.Prebuilt.Evidence
 	if ev == nil {
@@ -553,7 +576,7 @@ func verifyExternalEvidence(ctx context.Context, component catalog.NamedComponen
 			"prebuilt component %q has no explicit external-evidence declaration", component.Name)
 	}
 	if ev.None {
-		if ev.SBOMRef != "" || ev.SBOMDigest != "" || ev.ProvenanceRef != "" || ev.ProvenanceDigest != "" {
+		if ev.SBOMRef != "" || ev.SBOMDigest != "" || ev.ProvenanceRef != "" || ev.ProvenanceDigest != "" || ev.Signer != nil {
 			return nil, nil, e.New(e.CodeUnverifiedRef,
 				"prebuilt component %q mixes evidence:none with external references", component.Name)
 		}
@@ -603,18 +626,10 @@ func verifyExternalEvidence(ctx context.Context, component catalog.NamedComponen
 			return nil, nil, e.Wrap(e.CodeTimeout, err,
 				"reading external %s for %s", item.typeName, component.Name)
 		}
-		bytes, err := reader.ReadEvidence(ctx, item.ref)
+		bytes, err := readExternalEvidence(ctx, component, item.typeName, item.ref, reader)
 		if err != nil {
-			if ctx.Err() != nil {
-				return nil, nil, e.Wrap(e.CodeTimeout, ctx.Err(), "reading external %s for %s", item.typeName, component.Name)
-			}
-			return nil, nil, e.Wrap(e.CodeUnavailable, err, "reading external %s for %s", item.typeName, component.Name)
+			return nil, nil, err
 		}
-		if err := ctx.Err(); err != nil {
-			return nil, nil, e.Wrap(e.CodeTimeout, err,
-				"reading external %s for %s", item.typeName, component.Name)
-		}
-		bytes = append([]byte(nil), bytes...)
 		if len(bytes) == 0 {
 			return nil, nil, e.New(e.CodeProvenanceMissing,
 				"external %s for prebuilt component %q is empty", item.typeName, component.Name)
@@ -625,7 +640,8 @@ func verifyExternalEvidence(ctx context.Context, component catalog.NamedComponen
 				"external %s for prebuilt component %q hashes to %s, not declared %s",
 				item.typeName, component.Name, got, item.digest)
 		}
-		err = validateExternalEvidence(item.typeName, bytes, component.Name, artifactDigest)
+		err = validateExternalEvidence(ctx, item.typeName, bytes, evidenceSubjectName(component), artifactDigest,
+			ev.Signer, verifier)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -639,6 +655,48 @@ func verifyExternalEvidence(ctx context.Context, component catalog.NamedComponen
 	}
 	sort.Slice(props, func(i, j int) bool { return props[i].Name < props[j].Name })
 	return props, gaps, nil
+}
+
+// readExternalEvidence reads one declared reference. An archive: reference is a
+// member of the component's own pinned release archive; the catalog ToolPin
+// authenticates the archive bytes before the shared release-asset selector reads it.
+func readExternalEvidence(ctx context.Context, component catalog.NamedComponent, evidenceType, ref string,
+	reader EvidenceReader,
+) ([]byte, error) {
+	location := ref
+	member, archived := catalog.ArchiveMemberRef(ref)
+	tool := component.Prebuilt.Executable
+	if archived {
+		if tool == nil {
+			return nil, e.New(e.CodeInvalidCatalog,
+				"external %s %q for %s requires a pinned release archive", evidenceType, ref, component.Name)
+		}
+		location = tool.URL
+	}
+	raw, err := reader.ReadEvidence(ctx, location)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "reading external %s for %s", evidenceType, component.Name)
+		}
+		return nil, e.Wrap(e.CodeUnavailable, err, "reading external %s for %s", evidenceType, component.Name)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, e.Wrap(e.CodeTimeout, err, "reading external %s for %s", evidenceType, component.Name)
+	}
+	raw = append([]byte(nil), raw...)
+	if !archived {
+		return raw, nil
+	}
+	return tool.ArchiveMember(ctx, raw, member, MaxBundleBytes)
+}
+
+// evidenceSubjectName is the upstream artifact name its evidence describes: a
+// release executable's own file name, otherwise the component name.
+func evidenceSubjectName(component catalog.NamedComponent) string {
+	if tool := component.Prebuilt.Executable; tool != nil {
+		return path.Base(tool.ExecutablePath)
+	}
+	return component.Name
 }
 
 type externalCycloneDX struct {
@@ -656,6 +714,28 @@ type externalCycloneDXComponent struct {
 		Alg     string `json:"alg"`
 		Content string `json:"content"`
 	} `json:"hashes"`
+}
+
+type externalSPDX struct {
+	SPDXID            string                `json:"SPDXID"`
+	DocumentDescribes []string              `json:"documentDescribes"`
+	Packages          []externalSPDXElement `json:"packages"`
+	Files             []externalSPDXElement `json:"files"`
+	Relationships     []struct {
+		Element string `json:"spdxElementId"`
+		Related string `json:"relatedSpdxElement"`
+		Type    string `json:"relationshipType"`
+	} `json:"relationships"`
+}
+
+type externalSPDXElement struct {
+	SPDXID    string `json:"SPDXID"`
+	Name      string `json:"name"`
+	FileName  string `json:"fileName"`
+	Checksums []struct {
+		Algorithm string `json:"algorithm"`
+		Value     string `json:"checksumValue"`
+	} `json:"checksums"`
 }
 
 type externalSLSAStatement struct {
@@ -678,17 +758,45 @@ type externalSLSAStatement struct {
 	} `json:"predicate"`
 }
 
-func validateExternalEvidence(evidenceType string, raw []byte, component, artifactDigest string) error {
-	if err := canonical.ValidateJSONDocument(raw); err != nil {
-		return e.Wrap(e.CodeUnverifiedRef, err, "external %s for %s is not an unambiguous JSON document", evidenceType, component)
-	}
+func validateExternalEvidence(ctx context.Context, evidenceType string, raw []byte, subject, artifactDigest string,
+	signer *catalog.EvidenceSigner, verifier EvidenceBundleVerifier,
+) error {
 	switch evidenceType {
 	case "sbom":
-		return validateExternalCycloneDX(raw, component, artifactDigest)
+		return validateExternalSBOM(raw, subject, artifactDigest)
 	case "provenance":
-		return validateExternalSLSA(raw, component, artifactDigest)
+		return validateExternalProvenance(ctx, raw, subject, artifactDigest, signer, verifier)
 	default:
 		return e.New(e.CodeUnverifiedRef, "unsupported external evidence type %q", evidenceType)
+	}
+}
+
+// validateExternalSBOM accepts CycloneDX 1.4-1.6 JSON or SPDX 2.3 JSON. NVKR never
+// merges or converts the document; it only checks that it describes the artifact.
+func validateExternalSBOM(raw []byte, subject, artifactDigest string) error {
+	if bytes.HasPrefix(bytes.TrimSpace(raw), []byte("SPDXVersion:")) {
+		return e.New(e.CodeUnverifiedRef,
+			"external SBOM for %s is SPDX tag-value; only SPDX 2.3 JSON and CycloneDX JSON are supported", subject)
+	}
+	if err := canonical.ValidateJSONDocument(raw); err != nil {
+		return e.Wrap(e.CodeUnverifiedRef, err, "external sbom for %s is not an unambiguous JSON document", subject)
+	}
+	var format struct {
+		BOMFormat   string          `json:"bomFormat"`
+		SPDXVersion string          `json:"spdxVersion"`
+		Context     json.RawMessage `json:"@context"`
+	}
+	if err := json.Unmarshal(raw, &format); err != nil {
+		return e.Wrap(e.CodeUnverifiedRef, err, "decoding external SBOM for %s", subject)
+	}
+	switch {
+	case format.BOMFormat != "" && format.SPDXVersion == "" && format.Context == nil:
+		return validateExternalCycloneDX(raw, subject, artifactDigest)
+	case format.SPDXVersion == "SPDX-2.3" && format.BOMFormat == "" && format.Context == nil:
+		return validateExternalSPDX(raw, subject, artifactDigest)
+	default:
+		return e.New(e.CodeUnverifiedRef,
+			"external SBOM for %s is not a supported CycloneDX 1.4-1.6 or SPDX 2.3 JSON document", subject)
 	}
 }
 
@@ -735,13 +843,136 @@ func validateExternalCycloneDX(raw []byte, component, artifactDigest string) err
 	return nil
 }
 
+// validateExternalSPDX requires the document to describe exactly one package or
+// file, named after the subject, with exactly one SHA256 checksum equal to it.
+func validateExternalSPDX(raw []byte, subject, artifactDigest string) error {
+	var document externalSPDX
+	if err := json.Unmarshal(raw, &document); err != nil {
+		return e.Wrap(e.CodeUnverifiedRef, err, "decoding external SPDX SBOM for %s", subject)
+	}
+	if document.SPDXID == "" {
+		return e.New(e.CodeUnverifiedRef, "external SPDX SBOM for %s has no document SPDXID", subject)
+	}
+	described := make(map[string]bool)
+	for _, id := range document.DocumentDescribes {
+		described[id] = true
+	}
+	for _, relationship := range document.Relationships {
+		switch {
+		case relationship.Type == "DESCRIBES" && relationship.Element == document.SPDXID:
+			described[relationship.Related] = true
+		case relationship.Type == "DESCRIBED_BY" && relationship.Related == document.SPDXID:
+			described[relationship.Element] = true
+		}
+	}
+	if len(described) != 1 {
+		return e.New(e.CodeUnverifiedRef,
+			"external SPDX SBOM for %s must describe exactly one element (got %d)", subject, len(described))
+	}
+	var root *externalSPDXElement
+	for _, element := range append(document.Packages, document.Files...) {
+		if !described[element.SPDXID] {
+			continue
+		}
+		if root != nil {
+			return e.New(e.CodeUnverifiedRef, "external SPDX SBOM for %s repeats its described SPDXID", subject)
+		}
+		root = &element
+	}
+	if root == nil || (root.Name != subject && (root.Name != "" || root.FileName != subject)) {
+		return e.New(e.CodeUnverifiedRef, "external SPDX SBOM must describe an element named %s", subject)
+	}
+	sha256Rows := 0
+	for _, checksum := range root.Checksums {
+		if checksum.Algorithm != "SHA256" {
+			continue
+		}
+		sha256Rows++
+		if candidate := "sha256:" + checksum.Value; !canonical.IsDigest(candidate) || candidate != artifactDigest {
+			return e.New(e.CodeUnverifiedRef,
+				"external SPDX subject %s contains a non-canonical or conflicting SHA256 checksum", subject)
+		}
+	}
+	if sha256Rows != 1 {
+		return e.New(e.CodeUnverifiedRef,
+			"external SPDX subject %s must contain exactly one SHA256 checksum for artifact %s (got %d)",
+			subject, artifactDigest, sha256Rows)
+	}
+	return nil
+}
+
+// validateExternalProvenance accepts an unsigned in-toto statement, or a Sigstore
+// v0.3 DSSE bundle whose statement passes the same subject checks and whose
+// signature the injected verifier authenticates under the catalog signer policy.
+func validateExternalProvenance(ctx context.Context, raw []byte, subject, artifactDigest string,
+	signer *catalog.EvidenceSigner, verifier EvidenceBundleVerifier,
+) error {
+	if err := canonical.ValidateJSONDocument(raw); err != nil {
+		return e.Wrap(e.CodeUnverifiedRef, err, "external provenance for %s is not an unambiguous JSON document", subject)
+	}
+	var bundle struct {
+		MediaType string `json:"mediaType"`
+		DSSE      *struct {
+			PayloadType string `json:"payloadType"`
+			Payload     string `json:"payload"`
+		} `json:"dsseEnvelope"`
+	}
+	if err := json.Unmarshal(raw, &bundle); err != nil {
+		return e.Wrap(e.CodeUnverifiedRef, err, "decoding external provenance for %s", subject)
+	}
+	if bundle.MediaType == "" && bundle.DSSE == nil {
+		if signer != nil {
+			return e.New(e.CodeSignatureInvalid,
+				"external provenance for %s declares a signer but is an unsigned statement", subject)
+		}
+		return validateExternalSLSA(raw, subject, artifactDigest)
+	}
+	if bundle.MediaType != BundleMediaType || bundle.DSSE == nil || bundle.DSSE.PayloadType != "application/vnd.in-toto+json" {
+		return e.New(e.CodeUnverifiedRef,
+			"external provenance for %s is not a Sigstore v0.3 in-toto DSSE bundle", subject)
+	}
+	if signer == nil {
+		return e.New(e.CodeTrustPolicyMissing,
+			"signed external provenance for %s requires a prebuilt.evidence.signer policy", subject)
+	}
+	statement, err := base64.StdEncoding.DecodeString(bundle.DSSE.Payload)
+	if err != nil {
+		return e.Wrap(e.CodeUnverifiedRef, err, "decoding external provenance statement for %s", subject)
+	}
+	if err := canonical.ValidateJSONDocument(statement); err != nil {
+		return e.Wrap(e.CodeUnverifiedRef, err, "external provenance statement for %s is not unambiguous JSON", subject)
+	}
+	if err := validateExternalSLSA(statement, subject, artifactDigest); err != nil {
+		return err
+	}
+	if verifier == nil {
+		return e.New(e.CodeUnavailable,
+			"signed external provenance for %s requires a Sigstore bundle verifier", subject)
+	}
+	err = verifier.VerifyEvidenceBundle(ctx, append([]byte(nil), raw...), EvidenceBundlePolicy{
+		SubjectDigest: artifactDigest, PredicateType: SLSAProvenanceV1PredicateType,
+		Issuer: signer.Issuer, Identity: signer.Identity,
+	})
+	if ctx.Err() != nil {
+		return e.Wrap(e.CodeTimeout, ctx.Err(), "verifying external provenance for %s", subject)
+	}
+	if err != nil {
+		var coded *e.Error
+		if errors.As(err, &coded) {
+			return err
+		}
+		return e.Wrap(e.CodeSignatureInvalid, err, "verifying external provenance signature for %s", subject)
+	}
+	return nil
+}
+
 func validateExternalSLSA(raw []byte, component, artifactDigest string) error {
 	var statement externalSLSAStatement
 	if err := json.Unmarshal(raw, &statement); err != nil {
 		return e.Wrap(e.CodeUnverifiedRef, err, "decoding external SLSA provenance for %s", component)
 	}
-	if statement.Type != "https://in-toto.io/Statement/v1" ||
-		statement.PredicateType != "https://slsa.dev/provenance/v1" ||
+	if (statement.Type != "https://in-toto.io/Statement/v1" && statement.Type != "https://in-toto.io/Statement/v0.1") ||
+		statement.PredicateType != SLSAProvenanceV1PredicateType ||
 		strings.TrimSpace(statement.Predicate.BuildDefinition.BuildType) == "" ||
 		len(statement.Predicate.BuildDefinition.ExternalParameters) == 0 ||
 		strings.TrimSpace(statement.Predicate.RunDetails.Builder.ID) == "" {

@@ -13,6 +13,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/provenance"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/trust"
 	"github.com/urfave/cli/v2"
 )
@@ -89,7 +90,11 @@ func cmdAttest() *cli.Command {
 			// capabilities over this same qualified report: an exact-subject SBOM set and
 			// report/graph-derived provenance. Caller-supplied evidence strings cannot
 			// enter MarshalQualified.
-			verifiedSBOM, err := buildVerifiedSBOMFromReport(c.Context, res, rep)
+			evidenceVerifier, err := evidenceBundleVerifier(c)
+			if err != nil {
+				return err
+			}
+			verifiedSBOM, err := buildVerifiedSBOMFromReport(c.Context, res, rep, evidenceVerifier)
 			if err != nil {
 				return err
 			}
@@ -142,7 +147,7 @@ func cmdAttest() *cli.Command {
 // receipt. Neither decoded manifests nor caller-provided digest strings can enter
 // this authority boundary.
 func verifyEvidenceDigests(ctx context.Context, vectorDocument trust.DocumentReceipt,
-	res *buildgraph.Resolved, report *pipeline.Report,
+	res *buildgraph.Resolved, report *pipeline.Report, evidenceVerifier sbom.EvidenceBundleVerifier,
 ) error {
 	published, err := attest.VerifyPublishedVectorReceipt(ctx, vectorDocument)
 	if err != nil {
@@ -152,7 +157,7 @@ func verifyEvidenceDigests(ctx context.Context, vectorDocument trust.DocumentRec
 	if err != nil {
 		return err
 	}
-	verified, err := buildVerifiedSBOMFromReport(ctx, res, report)
+	verified, err := buildVerifiedSBOMFromReport(ctx, res, report, evidenceVerifier)
 	if err != nil {
 		return err
 	}
