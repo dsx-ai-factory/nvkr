@@ -136,7 +136,7 @@ case "$*" in
 esac
 printf 'kubectl\n' >> "$EVENTS"
 case "$*" in
- *"get deployments"*) printf '%s\n' '{"items":[{"metadata":{"namespace":"nke-controller"},"spec":{"selector":{"matchLabels":{"app.kubernetes.io/instance":"nke-controller","app.kubernetes.io/name":"cloud-workflow-engine"}}}}]}' ;;
+ *"get deployments"*) printf '%s\n' '{"items":[{"metadata":{"name":"nke-controller","namespace":"nke-controller"},"spec":{"selector":{"matchLabels":{"app.kubernetes.io/instance":"nke-controller","app.kubernetes.io/name":"nke-controller"}},"template":{"spec":{"containers":[{"name":"nke-controller"}]}}}}]}' ;;
 esac
 `), 0700)
 	writeTenantFixture(t, filepath.Join(tools, "kind"), []byte(`#!/bin/sh

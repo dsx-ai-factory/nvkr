@@ -367,7 +367,7 @@ func (s *nativeSiteAttempt) closeTenant(ctx context.Context) error {
 	}
 	cleanup := s.tenantOwner.restore(ctx)
 	if cleanup != nil && !errors.Is(cleanup, ErrUnjoined) {
-		cleanup = retainNativeSiteFailure(ctx, runner, s.assets.HostTools, filepath.Join(s.tenantOwner.session.Work, "site.kubeconfig"), cleanup)
+		cleanup = retainNativeSiteFailure(ctx, runner, s.assets, filepath.Join(s.tenantOwner.session.Work, "site.kubeconfig"), cleanup)
 	}
 	return cleanup
 }
@@ -840,30 +840,51 @@ func (s *nativeSiteAttempt) admitAPIClient(ctx context.Context, runner Runner, t
 	if err := requireContext(ctx); err != nil {
 		return err
 	}
+	controller, err := nativeControllerForAssets(ctx, s.assets)
+	if err != nil {
+		return err
+	}
 	gateway := s.bridge.gateway
 	if !gateway.Is4() || !gateway.IsPrivate() || !s.bridge.prefix.Contains(gateway) {
 		return nvkrerr.New(nvkrerr.CodeEngineCapability, "API client admission requires the observed private IPv4 demo gateway")
 	}
 	raw, err := s.capture(ctx, runner, "api-client-controller", filepath.Join(tools, "kubectl"), "--kubeconfig", kubeconfig,
-		"-n", "nke-controller", "get", "deployments", "-l", "app.kubernetes.io/instance=nke-controller", "-o", "json")
+		"-n", controller.name, "get", "deployments", "-l", "app.kubernetes.io/instance="+controller.name, "-o", "json")
 	if err != nil {
 		return err
 	}
 	var observed struct {
 		Items []struct {
 			Metadata struct {
+				Name      string `json:"name"`
 				Namespace string `json:"namespace"`
 			} `json:"metadata"`
 			Spec struct {
 				Selector json.RawMessage `json:"selector"`
+				Template struct {
+					Spec struct {
+						Containers []struct {
+							Name string `json:"name"`
+						} `json:"containers"`
+					} `json:"spec"`
+				} `json:"template"`
 			} `json:"spec"`
 		} `json:"items"`
 	}
 	if err := json.Unmarshal(raw, &observed); err != nil {
 		return err
 	}
-	if len(observed.Items) != 1 || observed.Items[0].Metadata.Namespace != "nke-controller" {
-		return errors.New("API client admission requires exactly one controller Deployment in its namespace")
+	if len(observed.Items) != 1 || observed.Items[0].Metadata.Namespace != controller.name || observed.Items[0].Metadata.Name != controller.name {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "API client admission requires exactly the source-selected controller Deployment in its namespace")
+	}
+	containers := 0
+	for _, container := range observed.Items[0].Spec.Template.Spec.Containers {
+		if container.Name == controller.name {
+			containers++
+		}
+	}
+	if containers != 1 {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "API client admission requires exactly one source-selected controller container")
 	}
 	selector := observed.Items[0].Spec.Selector
 	var selected struct {
@@ -872,13 +893,13 @@ func (s *nativeSiteAttempt) admitAPIClient(ctx context.Context, runner Runner, t
 	if err := json.Unmarshal(selector, &selected); err != nil {
 		return err
 	}
-	if selected.MatchLabels["app.kubernetes.io/instance"] != "nke-controller" {
-		return errors.New("API client admission requires the exact controller release selector")
+	if selected.MatchLabels["app.kubernetes.io/instance"] != controller.name || selected.MatchLabels["app.kubernetes.io/name"] != controller.name {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "API client admission requires the source-selected controller release and name selector")
 	}
 	// Preserve the server's complete selector. Kubernetes, through kubectl apply,
 	// owns LabelSelector validation; this consumer does not parse its grammar.
 	policy := map[string]any{"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
-		"metadata": map[string]string{"name": "nvke-demo-api-client", "namespace": "nke-controller"},
+		"metadata": map[string]string{"name": "nvke-demo-api-client", "namespace": controller.name},
 		"spec": map[string]any{"podSelector": selector, "policyTypes": []string{"Ingress"},
 			"ingress": []any{map[string]any{"from": []any{map[string]any{"ipBlock": map[string]string{"cidr": netip.PrefixFrom(gateway, 32).String()}}},
 				"ports": []any{map[string]any{"protocol": "TCP", "port": 8080}}}}}}

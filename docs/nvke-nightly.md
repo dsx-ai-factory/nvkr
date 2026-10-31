@@ -25,6 +25,13 @@ and DNS checks. VM, backend and network cleanup remain owned and joined by Go.
 The workflow does not invoke the demo's E2E CLI or NVKE's separate test harness.
 The existing demo executable supplies its existing network privilege helper.
 
+The selected installer declares the site controller's resource identity. NVKR
+checks the supported legacy `nke-controller` and current `nvke-controller`
+layouts against that installer's release, chart and explicit naming overrides.
+The startup-probe renderer, controller-log capture and API network policy use
+the same checked selection. Unsupported or inconsistent declarations fail before
+those consumers run; local OCI import aliases retain their separate ownership.
+
 ## Run a workflow branch before merging
 
 Follow [Run E2E tests for your pull request](pr-e2e.md) to trigger this workflow
@@ -92,6 +99,11 @@ drop them under backpressure. Plain writers retain bootstrap diagnostics private
 Ordinary diagnostic loss preserves the original failure; an unjoined observation
 still requires retaining dependent resources. These observations grant no readiness
 or qualification acceptance.
+
+A failed site installation also projects the already captured, joined pod
+observation through the existing anonymized table. It starts no additional probe;
+raw pod messages and controller logs stay private. A missing or dropped summary
+does not establish pod health or identify the failed installation step.
 
 The CI resource wrapper samples host memory/disk, cgroup memory events and Docker
 usage while the Go test runs, with a 15-second pause between samples. It records

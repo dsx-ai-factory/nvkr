@@ -69,7 +69,7 @@ IFS= read -r token < "$CLEANUP_RELEASE"
 test "$token" = proceed
 exec "$ACTUAL_RM" "$@"
 `), 0700)
-	runner, args, err := prepareSiteHelm(ctx, Runner{Env: []string{"PATH=" + tools + ":/usr/bin:/bin"}}, tools, out)
+	runner, args, err := prepareSiteHelm(ctx, Runner{Env: []string{"PATH=" + tools + ":/usr/bin:/bin"}}, tools, out, nativeControllerIdentity{name: "nke-controller"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func TestPrepareSiteHelmRejectsUnavailableBudgetBeforeFiles(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			out := privateTestDir(t)
 			base := Runner{Env: []string{"SYNTHETIC_CALLER=unchanged"}}
-			got, args, err := prepareSiteHelm(tc.ctx, base, "/unavailable-tools", out)
+			got, args, err := prepareSiteHelm(tc.ctx, base, "/unavailable-tools", out, nativeControllerIdentity{name: "nke-controller"})
 			var coded *nvkrerr.Error
 			if !errors.As(err, &coded) || coded.Code != tc.code || tc.cause != nil && !errors.Is(err, tc.cause) {
 				t.Fatalf("budget admission returned %v; want %s/%v", err, tc.code, tc.cause)
@@ -229,7 +229,7 @@ func TestPrepareSiteHelmPrivateIndependentConfiguration(t *testing.T) {
 	defer cancel()
 	deadline, _ := ctx.Deadline()
 	before := time.Until(deadline)
-	got, args, err := prepareSiteHelm(ctx, base, tools, out)
+	got, args, err := prepareSiteHelm(ctx, base, tools, out, nativeControllerIdentity{name: "nke-controller"})
 	after := time.Until(deadline)
 	if err != nil {
 		t.Fatal(err)
@@ -292,7 +292,7 @@ func TestPrepareSiteHelmRefusesExistingDestination(t *testing.T) {
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 			defer cancel()
-			_, args, err := prepareSiteHelm(ctx, Runner{}, "/selected-tools", out)
+			_, args, err := prepareSiteHelm(ctx, Runner{}, "/selected-tools", out, nativeControllerIdentity{name: "nke-controller"})
 			if !errors.Is(err, fs.ErrExist) || args != nil {
 				t.Fatal("existing Helm destination was admitted", args, err)
 			}
@@ -345,7 +345,7 @@ exit "$RESULT"
 			defer func() { _ = file.Close() }()
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
-			runner, args, err := prepareSiteHelm(ctx, Runner{Work: out, Env: []string{"PATH=/usr/bin:/bin"}, input: file}, tools, out)
+			runner, args, err := prepareSiteHelm(ctx, Runner{Work: out, Env: []string{"PATH=/usr/bin:/bin"}, input: file}, tools, out, nativeControllerIdentity{name: "nke-controller"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -406,11 +406,16 @@ exit "$RESULT"
 
 func TestSiteHelmRendererStockManifest(t *testing.T) {
 	tools, fixture := os.Getenv("NVKR_TEST_SITE_HELM_TOOLS"), os.Getenv("NVKR_TEST_SITE_HELM_MANIFEST")
-	if tools == "" && fixture == "" {
-		t.Skip("requires explicitly selected Helm/kubectl directory and saved stock manifest")
+	installer := os.Getenv("NVKR_TEST_SITE_HELM_INSTALLER")
+	if tools == "" && fixture == "" && installer == "" {
+		t.Skip("requires explicitly selected Helm/kubectl directory, saved stock manifest and its source installer")
 	}
-	if !filepath.IsAbs(tools) || !filepath.IsAbs(fixture) {
-		t.Fatal("both selected tools and stock manifest must be absolute paths")
+	if !filepath.IsAbs(tools) || !filepath.IsAbs(fixture) || !filepath.IsAbs(installer) {
+		t.Fatal("selected tools, stock manifest and source installer must be absolute paths")
+	}
+	controller, err := selectNativeControllerIdentity(t.Context(), installer)
+	if err != nil {
+		t.Fatal(err)
 	}
 	original, err := os.ReadFile(fixture)
 	if err != nil || len(bytes.TrimSpace(original)) == 0 {
@@ -430,7 +435,7 @@ func TestSiteHelmRendererStockManifest(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 	defer cancel()
-	runner, args, err := prepareSiteHelm(ctx, Runner{Work: out, Env: []string{"PATH=/usr/bin:/bin", "HOME=" + out}}, tools, out)
+	runner, args, err := prepareSiteHelm(ctx, Runner{Work: out, Env: []string{"PATH=/usr/bin:/bin", "HOME=" + out}}, tools, out, controller)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -438,7 +443,7 @@ func TestSiteHelmRendererStockManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	command := append([]string{filepath.Join(tools, "helm"), "template", "replay", chart, "--namespace", "nke-controller"}, args[3:]...)
+	command := append([]string{filepath.Join(tools, "helm"), "template", "replay", chart, "--namespace", controller.name}, args[3:]...)
 	patched, err := runner.Capture(ctx, command, "helm-stock-replay", 0)
 	if err != nil {
 		t.Fatal("selected Helm post-renderer failed", err)
@@ -466,15 +471,17 @@ func TestSiteHelmRendererStockManifest(t *testing.T) {
 					delete(metadata, "annotations")
 				}
 			}
-			if object["apiVersion"] == "apps/v1" && object["kind"] == "Deployment" && metadata["name"] == "nke-controller" && namespace == "nke-controller" {
+			if object["apiVersion"] == "apps/v1" && object["kind"] == "Deployment" && metadata["name"] == controller.name && namespace == controller.name {
 				targets++
 				spec := object["spec"].(map[string]any)
 				containers := spec["template"].(map[string]any)["spec"].(map[string]any)["containers"].([]any)
+				matchedContainers := 0
 				for _, rawContainer := range containers {
 					container := rawContainer.(map[string]any)
-					if container["name"] != "nke-controller" {
+					if container["name"] != controller.name {
 						continue
 					}
+					matchedContainers++
 					if index == 1 {
 						probe := container["startupProbe"].(map[string]any)
 						httpGet := probe["httpGet"].(map[string]any)
@@ -486,6 +493,9 @@ func TestSiteHelmRendererStockManifest(t *testing.T) {
 						}
 					}
 					delete(container, "startupProbe")
+				}
+				if matchedContainers != 1 {
+					t.Fatalf("rendered controller has %d source-selected containers", matchedContainers)
 				}
 				delete(spec, "progressDeadlineSeconds")
 			}

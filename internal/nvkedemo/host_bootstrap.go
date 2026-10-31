@@ -196,6 +196,10 @@ func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, 
 }
 
 func (s *nativeSiteAttempt) deployFromHost(ctx context.Context, runner Runner, cli, tools, out, specPath string) error {
+	controller, err := nativeControllerForAssets(ctx, s.assets)
+	if err != nil {
+		return err
+	}
 	runner.Env = SetEnv(runner.Env, map[string]string{"KUBECONFIG": filepath.Join(out, "site.kubeconfig"), "NVKECTL": cli})
 	version, err := nativeCAPIProviderVersion(ctx, s.assets)
 	if err != nil {
@@ -265,7 +269,7 @@ volumeBindingMode: Immediate
 		}
 		args = append(args, "--values-for", item+"="+path)
 	}
-	deployment, helmArgs, err := prepareSiteHelm(ctx, runner, tools, out)
+	deployment, helmArgs, err := prepareSiteHelm(ctx, runner, tools, out, controller)
 	if err != nil {
 		return err
 	}
@@ -281,7 +285,10 @@ volumeBindingMode: Immediate
 // liveness/readiness probes on startup, using Helm's supported post-renderer
 // and the bundled kubectl's Kustomize rather than modifying source charts.
 // The original Runner context still bounds the installation process.
-func prepareSiteHelm(ctx context.Context, runner Runner, tools, out string) (Runner, []string, error) {
+func prepareSiteHelm(ctx context.Context, runner Runner, tools, out string, controller nativeControllerIdentity) (Runner, []string, error) {
+	if err := controller.admit(); err != nil {
+		return runner, nil, err
+	}
 	budget, err := remainingWork(ctx)
 	if err != nil {
 		return runner, nil, err
@@ -340,25 +347,25 @@ patches:
       group: apps
       version: v1
       kind: Deployment
-      name: nke-controller
-      namespace: nke-controller
+      name: %s
+      namespace: %s
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
       metadata:
-        name: nke-controller
-        namespace: nke-controller
+        name: %s
+        namespace: %s
       spec:
         progressDeadlineSeconds: %d
         template:
           spec:
             containers:
-              - name: nke-controller
+              - name: %s
                 startupProbe:
                   httpGet: {path: /healthz, port: http}
                   periodSeconds: 10
                   failureThreshold: %d
-`, seconds, (seconds+9)/10)},
+`, controller.name, controller.name, controller.name, controller.name, seconds, controller.name, (seconds+9)/10)},
 	}
 	for _, file := range files {
 		if err := privateWrite(filepath.Join(plugin, file.name), []byte(file.content)); err != nil {
