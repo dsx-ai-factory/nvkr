@@ -57,11 +57,17 @@ sources:
         make -C os-image/packages/cni-calico bundle nfpm \
           ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
   ovn-kubernetes:
-    repo: https://github.com/ovn-kubernetes/ovn-kubernetes
-    constraint: 1.4.x
+    repo: https://github.com/dsx-ai-factory/ovn-kubernetes
+    constraint: v2.4.2
     toolchainImagesByArch:
-      amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
-      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
+      amd64: docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90
+      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b
+  nvke-cni-ovn-source:
+    repo: https://github.com/dsx-ai-factory/ovn-kubernetes
+    constraint: v2.4.2
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:8aa2821993207ae840ce09e4223217efcd14e01f71525db734faf4232bd59999
+      arm64: docker.io/library/golang@sha256:288557fbc328e4ef9a78bae2eb44f24447029ff08667be883d79eeaa9029cf0c
   nvke-kubeadm-distro-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
     constraint: v0.22.0
@@ -149,7 +155,7 @@ components:
   nvke-cni-ovn:
     platforms: [linux/amd64, linux/arm64]
     fromSource: true
-    source: nvke-os
+    source: nvke-cni-ovn-source
     builderType: oci-hermetic
     outputType: tarball
     materials:
@@ -159,24 +165,109 @@ components:
       - bash
       - -ec
       - |
-        readonly stage=/src/nvkr-output/stage
-        readonly work=/src/nvkr-output/work
-        mkdir -p "${stage}/charts" "${work}" /src/nvkr-output/ovn
-        cp -a os-image/packages/cni-common os-image/packages/cni-ovn \
-          "${work}/"
-        tar -xf /nvkr/inputs/materials/ovn-chart -C "${stage}/charts"
-        gzip -n -9 -c /nvkr/inputs/materials/ovn-image >"${stage}/images.tgz"
-        printf '%s  ovn-images_1.4.0_linux_{{.Arch}}.tgz\n' \
-          "$(sha256sum "${stage}/images.tgz" | cut -d' ' -f1)" \
-          >"${stage}/images.tgz.sha256"
-        CNI=cni-ovn PRODUCT=OVN CONTENT_KIND=charts \
-          CONTENT_SPEC="${work}/cni-ovn/packaging/nfpm-charts.yaml" \
-          NFPM_BIN=/usr/local/bin/nfpm ARCH={{.Arch}} DEB_REVISION=1 \
-          "${work}/cni-common/build-deb.sh" 1.4.0 "${stage}" \
-          /src/nvkr-output/ovn
-        tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
-          --numeric-owner -C /src/nvkr-output/ovn \
-          -cf /src/nvkr-output/nvke-cni-ovn.tar .
+        readonly stream=2.4.2
+        readonly revision=1+git.8af51273d52d
+        readonly out=/src/nvkr-output
+        readonly charts="$out/charts"
+        readonly images="$out/images"
+        readonly image_dir="$images/usr/lib/nvke/cni-ovn/$stream"
+        readonly image_name="ovn-images_${stream}_linux_{{.Arch}}.tgz"
+        mkdir -p "$charts/DEBIAN" "$charts/etc/dgx/ovn-kubernetes" "$images/DEBIAN" "$image_dir" "$out/debs"
+        tar -xf /nvkr/inputs/materials/ovn-chart -C "$charts/etc/dgx"
+        test -f "$charts/etc/dgx/ovn-kubernetes/Chart.yaml"
+        grep -qx "version: $stream" "$charts/etc/dgx/ovn-kubernetes/Chart.yaml"
+        # Fork-specific keys: the old upstream global.image override does not apply.
+        cat >"$charts/etc/dgx/ovn-kubernetes/values-nke.yaml" <<'EOF'
+        global:
+          skipCallToK8s: true
+          imagePullSecretName: ""
+          useImageDigest: false
+        ovnkube-control-plane:
+          ovnkubeControlPlane:
+            image: &built_image
+              repository: localhost/nvke/ovn-kubernetes
+              tag: git-8af51273d52dfa07454435d18d37230e582d797a
+              sha256: ""
+        ovnkube-single-node-zone:
+          ovnkubeSingleNodeZone:
+            image: *built_image
+          ovnkubeSingleNodeZoneNbdb:
+            image: *built_image
+          ovnkubeSingleNodeZoneSbdb:
+            image: *built_image
+          ovnkubeSingleNodeZoneNorthd:
+            image: *built_image
+          ovnkubeSingleNodeZoneOvnHost:
+            image: *built_image
+        EOF
+        for kind in charts images; do
+          root="$out/$kind"
+          cat >"$root/DEBIAN/control" <<EOF
+        Package: nvke-cni-ovn-$kind-$stream
+        Version: $revision
+        Architecture: {{.Arch}}
+        Maintainer: NVKE <nke-dev@exchange.nvidia.com>
+        Provides: nvke-cni-ovn-$kind, nke-cni-ovn-$kind, nke-cni-ovn-$kind-$stream
+        Conflicts: nvke-cni-ovn-$kind, nke-cni-ovn-$kind
+        Description: NVKE OVN $kind from pinned DSX source
+        EOF
+        done
+        printf 'Depends: containerd | nvke-kubeadm-distro | nke-kubeadm-distro\n' >>"$images/DEBIAN/control"
+        gzip -n -9 -c /nvkr/inputs/materials/ovn-image >"$image_dir/$image_name"
+        (cd "$image_dir" && sha256sum "$image_name" >"$image_name.sha256")
+        # Preserve the offline containerd import contract and fail configuration
+        # on checksum, readiness or import errors.
+        cat >"$images/DEBIAN/postinst" <<'EOF'
+        #!/bin/bash
+        # SPDX-License-Identifier: Apache-2.0
+        set -euo pipefail
+        [ "${1:-}" = configure ] || exit 0
+        readonly image_dir=/usr/lib/nvke/cni-ovn/2.4.2
+        readonly image_name=ovn-images_2.4.2_linux_{{.Arch}}.tgz
+        if [ -n "${NKE_CTR_BIN:-}" ]; then
+          ctr="$(command -v "$NKE_CTR_BIN")" || { echo "OVN import: ctr is not executable: $NKE_CTR_BIN" >&2; exit 1; }
+        elif [ -x /usr/local/bin/ctr ]; then
+          ctr=/usr/local/bin/ctr
+        else
+          ctr="$(command -v ctr)" || { echo 'OVN import: ctr not found' >&2; exit 1; }
+        fi
+        [ -f "$ctr" ] && [ -x "$ctr" ] || { echo "OVN import: ctr is not executable: $ctr" >&2; exit 1; }
+        readonly ctr
+        readonly log=/var/log/nvke-cni-ovn-postinst.log
+        cd "$image_dir"
+        sha256sum --strict -c "$image_name.sha256"
+        ready=false
+        for ((n=0; n<50; n++)); do
+          if timeout --kill-after=1s 2s "$ctr" version >/dev/null 2>&1; then
+            ready=true; break
+          fi
+          sleep 0.2
+        done
+        "$ready" || { echo 'OVN import: containerd readiness timed out' >&2; exit 1; }
+        gzip -dc "$image_name" | timeout --kill-after=5s 300s "$ctr" -n k8s.io images import - >>"$log" 2>&1 \
+          || { echo "OVN import failed; see $log" >&2; exit 1; }
+        EOF
+        chmod 0755 "$images/DEBIAN/postinst"
+        for kind in charts images; do
+          root="$out/$kind"
+          find "$root" -print0 | xargs -0 touch -h -d "@$SOURCE_DATE_EPOCH"
+          dpkg-deb --root-owner-group --uniform-compression -Zxz -z6 --build "$root" \
+            "$out/debs/nvke-cni-ovn-${kind}-${stream}_${revision}_{{.Arch}}.deb"
+        done
+        packages=("$out/debs"/*.deb)
+        test "${#packages[@]}" -eq 2
+        test -f "$out/debs/nvke-cni-ovn-images-${stream}_${revision}_{{.Arch}}.deb"
+        test "$(dpkg-deb --field "$out/debs/nvke-cni-ovn-images-${stream}_${revision}_{{.Arch}}.deb" Package)" = "nvke-cni-ovn-images-$stream"
+        test "$(dpkg-deb --field "$out/debs/nvke-cni-ovn-images-${stream}_${revision}_{{.Arch}}.deb" Architecture)" = "{{.Arch}}"
+        test "$(dpkg-deb --field "$out/debs/nvke-cni-ovn-images-${stream}_${revision}_{{.Arch}}.deb" Provides)" = "nvke-cni-ovn-images, nke-cni-ovn-images, nke-cni-ovn-images-$stream"
+        test "$(dpkg-deb --field "$out/debs/nvke-cni-ovn-images-${stream}_${revision}_{{.Arch}}.deb" Conflicts)" = "nvke-cni-ovn-images, nke-cni-ovn-images"
+        test -f "$out/debs/nvke-cni-ovn-charts-${stream}_${revision}_{{.Arch}}.deb"
+        test "$(dpkg-deb --field "$out/debs/nvke-cni-ovn-charts-${stream}_${revision}_{{.Arch}}.deb" Package)" = "nvke-cni-ovn-charts-$stream"
+        test "$(dpkg-deb --field "$out/debs/nvke-cni-ovn-charts-${stream}_${revision}_{{.Arch}}.deb" Architecture)" = "{{.Arch}}"
+        test "$(dpkg-deb --field "$out/debs/nvke-cni-ovn-charts-${stream}_${revision}_{{.Arch}}.deb" Provides)" = "nvke-cni-ovn-charts, nke-cni-ovn-charts, nke-cni-ovn-charts-$stream"
+        test "$(dpkg-deb --field "$out/debs/nvke-cni-ovn-charts-${stream}_${revision}_{{.Arch}}.deb" Conflicts)" = "nvke-cni-ovn-charts, nke-cni-ovn-charts"
+        tar --format=ustar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
+          --numeric-owner -C "$out/debs" -cf "$out/nvke-cni-ovn.tar" .
     writeDir: nvkr-output
     artifactPath: nvkr-output/nvke-cni-ovn.tar
   ovn-kube-ubuntu:
@@ -187,59 +278,74 @@ components:
     toolchainImage: moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef
     outputType: oci-image
     buildCommand:
-      - buildctl-daemonless.sh
-      - build
-      - --frontend
-      - dockerfile.v0
-      - --local
-      - context=/src
-      - --local
-      - dockerfile=/src/dist/images
-      - --opt
-      - filename=Dockerfile.ubuntu
-      - --opt
-      - platform=linux/{{.Arch}}
-      - --opt
-      - build-arg:OVN_KUBERNETES_DIR=.
-      - --opt
-      - build-arg:BUILDER_IMAGE=quay.io/projectquay/golang@sha256:d5acf07940fb5e6e2d07542abd853cece623d95ffd364769ec825aab5471d3b8
-      - --opt
-      - build-arg:KUBECTL_MINOR=1.36
-      - --opt
-      - build-arg:UBUNTU_BASE_IMAGE=docker.io/library/ubuntu@sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78
-      - --output
-      - type=oci,dest=/src/nvkr-output/ovn-kube-ubuntu.oci.tar,oci-mediatypes=true,rewrite-timestamp=true,name=ghcr.io/ovn-kubernetes/ovn-kubernetes/ovn-kube-ubuntu:release-1.4
+      - sh
+      - -ec
+      - |
+        echo 'OVN IMAGE BUILD: source-owned Dockerfile acquires OVS/OVN and kubectl through APT; not hermetic or NV FIPS/STIG.' >&2
+        exec buildctl-daemonless.sh build --frontend dockerfile.v0 \
+          --local context=/src --local dockerfile=/src/dist/images \
+          --opt filename=Dockerfile.ubuntu.nv --opt platform=linux/{{.Arch}} \
+          --opt build-arg:OVN_K8S_SRC_ROOT=. \
+          --opt build-arg:BASE_IMAGE=docker.io/library/ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55 \
+          --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
+          --opt build-arg:OVS_SOURCE=doca \
+          --opt build-arg:OVN_SOURCE=uca \
+          --opt build-arg:CLOUD_ARCHIVE=gazpacho \
+          --opt build-arg:UCA_OVN_VER=26.03.0-2~cloud0 \
+          --opt build-arg:DOCA_RELEASE=3.5.0 \
+          --opt build-arg:K8S_VER=v1.36 \
+          --output type=oci,dest=/src/nvkr-output/ovn-kube-ubuntu.oci.tar,oci-mediatypes=true,rewrite-timestamp=true,name=localhost/nvke/ovn-kubernetes:git-8af51273d52dfa07454435d18d37230e582d797a
     writeDir: nvkr-output
     artifactPath: nvkr-output/ovn-kube-ubuntu.oci.tar
   ovn-kubernetes-chart:
     platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: ovn-kubernetes
+    builderType: oci-hermetic
     outputType: tarball
+    helm:
+      chart: .
+      images:
+        control-plane:
+          values:
+            digest: ovnkube-control-plane.ovnkubeControlPlane.image.sha256
+            digestFormat: sha256-hex
+        nbdb:
+          values:
+            digest: ovnkube-single-node-zone.ovnkubeSingleNodeZoneNbdb.image.sha256
+            digestFormat: sha256-hex
+        node:
+          values:
+            digest: ovnkube-single-node-zone.ovnkubeSingleNodeZone.image.sha256
+            digestFormat: sha256-hex
+        northd:
+          values:
+            digest: ovnkube-single-node-zone.ovnkubeSingleNodeZoneNorthd.image.sha256
+            digestFormat: sha256-hex
+        ovn-host:
+          values:
+            digest: ovnkube-single-node-zone.ovnkubeSingleNodeZoneOvnHost.image.sha256
+            digestFormat: sha256-hex
+        sbdb:
+          values:
+            digest: ovnkube-single-node-zone.ovnkubeSingleNodeZoneSbdb.image.sha256
+            digestFormat: sha256-hex
     buildCommand:
       - bash
       - -ec
       - |
-        readonly chart=/src/helm/ovn-kubernetes
+        readonly chart=/src/charts/ovn-kubernetes
         readonly out=/src/nvkr-output/ovn-kubernetes
-        test -f "${chart}/Chart.yaml"
-        grep -qx 'version: 1.4.0' "${chart}/Chart.yaml"
-        mkdir -p "${out}"
-        cp -a "${chart}/." "${out}/"
-        cat >"${out}/values-nke.yaml" <<'EOF'
-        tags:
-          ovs-node: false
-        global:
-          image:
-            repository: ghcr.io/ovn-kubernetes/ovn-kubernetes/ovn-kube-ubuntu
-            tag: release-1.4
-        EOF
-        find "${out}" -type d -exec chmod 0755 {} +
-        find "${out}" -type f -exec chmod 0644 {} +
-        find "${out}" -exec touch -d '2026-01-01 00:00:00Z' {} +
-        tar --sort=name --mtime='2026-01-01 00:00:00Z' \
-          --owner=0 --group=0 --numeric-owner -C /src/nvkr-output \
-          -cf /src/nvkr-output/ovn-kubernetes-chart.tar ovn-kubernetes
+        test -f "$chart/Chart.yaml"
+        grep -qx 'version: 2.4.2' "$chart/Chart.yaml"
+        mkdir -p "$out"
+        cp -a "$chart/." "$out/"
+        # The pinned chart aliases upstream's values filename onto values.yaml.
+        test "$(readlink "$out/values-single-node-zone.yaml")" = values.yaml
+        rm "$out/values-single-node-zone.yaml"
+        test ! -e "$out/values-single-node-zone.yaml"
+        tar --format=ustar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
+          --numeric-owner -C /src/nvkr-output -cf /src/nvkr-output/ovn-kubernetes-chart.tar ovn-kubernetes
     writeDir: nvkr-output
     artifactPath: nvkr-output/ovn-kubernetes-chart.tar
   nvke-image-inputs:
