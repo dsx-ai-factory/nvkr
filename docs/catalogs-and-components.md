@@ -139,8 +139,9 @@ records retain their original encoding.
 An archive `tool` may also list sorted `companions`, exact members that ship beside the executable. A
 companion is delivered under its base name with mode 0644 in the same executable output. `catalog pin`
 records each companion digest, and observation and packaging check it against that pin. The
-[AICR CLI catalog](../inputs/catalogs/tools/aicr-arm64/README.md) delivers `aicr-attestation.sigstore.json`
-beside `aicr` this way. A companion is pinned bytes, not verified upstream evidence.
+[AICR CLI catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/tools/aicr-arm64/README.md)
+delivers `aicr-attestation.sigstore.json` beside `aicr` this way. A companion is pinned bytes, not verified
+upstream evidence.
 
 ## Build tools and version stamps
 
