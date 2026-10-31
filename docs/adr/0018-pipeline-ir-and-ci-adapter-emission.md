@@ -269,8 +269,7 @@ Repository checks disable compiled-output caches and CodeQL database/TRAP/overla
 mode is rejected before CodeQL initialization because it enables extra diagnostic uploads. The authored OS
 validation workflow retains private post-build files only when the selected candidate equals its exact
 trusted workflow commit. Arbitrary candidate execution receives no later storage credential and retains no
-file artifacts; trusted selection summaries and runner logs remain diagnostic. The nightly coordinator
-attaches only its constructed cycle summary, never unvalidated raw suite report files. These limits are not SLSA
+file artifacts; trusted selection summaries and runner logs remain diagnostic. These limits are not SLSA
 Build L3 or qualified execution claims.
 
 The explicit diagnostic `validate` route is separate from generated producer execution. Published-source
@@ -514,38 +513,29 @@ belong to Environment/profile configuration; component toolchains remain produce
 
 #### Repository NVKE E2E adapter outside generated execution
 
-The separately authored nightly coordinator resolves one NVKE main commit and
-dispatches the existing generated ARM64 NVIDIA producer with that exact source
-selection. The producer retains build, private transport, publication, signing,
-verification and frozen-Plan ownership. No parallel AMD64 producer is added.
-The admitted runtime source policy binds preparation, every source-built
-NVKE component and finalization to the cycle selection without a version-bump
-commit; independently acquired dependencies retain their reviewed pins.
+The authored nightly uses one public GitHub-hosted AMD64 job for local build and
+native Go E2E. It freezes NVKE main once, derives temporary source overlays through
+the catalog/local-preparation owners and calls the existing `TestEndToEnd` flow.
+The existing current-main disk-material/CAPI-init selections provide compatibility;
+other dependency pins, committed catalogs and locks are unchanged. The same job
+builds fresh local Runs, bootstraps the site VM,
+checks site readiness and tenant workload/DNS, and joins owned cleanup.
 
-The consumer retrieves the exact producing Run and same-Run Plan, authenticates
-the complete publication under the Environment's policy and requires the issued
-exact-input receipt plus producing invocation. It rejects a Plan that differs
-from the coordinator's NVKE commit. Existing Go native owners consume those
-published artifacts directly, invoke the built CLI to bootstrap a real site VM
-through a temporary kind/Lima backend, check the live API and Ready node, and
-join VM/backend/network cleanup. The nightly performs no second product build
-and fabricates no local Run. Tenant workload/DNS checks are explicit manual
-opt-ins. Local developer build-and-test integration retains its separate scope.
+This workflow uses ordinary branch `workflow_dispatch` and retains its daily
+trigger. It has no promotion/lock refs, NVIDIA runner or protected environment,
+repository secrets, publication/signing permission, Actions artifact upload or
+shared cache. Product bytes and private diagnostic files stay on the disposable
+host; stderr, build output and bounded host/kernel/cgroup samples enter the public
+job log. The ARM64 build/publish/consume nightly cycle is retired. Generated ARM64
+producer workflows remain available under their existing ARC admission policies,
+but no nightly invokes them or the legacy published-artifact consumer.
 
-Runtime uses `arc-arm64-kvm` and `nvkr-arc`; a public AMD64 lane awaits admitted
-artifact production support. Native KVM and actual capacity remain admission
-requirements. Jobs and blocking operations have bounded lifetimes; the runtime
-test reserves 125 minutes for native cleanup, reporting and margin within its
-six-hour job. Coordinator public attachments contain only constructed selection,
-producing-Run locator and cycle-verdict JSON. Binary products and raw diagnostics
-remain under private transport/publication policies; the runtime has no writer
-or OIDC permission and no shared Actions build cache.
-
-This downstream CI remains outside v1 qualified acceptance. Trusted NVKE code has
-sudo and Docker access; private paths and environment scrubbing provide no
-independent sandbox. Outcomes are unsigned diagnostics. Existing generated ARC
-disk policies and exact producer result accounting retain their owners. A
-completed hosted producer/bootstrap/cleanup cycle remains separate evidence.
+KVM and observed capacity are prerequisites. The six-hour job passes its remaining
+deadline to Go, which preserves two hours for independent cleanup. The explicit
+smaller hosted resource profile requires live validation; the earlier public VM
+experiment used a different harness and does not prove this native topology.
+Trusted source code has sudo and Docker access on the disposable hosted VM.
+Results remain unsigned local diagnostics, outside qualified release acceptance.
 
 ### 4. Runner provenance and conditional self-hosting bootstrap
 
@@ -1336,7 +1326,7 @@ policy without requiring current source pins in the committed baseline. Ordinary
 byte-exact, including after bootstrap restoration. Default and development generation remain unchanged.
 
 An optional `githubRuntimeSource` policy names one canonical GitHub repository and
-`refs/heads/main` for the coordinator's selection. The coordinator resolves that ref once;
+`refs/heads/main` for the workflow caller's selection. That caller resolves the ref once;
 the generated producer requires its full commit as dispatch input. The catalog owner
 fetches the configured main ref and admits only equality or Git-proven ancestry of the
 selected commit, allowing main to advance between selection and replay. Equality uses

@@ -277,6 +277,7 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 	if err := nativeIdentitySources(runInputs[cfg.ToolsRun].plan, runInputs[diskRun].plan, siteOutput.BuildDigest, diskArtifact.BuildDigest, diskOutput, arch); err != nil {
 		return assets, err
 	}
+	installer.selectTerminalAgent(runInputs[diskRun].plan, diskOutput, diskArtifact.BuildDigest, guestPlatform)
 	// All selected observations/platforms were admitted before creating output.
 	if err := os.Mkdir(out, 0o700); err != nil {
 		return assets, err

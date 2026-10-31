@@ -411,6 +411,51 @@ func TestRunnerCaptureContracts(t *testing.T) {
 	}
 }
 
+func TestRunnerPrivateMachineCapturePreservesDiagnosticsAndExit(t *testing.T) {
+	for _, tc := range []struct {
+		name                      string
+		privateLog, capture, fail bool
+	}{
+		{name: "captured stdout", capture: true},
+		{name: "captured stdout and retained log", capture: true, privateLog: true},
+		{name: "failed capture", capture: true, fail: true},
+		{name: "uncaptured build output"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stream bytes.Buffer
+			runner := Runner{Env: []string{"PATH=/usr/bin:/bin"}, output: &stream, privateCaptureStdout: true}
+			if tc.privateLog {
+				runner.Work = privateTestDir(t)
+			}
+			command := "printf machine-result; printf diagnostic >&2"
+			if tc.fail {
+				command += "; exit 7"
+			}
+			raw, err := runner.execute(t.Context(), []string{"/bin/sh", "-c", command}, "machine", 5*time.Second, tc.capture)
+			if tc.fail {
+				if CommandExitCode(err) != 7 {
+					t.Fatalf("original failure lost: %v", err)
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if tc.capture {
+				if string(raw) != "machine-result" || stream.String() != "diagnostic" {
+					t.Fatalf("capture=%q public=%q", raw, &stream)
+				}
+			} else if stream.String() != "machine-resultdiagnostic" {
+				t.Fatalf("uncaptured build stream changed: %q", &stream)
+			}
+			if tc.privateLog {
+				log, err := os.ReadFile(filepath.Join(runner.Work, "machine.log"))
+				if err != nil || !bytes.Contains(log, []byte("machine-result")) || !bytes.Contains(log, []byte("diagnostic")) {
+					t.Fatalf("private diagnostic lost: %q %v", log, err)
+				}
+			}
+		})
+	}
+}
+
 func TestRunnerRejectsBeforeProcessWork(t *testing.T) {
 	for _, name := range []string{"nil context", "canceled", "nil environment", "phase traversal", "workspace symlink", "workspace public", "existing log", "empty command", "negative timeout", "unbounded zero timeout"} {
 		t.Run(name, func(t *testing.T) {

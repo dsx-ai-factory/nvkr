@@ -101,22 +101,17 @@ func TestAuthoredPrivateConsumersUseReadCredential(t *testing.T) {
 	}
 }
 
-func TestNightlyPublicUploadsContainOnlyExplicitMetadata(t *testing.T) {
+func TestNightlyDoesNotUploadProductsOrMetadata(t *testing.T) {
 	workflow := readPrivateStorageWorkflow(t, "nvkr-nightly.yml")
-	public := map[string]string{
-		"select":       "${{ runner.temp }}/nightly-selection.json",
-		"build":        "${{ runner.temp }}/nightly-build-${{ matrix.name }}/build.json",
-		"runtime-test": "${{ runner.temp }}/nightly-reports-${{ matrix.name }}/cycle.json",
-	}
 	for name, job := range workflow.Jobs {
 		for permission, level := range job.Permissions {
-			if permission == "packages" || permission == "id-token" || level == "write" && (name != "build" || permission != "actions") {
+			if permission == "packages" || permission == "id-token" || level == "write" {
 				t.Fatalf("nightly job %s grants publication authority: %s=%s", name, permission, level)
 			}
 		}
 		for _, step := range job.Steps {
-			if strings.HasPrefix(step.Uses, "actions/upload-artifact@") && (public[name] == "" || step.With["path"] != public[name]) {
-				t.Fatalf("nightly job %s publicly uploads something other than its exact metadata file", name)
+			if strings.HasPrefix(step.Uses, "actions/upload-artifact@") {
+				t.Fatalf("nightly job %s uploads files from the local build", name)
 			}
 			for _, action := range []string{"actions/cache@", "docker/build-push-action@", "./.github/nvkr-run/actions/ci-upload"} {
 				if strings.HasPrefix(step.Uses, action) {

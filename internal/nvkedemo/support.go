@@ -73,6 +73,10 @@ type Runner struct {
 	// Only the artifact launcher opts into streaming public build output. Other
 	// commands keep potentially sensitive deployment diagnostics private.
 	output io.Writer
+	// Machine stdout remains captured/private while stderr and uncaptured build
+	// output still stream. Used by exact-source builds and private bootstrap
+	// stderr capture.
+	privateCaptureStdout bool
 	// Opted in only for the directly executed final nvkr local Run. Bootstrap
 	// shells and every source/utility command receive no inherited activity FD.
 	buildActivity bool
@@ -671,7 +675,14 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 	}
 	// The uncaptured public build stream owns its retention at the presenter.
 	// Private command logs and captured diagnostics retain their failure bound.
-	p.stdout = &boundedDiagnostic{writer: sink, remaining: diagnosticLimit, capture: capture,
+	stdoutSink := sink
+	if capture && r.privateCaptureStdout {
+		stdoutSink = nil
+		if p.diagnostic != nil {
+			stdoutSink = p.diagnostic
+		}
+	}
+	p.stdout = &boundedDiagnostic{writer: stdoutSink, remaining: diagnosticLimit, capture: capture,
 		publicStream: r.output != nil && r.Work == "" && !capture}
 	p.stderr = p.stdout
 	if capture {
@@ -693,7 +704,10 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 		}
 		return nil, &CommandError{Phase: phase, ExitCode: -1, Cause: err}
 	}
-	if r.Progress != nil {
+	// The owned bootstrap presenter already receives typed phase events. A
+	// duplicate synchronous write could delay cleanup behind its blocked sink.
+	_, ownedPresenter := r.Progress.(nativeBootstrapObserver)
+	if r.Progress != nil && !ownedPresenter {
 		_, _ = fmt.Fprintf(r.Progress, "Demo phase: %s\n", phase)
 	}
 	var activityWriter *os.File

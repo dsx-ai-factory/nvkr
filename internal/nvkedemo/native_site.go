@@ -901,7 +901,20 @@ func projectNativeSiteBoot(ctx context.Context, source, diskURL string) (*native
 	if err := requireContext(ctx); err != nil {
 		return nil, err
 	}
-	if strings.Count(source, "http://127.0.0.1/nvke-node.qcow2") != 1 {
+	// NVKE's retained and current fixtures name different loopback endpoints.
+	// Admit one known slot across both forms; NICoSim owns iPXE interpretation.
+	var sourceURL string
+	slots := 0
+	for _, candidate := range []string{
+		"http://127.0.0.1/nvke-node.qcow2",
+		"http://127.0.0.1:18080/files/images/nvke-node.qcow2",
+	} {
+		if count := strings.Count(source, candidate); count != 0 {
+			slots += count
+			sourceURL = candidate
+		}
+	}
+	if slots != 1 {
 		return nil, errors.New("source MachineImage must expose one local QCOW URL slot")
 	}
 	location, err := url.Parse(diskURL)
@@ -912,7 +925,7 @@ func projectNativeSiteBoot(ctx context.Context, source, diskURL string) (*native
 	if err != nil || !address.Is4() || !address.IsPrivate() {
 		return nil, errors.New("native site boot requires the owned private disk endpoint")
 	}
-	projected := strings.Replace(source, "http://127.0.0.1/nvke-node.qcow2", diskURL, 1)
+	projected := strings.Replace(source, sourceURL, diskURL, 1)
 	parsed, err := template.New("source-machine-image").Option("missingkey=error").Parse(projected)
 	if err != nil {
 		return nil, err

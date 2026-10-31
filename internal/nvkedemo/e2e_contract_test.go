@@ -257,3 +257,111 @@ func TestNativeE2EMacBuildUsesExplicitDistributionBeforeWork(t *testing.T) {
 		t.Fatalf("explicit native distribution was not selected: %v", err)
 	}
 }
+
+func TestNativeE2ESourceSelectionIsExplicit(t *testing.T) {
+	for _, commit := range []string{"", strings.Repeat("a", 40)} {
+		t.Run(commit, func(t *testing.T) {
+			values := map[string]string{"NVKR_NVKE_E2E_REPO": "/source/nvkr", "NVKR_NVKE_E2E_OUT": "/private/site", "NVKR_NVKE_E2E_ATTEMPT": "nightly-source", "NVKR_NVKE_E2E_SOURCE_COMMIT": commit}
+			build, _, _, err := nativeE2EConfig(t.Context(), func(name string) string { return values[name] })
+			if err != nil {
+				t.Fatal(err)
+			}
+			if build.NVKECommit != commit || build.Definition != "" || build.Environment != "" || build.NVKR != "" {
+				t.Fatal("source selection changed the default native input selection")
+			}
+		})
+	}
+}
+
+func TestNativeE2ESourceResolvesPathsBeforeChangingDirectory(t *testing.T) {
+	for _, commit := range []string{"", strings.Repeat("a", 40)} {
+		t.Run(commit, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			file := DemoFile{Version: 1,
+				Build: BuildFile{Repo: "../repo", NVKEClone: "../nvke", Attempt: "source", Jobs: 1},
+				Run:   RunFile{Out: "../site", NVKECheckout: "../installer", TimeoutSeconds: 3600},
+			}
+			raw, err := yaml.Marshal(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			config := filepath.Join(t.TempDir(), "e2e.yaml")
+			if err := os.WriteFile(config, raw, 0600); err != nil {
+				t.Fatal(err)
+			}
+			build, cfg, _, err := nativeE2EConfig(t.Context(), func(name string) string {
+				switch name {
+				case "NVKR_NVKE_E2E_CONFIG":
+					return config
+				case "NVKR_NVKE_E2E_SOURCE_COMMIT":
+					return commit
+				}
+				return ""
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for got, original := range map[string]string{build.Repository: file.Build.Repo, build.NVKEClone: file.Build.NVKEClone, cfg.Out: file.Run.Out, cfg.NVKECheckout: file.Run.NVKECheckout} {
+				want := original
+				if commit != "" {
+					want, err = filepath.Abs(original)
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				if got != want || cfg.Repository != build.Repository {
+					t.Fatalf("source %q path=%q want %q", commit, got, want)
+				}
+			}
+		})
+	}
+}
+
+func TestLocalNVKESourceRejectsIncompatibleBuildsBeforeWork(t *testing.T) {
+	for _, row := range []struct {
+		name, platform string
+		change         func(*BuildConfig)
+		valid          bool
+	}{
+		{"defaultAMD64", "linux/amd64", func(*BuildConfig) {}, true},
+		{"explicit ovn", "linux/amd64", func(c *BuildConfig) { c.Network = "ovn" }, true},
+		{"other architecture", "linux/arm64", func(*BuildConfig) {}, false},
+		{"Mac", "darwin/arm64", func(*BuildConfig) {}, false},
+		{"prepared", "linux/amd64", func(c *BuildConfig) { c.Prepared = true }, false},
+		{"qualification", "linux/amd64", func(c *BuildConfig) { c.QualifyLocal = true }, false},
+		{"policy", "linux/amd64", func(c *BuildConfig) { c.QualificationPolicy = "policy.json" }, false},
+		{"definition", "linux/amd64", func(c *BuildConfig) { c.Definition = "other.json" }, false},
+		{"environment", "linux/amd64", func(c *BuildConfig) { c.Environment = "other.json" }, false},
+		{"explicit builder", "linux/amd64", func(c *BuildConfig) { c.NVKR = "/distribution/nvkr" }, false},
+		{"upstream network", "linux/amd64", func(c *BuildConfig) { c.Network = "upstream-ovn" }, false},
+		{"conformance", "linux/amd64", func(c *BuildConfig) { c.Conformance = true }, false},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			cfg := BuildConfig{NVKECommit: strings.Repeat("a", 40)}
+			row.change(&cfg)
+			err := admitLocalNVKESource(cfg, row.platform)
+			if row.valid {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				assertNightlyCode(t, err, nvkrerr.CodeEngineCapability)
+			}
+			cfg.NVKECommit = ""
+			if err := admitLocalNVKESource(cfg, row.platform); err != nil {
+				t.Fatalf("empty source changed existing default: %v", err)
+			}
+		})
+	}
+}
+
+func TestLocalNVKESourceRejectsMalformedCommitBeforeHostWork(t *testing.T) {
+	for _, commit := range []string{"main", strings.Repeat("A", 40), strings.Repeat("z", 40), strings.Repeat("a", 39)} {
+		t.Run(commit, func(t *testing.T) {
+			// Invalid source syntax precedes even unsupported host admission and does
+			// not require an existing repository or native deployment prerequisites.
+			err := admitLocalNVKESource(BuildConfig{NVKECommit: commit}, "unknown/unknown")
+			assertNightlyCode(t, err, nvkrerr.CodeUsage)
+		})
+	}
+}

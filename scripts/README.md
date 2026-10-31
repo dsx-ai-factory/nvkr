@@ -27,6 +27,13 @@ read. `ci-test-summary.py` summarizes the retained Go JSON events. Partition, co
 small offline Go composition contracts run with `make test-ci-tools`; the Go fixture exercises every
 matrix entry without rebuilding the product suite.
 
+`bash scripts/ci-measure-workload.sh COMMAND [ARG...]` samples a disposable Linux
+CI host and its Docker containers alongside process timing. The nightly uses it
+to retain resource observations around the Go E2E, including kernel warnings and
+cgroup memory events. It publishes no files and preserves the workload's exit
+status on failure; sampler stop/join is bounded and a failed join fails the invocation. Samples are observations, not capacity or
+qualification acceptance.
+
 ## CLI artifact test baseline
 
 ```sh
@@ -176,11 +183,10 @@ Signer-policy rejection is covered by the owning consumer contract tests.
 
 ## Focused supporting contracts
 
-The authored nightly workflow uses `nightly-build.sh` to dispatch and join the
-existing generated producer, retaining its exact Run and frozen source selection.
-The Go E2E consumer authenticates that Run's private artifacts and performs native
-site bootstrap, readiness checks and cleanup without rebuilding NVKE. See the
-[nightly workflow and runtime bindings](../docs/nvke-nightly.md).
+The ARM64 build/publish/consume nightly cycle is retired. `nightly-build.sh` and
+`TestNightlyPublishedCandidate` remain as uninvoked legacy code pending removal;
+no maintained nightly supplies their dispatch or consumer inputs. The current
+[nightly](../docs/nvke-nightly.md) builds and tests locally on public hosted AMD64.
 
 - `demo-catalog-change.sh` exercises previewed and machine-managed source pin
   changes against an isolated catalog copy.

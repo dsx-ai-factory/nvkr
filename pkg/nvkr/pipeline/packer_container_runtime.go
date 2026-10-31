@@ -195,6 +195,13 @@ func runPackerContainerWithTimeouts(ctx context.Context, request packerContainer
 	if err := resources.removeContainer(ctx, stageName); err != nil {
 		return nil, err
 	}
+	// Staging has joined its transfers and authenticated the extracted volumes.
+	// Release these transport-only copies before the VM needs memory; the factory
+	// still owns the original material capabilities through consumption recording.
+	// Final cleanup may close these again because heldfile.Close is idempotent.
+	if err := errors.Join(inputArchive.Close(), workArchive.Close()); err != nil {
+		return nil, e.Wrap(e.CodeInternal, err, "releasing authenticated Packer staging transports")
+	}
 	if err := preflightPackerVersion(ctx, request.runtime, resources, request.node,
 		inputVolume, workVolume, nodeLabel, attemptLabel, attempt, request.bindings.packerVersion,
 		request.identity); err != nil {

@@ -24,6 +24,7 @@ type nativeInstallerSelection struct {
 	repo, commit, capiVersion, versionsDigest, siteSpecDigest string
 	sourceDate                                                int64
 	arch                                                      string
+	terminalCLICommit, terminalAgentCommit                    string
 }
 
 func nativeInstallerSelectionFromRun(ctx context.Context, root, bundle string) (*nativeInstallerSelection, error) {
@@ -73,9 +74,24 @@ func nativeInstallerSelectionFromPlan(plan *factory.Plan, bundle, buildDigest st
 		if err != nil || version != "v"+parsed.String() || parsed.Prerelease() != "" || parsed.Metadata() != "" {
 			return nil, errors.New("native tool Run requires an exact stable CAPI provider version")
 		}
-		return &nativeInstallerSelection{repo: installer.Repo, commit: installer.Commit, sourceDate: installer.SourceDate, capiVersion: version, arch: arch}, nil
+		selection := &nativeInstallerSelection{repo: installer.Repo, commit: installer.Commit, sourceDate: installer.SourceDate, capiVersion: version, arch: arch}
+		if len(components["nvkectl"].Patches) == 0 {
+			selection.terminalCLICommit = installer.Commit
+		}
+		return selection, nil
 	}
 	return nil, errors.New("native tool Run omits the selected host bundle build")
+}
+
+// Diagnostic eligibility cannot rely on the installer commit alone: the
+// selected agent must carry the reviewed, unmodified init-error masking too.
+// Losing this observation changes no ordinary deployment admission.
+func (s *nativeInstallerSelection) selectTerminalAgent(plan *factory.Plan, output, digest, platform string) {
+	s.terminalAgentCommit = ""
+	agent, err := nativeIdentityComponentForPlatform(plan, output, digest, "nvke-agent", platform)
+	if err == nil && agent.Repo == s.repo && agent.Commit == s.commit {
+		s.terminalAgentCommit = agent.Commit
+	}
 }
 
 const nativeSiteSpecPath = "cli/internal/bootstrap/sitespec/template.yaml"

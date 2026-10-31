@@ -68,9 +68,11 @@ type BuildConfig struct {
 	Prepared            bool
 	// Network selects a closed authored artifact set for E2E. It does not
 	// substitute source pins or confer deployment/readiness authority.
-	Conformance   bool
-	Network       string
-	Repository    string
+	Conformance bool
+	Network     string
+	Repository  string
+	// NVKECommit optionally freezes exact NVKE main source for the unsigned default AMD64 E2E.
+	NVKECommit    string
 	NVKEClone     string
 	Definition    string
 	Environment   string

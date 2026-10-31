@@ -42,6 +42,12 @@ func TestNativeSharedSetupPrecedesOrdinaryTenantAndStopsDiagnostic(t *testing.T)
 			writeTenantFixture(t, cli, []byte(`#!/bin/sh
 set -eu
 umask 077
+if test "$1" = --json-logs; then
+ shift
+ test "$1:$2" = bootstrap:site
+else
+ test "$1:$2" != bootstrap:site
+fi
 case "$1:$2" in
  generate:sitespec)
   case "$*" in *"cluster.podCidr=10.244.0.0/16"*"cluster.serviceCidr=10.96.0.0/16"*) ;; *) exit 54;; esac

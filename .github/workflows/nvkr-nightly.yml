@@ -8,308 +8,167 @@ name: NVKR nightly NVKE end-to-end tests
     - cron: '17 3 * * *'
   workflow_dispatch:
     inputs:
-      tenant_checks:
-        description: Also create a tenant and check workload and DNS after site bootstrap
+      debug_redacted_kubeadm_error:
+        description: 'Temporary debugging: publish the reviewed source-redacted kubeadm error'
         type: boolean
         default: false
-      profile:
-        description: Maintained nightly project to build and test
-        type: choice
-        required: true
-        default: all
-        options:
-          - all
-          - nvke-nightly-arm64
 
 permissions:
   contents: read
 
 concurrency:
-  group: nvkr-nightly-main
+  group: nvkr-nightly-${{ github.ref }}
   cancel-in-progress: false
 
+# Build and test together. Product bytes stay on this disposable runner.
 jobs:
-  select:
-    if: github.repository == 'dsx-ai-factory/nvkr' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    outputs:
-      matrix: ${{ steps.profiles.outputs.matrix }}
-      nvke_commit: ${{ steps.source.outputs.nvke_commit }}
-    steps:
-      - name: Check out the exact coordinator source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - name: Select maintained nightly projects
-        id: profiles
-        env:
-          PROFILE: ${{ inputs.profile || 'all' }}
-        run: |
-          set -euo pipefail
-          jq --arg profile "$PROFILE" '
-            [.[] | select(.network == "ovn") | select($profile == "all" or .name == $profile) |
-              {name, runtime_target, network}]
-          ' inputs/testing/nightly-profiles.json > "$RUNNER_TEMP/nightly-selection.json"
-          matrix=$(jq -ce --arg profile "$PROFILE" '
-            [.[] | select(.network == "ovn") | select($profile == "all" or .name == $profile)] |
-            if length > 0 and all(.[];
-              (.name == "nvke-nightly-arm64") and
-              .runtime_target == "native-arm64-vm" and
-              (.network == "ovn" or .network == "upstream-ovn")) and
-              (map(.name) | length == (unique | length)) then
-              {include: map({name})}
-            else error("invalid maintained nightly profile") end
-          ' inputs/testing/nightly-profiles.json)
-          printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
-      - name: Resolve NVKE main once for this nightly cycle
-        id: source
-        env:
-          GH_TOKEN: ${{ secrets.NKE_SOURCE_TOKEN }}
-        run: |
-          set -euo pipefail
-          : "${GH_TOKEN:?NVKE source resolution requires its read credential}"
-          source=$(timeout --kill-after=5s 60s gh api --hostname github.com \
-            -H 'X-GitHub-Api-Version: 2026-03-10' repos/dsx-ai-factory/nvke/git/ref/heads/main)
-          commit=$(jq -er '
-            if .ref == "refs/heads/main" and .object.type == "commit" and
-              (.object.sha | type == "string" and test("^[0-9a-f]{40}$")) then .object.sha
-            else error("invalid exact NVKE main revision") end' <<<"$source")
-          printf 'nvke_commit=%s\n' "$commit" >> "$GITHUB_OUTPUT"
-      - name: Preserve public nightly selection report
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
-        with:
-          name: nightly-selection-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/nightly-selection.json
-          if-no-files-found: warn
-          retention-days: 7
-
-  build:
-    name: Build and publish ${{ matrix.name }}
-    needs: [select]
+  e2e:
+    name: Build latest NVKE and run NVKR Go E2E (AMD64)
+    if: github.event_name != 'schedule' || github.repository == 'dsx-ai-factory/nvkr'
     runs-on: ubuntu-24.04
     timeout-minutes: 360
-    permissions:
-      contents: read
-      actions: write
-    strategy:
-      fail-fast: false
-      max-parallel: 1
-      matrix: ${{ fromJSON(needs.select.outputs.matrix) }}
-    steps:
-      - name: Check out the exact coordinator source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - name: Dispatch and join this project's exact producer Run
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PROFILE: ${{ matrix.name }}
-          NVKE_COMMIT: ${{ needs.select.outputs.nvke_commit }}
-        run: |
-          set -euo pipefail
-          bash scripts/nightly-build.sh inputs/testing/nightly-profiles.json "$PROFILE" \
-            "$RUNNER_TEMP/nightly-build-$PROFILE"
-      - name: Preserve exact producing Run facts
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
-        with:
-          name: nightly-build-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/nightly-build-${{ matrix.name }}/build.json
-          if-no-files-found: warn
-          retention-days: 7
-
-  select-runtime:
-    name: Select completed candidates for runtime tests
-    needs: [select, build]
-    if: always() && needs.select.result == 'success' && !cancelled()
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      actions: read
-    outputs:
-      matrix: ${{ steps.completed.outputs.matrix }}
-      available: ${{ steps.completed.outputs.available }}
-    steps:
-      - name: Select only this cycle's available producer locators
-        id: completed
-        env:
-          GH_TOKEN: ${{ github.token }}
-          MATRIX: ${{ needs.select.outputs.matrix }}
-        run: |
-          set -euo pipefail
-          selected='[]'
-          profiles=$(jq -er '
-            if (.include | type) == "array" and (.include | length) > 0 and
-              all(.include[];
-                (.name == "nvke-nightly-arm64")) and
-              (.include | map(.name) | length == (unique | length)) then
-              .include[].name
-            else error("invalid maintained runtime matrix") end
-          ' <<<"$MATRIX")
-          while IFS= read -r profile; do
-            artifact="nightly-build-$profile-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-            facts=$(gh api --hostname github.com -H 'X-GitHub-Api-Version: 2026-03-10' \
-              "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?name=$artifact&per_page=100")
-            available=$(jq -er --arg name "$artifact" --arg sha "$GITHUB_SHA" '
-              if .total_count == 0 and (.artifacts | length) == 0 then "false"
-              elif .total_count == 1 and (.artifacts | length) == 1 and
-                .artifacts[0].name == $name and .artifacts[0].expired == false and
-                .artifacts[0].workflow_run.head_sha == $sha then "true"
-              else error("invalid exact-cycle producer locator") end
-            ' <<<"$facts")
-            if [[ "$available" == true ]]; then
-              selected=$(jq -c --arg profile "$profile" '. + [$profile]' <<<"$selected")
-            fi
-          done <<<"$profiles"
-          matrix=$(jq -ce --argjson selected "$selected" \
-            '{include: [.include[] | select(.name as $name | $selected | index($name))]}' <<<"$MATRIX")
-          printf 'matrix=%s\navailable=%s\n' "$matrix" \
-            "$(jq -r '.include | length > 0' <<<"$matrix")" >> "$GITHUB_OUTPUT"
-
-  runtime-test:
-    name: Test published ${{ matrix.name }}
-    needs: [select-runtime]
-    if: needs.select-runtime.result == 'success' && needs.select-runtime.outputs.available == 'true' && !cancelled()
-    runs-on: arc-arm64-kvm
-    environment: nvkr-arc
-    timeout-minutes: 360
-    permissions:
-      contents: read
-      actions: read
     env:
-      COSIGN_DIGEST: c5d324e091826b0d7a78eb16fef316450b4eb9aaec045611c08ba06f5e73220a
-    concurrency:
-      group: nvkr-nightly-native-arm64-runtime
-      cancel-in-progress: false
-    strategy:
-      fail-fast: false
-      max-parallel: 1
-      matrix: ${{ fromJSON(needs.select-runtime.outputs.matrix) }}
+      GOTOOLCHAIN: local
     steps:
-      - name: Reserve time for Go cleanup and the job verdict
+      - name: Admit a public GitHub-hosted AMD64 runner
         run: |
           set -euo pipefail
-          printf 'NVKR_JOB_DEADLINE=%s\n' "$(( $(date +%s) + 355 * 60 ))" >> "$GITHUB_ENV"
-      - name: Check out the exact coordinator source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$(uname -s)/$(uname -m)" = Linux/x86_64
+          test -c /dev/kvm
+          printf 'NVKR_JOB_DEADLINE=%s\n' "$(( $(date +%s) + 350 * 60 ))" >> "$GITHUB_ENV"
+          nproc
+          free -m
+          df -Pm "$RUNNER_TEMP"
+      - name: Reclaim unused SDK space on the disposable hosted runner
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          # Fixed preinstalled SDKs are unused by this Go/KVM job. Reclaim them
+          # before checkout/build; preserve Docker, Go, sources and all outputs.
+          df -Pm "$RUNNER_TEMP"
+          sudo -n timeout --kill-after=10s 300s rm -rf -- \
+            /usr/local/lib/android /usr/share/dotnet /usr/local/.ghcup
+          df -Pm "$RUNNER_TEMP"
+      - name: Check out the dispatched NVKR branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+      - name: Resolve NVKE main once
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: dsx-ai-factory/nvke
+          ref: main
+          path: nvke-source
+          # The local clone also supplies the catalogs' retained baseline pins.
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Freeze this cycle's product source
+        run: |
+          set -euo pipefail
+          commit=$(git -C nvke-source rev-parse HEAD)
+          printf 'NVKR_NVKE_E2E_SOURCE_COMMIT=%s\n' "$commit" >> "$GITHUB_ENV"
+          printf 'NVKE_LOCAL_CLONE=%s/nvke-source\n' "$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+          printf 'NVKR commit: %s\n\nNVKE commit: %s\n' "$GITHUB_SHA" "$commit" >> "$GITHUB_STEP_SUMMARY"
       - name: Set up the repository's Go toolchain
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: .go-version
           cache: false
-      - name: Build the existing network privilege probe
-        timeout-minutes: 20
-        env:
-          GOTOOLCHAIN: local
-        run: |
-          timeout --kill-after=10s 900s make demo
-      - name: Admit the configured native runtime host
-        env:
-          GOTOOLCHAIN: local
+      - name: Set up container-backed Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          driver: docker-container
+          cache-binary: false
+      - name: Install native VM prerequisites on the disposable runner
+        timeout-minutes: 15
         run: |
           set -euo pipefail
-          test "$(go env GOOS)/$(go env GOARCH)" = linux/arm64
-          for tool in bash git gh jq curl timeout sha256sum docker sudo qemu-img \
-            qemu-system-aarch64 cloud-localds virsh ip iptables dnsmasq setcap getcap ps sysctl \
-            swtpm flock setsid openssl ss make awk df sort seq; do
-            command -v "$tool" >/dev/null || { echo "::error::Missing native host prerequisite: $tool"; exit 1; }
-          done
-          test -c /dev/kvm && test -r /dev/kvm && test -w /dev/kvm
-          exec 3<>/dev/kvm
-          exec 3>&-
-          docker_platform=$(timeout --kill-after=5s 30s docker info --format '{{.OSType}}/{{.Architecture}}')
-          case "$docker_platform" in
-            linux/aarch64|linux/arm64) ;;
-            *) echo '::error::Docker must use the same native Linux ARM64 host'; exit 1 ;;
-          esac
-          test ! -e .nightly-private && test ! -L .nightly-private
-          install -d -m 0700 .nightly-private
-      - name: Download this cycle's exact producing Run locator
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
-        with:
-          name: nightly-build-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: .nightly-private/build
-      - name: Build the pinned temporary bootstrap backend from source
+          sudo -n timeout --kill-after=10s 180s apt-get update
+          sudo -n timeout --kill-after=10s 600s apt-get install -y --no-install-recommends \
+            acl git make gcc libc6-dev jq coreutils python3 openssh-client bash curl openssl \
+            libvirt-daemon-system libvirt-clients qemu-utils qemu-system-x86 ovmf \
+            cloud-image-utils swtpm swtpm-tools gnutls-bin ipxe-qemu \
+            dnsmasq-base iptables iproute2 libcap2-bin e2fsprogs kmod time
+          # Persist this disposable runner's grant when udev reapplies device policy.
+          id
+          stat -c 'KVM before: uid=%u gid=%g mode=%a inode=%i device=%t:%T' /dev/kvm
+          getfacl -cp /dev/kvm
+          printf 'KERNEL=="kvm", OWNER="%s", GROUP="kvm", MODE="0660", OPTIONS+="static_node=kvm"\n' "$(id -u)" | \
+            sudo -n timeout --kill-after=5s 15s tee /etc/udev/rules.d/99-nvkr-kvm.rules
+          sudo -n timeout --kill-after=5s 15s udevadm verify /etc/udev/rules.d/99-nvkr-kvm.rules
+          sudo -n timeout --kill-after=5s 15s udevadm control --reload-rules
+          sudo -n timeout --kill-after=5s 30s udevadm trigger --name-match=kvm
+          sudo -n timeout --kill-after=5s 30s udevadm settle --timeout=25
+          stat -c 'KVM ready: uid=%u gid=%g mode=%a inode=%i device=%t:%T' /dev/kvm
+          getfacl -cp /dev/kvm
+          (exec 3<>/dev/kvm)
+          sudo -n -k timeout --signal=TERM --kill-after=5s 25s true
+          docker info --format '{{.OSType}}/{{.Architecture}}'
+      - name: Build the existing Linux bootstrap backend from pinned public source
         timeout-minutes: 20
         env:
           GOENV: 'off'
           GOWORK: 'off'
         run: |
           set -euo pipefail
-          umask 077
           source="$RUNNER_TEMP/nightly-lima-source"
           prefix="$RUNNER_TEMP/nightly-lima"
-          test ! -e "$source" && test ! -L "$source"
-          test ! -e "$prefix" && test ! -L "$prefix"
+          test ! -e "$source" && test ! -e "$prefix"
           git init "$source"
           git -C "$source" remote add origin https://github.com/lima-vm/lima.git
           timeout --kill-after=10s 180s git -C "$source" fetch --depth=1 origin f47461ed7d03f300297e01fd659e9aefc6c228b9
           git -C "$source" checkout --detach FETCH_HEAD
-          test "$(git -C "$source" rev-parse HEAD)" = f47461ed7d03f300297e01fd659e9aefc6c228b9
           test "$(git -C "$source" rev-parse 'HEAD^{tree}')" = 525cd5017b050291ab824892d624bbbacf7f8e7e
           timeout --kill-after=30s 900s make -C "$source" native documentation install PREFIX="$prefix"
           install -m 0644 "$source/NOTICE" "$prefix/share/doc/lima/NOTICE"
-          test "$("$prefix/bin/limactl" --version)" = 'limactl version f47461e'
-          test -x "$prefix/bin/nerdctl.lima"
           printf '%s\n' "$prefix/bin" >> "$GITHUB_PATH"
-      - name: Fetch and check the independent native verifier
-        timeout-minutes: 5
+      - name: Build the existing NVKR executables
+        timeout-minutes: 20
+        run: timeout --kill-after=10s 1100s make build demo
+      - name: Configure the hosted VM test
         run: |
           set -euo pipefail
-          destination="$RUNNER_TEMP/nightly-cosign-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-          test ! -e "$destination" && test ! -L "$destination"
-          install -d -m 0700 "$destination"
-          curl --fail --location --proto '=https' --proto-redir '=https' --connect-timeout 20 \
-            --max-time 180 --max-filesize 134217728 \
-            --output "$destination/cosign" \
-            https://github.com/sigstore/cosign/releases/download/v3.1.3/cosign-linux-arm64
-          printf '%s  %s\n' "$COSIGN_DIGEST" "$destination/cosign" | sha256sum -c -
-          chmod 0500 "$destination/cosign"
-          printf 'NVKR_NIGHTLY_COSIGN=%s\n' "$destination/cosign" >> "$GITHUB_ENV"
-          printf 'NVKR_NIGHTLY_COSIGN_DIGEST=sha256:%s\n' "$COSIGN_DIGEST" >> "$GITHUB_ENV"
-      - name: Authenticate producer artifacts and run native Go E2E
+          umask 077
+          # Initial hosted profile; acceptance requires a real E2E run.
+          cat > "$RUNNER_TEMP/nightly-e2e.yaml" <<EOF
+          version: 1
+          build:
+            repo: "$GITHUB_WORKSPACE"
+            attempt: "nightly-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+            jobs: 1
+            nvkeClone: "$NVKE_LOCAL_CLONE"
+          run:
+            out: "$RUNNER_TEMP/nightly-site-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+            timeoutSeconds: 3600
+            tenantWorkers: 1
+            resources:
+              siteMemoryGiB: 4
+              tenantMemoryGiB: 4
+              headroomMiB: 1024
+              vcpus: 2
+          EOF
+          printf 'NVKR_NVKE_E2E_CONFIG=%s/nightly-e2e.yaml\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - name: Build NVKE and run the existing Go site and tenant E2E with cleanup
         env:
-          GOTOOLCHAIN: local
-          GH_TOKEN: ${{ github.token }}
-          NVKR_REGISTRY_READ: ${{ secrets.NVKR_REGISTRY_READ }}
-          NVKR_REGISTRY_READ_USER: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          NVKR_NIGHTLY_ENABLE: '1'
-          NVKR_CI_STORAGE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          NVKR_CI_STORAGE_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
-          NVKR_NIGHTLY_PROFILE: ${{ matrix.name }}
-          NVKR_NIGHTLY_PROFILES: ${{ github.workspace }}/inputs/testing/nightly-profiles.json
-          NVKR_NIGHTLY_BUILD: ${{ github.workspace }}/.nightly-private/build/build.json
-          NVKR_NIGHTLY_TENANT: ${{ inputs.tenant_checks && '1' || '0' }}
-          NVKR_NIGHTLY_NETWORK_HELPER: ${{ github.workspace }}/bin/nvke-demo
-          NVKR_NIGHTLY_WORKSPACE: ${{ runner.temp }}/nightly-candidate-${{ matrix.name }}
-          NVKR_NIGHTLY_REPORTS: ${{ runner.temp }}/nightly-reports-${{ matrix.name }}
+          NVKR_NVKE_E2E: '1'
+          NVKR_NVKE_E2E_TENANT: '1'
+          NVKR_NVKE_E2E_DEBUG_REDACTED_ERROR: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_redacted_kubeadm_error && '1' || '0' }}
         run: |
           set -euo pipefail
-          go test ./internal/nvkedemo -list '^TestNightlyPublishedCandidate$' \
-            | grep -Fx TestNightlyPublishedCandidate
-          [[ "$NVKR_JOB_DEADLINE" =~ ^[0-9]+$ ]]
+          timeout --kill-after=10s 180s go test ./internal/nvkedemo -list '^TestEndToEnd$' | grep -Fx TestEndToEnd
           remaining=$(( NVKR_JOB_DEADLINE - $(date +%s) ))
+          # TestEndToEnd reserves two hours inside this deadline for owned cleanup.
           (( remaining > 125 * 60 ))
-          go test ./internal/nvkedemo -run '^TestNightlyPublishedCandidate$' -timeout "${remaining}s" -count=1 -v
-          jq -e --arg profile "$NVKR_NIGHTLY_PROFILE" --arg run "$GITHUB_RUN_ID" \
-            --arg attempt "$GITHUB_RUN_ATTEMPT" --arg sha "$GITHUB_SHA" '
-            .profile == $profile and .phase == "runtime" and .runtimePassed == true and
-            .coordinatorRun == $run and .coordinatorAttempt == $attempt and
-            .sourceCommit == $sha and .qualificationAuthority == "none"
-          ' "$NVKR_NIGHTLY_REPORTS/cycle.json" >/dev/null
-      - name: Preserve the public runtime verdict
+          bash scripts/ci-measure-workload.sh \
+            go test ./internal/nvkedemo -run '^TestEndToEnd$' -count=1 -v -timeout "${remaining}s"
+      - name: Record final hosted allocation
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
-        with:
-          name: nightly-runtime-report-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/nightly-reports-${{ matrix.name }}/cycle.json
-          if-no-files-found: warn
-          retention-days: 7
+        run: |
+          free -m
+          df -Pm "$RUNNER_TEMP"
+          timeout --kill-after=2s 10s id || true
+          timeout --kill-after=2s 10s stat -c 'KVM final: uid=%u gid=%g mode=%a inode=%i device=%t:%T' /dev/kvm || true
+          timeout --kill-after=2s 10s getfacl -cp /dev/kvm || true

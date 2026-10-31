@@ -366,6 +366,17 @@ func RunNativeGuest(ctx context.Context, cfg NativeGuestConfig) (result error) {
 						consoleRoot = "var/instances"
 					}
 					cleanupResult = errors.Join(cleanupResult, retainNativeInstanceFiles(cleanup, simdir, consoleRoot, out, row.ID))
+					// The retained snapshots are private, bounded copies of the
+					// owned serial logs. Publish only closed kubeadm phrases on
+					// failure; never the console, request fields or credentials.
+					if cfg.site != nil && result != nil {
+						for _, suffix := range []string{".log", "-ttyS0.log", "-ttyS1.log"} {
+							raw, readErr := readRunFile(cleanup, out, "native-console-"+row.ID+suffix, 8<<20)
+							if readErr == nil {
+								reportNativeBootstrapObservation(runner, nativeBootstrapKubeadmSummary(string(raw)))
+							}
+						}
+					}
 				}
 				_, deleteErr := call(cleanup, "delete", "instance", "delete", "--instance-id", row.ID)
 				cleanupResult = errors.Join(cleanupResult, deleteErr)

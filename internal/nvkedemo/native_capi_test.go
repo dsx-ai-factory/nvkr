@@ -214,6 +214,70 @@ func TestNativeInstallerSelectionReplaysCapturedRun(t *testing.T) {
 	})
 }
 
+func TestNativeInstallerTerminalBindingRequiresUnpatchedCLIAndAgent(t *testing.T) {
+	_, bundle, plan := nativeCapturedToolsFixture(t)
+	for _, tc := range []struct {
+		name                                               string
+		cliPatch, agentPatch, differentAgent, missingAgent bool
+	}{
+		{name: "unmodified"},
+		{name: "patched CLI", cliPatch: true},
+		{name: "patched agent", agentPatch: true},
+		{name: "different agent source", differentAgent: true},
+		{name: "missing agent", missingAgent: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw, err := canonical.Marshal(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var changed factory.Plan
+			if err := canonical.UnmarshalExact(raw, &changed); err != nil {
+				t.Fatal(err)
+			}
+			var digest string
+			for i := range changed.Builds {
+				build := &changed.Builds[i]
+				if build.Name != bundle {
+					continue
+				}
+				digest = build.BuildDigest
+				var agent catalog.NamedComponent
+				for j := range build.ResolvedComponents {
+					component := &build.ResolvedComponents[j]
+					if component.Name != "nvkectl" {
+						continue
+					}
+					agent = *component
+					agent.Name = "nvke-agent"
+					agent.Patches = nil
+					if tc.cliPatch {
+						component.Patches = []catalog.Patch{{Name: "synthetic-cli.patch"}}
+					}
+				}
+				if tc.agentPatch {
+					agent.Patches = []catalog.Patch{{Name: "synthetic-agent.patch"}}
+				}
+				if tc.differentAgent {
+					agent.Commit = strings.Repeat("9", 40)
+				}
+				if !tc.missingAgent {
+					build.ResolvedComponents = append(build.ResolvedComponents, agent)
+				}
+			}
+			selected, err := nativeInstallerSelectionFromPlan(&changed, bundle, digest)
+			if err != nil {
+				t.Fatalf("ordinary source selection changed: %v", err)
+			}
+			selected.selectTerminalAgent(&changed, bundle, digest, "linux/arm64")
+			if (selected.terminalCLICommit != "") != !tc.cliPatch ||
+				(selected.terminalAgentCommit != "") != !(tc.agentPatch || tc.differentAgent || tc.missingAgent) {
+				t.Fatalf("incorrect terminal-source binding: %+v", selected)
+			}
+		})
+	}
+}
+
 // Executes the actual catalog metadata-producing prefix using the selected Git
 // source and GNU Make. It changes only a private test workspace, never NVKE.
 func TestNativeInstallerSelectedSourceMakeContract(t *testing.T) {
