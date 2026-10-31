@@ -147,5 +147,24 @@ func nativeBootstrapKubeadmSummary(message string) string {
 			fmt.Fprintf(&result, "Bootstrap kubeadm wait observation: %s\n", item.label)
 		}
 	}
+	// The agent's status truncates this wrapper before the transport error,
+	// while its private serial log retains the command output. These labels
+	// observe literal text in that snapshot; they do not establish root cause.
+	if strings.Contains(message, "error execution phase wait-control-plane:") &&
+		strings.Contains(message, "unable to create the kubeadm:cluster-admins ClusterRoleBinding by using super-admin.conf:") {
+		for _, item := range []struct{ phrase, label string }{
+			{"connect: connection refused", "connection-refused"},
+			{"i/o timeout", "network-timeout"},
+			{"context deadline exceeded", "request-deadline"},
+			{"TLS handshake timeout", "tls-handshake-timeout"},
+			{"x509:", "certificate-verification"},
+			{"read: connection reset by peer", "connection-reset"},
+			{"unexpected EOF", "unexpected-eof"},
+		} {
+			if strings.Contains(message, item.phrase) {
+				fmt.Fprintf(&result, "Bootstrap kubeadm client observation: %s\n", item.label)
+			}
+		}
+	}
 	return result.String()
 }

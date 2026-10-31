@@ -17,11 +17,6 @@ import (
 
 // Only an owned, nonblocking presenter may publish bootstrap observations.
 // Plain writers retain diagnostics privately rather than delaying cleanup.
-// The temporary E2E-only debug capability is disabled for ordinary presenters.
-type nativeBootstrapTerminalObserver interface {
-	nativeBootstrapTerminalEnabled() bool
-}
-
 type nativeBootstrapObserver interface {
 	observeNativeBootstrap(string)
 }
@@ -77,7 +72,7 @@ func nativeBootstrapLogSummary(raw []byte) string {
 	return result.String()
 }
 
-func runNativeBootstrap(ctx context.Context, runner Runner, args []string, source *nativeInstallerSelection) error {
+func runNativeBootstrap(ctx context.Context, runner Runner, args []string) error {
 	if err := requireContext(ctx); err != nil {
 		return err
 	}
@@ -92,9 +87,6 @@ func runNativeBootstrap(ctx context.Context, runner Runner, args []string, sourc
 	// until the existing subprocess owner has confirmed the join.
 	if !errors.Is(err, ErrUnjoined) {
 		reportNativeBootstrapObservation(runner, nativeBootstrapLogSummary(stderr.Bytes()))
-		if observer, ok := runner.Progress.(nativeBootstrapTerminalObserver); err != nil && ok && observer.nativeBootstrapTerminalEnabled() {
-			reportNativeBootstrapObservation(runner, nativeBootstrapTerminalFailure(source, stderr.Bytes()))
-		}
 	}
 	return err
 }
@@ -158,45 +150,4 @@ func (s *nativeSiteAttempt) observeBootstrapFailure(ctx context.Context, runner 
 		}
 	}
 	return cause
-}
-
-// This is a reviewed diagnostic compatibility selection, not the build source
-// selection. Nightlies still build latest main. Other source commits retain the
-// closed observations until their terminal reporting boundary is reviewed.
-const reviewedBootstrapTerminalSource = "ca3f7c025c1474d9b0b9a19a830a3006168c6de7"
-
-// The existing asset admission binds the executable to its selected source.
-// At the reviewed source, reportFailure emits Error: through redact.Text, and
-// the agent masks init credentials before constructing its kubeadm failure.
-// Reuse only that operator report for this failure, never arbitrary stderr or
-// JSON attributes. This is not a general secret detector or anonymizer.
-func nativeBootstrapTerminalFailure(source *nativeInstallerSelection, raw []byte) string {
-	if source == nil || source.commit != reviewedBootstrapTerminalSource || source.terminalCLICommit != source.commit || source.terminalAgentCommit != source.commit {
-		return ""
-	}
-	scanner := bufio.NewScanner(bytes.NewReader(raw))
-	scanner.Buffer(make([]byte, 4096), 32<<10)
-	var report string
-	for scanner.Scan() {
-		line := scanner.Text()
-		if !strings.HasPrefix(line, "Error: ") {
-			continue
-		}
-		if report != "" || len(line) > 4096 {
-			return ""
-		}
-		// kubeadm adds "error: " before its phase error; the agent retains
-		// that line when adding its own "kubeadm init failed: " prefix.
-		if !strings.Contains(line, "failed to initialize Kubernetes control plane:") ||
-			!strings.Contains(line, "kubeadm init failed: error: error execution phase ") {
-			continue
-		}
-		// Quoting prevents terminal controls and Actions command injection;
-		// credential masking belongs to the reviewed source, before this line.
-		report = fmt.Sprintf("NVKE terminal failure (source-redacted): %q\n", line)
-	}
-	if scanner.Err() != nil {
-		return ""
-	}
-	return report
 }

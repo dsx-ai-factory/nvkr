@@ -7,11 +7,6 @@ name: NVKR nightly NVKE end-to-end tests
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
-    inputs:
-      debug_redacted_kubeadm_error:
-        description: 'Temporary debugging: publish the reviewed source-redacted kubeadm error'
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -155,7 +150,6 @@ jobs:
         env:
           NVKR_NVKE_E2E: '1'
           NVKR_NVKE_E2E_TENANT: '1'
-          NVKR_NVKE_E2E_DEBUG_REDACTED_ERROR: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_redacted_kubeadm_error && '1' || '0' }}
         run: |
           set -euo pipefail
           timeout --kill-after=10s 180s go test ./internal/nvkedemo -list '^TestEndToEnd$' | grep -Fx TestEndToEnd

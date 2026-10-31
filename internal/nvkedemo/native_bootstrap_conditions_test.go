@@ -122,3 +122,31 @@ func TestNativeBootstrapKubeadmPreflightKeepsReasonsPrivate(t *testing.T) {
 		t.Fatalf("unknown preflight reason was presented: %q", got)
 	}
 }
+
+func TestNativeBootstrapKubeadmClientObservationsKeepTransportPrivate(t *testing.T) {
+	const prefix = "error execution phase wait-control-plane: cannot obtain client without bootstrap: unable to create the kubeadm:cluster-admins ClusterRoleBinding by using super-admin.conf: Post https://PRIVATE_ENDPOINT:6443/PRIVATE_PATH: "
+	const phase = "Bootstrap kubeadm phase observation: wait-control-plane\n"
+	for _, tc := range []struct{ name, detail, label string }{
+		{"refused", "connect: connection refused", "connection-refused"},
+		{"network timeout", "i/o timeout", "network-timeout"},
+		{"request deadline", "context deadline exceeded", "request-deadline"},
+		{"TLS handshake", "TLS handshake timeout", "tls-handshake-timeout"},
+		{"certificate", "x509: certificate signed by unknown authority", "certificate-verification"},
+		{"reset", "read: connection reset by peer", "connection-reset"},
+		{"unexpected EOF", "unexpected EOF", "unexpected-eof"},
+		{"unknown", "PRIVATE_UNKNOWN_FAILURE", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			want := phase
+			if tc.label != "" {
+				want += "Bootstrap kubeadm client observation: " + tc.label + "\n"
+			}
+			if got := nativeBootstrapKubeadmSummary(prefix + tc.detail + " PRIVATE_TOKEN"); got != want || strings.Contains(got, "PRIVATE_") {
+				t.Fatalf("unsafe or incorrect client observation: %q", got)
+			}
+			if got := nativeBootstrapKubeadmSummary(tc.detail + " PRIVATE_TOKEN"); got != "" {
+				t.Fatalf("unrelated console text became a client observation: %q", got)
+			}
+		})
+	}
+}

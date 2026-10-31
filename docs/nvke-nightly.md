@@ -76,22 +76,16 @@ using the owned bootstrap kubeconfig. Only selected condition names/statuses and
 static source failure-context labels are presented; identities and raw messages
 remain private. Context labels describe literal source phrases, not a decoded
 Temporal error or proven root cause. Initialization observations also select closed
-nested activity labels and Kubernetes init-phase, preflight-check and wait labels
+nested activity labels and Kubernetes init-phase, preflight-check, wait and
+client-transport labels
 from private condition messages and already retained owned serial snapshots. Raw
 error details remain private; these literal observations may be absent for unknown
 failures. Unknown failures stay unclassified.
-For the reviewed NVKE source `ca3f7c025c1474d9b0b9a19a830a3006168c6de7`, a
-joined failed command may also present its bounded kubeadm terminal error only
-when a manual dispatch explicitly sets the temporary
-`debug_redacted_kubeadm_error` input. Its default is false; scheduled runs retain
-private errors. This temporary path will be removed after debugging. NVKE's
-[existing operator report](https://github.com/dsx-ai-factory/nvke/blob/ca3f7c025c1474d9b0b9a19a830a3006168c6de7/cli/internal/nvkectl/run.go#L100)
-masks registered credentials; the agent also masks init credentials before
-constructing that error. This is not a general secret detector or anonymizer:
-names, addresses and paths can appear in that report. Terminal controls are
-quoted. Other source commits retain the closed observations until their reporting
-boundary is reviewed; this does not change nightly selection of latest NVKE main.
-Stdout, arbitrary stderr, JSON attributes and raw console files remain private.
+Logging-only service drop-ins route kubelet and containerd output to the private
+owned serial console when those services start or restart. Transport labels
+observe fixed phrases anywhere in that snapshot; they do not establish why the
+API request failed. Raw terminal errors have no public dispatch option and remain
+private.
 The Go E2E presenter queues these observations without blocking cleanup; it may
 drop them under backpressure. Plain writers retain bootstrap diagnostics privately.
 Ordinary diagnostic loss preserves the original failure; an unjoined observation

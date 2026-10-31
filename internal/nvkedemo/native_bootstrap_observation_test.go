@@ -7,21 +7,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
 
-type bootstrapObservationRecorder struct {
-	bytes.Buffer
-	terminalDebug bool
-}
-
-func (r *bootstrapObservationRecorder) nativeBootstrapTerminalEnabled() bool { return r.terminalDebug }
+type bootstrapObservationRecorder struct{ bytes.Buffer }
 
 func (r *bootstrapObservationRecorder) observeNativeBootstrap(text string) {
 	r.WriteString(text)
@@ -63,6 +56,7 @@ test "$2" = bootstrap
 test "$3" = site
 printf 'PRIVATE_SITESPEC\n'
 printf '%s\n' '{"operation":"bootstrap_site","msg":"phase finished","phase":"preflight","outcome":"succeeded","err":"PRIVATE_STDERR"}' >&2
+printf '%s\n' 'Error: failed to initialize Kubernetes control plane: kubeadm init failed: error: error execution phase wait-control-plane: cannot obtain client without bootstrap: PRIVATE_KUBEADM_ERROR' >&2
 if test "$MODE" = failure; then exit 7; fi
 if test "$MODE" = canceled; then sleep 30; fi
 `), 0o700)
@@ -75,7 +69,7 @@ if test "$MODE" = canceled; then sleep 30; fi
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), duration)
 			defer cancel()
-			err := runNativeBootstrap(ctx, runner, []string{cli, "bootstrap", "site"}, nil)
+			err := runNativeBootstrap(ctx, runner, []string{cli, "bootstrap", "site"})
 			if mode == "success" && err != nil || mode == "failure" && CommandExitCode(err) != 7 || mode == "canceled" && !errors.Is(err, context.DeadlineExceeded) {
 				t.Fatalf("original result changed: %v", err)
 			}
@@ -91,7 +85,7 @@ if test "$MODE" = canceled; then sleep 30; fi
 				t.Fatal("source phase observation lost")
 			}
 			raw, err := os.ReadFile(filepath.Join(root, "host-nvke-bootstrap.log"))
-			if err != nil || !bytes.Contains(raw, []byte("PRIVATE_SITESPEC")) || !bytes.Contains(raw, []byte("PRIVATE_STDERR")) {
+			if err != nil || !bytes.Contains(raw, []byte("PRIVATE_SITESPEC")) || !bytes.Contains(raw, []byte("PRIVATE_STDERR")) || !bytes.Contains(raw, []byte("PRIVATE_KUBEADM_ERROR")) {
 				t.Fatal("private evidence lost")
 			}
 		})
@@ -152,75 +146,6 @@ printf '%s\n' '{"items":[{"metadata":{"namespace":"default","name":"PRIVATE_POD"
 			}
 			if mode != "observed" && mode != "read failure" && progress.Len() != 0 {
 				t.Fatal("ineligible outcome started observations")
-			}
-		})
-	}
-}
-
-func TestNativeBootstrapTerminalReportRequiresReviewedSourceAndFailure(t *testing.T) {
-	const line = "Error: failed to initialize Kubernetes control plane: kubeadm init failed: error: error execution phase wait-control-plane: cannot obtain client without bootstrap (credential <redacted>)"
-	source := &nativeInstallerSelection{commit: reviewedBootstrapTerminalSource, terminalCLICommit: reviewedBootstrapTerminalSource, terminalAgentCommit: reviewedBootstrapTerminalSource}
-	for _, tc := range []struct {
-		name   string
-		source *nativeInstallerSelection
-		raw    string
-		valid  bool
-	}{
-		{"reviewed operator report", source, line, true},
-		{"raw JSON stays private", source, `{"msg":"PRIVATE_TOKEN","error":"PRIVATE_SECRET"}` + "\n" + line, true},
-		{"missing selection", nil, line, false},
-		{"patched CLI", &nativeInstallerSelection{commit: reviewedBootstrapTerminalSource, terminalAgentCommit: reviewedBootstrapTerminalSource}, line, false},
-		{"patched agent", &nativeInstallerSelection{commit: reviewedBootstrapTerminalSource, terminalCLICommit: reviewedBootstrapTerminalSource}, line, false},
-		{"other source", &nativeInstallerSelection{commit: strings.Repeat("a", 40)}, line, false},
-		{"other error", source, "Error: PRIVATE_TOKEN", false},
-		{"incorrect simplified fixture", source, strings.Replace(line, "error: error execution phase", "error execution phase", 1), false},
-		{"arbitrary stderr", source, "PRIVATE_TOKEN", false},
-		{"JSON attribute", source, `{"msg":"PRIVATE","error":` + strconv.Quote(line) + `}`, false},
-		{"oversized report", source, line + strings.Repeat("x", 4096), false},
-		{"ambiguous reports", source, line + "\n" + line, false},
-		{"oversized preceding log", source, strings.Repeat("x", 40<<10) + "\n" + line, false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			got := nativeBootstrapTerminalFailure(tc.source, []byte(tc.raw))
-			want := ""
-			if tc.valid {
-				want = fmt.Sprintf("NVKE terminal failure (source-redacted): %q\n", line)
-			}
-			if got != want || strings.Contains(got, "PRIVATE_") {
-				t.Fatalf("unsafe or incorrect report: %q", got)
-			}
-		})
-	}
-	controlled := line + "\r::error::untrusted"
-	if got := nativeBootstrapTerminalFailure(source, []byte(controlled)); !strings.Contains(got, `\r::error::untrusted`) || strings.Contains(got, "\r") {
-		t.Fatalf("terminal controls were not quoted: %q", got)
-	}
-}
-
-func TestRunNativeBootstrapReportsReviewedFailureOnlyAfterFailedJoin(t *testing.T) {
-	const report = "Error: failed to initialize Kubernetes control plane: kubeadm init failed: error: error execution phase wait-control-plane: cannot obtain client without bootstrap"
-	for _, mode := range []string{"success", "failure", "disabled", "canceled"} {
-		t.Run(mode, func(t *testing.T) {
-			root := privateTestDir(t)
-			cli := filepath.Join(root, "nvkectl")
-			writeTenantFixture(t, cli, []byte("#!/bin/sh\nset -eu\nprintf 'PRIVATE_SITESPEC\\n'\nprintf '%s\\n' "+operatorQuote(report)+" >&2\nif test \"$MODE\" = failure || test \"$MODE\" = disabled; then exit 7; fi\nif test \"$MODE\" = canceled; then sleep 30; fi\n"), 0700)
-			progress := bootstrapObservationRecorder{terminalDebug: mode != "disabled"}
-			runner := Runner{Work: root, Env: []string{"PATH=/usr/bin:/bin", "MODE=" + mode}, Progress: &progress}
-			duration := 5 * time.Second
-			if mode == "canceled" {
-				duration = 100 * time.Millisecond
-			}
-			ctx, cancel := context.WithTimeout(t.Context(), duration)
-			defer cancel()
-			err := runNativeBootstrap(ctx, runner, []string{cli, "bootstrap", "site"}, &nativeInstallerSelection{commit: reviewedBootstrapTerminalSource, terminalCLICommit: reviewedBootstrapTerminalSource, terminalAgentCommit: reviewedBootstrapTerminalSource})
-			if mode == "success" && err != nil || (mode == "failure" || mode == "disabled") && CommandExitCode(err) != 7 || mode == "canceled" && !errors.Is(err, context.DeadlineExceeded) || errors.Is(err, ErrUnjoined) {
-				t.Fatalf("original result changed: %v", err)
-			}
-			if strings.Contains(progress.String(), "PRIVATE_") {
-				t.Fatal("private stdout was presented")
-			}
-			if (mode == "success" || mode == "disabled") && progress.Len() != 0 || mode == "failure" && !strings.Contains(progress.String(), "cannot obtain client without bootstrap") {
-				t.Fatalf("incorrect operator report: %q", progress.String())
 			}
 		})
 	}

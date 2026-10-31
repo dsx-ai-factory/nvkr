@@ -28,10 +28,6 @@ func TestEndToEnd(t *testing.T) {
 	if !enabled {
 		t.Skip("set NVKR_NVKE_E2E=1 on a dedicated native host to build and bootstrap real NVKE")
 	}
-	debugTerminal, err := nativeE2EOptIn("NVKR_NVKE_E2E_DEBUG_REDACTED_ERROR", os.Getenv("NVKR_NVKE_E2E_DEBUG_REDACTED_ERROR"))
-	if err != nil {
-		t.Fatal(err)
-	}
 	build, cfg, tenantChecks, err := nativeE2EConfig(t.Context(), os.Getenv)
 	if err != nil {
 		t.Fatal(err)
@@ -74,7 +70,6 @@ func TestEndToEnd(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	progress.terminalDebug = debugTerminal
 	build.Progress, cfg.Progress = progress, progress
 	if err := AdmitDemoDeployment(ctx, cfg); err != nil {
 		t.Fatal(err)
