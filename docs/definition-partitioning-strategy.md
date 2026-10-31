@@ -20,11 +20,11 @@ This document changes no ADR contract or organizational acceptance decision.
 
 | Definition | Outputs | Native targets | Required family |
 | --- | ---: | ---: | --- |
-| [Core](../inputs/definitions/nvke/core.yaml) | 22 | 26 | CLI/operator tools, controller with its bound chart, NICo charts, providers/reference fixture, CAPI and cert-manager bootstrap images |
+| [Core](../inputs/definitions/nvke/core.yaml) | 24 | 30 | CLI/operator tools, controller with its bound chart, NICo charts and Core/Flow images, providers/reference fixture, CAPI and cert-manager bootstrap images |
 | [Services](../inputs/definitions/nvke/services.yaml) | 34 | 34 | SPIRE, PostgreSQL, Temporal and local-path-provisioner charts and native runtime images |
 | [Telemetry](../inputs/definitions/nvke/telemetry.yaml) | 17 | 17 | NKTP chart and native runtime images |
 | [Disks](../inputs/definitions/nvke/disks.yaml) | 4 | 4 | AMD64/ARM64 plain and public-bootstrap FDE disks with complete material closures |
-| Total | 77 | 81 | The combined candidate's complete named output set plus the core family's two NICo charts and the services family's six local-path-provisioner outputs |
+| Total | 79 | 85 | The combined candidate's complete named output set plus the core family's two NICo charts and two NICo images and the services family's six local-path-provisioner outputs |
 
 Each family selects `inputs/environments/github-nvke-<family>.yaml`, with
 `githubBundle: nvke-<family>`. Generation owns `.github/workflows/nvkr-run-nvke-<family>.yml`
