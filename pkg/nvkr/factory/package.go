@@ -79,7 +79,7 @@ func executeBinaryPackage(ctx context.Context, plan *Plan, output Artifact, inpu
 	files := make([]delivery.BinaryFileInput, 0, len(inputs))
 	for _, input := range inputs {
 		mode := uint32(0o755)
-		if input.Kind == "tarball" {
+		if input.Kind == "tarball" || input.Kind == ArtifactReleaseCompanion {
 			// The compiled producer type owns applicability; filesystem mode and
 			// filename suffixes must not promote runtime assets to executable tools.
 			mode = 0o644

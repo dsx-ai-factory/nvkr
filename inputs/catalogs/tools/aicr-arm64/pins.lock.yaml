@@ -1,0 +1,20 @@
+# Machine-managed by `nvkr catalog pin` / `nvkr catalog bump`. Do not hand-edit.
+apiVersion: nvkr.dev/lock/v1
+kind: PinLock
+pins:
+  aicr:
+    commit: 2bf662b86c21a97b6e79e90035382ea252a44798
+    goVersion: 1.27.3
+    sourceDateEpoch: 1792572941
+    tag: v1.1.2
+    tool:
+      archiveDigest: sha256:7898cd203a6a51b452528bd0a5013e9424cec3ae2200e184a556537eefb9c91d
+      companions:
+      - digest: sha256:e9e661119160fb822b757a3a1189b10225e06da6d0d6b7fc6d3e1302a927ba79
+        path: aicr-attestation.sigstore.json
+      executableDigest: sha256:0ed855fd9e6ed0177ed1c1288be096a8d3b88ea1747043c7e2a20a3ccd35fc0d
+      executablePath: aicr
+      format: tar-gzip
+      platform: linux/arm64
+      url: https://github.com/NVIDIA/aicr/releases/download/v1.1.2/aicr_1.1.2_linux_arm64.tar.gz
+    treeHash: 60fa9de5b313d80d7a675c41921cb9798aec4bfb

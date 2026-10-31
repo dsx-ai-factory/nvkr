@@ -109,6 +109,9 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		if err := validatePackageInputs(spec, inputs, artifacts); err != nil {
 			return ArtifactGraph{}, err
 		}
+		if spec.Kind == PackageBinaryBundle {
+			inputs = append(inputs, releaseCompanionInputs(inputs, nodes, artifacts)...)
+		}
 		if spec.Kind == PackageImage {
 			for _, inputID := range append([]string(nil), inputs...) {
 				input := artifacts[inputID]

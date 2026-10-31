@@ -5,12 +5,19 @@ apiVersion: nvkr.dev/definition/v5
 kind: Definition
 metadata:
   name: nvke-core
-  description: Build the maintained AMD64 and ARM64 CLI, controller and provider images with their image-bound controller chart and reference-profile fixture, and acquire operator tools plus native CAPI and cert-manager images.
+  description: Build the maintained AMD64 and ARM64 CLI, controller and provider images with their image-bound controller chart and reference-profile fixture, and acquire operator tools and the ARM64 AICR CLI plus native CAPI and cert-manager images.
 catalog:
   base: ../../catalogs/nvke/module-tags
 sbomTool: syft
 cosignTool: cosign
 outputs:
+  - name: aicr
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/tools/aicr-arm64
+    format: executable
+    components:
+      - aicr
   - name: capi-controller-image
     platform: linux/amd64
     catalog:
