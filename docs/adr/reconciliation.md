@@ -1612,6 +1612,13 @@ and an unjoined outcome cannot be swallowed by a callback or lost during panic
 or test fatal exit. Controlled subprocess tests cover sequential tenants, failed
 validation retention, natural deletion and those ownership boundaries. These
 contracts do not establish a real site-reuse run or complete Mac/Linux acceptance.
+Native pool observations use NVKE's supported unfiltered JSON inventory, then
+select the already-observed cluster ID and exact worker identity/infrastructure.
+This removes the filtered CLI's separate parent-name lookup during deletion;
+foreign or ambiguous worker identities remain refused. Missing workers are
+accepted only after owned deletion starts. Query failures still require fresh
+cluster absence or remain failures; this protocol correction does not identify
+run #20's first private query error or prove complete natural deletion.
 The same downstream owner accepts one or two tenant workers independently of
 suite selection through `run.tenantWorkers` or `Config.TenantWorkers`. Omission
 retains the ordinary one-worker or conformance two-worker default; conformance
@@ -3636,6 +3643,16 @@ Ready and the main SPIRE pod at 1/2 Ready; it does not identify the first privat
 command error or establish its cause. Owned cleanup joined and Actions artifact
 count was zero. These observations establish integrated staging/probe progress,
 not a completed policy/handoff receipt or full site/tenant acceptance.
+[Run 41331140209](https://github.com/depohmel/nvkr/actions/runs/41331140209), on
+NVKR `914ed406250d33e6f9f52ffbce9063bda86814a7` with frozen latest NVKE
+`1ce10b480cf52f955b6d018cc7ba7ad141c6faf9`, completed fresh builds, identity-policy
+creation/convergence, authenticated handoff and final proof. The Go site and
+tenant subtests passed, including real node/cloud-init readiness and the single
+workload/DNS check. The parent failed during natural tenant-deletion cleanup:
+its pool-ownership query exited with status 1. Simulator and network teardown
+finished afterward; successful natural deletion and complete joined cleanup are
+not established. The first private query error remains unknown. Actions artifact
+count was zero; complete hosted E2E acceptance remains open.
 Historical [public Run 40578231640](https://github.com/depohmel/nvkr/actions/runs/40578231640)
 built a QCOW2 and passed NVKE's separate harness on AMD64 KVM, but encountered
 severe disk pressure and used best-effort teardown. It does not establish this

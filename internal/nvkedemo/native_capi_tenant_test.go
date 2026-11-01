@@ -151,8 +151,44 @@ func TestNativeCAPITenantOwnershipBindsStoredClusterAndWorker(t *testing.T) {
 	}
 }
 
+func TestNativeCAPITenantDeletionPoolInventoryAvoidsNameResolution(t *testing.T) {
+	attempt := nativeCAPITenantFixture(t, GuestCIDR, "ovn")
+	request, err := attempt.namedTenantRequest(t.Context(), "native-demo-tenant")
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding, err := newNativeCAPITenantOwnership(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding.workerID, binding.deleting = "owned-worker", true
+	row := tenantRow{Name: request.Name, ID: "owned-id", Infra: request.Infra, ControlPlane: &request.ControlPlane}
+	root := privateTestDir(t)
+	if err := privateJSON(filepath.Join(root, "pools.json"), []map[string]any{{"id": binding.workerID, "clusterID": row.ID, "name": "worker", "infra": request.NodePools[0].Infra}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := privateJSON(filepath.Join(root, "clusters.json"), []tenantRow{row}); err != nil {
+		t.Fatal(err)
+	}
+	cli := filepath.Join(root, "nvkectl")
+	writeTenantFixture(t, cli, []byte(`#!/bin/sh
+set -eu
+case "$*" in
+ 'get nodepools --cluster native-demo-tenant -o json') printf 'synthetic private name lookup error\n' >&2; exit 1;;
+ 'get nodepools -o json') cat "$FIXTURE/pools.json";;
+ 'get clusters -o json') cat "$FIXTURE/clusters.json";;
+ *) exit 42;;
+esac
+`), 0700)
+	owner := tenant{name: request.Name, id: row.ID, cliPath: cli, nativeCAPI: binding, session: ManagementSession{Runner: Runner{Work: root, Env: []string{"PATH=/usr/bin:/bin", "FIXTURE=" + root}}}}
+	got, err := owner.nativeCAPIRow(t.Context(), []tenantRow{row})
+	if err != nil || got == nil || got.ID != row.ID {
+		t.Fatal("stable-ID pool inventory depended on a separate cluster-name lookup", err)
+	}
+}
+
 func nativeCAPITenantOwnershipCases(t *testing.T, conformance bool) {
-	for _, failure := range []string{"", "cluster ID", "cluster name", "site", "control plane VPC", "worker VPC", "worker ID", "worker count", "extra worker", "missing worker", "deleted worker", "mixed provider", "bootstrap command"} {
+	for _, failure := range []string{"", "unrelated worker", "unrelated after deletion", "moved worker", "duplicate moved worker", "duplicate before adoption", "null inventory", "object inventory", "malformed inventory", "invalid worker identity", "invalid cluster identity", "invalid unrelated identity", "cluster ID", "cluster name", "site", "control plane VPC", "worker VPC", "worker ID", "worker name", "worker count", "extra worker", "missing worker", "deleted worker", "mixed provider", "bootstrap command"} {
 		t.Run(failure, func(t *testing.T) {
 			attempt := nativeCAPITenantFixture(t, GuestCIDR, "ovn")
 			if conformance {
@@ -171,6 +207,29 @@ func nativeCAPITenantOwnershipCases(t *testing.T, conformance bool) {
 			binding.workerID = "owned-worker"
 			pools := []map[string]any{pool}
 			switch failure {
+			case "unrelated worker", "unrelated after deletion":
+				foreign := map[string]any{"id": "unrelated-worker", "clusterID": "unrelated-cluster", "name": "legacy pool/with spaces"}
+				if failure == "unrelated after deletion" {
+					pools, binding.deleting = []map[string]any{foreign}, true
+				} else {
+					pools = append(pools, foreign)
+				}
+			case "moved worker":
+				pool["clusterID"] = "foreign-cluster"
+				binding.deleting = true
+			case "duplicate moved worker", "duplicate before adoption":
+				pools = append(pools, map[string]any{"id": binding.workerID, "clusterID": "foreign-cluster", "name": "worker"})
+				if failure == "duplicate before adoption" {
+					binding.workerID = ""
+				}
+			case "null inventory", "malformed inventory", "object inventory":
+				pools, binding.deleting = nil, true
+			case "invalid unrelated identity":
+				pools = append(pools, map[string]any{"clusterID": "foreign-cluster", "name": "worker"})
+			case "invalid worker identity":
+				pool["id"] = ""
+			case "invalid cluster identity":
+				pool["clusterID"] = ""
 			case "cluster ID":
 				row.ID = "foreign-id"
 			case "cluster name":
@@ -185,12 +244,14 @@ func nativeCAPITenantOwnershipCases(t *testing.T, conformance bool) {
 				pool["desiredNodeCount"] = request.NodePools[0].Count + 1
 			case "worker ID":
 				pool["id"] = "foreign-worker"
+			case "worker name":
+				pool["name"] = "foreign-worker"
 			case "extra worker":
 				pools = append(pools, pool)
 			case "missing worker":
 				pools = nil
 			case "deleted worker":
-				pools, binding.deleting = nil, true
+				pools, binding.deleting = []map[string]any{}, true
 			case "mixed provider":
 				row.NICo = TenantProvider{OrgID, SiteID, VPCID}
 			case "bootstrap command":
@@ -201,12 +262,18 @@ func nativeCAPITenantOwnershipCases(t *testing.T, conformance bool) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			switch failure {
+			case "malformed inventory":
+				data = []byte(`[{`)
+			case "object inventory":
+				data = []byte(`{}`)
+			}
 			writeTenantFixture(t, filepath.Join(root, "pools.json"), data, 0600)
 			cli := filepath.Join(root, "nvkectl")
-			writeTenantFixture(t, cli, []byte("#!/bin/sh\nset -eu\ntest \"$1:$2:$3:$4\" = \"get:nodepools:--cluster:native-demo-tenant\"\ncat \"$POOLS\"\n"), 0700)
+			writeTenantFixture(t, cli, []byte("#!/bin/sh\nset -eu\ntest \"$*\" = \"get nodepools -o json\"\ncat \"$POOLS\"\n"), 0700)
 			owner := tenant{name: request.Name, id: "owned-id", cliPath: cli, nativeCAPI: binding, session: ManagementSession{Runner: Runner{Work: root, Env: []string{"PATH=/usr/bin:/bin", "POOLS=" + filepath.Join(root, "pools.json")}}}}
 			got, err := owner.nativeCAPIRow(t.Context(), []tenantRow{row})
-			if (err == nil && got != nil) != (failure == "" || failure == "deleted worker") {
+			if (err == nil && got != nil) != (failure == "" || failure == "deleted worker" || failure == "unrelated worker" || failure == "unrelated after deletion") {
 				t.Fatalf("ownership result=%+v err=%v", got, err)
 			}
 		})

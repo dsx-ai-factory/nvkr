@@ -199,7 +199,9 @@ func (t *tenant) nativeCAPIRow(ctx context.Context, rows []tenantRow) (*tenantRo
 		!sameMachineInfra(row.ControlPlane.Infra, &ownership.controlPlane) {
 		return nil, errors.New("native tenant infrastructure changed; refusing adoption or removal")
 	}
-	raw, err := t.capture(ctx, []string{t.cli(), "get", "nodepools", "--cluster", t.name, "-o", "json"}, "native-pool-ownership", 30*time.Second)
+	// JSON inventory avoids NVKE's separate name lookup. Select only the
+	// already observed cluster ID; unrelated pools confer no ownership.
+	raw, err := t.capture(ctx, []string{t.cli(), "get", "nodepools", "-o", "json"}, "native-pool-ownership", 30*time.Second)
 	if err != nil {
 		return t.nativeCAPIDeletionObserved(ctx, err)
 	}
@@ -213,6 +215,24 @@ func (t *tenant) nativeCAPIRow(ctx context.Context, rows []tenantRow) (*tenantRo
 	if err := json.Unmarshal(raw, &pools); err != nil {
 		return nil, err
 	}
+	if pools == nil {
+		return nil, errors.New("native worker ownership requires a node pool inventory array")
+	}
+	ownedPools := pools[:0]
+	seenPools := make(map[string]bool, len(pools))
+	for _, pool := range pools {
+		if !safeTenantIdentity(pool.ID) || !safeTenantIdentity(pool.ClusterID) || seenPools[pool.ID] {
+			return nil, errors.New("native node pool inventory contains an invalid identity")
+		}
+		seenPools[pool.ID] = true
+		if ownership.workerID != "" && pool.ID == ownership.workerID && pool.ClusterID != row.ID {
+			return nil, errors.New("native tenant worker changed its cluster; refusing adoption or removal")
+		}
+		if pool.ClusterID == row.ID {
+			ownedPools = append(ownedPools, pool)
+		}
+	}
+	pools = ownedPools
 	if len(pools) == 0 && ownership.deleting && ownership.workerID != "" {
 		return row, nil
 	}
@@ -225,9 +245,9 @@ func (t *tenant) nativeCAPIRow(ctx context.Context, rows []tenantRow) (*tenantRo
 	return row, nil
 }
 
-// NVKE resolves the cluster name again before listing its pools. During owned
-// deletion it may disappear between our inventory and that lookup. Confirm the
-// absence with one fresh inventory; never infer deletion from a query failure.
+// A pool observation can fail while owned deletion is in progress. Confirm
+// cluster absence with one fresh inventory; a query failure alone is never
+// deletion evidence, and a still-present cluster keeps the original error.
 func (t *tenant) nativeCAPIDeletionObserved(ctx context.Context, queryErr error) (*tenantRow, error) {
 	if !t.nativeCAPI.deleting || t.id == "" || ctx.Err() != nil || errors.Is(queryErr, ErrUnjoined) {
 		return nil, queryErr

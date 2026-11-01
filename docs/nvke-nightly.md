@@ -191,6 +191,23 @@ The successful staging/probe steps establish those integrated boundaries;
 complete policy, handoff, tenant and resource acceptance still require a
 successful full run.
 
+[Run 41331140209](https://github.com/depohmel/nvkr/actions/runs/41331140209), on
+NVKR `914ed406250d33e6f9f52ffbce9063bda86814a7` with frozen latest NVKE
+`1ce10b480cf52f955b6d018cc7ba7ad141c6faf9`, completed fresh builds, identity-policy
+creation/convergence, authenticated host handoff and final proof. The Go site
+and tenant subtests passed, including real node/cloud-init readiness and the
+single workload/DNS check. The parent test failed during natural tenant-deletion
+cleanup when its pool-ownership query exited with status 1. Simulator and network
+teardown then finished; this does not prove successful natural tenant deletion
+or complete joined cleanup. Actions artifact count was zero. The underlying
+private query error is unknown; a successful full run remains required.
+
+The native tenant owner uses NVKE's unfiltered JSON node-pool inventory and
+selects the already-observed cluster ID. This avoids the filtered CLI's separate
+cluster-name lookup during deletion. Worker identity and infrastructure checks
+remain required; missing pools are allowed only after owned deletion starts,
+and pool-query errors still require fresh cluster absence or remain failures.
+
 The profile selects 256 MiB for system and Kubernetes memory reservations through
 the supported NVKE request fields and the installed kubelet package's documented
 operator override. The complete Kubernetes reservation map preserves the source's
