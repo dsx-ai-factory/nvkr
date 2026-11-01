@@ -845,8 +845,23 @@ ARM64 guests consume `site-startup-tools-arm64`; AMD64 guests consume
 `site-startup-tools-amd64`. The Mac host uses the Linux ARM64 companion for its
 ARM64 guest. It is built from catalog-selected source;
 the normal startup owner invokes it in its existing admitted controller container.
+The runtime admission and inherited-pipe adapter both support Linux ARM64 and
+AMD64; unsupported platforms remain errors before identity or remote work.
 Building the helper alone
 does not deploy, import SPIRE policy or repair a site.
+
+The controller receives a dedicated, disk-backed 256-MiB `emptyDir` at
+`/tmp/nvkr-site-identity` through its chart's supported `volumes` and
+`volumeMounts` values in the existing per-item override file. Runtime admission
+requires the exact writable mount and bounded volume before staging the held helper. The
+fixed staging command uses the source image's PATH-resolved `sh`; current
+distroless debug images have no `/bin/sh`. Staging and its digest receipt remain
+confined to the dedicated directory. The selected source's root-filesystem and
+user/security settings remain unchanged.
+
+Fixed identity-stage progress identifies runtime inspection, staging, probing,
+policy import and handoff/proof work. These observations contain no raw terminal
+errors or private identity values and do not replace the final completion receipt.
 
 It uses the upstream generated NodeAgent client and the existing controller CSI
 workload identity. No arbitrary script, credential, socket relay, downloader or

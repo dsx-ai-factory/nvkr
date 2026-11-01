@@ -86,6 +86,8 @@ esac
  test -f "$NVKECTL_SPIRE_CA_CERT_FILE"
  test -f "$NVKECTL_SPIRE_CA_KEY_FILE"
  case "$*" in *--stack-config*) ;; *) exit 53;; esac
+ case " $* " in *" --values-for controller=$FIXTURE/controller-native-tenant-security.json "*) ;; *) exit 59;; esac
+ case " $* " in *" --values-for spire=$FIXTURE/spire-native-tenant-security.json "*) ;; *) exit 60;; esac
  test "$HELM_PLUGINS" = "$FIXTURE/site-helm/plugins"
  test "$NVKR_SITE_KUBECTL" = "$FIXTURE/tools/kubectl"
  test -f "$HELM_PLUGINS/nvkr-site-startup/plugin.yaml"
@@ -114,6 +116,8 @@ esac
 			}
 			installNativeIdentityFixture(t, &attempt, tools, root)
 			runner := Runner{Work: root, Env: []string{"PATH=" + tools + ":/usr/bin:/bin", "FIXTURE=" + root, "EVENTS=" + events, "EXPECTED_CONTROLLER_IMAGE=" + attempt.assets.Images["controller"].Reference}}
+			var progress recordedProgress
+			runner.Progress = &progress
 			var row nativeInstance
 			if err = json.Unmarshal([]byte("{\"id\":\"site-fixture\",\"interfaces\":[{\"ipAddresses\":[\"172.30.0.2\",\"172.30.0.3\"]}]}"), &row); err != nil {
 				t.Fatal(err)
@@ -130,6 +134,37 @@ esac
 				err = attempt.ready(ctx, runner, row, tools, root, server)
 			} else {
 				_, err = attempt.setup(ctx, runner, row, tools, root, server)
+			}
+			for item, expected := range nativeTenantSecurityValues() {
+				raw, readErr := os.ReadFile(filepath.Join(root, item+"-native-tenant-security.json"))
+				if readErr != nil {
+					t.Fatal(readErr)
+				}
+				var got, want any
+				encoded, encodeErr := json.Marshal(expected)
+				if encodeErr != nil || json.Unmarshal(encoded, &want) != nil || json.Unmarshal(raw, &got) != nil || !reflect.DeepEqual(got, want) {
+					t.Fatal("installer must receive only its selected chart's values", item)
+				}
+			}
+			var stages []string
+			for _, event := range progress.events {
+				if event.Kind == PhaseStarted && strings.HasPrefix(event.Name, "native-identity-") {
+					stages = append(stages, event.Name)
+				}
+			}
+			wantStages := []string{"native-identity-preflight", "native-identity-runtime", "native-identity-observe", "native-identity-stage", "native-identity-probe", "native-identity-policy", "native-identity-handoff", "native-identity-proof"}
+			if tc.importFailure {
+				wantStages = wantStages[:6]
+				found := false
+				for _, event := range progress.events {
+					found = found || event.Kind == PhaseFailed && event.Name == "native-identity-policy"
+				}
+				if !found || strings.Contains(progress.String(), "synthetic-private-policy-error") {
+					t.Fatal("identity failure stage was lost or private error became public")
+				}
+			}
+			if !reflect.DeepEqual(stages, wantStages) {
+				t.Fatalf("identity stages=%v want=%v", stages, wantStages)
 			}
 			if tc.importFailure {
 				var failure *nativeSiteIdentityFailure

@@ -252,7 +252,7 @@ func TestNativeIdentityCompletionControlsDependencyLifetime(t *testing.T) {
 
 func TestNativeIdentityStagingUsesObservedCommandCompletion(t *testing.T) {
 	digest := strings.Repeat("a", 64)
-	receipt := digest + "  /tmp/nvkr-site-identity.fixture/helper\n"
+	receipt := digest + "  /tmp/nvkr-site-identity/stage.fixture/helper\n"
 	for _, tc := range []struct {
 		name       string
 		raw        string
@@ -261,6 +261,10 @@ func TestNativeIdentityStagingUsesObservedCommandCompletion(t *testing.T) {
 	}{
 		{"joined exact receipt", receipt, nil, false},
 		{"joined wrong hash", strings.Replace(receipt, digest, strings.Repeat("b", 64), 1), nil, false},
+		{"old unmounted temporary path", digest + "  /tmp/nvkr-site-identity.fixture/helper\n", nil, false},
+		{"another directory", digest + "  /tmp/another/stage.fixture/helper\n", nil, false},
+		{"escaped staging path", digest + "  /tmp/nvkr-site-identity/../stage.fixture/helper\n", nil, false},
+		{"empty attempt name", digest + "  /tmp/nvkr-site-identity/stage./helper\n", nil, false},
 		{"joined malformed receipt", "untrusted response", nil, false},
 		{"joined exit failure", "", &CommandError{ExitCode: 7, Cause: errors.New("synthetic remote staging failure")}, false},
 		{"no remote exit observed", "", &CommandError{ExitCode: -1, Cause: context.DeadlineExceeded}, true},

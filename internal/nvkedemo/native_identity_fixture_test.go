@@ -75,7 +75,7 @@ func installNativeIdentityFixture(t *testing.T, attempt *nativeSiteAttempt, tool
 	attempt.assets.SiteTools = tools
 	attempt.assets.identity = &nativeIdentityAssets{helperSHA: "sha256:" + plainSHA(helper)}
 	attempt.spireEnvironment = nativeBootstrapSpireEnvironment(NativeSiteStartup{Name: "nvke-native-site", Gateway: attempt.bridge.gateway.String()})
-	writeTenantFixture(t, filepath.Join(root, "identity-helper-receipt"), []byte(plainSHA(helper)+"  /tmp/nvkr-site-identity.fixture/helper\n"), 0600)
+	writeTenantFixture(t, filepath.Join(root, "identity-helper-receipt"), []byte(plainSHA(helper)+"  /tmp/nvkr-site-identity/stage.fixture/helper\n"), 0600)
 	controller := "docker.io/library/controller@sha256:" + strings.Repeat("c", 64)
 	server := "docker.io/nvkr-local/spire-server@sha256:" + strings.Repeat("d", 64)
 	attempt.assets.Images["controller"] = NativeImageAsset{File: "controller.tar", Reference: controller, ManifestDigest: "sha256:" + strings.Repeat("c", 64)}
@@ -87,6 +87,10 @@ func installNativeIdentityFixture(t *testing.T, attempt *nativeSiteAttempt, tool
 		return map[string]any{"name": name, "imageID": image, "ready": true, "containerID": "containerd://" + name, "state": map[string]any{"running": map[string]any{}}}
 	}
 	controllerPod := map[string]any{"metadata": map[string]any{"name": "controller-fixture", "namespace": "controller-fixture", "uid": "controller-uid"}, "spec": map[string]any{"serviceAccountName": "controller-fixture", "nodeName": "node-fixture", "containers": []any{map[string]any{"name": "controller-fixture", "image": controller, "env": []any{map[string]any{"name": "CONTROLLER_CONFIG_PATH", "value": "/etc/controller/config.yaml"}, map[string]any{"name": "NODE_AGENT_PORT", "value": "15005"}, map[string]any{"name": "SPIRE_SERVER_ADDRESS", "valueFrom": map[string]any{"fieldRef": map[string]any{"fieldPath": "status.hostIP"}}}}, "volumeMounts": []any{mounts("identity", "/spiffe-workload-api"), mounts("config", "/etc/controller")}}}, "volumes": []any{map[string]any{"name": "identity", "csi": map[string]any{"driver": "csi.spiffe.io", "readOnly": true}}, map[string]any{"name": "config", "configMap": map[string]any{"name": "config-fixture"}}}}, "status": map[string]any{"hostIP": "172.30.0.2", "containerStatuses": []any{containerState("controller-fixture", controller)}}}
+	controllerSpec := controllerPod["spec"].(map[string]any)
+	controllerContainer := controllerSpec["containers"].([]any)[0].(map[string]any)
+	controllerContainer["volumeMounts"] = append(controllerContainer["volumeMounts"].([]any), map[string]any{"name": nativeIdentityStagingVolume, "mountPath": nativeIdentityStagingRoot})
+	controllerSpec["volumes"] = append(controllerSpec["volumes"].([]any), map[string]any{"name": nativeIdentityStagingVolume, "emptyDir": map[string]string{"sizeLimit": nativeIdentityStagingLimit}})
 	serverPod := map[string]any{"metadata": map[string]any{"name": "server-fixture", "namespace": "server-fixture", "uid": "server-uid", "labels": map[string]string{"app": "server-fixture"}}, "spec": map[string]any{"containers": []any{map[string]any{"name": "server-fixture", "image": server, "volumeMounts": []any{mounts("tpm", "/run/spire/data/tpm-direct/hashes")}}}, "volumes": []any{map[string]any{"name": "tpm", "configMap": map[string]any{"name": "tpm-fixture"}}}}, "status": map[string]any{"containerStatuses": []any{containerState("server-fixture", server)}}}
 	writeJSON("identity-pods.json", map[string]any{"items": []any{controllerPod, serverPod}})
 	writeJSON("identity-config.json", map[string]any{"metadata": map[string]any{"uid": "config-uid"}, "data": map[string]string{"config.yaml": "spire:\n  className: fixture-class\n  serverNamespace: server-fixture\n  tpmPubhashesConfigMapName: tpm-fixture\n  serverPort: '32123'\n"}})
@@ -120,11 +124,11 @@ case "$*" in
   if test -e "$FIXTURE/identity-handed-off"; then cat "$FIXTURE/identity-agents.json"; else cat "$FIXTURE/identity-agents-empty.json"; fi; exit;;
  *"/opt/spire/bin/spire-server entry show"*)
   if test -e "$FIXTURE/identity-imported"; then cat "$FIXTURE/identity-registrations.json"; else cat "$FIXTURE/identity-registrations-empty.json"; fi; exit;;
- *"/bin/sh -c umask 077;"*)
+ *"-- sh -c umask 077; d="*)
   cmp - "$FIXTURE/tools/nvkr-site-identity-helper"
   printf 'identity-stage\n' >> "$EVENTS"; cat "$FIXTURE/identity-helper-receipt"; exit;;
- *"sha256sum /tmp/nvkr-site-identity.fixture/helper"*) cat "$FIXTURE/identity-helper-receipt"; exit;;
- *"-- /tmp/nvkr-site-identity.fixture/helper"*)
+ *"sha256sum /tmp/nvkr-site-identity/stage.fixture/helper"*) cat "$FIXTURE/identity-helper-receipt"; exit;;
+ *"-- /tmp/nvkr-site-identity/stage.fixture/helper"*)
   if test ! -e "$FIXTURE/identity-probed"; then
    cat > "$FIXTURE/identity-probe-request.json"
    printf 'identity-probe\n' >> "$EVENTS"; touch "$FIXTURE/identity-probed"; cat "$FIXTURE/identity-probe.json"

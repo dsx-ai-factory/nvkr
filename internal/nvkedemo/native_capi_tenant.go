@@ -257,6 +257,10 @@ func nativeTenantSecurityValues() map[string]any {
 	return map[string]any{
 		"controller": map[string]any{
 			"supportedInfraProviders": "nico,infra", "nodeAgent": map[string]string{"spireAttestationMethod": "joinToken"},
+			// Keep the source's root filesystem and security context unchanged.
+			// Only the held, hash-checked identity helper uses this bounded scratch.
+			"volumes":      []map[string]any{{"name": nativeIdentityStagingVolume, "emptyDir": map[string]string{"sizeLimit": nativeIdentityStagingLimit}}},
+			"volumeMounts": []map[string]any{{"name": nativeIdentityStagingVolume, "mountPath": nativeIdentityStagingRoot}},
 			// Match NVKE's site qualification values. Its SPIRE Service exposes
 			// 443; the controller's 8081 default is the backing Pod port.
 			// Helm replaces the env list, so retain the site node-agent port.

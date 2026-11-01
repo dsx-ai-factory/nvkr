@@ -1621,7 +1621,7 @@ inventory/cleanup and retained-child transport without changing artifact or
 source selection. Smaller-profile runtime acceptance remains unverified.
 
 A separate fixed site-identity helper now has one deep `pkg/nvkr/siteidentity`
-owner and a thin private Linux ARM64 build target. It reuses the upstream
+owner and thin private Linux ARM64/AMD64 build targets. It reuses the upstream
 generated NodeAgent client and GoSPIFFE/gRPC, admits its bounded output before
 remote work, and distinguishes not-started, joined failure and unknown remote
 completion. Mutation now delegates to NVKE v0.22.0's `ReconfigureSpireAgent` and
@@ -1667,6 +1667,21 @@ does not establish an authenticated handoff through integrated startup, a fresh
 customer first run or complete current-source Mac/Linux runtime acceptance.
 The [local guide](../local-nvke-demo.md#private-site-identity-operation-helper)
 records that boundary.
+
+The native controller values now provide a dedicated disk-backed 256-MiB
+`emptyDir` for helper staging. Runtime admission requires its exact writable
+mount, and the staged-path/digest receipt stays confined to that directory.
+Runtime admission and the exclusive Linux stdio adapter accept both declared
+Linux architectures; other platforms are refused before descriptor or remote
+work. Existing tenant join-token settings and site TPM attestation remain unchanged.
+PATH-resolved `sh` supports both retained Alpine and current
+distroless debug images without assuming `/bin/sh`; each selected source's
+root-filesystem/user/security context remains unchanged. Fixed identity stages
+use the existing progress owner; raw command output and error details remain
+private. Local pinned-base staging checks under AMD64 emulation on an ARM64
+Docker host establish filesystem/tool compatibility only, not authenticated
+handoff or native KVM acceptance. The completed runtime
+evidence and remaining full E2E gap are recorded under consumer acceptance below.
 
 The Mac network owner now consumes the verified upstream vmnet helper's JSON report and holds its Unix
 datagram connection through joined guest/service cleanup. Gateway binding is observed before services
@@ -3596,8 +3611,15 @@ Its owned site serial snapshot recorded a kernel OOM-kill marker and its pod
 snapshot showed broad restart/readiness failures. The host retained 4,951 MiB
 available immediately before failure. The killed process and exact failing Helm
 item remain unknown; cleanup joined and Actions artifact count was zero.
-The rebalanced profile preserves the earlier peak admission and still needs a
-successful full run. Historical [public Run 40578231640](https://github.com/depohmel/nvkr/actions/runs/40578231640)
+The rebalanced profile preserves the earlier peak admission.
+[Run 41266072695](https://github.com/depohmel/nvkr/actions/runs/41266072695), on
+NVKR `53ed72e8d7be9b8890ed80d521dc513c859e48fd` and the same frozen NVKE
+commit, completed the fresh build, bootstrap, full stack installation and SPIFFE
+setup, then failed 6.5 seconds into the site identity handoff. Its public log
+does not identify the internal failing branch. Owned VM/backend/network cleanup
+joined and Actions artifact count was zero. Site/tenant acceptance and complete
+resource sizing remain unproved; a successful full run is still required.
+Historical [public Run 40578231640](https://github.com/depohmel/nvkr/actions/runs/40578231640)
 built a QCOW2 and passed NVKE's separate harness on AMD64 KVM, but encountered
 severe disk pressure and used best-effort teardown. It does not establish this
 native NVKR topology, fresh source closure or joined cleanup. Full hosted

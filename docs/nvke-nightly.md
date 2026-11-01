@@ -155,7 +155,29 @@ failure still had 4,951 MiB available memory. This establishes observed guest
 memory pressure, without identifying the killed process or exact failing Helm
 release. VM/backend/network cleanup completed, and Actions artifact count was zero.
 The 6/3-GiB allocation rebalances the previous 4/4-GiB profile while preserving
-its peak admission. It requires a new full run to establish runtime acceptance.
+its peak admission.
+
+[Run 41266072695](https://github.com/depohmel/nvkr/actions/runs/41266072695), on
+NVKR `53ed72e8d7be9b8890ed80d521dc513c859e48fd` and the same frozen NVKE
+commit, completed the fresh build, bootstrap, full stack installation and SPIFFE
+setup with that allocation. It failed 6.5 seconds into the site identity handoff,
+before site/tenant test acceptance. VM/backend/network cleanup joined and Actions
+artifact count was zero. The public log does not identify the internal handoff
+failure. This run establishes installation progress, not a successful handoff,
+tenant execution, complete resource sizing or full E2E acceptance.
+
+Source inspection found two staging incompatibilities: the current controller's
+root filesystem is read-only without writable `/tmp`, and its distroless debug
+base provides PATH-resolved `sh` without `/bin/sh`. The native owner now supplies
+a dedicated bounded scratch volume through supported controller chart values,
+uses `sh` and admits that exact mount before staging. The source's security
+settings and identity proof remain unchanged. Fixed identity-stage observations
+locate future failures while raw errors remain private. The existing helper's
+runtime and Linux pipe-adoption guards also admit AMD64 alongside ARM64, matching
+its declared producer platforms. Its source self-pin must select that fix before
+building the helper. These changes still
+require a fresh full E2E run; neither incompatibility is proved to be run #16's
+first failing branch.
 
 The profile selects 256 MiB for system and Kubernetes memory reservations through
 the supported NVKE request fields and the installed kubelet package's documented
