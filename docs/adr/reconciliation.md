@@ -3569,15 +3569,35 @@ Ordinary manual branch dispatch and the daily 03:17 UTC trigger are retained.
 There is no promotion helper, lock ref, NVIDIA runner or protected environment,
 repository secret, signing/publication permission, Actions upload or shared cache
 in this workflow. Product bytes and private diagnostic files remain on its
-disposable runner disk; stderr, build output and bounded host/kernel/cgroup samples
-enter the public job log. The ARM64 build/publish/consume nightly cycle is retired.
+disposable runner disk; build stderr, ordinary build output and bounded
+host/kernel/cgroup samples enter the public job log. Raw deployment stdout and
+stderr remain private. Bootstrap JSON and fixed installer item/type labels have
+a bounded live projection in the existing owned stderr drain. These partial,
+closed observations grant no readiness or process-join acceptance. The presenter
+remains nonblocking. Malformed and oversized records are not observed; record/byte
+limits stop projection while private draining, original errors and unjoined-resource retention keep their
+existing ownership. Contract and race tests cover this behavior; fresh runtime
+acceptance remains pending. The ARM64 build/publish/consume nightly cycle is retired.
 Generated ARM64 producer workflows retain their existing admission policies, but
 no nightly invokes them or `TestNightlyPublishedCandidate`; no new producer is added.
 
 The six-hour job passes its remaining deadline to Go, which reserves two hours
 for independent cleanup. KVM and actual available resources are admitted at run
-time. The explicit 4-GiB site/2-GiB tenant profile is an initial sizing experiment,
-not a validated minimum. Historical [public Run 40578231640](https://github.com/depohmel/nvkr/actions/runs/40578231640)
+time. The explicit small profile selects a 6-GiB site, 3 GiB per tenant VM,
+four vCPUs per guest and 1 GiB additional headroom. Initial admission remains
+13 GiB available for the site plus the larger of the 6-GiB bootstrap backend or
+two tenant VMs, plus headroom. Tenant-only admission rechecks 7 GiB after the
+bootstrap backend joins. This is a sizing experiment, not a validated minimum.
+[Run 41252923744](https://github.com/depohmel/nvkr/actions/runs/41252923744), on
+NVKR `dcc9f571d5291e68affd0b3fcaa0792b0fff55d8` and NVKE
+`ca3f7c025c1474d9b0b9a19a830a3006168c6de7`, completed the fresh build and
+bootstrap with the preceding 4/4-GiB profile, then failed final stack installation.
+Its owned site serial snapshot recorded a kernel OOM-kill marker and its pod
+snapshot showed broad restart/readiness failures. The host retained 4,951 MiB
+available immediately before failure. The killed process and exact failing Helm
+item remain unknown; cleanup joined and Actions artifact count was zero.
+The rebalanced profile preserves the earlier peak admission and still needs a
+successful full run. Historical [public Run 40578231640](https://github.com/depohmel/nvkr/actions/runs/40578231640)
 built a QCOW2 and passed NVKE's separate harness on AMD64 KVM, but encountered
 severe disk pressure and used best-effort teardown. It does not establish this
 native NVKR topology, fresh source closure or joined cleanup. Full hosted

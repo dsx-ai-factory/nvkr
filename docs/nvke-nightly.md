@@ -6,8 +6,9 @@ Forks can dispatch their branches manually; their scheduled jobs are skipped. On
 GitHub-hosted AMD64 job builds and tests together. It uses no NVIDIA runner,
 protected environment, repository secret, signing permission or registry writer.
 It uploads no Actions artifacts or caches. Binaries, OCI images, QCOW2 files and
-private diagnostic files stay on the disposable runner's local disk. Stderr, build
-output and bounded host/kernel/cgroup samples enter the public job log.
+private diagnostic files stay on the disposable runner's local disk. Build stderr,
+ordinary build output and bounded host/kernel/cgroup samples enter the public job
+log. Raw deployment stdout and stderr remain private.
 
 The job checks out the dispatched NVKR commit and resolves NVKE `main` once.
 It passes that exact NVKE commit to NVKR's existing `TestEndToEnd` Go test.
@@ -74,8 +75,14 @@ Exact-source nightly builds retain machine-command stdout in their bounded
 captures and private logs instead of forwarding large Plan JSON to Actions.
 Build command stderr and the final build's ordinary output continue streaming.
 Bootstrap stdout, arbitrary stderr and raw diagnostic files stay private. Its
-source-owned JSON log records are projected into bounded, closed phase/outcome
-values, closed cluster states and static stage labels after the subprocess joins. A failed bootstrap also
+source-owned JSON log records are projected live into bounded, closed phase/outcome
+values, closed cluster states and static stage labels. Final installation also
+reports only exact admitted item/type labels from the selected installer's stderr.
+These live observations are explicitly partial and establish neither readiness
+nor process joining. The existing owned stderr drain performs the projection;
+there is no separate observer goroutine. Parsing is bounded to 8 MiB and 64
+observations per command. Malformed or oversized records stay private, and
+diagnostic loss preserves the raw drain and command result. A failed bootstrap also
 observes the temporary backend's guest memory/disk and an anonymized pod table
 before cleanup, through existing bounded subprocess and presentation owners.
 Cluster and node conditions are read through NVKE's existing Service-proxy route
@@ -127,11 +134,28 @@ reached that gate after preparing the installer ISO, with 48,748 MiB available
 against 65,536 MiB required. The cleanup change still needs a complete hosted run
 to establish sufficient space for disk build and deployment.
 
-The hosted workflow explicitly selects `resources.profile: small`, a 4-GiB site
-VM, 4 GiB per tenant VM, four vCPUs per guest and 1 GiB of host/QEMU headroom.
+The hosted workflow explicitly selects `resources.profile: small`, a 6-GiB site
+VM, 3 GiB per tenant VM, four vCPUs per guest and 1 GiB of host/QEMU headroom.
 An empty profile preserves the existing demo configuration. The small profile is
 a functional-test candidate; its settings are not proven hardware minima or a
 performance qualification. Host admission still checks actual available capacity.
+The temporary bootstrap backend uses 6 GiB and is joined before tenant creation.
+Initial admission still requires 13 GiB available: the site plus the larger of
+the bootstrap backend or two tenant VMs, plus headroom. After bootstrap teardown,
+tenant creation rechecks 7 GiB available beside the existing site. These
+observations reserve no resources.
+
+[Run 41252923744](https://github.com/depohmel/nvkr/actions/runs/41252923744), on
+NVKR `dcc9f571d5291e68affd0b3fcaa0792b0fff55d8` and frozen NVKE
+`ca3f7c025c1474d9b0b9a19a830a3006168c6de7`, completed the fresh build and
+NVKE bootstrap. Final stack installation then failed. The owned site VM's serial
+snapshot contained a kernel OOM-kill marker; the pod snapshot showed widespread
+restarts, unready containers and Pending pods. The host sample immediately before
+failure still had 4,951 MiB available memory. This establishes observed guest
+memory pressure, without identifying the killed process or exact failing Helm
+release. VM/backend/network cleanup completed, and Actions artifact count was zero.
+The 6/3-GiB allocation rebalances the previous 4/4-GiB profile while preserving
+its peak admission. It requires a new full run to establish runtime acceptance.
 
 The profile selects 256 MiB for system and Kubernetes memory reservations through
 the supported NVKE request fields and the installed kubelet package's documented

@@ -141,8 +141,8 @@ jobs:
             tenantWorkers: 1
             resources:
               profile: small
-              siteMemoryGiB: 4
-              tenantMemoryGiB: 4
+              siteMemoryGiB: 6
+              tenantMemoryGiB: 3
               headroomMiB: 1024
               vcpus: 4
           EOF
