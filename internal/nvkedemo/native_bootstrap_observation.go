@@ -80,14 +80,9 @@ func runNativeBootstrap(ctx context.Context, runner Runner, args []string) error
 		return configUsage("native bootstrap requires its selected CLI")
 	}
 	command := append([]string{args[0], "--json-logs"}, args[1:]...)
-	var stderr bytes.Buffer
-	runner.output, runner.privateCaptureStdout = &stderr, true
+	runner.output, runner.privateCaptureStdout = nil, true
+	runner.nativeObservations = nativeLiveBootstrap
 	_, err := runner.Capture(ctx, command, "host-nvke-bootstrap", 0)
-	// An unresolved child may still own its output writer. Never inspect it
-	// until the existing subprocess owner has confirmed the join.
-	if !errors.Is(err, ErrUnjoined) {
-		reportNativeBootstrapObservation(runner, nativeBootstrapLogSummary(stderr.Bytes()))
-	}
 	return err
 }
 

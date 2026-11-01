@@ -274,7 +274,7 @@ volumeBindingMode: Immediate
 		return err
 	}
 	args = append(args, helmArgs...)
-	if err := deployment.Run(ctx, args, "host-nvke-deploy", 0); err != nil {
+	if err := runNativeSiteInstall(ctx, deployment, args); err != nil {
 		return err
 	}
 	// Both source commands remain under the original work deadline.
