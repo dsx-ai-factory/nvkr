@@ -51,7 +51,7 @@ printf 'private-diagnostic\n'
 				t.Fatalf("ordinary early diagnostic loss blocked cleanup: %v", err)
 			}
 			raw, err := os.ReadFile(events)
-			want := strings.Repeat("capture\n", 6) + "kind-delete\n"
+			want := strings.Repeat("capture\n", 7) + "kind-delete\n"
 			if mode == "missing kubeconfig" {
 				want = "kind-delete\n"
 			}

@@ -61,6 +61,7 @@ type nativeSiteAttempt struct {
 	bootstrap                 *hostBootstrap
 	network                   string
 	api                       string
+	siteAPI                   netip.AddrPort
 	bridge                    nativeBridgeConfig
 	guard                     *NetworkGuard
 	tenantOwner               *tenant
@@ -367,7 +368,7 @@ func (s *nativeSiteAttempt) closeTenant(ctx context.Context) error {
 	}
 	cleanup := s.tenantOwner.restore(ctx)
 	if cleanup != nil && !errors.Is(cleanup, ErrUnjoined) {
-		cleanup = retainNativeSiteFailure(ctx, runner, s.assets, filepath.Join(s.tenantOwner.session.Work, "site.kubeconfig"), cleanup)
+		cleanup = retainNativeSiteFailure(ctx, runner, s.assets, filepath.Join(s.tenantOwner.session.Work, "site.kubeconfig"), s.siteAPI, cleanup)
 	}
 	return cleanup
 }
@@ -404,6 +405,11 @@ func (s *nativeSiteAttempt) setup(ctx context.Context, runner Runner, row native
 	if err != nil {
 		return Runner{}, err
 	}
+	address, err := netip.ParseAddr(ip)
+	if err != nil {
+		return Runner{}, err
+	}
+	s.siteAPI = netip.AddrPortFrom(address, 30080)
 	stage := beginProgress(runner.Progress, "site-05-install-site-controller", PhaseStarted, PhaseFinished, PhaseFailed)
 	prepared := beginProgress(runner.Progress, "native-site-preparation", PhaseStarted, PhaseFinished, PhaseFailed)
 	err = waitNativeSiteHandoff(ctx, s.handoff, server)
@@ -424,7 +430,7 @@ func (s *nativeSiteAttempt) setup(ctx context.Context, runner Runner, row native
 	}
 	runner.Env = SetEnv(runner.Env, map[string]string{"XDG_CONFIG_HOME": filepath.Join(out, "config")})
 	cli := s.assets.CLI
-	if _, err := s.capture(ctx, runner, "configure", cli, "config", "set-site", "--name", "nvke-native-site", "--url", "http://"+ip+":30080", "--kubeconfig", kubeconfig); err != nil {
+	if _, err := s.capture(ctx, runner, "configure", cli, "config", "set-site", "--name", "nvke-native-site", "--url", "http://"+s.siteAPI.String(), "--kubeconfig", kubeconfig); err != nil {
 		return Runner{}, err
 	}
 	check := beginProgress(runner.Progress, "check-05-install-site-controller", PhaseStarted, PhaseFinished, PhaseFailed)

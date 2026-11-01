@@ -112,6 +112,17 @@ observation through the existing anonymized table. It starts no additional probe
 raw pod messages and controller logs stay private. A missing or dropped summary
 does not establish pod health or identify the failed installation step.
 
+Failed tenant cleanup can project a fixed source-wrapper label from its bounded
+private capture, such as cluster lookup or delete request. Unknown, changed,
+oversized or ambiguous records stay unknown. These untrusted labels identify
+neither the transport cause nor whether a delete reached the server. Error text,
+trace IDs and response bytes remain private; command handling is unchanged.
+Failure diagnostics also observe only HTTP statuses from the already selected
+site endpoint's [listener and dependency-readiness paths](https://github.com/dsx-ai-factory/nvke/blob/1ce10b480cf52f955b6d018cc7ba7ad141c6faf9/controller/internal/server/health.go), with three-second
+deadlines and no redirects, proxy or credentials. Management API readiness and
+pod-observation availability use fixed labels. Bodies and transport errors stay
+private; these probes neither retry deletion nor grant readiness acceptance.
+
 The CI resource wrapper samples host memory/disk, cgroup memory events and Docker
 usage while the Go test runs, with a 15-second pause between samples. It records
 bounded kernel warnings before and after the workload. It preserves workload
@@ -197,10 +208,21 @@ NVKR `914ed406250d33e6f9f52ffbce9063bda86814a7` with frozen latest NVKE
 creation/convergence, authenticated host handoff and final proof. The Go site
 and tenant subtests passed, including real node/cloud-init readiness and the
 single workload/DNS check. The parent test failed during natural tenant-deletion
-cleanup when its pool-ownership query exited with status 1. Simulator and network
+cleanup when its pool-ownership query and fresh cluster-inventory confirmation
+both exited with status 1. Neither absence nor retained cluster state was
+observed at that failure. Simulator and network
 teardown then finished; this does not prove successful natural tenant deletion
 or complete joined cleanup. Actions artifact count was zero. The underlying
 private query error is unknown; a successful full run remains required.
+
+[Run 41344383365](https://github.com/depohmel/nvkr/actions/runs/41344383365), on
+NVKR `0558ac3eebc6fc2ce0fa9685b9e8ab4777410a66` with the same frozen NVKE,
+passed fresh builds, identity handoff/proof and both Go subtests: site (7.90
+seconds) and tenant (2968.61 seconds), including workload/DNS. The deletion
+command itself then exited with status 1 before deletion waiting began; the
+parent failed after 8033.05 seconds. Its private cause is unknown. Simulator/VM,
+DNS and network teardown finished, but natural deletion and complete joined
+cleanup did not pass. Actions artifact count was zero.
 
 The native tenant owner uses NVKE's unfiltered JSON node-pool inventory and
 selects the already-observed cluster ID. This avoids the filtered CLI's separate

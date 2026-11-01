@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -58,10 +59,10 @@ if test "$FAIL" != ''; then exit 9; fi
 				t.Fatal(err)
 			}
 			lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
-			if len(lines) != 9 || lines[0] != "nvke-api" || lines[1] != "nvke-api" || lines[8] != "bootstrap-delete" {
+			if len(lines) != 10 || lines[0] != "nvke-api" || lines[1] != "nvke-api" || lines[9] != "bootstrap-delete" {
 				t.Fatalf("diagnostics must follow restore failure and precede deletion: %s", raw)
 			}
-			for i, fragment := range []string{"get pods --all-namespaces -o json", "get events --all-namespaces -o json", "get services --all-namespaces -o json", "get endpointslices.discovery.k8s.io --all-namespaces -o json", "-n " + tc.controller + " logs --selector=app.kubernetes.io/name=" + tc.controller + ",app.kubernetes.io/instance=" + tc.controller + " --container=" + tc.controller, "--previous=true"} {
+			for i, fragment := range []string{"get --raw=/readyz", "get pods --all-namespaces -o json", "get events --all-namespaces -o json", "get services --all-namespaces -o json", "get endpointslices.discovery.k8s.io --all-namespaces -o json", "-n " + tc.controller + " logs --selector=app.kubernetes.io/name=" + tc.controller + ",app.kubernetes.io/instance=" + tc.controller + " --container=" + tc.controller, "--previous=true"} {
 				if !strings.Contains(lines[i+2], fragment) {
 					t.Fatalf("missing exact bounded read-only diagnostic %q: %s", fragment, raw)
 				}
@@ -73,7 +74,7 @@ if test "$FAIL" != ''; then exit 9; fi
 			if err != nil || len(folders) != 1 {
 				t.Fatalf("missing unique private failure observation: %v %v", folders, err)
 			}
-			for _, phase := range []string{"site-pods", "site-events", "site-services", "site-endpointslices", "controller-current", "controller-previous"} {
+			for _, phase := range []string{"site-api-ready", "site-pods", "site-events", "site-services", "site-endpointslices", "controller-current", "controller-previous"} {
 				log, err := os.ReadFile(filepath.Join(folders[0], phase+".log"))
 				if err != nil || !strings.Contains(string(log), "private-site-diagnostic") {
 					t.Fatalf("missing private diagnostic %s: %s %v", phase, log, err)
@@ -200,7 +201,7 @@ func TestNativeSiteDiagnosticsDoNotRaceUnjoinedOrCanceledWork(t *testing.T) {
 		if !errors.Is(cause, ErrUnjoined) {
 			cancel()
 		}
-		result := retainNativeSiteFailure(ctx, Runner{Work: root, Env: []string{"PATH=/usr/bin:/bin"}}, NativeAssets{HostTools: root}, "unused", cause)
+		result := retainNativeSiteFailure(ctx, Runner{Work: root, Env: []string{"PATH=/usr/bin:/bin"}}, NativeAssets{HostTools: root}, "unused", netip.AddrPort{}, cause)
 		if !errors.Is(result, cause) || errors.Is(result, ErrUnjoined) != errors.Is(cause, ErrUnjoined) {
 			t.Fatalf("diagnostic changed original failure: %v", result)
 		}
@@ -238,13 +239,17 @@ esac
 				writeTenantFixture(t, filepath.Join(root, nativeControllerSourceFiles[2]), []byte("nameOverride: other\n"), 0600)
 			}
 			cause := errors.New("PRIVATE_ORIGINAL_FAILURE")
-			got := retainNativeSiteFailure(t.Context(), runner, NativeAssets{Installer: root, HostTools: root, installerSelection: &nativeInstallerSelection{controller: controller}}, "unused", cause)
+			got := retainNativeSiteFailure(t.Context(), runner, NativeAssets{Installer: root, HostTools: root, installerSelection: &nativeInstallerSelection{controller: controller}}, "unused", netip.AddrPort{}, cause)
 			if got != cause {
 				t.Fatal("diagnostic replaced original cause", got)
 			}
 			if scenario == "selected" {
 				if !strings.Contains(progress.String(), "Site pod observation (not readiness acceptance):") || !strings.Contains(progress.String(), "nvke-controller  pod-001  Running  0/1  7") {
 					t.Fatal("joined descriptive rows missing", progress.String())
+				}
+			} else if scenario == "malformed" || scenario == "capture failed" {
+				if !strings.Contains(progress.String(), "Site pod observation unavailable; readiness is unverified.") {
+					t.Fatal("unavailable pod observation was silent", progress.String())
 				}
 			} else if progress.Len() != 0 || plain.Len() != 0 {
 				t.Fatal("ineligible diagnostic published", progress.String(), plain.String())

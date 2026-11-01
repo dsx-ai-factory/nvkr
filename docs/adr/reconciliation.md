@@ -1619,6 +1619,15 @@ foreign or ambiguous worker identities remain refused. Missing workers are
 accepted only after owned deletion starts. Query failures still require fresh
 cluster absence or remain failures; this protocol correction does not identify
 run #20's first private query error or prove complete natural deletion.
+Failed cleanup projects only fixed source-wrapper labels from bounded private
+command capture through the existing nonblocking observation owner. Unknown or
+ambiguous records confer no stage claim; raw messages and trace IDs stay private.
+These descriptive labels change neither command results nor deletion acceptance.
+Failure-only observations additionally report bounded HTTP statuses for the
+observed site's fixed health/readiness paths, without redirects, proxies,
+credentials or public response bodies, and fixed management-readiness and
+pod-capture availability labels. These observations preserve the original
+failure and do not authorize retries or readiness acceptance.
 The same downstream owner accepts one or two tenant workers independently of
 suite selection through `run.tenantWorkers` or `Config.TenantWorkers`. Omission
 retains the ordinary one-worker or conformance two-worker default; conformance
@@ -3649,10 +3658,21 @@ NVKR `914ed406250d33e6f9f52ffbce9063bda86814a7` with frozen latest NVKE
 creation/convergence, authenticated handoff and final proof. The Go site and
 tenant subtests passed, including real node/cloud-init readiness and the single
 workload/DNS check. The parent failed during natural tenant-deletion cleanup:
-its pool-ownership query exited with status 1. Simulator and network teardown
+its pool-ownership query and fresh cluster-inventory confirmation both exited
+with status 1. Neither cluster absence nor retained cluster state was observed.
+Simulator and network teardown
 finished afterward; successful natural deletion and complete joined cleanup are
 not established. The first private query error remains unknown. Actions artifact
 count was zero; complete hosted E2E acceptance remains open.
+[Run 41344383365](https://github.com/depohmel/nvkr/actions/runs/41344383365), on
+NVKR `0558ac3eebc6fc2ce0fa9685b9e8ab4777410a66` with the same frozen NVKE,
+passed fresh builds, identity handoff/proof and the Go site (7.90 seconds) and
+tenant (2968.61 seconds) subtests, including workload/DNS. Its deletion command
+exited with status 1 before deletion waiting began, and the parent failed after
+8033.05 seconds. The private cause is unknown. Simulator/VM, DNS and network
+teardown finished afterward; natural deletion and complete joined cleanup did
+not pass. Actions artifact count was zero. This result does not establish a
+functional deletion fix or full E2E acceptance.
 Historical [public Run 40578231640](https://github.com/depohmel/nvkr/actions/runs/40578231640)
 built a QCOW2 and passed NVKE's separate harness on AMD64 KVM, but encountered
 severe disk pressure and used best-effort teardown. It does not establish this

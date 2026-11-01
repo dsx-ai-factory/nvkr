@@ -7,7 +7,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"time"
@@ -79,7 +82,42 @@ func (s *nativeSiteAttempt) presentStatus(ctx context.Context, runner Runner, ac
 	return presentNativeStatus(ctx, runner, access)
 }
 
-func retainNativeSiteFailure(ctx context.Context, runner Runner, assets NativeAssets, kubeconfig string, cause error) error {
+// These bounded probes return only a valid HTTP status. Responses, addresses,
+// headers and transport errors never enter the public observation.
+func nativeFailureHTTPStatus(ctx context.Context, endpoint string) int {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil || request.URL.Scheme != "http" || request.URL.User != nil || request.URL.RawQuery != "" || request.URL.Fragment != "" || request.URL.RawPath != "" || request.URL.Path != "/healthz" && request.URL.Path != "/readyz" {
+		return 0
+	}
+	transport := &http.Transport{Proxy: nil, DisableKeepAlives: true, DisableCompression: true, MaxResponseHeaderBytes: 64 << 10}
+	defer transport.CloseIdleConnections()
+	client := http.Client{Timeout: 3 * time.Second, Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	response, err := client.Do(request)
+	if err != nil {
+		return 0
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 100 || response.StatusCode > 599 {
+		return 0
+	}
+	return response.StatusCode
+}
+
+func observeNativeSiteHealth(ctx context.Context, runner Runner, siteAPI netip.AddrPort) {
+	for _, probe := range []struct{ path, label string }{{"/healthz", "listener"}, {"/readyz", "dependencies"}} {
+		status := 0
+		if siteAPI.IsValid() && siteAPI.Addr().Is4() && siteAPI.Addr().IsPrivate() {
+			status = nativeFailureHTTPStatus(ctx, "http://"+siteAPI.String()+probe.path)
+		}
+		observation := "unavailable"
+		if status != 0 {
+			observation = fmt.Sprintf("HTTP %d", status)
+		}
+		reportNativeBootstrapObservation(runner, "Site REST "+probe.label+" observation (not acceptance): "+observation+".\n")
+	}
+}
+
+func retainNativeSiteFailure(ctx context.Context, runner Runner, assets NativeAssets, kubeconfig string, siteAPI netip.AddrPort, cause error) error {
 	if cause == nil || errors.Is(cause, ErrUnjoined) {
 		return cause
 	}
@@ -93,12 +131,14 @@ func retainNativeSiteFailure(ctx context.Context, runner Runner, assets NativeAs
 	if err != nil {
 		return cause
 	}
+	observeNativeSiteHealth(bounded, runner, siteAPI)
 	kubectl := filepath.Join(assets.HostTools, "kubectl")
 	prefix := []string{kubectl, "--kubeconfig", kubeconfig, "--request-timeout=5s"}
 	commands := []struct {
 		phase string
 		args  []string
 	}{
+		{"site-api-ready", []string{"get", "--raw=/readyz"}},
 		{"site-pods", []string{"get", "pods", "--all-namespaces", "-o", "json"}},
 		{"site-events", []string{"get", "events", "--all-namespaces", "-o", "json"}},
 		{"site-services", []string{"get", "services", "--all-namespaces", "-o", "json"}},
@@ -117,15 +157,29 @@ func retainNativeSiteFailure(ctx context.Context, runner Runner, assets NativeAs
 			break
 		}
 		args := append(append([]string{}, prefix...), command.args...)
-		raw, err := captureNativeObservation(bounded, private, args, command.phase, 5*time.Second)
+		timeout := 5 * time.Second
+		if command.phase == "site-api-ready" {
+			timeout = 3 * time.Second
+		}
+		raw, err := captureNativeObservation(bounded, private, args, command.phase, timeout)
 		if errors.Is(err, ErrUnjoined) {
 			// An unjoined observation must not race subsequent destructive
 			// cleanup. Ordinary diagnostic failure never blocks cleanup.
 			return errors.Join(cause, err)
 		}
-		if err == nil && command.phase == "site-pods" {
-			if rows, err := walkthroughPodRows(raw); err == nil {
+		switch command.phase {
+		case "site-api-ready":
+			observation := "unavailable"
+			if err == nil {
+				observation = "complete"
+			}
+			reportNativeBootstrapObservation(runner, "Site management API /readyz observation (not acceptance): "+observation+".\n")
+		case "site-pods":
+			rows, rowErr := walkthroughPodRows(raw)
+			if err == nil && rowErr == nil {
 				reportNativeBootstrapObservation(runner, "Site pod observation (not readiness acceptance):\n"+rows)
+			} else {
+				reportNativeBootstrapObservation(runner, "Site pod observation unavailable; readiness is unverified.\n")
 			}
 		}
 	}
@@ -148,7 +202,7 @@ func (s *nativeSiteAttempt) preserveFailure(ctx context.Context, cause error) er
 	if closeErr := file.Close(); closeErr != nil || !currentOwner(info) || info.Mode().Perm()&0o077 != 0 || info.Size() == 0 {
 		return cause
 	}
-	return retainNativeSiteFailure(ctx, *s.bootstrapRunner, s.assets, kubeconfig, cause)
+	return retainNativeSiteFailure(ctx, *s.bootstrapRunner, s.assets, kubeconfig, s.siteAPI, cause)
 }
 
 // Retain backend-owned serial logs before deletion through the bounded,
