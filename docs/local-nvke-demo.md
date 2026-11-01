@@ -863,6 +863,15 @@ Fixed identity-stage progress identifies runtime inspection, staging, probing,
 policy import and handoff/proof work. These observations contain no raw terminal
 errors or private identity values and do not replace the final completion receipt.
 
+After creating the source policy once, convergence may wait within its existing
+two-minute deadline for the same running containers to become Ready again. Each
+wait follows complete context validation and comparison of the pinned pod and
+container identities, configuration identity/bytes and host boot identity.
+Other runtime-check failures remain errors. Initial admission, helper probes,
+host mutation and final proof still require Ready containers. Fixed policy
+operation labels distinguish creation, response validation and convergence
+failures without publishing terminal errors or private values.
+
 It uses the upstream generated NodeAgent client and the existing controller CSI
 workload identity. No arbitrary script, credential, socket relay, downloader or
 new Pod is accepted. The request describes selected endpoints and identities.

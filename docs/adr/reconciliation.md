@@ -1678,7 +1678,13 @@ PATH-resolved `sh` supports both retained Alpine and current
 distroless debug images without assuming `/bin/sh`; each selected source's
 root-filesystem/user/security context remains unchanged. Fixed identity stages
 use the existing progress owner; raw command output and error details remain
-private. Local pinned-base staging checks under AMD64 emulation on an ARM64
+private. The policy convergence loop keeps its existing two-minute deadline and
+exactly-once creation. It may wait only for readiness of fully reobserved running
+containers whose pinned pod/container, configuration and boot identities are
+unchanged. Other runtime-check failures remain terminal; initial admission,
+probes, host mutation and final proof still require Ready containers. Closed
+policy-operation labels identify failure boundaries without exposing private
+errors. Local pinned-base staging checks under AMD64 emulation on an ARM64
 Docker host establish filesystem/tool compatibility only, not authenticated
 handoff or native KVM acceptance. The completed runtime
 evidence and remaining full E2E gap are recorded under consumer acceptance below.
@@ -3576,7 +3582,8 @@ AMD64 job for build and native NVKR Go E2E. It freezes NVKE main once and derive
 temporary source overlays through the existing catalog/local-input owners before
 the normal toolchain preparation. The existing AMD64 NVIDIA Definition/catalogs
 remain the authored selection, with existing current-main disk-material/CAPI-init
-compatibility selections. Other dependency pins and committed files are unchanged.
+compatibility selections. The runtime NVKE source freeze leaves committed catalog
+inputs unchanged; the native helper self-pin follows its separate maintenance owner.
 `TestEndToEnd` builds fresh local Runs, bootstraps the real site
 VM through kind/Lima, checks readiness and tenant workload/DNS, and joins cleanup.
 
@@ -3619,6 +3626,16 @@ setup, then failed 6.5 seconds into the site identity handoff. Its public log
 does not identify the internal failing branch. Owned VM/backend/network cleanup
 joined and Actions artifact count was zero. Site/tenant acceptance and complete
 resource sizing remain unproved; a successful full run is still required.
+[Run 41321949914](https://github.com/depohmel/nvkr/actions/runs/41321949914), on
+NVKR `29987555e55ce2a0e83b49aa8391aaf95400f736` with the same frozen NVKE
+commit, completed the fresh build, bootstrap, full stack installation, identity
+context observation, helper staging and authenticated same-boot helper probe.
+Policy preparation failed after 28.88 seconds, before host reconfiguration or
+site/tenant subtests. The pre-teardown snapshot showed the controller at 0/1
+Ready and the main SPIRE pod at 1/2 Ready; it does not identify the first private
+command error or establish its cause. Owned cleanup joined and Actions artifact
+count was zero. These observations establish integrated staging/probe progress,
+not a completed policy/handoff receipt or full site/tenant acceptance.
 Historical [public Run 40578231640](https://github.com/depohmel/nvkr/actions/runs/40578231640)
 built a QCOW2 and passed NVKE's separate harness on AMD64 KVM, but encountered
 severe disk pressure and used best-effort teardown. It does not establish this

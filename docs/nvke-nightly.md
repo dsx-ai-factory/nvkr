@@ -175,9 +175,21 @@ settings and identity proof remain unchanged. Fixed identity-stage observations
 locate future failures while raw errors remain private. The existing helper's
 runtime and Linux pipe-adoption guards also admit AMD64 alongside ARM64, matching
 its declared producer platforms. Its source self-pin must select that fix before
-building the helper. These changes still
-require a fresh full E2E run; neither incompatibility is proved to be run #16's
-first failing branch.
+building the helper. Neither incompatibility is proved to be run #16's first
+failing branch.
+
+[Run 41321949914](https://github.com/depohmel/nvkr/actions/runs/41321949914), on
+NVKR `29987555e55ce2a0e83b49aa8391aaf95400f736` with the same frozen NVKE
+commit, completed fresh builds, bootstrap, full stack installation, identity
+context observation, helper staging and the authenticated same-boot helper
+probe. Policy preparation failed after 28.88 seconds, before host
+reconfiguration or the site/tenant subtests. The pre-teardown pod snapshot
+showed the controller at 0/1 Ready and the main SPIRE pod at 1/2 Ready. That
+snapshot does not identify the first private command error or prove the cause
+of the failure. Owned cleanup joined and Actions artifact count was zero.
+The successful staging/probe steps establish those integrated boundaries;
+complete policy, handoff, tenant and resource acceptance still require a
+successful full run.
 
 The profile selects 256 MiB for system and Kubernetes memory reservations through
 the supported NVKE request fields and the installed kubelet package's documented

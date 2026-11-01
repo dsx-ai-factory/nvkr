@@ -112,13 +112,29 @@ case "$*" in
   fi
   touch "$FIXTURE/identity-imported"
   cat "$FIXTURE/identity-created.json"; exit;;
- *"get pods --all-namespaces"*) cat "$FIXTURE/identity-pods.json"; exit;;
- *"get configmap -n controller-fixture config-fixture"*) cat "$FIXTURE/identity-config.json"; exit;;
+ *"get pods --all-namespaces"*)
+  if test -e "$FIXTURE/identity-imported" && test -n "${IDENTITY_POLICY_UNREADY:-}"; then
+   count=0
+   if test -e "$FIXTURE/identity-policy-polls"; then count=$(cat "$FIXTURE/identity-policy-polls"); fi
+   count=$((count + 1)); printf '%s\n' "$count" > "$FIXTURE/identity-policy-polls"
+   case "$IDENTITY_POLICY_UNREADY:$count" in
+    api-error:*) printf 'synthetic-private-runtime-error\n' >&2; exit 17;;
+    once:1|always:*|after-policy:2) cat "$FIXTURE/identity-pods-unready.json"; exit;;
+   esac
+  fi
+  cat "$FIXTURE/identity-pods.json"; exit;;
+ *"get configmap -n controller-fixture config-fixture"*)
+  if test -e "$FIXTURE/identity-imported" && test -f "$FIXTURE/identity-config-policy.json"; then cat "$FIXTURE/identity-config-policy.json"; else cat "$FIXTURE/identity-config.json"; fi; exit;;
  *"get configmap -n server-fixture tpm-fixture"*)
   if test -e "$FIXTURE/identity-imported"; then cat "$FIXTURE/identity-map.json"; else cat "$FIXTURE/identity-map-empty.json"; fi; exit;;
- *"get services -n server-fixture"*) cat "$FIXTURE/identity-services.json"; exit;;
- *"get nodes -o json"*) cat "$FIXTURE/identity-nodes.json"; exit;;
+ *"get services -n server-fixture"*)
+  if test -e "$FIXTURE/identity-imported" && test -f "$FIXTURE/identity-services-policy.json"; then cat "$FIXTURE/identity-services-policy.json"; else cat "$FIXTURE/identity-services.json"; fi; exit;;
+ *"get nodes -o json"*)
+  if test -e "$FIXTURE/identity-imported" && test -f "$FIXTURE/identity-nodes-policy.json"; then cat "$FIXTURE/identity-nodes-policy.json"; else cat "$FIXTURE/identity-nodes.json"; fi; exit;;
  *"get clusterstaticentries.spire.spiffe.io"*)
+  if test -e "$FIXTURE/identity-imported" && test "${IDENTITY_POLICY_OBSERVE_FAILURE:-}" = once && test ! -e "$FIXTURE/identity-observe-failed"; then
+   touch "$FIXTURE/identity-observe-failed"; printf 'synthetic-private-observation-error\n' >&2; exit 17
+  fi
   if test -e "$FIXTURE/identity-imported"; then cat "$FIXTURE/identity-entries.json"; else cat "$FIXTURE/identity-entries-empty.json"; fi; exit;;
  *"/opt/spire/bin/spire-server agent list"*)
   if test -e "$FIXTURE/identity-handed-off"; then cat "$FIXTURE/identity-agents.json"; else cat "$FIXTURE/identity-agents-empty.json"; fi; exit;;
@@ -127,7 +143,7 @@ case "$*" in
  *"-- sh -c umask 077; d="*)
   cmp - "$FIXTURE/tools/nvkr-site-identity-helper"
   printf 'identity-stage\n' >> "$EVENTS"; cat "$FIXTURE/identity-helper-receipt"; exit;;
- *"sha256sum /tmp/nvkr-site-identity/stage.fixture/helper"*) cat "$FIXTURE/identity-helper-receipt"; exit;;
+ *"sha256sum /tmp/nvkr-site-identity/stage.fixture/helper"*) touch "$FIXTURE/identity-verified"; cat "$FIXTURE/identity-helper-receipt"; exit;;
  *"-- /tmp/nvkr-site-identity/stage.fixture/helper"*)
   if test ! -e "$FIXTURE/identity-probed"; then
    cat > "$FIXTURE/identity-probe-request.json"

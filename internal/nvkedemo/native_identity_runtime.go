@@ -35,6 +35,10 @@ const (
 	nativeIdentityStagingLimit  = "256Mi"
 )
 
+// Only a fully reobserved, unchanged running identity context may wait for
+// readiness. This private condition never authorizes probe, mutation or proof.
+var errNativeIdentityUnready = errors.New("pinned identity containers are not ready")
+
 type nativePodConfigMap struct {
 	Name  string
 	Items []struct{ Key, Path string }
@@ -148,7 +152,7 @@ func nativeIdentityEnvironment(container nativeIdentityContainer, name string) (
 	}
 	return *found, nil
 }
-func nativeIdentitySelectedPod(rows nativeIdentityPodList, reference string) (nativeIdentityPod, error) {
+func nativeIdentityObservedPod(rows nativeIdentityPodList, reference string) (nativeIdentityPod, error) {
 	var selected *nativeIdentityPod
 	for _, pod := range rows.Items {
 		for _, container := range pod.Spec.Containers {
@@ -156,7 +160,7 @@ func nativeIdentitySelectedPod(rows nativeIdentityPodList, reference string) (na
 				if state.Name != container.Name || state.ImageID != reference {
 					continue
 				}
-				if selected != nil || pod.Metadata.Name == "" || pod.Metadata.Namespace == "" || pod.Metadata.UID == "" || !state.Ready || state.State.Running == nil || state.ContainerID == "" {
+				if selected != nil || pod.Metadata.Name == "" || pod.Metadata.Namespace == "" || pod.Metadata.UID == "" || state.State.Running == nil || state.ContainerID == "" {
 					return nativeIdentityPod{}, errors.New("selected identity container is unavailable or ambiguous")
 				}
 				value := nativeIdentityPod{pod: pod, container: container, state: state}
@@ -165,7 +169,7 @@ func nativeIdentitySelectedPod(rows nativeIdentityPodList, reference string) (na
 		}
 	}
 	if selected == nil {
-		return nativeIdentityPod{}, errors.New("selected identity image has no exact ready container")
+		return nativeIdentityPod{}, errors.New("selected identity image has no exact running container")
 	}
 	return *selected, nil
 }
@@ -284,6 +288,25 @@ func nativeIdentityConfigProjection(raw string) (nativeIdentityConfig, error) {
 	return cfg, err
 }
 func (k *nativeIdentityCommands) runtime(ctx context.Context, assets NativeAssets, spec nativeStaticEntrySpec, ip string) (nativeIdentityRuntime, error) {
+	current, err := k.observeRuntime(ctx, assets, spec, ip)
+	if err == nil {
+		err = nativeIdentityRuntimeReady(current)
+	}
+	return current, err
+}
+
+func nativeIdentityRuntimeReady(current nativeIdentityRuntime) error {
+	if !current.controller.state.Ready || !current.server.state.Ready {
+		return errNativeIdentityUnready
+	}
+	return nil
+}
+
+// Recheck issues this exact sentinel only after full identity validation. A
+// wrapped/joined error may carry another failure and must never become a wait.
+func nativeIdentityReadinessPending(err error) bool { return err == errNativeIdentityUnready }
+
+func (k *nativeIdentityCommands) observeRuntime(ctx context.Context, assets NativeAssets, spec nativeStaticEntrySpec, ip string) (nativeIdentityRuntime, error) {
 	var runtime nativeIdentityRuntime
 	var pods nativeIdentityPodList
 	if err := k.get(ctx, &pods, "pods", "--all-namespaces"); err != nil {
@@ -297,10 +320,10 @@ func (k *nativeIdentityCommands) runtime(ctx context.Context, assets NativeAsset
 	if err != nil {
 		return runtime, err
 	}
-	if runtime.controller, err = nativeIdentitySelectedPod(pods, controllerRef); err != nil {
+	if runtime.controller, err = nativeIdentityObservedPod(pods, controllerRef); err != nil {
 		return runtime, err
 	}
-	if runtime.server, err = nativeIdentitySelectedPod(pods, serverRef); err != nil {
+	if runtime.server, err = nativeIdentityObservedPod(pods, serverRef); err != nil {
 		return runtime, err
 	}
 	if err := nativeIdentityCSI(runtime.controller); err != nil {
@@ -426,14 +449,14 @@ func (k *nativeIdentityCommands) runtime(ctx context.Context, assets NativeAsset
 	return runtime, nil
 }
 func (k *nativeIdentityCommands) recheck(ctx context.Context, selected nativeIdentityRuntime, assets NativeAssets, spec nativeStaticEntrySpec, ip string) error {
-	current, err := k.runtime(ctx, assets, spec, ip)
+	current, err := k.observeRuntime(ctx, assets, spec, ip)
 	if err != nil {
 		return err
 	}
 	if current.controller.pod.Metadata.UID != selected.controller.pod.Metadata.UID || current.server.pod.Metadata.UID != selected.server.pod.Metadata.UID || current.controller.state.ContainerID != selected.controller.state.ContainerID || current.server.state.ContainerID != selected.server.state.ContainerID || current.configUID != selected.configUID || current.configSHA != selected.configSHA || current.bootID != selected.bootID || !reflect.DeepEqual(current.config, selected.config) {
 		return errors.New("admitted identity context changed during handoff")
 	}
-	return nil
+	return nativeIdentityRuntimeReady(current)
 }
 func (k *nativeIdentityCommands) observe(ctx context.Context, runtime nativeIdentityRuntime, spec nativeStaticEntrySpec) (nativeIdentityObservation, error) {
 	var observed nativeIdentityObservation
@@ -668,11 +691,15 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	if err != nil {
 		return nil, err
 	}
+	createProgress := beginProgress(runner.Progress, "native-policy-create", PhaseStarted, PhaseFinished, PhaseFailed)
 	createdRaw, err := k.capture(ctx, "import-source-policy", policyBudget, original, "create", "-f", "-", "-o", "json")
+	createProgress.finish(err)
 	if err != nil {
 		return nil, err
 	}
+	responseProgress := beginProgress(runner.Progress, "native-policy-created-response", PhaseStarted, PhaseFinished, PhaseFailed)
 	createdUID, err := nativeIdentityCreatedEntry(createdRaw, source, prepared.TPM)
+	responseProgress.finish(err)
 	if err != nil {
 		return nil, err
 	}
@@ -680,23 +707,35 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	// automatic overwrite, guest retry, rollback or partial-state adoption.
 	policyCtx, stopPolicy := context.WithTimeout(ctx, 2*time.Minute)
 	var policyErr error
+	policyOperation := "runtime-recheck"
+	waitingReady := false
 	for policyCtx.Err() == nil {
-		if err := k.recheck(policyCtx, runtime, s.assets, spec, ip); err != nil {
-			stopPolicy()
-			return nil, err
+		policyOperation = "runtime-recheck"
+		err := k.recheck(policyCtx, runtime, s.assets, spec, ip)
+		if err != nil && !nativeIdentityReadinessPending(err) {
+			policyErr = err
+			break
 		}
-		observed, err := k.observe(policyCtx, runtime, spec)
 		if err == nil {
-			_, _, err = nativeIdentityPolicy(source, spec, prepared.TPM, createdUID, observed)
+			policyOperation = "observe"
+			observed, observeErr := k.observe(policyCtx, runtime, spec)
+			err = observeErr
+			if err == nil {
+				policyOperation = "match"
+				_, _, err = nativeIdentityPolicy(source, spec, prepared.TPM, createdUID, observed)
+			}
 		}
 		if err == nil {
 			policyErr = nil
 			break
 		}
 		policyErr = err
+		if nativeIdentityReadinessPending(err) && !waitingReady {
+			reportNativeBootstrapObservation(runner, "Site identity policy waiting for pinned running containers to become ready.\n")
+			waitingReady = true
+		}
 		if errors.Is(err, ErrUnjoined) {
-			stopPolicy()
-			return nil, err
+			break
 		}
 		if err := pause(policyCtx, 2*time.Second); err != nil {
 			policyErr = errors.Join(policyErr, err)
@@ -706,6 +745,7 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	policyErr = errors.Join(policyErr, policyCtx.Err())
 	stopPolicy()
 	if policyErr != nil {
+		reportNativeBootstrapObservation(runner, "Site identity policy stopped during "+policyOperation+".\n")
 		return nil, policyErr
 	}
 	advance("native-identity-handoff")
