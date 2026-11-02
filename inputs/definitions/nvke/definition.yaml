@@ -329,14 +329,6 @@ outputs:
     components:
       - helm
       - kubectl
-  - name: operator-tools-linux-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/tools/operator-arm64
-    format: executable
-    components:
-      - helm
-      - kubectl
   - name: postgresql
     platform: linux/amd64
     catalog:

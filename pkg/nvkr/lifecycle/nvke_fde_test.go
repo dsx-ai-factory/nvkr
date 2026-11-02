@@ -105,7 +105,7 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 		nktp-metrics-server-image nktp-metrics-server-image-arm64 nktp-node-exporter-image nktp-node-exporter-image-arm64
 		nktp-operator-image nktp-operator-image-arm64 nktp-target-allocator-image nktp-target-allocator-image-arm64
 		nvke-node-fde-amd64 nvke-node-fde-arm64 nvke-node-image-amd64 nvke-node-image-arm64
-		nvkectl nvkectl-linux-arm64 operator-tools operator-tools-linux-arm64 postgresql postgresql-image postgresql-image-arm64
+		nvkectl nvkectl-linux-arm64 operator-tools postgresql postgresql-image postgresql-image-arm64
 		spiffe-csi-image spiffe-csi-image-arm64 spire spire-agent-image spire-agent-image-arm64
 		spire-bash-image spire-bash-image-arm64 spire-controller-manager-image spire-controller-manager-image-arm64
 		spire-crds spire-oidc-image spire-oidc-image-arm64 spire-server-image spire-server-image-arm64
@@ -120,7 +120,7 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 		}
 	}
 	if !slices.Equal(names, wantNames) || len(diskOutputs) != 4 {
-		t.Fatalf("maintained M2 must retain all 70 outputs and four native disks: names=%v, disks=%d", names, len(diskOutputs))
+		t.Fatalf("maintained M2 must retain all 69 outputs and four native disks: names=%v, disks=%d", names, len(diskOutputs))
 	}
 	// This contract concerns the four native disk closures. Compiling unrelated
 	// controllers and charts adds no FDE signal and requires a synthetic Git source.

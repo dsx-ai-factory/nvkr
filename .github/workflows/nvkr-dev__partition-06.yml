@@ -846,17 +846,46 @@ jobs:
     permissions:
       actions: read
       contents: read
+  nvkr-spire-server-image-sbom:
+    name: 'Generate SBOMs: spire-server-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-process-spire-server-image-pull-spir-240af0efc28c'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
   nvkr-partition-results:
     name: 'Collect provider results: nvkr-partition-results'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-capi-controller-image-sbom, nvkr-capi-kubeadm-bootstrap-image-sbom, nvkr-capi-kubeadm-control-plane-image-sbom, nvkr-cert-manager-cainjector-image-sbom, nvkr-cert-manager-controller-image-sbom, nvkr-cert-manager-webhook-image-sbom, nvkr-csi-node-driver-registrar-image-sbom, nvkr-nktp-collector-image-sbom, nvkr-nktp-kube-state-metrics-image-sbom, nvkr-nktp-kubectl-image-sbom, nvkr-nktp-lgtm-image-sbom, nvkr-nktp-metrics-server-image-sbom, nvkr-nktp-node-exporter-image-sbom, nvkr-nktp-operator-image-sbom, nvkr-nktp-target-allocator-image-sbom, nvkr-postgresql-image-sbom, nvkr-postgresql-sbom, nvkr-process-nktp-build-nktp-chart-nktp-t-78bead2a7f7b, nvkr-process-nvkectl-build-nvkectl-nvkect-ae9c2b9c3380, nvkr-spiffe-csi-image-sbom, nvkr-spire-agent-image-sbom, nvkr-spire-bash-image-sbom, nvkr-spire-controller-manager-image-sbom, nvkr-spire-crds-sbom, nvkr-spire-oidc-image-sbom, nvkr-spire-sbom]
+    needs: [nvkr-capi-controller-image-sbom, nvkr-capi-kubeadm-bootstrap-image-sbom, nvkr-capi-kubeadm-control-plane-image-sbom, nvkr-cert-manager-cainjector-image-sbom, nvkr-cert-manager-controller-image-sbom, nvkr-cert-manager-webhook-image-sbom, nvkr-csi-node-driver-registrar-image-sbom, nvkr-nktp-collector-image-sbom, nvkr-nktp-kube-state-metrics-image-sbom, nvkr-nktp-kubectl-image-sbom, nvkr-nktp-lgtm-image-sbom, nvkr-nktp-metrics-server-image-sbom, nvkr-nktp-node-exporter-image-sbom, nvkr-nktp-operator-image-sbom, nvkr-nktp-target-allocator-image-sbom, nvkr-postgresql-image-sbom, nvkr-postgresql-sbom, nvkr-process-nktp-build-nktp-chart-nktp-t-78bead2a7f7b, nvkr-process-nvkectl-build-nvkectl-nvkect-ae9c2b9c3380, nvkr-spiffe-csi-image-sbom, nvkr-spire-agent-image-sbom, nvkr-spire-bash-image-sbom, nvkr-spire-controller-manager-image-sbom, nvkr-spire-crds-sbom, nvkr-spire-oidc-image-sbom, nvkr-spire-sbom, nvkr-spire-server-image-sbom]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     permissions: {}
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
-      nvkr-partition-11: ${{ format('"nvkr-capi-controller-image-sbom":{0},"nvkr-capi-kubeadm-bootstrap-image-sbom":{1},"nvkr-capi-kubeadm-control-plane-image-sbom":{2},"nvkr-cert-manager-cainjector-image-sbom":{3},"nvkr-cert-manager-controller-image-sbom":{4},"nvkr-cert-manager-webhook-image-sbom":{5},"nvkr-csi-node-driver-registrar-image-sbom":{6},"nvkr-nktp-collector-image-sbom":{7},"nvkr-nktp-kube-state-metrics-image-sbom":{8},"nvkr-nktp-kubectl-image-sbom":{9},"nvkr-nktp-lgtm-image-sbom":{10},"nvkr-nktp-metrics-server-image-sbom":{11},"nvkr-nktp-node-exporter-image-sbom":{12},"nvkr-nktp-operator-image-sbom":{13},"nvkr-nktp-target-allocator-image-sbom":{14},"nvkr-postgresql-image-sbom":{15},"nvkr-postgresql-sbom":{16},"nvkr-process-nktp-build-nktp-chart-nktp-t-78bead2a7f7b":{17},"nvkr-process-nvkectl-build-nvkectl-nvkect-ae9c2b9c3380":{18},"nvkr-spiffe-csi-image-sbom":{19},"nvkr-spire-agent-image-sbom":{20},"nvkr-spire-bash-image-sbom":{21},"nvkr-spire-controller-manager-image-sbom":{22},"nvkr-spire-crds-sbom":{23},"nvkr-spire-oidc-image-sbom":{24},"nvkr-spire-sbom":{25}', toJSON(needs['nvkr-capi-controller-image-sbom']), toJSON(needs['nvkr-capi-kubeadm-bootstrap-image-sbom']), toJSON(needs['nvkr-capi-kubeadm-control-plane-image-sbom']), toJSON(needs['nvkr-cert-manager-cainjector-image-sbom']), toJSON(needs['nvkr-cert-manager-controller-image-sbom']), toJSON(needs['nvkr-cert-manager-webhook-image-sbom']), toJSON(needs['nvkr-csi-node-driver-registrar-image-sbom']), toJSON(needs['nvkr-nktp-collector-image-sbom']), toJSON(needs['nvkr-nktp-kube-state-metrics-image-sbom']), toJSON(needs['nvkr-nktp-kubectl-image-sbom']), toJSON(needs['nvkr-nktp-lgtm-image-sbom']), toJSON(needs['nvkr-nktp-metrics-server-image-sbom']), toJSON(needs['nvkr-nktp-node-exporter-image-sbom']), toJSON(needs['nvkr-nktp-operator-image-sbom']), toJSON(needs['nvkr-nktp-target-allocator-image-sbom']), toJSON(needs['nvkr-postgresql-image-sbom']), toJSON(needs['nvkr-postgresql-sbom']), toJSON(needs['nvkr-process-nktp-build-nktp-chart-nktp-t-78bead2a7f7b']), toJSON(needs['nvkr-process-nvkectl-build-nvkectl-nvkect-ae9c2b9c3380']), toJSON(needs['nvkr-spiffe-csi-image-sbom']), toJSON(needs['nvkr-spire-agent-image-sbom']), toJSON(needs['nvkr-spire-bash-image-sbom']), toJSON(needs['nvkr-spire-controller-manager-image-sbom']), toJSON(needs['nvkr-spire-crds-sbom']), toJSON(needs['nvkr-spire-oidc-image-sbom']), toJSON(needs['nvkr-spire-sbom'])) }}
+      nvkr-partition-11: ${{ format('"nvkr-capi-controller-image-sbom":{0},"nvkr-capi-kubeadm-bootstrap-image-sbom":{1},"nvkr-capi-kubeadm-control-plane-image-sbom":{2},"nvkr-cert-manager-cainjector-image-sbom":{3},"nvkr-cert-manager-controller-image-sbom":{4},"nvkr-cert-manager-webhook-image-sbom":{5},"nvkr-csi-node-driver-registrar-image-sbom":{6},"nvkr-nktp-collector-image-sbom":{7},"nvkr-nktp-kube-state-metrics-image-sbom":{8},"nvkr-nktp-kubectl-image-sbom":{9},"nvkr-nktp-lgtm-image-sbom":{10},"nvkr-nktp-metrics-server-image-sbom":{11},"nvkr-nktp-node-exporter-image-sbom":{12},"nvkr-nktp-operator-image-sbom":{13},"nvkr-nktp-target-allocator-image-sbom":{14},"nvkr-postgresql-image-sbom":{15},"nvkr-postgresql-sbom":{16},"nvkr-process-nktp-build-nktp-chart-nktp-t-78bead2a7f7b":{17},"nvkr-process-nvkectl-build-nvkectl-nvkect-ae9c2b9c3380":{18},"nvkr-spiffe-csi-image-sbom":{19},"nvkr-spire-agent-image-sbom":{20},"nvkr-spire-bash-image-sbom":{21},"nvkr-spire-controller-manager-image-sbom":{22},"nvkr-spire-crds-sbom":{23},"nvkr-spire-oidc-image-sbom":{24},"nvkr-spire-sbom":{25},"nvkr-spire-server-image-sbom":{26}', toJSON(needs['nvkr-capi-controller-image-sbom']), toJSON(needs['nvkr-capi-kubeadm-bootstrap-image-sbom']), toJSON(needs['nvkr-capi-kubeadm-control-plane-image-sbom']), toJSON(needs['nvkr-cert-manager-cainjector-image-sbom']), toJSON(needs['nvkr-cert-manager-controller-image-sbom']), toJSON(needs['nvkr-cert-manager-webhook-image-sbom']), toJSON(needs['nvkr-csi-node-driver-registrar-image-sbom']), toJSON(needs['nvkr-nktp-collector-image-sbom']), toJSON(needs['nvkr-nktp-kube-state-metrics-image-sbom']), toJSON(needs['nvkr-nktp-kubectl-image-sbom']), toJSON(needs['nvkr-nktp-lgtm-image-sbom']), toJSON(needs['nvkr-nktp-metrics-server-image-sbom']), toJSON(needs['nvkr-nktp-node-exporter-image-sbom']), toJSON(needs['nvkr-nktp-operator-image-sbom']), toJSON(needs['nvkr-nktp-target-allocator-image-sbom']), toJSON(needs['nvkr-postgresql-image-sbom']), toJSON(needs['nvkr-postgresql-sbom']), toJSON(needs['nvkr-process-nktp-build-nktp-chart-nktp-t-78bead2a7f7b']), toJSON(needs['nvkr-process-nvkectl-build-nvkectl-nvkect-ae9c2b9c3380']), toJSON(needs['nvkr-spiffe-csi-image-sbom']), toJSON(needs['nvkr-spire-agent-image-sbom']), toJSON(needs['nvkr-spire-bash-image-sbom']), toJSON(needs['nvkr-spire-controller-manager-image-sbom']), toJSON(needs['nvkr-spire-crds-sbom']), toJSON(needs['nvkr-spire-oidc-image-sbom']), toJSON(needs['nvkr-spire-sbom']), toJSON(needs['nvkr-spire-server-image-sbom'])) }}
       nvkr-results-00: ${{ format('"nvkr-csi-node-driver-registrar-image-sbom":{0},"nvkr-spire-agent-image-sbom":{1}', toJSON(needs['nvkr-csi-node-driver-registrar-image-sbom']), toJSON(needs['nvkr-spire-agent-image-sbom'])) }}
       nvkr-results-00-statuses: ${{ format('{0} {1}', needs['nvkr-csi-node-driver-registrar-image-sbom'].result, needs['nvkr-spire-agent-image-sbom'].result) }}
       nvkr-results-01: ${{ format('"nvkr-nktp-lgtm-image-sbom":{0},"nvkr-postgresql-image-sbom":{1},"nvkr-postgresql-sbom":{2}', toJSON(needs['nvkr-nktp-lgtm-image-sbom']), toJSON(needs['nvkr-postgresql-image-sbom']), toJSON(needs['nvkr-postgresql-sbom'])) }}
@@ -875,8 +904,8 @@ jobs:
       nvkr-results-0a-statuses: ${{ format('{0} {1}', needs['nvkr-nktp-metrics-server-image-sbom'].result, needs['nvkr-process-nvkectl-build-nvkectl-nvkect-ae9c2b9c3380'].result) }}
       nvkr-results-0b: ${{ format('"nvkr-capi-controller-image-sbom":{0},"nvkr-nktp-kubectl-image-sbom":{1},"nvkr-nktp-node-exporter-image-sbom":{2}', toJSON(needs['nvkr-capi-controller-image-sbom']), toJSON(needs['nvkr-nktp-kubectl-image-sbom']), toJSON(needs['nvkr-nktp-node-exporter-image-sbom'])) }}
       nvkr-results-0b-statuses: ${{ format('{0} {1} {2}', needs['nvkr-capi-controller-image-sbom'].result, needs['nvkr-nktp-kubectl-image-sbom'].result, needs['nvkr-nktp-node-exporter-image-sbom'].result) }}
-      nvkr-results-0c: ${{ format('"nvkr-nktp-collector-image-sbom":{0},"nvkr-nktp-kube-state-metrics-image-sbom":{1},"nvkr-spire-sbom":{2}', toJSON(needs['nvkr-nktp-collector-image-sbom']), toJSON(needs['nvkr-nktp-kube-state-metrics-image-sbom']), toJSON(needs['nvkr-spire-sbom'])) }}
-      nvkr-results-0c-statuses: ${{ format('{0} {1} {2}', needs['nvkr-nktp-collector-image-sbom'].result, needs['nvkr-nktp-kube-state-metrics-image-sbom'].result, needs['nvkr-spire-sbom'].result) }}
+      nvkr-results-0c: ${{ format('"nvkr-nktp-collector-image-sbom":{0},"nvkr-nktp-kube-state-metrics-image-sbom":{1},"nvkr-spire-sbom":{2},"nvkr-spire-server-image-sbom":{3}', toJSON(needs['nvkr-nktp-collector-image-sbom']), toJSON(needs['nvkr-nktp-kube-state-metrics-image-sbom']), toJSON(needs['nvkr-spire-sbom']), toJSON(needs['nvkr-spire-server-image-sbom'])) }}
+      nvkr-results-0c-statuses: ${{ format('{0} {1} {2} {3}', needs['nvkr-nktp-collector-image-sbom'].result, needs['nvkr-nktp-kube-state-metrics-image-sbom'].result, needs['nvkr-spire-sbom'].result, needs['nvkr-spire-server-image-sbom'].result) }}
       nvkr-results-0e: ${{ format('"nvkr-spire-oidc-image-sbom":{0}', toJSON(needs['nvkr-spire-oidc-image-sbom'])) }}
       nvkr-results-0e-statuses: ${{ format('{0}', needs['nvkr-spire-oidc-image-sbom'].result) }}
       nvkr-results-0f: ${{ format('"nvkr-nktp-operator-image-sbom":{0}', toJSON(needs['nvkr-nktp-operator-image-sbom'])) }}

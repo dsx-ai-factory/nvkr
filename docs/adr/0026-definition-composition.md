@@ -27,7 +27,7 @@ At launch, the four-family NVKE pilot (#211) split the then 69-output combined c
 (28), telemetry (17) and disks (4) Definitions. Each family has its own owner, Environment, generated bundle, Run and Release, and
 the [partitioning strategy](../definition-partitioning-strategy.md) records why. The combined
 `inputs/definitions/nvke/definition.yaml` remains a hand-maintained second copy of the families' shared
-output declarations, currently 70, so every family change must be repeated there. Consumers that want one product Release must
+output declarations, currently 69, so every family change must be repeated there. Consumers that want one product Release must
 otherwise associate four family Releases themselves.
 
 Execution partitioning (ADR-18 §8, PR #264) already runs one complete Plan as bounded same-commit worker

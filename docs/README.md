@@ -30,7 +30,7 @@ The [34-concept reference](user-concepts.md) explains the vocabulary and connect
 | Build and recover the local NVKE CLI publication | [Local NVKE walkthrough](../demos/m1-local.md) |
 
 Example-specific inputs and commands live beside their Definitions: [three-output tutorial](examples/nvke-tutorial/README.md),
-[nine-output deploy example](examples/nvke-deploy/README.md), [70-output M2 candidate and committed workflow](../inputs/definitions/nvke/README.md),
+[nine-output deploy example](examples/nvke-deploy/README.md), [69-output M2 candidate and committed workflow](../inputs/definitions/nvke/README.md),
 and [OS-image routes](../inputs/definitions/diagnostics/README.md). The separate
 [Ubuntu 24 inputs](../inputs/definitions/diagnostics/ubuntu24/README.md) select native plain and
 public-bootstrap FDE disk builds alongside the existing Ubuntu 26 default. The
