@@ -22,7 +22,7 @@ var nvkeSplitFamilies = []struct {
 	name            string
 	outputs, native int
 }{
-	{"core", 24, 30},
+	{"core", 25, 31},
 	{"services", 34, 34},
 	{"telemetry", 17, 17},
 	{"disks", 4, 4},
@@ -71,6 +71,7 @@ func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 	for _, output := range combined.Outputs {
 		original[output.Name] = nvkeSplitCanonical(t, output)
 	}
+	wantOutputs, wantNative := nvkeSplitExpectedTotals(combined)
 	seen := make(map[string]string)
 	nativeTotal := 0
 	for _, family := range nvkeSplitFamilies {
@@ -116,9 +117,21 @@ func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 			nativeTotal += native
 		})
 	}
-	if len(original) != 69 || len(seen) != len(original)+len(nvkeFamilyOnlyOutputs) || nativeTotal != 85 {
-		t.Fatalf("partition requires %d of %d original plus family-only outputs and %d native targets; want 79/69 and 85", len(seen), len(original), nativeTotal)
+	if len(seen) != wantOutputs || nativeTotal != wantNative {
+		t.Fatalf("partition requires %d outputs and %d native targets; want %d and %d", len(seen), nativeTotal, wantOutputs, wantNative)
 	}
+}
+
+// nvkeSplitExpectedTotals derives the family aggregate from the authored combined
+// Definition plus the pinned family-only declarations, independent of the families.
+func nvkeSplitExpectedTotals(combined definition.Definition) (outputs, native int) {
+	for _, output := range combined.Outputs {
+		native += max(1, len(output.Platforms))
+	}
+	for _, only := range nvkeFamilyOnlyOutputs {
+		native += max(1, len(only.output.Platforms))
+	}
+	return len(combined.Outputs) + len(nvkeFamilyOnlyOutputs), native
 }
 
 func TestNVKEDefinitionSplitEnvironmentIsolation(t *testing.T) {
@@ -315,8 +328,8 @@ func TestNVKEDefinitionSplitCompiledIdentityAndGeneratedBundles(t *testing.T) {
 				len(plan.LifecycleOutputs), len(plan.Builds), len(plan.Graph.Nodes), len(jobs), len(workflow), len(bundle.Files[bundle.PlanPath]), events)
 		})
 	}
-	if buildCount != 85 || outputCount != 79 {
-		t.Fatalf("compiled families retain %d native builds and %d outputs, want 85 and 79", buildCount, outputCount)
+	if wantOutputs, wantNative := nvkeSplitExpectedTotals(combined.Definition); buildCount != wantNative || outputCount != wantOutputs {
+		t.Fatalf("compiled families retain %d native builds and %d outputs, want %d and %d", buildCount, outputCount, wantNative, wantOutputs)
 	}
 }
 
