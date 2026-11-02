@@ -1727,17 +1727,8 @@ select the already-observed cluster ID and exact worker identity/infrastructure.
 This removes the filtered CLI's separate parent-name lookup during deletion;
 foreign or ambiguous worker identities remain refused. Missing workers are
 accepted only after owned deletion starts. Query failures still require fresh
-cluster absence or remain failures; this protocol correction does not identify
-run #20's first private query error or prove complete natural deletion.
-Failed cleanup projects only fixed source-wrapper labels from bounded private
-command capture through the existing nonblocking observation owner. Unknown or
-ambiguous records confer no stage claim; raw messages and trace IDs stay private.
-These descriptive labels change neither command results nor deletion acceptance.
-Failure-only observations additionally report bounded HTTP statuses for the
-observed site's fixed health/readiness paths, without redirects, proxies,
-credentials or public response bodies, and fixed management-readiness and
-pod-capture availability labels. These observations preserve the original
-failure and do not authorize retries or readiness acceptance.
+valid cluster absence; unavailable reads may wait
+only under the existing bounded deletion owner. Raw cleanup captures stay private.
 The same downstream owner accepts one or two tenant workers independently of
 suite selection through `run.tenantWorkers` or `Config.TenantWorkers`. Omission
 retains the ordinary one-worker or conformance two-worker default; conformance
@@ -1803,15 +1794,13 @@ Linux architectures; other platforms are refused before descriptor or remote
 work. Existing tenant join-token settings and site TPM attestation remain unchanged.
 PATH-resolved `sh` supports both retained Alpine and current
 distroless debug images without assuming `/bin/sh`; each selected source's
-root-filesystem/user/security context remains unchanged. Fixed identity stages
-use the existing progress owner; raw command output and error details remain
-private. The policy convergence loop keeps its existing two-minute deadline and
+root-filesystem/user/security context remains unchanged. The existing
+`native-site-identity-handoff` progress stage remains; raw command output and error
+details stay private. The policy convergence loop keeps its existing two-minute deadline and
 exactly-once creation. It may wait only for readiness of fully reobserved running
 containers whose pinned pod/container, configuration and boot identities are
 unchanged. Other runtime-check failures remain terminal; initial admission,
-probes, host mutation and final proof still require Ready containers. Closed
-policy-operation labels identify failure boundaries without exposing private
-errors. Local pinned-base staging checks under AMD64 emulation on an ARM64
+probes, host mutation and final proof still require Ready containers. Local pinned-base staging checks under AMD64 emulation on an ARM64
 Docker host establish filesystem/tool compatibility only, not authenticated
 handoff or native KVM acceptance. The completed runtime
 evidence and remaining full E2E gap are recorded under consumer acceptance below.
@@ -2661,7 +2650,7 @@ package grants and anonymous/unrelated-user/fork access remain operator responsi
 artifacts and caches are not migrated or purged. No complete hosted private-transfer Run is recorded.
 
 The generated workflow binds the two nonsecret storage usernames from repository variables into workflow
-environment values; nested transfer actions consume the supported `env` context. Authored nightly,
+environment values; nested transfer actions consume the supported `env` context. Authored
 native-toolchain and OS-validation callers supply the corresponding username explicitly.
 [Development Run 38842595104](https://github.com/dsx-ai-factory/nvkr/actions/runs/38842595104), commit
 `3b0d86f61afab587bd5ed1a1a86d0f1cc9fb4921`, exercised all four bootstrap uploads and downstream helper
@@ -3019,8 +3008,7 @@ and recovery boundaries. The unit/race suites and complete test gate were not ru
 
 Repository workflow contracts disable compiled-output caches and CodeQL database/TRAP/overlay uploads,
 and reject runner debug mode before CodeQL initialization. OS candidate post-build files and the storage
-writer are admitted only for the exact trusted workflow commit. The nightly public runtime attachment
-contains the constructed cycle summary, not raw suite-report files. These safeguards and job consolidation
+writer are admitted only for the exact trusted workflow commit. The maintained hosted nightly uploads no attachments. These safeguards and job consolidation
 retain the existing `pipeline-attested` boundary; they do not establish SLSA Build L3 or qualified execution.
 
 Secondary named-runtime helper bootstraps previously restored the three runtime JSON files directly over
@@ -3765,6 +3753,12 @@ The explicit small profile selects a 7-GiB site, 3 GiB per tenant, four vCPUs an
 1 GiB headroom. Initial admission requires 14 GiB; the temporary 6-GiB bootstrap
 backend joins before tenant creation rechecks 7 GiB beside the site. This is a
 functional-test allocation, not a minimum hardware or OOM-causality claim.
+The small profile also sets the site's system reservation and the tenant's
+Reserved/SystemReserved/KubeReserved memory to 256Mi, appends the guest kubelet
+`--kube-reserved=cpu=1000m,memory=256Mi,ephemeral-storage=1Gi` override and restarts
+it, and sets OVN control-plane/node-zone memory requests to 128Mi. Recorded
+small-profile runtime acceptance covers these settings, not the default reservations.
+
 
 Runtime fixes admit the installer's legacy/current controller identity, bounded
 writable helper staging with source-supported shell, unchanged pinned-context

@@ -349,12 +349,13 @@ _Avoid_: Generic pass result, cluster qualification
 
 **Downstream test coordinator**:
 A separately authored repository CI workflow outside the NVKR product lifecycle.
-The nightly resolves one NVKE main commit, dispatches the existing generated
-producer, and consumes that Run's authenticated artifacts through native Go
-bootstrap/readiness tests. It currently uses the ARM64 NVIDIA target, without a
-second product build. VM, backend and network cleanup must join before success.
-Its unsigned outcomes are diagnostics, not release qualification or a seventh
-lifecycle object (ADR-16/18).
+The maintained nightly freezes one NVKE main commit, builds fresh local products
+on a disposable GitHub-hosted AMD64 runner, and invokes the existing native Go
+site/tenant workload and DNS tests. Natural tenant deletion and VM, backend and
+network cleanup must join before success. Product bytes and raw deployment captures
+stay private on that runner; no products are published or uploaded. Its unsigned
+outcomes are diagnostics, not release qualification or a seventh lifecycle object
+(ADR-16/18). The ARM64 dispatch-and-consume nightly is retired.
 _Avoid_: Nightly qualification, qualified runtime, product fleet operator
 
 **Clearance**:

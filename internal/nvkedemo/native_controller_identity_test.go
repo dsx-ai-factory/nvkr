@@ -108,7 +108,13 @@ func TestNativeControllerIdentitySourceAdmission(t *testing.T) {
 				if scenario == "canceled" {
 					cancel()
 				}
-				got, err := nativeControllerForAssets(ctx, NativeAssets{Installer: root, installerSelection: &nativeInstallerSelection{controller: selected}})
+				var got nativeControllerIdentity
+				var err error
+				if scenario == "changed source" {
+					got, err = nativeControllerForAssets(ctx, NativeAssets{Installer: root, installerSelection: &nativeInstallerSelection{controller: selected}})
+				} else {
+					got, err = selectNativeControllerIdentity(ctx, root)
+				}
 				if scenario == "selected" || scenario == "source-owned duplicate env" {
 					if err != nil || got != selected {
 						t.Fatalf("source selection=%+v err=%v", got, err)

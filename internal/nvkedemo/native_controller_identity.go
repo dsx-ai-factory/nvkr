@@ -38,6 +38,7 @@ func (identity nativeControllerIdentity) admit() error {
 func selectNativeControllerIdentity(ctx context.Context, installer string) (identity nativeControllerIdentity, result error) {
 	defer func() {
 		if result != nil {
+			identity = nativeControllerIdentity{}
 			result = e.Wrap(e.CodeEngineCapability, result, "admit source-selected native controller identity")
 		}
 	}()

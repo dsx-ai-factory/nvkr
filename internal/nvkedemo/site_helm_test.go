@@ -220,56 +220,89 @@ func TestPrepareSiteHelmRejectsUnavailableBudgetBeforeFiles(t *testing.T) {
 }
 
 func TestPrepareSiteHelmPrivateIndependentConfiguration(t *testing.T) {
-	out := privateTestDir(t)
-	tools := filepath.Join(out, "selected tools")
-	base := Runner{Env: []string{"PATH=/usr/bin:/bin", "HELM_PLUGINS=/synthetic/caller-plugins", "SYNTHETIC_CALLER=preserved"}}
-	beforeEnv := slices.Clone(base.Env)
-	t.Setenv("HELM_PLUGINS", "/synthetic/ambient-plugins")
-	ctx, cancel := context.WithTimeout(t.Context(), 90*time.Second+500*time.Millisecond)
-	defer cancel()
-	deadline, _ := ctx.Deadline()
-	before := time.Until(deadline)
-	got, args, err := prepareSiteHelm(ctx, base, tools, out, nativeControllerIdentity{name: "nke-controller"})
-	after := time.Until(deadline)
-	if err != nil {
-		t.Fatal(err)
+	for _, name := range []string{"nke-controller", "nvke-controller"} {
+		t.Run(name, func(t *testing.T) {
+			out := privateTestDir(t)
+			tools := filepath.Join(out, "selected tools")
+			base := Runner{Env: []string{"PATH=/usr/bin:/bin", "HELM_PLUGINS=/synthetic/caller-plugins", "SYNTHETIC_CALLER=preserved"}}
+			beforeEnv := slices.Clone(base.Env)
+			t.Setenv("HELM_PLUGINS", "/synthetic/ambient-plugins")
+			ctx, cancel := context.WithTimeout(t.Context(), 90*time.Second+500*time.Millisecond)
+			defer cancel()
+			deadline, _ := ctx.Deadline()
+			before := time.Until(deadline)
+			got, args, err := prepareSiteHelm(ctx, base, tools, out, nativeControllerIdentity{name: name})
+			after := time.Until(deadline)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(args) != 5 || args[0] != "--timeout" || !slices.Equal(args[2:4], []string{"--", "--post-renderer"}) {
+				t.Fatal("source installer lost its Helm passthrough", args)
+			}
+			budget, err := time.ParseDuration(args[1])
+			if err != nil || budget < after || budget > before {
+				t.Fatalf("timeout=%v err=%v, caller remaining=[%v,%v]", budget, err, after, before)
+			}
+			if !slices.Equal(base.Env, beforeEnv) || environmentValue(got.Env, "SYNTHETIC_CALLER") != "preserved" || environmentValue(got.Env, "NVKR_SITE_KUBECTL") != filepath.Join(tools, "kubectl") {
+				t.Fatal("Helm preparation changed caller state or lost the selected kubectl")
+			}
+			home := filepath.Join(out, "site-helm")
+			for _, key := range []string{"HELM_PLUGINS", "HELM_CACHE_HOME", "HELM_CONFIG_HOME", "HELM_DATA_HOME"} {
+				relative, err := filepath.Rel(home, environmentValue(got.Env, key))
+				if err != nil || !filepath.IsLocal(relative) || relative == "." {
+					t.Fatalf("%s escaped private Helm storage", key)
+				}
+			}
+			if err := filepath.WalkDir(home, func(path string, entry fs.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				info, err := entry.Info()
+				if err != nil {
+					return err
+				}
+				want := fs.FileMode(0600)
+				if entry.IsDir() {
+					want = 0700
+				}
+				if info.Mode().Perm() != want || !entry.IsDir() && !info.Mode().IsRegular() {
+					t.Errorf("private Helm entry %s has mode %s", path, info.Mode())
+				}
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := os.ReadFile(filepath.Join(home, "plugins", "nvkr-site-startup", "kustomization.yaml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var document struct {
+				Patches []struct {
+					Target struct{ Name, Namespace string }
+					Patch  string
+				}
+			}
+			if err := yaml.Unmarshal(raw, &document); err != nil || len(document.Patches) != 1 {
+				t.Fatal("missing startup patch", err)
+			}
+			patch := document.Patches[0]
+			var deployment struct {
+				Metadata struct{ Name, Namespace string }
+				Spec     struct {
+					Template struct {
+						Spec struct{ Containers []struct{ Name string } }
+					}
+				}
+			}
+			if err := yaml.Unmarshal([]byte(patch.Patch), &deployment); err != nil {
+				t.Fatal(err)
+			}
+			if patch.Target.Name != name || patch.Target.Namespace != name || deployment.Metadata.Name != name || deployment.Metadata.Namespace != name || len(deployment.Spec.Template.Spec.Containers) != 1 || deployment.Spec.Template.Spec.Containers[0].Name != name {
+				t.Fatal("startup patch lost the source-selected controller", patch)
+			}
+		})
 	}
-	if len(args) != 5 || args[0] != "--timeout" || !slices.Equal(args[2:4], []string{"--", "--post-renderer"}) {
-		t.Fatal("source installer lost its Helm passthrough", args)
-	}
-	budget, err := time.ParseDuration(args[1])
-	if err != nil || budget < after || budget > before {
-		t.Fatalf("timeout=%v err=%v, caller remaining=[%v,%v]", budget, err, after, before)
-	}
-	if !slices.Equal(base.Env, beforeEnv) || environmentValue(got.Env, "SYNTHETIC_CALLER") != "preserved" || environmentValue(got.Env, "NVKR_SITE_KUBECTL") != filepath.Join(tools, "kubectl") {
-		t.Fatal("Helm preparation changed caller state or lost the selected kubectl")
-	}
-	home := filepath.Join(out, "site-helm")
-	for _, key := range []string{"HELM_PLUGINS", "HELM_CACHE_HOME", "HELM_CONFIG_HOME", "HELM_DATA_HOME"} {
-		relative, err := filepath.Rel(home, environmentValue(got.Env, key))
-		if err != nil || !filepath.IsLocal(relative) || relative == "." {
-			t.Fatalf("%s escaped private Helm storage", key)
-		}
-	}
-	if err := filepath.WalkDir(home, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		info, err := entry.Info()
-		if err != nil {
-			return err
-		}
-		want := fs.FileMode(0600)
-		if entry.IsDir() {
-			want = 0700
-		}
-		if info.Mode().Perm() != want || !entry.IsDir() && !info.Mode().IsRegular() {
-			t.Errorf("private Helm entry %s has mode %s", path, info.Mode())
-		}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
+
 }
 
 func TestPrepareSiteHelmRefusesExistingDestination(t *testing.T) {

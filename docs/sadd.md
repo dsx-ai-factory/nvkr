@@ -51,13 +51,14 @@ NVKR does not operate a registry, provision clusters, or manage fleet lifecycle.
 access, registry retention, runtime acceptance and deployment policy. NVKR offers explicit descriptive local
 diagnostics under ADR-16 §6; these do not qualify a cluster. Downstream systems consume accepted artifact
 references and own deployment descriptions and acceptance decisions (ADR-19/20).
-A separately authored nightly CI workflow resolves one NVKE main commit and
-dispatches the existing generated producer. Its ARM64 NVIDIA consumer authenticates
-that Run's artifacts and invokes existing native Go site bootstrap, readiness and
-joined VM/backend/network cleanup owners, without rebuilding products. Binary
-transport/publication remains private; public coordinator attachments contain
-constructed JSON metadata only. These trusted-code integration results remain
-outside product lifecycle and v1 qualification acceptance (ADR-16/18).
+A separately authored nightly CI workflow freezes one NVKE main commit, builds
+fresh local products on a disposable GitHub-hosted AMD64 runner and invokes the
+existing native Go site/tenant workload and DNS tests. Natural tenant deletion and
+VM/backend/network cleanup must join before success. Product bytes and raw
+deployment captures stay private on that runner; no products are published or
+uploaded. The ARM64 dispatch-and-consume nightly is retired. These trusted-code
+integration results remain outside product lifecycle and v1 qualification
+acceptance (ADR-16/18).
 
 Proposed [ADR-24](adr/0024-imported-validator-catalog.md) separates imported-validator discovery from upstream
 test ownership and binds named artifact roles through explicit diagnostic profiles. The provisional CLI

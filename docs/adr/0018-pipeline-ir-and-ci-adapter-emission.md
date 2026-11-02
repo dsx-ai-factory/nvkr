@@ -534,8 +534,8 @@ but no nightly invokes them or the legacy published-artifact consumer.
 
 KVM and observed capacity are prerequisites. The six-hour job passes its remaining
 deadline to Go, which preserves two hours for independent cleanup. The explicit
-smaller hosted resource profile requires live validation; the earlier public VM
-experiment used a different harness and does not prove this native topology.
+smaller hosted resource profile has its runtime evidence and limits recorded in
+reconciliation.
 Trusted source code has sudo and Docker access on the disposable hosted VM.
 Results remain unsigned local diagnostics, outside qualified release acceptance.
 

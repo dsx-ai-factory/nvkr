@@ -176,7 +176,7 @@ for storage, toolchain and release packages. Previously retained Actions artifac
 old workflow refs also require separate handling; this change does not migrate or delete historical payloads.
 Compiled-output caches and CodeQL database uploads are disabled. Candidate OS builds retain private files
 only for the exact trusted workflow commit, so arbitrary candidate code cannot access a later storage writer.
-The nightly coordinator attaches its constructed cycle summary; raw suite report files are not public artifacts.
+The maintained hosted AMD64 nightly uploads no attachments; product bytes and raw deployment captures stay on its disposable runner.
 
 Generated workflows admit at most 2,000 record uploads per attempt, including conditional diagnostic and
 finalization uploads. The helper looks up exact selected names and fetches their record ZIPs serially,

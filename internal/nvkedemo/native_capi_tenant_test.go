@@ -123,6 +123,24 @@ func TestNativeCAPITenantDeletionConfirmationRequiresFreshAbsence(t *testing.T) 
 			if tc.adopted {
 				owner.id = "owned-id"
 			}
+			if tc.name == "retained" {
+				attempt := nativeCAPITenantFixture(t, GuestCIDR, "ovn")
+				request, err := attempt.namedTenantRequest(t.Context(), owner.name)
+				if err != nil {
+					t.Fatal(err)
+				}
+				binding, err := newNativeCAPITenantOwnership(request)
+				if err != nil {
+					t.Fatal(err)
+				}
+				binding.deleting = true
+				owner.nativeCAPI = binding
+				raw, err := json.Marshal([]tenantRow{{Name: owner.name, ID: owner.id, Infra: request.Infra, ControlPlane: &request.ControlPlane}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				writeTenantFixture(t, filepath.Join(root, "inventory.json"), raw, 0600)
+			}
 			queryErr := errors.New("original nodepool lookup failed")
 			cause := queryErr
 			if tc.unjoined {
@@ -146,7 +164,7 @@ func TestNativeCAPITenantDeletionConfirmationRequiresFreshAbsence(t *testing.T) 
 }
 
 func TestNativeDeletionWaitRequiresFreshAbsenceAfterUnavailableReads(t *testing.T) {
-	for _, scenario := range []string{"cluster unavailable", "pool and fallback unavailable", "pool unavailable", "fallback malformed", "fallback null", "fallback replaced", "fallback renamed", "fallback infrastructure", "null inventory", "invalid inventory", "other exit", "persistent unavailable", "expiry after retry"} {
+	for _, scenario := range []string{"cluster unavailable", "pool and fallback unavailable", "pool unavailable", "fallback malformed", "fallback null", "fallback replaced", "fallback renamed", "fallback infrastructure", "null inventory", "invalid inventory", "other exit", "fatal pool retained", "fatal pool fallback unavailable", "persistent unavailable", "expiry after retry"} {
 		t.Run(scenario, func(t *testing.T) {
 			attempt := nativeCAPITenantFixture(t, GuestCIDR, "ovn")
 			request, err := attempt.namedTenantRequest(t.Context(), "native-demo-tenant")
@@ -182,36 +200,45 @@ func TestNativeDeletionWaitRequiresFreshAbsenceAfterUnavailableReads(t *testing.
 set -eu
 case "$*" in
  'delete cluster native-demo-tenant') printf 'delete\n' >> "$FIXTURE/events"; touch "$FIXTURE/deleted";;
- 'get nodepools -o json') test ! -f "$FIXTURE/deleted" || exit 1; cat "$FIXTURE/pools.json";;
+ 'get nodepools -o json')
+  if test -f "$FIXTURE/deleted"; then
+   case "$SCENARIO" in 'fatal pool '*) exit 7;; *) exit 1;; esac
+  fi
+  cat "$FIXTURE/pools.json";;
  'get clusters -o json')
   if test ! -f "$FIXTURE/deleted"; then cat "$FIXTURE/clusters.json"; exit; fi
   n=0; if test -f "$FIXTURE/reads"; then n=$(cat "$FIXTURE/reads"); fi
   n=$((n+1)); printf '%s\n' "$n" > "$FIXTURE/reads"
   case "$SCENARIO:$n" in
-   'cluster unavailable:1'|'pool and fallback unavailable:2'|'persistent unavailable:'*|'expiry after retry:1') exit 1;;
+   'cluster unavailable:1'|'pool and fallback unavailable:2'|'persistent unavailable:'*|'expiry after retry:1'|'fatal pool fallback unavailable:2') exit 1;;
    'expiry after retry:2') exec sleep 60;;
    'other exit:1') exit 7;;
    'null inventory:1'|'fallback null:2') printf 'null';;
    'invalid inventory:1') printf '[{}]';;
    'fallback malformed:2') printf '[';;
    'fallback replaced:2'|'fallback renamed:2'|'fallback infrastructure:2') cat "$FIXTURE/fallback.json";;
-   'pool and fallback unavailable:1'|'pool unavailable:1'|'pool unavailable:2'|'fallback '*:1) cat "$FIXTURE/clusters.json";;
+   'pool and fallback unavailable:1'|'pool unavailable:1'|'pool unavailable:2'|'fallback '*:1|'fatal pool '*:1|'fatal pool retained:2') cat "$FIXTURE/clusters.json";;
    *) printf '[]';;
   esac;;
  *) exit 42;;
 esac
 `), 0700)
-			owner := tenant{name: request.Name, id: "owned-id", intent: true, cliPath: cli, nativeCAPI: binding, session: ManagementSession{Work: root, Runner: Runner{Work: root, Env: []string{"PATH=/usr/bin:/bin", "FIXTURE=" + root, "SCENARIO=" + scenario}}}}
-			budget := 12 * time.Second
-			switch scenario {
-			case "persistent unavailable":
-				budget = time.Second
-			case "expiry after retry":
-				budget = 6 * time.Second
-			}
-			ctx, cancel := context.WithTimeout(t.Context(), budget)
+			owner := tenant{name: request.Name, id: "owned-id", intent: true, cliPath: cli, nativeCAPI: binding, deletionPollInterval: 50 * time.Millisecond, session: ManagementSession{Work: root, Runner: Runner{Work: root, Env: []string{"PATH=/usr/bin:/bin", "FIXTURE=" + root, "SCENARIO=" + scenario}}}}
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 			defer cancel()
-			err = owner.restore(ctx)
+			if scenario == "persistent unavailable" || scenario == "expiry after retry" {
+				// Admission and the single delete finish before starting the short wait budget.
+				if _, err := owner.row(ctx); err != nil {
+					t.Fatal(err)
+				}
+				owner.nativeCAPI.deleting = true
+				if _, err := owner.capture(ctx, []string{owner.cli(), "delete", "cluster", owner.name}, "delete", tenantDeleteTimeout); err != nil {
+					t.Fatal(err)
+				}
+				err = owner.waitDeleted(ctx, 3*time.Second)
+			} else {
+				err = owner.restore(ctx)
+			}
 			recovered := scenario == "cluster unavailable" || scenario == "pool and fallback unavailable" || scenario == "pool unavailable"
 			if (err == nil) != recovered {
 				t.Fatalf("fresh deletion confirmation=%v, error=%v", recovered, err)
@@ -220,6 +247,22 @@ esac
 				var command *CommandError
 				if !errors.Is(err, context.DeadlineExceeded) || !errors.As(err, &command) || command.ExitCode != 1 {
 					t.Fatal("wait lost its deadline or original unavailable read", err)
+				}
+			}
+			expected := map[string]struct {
+				cause string
+				reads string
+			}{
+				"cluster unavailable": {"", "2\n"}, "pool and fallback unavailable": {"", "3\n"}, "pool unavailable": {"", "3\n"},
+				"fallback malformed": {"unexpected end of JSON input", "2\n"}, "fallback null": {"requires an array", "2\n"},
+				"fallback replaced": {"identity/provider changed", "2\n"}, "fallback renamed": {"changed its name", "2\n"}, "fallback infrastructure": {"infrastructure changed", "2\n"},
+				"null inventory": {"requires an array", "1\n"}, "invalid inventory": {"invalid cluster identity", "1\n"}, "other exit": {"exit 7", "1\n"},
+				"fatal pool retained": {"exit 7", "2\n"}, "fatal pool fallback unavailable": {"exit 7", "2\n"}, "expiry after retry": {"deadline exceeded", "2\n"},
+			}
+			if want, ok := expected[scenario]; ok {
+				reads, readErr := os.ReadFile(filepath.Join(root, "reads"))
+				if readErr != nil || string(reads) != want.reads || want.cause != "" && (err == nil || !strings.Contains(err.Error(), want.cause)) {
+					t.Fatalf("wrong failure or observation path: reads=%q err=%v readErr=%v", reads, err, readErr)
 				}
 			}
 			deletes, readErr := os.ReadFile(filepath.Join(root, "events"))
@@ -238,6 +281,9 @@ func TestNativeDeletionReadFailureRetainsFatalErrors(t *testing.T) {
 		pending bool
 	}{
 		{"joined read exit", joinedExit, true},
+		{"not deleting", joinedExit, false},
+		{"unadopted", joinedExit, false},
+		{"not native", joinedExit, false},
 		{"other exit", &CommandError{ExitCode: 7}, false},
 		{"invalid joined evidence", errors.Join(joinedExit, errors.New("invalid JSON")), false},
 		{"unknown failure", errors.New("unknown read failure"), false},
@@ -249,6 +295,14 @@ func TestNativeDeletionReadFailureRetainsFatalErrors(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			owner := tenant{id: "owned", nativeCAPI: &nativeCAPITenantOwnership{deleting: true}}
+			switch tc.name {
+			case "not deleting":
+				owner.nativeCAPI.deleting = false
+			case "unadopted":
+				owner.id = ""
+			case "not native":
+				owner.nativeCAPI = nil
+			}
 			err := owner.nativeDeletionReadFailure(t.Context(), tc.err)
 			_, pending := err.(*nativeDeletionReadPending)
 			if pending != tc.pending || !errors.Is(err, tc.err) {
@@ -470,5 +524,33 @@ func TestNativeCAPITenantActualNVKERequestDecoder(t *testing.T) {
 		}
 	default:
 		t.Fatal("actual NVKE CLI never submitted decoded request")
+	}
+}
+
+func TestNativeSecurityValuesSupplyAdmittedStaging(t *testing.T) {
+	for _, missing := range []string{"", "volumes", "volumeMounts"} {
+		t.Run(missing, func(t *testing.T) {
+			controller := nativeTenantSecurityValues()["controller"].(map[string]any)
+			if missing != "" {
+				delete(controller, missing)
+			}
+			raw, err := json.Marshal(controller)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var authored struct {
+				Volumes      []nativeIdentityVolume
+				VolumeMounts []nativeIdentityMount
+			}
+			if err := json.Unmarshal(raw, &authored); err != nil {
+				t.Fatal(err)
+			}
+			var pod nativeIdentityPod
+			pod.pod.Spec.Volumes = authored.Volumes
+			pod.container.VolumeMounts = authored.VolumeMounts
+			if err := nativeIdentityStaging(pod); (err == nil) != (missing == "") {
+				t.Fatal("authored staging disagrees with runtime admission", err)
+			}
+		})
 	}
 }

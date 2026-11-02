@@ -275,9 +275,6 @@ func (t *tenant) nativeCAPIDeletionObserved(ctx context.Context, queryErr error)
 	if ctx.Err() != nil {
 		return nil, errors.Join(queryErr, ctx.Err())
 	}
-	if rows == nil {
-		return nil, errors.Join(queryErr, errors.New("native deletion confirmation requires a cluster inventory array"))
-	}
 	row, err := t.nativeCAPIClusterRow(rows)
 	if err != nil {
 		return nil, errors.Join(queryErr, err)

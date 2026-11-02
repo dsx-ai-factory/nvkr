@@ -249,14 +249,15 @@ func pause(ctx context.Context, duration time.Duration) error {
 }
 
 type tenant struct {
-	name, id   string
-	cliPath    string
-	session    ManagementSession
-	intent     bool
-	sequence   int
-	cleaning   bool
-	cleanup    tenantCleanupObservations
-	nativeCAPI *nativeCAPITenantOwnership
+	name, id             string
+	cliPath              string
+	session              ManagementSession
+	intent               bool
+	sequence             int
+	cleaning             bool
+	cleanup              tenantCleanupObservations
+	nativeCAPI           *nativeCAPITenantOwnership
+	deletionPollInterval time.Duration
 }
 
 // The raw read classifier rejects arbitrary joined or validation errors. Only
@@ -409,6 +410,10 @@ func (t *tenant) waitDeleted(ctx context.Context, budget time.Duration) error {
 	}
 	deadline, cancel := context.WithTimeout(ctx, budget)
 	defer cancel()
+	interval := t.deletionPollInterval
+	if interval <= 0 {
+		interval = 5 * time.Second
+	}
 	var lastPending error
 	for {
 		row, err := t.row(deadline)
@@ -425,7 +430,7 @@ func (t *tenant) waitDeleted(ctx context.Context, budget time.Duration) error {
 		} else {
 			lastPending = nil
 		}
-		if waitErr := pause(deadline, 5*time.Second); waitErr != nil {
+		if waitErr := pause(deadline, interval); waitErr != nil {
 			return fmt.Errorf("NVKE tenant deletion did not finish: %w", errors.Join(lastPending, waitErr))
 		}
 	}

@@ -406,9 +406,12 @@ func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *test
 				cancel()
 			}
 			before := *selected
-			_, err := extractNativeInstaller(ctx, writeAssetArchive(t, entries), privateTestDir(t), selected)
+			extracted, err := extractNativeInstaller(ctx, writeAssetArchive(t, entries), privateTestDir(t), selected)
 			if (err == nil) != (scenario == "complete") {
 				t.Fatalf("unexpected extraction admission: %v", err)
+			}
+			if scenario == "complete" && (extracted == nil || extracted.controller.name != "nke-controller" || extracted.controller.digests == [4]string{}) {
+				t.Fatal("valid extraction lost source controller selection")
 			}
 			if *selected != before {
 				t.Fatal("extraction mutated the caller's checked selection")

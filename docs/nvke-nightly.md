@@ -37,7 +37,10 @@ gh run watch RUN_ID --repo YOUR_GITHUB_USERNAME/nvkr --exit-status
 ```
 
 The Actions UI also supports **NVKR nightly NVKE end-to-end tests → Run workflow**
-with the PR branch selected. No workflow inputs are required. Contributors with
+with the PR branch selected. No workflow inputs are required. This nightly
+intentionally freezes NVKE main once per cycle; it accepts no NVKE-ref override.
+The current-main compatibility selections do not promise support for arbitrary
+older source revisions. Contributors with
 upstream write access can use `dsx-ai-factory/nvkr` instead of a fork.
 
 Verify that `headSha` matches the PR commit and that the complete run concludes
@@ -64,6 +67,12 @@ site plus the larger of bootstrap or two tenants, plus headroom. Tenant creation
 rechecks 7 GiB beside the existing site. These checks reserve no resources.
 An unset profile retains the existing scheduling defaults. These allocations
 are functional-test settings, not proven hardware minima or performance qualification.
+The small profile also sets the site's system reservation and the tenant's
+Reserved/SystemReserved/KubeReserved memory to 256Mi, appends the guest kubelet
+`--kube-reserved=cpu=1000m,memory=256Mi,ephemeral-storage=1Gi` override and restarts
+it, and sets OVN control-plane/node-zone memory requests to 128Mi. Recorded
+small-profile runtime acceptance covers these settings, not the default reservations.
+
 
 The six-hour job passes its remaining deadline to Go, which preserves two hours
 for independently bounded cleanup. Setup requires a GitHub-hosted AMD64 machine,

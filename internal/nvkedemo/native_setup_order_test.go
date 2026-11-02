@@ -24,8 +24,9 @@ func TestNativeSharedSetupPrecedesOrdinaryTenantAndStopsDiagnostic(t *testing.T)
 		name                    string
 		ordinary, importFailure bool
 		handoffResult           string
+		profile                 string
 	}{
-		{name: "site"}, {name: "tenant", ordinary: true}, {name: "policy import failure", importFailure: true},
+		{name: "site"}, {name: "small site", profile: "small"}, {name: "tenant", ordinary: true}, {name: "policy import failure", importFailure: true},
 		{name: "wrong handoff caller", handoffResult: "caller"}, {name: "missing handoff status", handoffResult: "status"}, {name: "wrong permanent endpoint", handoffResult: "endpoint"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -51,6 +52,7 @@ umask 077
 case "$1:$2" in
  generate:sitespec)
   case "$*" in *"cluster.podCidr=10.244.0.0/16"*"cluster.serviceCidr=10.96.0.0/16"*) ;; *) exit 54;; esac
+  case " $* " in *" cluster.kubeletConfig.systemReservedMemory=$EXPECTED_RESERVED "*) ;; *) exit 61;; esac
   test -f "$NVKECTL_SPIRE_CA_CERT_FILE"
   test -f "$NVKECTL_SPIRE_CA_KEY_FILE"
   case "$*" in *spire.upstreamCA=true*) ;; *) exit 50;; esac
@@ -109,7 +111,7 @@ esac
 `), 0700)
 			handoff := &nativeHandoff{result: make(chan error, 1)}
 			handoff.result <- nil
-			attempt := nativeSiteAttempt{use: runNativeDemo, bridge: linuxNativeBridge(), bootstrap: &hostBootstrap{}, network: "upstream-ovn", handoff: handoff, files: filepath.Join(root, "files"), assets: NativeAssets{arch: "arm64", CLI: cli, HostTools: tools, Installer: installer, installerSelection: selection, Images: map[string]NativeImageAsset{
+			attempt := nativeSiteAttempt{resources: NativeResources{Profile: tc.profile}, use: runNativeDemo, bridge: linuxNativeBridge(), bootstrap: &hostBootstrap{}, network: "upstream-ovn", handoff: handoff, files: filepath.Join(root, "files"), assets: NativeAssets{arch: "arm64", CLI: cli, HostTools: tools, Installer: installer, installerSelection: selection, Images: map[string]NativeImageAsset{
 				"controller": {File: "controller.tar", Reference: "docker.io/library/controller:fixture"}, "provisioned-provider": {File: "provider.tar", Reference: "docker.io/library/provider:fixture"}, "profiles": {Reference: "docker.io/library/profiles:fixture"},
 			}}}
 			tenantFixture := nativeCAPITenantFixture(t, GuestCIDR, "upstream-ovn")
@@ -144,6 +146,11 @@ esac
 			}
 			var public bytes.Buffer
 			runner := Runner{Work: root, Progress: &public, output: &public, Env: []string{"PATH=" + tools + ":/usr/bin:/bin", "FIXTURE=" + root, "EVENTS=" + events, "EXPECTED_CONTROLLER_IMAGE=" + attempt.assets.Images["controller"].Reference}}
+			reserved := "1Gi"
+			if tc.profile == "small" {
+				reserved = "256Mi"
+			}
+			runner.Env = SetEnv(runner.Env, map[string]string{"EXPECTED_RESERVED": reserved})
 			var row nativeInstance
 			if err = json.Unmarshal([]byte("{\"id\":\"site-fixture\",\"interfaces\":[{\"ipAddresses\":[\"172.30.0.2\",\"172.30.0.3\"]}]}"), &row); err != nil {
 				t.Fatal(err)

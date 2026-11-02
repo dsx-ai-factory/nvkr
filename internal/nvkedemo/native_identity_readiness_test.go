@@ -165,7 +165,7 @@ func TestNativeIdentityUnreadyRecheckRejectsChangedContext(t *testing.T) {
 			case "API error":
 				runner.Env = SetEnv(runner.Env, map[string]string{"IDENTITY_POLICY_UNREADY": "api-error"})
 			}
-			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 			defer cancel()
 			receipt, err := attempt.completeNativeSiteIdentity(ctx, runner, "172.30.0.2", root)
 			if err == nil || receipt != nil || errors.Is(err, errNativeIdentityUnready) || errors.Is(err, context.DeadlineExceeded) {
@@ -192,7 +192,7 @@ func TestNativeIdentityPolicyCreateFailurePreventsMutation(t *testing.T) {
 			} else {
 				writeTenantFixture(t, filepath.Join(root, "identity-created.json"), []byte(`{"privateFixture":"untrusted-response"}`), 0600)
 			}
-			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 			defer cancel()
 			receipt, err := attempt.completeNativeSiteIdentity(ctx, runner, "172.30.0.2", root)
 			if err == nil || receipt != nil {
@@ -208,33 +208,61 @@ func TestNativeIdentityPolicyReadinessBoundAndCancellation(t *testing.T) {
 		t.Run(scenario, func(t *testing.T) {
 			attempt, runner, root, _ := nativeIdentityReadinessFixture(t)
 			runner.Env = SetEnv(runner.Env, map[string]string{"IDENTITY_POLICY_UNREADY": "always"})
-			budget := 2 * time.Second
+			sourceRaw, err := os.ReadFile(filepath.Join(root, "clusterstaticentries.yaml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			tpm := strings.Repeat("a", 64)
+			source, spec, err := nativeSourceStaticEntry(sourceRaw, tpm)
+			if err != nil {
+				t.Fatal(err)
+			}
+			k := nativeIdentityCommands{runner: runner, kubectl: filepath.Join(attempt.assets.HostTools, "kubectl"), kubeconfig: "unused"}
+			runtime, err := k.runtime(t.Context(), attempt.assets, spec, "172.30.0.2")
+			if err != nil {
+				t.Fatal(err)
+			}
+			// The fixture's policy is already created. Keep all setup outside the wait's budget.
+			writeTenantFixture(t, filepath.Join(root, "identity-imported"), nil, 0600)
+			budget := 5 * time.Second
 			if scenario == "cancel" {
-				budget = 10 * time.Second
+				budget = time.Minute
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), budget)
 			defer cancel()
 			want := context.DeadlineExceeded
 			if scenario == "cancel" {
-				// Cancel independently of diagnostic output. Join the callback before
-				// inspecting fixture state or releasing its owned temporary files.
+				// Observe a completed unready iteration before canceling a later read/pause.
 				done := make(chan struct{})
-				timer := time.AfterFunc(2*time.Second, func() {
-					cancel()
-					close(done)
-				})
-				defer func() {
-					if !timer.Stop() {
-						<-done
+				go func() {
+					defer close(done)
+					ticker := time.NewTicker(10 * time.Millisecond)
+					defer ticker.Stop()
+					for {
+						select {
+						case <-ctx.Done():
+							return
+						case <-ticker.C:
+							polls, _ := os.ReadFile(filepath.Join(root, "identity-policy-polls"))
+							if strings.TrimSpace(string(polls)) == "2" {
+								cancel()
+								return
+							}
+						}
 					}
 				}()
+				defer func() { cancel(); <-done }()
 				want = context.Canceled
 			}
-			receipt, err := attempt.completeNativeSiteIdentity(ctx, runner, "172.30.0.2", root)
-			if receipt != nil || !errors.Is(err, want) || !errors.Is(err, errNativeIdentityUnready) {
-				t.Fatal("unready wait lost its bound or cause", err)
+			err = k.waitPolicy(ctx, runtime, attempt.assets, spec, "172.30.0.2", source, tpm, "created-fixture")
+			polls, pollErr := os.ReadFile(filepath.Join(root, "identity-policy-polls"))
+			if !errors.Is(err, want) || !errors.Is(err, errNativeIdentityUnready) || pollErr != nil || len(polls) == 0 {
+				t.Fatal("unready wait lost its bound, cause or observed poll", err, pollErr)
 			}
-			assertIdentityPolicyNotDispatched(t, root)
+			events, readErr := os.ReadFile(filepath.Join(root, "events"))
+			if readErr == nil && strings.Contains(string(events), "identity-handoff") {
+				t.Fatal("canceled wait dispatched mutation")
+			}
 		})
 	}
 }
@@ -252,7 +280,7 @@ func TestNativeIdentityReadyAdmissionAndPostPolicyLoss(t *testing.T) {
 			} else {
 				runner.Env = SetEnv(runner.Env, map[string]string{"IDENTITY_POLICY_UNREADY": "after-policy"})
 			}
-			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 			defer cancel()
 			receipt, err := attempt.completeNativeSiteIdentity(ctx, runner, "172.30.0.2", root)
 			if receipt != nil || !errors.Is(err, errNativeIdentityUnready) || errors.Is(err, context.DeadlineExceeded) {

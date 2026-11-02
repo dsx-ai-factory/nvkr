@@ -54,6 +54,9 @@ func TestNightlyUsesOnlyHostedBuildAndGoE2E(t *testing.T) {
 	if workflow.Concurrency.Group != "nvkr-nightly-${{ github.ref }}" || workflow.Concurrency.CancelInProgress == nil || *workflow.Concurrency.CancelInProgress {
 		t.Fatal("nightly must serialize each branch without canceling its owned cleanup")
 	}
+	if strings.Count(string(raw), "MODE=") != 1 {
+		t.Fatal("nightly must have exactly one authored KVM device-mode rule")
+	}
 	for name, job := range workflow.Jobs {
 		if job.RunsOn != "ubuntu-24.04" || job.Environment != "" || len(job.Permissions) != 0 || job.TimeoutMinutes <= 135 || job.TimeoutMinutes > 360 {
 			t.Fatalf("job %s must use a bounded public hosted runner without protected NVIDIA environments", name)
@@ -64,6 +67,11 @@ func TestNightlyUsesOnlyHostedBuildAndGoE2E(t *testing.T) {
 		built, tenant, source, host, deadline, kvm := false, false, false, false, false, false
 		nvkrCheckouts := 0
 		for _, step := range job.Steps {
+			for _, line := range strings.Split(step.Run, "\n") {
+				if strings.Contains(line, "/dev/kvm") && (strings.Contains(line, "chmod") || strings.Contains(line, "setfacl")) {
+					t.Fatal("nightly KVM access must use its single udev rule")
+				}
+			}
 			host = host || strings.Contains(step.Run, `test "$RUNNER_ENVIRONMENT" = github-hosted`)
 			source = source || strings.Contains(step.Run, "NVKR_NVKE_E2E_SOURCE_COMMIT=")
 			// Assert the access boundary, not every udev command or its spelling.
@@ -93,10 +101,16 @@ func TestNightlyUsesOnlyHostedBuildAndGoE2E(t *testing.T) {
 			if strings.Contains(step.Run, "go test ./internal/nvkedemo -run '^TestEndToEnd$'") {
 				guard := "timeout --kill-after=10s 180s go test ./internal/nvkedemo -list '^TestEndToEnd$' | grep -Fx TestEndToEnd"
 				guardAt := strings.Index(step.Run, guard)
+				guardLines := 0
+				for _, line := range strings.Split(step.Run, "\n") {
+					if strings.TrimSpace(line) == guard {
+						guardLines++
+					}
+				}
 				built = step.Env["NVKR_NVKE_E2E"] == "1" && step.Env["NVKR_NVKE_E2E_CONFIG"] == "demos/nightly-nvke.yaml" && strings.Contains(step.Run, `-timeout "${remaining}s"`) &&
 					strings.Contains(step.Run, `-exec "env --chdir \"$GITHUB_WORKSPACE\""`) &&
 					strings.Contains(step.Run, "set -euo pipefail") && strings.Contains(step.Run, "(( remaining > 125 * 60 ))") &&
-					guardAt >= 0 && guardAt < strings.Index(step.Run, "remaining=$(( NVKR_JOB_DEADLINE")
+					guardLines == 1 && guardAt >= 0 && guardAt < strings.Index(step.Run, "remaining=$(( NVKR_JOB_DEADLINE")
 				tenant = step.Env["NVKR_NVKE_E2E_TENANT"] == "1"
 			}
 

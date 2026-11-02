@@ -448,6 +448,43 @@ func (k *nativeIdentityCommands) observeRuntime(ctx context.Context, assets Nati
 	runtime.bootID = nodes.Items[0].Status.NodeInfo.BootID
 	return runtime, nil
 }
+
+// waitPolicy owns only post-create observations. Setup and the single policy
+// mutation finish before this independently bounded convergence wait starts.
+func (k *nativeIdentityCommands) waitPolicy(ctx context.Context, runtime nativeIdentityRuntime, assets NativeAssets, spec nativeStaticEntrySpec, ip string, source nativeStaticEntry, tpm, createdUID string) error {
+	policyCtx, stopPolicy := context.WithTimeout(ctx, 2*time.Minute)
+	var policyErr error
+	for policyCtx.Err() == nil {
+		err := k.recheck(policyCtx, runtime, assets, spec, ip)
+		if err != nil && !nativeIdentityReadinessPending(err) {
+			policyErr = errors.Join(policyErr, err)
+			break
+		}
+		if err == nil {
+			observed, observeErr := k.observe(policyCtx, runtime, spec)
+			err = observeErr
+			if err == nil {
+				_, _, err = nativeIdentityPolicy(source, spec, tpm, createdUID, observed)
+			}
+		}
+		if err == nil {
+			policyErr = nil
+			break
+		}
+		policyErr = err
+		if errors.Is(err, ErrUnjoined) {
+			break
+		}
+		if err := pause(policyCtx, 2*time.Second); err != nil {
+			policyErr = errors.Join(policyErr, err)
+			break
+		}
+	}
+	policyErr = errors.Join(policyErr, policyCtx.Err())
+	stopPolicy()
+	return policyErr
+}
+
 func (k *nativeIdentityCommands) recheck(ctx context.Context, selected nativeIdentityRuntime, assets NativeAssets, spec nativeStaticEntrySpec, ip string) error {
 	current, err := k.observeRuntime(ctx, assets, spec, ip)
 	if err != nil {
@@ -690,38 +727,8 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	}
 	// Only observations are retried. Source policy is created once; there is no
 	// automatic overwrite, guest retry, rollback or partial-state adoption.
-	policyCtx, stopPolicy := context.WithTimeout(ctx, 2*time.Minute)
-	var policyErr error
-	for policyCtx.Err() == nil {
-		err := k.recheck(policyCtx, runtime, s.assets, spec, ip)
-		if err != nil && !nativeIdentityReadinessPending(err) {
-			policyErr = err
-			break
-		}
-		if err == nil {
-			observed, observeErr := k.observe(policyCtx, runtime, spec)
-			err = observeErr
-			if err == nil {
-				_, _, err = nativeIdentityPolicy(source, spec, prepared.TPM, createdUID, observed)
-			}
-		}
-		if err == nil {
-			policyErr = nil
-			break
-		}
-		policyErr = err
-		if errors.Is(err, ErrUnjoined) {
-			break
-		}
-		if err := pause(policyCtx, 2*time.Second); err != nil {
-			policyErr = errors.Join(policyErr, err)
-			break
-		}
-	}
-	policyErr = errors.Join(policyErr, policyCtx.Err())
-	stopPolicy()
-	if policyErr != nil {
-		return nil, policyErr
+	if err := k.waitPolicy(ctx, runtime, s.assets, spec, ip, source, prepared.TPM, createdUID); err != nil {
+		return nil, err
 	}
 	check, err := k.exec(ctx, runtime.controller, "verify-helper", 15*time.Second, nil, "sha256sum", helperPath)
 	if err != nil {
