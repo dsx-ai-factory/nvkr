@@ -1,140 +1,105 @@
-# ADR-29: Cluster observation and artifact attribution
+# ADR-29: Check whether a cluster runs the artifacts NVKR built
 
 - **Decision status:** Proposed; pending owner review and ratification.
 - **Date:** 2026-11-02
-- **Implementation maturity:** Design only. This proposal implements no collector, comparison,
-  evidence publisher or new qualification capability.
-- **Acceptance-test maturity:** None for this proposal; existing diagnostic checks do not establish acceptance.
-- **Deciders:** Pending; NVKR verification/evidence and downstream deployment/test owners must be identified.
-- **Index:** Proposed ADR-29 is outside the consolidated ADR-01–22 contract set until accepted.
-- **Relates to:** ADR-01 (identity), ADR-05/13 (evidence), ADR-16 (qualification), ADR-17 (lifecycle ownership),
-  ADR-19 (deployment ownership), ADR-20 (publication), ADR-23/24 (upstream tests and artifact bindings).
+- **Implementation maturity:** Design only; no implementation is added by this proposal.
+- **Acceptance-test maturity:** Not tested on a live cluster.
+- **Deciders:** Pending; NVKR evidence and downstream deployment/test owners must be named.
+- **Index:** Outside the consolidated ADR-01–22 contract set until accepted.
+- **Relates to:** ADR-01 (identity), ADR-05/13 (evidence), ADR-16 (qualification), ADR-17/19
+  (lifecycle and deployment ownership), ADR-20 (publication), ADR-23/24 (upstream tests).
 
 ## Context
 
-A verified build establishes artifact identity and origin, not installed location or current contents.
-A healthy cluster can still run different artifacts.
+After building NVKE with NVKR, a user needs to answer: **is my cluster running what I built?**
+A healthy cluster, matching version labels or passing tests cannot establish that.
 
-[ADR-19](0019-clusterdefinition-and-provisioning-adapter-boundary.md) leaves installation and topology
-with downstream systems. [ADR-16](0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
-permits selected OCI workload diagnostics without complete deployed coverage or qualification authority.
-Broader observations need attribution rules that preserve this boundary.
+We need a cluster snapshot, a comparison with the selected build, and evidence someone else can verify.
 
 ## Decision
 
-**We will represent cluster state and its comparison with an authenticated build as separate, scoped
-observations.** Every attribution must join an authenticated expected artifact to identified observed
-objects or nodes through a supported, explicit measurement or deployment record. Unknown joins remain unknown.
+**Reuse AICR for collection. Have NVKR compare those observations with its build records and SBOMs.
+Add measurements or installation records where the existing collectors leave gaps.**
 
-### Baseline and deployment ownership
+For example, NVKR built controller image A. The cluster reports the same version but runs image B.
+The report must show the difference, even if all functional tests pass.
 
-The baseline comes from the exact Run/Release and subject-bound SBOM/provenance, authenticated by the existing
-lifecycle owners under independently selected policy. A decoded release description or SBOM is insufficient.
-An admitted unsigned local diagnostic retains its weaker trust level and cannot claim authenticated publication.
+### Who does what?
 
-NVKE or another deployment owner supplies the applicable output-to-deployment mapping and expected cardinality.
-The comparison freezes and records that mapping and its policy. Build-only tools, unused architectures and
-contained dependencies retain their distinct roles; they are not all expected to appear as separate workloads.
-Required applicability cannot be silently reduced after collection fails. Built, acquired and repackaged
-artifacts remain distinguishable.
+- **AICR and reviewed extensions:** collect cluster and node observations. Reuse its Helm/Argo inventory
+  reader and evidence tools where they fit, rather than writing another collection framework.
+- **NVKE or another deployment owner:** installs the software and supplies records connecting artifacts
+  to installations and nodes. It defines where each output should appear and owns the tests.
+- **NVKR:** verifies the selected Run or Release and each output's evidence, compares observations with
+  those exact artifacts, and records the results. Reuse the existing SBOMs and deployment declarations.
 
-A snapshot is associated with existing Run/Artifact/Release identities, not a seventh authored lifecycle
-input or installation schema. It changes no existing Build, Release, SBOM or provenance bytes.
+A snapshot is an additional observation linked to the build. It does not change the build identity or
+publisher SBOM, introduce another authored lifecycle input, or move deployment ownership into NVKR.
 
-### Discovery and attribution
+### What do we compare?
 
-Discovery inventories the selected cluster scope, including unrecognized software, and records exclusions,
-denied reads, unreachable nodes and unsupported measurements. Observations bind cluster/object/node identities,
-collector identity/version, interval and available resource versions. Collection is not atomic;
-inconsistent reads remain visible.
-
-| Artifact class | Required attribution |
+| Artifact | Evidence needed |
 | --- | --- |
-| OCI image | Join the actual runtime identity to the authenticated image subject and native platform child using explicit digest semantics. Tags and version labels are hints. |
-| Helm chart | Bind the consumed chart archive to a deployment-owner installation record, values and rendered resources; compare live resources under explicit mutation/defaulting rules. Stored manifests alone cannot recover archive identity. |
-| OS image | Bind the delivered disk to a node through an authenticated provisioning/boot record and supported measurements. An OS version is insufficient, and a running mutable disk is not the original QCOW2 byte stream. |
-| OS package or host binary | Compare measured installed payload files with subject-bound package/file evidence, using explicit rules for configuration, generated files and package transformations. Package names and versions alone are insufficient. |
+| OCI image | The actual running image identity, compared with the built image for that platform. A tag is insufficient. |
+| Helm chart | A verified installation record identifying the exact chart archive, plus its values and rendered/live resources. Chart version alone is insufficient. |
+| OS image | A verified boot or provisioning record connecting the delivered image to the node, plus supported node measurements. An OS label is insufficient. |
+| OS package or binary | Installed file measurements compared with the build's package/file evidence. Package version alone is insufficient. |
 
-All four classes are required for the complete feature. Missing lineage, SBOM coverage or host measurements
-prevents the corresponding claim; an OCI-only implementation cannot report complete cluster attribution.
+The detailed design defines platform digest matching, chart changes, mutable disks and package/configuration
+rules. An image identity match alone does not prove unchanged writable files or process memory.
 
-### Claims, coverage and trust
+### What must the report tell the user?
 
-Separate **produced/acquired identity**, **installation attribution**, and **measured runtime content**.
-An image digest does not prove unchanged writable layers, mounted binaries, configuration or process memory.
-Retain unsupported measurements as gaps.
+For each expected item, show **matches, differs, not found, cannot verify, or does not apply**, with a reason.
+Show unexpected software too. Agree on required nodes, outputs and measurements before collection; do not
+reduce them after a failure. Embedded libraries and build-only tools are not expected to become separate Pods.
 
-Each required comparison returns matched, mismatched, not observed, unverified, or explicitly non-applicable,
-with supporting observations or a reason. Extra software remains visible; independent policy decides whether
-it is allowed. An overall match requires every applicable required member and measurement to succeed.
-Failed discovery, unknown identities or incomplete coverage cannot become a complete match.
+An unreachable required node or a missing installation record leaves a visible gap. Report partial coverage
+as partial. Full coverage must account for all four artifact classes; consumer policy decides what is required
+and whether extra software is allowed.
 
-Kubernetes API collection is read-only by default. Host collectors and test-driven mutations require separate
-admission of access, privileges, resource ownership, bounded execution and joined cleanup. Collection does
-not silently install collectors, use SSH, repair or provision resources. Authenticated APIs and signed
-reports identify observation sources, not trustworthy contents on a compromised node. Independent host/hardware
-attestation is outside this decision.
+### How do we collect and share it?
 
-### Reuse before new implementation
+Start with read-only Kubernetes access. Host access, installed collectors and tests that create resources
+need explicit permissions, limits and owned cleanup. Record which objects and nodes were observed, when,
+by which collector, and what failed. A snapshot spans an interval; it cannot prove continuously unchanged state.
 
-We will prefer existing admitted collectors, inventory readers and evidence tooling over another implementation.
-AICR has public snapshot, inventory, attestation and verifier packages; the
-[feature design](../cluster-observation-and-artifact-attribution.md#aicr-reuse-assessment) records their fit
-and missing guarantees. A successful collector call cannot hide omitted measurements, and an AICR recipe
-subject cannot stand in for an NVKR Run/output subject.
+Keep private originals. Prepare a shareable copy without credentials, kubeconfigs, private endpoints/server
+identifiers or provider logs before signing. State what was omitted and cannot be independently checked.
 
-The NVKR-specific layer correlates those observations with exact authenticated built/acquired outputs and
-their SBOMs. Missing runtime, host or installation-lineage measurements require admitted collector extensions;
-mapping names or versions alone cannot complete that join. The design's
-[worked examples](../cluster-observation-and-artifact-attribution.md#worked-example-was-the-built-artifact-deployed)
-separate reused observations, required enrichment and comparison outcomes across all four artifact classes.
+The signed evidence identifies the selected build, cluster, comparison rules, coverage and included files.
+Someone verifying the report chooses the expected cluster, build and comparison rules, which signer to
+trust, and how old observations may be. They verify the signature and included files, then repeat the
+comparison and coverage checks. A signed “pass” label alone is insufficient. A signature identifies the
+reporter; it does not prove that a compromised node reported truthfully. Unsigned local diagnostics remain
+unsigned and unqualified.
 
-Under current contribution policy, pinned subprocess integration or reviewed source adaptation are candidates;
-direct Go imports require a separate explicit dependency-policy decision. Adoption requires pinned source/tool
-identity, license and transitive-dependency review, compatibility checks and required security gates. This
-proposal adds no dependency or tool admission. New code should implement only uncovered attribution contracts.
-
-### Validation and portable evidence
-
-Reuse [ADR-23](0023-upstream-artifact-behavioral-validation.md) and
-[ADR-24](0024-imported-validator-catalog.md) for upstream-owned tests and explicit artifact bindings.
-Tests remain upstream; deployment and hardware lifecycle remain downstream. Cluster adapters need explicit
-admission. Record test subjects, suite/harness revision, selection and coverage. Functional verdict, capture,
-artifact comparison and cleanup outcome remain separate. Before/after snapshots establish no continuous proof.
-
-Retain original private observations and results. Define a shareable projection before signing; never redact
-already-signed bytes. Exclude credentials, kubeconfigs, token-bearing values, private endpoints/server
-identifiers and raw provider logs; document the projection's relationship to private originals and its limits.
-A portable observation binds the exact baseline, mapping/policy, observed identities,
-coverage, outcomes and an inventory of covered file digests and lengths. Structured identity uses ADR-01;
-wire schemas and any new digest family require explicit registration before implementation.
-
-A consumer independently selects the expected baseline/subjects, signer/issuer and applicability/freshness policy,
-authenticates the signed observation, verifies every covered file, and recomputes comparison and coverage
-against that baseline/policy from the covered observations. A signed overall verdict cannot replace this
-evaluation; test verdicts retain their upstream suite contracts. The consumer checks
-cluster, baseline and observation context rather than accepting a replay for another target. A locator or
-reporter-supplied digest/pass boolean supplies no authority. Public summaries and TestGrid reference the same
-verified evidence and disclose visibility/coverage limits; neither is the trust anchor.
-
-A signed failed or partial observation remains useful, but cannot satisfy a required matching/passing policy.
-This decision issues no qualification receipt or release authorization. ADR-16 retains ownership of the
-separately reviewed, independently authenticated external-result handoff.
+Keep functional test results, artifact comparisons, coverage and cleanup outcomes separate. Reuse the
+upstream test interfaces in [ADR-23](0023-upstream-artifact-behavioral-validation.md) and
+[ADR-24](0024-imported-validator-catalog.md), testing supplied artifacts without rebuilding them.
+Public pages and TestGrid link to the verifiable evidence. Failed and partial reports remain useful,
+but cannot satisfy a required passing policy.
 
 ## Consequences
 
-Consumers can distinguish build, installation and measured content claims. Healthy historical installations
-may remain unverified without lineage. Full coverage requires chart/boot records and host observers.
-Signatures authenticate the reporter's claims, not physical cluster existence or host integrity.
+Users can see what matches their build and what still needs proof. Historical installations may remain
+unverifiable without installation or boot records. AICR reuse reduces duplication, but its current image
+summary and chart inventory do not supply all the evidence required here.
 
-The [feature scope and delivery plan](../cluster-observation-and-artifact-attribution.md)
-owns detailed workflow, verification cases and implementation sequencing. This ADR selects no CLI, collector
-deployment mechanism, transport implementation or wire schema and does not establish operational acceptance.
+The [feature design](../cluster-observation-and-artifact-attribution.md) defines the detailed requirements,
+AICR source assessment, worked examples and delivery/acceptance plan. Integration choices still require
+pinning, license, dependency and security review. Direct Go imports need a separate policy decision under
+current contribution rules; no dependency is approved here.
+
+This is a proposed design, not an implemented capability. Commands and schemas remain undecided.
+It grants no release approval or qualification receipt; [ADR-16](0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
+continues to own that separate decision.
 
 ## Alternatives considered
 
-- **Match tags, versions or labels:** simpler discovery, but cannot establish artifact or installed-byte identity.
-- **Treat passing tests as attribution:** useful behavioral evidence, but does not prove what software was tested.
-- **Put deployment topology in Definition:** combines build and deployment ownership and contradicts ADR-19.
-- **Require host attestation for every observation:** stronger against compromised hosts, but excludes useful
-  API-based diagnostics. Report the observation trust boundary explicitly and admit stronger attestation separately.
+- **Compare versions only:** simple, but misses replaced images and changed files.
+- **Use passing tests as proof:** checks behavior without establishing what software was tested.
+- **Put deployment topology in Definition:** contradicts the deployment boundary in
+  [ADR-19](0019-clusterdefinition-and-provisioning-adapter-boundary.md).
+- **Require hardware attestation first:** provides stronger host trust, but delays useful API-based checks.
+  Keep their limits visible and add stronger attestation separately.
