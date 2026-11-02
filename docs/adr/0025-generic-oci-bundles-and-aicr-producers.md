@@ -35,8 +35,16 @@ output-affecting Build inputs under the existing graph identity. Environment own
 destination and credentials. No `aicrProfiles`, special AICR producer, Definition recipe field, SKU enum,
 classification or retired identity family is restored.
 
-The initial AICR producers compile a pinned upstream generator and render with explicit recipe coordinates
-and deployer names. Each selected renderer is an independent named output with its own required producer,
+The initial AICR producers compile a pinned upstream release and render with explicit recipe coordinates
+and deployer names. Each writes AICR's own OCI image layout (`aicr bundle --output oci-layout:<dir>`), requires
+exactly one manifest referencing one config and one layer, verifies the unpacked bundle with `aicr verify`, and
+emits that layer's exact bytes as its archive. NVKR does not repack AICR output, so the archive digest is the
+layer AICR packaged. Layout output renders AICR's registry variant, whose Argo CD deployer requires a repository
+URL. Build identity cannot take a publication destination from the Environment, so the catalog passes the
+non-resolving literal `oci://registry.invalid/aicr-bundle` and consumers set their own `repoURL`. Importing
+AICR's manifest unchanged through a pinned-tool producer, and dropping both this wrapper and the literal, is
+the ADR-27 follow-up ([ADR-27](0027-pinned-tool-producers.md) §5 and §9).
+Each selected renderer is an independent named output with its own required producer,
 terminal observation and evidence use. Equal Build Digests cannot satisfy sibling outputs. Unsupported
 NVKR formats, platforms, component selections and producer representations fail before source or output
 work. Recipe criteria are ordinary producer arguments; the pinned AICR renderer validates them after
@@ -74,8 +82,8 @@ bytes and compares it with the reported output. Existing staged delivery commits
 failure behavior.
 
 All renderers may use this generic format. AICR's `helm` output is a bundle of deployment inputs, not
-implicitly an installable Helm OCI chart. `argocd-helm` may contain a real chart, but transporting its complete
-directory through `bundle-oci` still makes no native Helm media-type promise. `helm-oci` retains its existing
+implicitly an installable Helm OCI chart. `argocd-helm` is AICR's packaged chart archive, but transporting it
+through `bundle-oci` still makes no native Helm media-type promise. `helm-oci` retains its existing
 real-chart-only contract; any producer selecting it must actually emit the admitted chart representation.
 
 
