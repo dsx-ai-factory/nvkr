@@ -107,7 +107,8 @@ Field names are proposed; the catalog owner fixes them at implementation. The co
   contains no host path. Any other template syntax, an unknown binding, or a binding with no token fails catalog
   loading.
 - **Literal environment only.** A producer may author literal environment variables as ordinary identity-bearing
-  inputs. Credentials, credential references and Environment-supplied values are not admitted.
+  inputs. The executor-owned names `HOME`, `TMPDIR`, `TZ` and `LC_ALL` (§3) are rejected. Credentials,
+  credential references and Environment-supplied values are not admitted.
 - **Catalog owns producers.** A Definition selects pinned-tool components by name exactly as it selects any
   producer (ADR-11 §1). There is no Definition-level tool, recipe, criteria or argument field.
 
@@ -154,8 +155,9 @@ A pinned-tool node runs through the shared helper launcher as an ordinary build 
   read-only, at fixed paths. Other members of the tool archive, including companion files, are never staged
   (§6).
 - **Fixed, credential-free environment.** The executor fixes the working directory, a private empty `HOME` and
-  `TMPDIR`, `TZ=UTC`, `LC_ALL=C` and umask `022`, adds the producer's literal variables, and passes no ambient
-  credential, token, registry configuration, kubeconfig or cache.
+  `TMPDIR`, `TZ=UTC`, `LC_ALL=C` and umask `022`. The child environment holds only those values and the
+  producer's literal variables, which cannot redefine them (§1); no ambient credential, token, registry
+  configuration, kubeconfig or cache is passed.
 - **Bounded and owned.** The node honors its execution requirements' wall-time budget and the caller's context;
   cancellation terminates and joins the child before returning.
 - **Linux only.** Held executable capabilities are Linux-only (ADR-22); other hosts fail admission.
@@ -191,8 +193,10 @@ of a format the tool already owns and an artifact digest that differs from the t
 Publishing a `file` result as its own named output needs an output format that admits it; this decision adds
 none. An `oci-layout` result reaches a Release only through the `bundle-oci` format, whose layout import (#285)
 checks the manifest, config, layer and `artifactType` allowlist, and applies the bounded archive admission before
-any output work. Existing producer staging gives no partial output: a failed or nonconforming run publishes no
-artifact or producer result.
+any output work. Output resolution enforces both rules before acquisition or staging, as it does for disk roots:
+a selected `file` producer that no other selected producer binds as a material, or an `oci-layout` producer
+selected for any format other than `bundle-oci`, fails with `invalid-catalog`. Existing producer staging gives
+no partial output: a failed or nonconforming run publishes no artifact or producer result.
 
 ### 6. Tool evidence, companions and tool-side signing
 
@@ -271,7 +275,7 @@ Pinned-tool producers reuse existing ADR-03 codes.
 
 | Condition | Code |
 |---|---|
-| Malformed pinned-tool component; unknown token or template; binding without token or token without binding; unselected, duplicate or cross-platform material; authored network request | `invalid-catalog` |
+| Malformed pinned-tool component; unknown token or template; binding without token or token without binding; unselected, duplicate or cross-platform material; authored network request; literal variable naming an executor-owned environment variable; `file` producer that no selected producer binds as a material; `oci-layout` producer outside `bundle-oci` | `invalid-catalog` |
 | Named tool source has no tool declaration or lock record; tool pin out of date with its declaration; two selections of one tool name with different pins | `unpinned-source` |
 | Tool, target and toolchain platforms differ; non-Linux execution host; deferred output form, lane or input kind | `engine-capability` |
 | Held executable or staged material differs from its pin or observed digest | `verify-failed` |
@@ -285,8 +289,8 @@ Each unit lands with table-driven contract tests that assert the coded error, no
 
 | Unit | Owner | Contract |
 |---|---|---|
-| T1 Catalog form | `pkg/nvkr/catalog` | `pinned-tool` component schema, tool reference to a pinned source, token grammar, material validation, rejected fields (`buildNetwork`, source, vendor, patches) |
-| T2 IR and identity | `pkg/nvkr/ir`, `pkg/nvkr/buildgraph` | Source-less `KindBuild` validation; tool digests and member in the logical node, URL only in transport; Build Digest changes for every logical field in §2 and not for transport |
+| T1 Catalog form | `pkg/nvkr/catalog` | `pinned-tool` component schema, tool reference to a pinned source, token grammar, material validation, rejected fields (`buildNetwork`, source, vendor, patches) and executor-owned environment names |
+| T2 IR and identity | `pkg/nvkr/ir`, `pkg/nvkr/buildgraph` | Source-less `KindBuild` validation; tool digests and member in the logical node, URL only in transport; Build Digest changes for every logical field in §2 and not for transport; output resolution rejects an unbound `file` producer and an `oci-layout` producer outside `bundle-oci` (§5) |
 | T3 Factory dataflow | `pkg/nvkr/factory` | Producer-selected tools compile to the shared `tool/<name>` node; one-pin-per-name; platform agreement; explicit tool and material inputs |
 | T4 Executor | `pkg/nvkr/pipeline` | Held executable re-hash before launch, read-only staging, fixed environment and umask, network `none`, exact output-form admission, no partial output, cancellation join |
 | T5 Provenance and membership | `pkg/nvkr/factory`, `pkg/nvkr/provenance`, `pkg/nvkr/releasemanifest` | `wrapped-build` plan type and member lane; tool transport and `nvkr:tool/<name>` dependencies; finalization rejects a missing or altered tool dependency |
