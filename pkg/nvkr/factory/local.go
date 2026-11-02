@@ -154,6 +154,9 @@ func AdmitLocal(ctx context.Context, plan *Plan, options LocalRunOptions) error 
 	if err := admitLocalDiskPublication(plan); err != nil {
 		return err
 	}
+	if err := admitLocalPinnedTools(plan); err != nil {
+		return err
+	}
 	toolchains, err := admitLocalNativeGo(ctx, plan)
 	if err != nil {
 		return err

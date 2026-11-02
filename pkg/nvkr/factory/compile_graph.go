@@ -25,6 +25,10 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		runsOn = DefaultRunsOn
 	}
 	plan.Graph = ArtifactGraph{SchemaVersion: ArtifactGraphSchema}
+	tools, err := withProducerTools(tools, plan.Builds)
+	if err != nil {
+		return ArtifactGraph{}, err
+	}
 	artifacts := map[string]Artifact{}
 	nodes := map[string]Node{}
 	for _, name := range sortedKeys(tools) {
