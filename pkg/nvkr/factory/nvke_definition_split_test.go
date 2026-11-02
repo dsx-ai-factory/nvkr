@@ -153,21 +153,22 @@ func TestNVKEDefinitionSplitEnvironmentIsolation(t *testing.T) {
 			want.GitHubBundle = bundleName
 			want.Publication.RepositoryPrefix += "/" + family.name
 			want.Signing.Identity = "^" + regexp.QuoteMeta(identity) + "@refs/heads/main$"
-			source := "https://github.com/dsx-ai-factory/nvke"
+			sources := map[string]bool{"https://github.com/dsx-ai-factory/nvke": true}
 			if family.name == "disks" {
-				source += ".git"
+				// Disks also build the release catalog's NVIDIA OVN fork producers.
+				sources = map[string]bool{"https://github.com/dsx-ai-factory/nvke.git": true, "https://github.com/dsx-ai-factory/ovn-kubernetes": true}
 			} else {
 				want.GitHubARC, want.DiskEvidence = "", ""
 				want.ExecutionClasses, want.DiskInspectionProfiles = nil, nil
 			}
 			for selected := range want.SourceAccess {
-				if selected != source {
+				if !sources[selected] {
 					delete(want.SourceAccess, selected)
 				}
 			}
 			// Services still needs the private NVKE catalog pin-set credential,
 			// even when every selected image/chart is acquired rather than built.
-			if len(want.SourceAccess) != 1 || !bytes.Equal(nvkeSplitCanonical(t, env), nvkeSplitCanonical(t, want)) {
+			if len(want.SourceAccess) != len(sources) || !bytes.Equal(nvkeSplitCanonical(t, env), nvkeSplitCanonical(t, want)) {
 				t.Fatal("family changes policy outside its namespace or retains the wrong source/disk capabilities")
 			}
 		})
