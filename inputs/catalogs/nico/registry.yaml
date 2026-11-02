@@ -60,8 +60,9 @@ components:
           arm64) suffix=aarch64; arg=AARCH64 ;;
           *) echo 'Unsupported NICo Core architecture' >&2; exit 1 ;;
         esac
+        # All three stamps are required before any BuildKit work, unset or empty.
+        : "${NICO_VERSION:?missing NICo version stamp}" "${NICO_COMMIT:?missing NICo commit stamp}" "${NICO_DATE:?missing NICo date stamp}"
         revision="$(printf '%.8s' "$NICO_COMMIT")"
-        timestamp="$NICO_DATE"
         # Both bases install the Kea packages at the version upstream records beside them.
         kea="$(cat /src/dev/docker/kea.version)"
         [ -n "$kea" ] || { echo 'NICo Core kea.version must name a Kea package version' >&2; exit 1; }
@@ -94,7 +95,7 @@ components:
           --opt "build-arg:CONTAINER_RUNTIME_$arg=nico-core-runtime" \
           --opt "context:nico-core-runtime=oci-layout://runtime@$runtime_digest" \
           --opt "build-arg:VERSION=$NICO_VERSION" --opt "build-arg:CI_COMMIT_SHORT_SHA=$revision" \
-          --opt "build-arg:CI_COMMIT_TIMESTAMP=$timestamp" \
+          --opt "build-arg:CI_COMMIT_TIMESTAMP=$NICO_DATE" \
           --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
           --output 'type=oci,dest=/src/bin/nico-core-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true'
   # The standalone nico-flow chart's image; the standalone REST charts are not packaged here.
@@ -114,6 +115,7 @@ components:
       - sh
       - -euc
       - >-
+        : "${NICO_VERSION:?missing NICo version stamp}";
         buildctl-daemonless.sh build --frontend dockerfile.v0
         --local context=/src/rest-api --local dockerfile=/src/rest-api/docker/production
         --opt filename=Dockerfile.nico-flow --opt platform=linux/{{.Arch}}

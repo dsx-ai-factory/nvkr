@@ -28,6 +28,12 @@ builder type, IR field, executor, provenance mapping or contract test exists. Pi
 scanner and signer acquisitions outside Build identity. AICR bundles additionally wait for an AICR release with
 local OCI layout output (NVIDIA/aicr#3534) and the separately drafted layout import (#285).
 
+[ADR-28](0028-multi-platform-executable-indexes.md) proposes multi-platform executables: one tool source and
+one lock transaction cover every platform of a release, and an executable output may declare a `platforms` set
+published as a standard OCI image index over minimal per-platform images. It is designed, not implemented: tool
+declarations, tool pins and executable outputs remain single-platform, and executables publish only as Binary
+Bundles. It also inventories the existing per-platform executable deliveries to retrofit.
+
 ## Current boundary
 
 The maintained public workflow is **Definition → Run → Release**, with Environment, Artifact and
@@ -37,6 +43,7 @@ there is no authored Recipe, cluster topology, placement, inheritance or composi
 internal evidence records are generated or authenticated rather than separately authored public inputs.
 Proposed ADR-26 composite Definitions are designed, not implemented; nothing above admits them.
 Proposed ADR-27 pinned-tool producers are likewise designed only; no producer runs a pinned release tool.
+Proposed ADR-28 multi-platform executable outputs are designed only; executable outputs remain single-platform.
 
 Planning, byte-exact GitHub generation, Plan/graph/diff views and metadata-only release navigation are
 implemented. Diagnostic pulling retrieves and checks one named output's complete payload closure from a
@@ -1354,6 +1361,7 @@ These boundaries remain unimplemented/unexercised.
 | 24 Validator catalog | Provisional CLI discovery and local-plan profiles: strict bounded catalog/profile loading, deterministic discovery, registered `nvke-cli/v1`, complete local-plan admission and frozen dispatch through factory/sourcegit/pipeline | Discovery, refusal, snapshot edits, both suite/architecture bindings and mocked dispatch are contract-tested; [guide](../artifact-testing.md#provisional-validator-catalog) distinguishes this from actual upstream execution. Native AMD64/ARM64 catalog runtime acceptance, legacy-command migration, new-format published adapters, controller/chart and second-repository adoption remain outstanding. Existing published authentication/capture semantics, unknown exhaustive completeness, unauthenticated artifact membership and no qualification authority are preserved |
 | 26 Definition composition (proposed) | Nothing; designed, not implemented. The four NVKE families and the combined candidate remain separate authored Definitions | Composite schema and `nvkr.composite-definition` family, digest-pinned member admission, effective-Definition merge and conflict rules, Plan/Run/publication composition records, `definition pin`, composite production and named development bundle generation and consumer expectations are unimplemented (ADR-26 units U1–U7). Identity invariance against the family and combined Plans is untested. Qualification (U8) and member Release reuse (U9, after the result-reuse decision lands) are deferred and must fail with `engine-capability`; composites rebuild every output. Retiring the combined `definition.yaml` (U10) is gated on a hosted composite Run and independent consumer verification, neither of which exists |
 | 27 Pinned-tool producers (proposed) | Nothing; designed, not implemented. Tool pins are acquired only run-wide for `sbomTool` and `cosignTool`, outside Build identity | `pinned-tool` catalog form, source-less `KindBuild` identity, shared `tool/<name>` dataflow, offline held-executable executor, `wrapped-build` provenance and membership, layout handoff and generation are unimplemented (ADR-27 units T1–T7). Qualified execution, directory output forms, companion staging and non-Linux execution are deferred and must fail admission with `engine-capability`; malformed declarations fail with `invalid-catalog`, and a tool run that leaves a directory or any other undeclared form fails with `build-failed` (ADR-27 §11). AICR bundle producers also need an AICR release with NVIDIA/aicr#3534 and the #285 layout import; no pinned-tool Run, hosted Run or consumer verification exists |
+| 28 Multi-platform executables (proposed) | Nothing; designed, not implemented. A tool declaration and its lock record name one platform, ADR-12 §1 rejects `platforms` on executable outputs with `invalid-catalog`, and each executable output publishes one single-platform Binary Bundle | Multi-platform tool declarations and `tools` lock entries, per-platform identity, executable `platforms` outputs, the `nvkr.dev/executable-index-build/v1` projection, image-index packaging, index and child evidence, `release pull` projection, qualification smoke and generation are unimplemented (ADR-28 units E1–E8). The AICR migration (E9) and every retrofit in ADR-28 §10 (#297) wait for those units. Darwin children and the qualified lane are deferred and must fail closed; qualification over an index output must fail with `engine-capability` until E7. No index has been built, published, signed or consumed |
 
 ## Feature-branch pipeline development
 
@@ -3596,7 +3604,7 @@ pinned `v2.2.2` version crate in that state stamped the `VERSION` and `CI_COMMIT
 left the build date blank. `v2.3.0` adds upstream [#6896](https://github.com/dsx-ai-factory/infra-controller/pull/6896)'s
 `CI_COMMIT_TIMESTAMP` argument for that date. The Core command derives all three from the source lock through
 `versionStamp`: the pin's tag, its commit truncated to eight characters and its commit date in UTC, so a pin
-update restamps them without editing the command, and a missing stamp stops before BuildKit. Flow stamps the same pin-derived version; its Dockerfile
+update restamps them without editing the command, and a missing or empty stamp stops before BuildKit. Flow stamps the same pin-derived version; its Dockerfile
 declares no revision argument, so source inspection indicates its commit reports `unknown` and its build time
 is the build's wall clock. No completed Core image has confirmed this metadata. At the `v2.2.2` pin, the Flow
 build command built both architectures locally in the pinned BuildKit image (AMD64 under emulation). A local ARM64 Core attempt at that pin with the
