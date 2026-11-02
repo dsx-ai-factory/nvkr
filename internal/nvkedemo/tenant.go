@@ -264,10 +264,10 @@ func (t *tenant) capture(ctx context.Context, args []string, phase string, budge
 	runner := t.session.Runner
 	// Commands retain their private numbered logs. Their exit status is not
 	// provisioning success; report interpreted state from the owning wait loop.
+	runner.Progress = nil
 	if t.cleaning {
 		return t.cleanup.capture(ctx, runner, args, phase, t.sequence, budget)
 	}
-	runner.Progress = nil
 	return runner.Capture(ctx, args, fmt.Sprintf("tenant-%03d-%s", t.sequence, phase), budget)
 }
 func (t *tenant) cli() string {

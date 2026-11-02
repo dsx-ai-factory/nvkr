@@ -525,11 +525,9 @@ This workflow uses ordinary branch `workflow_dispatch` and retains its daily
 trigger. It has no promotion/lock refs, NVIDIA runner or protected environment,
 repository secrets, publication/signing permission, Actions artifact upload or
 shared cache. Product bytes and private diagnostic files stay on the disposable
-host; build stderr, ordinary build output and bounded host/kernel/cgroup samples
-enter the public job log. Raw deployment stdout and stderr remain private. Only
-closed bootstrap observations and fixed installer item/type labels are projected
-live through the existing owned stderr drain and nonblocking presenter. These
-bounded, partial observations grant no readiness or process-join acceptance.
+host; build output and ordinary Go test outcomes enter the public job log. Raw
+deployment stdout and stderr remain private. Success requires the full test and
+joined cleanup, rather than a progress observation or child subtest alone.
 The ARM64 build/publish/consume nightly cycle is retired. Generated ARM64
 producer workflows remain available under their existing ARC admission policies,
 but no nightly invokes them or the legacy published-artifact consumer.

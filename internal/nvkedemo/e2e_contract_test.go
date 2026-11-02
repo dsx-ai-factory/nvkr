@@ -317,6 +317,33 @@ func TestNativeE2ESourceResolvesPathsBeforeChangingDirectory(t *testing.T) {
 	}
 }
 
+func TestHostedE2EUsesAuthoredConfiguration(t *testing.T) {
+	repository, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(repository)
+	build, cfg, tenant, err := nativeE2EConfig(t.Context(), func(name string) string {
+		switch name {
+		case "NVKR_NVKE_E2E_CONFIG":
+			return "demos/nightly-nvke.yaml"
+		case "NVKR_NVKE_E2E_SOURCE_COMMIT":
+			return strings.Repeat("a", 40)
+		case "NVKR_NVKE_E2E_TENANT":
+			return "1"
+		}
+		return ""
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if build.Repository != repository || build.NVKEClone != filepath.Join(repository, "nvke-source") || cfg.Out != filepath.Join(repository, ".nvkr", "nightly-site") ||
+		!tenant || !cfg.Cleanup || cfg.Conformance || cfg.TenantWorkers != 1 || build.Jobs != 1 || cfg.Runs != (RunInputs{}) || cfg.NVKR != "" ||
+		cfg.Resources != (NativeResources{SiteMemoryGiB: 7, TenantMemoryGiB: 3, HeadroomMiB: 1024, VCPUs: 4, Profile: "small"}) {
+		t.Fatalf("authored hosted configuration changed required inputs or lifecycle: build=%+v run=%+v", build, cfg)
+	}
+}
+
 func TestLocalNVKESourceRejectsIncompatibleBuildsBeforeWork(t *testing.T) {
 	for _, row := range []struct {
 		name, platform string

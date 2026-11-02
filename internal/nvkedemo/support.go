@@ -74,12 +74,8 @@ type Runner struct {
 	// commands keep potentially sensitive deployment diagnostics private.
 	output io.Writer
 	// Machine stdout remains captured/private while stderr and uncaptured build
-	// output still stream. Used by exact-source builds and private bootstrap
-	// stderr capture.
+	// output still stream. Used by exact-source builds.
 	privateCaptureStdout bool
-	// Only the existing stderr drain may project these source-owned closed
-	// observations. Raw bytes still belong to the private diagnostic sink.
-	nativeObservations nativeLiveObservationKind
 	// Opted in only for the directly executed final nvkr local Run. Bootstrap
 	// shells and every source/utility command receive no inherited activity FD.
 	buildActivity bool
@@ -200,17 +196,16 @@ type OwnedProcess struct {
 type ownedOutputPipe struct {
 	reader, writer *os.File
 	destination    io.Writer
-	observations   *nativeLiveObservation
 	done           chan error
 }
 
-func (p *OwnedProcess) childOutput(destination io.Writer, observations *nativeLiveObservation) (*os.File, error) {
+func (p *OwnedProcess) childOutput(destination io.Writer) (*os.File, error) {
 	reader, writer, err := os.Pipe()
 	if err != nil {
 		return nil, err
 	}
 	p.outputPipes = append(p.outputPipes, &ownedOutputPipe{
-		reader: reader, writer: writer, destination: destination, observations: observations, done: make(chan error, 1),
+		reader: reader, writer: writer, destination: destination, done: make(chan error, 1),
 	})
 	return writer, nil
 }
@@ -219,12 +214,7 @@ func (p *OwnedProcess) startOutputDrains() {
 	for _, pipe := range p.outputPipes {
 		closeErr := pipe.writer.Close()
 		go func() {
-			var err error
-			if pipe.observations != nil {
-				err = pipe.observations.drain(pipe.observations.ctx, pipe.destination, pipe.reader)
-			} else {
-				_, err = io.Copy(pipe.destination, pipe.reader)
-			}
+			_, err := io.Copy(pipe.destination, pipe.reader)
 			pipe.done <- errors.Join(closeErr, err, pipe.reader.Close())
 		}()
 	}
@@ -697,11 +687,11 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 	if capture {
 		p.stderr = &boundedDiagnostic{writer: sink, remaining: diagnosticLimit}
 	}
-	cmd.Stdout, err = p.childOutput(p.stdout, nil)
+	cmd.Stdout, err = p.childOutput(p.stdout)
 	if err == nil {
 		cmd.Stderr = cmd.Stdout
 		if p.stderr != p.stdout {
-			cmd.Stderr, err = p.childOutput(p.stderr, newNativeLiveObservation(ctx, r.nativeObservations, r.Progress))
+			cmd.Stderr, err = p.childOutput(p.stderr)
 		}
 	}
 	if err != nil {
@@ -713,13 +703,7 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 		}
 		return nil, &CommandError{Phase: phase, ExitCode: -1, Cause: err}
 	}
-	// The owned bootstrap presenter already receives typed phase events. A
-	// duplicate synchronous write could delay cleanup behind its blocked sink.
-	_, ownedPresenter := r.Progress.(nativeBootstrapObserver)
-	if r.nativeObservations != 0 {
-		p.processWriter = r.Progress
-	}
-	if r.Progress != nil && !ownedPresenter {
+	if r.Progress != nil {
 		_, _ = fmt.Fprintf(r.Progress, "Demo phase: %s\n", phase)
 	}
 	var activityWriter *os.File

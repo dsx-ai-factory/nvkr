@@ -83,22 +83,17 @@ jobs:
           set -euo pipefail
           sudo -n timeout --kill-after=10s 180s apt-get update
           sudo -n timeout --kill-after=10s 600s apt-get install -y --no-install-recommends \
-            acl git make gcc libc6-dev jq coreutils python3 openssh-client bash curl openssl \
+            git make gcc libc6-dev jq coreutils python3 openssh-client bash curl openssl \
             libvirt-daemon-system libvirt-clients qemu-utils qemu-system-x86 ovmf \
             cloud-image-utils swtpm swtpm-tools gnutls-bin ipxe-qemu \
-            dnsmasq-base iptables iproute2 libcap2-bin e2fsprogs kmod time
+            dnsmasq-base iptables iproute2 libcap2-bin e2fsprogs kmod
           # Persist this disposable runner's grant when udev reapplies device policy.
-          id
-          stat -c 'KVM before: uid=%u gid=%g mode=%a inode=%i device=%t:%T' /dev/kvm
-          getfacl -cp /dev/kvm
           printf 'KERNEL=="kvm", OWNER="%s", GROUP="kvm", MODE="0660", OPTIONS+="static_node=kvm"\n' "$(id -u)" | \
             sudo -n timeout --kill-after=5s 15s tee /etc/udev/rules.d/99-nvkr-kvm.rules
           sudo -n timeout --kill-after=5s 15s udevadm verify /etc/udev/rules.d/99-nvkr-kvm.rules
           sudo -n timeout --kill-after=5s 15s udevadm control --reload-rules
           sudo -n timeout --kill-after=5s 30s udevadm trigger --name-match=kvm
           sudo -n timeout --kill-after=5s 30s udevadm settle --timeout=25
-          stat -c 'KVM ready: uid=%u gid=%g mode=%a inode=%i device=%t:%T' /dev/kvm
-          getfacl -cp /dev/kvm
           (exec 3<>/dev/kvm)
           sudo -n -k timeout --signal=TERM --kill-after=5s 25s true
           docker info --format '{{.OSType}}/{{.Architecture}}'
@@ -123,47 +118,16 @@ jobs:
       - name: Build the existing NVKR executables
         timeout-minutes: 20
         run: timeout --kill-after=10s 1100s make build demo
-      - name: Configure the hosted VM test
-        run: |
-          set -euo pipefail
-          umask 077
-          # Initial hosted profile; acceptance requires a real E2E run.
-          cat > "$RUNNER_TEMP/nightly-e2e.yaml" <<EOF
-          version: 1
-          build:
-            repo: "$GITHUB_WORKSPACE"
-            attempt: "nightly-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-            jobs: 1
-            nvkeClone: "$NVKE_LOCAL_CLONE"
-          run:
-            out: "$RUNNER_TEMP/nightly-site-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-            timeoutSeconds: 3600
-            tenantWorkers: 1
-            resources:
-              profile: small
-              siteMemoryGiB: 7
-              tenantMemoryGiB: 3
-              headroomMiB: 1024
-              vcpus: 4
-          EOF
-          printf 'NVKR_NVKE_E2E_CONFIG=%s/nightly-e2e.yaml\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
       - name: Build NVKE and run the existing Go site and tenant E2E with cleanup
         env:
           NVKR_NVKE_E2E: '1'
           NVKR_NVKE_E2E_TENANT: '1'
+          NVKR_NVKE_E2E_CONFIG: demos/nightly-nvke.yaml
         run: |
           set -euo pipefail
           timeout --kill-after=10s 180s go test ./internal/nvkedemo -list '^TestEndToEnd$' | grep -Fx TestEndToEnd
           remaining=$(( NVKR_JOB_DEADLINE - $(date +%s) ))
           # TestEndToEnd reserves two hours inside this deadline for owned cleanup.
           (( remaining > 125 * 60 ))
-          bash scripts/ci-measure-workload.sh \
-            go test ./internal/nvkedemo -run '^TestEndToEnd$' -count=1 -v -timeout "${remaining}s"
-      - name: Record final hosted allocation
-        if: always()
-        run: |
-          free -m
-          df -Pm "$RUNNER_TEMP"
-          timeout --kill-after=2s 10s id || true
-          timeout --kill-after=2s 10s stat -c 'KVM final: uid=%u gid=%g mode=%a inode=%i device=%t:%T' /dev/kvm || true
-          timeout --kill-after=2s 10s getfacl -cp /dev/kvm || true
+          go test ./internal/nvkedemo -run '^TestEndToEnd$' -count=1 -v \
+            -exec "env --chdir \"$GITHUB_WORKSPACE\"" -timeout "${remaining}s"

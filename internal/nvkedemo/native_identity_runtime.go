@@ -39,19 +39,6 @@ const (
 // readiness. This private condition never authorizes probe, mutation or proof.
 var errNativeIdentityUnready = errors.New("pinned identity containers are not ready")
 
-var (
-	errNativeIdentityContainerUnavailable = errors.New("selected identity container is unavailable or ambiguous")
-	errNativeIdentityContainerMissing     = errors.New("selected identity image has no exact running container")
-)
-
-// The closed field locates a rejected comparison without publishing its values.
-// It carries no permission to reselect a replacement or retry host mutation.
-type nativeIdentityRuntimeChanged struct{ field string }
-
-func (*nativeIdentityRuntimeChanged) Error() string {
-	return "admitted identity context changed during handoff"
-}
-
 type nativePodConfigMap struct {
 	Name  string
 	Items []struct{ Key, Path string }
@@ -174,7 +161,7 @@ func nativeIdentityObservedPod(rows nativeIdentityPodList, reference string) (na
 					continue
 				}
 				if selected != nil || pod.Metadata.Name == "" || pod.Metadata.Namespace == "" || pod.Metadata.UID == "" || state.State.Running == nil || state.ContainerID == "" {
-					return nativeIdentityPod{}, errNativeIdentityContainerUnavailable
+					return nativeIdentityPod{}, errors.New("selected identity container is unavailable or ambiguous")
 				}
 				value := nativeIdentityPod{pod: pod, container: container, state: state}
 				selected = &value
@@ -182,7 +169,7 @@ func nativeIdentityObservedPod(rows nativeIdentityPodList, reference string) (na
 		}
 	}
 	if selected == nil {
-		return nativeIdentityPod{}, errNativeIdentityContainerMissing
+		return nativeIdentityPod{}, errors.New("selected identity image has no exact running container")
 	}
 	return *selected, nil
 }
@@ -466,27 +453,8 @@ func (k *nativeIdentityCommands) recheck(ctx context.Context, selected nativeIde
 	if err != nil {
 		return err
 	}
-	field := ""
-	switch {
-	case current.controller.pod.Metadata.UID != selected.controller.pod.Metadata.UID:
-		field = "controller-pod"
-	case current.server.pod.Metadata.UID != selected.server.pod.Metadata.UID:
-		field = "server-pod"
-	case current.controller.state.ContainerID != selected.controller.state.ContainerID:
-		field = "controller-container"
-	case current.server.state.ContainerID != selected.server.state.ContainerID:
-		field = "server-container"
-	case current.configUID != selected.configUID:
-		field = "config-object"
-	case current.configSHA != selected.configSHA:
-		field = "config-bytes"
-	case current.bootID != selected.bootID:
-		field = "host-boot"
-	case !reflect.DeepEqual(current.config, selected.config):
-		field = "config-projection"
-	}
-	if field != "" {
-		return &nativeIdentityRuntimeChanged{field: field}
+	if current.controller.pod.Metadata.UID != selected.controller.pod.Metadata.UID || current.server.pod.Metadata.UID != selected.server.pod.Metadata.UID || current.controller.state.ContainerID != selected.controller.state.ContainerID || current.server.state.ContainerID != selected.server.state.ContainerID || current.configUID != selected.configUID || current.configSHA != selected.configSHA || current.bootID != selected.bootID || !reflect.DeepEqual(current.config, selected.config) {
+		return errors.New("admitted identity context changed during handoff")
 	}
 	return nativeIdentityRuntimeReady(current)
 }
@@ -590,21 +558,11 @@ func nativeIdentityHelperRequest(spec nativeStaticEntrySpec, runtime nativeIdent
 }
 
 func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runner Runner, ip, out string) (receipt *nativeSiteIdentityReceipt, resultErr error) {
-	handoffOperation := ""
 	progress := beginProgress(runner.Progress, "native-site-identity-handoff", PhaseStarted, PhaseFinished, PhaseFailed)
-	stage := beginProgress(runner.Progress, "native-identity-preflight", PhaseStarted, PhaseFinished, PhaseFailed)
-	advance := func(name string) {
-		stage.finish(nil)
-		stage = beginProgress(runner.Progress, name, PhaseStarted, PhaseFinished, PhaseFailed)
-	}
 	defer func() {
-		if resultErr != nil && handoffOperation != "" {
-			reportNativeBootstrapObservation(runner, "Site identity handoff stopped during "+handoffOperation+".\n")
-		}
 		if errors.Is(resultErr, ErrUnjoined) && s.unjoinedWork == nil {
 			s.unjoinedWork = resultErr
 		}
-		stage.finish(resultErr)
 		progress.finish(resultErr)
 	}()
 	if err := requireContext(ctx); err != nil {
@@ -652,12 +610,10 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	if err != nil {
 		return nil, err
 	}
-	advance("native-identity-runtime")
 	runtime, err := k.runtime(ctx, s.assets, spec, ip)
 	if err != nil {
 		return nil, err
 	}
-	advance("native-identity-observe")
 	before, err := k.observe(ctx, runtime, spec)
 	if err != nil {
 		return nil, err
@@ -676,7 +632,6 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	if _, err := siteidentity.DecodeRequest(ctx, requestBytes); err != nil {
 		return nil, err
 	}
-	advance("native-identity-stage")
 	helper, err := nativeIdentityHeldInput(ctx, s.assets.SiteTools, nativeIdentityHelper, s.assets.identity.helperSHA, 128<<20)
 	if err != nil {
 		return nil, err
@@ -694,7 +649,6 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	if err := k.recheck(ctx, runtime, s.assets, spec, ip); err != nil {
 		return nil, err
 	}
-	advance("native-identity-probe")
 	probeRequest := request
 	probeRequest.Operation = "probe"
 	probeRequest.BudgetSeconds = 30
@@ -717,7 +671,6 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	if err := k.recheck(ctx, runtime, s.assets, spec, ip); err != nil {
 		return nil, err
 	}
-	advance("native-identity-policy")
 	if _, err := original.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
@@ -727,15 +680,11 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	if err != nil {
 		return nil, err
 	}
-	createProgress := beginProgress(runner.Progress, "native-policy-create", PhaseStarted, PhaseFinished, PhaseFailed)
 	createdRaw, err := k.capture(ctx, "import-source-policy", policyBudget, original, "create", "-f", "-", "-o", "json")
-	createProgress.finish(err)
 	if err != nil {
 		return nil, err
 	}
-	responseProgress := beginProgress(runner.Progress, "native-policy-created-response", PhaseStarted, PhaseFinished, PhaseFailed)
 	createdUID, err := nativeIdentityCreatedEntry(createdRaw, source, prepared.TPM)
-	responseProgress.finish(err)
 	if err != nil {
 		return nil, err
 	}
@@ -743,21 +692,16 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	// automatic overwrite, guest retry, rollback or partial-state adoption.
 	policyCtx, stopPolicy := context.WithTimeout(ctx, 2*time.Minute)
 	var policyErr error
-	policyOperation := "runtime-recheck"
-	waitingReady := false
 	for policyCtx.Err() == nil {
-		policyOperation = "runtime-recheck"
 		err := k.recheck(policyCtx, runtime, s.assets, spec, ip)
 		if err != nil && !nativeIdentityReadinessPending(err) {
 			policyErr = err
 			break
 		}
 		if err == nil {
-			policyOperation = "observe"
 			observed, observeErr := k.observe(policyCtx, runtime, spec)
 			err = observeErr
 			if err == nil {
-				policyOperation = "match"
 				_, _, err = nativeIdentityPolicy(source, spec, prepared.TPM, createdUID, observed)
 			}
 		}
@@ -766,10 +710,6 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 			break
 		}
 		policyErr = err
-		if nativeIdentityReadinessPending(err) && !waitingReady {
-			reportNativeBootstrapObservation(runner, "Site identity policy waiting for pinned running containers to become ready.\n")
-			waitingReady = true
-		}
 		if errors.Is(err, ErrUnjoined) {
 			break
 		}
@@ -781,14 +721,8 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	policyErr = errors.Join(policyErr, policyCtx.Err())
 	stopPolicy()
 	if policyErr != nil {
-		reportNativeBootstrapObservation(runner, "Site identity policy stopped during "+policyOperation+".\n")
-		if policyOperation == "runtime-recheck" {
-			reportNativeBootstrapObservation(runner, nativeIdentityRecheckObservation(policyErr))
-		}
 		return nil, policyErr
 	}
-	advance("native-identity-handoff")
-	handoffOperation = "verify-helper"
 	check, err := k.exec(ctx, runtime.controller, "verify-helper", 15*time.Second, nil, "sha256sum", helperPath)
 	if err != nil {
 		return nil, err
@@ -796,36 +730,27 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	if !slices.Equal(strings.Fields(string(check)), []string{strings.TrimPrefix(s.assets.identity.helperSHA, "sha256:"), helperPath}) {
 		return nil, errors.New("staged identity helper changed before dispatch")
 	}
-	handoffOperation = "runtime-recheck"
 	if err := k.recheck(ctx, runtime, s.assets, spec, ip); err != nil {
 		return nil, err
 	}
-	handoffOperation = "prepare-request"
 	requestInput, err := nativeIdentityRequestFile(ctx, private.Work, request)
 	if err != nil {
 		return nil, err
 	}
 	defer requestInput.Close()
-	handoffOperation = "helper-command"
 	dispatchedAt := time.Now()
 	result, err := s.captureNativeIdentityMutation(ctx, time.Duration(request.BudgetSeconds+30)*time.Second, func(critical context.Context) ([]byte, error) {
-		raw, commandErr := k.exec(critical, runtime.controller, "handoff-host", time.Duration(request.BudgetSeconds+30)*time.Second, requestInput, helperPath)
-		reportNativeBootstrapObservation(runner, nativeIdentityResultObservation(raw, commandErr))
-		return raw, commandErr
+		return k.exec(critical, runtime.controller, "handoff-host", time.Duration(request.BudgetSeconds+30)*time.Second, requestInput, helperPath)
 	})
 	if err != nil {
 		return nil, err
 	}
-	handoffOperation = "validate-caller"
 	if result.CallerID != request.ExpectedCaller {
 		return nil, errors.New("handoff caller differs from the admitted controller")
 	}
-	handoffOperation = "validate-status"
 	if result.Status == nil || result.Status.ServerAddress != request.ServerAddress || result.Status.ServerPort != uint32(request.ServerPort) {
 		return nil, errors.New("source-owned SPIRE status differs from its selected permanent endpoint")
 	}
-	handoffOperation = ""
-	advance("native-identity-proof")
 	proofCtx, stopProof := context.WithTimeout(ctx, time.Minute)
 	defer stopProof()
 	var proofErr error

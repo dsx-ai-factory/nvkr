@@ -7,9 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io"
 	"os"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -228,70 +226,5 @@ func TestOutputAdmissionPrecedesInputOrIdentity(t *testing.T) {
 		if result.Completion != NotStarted || err == nil || e.ExitCode(err) != e.ExitCode(e.New(e.CodeEngineCapability, "synthetic")) {
 			t.Fatalf("output refusal did not remain not-started: %+v %v", result, err)
 		}
-	}
-}
-
-func TestHelperRequestAdmissionBeforeIdentity(t *testing.T) {
-	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" && runtime.GOARCH != "amd64" {
-		t.Skip("runtime admission requires Linux AMD64 or ARM64")
-	}
-	for _, tc := range []struct {
-		name string
-		edit func(*Request)
-	}{
-		{"unknown operation", func(r *Request) { r.Operation = "exec" }},
-		{"unsupported JWT transport", func(r *Request) { r.TLSJWTEnabled = true }},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			request := validRequest()
-			tc.edit(&request)
-			raw, err := canonical.Marshal(request)
-			if err != nil {
-				t.Fatal(err)
-			}
-			input, requestWriter, err := os.Pipe()
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer input.Close()
-			defer requestWriter.Close()
-			resultReader, output, err := os.Pipe()
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer resultReader.Close()
-			defer output.Close()
-			if _, err := requestWriter.Write(raw); err != nil {
-				t.Fatal(err)
-			}
-			if err := requestWriter.Close(); err != nil {
-				t.Fatal(err)
-			}
-			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-			defer cancel()
-			result, err := RunHelper(ctx, input, output)
-			var coded *e.Error
-			want := Result{SchemaVersion: SchemaVersion, Completion: NotStarted, FailureCode: e.CodeUsage}
-			if !errors.As(err, &coded) || coded.Code != e.CodeUsage || result != want {
-				t.Fatalf("invalid request passed identity admission: result=%+v err=%v", result, err)
-			}
-			if err := output.Close(); err != nil {
-				t.Fatal(err)
-			}
-			if err := resultReader.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
-				t.Fatal(err)
-			}
-			encoded, err := io.ReadAll(io.LimitReader(resultReader, 4096))
-			if err != nil {
-				t.Fatal(err)
-			}
-			var observed Result
-			if err := canonical.UnmarshalExact(bytes.TrimSuffix(encoded, []byte{'\n'}), &observed); err != nil {
-				t.Fatal(err)
-			}
-			if observed != want {
-				t.Fatal("private helper result changed the pre-identity refusal")
-			}
-		})
 	}
 }

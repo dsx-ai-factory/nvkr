@@ -61,16 +61,6 @@ func TestEndToEnd(t *testing.T) {
 	defer stop()
 	ctx, cancel := context.WithDeadline(signalCtx, workDeadline)
 	defer cancel()
-	// Keep parent liveness visible during the independently bounded cleanup too.
-	progress, stopProgress := startNativeE2EProgress(t.Context(), os.Stdout, time.Minute)
-	defer func() {
-		cleanup, stop := context.WithTimeout(context.Background(), 5*time.Second)
-		defer stop()
-		if err := stopProgress(cleanup); err != nil {
-			t.Error(err)
-		}
-	}()
-	build.Progress, cfg.Progress = progress, progress
 	if err := AdmitDemoDeployment(ctx, cfg); err != nil {
 		t.Fatal(err)
 	}

@@ -191,6 +191,7 @@ func TestNativeIdentityCompletionControlsDependencyLifetime(t *testing.T) {
 		{name: "joined success", completion: siteidentity.JoinedSuccess},
 		{name: "joined helper failure", completion: siteidentity.JoinedFailure, commandErr: &CommandError{ExitCode: 17}, wantError: true},
 		{name: "unknown exit zero", completion: siteidentity.Unknown, wantUnknown: true, wantError: true},
+		{name: "unknown exit nonzero", completion: siteidentity.Unknown, commandErr: &CommandError{ExitCode: 22}, wantUnknown: true, wantError: true},
 		{name: "missing result", raw: "missing", wantUnknown: true, wantError: true},
 		{name: "unjoined local child", completion: siteidentity.JoinedSuccess, commandErr: ErrUnjoined, wantUnknown: true, wantError: true},
 		{name: "parent cancellation drains accepted call", completion: siteidentity.JoinedSuccess, cancel: true, wantError: true},
@@ -217,6 +218,9 @@ func TestNativeIdentityCompletionControlsDependencyLifetime(t *testing.T) {
 			})
 			if (err != nil) != tc.wantError || errors.Is(err, ErrUnjoined) != tc.wantUnknown || errors.Is(attempt.unjoinedWork, ErrUnjoined) != tc.wantUnknown {
 				t.Fatalf("err=%v retained=%v", err, attempt.unjoinedWork)
+			}
+			if tc.commandErr != nil && !errors.Is(err, tc.commandErr) {
+				t.Fatal("completion handling lost its original command failure", err)
 			}
 		})
 	}

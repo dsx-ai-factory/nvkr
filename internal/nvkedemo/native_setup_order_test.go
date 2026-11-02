@@ -4,6 +4,7 @@
 package nvkedemo
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,14 +14,19 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/siteidentity"
 )
 
 func TestNativeSharedSetupPrecedesOrdinaryTenantAndStopsDiagnostic(t *testing.T) {
 	for _, tc := range []struct {
 		name                    string
 		ordinary, importFailure bool
+		handoffResult           string
 	}{
-		{"site", false, false}, {"tenant", true, false}, {"policy import failure", false, true},
+		{name: "site"}, {name: "tenant", ordinary: true}, {name: "policy import failure", importFailure: true},
+		{name: "wrong handoff caller", handoffResult: "caller"}, {name: "missing handoff status", handoffResult: "status"}, {name: "wrong permanent endpoint", handoffResult: "endpoint"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ordinary := tc.ordinary
@@ -42,12 +48,6 @@ func TestNativeSharedSetupPrecedesOrdinaryTenantAndStopsDiagnostic(t *testing.T)
 			writeTenantFixture(t, cli, []byte(`#!/bin/sh
 set -eu
 umask 077
-if test "$1" = --json-logs; then
- shift
- test "$1:$2" = bootstrap:site
-else
- test "$1:$2" != bootstrap:site
-fi
 case "$1:$2" in
  generate:sitespec)
   case "$*" in *"cluster.podCidr=10.244.0.0/16"*"cluster.serviceCidr=10.96.0.0/16"*) ;; *) exit 54;; esac
@@ -62,6 +62,8 @@ case "$1:$2" in
   case " $* " in *" --nvke-controller-image $EXPECTED_CONTROLLER_IMAGE "*) ;; *) exit 56;; esac
   case " $* " in *" --provisioned-provider-image docker.io/library/provider:fixture "*) ;; *) exit 57;; esac
   printf 'bootstrap\n' >> "$EVENTS"
+  printf 'PRIVATE_BOOTSTRAP_STDOUT\n'
+  printf 'PRIVATE_BOOTSTRAP_STDERR\n' >&2
   while test "$#" -gt 0; do
    if test "$1" = --kubeconfig-out; then shift; printf 'private-fixture-config\n' > "$1"; break; fi
    shift
@@ -79,6 +81,7 @@ esac
 			for name, event := range map[string]string{"deploy/nvke-deploy.sh": "deploy", "controller/hack/apply-capi-spiffe-exec-auth.sh": "spiffe"} {
 				body := "#!/bin/sh\nset -eu\n"
 				if event == "deploy" {
+					body += "printf 'PRIVATE_DEPLOY_STDOUT\\n'\nprintf 'PRIVATE_DEPLOY_STDERR\\n' >&2\n"
 					body += ` test -n "$NVKECTL_NICO_TOKEN"
  test -n "$NVKECTL_NODE_USER"
  test -n "$NVKECTL_NODE_PASSWORD"
@@ -115,9 +118,32 @@ esac
 				attempt.assets.Images[role] = tenantFixture.assets.Images[role]
 			}
 			installNativeIdentityFixture(t, &attempt, tools, root)
-			runner := Runner{Work: root, Env: []string{"PATH=" + tools + ":/usr/bin:/bin", "FIXTURE=" + root, "EVENTS=" + events, "EXPECTED_CONTROLLER_IMAGE=" + attempt.assets.Images["controller"].Reference}}
-			var progress recordedProgress
-			runner.Progress = &progress
+			if tc.handoffResult != "" {
+				path := filepath.Join(root, "identity-result.json")
+				raw, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var result siteidentity.Result
+				if err := json.Unmarshal(raw, &result); err != nil {
+					t.Fatal(err)
+				}
+				switch tc.handoffResult {
+				case "caller":
+					result.CallerID = "spiffe://other.example.test/controller"
+				case "status":
+					result.Status = nil
+				case "endpoint":
+					result.Status.ServerAddress = "192.0.2.42"
+				}
+				raw, err = canonical.Marshal(result)
+				if err != nil {
+					t.Fatal(err)
+				}
+				writeTenantFixture(t, path, raw, 0600)
+			}
+			var public bytes.Buffer
+			runner := Runner{Work: root, Progress: &public, output: &public, Env: []string{"PATH=" + tools + ":/usr/bin:/bin", "FIXTURE=" + root, "EVENTS=" + events, "EXPECTED_CONTROLLER_IMAGE=" + attempt.assets.Images["controller"].Reference}}
 			var row nativeInstance
 			if err = json.Unmarshal([]byte("{\"id\":\"site-fixture\",\"interfaces\":[{\"ipAddresses\":[\"172.30.0.2\",\"172.30.0.3\"]}]}"), &row); err != nil {
 				t.Fatal(err)
@@ -146,25 +172,24 @@ esac
 					t.Fatal("installer must receive only its selected chart's values", item)
 				}
 			}
-			var stages []string
-			for _, event := range progress.events {
-				if event.Kind == PhaseStarted && strings.HasPrefix(event.Name, "native-identity-") {
-					stages = append(stages, event.Name)
-				}
+			if strings.Contains(public.String(), "PRIVATE_BOOTSTRAP_") || strings.Contains(public.String(), "PRIVATE_DEPLOY_") {
+				t.Fatal("bootstrap or deployment output escaped its private capture")
 			}
-			wantStages := []string{"native-identity-preflight", "native-identity-runtime", "native-identity-observe", "native-identity-stage", "native-identity-probe", "native-identity-policy", "native-identity-handoff", "native-identity-proof"}
-			if tc.importFailure {
-				wantStages = wantStages[:6]
-				found := false
-				for _, event := range progress.events {
-					found = found || event.Kind == PhaseFailed && event.Name == "native-identity-policy"
+			if tc.handoffResult != "" {
+				want := "source-owned SPIRE status differs from its selected permanent endpoint"
+				if tc.handoffResult == "caller" {
+					want = "handoff caller differs from the admitted controller"
 				}
-				if !found || strings.Contains(progress.String(), "synthetic-private-policy-error") {
-					t.Fatal("identity failure stage was lost or private error became public")
+				var failure *nativeSiteIdentityFailure
+				if !errors.As(err, &failure) || failure.cause.Error() != want {
+					t.Fatal("handoff result crossed its caller or permanent-endpoint admission", err)
 				}
-			}
-			if !reflect.DeepEqual(stages, wantStages) {
-				t.Fatalf("identity stages=%v want=%v", stages, wantStages)
+				events, readErr := os.ReadFile(events)
+				receipts, globErr := filepath.Glob(filepath.Join(root, "site-identity-*", "completed.json"))
+				if readErr != nil || globErr != nil || len(receipts) != 0 || strings.Count(string(events), "identity-import\n") != 1 || strings.Count(string(events), "identity-handoff\n") != 1 {
+					t.Fatal("rejected handoff retried mutation or issued completion", readErr, globErr)
+				}
+				return
 			}
 			if tc.importFailure {
 				var failure *nativeSiteIdentityFailure

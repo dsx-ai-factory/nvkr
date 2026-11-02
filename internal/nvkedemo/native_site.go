@@ -61,7 +61,6 @@ type nativeSiteAttempt struct {
 	bootstrap                 *hostBootstrap
 	network                   string
 	api                       string
-	siteAPI                   netip.AddrPort
 	bridge                    nativeBridgeConfig
 	guard                     *NetworkGuard
 	tenantOwner               *tenant
@@ -368,7 +367,7 @@ func (s *nativeSiteAttempt) closeTenant(ctx context.Context) error {
 	}
 	cleanup := s.tenantOwner.restore(ctx)
 	if cleanup != nil && !errors.Is(cleanup, ErrUnjoined) {
-		cleanup = retainNativeSiteFailure(ctx, runner, s.assets, filepath.Join(s.tenantOwner.session.Work, "site.kubeconfig"), s.siteAPI, cleanup)
+		cleanup = retainNativeSiteFailure(ctx, runner, s.assets, filepath.Join(s.tenantOwner.session.Work, "site.kubeconfig"), cleanup)
 	}
 	return cleanup
 }
@@ -405,11 +404,6 @@ func (s *nativeSiteAttempt) setup(ctx context.Context, runner Runner, row native
 	if err != nil {
 		return Runner{}, err
 	}
-	address, err := netip.ParseAddr(ip)
-	if err != nil {
-		return Runner{}, err
-	}
-	s.siteAPI = netip.AddrPortFrom(address, 30080)
 	stage := beginProgress(runner.Progress, "site-05-install-site-controller", PhaseStarted, PhaseFinished, PhaseFailed)
 	prepared := beginProgress(runner.Progress, "native-site-preparation", PhaseStarted, PhaseFinished, PhaseFailed)
 	err = waitNativeSiteHandoff(ctx, s.handoff, server)
@@ -430,7 +424,7 @@ func (s *nativeSiteAttempt) setup(ctx context.Context, runner Runner, row native
 	}
 	runner.Env = SetEnv(runner.Env, map[string]string{"XDG_CONFIG_HOME": filepath.Join(out, "config")})
 	cli := s.assets.CLI
-	if _, err := s.capture(ctx, runner, "configure", cli, "config", "set-site", "--name", "nvke-native-site", "--url", "http://"+s.siteAPI.String(), "--kubeconfig", kubeconfig); err != nil {
+	if _, err := s.capture(ctx, runner, "configure", cli, "config", "set-site", "--name", "nvke-native-site", "--url", "http://"+ip+":30080", "--kubeconfig", kubeconfig); err != nil {
 		return Runner{}, err
 	}
 	check := beginProgress(runner.Progress, "check-05-install-site-controller", PhaseStarted, PhaseFinished, PhaseFailed)
@@ -821,7 +815,7 @@ func (s *nativeSiteAttempt) runTenantRequest(ctx context.Context, runner Runner,
 	}
 	progress.update(time.Now(), "tenant-cloud-init", observed)
 	arch := s.assets.arch
-	if err := runNativeCloudInitForArchitecture(budget, out, tenantConfig, kubectl, request.Kubernetes, workloadImage, s.tenantNodeCount(), observed, arch, runner, capture); err != nil {
+	if err := runNativeCloudInitForArchitecture(budget, out, tenantConfig, kubectl, request.Kubernetes, workloadImage, s.tenantNodeCount(), observed, arch, capture); err != nil {
 		return err
 	}
 	if err := waitTenantDNS(budget, tenantConfig, kubectl, runner.Progress, capture); err != nil {

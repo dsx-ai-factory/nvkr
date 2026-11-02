@@ -176,7 +176,7 @@ func assertNotStarted(t *testing.T, raw []byte, code e.Code) {
 		t.Fatal(err)
 	}
 	if result.SchemaVersion != siteidentity.SchemaVersion || result.Completion != siteidentity.NotStarted ||
-		result.FailureCode != code || result.CallerID != "" || result.Status != nil || result.Reconfiguration != "" || result.After != nil {
+		result.FailureCode != code || result.CallerID != "" || result.Before != (siteidentity.PeerProof{}) || result.Status != nil || result.Reconfiguration != "" || result.After != nil {
 		t.Fatalf("invalid input reached identity or changed completion: %+v", result)
 	}
 }

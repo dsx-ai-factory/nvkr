@@ -313,31 +313,6 @@ if [[ "${runtime##*/}" == docker ]]; then
   else
     build_status=$?
     printf 'Docker Buildx export failed (exit %s); image load and validation were not attempted\n' "${build_status}" >&2
-    # Compare the host's path after failure, without retrying the build or
-    # treating a metadata response as package availability or APT acceptance.
-    if [[ "${diagnostic_local}" -eq 1 ]]; then
-      if command -v curl >/dev/null 2>&1; then
-        snapshot_curl=(-q --proto '=https' --http1.1 --silent --show-error
-          --connect-timeout 3 --max-time 5 --max-filesize 4194304 --retry 0
-          --output /dev/null --write-out '%{http_code}')
-        if [[ -n "${NVKR_BUILD_CA_BUNDLE:-}" ]]; then
-          snapshot_curl+=(--cacert "${NVKR_BUILD_CA_BUNDLE}")
-        fi
-        for snapshot_suite in resolute resolute-updates resolute-security; do
-          snapshot_curl_exit=0
-          snapshot_http="$(curl "${snapshot_curl[@]}" \
-            "https://snapshot.ubuntu.com/ubuntu/${snapshot}/dists/${snapshot_suite}/InRelease" 2>/dev/null)" || snapshot_curl_exit=$?
-          case "${snapshot_http}" in
-            [1-5][0-9][0-9]) ;;
-            *) snapshot_http=unavailable ;;
-          esac
-          printf 'Snapshot host HTTP observation (not acceptance): suite=%s http=%s curl-exit=%s\n' \
-            "${snapshot_suite}" "${snapshot_http}" "${snapshot_curl_exit}" >&2 || :
-        done
-      else
-        printf 'Snapshot host HTTP observation unavailable: curl missing\n' >&2 || :
-      fi
-    fi
     exit "${build_status}"
   fi
   "${runtime}" image load --input "${image_archive}"

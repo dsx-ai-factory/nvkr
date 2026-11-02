@@ -67,36 +67,6 @@ func TestNativeIdentityStagingRequiresDedicatedBoundedMount(t *testing.T) {
 	}
 }
 
-func TestNativeIdentityPreflightDoesNotBlockOwnedPresenter(t *testing.T) {
-	sink := &delayedDiagnosticSink{entered: make(chan struct{}), release: make(chan struct{})}
-	progress, stop := startNativeE2EProgress(t.Context(), sink, time.Hour)
-	t.Cleanup(func() {
-		close(sink.release)
-		cleanup, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := stop(cleanup); err != nil {
-			t.Error(err)
-		}
-	})
-	progress.observeNativeBootstrap("held presenter\n")
-	select {
-	case <-sink.entered:
-	case <-time.After(5 * time.Second):
-		t.Fatal("presenter did not reach held sink")
-	}
-	root := privateTestDir(t)
-	runner := Runner{Work: root, Env: []string{"PATH=/usr/bin:/bin"}, Progress: progress}
-	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-	defer cancel()
-	attempt := nativeSiteAttempt{}
-	if receipt, err := attempt.completeNativeSiteIdentity(ctx, runner, "172.30.0.2", root); err == nil || receipt != nil {
-		t.Fatal("missing identity source returned completion")
-	}
-	if err := runner.Run(ctx, []string{"/bin/sh", "-c", "exit 0"}, "identity-preflight-cleanup", 0); err != nil {
-		t.Fatal("identity presentation delayed owned cleanup", err)
-	}
-}
-
 // Opt-in source oracle: Helm owns values merging and rendering. Comparing the
 // complete source output proves this adapter adds only its exact staging mount
 // and volume, retaining each source layout's security, probes and image fields.

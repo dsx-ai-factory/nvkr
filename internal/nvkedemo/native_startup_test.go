@@ -178,9 +178,9 @@ func TestSiteStartupOnlyPreparesGuestForHostBootstrap(t *testing.T) {
 	if !strings.Contains(prepare.Content, "systemctl start --no-block spire-agent.service nvke-agent.service") {
 		t.Fatal("agents must start without blocking the host bootstrap")
 	}
-	// Only stdout/stderr routing may override the source-owned service units.
+	// Only stdout/stderr routing may override either source-owned service unit.
 	const consoleDropIn = "[Service]\nStandardOutput=journal+console\nStandardError=journal+console\n"
-	for _, unit := range []string{"nvke-agent.service", "spire-agent.service", "kubelet.service", "containerd.service"} {
+	for _, unit := range []string{"nvke-agent.service", "spire-agent.service"} {
 		path := "/etc/systemd/system/" + unit + ".d/10-nvkr-console.conf"
 		file, exists := files[path]
 		if !exists || file.Permissions != "0600" || file.Content != consoleDropIn {
@@ -193,7 +193,7 @@ func TestSiteStartupOnlyPreparesGuestForHostBootstrap(t *testing.T) {
 			dropIns++
 		}
 	}
-	if dropIns != 4 {
+	if dropIns != 2 {
 		t.Fatal("startup diagnostics must not add other service overrides")
 	}
 	// An unconditional reload is needed even if APT performs no installation.

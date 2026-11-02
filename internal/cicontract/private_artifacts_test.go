@@ -121,6 +121,9 @@ func TestNightlyDoesNotUploadProductsOrMetadata(t *testing.T) {
 			if strings.HasPrefix(step.Uses, "actions/setup-go@") && step.With["cache"] != false {
 				t.Fatalf("nightly job %s enables shared build cache", name)
 			}
+			if strings.HasPrefix(step.Uses, "docker/setup-buildx-action@") && step.With["cache-binary"] != false {
+				t.Fatalf("nightly job %s enables shared Buildx binary cache", name)
+			}
 		}
 	}
 }

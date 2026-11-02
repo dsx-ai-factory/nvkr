@@ -4,8 +4,6 @@
 package nvkedemo
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -44,19 +42,11 @@ type tenantCleanupObservations struct {
 func (o *tenantCleanupObservations) capture(ctx context.Context, runner Runner, args []string, phase string, sequence int, budget time.Duration) ([]byte, error) {
 	// Persistence must never prevent withdrawal when the disk is full or the
 	// workspace is unavailable. Reuse the existing bounded, joined command owner.
-	presenter := runner
 	runner.Work, runner.Progress = "", nil
 	sink := &boundedDiagnostic{remaining: tenantCleanupObservationLimit, capture: true}
 	runner.output = sink
 	raw, err := runner.Capture(ctx, args, fmt.Sprintf("tenant-%03d-%s", sequence, phase), budget)
 	combined, retentionErr := sink.result()
-	if err != nil {
-		stage := "unknown"
-		if retentionErr == nil && !errors.Is(err, ErrUnjoined) {
-			stage = tenantCleanupFailureStage(combined)
-		}
-		reportNativeBootstrapObservation(presenter, "Tenant cleanup failure observation: "+stage+" (source wrapper only; not acceptance)\n")
-	}
 	status := tenantCleanupCommandStatus{Sequence: sequence, Phase: phase, ExitCode: CommandExitCode(err), Status: "failed"}
 	switch {
 	case errors.Is(err, ErrUnjoined):
@@ -84,45 +74,6 @@ func (o *tenantCleanupObservations) capture(ctx context.Context, runner Runner, 
 		o.Delete = observation
 	}
 	return raw, err
-}
-
-// NVKE 1ce10b48's reportFailure prints one Error: record using these source
-// wrapper prefixes. Project only fixed labels, never the error suffix, trace ID,
-// arguments or response bytes. This untrusted observation does not identify a
-// transport cause, prove remote deletion acceptance or change command handling.
-// Changed, oversized or ambiguous output remains unknown.
-func tenantCleanupFailureStage(raw []byte) string {
-	if len(raw) == 0 || len(raw) > tenantCleanupObservationLimit || raw[len(raw)-1] != '\n' {
-		return "unknown"
-	}
-	scanner := bufio.NewScanner(bytes.NewReader(raw))
-	stage, seen := "unknown", false
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		if !bytes.HasPrefix(line, []byte("Error: ")) {
-			continue
-		}
-		if seen {
-			return "unknown"
-		}
-		seen = true
-		switch {
-		case bytes.HasPrefix(line, []byte("Error: finding cluster: ")):
-			stage = "cluster-lookup"
-		case bytes.HasPrefix(line, []byte("Error: deleting cluster: ")):
-			stage = "delete-request"
-		case bytes.HasPrefix(line, []byte("Error: building controller API authentication: ")):
-			stage = "client-auth-setup"
-		case bytes.HasPrefix(line, []byte("Error: listing clusters: ")):
-			stage = "cluster-inventory"
-		case bytes.HasPrefix(line, []byte("Error: listing node pools: ")):
-			stage = "pool-inventory"
-		}
-	}
-	if scanner.Err() != nil {
-		return "unknown"
-	}
-	return stage
 }
 
 // preserve is best-effort and exclusive: it neither creates a missing workspace

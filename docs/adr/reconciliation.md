@@ -1236,7 +1236,7 @@ interruption demonstrations remain M4-D.
 | 15 Air gap | No mirror implementation or CLI retained; supported offline signature primitives remain | Air-gap product lifecycle and zero-egress acceptance require a new admitted design |
 | 16 Release gates | Inventory/ReleaseSet/PromotionPolicy documents, exact member completeness and signed diagnostics; M3-A Run/policy artifact checks, generated exact-attempt handoff and held complete-set receipts; M3-B isolated native tool smoke and authenticated complete-set receipts; M3-C policy-only orchestration, v2 qualification evidence, receipt-only publisher, complete pre-sign gates and failure diagnostics; M4-C release-manifest schema and receipt-gated issuance | Real candidate native smoke, hosted worker/qualifier identities, qualification signing/attachment and independent M3 consumer acceptance remain unexercised. M4 manifest issuance is invoked by `run qualify --issue-manifest` and the generated production qualifier, with local contract coverage only; hosted OIDC attestation, registry read-back and independent consumer verification remain unexercised. Qualified clearance, release-specific trusted time, M4 tags and revocation remain unimplemented |
 | 17 Public lifecycle | Compiler-owned output joins, immutable attempts, failure records, process-owned snapshots, exact observations, deterministic disk and raw Debian archive retention, diagnostic output pulling, bounded descriptive progress, typed result browsers for interactive commands, read-only stored Run inspection and SDK/CLI delegation; Linux M3-A Run/policy CLI, captured-input replay and retained file diagnostic orchestration; M3-C policy-only qualification orchestration with generated-policy admission | No general resume protocol or authority restored by serialization; actual M3 candidate/provider acceptance remains unexercised. Strict local publication, private-passphrase/strict FDE publication and qualified lifecycle remain unavailable. Fresh live dashboard Run, native Linux race acceptance and human usability validation remain unexercised |
-| 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub producer generation, exact optional publication-branch allowlist, separate full-development branch workflow, mode-specific concurrency and artifact retention, scoped credentials and unconditional finalization; inline named jobs with ancestor-preserving dependency reduction and bounded exact-result collectors with diagnostic hosted evidence; at most two optional summaries per attempt with operation details in logs; explicit native ARC disk grouping, raw build-only disk transport and optional native hosted platform maps (including separate CLI output slots); authenticated independent qualification invocation/source-event binding; generated fixed native worker and qualifier with separate credentials; authored public-hosted AMD64 NVKE build/Go E2E adapter outside product execution (the ARM64 published-artifact nightly adapter is retired); producer bootstrap and private-transfer helpers build the runner from checkout source for checkout-built generators, or install the generator's own exact module version (a release or a commit's pseudo-version) and require its recorded module version and checksum; an unstamped released generator labels its Plans and `--version` with that build-information release version, and an unstamped commit install with the revision its pseudo-version encodes | Production hosted qualification, retry qualification of the qualifier itself and independent-consumer acceptance remain unproved. The [development record](#feature-branch-pipeline-development) documents successful qualification of the earlier main-source candidate; hosted validation of the current v0.22.0 selection remains pending. The downstream adapter trusts privileged NVKE source frozen once from main and yields unsigned diagnostics; full hosted build/site/tenant/cleanup acceptance remains unproved. Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate. The module-pinned bootstrap and build-information generator label have contract tests with injected build information; a local `go install …@<commit>` of the change rendered the commit-pinned bootstrap, but no tagged NVKR release contains it yet and no hosted Run from a repository without NVKR source is recorded. The release form's Go version is the toolchain that built the generator, so installs of one release built with different Go patch releases render different bundles |
+| 18 Execution and GitHub | Shared local/hosted producer launcher, held source/vendor lifetime, capability admission, manual-only GitHub producer generation, exact optional publication-branch allowlist, separate full-development branch workflow, mode-specific concurrency and artifact retention, scoped credentials and unconditional finalization; inline named jobs with ancestor-preserving dependency reduction and bounded exact-result collectors with diagnostic hosted evidence; at most two optional summaries per attempt with operation details in logs; explicit native ARC disk grouping, raw build-only disk transport and optional native hosted platform maps (including separate CLI output slots); authenticated independent qualification invocation/source-event binding; generated fixed native worker and qualifier with separate credentials; authored public-hosted AMD64 NVKE build/Go E2E adapter outside product execution (the ARM64 published-artifact nightly adapter is retired); producer bootstrap and private-transfer helpers build the runner from checkout source for checkout-built generators, or install the generator's own exact module version (a release or a commit's pseudo-version) and require its recorded module version and checksum; an unstamped released generator labels its Plans and `--version` with that build-information release version, and an unstamped commit install with the revision its pseudo-version encodes | Production hosted qualification, retry qualification of the qualifier itself and independent-consumer acceptance remain unproved. The [development record](#feature-branch-pipeline-development) documents successful qualification of the earlier main-source candidate; hosted validation of the current v0.22.0 selection remains pending. The downstream adapter trusts privileged NVKE source frozen once from main and yields unsigned diagnostics; [run #29](https://github.com/depohmel/nvkr/actions/runs/41456443314) passed full hosted build/site/tenant/deletion/cleanup on exact NVKR `d000f377` with frozen NVKE `1ce10b48`; this evidence does not cover later edits or qualification. Default-branch push publication and in-repository PR build triggers remain deferred; arbitrary self-hosted/other-provider routes and qualified emitters fail closed. Provider configuration and fresh runtime evidence remain separate. The module-pinned bootstrap and build-information generator label have contract tests with injected build information; a local `go install …@<commit>` of the change rendered the commit-pinned bootstrap, but no tagged NVKR release contains it yet and no hosted Run from a repository without NVKR source is recorded. The release form's Go version is the toolchain that built the generator, so installs of one release built with different Go patch releases render different bundles |
 | 19 Downstream boundary | Exact required/observed output membership, component evidence joins and noncircular release-content identity | Downstream owners supply topology, placement, provisioning and runtime qualification; historical topology records grant no current authority |
 | 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects with consistent named-output aliases and independent evidence, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation, selected output payload-closure retrieval and per-output assembly/finalization; consumer held-closure export bound to exact-input receipts; candidate M2 hosted signing/publication completed; public-bootstrap FDE build-provenance publication supported; development attempt namespaces and scoped GHCR cleanup; hosted GHCR package privacy admission using metadata-derived destination references and an exact-root-bound push; required Environment transport selection with preserved omitted-OCI behavior, explicit OCI identity and early APT/both rejection | Package admission has local contracts, not a hosted private-publication or public-source access proof; independent grants, historical provider payloads and future visibility changes remain operational obligations. Hosted GHCR legacy layouts without the metadata contract fail closed. `release pull` lacks the HTTP/2 peer-reset reacquisition used by `delivery.Pull`, so large disk pulls fail closed on peer resets, as recorded in [output-local publication](#output-local-publication-and-metadata-assembly); adding that recovery is open. Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and object-store/CDN transports remain unproved or unavailable; registration is deferred. Direct APT service adapter, repository signing and authenticated read-back remain unimplemented. |
 | 21 Generation | Exact recorded input selection, independent fixed production/development layouts, manifest-owned semantic action interfaces and Plan-derived invocation data with expanded-step validation, output-local ordinary job membership with addition/removal and failure-accounting contracts, stable result-collector membership and exact retirement of legacy producer children, manifest-last ownership, deterministic checks/retirement, canonical Plan inspection, linked graphs, semantic diffs, atomic pin maintenance plus regeneration and review patch workflows; separately owned qualification pair and runtime policy drift admission; optional named production namespaces independently own their manifest, lock, paths and retirement; opted-in named runtime Plans compile current source pins within the complete reviewed workflow/action and Environment contract and distribute frozen data through same-Run helpers; provider artifacts contain JSON locators while private CI carriers use a digest-bound GHCR transport with package visibility and linked-repository admission | Producer generation emits manual-dispatch workflows, not cron; optional qualification generation emits its fixed event/call pair. Authored downstream scheduling has separate ownership. Combining development with a nonempty named bundle is rejected before catalog resolution or generated-output work. The inline layout has guarded dispatch admission and isolated exact-result/failure diagnostics; complete production execution, automatic PR publication and scheduled/private-source service acceptance remain unexercised. The runtime Plan handoff and private CI carrier transport have local contracts; a hosted private-carrier producer-to-E2E cycle remains unexercised. Public-repository execution requires an independently admitted storage credential/access policy; public-linked storage fails closed. Historical Actions payloads and caches are not migrated by this implementation. The workflow `catalog update-ci` renders (installed as `catalog-refresh.yaml`) opens PRs with a GitHub App installation token minted in its `pull-request` job by the SHA-pinned `actions/create-github-app-token` action for this repository only, with contents, pull requests and workflows write, and revoked by the action when the job ends; the workflow token stays read-only (shape, action inputs, bot sign-off identity and step behavior contract-tested with a stubbed `gh`; a manual dispatch on 2026-10-16 failed at the earlier hand-rolled token step with an unattributed 404). No scheduled run, token exchange, push, PR, automatically started PR check, close or branch deletion has been exercised, so M4 acceptance item 1 is implemented but not demonstrated and M4 is not claimed. The review commit is created through the GitHub API with a DCO trailer for the App's bot user (contract-tested; GitHub signing and attribution not verified). Pin-only fixtures assert the production, development and qualification workflows stay identical; a topology, label, interface or action-pin change that regenerates a closure workflow is published in the same PR. One enrolled policy is supported until generated bundle roots are per-Definition. A branch that already holds the candidate is left alone, a closed unmerged PR whose head commit carries the same candidate stays closed even after its branch is deleted, fork PRs from a branch with the same name are ignored, a lookup page that could be truncated fails the step, and an unchanged Definition closes its stale PR and deletes its branch (contract-tested with a stubbed `gh` that applies each call's real filter). The ruleset, last-push approval and code-owner settings that protect the bot branch are repository settings that this workflow does not enforce; the release owner or an administrator must validate them before scheduled writes are relied on. The policy names the dependent development Run, qualification pair and additional named Runs (the two nightly bundles, checked and regenerated through the runtime-Plan owner because they compile current pins at dispatch); refresh admits each additional Run's catalogs before compiling it, and checks, regenerates and transports every member through its owner on an exact allowlist, refuses an unnamed committed bundle and a generator stamp that differs from the committed Plans (contract-tested with real local Git for the production and development bundles, and through the real qualification owner on a fixture with synthetic trust pins that contacts no GHCR or cosign; deployment-image selection is outside the closure and must be coordinated by hand before a moving release), and `make workflows-check` compares the installed workflow with `catalog update-ci` output (not exercised in the hosted gate). Producer matrices and general callable workflows remain deferred. Qualification generation does not make both owner writes one atomic transaction; lock and generated files are separate transactions; complete crash matrix remains |
@@ -1634,7 +1634,8 @@ retains the ordinary one-worker or conformance two-worker default; conformance
 rejects an explicit one-worker selection before work. Controlled tests cover
 count propagation through capacity, tenant requests, readiness/cloud-init,
 inventory/cleanup and retained-child transport without changing artifact or
-source selection. Smaller-profile runtime acceptance remains unverified.
+source selection. The [AMD64 nightly record](../nvke-nightly.md#evidence-and-privacy)
+exercises the small profile at its exact source revisions; other topologies remain separate.
 
 A separate fixed site-identity helper now has one deep `pkg/nvkr/siteidentity`
 owner and thin private Linux ARM64/AMD64 build targets. It reuses the upstream
@@ -3604,159 +3605,42 @@ inputs unchanged; the native helper self-pin follows its separate maintenance ow
 VM through kind/Lima, checks readiness and tenant workload/DNS, and joins cleanup.
 
 Ordinary manual branch dispatch and the daily 03:17 UTC trigger are retained.
-There is no promotion helper, lock ref, NVIDIA runner or protected environment,
-repository secret, signing/publication permission, Actions upload or shared cache
-in this workflow. Product bytes and private diagnostic files remain on its
-disposable runner disk; build stderr, ordinary build output and bounded
-host/kernel/cgroup samples enter the public job log. Raw deployment stdout and
-stderr remain private. Bootstrap JSON and fixed installer item/type labels have
-a bounded live projection in the existing owned stderr drain. These partial,
-closed observations grant no readiness or process-join acceptance. The presenter
-remains nonblocking. Malformed and oversized records are not observed; record/byte
-limits stop projection while private draining, original errors and unjoined-resource retention keep their
-existing ownership. Contract and race tests cover this behavior; fresh runtime
-acceptance remains pending. The ARM64 build/publish/consume nightly cycle is retired.
-Generated ARM64 producer workflows retain their existing admission policies, but
-no nightly invokes them or `TestNightlyPublishedCandidate`; no new producer is added.
+There is no promotion helper, lock ref, NVIDIA runner, protected environment,
+repository secret, signing/publication permission, Actions upload or shared cache.
+Build output and ordinary test outcomes enter the public job log; raw deployment
+errors and identity values remain private on the disposable runner. The retired
+ARM64 build/publish/consume nightly and its legacy consumer remain uninvoked.
 
 The six-hour job passes its remaining deadline to Go, which reserves two hours
-for independent cleanup. KVM and actual available resources are admitted at run
-time. The explicit small profile selects a 7-GiB site, 3 GiB per tenant VM,
-four vCPUs per guest and 1 GiB additional headroom. Initial admission requires
-14 GiB available for the site plus the larger of the 6-GiB bootstrap backend or
-two tenant VMs, plus headroom. Tenant-only admission rechecks 7 GiB after the
-bootstrap backend joins. This is a sizing experiment, not a validated minimum.
-[Run 41252923744](https://github.com/depohmel/nvkr/actions/runs/41252923744), on
-NVKR `dcc9f571d5291e68affd0b3fcaa0792b0fff55d8` and NVKE
-`ca3f7c025c1474d9b0b9a19a830a3006168c6de7`, completed the fresh build and
-bootstrap with the preceding 4/4-GiB profile, then failed final stack installation.
-Its owned site serial snapshot recorded a kernel OOM-kill marker and its pod
-snapshot showed broad restart/readiness failures. The host retained 4,951 MiB
-available immediately before failure. The killed process and exact failing Helm
-item remain unknown; cleanup joined and Actions artifact count was zero.
-The preceding 6/3-GiB profile preserved that earlier peak admission.
-[Run 41266072695](https://github.com/depohmel/nvkr/actions/runs/41266072695), on
-NVKR `53ed72e8d7be9b8890ed80d521dc513c859e48fd` and the same frozen NVKE
-commit, completed the fresh build, bootstrap, full stack installation and SPIFFE
-setup, then failed 6.5 seconds into the site identity handoff. Its public log
-does not identify the internal failing branch. Owned VM/backend/network cleanup
-joined and Actions artifact count was zero. Site/tenant acceptance and complete
-resource sizing remain unproved; a successful full run is still required.
-[Run 41321949914](https://github.com/depohmel/nvkr/actions/runs/41321949914), on
-NVKR `29987555e55ce2a0e83b49aa8391aaf95400f736` with the same frozen NVKE
-commit, completed the fresh build, bootstrap, full stack installation, identity
-context observation, helper staging and authenticated same-boot helper probe.
-Policy preparation failed after 28.88 seconds, before host reconfiguration or
-site/tenant subtests. The pre-teardown snapshot showed the controller at 0/1
-Ready and the main SPIRE pod at 1/2 Ready; it does not identify the first private
-command error or establish its cause. Owned cleanup joined and Actions artifact
-count was zero. These observations establish integrated staging/probe progress,
-not a completed policy/handoff receipt or full site/tenant acceptance.
-[Run 41331140209](https://github.com/depohmel/nvkr/actions/runs/41331140209), on
-NVKR `914ed406250d33e6f9f52ffbce9063bda86814a7` with frozen latest NVKE
-`1ce10b480cf52f955b6d018cc7ba7ad141c6faf9`, completed fresh builds, identity-policy
-creation/convergence, authenticated handoff and final proof. The Go site and
-tenant subtests passed, including real node/cloud-init readiness and the single
-workload/DNS check. The parent failed during natural tenant-deletion cleanup:
-its pool-ownership query and fresh cluster-inventory confirmation both exited
-with status 1. Neither cluster absence nor retained cluster state was observed.
-Simulator and network teardown
-finished afterward; successful natural deletion and complete joined cleanup are
-not established. The first private query error remains unknown. Actions artifact
-count was zero; complete hosted E2E acceptance remains open.
-[Run 41344383365](https://github.com/depohmel/nvkr/actions/runs/41344383365), on
-NVKR `0558ac3eebc6fc2ce0fa9685b9e8ab4777410a66` with the same frozen NVKE,
-passed fresh builds, identity handoff/proof and the Go site (7.90 seconds) and
-tenant (2968.61 seconds) subtests, including workload/DNS. Its deletion command
-exited with status 1 before deletion waiting began, and the parent failed after
-8033.05 seconds. The private cause is unknown. Simulator/VM, DNS and network
-teardown finished afterward; natural deletion and complete joined cleanup did
-not pass. Actions artifact count was zero. This result does not establish a
-functional deletion fix or full E2E acceptance.
-[Run 41358202754](https://github.com/depohmel/nvkr/actions/runs/41358202754), on
-NVKR `bca74c3e9a4e07c99503c30ea0d14d8a721d8ee2` with the same frozen NVKE,
-completed fresh builds, identity handoff/proof and the site subtest (8.41
-seconds). The tenant subtest failed after 2086.58 seconds at the host cloud-init
-probe's terminal Pod phase/container-count check, before tenant DNS/workload
-acceptance. The public evidence does not distinguish a failed Pod from missing
-container status or establish the command exit/host JSON status. Natural tenant
-deletion, deletion waiting and owned VM/backend, DNS and network cleanup all
-finished. The parent failed after 6693.85 seconds because tenant acceptance
-failed; Actions artifact count was zero. This establishes natural deletion for
-that failed-tenant attempt, not a cause or functional fix for the preceding
-failures or full E2E acceptance.
-The cloud-init failure projection now selects only closed Pod/container reasons,
-bounded exit/signal/restart values and documented host status labels/error
-counts. Missing, invalid and oversized host JSON are distinguished; identities,
-raw output and arbitrary reason/error strings remain private. The original
-exact-execution, same-boot, zero-retry, zero-exit, read-only mount and clean-JSON
-checks remain required. Contract tests cover the projection; its fresh hosted
-exercise is pending.
+for independent cleanup. Live KVM, disk and available memory are prerequisites.
+The explicit small profile selects a 7-GiB site, 3 GiB per tenant, four vCPUs and
+1 GiB headroom. Initial admission requires 14 GiB; the temporary 6-GiB bootstrap
+backend joins before tenant creation rechecks 7 GiB beside the site. This is a
+functional-test allocation, not a minimum hardware or OOM-causality claim.
 
-Run #22 also projected a kernel OOM-kill marker from a retained owned-guest
-serial snapshot during fallback cleanup. The public label does not identify
-its guest/process, original event time or causality; runner memory samples
-do not establish guest memory headroom.
-[Run 41369669608](https://github.com/depohmel/nvkr/actions/runs/41369669608), on
-NVKR `d58a4e6ddf02bc10951bbf6dd5d1266a5988a334` with the same frozen NVKE,
-completed fresh builds, bootstrap, full stack installation and identity-policy
-preparation. The broad host identity-handoff phase failed after 38.64 seconds,
-before final proof or either Go subtest. Its log does not distinguish the
-internal failing operation. The parent failed after 4866.96 seconds. Abbreviated
-cleanup does not establish joined VM/backend, DNS or network teardown and is
-consistent with unknown-completion resource retention. Actions artifact count
-was zero; the cloud-init failure projection was not exercised.
-Fixed handoff operation labels and closed helper-envelope/completion/error-code
-and local command status observations now separate those boundaries. Raw errors
-and identities remain private; acceptance, no-retry and unknown-completion
-retention rules are unchanged. Contract tests cover this projection; hosted
-exercise and a successful complete E2E run remain pending.
+Runtime fixes admit the installer's legacy/current controller identity, bounded
+writable helper staging with source-supported shell, unchanged pinned-context
+readiness convergence, current/retained image-URL placeholders and unfiltered
+pool inventory with exact tenant ownership. Original private error capture,
+identity rejection, actual host cloud-init/workload/DNS acceptance, unknown-completion
+retention and natural tenant deletion/wait remain enforced. Temporary diagnostic
+classifiers, failure-only health/curl probes, console drop-ins and the resource
+sampler are removed; required behavior retains focused regression coverage.
 
-On NVKR `9003ce02b8f02fdedce795c6ad6a4a5e005e4545` with the same frozen NVKE,
-[runs #24](https://github.com/depohmel/nvkr/actions/runs/41379174782),
-[#25](https://github.com/depohmel/nvkr/actions/runs/41379745382) and
-[#26](https://github.com/depohmel/nvkr/actions/runs/41381639339) failed during
-utility-image bootstrap on Ubuntu snapshot metadata/package HTTP 502/503.
-The parent tests failed after 111.29, 587.48 and 66.71 seconds, before any VM
-or new failure projection was exercised; all Actions artifact counts were zero.
-Local HTTP 200 samples do not establish hosted recovery. The exact AMD64 base's
-APT 3.2.0 already retries three times; controlled local acquisition probes
-confirmed recovery, exhaustion and SHA-256 rejection, not a hosted image build.
-Failure-only diagnostic utility exports now observe the host's three locked
-suite metadata URLs with optional curl, five-second GET deadlines and a requested
-four-MiB size cap (streaming enforcement requires curl 8.4.0 or later). Only fixed
-suite labels and bounded HTTP/exit statuses reach stderr; bodies and curl errors
-are discarded. Host responses are not BuildKit APT or package-availability
-proof. Original exit, no-ID output, cleanup, image validation and all source
-pins remain unchanged. Hosted exercise and full E2E acceptance remain pending.
-[Run #27](https://github.com/depohmel/nvkr/actions/runs/41383870132), on NVKR
-`32ec2b0f82fa9700b554395be71ac039a0c85683` with the same frozen NVKE, passed
-snapshot acquisition, fresh builds, bootstrap, full installation, helper probe
-and source-policy creation/response validation. Policy convergence waited for
-the unchanged pinned running context to become Ready, then failed during runtime
-recheck before host mutation, final proof or either Go subtest. Its failure
-snapshot showed the controller at 0/1 Ready and the main SPIRE pod at 0/2 Ready,
-each with one restart. The parent failed after 4783.94 seconds; owned VM/backend,
-DNS and network cleanup finished, and Actions artifact count was zero. Neither
-the rejected comparison nor the restart cause is established. No OOM marker was
-observed; absence does not prove there was no memory pressure.
+[Run #29](https://github.com/depohmel/nvkr/actions/runs/41456443314) completed on
+November 2, 2026 on exact NVKR `d000f377c0f0be4af10b3c13da24c89e1f02dbaf`, with
+frozen NVKE `1ce10b480cf52f955b6d018cc7ba7ad141c6faf9`. Fresh local builds,
+identity policy/handoff/final proof, site and tenant CP/worker checks, actual host
+cloud-init and exact workload/image/marker/DNS acceptance, natural deletion and
+waiting, and joined VM/backend/DNS/network cleanup all passed in one attempt.
+The parent passed in 5208.20 seconds, site in 7.89 and tenant in 470.17. All
+post-steps succeeded and Actions artifact count was zero. Raw marker/host output
+remained private; the passed tenant path enforces those checks. This record
+predates diagnostic cleanup/configuration extraction and does not establish
+acceptance of later revisions. Earlier failure causes remain unresolved.
 
-The next candidate adds 1 GiB to the site, with tenant and bootstrap sizes,
-features and headroom unchanged. Its 14,336-MiB admission fits that run's recorded
-14,691/14,919-MiB observations but must be rechecked live; this is an allocation
-experiment, not a demonstrated fix or minimum. Failure presentation reuses the
-already captured Pod JSON for closed current/previous termination reasons and
-bounded exit/signal/restart fields. Runtime rechecks expose only closed failure
-categories and changed-field labels. No new probe, policy retry or acceptance is
-introduced; raw messages, identities, original errors and unknown-completion
-retention stay unchanged. Fresh complete hosted acceptance remains pending.
-Historical [public Run 40578231640](https://github.com/depohmel/nvkr/actions/runs/40578231640)
-built a QCOW2 and passed NVKE's separate harness on AMD64 KVM, but encountered
-severe disk pressure and used best-effort teardown. It does not establish this
-native NVKR topology, fresh source closure or joined cleanup. Full hosted
-acceptance requires a completed current run; local tests establish contracts only.
 Trusted source code retains sudo/Docker access on the disposable hosted machine.
-These unsigned local diagnostics grant no qualified release acceptance.
+These unsigned local diagnostics grant no conformance or qualified release acceptance.
 
 The archive correction selects source-built tarball assets in executable bundles
 through exact resolved-component and producer/output membership. Helm and disk

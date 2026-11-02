@@ -113,7 +113,7 @@ may go directly to a focused PR. Report security vulnerabilities privately throu
 5. Open the PR with a clear description of *what* and *why*; link any issue.
 
 To test your PR's full build/site/tenant flow before merging, follow
-[Run E2E tests for your pull request](docs/pr-e2e.md). You can trigger it on your
+[Run E2E tests for your pull request](docs/nvke-nightly.md#run-a-workflow-branch-before-merging). You can trigger it on your
 PR branch in your own fork using public GitHub-hosted runners, then include the
 run URL and tested commit in your PR.
 

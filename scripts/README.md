@@ -27,13 +27,6 @@ read. `ci-test-summary.py` summarizes the retained Go JSON events. Partition, co
 small offline Go composition contracts run with `make test-ci-tools`; the Go fixture exercises every
 matrix entry without rebuilding the product suite.
 
-`bash scripts/ci-measure-workload.sh COMMAND [ARG...]` samples a disposable Linux
-CI host and its Docker containers alongside process timing. The nightly uses it
-to retain resource observations around the Go E2E, including kernel warnings and
-cgroup memory events. It publishes no files and preserves the workload's exit
-status on failure; sampler stop/join is bounded and a failed join fails the invocation. Samples are observations, not capacity or
-qualification acceptance.
-
 ## CLI artifact test baseline
 
 ```sh
