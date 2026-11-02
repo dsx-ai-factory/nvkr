@@ -19,7 +19,8 @@ func TestMaintainedM2OSFetchCredentialProjection(t *testing.T) {
 	const repository = "https://github.com/dsx-ai-factory/nvke.git"
 	const mirror = "https://github.com/dsx-ai-factory/nvke"
 	const dsxRepository = "https://github.com/dsx-ai-factory/project-dsx-identity"
-	privateRepositories := map[string]string{repository: mirror}
+	const ovnRepository = "https://github.com/dsx-ai-factory/ovn-kubernetes"
+	privateRepositories := map[string]string{repository: mirror, ovnRepository: ovnRepository}
 	environment, err := definition.LoadEnvironment(t.Context(), filepath.Join(root, "../../environments/github-release.yaml"))
 	if err != nil {
 		t.Fatal(err)
@@ -88,8 +89,8 @@ func TestMaintainedM2OSFetchCredentialProjection(t *testing.T) {
 					t.Errorf("private source fetch %s has no exact approved credential/mirror projection", source.ID)
 				}
 			}
-			if privateFetches[repository] != 4 || len(privateFetches) != 1 {
-				t.Fatalf("private source fetches = %v, want four NVKE source closures only", privateFetches)
+			if privateFetches[repository] != 4 || privateFetches[ovnRepository] != 3 || len(privateFetches) != 2 {
+				t.Fatalf("private source fetches = %v, want four NVKE and three OVN fork source closures only", privateFetches)
 			}
 		})
 	}
