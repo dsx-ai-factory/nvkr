@@ -2,7 +2,7 @@
 
 The combined [Definition](definition.yaml) is used by the committed `nvkr-run.yml`. It joins independently pinned NVKE CLI,
 controller and chart builds, operator executables, native node images and third-party deployment images
-into one release with **69 named outputs**. This remains a candidate; completed pipeline delivery and
+into one release with **70 named outputs**. This remains a candidate; completed pipeline delivery and
 full product acceptance are separate facts.
 
 ## Four-family pilot
@@ -272,7 +272,7 @@ claim, even after TPM enrollment. `swtpm` is not required for the bake.
 
 The [recorded AMD64 diagnostic Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035)
 completed a standalone FDE bake and raw artifact retention. It did not exercise FDE publication, an ARM64
-FDE bake, or this combined 69-output pipeline. Those operational acceptance checks remain outstanding.
+FDE bake, or this combined 70-output pipeline. Those operational acceptance checks remain outstanding.
 
 `../../environments/github-release.yaml` admits only ADR-18's `githubARC: native-kvm-v1` route on
 `arc-amd64-kvm` and `arc-arm64-kvm`, with required native KVM. Each execution class requests 8 CPUs,
@@ -313,7 +313,7 @@ provider access restrictions remain operator obligations.
 ## Generate and check the maintained workflow
 
 The same Definition also supplies the committed feature-branch development workflow through
-`../../environments/github-development.yaml`. It retains all 69 outputs, including plain and public-bootstrap FDE disks on both native routes, signing and verification.
+`../../environments/github-development.yaml`. It retains all 70 outputs, including plain and public-bootstrap FDE disks on both native routes, signing and verification.
 Only execution/publication policy changes: separate development environments and credentials, the
 `nvkr-dev.yml` signer identity, and run-attempt-scoped repositories beneath
 `ghcr.io/dsx-ai-factory/nvkr/development`. `make pipeline-dev-generate` regenerates it;
