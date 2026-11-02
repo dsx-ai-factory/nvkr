@@ -80,6 +80,14 @@ logical field in ADR-27 §2, including the tool pin, platform, arguments, litera
 output form and toolchain image; these producers use the `wrapped-build` lane. AICR bundles are the first use.
 Nothing is implemented.
 
+Proposed [ADR-28](adr/0028-multi-platform-executable-indexes.md) designs multi-platform executables: one tool
+source declares every platform of a release and the lock pins one entry per platform in one transaction. A
+tool whose platforms need different formats or companions, or whose asset URLs use other OS or architecture
+spellings, keeps one source per platform. An
+executable output may declare a `platforms` set, published as a standard OCI image index whose children are
+minimal per-platform images holding the executables and their companions. Each child keeps its native Build
+Digest and evidence; the output gains an aggregate Build Digest. Nothing is implemented.
+
 ## Assumptions {#assumptions}
 
 These assumptions are subject to the current ADRs and milestone acceptance criteria.
@@ -283,6 +291,11 @@ it to a source-less build node carrying the tool's archive and executable digest
 acquisition for its bytes. The executor re-hashes the tool before launch, denies network and admits only an
 exact single file or OCI layout. Any other directory output fails closed, and tool-side signing confers no
 authority. This path is designed, not implemented.
+
+A proposed multi-platform executable output (ADR-28) compiles like an OCI aggregate: one native closure per
+required platform, each with its own Build Digest, results and evidence, plus one index package node. Disk
+producers keep binding native results; the index is publication packaging. This path is designed, not
+implemented.
 
 The compiler derives each output's graph from its exact selected components and concrete
 target. `nvkr.build` identifies the logical projection of that validated graph. Output names, packaging and execution settings remain bound by their owning records. Equal Build
@@ -1235,6 +1248,7 @@ already obtained.
 | Deferred release registration transport | Registry/integration owners | Optional downstream discovery |
 | Proposed ADR-26 composite Definitions, then member Release reuse and composite qualification | Release-engineering, catalog, qualification and result-reuse owners | One combined Release from independently owned Definitions without a hand-maintained combined copy |
 | Proposed ADR-27 pinned-tool producers, then AICR layout output (NVIDIA/aicr#3534) and layout import | Catalog, execution, evidence and release-engineering owners | Outputs rendered by released tools, starting with AICR bundles, without rebuilding the tool from source |
+| Proposed ADR-28 multi-platform executables, then the AICR migration and the per-platform retrofits | Catalog, release-engineering, delivery and evidence owners | One tool source per release where platforms share a format, companions and admitted URL spellings, and one image-index output per executable, consumable by standard OCI clients |
 
 Qualified helper-image use remains unavailable until it satisfies ADR-07/18's executable/runtime admission.
 Source bootstrap records only the identities that actually participated; delivery by image cannot imply
