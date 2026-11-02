@@ -67,7 +67,7 @@ acquisition: its output is new bytes made by running the tool.
 sources:
   aicr:
     repo: https://github.com/NVIDIA/aicr
-    constraint: 1.1.x
+    constraint: 1.2.x
     tool:
       format: tar-gzip
       url: https://github.com/NVIDIA/aicr/releases/download/{{.Tag}}/aicr_{{.Version}}_linux_arm64.tar.gz
