@@ -39,9 +39,8 @@ func admitPinnedTool(n ir.Node, opts RunOptions) error {
 	if opts.Package {
 		return e.New(e.CodeEngineCapability, "pinned-tool build %q has no packaging lane", n.ID)
 	}
-	if n.OutputType != ir.OutputFile {
-		return e.New(e.CodeEngineCapability,
-			"pinned-tool build %q output form %q requires the bundle-oci layout import, which is not implemented", n.ID, n.OutputType)
+	if n.OutputType != ir.OutputFile && n.OutputType != ir.OutputOCILayout {
+		return e.New(e.CodeEngineCapability, "pinned-tool build %q output form %q is not admitted", n.ID, n.OutputType)
 	}
 	if n.Network != ir.NetworkNone {
 		return e.New(e.CodeEngineCapability, "pinned-tool build %q must run with network none", n.ID)
@@ -73,7 +72,8 @@ func AdmitPinnedToolHost(n ir.Node) error {
 
 // buildPinnedTool runs one pinned release executable in its digest-pinned image with
 // no network, a read-only root, fixed environment and read-only inputs, then admits
-// exactly one regular file. A failed or nonconforming run leaves no output.
+// exactly the declared regular file or OCI layout. A failed or nonconforming run
+// leaves no output.
 func buildPinnedTool(n ir.Node, opts RunOptions) (result *ArtifactResult, returnErr error) {
 	if err := admitPinnedTool(n, opts); err != nil {
 		return nil, err
@@ -104,7 +104,23 @@ func buildPinnedTool(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 			}
 		}
 	}()
-	if err := os.MkdirAll(outRoot, 0o755); err != nil {
+	// A file producer writes into the pre-created output root. A layout writer may
+	// refuse an existing directory, so a layout producer gets a private empty staging
+	// root and creates its layout at the absent child PinnedToolLayoutDir names.
+	mount := outRoot
+	if err := os.MkdirAll(filepath.Dir(outRoot), 0o755); err != nil {
+		return nil, e.Wrap(e.CodeBuildFailed, err, "creating output parent for %s", n.Component)
+	}
+	if n.OutputType == ir.OutputOCILayout {
+		if mount, err = os.MkdirTemp(filepath.Dir(outRoot), ".nvkr-layout-"); err != nil {
+			return nil, e.Wrap(e.CodeBuildFailed, err, "creating layout staging root for %s", n.Component)
+		}
+		defer func() {
+			if err := os.RemoveAll(mount); err != nil {
+				returnErr = errors.Join(returnErr, e.Wrap(e.CodeInternal, err, "removing layout staging root"))
+			}
+		}()
+	} else if err := os.MkdirAll(outRoot, 0o755); err != nil {
 		return nil, e.Wrap(e.CodeBuildFailed, err, "creating output dir for %s", n.Component)
 	}
 	toolDir, toolName, err := stagePinnedToolExecutable(ctx, n, opts.ToolExecutable, filepath.Dir(outRoot))
@@ -140,18 +156,14 @@ func buildPinnedTool(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 	if err := registerContainer(opts, name); err != nil {
 		return nil, err
 	}
-	if err := runContainerRuntime(opts, pinnedToolRunArgs(n, name, toolDir, toolName, inputs, outRoot)...); err != nil {
+	if err := runContainerRuntime(opts, pinnedToolRunArgs(n, name, toolDir, toolName, inputs, mount)...); err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return nil, e.Wrap(e.CodeTimeout, ctxErr, "pinned tool for %s did not finish", n.Component)
 		}
 		return nil, e.Wrap(e.CodeBuildFailed, err, "running pinned tool for %s", n.Component)
 	}
 	opts.reap.forget(name)
-	sum, size, err := admitPinnedToolOutput(ctx, outRoot, n)
-	if err != nil {
-		return nil, err
-	}
-	return &ArtifactResult{
+	result = &ArtifactResult{
 		Component:     n.Component,
 		OutputType:    n.OutputType,
 		Qualification: ArtifactUnqualified,
@@ -162,10 +174,20 @@ func buildPinnedTool(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 		BuilderType:            n.BuilderType,
 		EngineClass:            n.BuilderType,
 		Path:                   n.ArtifactPath,
-		SHA256:                 sum,
-		Size:                   size,
-		AbsPath:                filepath.Join(outRoot, n.ArtifactPath),
-	}, nil
+	}
+	if n.OutputType == ir.OutputOCILayout {
+		// The layout's index.json is its observed root; the layout import owns
+		// manifest-level identity and shape (ADR-27 §5).
+		result.SHA256, result.Size, err = admitPinnedToolLayout(ctx, mount, outRoot, n)
+		result.AbsPath, result.TransportPath = filepath.Join(outRoot, "index.json"), outRoot
+	} else {
+		result.SHA256, result.Size, err = admitPinnedToolOutput(ctx, outRoot, n)
+		result.AbsPath = filepath.Join(outRoot, n.ArtifactPath)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // stagePinnedToolExecutable snapshots the planned acquisition against the IR's
@@ -237,16 +259,67 @@ func admitPinnedToolOutput(ctx context.Context, root string, n ir.Node) (string,
 		return "", 0, e.Wrap(e.CodeBuildFailed, err, "reading pinned-tool output for %s", n.Component)
 	}
 	if len(entries) != 1 || entries[0].Name() != n.ArtifactPath || !entries[0].Type().IsRegular() {
-		names := make([]string, 0, len(entries))
-		for _, entry := range entries {
-			names = append(names, entry.Name())
-		}
 		return "", 0, e.New(e.CodeBuildFailed,
-			"pinned tool for %s left %q; want exactly the regular file %q", n.Component, names, n.ArtifactPath)
+			"pinned tool for %s left %q; want exactly the regular file %q", n.Component, entryNames(entries), n.ArtifactPath)
 	}
 	sum, size, _, err := hashRegularBeneathContext(ctx, root, n.ArtifactPath)
 	if err != nil {
 		return "", 0, e.Wrap(e.CodeBuildFailed, err, "collecting pinned-tool output for %s", n.Component)
 	}
 	return sum, size, nil
+}
+
+// admitPinnedToolLayout requires the staging root to hold exactly the tool-created
+// layout directory, whose root holds exactly blobs, index.json and oci-layout and no
+// link or special file anywhere (ADR-27 §5). The layout then becomes the output root.
+func admitPinnedToolLayout(ctx context.Context, staging, outRoot string, n ir.Node) (string, int64, error) {
+	name := path.Base(ir.PinnedToolLayoutDir)
+	entries, err := os.ReadDir(staging)
+	if err != nil {
+		return "", 0, e.Wrap(e.CodeBuildFailed, err, "reading pinned-tool layout output for %s", n.Component)
+	}
+	if len(entries) != 1 || entries[0].Name() != name || !entries[0].IsDir() {
+		return "", 0, e.New(e.CodeBuildFailed, "pinned tool for %s left %q; want exactly one OCI layout at %s",
+			n.Component, entryNames(entries), ir.PinnedToolLayoutDir)
+	}
+	layout := filepath.Join(staging, name)
+	root, err := os.ReadDir(layout)
+	if err != nil {
+		return "", 0, e.Wrap(e.CodeBuildFailed, err, "reading pinned-tool layout for %s", n.Component)
+	}
+	if len(root) != 3 || root[0].Name() != "blobs" || !root[0].IsDir() || root[1].Name() != "index.json" ||
+		!root[1].Type().IsRegular() || root[2].Name() != "oci-layout" || !root[2].Type().IsRegular() {
+		return "", 0, e.New(e.CodeBuildFailed, "pinned tool for %s left layout root %q; want exactly blobs, index.json and oci-layout",
+			n.Component, entryNames(root))
+	}
+	if err := filepath.WalkDir(layout, func(_ string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
+		if !entry.IsDir() && !entry.Type().IsRegular() {
+			return fmt.Errorf("%s is neither a directory nor a regular file", entry.Name())
+		}
+		return nil
+	}); err != nil {
+		return "", 0, mapCancellation(ctx, e.Wrap(e.CodeBuildFailed, err, "pinned-tool layout for %s", n.Component), "pinned-tool layout admission")
+	}
+	if err := os.Rename(layout, outRoot); err != nil {
+		return "", 0, e.Wrap(e.CodeBuildFailed, err, "moving pinned-tool layout for %s", n.Component)
+	}
+	sum, size, _, err := hashRegularBeneathContext(ctx, outRoot, "index.json")
+	if err != nil {
+		return "", 0, e.Wrap(e.CodeBuildFailed, err, "observing pinned-tool layout for %s", n.Component)
+	}
+	return sum, size, nil
+}
+
+func entryNames(entries []os.DirEntry) []string {
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	return names
 }

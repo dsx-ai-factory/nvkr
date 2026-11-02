@@ -22,8 +22,12 @@ func pinnedToolNode(nc catalog.NamedComponent, components map[string]catalog.Nam
 	if tool == nil || tool.Platform != platform {
 		return ir.Node{}, e.New(e.CodeEngineCapability, "pinned-tool component %q has no tool pinned for target %q", nc.Name, platform)
 	}
+	output := ir.PinnedToolOutputDir
+	if nc.OutputType == catalog.PinnedToolOutputOCILayout {
+		output = ir.PinnedToolLayoutDir
+	}
 	command, err := catalog.RenderToolArgs(nc.ToolArgs, catalog.ToolArgValues{
-		Output: ir.PinnedToolOutputDir,
+		Output: output,
 		Arch:   target.Arch(platform),
 		Material: func(binding string) (string, error) {
 			if _, ok := nc.Materials[binding]; !ok {

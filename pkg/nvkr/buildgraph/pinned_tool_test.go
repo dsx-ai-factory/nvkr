@@ -154,3 +154,16 @@ func TestPinnedToolOutputAdmission(t *testing.T) {
 		})
 	}
 }
+
+// A layout writer may refuse an existing directory, so a layout producer's output
+// token names an absent child of the private output root.
+func TestPinnedToolLayoutOutputRendersAnAbsentPath(t *testing.T) {
+	cat := pinnedToolCatalog()
+	bundle := cat.Components["recipe"]
+	bundle.OutputType, bundle.ArtifactPath = catalog.PinnedToolOutputOCILayout, ""
+	bundle.ToolArgs = []string{"bundle", "--output", "oci-layout:{{.Output}}"}
+	graph := mustCompile(t, &Resolved{Platform: "linux/arm64", Components: []catalog.NamedComponent{{Name: "bundle", Component: bundle}}})
+	if got := graph.Nodes[0].Command; !slices.Equal(got, []string{"bundle", "--output", "oci-layout:" + ir.PinnedToolLayoutDir}) {
+		t.Fatalf("layout output rendered %q", got)
+	}
+}

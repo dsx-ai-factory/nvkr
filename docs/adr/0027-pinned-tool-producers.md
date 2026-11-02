@@ -1,8 +1,8 @@
 # ADR-27 — Producers that run pinned release tools
 
 - **Decision status:** Proposed (design only; pending named-decider ratification)
-- **Implementation maturity:** Units T1–T5 and T7 are implemented for the `file` output form. T6 waits for the
-  #285 layout import, so an `oci-layout` producer fails closed; see `reconciliation.md`.
+- **Implementation maturity:** Units T1–T5 and T7 are implemented. The executor runs both output forms, but
+  selecting an `oci-layout` producer fails closed until T6 joins the #285 layout import; see `reconciliation.md`.
 - **Acceptance-test maturity:** Contract-tested. Linux executor tests use a fake container runtime. One unrecorded
   local run executed the AICR v1.2.0-rc1 recipe producer through the executor on Docker; no recorded Run, hosted
   Run or consumer verification exercises a pinned-tool producer.
@@ -160,8 +160,10 @@ A pinned-tool node runs through the shared helper launcher as an ordinary build 
   `TMPDIR`, `TZ=UTC`, `LC_ALL=C` and umask `022`. The child environment holds only those values and the
   producer's literal variables, which cannot redefine them (§1); no ambient credential, token, registry
   configuration, kubeconfig or cache is passed.
-- **Fixed sandbox paths.** `{{.Output}}` renders to `/nvkr/output` and a material to
-  `/nvkr/inputs/materials/<escaped binding>`. The working directory is `/nvkr/work`, `HOME` is `/nvkr/home`,
+- **Fixed sandbox paths.** For a `file` producer `{{.Output}}` renders to `/nvkr/output`, an existing empty
+  directory. A layout writer may refuse an existing directory, even an empty one, so for an `oci-layout` producer
+  `{{.Output}}` renders to `/nvkr/output/layout`, an absent path the tool creates. A material renders to
+  `/nvkr/inputs/materials/<escaped binding>`; a binding name may carry the file extension a tool reads it by. The working directory is `/nvkr/work`, `HOME` is `/nvkr/home`,
   `TMPDIR` is `/nvkr/tmp`, and the executable is mounted read-only at `/nvkr/tool/<member name>`. The root
   filesystem is read-only. An executor-owned bootstrap, `umask 022 && exec /usr/bin/env -i "$@"`, sets the umask
   and replaces the image environment. The toolchain image must therefore provide `/bin/sh` and `/usr/bin/env`;
@@ -192,7 +194,7 @@ The producer's private output directory must contain exactly one declared form w
 | `outputType` | Admission | Use |
 |---|---|---|
 | `file` | Exactly one regular file at `artifactPath`, a single file name; nothing else in the output directory | A material for another producer in the same output |
-| `oci-layout` | Exactly one OCI image layout at the output directory root, with nothing beside it; shape checks belong to the layout import owner (#285) | The payload of a `bundle-oci` output, imported byte-for-byte rather than rewrapped |
+| `oci-layout` | Exactly one OCI image layout at `{{.Output}}`, with nothing beside it, whose root holds exactly `blobs`, `index.json` and `oci-layout` and no link or special file; the executor then moves it to the output root and observes its `index.json`. Further shape checks belong to the layout import owner (#285) | The payload of a `bundle-oci` output, imported byte-for-byte rather than rewrapped |
 
 Directory trees, archives NVKR would have to create, symbolic links, special files and extra entries are
 refused. NVKR never archives or normalizes a tool's directory output: doing so would create a second definition
@@ -380,6 +382,7 @@ selection rules, the shared tool acquisition and one-pin-per-name, executor admi
 `wrapped-build` provenance with tool dependencies, and byte-stable default hosted generation. The Linux executor
 suite drives a fake container runtime, so it proves executor behavior, not container isolation. A local developer
 run on Docker (linux/arm64) executed the AICR v1.2.0-rc1 `recipe` producer offline and observed one regular file
-bound to the tool executable digest. It is not a recorded Run and proves nothing about hosted isolation. No hosted
-Run or consumer verification exists, T6 is unimplemented, and no claim follows from the #239 source-built AICR
-renders.
+bound to the tool executable digest. With that recipe as its material, the `bundle --deployer flux --output
+oci-layout:{{.Output}}` producer wrote one OCI layout at the absent path; its index names the manifest digest AICR
+reported. These are not recorded Runs and prove nothing about hosted isolation. No hosted Run or consumer
+verification exists, T6 is unimplemented, and no claim follows from the #239 source-built AICR renders.

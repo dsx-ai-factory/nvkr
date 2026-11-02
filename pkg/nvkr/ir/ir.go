@@ -93,7 +93,10 @@ type MaterialBinding struct {
 const (
 	PinnedToolInputsRoot = "/nvkr/inputs"
 	PinnedToolOutputDir  = "/nvkr/output"
-	PinnedToolWorkdir    = "/nvkr/work"
+	// PinnedToolLayoutDir is the absent child an oci-layout producer creates: layout
+	// writers may refuse an existing directory, even an empty one.
+	PinnedToolLayoutDir = "/nvkr/output/layout"
+	PinnedToolWorkdir   = "/nvkr/work"
 )
 
 // Pinned-tool output forms (ADR-27 §5).

@@ -42,6 +42,65 @@ func TestAdmitPinnedToolHostRefusesEmulation(t *testing.T) {
 	}
 }
 
+// An AICR-like layout writer refuses an existing target, even an empty directory,
+// so the executor must hand it an absent path and then admit exactly one layout.
+func TestPinnedToolExecutorHandsLayoutWriterAnAbsentPath(t *testing.T) {
+	refuseExisting := `case " $* " in *" oci-layout:/nvkr/output/layout "*) ;; *) exit 92;; esac
+target="$out/layout"
+if [ -e "$target" ]; then echo "refusing existing $target" >&2; exit 4; fi
+mkdir -p "$target/blobs/sha256"
+printf '{"imageLayoutVersion":"1.0.0"}' > "$target/oci-layout"
+printf '{"schemaVersion":2,"manifests":[]}' > "$target/index.json"
+printf blob > "$target/blobs/sha256/` + strings.Repeat("a", 64) + `"`
+	executable := []byte("#!/bin/sh\nexit 0\n")
+	for _, test := range []struct {
+		name  string
+		extra string
+		code  e.Code
+	}{
+		{name: "layout at the absent path"},
+		{name: "file beside the layout", extra: `; printf s > "$out/layout.sig"`, code: e.CodeBuildFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			tool := filepath.Join(root, "tools", "aicr")
+			if err := os.MkdirAll(filepath.Dir(tool), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(tool, executable, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			node := pinnedToolNode(executable)
+			node.Platform = "linux/" + runtime.GOARCH
+			node.OutputType, node.ArtifactPath = "oci-layout", ""
+			node.Command = []string{"bundle", "--output", "oci-layout:/nvkr/output/layout"}
+			result, err := (Local{}).ExecNode(node, RunOptions{Ctx: t.Context(), Launch: true,
+				Runtime: fakePinnedToolRuntime(t, refuseExisting+test.extra), SourceRoot: filepath.Join(root, "src"),
+				ToolExecutable: tool, Stdout: &strings.Builder{}, Stderr: &strings.Builder{}})
+			if got := pinnedToolCode(err); got != test.code {
+				t.Fatalf("ExecNode() code %q (%v); want %q", got, err, test.code)
+			}
+			output := filepath.Join(root, "out", "recipe")
+			staged, _ := filepath.Glob(filepath.Join(root, "out", ".nvkr-*"))
+			if len(staged) != 0 {
+				t.Fatalf("private staging remains: %q", staged)
+			}
+			if test.code != "" {
+				if _, statErr := os.Stat(output); !os.IsNotExist(statErr) {
+					t.Fatalf("failed run left partial output: %v", statErr)
+				}
+				return
+			}
+			if result.TransportPath != output || result.SHA256 != FileDigest([]byte(`{"schemaVersion":2,"manifests":[]}`)) {
+				t.Fatalf("wrong layout observation: %+v", result)
+			}
+			if _, err := os.Stat(filepath.Join(output, "oci-layout")); err != nil {
+				t.Fatalf("layout is not the output root: %v", err)
+			}
+		})
+	}
+}
+
 func TestPinnedToolExecutorContract(t *testing.T) {
 	executable := []byte("#!/bin/sh\nexit 0\n")
 	for _, test := range []struct {

@@ -44,7 +44,7 @@ func TestAdmitPinnedToolBeforeWork(t *testing.T) {
 	}{
 		{"qualified execution", func(_ *ir.Node, o *RunOptions) { o.Qualification = &QualifiedExecution{} }},
 		{"packaging", func(_ *ir.Node, o *RunOptions) { o.Package = true }},
-		{"layout output before bundle-oci import", func(n *ir.Node, _ *RunOptions) { n.OutputType, n.ArtifactPath = ir.OutputOCILayout, "" }},
+		{"undeclared output form", func(n *ir.Node, _ *RunOptions) { n.OutputType = "raw" }},
 		{"network", func(n *ir.Node, _ *RunOptions) { n.Network = ir.NetworkDefault }},
 		{"missing tool input", func(_ *ir.Node, o *RunOptions) { o.ToolExecutable = "" }},
 	} {
@@ -110,6 +110,69 @@ func TestAdmitPinnedToolOutputForm(t *testing.T) {
 			}
 			if test.code == "" && (sum != FileDigest([]byte("r")) || size != 1) {
 				t.Fatalf("wrong observation %s %d", sum, size)
+			}
+		})
+	}
+}
+
+// writeTestLayout writes the minimal OCI layout root a layout producer leaves.
+func writeTestLayout(dir string) error {
+	return errors.Join(os.MkdirAll(filepath.Join(dir, "blobs", "sha256"), 0o755),
+		os.WriteFile(filepath.Join(dir, "oci-layout"), []byte(`{"imageLayoutVersion":"1.0.0"}`), 0o644),
+		os.WriteFile(filepath.Join(dir, "index.json"), []byte(`{"schemaVersion":2,"manifests":[]}`), 0o644),
+		os.WriteFile(filepath.Join(dir, "blobs", "sha256", strings.Repeat("a", 64)), []byte("blob"), 0o644))
+}
+
+func TestAdmitPinnedToolLayoutForm(t *testing.T) {
+	layout := func(staging string) string { return filepath.Join(staging, "layout") }
+	for _, test := range []struct {
+		name  string
+		write func(string) error
+		code  e.Code
+	}{
+		{"one layout", func(s string) error { return writeTestLayout(layout(s)) }, ""},
+		{"no output", func(string) error { return nil }, e.CodeBuildFailed},
+		{"entry beside the layout", func(s string) error {
+			return errors.Join(writeTestLayout(layout(s)), os.WriteFile(filepath.Join(s, "layout.sig"), []byte("s"), 0o644))
+		}, e.CodeBuildFailed},
+		{"signature in the layout root", func(s string) error {
+			return errors.Join(writeTestLayout(layout(s)), os.WriteFile(filepath.Join(layout(s), "index.json.sig"), []byte("s"), 0o644))
+		}, e.CodeBuildFailed},
+		{"missing index", func(s string) error {
+			return errors.Join(writeTestLayout(layout(s)), os.Remove(filepath.Join(layout(s), "index.json")))
+		}, e.CodeBuildFailed},
+		{"layout is a file", func(s string) error { return os.WriteFile(layout(s), []byte("x"), 0o644) }, e.CodeBuildFailed},
+		{"link inside blobs", func(s string) error {
+			return errors.Join(writeTestLayout(layout(s)), os.Symlink("/etc/passwd", filepath.Join(layout(s), "blobs", "sha256", "link")))
+		}, e.CodeBuildFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			staging, outRoot := filepath.Join(root, "staging"), filepath.Join(root, "out")
+			if err := os.Mkdir(staging, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := test.write(staging); err != nil {
+				t.Fatal(err)
+			}
+			node := pinnedToolNode(nil)
+			node.OutputType, node.ArtifactPath = ir.OutputOCILayout, ""
+			sum, size, err := admitPinnedToolLayout(context.Background(), staging, outRoot, node)
+			if got := pinnedToolCode(err); got != test.code {
+				t.Fatalf("admitPinnedToolLayout() code %q (%v); want %q", got, err, test.code)
+			}
+			if test.code != "" {
+				if _, statErr := os.Lstat(outRoot); !os.IsNotExist(statErr) {
+					t.Fatalf("refused layout reached the output root: %v", statErr)
+				}
+				return
+			}
+			index := []byte(`{"schemaVersion":2,"manifests":[]}`)
+			if sum != FileDigest(index) || size != int64(len(index)) {
+				t.Fatalf("observed %s %d; want the layout index", sum, size)
+			}
+			if _, err := os.Stat(filepath.Join(outRoot, "oci-layout")); err != nil {
+				t.Fatalf("layout did not become the output root: %v", err)
 			}
 		})
 	}

@@ -162,8 +162,10 @@ so tool modes that push, download or sign keylessly fail. The toolchain image mu
 `/usr/bin/env` for the executor's fixed bootstrap.
 
 A `file` result is a material only: the output must also select a producer that binds it, and the tool must
-leave exactly that one regular file. The `oci-layout` form is reserved for bundle outputs and fails until layout
-import is available. Execution requires Linux, and a Definition that selects `sbomTool` cannot yet include a
+leave exactly that one regular file. A material is staged under its binding name, so name the binding with the
+extension the tool expects, such as `recipe.yaml` for AICR. For `outputType: oci-layout`, `{{.Output}}` is an
+absent path the tool creates, and it must leave exactly one OCI layout there. That form is reserved for bundle
+outputs, and selecting it fails until layout import is available. Execution requires Linux, and a Definition that selects `sbomTool` cannot yet include a
 `file` producer. [ADR-27](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0027-pinned-tool-producers.md)
 and [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md) record the
 remaining limits.
