@@ -29,8 +29,8 @@ const (
 var namespacePattern = regexp.MustCompile(`^ghcr\.io/([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)/([a-z0-9](?:[a-z0-9._-]*[a-z0-9])?)/development(?:-([a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?))?$`)
 
 // reservedBundles would collide with the fixed development qualification
-// workflows and manifest directory.
-var reservedBundles = map[string]bool{"qualify": true, "smoke": true, "qualification": true}
+// workflows, the authored registry-cleanup workflow and the manifest directory.
+var reservedBundles = map[string]bool{"qualify": true, "smoke": true, "qualification": true, "cleanup": true}
 var leafPattern = regexp.MustCompile(`^[a-z0-9]+(?:[._-][a-z0-9]+)*$`)
 
 // Namespace is an admitted repository-owned development namespace. A named
