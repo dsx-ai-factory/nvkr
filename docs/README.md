@@ -99,6 +99,10 @@ Proposed [ADR-27: Pinned-tool producers](adr/0027-pinned-tool-producers.md) desi
 released, digest-pinned tool offline with fixed arguments and typed inputs, with AICR bundles as the first use.
 It is design only.
 
+Proposed [ADR-28: Multi-platform executables](adr/0028-multi-platform-executable-indexes.md) designs one tool
+source for every platform of a release and executable outputs published as standard OCI image indexes, with
+the AICR CLI as the first migration and an inventory of existing executables to retrofit. It is design only.
+
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
 Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) covers branch
 dispatch, separate generated development bundles, artifact downloads and short retention.
