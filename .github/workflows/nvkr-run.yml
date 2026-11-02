@@ -31,7 +31,7 @@ jobs:
           [ ! -L "$GITHUB_STEP_SUMMARY" ] || exit 0
           [ ! -e "$GITHUB_STEP_SUMMARY" ] || [ -f "$GITHUB_STEP_SUMMARY" ] || exit 0
           {
-            printf '%s\n' '## NVKR Run started' '' '<code>nvke-m2</code> · 69 planned outputs · <code>linux/amd64, linux/arm64</code>' '' 'Lane: <code>pipeline-attested</code>. Execution and completeness checks are pending.' ''
+            printf '%s\n' '## NVKR Run started' '' '<code>nvke-m2</code> · 70 planned outputs · <code>linux/amd64, linux/arm64</code>' '' 'Lane: <code>pipeline-attested</code>. Execution and completeness checks are pending.' ''
           } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
       - &checkout-workflow-source
         name: Check out workflow source
@@ -1887,6 +1887,36 @@ jobs:
     permissions:
       actions: read
       contents: read
+  nvkr-operator-tools-linux-arm64-pull-helm:
+    name: 'Acquire pinned operator-tools-linux-arm64/pull-helm'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 60
+    needs: [build-runner-ubuntu-24-04-arm]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-operator-tools-linux-arm64-pull-kubectl:
+    name: 'Acquire pinned operator-tools-linux-arm64/pull-kubectl'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 60
+    needs: [build-runner-ubuntu-24-04-arm]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-arm-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-operator-tools-linux-arm64-t-f2243b9bec83:
+    name: 'Verify artifacts and generate SBOMs: operator-tools-linux-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-operator-tools-linux-arm64-pull-helm, nvkr-operator-tools-linux-arm64-pull-kubectl, nvkr-tool-syft]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-two-nodes
+    permissions:
+      actions: read
+      contents: read
   nvkr-operator-tools-pull-helm:
     name: 'Acquire pinned operator-tools/pull-helm'
     runs-on: 'ubuntu-24.04'
@@ -2082,6 +2112,16 @@ jobs:
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-process-operator-tools-terminal-obse-ad40acf7eeda]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-package-operator-tools-linux-arm64:
+    name: 'Package binaries: operator-tools-linux-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-process-operator-tools-linux-arm64-t-f2243b9bec83]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
     permissions:
@@ -3973,6 +4013,28 @@ jobs:
       contents: read
       id-token: write
     steps: *steps-ubuntu-24-04-node
+  nvkr-package-publication-operator-tools-linux-arm64:
+    name: 'Package publication bundle: publication-operator-tools-linux-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-package-operator-tools-linux-arm64]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-attest-sboms-output-operator-tools-linux-arm64:
+    name: 'Create and verify SBOM attestations: output-operator-tools-linux-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-package-publication-operator-tools-linux-arm64, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps: *steps-ubuntu-24-04-node
   nvkr-package-publication-postgresql-image-arm64:
     name: 'Package publication bundle: publication-postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -4644,6 +4706,21 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
+  nvkr-publish-output-operator-tools-linux-arm64:
+    name: 'Publish output-operator-tools-linux-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-attest-sboms-output-operator-tools-linux-arm64]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps: *steps-ubuntu-24-04-node
   nvkr-publish-output-postgresql:
     name: 'Publish output-postgresql'
     runs-on: 'ubuntu-24.04'
@@ -5264,6 +5341,21 @@ jobs:
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [nvkr-publish-output-operator-tools]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+    steps: *steps-ubuntu-24-04-node
+  nvkr-sign-output-operator-tools-linux-arm64:
+    name: 'Sign and attest release and deliverables: output-operator-tools-linux-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-publish-output-operator-tools-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -7247,6 +7339,20 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
     steps: *steps-ubuntu-24-04-node
+  nvkr-verify-publication-output-operator-t-26ea922ae95a:
+    name: 'Verify release and deliverable signatures: output-operator-tools-linux-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [nvkr-sign-output-operator-tools-linux-arm64]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+    steps: *steps-ubuntu-24-04-node
   nvkr-verify-publication-output-postgresql:
     name: 'Verify release and deliverable signatures: output-postgresql'
     runs-on: 'ubuntu-24.04'
@@ -7615,7 +7721,7 @@ jobs:
     name: 'Assemble release from verified output references'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-verify-publication-output-capi-contr-a309e0dde6c8, nvkr-verify-publication-output-capi-controller-image, nvkr-verify-publication-output-capi-kubea-400c7177454b, nvkr-verify-publication-output-capi-kubea-459a501ddf86, nvkr-verify-publication-output-capi-kubea-8c536327dae9, nvkr-verify-publication-output-capi-kubea-a1d9f5feb0f6, nvkr-verify-publication-output-capnico-controller, nvkr-verify-publication-output-cert-manag-02f76d39d687, nvkr-verify-publication-output-cert-manag-9a8734354915, nvkr-verify-publication-output-cert-manag-b56eb8b59b49, nvkr-verify-publication-output-cert-manag-d72fce3ac728, nvkr-verify-publication-output-cert-manag-eecf216a547d, nvkr-verify-publication-output-cert-manag-f1997a85223a, nvkr-verify-publication-output-cluster-ap-5fb4884131f8, nvkr-verify-publication-output-controller-chart, nvkr-verify-publication-output-csi-node-d-914d7376ead0, nvkr-verify-publication-output-csi-node-d-ed501e7759bf, nvkr-verify-publication-output-cwe, nvkr-verify-publication-output-nico-refer-768f0a1fbfbe, nvkr-verify-publication-output-nktp, nvkr-verify-publication-output-nktp-colle-3037712057c4, nvkr-verify-publication-output-nktp-collector-image, nvkr-verify-publication-output-nktp-kube-59673e96b3e2, nvkr-verify-publication-output-nktp-kube-8edb2f9f5644, nvkr-verify-publication-output-nktp-kubec-58bc88c11e26, nvkr-verify-publication-output-nktp-kubectl-image, nvkr-verify-publication-output-nktp-lgtm-image, nvkr-verify-publication-output-nktp-lgtm-image-arm64, nvkr-verify-publication-output-nktp-metri-4773ec2231a9, nvkr-verify-publication-output-nktp-metri-72d2044749d1, nvkr-verify-publication-output-nktp-node-308c6a04d0d9, nvkr-verify-publication-output-nktp-node-89687b0a3b8b, nvkr-verify-publication-output-nktp-opera-e8ca29886a10, nvkr-verify-publication-output-nktp-operator-image, nvkr-verify-publication-output-nktp-targe-83f6218e2759, nvkr-verify-publication-output-nktp-targe-c21c44003a70, nvkr-verify-publication-output-nvke-node-fde-amd64, nvkr-verify-publication-output-nvke-node-fde-arm64, nvkr-verify-publication-output-nvke-node-image-amd64, nvkr-verify-publication-output-nvke-node-image-arm64, nvkr-verify-publication-output-nvkectl, nvkr-verify-publication-output-nvkectl-linux-arm64, nvkr-verify-publication-output-operator-tools, nvkr-verify-publication-output-postgresql, nvkr-verify-publication-output-postgresql-image, nvkr-verify-publication-output-postgresql-image-arm64, nvkr-verify-publication-output-spiffe-csi-image, nvkr-verify-publication-output-spiffe-csi-image-arm64, nvkr-verify-publication-output-spire, nvkr-verify-publication-output-spire-agen-690d58615fef, nvkr-verify-publication-output-spire-agent-image, nvkr-verify-publication-output-spire-bash-image, nvkr-verify-publication-output-spire-bash-image-arm64, nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91, nvkr-verify-publication-output-spire-cont-81ba1c1e8041, nvkr-verify-publication-output-spire-crds, nvkr-verify-publication-output-spire-oidc-image, nvkr-verify-publication-output-spire-oidc-image-arm64, nvkr-verify-publication-output-spire-serv-2ffabff52266, nvkr-verify-publication-output-spire-server-image, nvkr-verify-publication-output-spire-tpm-fdd5a5adf925, nvkr-verify-publication-output-spire-tpm-server-image, nvkr-verify-publication-output-temporal, nvkr-verify-publication-output-temporal-a-325229721989, nvkr-verify-publication-output-temporal-a-9109bef2fded, nvkr-verify-publication-output-temporal-s-030929bd4981, nvkr-verify-publication-output-temporal-server-image, nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac, nvkr-verify-publication-output-temporal-ui-image]
+    needs: [nvkr-verify-publication-output-capi-contr-a309e0dde6c8, nvkr-verify-publication-output-capi-controller-image, nvkr-verify-publication-output-capi-kubea-400c7177454b, nvkr-verify-publication-output-capi-kubea-459a501ddf86, nvkr-verify-publication-output-capi-kubea-8c536327dae9, nvkr-verify-publication-output-capi-kubea-a1d9f5feb0f6, nvkr-verify-publication-output-capnico-controller, nvkr-verify-publication-output-cert-manag-02f76d39d687, nvkr-verify-publication-output-cert-manag-9a8734354915, nvkr-verify-publication-output-cert-manag-b56eb8b59b49, nvkr-verify-publication-output-cert-manag-d72fce3ac728, nvkr-verify-publication-output-cert-manag-eecf216a547d, nvkr-verify-publication-output-cert-manag-f1997a85223a, nvkr-verify-publication-output-cluster-ap-5fb4884131f8, nvkr-verify-publication-output-controller-chart, nvkr-verify-publication-output-csi-node-d-914d7376ead0, nvkr-verify-publication-output-csi-node-d-ed501e7759bf, nvkr-verify-publication-output-cwe, nvkr-verify-publication-output-nico-refer-768f0a1fbfbe, nvkr-verify-publication-output-nktp, nvkr-verify-publication-output-nktp-colle-3037712057c4, nvkr-verify-publication-output-nktp-collector-image, nvkr-verify-publication-output-nktp-kube-59673e96b3e2, nvkr-verify-publication-output-nktp-kube-8edb2f9f5644, nvkr-verify-publication-output-nktp-kubec-58bc88c11e26, nvkr-verify-publication-output-nktp-kubectl-image, nvkr-verify-publication-output-nktp-lgtm-image, nvkr-verify-publication-output-nktp-lgtm-image-arm64, nvkr-verify-publication-output-nktp-metri-4773ec2231a9, nvkr-verify-publication-output-nktp-metri-72d2044749d1, nvkr-verify-publication-output-nktp-node-308c6a04d0d9, nvkr-verify-publication-output-nktp-node-89687b0a3b8b, nvkr-verify-publication-output-nktp-opera-e8ca29886a10, nvkr-verify-publication-output-nktp-operator-image, nvkr-verify-publication-output-nktp-targe-83f6218e2759, nvkr-verify-publication-output-nktp-targe-c21c44003a70, nvkr-verify-publication-output-nvke-node-fde-amd64, nvkr-verify-publication-output-nvke-node-fde-arm64, nvkr-verify-publication-output-nvke-node-image-amd64, nvkr-verify-publication-output-nvke-node-image-arm64, nvkr-verify-publication-output-nvkectl, nvkr-verify-publication-output-nvkectl-linux-arm64, nvkr-verify-publication-output-operator-t-26ea922ae95a, nvkr-verify-publication-output-operator-tools, nvkr-verify-publication-output-postgresql, nvkr-verify-publication-output-postgresql-image, nvkr-verify-publication-output-postgresql-image-arm64, nvkr-verify-publication-output-spiffe-csi-image, nvkr-verify-publication-output-spiffe-csi-image-arm64, nvkr-verify-publication-output-spire, nvkr-verify-publication-output-spire-agen-690d58615fef, nvkr-verify-publication-output-spire-agent-image, nvkr-verify-publication-output-spire-bash-image, nvkr-verify-publication-output-spire-bash-image-arm64, nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91, nvkr-verify-publication-output-spire-cont-81ba1c1e8041, nvkr-verify-publication-output-spire-crds, nvkr-verify-publication-output-spire-oidc-image, nvkr-verify-publication-output-spire-oidc-image-arm64, nvkr-verify-publication-output-spire-serv-2ffabff52266, nvkr-verify-publication-output-spire-server-image, nvkr-verify-publication-output-spire-tpm-fdd5a5adf925, nvkr-verify-publication-output-spire-tpm-server-image, nvkr-verify-publication-output-temporal, nvkr-verify-publication-output-temporal-a-325229721989, nvkr-verify-publication-output-temporal-a-9109bef2fded, nvkr-verify-publication-output-temporal-s-030929bd4981, nvkr-verify-publication-output-temporal-server-image, nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac, nvkr-verify-publication-output-temporal-ui-image]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -7712,7 +7818,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-03'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-capi-kubeadm-con-a5cbb6fd910a, nvkr-attest-sboms-output-cluster-api-prov-270146b5b019, nvkr-attest-sboms-output-nktp, nvkr-attest-sboms-output-nvkectl-linux-arm64, nvkr-attest-sboms-output-postgresql-image-arm64, nvkr-attest-sboms-output-temporal-admin-t-9e993584a415, nvkr-cert-manager-webhook-image-sbom, nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent, nvkr-package-capi-kubeadm-bootstrap-image-arm64, nvkr-package-publication-csi-node-driver-02a78ae16d16, nvkr-package-publication-operator-tools, nvkr-package-publication-temporal-admin-tools-image, nvkr-process-capi-kubeadm-bootstrap-image-8c3aef4dafbd, nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6, nvkr-process-spire-bash-image-pull-spire-72c313316c1d, nvkr-process-spire-controller-manager-ima-0262ec0b780f, nvkr-publish-output-capi-kubeadm-bootstra-07670d07d213, nvkr-publish-output-cert-manager-webhook-image, nvkr-publish-output-cluster-api-provider-provisioned, nvkr-publish-output-nktp-collector-image-arm64, nvkr-publish-output-nvke-node-image-amd64, nvkr-publish-output-spire-controller-manager-image, nvkr-publish-output-spire-server-image-arm64, nvkr-sign-output-nvke-node-fde-amd64, nvkr-sign-output-spire-bash-image, nvkr-sign-output-temporal-server-image, nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-spire-controller-manager-image-sbom, nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-tool-cosign, nvkr-verify-publication-output-capi-kubea-400c7177454b, nvkr-verify-publication-output-csi-node-d-914d7376ead0, nvkr-verify-publication-output-nktp-kube-8edb2f9f5644, nvkr-verify-publication-output-spire, nvkr-verify-publication-output-temporal-ui-image]
+    needs: [nvkr-attest-sboms-output-capi-kubeadm-con-a5cbb6fd910a, nvkr-attest-sboms-output-cluster-api-prov-270146b5b019, nvkr-attest-sboms-output-nktp, nvkr-attest-sboms-output-nvkectl-linux-arm64, nvkr-attest-sboms-output-postgresql-image-arm64, nvkr-attest-sboms-output-temporal-admin-t-9e993584a415, nvkr-cert-manager-webhook-image-sbom, nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent, nvkr-package-capi-kubeadm-bootstrap-image-arm64, nvkr-package-publication-csi-node-driver-02a78ae16d16, nvkr-package-publication-operator-tools, nvkr-package-publication-temporal-admin-tools-image, nvkr-process-capi-kubeadm-bootstrap-image-8c3aef4dafbd, nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6, nvkr-process-spire-bash-image-pull-spire-72c313316c1d, nvkr-process-spire-controller-manager-ima-0262ec0b780f, nvkr-publish-output-capi-kubeadm-bootstra-07670d07d213, nvkr-publish-output-cert-manager-webhook-image, nvkr-publish-output-cluster-api-provider-provisioned, nvkr-publish-output-nktp-collector-image-arm64, nvkr-publish-output-nvke-node-image-amd64, nvkr-publish-output-spire-controller-manager-image, nvkr-publish-output-spire-server-image-arm64, nvkr-sign-output-nvke-node-fde-amd64, nvkr-sign-output-operator-tools-linux-arm64, nvkr-sign-output-spire-bash-image, nvkr-sign-output-temporal-server-image, nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-spire-controller-manager-image-sbom, nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-tool-cosign, nvkr-verify-publication-output-capi-kubea-400c7177454b, nvkr-verify-publication-output-csi-node-d-914d7376ead0, nvkr-verify-publication-output-nktp-kube-8edb2f9f5644, nvkr-verify-publication-output-spire, nvkr-verify-publication-output-temporal-ui-image]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -7725,7 +7831,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-04'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-cert-manager-con-d67471e4f0b4, nvkr-attest-sboms-output-nktp-collector-image-arm64, nvkr-attest-sboms-output-spiffe-csi-image-arm64, nvkr-attest-sboms-output-spire-controller-f3890ce97c17, nvkr-attest-sboms-output-spire-server-image-arm64, nvkr-capnico-controller-linux-amd64-fetch-d7e509f127ef, nvkr-cert-manager-cainjector-image-sbom, nvkr-cert-manager-controller-image-sbom, nvkr-cluster-api-provider-provisioned-lin-233fabd1edbc, nvkr-controller-chart-sbom, nvkr-nico-reference-profiles-fixture-linu-29120e898ac9, nvkr-nktp-target-allocator-image-sbom, nvkr-nvke-node-fde-amd64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-fde-arm64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart, nvkr-nvke-node-image-arm64-fetch-nvke-cni-ovn, nvkr-operator-tools-pull-kubectl, nvkr-package-publication-controller-chart, nvkr-package-publication-nktp-kubectl-image-arm64, nvkr-process-nktp-build-nktp-chart-nktp-t-78bead2a7f7b, nvkr-process-nktp-collector-image-pull-nk-7f8d9f4dfc62, nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79, nvkr-process-spire-server-image-pull-spir-240af0efc28c, nvkr-publish-output-cwe, nvkr-publish-output-nktp-metrics-server-image, nvkr-publish-output-temporal-admin-tools-image-arm64, nvkr-sign-output-nvkectl, nvkr-sign-output-spire-oidc-image, nvkr-sign-output-spire-tpm-server-image, nvkr-verify-publication-output-capi-kubea-459a501ddf86, nvkr-verify-publication-output-nktp-lgtm-image, nvkr-verify-publication-output-temporal-a-9109bef2fded]
+    needs: [nvkr-attest-sboms-output-cert-manager-con-d67471e4f0b4, nvkr-attest-sboms-output-nktp-collector-image-arm64, nvkr-attest-sboms-output-spiffe-csi-image-arm64, nvkr-attest-sboms-output-spire-controller-f3890ce97c17, nvkr-attest-sboms-output-spire-server-image-arm64, nvkr-capnico-controller-linux-amd64-fetch-d7e509f127ef, nvkr-cert-manager-cainjector-image-sbom, nvkr-cert-manager-controller-image-sbom, nvkr-cluster-api-provider-provisioned-lin-233fabd1edbc, nvkr-controller-chart-sbom, nvkr-nico-reference-profiles-fixture-linu-29120e898ac9, nvkr-nktp-target-allocator-image-sbom, nvkr-nvke-node-fde-amd64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-fde-arm64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart, nvkr-nvke-node-image-arm64-fetch-nvke-cni-ovn, nvkr-operator-tools-pull-kubectl, nvkr-package-operator-tools-linux-arm64, nvkr-package-publication-controller-chart, nvkr-package-publication-nktp-kubectl-image-arm64, nvkr-process-nktp-build-nktp-chart-nktp-t-78bead2a7f7b, nvkr-process-nktp-collector-image-pull-nk-7f8d9f4dfc62, nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79, nvkr-process-spire-server-image-pull-spir-240af0efc28c, nvkr-publish-output-cwe, nvkr-publish-output-nktp-metrics-server-image, nvkr-publish-output-temporal-admin-tools-image-arm64, nvkr-sign-output-nvkectl, nvkr-sign-output-spire-oidc-image, nvkr-sign-output-spire-tpm-server-image, nvkr-verify-publication-output-capi-kubea-459a501ddf86, nvkr-verify-publication-output-nktp-lgtm-image, nvkr-verify-publication-output-temporal-a-9109bef2fded]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -7738,7 +7844,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-05'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-controller-chart, nvkr-attest-sboms-output-nktp-kubectl-image-arm64, nvkr-attest-sboms-output-nktp-lgtm-image-arm64, nvkr-attest-sboms-output-nktp-metrics-ser-cc131630b796, nvkr-disk-nvke-node-image-amd64, nvkr-nvke-node-fde-amd64-fetch-nvke-agent-b1038550581e, nvkr-nvke-node-fde-amd64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-fde-arm64-fetch-nvke-kubeadm-distro, nvkr-nvkectl-fetch-nvkectl, nvkr-package-cert-manager-webhook-image-arm64, nvkr-package-cwe, nvkr-package-publication-cert-manager-cai-2887e3e2c736, nvkr-package-publication-cert-manager-webhook-image, nvkr-package-publication-nico-reference-p-ee3d0b71da16, nvkr-package-publication-nktp-operator-image, nvkr-package-publication-spiffe-csi-image-arm64, nvkr-package-publication-temporal-server-image, nvkr-package-publication-temporal-ui-image-arm64, nvkr-package-release, nvkr-package-spire-controller-manager-image-arm64, nvkr-postgresql-image-arm64-pull-postgresql-image, nvkr-process-temporal-pull-temporal-chart-e02b82483e4b, nvkr-process-temporal-ui-image-pull-tempo-fb82f86e5756, nvkr-publish-output-spire-controller-mana-4c760c0ddb13, nvkr-sign-output-capi-kubeadm-control-plane-image, nvkr-sign-output-capnico-controller, nvkr-sign-output-csi-node-driver-registra-1ee01f3e15c9, nvkr-sign-output-nktp-lgtm-image, nvkr-sign-output-spire-crds, nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image, nvkr-temporal-sbom, nvkr-verify-publication-output-capi-contr-a309e0dde6c8, nvkr-verify-publication-output-cwe, nvkr-verify-publication-output-spiffe-csi-image, nvkr-verify-publication-release]
+    needs: [nvkr-attest-sboms-output-controller-chart, nvkr-attest-sboms-output-nktp-kubectl-image-arm64, nvkr-attest-sboms-output-nktp-lgtm-image-arm64, nvkr-attest-sboms-output-nktp-metrics-ser-cc131630b796, nvkr-disk-nvke-node-image-amd64, nvkr-nvke-node-fde-amd64-fetch-nvke-agent-b1038550581e, nvkr-nvke-node-fde-amd64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-fde-arm64-fetch-nvke-kubeadm-distro, nvkr-nvkectl-fetch-nvkectl, nvkr-package-cert-manager-webhook-image-arm64, nvkr-package-cwe, nvkr-package-publication-cert-manager-cai-2887e3e2c736, nvkr-package-publication-cert-manager-webhook-image, nvkr-package-publication-nico-reference-p-ee3d0b71da16, nvkr-package-publication-nktp-operator-image, nvkr-package-publication-operator-tools-linux-arm64, nvkr-package-publication-spiffe-csi-image-arm64, nvkr-package-publication-temporal-server-image, nvkr-package-publication-temporal-ui-image-arm64, nvkr-package-release, nvkr-package-spire-controller-manager-image-arm64, nvkr-postgresql-image-arm64-pull-postgresql-image, nvkr-process-temporal-pull-temporal-chart-e02b82483e4b, nvkr-process-temporal-ui-image-pull-tempo-fb82f86e5756, nvkr-publish-output-spire-controller-mana-4c760c0ddb13, nvkr-sign-output-capi-kubeadm-control-plane-image, nvkr-sign-output-capnico-controller, nvkr-sign-output-csi-node-driver-registra-1ee01f3e15c9, nvkr-sign-output-nktp-lgtm-image, nvkr-sign-output-spire-crds, nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image, nvkr-temporal-sbom, nvkr-verify-publication-output-capi-contr-a309e0dde6c8, nvkr-verify-publication-output-cwe, nvkr-verify-publication-output-spiffe-csi-image, nvkr-verify-publication-release]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -7777,7 +7883,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-08'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-nktp-node-exporter-image, nvkr-attest-sboms-output-spire-bash-image, nvkr-nico-reference-profiles-fixture-linu-cd99e6119686, nvkr-nktp-collector-image-arm64-pull-nktp-85cb8e91f658, nvkr-nvke-node-fde-amd64-fetch-nvke-cni-ovn, nvkr-nvke-node-fde-amd64-fetch-ovn-kubernetes-chart, nvkr-nvke-node-fde-arm64-fetch-nvke-cni-ovn, nvkr-nvke-node-fde-arm64-fetch-ovn-kubernetes-chart, nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu, nvkr-package-nktp-metrics-server-image-arm64, nvkr-package-publication-nktp-operator-image-arm64, nvkr-package-publication-spire-agent-image, nvkr-package-publication-spire-server-image, nvkr-package-publication-temporal-server-image-arm64, nvkr-package-spiffe-csi-image-arm64, nvkr-process-cluster-api-provider-provisi-0fe9554d2806, nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd, nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b, nvkr-process-spire-oidc-image-pull-spire-ae9fdd6c5262, nvkr-publish-output-nvkectl, nvkr-publish-output-spire-oidc-image, nvkr-publish-output-spire-tpm-server-image, nvkr-sign-output-capi-kubeadm-control-pla-d95378faf55b, nvkr-sign-output-cwe, nvkr-sign-output-nktp, nvkr-sign-output-nktp-lgtm-image-arm64, nvkr-sign-output-nktp-metrics-server-image, nvkr-spiffe-csi-image-sbom, nvkr-temporal-ui-image-sbom, nvkr-verify-publication-output-spiffe-csi-image-arm64]
+    needs: [nvkr-attest-sboms-output-nktp-node-exporter-image, nvkr-attest-sboms-output-operator-tools-linux-arm64, nvkr-attest-sboms-output-spire-bash-image, nvkr-nico-reference-profiles-fixture-linu-cd99e6119686, nvkr-nktp-collector-image-arm64-pull-nktp-85cb8e91f658, nvkr-nvke-node-fde-amd64-fetch-nvke-cni-ovn, nvkr-nvke-node-fde-amd64-fetch-ovn-kubernetes-chart, nvkr-nvke-node-fde-arm64-fetch-nvke-cni-ovn, nvkr-nvke-node-fde-arm64-fetch-ovn-kubernetes-chart, nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu, nvkr-package-nktp-metrics-server-image-arm64, nvkr-package-publication-nktp-operator-image-arm64, nvkr-package-publication-spire-agent-image, nvkr-package-publication-spire-server-image, nvkr-package-publication-temporal-server-image-arm64, nvkr-package-spiffe-csi-image-arm64, nvkr-process-cluster-api-provider-provisi-0fe9554d2806, nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd, nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b, nvkr-process-spire-oidc-image-pull-spire-ae9fdd6c5262, nvkr-publish-output-nvkectl, nvkr-publish-output-spire-oidc-image, nvkr-publish-output-spire-tpm-server-image, nvkr-sign-output-capi-kubeadm-control-pla-d95378faf55b, nvkr-sign-output-cwe, nvkr-sign-output-nktp, nvkr-sign-output-nktp-lgtm-image-arm64, nvkr-sign-output-nktp-metrics-server-image, nvkr-spiffe-csi-image-sbom, nvkr-temporal-ui-image-sbom, nvkr-verify-publication-output-operator-t-26ea922ae95a, nvkr-verify-publication-output-spiffe-csi-image-arm64]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -7803,7 +7909,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0a'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-nktp-operator-image, nvkr-attest-sboms-output-spire-agent-image-arm64, nvkr-attest-sboms-output-temporal-admin-tools-image, nvkr-attest-sboms-output-temporal-server-image, nvkr-attest-sboms-output-temporal-ui-image-arm64, nvkr-nico-reference-profiles-fixture-linu-680f47b9fa86, nvkr-nktp-fetch-nktp-chart, nvkr-nktp-metrics-server-image-sbom, nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico, nvkr-package-nktp-kube-state-metrics-image-arm64, nvkr-package-publication-nvkectl, nvkr-package-publication-spire-tpm-server-image, nvkr-package-spire-oidc-image-arm64, nvkr-process-cluster-api-provider-provisi-4c9d6fcd78ec, nvkr-process-nvkectl-build-nvkectl-nvkect-ae9c2b9c3380, nvkr-process-nvkectl-linux-arm64-terminal-5504b08d0cab, nvkr-process-temporal-admin-tools-image-p-89b69e6994ff, nvkr-process-temporal-server-image-pull-t-8ac10b1a7911, nvkr-publish-output-csi-node-driver-registrar-image, nvkr-publish-output-nktp-operator-image-arm64, nvkr-publish-output-nvkectl-linux-arm64, nvkr-publish-output-spire-agent-image, nvkr-sign-output-capi-controller-image-arm64, nvkr-sign-output-cert-manager-controller-image, nvkr-sign-output-cert-manager-webhook-image-arm64, nvkr-sign-output-nktp-collector-image, nvkr-sign-output-nktp-kubectl-image-arm64, nvkr-sign-output-nktp-target-allocator-image, nvkr-sign-output-spire-controller-manager-image-arm64, nvkr-sign-output-spire-server-image, nvkr-verify-publication-output-capi-controller-image, nvkr-verify-publication-output-capi-kubea-a1d9f5feb0f6, nvkr-verify-publication-output-cert-manag-02f76d39d687, nvkr-verify-publication-output-spire-cont-81ba1c1e8041, nvkr-verify-publication-output-spire-crds, nvkr-verify-publication-output-spire-oidc-image-arm64]
+    needs: [nvkr-attest-sboms-output-nktp-operator-image, nvkr-attest-sboms-output-spire-agent-image-arm64, nvkr-attest-sboms-output-temporal-admin-tools-image, nvkr-attest-sboms-output-temporal-server-image, nvkr-attest-sboms-output-temporal-ui-image-arm64, nvkr-nico-reference-profiles-fixture-linu-680f47b9fa86, nvkr-nktp-fetch-nktp-chart, nvkr-nktp-metrics-server-image-sbom, nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico, nvkr-operator-tools-linux-arm64-pull-kubectl, nvkr-package-nktp-kube-state-metrics-image-arm64, nvkr-package-publication-nvkectl, nvkr-package-publication-spire-tpm-server-image, nvkr-package-spire-oidc-image-arm64, nvkr-process-cluster-api-provider-provisi-4c9d6fcd78ec, nvkr-process-nvkectl-build-nvkectl-nvkect-ae9c2b9c3380, nvkr-process-nvkectl-linux-arm64-terminal-5504b08d0cab, nvkr-process-temporal-admin-tools-image-p-89b69e6994ff, nvkr-process-temporal-server-image-pull-t-8ac10b1a7911, nvkr-publish-output-csi-node-driver-registrar-image, nvkr-publish-output-nktp-operator-image-arm64, nvkr-publish-output-nvkectl-linux-arm64, nvkr-publish-output-spire-agent-image, nvkr-sign-output-capi-controller-image-arm64, nvkr-sign-output-cert-manager-controller-image, nvkr-sign-output-cert-manager-webhook-image-arm64, nvkr-sign-output-nktp-collector-image, nvkr-sign-output-nktp-kubectl-image-arm64, nvkr-sign-output-nktp-target-allocator-image, nvkr-sign-output-spire-controller-manager-image-arm64, nvkr-sign-output-spire-server-image, nvkr-verify-publication-output-capi-controller-image, nvkr-verify-publication-output-capi-kubea-a1d9f5feb0f6, nvkr-verify-publication-output-cert-manag-02f76d39d687, nvkr-verify-publication-output-spire-cont-81ba1c1e8041, nvkr-verify-publication-output-spire-crds, nvkr-verify-publication-output-spire-oidc-image-arm64]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -7829,7 +7935,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0c'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-cert-manager-webhook-image, nvkr-attest-sboms-output-nico-reference-p-bcab49542eb0, nvkr-controller-chart-fetch-nvke-controller-chart, nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e, nvkr-nktp-collector-image-sbom, nvkr-nktp-kube-state-metrics-image-sbom, nvkr-nktp-metrics-server-image-arm64-pull-3fed0eeaa550, nvkr-nvke-node-image-amd64-fetch-nvke-cni-ovn, nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart, nvkr-package-cluster-api-provider-provisioned, nvkr-package-publication-capi-kubeadm-con-4fe0740f8f62, nvkr-package-publication-nktp-collector-image, nvkr-package-publication-nktp-target-allocator-image, nvkr-package-publication-spire-bash-image-arm64, nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77, nvkr-process-cert-manager-controller-imag-8684e5f78b05, nvkr-process-nico-reference-profiles-fixt-795da7fc5df7, nvkr-process-nktp-operator-image-pull-nkt-4f8772e3694e, nvkr-process-postgresql-image-pull-postgr-262baf89b239, nvkr-process-spire-pull-spire-chart-spire-33c1dfd25a91, nvkr-process-spire-tpm-server-image-pull-5e4c8bd40631, nvkr-publish-output-nktp, nvkr-publish-output-nktp-lgtm-image-arm64, nvkr-publish-output-postgresql-image-arm64, nvkr-spire-sbom, nvkr-spire-server-image-sbom, nvkr-verify-publication-output-nktp-kubectl-image, nvkr-verify-publication-output-nktp-opera-e8ca29886a10, nvkr-verify-publication-output-spire-bash-image, nvkr-verify-publication-output-temporal-s-030929bd4981]
+    needs: [nvkr-attest-sboms-output-cert-manager-webhook-image, nvkr-attest-sboms-output-nico-reference-p-bcab49542eb0, nvkr-controller-chart-fetch-nvke-controller-chart, nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e, nvkr-nktp-collector-image-sbom, nvkr-nktp-kube-state-metrics-image-sbom, nvkr-nktp-metrics-server-image-arm64-pull-3fed0eeaa550, nvkr-nvke-node-image-amd64-fetch-nvke-cni-ovn, nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart, nvkr-operator-tools-linux-arm64-pull-helm, nvkr-package-cluster-api-provider-provisioned, nvkr-package-publication-capi-kubeadm-con-4fe0740f8f62, nvkr-package-publication-nktp-collector-image, nvkr-package-publication-nktp-target-allocator-image, nvkr-package-publication-spire-bash-image-arm64, nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77, nvkr-process-cert-manager-controller-imag-8684e5f78b05, nvkr-process-nico-reference-profiles-fixt-795da7fc5df7, nvkr-process-nktp-operator-image-pull-nkt-4f8772e3694e, nvkr-process-operator-tools-linux-arm64-t-f2243b9bec83, nvkr-process-postgresql-image-pull-postgr-262baf89b239, nvkr-process-spire-pull-spire-chart-spire-33c1dfd25a91, nvkr-process-spire-tpm-server-image-pull-5e4c8bd40631, nvkr-publish-output-nktp, nvkr-publish-output-nktp-lgtm-image-arm64, nvkr-publish-output-postgresql-image-arm64, nvkr-spire-sbom, nvkr-spire-server-image-sbom, nvkr-verify-publication-output-nktp-kubectl-image, nvkr-verify-publication-output-nktp-opera-e8ca29886a10, nvkr-verify-publication-output-spire-bash-image, nvkr-verify-publication-output-temporal-s-030929bd4981]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -7868,7 +7974,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0f'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-cert-manager-cai-63e467a9fe7a, nvkr-attest-sboms-output-nktp-kube-state-6248dc6aafc3, nvkr-attest-sboms-output-spire, nvkr-attest-sboms-output-spire-agent-image, nvkr-attest-sboms-output-temporal-ui-image, nvkr-capnico-controller-linux-amd64-sbom, nvkr-cluster-api-provider-provisioned-lin-eba583757c10, nvkr-nktp-operator-image-sbom, nvkr-nvke-node-fde-amd64-fetch-nvke-spire-agent, nvkr-nvke-node-fde-arm64-fetch-nvke-spire-agent, nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01, nvkr-nvkectl-linux-arm64-build-nvkectl, nvkr-nvkectl-linux-arm64-fetch-nvkectl, nvkr-package-postgresql-image-arm64, nvkr-package-publication-capnico-controller, nvkr-package-publication-nktp-metrics-ser-eebe54e615ac, nvkr-package-publication-spire-oidc-image-arm64, nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c, nvkr-process-nktp-metrics-server-image-pu-4cb3efc71983, nvkr-process-spire-crds-pull-spire-crds-c-11103d63a93b, nvkr-process-temporal-admin-tools-image-a-2e37748f989e, nvkr-publish-output-nktp-operator-image, nvkr-publish-output-spiffe-csi-image-arm64, nvkr-publish-output-temporal-ui-image-arm64, nvkr-sign-output-capi-controller-image, nvkr-sign-output-cert-manager-cainjector-image-arm64, nvkr-sign-output-cert-manager-webhook-image, nvkr-sign-output-nktp-kube-state-metrics-image-arm64, nvkr-sign-output-nktp-kubectl-image, nvkr-sign-output-nvke-node-image-amd64, nvkr-sign-output-nvke-node-image-arm64, nvkr-sign-output-spire-controller-manager-image, nvkr-verify-publication-output-cert-manag-d72fce3ac728, nvkr-verify-publication-output-nktp-kubec-58bc88c11e26, nvkr-verify-publication-output-postgresql-image-arm64, nvkr-verify-publication-output-spire-oidc-image]
+    needs: [nvkr-attest-sboms-output-cert-manager-cai-63e467a9fe7a, nvkr-attest-sboms-output-nktp-kube-state-6248dc6aafc3, nvkr-attest-sboms-output-spire, nvkr-attest-sboms-output-spire-agent-image, nvkr-attest-sboms-output-temporal-ui-image, nvkr-capnico-controller-linux-amd64-sbom, nvkr-cluster-api-provider-provisioned-lin-eba583757c10, nvkr-nktp-operator-image-sbom, nvkr-nvke-node-fde-amd64-fetch-nvke-spire-agent, nvkr-nvke-node-fde-arm64-fetch-nvke-spire-agent, nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01, nvkr-nvkectl-linux-arm64-build-nvkectl, nvkr-nvkectl-linux-arm64-fetch-nvkectl, nvkr-package-postgresql-image-arm64, nvkr-package-publication-capnico-controller, nvkr-package-publication-nktp-metrics-ser-eebe54e615ac, nvkr-package-publication-spire-oidc-image-arm64, nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c, nvkr-process-nktp-metrics-server-image-pu-4cb3efc71983, nvkr-process-spire-crds-pull-spire-crds-c-11103d63a93b, nvkr-process-temporal-admin-tools-image-a-2e37748f989e, nvkr-publish-output-nktp-operator-image, nvkr-publish-output-operator-tools-linux-arm64, nvkr-publish-output-spiffe-csi-image-arm64, nvkr-publish-output-temporal-ui-image-arm64, nvkr-sign-output-capi-controller-image, nvkr-sign-output-cert-manager-cainjector-image-arm64, nvkr-sign-output-cert-manager-webhook-image, nvkr-sign-output-nktp-kube-state-metrics-image-arm64, nvkr-sign-output-nktp-kubectl-image, nvkr-sign-output-nvke-node-image-amd64, nvkr-sign-output-nvke-node-image-arm64, nvkr-sign-output-spire-controller-manager-image, nvkr-verify-publication-output-cert-manag-d72fce3ac728, nvkr-verify-publication-output-nktp-kubec-58bc88c11e26, nvkr-verify-publication-output-postgresql-image-arm64, nvkr-verify-publication-output-spire-oidc-image]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -7986,7 +8092,7 @@ jobs:
             status=Failed
           elif [ "$skipped" -gt 0 ] || [ "${NVKR_FINALIZE_OUTCOME:-}" = skipped ]; then
             status='Incomplete (skipped)'
-          elif [ "$total" -eq 567 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
+          elif [ "$total" -eq 576 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
             status=Completed
           fi
           {
