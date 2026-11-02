@@ -3,8 +3,9 @@
 - **Decision status:** Proposed (design only; pending named-decider ratification)
 - **Implementation maturity:** Units T1–T5 and T7 are implemented for the `file` output form. T6 waits for the
   #285 layout import, so an `oci-layout` producer fails closed; see `reconciliation.md`.
-- **Acceptance-test maturity:** Contract-tested only. Linux executor tests use a fake container runtime; no real
-  tool execution, hosted Run or consumer verification exercises a pinned-tool producer.
+- **Acceptance-test maturity:** Contract-tested. Linux executor tests use a fake container runtime. One unrecorded
+  local run executed the AICR v1.2.0-rc1 recipe producer through the executor on Docker; no recorded Run, hosted
+  Run or consumer verification exercises a pinned-tool producer.
 - **Deciders:** Pending; release-engineering, catalog, execution and evidence owners must be named before
   ratification.
 - **Index:** Proposed ADR-27 supplements ADR-01–22 and proposed ADR-23/24/26; it remains outside the consolidated
@@ -377,6 +378,8 @@ The design questions left open by the issue were decided on 2026-10-30:
 Contract suites cover T1–T5 and T7: catalog form and refusals, Build Digest coverage of every §2 logical field,
 selection rules, the shared tool acquisition and one-pin-per-name, executor admission, invocation and output form,
 `wrapped-build` provenance with tool dependencies, and byte-stable default hosted generation. The Linux executor
-suite drives a fake container runtime, so it proves executor behavior, not container isolation. No pinned-tool
-producer has run against a real container runtime or hosted runner, T6 is unimplemented, and no claim follows from
-the #239 source-built AICR renders.
+suite drives a fake container runtime, so it proves executor behavior, not container isolation. A local developer
+run on Docker (linux/arm64) executed the AICR v1.2.0-rc1 `recipe` producer offline and observed one regular file
+bound to the tool executable digest. It is not a recorded Run and proves nothing about hosted isolation. No hosted
+Run or consumer verification exists, T6 is unimplemented, and no claim follows from the #239 source-built AICR
+renders.
