@@ -100,8 +100,9 @@ released, digest-pinned tool offline with fixed arguments and typed inputs, with
 It is design only.
 
 Proposed [ADR-28: Multi-platform executables](adr/0028-multi-platform-executable-indexes.md) designs one tool
-source for every platform of a release and executable outputs published as standard OCI image indexes, with
-the AICR CLI as the first migration and an inventory of existing executables to retrofit. It is design only.
+source for every platform of a release, where the platforms share a format, companions and admitted URL
+spellings, and executable outputs published as standard OCI image indexes. The AICR CLI is the first
+migration, and the ADR inventories existing executables to retrofit. It is design only.
 
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
 Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) covers branch

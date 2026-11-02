@@ -119,8 +119,11 @@ The ARM64 entry is the record PR #294 pins. The AMD64 digests were measured from
 this decision; the archive digest matches `aicr_checksums.txt`. `catalog pin` produces the real entries.
 
 - Lock v1 gains an optional `tools` list, sorted by platform and exclusive with `tool`. Each entry has exactly
-  the existing single-platform record shape. Older strict readers reject the field, as they reject
+  the single-platform `tool` record shape. Older strict readers reject the field, as they reject
   `derivedFrom` (ADR-22 §1).
+- The optional `companions` field, in the declaration and in each entry, is the companion contract proposed in
+  #286 (PR #294). It is not on `main`. Until it lands, the shape is the current `tool` record without
+  `companions`, and companion declarations remain unadmitted.
 - A list rather than an architecture-keyed map, as prebuilt artifacts use, because `darwin/arm64` and
   `linux/arm64` share an architecture.
 - Completeness is an exact key set: one entry per declared platform. A missing entry, or one that disagrees with
@@ -245,8 +248,8 @@ referrers on each child:  NVKR signature, SLSA provenance, SBOM; verified upstre
 
 | Consumer | Use | Notes |
 |---|---|---|
-| Dockerfile | `COPY --from=<repository>@sha256:<index> /aicr /usr/local/bin/aicr` | BuildKit selects the child for the build's target platform |
-| Shell | `crane export --platform linux/arm64 <repository>@sha256:<index> - \| tar -x aicr` | Any OCI image client; no NVKR decoder |
+| Dockerfile | `COPY --from=<repository>@sha256:<index> /aicr /aicr-attestation.sigstore.json /usr/local/bin/` | BuildKit selects the child for the build's target platform. Copying the companion keeps `aicr bundle --attest` working |
+| Shell | `crane export --platform linux/arm64 <repository>@sha256:<index> - \| tar -x aicr aicr-attestation.sigstore.json` | Any OCI image client; no NVKR decoder |
 | ORAS | `oras pull --platform linux/arm64 <repository>@sha256:<index>`, then `tar -xzf` | The titled layer downloads as one tarball |
 | Kubernetes | An `image` volume referencing `<repository>@sha256:<index>` | The kubelet selects the node's platform. Image volumes are stable since v1.36 and mount read-only. The v1.31 alpha documented the mount as `noexec`, so a pod that runs the tool copies it to an executable volume unless its runtime permits exec (open question 6) |
 | NVKR diagnostic | `release pull --output aicr --out <directory>` | Writes `<directory>/<os>-<arch>/<file>` for every platform with the existing exact-file checks; selects no single platform, as for OCI aggregates |
@@ -280,7 +283,7 @@ Every executable delivery in the maintained catalogs and Definitions, its curren
 | `nvkectl` | From-source component for both platforms in `nvke/release`, `nvke/module-tags` and `nvke/native-site`; ARM64-only copies in `nvke/module-cli-arm64` (as `nvkectl-arm64`), `nvke/local-site-arm64` and `nvke/nightly-site-arm64`; outputs `nvkectl` (AMD64) and `nvkectl-linux-arm64` in `nvke/core.yaml` and `nvke/definition.yaml` | One `nvkectl` output with `platforms` in both Definitions. The catalog needs no change. The combined Definition's qualification requires native smoke for each executable member, so this waits for unit E7 |
 | Operator tools (Helm, kubectl) | `tools/operator-amd64` and `tools/operator-arm64` pin the same releases twice; `operator-tools` is AMD64 in the NVKE Definitions and ARM64 in demo and diagnostic Definitions | Merge into `tools/operator` with multi-platform sources (Helm's member becomes `linux-{{.Arch}}/helm`). The NVKE `operator-tools` output takes `platforms` |
 | Installer tools | `tools/installer-hosted-arm64` (Helm release asset; clusterctl, kind, kubectl and ORAS from source) and `tools/installer-local-arm64`; `installer-tools-arm64` outputs in demo and diagnostic Definitions | ARM64 only today. Move Helm to the multi-platform source form; add `platforms` when a consumer needs AMD64 |
-| Native demo tools | `tools/native` pins Helm, kubectl, kind, clusterctl and ORAS three times each (`<tool>` Darwin, `<tool>-linux` ARM64, `<tool>-linux-amd64`), Packer and its QEMU plugin twice, and vmnet-helper and vmnet-client for Darwin only; also from-source nerdctl, NICoSim, nvkectl and the site-identity helper. Outputs `native-tools-<platform>`, `installer-tools-amd64`, `site-startup-tools-<arch>` and `nicosim-tools-<arch>` in `demo/tools/*.json` and the demo site Definitions | Collapse each tool to one source whose `platforms` include `darwin/arm64`. Component renames move Build Digests (§3), and the native demo adapter that maps per-platform IDs to command names changes with them. These Definitions run on one host, so their outputs may stay single-platform; Darwin outputs must |
+| Native demo tools | `tools/native` pins Helm, kubectl, kind, clusterctl and ORAS three times each (`<tool>` Darwin, `<tool>-linux` ARM64, `<tool>-linux-amd64`), Packer and its QEMU plugin twice, and vmnet-helper and vmnet-client for Darwin only; also from-source nerdctl, NICoSim, nvkectl and the site-identity helper. Outputs `native-tools-<platform>`, `installer-tools-amd64`, `site-startup-tools-<arch>` and `nicosim-tools-<arch>` in `demo/tools/*.json` and the demo site Definitions | Collapse each tool to one source whose `platforms` include `darwin/arm64`. Component renames move Build Digests (§3), and the native demo adapter that maps per-platform IDs to command names changes with them. These Definitions run on one host, so their outputs may stay single-platform; Darwin outputs must stay single-platform |
 | SBOM scanner (Syft) | Run-wide tool, not an output: AMD64 `syft` in `nvke/release` and `nvke/module-tags`, ARM64 `tools/sbom-arm64` (with a `releaseExecutable` component), `syft-amd64` and `syft-arm64` in `nvsentinel`; Definitions select `syft`, `syft-amd64` or `syft-arm64` | One `syft` source with both platforms; each Run uses its utility platform's entry (§2). Retires `tools/sbom-arm64` and the per-architecture names |
 | Signer (cosign) | Run-wide AMD64 tool in `nvke/release` and `nvke/module-tags` | No change until an ARM64 utility platform signs; then add `platforms` |
 | NVSentinel binaries | 19 from-source components for both platforms; 19 outputs each in `nvsentinel/binaries-amd64.yaml` and `binaries-arm64.yaml` | One Definition with 19 `platforms` outputs; retire the per-architecture Definitions after consumers move |
@@ -397,7 +400,8 @@ Each unit lands with table-driven contract tests that assert the coded error, no
 ## Follow-ups
 
 - **ADR-12 §1:** on acceptance, admit `platforms` for executable outputs and remove the exclusion sentence.
-- **ADR-22:** on acceptance, move §1–§2 into "Tool release assets" and lock v1.
+- **ADR-22:** on acceptance, move §1–§2 into "Tool release assets" and lock v1. Per-platform `companions`
+  depend on #286 (PR #294) landing first.
 - **ADR-01/02:** add `nvkr.dev/executable-index-build/v1` beside the image-index projection.
 - **ADR-20:** add the executable index publication form, its metadata binding and its `release pull` projection.
 - **ADR-13:** child SBOM referrers; verified upstream evidence referrers once #287 lands.

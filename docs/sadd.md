@@ -80,7 +80,9 @@ output form and toolchain image; these producers use the `wrapped-build` lane. A
 Nothing is implemented.
 
 Proposed [ADR-28](adr/0028-multi-platform-executable-indexes.md) designs multi-platform executables: one tool
-source declares every platform of a release and the lock pins one entry per platform in one transaction. An
+source declares every platform of a release and the lock pins one entry per platform in one transaction. A
+tool whose platforms need different formats or companions, or whose asset URLs use other OS or architecture
+spellings, keeps one source per platform. An
 executable output may declare a `platforms` set, published as a standard OCI image index whose children are
 minimal per-platform images holding the executables and their companions. Each child keeps its native Build
 Digest and evidence; the output gains an aggregate Build Digest. Nothing is implemented.
@@ -1244,7 +1246,7 @@ already obtained.
 | Deferred release registration transport | Registry/integration owners | Optional downstream discovery |
 | Proposed ADR-26 composite Definitions, then member Release reuse and composite qualification | Release-engineering, catalog, qualification and result-reuse owners | One combined Release from independently owned Definitions without a hand-maintained combined copy |
 | Proposed ADR-27 pinned-tool producers, then AICR layout output (NVIDIA/aicr#3534) and layout import | Catalog, execution, evidence and release-engineering owners | Outputs rendered by released tools, starting with AICR bundles, without rebuilding the tool from source |
-| Proposed ADR-28 multi-platform executables, then the AICR migration and the per-platform retrofits | Catalog, release-engineering, delivery and evidence owners | One tool source per release and one image-index output per executable, consumable by standard OCI clients |
+| Proposed ADR-28 multi-platform executables, then the AICR migration and the per-platform retrofits | Catalog, release-engineering, delivery and evidence owners | One tool source per release where platforms share a format, companions and admitted URL spellings, and one image-index output per executable, consumable by standard OCI clients |
 
 Qualified helper-image use remains unavailable until it satisfies ADR-07/18's executable/runtime admission.
 Source bootstrap records only the identities that actually participated; delivery by image cannot imply
