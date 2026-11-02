@@ -68,19 +68,27 @@ type nativeCloudInitSpec struct {
 
 type nativeCloudInitNode struct{ Name, UID, BootID string }
 
-func nativeCloudInitStatus(raw []byte) error {
+type nativeCloudInitResult struct {
+	Status            string                       `json:"status"`
+	ExtendedStatus    string                       `json:"extended_status"`
+	Errors            []json.RawMessage            `json:"errors"`
+	RecoverableErrors map[string][]json.RawMessage `json:"recoverable_errors"`
+}
+
+func nativeCloudInitDocument(raw []byte) (nativeCloudInitResult, error) {
+	var wire nativeCloudInitResult
 	if err := canonical.ValidateJSONDocument(raw); err != nil {
-		return err
+		return wire, err
 	}
+	err := json.Unmarshal(raw, &wire)
+	return wire, err
+}
+
+func nativeCloudInitStatus(raw []byte) error {
 	// Interpret only cloud-init's documented status fields. The host's actual
 	// command exit, independently observed from the Pod, is required as well.
-	var wire struct {
-		Status            string                       `json:"status"`
-		ExtendedStatus    string                       `json:"extended_status"`
-		Errors            []json.RawMessage            `json:"errors"`
-		RecoverableErrors map[string][]json.RawMessage `json:"recoverable_errors"`
-	}
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	wire, err := nativeCloudInitDocument(raw)
+	if err != nil {
 		return err
 	}
 	if wire.Status != "done" || wire.ExtendedStatus != "done" || wire.Errors == nil || wire.RecoverableErrors == nil || len(wire.Errors) != 0 || len(wire.RecoverableErrors) != 0 {
@@ -109,7 +117,7 @@ func nativeCloudInitPodManifest(namespace, name, node, image string) map[string]
 // node. The Pods have no API token, network need, host namespaces or writeable
 // host mount. Their CLI output is diagnostic evidence, never release authority.
 func runNativeCloudInitForArchitecture(ctx context.Context, work, kubeconfig, kubectl, kubernetes, image string, expectedCount int, expected []tenantNode, arch string,
-	capture func(context.Context, []string, string, time.Duration) ([]byte, error)) (result error) {
+	presenter Runner, capture func(context.Context, []string, string, time.Duration) ([]byte, error)) (result error) {
 	if err := requireContext(ctx); err != nil {
 		return err
 	}
@@ -211,7 +219,7 @@ func runNativeCloudInitForArchitecture(ctx context.Context, work, kubeconfig, ku
 	}()
 	for i, node := range nodes {
 		name := fmt.Sprintf("status-%d", i)
-		if err := nativeCloudInitProbe(ctx, work, namespace, name, node.Name, image, get); err != nil {
+		if err := nativeCloudInitProbe(ctx, work, namespace, name, node.Name, image, presenter, get); err != nil {
 			return err
 		}
 	}
@@ -223,7 +231,15 @@ func runNativeCloudInitForArchitecture(ctx context.Context, work, kubeconfig, ku
 }
 
 func nativeCloudInitProbe(ctx context.Context, work, namespace, name, node, image string,
-	get func(context.Context, string, ...string) ([]byte, error)) (result error) {
+	presenter Runner, get func(context.Context, string, ...string) ([]byte, error)) (result error) {
+	var observed nativeCloudInitPod
+	var observedRaw []byte
+	var stdout []byte
+	defer func() {
+		if result != nil && !errors.Is(result, ErrUnjoined) {
+			reportNativeBootstrapObservation(presenter, nativeCloudInitFailureSummary(observedRaw, stdout))
+		}
+	}()
 	manifest := nativeCloudInitPodManifest(namespace, name, node, image)
 	path := filepath.Join(work, "cloud-init-"+name+".json")
 	if err := privateJSON(path, manifest); err != nil {
@@ -244,7 +260,8 @@ func nativeCloudInitProbe(ctx context.Context, work, namespace, name, node, imag
 		}
 		recovery, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 		defer cancel()
-		stdout, err := get(recovery, name+"-failure-stdout", "logs", name, "-n", namespace, "--container=status", "--pod-running-timeout=5s")
+		recovered, err := get(recovery, name+"-failure-stdout", "logs", name, "-n", namespace, "--container=status", "--pod-running-timeout=5s")
+		stdout = recovered
 		if len(stdout) > 0 {
 			err = errors.Join(err, privateWrite(filepath.Join(work, "cloud-init-"+name+"-stdout.json"), stdout))
 		}
@@ -263,7 +280,6 @@ func nativeCloudInitProbe(ctx context.Context, work, namespace, name, node, imag
 	if err := json.Unmarshal(requested, &expected); err != nil || !reflect.DeepEqual(selected, expected) {
 		return errors.New("created cloud-init Pod differs from authored diagnostic")
 	}
-	var observed nativeCloudInitPod
 	for {
 		raw, err := get(ctx, name+"-observe", "get", "pod", name, "-n", namespace, "-o", "json")
 		if err != nil {
@@ -272,6 +288,7 @@ func nativeCloudInitProbe(ctx context.Context, work, namespace, name, node, imag
 		if err := json.Unmarshal(raw, &observed); err != nil || observed.Metadata.Name != name || observed.Metadata.Namespace != namespace || observed.Metadata.UID != created.Metadata.UID || observed.Metadata.DeletionTimestamp != nil || !sameInfraManifest(observed.Spec, created.Spec) {
 			return errors.New("cloud-init Pod identity or execution changed")
 		}
+		observedRaw = raw
 		if observed.Status.Phase == "Succeeded" || observed.Status.Phase == "Failed" {
 			break
 		}
@@ -279,7 +296,8 @@ func nativeCloudInitProbe(ctx context.Context, work, namespace, name, node, imag
 			return err
 		}
 	}
-	stdout, logErr := get(ctx, name+"-stdout", "logs", name, "-n", namespace, "--container=status", "--pod-running-timeout=5s")
+	var logErr error
+	stdout, logErr = get(ctx, name+"-stdout", "logs", name, "-n", namespace, "--container=status", "--pod-running-timeout=5s")
 	logsCaptured = true
 	if len(stdout) > 0 {
 		if err := privateWrite(filepath.Join(work, "cloud-init-"+name+"-stdout.json"), stdout); err != nil {

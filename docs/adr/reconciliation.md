@@ -3673,6 +3673,25 @@ exited with status 1 before deletion waiting began, and the parent failed after
 teardown finished afterward; natural deletion and complete joined cleanup did
 not pass. Actions artifact count was zero. This result does not establish a
 functional deletion fix or full E2E acceptance.
+[Run 41358202754](https://github.com/depohmel/nvkr/actions/runs/41358202754), on
+NVKR `bca74c3e9a4e07c99503c30ea0d14d8a721d8ee2` with the same frozen NVKE,
+completed fresh builds, identity handoff/proof and the site subtest (8.41
+seconds). The tenant subtest failed after 2086.58 seconds at the host cloud-init
+probe's terminal Pod phase/container-count check, before tenant DNS/workload
+acceptance. The public evidence does not distinguish a failed Pod from missing
+container status or establish the command exit/host JSON status. Natural tenant
+deletion, deletion waiting and owned VM/backend, DNS and network cleanup all
+finished. The parent failed after 6693.85 seconds because tenant acceptance
+failed; Actions artifact count was zero. This establishes natural deletion for
+that failed-tenant attempt, not a cause or functional fix for the preceding
+failures or full E2E acceptance.
+The cloud-init failure projection now selects only closed Pod/container reasons,
+bounded exit/signal/restart values and documented host status labels/error
+counts. Missing, invalid and oversized host JSON are distinguished; identities,
+raw output and arbitrary reason/error strings remain private. The original
+exact-execution, same-boot, zero-retry, zero-exit, read-only mount and clean-JSON
+checks remain required. Contract tests cover the projection; its fresh hosted
+exercise is pending.
 Historical [public Run 40578231640](https://github.com/depohmel/nvkr/actions/runs/40578231640)
 built a QCOW2 and passed NVKE's separate harness on AMD64 KVM, but encountered
 severe disk pressure and used best-effort teardown. It does not establish this

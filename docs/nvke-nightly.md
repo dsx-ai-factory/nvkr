@@ -123,6 +123,15 @@ deadlines and no redirects, proxy or credentials. Management API readiness and
 pod-observation availability use fixed labels. Bodies and transport errors stay
 private; these probes neither retry deletion nor grant readiness acceptance.
 
+A failed tenant cloud-init probe can project closed Pod/container reason labels,
+bounded exit/signal/restart values and documented cloud-init status labels/error
+counts through that same presenter. Missing, invalid and oversized JSON remain
+explicitly unavailable observations. Pod/node identities, arbitrary reason
+strings, error values and raw host stdout stay private. This changes neither
+the exact execution/identity checks nor the requirement for zero exit and clean
+completion. Contract tests cover the projection; its fresh hosted exercise is
+pending.
+
 The CI resource wrapper samples host memory/disk, cgroup memory events and Docker
 usage while the Go test runs, with a 15-second pause between samples. It records
 bounded kernel warnings before and after the workload. It preserves workload
@@ -223,6 +232,19 @@ command itself then exited with status 1 before deletion waiting began; the
 parent failed after 8033.05 seconds. Its private cause is unknown. Simulator/VM,
 DNS and network teardown finished, but natural deletion and complete joined
 cleanup did not pass. Actions artifact count was zero.
+
+[Run 41358202754](https://github.com/depohmel/nvkr/actions/runs/41358202754), on
+NVKR `bca74c3e9a4e07c99503c30ea0d14d8a721d8ee2` with the same frozen NVKE,
+completed fresh builds, identity handoff/proof and the site subtest (8.41
+seconds). The tenant subtest failed after 2086.58 seconds at the host cloud-init
+probe's terminal Pod phase/container-count check. Its public evidence does not
+identify the Pod reason, command exit or host JSON status. Tenant DNS/workload
+acceptance was not reached. Natural tenant deletion and deletion waiting both
+finished, followed by joined owned VM/backend, DNS and network cleanup. The
+parent still failed after 6693.85 seconds because tenant acceptance failed.
+Actions artifact count was zero. This establishes natural deletion for this
+failed-tenant attempt, not a proven cause or fix for the preceding failures or
+a successful complete E2E run.
 
 The native tenant owner uses NVKE's unfiltered JSON node-pool inventory and
 selects the already-observed cluster ID. This avoids the filtered CLI's separate

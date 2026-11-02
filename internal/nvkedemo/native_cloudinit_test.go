@@ -45,7 +45,7 @@ func TestNativeCloudInitBindsActualExecutionAndJoinsUIDCleanup(t *testing.T) {
 
 func nativeCloudInitExecutionCases(t *testing.T, count int) {
 	image := "example.invalid/selected-workload@sha256:" + strings.Repeat("b", 64)
-	for _, mode := range []string{"accepted", "accepted AMD64", "host failure", "recoverable error", "missing RRO", "restarted", "missing exit", "missing restarts", "wrong image", "Pod replaced", "node replaced", "node rebooted", "cluster replaced", "mutated command", "lifecycle", "startupProbe", "livenessProbe", "readinessProbe", "cleanup replacement", "cancel", "unjoined"} {
+	for _, mode := range []string{"accepted", "accepted AMD64", "accepted observation changes", "host failure", "recoverable error", "missing RRO", "restarted", "missing exit", "missing restarts", "wrong image", "Pod replaced", "node replaced", "node rebooted", "cluster replaced", "mutated command", "lifecycle", "startupProbe", "livenessProbe", "readinessProbe", "cleanup replacement", "cancel", "unjoined"} {
 		t.Run(mode, func(t *testing.T) {
 			root := privateTestDir(t)
 			nodes := nativeTopologyNodes(count)
@@ -65,6 +65,7 @@ func nativeCloudInitExecutionCases(t *testing.T, count int) {
 			deleted, cleanupObserved := false, false
 			pods := map[string]map[string]any{}
 			creates, logReads := 0, 0
+			observationMutation := false
 			original := errors.New("original observation failure")
 			capture := func(callCtx context.Context, args []string, phase string, budget time.Duration) ([]byte, error) {
 				if len(args) < 5 || args[0] != "kubectl" || args[1] != "--kubeconfig" || args[2] != "tenant.config" || budget <= 0 {
@@ -173,7 +174,7 @@ func nativeCloudInitExecutionCases(t *testing.T, count int) {
 					if mode == "Pod replaced" {
 						pod["metadata"].(map[string]any)["uid"] = "new-pod-uid"
 					}
-					image, mount, restarts, exit, phase := image, "Enabled", 0, 0, "Succeeded"
+					image, mount, restarts, exit, podPhase := image, "Enabled", 0, 0, "Succeeded"
 					if mode == "wrong image" {
 						image = "sha256:other"
 					}
@@ -184,10 +185,15 @@ func nativeCloudInitExecutionCases(t *testing.T, count int) {
 						restarts = 1
 					}
 					if mode == "host failure" || mode == "recoverable error" {
-						exit, phase = 1, "Failed"
+						exit, podPhase = 1, "Failed"
 					}
-					pod["status"] = map[string]any{"phase": phase, "containerStatuses": []any{map[string]any{"name": "status", "imageID": image, "containerID": "containerd://owned", "restartCount": restarts, "state": map[string]any{"terminated": map[string]int{"exitCode": exit}}, "volumeMounts": []any{map[string]string{"name": "host", "mountPath": "/host", "recursiveReadOnly": mount}}}}}
+					pod["status"] = map[string]any{"phase": podPhase, "containerStatuses": []any{map[string]any{"name": "status", "imageID": image, "containerID": "containerd://owned", "restartCount": restarts, "state": map[string]any{"terminated": map[string]int{"exitCode": exit}}, "volumeMounts": []any{map[string]string{"name": "host", "mountPath": "/host", "recursiveReadOnly": mount}}}}}
 					status := pod["status"].(map[string]any)["containerStatuses"].([]any)[0].(map[string]any)
+					if mode == "accepted observation changes" && strings.HasSuffix(phase, "-after-stdout") {
+						observationMutation = true
+						pod["status"].(map[string]any)["reason"] = "PRIVATE_DIAGNOSTIC_POD_REASON"
+						status["state"] = map[string]any{"terminated": map[string]any{"exitCode": 0, "signal": 9, "reason": "PRIVATE_DIAGNOSTIC_TERMINATION"}}
+					}
 					if mode == "missing exit" {
 						status["state"] = map[string]any{"terminated": map[string]any{}}
 					}
@@ -202,12 +208,22 @@ func nativeCloudInitExecutionCases(t *testing.T, count int) {
 				t.Fatalf("unexpected command: %s %v", phase, args)
 				return nil, nil
 			}
-			err := runNativeCloudInitForArchitecture(ctx, root, "tenant.config", "kubectl", "1.34.2", image, count, nodes, arch, capture)
+			presenter := &bootstrapObservationRecorder{}
+			err := runNativeCloudInitForArchitecture(ctx, root, "tenant.config", "kubectl", "1.34.2", image, count, nodes, arch, Runner{Progress: presenter}, capture)
 			if (err == nil) != accepted {
 				t.Fatalf("observation result=%v", err)
 			}
 			if accepted && (creates != count || logReads != count || !deleted) {
 				t.Fatalf("lost zero-retry all-node observation: creates=%d logs=%d deleted=%v", creates, logReads, deleted)
+			}
+			if accepted && presenter.Len() != 0 {
+				t.Fatal("successful cloud-init published failure diagnostics")
+			}
+			if mode == "accepted observation changes" && !observationMutation {
+				t.Fatal("fixture did not change observation-only fields after stdout")
+			}
+			if (mode == "host failure" || mode == "recoverable error") && !strings.Contains(presenter.String(), "phase=Failed") {
+				t.Fatal("actual cloud-init failure did not reach the nonblocking presenter")
 			}
 			if mode == "unjoined" {
 				if cleanupObserved || !errors.Is(err, ErrUnjoined) {

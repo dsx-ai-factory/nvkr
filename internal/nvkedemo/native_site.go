@@ -821,7 +821,7 @@ func (s *nativeSiteAttempt) runTenantRequest(ctx context.Context, runner Runner,
 	}
 	progress.update(time.Now(), "tenant-cloud-init", observed)
 	arch := s.assets.arch
-	if err := runNativeCloudInitForArchitecture(budget, out, tenantConfig, kubectl, request.Kubernetes, workloadImage, s.tenantNodeCount(), observed, arch, capture); err != nil {
+	if err := runNativeCloudInitForArchitecture(budget, out, tenantConfig, kubectl, request.Kubernetes, workloadImage, s.tenantNodeCount(), observed, arch, runner, capture); err != nil {
 		return err
 	}
 	if err := waitTenantDNS(budget, tenantConfig, kubectl, runner.Progress, capture); err != nil {
