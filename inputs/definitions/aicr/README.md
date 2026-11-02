@@ -8,8 +8,17 @@ Flux, Helm, Helmfile and Terraform without adding a hardware-profile model.
 The [catalog](../../catalogs/aicr/registry.yaml) owns the six producers and
 [source lock](../../catalogs/aicr/pins.lock.yaml). Source preparation downloads,
 verifies and vendors dependencies without changing upstream module pins. Builds
-compile and render offline, verify the generated bundle and normalize tar/gzip
-metadata before NVKR packages the exact archive bytes in OCI.
+compile and render offline with `aicr bundle --output oci-layout:<dir>`, check that
+the layout holds one manifest with one layer, and verify the unpacked bundle. The
+artifact is that layer's exact bytes, so its digest is the archive AICR itself
+packaged; NVKR does not repack it. NVKR still wraps it in its own `bundle-oci`
+manifest; importing AICR's manifest unchanged is follow-up work under ADR-27.
+
+OCI output renders AICR's registry variant of each bundle. Argo CD requires a
+repository URL, so the catalog passes the fixed literal `oci://registry.invalid/aicr-bundle`.
+It never resolves: consumers set the Argo CD `repoURL` to wherever they host the
+bundle. `argocd-helm` takes `repoURL` at install time and Flux uses AICR's default
+OCIRepository name `aicr-bundle`; neither embeds a registry.
 
 ```sh
 make build
@@ -30,13 +39,14 @@ extracting it and following upstream deployment instructions; NVKR does not appl
 Admission and integrity preserve exact archive names. Extraction owners must handle
 case-insensitive, Unicode-normalization or reserved-name collisions on their destination filesystem.
 
-The pinned source is `fa705ec263a54eeb0ca25cb24c9f20c5d8504dca`. Other coordinates
+The pinned source is AICR `v1.2.0-rc1` (`0a4d1a2fe2fa9245fc298b924b9825aaac09d2a3`),
+the first release that writes an OCI layout without pushing. Other coordinates
 are ordinary catalog selections, not NVKR capabilities or hardware guarantees.
 The pinned upstream lacks a generic GB200 recipe and labels VR200 Preview.
 Referenced charts, images and providers are not vendored: these are not air-gap
 payloads. GitOps repository settings and cluster acceptance belong downstream.
 
 [Reconciliation](../../../docs/adr/reconciliation.md#aicr-deployment-bundles)
-records the earlier local six-output Run and its limits. Changes to catalog
-membership change build identity; that historical Run does not validate this
-trimmed catalog or the current branch against hardware or hosted services.
+records the local six-output Runs and their limits. Changes to the catalog
+change build identity; those Runs do not validate the inputs against hardware or
+hosted services.

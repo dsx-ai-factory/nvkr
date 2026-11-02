@@ -75,8 +75,8 @@ func TestMaintainedAICRBundleInputs(t *testing.T) {
 
 func assertAICRSourceProducer(t *testing.T, producer, fetch ir.Node) {
 	t.Helper()
-	const commit = "fa705ec263a54eeb0ca25cb24c9f20c5d8504dca"
-	const tree = "10c8c6832fa5d6b37c431dc5aa5bb44c52b3d1a7"
+	const commit = "0a4d1a2fe2fa9245fc298b924b9825aaac09d2a3"
+	const tree = "3cf48fc6cb293ed0fe3d94332010b9fe8d31b681"
 	const image = "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c"
 	if fetch.Repo != "https://github.com/NVIDIA/aicr" || fetch.Commit != commit || fetch.TreeHash != tree ||
 		fetch.VendorImage != image || fetch.VendorSpecDigest == "" || fetch.Network != ir.NetworkDefault {
@@ -91,7 +91,7 @@ func assertAICRSourceProducer(t *testing.T, producer, fetch ir.Node) {
 	for _, value := range producer.Env {
 		environment[value.Name] = value.Value
 	}
-	if environment["GIT_VERSION"] != commit || environment["BUILD_VERSION"] != "0.0.0-nvkr."+commit[:12] || environment["SOURCE_DATE_EPOCH"] != "1792385421" {
+	if environment["GIT_VERSION"] != commit || environment["BUILD_VERSION"] != "1.2.0-rc1" || environment["SOURCE_DATE_EPOCH"] != "1793628041" {
 		t.Fatalf("AICR build stamps do not bind the frozen source: %+v", environment)
 	}
 	for _, required := range []string{"go mod download", "go mod verify", "go mod vendor", "sha256sum -c -"} {
@@ -99,9 +99,9 @@ func assertAICRSourceProducer(t *testing.T, producer, fetch ir.Node) {
 			t.Fatalf("AICR dependency fetch omits %q", required)
 		}
 	}
-	for _, required := range []string{"-mod=vendor", "GOPROXY=off", "--os ubuntu --intent training", `--deployer "$3"`, "gzip -n"} {
+	for _, required := range []string{"-mod=vendor", "GOPROXY=off", "--os ubuntu --intent training", `--deployer "$3"`, `--output "oci-layout:$out/layout"`, `"$out/aicr" verify`, `cp "$layer" "$out/bundle.tar.gz"`} {
 		if !strings.Contains(strings.Join(producer.Command, "\n"), required) {
-			t.Fatalf("AICR build omits its offline rendering/archive contract %q", required)
+			t.Fatalf("AICR build omits its offline rendering/layer contract %q", required)
 		}
 	}
 }
