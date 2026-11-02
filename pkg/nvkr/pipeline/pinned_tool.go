@@ -185,13 +185,22 @@ func stagePinnedToolExecutable(ctx context.Context, n ir.Node, source, parent st
 		return "", "", e.Wrap(e.CodeBuildFailed, err, "creating private tool directory")
 	}
 	name := path.Base(n.ExecutableArchive.Member)
-	if err := materializeHeldInput(ctx, dir, name, held); err != nil {
+	// Create the copy with its final mode: some bind-mount filesystems refuse a
+	// later chmod of a read-only file. O_EXCL never follows an existing entry.
+	file, err := os.OpenFile(filepath.Join(dir, name), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o555)
+	if err == nil {
+		written, writeErr := held.WriteToContext(ctx, file)
+		err = errors.Join(writeErr, file.Sync(), file.Close())
+		if err == nil && written != held.Size() {
+			err = fmt.Errorf("wrote %d of %d bytes", written, held.Size())
+		}
+	}
+	if err == nil {
+		err = os.Chmod(dir, 0o555)
+	}
+	if err != nil {
 		_ = removePrivateTree(dir)
 		return "", "", e.Wrap(e.CodeBuildFailed, err, "staging pinned tool for %q", n.ID)
-	}
-	if err := errors.Join(os.Chmod(filepath.Join(dir, name), 0o555), os.Chmod(dir, 0o555)); err != nil {
-		_ = removePrivateTree(dir)
-		return "", "", e.Wrap(e.CodeBuildFailed, err, "sealing pinned tool for %q", n.ID)
 	}
 	return dir, name, nil
 }
