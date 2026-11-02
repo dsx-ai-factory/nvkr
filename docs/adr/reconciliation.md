@@ -3711,6 +3711,24 @@ and local command status observations now separate those boundaries. Raw errors
 and identities remain private; acceptance, no-retry and unknown-completion
 retention rules are unchanged. Contract tests cover this projection; hosted
 exercise and a successful complete E2E run remain pending.
+
+On NVKR `9003ce02b8f02fdedce795c6ad6a4a5e005e4545` with the same frozen NVKE,
+[runs #24](https://github.com/depohmel/nvkr/actions/runs/41379174782),
+[#25](https://github.com/depohmel/nvkr/actions/runs/41379745382) and
+[#26](https://github.com/depohmel/nvkr/actions/runs/41381639339) failed during
+utility-image bootstrap on Ubuntu snapshot metadata/package HTTP 502/503.
+The parent tests failed after 111.29, 587.48 and 66.71 seconds, before any VM
+or new failure projection was exercised; all Actions artifact counts were zero.
+Local HTTP 200 samples do not establish hosted recovery. The exact AMD64 base's
+APT 3.2.0 already retries three times; controlled local acquisition probes
+confirmed recovery, exhaustion and SHA-256 rejection, not a hosted image build.
+Failure-only diagnostic utility exports now observe the host's three locked
+suite metadata URLs with optional curl, five-second GET deadlines and a requested
+four-MiB size cap (streaming enforcement requires curl 8.4.0 or later). Only fixed
+suite labels and bounded HTTP/exit statuses reach stderr; bodies and curl errors
+are discarded. Host responses are not BuildKit APT or package-availability
+proof. Original exit, no-ID output, cleanup, image validation and all source
+pins remain unchanged. Hosted exercise and full E2E acceptance remain pending.
 Historical [public Run 40578231640](https://github.com/depohmel/nvkr/actions/runs/40578231640)
 built a QCOW2 and passed NVKE's separate harness on AMD64 KVM, but encountered
 severe disk pressure and used best-effort teardown. It does not establish this

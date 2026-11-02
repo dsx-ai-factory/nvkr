@@ -72,6 +72,21 @@ checksum checks. Missing or corrupt inputs fail; local mode never falls back to
 downloading release archives. The pinned base images and signed Ubuntu snapshot
 still require network access. Both optional inputs require Docker Buildx.
 
+After a failed Buildx export in `--diagnostic-local` mode, optional host-side
+curl probes can report HTTP statuses for the locked snapshot's three suite
+metadata URLs. Each GET has a five-second limit, no redirects or retries, and
+sets curl's four-MiB maximum-file-size option. Streaming size enforcement
+requires [curl 8.4.0 or later](https://curl.se/docs/manpage.html#--max-filesize);
+older curl may exceed that size when the response length is unknown. Bodies are
+discarded and the time limit still applies. Curl configuration files are disabled;
+the host's proxy
+environment and the admitted CA bundle, when supplied, still apply. Only fixed
+suite labels, HTTP statuses and curl exit codes reach stderr; bodies and curl
+errors are discarded. Missing curl or a failed observation preserves the
+original build failure, empty image-ID output and cleanup. Host metadata 200
+does not prove package availability or the BuildKit APT path. These observations
+neither retry the build nor authorize image loading or validation.
+
 ```sh
 CONTAINER_RUNTIME=docker NVKR_BUILD_ARCHIVES=/absolute/path/to/archives \
   NVKR_BUILD_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \

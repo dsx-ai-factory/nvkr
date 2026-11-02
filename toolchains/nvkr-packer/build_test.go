@@ -36,6 +36,19 @@ func toolchainFixtureDir(t *testing.T, root string) string {
 	return here
 }
 
+func toolchainCurlFixture(t *testing.T, root string) {
+	t.Helper()
+	const script = `#!/bin/sh
+printf '%s\n' "$*" >> "$TEST_CURL_CALLS"
+printf '%s' "${TEST_CURL_STATUS:-200}"
+printf 'PRIVATE_CURL_ERROR\n' >&2
+exit "${TEST_CURL_EXIT:-0}"
+`
+	if err := os.WriteFile(filepath.Join(root, "curl"), []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestToolchainValidatedImageID(t *testing.T) {
 	if _, err := exec.LookPath("jq"); err != nil {
 		t.Skip("requires jq")
@@ -51,11 +64,19 @@ func TestToolchainValidatedImageID(t *testing.T) {
 		wantExit                   int
 		flags                      []string
 		wantError, wantID          bool
+		curlStatus, curlExit       string
+		ordinary, missingCurl, ca  bool
 	}{
 		{name: "exact validated ID", inspected: measured, smokeExit: "0", wantID: true},
 		{name: "normalize bare ID", inspected: strings.TrimPrefix(measured, "sha256:"), smokeExit: "0", wantID: true},
 		{name: "native smoke failure emits no ID", inspected: measured, smokeExit: "42", wantError: true},
-		{name: "failed export emits no ID", inspected: measured, smokeExit: "0", buildExit: "42", wantError: true},
+		{name: "failed export emits no ID", inspected: measured, smokeExit: "0", buildExit: "42", wantError: true, wantExit: 42},
+		{name: "host snapshot unavailable", inspected: measured, smokeExit: "0", buildExit: "42", wantError: true, wantExit: 42, curlStatus: "503"},
+		{name: "host transport failure", inspected: measured, smokeExit: "0", buildExit: "42", wantError: true, wantExit: 42, curlStatus: "000", curlExit: "28"},
+		{name: "private malformed curl output", inspected: measured, smokeExit: "0", buildExit: "42", wantError: true, wantExit: 42, curlStatus: "PRIVATE_STATUS"},
+		{name: "admitted CA bundle", inspected: measured, smokeExit: "0", buildExit: "42", wantError: true, wantExit: 42, ca: true},
+		{name: "ordinary failed export has no probe", inspected: measured, smokeExit: "0", buildExit: "42", wantError: true, wantExit: 42, ordinary: true},
+		{name: "optional curl missing", inspected: measured, smokeExit: "0", buildExit: "42", wantError: true, wantExit: 42, missingCurl: true},
 		{name: "unlink failure emits no ID", inspected: measured, smokeExit: "0", cleanupCommand: "rm", wantError: true, wantExit: 1},
 		{name: "directory cleanup failure emits no ID", inspected: measured, smokeExit: "0", cleanupCommand: "rmdir", wantError: true, wantExit: 1},
 		{name: "export exit survives unlink failure", inspected: measured, smokeExit: "0", buildExit: "42", cleanupCommand: "rm", wantError: true, wantExit: 42},
@@ -67,6 +88,7 @@ func TestToolchainValidatedImageID(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			here := toolchainFixtureDir(t, dir)
+			toolchainCurlFixture(t, dir)
 			for _, name := range []string{"build.sh", "toolchain.lock.json"} {
 				data, err := os.ReadFile(name)
 				if err != nil {
@@ -105,15 +127,38 @@ esac
 					t.Fatal(err)
 				}
 			}
-			args := append([]string{filepath.Join(here, "build.sh"), "--arch", runtime.GOARCH,
-				"--diagnostic-local", "--print-validated-image-id"}, tc.flags...)
+			args := []string{filepath.Join(here, "build.sh"), "--arch", runtime.GOARCH, "--print-validated-image-id"}
+			if !tc.ordinary {
+				args = append(args, "--diagnostic-local")
+			}
+			args = append(args, tc.flags...)
+			probePath := dir + string(os.PathListSeparator) + os.Getenv("PATH")
+			if tc.missingCurl {
+				if err := os.Remove(filepath.Join(dir, "curl")); err != nil {
+					t.Fatal(err)
+				}
+				for _, name := range []string{"cat", "dirname", "jq", "uname", "id", "mktemp", "chmod", "tr", "rm", "rmdir"} {
+					path, err := exec.LookPath(name)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := os.Symlink(path, filepath.Join(dir, name)); err != nil {
+						t.Fatal(err)
+					}
+				}
+				probePath = dir
+			}
 			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, "bash", args...)
 			cmd.Env = append(os.Environ(), "CONTAINER_RUNTIME="+fake, "TEST_CALLS="+log,
 				"TEST_ARCH="+runtime.GOARCH, "TEST_IMAGE_ID="+tc.inspected, "TEST_EXPECTED_ID="+measured,
 				"TEST_SMOKE_EXIT="+tc.smokeExit, "TEST_BUILD_EXIT="+tc.buildExit, "NVKR_BUILD_ARCHIVES=", "NVKR_BUILD_CA_BUNDLE=",
-				"TMPDIR="+dir, "PATH="+dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+				"TEST_CURL_CALLS="+filepath.Join(dir, "curl-calls"), "TEST_CURL_STATUS="+tc.curlStatus, "TEST_CURL_EXIT="+tc.curlExit,
+				"TMPDIR="+dir, "PATH="+probePath)
+			if tc.ca {
+				cmd.Env = append(cmd.Env, "NVKR_BUILD_CA_BUNDLE="+fake)
+			}
 			var diagnostics bytes.Buffer
 			cmd.Stderr = &diagnostics
 			out, err := cmd.Output()
@@ -141,6 +186,44 @@ esac
 			}
 			if string(out) != want {
 				t.Fatalf("stdout=%q; want only validated ID %q", out, want)
+			}
+			if strings.Contains(diagnostics.String(), "PRIVATE") {
+				t.Fatal("private curl output became public")
+			}
+			probeCalls, readErr := os.ReadFile(filepath.Join(dir, "curl-calls"))
+			wantProbe := tc.buildExit == "42" && !tc.ordinary && !tc.missingCurl
+			if wantProbe {
+				if readErr != nil || strings.Count(string(probeCalls), "InRelease\n") != 3 {
+					t.Fatal("failed diagnostic export did not make exactly three probes", readErr)
+				}
+				for i, line := range strings.Split(strings.TrimSpace(string(probeCalls)), "\n") {
+					wantURL := "https://snapshot.ubuntu.com/ubuntu/20260920T000000Z/dists/" + []string{"resolute", "resolute-updates", "resolute-security"}[i] + "/InRelease"
+					if !strings.HasPrefix(line, "-q --proto =https --http1.1 ") || !strings.Contains(line, "--connect-timeout 3 --max-time 5 --max-filesize 4194304 --retry 0 --output /dev/null --write-out %{http_code} ") || !strings.HasSuffix(line, wantURL) {
+						t.Fatal("probe lost its bounds, source binding or private output handling", line)
+					}
+					if tc.ca && !strings.Contains(line, "--cacert "+fake+" ") {
+						t.Fatal("probe did not use the admitted CA bundle")
+					}
+				}
+				wantHTTP := tc.curlStatus
+				if wantHTTP == "" {
+					wantHTTP = "200"
+				}
+				if wantHTTP == "000" || strings.HasPrefix(wantHTTP, "PRIVATE") {
+					wantHTTP = "unavailable"
+				}
+				wantCurlExit := tc.curlExit
+				if wantCurlExit == "" {
+					wantCurlExit = "0"
+				}
+				if !strings.Contains(diagnostics.String(), "suite=resolute http="+wantHTTP+" curl-exit="+wantCurlExit+"\n") {
+					t.Fatal("closed status observation missing", diagnostics.String())
+				}
+			} else if !os.IsNotExist(readErr) {
+				t.Fatal("probe ran after success or outside diagnostic failure", readErr)
+			}
+			if tc.missingCurl && !strings.Contains(diagnostics.String(), "Snapshot host HTTP observation unavailable: curl missing") {
+				t.Fatal("optional curl absence changed or hid the primary failure")
 			}
 			calls, _ := os.ReadFile(log)
 			if strings.Contains(string(calls), "image inspect --format") {

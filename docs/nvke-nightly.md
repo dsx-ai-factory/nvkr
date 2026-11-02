@@ -267,6 +267,27 @@ command status observations distinguish these boundaries without publishing
 raw errors. They do not change acceptance, retry mutation or relax dependency
 retention. Contract tests cover the projection; fresh hosted exercise is pending.
 
+On NVKR `9003ce02b8f02fdedce795c6ad6a4a5e005e4545` with the same frozen NVKE,
+[run #24](https://github.com/depohmel/nvkr/actions/runs/41379174782),
+[run #25](https://github.com/depohmel/nvkr/actions/runs/41379745382) and
+[run #26](https://github.com/depohmel/nvkr/actions/runs/41381639339) failed during
+utility-image bootstrap. The pinned Ubuntu snapshot returned HTTP 502/503 for
+metadata in #24/#26 and package downloads in #25. The parent tests failed after
+111.29, 587.48 and 66.71 seconds respectively, before any VM or new failure
+projection was exercised. All three had zero Actions artifacts. Local metadata
+and sampled package downloads returned 200; that does not establish the hosted
+path. A controlled probe of the exact AMD64 base's APT 3.2.0 confirmed its default
+three retries, failure after exhaustion and SHA-256 mismatch rejection. Adding
+that same retry count would not change acquisition behavior.
+
+Diagnostic utility builds now project optional, failure-only host curl statuses
+for the three locked suite metadata URLs. These bounded observations compare a
+different client/network path at failure time; host metadata 200 does not prove
+package health or APT success inside BuildKit. Raw bodies and curl errors are
+discarded. Original build exit, no image-ID emission, cleanup and image
+validation remain unchanged. The source/snapshot pins and APT recipe are unchanged.
+Contract coverage is separate from fresh hosted exercise and full E2E acceptance.
+
 The native tenant owner uses NVKE's unfiltered JSON node-pool inventory and
 selects the already-observed cluster ID. This avoids the filtered CLI's separate
 cluster-name lookup during deletion. Worker identity and infrastructure checks
