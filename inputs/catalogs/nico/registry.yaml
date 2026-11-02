@@ -5,28 +5,38 @@ apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
   name: nico
-  description: Source-packaged NICo umbrella and prerequisite charts, plus source-built NICo Core and Flow images, from one infra-controller release pin.
+  description: Source-packaged NICo umbrella, prerequisite and Flow charts, plus source-built NICo Core and Flow images, from one infra-controller release pin.
 components:
   # Subcharts are vendored as local directories, so packaging needs no repository access.
   nico-chart:
     fromSource: true
     source: nico
-    artifactPath: charts/nico-2.2.2.tgz
+    artifactPath: charts/nico-2.3.0.tgz
     writeDir: charts
-    buildCommand: ['package', 'helm', '--version=2.2.2', '--app-version=v2.2.2', '--destination=charts/']
+    buildCommand: ['package', 'helm', '--version=2.3.0', '--app-version=v2.3.0', '--destination=charts/']
     outputType: tarball
     platforms: [linux/amd64, linux/arm64]
   nico-prereqs-chart:
     fromSource: true
     source: nico
-    artifactPath: charts/nico-prereqs-2.2.2.tgz
+    artifactPath: charts/nico-prereqs-2.3.0.tgz
     writeDir: charts
-    buildCommand: ['package', 'helm-prereqs', '--version=2.2.2', '--app-version=v2.2.2', '--destination=charts/']
+    buildCommand: ['package', 'helm-prereqs', '--version=2.3.0', '--app-version=v2.3.0', '--destination=charts/']
+    outputType: tarball
+    platforms: [linux/amd64, linux/arm64]
+  # Flow is a standalone release outside the umbrella; its chart needs no dependencies.
+  nico-flow-chart:
+    fromSource: true
+    source: nico
+    artifactPath: charts/nico-flow-2.3.0.tgz
+    writeDir: charts
+    buildCommand: ['package', 'helm/nico-flow', '--version=2.3.0', '--app-version=v2.3.0', '--destination=charts/']
     outputType: tarball
     platforms: [linux/amd64, linux/arm64]
   # The one image behind the umbrella chart's global.image.repository/tag. The source-owned
-  # native build and runtime base Dockerfiles are built first and bound into the release
-  # Dockerfile by digest, because rootless BuildKit admits no material inputs.
+  # native build and runtime base Dockerfiles, whose FROM lines upstream pins by digest, are
+  # built first and bound into the release Dockerfile by digest, because rootless BuildKit
+  # admits no material inputs.
   nico-core-image:
     fromSource: true
     source: nico
@@ -40,29 +50,30 @@ components:
     versionStamp:
       NICO_VERSION: "{{.Tag}}"
       NICO_COMMIT: "{{.Commit}}"
+      NICO_DATE: "{{.Date}}"
     buildCommand:
       - sh
       - -euc
       - |
         case '{{.Arch}}' in
-          amd64) suffix=x86_64; arg=X86_64
-            rust='rust:1.97.1-slim-bookworm=docker-image://docker.io/library/rust@sha256:2775a09d208ff0d7c1f50490c45b62db929e87ba1dcbc3f2132ac71a704bcdd3'
-            debian='debian:12-slim=docker-image://docker.io/library/debian@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3' ;;
-          arm64) suffix=aarch64; arg=AARCH64
-            rust='arm64v8/rust:1.97.1-slim-bookworm=docker-image://docker.io/arm64v8/rust@sha256:5da9de501c1aef013c94009b16d860aa51b098fc238ab7b8b1a82866bdce02b9'
-            debian='arm64v8/debian:12-slim=docker-image://docker.io/arm64v8/debian@sha256:acad2f5f6d93d7a3d5e2e2c74c62176a08b7b95721801c752ecaab0885dd136d' ;;
+          amd64) suffix=x86_64; arg=X86_64 ;;
+          arm64) suffix=aarch64; arg=AARCH64 ;;
           *) echo 'Unsupported NICo Core architecture' >&2; exit 1 ;;
         esac
         revision="$(printf '%.8s' "$NICO_COMMIT")"
+        timestamp="$NICO_DATE"
+        # Both bases install the Kea packages at the version upstream records beside them.
+        kea="$(cat /src/dev/docker/kea.version)"
+        [ -n "$kea" ] || { echo 'NICo Core kea.version must name a Kea package version' >&2; exit 1; }
         layouts="$(mktemp -d)"
-        for base in build:"$rust" runtime:"$debian"; do
+        for base in build runtime; do
           buildctl-daemonless.sh build --frontend dockerfile.v0 \
             --local context=/src/. --local dockerfile=/src/dev/docker \
-            --opt "filename=Dockerfile.${base%%:*}-container-$suffix" \
+            --opt "filename=Dockerfile.$base-container-$suffix" \
             --opt 'platform=linux/{{.Arch}}' \
-            --opt "context:${base#*:}" \
-            --output "type=oci,dest=$layouts/${base%%:*},tar=false" \
-            --metadata-file "$layouts/${base%%:*}.json"
+            --opt "build-arg:KEA_VERSION=$kea" \
+            --output "type=oci,dest=$layouts/$base,tar=false" \
+            --metadata-file "$layouts/$base.json"
         done
         # Assignments, not inline substitutions, so set -e stops on a missing or ambiguous digest.
         digest() {
@@ -83,9 +94,10 @@ components:
           --opt "build-arg:CONTAINER_RUNTIME_$arg=nico-core-runtime" \
           --opt "context:nico-core-runtime=oci-layout://runtime@$runtime_digest" \
           --opt "build-arg:VERSION=$NICO_VERSION" --opt "build-arg:CI_COMMIT_SHORT_SHA=$revision" \
+          --opt "build-arg:CI_COMMIT_TIMESTAMP=$timestamp" \
           --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
           --output 'type=oci,dest=/src/bin/nico-core-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true'
-  # The optional nico-flow subchart's image; the standalone REST charts are not packaged here.
+  # The standalone nico-flow chart's image; the standalone REST charts are not packaged here.
   nico-flow-image:
     fromSource: true
     source: nico
@@ -112,5 +124,5 @@ components:
 sources:
   nico:
     repo: https://github.com/dsx-ai-factory/infra-controller
-    constraint: v2.2.2
+    constraint: v2.3.0
     toolchainImage: alpine/helm@sha256:a6cf54599ccb99d90cf0712b30f03fdb3cab062e6b94e0418cc4db7e8a1464b2

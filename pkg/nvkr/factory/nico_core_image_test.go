@@ -81,7 +81,8 @@ func TestNICoCoreImageChainsNativeBases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stamps := nicoStampEnv(t, cat, "nico-core-image", map[string]string{"NICO_VERSION": pin.Tag, "NICO_COMMIT": pin.Commit})
+	stamps := nicoStampEnv(t, cat, "nico-core-image", map[string]string{"NICO_VERSION": pin.Tag, "NICO_COMMIT": pin.Commit, "NICO_DATE": catalog.EpochDate(pin.SourceDateEpoch)})
+	const keaVersion = "2.2.0-6"
 	const digestDiagnostic = "base metadata must name exactly one sha256 image digest"
 	buildDigest, runtimeDigest := "sha256:"+strings.Repeat("a", 64), "sha256:"+strings.Repeat("b", 64)
 	for _, arch := range []struct{ name, suffix, arg string }{
@@ -95,20 +96,33 @@ func TestNICoCoreImageChainsNativeBases(t *testing.T) {
 			// metadata failures report the digest diagnostic.
 			diagnostic string
 			unstamped  bool
+			// The source's kea.version content; "-" leaves the file absent.
+			kea        string
+			noBuildKit bool
 		}{
-			{"complete", nicoCoreMetadata(buildDigest), nicoCoreMetadata(runtimeDigest), false, "", false},
-			{"missing version stamp", nicoCoreMetadata(buildDigest), nicoCoreMetadata(runtimeDigest), true, "", true},
-			{"failed build base", "fail", nicoCoreMetadata(runtimeDigest), true, "", false},
-			{"failed runtime base", nicoCoreMetadata(buildDigest), "fail", true, "", false},
-			{"missing digest", nicoCoreMetadata(buildDigest), nicoCoreMetadata(), true, "NICo Core runtime " + digestDiagnostic, false},
-			{"duplicate digest", nicoCoreMetadata(buildDigest, buildDigest), nicoCoreMetadata(runtimeDigest), true, "NICo Core build " + digestDiagnostic, false},
-			{"short digest", nicoCoreMetadata(buildDigest), nicoCoreMetadata("sha256:bbbb"), true, "NICo Core runtime " + digestDiagnostic, false},
+			{"complete", nicoCoreMetadata(buildDigest), nicoCoreMetadata(runtimeDigest), false, "", false, keaVersion + "\n", false},
+			{"missing version stamp", nicoCoreMetadata(buildDigest), nicoCoreMetadata(runtimeDigest), true, "", true, keaVersion + "\n", true},
+			{"missing Kea version", nicoCoreMetadata(buildDigest), nicoCoreMetadata(runtimeDigest), true, "", false, "-", true},
+			{"empty Kea version", nicoCoreMetadata(buildDigest), nicoCoreMetadata(runtimeDigest), true, "kea.version must name a Kea package version", false, "\n", true},
+			{"failed build base", "fail", nicoCoreMetadata(runtimeDigest), true, "", false, keaVersion + "\n", false},
+			{"failed runtime base", nicoCoreMetadata(buildDigest), "fail", true, "", false, keaVersion + "\n", false},
+			{"missing digest", nicoCoreMetadata(buildDigest), nicoCoreMetadata(), true, "NICo Core runtime " + digestDiagnostic, false, keaVersion + "\n", false},
+			{"duplicate digest", nicoCoreMetadata(buildDigest, buildDigest), nicoCoreMetadata(runtimeDigest), true, "NICo Core build " + digestDiagnostic, false, keaVersion + "\n", false},
+			{"short digest", nicoCoreMetadata(buildDigest), nicoCoreMetadata("sha256:bbbb"), true, "NICo Core runtime " + digestDiagnostic, false, keaVersion + "\n", false},
 		} {
 			t.Run(arch.name+"/"+tc.name, func(t *testing.T) {
 				fixture, stub := t.TempDir(), t.TempDir()
 				argsFile := filepath.Join(stub, "args")
 				if err := os.WriteFile(filepath.Join(stub, "buildctl-daemonless.sh"), []byte(nicoCoreBuildKitStub), 0o755); err != nil {
 					t.Fatal(err)
+				}
+				if tc.kea != "-" {
+					if err := os.MkdirAll(filepath.Join(fixture, "dev", "docker"), 0o755); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(filepath.Join(fixture, "dev", "docker", "kea.version"), []byte(tc.kea), 0o644); err != nil {
+						t.Fatal(err)
+					}
 				}
 				ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 				defer cancel()
@@ -128,9 +142,12 @@ func TestNICoCoreImageChainsNativeBases(t *testing.T) {
 				}
 				out, err := cmd.CombinedOutput()
 				recorded, readErr := os.ReadFile(argsFile)
-				if tc.unstamped {
+				if tc.noBuildKit {
 					if err == nil || !os.IsNotExist(readErr) {
-						t.Fatalf("unstamped Core build reached BuildKit (err=%v, args=%v):\n%s", err, readErr, out)
+						t.Fatalf("Core build without stamps or Kea version reached BuildKit (err=%v, args=%v):\n%s", err, readErr, out)
+					}
+					if !strings.Contains(string(out), tc.diagnostic) {
+						t.Fatalf("Core build did not report %q:\n%s", tc.diagnostic, out)
 					}
 					return
 				}
@@ -167,8 +184,9 @@ func TestNICoCoreImageChainsNativeBases(t *testing.T) {
 				layouts := map[string]string{}
 				for i, stage := range []string{"build", "runtime"} {
 					call := calls[i]
-					if !slices.Contains(call, "filename=Dockerfile."+stage+"-container-"+arch.suffix) || !slices.Contains(call, "platform=linux/"+arch.name) {
-						t.Fatalf("%s base invocation does not select the native %s Dockerfile: %q", stage, arch.name, call)
+					if !slices.Contains(call, "filename=Dockerfile."+stage+"-container-"+arch.suffix) || !slices.Contains(call, "platform=linux/"+arch.name) ||
+						!slices.Contains(call, "build-arg:KEA_VERSION="+keaVersion) {
+						t.Fatalf("%s base invocation does not select the native %s Dockerfile with the Kea version: %q", stage, arch.name, call)
 					}
 					for _, value := range call {
 						if dest, ok := strings.CutPrefix(value, "type=oci,dest="); ok {
@@ -192,6 +210,7 @@ func TestNICoCoreImageChainsNativeBases(t *testing.T) {
 					// The upstream version helper stamps these; both must follow the locked pin.
 					"build-arg:VERSION=" + pin.Tag,
 					"build-arg:CI_COMMIT_SHORT_SHA=" + pin.Commit[:8],
+					"build-arg:CI_COMMIT_TIMESTAMP=" + catalog.EpochDate(pin.SourceDateEpoch),
 					"type=oci,dest=" + fixture + "/bin/nico-core-" + arch.name + ".oci.tar,oci-mediatypes=true,rewrite-timestamp=true",
 				} {
 					if !slices.Contains(release, want) {
