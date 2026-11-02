@@ -10,7 +10,7 @@
   ratification.
 - **Index:** Proposed ADR-28 supplements ADR-01–22 and proposed ADR-23/24/26/27; it remains outside the
   consolidated contract set until accepted. It builds on the tool companion contract proposed in #286 (PR #294),
-  which is not on `main`.
+  which is not on `main`. Implementation is tracked in #296 and the retrofit in #297.
 - **Relates to:** ADR-01 (`nvkr.build` schemas), ADR-02 §2 (aggregate logical projection), ADR-03 (coded errors),
   ADR-04 (signing), ADR-11 §1–§2 (direct selection, no sibling reuse), ADR-12 §1 (concrete targets and the
   executable-aggregate exclusion this decision lifts), ADR-13 (SBOMs, `evidence: none`), ADR-16 (artifact check
@@ -271,8 +271,8 @@ Verification Policy.
 
 ### 10. Retrofit inventory
 
-Every executable delivery in the maintained catalogs and Definitions, its current form and its migration. A
-separate tracking issue owns this list. Each row is its own reviewed change after the units it needs land.
+Every executable delivery in the maintained catalogs and Definitions, its current form and its migration.
+#297 tracks this list. Each row is its own reviewed change after the units it needs land.
 
 | Delivery | Current form | Migration |
 |---|---|---|
@@ -402,7 +402,7 @@ Each unit lands with table-driven contract tests that assert the coded error, no
 - **ADR-20:** add the executable index publication form, its metadata binding and its `release pull` projection.
 - **ADR-13:** child SBOM referrers; verified upstream evidence referrers once #287 lands.
 - **ADR-27 §3:** replace the separate-source rule with per-platform lock entries.
-- **Retrofit:** track §10 in its own issue.
+- **Retrofit:** #297 tracks §10.
 
 ## Acceptance evidence
 
