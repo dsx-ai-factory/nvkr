@@ -9,6 +9,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -31,6 +32,14 @@ for a in "$@"; do case "$a" in *:/nvkr/output) out=${a%:/nvkr/output};; esac; do
 		t.Fatal(err)
 	}
 	return path
+}
+
+func TestAdmitPinnedToolHostRefusesEmulation(t *testing.T) {
+	node := pinnedToolNode(nil)
+	node.Platform = map[string]string{"amd64": "linux/arm64", "arm64": "linux/amd64"}[runtime.GOARCH]
+	if got := pinnedToolCode(AdmitPinnedToolHost(node)); got != e.CodeEngineCapability {
+		t.Fatalf("cross-architecture pinned tool admitted with code %q", got)
+	}
 }
 
 func TestPinnedToolExecutorContract(t *testing.T) {
@@ -69,6 +78,7 @@ func TestPinnedToolExecutorContract(t *testing.T) {
 				defer cancel()
 			}
 			node := pinnedToolNode(executable)
+			node.Platform = "linux/" + runtime.GOARCH
 			result, err := (Local{}).ExecNode(node, RunOptions{Ctx: ctx, Launch: true, Runtime: fakePinnedToolRuntime(t, test.runtime),
 				SourceRoot: filepath.Join(root, "src"), ToolExecutable: tool, Stdout: &strings.Builder{}, Stderr: &strings.Builder{}})
 			if got := pinnedToolCode(err); got != test.code {

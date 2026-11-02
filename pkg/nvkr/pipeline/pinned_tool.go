@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"sort"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -48,11 +49,24 @@ func admitPinnedTool(n ir.Node, opts RunOptions) error {
 	if opts.DryRun {
 		return nil
 	}
-	if err := heldfile.RequireExecutableSupport(); err != nil {
-		return e.Wrap(e.CodeEngineCapability, err, "pinned-tool build %q requires Linux held executables", n.ID)
+	if err := AdmitPinnedToolHost(n); err != nil {
+		return err
 	}
 	if opts.ToolExecutable == "" {
 		return e.New(e.CodeEngineCapability, "pinned-tool build %q has no tool/%s input", n.ID, n.Tool)
+	}
+	return nil
+}
+
+// AdmitPinnedToolHost requires a Linux execution host whose platform equals the
+// build's target platform (ADR-27 §3, §8): held executables are Linux-only, and a
+// pinned tool never runs under emulation.
+func AdmitPinnedToolHost(n ir.Node) error {
+	if err := heldfile.RequireExecutableSupport(); err != nil {
+		return e.Wrap(e.CodeEngineCapability, err, "pinned-tool build %q requires Linux held executables", n.ID)
+	}
+	if host := runtime.GOOS + "/" + runtime.GOARCH; host != n.Platform {
+		return e.New(e.CodeEngineCapability, "pinned-tool build %q targets %s but this host is %s; emulation is not admitted", n.ID, n.Platform, host)
 	}
 	return nil
 }
