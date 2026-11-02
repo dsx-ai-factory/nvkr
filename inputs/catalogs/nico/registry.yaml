@@ -53,6 +53,8 @@ components:
             debian='arm64v8/debian:12-slim=docker-image://docker.io/arm64v8/debian@sha256:acad2f5f6d93d7a3d5e2e2c74c62176a08b7b95721801c752ecaab0885dd136d' ;;
           *) echo 'Unsupported NICo Core architecture' >&2; exit 1 ;;
         esac
+        # Both stamps are required before any BuildKit work, unset or empty.
+        : "${NICO_VERSION:?missing NICo version stamp}" "${NICO_COMMIT:?missing NICo commit stamp}"
         revision="$(printf '%.8s' "$NICO_COMMIT")"
         layouts="$(mktemp -d)"
         for base in build:"$rust" runtime:"$debian"; do
@@ -102,6 +104,7 @@ components:
       - sh
       - -euc
       - >-
+        : "${NICO_VERSION:?missing NICo version stamp}";
         buildctl-daemonless.sh build --frontend dockerfile.v0
         --local context=/src/rest-api --local dockerfile=/src/rest-api/docker/production
         --opt filename=Dockerfile.nico-flow --opt platform=linux/{{.Arch}}
