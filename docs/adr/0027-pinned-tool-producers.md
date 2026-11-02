@@ -241,7 +241,8 @@ Admission runs before tool acquisition, staging, subprocess or output work.
 | `run generate`, hosted GitHub Run | Supported once implemented; `pipeline-attested`, on ADR-18 §3 default hosted routing |
 | Native ARC disk route | Not admitted; ADR-18 limits it to disk producers |
 | Qualified execution, `run check-artifacts`, `run qualify` over a pinned-tool output | Deferred; `engine-capability` |
-| Directory output, companion staging, authored-file inputs, networked tool modes | Deferred; `engine-capability` or catalog rejection per §11 |
+| Directory output form, companion staging, authored-file inputs | Deferred; `engine-capability`, or `invalid-catalog` for a malformed declaration (§11) |
+| Networked tool modes | Not admitted. An authored network request fails with `invalid-catalog`; a tool flag that needs network is not parsed (§3), so network denial stops it at run time with `build-failed` |
 
 ### 9. AICR: what v1.1.2 supports and what waits
 
@@ -279,7 +280,7 @@ Pinned-tool producers reuse existing ADR-03 codes.
 | Named tool source has no tool declaration or lock record; tool pin out of date with its declaration; two selections of one tool name with different pins | `unpinned-source` |
 | Tool, target and toolchain platforms differ; non-Linux execution host; deferred output form, lane or input kind | `engine-capability` |
 | Held executable or staged material differs from its pin or observed digest | `verify-failed` |
-| Tool exits nonzero, or the output directory does not hold exactly the declared form | `build-failed` |
+| Tool exits nonzero, including a network-dependent mode stopped by network denial, or the output directory does not hold exactly the declared form | `build-failed` |
 | Producer result or provenance omits the tool dependency | `provenance-missing` |
 | Cancellation or wall-time expiry | `timeout` |
 
