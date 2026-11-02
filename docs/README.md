@@ -108,6 +108,11 @@ source for every platform of a release, where the platforms share a format, comp
 spellings, and executable outputs published as standard OCI image indexes. The AICR CLI is the first
 migration, and the ADR inventories existing executables to retrofit. It is design only.
 
+Proposed [ADR-29: cluster observation and artifact attribution](adr/0029-cluster-observation-and-artifact-attribution.md)
+and its [feature design](cluster-observation-and-artifact-attribution.md) cover discovery and comparison of
+OCI, Helm, OS images and host packages against authenticated build outputs, with validation, portable
+evidence and public/TestGrid reporting. The design assesses AICR reuse; it implements no new capability.
+
 Proposed [ADR-30: authenticated result reuse](adr/0030-authenticated-result-reuse.md) designs cross-Run reuse
 of complete named outputs and the test matrix for implementing it; reuse is not implemented.
 

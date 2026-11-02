@@ -499,3 +499,10 @@ A from-source builder capability for a disk-image output. The catalog binds one 
 artifact path. Generic build requirements use the shared execution contract. Typed IR/Plan lowering is admitted;
 VM execution remains a separately admitted capability.
 _Avoid_: Disk format, public output format, virtual machine artifact
+
+**Cluster observation (proposed)**:
+A scoped, time-bounded description of discovered software and its comparison with an authenticated build
+baseline under [proposed ADR-29](docs/adr/0029-cluster-observation-and-artifact-attribution.md). It separates
+produced/acquired identity, installation attribution and measured runtime content, with explicit coverage gaps.
+It is not an authored public lifecycle input; this proposal implements no collector or qualification capability.
+_Avoid_: Cluster realization, complete host attestation, conformance receipt, release authorization

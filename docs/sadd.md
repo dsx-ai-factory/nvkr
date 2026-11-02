@@ -92,6 +92,11 @@ its [aggregate identity](adr/0028-multi-platform-executable-indexes.md#5-aggrega
 [image-index publication](adr/0028-multi-platform-executable-indexes.md#6-publication-a-standard-image-index-over-minimal-per-platform-images).
 Nothing is implemented.
 
+Proposed [ADR-29](adr/0029-cluster-observation-and-artifact-attribution.md) separates cluster observations
+and attribution from build identity and qualification. The [feature design](cluster-observation-and-artifact-attribution.md)
+covers OCI, Helm, OS and host packages, AICR reuse and explicit observation gaps. It is design only;
+no new collector, dependency, runtime evidence publisher or provisioning authority is implemented.
+
 ## Assumptions {#assumptions}
 
 These assumptions are subject to the current ADRs and milestone acceptance criteria.
