@@ -83,6 +83,12 @@ AICR has public snapshot, inventory, attestation and verifier packages; the
 and missing guarantees. A successful collector call cannot hide omitted measurements, and an AICR recipe
 subject cannot stand in for an NVKR Run/output subject.
 
+The NVKR-specific layer correlates those observations with exact authenticated built/acquired outputs and
+their SBOMs. Missing runtime, host or installation-lineage measurements require admitted collector extensions;
+mapping names or versions alone cannot complete that join. The design's
+[worked examples](../cluster-observation-and-artifact-attribution.md#worked-example-was-the-built-artifact-deployed)
+separate reused observations, required enrichment and comparison outcomes across all four artifact classes.
+
 Under current contribution policy, pinned subprocess integration or reviewed source adaptation are candidates;
 direct Go imports require a separate explicit dependency-policy decision. Adoption requires pinned source/tool
 identity, license and transitive-dependency review, compatibility checks and required security gates. This
