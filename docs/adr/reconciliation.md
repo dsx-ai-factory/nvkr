@@ -3219,8 +3219,8 @@ layout, the entry falls from 373,817 to 264,038 bytes. The workers grow by 185,1
 bytes, and the largest file is now the entry.
 Signer jobs and the finalizer are byte-identical. Expanded parsing events in the entry are unchanged at
 13,308, because signers dominate them: 139 OIDC jobs account for 10,984 events. The flat default producer
-remains at 394,695 bytes and 47,055 events, which is 94.1% of the 50,000-event bound. Its 139 signers
-account for 10,984 of those events. Contracts resolve every forwarded fragment back to the exact
+was then at 394,695 bytes and 47,055 events, which is 94.1% of the 50,000-event bound. Its 139 signers
+accounted for 10,984 of those events. Contracts resolve every forwarded fragment back to the exact
 Plan-derived collector members, statuses and worker dependency reads. They also check that an unreported
 worker's fallback reproduces the replaced projection's null results and empty statuses. They also require each committed
 producer's OIDC jobs to sit in the entry workflow named by its anchored signer policy, and that policy to
@@ -3228,6 +3228,14 @@ admit no other committed workflow file. Lowering refuses worker or caller `id-to
 `CodeEngineCapability`. These are local generation and contract results. The hosted Run 40727132359 above
 predates fragment forwarding, so hosted execution of the new forwarding, including failure and cancellation
 reporting, is unrecorded. Signer relocation remains a proposed ADR-18 §8 design with no implementation.
+
+The maintained release Environment now also selects `githubExecutionPartitions`. The NVKE v0.23.0 DOCA OVS
+producer added one source fetch per release disk and took the flat release workflow to 47,731 events,
+above the 47,500 maintained threshold. Partitioned, the release entry has 272,696 bytes and 13,333 events;
+the largest of its 30 workers has 4,947. Every OIDC job stays in the entry, so the signer identity
+`nvkr-run.yml@refs/heads/main` is unchanged. The maintained bundle contract checks the private-image
+credential boundary on the flat reference that the workers must project exactly. These are local generation
+results. No partitioned release Run is recorded; the hosted development Run above is the closest evidence.
 
 Earlier flat-layout measurements recorded 564 original jobs and 16 collectors, down from
 596 original jobs and 16 collectors in the private-storage draft based on the same upstream code.

@@ -232,14 +232,21 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 			Steps  []struct{ ID string } `json:"steps"`
 		} `json:"jobs"`
 	}
-	if err := yaml.Unmarshal(bundle.Files[factory.GitHubWorkflowPath], &workflow); err != nil {
-		t.Fatal(err)
-	}
 	diskJobs := map[string]int{}
-	for _, job := range workflow.Jobs {
-		for _, step := range job.Steps {
-			if step.ID == "run-disk" {
-				diskJobs[job.RunsOn]++
+	// Partitioned bundles place disk jobs in sibling workers beside the entry.
+	for name, raw := range bundle.Files {
+		if !strings.HasPrefix(name, ".github/workflows/") {
+			continue
+		}
+		workflow.Jobs = nil
+		if err := yaml.Unmarshal(raw, &workflow); err != nil {
+			t.Fatal(err)
+		}
+		for _, job := range workflow.Jobs {
+			for _, step := range job.Steps {
+				if step.ID == "run-disk" {
+					diskJobs[job.RunsOn]++
+				}
 			}
 		}
 	}

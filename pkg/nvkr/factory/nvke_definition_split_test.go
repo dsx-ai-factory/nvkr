@@ -155,6 +155,8 @@ func TestNVKEDefinitionSplitEnvironmentIsolation(t *testing.T) {
 			want.GitHubBundle = bundleName
 			want.Publication.RepositoryPrefix += "/" + family.name
 			want.Signing.Identity = "^" + regexp.QuoteMeta(identity) + "@refs/heads/main$"
+			// Each family's workflow fits flat; only the combined producer partitions.
+			want.GitHubExecutionPartitions = false
 			sources := map[string]bool{"https://github.com/dsx-ai-factory/nvke": true}
 			if family.name == "disks" {
 				// Disks also build the release catalog's NVIDIA OVN fork producers.

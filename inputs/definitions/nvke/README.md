@@ -8,7 +8,7 @@ full product acceptance are separate facts.
 ## Four-family pilot
 
 Four independent Definitions partition the combined candidate's exact named outputs. The core family also
-selects the NICo charts and NICo Core and Flow images and the services family selects local-path-provisioner, which the combined Definition omits because its flat workflow has no remaining YAML
+selects the NICo charts and NICo Core and Flow images and the services family selects local-path-provisioner, which the combined Definition omits; they were added while its flat workflow had no remaining YAML
 parsing headroom. They reuse the
 shared catalogs and pins; they do not import each other or change the combined Definition into a parent.
 
