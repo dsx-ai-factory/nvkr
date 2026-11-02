@@ -237,6 +237,32 @@ func TestGitHubWorkflowSizeAdmission(t *testing.T) {
 	}
 }
 
+func TestGitHubWorkflowExpressionLengthAdmission(t *testing.T) {
+	expression := func(body string) string { return "key: '${{" + body + "}}'\n" }
+	for _, tc := range []struct {
+		name  string
+		raw   string
+		valid bool
+	}{
+		{"exact", expression(strings.Repeat("x", maxGitHubExpressionBytes)), true},
+		{"over", expression(strings.Repeat("x", maxGitHubExpressionBytes+1)), false},
+		{"second expression over", expression("x") + "other: '${{" + strings.Repeat("x", maxGitHubExpressionBytes+1) + "}}'\n", false},
+		{"quoted braces stay inside", expression("format(''{{{0}}}'', a)" + strings.Repeat("x", maxGitHubExpressionBytes)), false},
+		{"text outside expressions", "key: '" + strings.Repeat("x", maxGitHubExpressionBytes+1) + " ${{ a }}'\n", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateGitHubWorkflowSize([]byte(tc.raw))
+			if tc.valid {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			}
+		})
+	}
+}
+
 func TestGitHubWorkflowYAMLNodeAdmission(t *testing.T) {
 	// Stream, document and sequence start/end events account for six nodes.
 	for _, tc := range []struct {

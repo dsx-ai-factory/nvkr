@@ -58,7 +58,7 @@ func partitionedRecoveryRun(t *testing.T) partitionedRun {
 	if err != nil {
 		t.Fatal(err)
 	}
-	model, _, err := githubExecutionModel(t.Context(), plan, projection)
+	model, layout, err := githubExecutionModel(t.Context(), plan, projection)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,9 @@ func partitionedRecoveryRun(t *testing.T) partitionedRun {
 	if err != nil {
 		t.Fatal(err)
 	}
-	partitions, err := partitionGitHubJobs(t.Context(), dependencies, githubMaximumResultInputs)
+	// Inline placement is outside this contract, so every operation stays a member.
+	layout.Pinned = nil
+	partitions, err := partitionGitHubJobs(t.Context(), dependencies, layout)
 	if err != nil {
 		t.Fatal(err)
 	}

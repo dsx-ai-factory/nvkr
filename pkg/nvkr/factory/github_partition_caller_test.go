@@ -42,7 +42,7 @@ func TestGitHubPartitionResultRewriteRequiresMarkers(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			node := githubYAMLMap("run", githubYAMLString(test.value))
-			err := rewriteGitHubPartitionResults(node, []string{"build"}, owners)
+			err := rewriteGitHubPartitionResults(node, githubFinalizerJobID, []string{"build"}, owners)
 			if test.refuse {
 				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
 				return

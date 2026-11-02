@@ -31,7 +31,7 @@ func TestExecutionGraphPartitionSemanticEquivalence(t *testing.T) {
 	order := []string{"independent", "source", "recovery", "consumer", "verify"}
 	for _, capacity := range []int{1, 2, 64} {
 		t.Run(fmt.Sprintf("capacity-%d", capacity), func(t *testing.T) {
-			partitions, err := partitionExecutionGraph(t.Context(), dependencies, capacity)
+			partitions, err := partitionExecutionGraph(t.Context(), dependencies, unitExecutionLayout(dependencies, capacity, 0))
 			if err != nil {
 				t.Fatal(err)
 			}

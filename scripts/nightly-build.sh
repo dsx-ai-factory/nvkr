@@ -81,6 +81,7 @@ api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/disp
   fail NVKR-E-UNAVAILABLE 'dispatch outcome is ambiguous; do not retry or guess the producing run' 30
 run_id=$(jq -er '.workflow_run_id | select(type == "number" and . > 0 and . <= 9007199254740991 and floor == .) | tostring' "$out/dispatch.json") ||
   fail NVKR-E-UNAVAILABLE 'dispatch returned no exact run ID; no latest-run fallback is allowed' 30
+printf 'Producing Run: https://github.com/%s/actions/runs/%s\n' "$GITHUB_REPOSITORY" "$run_id"
 # Reserve thirty minutes below the 360-minute job for admission and cleanup.
 deadline=$((SECONDS + 19800))
 while (( SECONDS < deadline )); do

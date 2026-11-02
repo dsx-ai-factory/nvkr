@@ -50,6 +50,7 @@ records source availability and remaining gaps.
 | Canonical Plans, graph views, comparison, and drift | [Plan and graph inspection](plan-and-graph-inspection.md) |
 | Registry/layout browsing, generic JSON export, output downloads, credentials, and metadata limits | [Release navigation](release-navigation.md) |
 | Publication graph, artifact subjects, and signing scope | [Publication architecture](publication-architecture.md) |
+| Review the S3 boot and package delivery contract | [ADR-20 contract](adr/0020-artifact-publication-and-target-configuration.md#s3-file-delivery-contract), [implementation boundary](adr/reconciliation.md#s3-boot-and-package-delivery-contract) |
 | Coordinated upstream versions and exact locks | [Generic pin-set example](generic-pin-set-example.md), [NVKE acquired charts](nvke-pin-set-usage.md) |
 | Reviewable updates and matching regeneration (the installed `catalog-refresh.yaml` is generated, never hand-edited) | [Catalog maintenance](catalog-maintenance.md) |
 | Chart slots, image outputs, and registry-independent bytes | [Declarative Helm bindings](declarative-helm-bindings.md) |
@@ -95,11 +96,16 @@ that release several digest-pinned Definitions as one Release, with a worked NVK
 implementation units. Units U1–U7 are implemented and contract-tested only; no hosted composite Run, publication or
 consumer verification has been exercised or recorded, and qualification and member Release reuse remain deferred.
 
+Proposed [ADR-27: Pinned-tool producers](adr/0027-pinned-tool-producers.md) designs producers that run one
+released, digest-pinned tool offline with fixed arguments and typed inputs, with AICR bundles as the first use.
+It is design only.
+
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
 Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) covers branch
 dispatch, separate generated development bundles, artifact downloads and short retention.
 Use [CI steps and logs](ci-step-and-log-readability.md) to investigate failures and
 [CI test performance](ci-test-performance.md) for the current profiling follow-up.
+[Execution partition scheduling](execution-partition-scheduling.md) records the partition layout measurement and decision.
 [CVE management](cve-management.md), [issue and PR management](github-issue-pr-management.md), and
 [contribution guidance](../CONTRIBUTING.md) own ongoing maintainer procedures.
 The [source-release procedure](../RELEASE.md) covers releasing NVKR itself,

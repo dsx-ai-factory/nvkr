@@ -65,10 +65,14 @@ Actions uploads contain only constructed selection JSON, exact producing-Run
 locator JSON and the cycle verdict JSON. The runtime job has no registry writer
 or OIDC signing permission, and Go's shared Actions cache is disabled.
 
+The native Go consumer admits AMD64 and ARM64 only when the profile's VM target,
+selected disk in the Plan and native execution host agree. It repeats that check
+after restoring the exact producer Plan; publication receipts still own artifact
+authentication. The maintained coordinator and producer currently select ARM64.
 No additional AMD64 producer bundle is introduced. A public AMD64 runner lane
-requires its own admitted artifact production support before the coordinator
-can select it. The upstream-OVN producer remains a separate manual diagnostic;
-the maintained native consumer currently selects NVIDIA OVN only.
+requires matching AMD64 artifacts and a measured complete consumer run before
+operational acceptance. The upstream-OVN producer remains a separate manual
+diagnostic; the maintained native consumer currently selects NVIDIA OVN only.
 
 ## Timeouts and evidence
 
