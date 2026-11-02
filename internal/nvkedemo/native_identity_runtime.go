@@ -558,6 +558,7 @@ func nativeIdentityHelperRequest(spec nativeStaticEntrySpec, runtime nativeIdent
 }
 
 func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runner Runner, ip, out string) (receipt *nativeSiteIdentityReceipt, resultErr error) {
+	handoffOperation := ""
 	progress := beginProgress(runner.Progress, "native-site-identity-handoff", PhaseStarted, PhaseFinished, PhaseFailed)
 	stage := beginProgress(runner.Progress, "native-identity-preflight", PhaseStarted, PhaseFinished, PhaseFailed)
 	advance := func(name string) {
@@ -565,6 +566,9 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 		stage = beginProgress(runner.Progress, name, PhaseStarted, PhaseFinished, PhaseFailed)
 	}
 	defer func() {
+		if resultErr != nil && handoffOperation != "" {
+			reportNativeBootstrapObservation(runner, "Site identity handoff stopped during "+handoffOperation+".\n")
+		}
 		if errors.Is(resultErr, ErrUnjoined) && s.unjoinedWork == nil {
 			s.unjoinedWork = resultErr
 		}
@@ -749,6 +753,7 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 		return nil, policyErr
 	}
 	advance("native-identity-handoff")
+	handoffOperation = "verify-helper"
 	check, err := k.exec(ctx, runtime.controller, "verify-helper", 15*time.Second, nil, "sha256sum", helperPath)
 	if err != nil {
 		return nil, err
@@ -756,27 +761,35 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	if !slices.Equal(strings.Fields(string(check)), []string{strings.TrimPrefix(s.assets.identity.helperSHA, "sha256:"), helperPath}) {
 		return nil, errors.New("staged identity helper changed before dispatch")
 	}
+	handoffOperation = "runtime-recheck"
 	if err := k.recheck(ctx, runtime, s.assets, spec, ip); err != nil {
 		return nil, err
 	}
+	handoffOperation = "prepare-request"
 	requestInput, err := nativeIdentityRequestFile(ctx, private.Work, request)
 	if err != nil {
 		return nil, err
 	}
 	defer requestInput.Close()
+	handoffOperation = "helper-command"
 	dispatchedAt := time.Now()
 	result, err := s.captureNativeIdentityMutation(ctx, time.Duration(request.BudgetSeconds+30)*time.Second, func(critical context.Context) ([]byte, error) {
-		return k.exec(critical, runtime.controller, "handoff-host", time.Duration(request.BudgetSeconds+30)*time.Second, requestInput, helperPath)
+		raw, commandErr := k.exec(critical, runtime.controller, "handoff-host", time.Duration(request.BudgetSeconds+30)*time.Second, requestInput, helperPath)
+		reportNativeBootstrapObservation(runner, nativeIdentityResultObservation(raw, commandErr))
+		return raw, commandErr
 	})
 	if err != nil {
 		return nil, err
 	}
+	handoffOperation = "validate-caller"
 	if result.CallerID != request.ExpectedCaller {
 		return nil, errors.New("handoff caller differs from the admitted controller")
 	}
+	handoffOperation = "validate-status"
 	if result.Status == nil || result.Status.ServerAddress != request.ServerAddress || result.Status.ServerPort != uint32(request.ServerPort) {
 		return nil, errors.New("source-owned SPIRE status differs from its selected permanent endpoint")
 	}
+	handoffOperation = ""
 	advance("native-identity-proof")
 	proofCtx, stopProof := context.WithTimeout(ctx, time.Minute)
 	defer stopProof()

@@ -246,6 +246,27 @@ Actions artifact count was zero. This establishes natural deletion for this
 failed-tenant attempt, not a proven cause or fix for the preceding failures or
 a successful complete E2E run.
 
+During run #22's fallback VM cleanup, a retained owned-guest serial snapshot
+projected a kernel OOM-kill marker. That label identifies neither the affected
+guest/process nor the original event time or its relationship to cloud-init.
+Runner memory samples do not establish headroom inside a guest.
+
+[Run 41369669608](https://github.com/depohmel/nvkr/actions/runs/41369669608), on
+NVKR `d58a4e6ddf02bc10951bbf6dd5d1266a5988a334` with the same frozen NVKE,
+completed fresh builds, bootstrap, stack installation and identity-policy
+preparation. The broad host identity-handoff phase failed after 38.64 seconds,
+before final identity proof or either Go subtest. The log does not distinguish
+helper verification, runtime recheck, request preparation, helper execution or
+result validation. The parent failed after 4866.96 seconds. The abbreviated
+cleanup phases do not establish joined VM/backend, DNS or network teardown;
+they are consistent with the unknown-completion retention path. Actions
+artifact count was zero. The cloud-init failure projection was not exercised.
+
+Fixed handoff operation labels and closed helper completion/error-code and local
+command status observations distinguish these boundaries without publishing
+raw errors. They do not change acceptance, retry mutation or relax dependency
+retention. Contract tests cover the projection; fresh hosted exercise is pending.
+
 The native tenant owner uses NVKE's unfiltered JSON node-pool inventory and
 selects the already-observed cluster ID. This avoids the filtered CLI's separate
 cluster-name lookup during deletion. Worker identity and infrastructure checks

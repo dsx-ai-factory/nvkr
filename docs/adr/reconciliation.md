@@ -3692,6 +3692,25 @@ raw output and arbitrary reason/error strings remain private. The original
 exact-execution, same-boot, zero-retry, zero-exit, read-only mount and clean-JSON
 checks remain required. Contract tests cover the projection; its fresh hosted
 exercise is pending.
+
+Run #22 also projected a kernel OOM-kill marker from a retained owned-guest
+serial snapshot during fallback cleanup. The public label does not identify
+its guest/process, original event time or causality; runner memory samples
+do not establish guest memory headroom.
+[Run 41369669608](https://github.com/depohmel/nvkr/actions/runs/41369669608), on
+NVKR `d58a4e6ddf02bc10951bbf6dd5d1266a5988a334` with the same frozen NVKE,
+completed fresh builds, bootstrap, full stack installation and identity-policy
+preparation. The broad host identity-handoff phase failed after 38.64 seconds,
+before final proof or either Go subtest. Its log does not distinguish the
+internal failing operation. The parent failed after 4866.96 seconds. Abbreviated
+cleanup does not establish joined VM/backend, DNS or network teardown and is
+consistent with unknown-completion resource retention. Actions artifact count
+was zero; the cloud-init failure projection was not exercised.
+Fixed handoff operation labels and closed helper-envelope/completion/error-code
+and local command status observations now separate those boundaries. Raw errors
+and identities remain private; acceptance, no-retry and unknown-completion
+retention rules are unchanged. Contract tests cover this projection; hosted
+exercise and a successful complete E2E run remain pending.
 Historical [public Run 40578231640](https://github.com/depohmel/nvkr/actions/runs/40578231640)
 built a QCOW2 and passed NVKE's separate harness on AMD64 KVM, but encountered
 severe disk pressure and used best-effort teardown. It does not establish this

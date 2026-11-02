@@ -872,6 +872,14 @@ host mutation and final proof still require Ready containers. Fixed policy
 operation labels distinguish creation, response validation and convergence
 failures without publishing terminal errors or private values.
 
+Handoff failure observations identify helper verification, runtime recheck,
+request preparation, helper execution or caller/status validation with fixed
+labels. The helper command also projects its bounded local exit status, exact
+result-envelope availability, closed completion state and allowlisted error
+code. Raw result fields, identities and errors stay private. These observations
+cannot establish remote completion or authorize cleanup; unknown completion
+continues to retain dependent controls.
+
 It uses the upstream generated NodeAgent client and the existing controller CSI
 workload identity. No arbitrary script, credential, socket relay, downloader or
 new Pod is accepted. The request describes selected endpoints and identities.

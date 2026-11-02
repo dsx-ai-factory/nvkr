@@ -143,7 +143,9 @@ case "$*" in
  *"-- sh -c umask 077; d="*)
   cmp - "$FIXTURE/tools/nvkr-site-identity-helper"
   printf 'identity-stage\n' >> "$EVENTS"; cat "$FIXTURE/identity-helper-receipt"; exit;;
- *"sha256sum /tmp/nvkr-site-identity/stage.fixture/helper"*) touch "$FIXTURE/identity-verified"; cat "$FIXTURE/identity-helper-receipt"; exit;;
+ *"sha256sum /tmp/nvkr-site-identity/stage.fixture/helper"*)
+  if test "${IDENTITY_VERIFY_FAILURE:-}" = 1; then printf 'PRIVATE_VERIFY_ERROR\n' >&2; exit 17; fi
+  touch "$FIXTURE/identity-verified"; cat "$FIXTURE/identity-helper-receipt"; exit;;
  *"-- /tmp/nvkr-site-identity/stage.fixture/helper"*)
   if test ! -e "$FIXTURE/identity-probed"; then
    cat > "$FIXTURE/identity-probe-request.json"
@@ -152,6 +154,7 @@ case "$*" in
    test -e "$FIXTURE/identity-imported"
    cat > "$FIXTURE/identity-handoff-request.json"
    printf 'identity-handoff\n' >> "$EVENTS"; touch "$FIXTURE/identity-handed-off"; cat "$FIXTURE/identity-result.json"
+   if test -n "${IDENTITY_HANDOFF_EXIT:-}"; then printf 'PRIVATE_HANDOFF_ERROR\n' >&2; exit "$IDENTITY_HANDOFF_EXIT"; fi
   fi; exit;;
 esac
 printf 'kubectl\n' >> "$EVENTS"
