@@ -4,6 +4,7 @@
 package factory
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"net/url"
@@ -14,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -21,6 +23,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/provenance"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 )
 
 var pinnedToolFixturePin = catalog.ToolPin{Format: "tar-gzip", Platform: "linux/amd64", ExecutablePath: "aicr",
@@ -274,6 +277,56 @@ func TestPinnedToolRendersOnDefaultHostedRouting(t *testing.T) {
 		if !hosted.MatchString(workflow) {
 			t.Fatalf("generated job %q is not on default hosted runner %q", job, environment.RunsOn)
 		}
+	}
+}
+
+// Hosted SBOM publication requires the index to cover every producer result, and
+// release evidence requires one inventory per selected component, so a pinned-tool
+// result needs its own wrapped-build subject rather than an exclusion.
+func TestPinnedToolResultIsCoveredByHostedSBOM(t *testing.T) {
+	definition, environment, stack := pinnedToolFactoryInputs(t, nil)
+	plan, err := Compile(t.Context(), definition, environment, stack, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(t.TempDir())
+	_, artifacts := planIndex(plan)
+	for _, component := range []string{"consumer", "recipe"} {
+		body := []byte(component + " bytes")
+		encoded, err := canonical.Marshal(pipeline.ArtifactResult{Component: component, SHA256: pipeline.FileDigest(body), Size: int64(len(body))})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := writeFactoryFile(t.Context(), artifacts["result/rendered/"+component].Path, encoded, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	node := planNode(plan, "rendered/sbom")
+	if err := executeSBOM(t.Context(), plan, node, artifacts, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	local := func(filename string) (string, error) { return filename, nil }
+	objects, err := sbomPublicationObjects(t.Context(), plan, artifacts[node.Outputs[0]], artifacts, local)
+	if err != nil || len(objects) != 3 {
+		t.Fatalf("hosted SBOM publication: objects=%d error=%v", len(objects), err)
+	}
+	var recipe sbom.BOM
+	for _, object := range objects[1:] {
+		var bom sbom.BOM
+		if err := canonical.UnmarshalExact(bytes.TrimSpace(object.Bytes), &bom); err != nil {
+			t.Fatal(err)
+		}
+		if bom.Metadata.Component.Name == "recipe" {
+			recipe = bom
+		}
+	}
+	lane := map[string]string{}
+	for _, property := range recipe.Metadata.Component.Properties {
+		lane[property.Name] = property.Value
+	}
+	if recipe.Metadata.Component.Type != "file" || lane["nvkr:lane"] != "wrapped-build" || lane["nvkr:fromSource"] != "false" ||
+		lane["nvkr:toolExecutable"] != pinnedToolFixturePin.ExecutableDigest {
+		t.Fatalf("pinned-tool SBOM subject = %+v", recipe.Metadata.Component)
 	}
 }
 
