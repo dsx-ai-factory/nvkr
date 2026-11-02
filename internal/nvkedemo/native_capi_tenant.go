@@ -183,8 +183,11 @@ func sameMachineInfra(a, b *TenantMachineInfra) bool {
 		reflect.DeepEqual(a.PreCommands, b.PreCommands) && len(a.BootstrapFiles) == 0 && len(b.BootstrapFiles) == 0
 }
 
-func (t *tenant) nativeCAPIRow(ctx context.Context, rows []tenantRow) (*tenantRow, error) {
+func (t *tenant) nativeCAPIClusterRow(rows []tenantRow) (*tenantRow, error) {
 	for _, row := range rows {
+		if row.Name == "" || !safeTenantIdentity(row.ID) {
+			return nil, errors.New("native cluster inventory received an invalid cluster identity")
+		}
 		if t.id != "" && row.ID == t.id && row.Name != t.name {
 			return nil, errors.New("native tenant identity changed its name; refusing adoption or removal")
 		}
@@ -199,6 +202,15 @@ func (t *tenant) nativeCAPIRow(ctx context.Context, rows []tenantRow) (*tenantRo
 		!sameMachineInfra(row.ControlPlane.Infra, &ownership.controlPlane) {
 		return nil, errors.New("native tenant infrastructure changed; refusing adoption or removal")
 	}
+	return row, nil
+}
+
+func (t *tenant) nativeCAPIRow(ctx context.Context, rows []tenantRow) (*tenantRow, error) {
+	row, err := t.nativeCAPIClusterRow(rows)
+	if err != nil || row == nil {
+		return row, err
+	}
+	ownership := t.nativeCAPI
 	// JSON inventory avoids NVKE's separate name lookup. Select only the
 	// already observed cluster ID; unrelated pools confer no ownership.
 	raw, err := t.capture(ctx, []string{t.cli(), "get", "nodepools", "-o", "json"}, "native-pool-ownership", 30*time.Second)
@@ -247,13 +259,17 @@ func (t *tenant) nativeCAPIRow(ctx context.Context, rows []tenantRow) (*tenantRo
 
 // A pool observation can fail while owned deletion is in progress. Confirm
 // cluster absence with one fresh inventory; a query failure alone is never
-// deletion evidence, and a still-present cluster keeps the original error.
+// deletion evidence. Unavailable reads may wait only within the deletion owner.
 func (t *tenant) nativeCAPIDeletionObserved(ctx context.Context, queryErr error) (*tenantRow, error) {
 	if !t.nativeCAPI.deleting || t.id == "" || ctx.Err() != nil || errors.Is(queryErr, ErrUnjoined) {
 		return nil, queryErr
 	}
+	pending, canWait := t.nativeDeletionReadFailure(ctx, queryErr).(*nativeDeletionReadPending)
 	rows, err := t.inventory(ctx)
 	if err != nil {
+		if _, unavailable := err.(*nativeDeletionReadPending); canWait && unavailable {
+			return nil, &nativeDeletionReadPending{cause: errors.Join(queryErr, err)}
+		}
 		return nil, errors.Join(queryErr, err)
 	}
 	if ctx.Err() != nil {
@@ -262,13 +278,15 @@ func (t *tenant) nativeCAPIDeletionObserved(ctx context.Context, queryErr error)
 	if rows == nil {
 		return nil, errors.Join(queryErr, errors.New("native deletion confirmation requires a cluster inventory array"))
 	}
-	for _, row := range rows {
-		if row.Name == "" || !safeTenantIdentity(row.ID) {
-			return nil, errors.Join(queryErr, errors.New("native deletion confirmation received an invalid cluster identity"))
+	row, err := t.nativeCAPIClusterRow(rows)
+	if err != nil {
+		return nil, errors.Join(queryErr, err)
+	}
+	if row != nil {
+		if canWait {
+			return nil, pending
 		}
-		if row.Name == t.name || row.ID == t.id {
-			return nil, queryErr
-		}
+		return nil, queryErr
 	}
 	return nil, nil
 }

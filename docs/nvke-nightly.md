@@ -82,6 +82,10 @@ policy convergence waits only for the unchanged pinned running context to become
 Ready within its existing deadline. Identity changes and unknown completion remain
 terminal. Tenant pool observation uses the supported unfiltered inventory with
 exact cluster/worker ownership, avoiding a separate name lookup during deletion.
+After owned deletion starts, joined read-command exit-1 observations can be
+retried within the existing 45-minute wait. They never establish absence or retry
+the delete command. Success still requires a fresh valid inventory proving absence;
+invalid JSON, changed ownership, cancellation and unjoined work remain failures.
 
 ## Evidence and privacy
 

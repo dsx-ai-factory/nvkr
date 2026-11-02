@@ -3623,7 +3623,10 @@ writable helper staging with source-supported shell, unchanged pinned-context
 readiness convergence, current/retained image-URL placeholders and unfiltered
 pool inventory with exact tenant ownership. Original private error capture,
 identity rejection, actual host cloud-init/workload/DNS acceptance, unknown-completion
-retention and natural tenant deletion/wait remain enforced. Temporary diagnostic
+retention and natural tenant deletion/wait remain enforced. The existing deletion wait
+can retry owner-classified joined read-command exit-1 failures after deletion starts,
+without repeating the mutation. Fresh valid absence remains required; malformed
+inventory, changed ownership and unsafe or canceled work are not retryable. Temporary diagnostic
 classifiers, failure-only health/curl probes, console drop-ins and the resource
 sampler are removed; required behavior retains focused regression coverage.
 
