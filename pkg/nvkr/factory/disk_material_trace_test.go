@@ -878,7 +878,7 @@ func TestLocalProducerRecordsOnlyDiskOutputInvocations(t *testing.T) {
 					if (owner != nil) != test.vm || scheduled.producers == nil {
 						return e.New(e.CodeInternal, "scheduler did not thread the expected owner/session")
 					}
-					if err := executeLocalProducer(ctx, scheduledPlan, node, scheduled, run); err != nil {
+					if err := localOperationSession(scheduledPlan, scheduled, nil, run).execute(ctx, node); err != nil {
 						return err
 					}
 					if owner != nil {
