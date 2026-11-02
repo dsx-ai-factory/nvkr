@@ -10,7 +10,7 @@ build:
   jobs: 1
   nvkeClone: nvke-source
 run:
-  out: .nvkr/nightly-site
+  out: nightly-site
   timeoutSeconds: 3600
   tenantWorkers: 1
   resources:

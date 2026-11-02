@@ -318,15 +318,19 @@ func TestNativeE2ESourceResolvesPathsBeforeChangingDirectory(t *testing.T) {
 }
 
 func TestHostedE2EUsesAuthoredConfiguration(t *testing.T) {
-	repository, err := filepath.Abs("../..")
+	config, err := filepath.Abs("../../demos/nightly-nvke.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Chdir(repository)
+	t.Chdir(t.TempDir())
+	repository, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
 	build, cfg, tenant, err := nativeE2EConfig(t.Context(), func(name string) string {
 		switch name {
 		case "NVKR_NVKE_E2E_CONFIG":
-			return "demos/nightly-nvke.yaml"
+			return config
 		case "NVKR_NVKE_E2E_SOURCE_COMMIT":
 			return strings.Repeat("a", 40)
 		case "NVKR_NVKE_E2E_TENANT":
@@ -337,7 +341,10 @@ func TestHostedE2EUsesAuthoredConfiguration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if build.Repository != repository || build.NVKEClone != filepath.Join(repository, "nvke-source") || cfg.Out != filepath.Join(repository, ".nvkr", "nightly-site") ||
+	if _, err := freshDestination(cfg.Out); err != nil {
+		t.Fatalf("authored output must admit a fresh hosted workspace: %v", err)
+	}
+	if build.Repository != repository || build.NVKEClone != filepath.Join(repository, "nvke-source") || cfg.Out != filepath.Join(repository, "nightly-site") ||
 		!tenant || !cfg.Cleanup || cfg.Conformance || cfg.TenantWorkers != 1 || build.Jobs != 1 || cfg.Runs != (RunInputs{}) || cfg.NVKR != "" ||
 		cfg.Resources != (NativeResources{SiteMemoryGiB: 7, TenantMemoryGiB: 3, HeadroomMiB: 1024, VCPUs: 4, Profile: "small"}) {
 		t.Fatalf("authored hosted configuration changed required inputs or lifecycle: build=%+v run=%+v", build, cfg)
