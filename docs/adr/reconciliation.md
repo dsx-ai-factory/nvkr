@@ -3582,7 +3582,7 @@ omit `.git`, but the release Dockerfile's `cargo new` creates an empty Git repos
 pinned upstream version crate in that state stamps the `VERSION` and `CI_COMMIT_SHORT_SHA` arguments and
 leaves the build date blank. The Core command derives both from the source lock through `versionStamp`: the
 pin's tag and its commit truncated to eight characters, so a pin update restamps them without editing the
-command, and a missing stamp stops before BuildKit. Flow stamps the same pin-derived version; its Dockerfile
+command, and a missing or empty stamp stops before BuildKit. Flow stamps the same pin-derived version; its Dockerfile
 declares no revision argument, so source inspection indicates its commit reports `unknown` and its build time
 is the build's wall clock. The timestamp argument
 from upstream [#6896](https://github.com/dsx-ai-factory/infra-controller/pull/6896) is not in `v2.2.2`
