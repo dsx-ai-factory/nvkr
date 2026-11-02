@@ -1,10 +1,10 @@
 # ADR-27 — Producers that run pinned release tools
 
 - **Decision status:** Proposed (design only; pending named-decider ratification)
-- **Implementation maturity:** Designed, not implemented. No `pinned-tool` builder type, catalog form, IR
-  field, executor or provenance mapping exists; see `reconciliation.md`.
-- **Acceptance-test maturity:** None. The implementation units below name the contract suites that must pass;
-  no contract test, generated bundle, hosted Run or consumer verification exercises a pinned-tool producer.
+- **Implementation maturity:** Units T1–T5 and T7 are implemented for the `file` output form. T6 waits for the
+  #285 layout import, so an `oci-layout` producer fails closed; see `reconciliation.md`.
+- **Acceptance-test maturity:** Contract-tested only. Linux executor tests use a fake container runtime; no real
+  tool execution, hosted Run or consumer verification exercises a pinned-tool producer.
 - **Deciders:** Pending; release-engineering, catalog, execution and evidence owners must be named before
   ratification.
 - **Index:** Proposed ADR-27 supplements ADR-01–22 and proposed ADR-23/24/26; it remains outside the consolidated
@@ -91,10 +91,11 @@ components:
     materials:
       recipe: aicr-gb300-generic-training-recipe
     toolArgs: [bundle, --recipe, '{{.Material "recipe"}}', --deployer, flux,
-      <aicr#3534 layout flag>, '{{.Output}}']
+      --output, 'oci-layout:{{.Output}}']
 ```
 
-Field names are proposed; the catalog owner fixes them at implementation. The contract is:
+The implemented field names are `tool`, `toolArgs` and `toolEnv`; the loader resolves the tool pin from the named
+source's lock record. The contract is:
 
 - **Exactly one tool invocation per producer.** A producer runs the pinned executable once with a fixed argument
   vector. A multi-step tool flow is a chain of producers joined by material bindings (§4), never an ordered step
@@ -158,6 +159,12 @@ A pinned-tool node runs through the shared helper launcher as an ordinary build 
   `TMPDIR`, `TZ=UTC`, `LC_ALL=C` and umask `022`. The child environment holds only those values and the
   producer's literal variables, which cannot redefine them (§1); no ambient credential, token, registry
   configuration, kubeconfig or cache is passed.
+- **Fixed sandbox paths.** `{{.Output}}` renders to `/nvkr/output` and a material to
+  `/nvkr/inputs/materials/<escaped binding>`. The working directory is `/nvkr/work`, `HOME` is `/nvkr/home`,
+  `TMPDIR` is `/nvkr/tmp`, and the executable is mounted read-only at `/nvkr/tool/<member name>`. The root
+  filesystem is read-only. An executor-owned bootstrap, `umask 022 && exec /usr/bin/env -i "$@"`, sets the umask
+  and replaces the image environment. The toolchain image must therefore provide `/bin/sh` and `/usr/bin/env`;
+  no producer value is interpreted by that shell.
 - **Bounded and owned.** The node honors its execution requirements' wall-time budget and the caller's context;
   cancellation terminates and joins the child before returning.
 - **Linux only.** Held executable capabilities are Linux-only (ADR-22); other hosts fail admission.
@@ -183,7 +190,7 @@ The producer's private output directory must contain exactly one declared form w
 
 | `outputType` | Admission | Use |
 |---|---|---|
-| `file` | Exactly one regular file at `artifactPath`; nothing else in the output directory | A material for another producer in the same output |
+| `file` | Exactly one regular file at `artifactPath`, a single file name; nothing else in the output directory | A material for another producer in the same output |
 | `oci-layout` | Exactly one OCI image layout at the output directory root, with nothing beside it; shape checks belong to the layout import owner (#285) | The payload of a `bundle-oci` output, imported byte-for-byte rather than rewrapped |
 
 Directory trees, archives NVKR would have to create, symbolic links, special files and extra entries are
@@ -260,7 +267,8 @@ The AICR pin that #286 adds for the executable output is the same pin the bundle
   Bundle producers wait until the catalog pins an AICR release that writes a local OCI layout
   (NVIDIA/aicr#3534).
 
-Shipping AICR bundles (#288) therefore needs that AICR release, layout import (#285) and this decision's
+NVIDIA/aicr#3538 adds `aicr bundle --output oci-layout:<dir>[:tag]`, released in AICR `v1.2.0-rc1`. Shipping AICR
+bundles (#288) therefore needs a pin to that or a later AICR release, layout import (#285) and this decision's
 implementation. When it ships, `bundle-oci` outputs select the bundle producer and its recipe producer as an
 explicit material closure (§4). This adjusts the #239 draft's single-component `bundle-oci` selection, which
 the layout-import change revises. Bundles rendered this way carry no AICR in-bundle attestation (v1.1.2
@@ -366,5 +374,9 @@ The design questions left open by the issue were decided on 2026-10-30:
 
 ## Acceptance evidence
 
-None yet. The implementation units above are the contract target. No pinned-tool producer has run, and no claim
-follows from the #239 source-built AICR renders.
+Contract suites cover T1–T5 and T7: catalog form and refusals, Build Digest coverage of every §2 logical field,
+selection rules, the shared tool acquisition and one-pin-per-name, executor admission, invocation and output form,
+`wrapped-build` provenance with tool dependencies, and byte-stable default hosted generation. The Linux executor
+suite drives a fake container runtime, so it proves executor behavior, not container isolation. No pinned-tool
+producer has run against a real container runtime or hosted runner, T6 is unimplemented, and no claim follows from
+the #239 source-built AICR renders.

@@ -391,8 +391,8 @@ argument vector, no shell, no network, typed material inputs and only literal en
 digest-pinned container. Its result is one file or a producer-written OCI layout. Its builder type is `pinned-tool`
 and it belongs to the existing `wrapped-build` source lane; it is not an acquisition of the tool. Build identity
 covers every logical field in ADR-27 §2, including the tool pin, target platform, arguments, environment, material
-edges, output form and toolchain image. Proposed in [ADR-27](docs/adr/0027-pinned-tool-producers.md); not
-implemented.
+edges, output form and toolchain image. Proposed in [ADR-27](docs/adr/0027-pinned-tool-producers.md); the `file`
+form is implemented and contract-tested, and the OCI layout form waits for the layout import.
 _Avoid_: Run-wide pipeline tool, release executable output, build script
 
 **Component catalog overlay**:
