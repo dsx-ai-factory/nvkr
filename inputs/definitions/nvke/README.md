@@ -122,9 +122,11 @@ as `nico-api.nico-system.svc.cluster.local:1079`. It installs Flow as its own `f
 namespace `flow`, where `nico-prereqs` delivers its database credentials and the site agent expects
 `flow.flow.svc.cluster.local:50051`; the umbrella no longer contains Flow. Install it from the separate
 `nico-flow` chart and set Flow's own repository, which otherwise derives
-`<global.image.repository>/nico-flow`:
+`<global.image.repository>/nico-flow`. The chart renders its own `flow` Namespace, labeled so the site CA
+syncs into it, so `--create-namespace` would leave a namespace Helm refuses to adopt. As upstream's setup
+does, apply the chart's Namespace first and mark it for adoption by the `flow` release:
 
-```sh
+```bash
 digest() { jq -er --arg n "$1" '[.artifacts[] | select(.name == $n)] | if length == 1 then .[0].digest else error("want one \($n)") end' release.json; }
 CHART_DIGEST="$(digest nico)"
 FLOW_CHART_DIGEST="$(digest nico-flow)"
@@ -135,9 +137,13 @@ helm pull "oci://$PREFIX/nico-flow@$FLOW_CHART_DIGEST" --untar
 helm install nico ./nico --namespace nico-system --create-namespace \
   --set global.image.repository="$PREFIX/nico-core-image" \
   --set global.image.tag="v2.3.0@$CORE_DIGEST"
-helm install flow ./nico-flow --namespace flow --create-namespace \
-  --set images.flow.repository="$PREFIX/nico-flow-image" \
-  --set images.flow.tag="v2.3.0@$FLOW_DIGEST"
+FLOW_ARGS=(--namespace flow
+  --set images.flow.repository="$PREFIX/nico-flow-image"
+  --set images.flow.tag="v2.3.0@$FLOW_DIGEST")
+helm template flow ./nico-flow "${FLOW_ARGS[@]}" --show-only templates/namespace.yaml | kubectl apply -f -
+kubectl annotate namespace flow meta.helm.sh/release-name=flow meta.helm.sh/release-namespace=flow --overwrite
+kubectl label namespace flow app.kubernetes.io/managed-by=Helm --overwrite
+helm install flow ./nico-flow "${FLOW_ARGS[@]}"
 ```
 
 `PREFIX` is the Environment's publication prefix. Each output is published at `$PREFIX/<output>`;
