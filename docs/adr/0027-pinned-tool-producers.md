@@ -239,7 +239,7 @@ Admission runs before tool acquisition, staging, subprocess or output work.
 | `run local` on Linux | Supported once implemented; `static-unqualified` |
 | `run local` on another host | `engine-capability`; held executable capabilities are Linux-only |
 | `run generate`, hosted GitHub Run | Supported once implemented; `pipeline-attested`, on ADR-18 §3 default hosted routing |
-| Native ARC disk route | Not admitted; ADR-18 limits it to disk producers |
+| Native ARC disk route | Not admitted; `engine-capability`, as ADR-18 limits it to disk producers |
 | Qualified execution, `run check-artifacts`, `run qualify` over a pinned-tool output | Deferred; `engine-capability` |
 | Directory output form, companion staging, authored-file inputs | Deferred; `engine-capability`, or `invalid-catalog` for a malformed declaration (§11) |
 | Networked tool modes | Not admitted. An authored network request fails with `invalid-catalog`; a tool flag that needs network is not parsed (§3), so network denial stops it at run time with `build-failed` |
@@ -276,9 +276,9 @@ Pinned-tool producers reuse existing ADR-03 codes.
 
 | Condition | Code |
 |---|---|
-| Malformed pinned-tool component; unknown token or template; binding without token or token without binding; unselected, duplicate or cross-platform material; authored network request; literal variable naming an executor-owned environment variable; `file` producer that no selected producer binds as a material; `oci-layout` producer outside `bundle-oci` | `invalid-catalog` |
+| Malformed pinned-tool component; unknown token or template; binding without token or token without binding; missing, unselected, duplicate or cross-platform material; authored network request; literal variable naming an executor-owned environment variable; `file` producer that no selected producer binds as a material; `oci-layout` producer outside `bundle-oci` | `invalid-catalog` |
 | Named tool source has no tool declaration or lock record; tool pin out of date with its declaration; two selections of one tool name with different pins | `unpinned-source` |
-| Tool, target and toolchain platforms differ; non-Linux execution host; deferred output form, lane or input kind | `engine-capability` |
+| Tool, target and toolchain platforms differ; non-Linux execution host; material that is not one regular file; native ARC disk route; deferred output form, lane or input kind | `engine-capability` |
 | Held executable or staged material differs from its pin or observed digest | `verify-failed` |
 | Tool exits nonzero, including a network-dependent mode stopped by network denial, or the output directory does not hold exactly the declared form | `build-failed` |
 | Producer result or provenance omits the tool dependency | `provenance-missing` |
