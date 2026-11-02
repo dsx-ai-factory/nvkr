@@ -258,7 +258,7 @@ The AICR pin that #286 adds for the executable output is the same pin the bundle
 - A bundle producer cannot yet satisfy §5. v1.1.2 has no offline layout output, so a bundle invocation either
   leaves a directory tree, refused with `build-failed`, or attempts a registry push, which network denial stops.
   Bundle producers wait until the catalog pins an AICR release that writes a local OCI layout
-  (NVIDIA/aicr#3534). `v1.2.0-rc1` is the first; #239's interim source-built producers already render with it.
+  (NVIDIA/aicr#3534). `v1.2.0` is the first stable one; #239's interim source-built producers already render with it.
 
 Shipping AICR bundles (#288) therefore needs that AICR release, layout import (#285) and this decision's
 implementation. When it ships, `bundle-oci` outputs select the bundle producer and its recipe producer as an

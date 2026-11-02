@@ -39,8 +39,8 @@ extracting it and following upstream deployment instructions; NVKR does not appl
 Admission and integrity preserve exact archive names. Extraction owners must handle
 case-insensitive, Unicode-normalization or reserved-name collisions on their destination filesystem.
 
-The pinned source is AICR `v1.2.0-rc1` (`0a4d1a2fe2fa9245fc298b924b9825aaac09d2a3`),
-the first release that writes an OCI layout without pushing. Other coordinates
+The pinned source is AICR `v1.2.0` (`935e0746dc54da890a23c1ecca998244b3a25de7`),
+the first stable release that writes an OCI layout without pushing. Other coordinates
 are ordinary catalog selections, not NVKR capabilities or hardware guarantees.
 The pinned upstream lacks a generic GB200 recipe and labels VR200 Preview.
 Referenced charts, images and providers are not vendored: these are not air-gap

@@ -75,8 +75,8 @@ func TestMaintainedAICRBundleInputs(t *testing.T) {
 
 func assertAICRSourceProducer(t *testing.T, producer, fetch ir.Node) {
 	t.Helper()
-	const commit = "0a4d1a2fe2fa9245fc298b924b9825aaac09d2a3"
-	const tree = "3cf48fc6cb293ed0fe3d94332010b9fe8d31b681"
+	const commit = "935e0746dc54da890a23c1ecca998244b3a25de7"
+	const tree = "1d4bfa6d824159dbb4c8077303fe8de154946405"
 	const image = "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c"
 	if fetch.Repo != "https://github.com/NVIDIA/aicr" || fetch.Commit != commit || fetch.TreeHash != tree ||
 		fetch.VendorImage != image || fetch.VendorSpecDigest == "" || fetch.Network != ir.NetworkDefault {
@@ -91,7 +91,7 @@ func assertAICRSourceProducer(t *testing.T, producer, fetch ir.Node) {
 	for _, value := range producer.Env {
 		environment[value.Name] = value.Value
 	}
-	if environment["GIT_VERSION"] != commit || environment["BUILD_VERSION"] != "1.2.0-rc1" || environment["SOURCE_DATE_EPOCH"] != "1793628041" {
+	if environment["GIT_VERSION"] != commit || environment["BUILD_VERSION"] != "1.2.0" || environment["SOURCE_DATE_EPOCH"] != "1793648938" {
 		t.Fatalf("AICR build stamps do not bind the frozen source: %+v", environment)
 	}
 	for _, required := range []string{"go mod download", "go mod verify", "go mod vendor", "sha256sum -c -"} {
