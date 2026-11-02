@@ -210,8 +210,10 @@ executable output. A pinned-tool producer never stages them. In AICR v1.1.2 the 
 companion is `aicr bundle --attest`, which needs network for keyless signing and so cannot run here. Staging a
 companion for a future offline mode needs an explicit, digest-bound declaration and is deferred.
 
-Tool-side signing or attestation is not admitted. Outputs are signed and attested by NVKR's own production
-signing (ADR-04, ADR-20), which binds the exact published digest.
+Tool-side signing or attestation is not admitted. No catalog field requests it, so there is nothing to reject at
+admission; a tool flag that requests it is not parsed (§3) and fails at run time with `build-failed`, because
+keyless signing needs network and a signature file beside the output breaks the declared form (§5). Outputs are
+signed and attested by NVKR's own production signing (ADR-04, ADR-20), which binds the exact published digest.
 
 ### 7. Lane, provenance and Release membership
 
@@ -243,6 +245,7 @@ Admission runs before tool acquisition, staging, subprocess or output work.
 | Qualified execution, `run check-artifacts`, `run qualify` over a pinned-tool output | Deferred; `engine-capability` |
 | Directory output form, companion staging, authored-file inputs | Deferred; `engine-capability`, or `invalid-catalog` for a malformed declaration (§11) |
 | Networked tool modes | Not admitted. An authored network request fails with `invalid-catalog`; a tool flag that needs network is not parsed (§3), so network denial stops it at run time with `build-failed` |
+| Tool-side signing or attestation | Not admitted, with no catalog field to reject; a tool flag that requests it fails at run time with `build-failed` (§6) |
 
 ### 9. AICR: what v1.1.2 supports and what waits
 
@@ -280,7 +283,7 @@ Pinned-tool producers reuse existing ADR-03 codes.
 | Named tool source has no tool declaration or lock record; tool pin out of date with its declaration; two selections of one tool name with different pins | `unpinned-source` |
 | Tool, target and toolchain platforms differ; non-Linux execution host; material that is not one regular file; native ARC disk route; deferred output form, lane or input kind | `engine-capability` |
 | Held executable or staged material differs from its pin or observed digest | `verify-failed` |
-| Tool exits nonzero, including a network-dependent mode stopped by network denial, or the output directory does not hold exactly the declared form | `build-failed` |
+| Tool exits nonzero, including a network-dependent or tool-side signing mode stopped by network denial, or the output directory does not hold exactly the declared form | `build-failed` |
 | Producer result or provenance omits the tool dependency | `provenance-missing` |
 | Cancellation or wall-time expiry | `timeout` |
 
