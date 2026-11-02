@@ -28,6 +28,12 @@ func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 	if n.BuilderType == ir.BuilderNativeGo {
 		return buildNativeGo(n, opts)
 	}
+	if n.BuilderType == ir.BuilderPinnedTool {
+		return buildPinnedTool(n, opts)
+	}
+	if opts.ToolExecutable != "" {
+		return nil, e.New(e.CodePipelineDrift, "build node %q received an undeclared tool input", n.ID)
+	}
 	if err := admitBuildKit(n, opts); err != nil {
 		return nil, err
 	}

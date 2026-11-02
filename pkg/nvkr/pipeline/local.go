@@ -119,6 +119,9 @@ func (l Local) Run(g *ir.Graph, buildDigest string, opts RunOptions) (*Report, e
 			if err := admitBuildKit(node, opts); err != nil {
 				return rep, err
 			}
+			if err := admitPinnedTool(node, opts); err != nil {
+				return rep, err
+			}
 			selectedBuildNodes = append(selectedBuildNodes, node)
 		}
 	}
