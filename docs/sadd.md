@@ -74,9 +74,10 @@ composite qualification are deferred. Nothing is implemented.
 
 Proposed [ADR-27](adr/0027-pinned-tool-producers.md) designs pinned-tool producers: a catalog component runs one
 released, digest-pinned executable offline in a pinned container, with no shell, typed material inputs and only
-literal environment variables, and emits one file or a producer-written OCI layout. Build identity covers the
-tool's digests, arguments, literal environment, inputs and container; these producers use the `wrapped-build`
-lane. AICR bundles are the first use. Nothing is implemented.
+literal environment variables, and emits one file or a producer-written OCI layout. Build identity covers every
+logical field in ADR-27 §2, including the tool pin, platform, arguments, literal environment, material bindings,
+output form and toolchain image; these producers use the `wrapped-build` lane. AICR bundles are the first use.
+Nothing is implemented.
 
 ## Assumptions {#assumptions}
 
@@ -278,8 +279,8 @@ output attribution; it never changes an output's Build Digest. This path is desi
 A proposed pinned-tool producer (ADR-27) is an ordinary selected component inside this flow. The compiler lowers
 it to a source-less build node carrying the tool's archive and executable digests, and reuses the shared tool
 acquisition for its bytes. The executor re-hashes the tool before launch, denies network and admits only an
-exact single file or OCI layout. Directory output fails closed, and tool-side signing confers no authority. This
-path is designed, not implemented.
+exact single file or OCI layout. Any other directory output fails closed, and tool-side signing confers no
+authority. This path is designed, not implemented.
 
 The compiler derives each output's graph from its exact selected components and concrete
 target. `nvkr.build` identifies the logical projection of that validated graph. Output names, packaging and execution settings remain bound by their owning records. Equal Build
