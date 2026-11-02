@@ -62,6 +62,9 @@ var allowedBuildEnv = map[string]bool{
 	"NICO_SIM_VERSION": true,
 	"NICO_SIM_COMMIT":  true,
 	"NICO_SIM_TREE":    true,
+	// NICo Core/Flow Dockerfile version and revision arguments, rendered from the source lock.
+	"NICO_VERSION": true,
+	"NICO_COMMIT":  true,
 	// Upstream CWE Dockerfile build arguments, rendered from the source lock.
 	"BUILD_VERSION": true,
 	"GIT_VERSION":   true,

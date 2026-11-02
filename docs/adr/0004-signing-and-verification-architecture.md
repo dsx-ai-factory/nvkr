@@ -144,8 +144,13 @@ HTTP response-body budget that includes failed candidates. Each required predica
 budget of 32 candidates and 8 MiB; an individual bundle is also bounded to 8 MiB. Standard OCI referrers
 tag-schema fallback is supported; legacy `.sig` and `.att` attachment lookup is not.
 Paginated discovery is refused until the adapter can read all pages within its bounds. Explicit
-credentials are confined to the selected registry, and an empty credential uses anonymous access rather
-than an ambient keychain. The existing operation deadline covers transport and cryptographic verification.
+credentials are confined to the selected registry. With no explicit credential, a consumer whose payload
+reads use the default keychain gives discovery that same keychain; anonymous or explicit-password
+transport leaves discovery anonymous. A registry 401 or 403 on the referrers index is a coded fetch
+failure, not a signature result. A denied candidate manifest or bundle is one unusable candidate: the
+search continues, a later valid candidate can still satisfy the type, and when none does the last
+candidate failure determines the code, so a sole denied candidate reports a fetch failure. Cosign itself verifies the fetched bundles offline with an empty private Docker configuration.
+The existing operation deadline covers transport and cryptographic verification.
 Private temporary bundle files are checked for mutation and removed on success or failure. Unfetched
 historical or unrelated candidates are not claimed to be valid: this discovery requires an authenticated
 bundle for each required type, not validation of every registry referrer. Complete release payload and
@@ -251,6 +256,29 @@ invalidates shallow copies. Public descriptions and inspection never supply veri
 Live keyless acceptance requires the protected hosted workflow, public-transparency disclosure approval before
 the first signed NVKE bytes, bounded service retry/availability policy, and an independent cosign-only consumer
 exercise. Unit tests and local dry-run records establish none of those operational facts.
+
+The file-delivery contract in ADR-20 requires preserving the original build signature,
+subject-bound SLSA provenance and SBOM bundles byte-for-byte. Signing must retain the exact authenticated
+bundle bytes through an opaque closeable proof owner and provide supplied-bundle verification without
+registry discovery. The current verification/signing JSON records are descriptive and cannot serve as
+portable proofs. Capture must occur during the same verification that issues the source capability;
+re-downloading an unbound candidate or serializing a verified boolean is insufficient.
+
+The derived canonical delivery root must use detached keyless document signing with the admitted pinned signer,
+required transparency checks and a portable Sigstore bundle. Reusing detached-signing primitives does not
+grant a new authority: the pipeline-attested delivery role must be explicitly admitted and cannot borrow
+qualified-document or build-provenance authority. The signature binds relocation/completion, never a new
+build or runtime verdict. Exact root bytes, proof bytes, subject and invocation are bound before publication.
+
+Source verification and delivery verification take independently supplied Verification Policies. Both use
+the pipeline-attested artifact-publication boundary for the complete operation: the delivery signature alone
+cannot satisfy source provenance, evidence membership or payload checks. A policy may explicitly permit
+one principal in both roles; that is not independent signer separation. The consumer never obtains trusted
+identities from the root. Publisher-policy digests describe the issuing operation; a stricter consumer
+binds its own effective policies to its resulting receipt. Disk evidence minimums remain enforced.
+The root/locator/commit ordering in ADR-20 prevents circular signing. An indeterminate final upload cannot
+be reported as producer success, but cannot invalidate a completion independently authenticated later.
+This contract grants no implemented S3, offline, Secure Boot, full Release or qualified acceptance.
 
 ## Consequences
 

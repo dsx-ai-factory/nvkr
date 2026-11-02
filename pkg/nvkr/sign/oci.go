@@ -19,7 +19,8 @@ package sign
 //     exactly like the qualified sign-blob/verify-blob adapters in this package.
 //
 // Registry credentials NEVER appear in argv or in a record. The bundle reader
-// uses explicitly scoped in-memory credentials; subprocesses receive a private
+// uses explicitly scoped in-memory credentials or a caller-selected keychain;
+// subprocesses receive a private
 // 0600 config.json in a 0700 DOCKER_CONFIG directory owned by the operation.
 
 import (
@@ -38,6 +39,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
+	"github.com/google/go-containerregistry/pkg/authn"
 )
 
 // Record schema versions. Records are wire objects consumed by later gates, so
@@ -453,6 +455,9 @@ type CosignOCIOptions struct {
 	Identity     string
 	Issuer       string
 	Credential   Credential
+	// Keychain resolves bundle discovery access when Credential is empty; nil
+	// is anonymous. It never reaches cosign, argv, or a record.
+	Keychain authn.Keychain
 	// Runner selects the subprocess seam. nil selects the stock pinned adapter.
 	Runner CommandRunner
 }
@@ -465,6 +470,7 @@ type CosignOCISigner struct {
 	identity     string
 	issuer       string
 	credential   Credential
+	keychain     authn.Keychain
 	// Tests may replace descriptive transport independently of crypto. Production
 	// always constructs one private, lazy source for the complete Verify call.
 	bundleSource func(context.Context, Subject, Credential) (*ociBundleSource, error)
@@ -493,6 +499,9 @@ func NewCosignOCISigner(options CosignOCIOptions) (*CosignOCISigner, error) {
 	if err := options.Credential.validate(); err != nil {
 		return nil, err
 	}
+	if !options.Credential.empty() && options.Keychain != nil {
+		return nil, e.New(e.CodeUsage, "OCI verification accepts an explicit registry credential or a keychain, not both")
+	}
 	runner := options.Runner
 	if runner == nil {
 		runner = ExecRunner{}
@@ -508,6 +517,7 @@ func NewCosignOCISigner(options CosignOCIOptions) (*CosignOCISigner, error) {
 		identity:     identity,
 		issuer:       issuer,
 		credential:   options.Credential,
+		keychain:     options.Keychain,
 	}, nil
 }
 

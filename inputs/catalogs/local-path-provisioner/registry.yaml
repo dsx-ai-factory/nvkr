@@ -1,0 +1,52 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog/v3
+kind: SourceBuildRegistry
+metadata:
+  name: local-path-provisioner
+  description: Rancher local-path-provisioner chart packaged from one source pin with its acquired provisioner and helper images bound by digest; Rancher publishes no Helm repository.
+components:
+  local-path-provisioner-chart:
+    helm:
+      chart: .
+      images:
+        helper:
+          values:
+            digest: helperImage.digest
+        provisioner:
+          values:
+            digest: image.digest
+    fromSource: true
+    source: local-path-provisioner
+    # Upstream templates render only repository:tag; the patch adds unset digest values that take precedence.
+    patches:
+      - name: patches/chart-image-digest.patch
+        sha256: sha256:cf85c4eb81ac76d3f3ba42924968357bd01b903667b71aba247667873da748bb
+    artifactPath: charts/local-path-provisioner-0.0.37.tgz
+    writeDir: charts
+    buildCommand: ['package', 'deploy/chart/local-path-provisioner', '--destination=charts/']
+    outputType: tarball
+    platforms: [linux/amd64, linux/arm64]
+  local-path-provisioner-image:
+    source: local-path-provisioner
+    outputType: oci-image
+    platforms: [linux/amd64, linux/arm64]
+    prebuilt:
+      image: docker.io/rancher/local-path-provisioner:v0.0.37
+      evidence:
+        none: true
+  # The chart defaults its helper to busybox:latest; this selects an explicit release instead.
+  local-path-helper-image:
+    source: local-path-provisioner
+    outputType: oci-image
+    platforms: [linux/amd64, linux/arm64]
+    prebuilt:
+      image: docker.io/library/busybox:1.37.0
+      evidence:
+        none: true
+sources:
+  local-path-provisioner:
+    repo: https://github.com/rancher/local-path-provisioner
+    constraint: v0.0.37
+    toolchainImage: alpine/helm@sha256:a6cf54599ccb99d90cf0712b30f03fdb3cab062e6b94e0418cc4db7e8a1464b2

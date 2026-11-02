@@ -14,8 +14,12 @@ native Go bootstrap inputs, not copied nightly catalogs. The retained
 `installer-tools-arm64` output continues to use the hosted installer catalog and
 its explicit acquired Helm exception.
 
-The disk applies the existing `native-nvidia.json` and `native-local-kvm.json`
-overlays to the release node-image catalog. Its NVIDIA OVN 2.4.2 producer agrees
+The disk applies `native-nvidia.json`, `native-local-kvm.json` and the
+nightly-only `current-main-doca-ovs.json` overlays to the release node-image
+catalog. The last overlay uses NVKE's committed DOCA Makefile, fetcher and lock
+to acquire the required packages before offline image composition. Its exact Git
+baseline is rebound by the runtime source policy described below; tagged local
+Definitions retain their release inputs. Its NVIDIA OVN 2.4.2 producer agrees
 with the standalone OVN image and chart outputs. The overlays retain exact
 predecessor bindings and required native KVM execution; there is no upstream OVN
 fallback. The CAPI init output selects the separately reviewed current-main

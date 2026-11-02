@@ -24,7 +24,7 @@ sources:
     repo: https://github.com/NVIDIA/NVSentinel
     toolchainImagesByArch:
       amd64: localhost/nvkr-nvsentinel-ubuntu-26.04-amd64@sha256:fb19d5e7aa08d6d870eabff80fb012d6edf1c73cebad636f3d977bbbc7ad5eb8
-      arm64: localhost/nvkr-nvsentinel-ubuntu-26.04-arm64@sha256:257df633515584e9d56f9679042afb9f2ef2cd0c6c2d9d6f2691a6bbb31effcf
+      arm64: localhost/nvkr-nvsentinel-ubuntu-26.04-arm64@sha256:f6a0ffa4e29bf10f6d946742aabc868b00faaa5ff2c3c4b4fbdfdefdec71075b
     vendorCommand:
       - sh
       - -ec

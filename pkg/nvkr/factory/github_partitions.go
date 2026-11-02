@@ -9,6 +9,6 @@ import (
 
 type githubExecutionPartition = executionPartition
 
-func partitionGitHubJobs(ctx context.Context, dependencies map[string][]string, maxJobs int) ([]executionPartition, error) {
-	return partitionExecutionGraph(ctx, dependencies, maxJobs)
+func partitionGitHubJobs(ctx context.Context, dependencies map[string][]string, layout executionPartitioning) ([]executionPartition, error) {
+	return partitionExecutionGraph(ctx, dependencies, layout)
 }

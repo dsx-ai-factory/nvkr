@@ -63,8 +63,9 @@ When publication is configured, the release index and metadata publish under
 `<repositoryPrefix>/<output-name>`. The signed
 release metadata binds canonical sibling repository names and manifest digests; no complete closure is copied
 into the product repositories.
-Omitting publication produces a build-only Run. Destinations and a separate output-to-destination map are
-not authored. The generated internal routes still bind exact package inputs and targets.
+Omitting publication produces a build-only Run. In the implemented schema, destinations and a separate
+output-to-destination map are not authored. The S3 extension contract below specifies the bounded exception.
+The generated internal routes still bind exact package inputs and targets.
 Each derived route owns exactly one publisher and its publication reference. When signing is configured,
 its sign and verification operations bind that same route's package, reference and signature artifacts.
 Another publisher or signer cannot acquire route authority merely by naming an existing target.
@@ -178,16 +179,600 @@ This export grants no runtime verdict or stronger release/evidence lane. Contrac
 tests exercise origin mismatch, closure substitution, closed capabilities and
 pre-start cancellation; externally exercised end-to-end consumption remains unrecorded.
 
-An optional future S3 object and CDN URL must project those same payload bytes, not alternate Build identities.
-The signed root must bind the payload digest, exact object route and authenticated upload/read-back result
-before a consumer may accept that projection. Object-store schema, credentials, publication and consumption
-remain deferred. Qualified disk reproduction and strict FDE publication remain capability-gated. An FDE payload
+An S3 object and boot URL must project those same payload bytes, not alternate Build identities. The
+contract below binds the payload, route and authenticated read-back in a derived signed delivery root referencing
+the unchanged source publication; it does not rewrite a previously signed OCI root. Object-store execution and
+consumption remain unavailable. Qualified disk reproduction and strict FDE publication remain capability-gated. An FDE payload
 containing a private unlock credential cannot pass the existing no-secret publication rule. ADR-10's
 public `changeit` bootstrap value has no confidentiality requirement. Its native ARC publication route requires
 explicit `build-provenance-v1`, retains the exact producer encryption declaration through wrapper and signed
 metadata, and makes no inspected-content, secure-deployment or confidentiality claim. The consumer's existing
 minimum evidence policy still rejects producer-only evidence when strict is required; no separate confidentiality
 policy is implied by accepting a disk. The separate raw diagnostic route remains build-only.
+
+#### S3 file delivery contract
+
+This section freezes the proposed engineering contract for customer-controlled S3 delivery of the complete
+selected artifact set: QCOW2 disk images for VM boot and imaging, compatible EFI and iPXE assets, and Debian
+packages. Implementations must support that complete selected set. This section specifies the contract;
+the S3 adapter, native-file codecs and decoders remain implementation work, tracked in
+[reconciliation](reconciliation.md#s3-boot-and-package-delivery-contract). Ratification by
+the named deciders, provider acceptance and boot acceptance remain outstanding. Existing OCI behavior and
+existing schema readers are unchanged.
+
+The initial source is GitHub `per-output-v1` publication in the `pipeline-attested` lane. GCS, direct APT
+repository serving, other repository managers, arbitrary upload scripts and legacy monolithic-root projection
+are not admitted by this contract. A new adapter must satisfy the same ownership and acceptance boundary.
+
+**Authored inputs and versions.** Reserve `nvkr.dev/definition/v6` for the native `file` output below,
+`nvkr.dev/environment/v2` for `publication.fileTargets`, and `nvkr.dev/run-plan/v6` plus
+`nvkr.dev/artifact-graph/v6` for their derived graph and delivery operations. Native-file-aware publication
+uses the reserved `nvkr.dev/publication-root/v5`, `application/vnd.nvkr.publication-root.v5` and
+`application/vnd.nvkr.publication-root.config.v5+json`. Reserve `nvkr.dev/run/v5` for native-file requirements
+and required delivery completion. Their older versions retain their existing fields, closed vocabularies
+and completion rules; they must never silently interpret native-file or S3 delivery semantics. Existing
+source publications remain immutable and are authenticated under their original versioned contracts.
+
+Reserve the exact media types `application/vnd.nvkr.native-file.v1+json` for the canonical native-file manifest
+and `application/vnd.nvkr.file-delivery.v1+json` for the canonical file-delivery root. These describe the JSON
+record bytes, not the surrounding OCI index or manifest. The new-record media types and schemas must match;
+generic JSON or the other record's media type is not an interchangeable declaration.
+
+The `nvkr.dev/release/v4` public view retains its OCI source subject, artifact references, content subject
+and single effective source-policy digest. Native-file details remain bound by the new manifest and OCI
+wrapper. The S3 locator, selected delivery completion and separate effective source/delivery policies
+belong to the delivery receipt and generated records; existing Release fields must not be repurposed to
+carry them. No Release version change is reserved for that unchanged source view.
+
+These are contract reservations; runtime decoders do not yet accept the new versions. Existing v5
+Definitions and v1 Environments remain valid under their current contracts. Omitting file targets must
+preserve existing OCI behavior; admission must reject unknown or mixed fields. No current schema constant,
+catalog pin, generated workflow or executable capability changes in this freeze.
+
+Each `publication.fileTargets` entry has the closed shape below. The list is sorted by `name`, and names
+must be unique. Every configured target is required for Run success. There is no best-effort target or
+implicit selection of all outputs.
+
+| Field | Contract |
+| --- | --- |
+| `name` | Unique canonical target name, using the existing authored-name rules. |
+| `kind` | Exactly `s3`; its matching `s3` object is required. |
+| `outputs` | A nonempty, sorted list of unique, exact Definition output names. Initially only `file`, `executable` and `disk-image` outputs are admitted. Missing, duplicate, unknown or unsupported selections fail before work. |
+| `s3.endpoint`, `s3.region` | Explicit S3 API origin using HTTPS, plus the signing region. The endpoint has no user information, query, fragment or embedded credentials; provider endpoint and addressing behavior must be exercised. |
+| `s3.bucket`, `s3.prefix` | Explicit bucket and nonempty canonical relative key prefix; no traversal, empty segments or leading/trailing slash. Provider naming validation belongs to the admitted SDK/service boundary. |
+| `s3.addressing` | Exactly `path` or `virtual-host`; no silent addressing fallback. |
+| `s3.writeCredentialRef`, `s3.readCredentialRef` | Separate references to the scoped writer/cleanup and read-only verifier identities defined below. They resolve only in admitted operations; secret values never enter authored/generated records, URLs or logs. |
+| `s3.readBaseURL` | Optional HTTPS origin/path for ordinary file reads; mandatory for boot outputs. It is separate from the API endpoint. Each generated boot URL is a clean path with no query, fragment or secret and must be readable by the intended provisioning client. |
+| `s3.transfer` | Required positive bounds: `maxObjectBytes`, `maxTotalBytes`, `maxObjects`, `partSizeBytes`, `maxConcurrency`, `maxRequestAttempts`, `maxUploadAttempts`, `operationTimeoutSeconds`, `cleanupTimeoutSeconds`. Admission checks provider/SDK limits, memory and scratch before upload. Concurrency is global across transfers and the whole operation has a deadline. |
+
+The initial object-operation profile separates credentials as follows. These are the
+[AWS S3 action mappings](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-with-s3-policy-actions.html);
+an admitted compatible provider must establish equivalent operations and resource restrictions.
+
+| Credential | Operation | Required S3 action |
+| --- | --- | --- |
+| Read | GET and HEAD of the current object | `s3:GetObject` |
+| Read | GET of an exact object version | `s3:GetObjectVersion`, when version reads are supported |
+| Write | PUT, multipart initiation, part upload and completion | `s3:PutObject` |
+| Write | Abort an owned incomplete upload | `s3:AbortMultipartUpload` |
+| Write | List parts of an owned incomplete upload | `s3:ListMultipartUploadParts` |
+
+Both identities are restricted to objects in the configured bucket and literal `<prefix>/` subtree,
+represented for AWS by `arn:<partition>:s3:::<bucket>/<prefix>/*`. Policy rendering must not turn literal
+prefix characters into broader wildcard grants. The read identity grants no mutation or multipart-cleanup
+actions; the write identity's S3 actions are limited to the mapped write and cleanup actions. Runtime cleanup
+must also establish ownership of each upload ID; object-resource permission does not establish that ownership.
+Object deletion, bucket-policy changes and bucket-wide multipart enumeration are not part of this profile.
+Encryption-specific permissions, when needed, require explicit provider admission and narrowly scoped key
+policy review; these S3 actions do not implicitly grant them.
+
+Record evidence of both operator provisioning and review of the identities' effective policies before enablement;
+missing required grants or grants beyond the admitted action/resource scope fail that gate. Runtime admission
+must match credential references and operation/resource bindings to that admitted profile before work.
+Denied or unsupported operations fail closed. A successful request or credential reference cannot prove
+the absence of broader grants; this contract promises no comprehensive effective-IAM introspection.
+The initial profile requires no bucket listing. In particular, [missing-object HEAD may return `403` without
+`s3:ListBucket`](https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadObject.html); such a result remains
+unknown, never authenticated absence or success. Identical conditional write retries below require no
+absence proof; an unverifiable final result still fails or remains indeterminate. Do not expand access or guess.
+
+`maxRequestAttempts` counts the initial request and all SDK or owner-managed retries of each logical API
+request; calling the SDK again cannot reset that budget. `maxUploadAttempts` counts the initial single PUT
+or multipart upload, every whole-object PUT replay (including SDK retries), and each fresh multipart restart.
+Completion retries for the same upload ID consume the shared request budget, not another whole-upload slot.
+Neither budget resets the operation deadline. `maxObjectBytes`, `maxTotalBytes` and `maxObjects` bound the final
+set of unique stored objects for one target, including parent archives, original proof/control objects, the delivery root and
+its detached bundle. Multiple source bindings for the same object key count as one stored object. Reserve
+bounded capacity for the root and bundle before upload and reject any resulting size that exceeds it before
+committing. Repeated transfers and read-backs do not increase that stored-byte inventory, but are bounded
+independently by both attempt limits, the global concurrency/memory/scratch admission and the
+operation/cleanup deadlines.
+
+Targets affect Environment, Plan and delivery identity, never producer Build identity or unchanged file digests.
+The target must have a corresponding OCI publication source and signing configuration; the first extension does
+not replace OCI production. File delivery cannot satisfy or bypass any required `publication.transports`
+selection, including `apt`. Local credentials may support diagnostics, but authority-bearing delivery/signing
+remains GitHub-only. Implementations may resolve those references through federation or credentials for an
+admitted S3-compatible service. Build jobs must not inherit ambient storage credentials. Dependency,
+license, provenance and security review must admit pinned AWS SDK modules and transitive dependencies
+before implementation uses them.
+
+**Native file outputs.** A `format: file` output selects one exposed producer and its required material closure.
+Its `file` object contains exactly `kind` and `representation`. `kind` is one of `deb`, `efi`, `ipxe`, `kernel`,
+`initrd` or `iso`; `representation` is `file`, `tar` or `tar-gzip`. An archive representation includes every
+regular file in the archive; authored wildcards or subsets are not allowed. Kind comes from the declaration
+and owning validator, not the filename. The existing archive owner admits safe directory structure but
+rejects duplicate normalized names, traversal, links, special files, ambiguous or empty membership and
+unsupported content before publication.
+
+For `kind: deb` with `representation: file`, select the ordinary from-source `host-package` producer route
+used by `debian-package`, retaining its original raw DEB bytes and catalog-declared `artifactPath` binding
+for this exact named output. No additional Debian output, output-to-output selection, second producer or APT
+reconstruction is introduced. Archive representations retain the complete parent/member rules above and
+require their own admission and evidence joins; current local raw Debian export does not establish those
+joins or hosted/signing/publication capability.
+
+Reserve `nvkr.dev/native-file/v1` with the new `nvkr.native-file` digest family. Its closed canonical object
+contains `schemaVersion`, `platform`, `producer` and sorted `files`. `producer` binds exact `artifactID`,
+`component`, `buildDigest`, source blob `sha256`, `size` and `representation`. Each file binds `name`, `kind`,
+`mediaType`, regular-file `mode`, `sha256` and `size`. Mode preserves ordinary permission bits and rejects
+set-ID/sticky bits; it does not make a package an executable tool. A direct file's name is the canonical
+basename of its producer's catalog-declared artifact path. An archive member is identified by the parent blob and
+its canonical member name as well as its own digest/size. The OCI carrier retains that original file/archive
+and the generated manifest. Initial S3 delivery retains the complete source carrier closure, including parent
+archives, in addition to projecting native members. No package rebuilding, recompression or implicit permission
+upgrade is allowed. Native DEBs must not pass through the current APT package reconstruction path.
+ADR-13 owns evidence for actual package payloads; a file inventory cannot claim dependency coverage.
+
+**Selection and authority.** Authenticate the source aggregate's metadata, signatures, provenance and required
+SBOMs under external source policy, derive exact selected `PublicationOrigin` references from that authenticated
+membership, then verify each selected complete output-local payload/evidence root. Bind exact output names,
+platforms, Plan and original preparation/signing invocations. Unrelated image/chart payloads need not be
+downloaded, but their absence cannot be described as full aggregate payload verification. Preserve existing
+whole-Plan `ExactInputReceipt` and `ExportForInvocation` guarantees; neither accepts a subset.
+
+`lifecycle` must issue a separate opaque selection receipt retaining the selected complete held publications
+and actual authenticated source signature, provenance and SBOM bundle bytes. Verification records, booleans,
+restored paths or equal Build Digests cannot replace that owner or authorize another output or Run. `sign` owns
+proof retention and supplied-bundle authentication; `delivery` owns held bytes and storage receipts; `lifecycle`
+joins them. `Close` cancels and joins active work before releasing payload and proof owners. No new authored
+lifecycle object, second scheduler or plugin authority is introduced.
+
+**Signed root and consumer locator.** Reserve `nvkr.dev/file-delivery/v1` and the new `nvkr.file-delivery`
+digest family. The generated canonical delivery root has exactly these top-level fields:
+
+| Field | Required binding |
+| --- | --- |
+| `schemaVersion` | Exactly `nvkr.dev/file-delivery/v1`. |
+| `source` | Aggregate `reference`, `index`, `rootConfig`, `definitionDigest`, `environmentDigest`, `planDigest` and `invocation`. `index` contains raw OCI index `sha256`, `size` and `mediaType`; its digest must equal the pinned reference. `rootConfig` contains canonical PublicationRoot config `sha256`, `size` and its distinct `semanticDigest`, reached through that index's checked manifest/config descriptors. |
+| `delivery` | Target `name`, `environmentDigest`, `planDigest`, `invocation`, publisher `sourcePolicyDigest` and `deliveryPolicyDigest`. Source and delivery identities remain separate even when the initial integrated operation uses the same Run. |
+| `destination` | Exact admitted `endpoint`, `region`, `bucket`, `prefix` and `addressing`. |
+| `outputs` | Sorted selected output records: `name`, `platform`, `format`, `buildDigest`, original `publicationReference`, `preparationInvocation`, `signingInvocation`, wrapper `descriptorDigest`, and exhaustive sorted `objects` key references. `format` is exactly the Definition format (`file`, `executable` or `disk-image`). `fileKind` and `nativeManifest` are required exactly for `file` and forbidden otherwise; `nativeManifest` is the exact `objects.key` of that output's native-file manifest, also included in its own `objects` list. `fileKind` must match every file kind in that manifest. |
+| `objects` | Sorted exhaustive object records: `key`, `sha256`, `size`, `mediaType`, `role`, `sourceBindings`, `readback`, and optional `versionId`/`readURL`/`urlReadback`. Both URL fields are mandatory for every selected boot payload defined below; `urlReadback` is required exactly when `readURL` is present. Roles are `payload`, `manifest`, `signature`, `provenance` or `sbom`; `manifest` covers indexes/configs/control JSON with their exact media types. Source bindings use the closed variants below. |
+
+Each `sourceBindings` record contains exactly the fields of its `type` variant. All digests below are raw
+blob SHA-256 values; structured semantic digests are never substituted. Compare bindings field by field,
+lexicographically by exact UTF-8 bytes, beginning with the literal `type` and then its complete tuple below.
+Do not use locale order, enum ordinals or ambiguous concatenation. The array must be strictly increasing
+under this comparison; unsorted arrays and exact full-tuple duplicates fail. Equal selected bytes must
+retain distinct authenticated descriptor or parent-archive bindings.
+
+| `type` | Exact remaining fields and meaning | Ordering and uniqueness tuple |
+| --- | --- | --- |
+| `control` | `publicationReference`, `sha256`: an original control/evidence blob or verified detached proof for that exact publication subject. | `(type, publicationReference, sha256)` |
+| `member` | `publicationReference`, `outputName`, `parentSHA256`, `memberName`, `memberSHA256`: the original held file/archive and its exact canonical regular member. | `(type, publicationReference, outputName, parentSHA256, memberName, memberSHA256)` |
+| `payload` | `publicationReference`, `outputName`, `descriptorDigest`, `payloadSHA256`: the exact whole payload bound by that output's authenticated wrapper. | `(type, publicationReference, outputName, descriptorDigest, payloadSHA256)` |
+
+The owning verifier derives every binding from authenticated source controls, proof bytes and held payloads.
+The binding's selected byte digest must equal the destination object's `sha256`. A member must match its
+source manifest's exact size/mode/kind and parent identity. Object references resolve by complete exact `key`,
+not basename, array position or caller-asserted checksum; every selected output's required objects must resolve.
+The `nativeManifest` key must resolve to a `manifest` object with media type
+`application/vnd.nvkr.native-file.v1+json`. Authenticate its exact bytes and complete membership against that
+output's original source publication/wrapper and selected producer, not merely its kind or basename. Another
+output's same-kind manifest cannot substitute for this binding.
+
+Selected boot payloads are the raw QCOW2 of each selected `disk-image` output and every projected regular
+native file of selected `file` outputs with kind `efi`, `ipxe`, `kernel`, `initrd` or `iso`. Kernel/initrd/ISO
+selection is required when the installer protocol references them; once selected, the same URL rule applies.
+Derive the exact object keys from authenticated output and native-manifest membership, not filenames or
+media types. Every such key requires both `readURL` and `urlReadback`, including a key shared with a non-boot
+output. Retained parent archives, indexes/configs and evidence/proof objects do not enter this set merely
+through the required closure; they retain mandatory API verification. Any additional object actually
+selected as an installer download also requires both URL fields. Other objects may omit both.
+
+`readback` records the full-byte API observation (`sha256`, `size`, and the exact `versionId` or conditional-read
+`etag` used); its digest, size and version must match the corresponding object binding. The owner must
+derive it from completed reads, never deserialize it as authority. Objects are sorted by unique exact key;
+outputs and native files are sorted by unique name. An object's conditionally required `readURL` is the exact clean boot
+or file URL. Its required `urlReadback` contains exactly `readURL`, `sha256` and `size`, derived from a complete
+read of that URL; its `readURL` must equal the object's exact URL. Both the API and URL observations must
+match the object's exact `sha256` and `size` before root generation or signing; reading and hashing different
+URL bytes is a failure, not successful read-back.
+`urlReadback` must be absent when `readURL` is absent. The owning verifier derives both observations from
+its own separate completed reads; a version-pinned API read or HTTP metadata cannot replace the URL read.
+Signed observations do not replace the consumer's independent byte verification.
+Source control and evidence objects needed to independently authenticate aggregate membership and every
+selected output are mandatory
+even when they are not payloads. Unknown fields, empty object sets, missing required objects, duplicate
+bindings and subject/format confusion fail strict canonical validation.
+
+Payload/proof keys are `<prefix>/blobs/sha256/<hex>/<basename>`. A projected native/executable member uses the
+last segment of its canonical relative source name; the full member path remains in its source binding.
+A raw disk uses `<output-name>.qcow2`. Every other source blob, including parent archives, OCI index/config
+bytes and proof bundles, uses the fixed basename `blob`. Storage keys and source names retain their original
+characters. Construct URLs by encoding each key path segment exactly once: leave only ASCII letters, digits,
+`-`, `.`, `_` and `~` unescaped; encode other UTF-8 bytes as uppercase percent escapes. In particular, a literal
+`+` is `%2B`, a space is `%20` and a literal `%` is `%25`; never substitute `+` for space or double-encode an
+escaped segment. Thus `foo_1.2+nvke1_amd64.deb` retains that basename in storage and uses
+`foo_1.2%2Bnvke1_amd64.deb` in its URL. URL construction must preserve those escapes through request emission;
+generic path escaping alone is insufficient. This follows the [S3 URI-encoding rules](https://docs.aws.amazon.com/AmazonS3/latest/developerguide/sig-v4-header-based-auth.html)
+and the [object-key special-character guidance](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html).
+Reject ambiguous/unsafe names at source admission; ordinary Debian names containing `+` remain admitted.
+Shared bytes may reuse an exact key only with every named source binding preserved. Root bytes live at
+`<prefix>/deliveries/sha256/<root-blob-hex>.json`; the detached Sigstore
+bundle lives at `<prefix>/commits/sha256/<bundle-blob-hex>.sigstore.json`. These final two objects are outside
+the root's `objects` list. The root contains neither its own digest/location nor its signature, avoiding
+self-reference. Its semantic family digest, raw JSON SHA-256 and payload/wrapper identities are distinct.
+
+The strict caller-pinned locator `nvkr.dev/file-delivery-locator/v1` contains `schemaVersion`, `endpoint`,
+`region`, `bucket`, `addressing`, `document` and `bundle`. `document` contains `key`, `sha256`, `size` and an
+optional `versionId` learned from its completed upload/read-back. `bundle` contains exactly `key`, `sha256`
+and `size`; `versionId` is forbidden because the final commit has not occurred when the locator is frozen.
+Do not add a version to the frozen locator after acknowledgement or recovery. To discover the bundle after
+commit or an indeterminate result, perform a bounded HEAD at its exact key, then GET the returned exact
+version where supported; otherwise use the returned ETag for a conditional GET. Admit both metadata access
+and exact-version read permission when required; denied or failed version reads permit no fallback to an
+unversioned read. Metadata is no proof: verify the complete bytes against the pinned digest/size and
+authenticate the bundle, document and required closure under independent consumer policies. Record the
+observed version or conditional-read binding in the resulting
+receipt, not in a rewritten locator. A missing, denied, conflicting or changed object cannot yield success;
+do not search other keys or reconstruct the locator by re-signing. The
+[PUT response](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html) supplies the assigned version;
+the [GET contract](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html) supports exact-version
+and ETag-conditional reads; [HEAD](https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadObject.html) discovers
+metadata without authenticating object bytes. The consumer admits endpoint/read access independently.
+A mutable name or the locator alone supplies no trust. Source and delivery Verification Policies are
+independent caller inputs; publisher-policy digests in the root are descriptive. Consumer receipts bind the
+policies actually enforced.
+The root cannot nominate its trusted signer, weaken disk evidence, or upgrade the lane or acceptance scope.
+Full Release qualification, revocation and offline acceptance remain outside this artifact-publication contract.
+
+**Transfer, commit and interruption.** Use conditional creation (`If-None-Match: *`) for PUT and multipart
+completion. Retain the same authenticated held bytes, physical key, namespace authority and unchanged operation
+deadline through every retry. On `412`, authenticate the exact key through full GET/digest/size reconciliation:
+reuse equal bytes, fail on conflicting bytes, and fail or retain an indeterminate result when verification
+is unavailable. Lost PUT/completion responses and `409` require the same reconciliation attempt before retry;
+an unknown read result supplies neither success nor absence, but does not prohibit the identical conditional
+replays below. A denied write or permanent validation error fails rather than retrying.
+
+For PUT, a retryable failure, lost response or `409` permits reissuing the identical held bytes at the same key
+with `If-None-Match: *`, without proving absence. For retryable multipart-completion failures, including
+transport loss, retryable `5xx` and retryable errors embedded in `200` responses, retry completion with the same
+owned upload ID, frozen complete ordered part list and conditional header. The admitted SDK must interpret the
+complete response; `200` headers alone cannot establish completion. `NoSuchUpload` requires the same full-byte
+key reconciliation as `412`: the upload may already have completed, and an unverifiable result cannot authorize
+a fresh upload. A completion `409` instead requires abandoning that upload ID. If reconciliation cannot
+authenticate equal bytes and establishes no conflict, stop/join and clean up the owned incomplete upload under
+the rules below, then initiate a fresh upload and resend every part within `maxUploadAttempts`. This restart
+needs no absence proof and preserves the same held bytes, key and conditional completion. Do not retry the old
+upload ID after `409`. All SDK and owner-managed retries obey the shared request/upload budgets and deadline;
+SDK retries must not bypass reconciliation, cleanup or authorization gates.
+
+Even an acknowledged write requires complete-byte verification. Status codes, ETags and provider checksum
+metadata are not payload identity. Use exact version reads where supported; otherwise admit explicit
+ETag-conditional reads with full rehash. A provider unable to meet a selected requirement fails admission.
+The conditional retry/restart distinction follows [AWS conditional-write behavior](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html)
+and [PUT](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html);
+same-upload completion retries and embedded-error handling follow [the completion API](https://docs.aws.amazon.com/AmazonS3/latest/API/API_CompleteMultipartUpload.html).
+Mandatory full-byte reconciliation is this contract's requirement for every admitted provider.
+
+`lifecycle` is the sole owner of the specified private durable **delivery-namespace store**, distinct from
+immutable public Run/attempt records and retained payload/proof carriers. It owns authenticated enrollment
+and overlap reservations, operation/generation registration and phase transitions, verified completion,
+closure and operator retirement. The store's atomic boundary covers overlap checking plus no-replace
+enrollment across the admitted provider/resource and bucket, and generation-checked state changes for each
+enrolled namespace. `factory` schedules execution and `delivery` authenticates bytes/storage receipts;
+neither independently issues namespace-transition authority. The backend must provide authenticated
+cross-Run persistence, serialization and exact-state read-back after runner loss. A per-attempt local
+transaction, workflow group or expiring job artifact cannot supply that store. No backend or hosted service
+is admitted by this contract; its implementation and capability admission remain required before work.
+Without an admitted backend profile, return `CodeEngineCapability` before producer or delivery work.
+
+Before work, admit a physical namespace identity: provider/resource identity, bucket and canonical literal
+key prefix. Establish equivalent endpoints and addressing forms through the admitted SDK/service profile
+and recorded authoritative operator resource evidence; URL normalization alone is not proof. Unknown or
+ambiguous mappings fail admission. Target names, endpoint spelling, addressing mode and Run IDs are not
+parts of the pending-state key. Renaming a target or changing transport configuration cannot clear a predecessor.
+
+Operator-authorized no-replace enrollment through `lifecycle`'s delivery-namespace store initializes authenticated state for
+a dedicated unused physical namespace. The initial profile admits neither owner migration nor reinitialization
+of a previously enrolled namespace. Enrollment records
+the resource mapping, recovery capabilities and one owning repository, workflow path, display name/bundle,
+exact dispatch ref and evaluated non-canceling concurrency group. Admit only that owner. Another repository,
+bundle, workflow or ref cannot share the namespace under a different group; the current per-workflow groups are not
+a repository-wide lock. Ordinary publication cannot initialize or reset missing state. Concurrent enrollment
+has one winner; retries authenticate the existing record rather than overwrite it. Missing enrolled state,
+an attempted migration/reset or ownership/resource ambiguity fails admission before producer or delivery work.
+
+Before new-enrollment overlap admission, an exact retry must authenticate and reuse the existing non-retired
+enrollment for the same physical namespace and complete recorded owner tuple. Reuse leaves the record unchanged
+and neither initializes/resets state nor clears pending obligations, including after a lost enrollment
+acknowledgement. An equal prefix with any different owner field fails admission. A retired namespace remains
+blocked even for the same owner.
+
+New enrollment must reject a prefix equal to, containing, or contained by any enrolled or retired namespace
+on the same admitted provider/resource and bucket. Compare canonical literal prefix subtrees at `/` key-segment
+boundaries: `nvke` contains `nvke/os`, but not `nvke2`. The enrollment owner must serialize the complete
+overlap check and no-replace creation so concurrent overlapping enrollments cannot both succeed; missing or
+incomplete reservation state fails admission. The authenticated existing-record retry above is not a new
+enrollment. Empty and bucket-root prefixes remain rejected by the authored prefix grammar.
+
+Across Runs and attempts, `lifecycle`'s delivery-namespace store serializes that enrolled physical namespace;
+serialization covers predecessor lookup, registration, signing, recovery-byte retention and commit disposition.
+Durable CAS/no-replace state must preserve unresolved obligations even when a byte carrier expires.
+Concurrent callers cannot both observe an empty state and acquire signing authority. Missing serialization,
+missing state or incomplete recovery history fails admission; this requires no new public object or service.
+
+The pending operation binds an exact operation ID and generation. In `preparing`, final PUT is forbidden.
+Only atomic promotion to `commit-authorized`, after confirmed recovery-package retention/read-back, may
+issue authority for its exact frozen bundle and key. Every in-run final-bundle dispatch or retry requires
+`lifecycle` to authenticate that current operation/generation's live `commit-authorized` state under namespace
+serialization; retention or a prior job receipt alone cannot authorize it. Exact-state CAS can instead close
+`preparing` as `closed-never-dispatched`; that winning close fences stale promotion and PUT authority, including after
+a replacement operation starts. If promotion wins or its outcome is uncertain, do not classify the operation
+as undispatched. Recover the durable phase; lost acknowledgements are not proof of a failed transition.
+
+An authorized operator may retire an unrecoverable namespace as `retired-indeterminate`, retaining its
+operation, locator and unknown remote fate. Retirement never proves absence, cancels an earlier request or
+revokes an old signature. The old physical namespace remains blocked through every alias; continued delivery
+requires explicit enrollment of a dedicated non-overlapping new prefix. This is not same-prefix reset or
+automatic expiry cleanup. Operator authority, the retirement reason and its durable disposition must be
+authenticated by the delivery-namespace store owner; a caller boolean cannot clear the obligation.
+
+Authenticate a predecessor against its own frozen source, Plan, Environment, destination and invocation
+under current independent policies. If complete and the current request bindings match, reuse its unchanged
+locator and original invocation. If complete but the bindings differ, durably close that terminal operation
+before registering the distinct new delivery; its receipt cannot satisfy new outputs. Record each new
+attempt's observation separately without rewriting an earlier public Run. Uncertain, expired, inaccessible
+or conflicting pending state blocks fresh signing; expiry and a new provider run ID never create empty
+initial state. A current-key absence observation and a stopped local writer cannot exclude a late dispatched
+commit. Fresh signing requires authenticated initial state or a reconciled terminal predecessor disposition.
+Changing a signature or key cannot clear uncertainty. Multiple completed deliveries remain possible; this
+does not promise one physical S3 version, provider-wide exactly-once publication or an atomic transaction.
+
+For recovery after producer loss, retain the exact canonical root, original Sigstore bundle and frozen
+locator together before the first final PUT. Authenticate all three and the required remote closure into
+fresh held owners; the remote root and its `objects` must verify, but the final bundle may still be absent.
+Stored descriptions or success flags cannot restore authority. After serialized recovery
+ownership, recovery may conditionally PUT the identical
+retained final bundle at its original key without proving absence, including a bounded `409` retry. This is
+the only cross-Run write replay admitted here: it does not extend in-run transfer retries to cross-Run
+payload replay or multipart resume, and permits no re-signing or another key. Authenticate the original
+operation/generation's current `commit-authorized` state before each recovery dispatch; closed, completed,
+superseded or retired state supplies no replay authority. The recovery operation's
+admitted request/upload limits and deadline bound replay. `403` proves neither absence nor success;
+`412` requires full equal-byte verification, and even an acknowledged PUT requires independent complete
+verification before success. Preserve the original root, signature, locator and signed invocation. Missing
+recovery bytes plus an unverifiable remote completion leaves the pending state blocked. Conditional writes
+can create another identical-byte version after a delete marker; recovery converges on the pinned bytes/key,
+not a promise of one stored version.
+For this exact-bundle replay only, prior-runner exit or joining need not be established: a late original
+request and the replay use the same authenticated bytes, physical key and `If-None-Match: *`. All other
+conditions remain, including stop/join ownership of workers started by the current recovery operation.
+This exception authorizes no fresh signature, other-key write, payload replay or multipart work.
+
+After that gate, the state order is source authentication → upload payloads and proofs → verify every required
+storage object and boot URL → generate canonical root → detached signing → root upload and read-back → confirmed durable recovery-byte retention
+→ confirmed generation-checked `commit-authorized` promotion → conditional bundle upload last
+→ independent root, bundle and required-closure authentication
+→ durable generation-checked `verified-complete` transition and confirmation → producer success.
+Using the live verification receipt, `lifecycle`'s delivery-namespace store must atomically transition the exact
+`commit-authorized` operation/generation to `verified-complete`. Bind the enrolled physical namespace,
+originating Run/attempt and target, unchanged locator and exact root/bundle identities, and the policies
+actually enforced. Confirm the durable terminal record before reporting producer success. A conflicting
+generation, persistence failure or unconfirmed result returns a coded error while preserving recoverable
+state and any valid remote completion. Resolve a lost transition acknowledgement through authoritative
+exact-state read-back; never overwrite conflicting or retired state or substitute a stored success flag.
+Recovery records its own observation without rewriting the originating Run or extending its cutoff. Later
+reconciliation still authenticates the required remote closure under independent policies; this internal
+terminal record is not portable verification authority.
+Freeze the exact root, bundle and locator bytes before the final commit request. Exact-byte request retries
+preserve them; a new signature or key cannot bypass the predecessor gate. `lifecycle` must durably retain
+the root, bundle and locator bytes under the originating Run/attempt and target, linked from the cross-Run
+pending state and retrievable after producer or runner loss. Admit bounds for the complete recovery package
+and confirm exact-byte read-back of every member before the final request; failed or unconfirmed retention
+prevents that request.
+An acknowledged durable Run record or already retained job artifact may satisfy this requirement; process
+memory, logs, an ephemeral runner file or an artifact uploaded only after the commit cannot. A job artifact
+qualifies only when independently discoverable by provider run/attempt and target without a terminal Run
+record. Confirm all stored recovery bytes, recovery access and service-reported expiry before the commit request.
+Before work, the attempt owner must freeze a finite absolute terminal Run-record publication cutoff in the
+durable pending-attempt record, using the admitted execution/finalization deadline; the retained recovery
+package must bind that unchanged cutoff. The owner and record verifier
+must enforce it across queue delay, execution, cleanup, finalization and record upload. A relative finalizer
+job budget alone is insufficient; if an enforceable finite cutoff is unavailable, reject admission.
+Do not dispatch terminal publication after the cutoff or accept a late-visible record as that attempt's
+terminal publication; missing evidence of timely publication fails closed. Late bytes may remain diagnostic;
+no provider deletion or cancellation guarantee is assumed. Recovery uses a new explicit attempt and never
+extends the predecessor's cutoff or rewrites its outcome. The absolute recovery deadline is that fixed cutoff
+plus the required Run-record retention interval, even if no terminal Run record is written. Each recovery
+attempt admits its own cutoff and sufficient retention without changing the predecessor's signed bytes.
+The recovery package's confirmed expiry must reach its deadline; a requested duration or future finalizer upload is
+insufficient. [GitHub artifact metadata exposes expiry](https://docs.github.com/en/rest/actions/artifacts#get-an-artifact),
+and [artifact retention remains limited by provider policy](https://docs.github.com/en/actions/tutorials/store-and-share-data#configuring-a-custom-artifact-retention-period).
+Insufficient expiry or recovery access prevents commit. Recovery access and retention must cover cancellation,
+timeout and indeterminate-result reconciliation; cleanup cannot remove the locator within that window while
+reconciliation remains outstanding. Expiry limits
+recovery availability, never the validity of a surviving remote completion or absence of a pending obligation.
+The cutoff governs accepted Run-record publication, not revocation of a valid remote S3 completion. The record supplies coordinates,
+never trust or a successful outcome. Reconciliation retrieves it independently of the producer and performs
+the locator's complete verification, without bucket scans or regenerated signatures. Before the final commit
+request, failure cannot publish a completion. Its result can be indeterminate: a lost response or failed final read-back
+may leave a valid completion remotely. Return no producer success until reconciliation; preserve objects and
+report the exact attempted locator as indeterminate. An independent consumer may accept it only after all
+signature, policy and required-closure checks pass. Do not promise rollback, absence of a valid remote commit
+after an error, or an atomic transaction across objects or targets. Every consumer checks the closure anew.
+
+Before abandoning or restarting a multipart attempt, and on every operation exit, start one fresh cleanup
+context bounded by `cleanupTimeoutSeconds` before stopping and joining transfer workers. This includes
+equal-object reuse, non-cancellation failure, deadline expiration and cancellation. Every worker request
+and body operation must honor cancellation and admitted I/O bounds. Stop new work, cancel active requests
+and close owned active bodies/transport resources as needed; confirm worker joining before abort/list,
+restarting an upload or releasing held payload/proof owners. Abort/list verification uses the remaining
+cleanup budget, not a second full timeout. If that budget expires before joining, record cleanup failure
+and retain lifetime ownership: do not abort/list, restart, release held payload/proof owners or report producer
+success. The enclosing supervisor must immediately terminate the owning execution process and its descendants,
+escalating from graceful to forced termination and observing exit under a separate bound of at most
+`cleanupTimeoutSeconds`. Admission and generated job headroom must reserve both windows before work;
+the second is exclusively termination/reap observation, never another upload, abort/list budget or retry.
+Continued unbounded joining and reliance on the hosted job timeout are not permitted. A termination signal
+or timed-out wait is not proof of joining. If exit remains unconfirmed at the second deadline, record a
+terminal infrastructure/cleanup failure and keep the delivery state blocked and unsafe owners under the
+enclosing supervisor; no ordinary detached-worker return, abort/list, upload restart, held payload/proof
+release or producer success is authorized. An adapter without that finite supervisor capability is not
+admitted; a platform failure to reap is reported explicitly, not as successful bounded teardown.
+Remote leftovers remain subject to operator expiration; that policy cannot replace local worker ownership.
+Once joined and within the remaining cleanup budget, abort every remaining owned
+incomplete upload ID and verify that its parts are gone, repeating bounded abort/list operations when
+necessary. Never abort a known completed upload or delete a completed object. An absent upload ID does not
+establish whether completion succeeded: reconcile ambiguous completion against the exact object key,
+preserving any completed objects and the attempted locator. Cleanup must not invalidate a valid remote
+completion or turn an indeterminate result into success. Cleanup errors remain visible alongside the
+primary result. The [AWS abort API guidance](https://docs.aws.amazon.com/AmazonS3/latest/API/API_AbortMultipartUpload.html)
+describes verification through `ListParts`; [completion may also retire an upload ID](https://docs.aws.amazon.com/AmazonS3/latest/API/API_CompleteMultipartUpload.html).
+Process death or a lost initiation response can leave an upload whose ID the owner never obtained;
+an operator-owned incomplete-upload expiration policy is required for such cases. Immediate cleanup of
+unidentified uploads and durable multipart resume are not promised. Never prune unrelated bucket objects.
+Failure or an indeterminate result for a required target prevents Run success without invalidating
+completed OCI publication or claiming that another target was rolled back.
+
+**Boot and package acceptance.** All selected AMD64/ARM64 QCOW2, EFI, iPXE and DEB outputs are required
+parts of the complete customer path. Source templates retain their own identities; destination- or
+machine-specific rendering has a new identity and belongs to the downstream deployment owner. That owner
+authenticates the delivered asset set before selecting or rendering it. iPXE and
+firmware do not implicitly verify NVKR JSON or Sigstore bundles. Boot endpoints must be exercised from the
+actual provisioning network using the actual clients' read-access method, separately from SDK API read-back.
+The downstream owner must bind bytes actually executed at each boot hop to the authenticated assets through
+client verification or a trusted serving boundary retaining the verified bytes and enforcing their immutable
+mapping. A successful preflight GET alone does not establish that binding. The expected QCOW2 digest must
+come from authenticated metadata, not an untrusted checksum fetched beside the image.
+
+The QCOW-imager path requires a compatible architecture-matched EFI UKI, exact QCOW2, and script bindings for
+image URL/expected SHA-256, disk selection, encryption/unlock mode, console and cloud-init datasource. Separate
+kernel/initrd/ISO outputs are required only when the selected installer protocol references them. Firmware,
+DHCP/PXE service and instance-specific metadata remain deployment prerequisites. Cosign transport signing does
+not establish UEFI Secure Boot. A built or signed EFI cannot silently substitute for another imager contract;
+the pinned NVKE source [documents incompatible disk-selection parameters](https://github.com/dsx-ai-factory/nvke/blob/ff21ba8c07cafff74b68e238a8876af11e5beded/os-image/efi/README.md#L36).
+
+Before enablement, record evidence of default-branch generated delivery to the named service/version, independent
+read-only S3 consumption with registry access disabled, direct VM boot of the downloaded QCOW2, and actual
+iPXE chainload → EFI image verification/disk write → installed-disk reboot → cloud-init/node-service checks
+for every supported architecture/profile. A simulator that skips EFI execution cannot establish that path.
+Install each delivered DEB on a matching clean target and check declared dependencies and runtime behavior;
+mutually exclusive package versions use separate test cases, not one impossible combined installation.
+Required tests cover corrupt or missing proof or boot files, EFI or script substitution after verification,
+wrong architectures or digests, incompatible imager parameters, equal or conflicting existing objects,
+concurrent writes, lost commit acknowledgements, denied access, interrupted multipart transfers and failed
+boot or installation. Accept the exact reserved native-file and file-delivery JSON media types with their
+matching schemas; reject omitted, generic, swapped or unknown record media types. With matching API bytes,
+require coded refusal before signing or final commit when a `readURL` serves same-length corrupted bytes or
+a truncated body. Require a positive case with distinct API and URL routes returning identical complete bytes;
+reject missing, unexpected or malformed `urlReadback` records, changed recorded URLs and mismatched observed
+digests or sizes. An API observation alone must not satisfy URL-readback admission. Exercise
+all boot kinds, multiple projected members and shared boot/non-boot keys: a missing base URL fails admission
+before producer work, and a missing URL pair on any boot payload fails before root signing or final commit
+even with valid API read-back. Accept a complete boot set whose retained proof/control closure uses API-only
+reads, and ordinary non-boot file delivery without URL fields. An archive selected as an installer download
+must carry the URL pair. With two same-kind file outputs, reject a missing, wrong-kind or wrong-output
+`nativeManifest` key, including manifest substitution and omission from that output's `objects` list.
+For direct DEBs, require the exact selected host-package producer/result and catalog artifact path; reject
+an extra-output dependency, substituted producer/path or reconstructed package as that source. Missing
+cross-Run backend admission must return `CodeEngineCapability` before work; an immutable attempt transaction alone cannot
+satisfy namespace-state admission. Exercise
+unchanged Debian names containing `+` through actual emitted URLs, including
+distinct space and literal-percent names. Ordering contracts must accept the literal type sequence
+`[control, member, payload]` and reject `[control, payload, member]`, `[payload, member]` and other unsorted
+permutations. Fix expected order independently of the producer/verifier comparator, table positions and enum
+ordinals. Within each variant, tie earlier fields and vary each applicable field; specifically exercise
+`descriptorDigest` for `payload` and `parentSHA256` for `member` before later fields, ensuring that later
+fields cannot override the first difference. Where the admitted name grammar
+permits it, include UTF-8 names distinguishing byte order from locale or UTF-16 order. Equal payload bytes
+must retain distinct authenticated descriptor/parent bindings; exact full-tuple duplicates fail.
+Exercise denied and out-of-scope credential
+admission, cancellation during active transfer and a cleanup deadline expiring before worker join; no abort,
+restart, held payload/proof release or success may precede joining. Lose a PUT response or return `409`
+with a missing-key reconciliation `403`: identical conditional PUT replay must remain possible without
+accepting the unknown read as proof. Exercise completion transport loss, retryable
+`5xx` and retryable embedded errors with unchanged upload ID, part list and conditional header; `200` headers
+alone must not authorize success. Require full-byte reconciliation on `412` and `NoSuchUpload`, with no fresh
+upload for an unverifiable `NoSuchUpload` result. Completion `409` must use joined cleanup before a fresh
+upload and resend all parts without an absence prerequisite. Permanent validation/authorization errors fail.
+Exhaust combined SDK/owner request attempts and whole-object upload attempts independently, including PUT
+replays, and reject budget resets or deadline extensions. On a versioned bucket, lose the final
+acknowledgement and recover the same frozen locator through version discovery and complete independent
+verification. When the admitted storage profile does not support version reads, also lose the final
+acknowledgement and recover through bounded HEAD at the frozen bundle key followed by GET with `If-Match`
+bound to the returned ETag. Require complete digest/size verification and independent authentication of the
+bundle, root and required closure; retain the conditional-read binding in the receipt without rewriting the
+locator. Reject a missing/unusable ETag, a changed ETag between HEAD and GET, denied reads, truncated bodies
+and digest/size mismatches with coded errors and no success. Denied or failed exact-version reads in a profile
+that supports them must issue no fallback unversioned GET; missing conditional-read capability also fails
+admission rather than downgrading to an unconditional read. A new provider Run ID must not bypass an unresolved
+operation for the same enrolled physical namespace. Target rename, endpoint alias and addressing-mode changes
+must select the same state.
+Test first-use enrollment, a conflicting second owner/bundle/ref, missing enrolled state, concurrent initialization
+and attempted migration/reset. Reject a different owning repository, including a fork, while keeping workflow
+path, display name/bundle, dispatch ref and evaluated concurrency group unchanged. With bundle and dispatch
+ref unchanged, reject a changed workflow path, changed evaluated concurrency group and `cancel-in-progress: true`.
+After a lost enrollment acknowledgement, an exact retry with the same physical namespace and complete owner
+tuple must authenticate and reuse the unchanged non-retired record before new-enrollment overlap rejection.
+For an equal prefix, vary each owner field individually and require refusal; a retired namespace also rejects
+a same-owner retry. Reject new equal, ancestor and descendant prefixes against both enrolled and retired
+reservations on the same provider/resource and bucket; race
+concurrent parent/child enrollments so only one can succeed. Include disjoint sibling prefixes as a positive
+case, and reject empty/bucket-root prefixes under the existing grammar. Each invalid delivery admission must
+return a coded error with zero producer
+execution, payload/proof transfer, signing or final PUTs; control-record inspection/enrollment is separate.
+Test death in `preparing` before recovery retention: exact-state closure must permit
+the next operation without a possible stale commit. Race closure against promotion; only the winning transition
+may authorize its outcome, and stale generations cannot promote or PUT. Test retained bytes without
+confirmed promotion: zero final-bundle requests may dispatch. A queued bundle-upload job or retry with a
+stale authorization/retention receipt must also refuse dispatch after
+closure, supersession or retirement. Test expired/unrecoverable authorized
+state: only authenticated retirement may close its active obligation, the old physical namespace stays blocked,
+and a separately enrolled non-overlapping prefix permits continued delivery without claiming old absence.
+Exercise death after recovery-byte retention both before and during final PUT, including a
+missing-object `403`: exact-bundle replay must converge without re-signing. Lost-acknowledgement replay must
+verify the same pinned bytes/key. Include a racing original request with unavailable prior-runner status;
+replay cannot require an impossible old-runner join. Missing recovery bytes and unverifiable remote state
+must block signing except for the explicit retirement/new-namespace path.
+A verified terminal predecessor must permit a genuinely different subsequent delivery. Uncertain, expired
+or incomplete pending history prevents new signing. Concurrent callers must not both acquire signing authority.
+After successful remote authentication, failed or unconfirmed terminal persistence must prevent producer
+success while retaining recovery of the existing completion. Lose the terminal CAS acknowledgement: matching
+durable exact-state read-back must resolve it without re-signing. Crash before that CAS, then recover by
+authenticating the existing completion and recording its terminal disposition. Stale generations, retirement
+winning the transition race, and substituted origin, target, locator or verification-policy bindings must return coded refusals.
+Verify that a later Run reconciles the durable terminal predecessor through the existing reuse/new-delivery
+rules without treating the stored disposition as portable proof or rewriting the originating attempt.
+With successful byte read-back, require coded failure and zero final commit requests for service expiry
+before the recovery deadline, sufficient requested retention capped to insufficient reported expiry,
+unverifiable expiry/access, or discovery requiring a terminal Run record that was never published.
+Confirmed expiry equal to the deadline is sufficient; a requested/reported difference alone is not failure
+when the confirmed expiry still covers the deadline. Delay a finalizer past the frozen publication cutoff:
+it must fail with a coded error, issue no new commit request and neither publish nor accept a terminal record
+for that old attempt. Admission without an enforceable finite cutoff must return `CodeEngineCapability`
+before producer execution, payload/proof transfer, signing or a final PUT. Delay a queued operation before execution until its
+already-frozen cutoff expires: return `CodeTimeout` with zero such work or PUTs; worker start cannot
+recompute or extend the cutoff. No retry may extend the old cutoff. A cleanup expiry must trigger bounded supervisor termination;
+an unconfirmed exit at its deadline must preserve blocked state, unsafe ownership and failure without success.
+Terminate the
+producer or runner after the bundle lands but before acknowledgement, then retrieve the pre-recorded locator
+and reconcile without the producer's memory or files. Failed durable retention or its read-back must prevent
+the final commit request. Delivery success, boot readiness and qualification remain separate results. Record
+provider capabilities, exact artifact/client identities and acceptance limits in reconciliation; no provider
+or format is enabled by this contract freeze alone.
 
 ### 3. The emitted publish phase
 

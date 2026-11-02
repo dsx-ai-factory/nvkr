@@ -18,7 +18,60 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 )
+
+func TestNightlyRuntimeBindsProfileDiskAndNativeHost(t *testing.T) {
+	for _, test := range []struct {
+		name, runtimeTarget, host, diskPlatform string
+		diskOutput                              string
+		missing, duplicate, noPlan              bool
+		code                                    e.Code
+	}{
+		{name: "ARM64", runtimeTarget: "native-arm64-vm", host: "linux/arm64", diskPlatform: "linux/arm64"},
+		{name: "AMD64", runtimeTarget: "native-amd64-vm", host: "linux/amd64", diskPlatform: "linux/amd64"},
+		{name: "cross architecture host", runtimeTarget: "native-amd64-vm", host: "linux/arm64", diskPlatform: "linux/amd64", code: e.CodeEngineCapability},
+		{name: "unsupported host", runtimeTarget: "native-arm64-vm", host: "linux/s390x", diskPlatform: "linux/arm64", code: e.CodeEngineCapability},
+		{name: "non Linux host", runtimeTarget: "native-arm64-vm", host: "darwin/arm64", diskPlatform: "linux/arm64", code: e.CodeEngineCapability},
+		{name: "unsupported target", runtimeTarget: "native-s390x-vm", host: "linux/arm64", diskPlatform: "linux/arm64", code: e.CodeEngineCapability},
+		{name: "cross architecture disk", runtimeTarget: "native-amd64-vm", host: "linux/amd64", diskPlatform: "linux/arm64", code: e.CodeVerifyFailed},
+		{name: "unsupported disk", runtimeTarget: "native-arm64-vm", host: "linux/arm64", diskPlatform: "linux/s390x", code: e.CodeVerifyFailed},
+		{name: "different same architecture disk", runtimeTarget: "native-arm64-vm", host: "linux/arm64", diskPlatform: "linux/arm64", diskOutput: "other-disk", code: e.CodeVerifyFailed},
+		{name: "missing disk", runtimeTarget: "native-arm64-vm", host: "linux/arm64", missing: true, code: e.CodeVerifyFailed},
+		{name: "ambiguous disk", runtimeTarget: "native-arm64-vm", host: "linux/arm64", diskPlatform: "linux/arm64", duplicate: true, code: e.CodeVerifyFailed},
+		{name: "missing Plan", runtimeTarget: "native-arm64-vm", host: "linux/arm64", noPlan: true, code: e.CodeVerifyFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			diskOutput := "nvke-node-image-arm64"
+			if test.runtimeTarget == "native-amd64-vm" {
+				diskOutput = "nvke-node-image-amd64"
+			}
+			profile := NightlyProfile{RuntimeTarget: test.runtimeTarget, Network: "ovn", DiskOutput: diskOutput}
+			plan := &factory.Plan{Builds: []factory.BuildPlan{{Name: "unselected-disk", Platform: "linux/other"}}}
+			if test.diskOutput != "" {
+				plan.Builds = append(plan.Builds, factory.BuildPlan{Name: diskOutput, Platform: test.diskPlatform})
+				profile.DiskOutput = test.diskOutput
+			}
+			if !test.missing {
+				plan.Builds = append(plan.Builds, factory.BuildPlan{Name: profile.DiskOutput, Platform: test.diskPlatform})
+			}
+			if test.duplicate {
+				plan.Builds = append(plan.Builds, factory.BuildPlan{Name: profile.DiskOutput, Platform: test.diskPlatform})
+			}
+			if test.noPlan {
+				plan = nil
+			}
+			platform, err := nightlyRuntimePlatform(profile, plan, test.host)
+			if test.code != "" {
+				assertNightlyCode(t, err, test.code)
+				return
+			}
+			if err != nil || platform != test.host {
+				t.Fatalf("platform=%q error=%v, want %q", platform, err, test.host)
+			}
+		})
+	}
+}
 
 func TestNightlyDeadlineReservesNativeCleanupBeforeStartingWork(t *testing.T) {
 	now := time.Now()

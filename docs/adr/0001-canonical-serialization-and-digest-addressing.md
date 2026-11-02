@@ -215,6 +215,37 @@ identities and inexact bindings fail closed. The canonical document is bounded b
 transport limit. Pretty-printed JSON hashes are insufficient for either document. Reconciliation records
 implementation and external acceptance independently of schema registration.
 
+The S3/native-file contract in ADR-20 defines the following new families. Their names and semantics form
+the implementation contract; executable codec registration and decoders remain implementation work.
+
+| Object | Canonical schema | Frozen family kind |
+| --- | --- | --- |
+| Native file/member manifest | `nvkr.dev/native-file/v1` | `nvkr.native-file` |
+| Derived signed file-delivery root | `nvkr.dev/file-delivery/v1` | `nvkr.file-delivery` |
+
+The extension reserves the following wire versions. This table does not change the implemented versions above.
+
+| Object | Version decision | Reason |
+| --- | --- | --- |
+| Definition | Reserve `nvkr.dev/definition/v6` | Adds native `file` outputs. |
+| Environment | Reserve `nvkr.dev/environment/v2` | Adds typed file targets. |
+| Run Plan and artifact graph | Reserve `nvkr.dev/run-plan/v6` and `nvkr.dev/artifact-graph/v6` | Extends closed output and operation vocabularies. |
+| PublicationRoot | Reserve `nvkr.dev/publication-root/v5` and matching v5 root/config media types | Adds native-file output membership. |
+| Run | Reserve `nvkr.dev/run/v5` | Adds native-file requirements and required delivery completion. |
+| Release view | Retain `nvkr.dev/release/v4` for the unchanged OCI source view | S3 coordinates, completion and separate policies belong to delivery records and receipts. |
+
+ADR-20 owns the exact publication media types and the unchanged Release-view boundary. Older schemas retain
+their existing fields and meanings; this reservation registers no decoder or executable capability.
+
+The native manifest binds unchanged producer bytes and complete admitted regular members. The delivery
+root binds authenticated source publications to exact stored bytes and destinations. Neither reuses retired
+`nvkr.publication`/`nvkr.publication-manifest` families or changes Build identity. Implementations must register
+the distinct tags and add strict canonical/unknown-schema/family-separation contracts before minting them.
+The `nvkr.dev/file-delivery-locator/v1` locator pins raw document/bundle hashes and sizes; it is transport
+selection, not another semantic identity or trust object. The raw SHA-256 digests of the root JSON,
+detached bundle and native payload remain distinct from the typed identities of the delivery root and
+native-file manifest.
+
 ## Consequences
 
 **Positive**

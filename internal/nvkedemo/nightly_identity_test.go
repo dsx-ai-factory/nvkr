@@ -32,6 +32,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 // These test-only descriptions correlate one admitted nightly cycle. They issue
@@ -167,13 +168,25 @@ func validateNightlyProfile(profile NightlyProfile) error {
 	if profile.HarnessCommit != "" && !nightlyGitCommit(profile.HarnessCommit) {
 		return e.New(e.CodeVerifyFailed, "legacy harness description requires an exact commit")
 	}
-	if profile.RuntimeTarget != "native-arm64-vm" || (profile.Network != "ovn" && profile.Network != "upstream-ovn") {
-		return e.New(e.CodeEngineCapability, "nightly adapter requires native ARM64 VMs and an explicit supported OVN network")
+	if _, err := nightlyRuntimeTargetPlatform(profile.RuntimeTarget); err != nil {
+		return err
+	}
+	if profile.Network != "ovn" && profile.Network != "upstream-ovn" {
+		return e.New(e.CodeEngineCapability, "nightly adapter requires an explicit supported OVN network")
 	}
 	if profile.ControllerOutput != "" && !nightlyOutputNamePattern.MatchString(profile.ControllerOutput) {
 		return e.New(e.CodeVerifyFailed, "nightly controller output requires a canonical logical name")
 	}
 	return nil
+}
+
+func nightlyRuntimeTargetPlatform(runtimeTarget string) (string, error) {
+	for _, arch := range target.Arches() {
+		if runtimeTarget == "native-"+arch+"-vm" {
+			return "linux/" + arch, nil
+		}
+	}
+	return "", e.New(e.CodeEngineCapability, "nightly adapter requires a supported native Linux VM target")
 }
 
 func nightlyGitCommit(value string) bool {

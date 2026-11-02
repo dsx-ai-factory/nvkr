@@ -152,7 +152,7 @@ func testCosignProvenanceDiscovery(t *testing.T, binary string, withSBOM bool) {
 	}
 	requireRun(signArgs(ociAttestArgs(subject, "provenance.json"))...)
 	requireRun(signArgs(exactAttestArgs(QualificationPredicateType, subject, "qualification.json"))...)
-	source, err := newRegistryBundleSource(ctx, Subject{Ref: subject, Digest: digest.String()}, Credential{})
+	source, err := newRegistryBundleSource(ctx, Subject{Ref: subject, Digest: digest.String()}, Credential{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

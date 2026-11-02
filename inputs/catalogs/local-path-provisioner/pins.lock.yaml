@@ -1,0 +1,22 @@
+# Machine-managed by `nvkr catalog pin` / `nvkr catalog bump`. Do not hand-edit.
+apiVersion: nvkr.dev/lock/v1
+artifacts:
+  local-path-helper-image:
+    digests:
+      amd64: sha256:66a6306db78bf2dbf3487f293aa8d6990d8e506fdffab9cc43fe422becf886e4
+      arm64: sha256:d82c2ab94640ded77cf76514ce6a84870761105058a4a9e51b05a8a79be97a6c
+    imageParentDigest: sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec
+    tag: v0.0.37
+  local-path-provisioner-image:
+    digests:
+      amd64: sha256:c3f2c60ee2490eb83ac00101d7e239fd8c20a5b8b4038e2dfc36a7e66fe99c08
+      arm64: sha256:6a6bade778f51df4e3f9710db6b62ff6eb366cac897e7eccc3528ebd6d22e86c
+    imageParentDigest: sha256:e757967a5ec338f6a9b371c5a9688bedaa8c3578ea3dd4db329ea0084be0a86f
+    tag: v0.0.37
+kind: PinLock
+pins:
+  local-path-provisioner:
+    commit: 49b2be8e26d6d34c9afaa21fa33108d2e82f8955
+    sourceDateEpoch: 1785898268
+    tag: v0.0.37
+    treeHash: bd2f817f389e539ec884bf65d737ebaa62bc95ec
