@@ -9,11 +9,13 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/internal/releaseasset"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -168,7 +170,15 @@ func TestBuildVerifiedAuthenticatesAICRSigstoreProvenanceAndSPDX(t *testing.T) {
 			if tc.archive != nil {
 				served = tc.archive
 			}
-			reader := EvidenceReaderFunc(func(_ context.Context, ref string) ([]byte, error) {
+			reader := EvidenceReaderFunc(func(_ context.Context, ref string, maxBytes int64) ([]byte, error) {
+				// The pinned archive carrier gets the tool transport limit; direct evidence keeps the bundle limit.
+				want := int64(MaxBundleBytes)
+				if ref == aicrArchiveURL {
+					want = releaseasset.MaxToolTransportBytes
+				}
+				if maxBytes != want {
+					return nil, fmt.Errorf("reading %s with limit %d, want %d", ref, maxBytes, want)
+				}
 				switch ref {
 				case aicrSBOMURL:
 					return spdx, nil

@@ -17,6 +17,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/dsx-ai-factory/nvkr/internal/releaseasset"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
@@ -29,15 +30,16 @@ import (
 // EvidenceReader is the only external-evidence acquisition seam. Implementations
 // may read https, OCI, or an activated mirror, but must honor ctx. BuildVerified
 // computes the digest itself, so this adapter cannot assert that bytes verified.
+// It must fail rather than return more than maxBytes.
 type EvidenceReader interface {
-	ReadEvidence(ctx context.Context, ref string) ([]byte, error)
+	ReadEvidence(ctx context.Context, ref string, maxBytes int64) ([]byte, error)
 }
 
 // EvidenceReaderFunc adapts a function to EvidenceReader.
-type EvidenceReaderFunc func(context.Context, string) ([]byte, error)
+type EvidenceReaderFunc func(context.Context, string, int64) ([]byte, error)
 
-func (fn EvidenceReaderFunc) ReadEvidence(ctx context.Context, ref string) ([]byte, error) {
-	return fn(ctx, ref)
+func (fn EvidenceReaderFunc) ReadEvidence(ctx context.Context, ref string, maxBytes int64) ([]byte, error) {
+	return fn(ctx, ref, maxBytes)
 }
 
 // SLSAProvenanceV1PredicateType is the only accepted upstream provenance predicate.
@@ -663,7 +665,7 @@ func verifyExternalEvidence(ctx context.Context, component catalog.NamedComponen
 func readExternalEvidence(ctx context.Context, component catalog.NamedComponent, evidenceType, ref string,
 	reader EvidenceReader,
 ) ([]byte, error) {
-	location := ref
+	location, limit := ref, int64(MaxBundleBytes)
 	member, archived := catalog.ArchiveMemberRef(ref)
 	tool := component.Prebuilt.Executable
 	if archived {
@@ -671,9 +673,9 @@ func readExternalEvidence(ctx context.Context, component catalog.NamedComponent,
 			return nil, e.New(e.CodeInvalidCatalog,
 				"external %s %q for %s requires a pinned release archive", evidenceType, ref, component.Name)
 		}
-		location = tool.URL
+		location, limit = tool.URL, releaseasset.MaxToolTransportBytes
 	}
-	raw, err := reader.ReadEvidence(ctx, location)
+	raw, err := reader.ReadEvidence(ctx, location, limit)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "reading external %s for %s", evidenceType, component.Name)
@@ -682,6 +684,9 @@ func readExternalEvidence(ctx context.Context, component catalog.NamedComponent,
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "reading external %s for %s", evidenceType, component.Name)
+	}
+	if int64(len(raw)) > limit {
+		return nil, e.New(e.CodeUnavailable, "external %s for %s exceeds %d bytes", evidenceType, component.Name, limit)
 	}
 	raw = append([]byte(nil), raw...)
 	if !archived {

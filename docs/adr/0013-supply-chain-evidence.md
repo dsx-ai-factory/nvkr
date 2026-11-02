@@ -67,7 +67,8 @@ schema defines the reference, consumed by both the acquire lane and the SBOM emi
 
 A reference may also be `archive:<member>`: a regular companion member of a release executable's pinned
 archive, read only after the archive bytes hash to the source pin's archive digest. The member must differ
-from the executable, and its own declared digest is still checked.
+from the executable, and its own declared digest is still checked. The archive transport shares the 256 MiB
+source-tool carrier bound; a directly referenced document and an extracted member stay within 64 MiB.
 
 Upstream evidence is validated, never merged or converted. NVKR records only the reference and digest beside its
 own CycloneDX document; it has no reason to require CycloneDX input. The SBOM may be CycloneDX 1.4–1.6 JSON or

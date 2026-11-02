@@ -80,7 +80,7 @@ func TestBuildVerifiedReadsAndHashesExternalEvidence(t *testing.T) {
 		t.Fatalf("test fixture artifact digest drifted: got %s want %s", artifactDigest, expectedArtifactDigest)
 	}
 	reads := map[string]int{}
-	reader := EvidenceReaderFunc(func(_ context.Context, ref string) ([]byte, error) {
+	reader := EvidenceReaderFunc(func(_ context.Context, ref string, _ int64) ([]byte, error) {
 		reads[ref]++
 		switch ref {
 		case evidence.SBOMRef:
@@ -133,7 +133,7 @@ func TestBuildVerifiedRejectsTamperedAbsentAndUnpinnedMaterial(t *testing.T) {
 	resolved, buildDigest, artifactDigest := prebuiltResolved(t, evidence)
 	artifacts := map[string]string{"prebuilt": artifactDigest}
 
-	tampered := EvidenceReaderFunc(func(context.Context, string) ([]byte, error) { return []byte("tampered"), nil })
+	tampered := EvidenceReaderFunc(func(context.Context, string, int64) ([]byte, error) { return []byte("tampered"), nil })
 	if _, err := BuildVerified(context.Background(), resolved, buildDigest, artifacts, tampered, nil); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
 		t.Fatalf("tampered external evidence must fail closed, got %v", err)
 	}
@@ -185,7 +185,7 @@ func TestBuildVerifiedHonorsContext(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	reader := EvidenceReaderFunc(func(context.Context, string) ([]byte, error) { return body, nil })
+	reader := EvidenceReaderFunc(func(context.Context, string, int64) ([]byte, error) { return body, nil })
 	if _, err := BuildVerified(ctx, resolved, buildDigest,
 		map[string]string{"prebuilt": artifactDigest}, reader, nil); sbomCode(err) != nvkrerr.CodeTimeout {
 		t.Fatalf("canceled acquisition must return timeout, got %v", err)
@@ -199,7 +199,7 @@ func TestBuildVerifiedRequiresExactArtifactSetAndCanonicalReferences(t *testing.
 	}
 	resolved, buildDigest, artifactDigest := prebuiltResolved(t, evidence)
 	readerCalls := 0
-	reader := EvidenceReaderFunc(func(context.Context, string) ([]byte, error) {
+	reader := EvidenceReaderFunc(func(context.Context, string, int64) ([]byte, error) {
 		readerCalls++
 		return body, nil
 	})
@@ -267,7 +267,7 @@ func TestBuildVerifiedSnapshotsCallerInputsBeforeExternalIO(t *testing.T) {
 	}
 	resolved, buildDigest, artifactDigest := prebuiltResolved(t, evidence)
 	hashes := map[string]string{"prebuilt": artifactDigest}
-	reader := EvidenceReaderFunc(func(context.Context, string) ([]byte, error) {
+	reader := EvidenceReaderFunc(func(context.Context, string, int64) ([]byte, error) {
 		hashes["prebuilt"] = "sha256:" + strings.Repeat("f", 64)
 		resolved.Components[0].Prebuilt.Evidence.SBOMDigest = "sha256:" + strings.Repeat("e", 64)
 		resolved.Components[0].Name = "mutated"
@@ -298,7 +298,7 @@ func TestBuildVerifiedRejectsUntypedOrWrongSubjectExternalBytes(t *testing.T) {
 				SBOMRef: "https://upstream.example/sbom", SBOMDigest: evidenceDigest(body),
 			}
 			resolved, buildDigest, artifactDigest := prebuiltResolved(t, evidence)
-			reader := EvidenceReaderFunc(func(context.Context, string) ([]byte, error) { return body, nil })
+			reader := EvidenceReaderFunc(func(context.Context, string, int64) ([]byte, error) { return body, nil })
 			if _, err := BuildVerified(context.Background(), resolved, buildDigest,
 				map[string]string{"prebuilt": artifactDigest}, reader, nil); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
 				t.Fatalf("external bytes without a matching typed subject produced authority: %v", err)
@@ -328,7 +328,7 @@ func TestExternalCycloneDXCannotReplayOneSubjectAcrossConflictingArtifactHashes(
 			if err != nil {
 				t.Fatal(err)
 			}
-			reader := EvidenceReaderFunc(func(context.Context, string) ([]byte, error) {
+			reader := EvidenceReaderFunc(func(context.Context, string, int64) ([]byte, error) {
 				return append([]byte(nil), body...), nil
 			})
 			if _, err := BuildVerified(context.Background(), resolved, buildDigest,
@@ -479,7 +479,7 @@ func TestBuildVerifiedSeparatesExternalVerificationFromPublisherAuthority(t *tes
 		ProvenanceRef: "https://upstream.example/provenance", ProvenanceDigest: evidenceDigest(provenanceBytes),
 	}
 	resolved, buildDigest, artifactDigest := prebuiltResolved(t, evidence)
-	reader := EvidenceReaderFunc(func(_ context.Context, ref string) ([]byte, error) {
+	reader := EvidenceReaderFunc(func(_ context.Context, ref string, _ int64) ([]byte, error) {
 		switch ref {
 		case evidence.SBOMRef:
 			return sbomBytes, nil
@@ -530,7 +530,7 @@ func TestBuildVerifiedFromReportRejectsFabricationAndCallbackMutation(t *testing
 		SBOMRef: "https://upstream.example/alpha.sbom", SBOMDigest: evidenceDigest(body),
 	}
 	resolved, report = qualifiedSBOMReport(t, []string{"alpha"}, map[string]*catalog.ExternalEvidence{"alpha": external})
-	reader := EvidenceReaderFunc(func(context.Context, string) ([]byte, error) {
+	reader := EvidenceReaderFunc(func(context.Context, string, int64) ([]byte, error) {
 		report.Artifacts[0].SHA256 = "sha256:" + strings.Repeat("f", 64)
 		return body, nil
 	})
