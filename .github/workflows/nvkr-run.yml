@@ -958,8 +958,8 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-nvke-node-fde-amd64-fetch-nvke-agent-dc6f3464c691:
-    name: 'Fetch pinned source for nvke-agent, nvke-cni-ovn, nvke-image-inputs, nvke-node-fde-amd64, nvke-patched-installer-iso-amd64 (nvke-node-fde-amd64)'
+  nvkr-nvke-node-fde-amd64-fetch-nvke-agent-b1038550581e:
+    name: 'Fetch pinned source for nvke-agent, nvke-image-inputs, nvke-node-fde-amd64, nvke-patched-installer-iso-amd64 (nvke-node-fde-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04]
@@ -984,7 +984,7 @@ jobs:
     name: 'Build and package producer evidence for nvke-node-fde-amd64'
     runs-on: 'arc-amd64-kvm'
     timeout-minutes: 1045
-    needs: [build-runner-arc-amd64-kvm, nvkr-nvke-node-fde-amd64-fetch-nvke-agent-dc6f3464c691, nvkr-nvke-node-fde-amd64-fetch-nvke-cni-calico, nvkr-nvke-node-fde-amd64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-fde-amd64-fetch-nvke-spire-agent, nvkr-nvke-node-fde-amd64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-fde-amd64-fetch-ovn-kubernetes-chart]
+    needs: [build-runner-arc-amd64-kvm, nvkr-nvke-node-fde-amd64-fetch-nvke-agent-b1038550581e, nvkr-nvke-node-fde-amd64-fetch-nvke-cni-calico, nvkr-nvke-node-fde-amd64-fetch-nvke-cni-ovn, nvkr-nvke-node-fde-amd64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-fde-amd64-fetch-nvke-spire-agent, nvkr-nvke-node-fde-amd64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-fde-amd64-fetch-ovn-kubernetes-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-arc'
     permissions:
@@ -1152,6 +1152,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+  nvkr-nvke-node-fde-amd64-fetch-nvke-cni-ovn:
+    name: 'Fetch pinned source for nvke-cni-ovn (nvke-node-fde-amd64)'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [build-runner-ubuntu-24-04]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-source-part-1
+    permissions:
+      actions: read
+      contents: read
   nvkr-nvke-node-fde-amd64-fetch-nvke-kubeadm-distro:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-fde-amd64)'
     runs-on: 'ubuntu-24.04'
@@ -1202,7 +1216,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-source-part-1
     permissions:
       actions: read
       contents: read
@@ -1212,23 +1230,16 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    permissions:
-      actions: read
-      contents: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: execute node part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-node
-        with:
-          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
-          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-  nvkr-nvke-node-fde-arm64-fetch-nvke-agent-e713dcd879bc:
-    name: 'Fetch pinned source for nvke-agent, nvke-cni-ovn, nvke-image-inputs, nvke-node-fde-arm64, nvke-patched-installer-iso (nvke-node-fde-arm64)'
+      - *operation-execute-source-part-1
+    permissions:
+      actions: read
+      contents: read
+  nvkr-nvke-node-fde-arm64-fetch-nvke-agent-9291de711464:
+    name: 'Fetch pinned source for nvke-agent, nvke-image-inputs, nvke-node-fde-arm64, nvke-patched-installer-iso (nvke-node-fde-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
@@ -1253,7 +1264,7 @@ jobs:
     name: 'Build and package producer evidence for nvke-node-fde-arm64'
     runs-on: 'arc-arm64-kvm'
     timeout-minutes: 1045
-    needs: [build-runner-arc-arm64-kvm, nvkr-nvke-node-fde-arm64-fetch-nvke-agent-e713dcd879bc, nvkr-nvke-node-fde-arm64-fetch-nvke-cni-calico, nvkr-nvke-node-fde-arm64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-fde-arm64-fetch-nvke-spire-agent, nvkr-nvke-node-fde-arm64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-fde-arm64-fetch-ovn-kubernetes-chart]
+    needs: [build-runner-arc-arm64-kvm, nvkr-nvke-node-fde-arm64-fetch-nvke-agent-9291de711464, nvkr-nvke-node-fde-arm64-fetch-nvke-cni-calico, nvkr-nvke-node-fde-arm64-fetch-nvke-cni-ovn, nvkr-nvke-node-fde-arm64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-fde-arm64-fetch-nvke-spire-agent, nvkr-nvke-node-fde-arm64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-fde-arm64-fetch-ovn-kubernetes-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-arc'
     permissions:
@@ -1340,6 +1351,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+  nvkr-nvke-node-fde-arm64-fetch-nvke-cni-ovn:
+    name: 'Fetch pinned source for nvke-cni-ovn (nvke-node-fde-arm64)'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 60
+    needs: [build-runner-ubuntu-24-04-arm]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-source-part-1
+    permissions:
+      actions: read
+      contents: read
   nvkr-nvke-node-fde-arm64-fetch-nvke-kubeadm-distro:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-fde-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -1390,7 +1415,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-source-part-1
     permissions:
       actions: read
       contents: read
@@ -1400,23 +1429,16 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    permissions:
-      actions: read
-      contents: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: execute node part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-node
-        with:
-          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
-          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-  nvkr-nvke-node-image-amd64-fetch-nvke-age-0c826a20a7b4:
-    name: 'Fetch pinned source for nvke-agent, nvke-cni-ovn, nvke-image-inputs, nvke-node-image-amd64, nvke-patched-installer-iso-amd64 (nvke-node-image-amd64)'
+      - *operation-execute-source-part-1
+    permissions:
+      actions: read
+      contents: read
+  nvkr-nvke-node-image-amd64-fetch-nvke-age-693f047a753d:
+    name: 'Fetch pinned source for nvke-agent, nvke-image-inputs, nvke-node-image-amd64, nvke-patched-installer-iso-amd64 (nvke-node-image-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04]
@@ -1441,7 +1463,7 @@ jobs:
     name: 'Build and package producer evidence for nvke-node-image-amd64'
     runs-on: 'arc-amd64-kvm'
     timeout-minutes: 1045
-    needs: [build-runner-arc-amd64-kvm, nvkr-nvke-node-image-amd64-fetch-nvke-age-0c826a20a7b4, nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico, nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent, nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart]
+    needs: [build-runner-arc-amd64-kvm, nvkr-nvke-node-image-amd64-fetch-nvke-age-693f047a753d, nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico, nvkr-nvke-node-image-amd64-fetch-nvke-cni-ovn, nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent, nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-arc'
     permissions:
@@ -1522,6 +1544,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+  nvkr-nvke-node-image-amd64-fetch-nvke-cni-ovn:
+    name: 'Fetch pinned source for nvke-cni-ovn (nvke-node-image-amd64)'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [build-runner-ubuntu-24-04]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-source-part-1
+    permissions:
+      actions: read
+      contents: read
   nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-image-amd64)'
     runs-on: 'ubuntu-24.04'
@@ -1572,7 +1608,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-source-part-1
     permissions:
       actions: read
       contents: read
@@ -1582,23 +1622,16 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    permissions:
-      actions: read
-      contents: read
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: execute node part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-node
-        with:
-          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
-          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-  nvkr-nvke-node-image-arm64-fetch-nvke-age-aee9fbaecda2:
-    name: 'Fetch pinned source for nvke-agent, nvke-cni-ovn, nvke-image-inputs, nvke-node-image, nvke-patched-installer-iso (nvke-node-image-arm64)'
+      - *operation-execute-source-part-1
+    permissions:
+      actions: read
+      contents: read
+  nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01:
+    name: 'Fetch pinned source for nvke-agent, nvke-image-inputs, nvke-node-image, nvke-patched-installer-iso (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
@@ -1623,7 +1656,7 @@ jobs:
     name: 'Build and package producer evidence for nvke-node-image-arm64'
     runs-on: 'arc-arm64-kvm'
     timeout-minutes: 1045
-    needs: [build-runner-arc-arm64-kvm, nvkr-nvke-node-image-arm64-fetch-nvke-age-aee9fbaecda2, nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico, nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent, nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart]
+    needs: [build-runner-arc-arm64-kvm, nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01, nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico, nvkr-nvke-node-image-arm64-fetch-nvke-cni-ovn, nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent, nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-arc'
     permissions:
@@ -1704,6 +1737,20 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+  nvkr-nvke-node-image-arm64-fetch-nvke-cni-ovn:
+    name: 'Fetch pinned source for nvke-cni-ovn (nvke-node-image-arm64)'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 60
+    needs: [build-runner-ubuntu-24-04-arm]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-source-part-1
+    permissions:
+      actions: read
+      contents: read
   nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -1754,7 +1801,11 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-source-part-1
     permissions:
       actions: read
       contents: read
@@ -1764,21 +1815,14 @@ jobs:
     timeout-minutes: 60
     needs: [build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    permissions:
-      actions: read
-      contents: read
     steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: execute node part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-node
-        with:
-          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
-          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - *operation-execute-source-part-1
+    permissions:
+      actions: read
+      contents: read
   nvkr-nvkectl-linux-arm64-fetch-nvkectl:
     name: 'Fetch pinned source for nvkectl (nvkectl-linux-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -7655,7 +7699,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-02'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-capi-kubeadm-bootstrap-image, nvkr-attest-sboms-output-capi-kubeadm-con-aff5fe5bef73, nvkr-attest-sboms-output-nvke-node-fde-arm64, nvkr-attest-sboms-output-nvke-node-image-arm64, nvkr-attest-sboms-output-operator-tools, nvkr-attest-sboms-output-spire-tpm-server-image-arm64, nvkr-attest-sboms-output-temporal, nvkr-nktp-sbom, nvkr-nvke-node-fde-arm64-fetch-nvke-agent-e713dcd879bc, nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico, nvkr-package-capnico-controller, nvkr-package-cert-manager-cainjector-image-arm64, nvkr-package-csi-node-driver-registrar-image-arm64, nvkr-package-publication-nktp, nvkr-package-publication-postgresql-image-arm64, nvkr-package-publication-spire-oidc-image, nvkr-process-capi-controller-image-pull-c-d7d51b217a77, nvkr-process-operator-tools-terminal-obse-ad40acf7eeda, nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f, nvkr-process-spire-controller-manager-ima-3e5db62fee30, nvkr-publish-output-spiffe-csi-image, nvkr-publish-output-spire-bash-image-arm64, nvkr-publish-output-temporal-server-image-arm64, nvkr-publish-output-temporal-ui-image, nvkr-publish-release, nvkr-sign-output-cert-manager-cainjector-image, nvkr-sign-output-controller-chart, nvkr-sign-output-nktp-kube-state-metrics-image, nvkr-sign-output-nktp-node-exporter-image-arm64, nvkr-sign-output-spire, nvkr-spire-controller-manager-image-arm64-92b22b7f2333, nvkr-verify-publication-output-capnico-controller, nvkr-verify-publication-output-nktp-metri-72d2044749d1, nvkr-verify-publication-output-nvke-node-fde-amd64, nvkr-verify-publication-output-nvke-node-image-amd64, nvkr-verify-publication-output-postgresql, nvkr-verify-publication-output-postgresql-image]
+    needs: [nvkr-attest-sboms-output-capi-kubeadm-bootstrap-image, nvkr-attest-sboms-output-capi-kubeadm-con-aff5fe5bef73, nvkr-attest-sboms-output-nvke-node-fde-arm64, nvkr-attest-sboms-output-nvke-node-image-arm64, nvkr-attest-sboms-output-operator-tools, nvkr-attest-sboms-output-spire-tpm-server-image-arm64, nvkr-attest-sboms-output-temporal, nvkr-nktp-sbom, nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico, nvkr-package-capnico-controller, nvkr-package-cert-manager-cainjector-image-arm64, nvkr-package-csi-node-driver-registrar-image-arm64, nvkr-package-publication-nktp, nvkr-package-publication-postgresql-image-arm64, nvkr-package-publication-spire-oidc-image, nvkr-process-capi-controller-image-pull-c-d7d51b217a77, nvkr-process-operator-tools-terminal-obse-ad40acf7eeda, nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f, nvkr-process-spire-controller-manager-ima-3e5db62fee30, nvkr-publish-output-spiffe-csi-image, nvkr-publish-output-spire-bash-image-arm64, nvkr-publish-output-temporal-server-image-arm64, nvkr-publish-output-temporal-ui-image, nvkr-publish-release, nvkr-sign-output-cert-manager-cainjector-image, nvkr-sign-output-controller-chart, nvkr-sign-output-nktp-kube-state-metrics-image, nvkr-sign-output-nktp-node-exporter-image-arm64, nvkr-sign-output-spire, nvkr-spire-controller-manager-image-arm64-92b22b7f2333, nvkr-verify-publication-output-capnico-controller, nvkr-verify-publication-output-nktp-metri-72d2044749d1, nvkr-verify-publication-output-nvke-node-fde-amd64, nvkr-verify-publication-output-nvke-node-image-amd64, nvkr-verify-publication-output-postgresql, nvkr-verify-publication-output-postgresql-image]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -7668,7 +7712,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-03'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-capi-kubeadm-con-a5cbb6fd910a, nvkr-attest-sboms-output-cluster-api-prov-270146b5b019, nvkr-attest-sboms-output-nktp, nvkr-attest-sboms-output-nvkectl-linux-arm64, nvkr-attest-sboms-output-postgresql-image-arm64, nvkr-attest-sboms-output-temporal-admin-t-9e993584a415, nvkr-cert-manager-webhook-image-sbom, nvkr-nvke-node-fde-amd64-fetch-nvke-agent-dc6f3464c691, nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent, nvkr-package-capi-kubeadm-bootstrap-image-arm64, nvkr-package-publication-csi-node-driver-02a78ae16d16, nvkr-package-publication-operator-tools, nvkr-package-publication-temporal-admin-tools-image, nvkr-process-capi-kubeadm-bootstrap-image-8c3aef4dafbd, nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6, nvkr-process-spire-bash-image-pull-spire-72c313316c1d, nvkr-process-spire-controller-manager-ima-0262ec0b780f, nvkr-publish-output-capi-kubeadm-bootstra-07670d07d213, nvkr-publish-output-cert-manager-webhook-image, nvkr-publish-output-cluster-api-provider-provisioned, nvkr-publish-output-nktp-collector-image-arm64, nvkr-publish-output-nvke-node-image-amd64, nvkr-publish-output-spire-controller-manager-image, nvkr-publish-output-spire-server-image-arm64, nvkr-sign-output-nvke-node-fde-amd64, nvkr-sign-output-spire-bash-image, nvkr-sign-output-temporal-server-image, nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-spire-controller-manager-image-sbom, nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-tool-cosign, nvkr-verify-publication-output-capi-kubea-400c7177454b, nvkr-verify-publication-output-csi-node-d-914d7376ead0, nvkr-verify-publication-output-nktp-kube-8edb2f9f5644, nvkr-verify-publication-output-spire, nvkr-verify-publication-output-temporal-ui-image]
+    needs: [nvkr-attest-sboms-output-capi-kubeadm-con-a5cbb6fd910a, nvkr-attest-sboms-output-cluster-api-prov-270146b5b019, nvkr-attest-sboms-output-nktp, nvkr-attest-sboms-output-nvkectl-linux-arm64, nvkr-attest-sboms-output-postgresql-image-arm64, nvkr-attest-sboms-output-temporal-admin-t-9e993584a415, nvkr-cert-manager-webhook-image-sbom, nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent, nvkr-package-capi-kubeadm-bootstrap-image-arm64, nvkr-package-publication-csi-node-driver-02a78ae16d16, nvkr-package-publication-operator-tools, nvkr-package-publication-temporal-admin-tools-image, nvkr-process-capi-kubeadm-bootstrap-image-8c3aef4dafbd, nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6, nvkr-process-spire-bash-image-pull-spire-72c313316c1d, nvkr-process-spire-controller-manager-ima-0262ec0b780f, nvkr-publish-output-capi-kubeadm-bootstra-07670d07d213, nvkr-publish-output-cert-manager-webhook-image, nvkr-publish-output-cluster-api-provider-provisioned, nvkr-publish-output-nktp-collector-image-arm64, nvkr-publish-output-nvke-node-image-amd64, nvkr-publish-output-spire-controller-manager-image, nvkr-publish-output-spire-server-image-arm64, nvkr-sign-output-nvke-node-fde-amd64, nvkr-sign-output-spire-bash-image, nvkr-sign-output-temporal-server-image, nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-spire-controller-manager-image-sbom, nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-tool-cosign, nvkr-verify-publication-output-capi-kubea-400c7177454b, nvkr-verify-publication-output-csi-node-d-914d7376ead0, nvkr-verify-publication-output-nktp-kube-8edb2f9f5644, nvkr-verify-publication-output-spire, nvkr-verify-publication-output-temporal-ui-image]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -7681,7 +7725,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-04'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-cert-manager-con-d67471e4f0b4, nvkr-attest-sboms-output-nktp-collector-image-arm64, nvkr-attest-sboms-output-spiffe-csi-image-arm64, nvkr-attest-sboms-output-spire-controller-f3890ce97c17, nvkr-attest-sboms-output-spire-server-image-arm64, nvkr-capnico-controller-linux-amd64-fetch-d7e509f127ef, nvkr-cert-manager-cainjector-image-sbom, nvkr-cert-manager-controller-image-sbom, nvkr-cluster-api-provider-provisioned-lin-233fabd1edbc, nvkr-controller-chart-sbom, nvkr-nico-reference-profiles-fixture-linu-29120e898ac9, nvkr-nktp-target-allocator-image-sbom, nvkr-nvke-node-fde-amd64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-fde-arm64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart, nvkr-operator-tools-pull-kubectl, nvkr-package-publication-controller-chart, nvkr-package-publication-nktp-kubectl-image-arm64, nvkr-process-nktp-build-nktp-chart-nktp-t-78bead2a7f7b, nvkr-process-nktp-collector-image-pull-nk-7f8d9f4dfc62, nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79, nvkr-process-spire-server-image-pull-spir-240af0efc28c, nvkr-publish-output-cwe, nvkr-publish-output-nktp-metrics-server-image, nvkr-publish-output-temporal-admin-tools-image-arm64, nvkr-sign-output-nvkectl, nvkr-sign-output-spire-oidc-image, nvkr-sign-output-spire-tpm-server-image, nvkr-verify-publication-output-capi-kubea-459a501ddf86, nvkr-verify-publication-output-nktp-lgtm-image, nvkr-verify-publication-output-temporal-a-9109bef2fded]
+    needs: [nvkr-attest-sboms-output-cert-manager-con-d67471e4f0b4, nvkr-attest-sboms-output-nktp-collector-image-arm64, nvkr-attest-sboms-output-spiffe-csi-image-arm64, nvkr-attest-sboms-output-spire-controller-f3890ce97c17, nvkr-attest-sboms-output-spire-server-image-arm64, nvkr-capnico-controller-linux-amd64-fetch-d7e509f127ef, nvkr-cert-manager-cainjector-image-sbom, nvkr-cert-manager-controller-image-sbom, nvkr-cluster-api-provider-provisioned-lin-233fabd1edbc, nvkr-controller-chart-sbom, nvkr-nico-reference-profiles-fixture-linu-29120e898ac9, nvkr-nktp-target-allocator-image-sbom, nvkr-nvke-node-fde-amd64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-fde-arm64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart, nvkr-nvke-node-image-arm64-fetch-nvke-cni-ovn, nvkr-operator-tools-pull-kubectl, nvkr-package-publication-controller-chart, nvkr-package-publication-nktp-kubectl-image-arm64, nvkr-process-nktp-build-nktp-chart-nktp-t-78bead2a7f7b, nvkr-process-nktp-collector-image-pull-nk-7f8d9f4dfc62, nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79, nvkr-process-spire-server-image-pull-spir-240af0efc28c, nvkr-publish-output-cwe, nvkr-publish-output-nktp-metrics-server-image, nvkr-publish-output-temporal-admin-tools-image-arm64, nvkr-sign-output-nvkectl, nvkr-sign-output-spire-oidc-image, nvkr-sign-output-spire-tpm-server-image, nvkr-verify-publication-output-capi-kubea-459a501ddf86, nvkr-verify-publication-output-nktp-lgtm-image, nvkr-verify-publication-output-temporal-a-9109bef2fded]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -7694,7 +7738,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-05'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-controller-chart, nvkr-attest-sboms-output-nktp-kubectl-image-arm64, nvkr-attest-sboms-output-nktp-lgtm-image-arm64, nvkr-attest-sboms-output-nktp-metrics-ser-cc131630b796, nvkr-disk-nvke-node-image-amd64, nvkr-nvke-node-fde-amd64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-fde-arm64-fetch-nvke-kubeadm-distro, nvkr-nvkectl-fetch-nvkectl, nvkr-package-cert-manager-webhook-image-arm64, nvkr-package-cwe, nvkr-package-publication-cert-manager-cai-2887e3e2c736, nvkr-package-publication-cert-manager-webhook-image, nvkr-package-publication-nico-reference-p-ee3d0b71da16, nvkr-package-publication-nktp-operator-image, nvkr-package-publication-spiffe-csi-image-arm64, nvkr-package-publication-temporal-server-image, nvkr-package-publication-temporal-ui-image-arm64, nvkr-package-release, nvkr-package-spire-controller-manager-image-arm64, nvkr-postgresql-image-arm64-pull-postgresql-image, nvkr-process-temporal-pull-temporal-chart-e02b82483e4b, nvkr-process-temporal-ui-image-pull-tempo-fb82f86e5756, nvkr-publish-output-spire-controller-mana-4c760c0ddb13, nvkr-sign-output-capi-kubeadm-control-plane-image, nvkr-sign-output-capnico-controller, nvkr-sign-output-csi-node-driver-registra-1ee01f3e15c9, nvkr-sign-output-nktp-lgtm-image, nvkr-sign-output-spire-crds, nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image, nvkr-temporal-sbom, nvkr-verify-publication-output-capi-contr-a309e0dde6c8, nvkr-verify-publication-output-cwe, nvkr-verify-publication-output-spiffe-csi-image, nvkr-verify-publication-release]
+    needs: [nvkr-attest-sboms-output-controller-chart, nvkr-attest-sboms-output-nktp-kubectl-image-arm64, nvkr-attest-sboms-output-nktp-lgtm-image-arm64, nvkr-attest-sboms-output-nktp-metrics-ser-cc131630b796, nvkr-disk-nvke-node-image-amd64, nvkr-nvke-node-fde-amd64-fetch-nvke-agent-b1038550581e, nvkr-nvke-node-fde-amd64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-fde-arm64-fetch-nvke-kubeadm-distro, nvkr-nvkectl-fetch-nvkectl, nvkr-package-cert-manager-webhook-image-arm64, nvkr-package-cwe, nvkr-package-publication-cert-manager-cai-2887e3e2c736, nvkr-package-publication-cert-manager-webhook-image, nvkr-package-publication-nico-reference-p-ee3d0b71da16, nvkr-package-publication-nktp-operator-image, nvkr-package-publication-spiffe-csi-image-arm64, nvkr-package-publication-temporal-server-image, nvkr-package-publication-temporal-ui-image-arm64, nvkr-package-release, nvkr-package-spire-controller-manager-image-arm64, nvkr-postgresql-image-arm64-pull-postgresql-image, nvkr-process-temporal-pull-temporal-chart-e02b82483e4b, nvkr-process-temporal-ui-image-pull-tempo-fb82f86e5756, nvkr-publish-output-spire-controller-mana-4c760c0ddb13, nvkr-sign-output-capi-kubeadm-control-plane-image, nvkr-sign-output-capnico-controller, nvkr-sign-output-csi-node-driver-registra-1ee01f3e15c9, nvkr-sign-output-nktp-lgtm-image, nvkr-sign-output-spire-crds, nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image, nvkr-temporal-sbom, nvkr-verify-publication-output-capi-contr-a309e0dde6c8, nvkr-verify-publication-output-cwe, nvkr-verify-publication-output-spiffe-csi-image, nvkr-verify-publication-release]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -7733,7 +7777,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-08'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-nktp-node-exporter-image, nvkr-attest-sboms-output-spire-bash-image, nvkr-nico-reference-profiles-fixture-linu-cd99e6119686, nvkr-nktp-collector-image-arm64-pull-nktp-85cb8e91f658, nvkr-nvke-node-fde-amd64-fetch-ovn-kubernetes-chart, nvkr-nvke-node-fde-arm64-fetch-ovn-kubernetes-chart, nvkr-nvke-node-image-amd64-fetch-nvke-age-0c826a20a7b4, nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu, nvkr-package-nktp-metrics-server-image-arm64, nvkr-package-publication-nktp-operator-image-arm64, nvkr-package-publication-spire-agent-image, nvkr-package-publication-spire-server-image, nvkr-package-publication-temporal-server-image-arm64, nvkr-package-spiffe-csi-image-arm64, nvkr-process-cluster-api-provider-provisi-0fe9554d2806, nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd, nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b, nvkr-process-spire-oidc-image-pull-spire-ae9fdd6c5262, nvkr-publish-output-nvkectl, nvkr-publish-output-spire-oidc-image, nvkr-publish-output-spire-tpm-server-image, nvkr-sign-output-capi-kubeadm-control-pla-d95378faf55b, nvkr-sign-output-cwe, nvkr-sign-output-nktp, nvkr-sign-output-nktp-lgtm-image-arm64, nvkr-sign-output-nktp-metrics-server-image, nvkr-spiffe-csi-image-sbom, nvkr-temporal-ui-image-sbom, nvkr-verify-publication-output-spiffe-csi-image-arm64]
+    needs: [nvkr-attest-sboms-output-nktp-node-exporter-image, nvkr-attest-sboms-output-spire-bash-image, nvkr-nico-reference-profiles-fixture-linu-cd99e6119686, nvkr-nktp-collector-image-arm64-pull-nktp-85cb8e91f658, nvkr-nvke-node-fde-amd64-fetch-nvke-cni-ovn, nvkr-nvke-node-fde-amd64-fetch-ovn-kubernetes-chart, nvkr-nvke-node-fde-arm64-fetch-nvke-cni-ovn, nvkr-nvke-node-fde-arm64-fetch-ovn-kubernetes-chart, nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu, nvkr-package-nktp-metrics-server-image-arm64, nvkr-package-publication-nktp-operator-image-arm64, nvkr-package-publication-spire-agent-image, nvkr-package-publication-spire-server-image, nvkr-package-publication-temporal-server-image-arm64, nvkr-package-spiffe-csi-image-arm64, nvkr-process-cluster-api-provider-provisi-0fe9554d2806, nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd, nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b, nvkr-process-spire-oidc-image-pull-spire-ae9fdd6c5262, nvkr-publish-output-nvkectl, nvkr-publish-output-spire-oidc-image, nvkr-publish-output-spire-tpm-server-image, nvkr-sign-output-capi-kubeadm-control-pla-d95378faf55b, nvkr-sign-output-cwe, nvkr-sign-output-nktp, nvkr-sign-output-nktp-lgtm-image-arm64, nvkr-sign-output-nktp-metrics-server-image, nvkr-spiffe-csi-image-sbom, nvkr-temporal-ui-image-sbom, nvkr-verify-publication-output-spiffe-csi-image-arm64]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -7746,7 +7790,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-09'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [build-runner-arc-amd64-kvm, build-runner-arc-arm64-kvm, nvkr-attest-sboms-output-cert-manager-con-d61492d4f3a1, nvkr-attest-sboms-output-cwe, nvkr-attest-sboms-output-nktp-metrics-server-image, nvkr-attest-sboms-output-nktp-node-export-a5e0b32a9940, nvkr-capi-kubeadm-bootstrap-image-sbom, nvkr-capi-kubeadm-control-plane-image-sbom, nvkr-cert-manager-controller-image-arm64-b106a6b7ed83, nvkr-cwe-linux-arm64-build-nvke-controller, nvkr-cwe-linux-arm64-fetch-nvke-controller, nvkr-disk-nvke-node-image-arm64, nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro, nvkr-package-nktp-lgtm-image-arm64, nvkr-package-publication-capi-kubeadm-boo-1eda7b138eb0, nvkr-package-publication-capi-kubeadm-con-b43cc041198e, nvkr-package-publication-cert-manager-con-61609993557f, nvkr-package-publication-cluster-api-prov-6fe85337de7c, nvkr-package-publication-csi-node-driver-75d8004e6ab4, nvkr-package-publication-nktp-node-exporter-image, nvkr-package-publication-nktp-target-allo-fd174f2cfe07, nvkr-package-publication-spire-bash-image, nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6, nvkr-process-capnico-controller-linux-amd-5f43e949be81, nvkr-process-csi-node-driver-registrar-im-11c07063ce1a, nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5, nvkr-process-spire-server-image-arm64-ter-78345db78e5c, nvkr-process-temporal-server-image-arm64-a7b9faf98be2, nvkr-publish-output-capnico-controller, nvkr-publish-output-cert-manager-cainject-37550fcc232b, nvkr-publish-output-nktp-lgtm-image, nvkr-publish-output-nktp-metrics-server-image-arm64, nvkr-publish-output-operator-tools, nvkr-publish-output-postgresql, nvkr-publish-output-postgresql-image, nvkr-sign-output-spire-oidc-image-arm64, nvkr-sign-output-spire-tpm-server-image-arm64, nvkr-spire-crds-sbom, nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3, nvkr-temporal-admin-tools-image-sbom, nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29, nvkr-verify-publication-output-capi-kubea-8c536327dae9, nvkr-verify-publication-output-nico-refer-768f0a1fbfbe, nvkr-verify-publication-output-nktp-lgtm-image-arm64, nvkr-verify-publication-output-spire-agen-690d58615fef, nvkr-verify-publication-output-spire-serv-2ffabff52266]
+    needs: [build-runner-arc-amd64-kvm, build-runner-arc-arm64-kvm, nvkr-attest-sboms-output-cert-manager-con-d61492d4f3a1, nvkr-attest-sboms-output-cwe, nvkr-attest-sboms-output-nktp-metrics-server-image, nvkr-attest-sboms-output-nktp-node-export-a5e0b32a9940, nvkr-capi-kubeadm-bootstrap-image-sbom, nvkr-capi-kubeadm-control-plane-image-sbom, nvkr-cert-manager-controller-image-arm64-b106a6b7ed83, nvkr-cwe-linux-arm64-build-nvke-controller, nvkr-cwe-linux-arm64-fetch-nvke-controller, nvkr-disk-nvke-node-image-arm64, nvkr-nvke-node-fde-arm64-fetch-nvke-agent-9291de711464, nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro, nvkr-package-nktp-lgtm-image-arm64, nvkr-package-publication-capi-kubeadm-boo-1eda7b138eb0, nvkr-package-publication-capi-kubeadm-con-b43cc041198e, nvkr-package-publication-cert-manager-con-61609993557f, nvkr-package-publication-cluster-api-prov-6fe85337de7c, nvkr-package-publication-csi-node-driver-75d8004e6ab4, nvkr-package-publication-nktp-node-exporter-image, nvkr-package-publication-nktp-target-allo-fd174f2cfe07, nvkr-package-publication-spire-bash-image, nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6, nvkr-process-capnico-controller-linux-amd-5f43e949be81, nvkr-process-csi-node-driver-registrar-im-11c07063ce1a, nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5, nvkr-process-spire-server-image-arm64-ter-78345db78e5c, nvkr-process-temporal-server-image-arm64-a7b9faf98be2, nvkr-publish-output-capnico-controller, nvkr-publish-output-cert-manager-cainject-37550fcc232b, nvkr-publish-output-nktp-lgtm-image, nvkr-publish-output-nktp-metrics-server-image-arm64, nvkr-publish-output-operator-tools, nvkr-publish-output-postgresql, nvkr-publish-output-postgresql-image, nvkr-sign-output-spire-oidc-image-arm64, nvkr-sign-output-spire-tpm-server-image-arm64, nvkr-spire-crds-sbom, nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3, nvkr-temporal-admin-tools-image-sbom, nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29, nvkr-verify-publication-output-capi-kubea-8c536327dae9, nvkr-verify-publication-output-nico-refer-768f0a1fbfbe, nvkr-verify-publication-output-nktp-lgtm-image-arm64, nvkr-verify-publication-output-spire-agen-690d58615fef, nvkr-verify-publication-output-spire-serv-2ffabff52266]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -7785,7 +7829,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0c'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-cert-manager-webhook-image, nvkr-attest-sboms-output-nico-reference-p-bcab49542eb0, nvkr-controller-chart-fetch-nvke-controller-chart, nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e, nvkr-nktp-collector-image-sbom, nvkr-nktp-kube-state-metrics-image-sbom, nvkr-nktp-metrics-server-image-arm64-pull-3fed0eeaa550, nvkr-nvke-node-image-arm64-fetch-nvke-age-aee9fbaecda2, nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart, nvkr-package-cluster-api-provider-provisioned, nvkr-package-publication-capi-kubeadm-con-4fe0740f8f62, nvkr-package-publication-nktp-collector-image, nvkr-package-publication-nktp-target-allocator-image, nvkr-package-publication-spire-bash-image-arm64, nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77, nvkr-process-cert-manager-controller-imag-8684e5f78b05, nvkr-process-nico-reference-profiles-fixt-795da7fc5df7, nvkr-process-nktp-operator-image-pull-nkt-4f8772e3694e, nvkr-process-postgresql-image-pull-postgr-262baf89b239, nvkr-process-spire-pull-spire-chart-spire-33c1dfd25a91, nvkr-process-spire-tpm-server-image-pull-5e4c8bd40631, nvkr-publish-output-nktp, nvkr-publish-output-nktp-lgtm-image-arm64, nvkr-publish-output-postgresql-image-arm64, nvkr-spire-sbom, nvkr-spire-server-image-sbom, nvkr-verify-publication-output-nktp-kubectl-image, nvkr-verify-publication-output-nktp-opera-e8ca29886a10, nvkr-verify-publication-output-spire-bash-image, nvkr-verify-publication-output-temporal-s-030929bd4981]
+    needs: [nvkr-attest-sboms-output-cert-manager-webhook-image, nvkr-attest-sboms-output-nico-reference-p-bcab49542eb0, nvkr-controller-chart-fetch-nvke-controller-chart, nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e, nvkr-nktp-collector-image-sbom, nvkr-nktp-kube-state-metrics-image-sbom, nvkr-nktp-metrics-server-image-arm64-pull-3fed0eeaa550, nvkr-nvke-node-image-amd64-fetch-nvke-cni-ovn, nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart, nvkr-package-cluster-api-provider-provisioned, nvkr-package-publication-capi-kubeadm-con-4fe0740f8f62, nvkr-package-publication-nktp-collector-image, nvkr-package-publication-nktp-target-allocator-image, nvkr-package-publication-spire-bash-image-arm64, nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77, nvkr-process-cert-manager-controller-imag-8684e5f78b05, nvkr-process-nico-reference-profiles-fixt-795da7fc5df7, nvkr-process-nktp-operator-image-pull-nkt-4f8772e3694e, nvkr-process-postgresql-image-pull-postgr-262baf89b239, nvkr-process-spire-pull-spire-chart-spire-33c1dfd25a91, nvkr-process-spire-tpm-server-image-pull-5e4c8bd40631, nvkr-publish-output-nktp, nvkr-publish-output-nktp-lgtm-image-arm64, nvkr-publish-output-postgresql-image-arm64, nvkr-spire-sbom, nvkr-spire-server-image-sbom, nvkr-verify-publication-output-nktp-kubectl-image, nvkr-verify-publication-output-nktp-opera-e8ca29886a10, nvkr-verify-publication-output-spire-bash-image, nvkr-verify-publication-output-temporal-s-030929bd4981]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -7798,7 +7842,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0d'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-capi-kubeadm-boo-bcd3e61be11a, nvkr-attest-sboms-output-cert-manager-web-cf7074e21b0b, nvkr-attest-sboms-output-csi-node-driver-ca2c548b7442, nvkr-attest-sboms-output-nktp-kube-state-5427c42def27, nvkr-attest-sboms-output-nvkectl, nvkr-attest-sboms-output-spire-bash-image-arm64, nvkr-cert-manager-cainjector-image-arm64-395a5ae01148, nvkr-cluster-api-provider-provisioned-lin-768a4d08b436, nvkr-cwe-linux-amd64-fetch-nvke-controller, nvkr-disk-nvke-node-fde-arm64, nvkr-nktp-lgtm-image-arm64-pull-nktp-lgtm-image, nvkr-package-publication-capi-controller-image, nvkr-package-publication-cert-manager-cai-ce1a9c1fcd69, nvkr-package-publication-spire-agent-image-arm64, nvkr-package-publication-spire-server-image-arm64, nvkr-process-capi-controller-image-arm64-7043f52cb345, nvkr-process-nktp-target-allocator-image-98482bd26a86, nvkr-process-spiffe-csi-image-pull-spiffe-2ee250ddfce9, nvkr-publish-output-spire-oidc-image-arm64, nvkr-publish-output-spire-tpm-server-image-arm64, nvkr-publish-output-temporal, nvkr-sign-output-capi-kubeadm-bootstrap-image, nvkr-sign-output-nico-reference-profiles-fixture, nvkr-sign-output-nktp-metrics-server-image-arm64, nvkr-sign-output-operator-tools, nvkr-sign-output-postgresql, nvkr-sign-output-postgresql-image, nvkr-sign-output-temporal-admin-tools-image, nvkr-spire-bash-image-arm64-pull-spire-bash-image, nvkr-verify-publication-output-nktp-collector-image, nvkr-verify-publication-output-nktp-metri-4773ec2231a9, nvkr-verify-publication-output-nktp-node-89687b0a3b8b, nvkr-verify-publication-output-spire-server-image]
+    needs: [nvkr-attest-sboms-output-capi-kubeadm-boo-bcd3e61be11a, nvkr-attest-sboms-output-cert-manager-web-cf7074e21b0b, nvkr-attest-sboms-output-csi-node-driver-ca2c548b7442, nvkr-attest-sboms-output-nktp-kube-state-5427c42def27, nvkr-attest-sboms-output-nvkectl, nvkr-attest-sboms-output-spire-bash-image-arm64, nvkr-cert-manager-cainjector-image-arm64-395a5ae01148, nvkr-cluster-api-provider-provisioned-lin-768a4d08b436, nvkr-cwe-linux-amd64-fetch-nvke-controller, nvkr-disk-nvke-node-fde-arm64, nvkr-nktp-lgtm-image-arm64-pull-nktp-lgtm-image, nvkr-nvke-node-image-amd64-fetch-nvke-age-693f047a753d, nvkr-package-publication-capi-controller-image, nvkr-package-publication-cert-manager-cai-ce1a9c1fcd69, nvkr-package-publication-spire-agent-image-arm64, nvkr-package-publication-spire-server-image-arm64, nvkr-process-capi-controller-image-arm64-7043f52cb345, nvkr-process-nktp-target-allocator-image-98482bd26a86, nvkr-process-spiffe-csi-image-pull-spiffe-2ee250ddfce9, nvkr-publish-output-spire-oidc-image-arm64, nvkr-publish-output-spire-tpm-server-image-arm64, nvkr-publish-output-temporal, nvkr-sign-output-capi-kubeadm-bootstrap-image, nvkr-sign-output-nico-reference-profiles-fixture, nvkr-sign-output-nktp-metrics-server-image-arm64, nvkr-sign-output-operator-tools, nvkr-sign-output-postgresql, nvkr-sign-output-postgresql-image, nvkr-sign-output-temporal-admin-tools-image, nvkr-spire-bash-image-arm64-pull-spire-bash-image, nvkr-verify-publication-output-nktp-collector-image, nvkr-verify-publication-output-nktp-metri-4773ec2231a9, nvkr-verify-publication-output-nktp-node-89687b0a3b8b, nvkr-verify-publication-output-spire-server-image]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -7824,7 +7868,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0f'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-cert-manager-cai-63e467a9fe7a, nvkr-attest-sboms-output-nktp-kube-state-6248dc6aafc3, nvkr-attest-sboms-output-spire, nvkr-attest-sboms-output-spire-agent-image, nvkr-attest-sboms-output-temporal-ui-image, nvkr-capnico-controller-linux-amd64-sbom, nvkr-cluster-api-provider-provisioned-lin-eba583757c10, nvkr-nktp-operator-image-sbom, nvkr-nvke-node-fde-amd64-fetch-nvke-spire-agent, nvkr-nvke-node-fde-arm64-fetch-nvke-spire-agent, nvkr-nvkectl-linux-arm64-build-nvkectl, nvkr-nvkectl-linux-arm64-fetch-nvkectl, nvkr-package-postgresql-image-arm64, nvkr-package-publication-capnico-controller, nvkr-package-publication-nktp-metrics-ser-eebe54e615ac, nvkr-package-publication-spire-oidc-image-arm64, nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c, nvkr-process-nktp-metrics-server-image-pu-4cb3efc71983, nvkr-process-spire-crds-pull-spire-crds-c-11103d63a93b, nvkr-process-temporal-admin-tools-image-a-2e37748f989e, nvkr-publish-output-nktp-operator-image, nvkr-publish-output-spiffe-csi-image-arm64, nvkr-publish-output-temporal-ui-image-arm64, nvkr-sign-output-capi-controller-image, nvkr-sign-output-cert-manager-cainjector-image-arm64, nvkr-sign-output-cert-manager-webhook-image, nvkr-sign-output-nktp-kube-state-metrics-image-arm64, nvkr-sign-output-nktp-kubectl-image, nvkr-sign-output-nvke-node-image-amd64, nvkr-sign-output-nvke-node-image-arm64, nvkr-sign-output-spire-controller-manager-image, nvkr-verify-publication-output-cert-manag-d72fce3ac728, nvkr-verify-publication-output-nktp-kubec-58bc88c11e26, nvkr-verify-publication-output-postgresql-image-arm64, nvkr-verify-publication-output-spire-oidc-image]
+    needs: [nvkr-attest-sboms-output-cert-manager-cai-63e467a9fe7a, nvkr-attest-sboms-output-nktp-kube-state-6248dc6aafc3, nvkr-attest-sboms-output-spire, nvkr-attest-sboms-output-spire-agent-image, nvkr-attest-sboms-output-temporal-ui-image, nvkr-capnico-controller-linux-amd64-sbom, nvkr-cluster-api-provider-provisioned-lin-eba583757c10, nvkr-nktp-operator-image-sbom, nvkr-nvke-node-fde-amd64-fetch-nvke-spire-agent, nvkr-nvke-node-fde-arm64-fetch-nvke-spire-agent, nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01, nvkr-nvkectl-linux-arm64-build-nvkectl, nvkr-nvkectl-linux-arm64-fetch-nvkectl, nvkr-package-postgresql-image-arm64, nvkr-package-publication-capnico-controller, nvkr-package-publication-nktp-metrics-ser-eebe54e615ac, nvkr-package-publication-spire-oidc-image-arm64, nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c, nvkr-process-nktp-metrics-server-image-pu-4cb3efc71983, nvkr-process-spire-crds-pull-spire-crds-c-11103d63a93b, nvkr-process-temporal-admin-tools-image-a-2e37748f989e, nvkr-publish-output-nktp-operator-image, nvkr-publish-output-spiffe-csi-image-arm64, nvkr-publish-output-temporal-ui-image-arm64, nvkr-sign-output-capi-controller-image, nvkr-sign-output-cert-manager-cainjector-image-arm64, nvkr-sign-output-cert-manager-webhook-image, nvkr-sign-output-nktp-kube-state-metrics-image-arm64, nvkr-sign-output-nktp-kubectl-image, nvkr-sign-output-nvke-node-image-amd64, nvkr-sign-output-nvke-node-image-arm64, nvkr-sign-output-spire-controller-manager-image, nvkr-verify-publication-output-cert-manag-d72fce3ac728, nvkr-verify-publication-output-nktp-kubec-58bc88c11e26, nvkr-verify-publication-output-postgresql-image-arm64, nvkr-verify-publication-output-spire-oidc-image]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -7942,7 +7986,7 @@ jobs:
             status=Failed
           elif [ "$skipped" -gt 0 ] || [ "${NVKR_FINALIZE_OUTCOME:-}" = skipped ]; then
             status='Incomplete (skipped)'
-          elif [ "$total" -eq 563 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
+          elif [ "$total" -eq 567 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
             status=Completed
           fi
           {

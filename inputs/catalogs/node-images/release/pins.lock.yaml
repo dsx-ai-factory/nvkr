@@ -16,6 +16,11 @@ pins:
     sourceDateEpoch: 1792548398
     tag: v0.22.0
     treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
+  nvke-cni-ovn-source:
+    commit: 8af51273d52dfa07454435d18d37230e582d797a
+    sourceDateEpoch: 1792137152
+    tag: v2.4.2
+    treeHash: c4a54b0b3b615e5bd6df2d591451d7ab03dffc08
   nvke-kubeadm-distro-source:
     commit: 400c24fb6465b042be883d6b62472528520d6291
     sourceDateEpoch: 1792548398
@@ -32,7 +37,7 @@ pins:
     tag: v0.22.0
     treeHash: f3afc02f5c92f4aacda3a1655836a91bef093bfe
   ovn-kubernetes:
-    commit: d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d
-    sourceDateEpoch: 1788540677
-    tag: v1.4.0
-    treeHash: ce0cb49cd14f2fc260457e61a5a222c027a07f79
+    commit: 8af51273d52dfa07454435d18d37230e582d797a
+    sourceDateEpoch: 1792137152
+    tag: v2.4.2
+    treeHash: c4a54b0b3b615e5bd6df2d591451d7ab03dffc08

@@ -37,7 +37,7 @@ For NVIDIA OVN, open these in this order:
 | Each selected stack's `registry.yaml` | Reusable build/acquisition producers, dependencies and instructions. |
 | Each selected stack's `pins.lock.yaml` | CLI-managed exact source, artifact and tool identities. |
 | `inputs/catalogs/node-images/release` | The shared release OS and material producers. |
-| `inputs/catalogs/node-images/variants/native-nvidia.json` | NVIDIA OVN producers over the shared release catalog. |
+| `inputs/catalogs/node-images/variants/native-nvidia.json` | NVIDIA OVN producers, identical to the shared release catalog's. |
 | `inputs/catalogs/node-images/variants/native-local-kvm.json` | Native agent stamp, MAC-stable DHCP staging and KVM settings. |
 | `inputs/environments/local-arm64-kvm.json` | Native Linux ARM64 Docker/KVM build execution; publication and signing are absent. |
 
