@@ -445,7 +445,7 @@ bash scripts/nvke-full-arm64-local.sh --build-accelerator tcg \
 ```
 
 Add `--network upstream-ovn` before the attempt for the matched upstream
-selection. These TCG Definitions use the refreshed NVKE `v0.22.0` product pins
+selection. These TCG Definitions use the refreshed NVKE `v0.23.0` product pins
 while retaining their separate build and network selections.
 For the maintained native Mac workflow, `--accelerator tcg` explicitly selects
 software execution for the existing 64K image; it does not select these historical
@@ -853,7 +853,7 @@ workload identity. No arbitrary script, credential, socket relay, downloader or
 new Pod is accepted. The request describes selected endpoints and identities.
 Those descriptions must come from the native owner's admitted artifacts and source contract; the
 helper does not grant trust to caller-supplied paths or membership. Its generated
-client is resolved to the same stock NVKE v0.22.0 source.
+client is resolved to the same stock NVKE v0.23.0 source.
 
 The helper reports remote completion independently from its process exit:
 
@@ -909,22 +909,22 @@ acceptance of the reduced helper remains externally unverified.
 
 ## Where the NVKE versions come from
 
-The shared native NVIDIA selection uses stock NVKE `v0.22.0` at commit
-[`400c24fb`](https://github.com/dsx-ai-factory/nvke/commit/400c24fb6465b042be883d6b62472528520d6291)
-and tree `f3afc02f5c92f4aacda3a1655836a91bef093bfe` for all NVKE product sources
+The shared native NVIDIA selection uses stock NVKE `v0.23.0` at commit
+[`2cfd0008`](https://github.com/dsx-ai-factory/nvke/commit/2cfd00081b468d85a4894ec17e9deac13c9d8169)
+and tree `a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53` for all NVKE product sources
 below. NVKR verifies the pinned commit and tree; NVIDIA OVN retains its separate pin.
 
 | Part | Selected source | Owning input |
 | --- | --- | --- |
-| Native host CLI, installer and NICoSim | `v0.22.0` / `400c24fb` | [Shared tools lock](../inputs/catalogs/tools/native/pins.lock.yaml) |
-| Site CLI/controller/charts and provisioned provider | `v0.22.0` / `400c24fb` | [Native site lock](../inputs/catalogs/nvke/native-site/pins.lock.yaml) |
-| OS, agent and kubeadm | `v0.22.0` / `400c24fb` | [Shared release OS lock](../inputs/catalogs/node-images/release/pins.lock.yaml) |
-| Profiles and runbooks | `v0.22.0` / `400c24fb` | [Native profiles lock](../inputs/catalogs/controller-profiles/native-nvidia/pins.lock.yaml) |
-| Upstream SPIRE/TPM agent packaging | `v0.22.0` / `400c24fb` | [Shared release OS lock](../inputs/catalogs/node-images/release/pins.lock.yaml) |
+| Native host CLI, installer and NICoSim | `v0.23.0` / `2cfd0008` | [Shared tools lock](../inputs/catalogs/tools/native/pins.lock.yaml) |
+| Site CLI/controller/charts and provisioned provider | `v0.23.0` / `2cfd0008` | [Native site lock](../inputs/catalogs/nvke/native-site/pins.lock.yaml) |
+| OS, agent and kubeadm | `v0.23.0` / `2cfd0008` | [Shared release OS lock](../inputs/catalogs/node-images/release/pins.lock.yaml) |
+| Profiles and runbooks | `v0.23.0` / `2cfd0008` | [Native profiles lock](../inputs/catalogs/controller-profiles/native-nvidia/pins.lock.yaml) |
+| Upstream SPIRE/TPM agent packaging | `v0.23.0` / `2cfd0008` | [Shared release OS lock](../inputs/catalogs/node-images/release/pins.lock.yaml) |
 | NVIDIA OVN image/chart | [`8af51273`](https://github.com/dsx-ai-factory/ovn-kubernetes/commit/8af51273d52dfa07454435d18d37230e582d797a), 2.4.2 | [Native NVIDIA overlay](../inputs/catalogs/node-images/variants/native-nvidia.json) |
 
 These host architectures use the same NVKE source selections. SPIRE packaging
-and its startup renderer come from the same NVKE `v0.22.0` source as the OS, CLI and controller.
+and its startup renderer come from the same NVKE `v0.23.0` source as the OS, CLI and controller.
 The source-owned lock pins public SPIRE 1.14.1 and TPM plugin 1.9.0 archives.
 The package revision is `1.14.1+tpm1.9.0-4`; no DSX binary is downloaded or
 included by that producer.
@@ -941,7 +941,7 @@ The default AMD64 Definition selects 34 outputs, including host and site tools.
 Package producers inspect actual Debian `Package`/`Architecture` metadata, and the disk
 uses NVKE's renamed Packer build/material schema and QCOW2 output. Changed package
 bytes require a fresh disk build. Maintained release, upstream and TCG product
-selections also use NVKE `v0.22.0`; their third-party pins and historical runtime
+selections also use NVKE `v0.23.0`; their third-party pins and historical runtime
 evidence remain separate. The [scheduled nightly](nvke-nightly.md) resolves latest
 NVKE main, dispatches the NVIDIA ARM64 producer and runs its native Go site smoke
 against that exact Run's authenticated published artifacts. Its runtime consumer
