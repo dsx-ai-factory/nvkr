@@ -43,7 +43,8 @@ Bundles. It also inventories the existing per-platform executable deliveries to 
 
 [ADR-29](0029-cluster-observation-and-artifact-attribution.md) proposes scoped cluster observations and
 attribution to authenticated OCI, Helm, OS-image and host-package artifacts. The linked feature design
-assesses AICR reuse and coverage gaps. It is design only: no collector, comparator, dependency, portable
+proposes AICR Go API integration subject to dependency-policy approval and connects validation results to
+observed artifacts with explicit coverage gaps. It is design only: no collector, comparator, dependency, portable
 runtime-evidence publisher or new qualification authority is implemented by this proposal.
 
 [ADR-30](0030-authenticated-result-reuse.md) proposes pipeline-attested cross-Run reuse of complete named

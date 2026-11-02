@@ -52,8 +52,9 @@ output explicitly selected by a Definition remains mandatory for that Run and Re
 
 ## Proposed follow-on: cluster observation and evidence
 
-The [cluster observation proposal](cluster-observation-and-artifact-attribution.md) covers discovery and
-attribution of deployed images, charts, operating systems and packages to an authenticated build, followed
-by upstream validation and portable, independently verifiable evidence with public/TestGrid reporting.
-It proposes reuse of existing AICR capabilities with explicit gaps. It is not an accepted milestone or
+The [cluster observation proposal](cluster-observation-and-artifact-attribution.md) connects upstream
+validation results to the selected artifacts by recording which images, charts, operating systems and
+packages the tested cluster actually runs. It includes portable, independently verifiable evidence with
+public/TestGrid reporting. It proposes AICR Go API integration subject to dependency-policy approval,
+with explicit coverage gaps. It is not an accepted milestone or
 implemented feature, does not change M1–M4 acceptance, and grants no release qualification authority.

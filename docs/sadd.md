@@ -94,7 +94,9 @@ Nothing is implemented.
 
 Proposed [ADR-29](adr/0029-cluster-observation-and-artifact-attribution.md) separates cluster observations
 and attribution from build identity and qualification. The [feature design](cluster-observation-and-artifact-attribution.md)
-covers OCI, Helm, OS and host packages, AICR reuse and explicit observation gaps. It is design only;
+connects test results to selected OCI, Helm, OS and host-package artifacts using observations and comparisons.
+It proposes AICR Go API integration behind an NVKR adapter, conditional on dependency-policy approval,
+with explicit observation gaps. It is design only;
 no new collector, dependency, runtime evidence publisher or provisioning authority is implemented.
 
 ## Assumptions {#assumptions}

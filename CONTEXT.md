@@ -504,5 +504,6 @@ _Avoid_: Disk format, public output format, virtual machine artifact
 A scoped, time-bounded description of discovered software and its comparison with an authenticated build
 baseline under [proposed ADR-29](docs/adr/0029-cluster-observation-and-artifact-attribution.md). It separates
 produced/acquired identity, installation attribution and measured runtime content, with explicit coverage gaps.
+Validation results reference these observations to establish which selected artifacts were actually tested.
 It is not an authored public lifecycle input; this proposal implements no collector or qualification capability.
 _Avoid_: Cluster realization, complete host attestation, conformance receipt, release authorization

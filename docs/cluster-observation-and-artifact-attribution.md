@@ -9,9 +9,10 @@ It does not allocate a command, wire schema, digest family or approved collector
 
 ## User outcome
 
-Select an exact NVKR build or Release, inspect an existing cluster, and find which deployed artifacts match
-that build and its SBOMs. Save a snapshot and comparison, run upstream-owned validation against explicitly
-identified subjects, and share independently verifiable evidence with readable results and TestGrid links.
+A user wants to validate selected artifacts or run tests against a cluster. Establish which built or acquired
+artifacts the test environment actually runs, using the selected NVKR Run or Release and its SBOMs. Save
+cluster observations and comparisons with the upstream-owned test results so that someone else can verify
+what those results cover. Share readable results and evidence through public/TestGrid links.
 The complete feature covers OCI images, Helm charts, OS images, and host packages/binaries.
 
 The report answers three separate questions: what was produced or acquired, what was installed, and what
@@ -34,8 +35,11 @@ functional test cannot establish installed identity; an intact signature cannot 
    and unsupported measurements. Do not describe several changing API reads as an atomic snapshot.
 4. Compare observed subjects/content with the authenticated baseline under that frozen policy. Preserve
    installation-lineage gaps and ambiguous digest domains. Do not shrink the required scope after a failure.
-5. Invoke selected upstream-owned checks through admitted artifact/cluster adapters. Record source/harness
-   identity, tested subjects, selection, completeness, skips, original results and cleanup separately.
+5. Invoke selected upstream-owned checks through admitted artifact/cluster adapters. Bind the test execution
+   to its selected artifacts, suite/harness revision, target cluster and required observation intervals.
+   A claim that these artifacts passed validation requires the upstream verdict and the required identity
+   and coverage checks. Tests may run diagnostically with gaps, but cannot silently validate another artifact.
+   Record selection, completeness, skips, original results and cleanup separately.
    Tests that allocate tenants or create resources require capacity, access and lifecycle ownership even
    when they use product APIs. Hardware provisioning remains downstream, outside the verifier.
 6. Retain private originals and construct a reviewed shareable projection before signing. Package covered
@@ -67,12 +71,44 @@ Reuse NVKR's existing [CycloneDX evidence and signing owners](dependency-sboms.m
 build evidence. The observation/comparison is an additional record; it must not rewrite the publisher's
 SBOM or introduce another SBOM implementation.
 
+## Proposed integration: Go APIs behind an NVKR adapter
+
+The proposed integration calls AICR Go APIs from a dedicated NVKR adapter. It does not invoke the AICR CLI
+or require users to operate a second CLI. This is a proposed architecture, not dependency approval or an
+implemented adapter. Pin and review the chosen module revision and its linked dependency closure before use.
+Pin any deployed collector image by digest separately; pinning the Go module does not pin an agent image.
+
+| Task | API or owner | Integration responsibility |
+| --- | --- | --- |
+| Capture an AICR snapshot | [CollectSnapshot](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/client/v1/aicr.go#L2233) / [LoadSnapshot](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/client/v1/snapshot.go) | Collection deploys an agent Job and needs explicit access, privileges, resource limits and cleanup. Loading a captured local file deploys no agent; retain the exact bytes used. Neither route establishes every node was measured. |
+| Read installed chart records | [Read](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/inventory/read.go) / [ReadReleases](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/inventory/releases.go) | Supply deployment scope and naming; preserve provenance and gaps. These records do not establish original chart archive identity. Pin the package contract; do not assume all public packages share the client's stability guarantee. |
+| Fill missing observations | Reviewed AICR extensions and deployment-owner records | Preserve runtime image identities and add required chart-install, boot/image and package-file evidence. Do not reconstruct proof from version strings. |
+| Compare and report | Existing NVKR lifecycle/evidence owners plus the new comparison module | Verify the expected artifacts/SBOMs, compare covered facts, and bind suite/execution/target/time/results to them. Retain functional, identity, coverage and cleanup outcomes separately. |
+
+The adapter controls when collection is permitted and preserves exact observations. Persist `Snapshot.Raw`
+from collection; use the existing snapshot types/accessors for measurement inspection, rather than another
+parser or a lossy reserialization. Capture imported source bytes once before loading them, so the retained
+record is the same one evaluated. Read-only Kubernetes inspection remains the default; an AICR agent Job is a separate opt-in capability, not an invisible side
+effect. Imported observations retain their original collection scope and trust limits. AICR's current
+collector error handling needs explicit coverage accounting before a complete match can be claimed.
+
+Current contribution policy says to adapt source rather than import AICR. This proposal recommends a
+reviewed exception for these Go APIs, conditional on owner approval and the license, provenance,
+compatibility, transitive-dependency and vulnerability checks. Until that is approved, direct imports are
+blocked. Do not silently substitute CLI execution or copied collectors. Revisit the decision with owners
+if the import cannot be admitted. No module, vendored source or executable pin is added by this PR.
+
+AICR evidence code remains a separate compatibility assessment: it currently binds AICR recipe subjects.
+NVKR must retain its own authenticated artifact and test-result bindings; importing a package does not
+make an AICR recipe attestation evidence for an NVKR output.
+
 ## AICR reuse assessment
 
 AICR already contains reusable implementations. The inspected source is
 [NVIDIA/aicr at 935e0746](https://github.com/NVIDIA/aicr/tree/935e0746dc54da890a23c1ecca998244b3a25de7).
-These are source/API findings, not proof that the selected CLI release exposes every API or that NVKR can
-already consume those records. Do not implement another collector or evidence stack before evaluating them.
+These are source/API findings, not proof that the proposed NVKR adapter already consumes those records
+or that a released module version has passed the required dependency review. Do not implement another
+collector or evidence stack before evaluating them.
 
 | Existing capability | Reuse candidate | NVKR integration still required |
 | --- | --- | --- |
@@ -90,10 +126,10 @@ extensions or other admitted collectors, not a duplicate snapshot/evidence frame
 AICR's root [license](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/LICENSE)
 is Apache-2.0. That alone does not approve a linked dependency closure. Current
 [contribution policy](../CONTRIBUTING.md#the-invariants-your-change-must-respect) directs AICR reuse through
-reading/source adaptation rather than importing. Evaluate a pinned, bounded CLI adapter where its exported
-contract suffices, or reviewed source adaptation with required notices. A direct Go-library integration is
-an alternative requiring an explicit policy decision plus version, transitive-license, provenance,
-compatibility and vulnerability review. This PR adds no module, vendored code or executable pin.
+reading/source adaptation rather than importing. The integration proposed above therefore requires an
+explicit exception plus version, transitive-license, provenance, compatibility and vulnerability review.
+CLI integration or reviewed source adaptation remain alternatives if that decision is revisited; neither
+is silently selected by this proposal. This PR adds no module, vendored code or executable pin.
 
 [Proposed pinned-tool producers](adr/0027-pinned-tool-producers.md) and the separate AICR bundle work address
 build-time production of recipe bundles. They are related reuse paths, not implementations of live cluster
@@ -356,7 +392,8 @@ review with those owners. Reconcile accepted changes at ADR-05/13/16/19/23/24 be
 implementation. Current required-suite qualification ingestion remains separate work under ADR-16.
 
 The architecture review must agree on observation trust and required coverage. The implementation review
-must select and verify the actual reusable tool/library contract, its dependency/admission boundary, target
-identity and supported host measurements. No arbitrary shell adapter, unreviewed schema, or new authority
+must approve the proposed Go-library policy exception and verify the exact pinned API/dependency contract,
+its admission boundary, target identity and supported host measurements. No arbitrary shell adapter,
+unreviewed schema, or new authority
 restored from serialized reports is admitted by this document. No schedule, approved owner or ratification
 is inferred from including the proposal in the roadmap.

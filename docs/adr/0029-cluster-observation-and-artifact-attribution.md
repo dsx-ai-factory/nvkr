@@ -1,4 +1,4 @@
-# ADR-29: Check whether a cluster runs the artifacts NVKR built
+# ADR-29: Connect cluster test results to the artifacts tested
 
 - **Decision status:** Proposed; pending owner review and ratification.
 - **Date:** 2026-11-02
@@ -11,27 +11,37 @@
 
 ## Context
 
-After building NVKE with NVKR, a user needs to answer: **is my cluster running what I built?**
-A healthy cluster, matching version labels or passing tests cannot establish that.
+A user wants to validate a build or run tests against a cluster. To trust those results for that build,
+they need to know that **the software being tested is actually the software NVKR built or acquired**.
+A passing test against a different image or binary does not validate the selected artifact.
 
-We need a cluster snapshot, a comparison with the selected build, and evidence someone else can verify.
+Capture the tested environment, compare it with the selected artifacts and their SBOMs, and keep that
+evidence with the test results. A cluster snapshot makes this connection inspectable and verifiable.
 
 ## Decision
 
-**Reuse AICR for collection. Have NVKR compare those observations with its build records and SBOMs.
-Add measurements or installation records where the existing collectors leave gaps.**
+**Connect validation results to the selected artifacts through recorded cluster observations and
+comparisons. Integrate AICR through its Go APIs behind an NVKR adapter, subject to dependency-policy
+approval. Add missing measurements or installation records rather than another collection framework.**
 
 For example, NVKR built controller image A. The cluster reports the same version but runs image B.
-The report must show the difference, even if all functional tests pass.
+Keep the functional test result, but do not report that it validates image A. Show the mismatch and
+which environment the test actually exercised.
 
 ### Who does what?
 
-- **AICR and reviewed extensions:** collect cluster and node observations. Reuse its Helm/Argo inventory
-  reader and evidence tools where they fit, rather than writing another collection framework.
-- **NVKE or another deployment owner:** installs the software and supplies records connecting artifacts
-  to installations and nodes. It defines where each output should appear and owns the tests.
+- **AICR Go APIs:** call `Client.CollectSnapshot` / `Client.LoadSnapshot` from `pkg/client/v1` for
+  snapshots, and `Read` / `ReadReleases` from `pkg/inventory` for installed-chart records. An NVKR adapter
+  owns these calls and preserves the observations. Use Go libraries, not the AICR CLI. The
+  [integration design](../cluster-observation-and-artifact-attribution.md#proposed-integration-go-apis-behind-an-nvkr-adapter)
+  links the exact upstream APIs and identifies the measurements they still lack.
+- **Deployment owner:** installs the software, defines where each output should appear, and supplies
+  records connecting artifacts to installations and nodes.
+- **Upstream artifact owners, including NVKE:** own test assertions, fixtures and entrypoints. NVKR
+  invokes these through the existing test interfaces.
 - **NVKR:** verifies the selected Run or Release and each output's evidence, compares observations with
-  those exact artifacts, and records the results. Reuse the existing SBOMs and deployment declarations.
+  those exact artifacts, and connects the comparison to the suite, test execution and results. Reuse the
+  existing SBOMs and deployment declarations.
 
 A snapshot is an additional observation linked to the build. It does not change the build identity or
 publisher SBOM, introduce another authored lifecycle input, or move deployment ownership into NVKR.
@@ -60,7 +70,9 @@ and whether extra software is allowed.
 
 ### How do we collect and share it?
 
-Start with read-only Kubernetes access. Host access, installed collectors and tests that create resources
+`CollectSnapshot` deploys an agent Job; it is not a read-only API call. It requires explicit permission
+and cleanup. `LoadSnapshot` can read a captured local file without deploying an agent. Start with read-only
+Kubernetes inspection; opt into agent collection separately. Host access and tests that create resources
 need explicit permissions, limits and owned cleanup. Record which objects and nodes were observed, when,
 by which collector, and what failed. A snapshot spans an interval; it cannot prove continuously unchanged state.
 
@@ -74,22 +86,27 @@ comparison and coverage checks. A signed “pass” label alone is insufficient.
 reporter; it does not prove that a compromised node reported truthfully. Unsigned local diagnostics remain
 unsigned and unqualified.
 
-Keep functional test results, artifact comparisons, coverage and cleanup outcomes separate. Reuse the
-upstream test interfaces in [ADR-23](0023-upstream-artifact-behavioral-validation.md) and
-[ADR-24](0024-imported-validator-catalog.md), testing supplied artifacts without rebuilding them.
+Bind each test execution to its selected artifacts, suite revision, target cluster and observation intervals.
+A claim that the selected artifacts passed validation requires both the upstream test verdict and all
+required identity/coverage checks. Diagnostic tests may still run when identity cannot be established,
+but their results must retain that limitation. Keep comparison and cleanup outcomes separate. Reuse the
+artifact-test interfaces in [ADR-23](0023-upstream-artifact-behavioral-validation.md) and the validator
+catalog and adapter contracts in [ADR-24](0024-imported-validator-catalog.md). Artifact tests consume
+supplied artifacts without rebuilding them. Cluster checks keep their own required inputs and result contracts.
 Public pages and TestGrid link to the verifiable evidence. Failed and partial reports remain useful,
 but cannot satisfy a required passing policy.
 
 ## Consequences
 
-Users can see what matches their build and what still needs proof. Historical installations may remain
-unverifiable without installation or boot records. AICR reuse reduces duplication, but its current image
+Users can see which artifacts a validation result covers and what still needs proof. Historical installations
+may remain unverifiable without installation or boot records. AICR reuse reduces duplication, but its current image
 summary and chart inventory do not supply all the evidence required here.
 
 The [feature design](../cluster-observation-and-artifact-attribution.md) defines the detailed requirements,
 AICR source assessment, worked examples and delivery/acceptance plan. Integration choices still require
-pinning, license, dependency and security review. Direct Go imports need a separate policy decision under
-current contribution rules; no dependency is approved here.
+pinning, license, dependency and security review. The proposed Go-library integration needs an explicit
+exception to current contribution policy before implementation; this ADR does not grant that approval.
+No dependency is added here.
 
 This is a proposed design, not an implemented capability. Commands and schemas remain undecided.
 It grants no release approval or qualification receipt; [ADR-16](0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
