@@ -97,7 +97,7 @@ func TestNICoCoreImageChainsNativeBases(t *testing.T) {
 			stampEnv []string
 		}{
 			{"complete", nicoCoreMetadata(buildDigest), nicoCoreMetadata(runtimeDigest), false, "", nil},
-			{"missing stamps", nicoCoreMetadata(buildDigest), nicoCoreMetadata(runtimeDigest), true, "missing NICo", []string{}},
+			{"missing stamps", nicoCoreMetadata(buildDigest), nicoCoreMetadata(runtimeDigest), true, "missing NICo version stamp", []string{}},
 			{"missing version stamp", nicoCoreMetadata(buildDigest), nicoCoreMetadata(runtimeDigest), true, "missing NICo version stamp", []string{"NICO_COMMIT=" + pin.Commit}},
 			{"empty version stamp", nicoCoreMetadata(buildDigest), nicoCoreMetadata(runtimeDigest), true, "missing NICo version stamp", []string{"NICO_COMMIT=" + pin.Commit, "NICO_VERSION="}},
 			{"missing commit stamp", nicoCoreMetadata(buildDigest), nicoCoreMetadata(runtimeDigest), true, "missing NICo commit stamp", []string{"NICO_VERSION=" + pin.Tag}},
