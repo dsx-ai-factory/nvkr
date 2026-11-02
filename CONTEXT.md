@@ -364,10 +364,11 @@ _Avoid_: Named output, artifact, authored build group
 **Pinned-tool producer**:
 A component producer that runs one released executable, pinned by archive and executable digest, once with a fixed
 argument vector, no shell, no network, typed material inputs and only literal environment variables, inside a
-digest-pinned container. Its
-result is one file or a producer-written OCI layout; build identity covers the tool, arguments, inputs and
-container. It is a `wrapped-build` producer, not an acquisition of the tool. Proposed in
-[ADR-27](docs/adr/0027-pinned-tool-producers.md); not implemented.
+digest-pinned container. Its result is one file or a producer-written OCI layout. Its builder type is `pinned-tool`
+and it belongs to the existing `wrapped-build` source lane; it is not an acquisition of the tool. Build identity
+covers every logical field in ADR-27 §2, including the tool pin, target platform, arguments, environment, material
+edges, output form and toolchain image. Proposed in [ADR-27](docs/adr/0027-pinned-tool-producers.md); not
+implemented.
 _Avoid_: Run-wide pipeline tool, release executable output, build script
 
 **Component catalog overlay**:
