@@ -111,6 +111,11 @@ A failed site installation also projects the already captured, joined pod
 observation through the existing anonymized table. It starts no additional probe;
 raw pod messages and controller logs stay private. A missing or dropped summary
 does not establish pod health or identify the failed installation step.
+The same captured JSON now supplies closed current/previous termination reasons
+and bounded exit, signal and restart values for unready or restarted containers.
+Pod/container ordinals contain no source identities; malformed, ambiguous or
+oversized observations remain unavailable. These fields cannot establish why a
+container terminated or replace any readiness or cleanup check.
 
 Failed tenant cleanup can project a fixed source-wrapper label from its bounded
 private capture, such as cluster lookup or delete request. Unknown, changed,
@@ -154,16 +159,20 @@ reached that gate after preparing the installer ISO, with 48,748 MiB available
 against 65,536 MiB required. The cleanup change still needs a complete hosted run
 to establish sufficient space for disk build and deployment.
 
-The hosted workflow explicitly selects `resources.profile: small`, a 6-GiB site
+The hosted workflow explicitly selects `resources.profile: small`, a 7-GiB site
 VM, 3 GiB per tenant VM, four vCPUs per guest and 1 GiB of host/QEMU headroom.
 An empty profile preserves the existing demo configuration. The small profile is
 a functional-test candidate; its settings are not proven hardware minima or a
 performance qualification. Host admission still checks actual available capacity.
 The temporary bootstrap backend uses 6 GiB and is joined before tenant creation.
-Initial admission still requires 13 GiB available: the site plus the larger of
+Initial admission requires 14 GiB available: the site plus the larger of
 the bootstrap backend or two tenant VMs, plus headroom. After bootstrap teardown,
 tenant creation rechecks 7 GiB available beside the existing site. These
 observations reserve no resources.
+This allocation adds 1 GiB to the preceding site candidate. It fits run #27's
+recorded 14,691/14,919-MiB observations against the new 14,336-MiB requirement,
+but every fresh attempt must pass live admission. It is a controlled sizing
+experiment, not a proved fix for that run's restarts or a hardware minimum.
 
 [Run 41252923744](https://github.com/depohmel/nvkr/actions/runs/41252923744), on
 NVKR `dcc9f571d5291e68affd0b3fcaa0792b0fff55d8` and frozen NVKE
@@ -287,6 +296,21 @@ package health or APT success inside BuildKit. Raw bodies and curl errors are
 discarded. Original build exit, no image-ID emission, cleanup and image
 validation remain unchanged. The source/snapshot pins and APT recipe are unchanged.
 Contract coverage is separate from fresh hosted exercise and full E2E acceptance.
+
+[Run #27](https://github.com/depohmel/nvkr/actions/runs/41383870132), on NVKR
+`32ec2b0f82fa9700b554395be71ac039a0c85683` with frozen NVKE
+`1ce10b480cf52f955b6d018cc7ba7ad141c6faf9`, passed acquisition, fresh builds,
+bootstrap, full installation, helper probe and policy creation/response
+validation. Policy convergence observed the unchanged pinned running context
+become unready, then failed during runtime recheck before host mutation, final
+proof or either Go subtest. The failure snapshot showed the controller at 0/1
+Ready and the main SPIRE pod at 0/2 Ready, each with one restart. The parent
+failed after 4783.94 seconds; owned VM/backend, DNS and network cleanup finished,
+and Actions artifact count was zero. The rejected runtime condition and restart
+cause remain unknown. No OOM marker was observed; that does not rule out memory
+pressure. Fixed runtime-recheck categories now distinguish rejected
+context fields, unavailable containers, command failures and canceled/deadline
+or unjoined work. They preserve the original error and strict identity checks.
 
 The native tenant owner uses NVKE's unfiltered JSON node-pool inventory and
 selects the already-observed cluster ID. This avoids the filtered CLI's separate

@@ -74,6 +74,9 @@ func TestNativeCapacityChecksAggregatePhasesAndIncrementalTenants(t *testing.T) 
 		{"selected four CPUs unavailable", NativeResources{6, 3, 1024, 4, ""}, false, false, true, 13 * 1024, 3999, 0},
 		{"bootstrap larger than guests", NativeResources{6, 3, 1024, 2, ""}, false, false, true, 13 * 1024, 2000, 0},
 		{"joined bootstrap excluded", NativeResources{6, 3, 1024, 2, ""}, false, true, false, 7 * 1024, 2000, 0},
+		{"seven GiB site full budget", NativeResources{7, 3, 1024, 4, "small"}, false, false, false, 14 * 1024, 4000, 1},
+		{"seven GiB site headroom required", NativeResources{7, 3, 1024, 4, "small"}, false, false, true, 14*1024 - 1, 4000, 1},
+		{"seven GiB site incremental tenants", NativeResources{7, 3, 1024, 4, "small"}, false, true, false, 7 * 1024, 4000, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			admission := nativeResourceAdmission{resources: tc.profile, tenantWorkers: tc.workers, conformance: tc.conformance, observe: func(context.Context, string) (execution.ResourceCapacity, error) {

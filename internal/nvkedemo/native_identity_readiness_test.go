@@ -130,6 +130,8 @@ func TestNativeIdentityUnreadyRecheckRejectsChangedContext(t *testing.T) {
 	for _, scenario := range []string{"controller UID", "server UID", "controller container", "server container", "controller image", "not running", "config UID", "config bytes", "boot ID", "CSI", "staging", "server mount", "service binding", "API error"} {
 		t.Run(scenario, func(t *testing.T) {
 			attempt, runner, root, _ := nativeIdentityReadinessFixture(t)
+			progress := &identityPolicyProgress{}
+			runner.Progress = progress
 			runner.Env = SetEnv(runner.Env, map[string]string{"IDENTITY_POLICY_UNREADY": "always"})
 			switch scenario {
 			case "controller UID", "server UID", "controller container", "server container", "controller image", "not running", "CSI", "staging", "server mount":
@@ -188,6 +190,33 @@ func TestNativeIdentityUnreadyRecheckRejectsChangedContext(t *testing.T) {
 			}
 			if scenario == "API error" && CommandExitCode(err) != 17 {
 				t.Fatal("runtime API failure lost original exit code", err)
+			}
+			want := "cause=unclassified"
+			switch scenario {
+			case "controller UID":
+				want = "cause=context-changed field=controller-pod"
+			case "server UID":
+				want = "cause=context-changed field=server-pod"
+			case "controller container":
+				want = "cause=context-changed field=controller-container"
+			case "server container":
+				want = "cause=context-changed field=server-container"
+			case "config UID":
+				want = "cause=context-changed field=config-object"
+			case "config bytes":
+				want = "cause=context-changed field=config-bytes"
+			case "boot ID":
+				want = "cause=context-changed field=host-boot"
+			case "controller image":
+				want = "cause=container-missing"
+			case "not running":
+				want = "cause=container-unavailable"
+			case "API error":
+				want = "cause=command-failed field=unavailable exit=17"
+			}
+			observed := strings.Join(progress.observations, "")
+			if !strings.Contains(observed, want) || strings.Contains(observed, "private") {
+				t.Fatal("runtime rejection lost its closed observation or exposed private values", observed)
 			}
 			polls, readErr := os.ReadFile(filepath.Join(root, "identity-policy-polls"))
 			if readErr != nil || string(polls) != "1\n" {
@@ -259,7 +288,11 @@ func TestNativeIdentityPolicyReadinessBoundAndCancellation(t *testing.T) {
 			if receipt != nil || !errors.Is(err, want) || !errors.Is(err, errNativeIdentityUnready) {
 				t.Fatal("unready wait lost its bound or cause", err)
 			}
-			if len(progress.observations) != 2 || progress.observations[1] != "Site identity policy stopped during runtime-recheck.\n" {
+			cause := "deadline"
+			if scenario == "cancel" {
+				cause = "canceled"
+			}
+			if len(progress.observations) != 3 || progress.observations[1] != "Site identity policy stopped during runtime-recheck.\n" || !strings.Contains(progress.observations[2], "cause="+cause+" ") {
 				t.Fatal("waiting/terminal classifications were not fixed and bounded", progress.observations)
 			}
 			assertIdentityPolicyNotDispatched(t, root)

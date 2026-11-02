@@ -39,6 +39,19 @@ const (
 // readiness. This private condition never authorizes probe, mutation or proof.
 var errNativeIdentityUnready = errors.New("pinned identity containers are not ready")
 
+var (
+	errNativeIdentityContainerUnavailable = errors.New("selected identity container is unavailable or ambiguous")
+	errNativeIdentityContainerMissing     = errors.New("selected identity image has no exact running container")
+)
+
+// The closed field locates a rejected comparison without publishing its values.
+// It carries no permission to reselect a replacement or retry host mutation.
+type nativeIdentityRuntimeChanged struct{ field string }
+
+func (*nativeIdentityRuntimeChanged) Error() string {
+	return "admitted identity context changed during handoff"
+}
+
 type nativePodConfigMap struct {
 	Name  string
 	Items []struct{ Key, Path string }
@@ -161,7 +174,7 @@ func nativeIdentityObservedPod(rows nativeIdentityPodList, reference string) (na
 					continue
 				}
 				if selected != nil || pod.Metadata.Name == "" || pod.Metadata.Namespace == "" || pod.Metadata.UID == "" || state.State.Running == nil || state.ContainerID == "" {
-					return nativeIdentityPod{}, errors.New("selected identity container is unavailable or ambiguous")
+					return nativeIdentityPod{}, errNativeIdentityContainerUnavailable
 				}
 				value := nativeIdentityPod{pod: pod, container: container, state: state}
 				selected = &value
@@ -169,7 +182,7 @@ func nativeIdentityObservedPod(rows nativeIdentityPodList, reference string) (na
 		}
 	}
 	if selected == nil {
-		return nativeIdentityPod{}, errors.New("selected identity image has no exact running container")
+		return nativeIdentityPod{}, errNativeIdentityContainerMissing
 	}
 	return *selected, nil
 }
@@ -453,8 +466,27 @@ func (k *nativeIdentityCommands) recheck(ctx context.Context, selected nativeIde
 	if err != nil {
 		return err
 	}
-	if current.controller.pod.Metadata.UID != selected.controller.pod.Metadata.UID || current.server.pod.Metadata.UID != selected.server.pod.Metadata.UID || current.controller.state.ContainerID != selected.controller.state.ContainerID || current.server.state.ContainerID != selected.server.state.ContainerID || current.configUID != selected.configUID || current.configSHA != selected.configSHA || current.bootID != selected.bootID || !reflect.DeepEqual(current.config, selected.config) {
-		return errors.New("admitted identity context changed during handoff")
+	field := ""
+	switch {
+	case current.controller.pod.Metadata.UID != selected.controller.pod.Metadata.UID:
+		field = "controller-pod"
+	case current.server.pod.Metadata.UID != selected.server.pod.Metadata.UID:
+		field = "server-pod"
+	case current.controller.state.ContainerID != selected.controller.state.ContainerID:
+		field = "controller-container"
+	case current.server.state.ContainerID != selected.server.state.ContainerID:
+		field = "server-container"
+	case current.configUID != selected.configUID:
+		field = "config-object"
+	case current.configSHA != selected.configSHA:
+		field = "config-bytes"
+	case current.bootID != selected.bootID:
+		field = "host-boot"
+	case !reflect.DeepEqual(current.config, selected.config):
+		field = "config-projection"
+	}
+	if field != "" {
+		return &nativeIdentityRuntimeChanged{field: field}
 	}
 	return nativeIdentityRuntimeReady(current)
 }
@@ -750,6 +782,9 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	stopPolicy()
 	if policyErr != nil {
 		reportNativeBootstrapObservation(runner, "Site identity policy stopped during "+policyOperation+".\n")
+		if policyOperation == "runtime-recheck" {
+			reportNativeBootstrapObservation(runner, nativeIdentityRecheckObservation(policyErr))
+		}
 		return nil, policyErr
 	}
 	advance("native-identity-handoff")

@@ -217,7 +217,7 @@ func TestNativeSiteFailureProjectsOnlyJoinedPodRows(t *testing.T) {
 		t.Run(scenario, func(t *testing.T) {
 			root := privateTestDir(t)
 			controller := nativeControllerFixture(t, root, "nvke-controller")
-			pods := `{"items":[{"metadata":{"namespace":"nvke-controller","name":"PRIVATE_POD","annotations":{"secret":"PRIVATE_SECRET"}},"status":{"phase":"Running","containerStatuses":[{"ready":false,"restartCount":7,"state":{"waiting":{"message":"PRIVATE_ERROR"}}}]}}]}`
+			pods := `{"items":[{"metadata":{"namespace":"nvke-controller","name":"PRIVATE_POD","annotations":{"secret":"PRIVATE_SECRET"}},"status":{"phase":"Running","containerStatuses":[{"ready":false,"restartCount":7,"state":{"waiting":{"message":"PRIVATE_ERROR"}},"lastState":{"terminated":{"reason":"OOMKilled","exitCode":137,"signal":9,"message":"PRIVATE_PREVIOUS_ERROR"}}}]}}]}`
 			if scenario == "malformed" {
 				pods = "PRIVATE_INVALID_JSON"
 			}
@@ -247,9 +247,15 @@ esac
 				if !strings.Contains(progress.String(), "Site pod observation (not readiness acceptance):") || !strings.Contains(progress.String(), "nvke-controller  pod-001  Running  0/1  7") {
 					t.Fatal("joined descriptive rows missing", progress.String())
 				}
+				if !strings.Contains(progress.String(), "state=waiting restarts=7") || !strings.Contains(progress.String(), "last-termination=OOMKilled last-exit=137 last-signal=9") {
+					t.Fatal("closed termination fields from the same joined snapshot missing", progress.String())
+				}
 			} else if scenario == "malformed" || scenario == "capture failed" {
 				if !strings.Contains(progress.String(), "Site pod observation unavailable; readiness is unverified.") {
 					t.Fatal("unavailable pod observation was silent", progress.String())
+				}
+				if strings.Contains(progress.String(), "last-termination=OOMKilled") {
+					t.Fatal("failed or malformed capture published termination fields")
 				}
 			} else if progress.Len() != 0 || plain.Len() != 0 {
 				t.Fatal("ineligible diagnostic published", progress.String(), plain.String())

@@ -3621,9 +3621,9 @@ no nightly invokes them or `TestNightlyPublishedCandidate`; no new producer is a
 
 The six-hour job passes its remaining deadline to Go, which reserves two hours
 for independent cleanup. KVM and actual available resources are admitted at run
-time. The explicit small profile selects a 6-GiB site, 3 GiB per tenant VM,
-four vCPUs per guest and 1 GiB additional headroom. Initial admission remains
-13 GiB available for the site plus the larger of the 6-GiB bootstrap backend or
+time. The explicit small profile selects a 7-GiB site, 3 GiB per tenant VM,
+four vCPUs per guest and 1 GiB additional headroom. Initial admission requires
+14 GiB available for the site plus the larger of the 6-GiB bootstrap backend or
 two tenant VMs, plus headroom. Tenant-only admission rechecks 7 GiB after the
 bootstrap backend joins. This is a sizing experiment, not a validated minimum.
 [Run 41252923744](https://github.com/depohmel/nvkr/actions/runs/41252923744), on
@@ -3634,7 +3634,7 @@ Its owned site serial snapshot recorded a kernel OOM-kill marker and its pod
 snapshot showed broad restart/readiness failures. The host retained 4,951 MiB
 available immediately before failure. The killed process and exact failing Helm
 item remain unknown; cleanup joined and Actions artifact count was zero.
-The rebalanced profile preserves the earlier peak admission.
+The preceding 6/3-GiB profile preserved that earlier peak admission.
 [Run 41266072695](https://github.com/depohmel/nvkr/actions/runs/41266072695), on
 NVKR `53ed72e8d7be9b8890ed80d521dc513c859e48fd` and the same frozen NVKE
 commit, completed the fresh build, bootstrap, full stack installation and SPIFFE
@@ -3729,6 +3729,27 @@ suite labels and bounded HTTP/exit statuses reach stderr; bodies and curl errors
 are discarded. Host responses are not BuildKit APT or package-availability
 proof. Original exit, no-ID output, cleanup, image validation and all source
 pins remain unchanged. Hosted exercise and full E2E acceptance remain pending.
+[Run #27](https://github.com/depohmel/nvkr/actions/runs/41383870132), on NVKR
+`32ec2b0f82fa9700b554395be71ac039a0c85683` with the same frozen NVKE, passed
+snapshot acquisition, fresh builds, bootstrap, full installation, helper probe
+and source-policy creation/response validation. Policy convergence waited for
+the unchanged pinned running context to become Ready, then failed during runtime
+recheck before host mutation, final proof or either Go subtest. Its failure
+snapshot showed the controller at 0/1 Ready and the main SPIRE pod at 0/2 Ready,
+each with one restart. The parent failed after 4783.94 seconds; owned VM/backend,
+DNS and network cleanup finished, and Actions artifact count was zero. Neither
+the rejected comparison nor the restart cause is established. No OOM marker was
+observed; absence does not prove there was no memory pressure.
+
+The next candidate adds 1 GiB to the site, with tenant and bootstrap sizes,
+features and headroom unchanged. Its 14,336-MiB admission fits that run's recorded
+14,691/14,919-MiB observations but must be rechecked live; this is an allocation
+experiment, not a demonstrated fix or minimum. Failure presentation reuses the
+already captured Pod JSON for closed current/previous termination reasons and
+bounded exit/signal/restart fields. Runtime rechecks expose only closed failure
+categories and changed-field labels. No new probe, policy retry or acceptance is
+introduced; raw messages, identities, original errors and unknown-completion
+retention stay unchanged. Fresh complete hosted acceptance remains pending.
 Historical [public Run 40578231640](https://github.com/depohmel/nvkr/actions/runs/40578231640)
 built a QCOW2 and passed NVKE's separate harness on AMD64 KVM, but encountered
 severe disk pressure and used best-effort teardown. It does not establish this

@@ -181,6 +181,9 @@ func retainNativeSiteFailure(ctx context.Context, runner Runner, assets NativeAs
 			} else {
 				reportNativeBootstrapObservation(runner, "Site pod observation unavailable; readiness is unverified.\n")
 			}
+			if err == nil {
+				reportNativeBootstrapObservation(runner, nativeSitePodFailureSummary(raw))
+			}
 		}
 	}
 	return cause

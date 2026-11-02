@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +18,33 @@ import (
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/siteidentity"
 )
+
+func TestNativeIdentityRecheckObservationKeepsFailureCategoriesClosed(t *testing.T) {
+	for _, tc := range []struct {
+		name, want string
+		err        error
+	}{
+		{"none", "cause=unavailable", nil},
+		{"unready", "cause=unready", errNativeIdentityUnready},
+		{"container missing", "cause=container-missing", errNativeIdentityContainerMissing},
+		{"container unavailable", "cause=container-unavailable", errNativeIdentityContainerUnavailable},
+		{"changed", "cause=context-changed field=controller-container", fmt.Errorf("PRIVATE_ERROR: %w", &nativeIdentityRuntimeChanged{field: "controller-container"})},
+		{"unknown changed field", "cause=context-changed field=unknown", &nativeIdentityRuntimeChanged{field: "PRIVATE_FIELD"}},
+		{"command", "cause=command-failed field=unavailable exit=17", &CommandError{Phase: "PRIVATE_PHASE", ExitCode: 17, Cause: errors.New("PRIVATE_ERROR")}},
+		{"unknown command", "cause=unclassified", &CommandError{ExitCode: 1000}},
+		{"unknown", "cause=unclassified", errors.New("PRIVATE_ERROR")},
+		{"deadline", "cause=deadline", errors.Join(errNativeIdentityUnready, context.DeadlineExceeded)},
+		{"cancel", "cause=canceled", context.Canceled},
+		{"unjoined", "cause=unjoined", errors.Join(ErrUnjoined, context.DeadlineExceeded, &nativeIdentityRuntimeChanged{field: "host-boot"})},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := nativeIdentityRecheckObservation(tc.err)
+			if !strings.Contains(got, tc.want) || strings.Contains(got, "PRIVATE") || len(got) > 256 {
+				t.Fatalf("unsafe or incomplete recheck observation: %q", got)
+			}
+		})
+	}
+}
 
 func TestNativeIdentityResultObservationKeepsPrivateFieldsClosed(t *testing.T) {
 	result := siteidentity.Result{SchemaVersion: siteidentity.SchemaVersion, Completion: siteidentity.Unknown, FailureCode: nvkrerr.CodeVerifyFailed, CallerID: "PRIVATE_CALLER", Operation: "PRIVATE_OPERATION", Reconfiguration: "PRIVATE_RESULT"}

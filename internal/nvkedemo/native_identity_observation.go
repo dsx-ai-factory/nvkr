@@ -36,6 +36,37 @@ func nativeIdentityCommandObservation(err error) string {
 	return fmt.Sprintf("command=%s exit=%s", command, exit)
 }
 
+// Keep source errors and compared identities private. A classified rejection is
+// still the original failure; it cannot authorize waiting, reselection or cleanup.
+func nativeIdentityRecheckObservation(err error) string {
+	cause, field, exit := "unclassified", "unavailable", "unavailable"
+	var changed *nativeIdentityRuntimeChanged
+	switch {
+	case err == nil:
+		cause = "unavailable"
+	case errors.Is(err, ErrUnjoined):
+		cause = "unjoined"
+	case errors.Is(err, context.Canceled):
+		cause = "canceled"
+	case errors.Is(err, context.DeadlineExceeded):
+		cause = "deadline"
+	case errors.As(err, &changed):
+		cause = "context-changed"
+		field = nativeObservationLabel(changed.field, "controller-pod", "server-pod", "controller-container", "server-container", "config-object", "config-bytes", "host-boot", "config-projection")
+	case errors.Is(err, errNativeIdentityContainerUnavailable):
+		cause = "container-unavailable"
+	case errors.Is(err, errNativeIdentityContainerMissing):
+		cause = "container-missing"
+	case nativeIdentityReadinessPending(err):
+		cause = "unready"
+	default:
+		if code := CommandExitCode(err); code >= 0 && code <= 255 {
+			cause, exit = "command-failed", strconv.Itoa(code)
+		}
+	}
+	return fmt.Sprintf("Site identity runtime recheck observation (not acceptance): cause=%s field=%s exit=%s\n", cause, field, exit)
+}
+
 // Decode with the same bounded, exact codec as completion acceptance. Only
 // closed fields are projected; no source error, identity or response text is
 // copied. Unknown values stay unknown and cannot widen the acceptance contract.

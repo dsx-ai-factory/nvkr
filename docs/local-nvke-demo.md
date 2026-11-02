@@ -871,6 +871,10 @@ Other runtime-check failures remain errors. Initial admission, helper probes,
 host mutation and final proof still require Ready containers. Fixed policy
 operation labels distinguish creation, response validation and convergence
 failures without publishing terminal errors or private values.
+Terminal runtime-recheck observations distinguish closed failure categories and
+the first changed comparison field, without publishing either compared value.
+The original error, strict identity rejection and exact-once policy creation are
+unchanged; a classification cannot authorize reselection or host mutation.
 
 Handoff failure observations identify helper verification, runtime recheck,
 request preparation, helper execution or caller/status validation with fixed
