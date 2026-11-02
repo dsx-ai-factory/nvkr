@@ -278,8 +278,8 @@ output attribution; it never changes an output's Build Digest. This path is desi
 A proposed pinned-tool producer (ADR-27) is an ordinary selected component inside this flow. The compiler lowers
 it to a source-less build node carrying the tool's archive and executable digests, and reuses the shared tool
 acquisition for its bytes. The executor re-hashes the tool before launch, denies network and admits only an
-exact single file or OCI layout. Directory output and tool-side signing fail closed. This path is designed, not
-implemented.
+exact single file or OCI layout. Directory output fails closed, and tool-side signing confers no authority. This
+path is designed, not implemented.
 
 The compiler derives each output's graph from its exact selected components and concrete
 target. `nvkr.build` identifies the logical projection of that validated graph. Output names, packaging and execution settings remain bound by their owning records. Equal Build
