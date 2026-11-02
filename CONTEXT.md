@@ -363,7 +363,8 @@ _Avoid_: Named output, artifact, authored build group
 
 **Pinned-tool producer**:
 A component producer that runs one released executable, pinned by archive and executable digest, once with a fixed
-argument vector, no shell, no network and only typed material inputs, inside a digest-pinned container. Its
+argument vector, no shell, no network, typed material inputs and only literal environment variables, inside a
+digest-pinned container. Its
 result is one file or a producer-written OCI layout; build identity covers the tool, arguments, inputs and
 container. It is a `wrapped-build` producer, not an acquisition of the tool. Proposed in
 [ADR-27](docs/adr/0027-pinned-tool-producers.md); not implemented.

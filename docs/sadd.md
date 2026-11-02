@@ -73,8 +73,8 @@ no member Run, Release or lane. Development bundles are planned with generation;
 composite qualification are deferred. Nothing is implemented.
 
 Proposed [ADR-27](adr/0027-pinned-tool-producers.md) designs pinned-tool producers: a catalog component runs one
-released, digest-pinned executable offline in a pinned container, with no shell and only typed material inputs,
-and emits one file or a producer-written OCI layout. Build identity covers the tool's digests, arguments, inputs
+released, digest-pinned executable offline in a pinned container, with no shell, typed material inputs and only
+literal environment variables, and emits one file or a producer-written OCI layout. Build identity covers the tool's digests, arguments, inputs
 and container; these producers use the `wrapped-build` lane. AICR bundles are the first use. Nothing is
 implemented.
 
