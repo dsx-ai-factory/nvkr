@@ -96,6 +96,9 @@ func Resolve(cat *catalog.Catalog, selection Selection) (*Resolved, error) {
 	if err := catalog.ValidateMaterialSet(resolved.Components); err != nil {
 		return nil, e.Wrap(e.CodeInvalidCatalog, err, "selected output has an incomplete material set")
 	}
+	if err := validatePinnedToolOutputs(resolved.Components); err != nil {
+		return nil, err
+	}
 	hasDiskRoot := containsDiskRoot(resolved.Components)
 	if hasDiskRoot && selection.OutputFormat != "" && selection.OutputFormat != definition.OutputDiskImage {
 		return nil, e.New(e.CodeInvalidCatalog,
@@ -288,6 +291,10 @@ func requireComponentRoute(name string, component catalog.Component, platform st
 	}
 	arch := target.ExecutableArch(platform)
 	switch {
+	case component.BuilderType == catalog.BuilderPinnedTool:
+		if component.ToolExecutable == nil || component.ToolExecutable.Platform != platform {
+			return e.New(e.CodeEngineCapability, "pinned-tool component %q has no tool pinned for target %q", name, platform)
+		}
 	case component.Prebuilt != nil:
 		if component.Prebuilt.Digests[arch] == "" {
 			return e.New(e.CodeUnpinnedSource, "prebuilt component %q has no pinned digest for arch %q", name, arch)

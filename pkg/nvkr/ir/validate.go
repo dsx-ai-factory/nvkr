@@ -156,6 +156,15 @@ func (g *Graph) Validate() error {
 		if node.Kind != KindBuild {
 			continue
 		}
+		if node.BuilderType == BuilderPinnedTool {
+			if err := validateMaterialDependencies(node, byID, ""); err != nil {
+				return err
+			}
+			if err := validatePinnedToolMaterials(node, byID); err != nil {
+				return err
+			}
+			continue
+		}
 		fetch, err := sourceDependency(node, byID)
 		if err != nil {
 			return err
@@ -313,6 +322,9 @@ func VendorSpecIdentity(command []string, image string) (string, error) {
 func validateBuildNode(n Node) error {
 	if n.BuilderType == BuilderVMImage {
 		return validateVMImageNode(n)
+	}
+	if n.BuilderType == BuilderPinnedTool {
+		return validatePinnedToolNode(n)
 	}
 	if err := rejectUnexpectedNodeFields(n, allowFields(
 		"requirements", "executionBinding",
@@ -687,6 +699,10 @@ func validateMaterialDependencies(node Node, byID map[string]Node, fetchID strin
 			return e.New(e.CodeInvalidCatalog,
 				"build node %q material %q does not bind producer %q for component %q",
 				node.ID, binding.Binding, binding.Producer, binding.Component)
+		}
+		if producer.OutputType == OutputOCILayout {
+			return e.New(e.CodeEngineCapability,
+				"build node %q material %q binds an OCI layout, which is not one regular file", node.ID, binding.Binding)
 		}
 		expected[binding.Producer] = binding
 	}

@@ -33,6 +33,7 @@ type LogicalNode struct {
 	ExecutableArchive *ExecutableArchive `json:"executableArchive,omitempty"`
 	Component         string             `json:"component,omitempty"`
 	BuilderType       string             `json:"builderType,omitempty"`
+	Tool              string             `json:"tool,omitempty"`
 	FlakeOutput       string             `json:"flakeOutput,omitempty"`
 	FlakeLockDigest   string             `json:"flakeLockDigest,omitempty"`
 	Toolchain         string             `json:"toolchain,omitempty"`
@@ -96,6 +97,7 @@ var nodeBuildIdentityRules = map[string]buildIdentityFieldRule{
 	"ExecutableArchive": includeLogicalValueInBuildIdentity,
 	"Component":         includeLogicalValueInBuildIdentity,
 	"BuilderType":       includeLogicalValueInBuildIdentity,
+	"Tool":              includeLogicalValueInBuildIdentity,
 	"FlakeRef":          excludeTransportFromBuildIdentity,
 	"FlakeOutput":       includeLogicalValueInBuildIdentity,
 	"FlakeLockDigest":   includeLogicalValueInBuildIdentity,
@@ -205,7 +207,7 @@ func (g Graph) logicalGraph() LogicalGraph {
 			VendorCmd:   append([]string(nil), node.VendorCmd...),
 			VendorImage: imageDigestID(node.VendorImage), Digest: node.Digest, ImageParentDigest: node.ImageParentDigest,
 			ExecutableArchive: cloneExecutableArchive(node.ExecutableArchive),
-			Component:         node.Component, BuilderType: node.BuilderType,
+			Component:         node.Component, BuilderType: node.BuilderType, Tool: node.Tool,
 			FlakeOutput: node.FlakeOutput, FlakeLockDigest: node.FlakeLockDigest,
 			Toolchain: imageDigestID(node.Toolchain), ToolchainPlatform: node.ToolchainPlatform,
 			Platform: node.Platform,
