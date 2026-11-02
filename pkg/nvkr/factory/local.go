@@ -251,6 +251,11 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 		if err := admitLocalDiskPublication(plan); err != nil {
 			return nil, err
 		}
+		// A VM Plan reaches runLocal without AdmitLocal, and a pinned-tool file can
+		// be a material of its disk root.
+		if err := admitLocalPinnedTools(plan); err != nil {
+			return nil, err
+		}
 	}
 	if !options.DryRun && hasLocalVMBuild(plan) {
 		if err := validateVMDriverPlan(plan); err != nil {
