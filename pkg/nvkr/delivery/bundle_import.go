@@ -5,6 +5,7 @@ package delivery
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -152,7 +153,7 @@ func admitBundleManifest(raw []byte) (ociManifest, error) {
 	// Descriptor omits the OCI data member, so the config's embedded copy is checked separately.
 	var embedded struct {
 		Config struct {
-			Data *[]byte `json:"data"`
+			Data json.RawMessage `json:"data"`
 		} `json:"config"`
 	}
 	for _, schema := range []reflect.Type{reflect.TypeFor[ociManifest](), reflect.TypeOf(embedded)} {
@@ -171,10 +172,21 @@ func admitBundleManifest(raw []byte) (ociManifest, error) {
 	}
 	if manifest.SchemaVersion != 2 || manifest.MediaType != MediaOCIManifest || manifest.Subject != nil ||
 		manifest.Config.MediaType != MediaEmptyConfig || manifest.Config.Digest != digestBytes([]byte("{}")) || manifest.Config.Size != 2 ||
-		(embedded.Config.Data != nil && string(*embedded.Config.Data) != "{}") ||
+		(embedded.Config.Data != nil && !emptyConfigData(embedded.Config.Data)) ||
 		len(manifest.Layers) != 1 || manifest.Layers[0].MediaType != MediaImageLayerGzip || !isDigest(manifest.Layers[0].Digest) ||
 		manifest.Layers[0].Size <= 0 || manifest.Layers[0].Size > bundlearchive.MaxArchiveBytes {
 		return ociManifest{}, e.New(e.CodeVerifyFailed, "bundle layout has an invalid OCI manifest shape")
 	}
 	return manifest, nil
+}
+
+// emptyConfigData admits only the OCI form of a present config data member:
+// a base64 JSON string whose decoded bytes are exactly {}.
+func emptyConfigData(raw json.RawMessage) bool {
+	var encoded string
+	if len(raw) == 0 || raw[0] != '"' || json.Unmarshal(raw, &encoded) != nil {
+		return false
+	}
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	return err == nil && string(decoded) == "{}"
 }

@@ -164,6 +164,16 @@ func TestImportBundleLayoutPreservesProducerDigest(t *testing.T) {
 	assertRegistryCode(t, err, e.CodeImmutableViolation)
 }
 
+func TestImportBundleLayoutAdmitsOmittedConfigData(t *testing.T) {
+	source := aicrLayoutFixture(t)
+	digest := rewriteFixtureManifest(t, source, func(manifest map[string]any) {
+		delete(manifest["config"].(map[string]any), "data")
+	})
+	if _, err := ImportBundleLayout(t.Context(), filepath.Join(t.TempDir(), "imported"), source, digest); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestImportBundleLayoutRefusesBeforeOutput(t *testing.T) {
 	for _, test := range []struct {
 		name   string
@@ -265,6 +275,15 @@ func TestImportBundleLayoutRefusesBeforeOutput(t *testing.T) {
 			return rewriteFixtureManifest(t, root, func(manifest map[string]any) {
 				manifest["config"].(map[string]any)["data"] = "eyJhIjoxfQ=="
 			})
+		}},
+		{name: "config data null", mutate: func(t *testing.T, root string) string {
+			return spliceFixtureManifest(t, root, `"data":null`)
+		}},
+		{name: "config data byte array", mutate: func(t *testing.T, root string) string {
+			return spliceFixtureManifest(t, root, `"data":[123,125]`)
+		}},
+		{name: "config data not base64", mutate: func(t *testing.T, root string) string {
+			return spliceFixtureManifest(t, root, `"data":"{}"`)
 		}},
 		{name: "config data alias after", mutate: func(t *testing.T, root string) string {
 			return spliceFixtureManifest(t, root, `"data":"eyJhIjoxfQ==","DATA":"e30="`)
