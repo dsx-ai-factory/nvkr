@@ -35,7 +35,9 @@ func NewCompositionRecord(composition Composition) (*CompositionRecord, error) {
 
 // ValidateMembership requires a complete record whose members recompute
 // definitionDigest and whose attribution names exactly outputs, in order, each
-// to a listed member, with no listed member left without an output.
+// to a listed member, with no listed member left without an output. Without the
+// effective Definition it cannot check that declared variant members select
+// their components; Validate adds that check when the Definition is available.
 func (record CompositionRecord) ValidateMembership(definitionDigest string, outputs []string) error {
 	if err := record.validate(definitionDigest); err != nil {
 		return err
@@ -53,7 +55,8 @@ func (record CompositionRecord) ValidateMembership(definitionDigest string, outp
 
 // ValidateOutputLocal requires the same complete record but lets outputs be the
 // non-empty subset one output-local publication carries. Final Release issuance
-// still requires ValidateMembership over the complete output set.
+// still requires ValidateMembership over the complete output set. Like
+// ValidateMembership, it does not check variant selection; Validate does.
 func (record CompositionRecord) ValidateOutputLocal(definitionDigest string, outputs []string) error {
 	if err := record.validate(definitionDigest); err != nil {
 		return err
@@ -107,7 +110,8 @@ func (record CompositionRecord) validate(definitionDigest string) error {
 	return nil
 }
 
-// Validate additionally binds the record to the effective Definition.
+// Validate additionally binds the record to the effective Definition and
+// requires every declared variant member to select its component there.
 func (record CompositionRecord) Validate(effective Definition, definitionDigest string) error {
 	names := make([]string, 0, len(effective.Outputs))
 	for _, output := range effective.Outputs {

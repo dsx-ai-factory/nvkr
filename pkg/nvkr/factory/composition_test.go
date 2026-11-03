@@ -322,6 +322,13 @@ func TestCompositePlanRecordValidation(t *testing.T) {
 		{name: "variant naming unlisted member", code: e.CodeUnverifiedRef, mutate: func(plan *Plan) {
 			plan.Composition.Variants = []authored.DeclaredVariant{{Component: "containerd", Members: []string{"alpha", "gamma"}}}
 		}},
+		// The digest recomputes, so only the record's selection check can refuse it: beta selects no containerd.
+		{name: "digest-consistent variant member without the component", code: e.CodeInvalidCatalog, mutate: func(plan *Plan) {
+			plan.Composition.Variants = []authored.DeclaredVariant{{Component: "containerd", Members: []string{"alpha", "beta"}}}
+			if digest, err := authored.CompositeDigest(plan.Composition.Metadata, plan.Composition.Members, plan.Composition.Variants...); err == nil {
+				plan.DefinitionDigest = digest
+			}
+		}},
 		{name: "fixed development layout", code: e.CodeEngineCapability, mutate: func(plan *Plan) {
 			plan.Environment.GitHubDevelopment, plan.Environment.GitHubBundle = true, ""
 		}},
