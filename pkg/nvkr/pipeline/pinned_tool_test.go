@@ -38,6 +38,8 @@ func pinnedToolCode(err error) e.Code {
 	return ""
 }
 
+// Dry run ends admission after the lane checks, so the host check cannot stand in
+// for a deleted one. The missing-tool case needs a matching host and is Linux-only.
 func TestAdmitPinnedToolBeforeWork(t *testing.T) {
 	for _, test := range []struct {
 		name   string
@@ -47,11 +49,13 @@ func TestAdmitPinnedToolBeforeWork(t *testing.T) {
 		{"packaging", func(_ *ir.Node, o *RunOptions) { o.Package = true }},
 		{"undeclared output form", func(n *ir.Node, _ *RunOptions) { n.OutputType = "raw" }},
 		{"network", func(n *ir.Node, _ *RunOptions) { n.Network = ir.NetworkDefault }},
-		{"missing tool input", func(_ *ir.Node, o *RunOptions) { o.ToolExecutable = "" }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			node := pinnedToolNode([]byte("tool"))
-			opts := RunOptions{Ctx: t.Context(), ToolExecutable: "/held/aicr"}
+			opts := RunOptions{Ctx: t.Context(), DryRun: true, ToolExecutable: "/held/aicr"}
+			if err := admitPinnedTool(node, opts); err != nil {
+				t.Fatalf("baseline dry run refused: %v", err)
+			}
 			test.change(&node, &opts)
 			if got := pinnedToolCode(admitPinnedTool(node, opts)); got != e.CodeEngineCapability {
 				t.Fatalf("admitPinnedTool() code %q; want %s", got, e.CodeEngineCapability)
@@ -59,7 +63,7 @@ func TestAdmitPinnedToolBeforeWork(t *testing.T) {
 		})
 	}
 	node := pinnedToolNode([]byte("tool"))
-	if _, err := (Local{}).ExecNode(node, RunOptions{Ctx: t.Context(), ToolExecutable: "/held/aicr"}); pinnedToolCode(err) != e.CodeEngineCapability {
+	if _, err := (Local{}).ExecNode(node, RunOptions{Ctx: t.Context(), DryRun: true, ToolExecutable: "/held/aicr"}); pinnedToolCode(err) != e.CodeEngineCapability {
 		t.Fatalf("non-launched exec-node admitted a pinned tool: %v", err)
 	}
 	if result, err := buildPinnedTool(node, RunOptions{Ctx: t.Context(), DryRun: true, Stdout: &strings.Builder{}}); result != nil || err != nil {

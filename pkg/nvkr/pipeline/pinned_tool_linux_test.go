@@ -42,6 +42,19 @@ func TestAdmitPinnedToolHostRefusesEmulation(t *testing.T) {
 	}
 }
 
+func TestAdmitPinnedToolRequiresToolInput(t *testing.T) {
+	node := pinnedToolNode(nil)
+	node.Platform = "linux/" + runtime.GOARCH
+	opts := RunOptions{Ctx: t.Context(), ToolExecutable: "/held/aicr"}
+	if err := admitPinnedTool(node, opts); err != nil {
+		t.Fatalf("matching host refused: %v", err)
+	}
+	opts.ToolExecutable = ""
+	if got := pinnedToolCode(admitPinnedTool(node, opts)); got != e.CodeEngineCapability {
+		t.Fatalf("missing tool input admitted with code %q", got)
+	}
+}
+
 // An AICR-like layout writer refuses an existing target, even an empty directory,
 // so the executor must hand it an absent path and then admit exactly one layout.
 func TestPinnedToolExecutorHandsLayoutWriterAnAbsentPath(t *testing.T) {
