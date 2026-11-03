@@ -243,6 +243,17 @@ the included regular files at the source/archive and final packaging subjects. I
 referenced charts, images or providers. Diagnostic pulling writes the exact archive without extraction
 or deployment; authenticated consumption retains the normal signed Release/evidence requirements.
 
+Delivery can also import a producer-written OCI image layout without rebuilding its manifest. The source
+root must hold only the layout entries and exactly one pinned OCI image manifest with the empty config and
+one gzip tar layer, an artifact type on the import allowlist (initially
+`application/vnd.nvidia.aicr.artifact`), and no unreachable blobs. The layer must also pass the bounded
+archive reader, all before output work. Contract tests import a layout copied from AICR v1.1.2's own
+registry push with the same manifest digest, and they refuse each malformed shape with no output. No
+producer, Definition format or publication path uses the import yet. Proposed ADR-27 pinned-tool producers
+admit regular files, but selecting an `oci-layout` producer, which ADR-27 routes to this import, still fails
+closed until that wiring lands. The `v1.2.0` producers above write AICR's layout and emit only its layer, so
+`bundle-oci` publication still uses the NVKR-built wrapper.
+
 The [focused AICR example](../../inputs/definitions/aicr/README.md) retains one GB300
 selection across six renderer formats and one local build-only Environment. A second Definition
 selects AICR's Preview `gb200-nvke-ubuntu-training-kubeflow` leaf in the `helm`, `flux` and
