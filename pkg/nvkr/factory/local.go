@@ -851,83 +851,81 @@ func copyCurrentRunner(ctx context.Context, destination string) error {
 }
 
 func executeLocalFactoryNode(ctx context.Context, plan *Plan, node Node, options LocalRunOptions, runners map[string]string) error {
-	if node.IRNode != "" {
-		run := (pipeline.Local{}).ExecNode
-		if options.producers != nil {
-			run = options.producers.ExecNode
-		}
-		return executeLocalProducer(ctx, plan, node, options, run)
+	run := (pipeline.Local{}).ExecNode
+	if options.producers != nil {
+		run = options.producers.ExecNode
 	}
+	return localOperationSession(plan, options, runners, run).execute(ctx, node)
+}
 
-	rawPackage := false
+// localOperationSession places producers in the Run's source-owning session with
+// its native Go toolchains and held disk owner, offline utilities in their
+// pinned containers, and terminal observation in this process. The Run admitted
+// its whole Plan, so its producers and raw Debian host operations skip the
+// direct-node gate; other in-process operations still pass it.
+func localOperationSession(plan *Plan, options LocalRunOptions, runners map[string]string,
+	run func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error),
+) *operationSession {
+	return newOperationSession(plan, operationPlacement{
+		workspace: options.Workspace, runtime: options.Runtime, jobs: options.Jobs, owner: options.materialOwner,
+		producer: func(instruction ir.Node, settings pipeline.RunOptions) (*pipeline.ArtifactResult, error) {
+			if instruction.BuilderType == ir.BuilderNativeGo {
+				settings.NativeGo = options.nativeGo[instruction.Toolchain]
+			}
+			return run(instruction, settings)
+		},
+		contained: func(plan *Plan, node Node) bool {
+			return node.Network == ir.NetworkNone && node.Kind != NodeVerify && !localRawComposition(plan, node)
+		},
+		launch: func(ctx context.Context, node Node) error {
+			return launchLocalUtility(ctx, plan, node, options, runners)
+		},
+		owned: func(plan *Plan, node Node) bool {
+			return node.IRNode != "" || (localRawPackage(plan, node) && node.Kind == NodeVerify) || localRawComposition(plan, node)
+		},
+	}, options.Stdout, options.Stderr)
+}
+
+// Terminal observation reopens local producer bytes. A raw package's
+// source-only composition also uses these host records; neither executes
+// producer code or grants the gated direct-node entry point.
+func localRawPackage(plan *Plan, node Node) bool {
 	if plan != nil {
 		for _, output := range plan.Definition.Outputs {
 			if output.Name == node.BuildTarget && output.Format == authored.OutputDebianPackage {
-				rawPackage = true
+				return true
 			}
 		}
 	}
-	// Terminal observation reopens local producer bytes. A raw package's
-	// source-only composition also uses these host records; neither executes
-	// producer code or grants the gated direct-node entry point.
-	if node.Network == ir.NetworkNone && node.Kind != NodeVerify && !(rawPackage && node.Kind == NodeSBOM && plan.Definition.SBOMTool == "") {
-		if _, ok := runners[node.Platform]; !ok {
-			return e.New(e.CodeEngineCapability, "factory node %s has no linux runner for %s", node.ID, node.Platform)
-		}
-		workspace, err := filepath.Abs(options.Workspace)
+	return false
+}
+
+func localRawComposition(plan *Plan, node Node) bool {
+	return localRawPackage(plan, node) && node.Kind == NodeSBOM && plan.Definition.SBOMTool == ""
+}
+
+func launchLocalUtility(ctx context.Context, plan *Plan, node Node, options LocalRunOptions, runners map[string]string) error {
+	if _, ok := runners[node.Platform]; !ok {
+		return e.New(e.CodeEngineCapability, "factory node %s has no linux runner for %s", node.ID, node.Platform)
+	}
+	workspace, err := filepath.Abs(options.Workspace)
+	if err != nil {
+		return err
+	}
+	arch := strings.TrimPrefix(node.Platform, "linux/")
+	containerRunner := "/workspace/.nvkr/factory/.runner/nvkr-exec-" + arch
+	planDigest := ""
+	if hasLocalVMBuild(plan) {
+		planDigest, err = plan.Digest()
 		if err != nil {
 			return err
 		}
-		arch := strings.TrimPrefix(node.Platform, "linux/")
-		containerRunner := "/workspace/.nvkr/factory/.runner/nvkr-exec-" + arch
-		planDigest := ""
-		if hasLocalVMBuild(plan) {
-			planDigest, err = plan.Digest()
-			if err != nil {
-				return err
-			}
-		}
-		return executeUtilityNode(ctx, node, utilityRunnerLocation{
-			runtime: options.Runtime, mountSource: workspace, mountTarget: "/workspace/.nvkr/factory",
-			helper: containerRunner, plan: "/workspace/.nvkr/factory/" + localPlanPath, planDigest: planDigest,
-			user: localContainerUser(), home: true,
-		}, options.Stdout, options.Stderr)
 	}
-	relocated, err := relocateFactoryPlan(plan, options.Workspace)
-	if err != nil {
-		return err
-	}
-	if rawPackage && node.Kind == NodeVerify {
-		_, artifacts := planIndex(relocated)
-		return executeObservation(ctx, relocated, node, artifacts)
-	}
-	if rawPackage && node.Kind == NodeSBOM && plan.Definition.SBOMTool == "" {
-		_, artifacts := planIndex(relocated)
-		return executeSBOM(ctx, relocated, node, artifacts, options.Stdout)
-	}
-	return ExecuteNode(ctx, relocated, node.ID, options.Stdout, options.Stderr)
-}
-
-func executeLocalProducer(ctx context.Context, plan *Plan, node Node, options LocalRunOptions,
-	run func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error),
-) error {
-	relocated, err := relocateFactoryPlan(plan, options.Workspace)
-	if err != nil {
-		return err
-	}
-	var owner *LocalRunResult
-	for _, output := range plan.LifecycleOutputs {
-		if output.Name == node.BuildTarget && output.Kind == authored.OutputDiskImage {
-			owner = options.materialOwner
-		}
-	}
-	invoke := func(instruction ir.Node, settings pipeline.RunOptions) (*pipeline.ArtifactResult, error) {
-		if instruction.BuilderType == ir.BuilderNativeGo {
-			settings.NativeGo = options.nativeGo[instruction.Toolchain]
-		}
-		return run(instruction, settings)
-	}
-	return executeProducer(ctx, relocated, node, options.Runtime, options.Jobs, options.Stdout, options.Stderr, invoke, owner)
+	return executeUtilityNode(ctx, node, utilityRunnerLocation{
+		runtime: options.Runtime, mountSource: workspace, mountTarget: "/workspace/.nvkr/factory",
+		helper: containerRunner, plan: "/workspace/.nvkr/factory/" + localPlanPath, planDigest: planDigest,
+		user: localContainerUser(), home: true,
+	}, options.Stdout, options.Stderr)
 }
 
 func hasLocalVMBuild(plan *Plan) bool {
