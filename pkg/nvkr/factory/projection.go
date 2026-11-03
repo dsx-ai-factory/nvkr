@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -303,7 +304,11 @@ func runProjectionAdapter(ctx context.Context, adapter ProjectionAdapter, reques
 	case stdout.overflow:
 		return nil, e.New(e.CodePipelineDrift, "projection adapter response exceeds %d bytes", limit)
 	case err != nil:
-		return nil, e.Wrap(e.CodeEngineCapability, err, "projection adapter refused: %s", strings.TrimSpace(stderr.String()))
+		var exit *exec.ExitError
+		if errors.As(err, &exit) {
+			return nil, e.Wrap(e.CodeEngineCapability, err, "projection adapter refused: %s", strings.TrimSpace(stderr.String()))
+		}
+		return nil, e.Wrap(e.CodeEngineCapability, err, "host failed to run projection adapter %s", adapter.Path)
 	}
 	return stdout.Bytes(), nil
 }

@@ -379,6 +379,27 @@ func TestProjectionHostRefusesMisbehavingPlugins(t *testing.T) {
 	}
 }
 
+func TestProjectionHostSeparatesRefusalFromLaunchFailure(t *testing.T) {
+	plan := githubTestPlan(t)
+	missing := projectionTestAdapter(t, "refuse")
+	missing.Path = filepath.Join(t.TempDir(), "absent")
+	for _, test := range []struct {
+		name, want, not string
+		adapter         ProjectionAdapter
+	}{
+		{"refusal", "projection adapter refused", "host failed", projectionTestAdapter(t, "refuse")},
+		{"missing adapter", "host failed to run projection adapter", "refused", missing},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := Render(WithProjectionAdapter(t.Context(), test.adapter), plan, EngineGitHub)
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			if !strings.Contains(err.Error(), test.want) || strings.Contains(err.Error(), test.not) {
+				t.Fatalf("error %q, want %q without %q", err, test.want, test.not)
+			}
+		})
+	}
+}
+
 func TestProjectionHostStopsAdapterOnCancellation(t *testing.T) {
 	plan, record := githubTestPlan(t), recordProjectionLaunches(t)
 	ctx, cancel := context.WithCancel(t.Context())
