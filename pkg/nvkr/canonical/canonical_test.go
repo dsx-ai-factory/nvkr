@@ -273,6 +273,9 @@ func TestRejectFieldAliasesBindsOnlyStructFields(t *testing.T) {
 		} `json:"signatures"`
 		Ignored  string `json:"-"`
 		Optional string `json:"optional,omitempty"`
+		Dash     struct {
+			Kind string `json:"kind"`
+		} `json:"-,omitempty"`
 	}
 	for _, tc := range []struct {
 		name string
@@ -293,6 +296,8 @@ func TestRejectFieldAliasesBindsOnlyStructFields(t *testing.T) {
 		{name: "alias inside an array of structs", raw: `{"signatures":[{"KEYID":"k"}]}`},
 		{name: "alias of a tag with options", raw: `{"OPTIONAL":"o"}`},
 		{name: "member named like an ignored field", raw: `{"ignored":"i","IGNORED":"j"}`, ok: true},
+		{name: "exact members under a field named dash", raw: `{"-":{"kind":"k"}}`, ok: true},
+		{name: "alias under a field named dash", raw: `{"-":{"KIND":"k"}}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := RejectFieldAliases([]byte(tc.raw), &statement{})
