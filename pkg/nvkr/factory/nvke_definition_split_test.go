@@ -26,11 +26,12 @@ var nvkeSplitFamilies = []struct {
 	{"services", 34, 34},
 	{"telemetry", 17, 17},
 	{"disks", 4, 4},
+	{"disks-ubuntu24", 4, 4},
 }
 
-// Family-only outputs are not in the combined Definition, whose flat workflow
-// has no remaining YAML parsing headroom. Each declaration is pinned exactly so a
-// valid but unintended selection fails here rather than only after regeneration.
+// Family-only outputs are not in the combined Definition. Each declaration is
+// pinned exactly so a valid but unintended selection fails here rather than only
+// after regeneration; the Ubuntu 24.04 disks must keep the Ubuntu 24 overlay.
 var nvkeFamilyOnlyOutputs = map[string]struct {
 	family string
 	output definition.DefinitionOutput
@@ -48,6 +49,61 @@ var nvkeFamilyOnlyOutputs = map[string]struct {
 	"nico-flow":                          {"core", nvkeFamilyOnlyOutput("nico-flow", "linux/amd64", "nico", definition.OutputHelm, "nico-flow-chart", nil)},
 	"nico-flow-image":                    {"core", definition.DefinitionOutput{Name: "nico-flow-image", Platforms: []string{"linux/amd64", "linux/arm64"}, Catalog: &definition.Catalog{Base: "../../catalogs/nico"}, Components: []string{"nico-flow-image"}, Format: definition.OutputOCI}},
 	"nico-prereqs":                       {"core", nvkeFamilyOnlyOutput("nico-prereqs", "linux/amd64", "nico", definition.OutputHelm, "nico-prereqs-chart", nil)},
+	"nvke-node-fde-ubuntu24-amd64":       {"disks-ubuntu24", nvkeUbuntu24Disk("nvke-node-fde-ubuntu24-amd64", "linux/amd64", "nvke-node-fde-amd64")},
+	"nvke-node-fde-ubuntu24-arm64":       {"disks-ubuntu24", nvkeUbuntu24Disk("nvke-node-fde-ubuntu24-arm64", "linux/arm64", "nvke-node-fde-arm64")},
+	"nvke-node-image-ubuntu24-amd64":     {"disks-ubuntu24", nvkeUbuntu24Disk("nvke-node-image-ubuntu24-amd64", "linux/amd64", "nvke-node-image-amd64")},
+	"nvke-node-image-ubuntu24-arm64":     {"disks-ubuntu24", nvkeUbuntu24Disk("nvke-node-image-ubuntu24-arm64", "linux/arm64", "nvke-node-image")},
+}
+
+// TestNVKEUbuntu24DisksMatchDiagnostics binds each maintained Ubuntu 24.04 disk to
+// the build-only diagnostic selection whose 24.04 producers, ISO and Packer series
+// the lifecycle tests resolve (nvke_ubuntu24_test.go), so that coverage applies here.
+func TestNVKEUbuntu24DisksMatchDiagnostics(t *testing.T) {
+	nvkeSplitRepository(t)
+	family := nvkeSplitDefinition(t, "inputs/definitions/nvke/disks-ubuntu24.yaml")
+	if len(family.Outputs) != 4 {
+		t.Fatalf("Ubuntu 24.04 disks family has %d outputs, want 4", len(family.Outputs))
+	}
+	for _, output := range family.Outputs {
+		t.Run(output.Name, func(t *testing.T) {
+			variant := strings.Replace(strings.TrimPrefix(output.Name, "nvke-node-"), "-ubuntu24", "", 1)
+			diagnostic := nvkeSplitDefinition(t, "inputs/definitions/diagnostics/ubuntu24/definition-github-"+variant+".yaml")
+			if len(diagnostic.Outputs) != 1 || diagnostic.Outputs[0].Catalog == nil {
+				t.Fatalf("diagnostic %s does not select one catalog-scoped output", variant)
+			}
+			// The diagnostic Definition sits one directory deeper, so its catalog
+			// paths carry one extra "../" to reach the same inputs/catalogs files.
+			want := diagnostic.Outputs[0]
+			stack := *want.Catalog
+			stack.Base = strings.TrimPrefix(stack.Base, "../")
+			stack.Overlays = nil
+			for _, overlay := range want.Catalog.Overlays {
+				stack.Overlays = append(stack.Overlays, strings.TrimPrefix(overlay, "../"))
+			}
+			want.Catalog = &stack
+			if !bytes.Equal(nvkeSplitCanonical(t, output), nvkeSplitCanonical(t, want)) {
+				t.Fatalf("maintained %s diverges from its diagnostic selection", output.Name)
+			}
+		})
+	}
+}
+
+// nvkeUbuntu24Disk is a native disk with its complete material closure, selected
+// through the release node-image stack plus the Ubuntu 24 overlay.
+func nvkeUbuntu24Disk(name, platform, root string) definition.DefinitionOutput {
+	installer, patched := "ubuntu-installer-iso", "nvke-patched-installer-iso"
+	if platform == "linux/amd64" {
+		installer, patched = installer+"-amd64", patched+"-amd64"
+	}
+	return definition.DefinitionOutput{
+		Name:     name,
+		Platform: platform,
+		Catalog: &definition.Catalog{Base: "../../catalogs/node-images/release", Overlays: []string{
+			"../../catalogs/node-images/variants/native-toolchains.yaml", "../../catalogs/node-images/variants/ubuntu24.json"}},
+		Format: definition.OutputDiskImage,
+		Components: []string{"nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-doca-ovs", "nvke-image-inputs",
+			"nvke-kubeadm-distro", root, patched, "nvke-spire-agent", "ovn-kube-ubuntu", "ovn-kubernetes-chart", installer},
+	}
 }
 
 func nvkeFamilyOnlyOutput(name, platform, catalog, format, component string, images map[string]string) definition.DefinitionOutput {
@@ -64,7 +120,8 @@ func nvkeFamilyOnlyOutput(name, platform, catalog, format, component string, ima
 	return output
 }
 
-// Family-only catalogs hold only public sources, so they load from disk.
+// Family-only catalogs declare no pin set to revalidate, so they load from disk:
+// these public catalogs, plus each pinned family-only overlay stack.
 var nvkeFamilyOnlyCatalogs = map[string]bool{"../../catalogs/local-path-provisioner": true, "../../catalogs/nico": true, "../../catalogs/tools/aicr-arm64": true, "../../catalogs/tools/operator-arm64": true}
 
 func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
@@ -109,7 +166,7 @@ func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 				if !bytes.Equal(nvkeSplitCanonical(t, output), original[output.Name]) {
 					t.Fatalf("output %q is added or changes the combined selection", output.Name)
 				}
-				if (output.Format == definition.OutputDiskImage) != (family.name == "disks") {
+				if (output.Format == definition.OutputDiskImage) != nvkeDiskFamily(family.name) {
 					t.Fatalf("disk output %q escaped its native execution family", output.Name)
 				}
 				native += max(1, len(output.Platforms))
@@ -174,7 +231,7 @@ func TestNVKEDefinitionSplitEnvironmentIsolation(t *testing.T) {
 			// Each family's workflow fits flat; only the combined producer partitions.
 			want.GitHubExecutionPartitions = false
 			sources := map[string]bool{"https://github.com/dsx-ai-factory/nvke": true}
-			if family.name == "disks" {
+			if nvkeDiskFamily(family.name) {
 				// Disks also build the release catalog's NVIDIA OVN fork producers.
 				sources = map[string]bool{"https://github.com/dsx-ai-factory/nvke.git": true, "https://github.com/dsx-ai-factory/ovn-kubernetes": true}
 			} else {
@@ -301,7 +358,7 @@ func TestNVKEDefinitionSplitCompiledIdentityAndGeneratedBundles(t *testing.T) {
 					t.Fatalf("family helper %s permits nondefault-ref execution: %q", id, job.If)
 				}
 			}
-			if family.name != "disks" {
+			if !nvkeDiskFamily(family.name) {
 				assertNoPrivateToolchainPreparation(t, bundle)
 			}
 			if bundle.WorkflowPath != ".github/workflows/nvkr-run-nvke-"+family.name+".yml" ||
@@ -371,7 +428,7 @@ func nvkeSplitCatalogLoader(t *testing.T, combined *Plan) func(context.Context, 
 			return nil, e.Wrap(e.CodeTimeout, err, "split fixture catalog load canceled")
 		}
 		stack, ok := stacks[string(nvkeSplitCanonical(t, spec))]
-		if !ok && nvkeFamilyOnlyCatalogs[spec.Base] && len(spec.Overlays) == 0 {
+		if !ok && (nvkeFamilyOnlyCatalogs[spec.Base] && len(spec.Overlays) == 0 || nvkeFamilyOnlyStack(t, spec)) {
 			return loadFactoryCatalogStack(ctx, "inputs/definitions/nvke/core.yaml", spec)
 		}
 		if !ok {
@@ -381,6 +438,18 @@ func nvkeSplitCatalogLoader(t *testing.T, combined *Plan) func(context.Context, 
 	}
 }
 
+// nvkeFamilyOnlyStack admits exactly a pinned family-only output's catalog stack.
+func nvkeFamilyOnlyStack(t *testing.T, spec definition.Catalog) bool {
+	t.Helper()
+	for _, only := range nvkeFamilyOnlyOutputs {
+		if only.output.Catalog != nil && len(only.output.Catalog.Overlays) != 0 &&
+			bytes.Equal(nvkeSplitCanonical(t, *only.output.Catalog), nvkeSplitCanonical(t, spec)) {
+			return true
+		}
+	}
+	return false
+}
+
 func nvkeSplitRepository(t *testing.T) {
 	t.Helper()
 	root, err := filepath.Abs("../../..")
@@ -388,6 +457,12 @@ func nvkeSplitRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(root)
+}
+
+// nvkeDiskFamily reports whether a family owns native disk execution; each Ubuntu
+// series is a sibling disk family, not an exception to the other.
+func nvkeDiskFamily(family string) bool {
+	return family == "disks" || family == "disks-ubuntu24"
 }
 
 func nvkeSplitPaths(family string) (string, string) {

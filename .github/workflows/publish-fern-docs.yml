@@ -241,15 +241,16 @@ jobs:
           package-manager-cache: false
 
       - name: Install Fern CLI
-        run: npm install -g fern-api@latest
+        run: make fern-install
 
       - name: Publish docs
         env:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
+          FERN_NO_VERSION_REDIRECTION: 'true'
         working-directory: ./fern
         run: |
           set -eo pipefail
-          fern generate --docs 2>&1 | tee /tmp/fern-output.log
+          "$GITHUB_WORKSPACE/tools/fern/node_modules/.bin/fern" generate --docs 2>&1 | tee /tmp/fern-output.log
           URL=$(grep -oP 'Published docs to \K.*(?= \()' /tmp/fern-output.log || true)
           if [ -n "$URL" ]; then
             echo "### Published: [$URL]($URL)" >> "$GITHUB_STEP_SUMMARY"

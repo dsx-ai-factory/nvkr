@@ -110,6 +110,10 @@ func TestPrivateToolchainPublicationBoundary(t *testing.T) {
 		{"disk family current subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
 		{"disk family prefix lookalike", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-mirror", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
 		{"disk family child prefix", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks/other", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
+		{"ubuntu24 disk family current subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-ubuntu24", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
+		{"ubuntu24 disk family prefix lookalike", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-ubuntu24-mirror", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
+		{"ubuntu24 disk family child prefix", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-ubuntu24/other", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
+		{"ubuntu24 disk family non-toolchain subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-ubuntu24", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/other/packer", false, false},
 		{"core family prefix", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/core", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
 		{"services family prefix", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/services", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
 		{"telemetry family prefix", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/telemetry", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
@@ -192,16 +196,20 @@ func assertNoPrivateToolchainPreparation(t *testing.T, bundle *GeneratedBundle) 
 
 func TestMaintainedNamedPrivateImageCredentialBoundary(t *testing.T) {
 	// The combined and nightly bundles share their assertions with
-	// TestMaintainedGitHubBundles. Keep the disks-family namespace covered too.
-	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke-disks/plan.json")
-	if err != nil {
-		t.Fatal(err)
+	// TestMaintainedGitHubBundles. Keep both disk-family namespaces covered too.
+	for _, bundleName := range []string{"nvkr-run-nvke-disks", "nvkr-run-nvke-disks-ubuntu24"} {
+		t.Run(bundleName, func(t *testing.T) {
+			plan, err := LoadPlanContext(t.Context(), "../../../.github/"+bundleName+"/plan.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertGitHubPrivateImageCredentialBoundary(t, plan, bundle, 4)
+		})
 	}
-	bundle, err := RenderGitHub(t.Context(), plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertGitHubPrivateImageCredentialBoundary(t, plan, bundle, 4)
 }
 
 // Maintained product checks share their already-rendered bundle with the entry

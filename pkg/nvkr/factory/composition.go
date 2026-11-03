@@ -26,8 +26,7 @@ func newCompositionRecord(composition authored.Composition) (*CompositionRecord,
 }
 
 // compileComposition compiles an admitted composite's effective Definition
-// through the ordinary compiler, then binds the composition record. Each
-// distinct catalog stack loads once per compile.
+// through the ordinary compiler, then binds the composition record.
 func compileComposition(ctx context.Context, composition authored.Composition, environmentPath string, environment authored.Environment,
 	generatorVersion string, loadStack func(context.Context, authored.Catalog) (*catalog.Stack, error),
 ) (*Plan, error) {
@@ -38,20 +37,7 @@ func compileComposition(ctx context.Context, composition authored.Composition, e
 	if err != nil {
 		return nil, err
 	}
-	stacks := map[string]*catalog.Stack{}
-	loadOnce := func(ctx context.Context, spec authored.Catalog) (*catalog.Stack, error) {
-		key := spec.Base + "\x00" + strings.Join(spec.Overlays, "\x00")
-		if stack, ok := stacks[key]; ok {
-			return stack, nil
-		}
-		stack, err := loadStack(ctx, spec)
-		if err != nil {
-			return nil, err
-		}
-		stacks[key] = stack
-		return stack, nil
-	}
-	plan, err := compileDocumentsFor(ctx, composition.Path(), composition.Effective(), environmentPath, environment, generatorVersion, loadOnce, record)
+	plan, err := compileDocumentsFor(ctx, composition.Path(), composition.Effective(), environmentPath, environment, generatorVersion, loadStack, record)
 	if err != nil {
 		return nil, err
 	}

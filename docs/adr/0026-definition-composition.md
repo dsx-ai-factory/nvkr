@@ -132,10 +132,12 @@ select the component in at least one of its outputs, so admission refuses a miss
 declaration does not require the producers to differ, so catalog maintenance that converges the pins does not
 break the composite. Authors may still put both outputs in one member, where ADR-11 already admits the variant.
 
-The four NVKE families select no `(component, platform)` in common and declare no variants. Per-release
-node-image Definitions motivate the opt-in. One Definition per Ubuntu release selects the same node agent, DOCA
-OVS, installer and disk producers at release-specific pins, and a site composite that releases both members
-declares each of those components as a variant of the two members.
+The core, services, telemetry and Ubuntu 26.04 disks families select no `(component, platform)` in common and
+declare no variants. The Ubuntu 24.04 disks family replaces the same disk, agent, installer and DOCA OVS
+components through its overlay, so it is a separately released sibling that the combined Definition omits. A
+composite that holds both Ubuntu series either selects both in one member or lists both disk families as members
+and declares each of those components as a variant of the two; the worked example below composes the other four
+families.
 
 The effective Definition is a derived internal record, like a Plan. It is never written as an authored input,
 cannot be selected with `--definition` and has no file. `definition inspect` may show it as a description.
