@@ -168,7 +168,8 @@ A pinned-tool node runs through the shared helper launcher as an ordinary build 
   `TMPDIR` is `/nvkr/tmp`, and the executable is mounted read-only at `/nvkr/tool/<member name>`. The root
   filesystem is read-only. An executor-owned bootstrap, `umask 022 && exec /usr/bin/env -i "$@"`, sets the umask
   and replaces the image environment. The toolchain image must therefore provide `/bin/sh` and `/usr/bin/env`;
-  no producer value is interpreted by that shell.
+  no producer value is interpreted by that shell. A tool path containing `=` is refused with `invalid-catalog`,
+  because `env` would read the staged name as an assignment and run the next argument instead.
 - **Bounded and owned.** The node honors its execution requirements' wall-time budget and the caller's context;
   cancellation terminates and joins the child before returning.
 - **Linux only.** Held executable capabilities are Linux-only (ADR-22); other hosts fail admission.

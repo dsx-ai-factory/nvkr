@@ -94,6 +94,7 @@ func TestPinnedToolCatalogForm(t *testing.T) {
 		{name: "tool fields on another builder", append: "  stray:\n    source: plain\n    fromSource: true\n    tool: aicr\n    platforms: [linux/arm64]\n    outputType: raw\n    buildCommand: [make]\n    artifactPath: out/x\n", code: e.CodeInvalidCatalog},
 		{name: "unknown tool source", edits: []edit{{registry: [2]string{"    tool: aicr\n    toolchainImage", "    tool: missing\n    toolchainImage"}}}, code: e.CodeInvalidCatalog},
 		{name: "source without tool declaration", edits: []edit{{registry: [2]string{"    tool: aicr\n    toolchainImage", "    tool: plain\n    toolchainImage"}}}, code: e.CodeUnpinnedSource},
+		{name: "assignment in executable path", edits: []edit{{registry: [2]string{"executablePath: aicr\n", "executablePath: bin/aicr=1\n"}, lock: [2]string{"executablePath: aicr\n", "executablePath: bin/aicr=1\n"}}}, code: e.CodeInvalidCatalog},
 		{name: "tool pin out of date", edits: []edit{{lock: [2]string{"_linux_arm64.tar.gz\n", "_linux_arm64.tgz\n"}}}, code: e.CodeUnpinnedSource},
 		{name: "platform differs from tool", edits: []edit{{registry: [2]string{"    platforms: [linux/arm64]\n    outputType: file", "    platforms: [linux/amd64]\n    outputType: file"}}}, code: e.CodeEngineCapability},
 		{name: "second platform", edits: []edit{{registry: [2]string{"    platforms: [linux/arm64]\n    outputType: file", "    platforms: [linux/amd64, linux/arm64]\n    outputType: file"}}}, code: e.CodeEngineCapability},

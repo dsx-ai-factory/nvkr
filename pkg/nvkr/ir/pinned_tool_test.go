@@ -44,6 +44,7 @@ func TestPinnedToolNodeContract(t *testing.T) {
 		{name: "missing tool name", change: func(_, r *Node) { r.Tool = "" }, code: e.CodeUnpinnedSource},
 		{name: "missing archive pin", change: func(_, r *Node) { r.ExecutableArchive = nil }, code: e.CodeUnpinnedSource},
 		{name: "raw archive digest differs", change: func(_, r *Node) { r.ExecutableArchive.Format = "raw" }, code: e.CodeUnpinnedSource},
+		{name: "assignment in member", change: func(_, r *Node) { r.ExecutableArchive.Member = "bin/aicr=1" }, code: e.CodeUnpinnedSource},
 		{name: "tagged toolchain", change: func(_, r *Node) { r.Toolchain = "example.test/runner:1" }, code: e.CodeTagToolchain},
 		{name: "directory output form", change: func(_, r *Node) { r.OutputType = "raw" }, code: e.CodeInvalidCatalog},
 		{name: "nested file", change: func(_, r *Node) { r.ArtifactPath = "a/recipe.yaml" }, code: e.CodeInvalidCatalog},

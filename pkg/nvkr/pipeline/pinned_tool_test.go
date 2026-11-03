@@ -81,6 +81,20 @@ func TestPinnedToolRunArgsAreFixed(t *testing.T) {
 	}
 }
 
+// env(1) would read a staged name containing '=' as an assignment and run the next
+// argument from the image instead of the pinned tool.
+func TestStagePinnedToolRefusesAssignmentName(t *testing.T) {
+	node := pinnedToolNode([]byte("tool"))
+	node.ExecutableArchive.Member = "bin/aicr=1"
+	parent := t.TempDir()
+	if _, _, err := stagePinnedToolExecutable(t.Context(), node, "/held/aicr", parent); pinnedToolCode(err) != e.CodeInvalidCatalog {
+		t.Fatalf("stagePinnedToolExecutable() = %v; want %s", err, e.CodeInvalidCatalog)
+	}
+	if entries, err := os.ReadDir(parent); err != nil || len(entries) != 0 {
+		t.Fatalf("refused staging left %v, %v", entries, err)
+	}
+}
+
 func TestAdmitPinnedToolOutputForm(t *testing.T) {
 	for _, test := range []struct {
 		name  string

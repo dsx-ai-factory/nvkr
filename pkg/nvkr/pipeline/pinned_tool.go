@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
@@ -194,6 +195,11 @@ func buildPinnedTool(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 // stagePinnedToolExecutable snapshots the planned acquisition against the IR's
 // executable digest and writes that snapshot into a private read-only directory.
 func stagePinnedToolExecutable(ctx context.Context, n ir.Node, source, parent string) (string, string, error) {
+	name := path.Base(n.ExecutableArchive.Member)
+	if strings.Contains(name, "=") {
+		// env(1) would read the name as an assignment and run the next argument instead.
+		return "", "", e.New(e.CodeInvalidCatalog, "pinned tool member %q for %q cannot be staged", n.ExecutableArchive.Member, n.ID)
+	}
 	held, err := heldfile.OpenContext(ctx, source, heldfile.Options{
 		Label: "pinned tool " + n.Tool, Executable: true, MaxBytes: maxPinnedToolBytes, ExpectedDigest: n.Digest})
 	if err != nil {
@@ -207,7 +213,6 @@ func stagePinnedToolExecutable(ctx context.Context, n ir.Node, source, parent st
 	if err != nil {
 		return "", "", e.Wrap(e.CodeBuildFailed, err, "creating private tool directory")
 	}
-	name := path.Base(n.ExecutableArchive.Member)
 	// Create the copy with its final mode: some bind-mount filesystems refuse a
 	// later chmod of a read-only file. O_EXCL never follows an existing entry.
 	file, err := os.OpenFile(filepath.Join(dir, name), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o555)

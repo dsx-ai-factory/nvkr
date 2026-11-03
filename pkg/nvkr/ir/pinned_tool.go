@@ -42,7 +42,7 @@ func validatePinnedToolNode(n Node) error {
 	}
 	archive := n.ExecutableArchive
 	if !strings.HasPrefix(n.Artifact, "https://") || !safeReference(n.Artifact) || !canonical.IsDigest(n.Digest) || archive == nil ||
-		!canonical.IsDigest(archive.Digest) || !safeRelativePath(archive.Member) ||
+		!canonical.IsDigest(archive.Digest) || !safeRelativePath(archive.Member) || strings.Contains(archive.Member, "=") ||
 		(archive.Format != "raw" && archive.Format != "tar-gzip" && archive.Format != "zip") ||
 		(archive.Format == "raw" && archive.Digest != n.Digest) {
 		return e.New(e.CodeUnpinnedSource, "pinned-tool node %q requires an exact HTTPS tool archive, member and executable digest", n.ID)
