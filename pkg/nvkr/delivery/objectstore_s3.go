@@ -98,7 +98,7 @@ func newS3ObjectStore(ctx context.Context, options S3ObjectStoreOptions) (Object
 
 func admitObjectOptions(o S3ObjectStoreOptions) (S3ObjectStoreOptions, error) {
 	if o.OperationTimeout == 0 {
-		o.OperationTimeout = time.Hour
+		o.OperationTimeout = 59*time.Minute - time.Second
 	}
 	if o.CleanupTimeout == 0 {
 		o.CleanupTimeout = time.Minute

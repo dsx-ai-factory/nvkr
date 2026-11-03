@@ -51,8 +51,10 @@ key, with the original output name and payload binding in the inventory.
 
 Optional `transfer` fields on the destination are `maxObjectBytes`, `maxTotalBytes`, `maxObjects` and
 `operationTimeoutSeconds`; defaults are 64 GiB, 256 GiB, 8192 and 1200 seconds. The complete inventory must fit
-before any upload. A temporary session must cover the operation and cleanup deadlines; insufficient lifetime
-fails before writes. SDK callers use the same publication owner and byte-provider interface. A consumer restores
+before any upload. The operation timeout is at most 3539 seconds, leaving 60 seconds for cleanup and one
+second for credential-expiry precision within a one-hour workload session. A temporary session must cover
+both deadlines; insufficient lifetime fails before writes. SDK callers use the same publication owner and
+byte-provider interface. A consumer restores
 the original closure and verifies every original proof and exact input/output binding under its own policy;
 an inventory, ETag or S3 metadata alone is not authenticity evidence.
 

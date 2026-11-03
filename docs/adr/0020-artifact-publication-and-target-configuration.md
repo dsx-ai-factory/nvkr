@@ -214,8 +214,10 @@ Old inputs retain their original canonical bytes and logical Build identities. N
 publication-root identity family, public object or worker supervisor is introduced for transport.
 
 The transfer bounds are maximum unique object bytes, total unique stored bytes, object count and operation
-seconds. Defaults are 64 GiB per object, 256 GiB total, 8192 objects and 1200 seconds. The complete known
-inventory, including original proof bytes and conservative final-inventory headroom, is admitted before the
+seconds. Defaults are 64 GiB per object, 256 GiB total, 8192 objects and 1200 seconds. Authored operation
+timeouts are at most 3539 seconds, reserving the default 60-second cleanup bound and one second for credential
+expiry precision within a one-hour workload session. The complete known inventory, including original proof
+bytes and conservative final-inventory headroom, is admitted before the
 first write. Limits cannot exceed the source/publication and provider limits. One fresh store owns each
 bounded operation; SDK request retries and whole multipart restarts remain separately bounded and do not
 reset its deadline. SDK retry counts apply per API invocation, rather than promising a cross-call request ledger.

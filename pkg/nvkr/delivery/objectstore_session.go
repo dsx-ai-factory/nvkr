@@ -42,7 +42,8 @@ func objectSession(ctx context.Context, options S3ObjectStoreOptions, client *ht
 		if len(token) < 4 || len(token) > 20000 {
 			return nil, e.New(e.CodeTrustPolicyMissing, "workload identity token exceeds STS bounds")
 		}
-		duration := max(15*time.Minute, ((time.Until(required)+time.Second-1)/time.Second)*time.Second)
+		// STS expiration may have whole-second precision; retain coverage after truncation.
+		duration := max(15*time.Minute, ((time.Until(required)+time.Second-1)/time.Second)*time.Second+time.Second)
 		if duration > 12*time.Hour {
 			return nil, e.New(e.CodeTrustPolicyMissing, "S3 operation exceeds maximum workload session duration")
 		}

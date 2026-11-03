@@ -115,7 +115,8 @@ func (environment Environment) validateObjectStores() error {
 			return e.New(e.CodeTrustPolicyMissing, "S3 workload role must reference github:VARIABLE_NAME")
 		}
 		limits := destination.EffectiveTransfer()
-		if limits.MaxObjectBytes > 64<<30 || limits.MaxTotalBytes > math.MaxInt64 || limits.MaxTotalBytes < limits.MaxObjectBytes || limits.MaxObjects > 32768 || limits.OperationTimeoutSeconds > 3600 {
+		// Reserve 60 seconds for cleanup and one for STS expiry precision within a one-hour session.
+		if limits.MaxObjectBytes > 64<<30 || limits.MaxTotalBytes > math.MaxInt64 || limits.MaxTotalBytes < limits.MaxObjectBytes || limits.MaxObjects > 32768 || limits.OperationTimeoutSeconds > 3539 {
 			return e.New(e.CodeEngineCapability, "object-store transfer exceeds admitted inventory or operation bounds")
 		}
 	}

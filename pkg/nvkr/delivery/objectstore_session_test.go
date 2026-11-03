@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -25,10 +26,18 @@ func (transport objectSessionHTTP) RoundTrip(r *http.Request) (*http.Response, e
 }
 
 func TestObjectStoreWorkloadSessionIsSynchronousAndFixed(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		time.Sleep(100 * time.Millisecond)
+		testObjectStoreWorkloadSession(t)
+	})
+}
+
+func testObjectStoreWorkloadSession(t *testing.T) {
 	options := objectTestOptions()
 	options.Credentials = nil
 	options.RoleARN = "arn:aws:iam::123456789012:role/synthetic"
 	options.SessionName = "synthetic"
+	options.OperationTimeout, options.CleanupTimeout = 0, 0
 	calls, tokens := 0, 0
 	options.TokenSource = func(ctx context.Context) ([]byte, error) {
 		if err := ctx.Err(); err != nil {
@@ -36,6 +45,10 @@ func TestObjectStoreWorkloadSessionIsSynchronousAndFixed(t *testing.T) {
 		}
 		tokens++
 		return []byte("synthetic-workload-token"), nil
+	}
+	options, err := admitObjectOptions(options)
+	if err != nil || options.OperationTimeout != 59*time.Minute-time.Second || options.CleanupTimeout != time.Minute {
+		t.Fatalf("default session bounds: %v", err)
 	}
 	client := &http.Client{Transport: objectSessionHTTP(func(request *http.Request) (*http.Response, error) {
 		calls++
@@ -51,10 +64,10 @@ func TestObjectStoreWorkloadSessionIsSynchronousAndFixed(t *testing.T) {
 			t.Fatal(err)
 		}
 		duration, _ := strconv.Atoi(values.Get("DurationSeconds"))
-		if duration < 900 || values.Get("RoleArn") != options.RoleARN || values.Get("WebIdentityToken") != "synthetic-workload-token" {
+		if duration < 900 || duration > 3600 || values.Get("RoleArn") != options.RoleARN || values.Get("WebIdentityToken") != "synthetic-workload-token" {
 			t.Fatal("SDK did not bind token, role and session duration")
 		}
-		response := fmt.Sprintf(`<AssumeRoleWithWebIdentityResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/"><AssumeRoleWithWebIdentityResult><Credentials><AccessKeyId>synthetic-access</AccessKeyId><SecretAccessKey>synthetic-secret</SecretAccessKey><SessionToken>synthetic-session</SessionToken><Expiration>%s</Expiration></Credentials></AssumeRoleWithWebIdentityResult></AssumeRoleWithWebIdentityResponse>`, time.Now().Add(time.Hour).UTC().Format(time.RFC3339))
+		response := fmt.Sprintf(`<AssumeRoleWithWebIdentityResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/"><AssumeRoleWithWebIdentityResult><Credentials><AccessKeyId>synthetic-access</AccessKeyId><SecretAccessKey>synthetic-secret</SecretAccessKey><SessionToken>synthetic-session</SessionToken><Expiration>%s</Expiration></Credentials></AssumeRoleWithWebIdentityResult></AssumeRoleWithWebIdentityResponse>`, time.Now().Add(time.Duration(duration)*time.Second).UTC().Format(time.RFC3339))
 		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(response)), Request: request}, nil
 	})}
 	ctx, cancel := context.WithTimeout(t.Context(), options.OperationTimeout)

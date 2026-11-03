@@ -40,7 +40,9 @@ func TestObjectStoreEnvironmentAdmission(t *testing.T) {
 		{"role value", func(x *Environment) {
 			x.Publication.ObjectStores[0].S3.RoleRef = "arn:aws:iam::123456789012:role/publisher"
 		}, e.CodeTrustPolicyMissing},
-		{"timeout", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.OperationTimeoutSeconds = 3601 }, e.CodeEngineCapability},
+		{"maximum session timeout", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.OperationTimeoutSeconds = 3539 }, ""},
+		{"cleanup exceeds session", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.OperationTimeoutSeconds = 3540 }, e.CodeEngineCapability},
+		{"one hour omits cleanup", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.OperationTimeoutSeconds = 3600 }, e.CodeEngineCapability},
 		{"total", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.MaxTotalBytes = 1 }, e.CodeEngineCapability},
 		{"object capability", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.MaxObjectBytes = 64<<30 + 1 }, e.CodeEngineCapability},
 		{"inventory capability", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.MaxObjects = 32769 }, e.CodeEngineCapability},
