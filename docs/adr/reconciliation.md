@@ -3652,6 +3652,15 @@ catalog command as it was before intermediate-digest validation built both sourc
 the compiler was killed by signal 9 in an 8 GiB Docker VM; no Core image was produced. Neither has been rebuilt
 at `v2.3.0`, and no hosted Run has built, published or signed either image or the Flow chart.
 
+The core family also selects `controller-profiles` from the existing `nvke-controller-profiles-image` producer
+in `inputs/catalogs/nvke/release`. NVKE's controller deploy item names `profilesArtifact: controller-profiles`
+(`deploy/nico/controller/release.yaml:20` at `v0.22.0`, `v0.23.0` and main on 2026-11-02), and a `--release`
+render fails when the Release lacks it; the stack config's `images.profiles` overrides it but cannot replace it.
+The image packages NVKE's controller test fixture profiles and runbooks, not fleet configuration. It is
+contract-tested by the family membership matrix and the regenerated core bundle only; no hosted Run has built
+or published it, and no NVKE render has consumed it. CAPI provider manifests and a clusterctl local repository
+are not delivered.
+
 Current Definition v5/catalog v3/IR v4/Plan and artifact-graph v5 reject retired recipe, cluster, category,
 role, composition and staging fields, including empty legacy fields. Runs/Releases use v4 and validation vectors retain v3; publication roots and Inventory/ReleaseSet use v4; disk manifests use v2. Removed compiler-handoff,
 execution-settings, AICR, release-authorization/reproduction-result/waiver and qualified-publication families

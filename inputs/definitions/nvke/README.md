@@ -8,13 +8,13 @@ full product acceptance are separate facts.
 ## Four-family pilot
 
 Four independent Definitions partition the combined candidate's exact named outputs. The core family also
-selects the NICo charts, the NICo Core and Flow images and the ARM64 AICR CLI, and the services family selects local-path-provisioner, which the combined Definition omits because its flat workflow has no remaining YAML
+selects the NICo charts, the NICo Core and Flow images, the ARM64 AICR CLI and the `controller-profiles` image, and the services family selects local-path-provisioner, which the combined Definition omits because its flat workflow has no remaining YAML
 parsing headroom. They reuse the
 shared catalogs and pins; they do not import each other or change the combined Definition into a parent.
 
 | Definition | Outputs | Membership | Environment |
 |---|---:|---|---|
-| [Core](core.yaml) | 27 | CLI/operator tools, AICR CLI, controller and bound chart, NICo charts and Core/Flow images, providers/reference fixture, CAPI and cert-manager images | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) |
+| [Core](core.yaml) | 28 | CLI/operator tools, AICR CLI, controller with its bound chart and `controller-profiles` image, NICo charts and Core/Flow images, providers/reference fixture, CAPI and cert-manager images | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) |
 | [Services](services.yaml) | 34 | SPIRE, PostgreSQL, Temporal and local-path-provisioner charts and native images | [github-nvke-services.yaml](../../environments/github-nvke-services.yaml) |
 | [Telemetry](telemetry.yaml) | 17 | NKTP chart and native runtime images | [github-nvke-telemetry.yaml](../../environments/github-nvke-telemetry.yaml) |
 | [Disks](disks.yaml) | 4 | Native AMD64/ARM64 plain and public-bootstrap FDE disks, each with its complete material closure | [github-nvke-disks.yaml](../../environments/github-nvke-disks.yaml) |
@@ -66,8 +66,9 @@ historical capacity measurements and remaining cutover work.
 | Default StorageClass (services family only) | `../../catalogs/local-path-provisioner` | Source-packaged `local-path-provisioner` chart from Rancher `v0.0.37`, one chart per native architecture with its acquired provisioner and BusyBox helper images bound by digest |
 | NICo charts (core family only) | `../../catalogs/nico` | Source-packaged `nico` umbrella, `nico-prereqs` and standalone `nico-flow` charts from one infra-controller `v2.3.0` pin, each stamped `2.3.0` |
 | NICo images (core family only) | `../../catalogs/nico` | Source-built `nico-core-image` and `nico-flow-image`, each one OCI index requiring AMD64 and ARM64, from the same infra-controller pin |
+| Controller profiles (core family only) | `../../catalogs/nvke/release` | `controller-profiles`, one AMD64/ARM64 content image from the existing `nvke-controller-profiles-image` producer. It holds NVKE's controller test fixture profiles and runbooks, not fleet configuration. NVKE's `--release` deploy path requires this artifact name for the controller item; a site with its own profiles sets `images.profiles`, which overrides it |
 | Provisioned infrastructure provider | `../../catalogs/nvke/release` | Existing source-built `cluster-api-provider-provisioned`, independently delivered for both architectures; not CAPNICo or CAPI core |
-| Reference-profile fixture | `../../catalogs/nvke/release-components` | `nico-reference-profiles-fixture`, one AMD64/ARM64 content image containing the two NICO test config profiles and their runbooks, not production fleet configuration or the demo's runnable `controller-profiles` |
+| Reference-profile fixture | `../../catalogs/nvke/release-components` | `nico-reference-profiles-fixture`, one AMD64/ARM64 content image containing the two NICO test config profiles and their runbooks, not production fleet configuration or the `controller-profiles` image |
 | Telemetry | `../../catalogs/nvke/release-components` | Source-packaged `nktp` with its three vendored dependencies; eight required/optional runtime images for each native architecture, including the enabled Target Allocator and the uninstall hook's kubectl |
 | Bootstrap runtime images | `../../catalogs/nvke/release-components` | CAPI core, kubeadm bootstrap/control-plane and three cert-manager images, each with separate AMD64 and ARM64 outputs |
 

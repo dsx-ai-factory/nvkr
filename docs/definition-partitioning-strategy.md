@@ -20,11 +20,11 @@ This document changes no ADR contract or organizational acceptance decision.
 
 | Definition | Outputs | Native targets | Required family |
 | --- | ---: | ---: | --- |
-| [Core](../inputs/definitions/nvke/core.yaml) | 26 | 32 | CLI/operator tools, controller with its bound chart, NICo charts and Core/Flow images, providers/reference fixture, CAPI and cert-manager bootstrap images |
+| [Core](../inputs/definitions/nvke/core.yaml) | 28 | 35 | CLI/operator tools, ARM64 AICR CLI, controller with its bound chart and `controller-profiles` image, NICo charts and Core/Flow images, providers/reference fixture, CAPI and cert-manager bootstrap images |
 | [Services](../inputs/definitions/nvke/services.yaml) | 34 | 34 | SPIRE, PostgreSQL, Temporal and local-path-provisioner charts and native runtime images |
 | [Telemetry](../inputs/definitions/nvke/telemetry.yaml) | 17 | 17 | NKTP chart and native runtime images |
 | [Disks](../inputs/definitions/nvke/disks.yaml) | 4 | 4 | AMD64/ARM64 plain and public-bootstrap FDE disks with complete material closures |
-| Total | 81 | 87 | The combined candidate's complete named output set plus the core family's three NICo charts, two NICo images and ARM64 operator tools, and the services family's six local-path-provisioner outputs |
+| Total | 83 | 90 | The combined candidate's complete named output set plus the core family's three NICo charts, two NICo images, ARM64 operator tools, ARM64 AICR CLI and `controller-profiles` image, and the services family's six local-path-provisioner outputs |
 
 Each family selects `inputs/environments/github-nvke-<family>.yaml`, with
 `githubBundle: nvke-<family>`. Generation owns `.github/workflows/nvkr-run-nvke-<family>.yml`
