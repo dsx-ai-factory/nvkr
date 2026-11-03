@@ -4,14 +4,18 @@
 package cicontract
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"maps"
 	"os/exec"
 	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
 )
 
 // The merge gate's steps are classified exactly. Every entry must stay in use,
@@ -43,47 +47,171 @@ var (
 // the .go-version patch instead.
 const localOnlyPrerequisite = "go-version-check"
 
+// TestCompleteLocalGateMatchesMergeGate requires `make ci-check` to run exactly
+// the make targets the merge gate runs, read from the real workflow and Makefile.
 func TestCompleteLocalGateMatchesMergeGate(t *testing.T) {
-	hosted := hostedMakeTargets(t, readMergeGateJobs(t))
-	prerequisites := makePrerequisites(t)
+	hosted, err := hostedMakeTargets(readMergeGateJobs(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := checkLocalGate(hosted, makePrerequisites(t)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestLocalGateRejectsInventoryDrift applies one edit to the real workflow or
+// to a Makefile inventory equal to it, and requires each edit to fail.
+func TestLocalGateRejectsInventoryDrift(t *testing.T) {
+	step := func(t *testing.T, jobs map[string]mergeGateJob, job, name string) *mergeGateStep {
+		t.Helper()
+		steps := jobs[job].Steps
+		index := slices.IndexFunc(steps, func(step mergeGateStep) bool { return step.Name == name })
+		if index < 0 {
+			t.Fatalf("merge gate %s has no step %q", job, name)
+		}
+		return &steps[index]
+	}
+	workflowCases := []struct {
+		name, want string
+		edit       func(*testing.T, map[string]mergeGateJob)
+	}{
+		{"raw command replaces make", `actionlint step "actionlint" must run one make target`,
+			func(t *testing.T, jobs map[string]mergeGateJob) {
+				step(t, jobs, "actionlint", "actionlint").Run = "actionlint -color"
+			}},
+		{"make with flags", `check step "vet" must run one make target`,
+			func(t *testing.T, jobs map[string]mergeGateJob) { step(t, jobs, "check", "vet").Run = "make -k vet" }},
+		{"make with variable", `check step "vet" must run one make target`,
+			func(t *testing.T, jobs map[string]mergeGateJob) {
+				step(t, jobs, "check", "vet").Run = "make vet GOFLAGS=-short"
+			}},
+		{"multi-line run", `check step "vet" must run one make target`,
+			func(t *testing.T, jobs map[string]mergeGateJob) {
+				step(t, jobs, "check", "vet").Run = "make vet\nmake lint"
+			}},
+		{"pipe swallows failure", `must run one make target`,
+			func(t *testing.T, jobs map[string]mergeGateJob) {
+				shard := step(t, jobs, "tests", "test (ordinary suite shard)")
+				shard.Run += " || true"
+			}},
+		{"pipe without pipefail shell", `must run one make target`,
+			func(t *testing.T, jobs map[string]mergeGateJob) {
+				step(t, jobs, "tests", "test (ordinary suite shard)").Shell = ""
+			}},
+		{"conditional step", `check step "vet" must run unconditionally`,
+			func(t *testing.T, jobs map[string]mergeGateJob) {
+				step(t, jobs, "check", "vet").If = "github.event_name == 'push'"
+			}},
+		{"soft failure", `check step "vet" must run unconditionally`,
+			func(t *testing.T, jobs map[string]mergeGateJob) { step(t, jobs, "check", "vet").ContinueOnError = true }},
+		{"unclassified action", `uses unclassified action example/other-linter@v1`,
+			func(t *testing.T, jobs map[string]mergeGateJob) {
+				step(t, jobs, "lint", "lint").Uses = "example/other-linter@v1"
+			}},
+		{"narrowing action input", `sets inputs [install-mode only-new-issues skip-cache version]`,
+			func(t *testing.T, jobs map[string]mergeGateJob) {
+				step(t, jobs, "lint", "lint").With["only-new-issues"] = true
+			}},
+		{"provider-only job runs make", `provider-only job analyze runs make step`,
+			func(t *testing.T, jobs map[string]mergeGateJob) {
+				job := jobs["analyze"]
+				job.Steps = append(job.Steps, mergeGateStep{storageWorkflowStep: storageWorkflowStep{Run: "make vet"}})
+				jobs["analyze"] = job
+			}},
+		{"stale support step", `classification entries match no merge gate step: [step tests/Summarize test timings]`,
+			func(t *testing.T, jobs map[string]mergeGateJob) {
+				job := jobs["tests"]
+				job.Steps = slices.DeleteFunc(job.Steps, func(step mergeGateStep) bool { return step.Name == "Summarize test timings" })
+				jobs["tests"] = job
+			}},
+		{"missing job", `merge gate has no docs job`,
+			func(t *testing.T, jobs map[string]mergeGateJob) { delete(jobs, "docs") }},
+	}
+	for _, tc := range workflowCases {
+		t.Run(tc.name, func(t *testing.T) {
+			jobs := readMergeGateJobs(t)
+			tc.edit(t, jobs)
+			_, err := hostedMakeTargets(jobs)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("hostedMakeTargets error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+
+	hosted, err := hostedMakeTargets(readMergeGateJobs(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	inventory := func(extra ...string) []string {
+		return append(slices.Concat([]string{localOnlyPrerequisite}, hosted), extra...)
+	}
+	without := func(target string) []string {
+		return slices.DeleteFunc(inventory(), func(candidate string) bool { return candidate == target })
+	}
+	makeCases := []struct {
+		name, want     string
+		ciCheck, check []string
+	}{
+		{"ci-check drops a hosted check", "must run exactly", without("docs-check"), []string{"vet"}},
+		{"ci-check adds an unhosted check", "must run exactly", inventory("test-race"), []string{"vet"}},
+		{"ci-check lists a check twice", "lists a target twice", inventory("vet"), []string{"vet"}},
+		{"ci-check skips the toolchain pin", "must admit the pinned toolchain", without(localOnlyPrerequisite), []string{"vet"}},
+		{"check runs what ci-check omits", "make check runs test-race", inventory(), []string{localOnlyPrerequisite, "test-race"}},
+	}
+	for _, tc := range makeCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := checkLocalGate(hosted, map[string][]string{"ci-check": tc.ciCheck, "check": tc.check})
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("checkLocalGate error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+	if err := checkLocalGate(hosted, map[string][]string{"ci-check": inventory(), "check": {localOnlyPrerequisite, "vet"}}); err != nil {
+		t.Fatalf("equal inventories rejected: %v", err)
+	}
+}
+
+// checkLocalGate compares the merge gate's sorted targets with the ci-check and
+// check prerequisites make reports.
+func checkLocalGate(hosted []string, prerequisites map[string][]string) error {
 	local := prerequisites["ci-check"]
 	if !slices.Contains(local, localOnlyPrerequisite) {
-		t.Fatalf("ci-check must admit the pinned toolchain with %s: %v", localOnlyPrerequisite, local)
+		return fmt.Errorf("ci-check must admit the pinned toolchain with %s: %v", localOnlyPrerequisite, local)
 	}
 	local = slices.DeleteFunc(slices.Clone(local), func(target string) bool { return target == localOnlyPrerequisite })
 	slices.Sort(local)
 	if len(slices.Compact(slices.Clone(local))) != len(local) {
-		t.Fatalf("ci-check lists a target twice: %v", local)
+		return fmt.Errorf("ci-check lists a target twice: %v", local)
 	}
 	if !slices.Equal(hosted, local) {
-		t.Fatalf("make ci-check must run exactly the merge gate's locally reproducible checks:\nmerge gate %v\nci-check   %v", hosted, local)
+		return fmt.Errorf("make ci-check must run exactly the merge gate's locally reproducible checks:\nmerge gate %v\nci-check   %v", hosted, local)
 	}
 	for _, target := range prerequisites["check"] {
 		if target != localOnlyPrerequisite && !slices.Contains(local, target) {
-			t.Fatalf("make check runs %s, which make ci-check omits", target)
+			return fmt.Errorf("make check runs %s, which make ci-check omits", target)
 		}
 	}
+	return nil
 }
 
 // hostedMakeTargets returns the sorted local targets the merge gate's check
 // jobs run. A step that is neither provisioning, a classified support step,
-// nor a single make invocation fails the test, so a check added to the
-// workflow outside make cannot escape the local inventory.
-func hostedMakeTargets(t *testing.T, jobs map[string]mergeGateJob) []string {
-	t.Helper()
+// nor a single make invocation is an error, so a check added to the workflow
+// outside make cannot escape the local inventory.
+func hostedMakeTargets(jobs map[string]mergeGateJob) ([]string, error) {
 	used := map[string]bool{}
 	targets := map[string]bool{}
 	for _, pair := range mergeGatePairs {
 		for _, name := range pair.jobs {
 			job, ok := jobs[name]
 			if !ok {
-				t.Fatalf("merge gate has no %s job", name)
+				return nil, fmt.Errorf("merge gate has no %s job", name)
 			}
 			if slices.Contains(providerOnlyJobs, name) {
 				used["job "+name] = true
 				for _, step := range job.Steps {
 					if _, ok := makeStepTarget(step); ok {
-						t.Fatalf("provider-only job %s runs make step %q; move the check to a reproducible job", name, step.Name)
+						return nil, fmt.Errorf("provider-only job %s runs make step %q; move the check to a reproducible job", name, step.Name)
 					}
 				}
 				continue
@@ -98,16 +226,18 @@ func hostedMakeTargets(t *testing.T, jobs map[string]mergeGateJob) []string {
 						if strings.HasPrefix(step.Uses, prefix) {
 							inputs := slices.Sorted(maps.Keys(step.With))
 							if !slices.Equal(inputs, action.inputs) {
-								t.Fatalf("%s step %q sets inputs %v, want exactly %v", name, step.Name, inputs, action.inputs)
+								return nil, fmt.Errorf("%s step %q sets inputs %v, want exactly %v", name, step.Name, inputs, action.inputs)
 							}
 							target, ok = action.target, true
 							used["action "+prefix] = true
 						}
 					}
 					if !ok {
-						t.Fatalf("%s step %q uses unclassified action %s", name, step.Name, step.Uses)
+						return nil, fmt.Errorf("%s step %q uses unclassified action %s", name, step.Name, step.Uses)
 					}
-					requireUnconditional(t, name, step)
+					if err := requireUnconditional(name, step); err != nil {
+						return nil, err
+					}
 					targets[target] = true
 					continue
 				}
@@ -117,9 +247,11 @@ func hostedMakeTargets(t *testing.T, jobs map[string]mergeGateJob) []string {
 				}
 				target, ok := makeStepTarget(step)
 				if !ok {
-					t.Fatalf("%s step %q must run one make target: %q", name, step.Name, step.Run)
+					return nil, fmt.Errorf("%s step %q must run one make target: %q", name, step.Name, step.Run)
 				}
-				requireUnconditional(t, name, step)
+				if err := requireUnconditional(name, step); err != nil {
+					return nil, err
+				}
 				if local, sliced := hostedSlices[target]; sliced {
 					used["slice "+target] = true
 					target = local
@@ -143,14 +275,9 @@ func hostedMakeTargets(t *testing.T, jobs map[string]mergeGateJob) []string {
 	}
 	if len(stale) > 0 {
 		slices.Sort(stale)
-		t.Fatalf("classification entries match no merge gate step: %v", stale)
+		return nil, fmt.Errorf("classification entries match no merge gate step: %v", stale)
 	}
-	result := make([]string, 0, len(targets))
-	for target := range targets {
-		result = append(result, target)
-	}
-	slices.Sort(result)
-	return result
+	return slices.Sorted(maps.Keys(targets)), nil
 }
 
 func appendUnused(stale []string, used map[string]bool, key string) []string {
@@ -162,11 +289,11 @@ func appendUnused(stale []string, used map[string]bool, key string) []string {
 
 // requireUnconditional rejects a counted step that may not run or whose
 // failure would not fail its job.
-func requireUnconditional(t *testing.T, job string, step mergeGateStep) {
-	t.Helper()
+func requireUnconditional(job string, step mergeGateStep) error {
 	if step.If != "" || step.ContinueOnError != nil && step.ContinueOnError != false {
-		t.Fatalf("%s step %q must run unconditionally and propagate failures", job, step.Name)
+		return fmt.Errorf("%s step %q must run unconditionally and propagate failures", job, step.Name)
 	}
+	return nil
 }
 
 // makeStepTarget accepts `make <target>`, optionally piped into one tee to
@@ -199,14 +326,18 @@ func makePrerequisites(t *testing.T) map[string][]string {
 	command := exec.CommandContext(ctx, "make", "-C", "../..", "--no-print-directory", "-pRrq", "ci-check")
 	// An enclosing make (for example `make test`) must not pass its flags down.
 	command.Env = append(command.Environ(), "MAKEFLAGS=", "MFLAGS=", "MAKELEVEL=")
-	output, err := command.Output()
+	var stdout, stderr bytes.Buffer
+	command.Stdout, command.Stderr = &stdout, &stderr
+	// Parsing evaluates $(shell ...); the owned process group stops any such
+	// descendant and bounds the pipe wait when the deadline passes.
+	err := ownedcmd.Run(ctx, command)
 	// Question mode exits 1 because phony targets are never up to date; 2 is an error.
 	var exitError *exec.ExitError
 	if err != nil && !(errors.As(err, &exitError) && exitError.ExitCode() == 1) {
-		t.Fatalf("make could not read the Makefile database: %v", err)
+		t.Fatalf("make could not read the Makefile database: %v\n%s", err, stderr.Bytes())
 	}
 	prerequisites := map[string][]string{}
-	for line := range strings.Lines(string(output)) {
+	for line := range strings.Lines(stdout.String()) {
 		for _, target := range []string{"check", "ci-check"} {
 			if rest, ok := strings.CutPrefix(strings.TrimSuffix(line, "\n"), target+":"); ok && !strings.HasPrefix(rest, "=") {
 				if _, seen := prerequisites[target]; seen {
