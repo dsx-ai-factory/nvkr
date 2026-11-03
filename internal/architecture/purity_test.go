@@ -41,13 +41,14 @@ import (
 
 const modulePath = "github.com/dsx-ai-factory/nvkr"
 
-// identityPackages are the package trees whose output flows into a digest-addressed
-// identity (buildDigest / builder-profile / trust objects). They MUST be pure.
+// identityPackages are the roots of the package trees whose output flows into a
+// digest-addressed identity (buildDigest / builder-profile / trust objects). Every
+// package in those trees MUST be pure.
 var identityPackages = []string{
-	modulePath + "/pkg/nvkr/buildgraph/...",
-	modulePath + "/pkg/nvkr/canonical/...",
-	modulePath + "/pkg/nvkr/ir/...",
-	modulePath + "/pkg/nvkr/target/...",
+	modulePath + "/pkg/nvkr/buildgraph",
+	modulePath + "/pkg/nvkr/canonical",
+	modulePath + "/pkg/nvkr/ir",
+	modulePath + "/pkg/nvkr/target",
 }
 
 // allowedIdentityImports is the exact set of packages identity packages may import.
@@ -131,15 +132,42 @@ type purityFinding struct {
 
 func TestIdentityPathsArePure(t *testing.T) {
 	root := filepath.Join("..", "..")
-	for _, pattern := range identityPackages {
-		// go list runs in a child the test cache cannot observe; walking the trees here makes
-		// an added file or package invalidate a cached pass.
-		dir := filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(strings.TrimSuffix(pattern, "/..."), modulePath+"/")))
-		if err := filepath.WalkDir(dir, func(_ string, _ fs.DirEntry, err error) error { return err }); err != nil {
+	// go list runs in a child the test cache cannot observe; walking the trees here makes
+	// an added file or package invalidate a cached pass. Listing explicit packages instead
+	// of "tree/..." patterns also keeps go list from needing every module in the build
+	// list, which an offline module cache may not hold.
+	var packages []string
+	for _, tree := range identityPackages {
+		dir := filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(tree, modulePath+"/")))
+		err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			name := entry.Name()
+			// Match the go tool's "..." rules: skip testdata and _ or . prefixed names.
+			if path != dir && (name == "testdata" || strings.HasPrefix(name, "_") || strings.HasPrefix(name, ".")) {
+				if entry.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+				return nil
+			}
+			rel, err := filepath.Rel(root, filepath.Dir(path))
+			if err != nil {
+				return err
+			}
+			if pkg := modulePath + "/" + filepath.ToSlash(rel); !slices.Contains(packages, pkg) {
+				packages = append(packages, pkg)
+			}
+			return nil
+		})
+		if err != nil {
 			t.Fatal(err)
 		}
 	}
-	listed := goListExports(t, root, identityPackages...)
+	listed := goListExports(t, root, packages...)
 	fset := token.NewFileSet()
 	imp := exportImporter(fset, listed)
 	var findings []purityFinding
@@ -168,9 +196,9 @@ func TestIdentityPathsArePure(t *testing.T) {
 		findings = append(findings, pkgFindings...)
 		checked[pkg.ImportPath] = true
 	}
-	for _, pattern := range identityPackages {
-		if root := strings.TrimSuffix(pattern, "/..."); !checked[root] {
-			t.Errorf("identity package %s was not checked", root)
+	for _, pkg := range identityPackages {
+		if !checked[pkg] {
+			t.Errorf("identity package %s was not checked", pkg)
 		}
 	}
 	for _, problem := range applyPurityExceptions(findings, purityExceptions) {
