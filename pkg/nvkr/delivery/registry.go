@@ -404,8 +404,18 @@ func registryOptions(ctx context.Context, options RegistryOptions) []remote.Opti
 			Username: options.Username, Password: options.Password,
 		})))
 	default:
-		return append(remoteOptions, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+		return append(remoteOptions, remote.WithAuthFromKeychain(options.AmbientKeychain()))
 	}
+}
+
+// AmbientKeychain returns the keychain these options consult, or nil when access
+// is anonymous or explicit. Other registry readers use it so ambient access
+// cannot drift from delivery; explicit secrets are never widened through it.
+func (options RegistryOptions) AmbientKeychain() authn.Keychain {
+	if options.Anonymous || options.Password != "" {
+		return nil
+	}
+	return authn.DefaultKeychain
 }
 
 // Validate admits transport credentials before filesystem or network work.

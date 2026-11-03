@@ -123,11 +123,14 @@ changed shapes are:
 | Object | Schema |
 |---|---|
 | Definition | `nvkr.dev/definition/v5` |
+| Composite Definition (proposed ADR-26) | `nvkr.dev/composite-definition/v1`, identity family `nvkr.composite-definition` |
 | Component catalog and snapshot | `nvkr.dev/catalog/v3`, `nvkr.dev/catalog-snapshot/v3` |
 | Component catalog overlay | `nvkr.dev/catalog-overlay/v3` |
 | Executable and logical build graph | `nvkr.dev/ir/v4` |
 | Run plan and artifact graph | `nvkr.dev/run-plan/v5`, `nvkr.dev/artifact-graph/v5` |
+| Composite Run plan (proposed ADR-26) | `nvkr.dev/run-plan/v6`, carrying the composition record; plain Plans stay v5 |
 | Run and Release views | `nvkr.dev/run/v4`, `nvkr.dev/release/v4` |
+| Composite Run record and publication root (proposed ADR-26) | `nvkr.dev/run/v5`, `nvkr.dev/publication-root/v5`, each carrying the composition record; plain records stay v4 and OCI media types are unchanged |
 
 Definition v5 retains removal of cluster views and adds an explicit required platform set for an aggregate OCI image. Catalog v3 removes delivery categories and node-role affinities. IR v4
 binds typed VM disk, producer, selected toolchain-host platform,
@@ -143,8 +146,9 @@ v5 retains that reference contract and freezes every native child build, produce
 The logical image-index build projection uses `nvkr.dev/image-index-build/v1` inside the existing
 `nvkr.build` family: sorted `requiredPlatforms` plus sorted children containing only `platform`, `buildDigest`
 and `component`. It is distinct from native IR v4 and from OCI manifest observations. Native IR bytes and
-binary-bundle v1 remain unchanged. Publication-root metadata and media use v4 (ADR-20); Definition v4,
-Plan/artifact-graph v4 and Run/Release v3 are rejected rather than reinterpreted with aggregate membership.
+binary-bundle v1 remain unchanged. Plain publication-root metadata and media use v4 (ADR-20); composite roots
+use v5 metadata with unchanged media types (proposed ADR-26). Definition v4, Plan/artifact-graph v4 and
+Run/Release v3 are rejected rather than reinterpreted with aggregate membership.
 
 Production SLSA build-type URIs use `/v2` for the replacement of compiler-handoff parameters by the original
 `definitionDigest` and `environmentDigest`. SLSA provenance/v1 and in-toto Statement/v1 remain unchanged.
@@ -214,6 +218,37 @@ Members are sorted by name and unique. Unknown fields, versions, lanes or kinds,
 identities and inexact bindings fail closed. The canonical document is bounded by the qualification signing
 transport limit. Pretty-printed JSON hashes are insufficient for either document. Reconciliation records
 implementation and external acceptance independently of schema registration.
+
+The S3/native-file contract in ADR-20 defines the following new families. Their names and semantics form
+the implementation contract; executable codec registration and decoders remain implementation work.
+
+| Object | Canonical schema | Frozen family kind |
+| --- | --- | --- |
+| Native file/member manifest | `nvkr.dev/native-file/v1` | `nvkr.native-file` |
+| Derived signed file-delivery root | `nvkr.dev/file-delivery/v1` | `nvkr.file-delivery` |
+
+The extension reserves the following wire versions. This table does not change the implemented versions above.
+
+| Object | Version decision | Reason |
+| --- | --- | --- |
+| Definition | Reserve `nvkr.dev/definition/v6` | Adds native `file` outputs. |
+| Environment | Reserve `nvkr.dev/environment/v2` | Adds typed file targets. |
+| Run Plan and artifact graph | Reserve `nvkr.dev/run-plan/v6` and `nvkr.dev/artifact-graph/v6` | Extends closed output and operation vocabularies. |
+| PublicationRoot | Reserve `nvkr.dev/publication-root/v5` and matching v5 root/config media types | Adds native-file output membership. |
+| Run | Reserve `nvkr.dev/run/v5` | Adds native-file requirements and required delivery completion. |
+| Release view | Retain `nvkr.dev/release/v4` for the unchanged OCI source view | S3 coordinates, completion and separate policies belong to delivery records and receipts. |
+
+ADR-20 owns the exact publication media types and the unchanged Release-view boundary. Older schemas retain
+their existing fields and meanings; this reservation registers no decoder or executable capability.
+
+The native manifest binds unchanged producer bytes and complete admitted regular members. The delivery
+root binds authenticated source publications to exact stored bytes and destinations. Neither reuses retired
+`nvkr.publication`/`nvkr.publication-manifest` families or changes Build identity. Implementations must register
+the distinct tags and add strict canonical/unknown-schema/family-separation contracts before minting them.
+The `nvkr.dev/file-delivery-locator/v1` locator pins raw document/bundle hashes and sizes; it is transport
+selection, not another semantic identity or trust object. The raw SHA-256 digests of the root JSON,
+detached bundle and native payload remain distinct from the typed identities of the delivery root and
+native-file manifest.
 
 ## Consequences
 

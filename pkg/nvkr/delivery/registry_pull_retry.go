@@ -45,19 +45,36 @@ func pullWithRecoveryUsing(ctx context.Context, out string, acquire pullAcquire,
 		ctx, cancel = context.WithTimeout(ctx, pullReadTimeout)
 		defer cancel()
 	}
-	for attempt := 1; attempt <= pullReadAttempts; attempt++ {
+	var inspection Inspection
+	err := retryInterruptedRead(ctx, wait, func() (bool, error) {
+		var retry bool
+		var err error
+		inspection, retry, err = pullReadAttempt(ctx, out, acquire, remove)
+		return retry, err
+	})
+	if err != nil {
+		return Inspection{}, err
+	}
+	return inspection, nil
+}
+
+// retryInterruptedRead is the one bounded reacquisition loop for registry reads.
+// An attempt authorizes another only by reporting an interrupted body after it
+// has released its own partial bytes; every attempt re-verifies from scratch.
+func retryInterruptedRead(ctx context.Context, wait func(context.Context, time.Duration) error, attempt func() (bool, error)) error {
+	for count := 1; count <= pullReadAttempts; count++ {
 		if err := deliveryContext(ctx); err != nil {
-			return Inspection{}, err
+			return err
 		}
-		inspection, retry, err := pullReadAttempt(ctx, out, acquire, remove)
-		if err == nil || !retry || attempt == pullReadAttempts {
-			return inspection, err
+		retry, err := attempt()
+		if err == nil || !retry || count == pullReadAttempts {
+			return err
 		}
-		if err := wait(ctx, time.Duration(attempt)*time.Second); err != nil {
-			return Inspection{}, e.Wrap(e.CodeTimeout, err, "waiting to reacquire interrupted publication")
+		if err := wait(ctx, time.Duration(count)*time.Second); err != nil {
+			return e.Wrap(e.CodeTimeout, err, "waiting to reacquire interrupted registry read")
 		}
 	}
-	return Inspection{}, e.New(e.CodeInternal, "publication acquisition attempt bound was exceeded")
+	return e.New(e.CodeInternal, "registry read attempt bound was exceeded")
 }
 
 // Each attempt has one private layout. Cleanup must finish successfully before

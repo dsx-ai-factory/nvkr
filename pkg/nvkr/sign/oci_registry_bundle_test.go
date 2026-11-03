@@ -22,6 +22,7 @@ import (
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
+	"github.com/google/go-containerregistry/pkg/authn"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 )
@@ -310,7 +311,7 @@ func TestRegistryBundleRejectsMalformedClosure(t *testing.T) {
 				f.routes[path] = response
 			}
 			f.index(t, []v1.Descriptor{descriptor})
-			source, err := newRegistryBundleSource(t.Context(), f.subject, Credential{})
+			source, err := newRegistryBundleSource(t.Context(), f.subject, Credential{}, nil)
 			if err == nil {
 				defer source.close()
 				_, err = source.bundle(t.Context(), descriptor)
@@ -354,7 +355,7 @@ func TestRegistryBundleDiscoveryLimitsAndFallback(t *testing.T) {
 				delete(f.routes, path)
 				f.routes["/v2/fixture/output/manifests/sha256-"+strings.TrimPrefix(ociTestDigest, "sha256:")] = response
 			}
-			source, err := newRegistryBundleSource(t.Context(), f.subject, Credential{})
+			source, err := newRegistryBundleSource(t.Context(), f.subject, Credential{}, nil)
 			if source != nil {
 				defer source.close()
 			}
@@ -407,7 +408,7 @@ func TestRegistryBundleCredentialsAreExplicitAndScoped(t *testing.T) {
 				}
 				t.Setenv("DOCKER_CONFIG", dir)
 			}
-			source, err := newRegistryBundleSource(t.Context(), f.subject, credential)
+			source, err := newRegistryBundleSource(t.Context(), f.subject, credential, nil)
 			if source != nil {
 				defer source.close()
 			}
@@ -435,6 +436,71 @@ func TestRegistryBundleCredentialsAreExplicitAndScoped(t *testing.T) {
 	}
 }
 
+func TestRegistryBundleKeychainResolution(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		private, keychain bool
+		ambientPassword   string
+		wantAuthorization bool
+		want              e.Code
+	}{
+		{name: "private registry through default keychain", private: true, keychain: true, ambientPassword: "fixture-password", wantAuthorization: true},
+		{name: "anonymous registry without keychain"},
+		{name: "anonymous registry with empty keychain", keychain: true},
+		{name: "private registry without keychain", private: true, want: e.CodeFetchFailed},
+		{name: "keychain credential rejected", private: true, keychain: true, ambientPassword: "wrong-password", want: e.CodeFetchFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newBundleRegistryFixture(t)
+			f.requireBasic = tc.private
+			descriptor := f.add(t, []byte(`{"bundle":"exact"}`), "", nil)
+			f.index(t, []v1.Descriptor{descriptor})
+			dir := t.TempDir()
+			config := `{"auths":{}}`
+			if tc.ambientPassword != "" {
+				config = fmt.Sprintf(`{"auths":{%q:{"auth":%q}}}`, strings.TrimPrefix(f.server.URL, "http://"), base64.StdEncoding.EncodeToString([]byte("fixture-user:"+tc.ambientPassword)))
+			}
+			if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(config), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("DOCKER_CONFIG", dir)
+			var keychain authn.Keychain
+			if tc.keychain {
+				keychain = authn.DefaultKeychain
+			}
+			source, err := newRegistryBundleSource(t.Context(), f.subject, Credential{}, keychain)
+			if source != nil {
+				defer source.close()
+			}
+			if tc.want != "" {
+				requireSignCode(t, err, tc.want)
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := source.bundle(t.Context(), descriptor); err != nil {
+				t.Fatal(err)
+			}
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			authorized := false
+			for _, authorization := range f.authorizations {
+				authorized = authorized || authorization != ""
+			}
+			if authorized != tc.wantAuthorization {
+				t.Fatalf("authorization sent=%v, want %v", authorized, tc.wantAuthorization)
+			}
+		})
+	}
+}
+
+func TestOCIVerifierRejectsCredentialWithKeychain(t *testing.T) {
+	_, err := NewCosignOCISigner(CosignOCIOptions{Identity: "^fixture$", Issuer: ociTestIssuer, Runner: &cosignStub{},
+		Credential: Credential{Registry: "registry.invalid", Username: "fixture-user", Password: "fixture-password"}, Keychain: authn.DefaultKeychain})
+	requireSignCode(t, err, e.CodeUsage)
+}
+
 func TestRegistryBundleCancellationStopsBodyRead(t *testing.T) {
 	started := make(chan struct{})
 	stopped := make(chan struct{})
@@ -454,7 +520,7 @@ func TestRegistryBundleCancellationStopsBodyRead(t *testing.T) {
 	defer cancel()
 	finished := make(chan error, 1)
 	go func() {
-		source, err := newRegistryBundleSource(ctx, Subject{Ref: strings.TrimPrefix(server.URL, "http://") + "/fixture/output@" + ociTestDigest, Digest: ociTestDigest}, Credential{})
+		source, err := newRegistryBundleSource(ctx, Subject{Ref: strings.TrimPrefix(server.URL, "http://") + "/fixture/output@" + ociTestDigest, Digest: ociTestDigest}, Credential{}, nil)
 		if source != nil {
 			source.close()
 		}
@@ -487,7 +553,7 @@ func TestRegistryBundleCachesFailedReadsAndHonorsCancellation(t *testing.T) {
 	response := f.routes[path]
 	response.body = []byte("broken manifest")
 	f.routes[path] = response
-	source, err := newRegistryBundleSource(t.Context(), f.subject, Credential{})
+	source, err := newRegistryBundleSource(t.Context(), f.subject, Credential{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -581,7 +647,7 @@ func TestRegistryBundleRejectsAmbiguousJSON(t *testing.T) {
 				response.body = bytes.Replace(response.body, []byte(`"schemaVersion":2`), []byte(`"schemaVersion":1,"schemaVersion":2`), 1)
 				f.routes[path] = response
 			}
-			source, err := newRegistryBundleSource(t.Context(), f.subject, Credential{})
+			source, err := newRegistryBundleSource(t.Context(), f.subject, Credential{}, nil)
 			if source != nil {
 				defer source.close()
 			}

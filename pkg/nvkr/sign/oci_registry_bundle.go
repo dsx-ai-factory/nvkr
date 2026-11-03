@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
@@ -106,8 +107,8 @@ func (s *ociBundleSource) bundle(ctx context.Context, descriptor v1.Descriptor) 
 	return raw, err
 }
 
-// Registry credentials are scoped before any I/O. An empty credential is
-// explicitly anonymous; neither a Docker keychain nor an ambient helper runs.
+// Registry credentials are scoped before any I/O. An explicit credential wins;
+// otherwise only a caller-selected keychain is consulted, and none means anonymous.
 func admitOCIRegistry(subject Subject, credential Credential) (name.Digest, error) {
 	if err := subject.Validate(); err != nil {
 		return name.Digest{}, err
@@ -125,7 +126,7 @@ func admitOCIRegistry(subject Subject, credential Credential) (name.Digest, erro
 	return ref, nil
 }
 
-func newRegistryBundleSource(ctx context.Context, subject Subject, credential Credential) (*ociBundleSource, error) {
+func newRegistryBundleSource(ctx context.Context, subject Subject, credential Credential, keychain authn.Keychain) (*ociBundleSource, error) {
 	if err := contextError(ctx); err != nil {
 		return nil, err
 	}
@@ -136,11 +137,14 @@ func newRegistryBundleSource(ctx context.Context, subject Subject, credential Cr
 	base := http.DefaultTransport.(*http.Transport).Clone()
 	budget := &ociReadBudget{remaining: maxOCIBundleSearchBytes}
 	source := &ociBundleSource{close: base.CloseIdleConnections, check: budget.failure}
-	auth := authn.Anonymous
-	if !credential.empty() {
-		auth = authn.FromConfig(authn.AuthConfig{Username: credential.Username, Password: credential.Password})
+	auth := remote.WithAuth(authn.Anonymous)
+	switch {
+	case !credential.empty():
+		auth = remote.WithAuth(authn.FromConfig(authn.AuthConfig{Username: credential.Username, Password: credential.Password}))
+	case keychain != nil:
+		auth = remote.WithAuthFromKeychain(keychain)
 	}
-	puller, err := remote.NewPuller(remote.WithContext(ctx), remote.WithAuth(auth),
+	puller, err := remote.NewPuller(remote.WithContext(ctx), auth,
 		remote.WithTransport(ociBundleTransport{base: base, budget: budget}), remote.WithUserAgent("nvkr/sign"),
 		// This is the standard OCI referrers tag schema, never cosign's legacy
 		// .sig or .att attachment lookup.
@@ -265,6 +269,11 @@ func loadRegistryBundle(ctx context.Context, puller *remote.Puller, subject name
 func ociBundleFetchError(ctx context.Context, err error) error {
 	if ctxErr := contextError(ctx); ctxErr != nil {
 		return ctxErr
+	}
+	// A registry refusal is an access failure, never evidence about a signature.
+	var registryErr *transport.Error
+	if errors.As(err, &registryErr) && (registryErr.StatusCode == http.StatusUnauthorized || registryErr.StatusCode == http.StatusForbidden) {
+		return e.Wrap(e.CodeFetchFailed, err, "registry denied OCI verification bundle read")
 	}
 	return e.Wrap(e.CodeSignatureInvalid, err, "reading OCI verification bundle")
 }

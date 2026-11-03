@@ -27,6 +27,9 @@ native disk and pipeline-attested stages with separate signer policy, credential
 registry namespaces. Cleanup admits only internal-visibility packages in those namespaces.
 Unsigned development remains static-unqualified. Neither setting grants production
 acceptance, provider access or qualified evidence.
+ADR-20 specifies an S3 extension with typed file destinations under Environment publication settings.
+Destinations and clean boot URLs remain transport configuration; they do not change producer Build identity.
+Its future schema reservation does not change the implemented Environment version or enable delivery.
 _Avoid_: Delivery profile, component catalog, build identity
 
 **Run**:
@@ -66,7 +69,8 @@ A Definition form that names complete member Definitions by locator and exact `n
 releases the exact union of their named outputs through one Plan, Run and Release. Output names are preserved;
 duplicates, divergent shared producers, differing base catalogs or tools, and digest drift are coded errors,
 never precedence. Members keep their own Runs and Releases; a composite neither references nor inherits them.
-Proposed [ADR-26](docs/adr/0026-definition-composition.md) designs it; it is not implemented.
+Proposed [ADR-26](docs/adr/0026-definition-composition.md) designs it; units U1–U7 are implemented and contract-tested
+only, with no hosted composite Run, publication or consumer verification yet.
 _Avoid_: Recipe, selection group, parent Release, association file, include
 
 **Effective Definition (proposed)**:
@@ -147,7 +151,8 @@ Large finalizers collect the exact original per-job results through fixed, bound
 collector success never substitutes for producer success. Neither scripts supplied as data nor separately
 authored lifecycle inputs are admitted.
 Opt-in execution partitioning moves original jobs into bounded same-commit worker workflows under the same
-manifest; OIDC-signing jobs remain in the entry to preserve signer identity. A partition is generated
+manifest; OIDC-signing jobs remain in the entry to preserve signer identity. Moving them requires an explicit
+certificate-identity and trust-policy migration, which is proposed but not implemented. A partition is generated
 scheduling structure, not a Definition, Run or Release, and never follows proposed composite member
 boundaries. It forwards original
 job results to the single finalizer; it does not authorize artifact acceptance. The complete Plan and required
@@ -198,11 +203,40 @@ _Avoid_: Release publication root, native image manifest, qualification receipt
 An Artifact format containing exact executable files and their installation metadata.
 _Avoid_: Release, arbitrary archive
 
+**Executable image index (proposed)**:
+An Artifact format for an executable output that declares a `platforms` set: a standard OCI image index whose
+children are minimal per-platform images, each holding one layer with that platform's executables and declared
+companions. Children carry no entrypoint and make no runtime claim. Each child keeps its native Build Digest
+and evidence; the output has an aggregate Build Digest. Proposed in
+[ADR-28](docs/adr/0028-multi-platform-executable-indexes.md); not implemented.
+_Avoid_: Runnable OCI image index, binary bundle, upstream-published image
+
 **Debian package**:
 An Artifact format (`debian-package`) containing one raw Debian archive from an explicitly selected source
 producer. The same package bytes can be supplied as an OS build material. Local retention does not establish
 installation or runtime acceptance.
 _Avoid_: APT repository, installed package, builder type
+
+**Native file output**:
+The Artifact representation specified in ADR-20 for unchanged producer-created Debian packages, EFI/iPXE
+files and installer assets. All regular files in an archive retain the parent archive identity, canonical
+member name, digest, size, mode and declared kind. File integrity is distinct from package dependencies and
+boot readiness. Implementation remains outstanding under the ADR-20 contract.
+_Avoid_: Reconstructed package, executable tool, installed inventory
+
+**File-delivery root**:
+A generated record with a detached signature, binding selected authenticated source publications and exact
+named payload and evidence objects to their S3 routes and read-back observations. It preserves original
+provenance and adds no build, boot or qualification verdict. Implementation remains outstanding under the
+specified contract.
+_Avoid_: Authored lifecycle object, replacement source release, successful upload flag
+
+**File-delivery locator**:
+Caller-pinned transport coordinates and raw hashes/sizes for the delivery document and detached bundle.
+It locates proof; independent consumer policy and complete-byte checks establish acceptance. A final commit
+may exist after lost acknowledgement, so an indeterminate producer result requires independent reconciliation.
+Implementation remains outstanding under the ADR-20 contract.
+_Avoid_: Trusted policy, mutable release name, atomic bucket transaction
 
 ## Evidence and authority
 
@@ -366,6 +400,16 @@ _Avoid_: Inventory, registry destination
 A catalog declaration describing how to build or acquire a named component from pinned inputs and which target
 platforms it supports. It carries build or acquisition instructions, never a deployment placement taxonomy.
 _Avoid_: Named output, artifact, authored build group
+
+**Pinned-tool producer**:
+A component producer that runs one released executable, pinned by archive and executable digest, once with a fixed
+argument vector, no shell, no network, typed material inputs and only literal environment variables, inside a
+digest-pinned container. Its result is one file or a producer-written OCI layout. Its builder type is `pinned-tool`
+and it belongs to the existing `wrapped-build` source lane; it is not an acquisition of the tool. Build identity
+covers every logical field in ADR-27 §2, including the tool pin, target platform, arguments, environment, material
+edges, output form and toolchain image. Proposed in [ADR-27](docs/adr/0027-pinned-tool-producers.md); not
+implemented.
+_Avoid_: Run-wide pipeline tool, release executable output, build script
 
 **Component catalog overlay**:
 An ordered, predecessor-bound catalog change replacing a complete component producer or performing an exact

@@ -185,3 +185,22 @@ func TestDigestOnlyPublicationNeverWritesATag(t *testing.T) {
 		t.Fatalf("digest-only round trip: %v", err)
 	}
 }
+
+func TestAmbientKeychainOnlyForAmbientAccess(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		options RegistryOptions
+		ambient bool
+	}{
+		{"ambient", RegistryOptions{}, true},
+		{"ambient plain HTTP", RegistryOptions{PlainHTTP: true}, true},
+		{"anonymous", RegistryOptions{Anonymous: true}, false},
+		{"explicit", RegistryOptions{Username: "fixture-user", Password: "fixture-password"}, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := test.options.AmbientKeychain() != nil; got != test.ambient {
+				t.Fatalf("ambient keychain=%v, want %v", got, test.ambient)
+			}
+		})
+	}
+}

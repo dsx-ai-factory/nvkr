@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
@@ -163,16 +162,9 @@ func retainCheckedControls(ctx context.Context, layout, rootDigest string, state
 func checkPublicationOutput(ctx context.Context, layout, stage string, object PublishedObject, reference name.Digest,
 	controls map[string]bool, state *publicationState, options RegistryOptions,
 ) error {
-	for attempt := 1; attempt <= pullReadAttempts; attempt++ {
-		retry, err := checkPublicationOutputAttempt(ctx, layout, stage, object, reference, controls, state, options)
-		if err == nil || !retry || attempt == pullReadAttempts {
-			return err
-		}
-		if err := waitForPullRead(ctx, time.Duration(attempt)*time.Second); err != nil {
-			return e.Wrap(e.CodeTimeout, err, "waiting to reacquire interrupted checked output")
-		}
-	}
-	return e.New(e.CodeInternal, "checked output acquisition attempt bound exceeded")
+	return retryInterruptedRead(ctx, waitForPullRead, func() (bool, error) {
+		return checkPublicationOutputAttempt(ctx, layout, stage, object, reference, controls, state, options)
+	})
 }
 
 func checkPublicationOutputAttempt(ctx context.Context, layout, stage string, object PublishedObject, reference name.Digest,

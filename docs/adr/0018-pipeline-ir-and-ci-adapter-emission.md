@@ -922,9 +922,13 @@ container isolation or runtime authentication. Disk observation retains its orig
 hosted utility jobs are unchanged.
 
 Local execution schedules the whole Run graph once in bounded ready batches, retains source receipts
-through `pipeline.NodeSession`, and cancels and joins pending operations on failure. Hosted build and utility jobs enter through
-`factory.ExecuteNode`; hosted source fetch delegates through a private factory source owner to the same producer primitive. Neither path converts a whole producer
-report into a second scheduling result model.
+through `pipeline.NodeSession`, and cancels and joins pending operations on failure. Local scheduling, hosted build
+and utility steps and `factory execute-node` dispatch each exact operation through one factory ordinary-operation
+session.
+Placement chooses only the producer runtime, workspace and whether an offline utility launches its pinned
+`execute-node` child; every in-process operation that the opening Run did not already admit passes the same
+complete-Plan execute-node admission. Hosted source fetch delegates through a private factory source owner to the
+same producer primitive. Neither path converts a whole producer report into a second scheduling result model.
 Source receipts remain reusable; result slots and completeness still belong to each exact named output.
 
 Authenticated source patches are checked, applied and reverse-checked by Git in the private build snapshot.
@@ -1084,7 +1088,8 @@ Final Run records and production qualification handoffs retain seven days and di
 prevent finalization. Release finalizers have a dedicated two-hour job budget for bootstrap, bounded
 carrier acquisition/restoration, complete-release authentication and record uploads; the fifteen-minute
 utility-job budget does not apply. This bound is not evidence of successful hosted completion.
-Expired carriers require a complete new Run. Signed development uses per-attempt
+Expired carriers require a complete new Run. That does not clear an unresolved S3 delivery: ADR-20's
+cross-Run physical-namespace gate must still reconcile it before fresh signing. Signed development uses per-attempt
 registry namespaces and the same authenticated earlier-attempt reuse as production.
 These retention periods govern provider locator records. Private carrier blobs have no automatic expiry
 in this implementation; registry retention must be managed separately, without removing active Run inputs.
@@ -1437,9 +1442,10 @@ successful diagnostic dispatches.
 The opt-in Environment setting `githubExecutionPartitions: true` projects producer jobs into generated
 same-commit `workflow_call` workers. This is one Definition, complete Plan, provider Run and final Release;
 workers do not publish independent family Releases. Local generation contracts are implemented. A minimal
-hosted diagnostic exercised result forwarding on success, failure and cancellation. The full development
-Run recorded in reconciliation exercised generated-bundle execution and signing identity; qualification
-remains unestablished for this topology. The retained flat mode
+hosted diagnostic at commit `902f3febd10cd61abecb82571f66283857169851` exercised the earlier member-by-member
+result forwarding on success, failure and cancellation. The full development Run recorded in reconciliation
+exercised generated-bundle execution and signing identity with that earlier forwarding. Hosted execution of
+per-worker fragment forwarding (§8) is unrecorded, and qualification remains unestablished for this topology. The retained flat mode
 remains the default.
 
 Factory's provider-independent execution graph owns operation membership, admitted success/completion
@@ -1450,10 +1456,15 @@ and an acyclic contracted dependency graph. Semantic equivalence tests compare f
 with partitioned prerequisite-result evaluation under failure and cancellation. These are local contracts,
 not proof of provider cancellation timing or support for another CI adapter.
 
-The compiler groups lexically ordered jobs by dependency depth, with at most 64 original jobs per worker
-and at most 50 workers. Jobs requesting `id-token: write` remain in the entry workflow: Fulcio uses the
+The compiler groups jobs by dependency depth and orders each depth by bounded finish time, the longest
+path of declared job timeouts. It splits a depth where those finish times diverge, widest gap first, until
+it reaches 30 workers, with at most 64 original jobs per worker and at most 50 workers. Timeouts only order
+scheduling; they never change membership, conditions or identity. A local
+[scheduling harness](../execution-partition-scheduling.md) over the maintained Plans motivated this
+grouping with estimated durations; hosted wall time remains unmeasured. Jobs requesting `id-token: write` remain in the entry workflow: Fulcio uses the
 reusable workflow path for the certificate signer identity, so moving them would change the authored signer
-policy. Dependencies and result reports project both inline jobs and worker jobs without widening that policy.
+policy (see the proposed migration below). Dependencies and result reports project both inline jobs and worker
+jobs without widening that policy.
 Original job IDs, operations, runner admission, per-job permissions and output slots
 remain intact. A partition may wait for unrelated jobs sharing an earlier partition; it must not turn their
 failure into a false prerequisite failure. Ordinary jobs require `!cancelled()` and check their original
@@ -1465,11 +1476,66 @@ refused until their context can be projected exactly. Matrix scheduling remains 
 Workers have no concurrency group competing with the entry workflow. Callers pass explicit required
 secrets and sufficient permissions; individual jobs retain their original narrower permissions. Secret references
 must name a static secret through dot or quoted bracket syntax; dynamic selection is refused before emission. Each worker
-has a credential-free, unconditional result collector. The entry reconstructs the original collector reports
-from those exact job results, retaining failure, cancellation and skipping. Missing or malformed reports
+has a credential-free, unconditional result collector. That collector also exports one fragment per entry
+consumer: for each original result collector, worker caller or collector-free finalizer, the exact
+`toJSON` results and statuses of only its members owned by that worker. The entry reconstructs each
+original collector report and worker dependency input by joining one fragment per worker with inline
+jobs' direct results, retaining failure, cancellation and skipping. If a worker never reports, its fragment
+falls back to null member results and empty statuses. These are the values the per-member projection
+produced, so dependency admission and collector accounting are unchanged. Missing or malformed reports
 cannot authorize publication. The original finalizer, complete Plan, same-Run transfer authentication and
 artifact/evidence acceptance gates remain unchanged. Generated worker membership and caller wiring must
 match deterministic regeneration exactly before the existing flat semantic validator admits the logical graph.
+Lowering refuses any worker or worker caller that declares `id-token`, and maintained-bundle contracts
+require every committed producer's OIDC jobs to remain in the entry workflow named by its signer policy.
+
+#### Proposed: signer relocation requires an explicit identity migration
+
+This subsection is proposed design, not implemented behavior. Today every `id-token: write` job stays
+inline, and no code path relocates a signer. Local measurements of the committed bundles show where those
+jobs fall. In the partitioned development entry, the 139 inline signing and SBOM-attestation jobs account
+for 10,984 of 13,308 expanded YAML parsing events and 104,357 of 264,038 bytes. In the flat default
+producer, the same jobs account for 10,984 of 47,055 events. That producer is at 94.1% of the 50,000-event
+parser bound, the binding constraint today. These are local generation measurements, not provider
+evidence.
+
+Relocation is not a scheduling change. For GitHub OIDC, Fulcio sets the certificate SAN and Build Signer
+URI from `job_workflow_ref`, which names the called reusable workflow, not the entry workflow. Build Config
+URI carries the top-level `workflow_ref`. Moving a signer into a worker therefore changes the identity
+that every current signer policy (`^https://github.com/<repo>/.github/workflows/<entry>.yml@<ref>$`) and every
+consumer verification policy authenticates. Partition indexes depend on grouping, so a worker-path identity
+would also churn with unrelated topology changes. Any relocation must ship together with all of the following:
+
+1. **One fixed signer workflow.** A generator-owned `<entry-stem>__signer.yml` would be the only file that
+   requests `id-token`, whatever the partition count. Each signing operation would call it with an explicit
+   Plan-derived operation selector, because `github.job` no longer names the original job. Signer jobs would
+   never share a file with producer jobs.
+2. **Caller binding in the trust policy.** Any workflow allowed to call a reusable workflow can mint the same
+   SAN. The policy must therefore pin the signer workflow SAN, the Build Config URI of the exact entry
+   workflow and ref, the `workflow_dispatch` trigger and the issuer. Verification must reject a certificate
+   whose caller differs. Current OCI signature verification matches SAN and issuer only, so this verifier
+   capability (ADR-04) must be implemented for the OCI path and contract-tested first. Detached-document
+   verification already checks the exact Build Config URI, Build Config digest and Run invocation (ADR-04); it
+   is the owning context to extend, but it does not implement this trigger and caller policy or signer relocation. Provenance `builder.id` comes from `GITHUB_WORKFLOW_REF`,
+   which stays the caller's entry workflow (ADR-09). Development publication admission matches its workflow identity
+   against that `builder.id` and would then diverge from the SAN. The migration must define `builder.id` as the
+   Build Config URI and match the caller and signer identities separately, in the same change.
+3. **An authored Environment migration.** The signer and caller identities become distinct, anchored
+   Environment fields. They enter Environment and Plan identity but not logical Build identity. Generation
+   relocates signers only when the admitted Environment selects that policy, and it refuses a policy that
+   also admits the entry, any worker or any other workflow file.
+4. **No silent dual acceptance.** Each Release remains bound to the identity that signed it. Consumers adopt
+   the new identity by an explicit verification-policy change (ADR-16). Previously verified Releases keep
+   their original policy, and no verifier widens a regex to accept both identities.
+5. **Evidence before adoption.** A signed development Run must be verified under the new policy, including a
+   negative check that a foreign caller's certificate is refused. Production adoption then needs its own
+   recorded Run and qualification decision. Until then, the flat production producer and the inline-signer
+   partition layout remain the only admitted forms.
+
+Relocation would leave one Definition, one complete Plan, one logical Run and one Release. It changes only
+who mints certificates, which is why it is a signer-identity decision rather than an execution-organization
+decision. Selecting partitioned execution for the flat producer is a separate Environment decision that does
+not move signers.
 
 Every generated run script, including scripts inside composite actions, remains checked against GitHub's
 21,000-character ceiling, conservatively measured as UTF-8 bytes, including explicit operator setup and
@@ -1488,6 +1554,61 @@ still prevent finalization.
 Finalizers are scheduled unconditionally and fail on failed/missing producers, failed restore, omitted required
 artifacts, malformed or substituted observations/SBOMs, and wrong production predicates. The platform may prevent
 the finalizer itself from starting; inspect provider status when no Run record exists (ADR-17).
+
+ADR-20's [S3 file-delivery contract](0020-artifact-publication-and-target-configuration.md#s3-file-delivery-contract)
+owns the normative wire formats, storage, namespace, recovery, retention, cleanup and completion protocol.
+Its generated execution remains implementation work. That execution must
+retain GitHub-only authority, the admitted source/signing branches and protected Environments, and the
+existing producer isolation. Derive required delivery nodes from typed targets and named outputs in the
+complete Plan. The graph preserves ADR-20's required order: source aggregate authentication, selected complete
+output checks and proof capture → payload/proof upload and full read-back → required-object and boot-URL
+verification → canonical root generation and detached signing → root upload/read-back → durable root/bundle/locator
+retention → confirmed generation-checked `commit-authorized` promotion → conditional bundle upload last
+→ independent root, bundle and required-closure authentication
+→ durable generation-checked `verified-complete` confirmation → producer success. The remote bundle commit
+precedes independent post-commit verification; durable completion and producer success follow it. Every
+required target result is a finalizer dependency; job success or an unverified locator cannot replace the
+authenticated result.
+
+Source, build and ARC jobs must receive no S3 credentials. Only admitted transfer and completion operations
+may resolve writer credential references or obtain federated write credentials; verifier access must be
+independently scoped to read-only operations. Generated credential bindings must satisfy ADR-20's admitted
+action/resource profile and operator policy-review gate; successful SDK calls cannot establish that gate.
+A new S3 OIDC consumer requires explicit
+renderer and bundle-validator admission, not removal of existing signing-only token checks. No OIDC or storage
+credentials are available to arbitrary jobs, PRs or forks. The consumer selects its own read identity and
+policies. Secret references may be recorded; secret values cannot be
+transported in plans, command arguments, boot scripts, artifacts or logs. Referenced authentication and
+provider capabilities must be admitted before producer, storage or publication work.
+
+Generated admission must enforce the exact enrolled repository/workflow/bundle/ref and evaluated non-canceling
+group under ADR-20. Current per-workflow groups are not a repository-wide lock; reject another namespace owner
+rather than infer shared serialization. Signing and commit jobs depend on authenticated cross-Run predecessor
+admission from `lifecycle`'s private delivery-namespace store (ADR-20). Generated dispatch, retry and recovery
+paths delegate to that store owner; provider job status cannot clear its unresolved obligations.
+
+The final bundle-upload job must depend on ADR-20's confirmed exact-byte recovery-package retention receipt
+for the frozen root, bundle and locator under the originating Run/attempt and target, and on the confirmed
+`commit-authorized` promotion for that exact operation and generation. Each dispatch or retry must obtain
+`lifecycle`'s live namespace authorization for those bindings; queued job status or a stored retention receipt
+cannot bypass winning closure, supersession or retirement. Failed or unconfirmed retention or promotion
+prevents the commit request; a post-commit artifact-upload step or finalizer cannot satisfy these prerequisites.
+Admit the required recovery access and retention before producer or delivery work.
+Admission must freeze and enforce ADR-20's absolute terminal Run-record publication cutoff across scheduling
+and queue delay, execution, cleanup, finalization and record upload. Queue delay cannot extend it. Late terminal
+publication is refused or rejected, and recovery uses a new explicit attempt under ADR-20's cutoff rules.
+
+Generated job admission also reserves the cleanup window and a separate termination/reap-observation
+window no larger than `cleanupTimeoutSeconds`, as specified in ADR-20. Cleanup expiry requires supervisor
+termination under that second bound; it cannot become indefinite joining or rely on the hosted job timeout.
+A missing supervisor capability fails admission; an unconfirmed exit fails teardown and leaves authority blocked.
+
+The finalizer reports no successful required delivery for failed or indeterminate completion. A valid remote
+commit can survive lost acknowledgement, cancellation or finalizer failure; retrieve its preserved locator
+for independent reconciliation rather than claiming rollback. Existing OCI publication may remain successful
+while its required S3 delivery fails. Native EFI production needs its own admitted Linux/mkosi/material
+capability; existing ARC disk admission does not implicitly authorize it. Boot/install acceptance is a
+downstream exercise of delivered artifacts, not a new generated provisioning engine or qualification verdict.
 
 ## Consequences
 
