@@ -24,6 +24,7 @@ BASE = {
     "docs/old.md": "Old text remains unproven.\n",
     "docs/moved-from.md": "Old text remains unproven.\nTwo.\nThree.\nFour.\nFive.\n",
     "docs/dash.md": "-- intro\n",
+    "docs/straddle.md": "Intro.\nCompletion requires a recorded\nOld tail.\n",
 }
 # Each case owns distinct paths, so one base...head diff exercises them all.
 CASES = {
@@ -54,6 +55,12 @@ CASES = {
         {"docs/category.md": "[Reconciliation](adr/reconciliation.md) owns externally exercised scope.\n"
                              "The release was not externally exercised.\n"},
         [f'docs/category.md:2: status restated ("not externally exercised"); {LINK}']),
+    "phrase starting on an unchanged line": (
+        {"docs/straddle.md": "Intro.\nCompletion requires a recorded\nrun of the workflow.\n"},
+        [f'docs/straddle.md:3: status restated ("requires a recorded run"); {LINK}']),
+    "ledger look-alike is checked": (
+        {"docs/adr/reconciliation.md-backup.md": "Hosted signing remains unproven.\n"},
+        [f'docs/adr/reconciliation.md-backup.md:1: status restated ("remains unproven"); {LINK}']),
     "ledger and evidence": (
         {"docs/adr/reconciliation.md": LEDGER + "Hosted signing remains unproven.\n",
          "docs/evidence/run.md": "Hosted signing remains unproven.\n"}, []),

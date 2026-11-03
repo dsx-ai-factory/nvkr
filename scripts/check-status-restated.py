@@ -22,7 +22,7 @@ import sys
 
 LEDGER = "docs/adr/reconciliation.md"
 OWNERS = f"{LEDGER}#support-by-owner"
-EXEMPT = (LEDGER, "docs/evidence/")
+EVIDENCE = "docs/evidence/"
 MARKDOWN = ("*.md", "*.mdx")
 REVISION_HINT = "fetch BASE and HEAD with full history, or set STATUS_BASE/STATUS_HEAD"
 
@@ -73,7 +73,11 @@ def header_path(line):
 
 
 def added_runs(diff):
-    """Yield (path, [(line_number, text)]) for the added lines of each -U0 hunk."""
+    """Yield (path, [(line_number, text, added)]) for the new-side lines of each -U1 hunk.
+
+    One context line on each side lets a phrase that wraps between an unchanged and an
+    added line match; scan() reports only matches that touch an added line.
+    """
     path, run, nxt, in_header = None, [], 0, False
     for line in diff.splitlines():
         if line.startswith(("diff --git ", "@@")) and run:
@@ -86,8 +90,8 @@ def added_runs(diff):
         elif line.startswith("@@"):
             in_header = False
             nxt = int(re.match(r"@@ -\S+ \+(\d+)", line).group(1))
-        elif not in_header and line.startswith("+") and path:
-            run.append((nxt, line[1:]))
+        elif not in_header and line.startswith(("+", " ")) and path:
+            run.append((nxt, line[1:], line.startswith("+")))
             nxt += 1
     if run:
         yield path, run
@@ -99,7 +103,7 @@ def untracked_runs(repo):
                  "--", *MARKDOWN)
     for path in filter(None, listed.split("\0")):
         text = Path(repo, path).read_text(encoding="utf-8", errors="replace")
-        yield path, list(enumerate(text.splitlines(), 1))
+        yield path, [(number, line, True) for number, line in enumerate(text.splitlines(), 1)]
 
 
 def has_reason(line):
@@ -110,7 +114,7 @@ def has_reason(line):
 def scan(run):
     """Return (line, message, context) findings for one run; phrases may wrap across its lines."""
     text, starts = "", []
-    for _, line in run:
+    for _, line, _ in run:
         starts.append(len(text))
         text += line + " "
 
@@ -118,20 +122,19 @@ def scan(run):
         return max(i for i, s in enumerate(starts) if s <= offset)
 
     findings, seen = [], set()
-    for number, line in run:
-        if any(not REASON.match(m.group(1)) for m in ESCAPE.finditer(line)):
+    for number, line, added in run:
+        if added and any(not REASON.match(m.group(1)) for m in ESCAPE.finditer(line)):
             findings.append((number, "status-ok escape needs a reason: <!-- status-ok: why -->", ""))
     for phrase in PHRASES:
         for m in phrase.finditer(text):
-            first, last = line_of(m.start()), line_of(m.end() - 1)
-            if first in seen:
+            lines = range(line_of(m.start()), line_of(m.end() - 1) + 1)
+            added = [run[i][0] for i in lines if run[i][2]]
+            if not added or added[0] in seen or any(has_reason(run[i][1]) for i in lines):
                 continue
-            if any(has_reason(run[i][1]) for i in range(first, last + 1)):
-                continue
-            seen.add(first)
-            # The matched lines decide the ADR row first, then the rest of the added run.
-            span = " ".join(run[i][1] for i in range(first, last + 1)) + " " + text
-            findings.append((run[first][0], f'status restated ("{" ".join(m.group().split())}")', span))
+            seen.add(added[0])
+            # The matched lines decide the ADR row first, then the rest of the hunk.
+            span = " ".join(run[i][1] for i in lines) + " " + text
+            findings.append((added[0], f'status restated ("{" ".join(m.group().split())}")', span))
     return findings
 
 
@@ -159,13 +162,13 @@ def ledger_row(repo, head, path, text):
 def check(repo, base, head=None):
     """Return (merge base, formatted findings) for Markdown lines added since the merge base."""
     since = git(repo, "merge-base", base, head or "HEAD", hint=REVISION_HINT).strip()
-    diff = git(repo, "-c", "core.quotePath=false", "diff", "--no-color", "--no-ext-diff", "-U0", "-M",
+    diff = git(repo, "-c", "core.quotePath=false", "diff", "--no-color", "--no-ext-diff", "-U1", "-M",
                "--src-prefix=a/", "--dst-prefix=b/", "--diff-filter=AMR", since, *([head] if head else []),
                "--", *MARKDOWN, hint=REVISION_HINT)
     runs = list(added_runs(diff)) + ([] if head else list(untracked_runs(repo)))
     out = set()
     for path, run in runs:
-        if path.startswith(EXEMPT):
+        if path == LEDGER or path.startswith(EVIDENCE):
             continue
         for number, message, span in scan(run):
             if span:
