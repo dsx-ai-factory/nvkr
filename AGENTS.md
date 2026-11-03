@@ -43,7 +43,7 @@ paths; macOS builds and runs tests and diagnostics.
 
 1. Current ADR-01–22 contain the engineering contracts directly, pending named-decider ratification.
    Each section states its lane and any deferred capability; proposed design is not organizational acceptance.
-2. `docs/adr/reconciliation/README.md` owns current implementation, evidence and disabled-path status.
+2. `docs/adr/reconciliation/` (index: `README.md`) owns current implementation, evidence and disabled-path status.
 3. Code and tests establish implementation; unit tests do not prove external services or production workflows.
 
 `docs/sadd.md` explains architecture, `CONTEXT.md` defines vocabulary, `docs/milestones.md` is the outcome
