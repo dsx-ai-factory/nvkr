@@ -4,6 +4,7 @@
 package buildgraph
 
 import (
+	"fmt"
 	"maps"
 	"slices"
 	"strings"
@@ -58,6 +59,40 @@ func TestPinnedToolCompilesSourceLessBuild(t *testing.T) {
 		if strings.HasPrefix(id, "fetch-") && !slices.Contains(nodes["build-consumer"].Needs, id) {
 			t.Fatalf("pinned-tool producer gained a source fetch %q", id)
 		}
+	}
+}
+
+// A resolved pinned-tool producer owns its tool pin, arguments and environment in both
+// directions, so a later catalog change cannot alter an already resolved selection.
+func TestPinnedToolResolvedInputsOwnTheirMemory(t *testing.T) {
+	cat := pinnedToolCatalog()
+	recipe := cat.Components["recipe"]
+	recipe.ToolExecutable.Companions = []catalog.ToolCompanion{{Path: "aicr.sig", Digest: "sha256:" + strings.Repeat("d", 64)}}
+	resolved, err := Resolve(cat, Selection{Components: []string{"consumer", "recipe"}, Platform: "linux/arm64"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got catalog.Component
+	for _, component := range resolved.Components {
+		if component.Name == "recipe" {
+			got = component.Component
+		}
+	}
+	snapshot := func(c catalog.Component) string { return fmt.Sprint(*c.ToolExecutable, c.ToolArgs, c.ToolEnv) }
+	mutate := func(c catalog.Component, value string) {
+		c.ToolExecutable.ExecutableDigest = "sha256:" + strings.Repeat(value, 64)
+		c.ToolExecutable.Companions[0].Digest = "sha256:" + strings.Repeat(value, 64)
+		c.ToolArgs[2], c.ToolEnv["AICR_LOG_FORMAT"] = value, value
+	}
+	catalogBefore := snapshot(recipe)
+	mutate(got, "e")
+	if snapshot(recipe) != catalogBefore {
+		t.Fatalf("resolved mutation changed the catalog: %s", snapshot(recipe))
+	}
+	resolvedBefore := snapshot(got)
+	mutate(recipe, "f")
+	if snapshot(got) != resolvedBefore {
+		t.Fatalf("catalog mutation changed the resolved producer: %s", snapshot(got))
 	}
 }
 

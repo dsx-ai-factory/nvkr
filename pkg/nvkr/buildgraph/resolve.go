@@ -222,6 +222,13 @@ func cloneComponent(component catalog.Component) catalog.Component {
 	component.VersionStamp = maps.Clone(component.VersionStamp)
 	component.Patches = slices.Clone(component.Patches)
 	component.BuildRequirements = execution.Clone(component.BuildRequirements)
+	component.ToolArgs = slices.Clone(component.ToolArgs)
+	component.ToolEnv = maps.Clone(component.ToolEnv)
+	if component.ToolExecutable != nil {
+		tool := *component.ToolExecutable
+		tool.Companions = slices.Clone(tool.Companions)
+		component.ToolExecutable = &tool
+	}
 	if component.Flake != nil {
 		copy := *component.Flake
 		component.Flake = &copy
