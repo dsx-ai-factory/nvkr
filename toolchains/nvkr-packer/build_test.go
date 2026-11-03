@@ -55,7 +55,7 @@ func TestToolchainValidatedImageID(t *testing.T) {
 		{name: "exact validated ID", inspected: measured, smokeExit: "0", wantID: true},
 		{name: "normalize bare ID", inspected: strings.TrimPrefix(measured, "sha256:"), smokeExit: "0", wantID: true},
 		{name: "native smoke failure emits no ID", inspected: measured, smokeExit: "42", wantError: true},
-		{name: "failed export emits no ID", inspected: measured, smokeExit: "0", buildExit: "42", wantError: true},
+		{name: "failed export emits no ID", inspected: measured, smokeExit: "0", buildExit: "42", wantError: true, wantExit: 42},
 		{name: "unlink failure emits no ID", inspected: measured, smokeExit: "0", cleanupCommand: "rm", wantError: true, wantExit: 1},
 		{name: "directory cleanup failure emits no ID", inspected: measured, smokeExit: "0", cleanupCommand: "rmdir", wantError: true, wantExit: 1},
 		{name: "export exit survives unlink failure", inspected: measured, smokeExit: "0", buildExit: "42", cleanupCommand: "rm", wantError: true, wantExit: 42},

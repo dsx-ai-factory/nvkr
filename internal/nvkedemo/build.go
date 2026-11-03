@@ -6,6 +6,7 @@ package nvkedemo
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -51,6 +52,9 @@ func BuildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 	return result, nil
 }
 func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
+	if err := admitLocalNVKESource(cfg, runtime.GOOS+"/"+runtime.GOARCH); err != nil {
+		return BuiltInputs{}, err
+	}
 	if err := AdmitDemoBuild(ctx, cfg); err != nil {
 		return BuiltInputs{}, err
 	}
@@ -126,7 +130,7 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 		}
 		env = SetEnv(env, map[string]string{"NVKE_LOCAL_CLONE": clone})
 	}
-	runner := Runner{Env: env, Progress: cfg.Progress, output: cfg.Progress}
+	runner := Runner{Env: env, Progress: cfg.Progress, output: cfg.Progress, privateCaptureStdout: cfg.NVKECommit != ""}
 	// All host checks and fresh-path checks precede the first bootstrap. The
 	// script remains authoritative for exact runtime/toolchain admission.
 	for _, root := range []string{"runs", "laptop-bootstrap", "native-tools/runs", "mac-build", "native-build"} {
@@ -156,6 +160,13 @@ func buildArtifacts(ctx context.Context, cfg BuildConfig) (BuiltInputs, error) {
 		}
 	}
 	cfg.Repository = repo
+	if cfg.NVKECommit != "" {
+		prepared, err := factory.PrepareLocalNVKESource(ctx, repo, cfg.Definition, cfg.Environment, filepath.Join(".nvkr", "source-build", cfg.AttemptPrefix), cfg.NVKECommit)
+		if err != nil {
+			return BuiltInputs{}, err
+		}
+		cfg.Definition, cfg.Environment = prepared.Definition, prepared.Environment
+	}
 	if nativeDefault {
 		if err := prepareDefaultNativeBuild(ctx, runner, &cfg, runtime.GOOS+"/"+runtime.GOARCH); err != nil {
 			return BuiltInputs{}, err
@@ -534,4 +545,21 @@ func prepareLocalArtifacts(ctx context.Context, runner Runner, script string, cf
 	}
 	args := append([]string{"bash", script, "--prepare-only"}, flags...)
 	return runner.Run(ctx, append(args, cfg.AttemptPrefix, strconv.Itoa(cfg.Jobs), "all"), "build-prepare", 0)
+}
+
+// Admit the optional nightly source lane before filesystem or producer work.
+func admitLocalNVKESource(cfg BuildConfig, platform string) error {
+	if cfg.NVKECommit == "" {
+		return nil
+	}
+	if len(cfg.NVKECommit) != 40 || strings.ToLower(cfg.NVKECommit) != cfg.NVKECommit {
+		return configUsage("exact local NVKE source requires a full lowercase commit")
+	}
+	if _, err := hex.DecodeString(cfg.NVKECommit); err != nil {
+		return configUsage("exact local NVKE source requires a full lowercase commit")
+	}
+	if platform != "linux/amd64" || cfg.Definition != "" || cfg.Environment != "" || cfg.NVKR != "" || cfg.Prepared || cfg.QualifyLocal || cfg.QualificationPolicy != "" || cfg.Conformance || (cfg.Network != "" && cfg.Network != "ovn") {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "exact local NVKE main source requires the unsigned default Linux AMD64 NVIDIA build")
+	}
+	return nil
 }

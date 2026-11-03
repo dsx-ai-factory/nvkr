@@ -320,7 +320,9 @@ jobs:
     if: needs.check-paths.outputs.code == 'true'
     # Tests need disk-backed /tmp and GNU tools, unlike Ubuntu 26.04.
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    # The demo shard passed in 233s on a cold hosted runner; allow setup and
+    # result retention to finish within the same bounded job deadline.
+    timeout-minutes: 10
     strategy:
       # Keep every shard's diagnostics when another fails. The aggregate gate
       # requires the entire matrix to succeed.

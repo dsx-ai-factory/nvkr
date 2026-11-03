@@ -154,7 +154,7 @@ func TestNativeSimulatorUsesSelectedCPUAndMemory(t *testing.T) {
 		cpu, memory string
 	}{
 		{"default", NativeResources{}, "6", "12288"},
-		{"explicit", NativeResources{6, 3, 1024, 4}, "4", "3072"},
+		{"explicit", NativeResources{6, 3, 1024, 4, ""}, "4", "3072"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			env, err := nativeSimulatorEnvironment(startupTestContext(t), NativeGuestConfig{site: &nativeSiteAttempt{resources: tc.resources}}, linuxNativeBridge(), "/disk.qcow2", "/seed.yaml", "/sim")
@@ -229,7 +229,7 @@ func TestNativeArchitecturePublishedGuestsBindObservedCPUAndDisk(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			attempt := nativeSiteAttempt{guard: &NetworkGuard{}, assets: NativeAssets{arch: "amd64"}, simulatorWork: work, diskDigest: digest, resources: NativeResources{6, 3, 1024, 4}}
+			attempt := nativeSiteAttempt{guard: &NetworkGuard{}, assets: NativeAssets{arch: "amd64"}, simulatorWork: work, diskDigest: digest, resources: NativeResources{6, 3, 1024, 4, ""}}
 			domains, err := attempt.observeGuestDomains(t.Context(), runner)
 			if (err == nil) != tc.pass || tc.pass && len(domains) != 3 {
 				t.Fatalf("guest observation: %v %v", domains, err)

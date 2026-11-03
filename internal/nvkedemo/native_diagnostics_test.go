@@ -16,8 +16,12 @@ import (
 )
 
 func TestNativeFailedTenantCleanupRetainsDiagnosticsBeforeDeletion(t *testing.T) {
-	for _, failure := range []string{"", "diagnostics fail"} {
-		t.Run(failure, func(t *testing.T) {
+	for _, tc := range []struct{ controller, failure string }{
+		{"nke-controller", ""}, {"nke-controller", "diagnostics fail"},
+		{"nvke-controller", ""}, {"nvke-controller", "diagnostics fail"},
+	} {
+		t.Run(tc.controller+"/"+tc.failure, func(t *testing.T) {
+			failure := tc.failure
 			root := privateTestDir(t)
 			events := filepath.Join(root, "events")
 			cli := filepath.Join(root, "nvkectl")
@@ -42,7 +46,8 @@ if test "$FAIL" != ''; then exit 9; fi
 			writeTenantFixture(t, filepath.Join(root, "kind"), []byte("#!/bin/sh\nset -eu\nprintf 'bootstrap-delete\\n' >> \"$EVENTS\"\n"), 0o700)
 			var public bytes.Buffer
 			runner := Runner{Work: root, Progress: &public, Env: []string{"PATH=/usr/bin:/bin", "FIXTURE=" + root, "EVENTS=" + events, "FAIL=" + failure, "XDG_CONFIG_HOME=" + filepath.Join(root, "config")}}
-			attempt := nativeSiteAttempt{assets: NativeAssets{HostTools: root, CLI: cli}, bootstrapName: "owned", bootstrapRunner: &runner,
+			controller := nativeControllerFixture(t, root, tc.controller)
+			attempt := nativeSiteAttempt{assets: NativeAssets{HostTools: root, CLI: cli, Installer: root, installerSelection: &nativeInstallerSelection{controller: controller}}, bootstrapName: "owned", bootstrapRunner: &runner,
 				tenantOwner: &tenant{name: "native-demo-tenant", id: "owned-id", intent: true, cliPath: cli, session: ManagementSession{Work: root, Runner: runner}}}
 			err := attempt.close(t.Context())
 			if CommandExitCode(err) != 7 {
@@ -56,7 +61,7 @@ if test "$FAIL" != ''; then exit 9; fi
 			if len(lines) != 9 || lines[0] != "nvke-api" || lines[1] != "nvke-api" || lines[8] != "bootstrap-delete" {
 				t.Fatalf("diagnostics must follow restore failure and precede deletion: %s", raw)
 			}
-			for i, fragment := range []string{"get pods --all-namespaces -o json", "get events --all-namespaces -o json", "get services --all-namespaces -o json", "get endpointslices.discovery.k8s.io --all-namespaces -o json", "logs --selector=app.kubernetes.io/name=nke-controller,app.kubernetes.io/instance=nke-controller --container=nke-controller", "--previous=true"} {
+			for i, fragment := range []string{"get pods --all-namespaces -o json", "get events --all-namespaces -o json", "get services --all-namespaces -o json", "get endpointslices.discovery.k8s.io --all-namespaces -o json", "-n " + tc.controller + " logs --selector=app.kubernetes.io/name=" + tc.controller + ",app.kubernetes.io/instance=" + tc.controller + " --container=" + tc.controller, "--previous=true"} {
 				if !strings.Contains(lines[i+2], fragment) {
 					t.Fatalf("missing exact bounded read-only diagnostic %q: %s", fragment, raw)
 				}
@@ -195,7 +200,7 @@ func TestNativeSiteDiagnosticsDoNotRaceUnjoinedOrCanceledWork(t *testing.T) {
 		if !errors.Is(cause, ErrUnjoined) {
 			cancel()
 		}
-		result := retainNativeSiteFailure(ctx, Runner{Work: root, Env: []string{"PATH=/usr/bin:/bin"}}, root, "unused", cause)
+		result := retainNativeSiteFailure(ctx, Runner{Work: root, Env: []string{"PATH=/usr/bin:/bin"}}, NativeAssets{HostTools: root}, "unused", cause)
 		if !errors.Is(result, cause) || errors.Is(result, ErrUnjoined) != errors.Is(cause, ErrUnjoined) {
 			t.Fatalf("diagnostic changed original failure: %v", result)
 		}
