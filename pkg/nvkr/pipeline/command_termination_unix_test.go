@@ -90,7 +90,7 @@ func TestExecCmdSuccessfulChildCannotLeaveDescendant(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("NVKR_DESCENDANT_PID", pidPath)
-	if err := runOwnedCommand(context.Background(), execCmd(RunOptions{}, script)); err != nil {
+	if err := runOwnedCommand(context.Background(), execCmd(RunOptions{Ctx: t.Context()}, script)); err != nil {
 		t.Fatalf("successful direct child returned %v", err)
 	}
 	rawPID, err := os.ReadFile(pidPath)

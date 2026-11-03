@@ -29,7 +29,7 @@ func sessionSource(t *testing.T, root string) ir.Node {
 	if err := os.WriteFile(filepath.Join(dir, "input.txt"), []byte("pinned input\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	digest, err := sourceTreeDigest(dir)
+	digest, err := sourceTreeDigestContext(t.Context(), dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func sessionSource(t *testing.T, root string) ir.Node {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := writeSourceReceipt(receiptPath, sourceReceipt{Schema: sourceReceiptSchema,
+	if err := writeSourceReceiptContext(t.Context(), receiptPath, sourceReceipt{Schema: sourceReceiptSchema,
 		Commit: fetch.Commit, TreeHash: fetch.TreeHash, VendorSpecDigest: fetch.VendorSpecDigest,
 		ClosureDigest: digest}); err != nil {
 		t.Fatal(err)

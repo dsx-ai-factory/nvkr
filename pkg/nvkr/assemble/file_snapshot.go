@@ -34,7 +34,7 @@ func openRegularFileCapabilityContext(ctx context.Context, path, label string) (
 	}
 	source := os.NewFile(uintptr(fd), path)
 	if source == nil {
-		_ = unix.Close(fd)
+		_ = unix.Close(fd) //nolint:errcheck // read-only descriptor release; the failure is returned
 		return nil, e.New(e.CodeInternal, "opening %s file capability", label)
 	}
 	owned := true

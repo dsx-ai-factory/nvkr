@@ -96,6 +96,9 @@ func executeLocalWithFactoryRunner(ctx context.Context, prepared *PreparedRun, o
 func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, options LocalOptions,
 	deps localExecutionDependencies,
 ) (returnedRun *Run, returnedErr error) {
+	if ctx == nil {
+		return nil, e.New(e.CodeUsage, "local execution requires a context")
+	}
 	if prepared == nil || prepared.plan == nil || prepared.run == nil {
 		return nil, e.New(e.CodeUsage, "local execution requires a prepared run")
 	}

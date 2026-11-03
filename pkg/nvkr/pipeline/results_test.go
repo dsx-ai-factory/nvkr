@@ -202,7 +202,7 @@ func TestTerminalTreeTraversalRejectsIntermediateSymlink(t *testing.T) {
 	if err := os.Symlink(external, filepath.Join(root, "blobs")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := snapshotRegularTree(root); err == nil {
+	if _, err := snapshotRegularTreeContext(t.Context(), root); err == nil {
 		t.Fatal("descriptor-relative terminal traversal followed an intermediate symlink")
 	}
 }

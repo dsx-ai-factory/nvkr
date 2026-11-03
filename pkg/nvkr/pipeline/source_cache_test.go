@@ -145,7 +145,7 @@ func BenchmarkPreparedSourceReuse(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	closure, err := sourceTreeDigest(source)
+	closure, err := sourceTreeDigestContext(b.Context(), source)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func BenchmarkPreparedSourceReuse(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	if err := writeSourceReceipt(receiptPath, sourceReceipt{
+	if err := writeSourceReceiptContext(b.Context(), receiptPath, sourceReceipt{
 		Schema: sourceReceiptSchema, Commit: fetch.Commit, TreeHash: fetch.TreeHash,
 		VendorSpecDigest: vendorDigest, ClosureDigest: closure,
 	}); err != nil {
@@ -235,7 +235,7 @@ func TestPreparedSourceCacheDoesNotMergeDifferentPatchInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	closure, err := sourceTreeDigest(source)
+	closure, err := sourceTreeDigestContext(t.Context(), source)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +243,7 @@ func TestPreparedSourceCacheDoesNotMergeDifferentPatchInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := writeSourceReceipt(receiptPath, sourceReceipt{
+	if err := writeSourceReceiptContext(t.Context(), receiptPath, sourceReceipt{
 		Schema: sourceReceiptSchema, Commit: fetch.Commit, TreeHash: fetch.TreeHash,
 		VendorSpecDigest: vendorDigest, ClosureDigest: closure,
 	}); err != nil {

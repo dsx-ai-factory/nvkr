@@ -186,7 +186,7 @@ The selected local profile asked for 2.4.0 packages. These differences require r
 not path rewriting or an assumption that equal output counts establish parity.
 
 The maintained release disks now embed the NVIDIA OVN fork `v2.4.2` (`8af51273`), matching NVKE
-`v0.22.0`'s default tenant `cniVersion` and the native NVIDIA demo's producers. The upstream 1.4.0 demo
+`v0.23.0`'s default tenant `cniVersion` and the native NVIDIA demo's producers. The upstream 1.4.0 demo
 variants remain explicit overlays, and the nightly KVM overlay drift remains open.
 
 NKTP still needs digest-bound deployment references, and the SPIRE packaging rollback omits the required

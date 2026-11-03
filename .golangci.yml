@@ -24,6 +24,8 @@ linters:
     misspell:
       locale: US
     errcheck:
+      # Report errors assigned to _. Exclusions below limit this to migrated packages.
+      check-blank: true
       # Idiomatic deferred cleanup whose error is intentionally ignored.
       exclude-functions:
         - (*os.File).Close
@@ -42,9 +44,13 @@ linters:
     rules:
       # User-facing CLI/report writers and the bake-off env harness intentionally
       # ignore the write/flush/setenv error — the process is exiting or the output
-      # is advisory.
+      # is advisory. Outside the migrated packages in path-except, errors assigned
+      # to _ are also not reported yet, along with any other unchecked call on such
+      # a line. Migrated non-test files get neither exemption; exclude-functions
+      # and the test-file rule below still apply to them. Migrate package by package.
       - linters: [errcheck]
-        source: '(fmt\.Fprint|\.Write\(|\.Flush\(|os\.Setenv)'
+        path-except: '^pkg/nvkr/assemble/'
+        source: '(fmt\.Fprint|\.Write\(|\.Flush\(|os\.Setenv)|\b_\s*:?='
       # QF1001 (apply De Morgan's law) is a stylistic quickfix, not a correctness issue.
       - linters: [staticcheck]
         text: 'QF1001'
