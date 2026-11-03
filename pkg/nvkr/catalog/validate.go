@@ -184,6 +184,12 @@ func sourceExecutableTarget(fromSource bool, builder string, output string) bool
 }
 
 func validateComponent(name string, c Component) error {
+	if c.BuilderType == BuilderPinnedTool {
+		return validatePinnedTool(name, c)
+	}
+	if c.Tool != "" || c.ToolExecutable != nil || len(c.ToolArgs) != 0 || len(c.ToolEnv) != 0 {
+		return e.New(e.CodeInvalidCatalog, "component %q: tool fields require builderType pinned-tool", name)
+	}
 	if len(c.BuildCommandByPlatform) != 0 && (!c.FromSource || c.Packer != nil || c.Flake != nil) {
 		return e.New(e.CodeInvalidCatalog, "component %q: platform commands require a plain from-source command producer", name)
 	}
@@ -335,7 +341,7 @@ func validateComponent(name string, c Component) error {
 		}
 	default:
 		return e.New(e.CodeInvalidCatalog,
-			"component %q: unknown builderType %q (want oci-hermetic, nix, buildkit-rootless, or vm-image)", name, c.BuilderType)
+			"component %q: unknown builderType %q (want oci-hermetic, nix, buildkit-rootless, vm-image or pinned-tool)", name, c.BuilderType)
 	}
 	if c.Repo == "" {
 		return e.New(e.CodeUnpinnedSource, "component %q: source has no repo", name)

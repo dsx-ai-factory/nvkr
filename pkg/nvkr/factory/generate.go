@@ -48,8 +48,9 @@ func ValidateGenerationEngine(engine string) error {
 }
 
 // Render selects a concrete topology/transport adapter at the engine seam. It
-// is the top-level generation seam: only `run generate` writes, qualification
-// generation and catalog maintenance call it. Generated bootstrap and worker
+// is the top-level generation seam: only `run generate` writes, its diagnostic
+// projection-pilot check, qualification generation and catalog maintenance
+// call it. Generated bootstrap and worker
 // commands admit committed bytes through CheckGenerated and the GitHub runtime
 // owners, which use only the core projection, so no generator selected here
 // runs inside a generated stage.
@@ -60,8 +61,19 @@ func Render(ctx context.Context, plan *Plan, engine string) (*GeneratedBundle, e
 	return renderSelected(ctx, plan)
 }
 
-// renderSelected is the projection behind Render. Boundary tests trap it.
-var renderSelected = RenderGitHub
+// renderSelected is the projection behind Render: the in-binary GitHub renderer,
+// or the projection plugin and transport a top-level caller selected through
+// WithProjectionAdapter. Boundary tests trap it.
+var renderSelected = func(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
+	if adapter, ok := selectedProjectionAdapter(ctx); ok {
+		plugin, err := adapter.plugin()
+		if err != nil {
+			return nil, err
+		}
+		return renderProjected(ctx, plan, plugin, adapter.Release)
+	}
+	return RenderGitHub(ctx, plan)
+}
 
 // CheckGenerated is the check twin of Render that never takes the generation
 // seam: it compares the committed bundle under root with the core projection of
@@ -76,8 +88,10 @@ func CheckGenerated(ctx context.Context, plan *Plan, engine, root string) error 
 
 // Generate checks or writes one hosted bundle and returns its Plan digest.
 // Generated bootstraps run check mode, so only write mode takes the Render seam.
+// The one exception is a top-level diagnostic check that selected a projection
+// adapter through WithProjectionAdapter; no generated command can select one.
 func Generate(ctx context.Context, plan *Plan, engine, root string, check bool) (string, error) {
-	if check {
+	if check && !ProjectionAdapterSelected(ctx) {
 		if err := CheckGenerated(ctx, plan, engine, root); err != nil {
 			return "", err
 		}
@@ -86,6 +100,12 @@ func Generate(ctx context.Context, plan *Plan, engine, root string, check bool) 
 	bundle, err := Render(ctx, plan, engine)
 	if err != nil {
 		return "", err
+	}
+	if check {
+		if err := CheckGeneratedBundle(ctx, root, bundle); err != nil {
+			return "", err
+		}
+		return bundle.PlanDigest, nil
 	}
 	if err := WriteGeneratedBundle(ctx, root, bundle); err != nil {
 		return "", err

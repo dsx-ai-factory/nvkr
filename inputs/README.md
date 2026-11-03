@@ -12,7 +12,7 @@ inputs/
   catalogs/      # Shared producer owners, including explicit version/packaging variants
   environments/  # Execution, credentials, signing and publication policy
   policies/      # Independently authored verification policy
-  testing/       # Downstream nightly coordinator configuration
+  testing/       # Retained downstream test inputs; maintained hosted nightly configuration lives in demos/
   experiments/   # Producers outside the maintained release catalog
 ```
 

@@ -659,6 +659,10 @@ func extractNativeInstaller(ctx context.Context, archive, installer string, sele
 		return nil, err
 	}
 	selection.siteSpecDigest = plainSHA(spec)
+	selection.controller, err = selectNativeControllerIdentity(ctx, installer)
+	if err != nil {
+		return nil, err
+	}
 	err = admitNativeSiteContract(ctx, NativeAssets{Installer: installer, installerSelection: selection})
 	if err != nil {
 		return nil, err

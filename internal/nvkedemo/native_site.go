@@ -86,6 +86,9 @@ func runNativeSite(ctx context.Context, cfg NativeConfig, use func(context.Conte
 			result = nvkrerr.Wrap(nvkrerr.CodePreflightFailed, result, "native NVKE demo")
 		}
 	}()
+	if err := admitNativeResourcesForNetwork(cfg.Resources, cfg.Network); err != nil {
+		return err
+	}
 	if err := requireContext(ctx); err != nil {
 		return err
 	}
@@ -311,7 +314,7 @@ func (s *nativeSiteAttempt) startup(ctx context.Context, api, diskURL, out strin
 		ControllerImage: s.assets.Images["controller"].Reference, ProviderImage: s.assets.Images["provisioned-provider"].Reference,
 		HandoffURL: handoff.URL, HandoffToken: handoff.Token, HandoffCertificate: handoff.Certificate,
 		Deployment: &NativeSiteDeployment{NicoURL: api, ImageURL: diskURL, ProfilesImage: s.assets.Images["profiles"].Reference},
-		arch:       s.assets.arch, imageTags: s.assets.importTags,
+		arch:       s.assets.arch, imageTags: s.assets.importTags, resourceProfile: s.resources.Profile,
 	}
 	cfg.ImageImports = make(map[string]string)
 	for role, image := range s.assets.Images {
@@ -364,7 +367,7 @@ func (s *nativeSiteAttempt) closeTenant(ctx context.Context) error {
 	}
 	cleanup := s.tenantOwner.restore(ctx)
 	if cleanup != nil && !errors.Is(cleanup, ErrUnjoined) {
-		cleanup = retainNativeSiteFailure(ctx, runner, s.assets.HostTools, filepath.Join(s.tenantOwner.session.Work, "site.kubeconfig"), cleanup)
+		cleanup = retainNativeSiteFailure(ctx, runner, s.assets, filepath.Join(s.tenantOwner.session.Work, "site.kubeconfig"), cleanup)
 	}
 	return cleanup
 }
@@ -628,15 +631,22 @@ func (s *nativeSiteAttempt) namedTenantRequest(ctx context.Context, name string)
 	if err != nil {
 		return TenantRequest{}, err
 	}
+	ovnVersion, _, _, err := selectedOVNOutputs(mode)
+	if err != nil {
+		return TenantRequest{}, err
+	}
+	if err := admitNativeResourceProfile(s.resources.Profile, ovnVersion); err != nil {
+		return TenantRequest{}, err
+	}
 	version, err := nativeKubernetesVersion(ctx, s.assets)
 	if err != nil {
 		return TenantRequest{}, err
 	}
 	request := TenantRequest{
 		Name: name, Kubernetes: version, CNI: "ovn-kubernetes", CNIVersion: siteOVNVersion,
-		ControlPlane: ControlPlaneIntent{Count: 1, Reserved: "1Gi", DisableMonitor: true},
+		ControlPlane: ControlPlaneIntent{Count: 1, Reserved: nativeReservedMemory(s.resources.Profile), DisableMonitor: true},
 		NodePools: []NodePoolIntent{{Name: "worker", Prefix: "w", Count: s.tenantNodeCount() - 1,
-			SystemReserved: "1Gi", KubeReserved: "1Gi", DisableAuto: true, DisableMonitor: true}},
+			SystemReserved: nativeReservedMemory(s.resources.Profile), KubeReserved: nativeReservedMemory(s.resources.Profile), DisableAuto: true, DisableMonitor: true}},
 	}
 	switch mode {
 	case "ovn":
@@ -830,30 +840,51 @@ func (s *nativeSiteAttempt) admitAPIClient(ctx context.Context, runner Runner, t
 	if err := requireContext(ctx); err != nil {
 		return err
 	}
+	controller, err := nativeControllerForAssets(ctx, s.assets)
+	if err != nil {
+		return err
+	}
 	gateway := s.bridge.gateway
 	if !gateway.Is4() || !gateway.IsPrivate() || !s.bridge.prefix.Contains(gateway) {
 		return nvkrerr.New(nvkrerr.CodeEngineCapability, "API client admission requires the observed private IPv4 demo gateway")
 	}
 	raw, err := s.capture(ctx, runner, "api-client-controller", filepath.Join(tools, "kubectl"), "--kubeconfig", kubeconfig,
-		"-n", "nke-controller", "get", "deployments", "-l", "app.kubernetes.io/instance=nke-controller", "-o", "json")
+		"-n", controller.name, "get", "deployments", "-l", "app.kubernetes.io/instance="+controller.name, "-o", "json")
 	if err != nil {
 		return err
 	}
 	var observed struct {
 		Items []struct {
 			Metadata struct {
+				Name      string `json:"name"`
 				Namespace string `json:"namespace"`
 			} `json:"metadata"`
 			Spec struct {
 				Selector json.RawMessage `json:"selector"`
+				Template struct {
+					Spec struct {
+						Containers []struct {
+							Name string `json:"name"`
+						} `json:"containers"`
+					} `json:"spec"`
+				} `json:"template"`
 			} `json:"spec"`
 		} `json:"items"`
 	}
 	if err := json.Unmarshal(raw, &observed); err != nil {
 		return err
 	}
-	if len(observed.Items) != 1 || observed.Items[0].Metadata.Namespace != "nke-controller" {
-		return errors.New("API client admission requires exactly one controller Deployment in its namespace")
+	if len(observed.Items) != 1 || observed.Items[0].Metadata.Namespace != controller.name || observed.Items[0].Metadata.Name != controller.name {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "API client admission requires exactly the source-selected controller Deployment in its namespace")
+	}
+	containers := 0
+	for _, container := range observed.Items[0].Spec.Template.Spec.Containers {
+		if container.Name == controller.name {
+			containers++
+		}
+	}
+	if containers != 1 {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "API client admission requires exactly one source-selected controller container")
 	}
 	selector := observed.Items[0].Spec.Selector
 	var selected struct {
@@ -862,13 +893,13 @@ func (s *nativeSiteAttempt) admitAPIClient(ctx context.Context, runner Runner, t
 	if err := json.Unmarshal(selector, &selected); err != nil {
 		return err
 	}
-	if selected.MatchLabels["app.kubernetes.io/instance"] != "nke-controller" {
-		return errors.New("API client admission requires the exact controller release selector")
+	if selected.MatchLabels["app.kubernetes.io/instance"] != controller.name || selected.MatchLabels["app.kubernetes.io/name"] != controller.name {
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "API client admission requires the source-selected controller release and name selector")
 	}
 	// Preserve the server's complete selector. Kubernetes, through kubectl apply,
 	// owns LabelSelector validation; this consumer does not parse its grammar.
 	policy := map[string]any{"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
-		"metadata": map[string]string{"name": "nvke-demo-api-client", "namespace": "nke-controller"},
+		"metadata": map[string]string{"name": "nvke-demo-api-client", "namespace": controller.name},
 		"spec": map[string]any{"podSelector": selector, "policyTypes": []string{"Ingress"},
 			"ingress": []any{map[string]any{"from": []any{map[string]any{"ipBlock": map[string]string{"cidr": netip.PrefixFrom(gateway, 32).String()}}},
 				"ports": []any{map[string]any{"protocol": "TCP", "port": 8080}}}}}}
@@ -904,7 +935,20 @@ func projectNativeSiteBoot(ctx context.Context, source, diskURL string) (*native
 	if err := requireContext(ctx); err != nil {
 		return nil, err
 	}
-	if strings.Count(source, nativeMachineImageDiskSlot) != 1 {
+	// NVKE's retained and current fixtures name different loopback endpoints.
+	// Admit one known slot across both forms; NICoSim owns iPXE interpretation.
+	var sourceURL string
+	slots := 0
+	for _, candidate := range []string{
+		"http://127.0.0.1/nvke-node.qcow2",
+		nativeMachineImageDiskSlot,
+	} {
+		if count := strings.Count(source, candidate); count != 0 {
+			slots += count
+			sourceURL = candidate
+		}
+	}
+	if slots != 1 {
 		return nil, errors.New("source MachineImage must expose one local QCOW URL slot")
 	}
 	location, err := url.Parse(diskURL)
@@ -915,7 +959,7 @@ func projectNativeSiteBoot(ctx context.Context, source, diskURL string) (*native
 	if err != nil || !address.Is4() || !address.IsPrivate() {
 		return nil, errors.New("native site boot requires the owned private disk endpoint")
 	}
-	projected := strings.Replace(source, nativeMachineImageDiskSlot, diskURL, 1)
+	projected := strings.Replace(source, sourceURL, diskURL, 1)
 	parsed, err := template.New("source-machine-image").Option("missingkey=error").Parse(projected)
 	if err != nil {
 		return nil, err

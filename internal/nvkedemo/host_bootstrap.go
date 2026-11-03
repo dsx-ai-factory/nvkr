@@ -39,7 +39,7 @@ printf '%s  %s\n' {{quote (sha .Digest)}} {{quote (printf "downloads/%s" .Name)}
 install -m 0755 downloads/nerdctl bin/nerdctl
 export PATH="$work/bin:$PATH"
 DEBIAN_FRONTEND=noninteractive NVKE_AGENT_SKIP_START=1 apt-get install -y -o DPkg::Lock::Timeout=600 \
-  nvke-agent spire-agent nvke-kubeadm-distro-{{.KubernetesVersion}} nvke-cni-ovn-images-{{.OVNVersion}} nvke-cni-ovn-charts-{{.OVNVersion}}
+  nvke-agent spire-agent nvke-kubeadm-distro-{{.KubernetesVersion}} nvke-cni-ovn-images-{{.OVNVersion}} nvke-cni-ovn-charts-{{.OVNVersion}}{{kubeletProfile}}
 # Cloud-init wrote logging-only drop-ins before package installation. Reload
 # even when APT finds the packages already installed and runs no postinst.
 systemctl daemon-reload
@@ -141,7 +141,7 @@ func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, 
 	args := []string{cli, "generate", "sitespec", "nvke-native-site", "--nodes", filepath.Join(out, "hosts.csv"),
 		"--set", "cluster.k8sVersion=" + kubernetes, "--set", "cluster.cniName=ovn-kubernetes", "--set", "cluster.cniVersion=" + version,
 		"--set", "cluster.podCidr=" + managementPodCIDR, "--set", "cluster.serviceCidr=" + managementServiceCIDR,
-		"--set", "cluster.kubeletConfig.systemReservedMemory=1Gi", "--set", "spire.trustDomain=nvke-native-site.nke.local",
+		"--set", "cluster.kubeletConfig.systemReservedMemory=" + nativeReservedMemory(s.resources.Profile), "--set", "spire.trustDomain=nvke-native-site.nke.local",
 		"--set", "spire.upstreamCA=true"}
 	runner = bindNativeSpireCA(runner, caRoot)
 	spec, err := s.capture(ctx, runner, "generate-sitespec", args...)
@@ -178,7 +178,10 @@ func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, 
 	}
 	runner.Env = SetEnv(runner.Env, map[string]string{"NVKECTL_BOOTSTRAP_CLUSTER_NAME": cluster, "NVKECTL_BOOTSTRAP_WAIT_READY": timeout.String()})
 	s.bootstrapRunner = &runner
-	if err := runner.Run(ctx, []string{cli, "bootstrap", "site", "--sitespec", specPath, "--nvke-controller-image", s.assets.Images["controller"].Reference, "--provisioned-provider-image", s.assets.Images["provisioned-provider"].Reference,
+	// Bootstrap and deployment output remains in the existing private captures.
+	bootstrap := runner
+	bootstrap.output = nil
+	if _, err := bootstrap.Capture(ctx, []string{cli, "bootstrap", "site", "--sitespec", specPath, "--nvke-controller-image", s.assets.Images["controller"].Reference, "--provisioned-provider-image", s.assets.Images["provisioned-provider"].Reference,
 		"--kubeconfig-out", filepath.Join(out, "site.kubeconfig"), "--encryption-key-out", filepath.Join(out, "site-etcd-encryption-key.json"), "--diagnostics-dir", filepath.Join(out, "bootstrap-diagnostics"), "--keep-bootstrap-cluster", "--timeout", timeout.String()}, "host-nvke-bootstrap", 0); err != nil {
 		return err
 	}
@@ -196,6 +199,10 @@ func (s *nativeSiteAttempt) bootstrapOnHost(ctx context.Context, runner Runner, 
 }
 
 func (s *nativeSiteAttempt) deployFromHost(ctx context.Context, runner Runner, cli, tools, out, specPath string) error {
+	controller, err := nativeControllerForAssets(ctx, s.assets)
+	if err != nil {
+		return err
+	}
 	runner.Env = SetEnv(runner.Env, map[string]string{"KUBECONFIG": filepath.Join(out, "site.kubeconfig"), "NVKECTL": cli})
 	version, err := nativeCAPIProviderVersion(ctx, s.assets)
 	if err != nil {
@@ -235,7 +242,7 @@ volumeBindingMode: Immediate
 	if _, err := s.capture(ctx, runner, "validate-sitespec", cli, "validate", "sitespec", "--sitespec", specPath); err != nil {
 		return err
 	}
-	telemetry, err := demoTelemetryValues()
+	telemetry, err := demoTelemetryValuesForProfile(s.resources.Profile)
 	if err != nil {
 		return err
 	}
@@ -265,12 +272,13 @@ volumeBindingMode: Immediate
 		}
 		args = append(args, "--values-for", item+"="+path)
 	}
-	deployment, helmArgs, err := prepareSiteHelm(ctx, runner, tools, out)
+	deployment, helmArgs, err := prepareSiteHelm(ctx, runner, tools, out, controller)
 	if err != nil {
 		return err
 	}
 	args = append(args, helmArgs...)
-	if err := deployment.Run(ctx, args, "host-nvke-deploy", 0); err != nil {
+	deployment.output = nil
+	if _, err := deployment.Capture(ctx, args, "host-nvke-deploy", 0); err != nil {
 		return err
 	}
 	// Both source commands remain under the original work deadline.
@@ -281,7 +289,10 @@ volumeBindingMode: Immediate
 // liveness/readiness probes on startup, using Helm's supported post-renderer
 // and the bundled kubectl's Kustomize rather than modifying source charts.
 // The original Runner context still bounds the installation process.
-func prepareSiteHelm(ctx context.Context, runner Runner, tools, out string) (Runner, []string, error) {
+func prepareSiteHelm(ctx context.Context, runner Runner, tools, out string, controller nativeControllerIdentity) (Runner, []string, error) {
+	if err := controller.admit(); err != nil {
+		return runner, nil, err
+	}
 	budget, err := remainingWork(ctx)
 	if err != nil {
 		return runner, nil, err
@@ -340,25 +351,25 @@ patches:
       group: apps
       version: v1
       kind: Deployment
-      name: nke-controller
-      namespace: nke-controller
+      name: %s
+      namespace: %s
     patch: |-
       apiVersion: apps/v1
       kind: Deployment
       metadata:
-        name: nke-controller
-        namespace: nke-controller
+        name: %s
+        namespace: %s
       spec:
         progressDeadlineSeconds: %d
         template:
           spec:
             containers:
-              - name: nke-controller
+              - name: %s
                 startupProbe:
                   httpGet: {path: /healthz, port: http}
                   periodSeconds: 10
                   failureThreshold: %d
-`, seconds, (seconds+9)/10)},
+`, controller.name, controller.name, controller.name, controller.name, seconds, controller.name, (seconds+9)/10)},
 	}
 	for _, file := range files {
 		if err := privateWrite(filepath.Join(plugin, file.name), []byte(file.content)); err != nil {
@@ -411,9 +422,22 @@ func nativeCAPIInitArgs(tools, kubeconfig, version string) []string {
 // node. Use its supported values to keep one collector per role with small
 // CPU requests; authentication, probes and memory limits remain source-owned.
 func demoTelemetryValues() ([]byte, error) {
+	return demoTelemetryValuesForProfile("")
+}
+
+func demoTelemetryValuesForProfile(profile string) ([]byte, error) {
+	if err := admitNativeResourceProfile(profile, siteOVNVersion); err != nil {
+		return nil, err
+	}
 	values := map[string]any{"otel-lgtm": map[string]any{"enabled": false}}
 	for _, role := range []string{"watchdog", "gateway_logs", "gateway_metrics", "gateway_traces", "large_target_metrics", "cluster_events", "daemonset"} {
-		resources := func() map[string]any { return map[string]any{"requests": map[string]any{"cpu": "25m"}} }
+		resources := func() map[string]any {
+			requests := map[string]any{"cpu": "25m"}
+			if profile == "small" {
+				requests["memory"] = "64Mi"
+			}
+			return map[string]any{"requests": requests}
+		}
 		settings := map[string]any{"resources": resources()}
 		if role != "daemonset" {
 			settings["replicas"] = 1

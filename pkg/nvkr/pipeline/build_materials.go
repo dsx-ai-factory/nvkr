@@ -487,7 +487,7 @@ func admitBuildMaterials(node ir.Node, options RunOptions) error {
 		}
 		return nil
 	}
-	if node.BuilderType != ir.BuilderOCIHermetic {
+	if node.BuilderType != ir.BuilderOCIHermetic && node.BuilderType != ir.BuilderPinnedTool {
 		return e.New(e.CodeEngineCapability,
 			"build node %q cannot consume ordinary material inputs with builder %q", node.ID, node.BuilderType)
 	}
