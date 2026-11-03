@@ -30,14 +30,20 @@ func TestReleaseExecutableAcquisition(t *testing.T) {
 func testReleaseExecutableAcquisition(t *testing.T, format string) {
 	t.Helper()
 	executable := []byte("pinned executable")
+	attestation := []byte("pinned attestation")
 	var carrier bytes.Buffer
 	gz := gzip.NewWriter(&carrier)
 	tw := tar.NewWriter(gz)
-	if err := tw.WriteHeader(&tar.Header{Name: "linux-amd64/tool", Size: int64(len(executable)), Mode: 0755, Typeflag: tar.TypeReg}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := tw.Write(executable); err != nil {
-		t.Fatal(err)
+	for _, member := range []struct {
+		name    string
+		content []byte
+	}{{"linux-amd64/tool", executable}, {"tool-attestation.sigstore.json", attestation}} {
+		if err := tw.WriteHeader(&tar.Header{Name: member.name, Size: int64(len(member.content)), Mode: 0755, Typeflag: tar.TypeReg}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tw.Write(member.content); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := tw.Close(); err != nil {
 		t.Fatal(err)
@@ -48,12 +54,17 @@ func testReleaseExecutableAcquisition(t *testing.T, format string) {
 	if format == "zip" {
 		carrier.Reset()
 		zw := zip.NewWriter(&carrier)
-		f, err := zw.Create("linux-amd64/tool")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := f.Write(executable); err != nil {
-			t.Fatal(err)
+		for _, member := range []struct {
+			name    string
+			content []byte
+		}{{"linux-amd64/tool", executable}, {"tool-attestation.sigstore.json", attestation}} {
+			f, err := zw.Create(member.name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.Write(member.content); err != nil {
+				t.Fatal(err)
+			}
 		}
 		if err := zw.Close(); err != nil {
 			t.Fatal(err)
@@ -82,6 +93,15 @@ func testReleaseExecutableAcquisition(t *testing.T, format string) {
 		{name: "missing member", change: func(n *ir.Node) { n.ExecutableArchive.Member = "other" }, code: e.CodeVerifyFailed},
 		{name: "unsafe member", change: func(n *ir.Node) { n.ExecutableArchive.Member = "../tool" }, code: e.CodeInvalidCatalog},
 		{name: "wrong delivery", change: func(n *ir.Node) { n.OutputType = "raw"; n.Env = nil }, code: e.CodeInvalidCatalog},
+		{name: "companion", change: func(n *ir.Node) {
+			n.ExecutableArchive.Companions = []ir.ArchiveMember{{Member: "tool-attestation.sigstore.json", Digest: sha256Of(attestation)}}
+		}},
+		{name: "changed companion", change: func(n *ir.Node) {
+			n.ExecutableArchive.Companions = []ir.ArchiveMember{{Member: "tool-attestation.sigstore.json", Digest: sha256Of([]byte("other"))}}
+		}, code: e.CodeVerifyFailed},
+		{name: "missing companion", change: func(n *ir.Node) {
+			n.ExecutableArchive.Companions = []ir.ArchiveMember{{Member: "absent.sigstore.json", Digest: sha256Of(attestation)}}
+		}, code: e.CodeVerifyFailed},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -122,6 +142,14 @@ func testReleaseExecutableAcquisition(t *testing.T, format string) {
 			got, err := os.ReadFile(filepath.Join(root, "tool"))
 			if err != nil || !bytes.Equal(got, want) {
 				t.Fatalf("output %q, error %v", got, err)
+			}
+			companion, err := os.ReadFile(filepath.Join(root, "tool-attestation.sigstore.json"))
+			if len(node.ExecutableArchive.Companions) == 1 && test.code == "" {
+				if err != nil || !bytes.Equal(companion, attestation) {
+					t.Fatalf("companion %q, error %v", companion, err)
+				}
+			} else if !os.IsNotExist(err) {
+				t.Fatalf("unpinned or failed companion published: %q, %v", companion, err)
 			}
 			entries, err := os.ReadDir(root)
 			if err != nil {

@@ -53,9 +53,26 @@ func TestReleaseExecutableRejectsMalformedPullClosure(t *testing.T) {
 		{name: "OCI transport", change: func(n *Node) { n.Artifact = "example.invalid/image:v1" }},
 		{name: "HTTP transport", change: func(n *Node) { n.Artifact = "http://example.invalid/tool.tar.gz" }},
 		{name: "unpinned executable", change: func(n *Node) { n.Digest = "" }, code: e.CodeUnpinnedSource},
+		{name: "unpinned companion", change: func(n *Node) { n.ExecutableArchive.Companions[0].Digest = "" }},
+		{name: "traversal companion", change: func(n *Node) { n.ExecutableArchive.Companions[0].Member = "../tool.sig" }},
+		{name: "companion shadows component", change: func(n *Node) { n.ExecutableArchive.Companions[0].Member = "dist/tool" }},
+		{name: "companion shadows member", change: func(n *Node) {
+			n.Component, n.ID = "renamed", "pull-renamed"
+			n.ExecutableArchive.Companions[0].Member = "dist/tool"
+		}},
+		{name: "unsorted companions", change: func(n *Node) {
+			n.ExecutableArchive.Companions = append(n.ExecutableArchive.Companions, ArchiveMember{Member: "a.sig", Digest: n.Digest})
+		}},
+		{name: "colliding companions", change: func(n *Node) {
+			n.ExecutableArchive.Companions = append(n.ExecutableArchive.Companions, ArchiveMember{Member: "x/tool.sig", Digest: n.Digest})
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			node := releaseExecutableGraph().Nodes[0]
+			node.ExecutableArchive.Companions = []ArchiveMember{{Member: "tool.sig", Digest: "sha256:" + strings.Repeat("d", 64)}}
+			if err := node.Validate(); err != nil {
+				t.Fatalf("baseline companion rejected: %v", err)
+			}
 			tc.change(&node)
 			code := tc.code
 			if code == "" {
@@ -81,6 +98,9 @@ func TestReleaseExecutableIdentityAndDescriptionIsolation(t *testing.T) {
 		{name: "archive pin", change: func(n *Node) { n.ExecutableArchive.Digest = "sha256:" + strings.Repeat("c", 64) }, moves: true},
 		{name: "member", change: func(n *Node) { n.ExecutableArchive.Member = "other/tool" }, moves: true},
 		{name: "executable pin", change: func(n *Node) { n.Digest = "sha256:" + strings.Repeat("c", 64) }, moves: true},
+		{name: "companion", change: func(n *Node) {
+			n.ExecutableArchive.Companions = []ArchiveMember{{Member: "tool.sig", Digest: "sha256:" + strings.Repeat("d", 64)}}
+		}, moves: true},
 		{name: "mirror", change: func(n *Node) { n.Artifact = "https://mirror.example/tool.tar.gz" }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -102,6 +122,15 @@ func TestReleaseExecutableIdentityAndDescriptionIsolation(t *testing.T) {
 	description.Nodes[0].ExecutableArchive.Member = "changed"
 	if base.Nodes[0].ExecutableArchive.Member != "bin/tool" {
 		t.Fatal("logical description aliases source graph")
+	}
+	base.Nodes[0].ExecutableArchive.Companions = []ArchiveMember{{Member: "tool.sig", Digest: "sha256:" + strings.Repeat("d", 64)}}
+	description, err = base.DigestView()
+	if err != nil {
+		t.Fatal(err)
+	}
+	description.Nodes[0].ExecutableArchive.Companions[0].Member = "changed"
+	if base.Nodes[0].ExecutableArchive.Companions[0].Member != "tool.sig" {
+		t.Fatal("logical description aliases source companions")
 	}
 }
 

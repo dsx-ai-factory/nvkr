@@ -122,6 +122,8 @@ func lifecyclePackageKind(kind string) string {
 		return PackageAPT
 	case "helm-oci":
 		return PackageHelm
+	case "bundle-oci":
+		return PackageBundle
 	case "oci":
 		return PackageImage
 	case authored.OutputDiskImage:

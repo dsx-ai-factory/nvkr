@@ -64,7 +64,7 @@ func load(ctx context.Context, p DataProvider) (*Catalog, error) {
 			cat.Actions[name] = action
 		}
 		if pin.Tool != nil {
-			cat.Tools[name] = *pin.Tool
+			cat.Tools[name] = pin.Tool.clone()
 		}
 	}
 
@@ -96,7 +96,7 @@ func load(ctx context.Context, p DataProvider) (*Catalog, error) {
 
 func clonePin(pin Pin) Pin {
 	if pin.Tool != nil {
-		tool := *pin.Tool
+		tool := pin.Tool.clone()
 		pin.Tool = &tool
 	}
 	return pin
