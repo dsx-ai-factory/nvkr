@@ -31,8 +31,8 @@ matrix entry without rebuilding the product suite.
 [reconciliation ledger](../docs/adr/reconciliation.md). It fails when a Markdown line added since the merge
 base, outside the ledger and `docs/evidence/`, matches one of a fixed list of status phrases taken from
 fixed review findings. Other phrasings pass, it cannot judge whether a sentence is true, and it ignores
-text already in the tree. Each finding names the ledger's Support-by-owner row when the file or paragraph
-cites an ADR, and the ledger otherwise. The Merge Gate runs it on every pull request against the PR's base
+text already in the tree. Each finding names the ledger's Support-by-owner row when the file, or the matched
+paragraph or list item, cites an ADR, and the ledger otherwise. The Merge Gate runs it on every pull request against the PR's base
 and head. `make status-restated-check` runs it locally against `origin/main` and the working tree,
 including uncommitted and untracked files; set `STATUS_BASE` when `origin/main` is not your base, and
 `STATUS_HEAD` to check a commit instead. For a deliberate exception, add `<!-- status-ok: reason -->` to the
