@@ -238,9 +238,12 @@ func stagePinnedToolExecutable(ctx context.Context, n ir.Node, source, parent st
 // the working directory are private and empty.
 func pinnedToolRunArgs(n ir.Node, name, toolDir, toolName, inputs, output string) []string {
 	// The invoking identity owns everything the tool writes, so a rootful runtime
-	// never leaves root-owned output the executor cannot admit or remove.
+	// never leaves root-owned output the executor cannot admit or remove. Each tmpfs
+	// states its mode: Docker mounts the -w directory 0755 root-owned, which a
+	// non-root tool cannot write.
 	args := []string{"run", "--rm", "--name", name, "--platform", n.Platform, "--network=none", "--read-only",
-		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "--tmpfs", ir.PinnedToolExecutorEnv["HOME"], "--tmpfs", ir.PinnedToolExecutorEnv["TMPDIR"], "--tmpfs", ir.PinnedToolWorkdir,
+		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "--tmpfs", ir.PinnedToolExecutorEnv["HOME"] + ":mode=1777",
+		"--tmpfs", ir.PinnedToolExecutorEnv["TMPDIR"] + ":mode=1777", "--tmpfs", ir.PinnedToolWorkdir + ":mode=1777",
 		"-v", toolDir + ":" + pinnedToolContainerDir + ":ro", "-v", output + ":" + ir.PinnedToolOutputDir}
 	if inputs != "" {
 		args = append(args, buildMaterialMountArgs(inputs)...)
