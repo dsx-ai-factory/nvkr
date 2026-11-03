@@ -97,6 +97,10 @@ func inspect(ctx context.Context, source io.Reader, compressedLimit, expandedLim
 			return nil, e.New(e.CodeVerifyFailed, "bundle contains duplicate or conflicting path %q", name)
 		}
 		for parent := path.Dir(name); parent != "."; parent = path.Dir(parent) {
+			if parents[parent] {
+				// This parent and its ancestors were checked when first recorded.
+				break
+			}
 			if isDir, exists := seen[parent]; exists && !isDir {
 				return nil, e.New(e.CodeVerifyFailed, "bundle has a regular-file parent %q", parent)
 			}

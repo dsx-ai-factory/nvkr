@@ -81,6 +81,14 @@ func TestInspectRejectsUnsafeArchives(t *testing.T) {
 		{"setuid", []tar.Header{{Name: "file", Mode: 0o4644, Typeflag: tar.TypeReg}}},
 		{"file parent", []tar.Header{file, {Name: "entry/child", Mode: 0o644, Typeflag: tar.TypeReg}}},
 		{"file parent after child", []tar.Header{{Name: "entry/child", Mode: 0o644, Typeflag: tar.TypeReg}, file}},
+		{"file ancestor after shared prefix", []tar.Header{
+			{Name: "a/b/x", Mode: 0o644, Typeflag: tar.TypeReg},
+			{Name: "a/b/y", Mode: 0o644, Typeflag: tar.TypeReg},
+			{Name: "a", Mode: 0o644, Typeflag: tar.TypeReg}}},
+		{"file parent then shared prefix", []tar.Header{
+			{Name: "a/x", Mode: 0o644, Typeflag: tar.TypeReg},
+			{Name: "a/b", Mode: 0o644, Typeflag: tar.TypeReg},
+			{Name: "a/b/y", Mode: 0o644, Typeflag: tar.TypeReg}}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			_, err := Inspect(t.Context(), bytes.NewReader(archiveFixture(t, test.headers...)))
@@ -88,6 +96,34 @@ func TestInspectRejectsUnsafeArchives(t *testing.T) {
 				t.Fatalf("got %v", err)
 			}
 		})
+	}
+}
+
+func TestInspectSharedDeepPrefix(t *testing.T) {
+	prefix := strings.Repeat("d/", 200)
+	headers := []tar.Header{
+		{Name: prefix + "first", Mode: 0o644, Typeflag: tar.TypeReg, Size: 1},
+		{Name: prefix, Mode: 0o755, Typeflag: tar.TypeDir},
+		{Name: "d/", Mode: 0o755, Typeflag: tar.TypeDir},
+	}
+	for i := range 100 {
+		headers = append(headers, tar.Header{Name: fmt.Sprintf("%sfile-%03d", prefix, i), Mode: 0o644, Typeflag: tar.TypeReg})
+	}
+	entries, err := inspect(t.Context(), bytes.NewReader(archiveFixture(t, headers...)), 1<<20, 1<<20, 300)
+	if err != nil {
+		t.Fatal(err)
+	}
+	directories := map[string]bool{}
+	for _, entry := range entries {
+		directories[entry.Path] = entry.Directory
+	}
+	if len(entries) != len(headers) || len(directories) != len(headers) || !directories["d"] ||
+		!directories[strings.TrimSuffix(prefix, "/")] || directories[prefix+"file-099"] {
+		t.Fatalf("unexpected inventory: %+v", directories)
+	}
+	// 200 implicit directories exceed a 199-entry directory bound.
+	if _, err := inspect(t.Context(), bytes.NewReader(archiveFixture(t, headers[0])), 1<<20, 1<<20, 199); errorCode(err) != e.CodeVerifyFailed {
+		t.Fatalf("directory bound: %v", err)
 	}
 }
 
