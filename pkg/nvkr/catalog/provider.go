@@ -37,7 +37,9 @@ const (
 
 // DataProvider is the synchronous parser seam for diagnostic and in-memory inputs.
 // Authority-bearing I/O uses ContextDataProvider and binds one context and resource
-// budget across every deep read. Directory providers implement both interfaces.
+// budget across every deep read. Directory providers implement both interfaces, but
+// their synchronous methods refuse with CodeEngineCapability: directory reads run
+// only through BindContext.
 type DataProvider interface {
 	ReadFile(name string) ([]byte, error)
 	ReadDir(name string) ([]string, error)
@@ -103,8 +105,8 @@ func (provider dirProvider) ReadDirContext(ctx context.Context, name string) ([]
 func (provider dirProvider) Name() string { return "dir:" + provider.root }
 
 // Dir returns a bounded, no-follow provider backed by an on-disk catalog directory
-// (--data). ContextDataProvider is implemented even though the compatibility return
-// type remains DataProvider.
+// (--data). Its reads run through ContextDataProvider, which it implements even
+// though the return type remains DataProvider; the synchronous methods refuse.
 func Dir(dir string) DataProvider { return dirProvider{root: dir} }
 
 // ValidateFilePayload validates the result of a ContextDataProvider file read.

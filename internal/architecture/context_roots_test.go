@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/build"
-	"go/importer"
 	"go/parser"
 	"go/token"
 	"go/types"
@@ -19,11 +18,13 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 	"testing"
 )
 
-// contextRoot names every production function that may create a root context with
+// contextRootRule prefixes every finding so a failure names the guard that raised it.
+const contextRootRule = "context-root"
+
+// contextRoot names a production function that creates a root context with
 // context.Background or context.TODO. Work paths receive their caller's context;
 // a convenience wrapper or nil-context default would silently drop cancellation.
 type contextRoot struct {
@@ -38,6 +39,9 @@ type contextRootException struct {
 const (
 	processRoot    = "process root: signal-bound context for the command's whole lifetime"
 	boundedCleanup = "bounded cleanup: must outlive the canceled caller and owns its own deadline"
+	// The conformance producer recovers results, cleans up and observes the
+	// environment after its canceled suite is joined.
+	boundedRecovery = "bounded recovery and cleanup: runs after the canceled suite is joined, each step with its own deadline"
 )
 
 // contextRootExceptions is the exact inventory of allowed root contexts. Entries
@@ -48,7 +52,7 @@ var contextRootExceptions = map[contextRoot]contextRootException{
 	{"cmd/nvkr-site-identity-helper/main.go", "main", "Background"}:                                                   {1, processRoot},
 	{"cmd/nvkr/main.go", "main", "Background"}:                                                                        {1, processRoot},
 	{"internal/nvkedemo/support.go", "(*OwnedProcess).finish", "Background"}:                                          {3, boundedCleanup},
-	{"pkg/nvkr/conformance/run.go", "(*Producer).produce", "Background"}:                                              {3, boundedCleanup},
+	{"pkg/nvkr/conformance/run.go", "(*Producer).produce", "Background"}:                                              {3, boundedRecovery},
 	{"pkg/nvkr/factory/utility_runner.go", "executeUtilityNode", "Background"}:                                        {1, boundedCleanup},
 	{"pkg/nvkr/pipeline/container_lifecycle.go", "(*reaper).cleanup", "Background"}:                                   {1, boundedCleanup},
 	{"pkg/nvkr/pipeline/disk_inspection_runtime.go", "runDiskInspectionContainerWithCleanupTimeout", "Background"}:    {1, boundedCleanup},
@@ -58,17 +62,20 @@ var contextRootExceptions = map[contextRoot]contextRootException{
 	{"pkg/nvkr/pipeline/tool_smoke_container.go", "runToolSmokeContainer", "Background"}:                              {1, boundedCleanup},
 }
 
-// contextRootBuildConfigs covers every build constraint used by production files.
-// A file selected by none of them fails the check instead of going unscanned.
+// contextRootBuildConfigs covers every build constraint used by production files,
+// including `ignore`-tagged generators. A file selected by none of them fails the
+// check instead of going unscanned.
 var contextRootBuildConfigs = []struct {
 	goos, goarch string
 	cgo          bool
+	tags         []string
 }{
-	{"linux", "amd64", false},
-	{"darwin", "arm64", true},
-	{"darwin", "arm64", false},
-	{"freebsd", "amd64", false},
-	{"windows", "amd64", false},
+	{"linux", "amd64", false, nil},
+	{"darwin", "arm64", true, nil},
+	{"darwin", "arm64", false, nil},
+	{"freebsd", "amd64", false, nil},
+	{"windows", "amd64", false, nil},
+	{"linux", "amd64", false, []string{"ignore"}},
 }
 
 func TestContextRootsMatchExactInventory(t *testing.T) {
@@ -76,35 +83,157 @@ func TestContextRootsMatchExactInventory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sites := make([]contextRoot, 0, len(found)+len(contextRootExceptions))
+	for _, violation := range contextRootViolations(found, contextRootExceptions) {
+		t.Error(violation)
+	}
+}
+
+func TestContextRootViolations(t *testing.T) {
+	site := contextRoot{"pkg/p/p.go", "Run", "Background"}
+	other := contextRoot{"pkg/p/q.go", "Wait", "TODO"}
+	for _, test := range []struct {
+		name       string
+		found      map[contextRoot][]string
+		exceptions map[contextRoot]contextRootException
+		want       []string
+	}{
+		{
+			name:       "exact match",
+			found:      map[contextRoot][]string{site: {"pkg/p/p.go:3:9"}},
+			exceptions: map[contextRoot]contextRootException{site: {1, boundedCleanup}},
+		},
+		{
+			name:  "new site",
+			found: map[contextRoot][]string{site: {"pkg/p/p.go:3:9"}},
+			want:  []string{"context-root: pkg/p/p.go:3:9: Run calls context.Background 1 time(s)"},
+		},
+		{
+			name:       "count changed",
+			found:      map[contextRoot][]string{site: {"pkg/p/p.go:3:9", "pkg/p/p.go:7:9"}},
+			exceptions: map[contextRoot]contextRootException{site: {1, boundedCleanup}},
+			want:       []string{"context-root: pkg/p/p.go:3:9, pkg/p/p.go:7:9: Run calls context.Background 2 time(s); inventory allows exactly 1"},
+		},
+		{
+			name:       "stale exception",
+			exceptions: map[contextRoot]contextRootException{site: {1, boundedCleanup}},
+			want:       []string{"context-root: pkg/p/p.go: Run context.Background exception is stale"},
+		},
+		{
+			name:       "missing reason",
+			found:      map[contextRoot][]string{site: {"pkg/p/p.go:3:9"}},
+			exceptions: map[contextRoot]contextRootException{site: {1, ""}},
+			want:       []string{"context-root: pkg/p/p.go: Run exception has no reason"},
+		},
+		{
+			name:  "sorted",
+			found: map[contextRoot][]string{other: {"pkg/p/q.go:4:2"}, site: {"pkg/p/p.go:3:9"}},
+			want: []string{
+				"context-root: pkg/p/p.go:3:9: Run calls context.Background 1 time(s)",
+				"context-root: pkg/p/q.go:4:2: Wait calls context.TODO 1 time(s)",
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got := contextRootViolations(test.found, test.exceptions)
+			if len(got) != len(test.want) {
+				t.Fatalf("violations = %q; want prefixes %q", got, test.want)
+			}
+			for index := range got {
+				if !strings.HasPrefix(got[index], test.want[index]) {
+					t.Fatalf("violation %d = %q; want prefix %q", index, got[index], test.want[index])
+				}
+			}
+		})
+	}
+}
+
+// contextRootViolations compares found root contexts with the exception inventory
+// and returns one sorted message per difference.
+func contextRootViolations(found map[contextRoot][]string, exceptions map[contextRoot]contextRootException) []string {
+	sites := make([]contextRoot, 0, len(found)+len(exceptions))
 	for site := range found {
 		sites = append(sites, site)
 	}
-	for site := range contextRootExceptions {
+	for site := range exceptions {
 		if _, ok := found[site]; !ok {
 			sites = append(sites, site)
 		}
 	}
 	sort.Slice(sites, func(i, j int) bool {
 		left, right := sites[i], sites[j]
-		return left.File+"\x00"+left.Function+"\x00"+left.Symbol < right.File+"\x00"+right.Function+"\x00"+right.Symbol
+		if left.File != right.File {
+			return left.File < right.File
+		}
+		if left.Function != right.Function {
+			return left.Function < right.Function
+		}
+		return left.Symbol < right.Symbol
 	})
+	var violations []string
 	for _, site := range sites {
-		count, present := found[site]
-		allowed, ok := contextRootExceptions[site]
-		if ok && allowed.Reason == "" {
-			t.Errorf("%s: %s exception has no reason", site.File, site.Function)
-		}
+		positions, present := found[site]
+		allowed, listed := exceptions[site]
+		where := strings.Join(positions, ", ")
 		switch {
+		case listed && allowed.Reason == "":
+			violations = append(violations, fmt.Sprintf("%s: %s: %s exception has no reason", contextRootRule, site.File, site.Function))
 		case !present:
-			t.Errorf("%s: %s context.%s exception is stale; remove it from the inventory", site.File, site.Function, site.Symbol)
-		case !ok:
-			t.Errorf("%s: %s calls context.%s %d time(s); pass the caller's context instead, or add an exact bounded-cleanup or process-root exception with its reason",
-				site.File, site.Function, site.Symbol, count)
-		case allowed.Count != count:
-			t.Errorf("%s: %s calls context.%s %d time(s); inventory allows exactly %d (%s)",
-				site.File, site.Function, site.Symbol, count, allowed.Count, allowed.Reason)
+			violations = append(violations, fmt.Sprintf("%s: %s: %s context.%s exception is stale; remove it from contextRootExceptions",
+				contextRootRule, site.File, site.Function, site.Symbol))
+		case !listed:
+			violations = append(violations, fmt.Sprintf("%s: %s: %s calls context.%s %d time(s); pass the caller's context instead, "+
+				"or add an exact process-root or bounded-cleanup entry with its reason to contextRootExceptions",
+				contextRootRule, where, site.Function, site.Symbol, len(positions)))
+		case allowed.Count != len(positions):
+			violations = append(violations, fmt.Sprintf("%s: %s: %s calls context.%s %d time(s); inventory allows exactly %d (%s)",
+				contextRootRule, where, site.Function, site.Symbol, len(positions), allowed.Count, allowed.Reason))
 		}
+	}
+	return violations
+}
+
+func TestFindModuleContextRootsScansWhatGoBuilds(t *testing.T) {
+	root := t.TempDir()
+	write := func(name, source string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, name), []byte(source), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const leak = "import \"context\"\nfunc Leak() { _ = context.Background() }\n"
+	write("go.mod", "module example.com/m\n")
+	write("p/p.go", "package p\n"+leak)
+	write("p/linux.go", "//go:build linux\n\npackage p\nimport \"context\"\nfunc Linux() { _ = context.TODO() }\n")
+	write("p/generate.go", "//go:build ignore\n\npackage main\n"+leak)
+	write("p/p_test.go", "package p\n"+leak)
+	write("p/_draft.go", "package p\n"+leak)
+	write("_attic/a.go", "package attic\n"+leak)
+	write(".hidden/h.go", "package hidden\n"+leak)
+	write("p/testdata/t.go", "package t\n"+leak)
+	write("nested/go.mod", "module example.com/nested\n")
+	write("nested/n.go", "package nested\n"+leak)
+	if err := os.Symlink(filepath.Join(root, "missing"), filepath.Join(root, "p", ".#p.go")); err != nil {
+		t.Fatal(err)
+	}
+	found, err := findModuleContextRoots(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[contextRoot][]string{
+		{"p/generate.go", "Leak", "Background"}: {"p/generate.go:5:27"},
+		{"p/linux.go", "Linux", "TODO"}:         {"p/linux.go:5:28"},
+		{"p/p.go", "Leak", "Background"}:        {"p/p.go:3:27"},
+	}
+	if fmt.Sprint(found) != fmt.Sprint(want) {
+		t.Fatalf("found = %v; want %v", found, want)
+	}
+
+	write("p/never.go", "//go:build nvkr_never\n\npackage p\n")
+	if _, err := findModuleContextRoots(root); err == nil || !strings.Contains(err.Error(), "context-root: p/never.go matches no build configuration") {
+		t.Fatalf("unselected file error = %v", err)
 	}
 }
 
@@ -182,6 +311,14 @@ import "example.com/remote"
 func Use() { remote.New().Style.Background() }`,
 		},
 		{
+			name: "unchecked dot import",
+			source: `package p
+import . "context"
+func Use() { _ = Background() }`,
+			extra:   "package q\n",
+			wantErr: "cannot resolve Background",
+		},
+		{
 			name: "unchecked context qualifier",
 			source: `package p
 import "context"
@@ -230,32 +367,42 @@ type contextRootSite struct {
 	function, symbol string
 }
 
-// findModuleContextRoots scans every non-test Go file in the main module under
-// each build configuration and counts distinct root-context uses per function.
-func findModuleContextRoots(root string) (map[contextRoot]int, error) {
+// findModuleContextRoots scans every non-test Go file that the go command would
+// build in the module at root, under each build configuration, and returns the
+// distinct root-context positions per function.
+func findModuleContextRoots(root string) (map[contextRoot][]string, error) {
 	root, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
+	}
+	relative := func(name string) string {
+		if rel, err := filepath.Rel(root, name); err == nil {
+			return filepath.ToSlash(rel)
+		}
+		return name
 	}
 	directories := map[string][]string{}
 	err = filepath.WalkDir(root, func(current string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
+		name := entry.Name()
+		if current == root {
+			return nil
+		}
+		// The go command ignores names starting with "." or "_" and testdata.
+		ignored := strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")
 		if entry.IsDir() {
-			name := entry.Name()
-			if current != root && (strings.HasPrefix(name, ".") || name == "testdata" || name == "node_modules" || name == "vendor") {
+			if ignored || name == "testdata" || name == "node_modules" || name == "vendor" {
 				return filepath.SkipDir
 			}
-			if current != root {
-				if _, err := os.Stat(filepath.Join(current, "go.mod")); err == nil {
-					return filepath.SkipDir // nested module
-				}
+			if _, err := os.Stat(filepath.Join(current, "go.mod")); err == nil {
+				return filepath.SkipDir // nested module
 			}
 			return nil
 		}
-		if strings.HasSuffix(current, ".go") && !strings.HasSuffix(current, "_test.go") {
-			directories[filepath.Dir(current)] = append(directories[filepath.Dir(current)], entry.Name())
+		if !ignored && strings.HasSuffix(name, ".go") && !strings.HasSuffix(name, "_test.go") {
+			directories[filepath.Dir(current)] = append(directories[filepath.Dir(current)], name)
 		}
 		return nil
 	})
@@ -275,7 +422,7 @@ func findModuleContextRoots(root string) (map[contextRoot]int, error) {
 		covered := map[string]bool{}
 		for _, config := range contextRootBuildConfigs {
 			context := build.Default
-			context.GOOS, context.GOARCH, context.CgoEnabled = config.goos, config.goarch, config.cgo
+			context.GOOS, context.GOARCH, context.CgoEnabled, context.BuildTags = config.goos, config.goarch, config.cgo, config.tags
 			context.OpenFile = func(path string) (io.ReadCloser, error) {
 				source, ok := sources[path]
 				if !ok {
@@ -283,7 +430,8 @@ func findModuleContextRoots(root string) (map[contextRoot]int, error) {
 				}
 				return io.NopCloser(bytes.NewReader(source)), nil
 			}
-			var files []*ast.File
+			// Group by package clause: an ignore-tagged generator is its own main package.
+			packages := map[string][]*ast.File{}
 			for _, name := range names {
 				match, err := context.MatchFile(directory, name)
 				if err != nil {
@@ -299,53 +447,49 @@ func findModuleContextRoots(root string) (map[contextRoot]int, error) {
 						return nil, err
 					}
 				}
-				files = append(files, parsed[name])
+				packages[parsed[name].Name.Name] = append(packages[parsed[name].Name.Name], parsed[name])
 			}
-			if len(files) == 0 {
-				continue
-			}
-			sites, err := packageContextRoots(fset, files)
-			if err != nil {
-				return nil, err
-			}
-			for _, site := range sites {
-				seen[site.pos] = site
+			for _, files := range packages {
+				sites, err := packageContextRoots(fset, files)
+				if err != nil {
+					return nil, err
+				}
+				for _, site := range sites {
+					seen[site.pos] = site
+				}
 			}
 		}
 		for _, name := range names {
 			if !covered[name] {
-				return nil, fmt.Errorf("%s matches no context-root build configuration; extend contextRootBuildConfigs",
-					filepath.Join(directory, name))
+				return nil, fmt.Errorf("%s: %s matches no build configuration; add one that selects it to contextRootBuildConfigs",
+					contextRootRule, relative(filepath.Join(directory, name)))
 			}
 		}
 	}
-	found := map[contextRoot]int{}
+	found := map[contextRoot][]string{}
 	for _, site := range seen {
-		relative, err := filepath.Rel(root, site.pos.Filename)
-		if err != nil {
-			return nil, err
-		}
-		found[contextRoot{filepath.ToSlash(relative), site.function, site.symbol}]++
+		file := relative(site.pos.Filename)
+		key := contextRoot{file, site.function, site.symbol}
+		found[key] = append(found[key], fmt.Sprintf("%s:%d:%d", file, site.pos.Line, site.pos.Column))
+	}
+	for key := range found {
+		sort.Strings(found[key])
 	}
 	return found, nil
 }
 
-// packageContextRoots type-checks one package's files against the real context
-// package. Other imports are empty stand-ins, so their type errors are ignored;
-// any Background or TODO identifier that then remains unresolved is an error
-// rather than an assumed non-match.
+// packageContextRoots type-checks one package's files so that scoping, aliases and
+// dot imports resolve each identifier. Every import is a stand-in and the
+// resulting type errors are ignored; any Background or TODO identifier that then
+// remains unresolved is an error rather than an assumed non-match.
 func packageContextRoots(fset *token.FileSet, files []*ast.File) ([]contextRootSite, error) {
-	contextPackage, err := loadContextPackage()
-	if err != nil {
-		return nil, err
-	}
 	roots := map[types.Object]string{
 		contextPackage.Scope().Lookup("Background"): "Background",
 		contextPackage.Scope().Lookup("TODO"):       "TODO",
 	}
 	info := &types.Info{Uses: map[*ast.Ident]types.Object{}, Defs: map[*ast.Ident]types.Object{}}
 	config := types.Config{
-		Importer: contextOnlyImporter{context: contextPackage},
+		Importer: contextOnlyImporter{},
 		Error:    func(error) {},
 	}
 	_, _ = config.Check(files[0].Name.Name, fset, files, info)
@@ -458,15 +602,26 @@ func functionName(decl *ast.FuncDecl) string {
 	return types.ExprString(receiver) + "." + decl.Name.Name
 }
 
-var loadContextPackage = sync.OnceValues(func() (*types.Package, error) {
-	return importer.ForCompiler(token.NewFileSet(), "source", nil).Import("context")
-})
+// contextPackage stands in for the standard context package. The checker needs the
+// identity of its two root constructors, not the real package's types.
+var contextPackage = func() *types.Package {
+	pkg := types.NewPackage("context", "context")
+	name := types.NewTypeName(token.NoPos, pkg, "Context", nil)
+	contextType := types.NewNamed(name, types.NewInterfaceType(nil, nil).Complete(), nil)
+	pkg.Scope().Insert(name)
+	result := types.NewTuple(types.NewVar(token.NoPos, pkg, "", contextType))
+	for _, root := range []string{"Background", "TODO"} {
+		pkg.Scope().Insert(types.NewFunc(token.NoPos, pkg, root, types.NewSignatureType(nil, nil, nil, nil, result, false)))
+	}
+	pkg.MarkComplete()
+	return pkg
+}()
 
-type contextOnlyImporter struct{ context *types.Package }
+type contextOnlyImporter struct{}
 
-func (importer contextOnlyImporter) Import(importPath string) (*types.Package, error) {
+func (contextOnlyImporter) Import(importPath string) (*types.Package, error) {
 	if importPath == "context" {
-		return importer.context, nil
+		return contextPackage, nil
 	}
 	stand := types.NewPackage(importPath, path.Base(importPath))
 	stand.MarkComplete()
