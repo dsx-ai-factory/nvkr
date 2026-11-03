@@ -69,8 +69,9 @@ retain their separate admission and result contracts; catalog registration grant
 Proposed [ADR-26](adr/0026-definition-composition.md) designs composite Definitions: complete member Definitions
 pinned by exact digest compile to one Plan, Run and Release whose membership is the exact union of their named
 outputs. Members keep independent ownership, Runs and Releases; a composite rebuilds every output and inherits
-no member Run, Release or lane. Development bundles are planned with generation; member Release reuse and
-composite qualification are deferred. Nothing is implemented.
+no member Run, Release or lane. Admission, merge, composite Plans, generation including named development
+bundles, Run and publication records and consumer expectations are implemented and contract-tested only; member
+Release reuse and composite qualification are deferred and refused, and no hosted composite Run exists.
 
 Proposed [ADR-27](adr/0027-pinned-tool-producers.md) designs pinned-tool producers: a catalog component runs one
 released, digest-pinned executable offline in a pinned container, with no shell, typed material inputs and only
@@ -282,8 +283,9 @@ Specialized byte-changing transformations remain explicit product intent.
 
 A proposed composite Definition (ADR-26) would enter this flow before the compiler: admission loads each
 digest-pinned member, rejects drift and structural conflicts, and derives one effective Definition that the same
-compiler consumes; the compiler rejects divergent cross-member producers once catalogs are resolved. Composition changes Definition, Plan, Run and Release identities and records every member digest and
-output attribution; it never changes an output's Build Digest. This path is designed, not implemented.
+compiler consumes; the compiler rejects divergent cross-member producers once catalogs are resolved. Composition
+changes Definition, Plan, Run and Release identities and records every member digest and output attribution; it
+never changes an output's Build Digest. This path is implemented and contract-tested, not externally exercised.
 
 A proposed pinned-tool producer (ADR-27) is an ordinary selected component inside this flow. The compiler lowers
 it to a source-less build node carrying the tool's archive and executable digests, and reuses the shared tool

@@ -23,6 +23,7 @@ func bindReleaseContentOutputs(outputs []factory.LifecycleOutputPlan, run *Run) 
 	}
 	copyRun := *run
 	copyRun.Expected = cloneRequired(run.Expected)
+	copyRun.Composition = run.Composition.Clone()
 	copyRun.Observed = cloneArtifacts(run.Observed)
 	copyRun.ContentSubject = contentSubject
 	if err := factory.ValidateLifecycleOutputs(outputs, run.Observed); err != nil {
