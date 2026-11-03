@@ -123,18 +123,18 @@ consumes unchanged. The derivation is a pure, deterministic function of the comp
 
 The cross-member producer rule is deliberately stricter than a single Definition: two family owners releasing the
 same component at different pins is exactly the silent incompatibility a combined Release must not hide. An
-author who intends different producers of one component in different members declares that in the composite:
-a `variants` entry names the component and the members that may diverge on it. The declaration lives in the
+author who intends different producers of one component in different members declares that in the composite. A
+`variants` entry names the component and the members that may diverge on it. The declaration lives in the
 composite, so review sees it, and the composite digest binds it (§4). It permits divergence only between the
 listed members for that component, on every platform they select. Any other divergence still fails, including
 one between a declared member and an unlisted member that selects the same component. Every declared member must
-select the component in at least one of its outputs, so admission refuses a misspelled or stale declaration. A declaration
-does not require the producers to differ: catalog maintenance that converges the pins does not break the
-composite. Authors may still put both outputs in one member, where ADR-11 already admits the variant.
+select the component in at least one of its outputs, so admission refuses a misspelled or stale declaration. A
+declaration does not require the producers to differ, so catalog maintenance that converges the pins does not
+break the composite. Authors may still put both outputs in one member, where ADR-11 already admits the variant.
 
 The four NVKE families select no `(component, platform)` in common and declare no variants. Per-release
-node-image Definitions are the motivating case: one Definition per Ubuntu release selects the same node agent,
-DOCA OVS, installer and disk producers at release-specific pins, and a site composite that releases both members
+node-image Definitions motivate the opt-in. One Definition per Ubuntu release selects the same node agent, DOCA
+OVS, installer and disk producers at release-specific pins, and a site composite that releases both members
 declares each of those components as a variant of the two members.
 
 The effective Definition is a derived internal record, like a Plan. It is never written as an authored input,
