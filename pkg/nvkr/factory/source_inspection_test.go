@@ -120,7 +120,7 @@ func TestInspectRestoredSourceChecksExactPlanPaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	base, err := catalog.LoadContext(t.Context(), sourceInspectionCatalog{ContextDataProvider: provider.(catalog.ContextDataProvider), lock: raw})
+	base, err := catalog.LoadContext(t.Context(), sourceInspectionCatalog{ContextDataProvider: provider, lock: raw})
 	if err != nil {
 		t.Fatal(err)
 	}
