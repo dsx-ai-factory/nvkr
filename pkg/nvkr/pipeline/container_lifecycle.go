@@ -56,9 +56,6 @@ func newReaper(ctx context.Context, docker string) *reaper {
 }
 
 func newReaperWithCleanup(ctx context.Context, docker string, cleanup reaperCleanupCommand) *reaper {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	r := &reaper{
 		names: map[string]bool{}, docker: docker,
 		cleanupTimeout: defaultReaperCleanupTimeout,

@@ -21,7 +21,11 @@ func TestNVKEReleasePinsStayAligned(t *testing.T) {
 	} {
 		t.Run(directory, func(t *testing.T) {
 			root := filepath.Join("../../../inputs/catalogs", directory)
-			registry, err := readRegistry(Dir(root))
+			bound, err := BindContext(t.Context(), Dir(root))
+			if err != nil {
+				t.Fatal(err)
+			}
+			registry, err := readRegistry(bound)
 			if err != nil {
 				t.Fatal(err)
 			}

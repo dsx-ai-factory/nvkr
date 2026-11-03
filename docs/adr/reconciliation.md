@@ -3662,7 +3662,9 @@ The public modules enforce one owner per invariant. [ADR-17](0017-cli-sdk-founda
 and [Development](../../DEVELOPMENT.md) describe current package/lifetime ownership. Completed cleanup,
 organization and migration reports do not remain a second status ledger. Tests in the owning packages retain
 strict input admission, held-byte substitution, durable attempt commit, cancellation/join, terminal evidence
-and exact output/Plan bindings; passing repository gates do not establish external acceptance.
+and exact output/Plan bindings; passing repository gates do not establish external acceptance. A repository
+architecture test limits production root contexts to an exact inventory of process roots and bounded cleanup,
+so a work path cannot replace its caller's cancellation with a context of its own.
 
 ## External run references
 

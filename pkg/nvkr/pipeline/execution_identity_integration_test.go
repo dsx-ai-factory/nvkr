@@ -342,7 +342,7 @@ func TestRuntimeSnapshotClosesObserveThenExecutePathRace(t *testing.T) {
 	if err := os.WriteFile(original, []byte("#!/bin/sh\nprintf original"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	snapshot, err := snapshotRuntimeExecutable(original)
+	snapshot, err := snapshotRuntimeExecutableContext(t.Context(), original)
 	if runtime.GOOS != "linux" {
 		if executionErrorCode(err) != nvkrerr.CodeEngineCapability {
 			t.Fatalf("non-Linux qualified runtime capture did not fail closed: %v", err)

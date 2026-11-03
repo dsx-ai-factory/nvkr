@@ -59,8 +59,10 @@ type ContextDataProvider interface {
 // unsupported hosts fail closed rather than falling back to pathname checks.
 type dirProvider struct{ root string }
 
+// ReadFile and ReadDir satisfy the parser seam only to fail closed: directory
+// reads are authority-bearing I/O and run only through BindContext.
 func (provider dirProvider) ReadFile(name string) ([]byte, error) {
-	return provider.ReadFileContext(context.Background(), name)
+	return nil, e.New(e.CodeEngineCapability, "directory catalog file %q requires a context-bound read", name)
 }
 
 func (provider dirProvider) ReadFileContext(ctx context.Context, name string) ([]byte, error) {
@@ -74,7 +76,7 @@ func (provider dirProvider) ReadFileContext(ctx context.Context, name string) ([
 }
 
 func (provider dirProvider) ReadDir(name string) ([]string, error) {
-	return provider.ReadDirContext(context.Background(), name)
+	return nil, e.New(e.CodeEngineCapability, "directory catalog listing %q requires a context-bound read", name)
 }
 
 func (provider dirProvider) ReadDirContext(ctx context.Context, name string) ([]string, error) {
