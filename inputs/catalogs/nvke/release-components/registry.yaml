@@ -68,14 +68,14 @@ components:
     outputType: oci-image
     platforms: [linux/amd64, linux/arm64]
     prebuilt:
-      image: rancher/kubectl:v1.34.1
+      image: rancher/kubectl:v1.35.6
       evidence: {none: true}
   nktp-lgtm-image:
     source: nvke-content
     outputType: oci-image
     platforms: [linux/amd64, linux/arm64]
     prebuilt:
-      image: grafana/otel-lgtm:0.32.0
+      image: grafana/otel-lgtm:0.38.0
       evidence: {none: true}
   nktp-metrics-server-image:
     source: nvke-content
@@ -96,26 +96,26 @@ components:
     outputType: oci-image
     platforms: [linux/amd64, linux/arm64]
     prebuilt:
-      image: ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator:0.159.0
+      image: ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator:0.161.0
       evidence: {none: true}
   nktp-target-allocator-image:
     source: nvke-content
     outputType: oci-image
     platforms: [linux/amd64, linux/arm64]
     prebuilt:
-      image: ghcr.io/open-telemetry/opentelemetry-operator/target-allocator:0.159.0
+      image: ghcr.io/open-telemetry/opentelemetry-operator/target-allocator:0.161.0
       evidence: {none: true}
   nktp-chart:
     fromSource: true
     source: nvke-nktp
-    artifactPath: charts/nktp-0.22.0.tgz
+    artifactPath: charts/nktp-0.23.0.tgz
     writeDir: charts
     platforms: [linux/amd64, linux/arm64]
     outputType: tarball
     buildCommand:
       - sh
       - -euc
-      - .nvkr-tools/helm package nktp/deploy/charts/nktp --version=0.22.0 --app-version=v0.22.0 --destination=charts/
+      - .nvkr-tools/helm package nktp/deploy/charts/nktp --version=0.23.0 --app-version=v0.23.0 --destination=charts/
   capnico-controller:
     fromSource: true
     source: capnico
@@ -171,11 +171,11 @@ sources:
     toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
   nvke-content:
     repo: https://github.com/dsx-ai-factory/nvke
-    constraint: v0.22.0
+    constraint: v0.23.0
     toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
   nvke-nktp:
     repo: https://github.com/dsx-ai-factory/nvke
-    constraint: v0.22.0
+    constraint: v0.23.0
     # Empty entrypoint, curl and tar are supplied by this existing pinned image.
     # The selected NVKE tool-versions.mk owns Helm v4.2.4. Its native executable
     # is acquired and verified in fetch, retained with the source, then used offline.
@@ -206,6 +206,6 @@ sources:
         test "$#" -eq 3
         printf '%s\n' \
           '084e6edb680cf4e2acc30bd496568c53fdf663cbacf6e17876b25785c35b7a13  nktp/deploy/charts/nktp/charts/metrics-server-3.13.1.tgz' \
-          'df7d63a331d9d164a276f5b4395c6383c00fe801abcc6b2ea969de182914dc32  nktp/deploy/charts/nktp/charts/opentelemetry-kube-stack-0.22.0.tgz' \
+          'e3460a7572a2b9c98ff421a29501dc26cdd09d83859f0556f6c3f5443793afda  nktp/deploy/charts/nktp/charts/opentelemetry-kube-stack-0.25.1.tgz' \
           '70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/deploy/charts/nktp/charts/prometheus-node-exporter-4.56.1.tgz' \
           | sha256sum -c -

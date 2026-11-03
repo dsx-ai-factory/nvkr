@@ -11,10 +11,6 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-func snapshotRuntimeExecutable(runtimePath string) (*heldRuntimeExecutable, error) {
-	return snapshotRuntimeExecutableContext(context.Background(), runtimePath)
-}
-
 func snapshotRuntimeExecutableContext(ctx context.Context, runtimePath string) (*heldRuntimeExecutable, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "holding a container runtime requires a non-nil context")

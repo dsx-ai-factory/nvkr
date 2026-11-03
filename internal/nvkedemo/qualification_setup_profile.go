@@ -86,7 +86,7 @@ func bindDemoQualificationScope(p *lifecycle.LocalQualificationPolicy, plan *fac
 	} {
 		expected[name] = factory.LifecycleOutputPlan{Name: name, Kind: "executable", Components: components}
 	}
-	expected[disk] = factory.LifecycleOutputPlan{Name: disk, Kind: lifecycle.OutputDiskImage, Components: []string{"nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-image-inputs", "nvke-kubeadm-distro", "nvke-node-image", "nvke-patched-installer-iso", "nvke-spire-agent", "ovn-kube-ubuntu", "ovn-kubernetes-chart", "ubuntu-installer-iso"}}
+	expected[disk] = factory.LifecycleOutputPlan{Name: disk, Kind: lifecycle.OutputDiskImage, Components: []string{"nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-doca-ovs", "nvke-image-inputs", "nvke-kubeadm-distro", "nvke-node-image", "nvke-patched-installer-iso", "nvke-spire-agent", "ovn-kube-ubuntu", "ovn-kubernetes-chart", "ubuntu-installer-iso"}}
 	if len(plan.LifecycleOutputs) != len(expected) {
 		return configUsage("qualification setup requires the complete maintained 32-output local demo")
 	}

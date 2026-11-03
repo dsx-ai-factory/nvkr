@@ -203,10 +203,11 @@ func TestGitHubPartitionMaintainedCapacity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile(filepath.Join("../../..", GitHubWorkflowPath))
+	flat, err := renderGitHubFlat(t.Context(), plan, false)
 	if err != nil {
 		t.Fatal(err)
 	}
+	raw := flat.Files[flat.WorkflowPath]
 	entry, workers, err := lowerGitHubPartitions(t.Context(), plan, raw)
 	if err != nil {
 		t.Fatal(err)
@@ -227,10 +228,11 @@ func TestGitHubPartitionDependenciesCrossSigningBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile(filepath.Join("../../..", GitHubWorkflowPath))
+	flat, err := renderGitHubFlat(t.Context(), plan, false)
 	if err != nil {
 		t.Fatal(err)
 	}
+	raw := flat.Files[flat.WorkflowPath]
 	entry, workers, err := lowerGitHubPartitions(t.Context(), plan, raw)
 	if err != nil {
 		t.Fatal(err)

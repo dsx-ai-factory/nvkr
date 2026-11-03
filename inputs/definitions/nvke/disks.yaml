@@ -21,6 +21,7 @@ outputs:
       - nvke-agent
       - nvke-cni-calico
       - nvke-cni-ovn
+      - nvke-doca-ovs
       - nvke-image-inputs
       - nvke-kubeadm-distro
       - nvke-node-fde-amd64
@@ -39,6 +40,7 @@ outputs:
       - nvke-agent
       - nvke-cni-calico
       - nvke-cni-ovn
+      - nvke-doca-ovs
       - nvke-image-inputs
       - nvke-kubeadm-distro
       - nvke-node-fde-arm64
@@ -57,6 +59,7 @@ outputs:
       - nvke-agent
       - nvke-cni-calico
       - nvke-cni-ovn
+      - nvke-doca-ovs
       - nvke-image-inputs
       - nvke-kubeadm-distro
       - nvke-node-image-amd64
@@ -75,6 +78,7 @@ outputs:
       - nvke-agent
       - nvke-cni-calico
       - nvke-cni-ovn
+      - nvke-doca-ovs
       - nvke-image-inputs
       - nvke-kubeadm-distro
       - nvke-node-image

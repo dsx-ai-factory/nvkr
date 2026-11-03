@@ -460,6 +460,34 @@ func TestExecuteLocalPreflightsDiskBeforeAttemptReservation(t *testing.T) {
 	}
 }
 
+func TestExecuteLocalRejectsNilContextBeforeAttemptReservation(t *testing.T) {
+	t.Chdir(t.TempDir())
+	prepared, _ := diskLifecycleFixture(t, "nil-context")
+	called := false
+	accept := func(context.Context, *factory.Plan, factory.LocalRunOptions) error { called = true; return nil }
+	var missing context.Context
+	run, err := executeLocalWithDependencies(missing, prepared,
+		LocalOptions{AttemptsRoot: ".nvkr/runs"}, localExecutionDependencies{
+			admitLocal: accept,
+			runFactory: func(context.Context, *factory.Plan, factory.LocalRunOptions) (localExecutionResult, error) {
+				called = true
+				return nil, nil
+			},
+			writeRecordState: writeRunRecordState,
+			beginDiskCommit: func(string) (*diskAttemptTransaction, error) {
+				called = true
+				return nil, nil
+			},
+		})
+	assertCode(t, err, nvkrerr.CodeUsage)
+	if run != nil || called {
+		t.Fatalf("nil context: run=%+v dependency called=%t; want rejection before any dependency", run, called)
+	}
+	if _, statErr := os.Stat(".nvkr"); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("nil context reserved attempt storage: %v", statErr)
+	}
+}
+
 func TestExecuteLocalRetainsCommittedDiskWhenMarkerCleanupFails(t *testing.T) {
 	t.Chdir(t.TempDir())
 	prepared, exporter := diskLifecycleFixture(t, "marker-cleanup-failed")
