@@ -203,22 +203,24 @@ func TestNightlyDispatchesGeneratedProducerBeforeNativeConsumer(t *testing.T) {
 }
 
 // nightlyDispatchContract executes run against a recording producer stub. The
-// step must invoke the producer exactly once with the exact arguments and exit
-// with the producer's status, so commented, skipped or swallowed dispatch fails.
+// step must invoke the producer exactly once with the exact arguments and the
+// frozen NVKE revision, and exit with the producer's status, so commented,
+// skipped, rebound or swallowed dispatch fails.
 func nightlyDispatchContract(t *testing.T, run string) error {
 	t.Helper()
+	const commit = "dddddddddddddddddddddddddddddddddddddddd"
 	for _, exit := range []int{0, 23} {
 		root := t.TempDir()
 		if err := os.Mkdir(filepath.Join(root, "scripts"), 0o700); err != nil {
 			t.Fatal(err)
 		}
-		stub := "printf '%s\\n' \"$#\" \"$@\" >>\"$RUNNER_TEMP/calls\"\nexit \"$STUB_EXIT\"\n"
+		stub := "printf '%s\\n' \"${NVKE_COMMIT-unset}\" \"$#\" \"$@\" >>\"$RUNNER_TEMP/calls\"\nexit \"$STUB_EXIT\"\n"
 		if err := os.WriteFile(filepath.Join(root, "scripts", "nightly-build.sh"), []byte(stub), 0o600); err != nil {
 			t.Fatal(err)
 		}
 		output, code := runMergeGateStep(t, mergeGateStep{storageWorkflowStep: storageWorkflowStep{Run: run}}, root,
-			[]string{"PROFILE=nvke-nightly-arm64", "STUB_EXIT=" + strconv.Itoa(exit)})
-		want := "3\ninputs/testing/nightly-profiles.json\nnvke-nightly-arm64\n" + root + "/nightly-build-nvke-nightly-arm64\n"
+			[]string{"PROFILE=nvke-nightly-arm64", "NVKE_COMMIT=" + commit, "STUB_EXIT=" + strconv.Itoa(exit)})
+		want := commit + "\n3\ninputs/testing/nightly-profiles.json\nnvke-nightly-arm64\n" + root + "/nightly-build-nvke-nightly-arm64\n"
 		calls, err := os.ReadFile(filepath.Join(root, "calls"))
 		if err != nil || string(calls) != want {
 			return fmt.Errorf("producer dispatch recorded %q (read error: %v), want exactly %q: %s", calls, err, want, output)
@@ -241,6 +243,8 @@ func TestNightlyDispatchContractRejectsUnexecutedOrSwallowedDispatch(t *testing.
 		{"early exit", "exit 0\n" + dispatch + "\n", false},
 		{"dropped argument", `bash scripts/nightly-build.sh inputs/testing/nightly-profiles.json "$PROFILE"` + "\n", false},
 		{"repeated dispatch", dispatch + "\n" + dispatch + "\n", false},
+		{"rebound revision", "NVKE_COMMIT=main " + dispatch + "\n", false},
+		{"dropped revision", "unset NVKE_COMMIT\n" + dispatch + "\n", false},
 		{"swallowed failure", dispatch + " || true\n", false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
