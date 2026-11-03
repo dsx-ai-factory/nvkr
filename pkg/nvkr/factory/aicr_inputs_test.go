@@ -108,6 +108,10 @@ func TestAICRNVKELeafAdmission(t *testing.T) {
 		admit        bool
 	}{
 		{"curated leaf last", "componentRefs: []\nmetadata:\n" + overlays + "    - " + leaf + "\n  version: v1.2.0\n", true},
+		// Verbatim top-level neighbors and metadata of the recipe AICR v1.2.0 wrote in local
+		// attempt aicr-nvke-gb200-local-20261103-r7 (sha256:80c875d6…).
+		{"AICR v1.2.0 writer output", "kind: RecipeResult\nmetadata:\n  appliedOverlays:\n    - base\n    - monitoring-hpa\n" +
+			"    - gb200-any\n    - nvke\n    - gb200-nvke-ubuntu-training\n    - " + leaf + "\n  version: 1.2.0\nvalidation:\n", true},
 		{"wildcard merge without the leaf", "metadata:\n" + overlays + "  excludedOverlays:\n    - name: " + leaf + "\n", false},
 		{"leaf not last", "metadata:\n" + overlays + "    - " + leaf + "\n    - later\n", false},
 		{"unreadable item after the leaf", "metadata:\n" + overlays + "    - " + leaf + "\n    - \"later overlay\"\n", false},
@@ -119,6 +123,12 @@ func TestAICRNVKELeafAdmission(t *testing.T) {
 		{"absent list", "metadata:\n  version: v1.2.0\n", false},
 		{"quoted leaf", "metadata:\n  appliedOverlays:\n    - \"" + leaf + "\"\n", false},
 		{"CRLF line endings", "metadata:\r\n  appliedOverlays:\r\n    - " + leaf + "\r\n", false},
+		{"metadata child at another indent", "metadata:\n    appliedOverlays:\n      - " + leaf + "\n", true},
+		{"comments before the metadata child", "metadata:\n# note\n    # note\n  appliedOverlays:\n    - " + leaf + "\n", true},
+		{"lone list outside metadata", "spec:\n  appliedOverlays:\n    - " + leaf + "\n", false},
+		{"lone top-level list", "appliedOverlays:\n  - " + leaf + "\n", false},
+		{"lone list nested below metadata", "metadata:\n  labels:\n    appliedOverlays:\n      - " + leaf + "\n", false},
+		{"lone list after metadata ends", "metadata:\n  version: v1.2.0\nspec:\n  appliedOverlays:\n    - " + leaf + "\n", false},
 	} {
 		for _, build := range plan.Builds {
 			t.Run(test.name+"/"+build.Name, func(t *testing.T) {
@@ -131,19 +141,15 @@ func TestAICRNVKELeafAdmission(t *testing.T) {
 				if len(command) < 6 || !slices.Equal(command[:4], []string{"bash", "-euo", "pipefail", "-c"}) {
 					t.Fatalf("producer is not one bash script with positional arguments: %q", command)
 				}
-				script := command[4]
-				start := strings.Index(script, `leaf="`)
-				check := strings.Index(script, `[ "$applied" = "$leaf" ] ||`)
-				bundle := strings.Index(script, `"$out/aicr" bundle`)
-				if start < 0 || check < start || bundle < check {
-					t.Fatalf("leaf admission must precede bundle rendering:\n%s", script)
+				lines, ok := leafAdmissionLines(command[4])
+				if !ok {
+					t.Fatalf("leaf admission must be whole lines preceding bundle rendering:\n%s", command[4])
 				}
-				end := check + strings.IndexByte(script[check:], '\n')
 				out := t.TempDir()
 				if err := os.WriteFile(filepath.Join(out, "recipe.yaml"), []byte(test.recipe), 0o600); err != nil {
 					t.Fatal(err)
 				}
-				args := append([]string{"-euo", "pipefail", "-c", "out=\"$NVKR_TEST_OUT\"\n" + script[start:end]}, command[5:]...)
+				args := append([]string{"-euo", "pipefail", "-c", "out=\"$NVKR_TEST_OUT\"\n" + lines}, command[5:]...)
 				admission := exec.CommandContext(t.Context(), "bash", args...)
 				admission.Env = append(os.Environ(), "NVKR_TEST_OUT="+out)
 				output, err := admission.CombinedOutput()
@@ -152,6 +158,102 @@ func TestAICRNVKELeafAdmission(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// The NVKE producers pass the DRA eviction label to every deployer and readiness hooks
+// to every deployer except flux, which rejects them. This runs each compiled producer's
+// bundle call, with its own positional arguments, against a stub aicr that records argv.
+func TestAICRNVKEBundleFlags(t *testing.T) {
+	aicrInputTestRoot(t)
+	plan := compileAICRInput(t, "nvke-gb200.yaml", "aicr-local-arm64.yaml")
+	for _, build := range plan.Builds {
+		t.Run(build.Name, func(t *testing.T) {
+			var command []string
+			for _, node := range build.Graph.Nodes {
+				if node.Kind == ir.KindBuild {
+					command = node.Command
+				}
+			}
+			if len(command) < 6 || !slices.Equal(command[:4], []string{"bash", "-euo", "pipefail", "-c"}) {
+				t.Fatalf("producer is not one bash script with positional arguments: %q", command)
+			}
+			script := command[4]
+			start, end := strings.Index(script, "hooks=()"), strings.Index(script, "# Publish AICR's own layer bytes")
+			if start < 0 || end < start {
+				t.Fatalf("bundle invocation not found:\n%s", script)
+			}
+			out := t.TempDir()
+			stub := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$(dirname \"$0\")/argv\"\n"
+			if err := os.WriteFile(filepath.Join(out, "aicr"), []byte(stub), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			// The stub replaces timeout's two duration arguments, leaving the bundle argv.
+			bundle := "out=\"$NVKR_TEST_OUT\"\ntimeout() { shift 2; \"$@\"; }\n" + script[start:end]
+			run := exec.CommandContext(t.Context(), "bash", append([]string{"-euo", "pipefail", "-c", bundle}, command[5:]...)...)
+			run.Env = append(os.Environ(), "NVKR_TEST_OUT="+out)
+			if output, err := run.CombinedOutput(); err != nil {
+				t.Fatalf("%v\n%s", err, output)
+			}
+			raw, err := os.ReadFile(filepath.Join(out, "argv"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			// The output name, not the producer's positional arguments, names the expected deployer.
+			deployer, ok := strings.CutPrefix(build.Name, "aicr-nvke-gb200-ubuntu-training-kubeflow-")
+			if !ok {
+				t.Fatalf("unexpected GB200 output %q", build.Name)
+			}
+			argv := "\n" + string(raw)
+			for _, pair := range []string{"--recipe\n" + out + "/recipe.yaml", "--deployer\n" + deployer, "--output\noci-layout:" + out + "/layout"} {
+				if !strings.Contains(argv, "\n"+pair+"\n") {
+					t.Fatalf("%s bundle omits %q: %q", deployer, pair, argv)
+				}
+			}
+			if !strings.Contains(argv, "\n--dra-eviction-node-label\nnvidia.com/dra-kubelet-plugin=true\n") {
+				t.Fatalf("%s bundle omits the DRA eviction label: %q", deployer, argv)
+			}
+			if hooks := strings.Contains(argv, "\n--readiness-hooks\n"); hooks != (deployer != "flux") {
+				t.Fatalf("%s readiness hooks = %v: %q", deployer, hooks, argv)
+			}
+		})
+	}
+}
+
+// leafAdmissionLines returns the producer's admission lines, from the leaf assignment
+// through the end of the check line. The check line must end in a newline: without
+// one the cut would drop the check and every rejection case would fail misleadingly.
+func leafAdmissionLines(script string) (string, bool) {
+	start := strings.Index(script, `leaf="`)
+	check := strings.Index(script, `[ "$applied" = "$leaf" ] ||`)
+	bundle := strings.Index(script, `"$out/aicr" bundle`)
+	if start < 0 || check < start || bundle < check {
+		return "", false
+	}
+	end := strings.IndexByte(script[check:], '\n')
+	if end < 0 {
+		return "", false
+	}
+	return script[start : check+end], true
+}
+
+func TestLeafAdmissionLines(t *testing.T) {
+	const assign, check, bundle = `leaf="x"` + "\n", `[ "$applied" = "$leaf" ] || exit 1`, `"$out/aicr" bundle`
+	for _, test := range []struct {
+		name, script, want string
+		ok                 bool
+	}{
+		{"whole lines", assign + check + "\n" + bundle + "\n", assign + check, true},
+		{"check without newline", assign + check + "; " + bundle, "", false},
+		{"check after bundle", bundle + "\n" + assign + check + "\n", "", false},
+		{"no assignment", check + "\n" + bundle + "\n", "", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, ok := leafAdmissionLines(test.script)
+			if got != test.want || ok != test.ok {
+				t.Fatalf("leafAdmissionLines() = %q, %v; want %q, %v", got, ok, test.want, test.ok)
+			}
+		})
 	}
 }
 

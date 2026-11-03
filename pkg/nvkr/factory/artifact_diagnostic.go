@@ -34,7 +34,7 @@ type ArtifactTestOptions struct {
 	Stdout, Stderr                               io.Writer
 	// DiagnosticConfiguration is descriptive canonical selection metadata only.
 	DiagnosticConfiguration []byte
-	// DependencyTimeout is a separate acquisition budget; zero preserves legacy per-container behavior.
+	// DependencyTimeout is a separate acquisition budget; zero reuses Timeout.
 	DependencyTimeout time.Duration
 }
 
@@ -53,42 +53,12 @@ type artifactTestResult struct {
 	artifactTestCounts
 }
 
-// TestCLIArtifact validates the complete Plan and selects its CLI producer before
-// source, workspace or subprocess work. The source and pipeline owners import and
-// execute the matching upstream tests against a private copy of supplied bytes.
-func TestCLIArtifact(ctx context.Context, options ArtifactTestOptions) error {
-	return testCLIArtifact(ctx, options, sourcegit.ImportLocal, pipeline.RunArtifactDiagnostic)
-}
-
-func testCLIArtifact(ctx context.Context, options ArtifactTestOptions,
-	importSource func(context.Context, []string, string, string, string, string, io.Writer) error,
-	run func(context.Context, pipeline.ArtifactDiagnostic, io.Writer, io.Writer) error) (returnErr error) {
-	invocation, err := AdmitCLIArtifact(ctx, options)
-	if err != nil {
-		return err
-	}
-	return runCLIArtifact(ctx, invocation.options, &invocation.inputs, importSource, run)
-}
-
 // CLIArtifactInvocation freezes the validated producer and suite for one diagnostic.
 // It grants no artifact membership or qualification authority.
 type CLIArtifactInvocation struct {
 	options    ArtifactTestOptions
 	inputs     CLIArtifactTestInputs
 	planSHA256 string
-}
-
-// AdmitCLIArtifact validates a complete Plan without workspace or executable work.
-// Run never reopens the Plan. Artifact bytes remain caller supplied until staging.
-func AdmitCLIArtifact(ctx context.Context, options ArtifactTestOptions) (*CLIArtifactInvocation, error) {
-	if options.Suite != "" && options.Suite != "contract" && options.Suite != "cli" {
-		return nil, e.New(e.CodeUsage, "suite must be contract or cli")
-	}
-	plan, err := LoadCLIArtifactPlan(ctx, options.Plan)
-	if err != nil {
-		return nil, err
-	}
-	return plan.Admit(ctx, options)
 }
 
 // Admit selects one producer from this frozen Plan without reopening its path.
