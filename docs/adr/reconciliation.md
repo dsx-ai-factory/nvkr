@@ -242,8 +242,8 @@ selects AICR's Preview `gb200-nvke-ubuntu-training-kubeflow` leaf in the `helm`,
 `argocd-helm` formats from the same catalog. AICR `v1.2.0` refuses criteria that no applied overlay covers;
 these producers also fail the build unless the rendered recipe's last applied overlay is that leaf. The
 admission lines of each compiled producer are contract-tested under the host's bash and awk against
-hand-written recipe fixtures, including a removed or malformed leaf. Native Helm examples and publication
-Environments remain out of scope.
+hand-written recipe fixtures, including a removed or malformed leaf and a list outside top-level
+`metadata`. Native Helm examples and publication Environments remain out of scope.
 
 On November 2, the current six-output GB300 Definition with the `v1.2.0` layout producers finished
 local attempt `aicr-gb300-v120-local-20261102-r1` with exit code 0. Its immutable
@@ -261,8 +261,10 @@ On November 3, the three-output GB200 NVKE Kubeflow training Definition finished
 `lifecycle.json` records status `complete`, lane `unqualified-local-execution`, Plan digest
 `sha256:f396614a348a292592c27742d850598c5cbfec754916dff40be16199fdfbf635` and content subject
 `sha256:6086823c928396914011fa96195a2e5403fb56e34e03080426eea0f268e0489f`; all three outputs were
-observed after the leaf check passed. A scratch attempt for the uncovered `dynamo` platform failed in
-`aicr recipe` with AICR's coverage error and produced no output.
+observed after the leaf check passed. That attempt ran an earlier check that did not require the list
+under `metadata`; the scoped producers have new Build Digests and no recorded Run, and their check was
+rerun only against that attempt's three retained recipes. A scratch attempt for the uncovered `dynamo`
+platform failed in `aicr recipe` with AICR's coverage error and produced no output.
 AICR's own [NVKE conformance record](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/docs/conformance/cncf/v1.36/nvke/README.md)
 used this leaf at AICR commit `864dd60065f1`, not the `v1.2.0` pin. NVKR claims no hardware or AICR
 validation evidence for these bundles.

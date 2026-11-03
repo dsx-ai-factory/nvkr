@@ -119,6 +119,12 @@ func TestAICRNVKELeafAdmission(t *testing.T) {
 		{"absent list", "metadata:\n  version: v1.2.0\n", false},
 		{"quoted leaf", "metadata:\n  appliedOverlays:\n    - \"" + leaf + "\"\n", false},
 		{"CRLF line endings", "metadata:\r\n  appliedOverlays:\r\n    - " + leaf + "\r\n", false},
+		{"metadata child at another indent", "metadata:\n    appliedOverlays:\n      - " + leaf + "\n", true},
+		{"comments before the metadata child", "metadata:\n# note\n  # note\n  appliedOverlays:\n    - " + leaf + "\n", true},
+		{"lone list outside metadata", "spec:\n  appliedOverlays:\n    - " + leaf + "\n", false},
+		{"lone top-level list", "appliedOverlays:\n  - " + leaf + "\n", false},
+		{"lone list nested below metadata", "metadata:\n  labels:\n    appliedOverlays:\n      - " + leaf + "\n", false},
+		{"lone list after metadata ends", "metadata:\n  version: v1.2.0\nspec:\n  appliedOverlays:\n    - " + leaf + "\n", false},
 	} {
 		for _, build := range plan.Builds {
 			t.Run(test.name+"/"+build.Name, func(t *testing.T) {
@@ -131,19 +137,15 @@ func TestAICRNVKELeafAdmission(t *testing.T) {
 				if len(command) < 6 || !slices.Equal(command[:4], []string{"bash", "-euo", "pipefail", "-c"}) {
 					t.Fatalf("producer is not one bash script with positional arguments: %q", command)
 				}
-				script := command[4]
-				start := strings.Index(script, `leaf="`)
-				check := strings.Index(script, `[ "$applied" = "$leaf" ] ||`)
-				bundle := strings.Index(script, `"$out/aicr" bundle`)
-				if start < 0 || check < start || bundle < check {
-					t.Fatalf("leaf admission must precede bundle rendering:\n%s", script)
+				lines, ok := leafAdmissionLines(command[4])
+				if !ok {
+					t.Fatalf("leaf admission must be whole lines preceding bundle rendering:\n%s", command[4])
 				}
-				end := check + strings.IndexByte(script[check:], '\n')
 				out := t.TempDir()
 				if err := os.WriteFile(filepath.Join(out, "recipe.yaml"), []byte(test.recipe), 0o600); err != nil {
 					t.Fatal(err)
 				}
-				args := append([]string{"-euo", "pipefail", "-c", "out=\"$NVKR_TEST_OUT\"\n" + script[start:end]}, command[5:]...)
+				args := append([]string{"-euo", "pipefail", "-c", "out=\"$NVKR_TEST_OUT\"\n" + lines}, command[5:]...)
 				admission := exec.CommandContext(t.Context(), "bash", args...)
 				admission.Env = append(os.Environ(), "NVKR_TEST_OUT="+out)
 				output, err := admission.CombinedOutput()
@@ -152,6 +154,43 @@ func TestAICRNVKELeafAdmission(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// leafAdmissionLines returns the producer's admission lines, from the leaf assignment
+// through the end of the check line. The check line must end in a newline: without
+// one the cut would drop the check and every rejection case would fail misleadingly.
+func leafAdmissionLines(script string) (string, bool) {
+	start := strings.Index(script, `leaf="`)
+	check := strings.Index(script, `[ "$applied" = "$leaf" ] ||`)
+	bundle := strings.Index(script, `"$out/aicr" bundle`)
+	if start < 0 || check < start || bundle < check {
+		return "", false
+	}
+	end := strings.IndexByte(script[check:], '\n')
+	if end < 0 {
+		return "", false
+	}
+	return script[start : check+end], true
+}
+
+func TestLeafAdmissionLines(t *testing.T) {
+	const assign, check, bundle = `leaf="x"` + "\n", `[ "$applied" = "$leaf" ] || exit 1`, `"$out/aicr" bundle`
+	for _, test := range []struct {
+		name, script, want string
+		ok                 bool
+	}{
+		{"whole lines", assign + check + "\n" + bundle + "\n", assign + check, true},
+		{"check without newline", assign + check + "; " + bundle, "", false},
+		{"check after bundle", bundle + "\n" + assign + check + "\n", "", false},
+		{"no assignment", check + "\n" + bundle + "\n", "", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, ok := leafAdmissionLines(test.script)
+			if got != test.want || ok != test.ok {
+				t.Fatalf("leafAdmissionLines() = %q, %v; want %q, %v", got, ok, test.want, test.ok)
+			}
+		})
 	}
 }
 
