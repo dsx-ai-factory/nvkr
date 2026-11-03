@@ -38,6 +38,7 @@ func TestQualificationSmokePlanAdmitsCompleteStaticScope(t *testing.T) {
 			p.LifecycleOutputs[0].Components = []string{"tool", "tool"}
 		}, e.CodeReleaseIncomplete},
 		{"unknown kind", func(p *factory.Plan, _ *QualificationPolicy) { p.LifecycleOutputs[0].Kind = "unknown" }, e.CodeEngineCapability},
+		{"bundle has no deployment smoke exemption", func(p *factory.Plan, _ *QualificationPolicy) { p.LifecycleOutputs[0].Kind = OutputBundle }, e.CodeEngineCapability},
 		{"no build", func(p *factory.Plan, _ *QualificationPolicy) { p.Builds = nil }, e.CodeReleaseIncomplete},
 		{"ambiguous build", func(p *factory.Plan, _ *QualificationPolicy) { p.Builds = append(p.Builds, p.Builds[0]) }, e.CodeReleaseIncomplete},
 		{"no graph", func(p *factory.Plan, _ *QualificationPolicy) { p.Builds[0].Graph = nil }, e.CodeReleaseIncomplete},

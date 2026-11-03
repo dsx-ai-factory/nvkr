@@ -7,8 +7,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -222,5 +226,66 @@ func TestWriteGeneratedBundleCodesEveryFailure(t *testing.T) {
 				t.Fatal("coded write error lost its cause")
 			}
 		})
+	}
+}
+
+// An early raw staging failure names the logical member, keeps the
+// os.PathError and its cause, and leaves every published byte in place.
+func TestWriteGeneratedBundleStagingFailureKeepsPublishedBytes(t *testing.T) {
+	bundle, err := RenderGitHub(t.Context(), githubTestPlan(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	if err := WriteGeneratedBundle(t.Context(), root, bundle); err != nil {
+		t.Fatal(err)
+	}
+	// Prior bytes differ from the bundle, so any publication would change them.
+	if err := os.WriteFile(filepath.Join(root, bundle.WorkflowPath), []byte("operator bytes\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := func() map[string]string {
+		tree := map[string]string{}
+		if err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+			if err != nil || entry.IsDir() {
+				return err
+			}
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			info, err := entry.Info()
+			if err != nil {
+				return err
+			}
+			tree[path] = fmt.Sprintf("%s %q", info.Mode(), raw)
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return tree
+	}
+	before := snapshot()
+
+	previous := syncStagedMember
+	t.Cleanup(func() { syncStagedMember = previous })
+	cause := errors.New("injected raw staging failure")
+	var staged string
+	syncStagedMember = func(file *os.File) error {
+		staged = file.Name()
+		return &os.PathError{Op: "sync", Path: file.Name(), Err: cause}
+	}
+	err = WriteGeneratedBundle(t.Context(), root, bundle)
+	assertFactoryErrorCode(t, err, e.CodeInternal)
+	var pathErr *os.PathError
+	if !errors.As(err, &pathErr) || pathErr.Op != "sync" || pathErr.Path != staged || !errors.Is(err, cause) {
+		t.Fatalf("staging error lost its os.PathError or cause: %v", err)
+	}
+	first := sortedFileNames(bundle.Files)[0]
+	if !strings.Contains(err.Error(), "staging generated member "+first+":") {
+		t.Fatalf("staging error does not name logical member %s: %v", first, err)
+	}
+	if after := snapshot(); !reflect.DeepEqual(after, before) {
+		t.Fatalf("failed staging changed published bytes:\nbefore %v\nafter  %v", before, after)
 	}
 }

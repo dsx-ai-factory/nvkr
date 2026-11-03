@@ -55,9 +55,9 @@ func TestNVKEUbuntu24NativeDiskSelections(t *testing.T) {
 				if variant.output == "fde" {
 					root = "nvke-node-fde-" + tc.arch
 				}
-				wantComponents := []string{"nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-image-inputs", "nvke-kubeadm-distro",
+				wantComponents := []string{"nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-doca-ovs", "nvke-image-inputs", "nvke-kubeadm-distro",
 					root, tc.patched, "nvke-spire-agent", "ovn-kube-ubuntu", "ovn-kubernetes-chart", tc.installer}
-				if build.Platform != "linux/"+tc.arch || !slices.Equal(build.Components, wantComponents) || len(build.ResolvedComponents) != 11 {
+				if build.Platform != "linux/"+tc.arch || !slices.Equal(build.Components, wantComponents) || len(build.ResolvedComponents) != 12 {
 					t.Fatalf("unexpected native material closure: %s / %v", build.Platform, build.Components)
 				}
 				if build.BuildDigest == original.BuildDigest || identities[build.BuildDigest] {
@@ -78,7 +78,8 @@ func TestNVKEUbuntu24NativeDiskSelections(t *testing.T) {
 						packer.Variables["ubuntu_series"] = "26.04"
 						producer.Packer = &packer
 					}
-					if component != "nvke-agent" && component != "ubuntu-installer-iso" && component != "ubuntu-installer-iso-amd64" &&
+					// The agent and DOCA OVS packages are Ubuntu-series specific.
+					if component != "nvke-agent" && component != "nvke-doca-ovs" && component != "ubuntu-installer-iso" && component != "ubuntu-installer-iso-amd64" &&
 						!reflect.DeepEqual(producer, original.CatalogSnapshot.Components[component]) {
 						t.Fatalf("Ubuntu selection unexpectedly changed unrelated producer %s", component)
 					}
@@ -252,7 +253,7 @@ func TestNVKEUbuntu24LocalDiskSelections(t *testing.T) {
 			if build.BuildDigest != nvkeUbuntu24Build(t, hosted, build.Name).BuildDigest {
 				t.Fatal("local and hosted Ubuntu 24 selections must retain identical logical Build inputs")
 			}
-			if build.Platform != "linux/"+arch || len(build.Components) != 11 {
+			if build.Platform != "linux/"+arch || len(build.Components) != 12 {
 				t.Fatalf("local native closure = %s / %v", build.Platform, build.Components)
 			}
 			for _, node := range build.Graph.Nodes {

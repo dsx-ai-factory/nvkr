@@ -98,6 +98,23 @@ func TestDirectoryProviderSupportsBoundedContextLoad(t *testing.T) {
 	}
 }
 
+func TestDirectoryProviderRefusesUnboundReads(t *testing.T) {
+	provider := Dir("../../../testdata/catalogs/kubernetes-layered")
+	for _, test := range []struct {
+		name string
+		read func() error
+	}{
+		{name: "file", read: func() error { _, err := provider.ReadFile(RegistryFile); return err }},
+		{name: "directory", read: func() error { _, err := provider.ReadDir("."); return err }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.read(); catalogErrorCode(err) != nvkrerr.CodeEngineCapability {
+				t.Fatalf("unbound directory %s read returned %v; want %s", test.name, err, nvkrerr.CodeEngineCapability)
+			}
+		})
+	}
+}
+
 func TestBoundContextProviderEnforcesAggregateByteLimit(t *testing.T) {
 	provider := &countedContextProvider{file: bytes.Repeat([]byte{'x'}, int(MaxCatalogFileBytes))}
 	bound, err := BindContext(context.Background(), provider)

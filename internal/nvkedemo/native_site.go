@@ -738,7 +738,7 @@ func (s *nativeSiteAttempt) runTenantRequest(ctx context.Context, runner Runner,
 		}
 		progress.conditions = fresh.Conditions
 		progress.update(time.Now(), stage, nodes)
-		// NVKE v0.22.0 clusterstate.IsProvisioningFailed uses exactly these
+		// NVKE v0.23.0 clusterstate.IsProvisioningFailed uses exactly these
 		// two statuses. Missing or Unknown conditions do not prove failure.
 		if fresh.Conditions.Provisioning.Status == TenantConditionFalse && fresh.Conditions.Provisioned.Status == TenantConditionFalse {
 			return errors.New("NVKE reported native tenant provisioning failed")
@@ -928,6 +928,9 @@ func (s *nativeSiteAttempt) selectBootNetwork(network nativeBridgeConfig, diskUR
 	return network, nil
 }
 
+// nativeMachineImageDiskSlot is the pinned NVKE MachineImage fixture's local QCOW URL.
+const nativeMachineImageDiskSlot = "http://127.0.0.1:18080/files/images/nvke-node.qcow2"
+
 func projectNativeSiteBoot(ctx context.Context, source, diskURL string) (*nativeSiteBoot, error) {
 	if err := requireContext(ctx); err != nil {
 		return nil, err
@@ -938,7 +941,7 @@ func projectNativeSiteBoot(ctx context.Context, source, diskURL string) (*native
 	slots := 0
 	for _, candidate := range []string{
 		"http://127.0.0.1/nvke-node.qcow2",
-		"http://127.0.0.1:18080/files/images/nvke-node.qcow2",
+		nativeMachineImageDiskSlot,
 	} {
 		if count := strings.Count(source, candidate); count != 0 {
 			slots += count

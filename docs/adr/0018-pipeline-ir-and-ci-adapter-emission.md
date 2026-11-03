@@ -516,8 +516,9 @@ belong to Environment/profile configuration; component toolchains remain produce
 The authored nightly uses one public GitHub-hosted AMD64 job for local build and
 native Go E2E. It freezes NVKE main once, derives temporary source overlays through
 the catalog/local-preparation owners and calls the existing `TestEndToEnd` flow.
-The existing current-main disk-material/CAPI-init selections provide compatibility;
-other dependency pins, committed catalogs and locks are unchanged. The same job
+The AMD64 Definition and v0.23.0 catalogs own the complete material graph;
+source freezing preserves producer commands, materials, toolchains and independent
+dependency pins. Committed catalogs and locks are unchanged. The same job
 builds fresh local Runs, bootstraps the site VM,
 checks site readiness and tenant workload/DNS, and joins owned cleanup.
 
@@ -1484,10 +1485,10 @@ require every committed producer's OIDC jobs to remain in the entry workflow nam
 This subsection is proposed design, not implemented behavior. Today every `id-token: write` job stays
 inline, and no code path relocates a signer. Local measurements of the committed bundles show where those
 jobs fall. In the partitioned development entry, the 139 inline signing and SBOM-attestation jobs account
-for 10,984 of 13,308 expanded YAML parsing events and 104,357 of 264,038 bytes. In the flat default
-producer, the same jobs account for 10,984 of 47,055 events. That producer is at 94.1% of the 50,000-event
-parser bound, the binding constraint today. These are local generation measurements, not provider
-evidence.
+for 10,984 of 13,308 expanded YAML parsing events and 104,357 of 264,038 bytes. The maintained release
+producer selects the same inline-signer partition layout; its entry has 13,333 events and 272,696 bytes.
+Before that selection, its flat workflow had reached 47,731 events, above the maintained 95% headroom
+threshold. These are local generation measurements, not provider evidence.
 
 Relocation is not a scheduling change. For GitHub OIDC, Fulcio sets the certificate SAN and Build Signer
 URI from `job_workflow_ref`, which names the called reusable workflow, not the entry workflow. Build Config

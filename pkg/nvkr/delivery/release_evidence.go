@@ -37,11 +37,13 @@ func verifyReleaseEvidenceSources(ctx context.Context, root string, publication 
 	builds := map[releaseEvidenceSlot]string{}
 	diskRoots := map[string]string{}
 	diskModes := map[string]string{}
+	bundleOutputs := map[string]bool{}
 	for _, o := range publication.Objects {
 		output := o.Output
 		if output == nil {
 			continue
 		}
+		bundleOutputs[o.Name] = output.Format == outputFormatBundle
 		if output.ImageIndex != nil {
 			if err := validateImageIndexObject(o); err != nil {
 				return err
@@ -112,9 +114,12 @@ func verifyReleaseEvidenceSources(ctx context.Context, root string, publication 
 				if subject != binding.SubjectDigest {
 					binding.InspectionInputDigest = subject
 				}
-			case outputFormatHelm:
+			case outputFormatHelm, outputFormatBundle:
 				binding.Stage = "source-build"
 				binding.SubjectKind = "source-archive"
+				if output.Format == outputFormatBundle && subject != o.BlobDigest {
+					return e.New(e.CodeVerifyFailed, "bundle build subject differs from its preserved archive")
+				}
 			case "executable", "apt-repository", "disk-image":
 			default:
 				return e.New(e.CodeVerifyFailed, "release has an unsupported output format")
@@ -122,9 +127,12 @@ func verifyReleaseEvidenceSources(ctx context.Context, root string, publication 
 			slot := evidenceSlot(o.Name, binding)
 			expected[slot], builds[slot] = binding, output.BuildDigest
 		}
-		if output.Format == outputFormatHelm {
+		if output.Format == outputFormatHelm || output.Format == outputFormatBundle {
 			binding := EvidenceBinding{Outputs: []string{o.Name}, Component: o.Name, Stage: "packaging", SubjectKind: "helm-bundle",
 				SubjectDigest: o.DescriptorDigest, InspectionInputDigest: o.BlobDigest}
+			if output.Format == outputFormatBundle {
+				binding.SubjectKind = "bundle"
+			}
 			slot := evidenceSlot(o.Name, binding)
 			expected[slot], builds[slot] = binding, output.BuildDigest
 		}
@@ -235,6 +243,13 @@ func verifyReleaseEvidenceSources(ctx context.Context, root string, publication 
 			}
 			diskRoot := diskRoots[outputName]
 			method := props["nvkr:dependencyInspection"]
+			if bundleOutputs[outputName] {
+				if len(bom.Components) == 0 || method != sbom.BundleFilesMethod {
+					return e.New(e.CodeProvenanceMissing, "bundle requires an exact file inventory at both evidence stages")
+				}
+			} else if method == sbom.BundleFilesMethod {
+				return e.New(e.CodeVerifyFailed, "bundle file inspection is not valid for a non-bundle output")
+			}
 			if diskRoot == "" && (method == "disk-content/v1" || method == "disk-reconciled/v1") {
 				return e.New(e.CodeVerifyFailed, "disk inspection method is not valid for a non-disk output")
 			}
@@ -242,7 +257,7 @@ func verifyReleaseEvidenceSources(ctx context.Context, root string, publication 
 		if props["nvkr:evidenceStage"] != binding.Stage || props["nvkr:inspectionInputDigest"] != binding.InspectionInputDigest {
 			return e.New(e.CodeVerifyFailed, "SBOM build, stage or inspection input is unbound")
 		}
-		if binding.Stage == "packaging" && (len(bom.Components) == 0 || props["nvkr:dependencyInspection"] != "helm-manifests/v1") {
+		if binding.SubjectKind == "helm-bundle" && (len(bom.Components) == 0 || props["nvkr:dependencyInspection"] != "helm-manifests/v1") {
 			return e.New(e.CodeProvenanceMissing, "final Helm package requires an inspected inventory")
 		}
 		if sources != nil {

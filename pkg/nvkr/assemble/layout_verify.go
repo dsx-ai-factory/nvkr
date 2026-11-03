@@ -63,7 +63,7 @@ func VerifyLayoutContext(ctx context.Context, dir string) error {
 		}
 		blob := os.NewFile(uintptr(fd), name)
 		if blob == nil {
-			_ = unix.Close(fd)
+			_ = unix.Close(fd) //nolint:errcheck // read-only descriptor release; the failure is returned
 			return e.New(e.CodeInternal, "holding OCI blob %s", name)
 		}
 		before, statErr := blob.Stat()
@@ -126,7 +126,7 @@ func openLayoutDirectory(parentFD int, name, label string) (*os.File, error) {
 	}
 	directory := os.NewFile(uintptr(fd), name)
 	if directory == nil {
-		_ = unix.Close(fd)
+		_ = unix.Close(fd) //nolint:errcheck // read-only descriptor release; the failure is returned
 		return nil, e.New(e.CodeInternal, "holding %s", label)
 	}
 	return directory, nil

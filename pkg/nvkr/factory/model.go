@@ -71,6 +71,7 @@ const (
 	PackageAPT          = "apt-repository"
 	PackageOCI          = "oci-root"
 	PackageHelm         = "helm-oci"
+	PackageBundle       = "bundle-oci"
 	PackageImage        = "container-image"
 	PackageDiskImage    = "disk-image"
 )

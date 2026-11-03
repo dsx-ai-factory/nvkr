@@ -47,7 +47,8 @@ func TestMaintainedWorkflowMakesImageBindingVisible(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
+	// Partition workers project the flat reference's jobs exactly.
+	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, githubFlatReference(t, plan, bundle)))
 	found := false
 	for _, job := range document.Jobs {
 		if strings.Contains(job.Name, "terminal-observe") || strings.Contains(job.Name, "fetch-source-") {

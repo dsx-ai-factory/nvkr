@@ -8,7 +8,7 @@ full product acceptance are separate facts.
 ## Four-family pilot
 
 Four independent Definitions partition the combined candidate's exact named outputs. The core family also
-selects the NICo charts, the NICo Core and Flow images and the ARM64 AICR CLI, and the services family selects local-path-provisioner, which the combined Definition omits because its flat workflow has no remaining YAML
+selects the NICo charts, the NICo Core and Flow images and the ARM64 AICR CLI, and the services family selects local-path-provisioner, which the combined Definition omits; they were added while its flat workflow had no remaining YAML
 parsing headroom. They reuse the
 shared catalogs and pins; they do not import each other or change the combined Definition into a parent.
 
@@ -56,7 +56,7 @@ historical capacity measurements and remaining cutover work.
 
 | Output group | Owning inputs | Selection |
 |---|---|---|
-| CLI | `../../catalogs/nvke/module-tags` | AMD64 `nvkectl` and ARM64 `nvkectl-linux-arm64`, from their shared NVKE v0.22.0 source pin |
+| CLI | `../../catalogs/nvke/module-tags` | AMD64 `nvkectl` and ARM64 `nvkectl-linux-arm64`, from their shared NVKE v0.23.0 source pin |
 | Controller and charts | `../../catalogs/nvke/release` | AMD64/ARM64 aggregate `cwe`, image-bound `controller-chart`, PostgreSQL, SPIRE, SPIRE CRDs and Temporal chart packages |
 | Operator tools | `../../catalogs/tools/operator-amd64`, `../../catalogs/tools/operator-arm64` | AMD64 `operator-tools` and, in the core family only, ARM64 `operator-tools-linux-arm64` Helm and kubectl executables, at the same pinned versions |
 | AICR CLI (core family only) | `../../catalogs/tools/aicr-arm64` | ARM64 `aicr` release executable with its `aicr-attestation.sigstore.json` companion beside it; upstream evidence is not verified (`evidence.none`) |
@@ -84,8 +84,8 @@ built OCI exports only. The architecture-independent NKTP chart is packaged once
 | NICo charts | Not selected by NVKE's pin set; the site installs `nico`, `nico-prereqs` and `nico-flow` from infra-controller's `helm`, `helm-prereqs` and `helm/nico-flow` directories. `v2.3.0` is the latest non-candidate release; subcharts are vendored as local directories and the Flow chart has no dependencies, so packaging is offline | Charts plus the Core and Flow images. Since `v2.3.0` Flow is a standalone release that the umbrella excludes, so it is packaged as its own chart. The prerequisite chart's helmfile-installed operators and third-party images are not selected |
 | NICo images | infra-controller `v2.3.0`'s own Dockerfiles. Flow: `rest-api/docker/production/Dockerfile.nico-flow` with `golang:1.26.4` and `nvcr.io/nvidia/distroless/go:v4.0.8`, both bound by index digest. Core: `dev/docker/Dockerfile.release-container-{x86_64,aarch64}` on bases built from the native `Dockerfile.build-container-*` and `Dockerfile.runtime-container-*`, bound by digest. Those bases' `FROM` lines carry upstream's own digest pins, and both receive the Kea package version recorded in `dev/docker/kea.version` | Flow is the only REST image the packaged charts reference, through the standalone `nico-flow` chart; the standalone REST charts are excluded from the umbrella package and not selected. A cold Core Rust build may exceed the generated hosted build-job budget; a hosted Run must prove it. Apart from Kea, both bases still install unpinned public packages and tools at build time. Core stamps version `v2.3.0`, revision `abc446b3` and the pinned commit's date from build arguments derived from the source lock; the date argument is upstream [#6896](https://github.com/dsx-ai-factory/infra-controller/pull/6896)'s `CI_COMMIT_TIMESTAMP`, rendered in UTC rather than with upstream CI's committer offset. Flow stamps the same version, but its Dockerfile declares no revision argument |
 | Default StorageClass | Rancher publishes `rancher/local-path-provisioner` images but no Helm repository; the chart is packaged from `deploy/chart/local-path-provisioner` at `v0.0.37`, whose values select image `v0.0.37`. The chart's `busybox:latest` helper is replaced by an explicit `1.37.0` selection | A hashed source patch adds empty `image.digest` and `helperImage.digest` values that render `@digest` when set; unset renders are unchanged. Acquired images are native outputs, so each chart binds one architecture's digests; a mixed-architecture cluster needs a source-built image index |
-| NKTP chart and dependencies | The same NVKE `v0.22.0` source as the maintained controller; `nktp/deploy/charts/nktp/Chart.yaml` and `Chart.lock` select three exact dependencies; packaging stamps chart `0.22.0` | Fetch verifies Helm `v4.2.4` and all three acquired chart archives; packaging uses the retained closure with no network |
-| NKTP images | Selected source values and authenticated dependency charts: collector `0.162.0`, operator `0.159.0`, LGTM `0.32.0`, kube-state-metrics `v2.20.0`, node-exporter `v1.12.1`, optional metrics-server `v0.8.1`, uninstall kubectl `v1.34.1`; Operator `0.159.0`'s `versions.txt` selects Target Allocator `0.159.0` | Acquired images, not source builds; native subjects and parent indexes are lock-owned. Helm test-only BusyBox is excluded. Images are delivered separately; chart references are not automatically rewritten to publication repositories |
+| NKTP chart and dependencies | The same NVKE `v0.23.0` source as the maintained controller; `nktp/deploy/charts/nktp/Chart.yaml` and `Chart.lock` select three exact dependencies; packaging stamps chart `0.23.0` | Fetch verifies Helm `v4.2.4` and all three acquired chart archives; packaging uses the retained closure with no network |
+| NKTP images | Selected source values and authenticated dependency charts: collector `0.162.0`, operator `0.161.0` (the OpenTelemetry kube-stack `0.25.1` subchart's app version), LGTM `0.38.0`, kube-state-metrics `v2.20.0`, node-exporter `v1.12.1`, optional metrics-server `v0.8.1`, uninstall kubectl `v1.35.6`; the NKTP values select Target Allocator `0.161.0` | Acquired images, not source builds; native subjects and parent indexes are lock-owned. Helm test-only BusyBox is excluded. Images are delivered separately; chart references are not automatically rewritten to publication repositories |
 | Reference-profile fixture | The selected NVKE fixture Dockerfile, `nico-vms-cp.yaml`, `nico-vms-worker.yaml` and sibling runbooks | Explicitly named `nico-reference-profiles-fixture`: the control-plane profile skips its pre-join reboot. It must not be installed as production fleet configuration. No empty/failure-test config profile, placeholder example, copied OSProfile or new Dockerfile/patch is added |
 | CAPI and cert-manager images | Selected NVKE `make/tool-versions.mk` chooses CAPI `v1.13.6`; its published provider manifests name the three controllers, and its clusterctl config selects cert-manager `v1.21.1` | Acquired runtime images only. Provider manifests/metadata and installation remain a separate consumer contract |
 
@@ -162,7 +162,7 @@ published digest and testing rendered manifests for both architectures without m
 Until then, consumers must explicitly relocate/bind those references; chart and image delivery alone
 does not prove offline installation or that a deployed workload uses the signed image outputs.
 
-The controller and CLI now select NVKE `v0.22.0`. The config-only reference image is not a complete
+The controller and CLI now select NVKE `v0.23.0`. The config-only reference image is not a complete
 provisioning configuration. Fleet payload selection and delivery of the Kubernetes release resources
 remain separate consumer work; updating source pins does not establish deployment acceptance.
 
@@ -171,11 +171,13 @@ native image digests. Do not maintain a second digest table in documentation. Po
 retain their source-owned index digests as well as the selected native child pins; acquisition checks
 actual parent-to-child membership before using the native image.
 
-OS assembly, agent, Calico, kubeadm and SPIRE packaging all select NVKE `v0.22.0` at
-`400c24fb6465b042be883d6b62472528520d6291`. SPIRE stages `1.14.1` and TPM plugin `1.9.0`,
+OS assembly, agent, Calico, kubeadm, SPIRE packaging and DOCA OVS acquisition all select NVKE `v0.23.0` at
+`2cfd00081b468d85a4894ec17e9deac13c9d8169`. The `nvke-doca-ovs` producer fetches the source-locked DOCA OVS
+`3.5.0` debs for Ubuntu `26.04` (`24.04` under the Ubuntu 24 overlay) and supplies them as the sixth
+image-inputs material, which the source's composer requires. NVIDIA publishes these packages without source. SPIRE stages `1.14.1` and TPM plugin `1.9.0`,
 then packages Debian revision `4` offline before image-input composition and Packer.
 That source-owned packaging excludes DSX IMDS. SPIRE server/container outputs retain their
-separately pinned chart-selected versions. The agent package stamps `v0.22.0`.
+separately pinned chart-selected versions. The agent package stamps `v0.23.0`.
 These updated inputs do not establish a new build, source-review acceptance or runtime result.
 The pinned commit's source-owned direct-Packer contract receives `capture_apt_acquisitions=true` and exports
 `non-fde/apt-acquisitions.tar` or `fde/apt-acquisitions.tar`, which each producer declares through `packer.acquisitionArchive`.

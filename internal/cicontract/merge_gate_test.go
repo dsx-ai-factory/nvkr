@@ -224,6 +224,87 @@ func TestMergeGateRequiresCompleteCheckPairs(t *testing.T) {
 	}
 }
 
+// The real job `if:` conditions and the gate's event predicates are evaluated
+// together for every event origin, so a job condition that drifts from the
+// gate's pair table fails the gate. jq evaluates the expressions after
+// substituting the known contexts; any other context or function errors.
+func TestMergeGateJobConditionsMatchGate(t *testing.T) {
+	jobs := readMergeGateJobs(t)
+	step := jobs["gate"].Steps[0]
+	outputNames := []string{"code", "actions", "pipeline", "notices", "docs"}
+	events := []struct {
+		name, eventName, headRepository, fork string
+	}{
+		{"push", `"push"`, "null", "null"},
+		{"same-repository pull request", `"pull_request"`, `"dsx-ai-factory/nvkr"`, "false"},
+		{"fork pull request", `"pull_request"`, `"contributor/nvkr"`, "true"},
+	}
+	for _, event := range events {
+		selections := []map[string]string{{}}
+		for _, output := range outputNames {
+			selections = append(selections, map[string]string{output: "false"})
+		}
+		for _, overrides := range selections {
+			outputs := map[string]string{}
+			replacements := []string{
+				"github.event.pull_request.head.repo.full_name", event.headRepository,
+				"github.event.pull_request.head.repo.fork", event.fork,
+				"github.event_name", event.eventName,
+				"github.repository", `"dsx-ai-factory/nvkr"`,
+				"&&", " and ", "||", " or ", "'", `"`,
+			}
+			for _, output := range outputNames {
+				outputs[output] = "true"
+				if value, ok := overrides[output]; ok {
+					outputs[output] = value
+				}
+				replacements = append(replacements, "needs.check-paths.outputs."+output, `"`+outputs[output]+`"`)
+			}
+			evaluate := strings.NewReplacer(replacements...)
+			expressions := map[string]string{}
+			for name, job := range jobs {
+				if name != "check-paths" && name != "gate" {
+					expressions[name] = job.If
+				}
+			}
+			for _, name := range []string{"SAME_REPOSITORY", "FORK_PULL_REQUEST"} {
+				expressions[name] = strings.TrimSuffix(strings.TrimPrefix(step.Env[name], "${{ "), " }}")
+			}
+			var program []string
+			for _, name := range slices.Sorted(maps.Keys(expressions)) {
+				program = append(program, fmt.Sprintf("%q: (%s)", name, evaluate.Replace(expressions[name])))
+			}
+			t.Run(fmt.Sprintf("%s %v", event.name, overrides), func(t *testing.T) {
+				t.Parallel()
+				raw, err := exec.CommandContext(t.Context(), "jq", "-cn", "{"+strings.Join(program, ", ")+"}").Output()
+				if err != nil {
+					t.Fatalf("job conditions must use only known contexts and operators: %v\n%s", err, program)
+				}
+				var selected map[string]bool
+				if err := json.Unmarshal(raw, &selected); err != nil {
+					t.Fatal(err)
+				}
+				in := mergeGateInputs{checkPaths: "success", outputs: outputs, results: map[string]string{}}
+				env := []string{}
+				for name, run := range selected {
+					switch {
+					case name == "SAME_REPOSITORY" || name == "FORK_PULL_REQUEST":
+						env = append(env, fmt.Sprintf("%s=%t", name, run))
+					case run:
+						in.results[name] = "success"
+					default:
+						in.results[name] = "skipped"
+					}
+				}
+				output, code := runMergeGateStep(t, step, t.TempDir(), append(in.env(t), env...))
+				if code != 0 {
+					t.Fatalf("job conditions disagree with the gate (selected %v):\n%s", selected, output)
+				}
+			})
+		}
+	}
+}
+
 func TestMergeGateTestMatrix(t *testing.T) {
 	jobs := readMergeGateJobs(t)
 	producer, tests := jobs["check-paths"], jobs["tests"]

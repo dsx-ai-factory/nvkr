@@ -14,8 +14,8 @@ cloud-init completion on both tenant nodes, the selected workload image and
 architecture, workload completion and cluster DNS. The parent passes only after
 natural tenant deletion, deletion verification and joined VM/backend/network cleanup.
 
-Source preparation reuses the existing AMD64 NVIDIA Definition/catalogs and
-current-main disk-material/CAPI-init compatibility selections. It leaves
+Source preparation reuses the existing AMD64 NVIDIA Definition and v0.23.0
+catalogs, preserving their producer commands, material graph and toolchains. It leaves
 committed catalogs and the NVKE checkout unchanged; other dependency pins retain
 their owners. NVIDIA OVN remains selected. The existing native helper self-pin
 has its separate maintenance owner, including its post-squash canonical-main re-pin.
@@ -39,7 +39,7 @@ gh run watch RUN_ID --repo YOUR_GITHUB_USERNAME/nvkr --exit-status
 The Actions UI also supports **NVKR nightly NVKE end-to-end tests → Run workflow**
 with the PR branch selected. No workflow inputs are required. This nightly
 intentionally freezes NVKE main once per cycle; it accepts no NVKE-ref override.
-The current-main compatibility selections do not promise support for arbitrary
+The versioned catalog selections do not promise support for arbitrary
 older source revisions. Contributors with
 upstream write access can use `dsx-ai-factory/nvkr` instead of a fork.
 

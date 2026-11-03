@@ -56,9 +56,6 @@ func newReaper(ctx context.Context, docker string) *reaper {
 }
 
 func newReaperWithCleanup(ctx context.Context, docker string, cleanup reaperCleanupCommand) *reaper {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	r := &reaper{
 		names: map[string]bool{}, docker: docker,
 		cleanupTimeout: defaultReaperCleanupTimeout,
@@ -187,7 +184,7 @@ func runReaperCleanupCommand(ctx context.Context, grace time.Duration, docker st
 	if runtimeExecutable != nil {
 		return runtimeExecutable.runCleanup(ctx, grace, nil, nil, args...)
 	}
-	cmd := execCmd(RunOptions{Ctx: ctx}, docker, args...) //nvkr:allow-nondeterminism best-effort cleanup, not identity
+	cmd := execCmd(RunOptions{Ctx: ctx}, docker, args...)
 	cmd.WaitDelay = grace
 	return runOwnedCommand(ctx, cmd)
 }

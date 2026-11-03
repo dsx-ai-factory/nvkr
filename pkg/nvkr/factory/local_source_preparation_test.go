@@ -18,7 +18,6 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
-	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -133,33 +132,12 @@ func TestPrepareLocalNVKESourceFreezesCapturedAMD64Graph(t *testing.T) {
 		}
 		cohorts[original.CatalogDigest] = build.CatalogDigest
 	}
-	nightly, err := authored.LoadDefinition(t.Context(), "inputs/definitions/demo/arm64-nvidia-kvm.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var wantInit catalog.Component
-	for _, output := range nightly.Outputs {
-		for _, name := range output.Components {
-			if name != "native-capi-exec-init-image" {
-				continue
-			}
-			selection := nightly.Catalog
-			if output.Catalog != nil {
-				selection = *output.Catalog
-			}
-			stack, err := loadFactoryCatalogStack(t.Context(), "inputs/definitions/demo/arm64-nvidia-kvm.json", selection)
-			if err != nil {
-				t.Fatal(err)
-			}
-			wantInit = stack.Catalog.Components[name]
-		}
-	}
-	if wantInit.FromSource || wantInit.Prebuilt == nil {
-		t.Fatal("authored current-main CAPI producer is missing")
-	}
 	frozen := 0
 	for index, build := range after.Builds {
 		prior := before.Builds[index]
+		if len(prior.ResolvedComponents) != len(build.ResolvedComponents) {
+			t.Fatal("source selection changed material membership")
+		}
 		if prior.Name != build.Name || build.Platform != "linux/amd64" {
 			t.Fatal("source selection changed named target")
 		}
@@ -172,10 +150,6 @@ func TestPrepareLocalNVKESourceFreezesCapturedAMD64Graph(t *testing.T) {
 				if component.ToolchainImage != original.ToolchainImage || !reflect.DeepEqual(component.ToolchainImages, original.ToolchainImages) {
 					t.Fatalf("source preparation changed catalog toolchain %s/%s", build.Name, name)
 				}
-			} else if name == "native-capi-exec-init-image" {
-				if !reflect.DeepEqual(component, wantInit) {
-					t.Fatal("catalog init image differs from its authored current-main component")
-				}
 			} else if !reflect.DeepEqual(component, original) {
 				t.Fatalf("independent catalog member %s changed", name)
 			}
@@ -183,17 +157,16 @@ func TestPrepareLocalNVKESourceFreezesCapturedAMD64Graph(t *testing.T) {
 		for componentIndex, component := range build.ResolvedComponents {
 			name := component.Name
 			original := prior.ResolvedComponents[componentIndex]
+			if original.Name != name {
+				t.Fatal("source selection changed component membership")
+			}
 			if component.FromSource && strings.TrimSuffix(component.Repo, ".git") == localNVKERepository {
 				frozen++
 				if component.Commit != commit || component.Tag != commit || component.SourceDate == 0 || component.TreeHash == "" {
 					t.Fatalf("%s/%s was not frozen", build.Name, name)
 				}
-				if original.ToolchainImage != component.ToolchainImage || !reflect.DeepEqual(original.ToolchainImages, component.ToolchainImages) || (name != "nvke-image-inputs" && !reflect.DeepEqual(original.BuildCommand, component.BuildCommand)) {
+				if original.ToolchainImage != component.ToolchainImage || !reflect.DeepEqual(original.ToolchainImages, component.ToolchainImages) || !reflect.DeepEqual(original.BuildCommand, component.BuildCommand) || !reflect.DeepEqual(original.Materials, component.Materials) {
 					t.Fatalf("source selection changed producer %s", name)
-				}
-			} else if name == "native-capi-exec-init-image" {
-				if !reflect.DeepEqual(component.Component, wantInit) {
-					t.Fatal("CAPI init image differs from the authored current-main producer")
 				}
 			} else if !reflect.DeepEqual(component, original) {
 				t.Fatalf("independent component %s changed", name)
@@ -208,8 +181,8 @@ func TestPrepareLocalNVKESourceFreezesCapturedAMD64Graph(t *testing.T) {
 				if !covered {
 					t.Fatal("current-main material producer is outside local toolchain preparation")
 				}
-				if !bytes.Contains([]byte(strings.Join(component.BuildCommand, " ")), []byte("doca-ovs")) {
-					t.Fatal("current-main DOCA material producer was not selected")
+				if component.Materials["doca-ovs"] != "nvke-doca-ovs" {
+					t.Fatal("source preparation lost the authored DOCA material edge")
 				}
 				if !reflect.DeepEqual(component.Platforms, []string{"linux/amd64", "linux/arm64"}) {
 					t.Fatal("current-main material producer lost declared platforms")
