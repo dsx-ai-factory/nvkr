@@ -692,6 +692,10 @@ func copyContext(ctx context.Context, destination io.Writer, source io.Reader) (
 	return io.CopyBuffer(destination, contextReader{ctx: ctx, source: source}, make([]byte, sparseCopyBlock))
 }
 
+// lockContended is a test-only observation seam: when set, it is called with
+// each mutex a lockMutexContext attempt found held. It is always nil in production.
+var lockContended atomic.Pointer[func(*sync.Mutex)]
+
 func lockMutexContext(ctx context.Context, mutex *sync.Mutex) error {
 	if ctx == nil {
 		return errors.New("held operation requires a non-nil context")
@@ -702,6 +706,9 @@ func lockMutexContext(ctx context.Context, mutex *sync.Mutex) error {
 	for {
 		if mutex.TryLock() {
 			return nil
+		}
+		if observe := lockContended.Load(); observe != nil {
+			(*observe)(mutex)
 		}
 		timer := time.NewTimer(5 * time.Millisecond)
 		select {
