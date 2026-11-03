@@ -18,7 +18,8 @@ func TestMergeGateActionlintConfigurationTriggersCheck(t *testing.T) {
 	}
 	var workflow struct {
 		Jobs map[string]struct {
-			Steps []struct {
+			Outputs map[string]string `json:"outputs"`
+			Steps   []struct {
 				ID   string `json:"id"`
 				With struct {
 					Filters string `json:"filters"`
@@ -28,6 +29,11 @@ func TestMergeGateActionlintConfigurationTriggersCheck(t *testing.T) {
 	}
 	if err := yaml.Unmarshal(raw, &workflow); err != nil {
 		t.Fatal(err)
+	}
+	// The actionlint job selects on this output; it must come from the filter below.
+	const output = "${{ github.event_name != 'pull_request' && 'true' || steps.changes.outputs.actions }}"
+	if got := workflow.Jobs["check-paths"].Outputs["actions"]; got != output {
+		t.Fatalf("check-paths actions output = %q, want %q", got, output)
 	}
 	for _, step := range workflow.Jobs["check-paths"].Steps {
 		if step.ID != "changes" {

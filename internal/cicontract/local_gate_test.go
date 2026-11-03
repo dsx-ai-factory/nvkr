@@ -120,22 +120,46 @@ func TestLocalGateRejectsInventoryDrift(t *testing.T) {
 			func(t *testing.T, jobs map[string]mergeGateJob) {
 				step(t, jobs, "lint", "lint").With["only-new-issues"] = true
 			}},
-		{"provider-only job runs make", `provider-only job analyze runs make step`,
+		{"provider-only job runs make", `provider-only job analyze step "" contains the word make`,
 			func(t *testing.T, jobs map[string]mergeGateJob) {
 				job := jobs["analyze"]
 				job.Steps = append(job.Steps, mergeGateStep{storageWorkflowStep: storageWorkflowStep{Run: "make vet"}})
 				jobs["analyze"] = job
 			}},
-		{"provider-only job runs flagged make", `provider-only job analyze runs make step`,
+		{"provider-only job runs flagged make", `provider-only job analyze step "" contains the word make`,
 			func(t *testing.T, jobs map[string]mergeGateJob) {
 				job := jobs["analyze"]
 				job.Steps = append(job.Steps, mergeGateStep{storageWorkflowStep: storageWorkflowStep{Run: "echo start\ntrue && make -k vet GOFLAGS=-short"}})
 				jobs["analyze"] = job
 			}},
-		{"provider-only job runs make by path", `provider-only job analyze runs make step`,
+		{"provider-only job runs make by path", `provider-only job analyze step "" contains the word make`,
 			func(t *testing.T, jobs map[string]mergeGateJob) {
 				job := jobs["analyze"]
 				job.Steps = append(job.Steps, mergeGateStep{storageWorkflowStep: storageWorkflowStep{Run: "/usr/bin/make test-race"}})
+				jobs["analyze"] = job
+			}},
+		{"provider-only job: quoted make path", `provider-only job analyze step "" contains the word make`,
+			func(t *testing.T, jobs map[string]mergeGateJob) {
+				job := jobs["analyze"]
+				job.Steps = append(job.Steps, mergeGateStep{storageWorkflowStep: storageWorkflowStep{Run: `'/usr/bin/make' vet`}})
+				jobs["analyze"] = job
+			}},
+		{"provider-only job: double-quoted make", `provider-only job analyze step "" contains the word make`,
+			func(t *testing.T, jobs map[string]mergeGateJob) {
+				job := jobs["analyze"]
+				job.Steps = append(job.Steps, mergeGateStep{storageWorkflowStep: storageWorkflowStep{Run: `"make" vet`}})
+				jobs["analyze"] = job
+			}},
+		{"provider-only job: make in substitution", `provider-only job analyze step "" contains the word make`,
+			func(t *testing.T, jobs map[string]mergeGateJob) {
+				job := jobs["analyze"]
+				job.Steps = append(job.Steps, mergeGateStep{storageWorkflowStep: storageWorkflowStep{Run: `echo $(make vet)`}})
+				jobs["analyze"] = job
+			}},
+		{"provider-only job: prose mentioning make", `provider-only job analyze step "" contains the word make`,
+			func(t *testing.T, jobs map[string]mergeGateJob) {
+				job := jobs["analyze"]
+				job.Steps = append(job.Steps, mergeGateStep{storageWorkflowStep: storageWorkflowStep{Run: `echo 'Please make sure CodeQL is ready'`}})
 				jobs["analyze"] = job
 			}},
 		{"stale support step", `classification entries match no merge gate step: [step tests/Summarize test timings]`,
@@ -230,13 +254,13 @@ func hostedMakeTargets(jobs map[string]mergeGateJob) ([]string, error) {
 			if slices.Contains(providerOnlyJobs, name) {
 				used["job "+name] = true
 				for _, step := range job.Steps {
-					// Any make word or path, not only the canonical form, would hide a local
-					// check here. Matching words rather than parsing shell fails closed: prose
-					// containing "make" is rejected too.
+					// Any make word or path, quoted or not, could hide a local check here.
+					// This is a word match, not a shell parser: it fails closed, so prose
+					// or a comment containing the word make is rejected too.
 					if slices.ContainsFunc(strings.FieldsFunc(step.Run, isShellSeparator), func(word string) bool {
 						return path.Base(word) == "make"
 					}) {
-						return nil, fmt.Errorf("provider-only job %s runs make step %q; move the check to a reproducible job", name, step.Name)
+						return nil, fmt.Errorf("provider-only job %s step %q contains the word make, which provider-only steps may not use; move any local check to a reproducible job", name, step.Name)
 					}
 				}
 				continue
@@ -306,7 +330,7 @@ func hostedMakeTargets(jobs map[string]mergeGateJob) ([]string, error) {
 }
 
 func isShellSeparator(r rune) bool {
-	return unicode.IsSpace(r) || strings.ContainsRune(";&|()`$", r)
+	return unicode.IsSpace(r) || strings.ContainsRune(";&|()`$'\"\\", r)
 }
 
 func appendUnused(stale []string, used map[string]bool, key string) []string {
