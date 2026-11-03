@@ -86,6 +86,12 @@ catalog stack made explicit. It is an internal record, recorded by digest in the
 authored or selected as input.
 _Avoid_: Flattened file, combined candidate, authored Definition
 
+**Declared variant (proposed)**:
+A composite Definition's explicit permission for named members to select different effective producers of
+one component. Proposed ADR-26 binds it into the composite identity and composition record; any cross-member
+producer divergence it does not cover fails compilation.
+_Avoid_: Override, pin exception, allowlist
+
 **Named output**:
 A Definition's declaration of exact selected producers, concrete target platform or explicit aggregate image
 platform set, and the artifact format they must produce. Each named output is an independent required use, even when two outputs share a Build Digest.

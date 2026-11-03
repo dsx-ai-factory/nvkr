@@ -123,6 +123,125 @@ func TestCompositeCompilationContract(t *testing.T) {
 	}
 }
 
+// TestCompositeDeclaredVariantContract proves the ADR-26 §3 opt-in: members
+// may resolve different producers for one component only when the composite
+// declares them as variants of that component, and each variant stays
+// attributed to its member.
+func TestCompositeDeclaredVariantContract(t *testing.T) {
+	shared := func(name, component string, catalog *authored.Catalog) func(*authored.Definition) {
+		return func(member *authored.Definition) {
+			member.Outputs = append(member.Outputs, authored.DefinitionOutput{Name: name, Platform: "linux/amd64", Format: authored.OutputExecutable,
+				Components: []string{component}, Catalog: catalog})
+		}
+	}
+	override := &authored.Catalog{Base: "../override"}
+	diverge, converge := shared("shared", "containerd", override), shared("shared", "containerd", nil)
+	// alpha also selects beta's kubectl producer, so a kubectl declaration is selected by both.
+	alphaKubectl := shared("tools-kubectl", "kubectl", override)
+	variant := func(component string, members ...string) []authored.DeclaredVariant {
+		return []authored.DeclaredVariant{{Component: component, Members: members}}
+	}
+	for _, tc := range []struct {
+		name     string
+		alpha    func(*authored.Definition)
+		beta     func(*authored.Definition)
+		gamma    bool // gamma selects containerd from beta's divergent catalog
+		variants []authored.DeclaredVariant
+		code     e.Code
+		distinct int
+	}{
+		{name: "undeclared divergence", beta: diverge, code: e.CodeInvalidCatalog},
+		{name: "declared pair", beta: diverge, variants: variant("containerd", "alpha", "beta"), distinct: 2},
+		{name: "declared pair on the wrong component", alpha: alphaKubectl, beta: diverge, variants: variant("kubectl", "alpha", "beta"), code: e.CodeInvalidCatalog},
+		{name: "declared pair on the wrong member", beta: diverge, gamma: true, variants: variant("containerd", "alpha", "gamma"), code: e.CodeInvalidCatalog},
+		{name: "declared pair on the other wrong member", beta: diverge, gamma: true, variants: variant("containerd", "beta", "gamma"), code: e.CodeInvalidCatalog},
+		{name: "declared member set", beta: diverge, gamma: true, variants: variant("containerd", "alpha", "beta", "gamma"), distinct: 2},
+		{name: "declared pair with converged producers", beta: converge, variants: variant("containerd", "alpha", "beta"), distinct: 1},
+		{name: "declared member without the component", variants: variant("containerd", "alpha", "beta"), code: e.CodeInvalidCatalog},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var gamma authored.Definition
+			root, composite := compositeFactoryFixture(t, func(alpha, beta *authored.Definition) {
+				gamma = beta.Clone()
+				gamma.Metadata.Name = "gamma"
+				gamma.Outputs = nil
+				diverge(&gamma)
+				gamma.Outputs[0].Name = "gamma-tools"
+				if tc.alpha != nil {
+					tc.alpha(alpha)
+				}
+				if tc.beta != nil {
+					tc.beta(beta)
+				}
+			})
+			if tc.gamma {
+				writeSnapshotFixtureDocument(t, root, "config/gamma.json", gamma)
+				digest, err := gamma.Digest()
+				if err != nil {
+					t.Fatal(err)
+				}
+				composite.Members = append(composite.Members, authored.CompositeMember{Name: "gamma", Definition: "gamma.json", Digest: digest})
+			}
+			composite.Variants = tc.variants
+			writeSnapshotFixtureDocument(t, root, compositeFixturePath, composite)
+			plan, _, err := CaptureCompileFiles(t.Context(), root, compositeFixturePath, snapshotEnvironment, "composite-test")
+			if tc.code != "" {
+				assertFactoryErrorCode(t, err, tc.code)
+				if plan != nil {
+					t.Fatal("refused composite returned a Plan")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want, err := composite.Digest(); err != nil || plan.DefinitionDigest != want || !slices.EqualFunc(plan.Composition.Variants, tc.variants, func(a, b authored.DeclaredVariant) bool {
+				return a.Component == b.Component && slices.Equal(a.Members, b.Members)
+			}) {
+				t.Fatalf("Plan binds %s with variants %+v, want %s with %+v (%v)", plan.DefinitionDigest, plan.Composition.Variants, want, tc.variants, err)
+			}
+			assertCompositeIdentityInvariance(t, root, plan)
+			// Each distinct containerd producer is attributed only to declared members.
+			producers := map[string]map[string]bool{}
+			for _, build := range plan.Builds {
+				output, _, _ := strings.Cut(build.Name, "/")
+				member, _ := plan.Composition.MemberOf(output)
+				for _, component := range build.ResolvedComponents {
+					if component.Name == "containerd" {
+						key := string(mustCanonical(t, component))
+						if producers[key] == nil {
+							producers[key] = map[string]bool{}
+						}
+						producers[key][member] = true
+					}
+				}
+			}
+			if len(producers) != tc.distinct {
+				t.Fatalf("containerd has %d distinct producers, want %d", len(producers), tc.distinct)
+			}
+			for _, members := range producers {
+				for member := range members {
+					if !slices.Contains(tc.variants[0].Members, member) {
+						t.Fatalf("containerd variant attributed to undeclared member %q", member)
+					}
+				}
+			}
+			// A saved Plan stripped of its declaration, with a recomputed digest, still fails validation.
+			forged := *plan
+			forged.Composition = plan.Composition.Clone()
+			forged.Composition.Variants = nil
+			if forged.DefinitionDigest, err = authored.CompositeDigest(forged.Composition.Metadata, forged.Composition.Members); err != nil {
+				t.Fatal(err)
+			}
+			if err := forged.Validate(); tc.distinct > 1 {
+				assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
+			} else if err != nil {
+				t.Fatalf("converged Plan without its declaration = %v", err)
+			}
+		})
+	}
+}
+
 // assertCompositeIdentityInvariance compiles each member alone and requires
 // every composite output and native build to keep its exact record.
 func assertCompositeIdentityInvariance(t *testing.T, root string, plan *Plan) {
@@ -196,6 +315,19 @@ func TestCompositePlanRecordValidation(t *testing.T) {
 		}},
 		{name: "plain definition digest", code: e.CodeUnverifiedRef, mutate: func(plan *Plan) {
 			plan.DefinitionDigest = plan.Composition.EffectiveDefinitionDigest
+		}},
+		{name: "added variant", code: e.CodeUnverifiedRef, mutate: func(plan *Plan) {
+			plan.Composition.Variants = []authored.DeclaredVariant{{Component: "containerd", Members: []string{"alpha", "beta"}}}
+		}},
+		{name: "variant naming unlisted member", code: e.CodeUnverifiedRef, mutate: func(plan *Plan) {
+			plan.Composition.Variants = []authored.DeclaredVariant{{Component: "containerd", Members: []string{"alpha", "gamma"}}}
+		}},
+		// The digest recomputes, so only the record's selection check can refuse it: beta selects no containerd.
+		{name: "digest-consistent variant member without the component", code: e.CodeInvalidCatalog, mutate: func(plan *Plan) {
+			plan.Composition.Variants = []authored.DeclaredVariant{{Component: "containerd", Members: []string{"alpha", "beta"}}}
+			if digest, err := authored.CompositeDigest(plan.Composition.Metadata, plan.Composition.Members, plan.Composition.Variants...); err == nil {
+				plan.DefinitionDigest = digest
+			}
 		}},
 		{name: "fixed development layout", code: e.CodeEngineCapability, mutate: func(plan *Plan) {
 			plan.Environment.GitHubDevelopment, plan.Environment.GitHubBundle = true, ""

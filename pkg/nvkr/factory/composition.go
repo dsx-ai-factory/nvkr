@@ -44,9 +44,6 @@ func compileComposition(ctx context.Context, composition authored.Composition, e
 	if plan.DefinitionDigest != composition.Digest() {
 		return nil, e.New(e.CodeUnverifiedRef, "composite Plan does not bind the admitted composite digest")
 	}
-	if err := checkCrossMemberProducers(*plan, record); err != nil {
-		return nil, err
-	}
 	return plan, nil
 }
 
@@ -75,9 +72,11 @@ func admitCompositeEnvironment(environment authored.Environment) error {
 	return nil
 }
 
-// checkCrossMemberProducers enforces ADR-26 §3: outputs of different members
-// that select one (component, platform) must resolve the identical effective
-// producer. Variants inside one member keep ADR-11 semantics.
+// checkCrossMemberProducers enforces ADR-26 §3 on every composite Plan
+// validation: outputs of different members that select one (component,
+// platform) must resolve the identical effective producer unless the composite
+// declares both members as variants of that component. Variants inside one
+// member keep ADR-11 semantics.
 func checkCrossMemberProducers(plan Plan, record *CompositionRecord) error {
 	type producer struct {
 		member string
@@ -97,8 +96,8 @@ func checkCrossMemberProducers(plan Plan, record *CompositionRecord) error {
 			}
 			key := component.Name + "\x00" + build.Platform
 			for _, previous := range seen[key] {
-				if previous.member != member && !bytes.Equal(previous.bytes, resolved) {
-					return e.New(e.CodeInvalidCatalog, "members %q and %q select divergent producers for component %q on %s",
+				if previous.member != member && !bytes.Equal(previous.bytes, resolved) && !record.DeclaresVariant(component.Name, previous.member, member) {
+					return e.New(e.CodeInvalidCatalog, "members %q and %q select divergent producers for component %q on %s without a declared variant",
 						previous.member, member, component.Name, build.Platform)
 				}
 			}
