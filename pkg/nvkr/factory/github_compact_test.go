@@ -452,13 +452,14 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 					// The default suite checks the combined bundle's emitted pin and
 					// source credential scope; the extended suite covers the others.
 					assertMaintainedPinSetCredentialScope(t, plan, emitted, true)
+					assertGitHubEmittedCredentialRefusals(t, plan, bundle, emitted)
 				}
 				if selected.privateDiskProducers >= 0 {
 					// The emitted workers, not only their flat reference, keep each
 					// image credential in its read-only preparation step.
 					emittedJobs := map[string]githubJob{}
-					for _, document := range emitted {
-						maps.Copy(emittedJobs, document.Jobs)
+					for _, name := range slices.Sorted(maps.Keys(emitted)) {
+						maps.Copy(emittedJobs, emitted[name].Jobs)
 					}
 					assertGitHubPrivateImageJobs(t, emittedJobs, selected.privateDiskProducers)
 				}
@@ -486,9 +487,9 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 // githubEmittedWorkflows decodes each workflow file a bundle emits, the entry
 // and any partition workers, with its local actions expanded. An entry's
 // worker-calling jobs have no steps; their bodies are the worker documents.
-func githubEmittedWorkflows(t *testing.T, plan *Plan, bundle *GeneratedBundle) []githubWorkflowDocument {
+func githubEmittedWorkflows(t *testing.T, plan *Plan, bundle *GeneratedBundle) map[string]githubWorkflowDocument {
 	t.Helper()
-	var documents []githubWorkflowDocument
+	documents := map[string]githubWorkflowDocument{}
 	for _, name := range slices.Sorted(maps.Keys(bundle.Files)) {
 		if name != bundle.WorkflowPath && !githubPartitionWorkflowSuffix.MatchString(name) {
 			continue
@@ -515,7 +516,7 @@ func githubEmittedWorkflows(t *testing.T, plan *Plan, bundle *GeneratedBundle) [
 		if err != nil {
 			t.Fatal(err)
 		}
-		documents = append(documents, decodeGitHubWorkflow(t, expanded))
+		documents[name] = decodeGitHubWorkflow(t, expanded)
 	}
 	return documents
 }
@@ -536,7 +537,7 @@ func githubFlatReference(t *testing.T, plan *Plan, bundle *GeneratedBundle) *Gen
 
 // assertGitHubPartitionCallerSecrets requires an entry caller to forward exactly
 // its worker's declared secrets, each from the same repository secret.
-func assertGitHubPartitionCallerSecrets(t *testing.T, bundle *GeneratedBundle, id string, call *yamlv3.Node) {
+func assertGitHubPartitionCallerSecrets(t testing.TB, bundle *GeneratedBundle, id string, call *yamlv3.Node) {
 	t.Helper()
 	worker := strings.TrimPrefix(githubYAMLValue(call, "uses"), "./")
 	raw, ok := bundle.Files[worker]
@@ -572,4 +573,110 @@ func assertGitHubPartitionCallerSecrets(t *testing.T, bundle *GeneratedBundle, i
 			t.Fatalf("entry job %s forwards undeclared or renamed secret %s", id, name)
 		}
 	}
+}
+
+// assertGitHubEmittedCredentialRefusals proves that the caller and emitted-worker
+// credential guards refuse mutated copies of the maintained bundle.
+func assertGitHubEmittedCredentialRefusals(t *testing.T, plan *Plan, bundle *GeneratedBundle, emitted map[string]githubWorkflowDocument) {
+	t.Helper()
+	const sourceSecret = "${{ secrets.NKE_SOURCE_TOKEN }}"
+	scalar := func(value string) *yamlv3.Node { return &yamlv3.Node{Kind: yamlv3.ScalarNode, Value: value} }
+	for _, tc := range []struct {
+		name, want string
+		edit       func(call *yamlv3.Node)
+	}{
+		{"caller with", "outside secrets", func(call *yamlv3.Node) {
+			call.Content = append(call.Content, scalar("with"),
+				&yamlv3.Node{Kind: yamlv3.MappingNode, Content: []*yamlv3.Node{scalar("token"), scalar(sourceSecret)}})
+		}},
+		{"caller if", "outside secrets", func(call *yamlv3.Node) {
+			call.Content = append(call.Content, scalar("if"), scalar("env.NVKR_PIN_SOURCE_TOKEN_0 != ''"))
+		}},
+		{"renamed secret", "undeclared or renamed secret", func(call *yamlv3.Node) {
+			githubYAMLField(githubYAMLField(call, "secrets"), "NKE_SOURCE_TOKEN").Value = "${{ secrets.OTHER }}"
+		}},
+		{"extra secret", "beyond", func(call *yamlv3.Node) {
+			secrets := githubYAMLField(call, "secrets")
+			secrets.Content = append(secrets.Content, scalar("OTHER"), scalar("${{ secrets.OTHER }}"))
+		}},
+	} {
+		var document yamlv3.Node
+		if err := yamlv3.Unmarshal(bundle.Files[bundle.WorkflowPath], &document); err != nil {
+			t.Fatal(err)
+		}
+		id, call := "", (*yamlv3.Node)(nil)
+		jobs := githubYAMLField(document.Content[0], "jobs")
+		for index := 0; index < len(jobs.Content) && call == nil; index += 2 {
+			if githubYAMLField(githubYAMLField(jobs.Content[index+1], "secrets"), "NKE_SOURCE_TOKEN") != nil {
+				id, call = jobs.Content[index].Value, jobs.Content[index+1]
+			}
+		}
+		if call == nil {
+			t.Fatal("no entry job forwards the source secret")
+		}
+		tc.edit(call)
+		if got := githubAssertionRefusal(t, func(t testing.TB) { assertGitHubPartitionCallerSecrets(t, bundle, id, call) }); !strings.Contains(got, tc.want) {
+			t.Fatalf("%s: caller guard reported %q, want %q", tc.name, got, tc.want)
+		}
+	}
+	name, id := "", ""
+	for _, file := range slices.Sorted(maps.Keys(emitted)) {
+		for _, job := range slices.Sorted(maps.Keys(emitted[file].Jobs)) {
+			if file != bundle.WorkflowPath && id == "" && len(emitted[file].Jobs[job].Steps) != 0 {
+				name, id = file, job
+			}
+		}
+	}
+	if id == "" {
+		t.Fatal("no emitted worker job has steps")
+	}
+	for _, tc := range []struct {
+		name, want string
+		edit       func(job *githubJob)
+	}{
+		{"worker condition", "job condition", func(job *githubJob) { job.If = "env.NVKR_PIN_SOURCE_TOKEN_0 != ''" }},
+		{"worker output", "job condition", func(job *githubJob) { job.Outputs = map[string]string{"token": sourceSecret} }},
+		{"worker step input", "step inputs", func(job *githubJob) { job.Steps[0].With = map[string]string{"token": sourceSecret} }},
+	} {
+		job := emitted[name].Jobs[id]
+		job.Steps = slices.Clone(job.Steps)
+		tc.edit(&job)
+		documents := map[string]githubWorkflowDocument{name: {Jobs: map[string]githubJob{id: job}}}
+		if got := githubAssertionRefusal(t, func(t testing.TB) { assertMaintainedPinSetCredentialScope(t, plan, documents, true) }); !strings.Contains(got, tc.want) {
+			t.Fatalf("%s: worker guard reported %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+// githubFatalRecorder records a helper's fatal failure instead of failing the test.
+type githubFatalRecorder struct {
+	testing.TB
+	message string
+}
+
+func (r *githubFatalRecorder) Fatal(args ...any) {
+	r.message = fmt.Sprint(args...)
+	panic(r)
+}
+
+func (r *githubFatalRecorder) Fatalf(format string, args ...any) {
+	r.message = fmt.Sprintf(format, args...)
+	panic(r)
+}
+
+// githubAssertionRefusal returns the fatal message check reports, or "" if it passes.
+func githubAssertionRefusal(t *testing.T, check func(testing.TB)) (message string) {
+	t.Helper()
+	recorder := &githubFatalRecorder{TB: t}
+	defer func() {
+		switch recovered := recover(); recovered {
+		case nil:
+		case recorder:
+			message = recorder.message
+		default:
+			panic(recovered)
+		}
+	}()
+	check(recorder)
+	return ""
 }
