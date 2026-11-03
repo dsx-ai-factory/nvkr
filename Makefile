@@ -126,8 +126,10 @@ test-ci-tools: ## Require Python and check CI sharding, reports and local adapte
 	python3 -B -m unittest discover -s scripts -p '*_test.py'
 
 # Diff-scoped: only Markdown lines added since the merge base with STATUS_BASE are checked.
+# An empty STATUS_HEAD checks the working tree, including uncommitted and untracked files;
+# CI sets both to the pull request's base and head commits.
 STATUS_BASE ?= origin/main
-STATUS_HEAD ?= HEAD
+STATUS_HEAD ?=
 
 .PHONY: status-restated-check
 status-restated-check: ## Fail when added docs restate validation status outside the reconciliation ledger.

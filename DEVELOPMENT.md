@@ -18,6 +18,8 @@ for `make test-ci-tools`, which runs the CI report parser and all local adapter 
 only the Python standard library. Go-test adapter wrappers report an explicit skip when Python is
 absent; that is not full-gate coverage. The tooling gate fails if Python is missing or too old and
 runs every suite independently, so a Go-only test pass cannot stand in for the completion gate.
+The restated-status check in `make check` diffs against `origin/main`; set `STATUS_BASE` when your base
+branch has another name, and fetch full history in a shallow clone.
 On macOS with Homebrew, install the additional JSON, timeout, and Python tools with:
 
 ```sh

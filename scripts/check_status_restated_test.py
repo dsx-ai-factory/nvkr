@@ -15,12 +15,15 @@ spec = importlib.util.spec_from_file_location("restated", Path(__file__).with_na
 restated = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(restated)
 
-LINK = "link docs/adr/reconciliation.md instead"
+LINK = "link its docs/adr/reconciliation.md row instead"
+OWNERS = "link docs/adr/reconciliation.md#support-by-owner row"
 LEDGER = "| Owner | Implemented | Remaining |\n|---|---|---|\n| 01–03 Identity | x | y |\n| 21 Generation | x | y |\n"
 BASE = {
     "docs/adr/reconciliation.md": LEDGER,
     "docs/guide.md": "Existing text remains unrecorded.\n",
     "docs/old.md": "Old text remains unproven.\n",
+    "docs/moved-from.md": "Old text remains unproven.\nTwo.\nThree.\nFour.\nFive.\n",
+    "docs/dash.md": "-- intro\n",
 }
 # Each case owns distinct paths, so one base...head diff exercises them all.
 CASES = {
@@ -33,11 +36,24 @@ CASES = {
     "adr file names its owner row": (
         {"docs/adr/0021-generation.md": "Its hosted acceptance is unrecorded.\n"},
         ['docs/adr/0021-generation.md:1: status restated ("is unrecorded"); '
-         "link docs/adr/reconciliation.md:4 (Support by owner, 21 Generation) instead"]),
+         f'{OWNERS} "21 Generation" instead']),
     "adr reference names a range row": (
-        {"docs/identity.md": "ADR-02 identity has not been exercised.\n"},
+        {"docs/identity.md": "Identity has not been exercised\nfor ADR-02.\n"},
         ['docs/identity.md:1: status restated ("has not been exercised"); '
-         "link docs/adr/reconciliation.md:3 (Support by owner, 01 Identity) instead"]),
+         f'{OWNERS} "01 Identity" instead']),
+    "renamed file reports only added lines": (
+        {"docs/moved-from.md": None, "docs/moved.md": BASE["docs/moved-from.md"] + "Signing is untested.\n"},
+        [f'docs/moved.md:6: status restated ("is untested"); {LINK}']),
+    "added line that looks like a header": (
+        {"docs/dash.md": "++ Hosted acceptance remains unrecorded.\n"},
+        [f'docs/dash.md:1: status restated ("remains unrecorded"); {LINK}']),
+    "validation subject makes unverified count": (
+        {"docs/cycle.md": "The runtime cycle remains unverified; payloads remain unverified by design.\n"},
+        [f'docs/cycle.md:1: status restated ("cycle remains unverified"); {LINK}']),
+    "evidence category named, not claimed": (
+        {"docs/category.md": "[Reconciliation](adr/reconciliation.md) owns externally exercised scope.\n"
+                             "The release was not externally exercised.\n"},
+        [f'docs/category.md:2: status restated ("not externally exercised"); {LINK}']),
     "ledger and evidence": (
         {"docs/adr/reconciliation.md": LEDGER + "Hosted signing remains unproven.\n",
          "docs/evidence/run.md": "Hosted signing remains unproven.\n"}, []),
@@ -65,6 +81,9 @@ def git(repo, *args):
 def commit(repo, files):
     for name, text in files.items():
         path = Path(repo, name)
+        if text is None:
+            path.unlink()
+            continue
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
     git(repo, "add", "-A")
@@ -83,7 +102,7 @@ class StatusRestatedTest(unittest.TestCase):
         git(cls.repo, "init", "-q", "-b", "main")
         cls.base = commit(cls.repo, BASE)
         cls.head = commit(cls.repo, {k: v for files, _ in CASES.values() for k, v in files.items()})
-        cls.findings = restated.check(cls.repo, cls.base, cls.head)
+        _, cls.findings = restated.check(cls.repo, cls.base, cls.head)
 
     def test_findings(self):
         """Flag added restatements, including wrapped ones; skip the ledger, evidence, lanes and code."""
@@ -101,6 +120,17 @@ class StatusRestatedTest(unittest.TestCase):
             with self.assertRaises(SystemExit) as raised:
                 restated.main(["--repo", self.repo, "no-such-revision", self.head])
         self.assertIn("no-such-revision", str(raised.exception.code))
+        self.assertIn("STATUS_BASE", str(raised.exception.code))
+
+    def test_working_tree(self):
+        """Without a head, check uncommitted and untracked Markdown since the merge base."""
+        Path(self.repo, "docs/old.md").write_text(BASE["docs/old.md"] + "Signing is unproven.\n")
+        Path(self.repo, "docs/new.md").write_text("Publication has not been recorded.\n")
+        _, findings = restated.check(self.repo, self.head)
+        self.assertEqual(findings, [
+            f'docs/new.md:1: status restated ("has not been recorded"); {LINK}',
+            f'docs/old.md:2: status restated ("is unproven"); {LINK}',
+        ])
 
 
 if __name__ == "__main__":
