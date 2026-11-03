@@ -936,8 +936,8 @@ owns the exact Ubuntu conformance result, completed cleanup, failed Mac attempt
 and limits of each recorded revision. Earlier retained-artifact diagnostics used
 a two-node tenant and do not establish the current four-guest conformance topology.
 
-Native ARM64 NVIDIA Definitions select 32 outputs, or 38 with conformance.
-The default AMD64 Definition selects 34 outputs, including host and site tools.
+`bin/nvkr definition inspect --definition <path>` prints each Definition's exact
+output selection; the default AMD64 Definition also selects host and site tools.
 Package producers inspect actual Debian `Package`/`Architecture` metadata, and the disk
 uses NVKE's renamed Packer build/material schema and QCOW2 output. Changed package
 bytes require a fresh disk build. Maintained release, upstream and TCG product
