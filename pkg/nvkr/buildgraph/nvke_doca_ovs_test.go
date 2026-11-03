@@ -169,6 +169,10 @@ func TestDOCAOVSArchiveWrapperExecutesWithFixtures(t *testing.T) {
 			if len(command) != 3 || command[0] != "bash" || command[1] != "-ec" {
 				t.Fatalf("%s/%s DOCA OVS packaging command = %q", directory, arch, command)
 			}
+			// The fixture relocates exactly the working directory and two output paths.
+			if got := strings.Count(command[2], "/src/"); got != 3 {
+				t.Fatalf("%s/%s DOCA OVS packaging command has %d /src/ paths, want 3", directory, arch, got)
+			}
 			other := map[string]string{"amd64": "arm64", "arm64": "amd64"}[arch]
 			for _, tc := range []struct {
 				name  string
@@ -189,6 +193,9 @@ func TestDOCAOVSArchiveWrapperExecutesWithFixtures(t *testing.T) {
 					delete(debs, "doca-ovs-fixture-7_1.0_"+arch+".deb")
 					debs["doca-openvswitch-switch_2.0_"+arch+".deb"] = "Package: doca-openvswitch-switch\nArchitecture: " + arch + "\n"
 				}, false, 0},
+				{"switch is a directory", func(debs map[string]string) {
+					debs["doca-openvswitch-switch_1.0_"+arch+".deb"] = docaFixtureDirectory
+				}, false, 0},
 				{"switch package field", func(debs map[string]string) {
 					debs["doca-openvswitch-switch_1.0_"+arch+".deb"] = "Package: doca-openvswitch-common\nArchitecture: " + arch + "\n"
 				}, false, 1},
@@ -208,7 +215,13 @@ func TestDOCAOVSArchiveWrapperExecutesWithFixtures(t *testing.T) {
 						t.Fatal(err)
 					}
 					for name, control := range debs {
-						if err := os.WriteFile(filepath.Join(staged, name), []byte(control), 0o600); err != nil {
+						var err error
+						if control == docaFixtureDirectory {
+							err = os.Mkdir(filepath.Join(staged, name), 0o700)
+						} else {
+							err = os.WriteFile(filepath.Join(staged, name), []byte(control), 0o600)
+						}
+						if err != nil {
 							t.Fatal(err)
 						}
 					}
@@ -249,6 +262,9 @@ func TestDOCAOVSArchiveWrapperExecutesWithFixtures(t *testing.T) {
 		}
 	}
 }
+
+// docaFixtureDirectory stages a directory, not a file, under that deb name.
+const docaFixtureDirectory = "<directory>"
 
 func gnuTarPath(t *testing.T) string {
 	t.Helper()
