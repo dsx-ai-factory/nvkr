@@ -238,13 +238,15 @@ func stagePinnedToolExecutable(ctx context.Context, n ir.Node, source, parent st
 // the working directory are private and empty.
 func pinnedToolRunArgs(n ir.Node, runtimeName, name, toolDir, toolName, inputs, output string) []string {
 	args := []string{"run", "--rm", "--name", name, "--platform", n.Platform, "--network=none", "--read-only"}
-	// ADR-18: Docker containers run as the host runner's UID/GID, so the executor
-	// can admit and remove everything the tool writes. Rootless Podman keeps its own
-	// mapping, where container root is already the invoking user; a host UID there
-	// would map to a subordinate UID that cannot write the output mount.
+	// The tool always runs as the invoking user, never as an image-declared USER, so
+	// the executor can admit and remove everything it writes. ADR-18: Docker runs as
+	// the host runner's UID/GID; Podman keeps its own mapping, where container root
+	// is the invoking user and a host UID would map to a subordinate one.
+	identity := "0:0"
 	if runtimeName == "docker" {
-		args = append(args, "--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()))
+		identity = fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid())
 	}
+	args = append(args, "--user", identity)
 	// Each tmpfs states its mode: Docker mounts the -w directory 0755 root-owned,
 	// which a non-root tool cannot write.
 	args = append(args, "--tmpfs", ir.PinnedToolExecutorEnv["HOME"]+":mode=1777",

@@ -81,11 +81,11 @@ func TestPinnedToolRunArgsAreFixed(t *testing.T) {
 			"HOME=/nvkr/home", "LC_ALL=C", "TMPDIR=/nvkr/tmp", "TZ=UTC", "AICR_LOG_FORMAT=text",
 			"/nvkr/tool/aicr", "recipe", "--output", "/nvkr/output/recipe.yaml")
 	}
-	// Docker runs as the host user (ADR-18); rootless Podman's mapping already makes
-	// container root the invoking user, and a host UID would map to a subordinate one.
+	// Docker runs as the host user (ADR-18); Podman's mapping makes container root the
+	// invoking user, and a host UID or image USER would map to a subordinate one.
 	for runtimeName, want := range map[string][]string{
 		"docker": invocation("--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid())),
-		"podman": invocation(),
+		"podman": invocation("--user", "0:0"),
 	} {
 		got := pinnedToolRunArgs(node, runtimeName, "nvkr-1", "/private/tool", "aicr", "/private/inputs", "/private/out")
 		if !slices.Equal(got, want) {
