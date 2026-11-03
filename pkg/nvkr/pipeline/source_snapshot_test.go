@@ -48,7 +48,7 @@ func TestMaterializeSourceAppliesAuthenticatedPatchPrivately(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	closure, err := sourceTreeDigest(source)
+	closure, err := sourceTreeDigestContext(t.Context(), source)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestMaterializeSourceAppliesAuthenticatedPatchPrivately(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := writeSourceReceipt(receiptPath, sourceReceipt{
+	if err := writeSourceReceiptContext(t.Context(), receiptPath, sourceReceipt{
 		Schema: sourceReceiptSchema, Commit: fetch.Commit, TreeHash: fetch.TreeHash,
 		VendorSpecDigest: vendorDigest, ClosureDigest: closure,
 	}); err != nil {
@@ -73,7 +73,7 @@ func TestMaterializeSourceAppliesAuthenticatedPatchPrivately(t *testing.T) {
 	}
 	var progress bytes.Buffer
 	snapshot, err := materializeSource(build, RunOptions{
-		SourceRoot: root, progress: &progressSink{w: &progress},
+		Ctx: t.Context(), SourceRoot: root, progress: &progressSink{w: &progress},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -141,7 +141,7 @@ func checkAuthenticatedNewFilePatch(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	closure, err := sourceTreeDigest(source)
+	closure, err := sourceTreeDigestContext(t.Context(), source)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func checkAuthenticatedNewFilePatch(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := writeSourceReceipt(receiptPath, sourceReceipt{
+	if err := writeSourceReceiptContext(t.Context(), receiptPath, sourceReceipt{
 		Schema: sourceReceiptSchema, Commit: fetch.Commit, TreeHash: fetch.TreeHash,
 		VendorSpecDigest: vendorDigest, ClosureDigest: closure,
 	}); err != nil {
@@ -174,7 +174,7 @@ func checkAuthenticatedNewFilePatch(t *testing.T) string {
 			Name: "patches/add-generated-script.patch", SHA256: digestBytes([]byte(patch)), Content: patch,
 		}},
 	}
-	snapshot, err := materializeSource(build, RunOptions{SourceRoot: root})
+	snapshot, err := materializeSource(build, RunOptions{Ctx: t.Context(), SourceRoot: root})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,9 +259,9 @@ func TestMaterializeSourceRejectsDriftAfterFetch(t *testing.T) {
 	}
 	fetch := ir.Node{ID: "fetch-r", Dest: dest, Commit: goodSourceCommit, TreeHash: "tree"}
 	vendorDigest, _ := fetchVendorSpecDigest(fetch)
-	closure, _ := sourceTreeDigest(source)
+	closure, _ := sourceTreeDigestContext(t.Context(), source)
 	receiptPath, _ := sourceReceiptPath(root, dest)
-	if err := writeSourceReceipt(receiptPath, sourceReceipt{
+	if err := writeSourceReceiptContext(t.Context(), receiptPath, sourceReceipt{
 		Schema: sourceReceiptSchema, Commit: fetch.Commit, TreeHash: fetch.TreeHash,
 		VendorSpecDigest: vendorDigest, ClosureDigest: closure,
 	}); err != nil {
@@ -273,7 +273,7 @@ func TestMaterializeSourceRejectsDriftAfterFetch(t *testing.T) {
 	_, err := materializeSource(ir.Node{
 		Component: "r", SourceDest: dest, SourceCommit: fetch.Commit,
 		SourceTreeHash: fetch.TreeHash, VendorSpecDigest: vendorDigest,
-	}, RunOptions{SourceRoot: root})
+	}, RunOptions{Ctx: t.Context(), SourceRoot: root})
 	if code(err) != nvkrerr.CodeBuildFailed {
 		t.Fatalf("source drift must fail closed, got %v", err)
 	}
@@ -299,7 +299,7 @@ func TestApplyPatchesRejectsForgedContent(t *testing.T) {
 	n := ir.Node{Component: "r", Patches: []ir.PatchRef{{
 		Name: "fix.patch", SHA256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Content: "forged",
 	}}}
-	if err := applyPatches(n, dir, RunOptions{}); code(err) != nvkrerr.CodeBuildFailed {
+	if err := applyPatches(n, dir, RunOptions{Ctx: t.Context()}); code(err) != nvkrerr.CodeBuildFailed {
 		t.Fatalf("forged in-IR patch content must fail closed, got %v", err)
 	}
 }
@@ -312,10 +312,10 @@ func TestSourceClosureRejectsEscapingSymlinks(t *testing.T) {
 	if err := os.Symlink("../../outside", filepath.Join(root, "nested", "escape")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := sourceTreeDigest(root); err == nil {
+	if _, err := sourceTreeDigestContext(t.Context(), root); err == nil {
 		t.Fatal("source closure accepted a symlink escaping the authenticated root")
 	}
-	if err := copySourceTree(root, t.TempDir(), 0); err == nil {
+	if err := copySourceTreeContext(t.Context(), root, t.TempDir(), 0); err == nil {
 		t.Fatal("source materializer copied a symlink escaping the authenticated root")
 	}
 }
@@ -354,7 +354,7 @@ func TestSourceInspectionRejectsDirectorySwappedToHostSymlink(t *testing.T) {
 		t.Fatal("source inspection followed a directory pathname swapped to a host symlink")
 	}
 	destination := t.TempDir()
-	if err := copySourceTree(root, destination, 0); err == nil {
+	if err := copySourceTreeContext(t.Context(), root, destination, 0); err == nil {
 		t.Fatal("source snapshot copied through a swapped host symlink")
 	}
 	if _, err := os.Stat(filepath.Join(destination, "source", "host-canary")); !os.IsNotExist(err) {
@@ -364,7 +364,7 @@ func TestSourceInspectionRejectsDirectorySwappedToHostSymlink(t *testing.T) {
 
 func TestSourceClosureBindsEmptyDirectoriesAndModes(t *testing.T) {
 	root := t.TempDir()
-	base, err := sourceTreeDigest(root)
+	base, err := sourceTreeDigestContext(t.Context(), root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -372,7 +372,7 @@ func TestSourceClosureBindsEmptyDirectoriesAndModes(t *testing.T) {
 	if err := os.Mkdir(empty, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	withDirectory, err := sourceTreeDigest(root)
+	withDirectory, err := sourceTreeDigestContext(t.Context(), root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -382,7 +382,7 @@ func TestSourceClosureBindsEmptyDirectoriesAndModes(t *testing.T) {
 	if err := os.Chmod(empty, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	withChangedMode, err := sourceTreeDigest(root)
+	withChangedMode, err := sourceTreeDigestContext(t.Context(), root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -396,14 +396,14 @@ func TestSourceClosureBindsEmptyDirectoriesAndModes(t *testing.T) {
 	if err := os.Chmod(file, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	withExecutable, err := sourceTreeDigest(root)
+	withExecutable, err := sourceTreeDigestContext(t.Context(), root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Chmod(file, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	withNonExecutable, err := sourceTreeDigest(root)
+	withNonExecutable, err := sourceTreeDigestContext(t.Context(), root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -438,7 +438,7 @@ func TestSourceClosureUsesVersionedCanonicalTreeManifest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manifest, err := sourceTreeManifest(root)
+	manifest, err := sourceTreeManifestContext(t.Context(), root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -454,7 +454,7 @@ func TestSourceClosureUsesVersionedCanonicalTreeManifest(t *testing.T) {
 	if !reflect.DeepEqual(manifest, want) {
 		t.Fatalf("source closure manifest mismatch:\n got: %#v\nwant: %#v", manifest, want)
 	}
-	gotDigest, err := sourceTreeDigest(root)
+	gotDigest, err := sourceTreeDigestContext(t.Context(), root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -472,7 +472,7 @@ func TestSourceClosureUsesVersionedCanonicalTreeManifest(t *testing.T) {
 	if err := os.Symlink("empty", link); err != nil {
 		t.Fatal(err)
 	}
-	retargeted, err := sourceTreeDigest(root)
+	retargeted, err := sourceTreeDigestContext(t.Context(), root)
 	if err != nil {
 		t.Fatal(err)
 	}

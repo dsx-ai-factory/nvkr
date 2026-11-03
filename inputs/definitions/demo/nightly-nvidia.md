@@ -22,9 +22,8 @@ baseline is rebound by the runtime source policy described below; tagged local
 Definitions retain their release inputs. Its NVIDIA OVN 2.4.2 producer agrees
 with the standalone OVN image and chart outputs. The overlays retain exact
 predecessor bindings and required native KVM execution; there is no upstream OVN
-fallback. The CAPI init output selects the separately reviewed current-main
-acquisition from the shared native-tools catalog. The tagged local demo retains
-its original acquisition.
+fallback. The CAPI init output uses the shared native-tools catalog's tagged
+acquisition, which NVKE `v0.23.0` aligned with current main's parent image.
 
 The existing `github-nightly-nvidia.json` Environment retains ARC ARM64 KVM disk
 production, `build-provenance-v1` evidence, private/internal artifact storage and

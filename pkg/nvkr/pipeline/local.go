@@ -14,15 +14,9 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/profile"
 )
 
-// ctx returns the run's context. Public execution entry points reject nil before
-// calling helpers; the background fallback is limited to non-authoritative internal
-// helpers.
-func (o RunOptions) ctx() context.Context {
-	if o.Ctx != nil {
-		return o.Ctx
-	}
-	return context.Background()
-}
+// ctx returns the run's admitted context. Public execution entry points reject nil
+// before calling helpers, so helpers never substitute a context of their own.
+func (o RunOptions) ctx() context.Context { return o.Ctx }
 
 func mapCancellation(ctx context.Context, err error, operation string) error {
 	if err == nil {

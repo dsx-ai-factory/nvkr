@@ -78,16 +78,88 @@ func TestOutputCleansDescendantsAfterSuccessfulParent(t *testing.T) {
 }
 
 func TestCombinedOutputPreservesContextCancellation(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
-	defer cancel()
-	started := time.Now()
-	_, err := CombinedOutput(ctx, "sh", "-c", "trap '' TERM; sleep 30 & wait")
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("canceled command error = %v, want deadline exceeded", err)
+	ctx, cancel := context.WithCancel(t.Context())
+	ready := filepath.Join(t.TempDir(), "ready")
+	if err := unix.Mkfifo(ready, 0o600); err != nil {
+		t.Fatal(err)
 	}
-	if elapsed := time.Since(started); elapsed > time.Second {
-		t.Fatalf("canceled command returned after %s", elapsed)
+	var runErr error
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		// CombinedOutput owns stdout, so the shell reports readiness through a FIFO,
+		// only after it ignores TERM and has forked the descendant.
+		_, runErr = CombinedOutput(ctx, "/bin/sh", "-c",
+			`trap '' TERM; sleep 30 & printf '%s\n' "$$" > "$1"; wait`, "sh", ready)
+	}()
+	var pid int
+	defer func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(processWatchdog(t)):
+			// The owner hung, which already failed the test; force-stop the
+			// reported group so the 30 s descendant cannot outlive the test.
+			t.Error("canceled command did not return during cleanup")
+			if pid > 0 {
+				_ = syscall.Kill(-pid, syscall.SIGKILL)
+				awaitProcessGroupExit(t, pid)
+			}
+		}
+	}()
+	reported := make(chan []byte, 1)
+	// Opening the FIFO blocks until the shell opens it for writing. If the shell
+	// exits first, this goroutine stays blocked until the test binary exits.
+	go func() {
+		line, _ := os.ReadFile(ready)
+		reported <- line
+	}()
+	var line []byte
+	select {
+	case line = <-reported:
+	case <-done:
+		t.Fatalf("command exited before readiness: %v", runErr)
+	case <-time.After(processWatchdog(t)):
+		t.Fatal("command did not report readiness")
 	}
+	var err error
+	if pid, err = strconv.Atoi(strings.TrimSpace(string(line))); err != nil {
+		t.Fatalf("child pid %q: %v", line, err)
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(processWatchdog(t)):
+		t.Fatal("canceled command did not return")
+	}
+	if !errors.Is(runErr, context.Canceled) {
+		t.Fatalf("canceled command error = %v, want context canceled", runErr)
+	}
+	awaitProcessGroupExit(t, pid)
+}
+
+// processWatchdog bounds waits on real processes: well below the fixtures'
+// 30 s sleep, so a missed SIGKILL escalation fails, and before the test deadline.
+func processWatchdog(t *testing.T) time.Duration {
+	bound := 10 * time.Second
+	if deadline, ok := t.Deadline(); ok {
+		bound = min(bound, time.Until(deadline)/2)
+	}
+	return bound
+}
+
+// awaitProcessGroupExit observes the kernel reaping every member of pgid, which
+// happens asynchronously after the owner returns.
+func awaitProcessGroupExit(t *testing.T, pgid int) {
+	t.Helper()
+	deadline := time.Now().Add(processWatchdog(t))
+	for time.Now().Before(deadline) {
+		if errors.Is(syscall.Kill(-pgid, 0), syscall.ESRCH) {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("canceled command left process group %d", pgid)
 }
 
 func TestOutputRejectsNilContextBeforeStart(t *testing.T) {
@@ -111,7 +183,7 @@ func TestRunOwnsDetachedSessionAndCancellation(t *testing.T) {
 			if err := reader.SetReadDeadline(time.Now().Add(3 * time.Second)); err != nil {
 				t.Fatal(err)
 			}
-			command := exec.CommandContext(ctx, "/bin/sh", "-c", "trap '' TERM; printf '%s\\n' \"$$\"; sleep 30 & wait")
+			command := exec.CommandContext(ctx, "/bin/sh", "-c", "trap '' TERM; sleep 30 & printf '%s\\n' \"$$\"; wait")
 			command.SysProcAttr = &syscall.SysProcAttr{Setsid: detached}
 			command.Stdout = writer
 			joined := make(chan error, 1)
@@ -143,14 +215,7 @@ func TestRunOwnsDetachedSessionAndCancellation(t *testing.T) {
 			if !errors.Is(err, context.Canceled) {
 				t.Fatalf("canceled command = %v", err)
 			}
-			deadline := time.Now().Add(time.Second)
-			for time.Now().Before(deadline) {
-				if errors.Is(syscall.Kill(-pid, 0), syscall.ESRCH) {
-					return
-				}
-				time.Sleep(10 * time.Millisecond)
-			}
-			t.Fatalf("canceled command left process group %d", pid)
+			awaitProcessGroupExit(t, pid)
 		})
 	}
 }

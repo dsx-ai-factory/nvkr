@@ -39,8 +39,8 @@ jobs:
   nvkr-disk-nvke-node-fde-amd64:
     name: 'Build and package producer evidence for nvke-node-fde-amd64'
     runs-on: 'arc-amd64-kvm'
-    timeout-minutes: 1045
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-arc-amd64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-nvke-agent-b1038550581e'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-nvke-cni-calico'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-nvke-cni-ovn'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-nvke-kubeadm-distro'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-nvke-spire-agent'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-ovn-kube-ubuntu'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-ovn-kubernetes-chart'].result == 'success' }}
+    timeout-minutes: 1105
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-arc-amd64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-nvke-agent-b1038550581e'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-nvke-cni-calico'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-nvke-cni-ovn'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-nvke-doca-ovs'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-nvke-kubeadm-distro'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-nvke-spire-agent'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-ovn-kube-ubuntu'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-amd64-fetch-ovn-kubernetes-chart'].result == 'success' }}
     environment: 'nvkr-dev-arc'
     permissions:
       actions: read
@@ -174,11 +174,16 @@ jobs:
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-16'] }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: collect node outputs part-17
+        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-17'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-disk-nvke-node-fde-arm64:
     name: 'Build and package producer evidence for nvke-node-fde-arm64'
     runs-on: 'arc-arm64-kvm'
-    timeout-minutes: 1045
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-arc-arm64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-nvke-agent-9291de711464'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-nvke-cni-calico'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-nvke-cni-ovn'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-nvke-kubeadm-distro'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-nvke-spire-agent'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-ovn-kube-ubuntu'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-ovn-kubernetes-chart'].result == 'success' }}
+    timeout-minutes: 1105
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-arc-arm64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-nvke-agent-9291de711464'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-nvke-cni-calico'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-nvke-cni-ovn'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-nvke-doca-ovs'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-nvke-kubeadm-distro'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-nvke-spire-agent'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-ovn-kube-ubuntu'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-fde-arm64-fetch-ovn-kubernetes-chart'].result == 'success' }}
     environment: 'nvkr-dev-arc'
     permissions:
       actions: read
@@ -312,11 +317,16 @@ jobs:
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-16'] }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: collect node outputs part-17
+        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-17'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-disk-nvke-node-image-amd64:
     name: 'Build and package producer evidence for nvke-node-image-amd64'
     runs-on: 'arc-amd64-kvm'
-    timeout-minutes: 1045
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-arc-amd64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-nvke-age-693f047a753d'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-nvke-cni-ovn'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart'].result == 'success' }}
+    timeout-minutes: 1105
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-arc-amd64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-nvke-age-693f047a753d'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-nvke-cni-ovn'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-nvke-doca-ovs'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart'].result == 'success' }}
     environment: 'nvkr-dev-arc'
     permissions:
       actions: read
@@ -450,11 +460,16 @@ jobs:
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-16'] }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: collect node outputs part-17
+        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-17'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-disk-nvke-node-image-arm64:
     name: 'Build and package producer evidence for nvke-node-image-arm64'
     runs-on: 'arc-arm64-kvm'
-    timeout-minutes: 1045
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-arc-arm64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-nvke-cni-ovn'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart'].result == 'success' }}
+    timeout-minutes: 1105
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-arc-arm64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-nvke-cni-ovn'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-nvke-doca-ovs'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart'].result == 'success' }}
     environment: 'nvkr-dev-arc'
     permissions:
       actions: read
@@ -587,6 +602,11 @@ jobs:
         uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-16'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: collect node outputs part-17
+        uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-17'] }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-partition-results:
     name: 'Collect provider results: nvkr-partition-results'

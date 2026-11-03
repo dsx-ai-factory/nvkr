@@ -48,7 +48,9 @@ Each selected renderer is an independent named output with its own required prod
 terminal observation and evidence use. Equal Build Digests cannot satisfy sibling outputs. Unsupported
 NVKR formats, platforms, component selections and producer representations fail before source or output
 work. Recipe criteria are ordinary producer arguments; the pinned AICR renderer validates them after
-source preparation and compilation and refuses unavailable coordinates without producing an artifact.
+source preparation and compilation and refuses unknown values and criteria that no applied overlay covers,
+without producing an artifact. A producer that names one exact leaf may also require it to be the recipe's
+last applied overlay before bundling, so a later pin that resolves the coordinate differently fails.
 
 The platform selects the admitted producer route; a bundle's declared platform is not an inspection of its
 referenced deployment images or proof that a cluster or GPU is compatible. Upstream recipe metadata and

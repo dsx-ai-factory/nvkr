@@ -30,11 +30,11 @@ func snapshotFixture(t *testing.T) (string, authored.Definition, authored.Enviro
 	}
 	root := t.TempDir()
 	provider := testCatalogProvider(t)
-	registry, err := provider.ReadFile(catalog.RegistryFile)
+	registry, err := provider.ReadFileContext(t.Context(), catalog.RegistryFile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	lock, err := provider.ReadFile(catalog.LockFile)
+	lock, err := provider.ReadFileContext(t.Context(), catalog.LockFile)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -19,7 +19,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
+	"unicode"
+
+	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 type tarEntry struct {
@@ -30,7 +34,17 @@ type tarEntry struct {
 	link string // when non-empty, a symlink target (recorded verbatim, never followed)
 }
 
-func writeTar(entries []tarEntry, epoch int64) []byte {
+// validateExecutableName refuses a name that is not exactly one archive path element,
+// before any input is read or output written.
+func validateExecutableName(name string) error {
+	if name == "" || name == "." || name == ".." ||
+		strings.ContainsFunc(name, func(r rune) bool { return r == '/' || unicode.IsControl(r) }) {
+		return nvkrerr.New(nvkrerr.CodeInvalidCatalog, "executable name %q is not a single archive path element", name)
+	}
+	return nil
+}
+
+func writeTar(entries []tarEntry, epoch int64) ([]byte, error) {
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
 	mt := time.Unix(epoch, 0).UTC()
@@ -49,23 +63,44 @@ func writeTar(entries []tarEntry, epoch int64) []byte {
 			h.Typeflag = tar.TypeReg
 			h.Size = int64(len(e.data))
 		}
-		_ = tw.WriteHeader(h)
+		if err := tw.WriteHeader(h); err != nil {
+			return nil, fmt.Errorf("tar header %q: %w", e.name, err)
+		}
 		if h.Typeflag == tar.TypeReg {
-			_, _ = tw.Write(e.data)
+			if _, err := tw.Write(e.data); err != nil {
+				return nil, fmt.Errorf("tar member %q: %w", e.name, err)
+			}
 		}
 	}
-	_ = tw.Close()
-	return buf.Bytes()
+	if err := tw.Close(); err != nil {
+		return nil, fmt.Errorf("closing tar: %w", err)
+	}
+	return buf.Bytes(), nil
 }
 
-func gzipBytes(in []byte) []byte {
+func gzipBytes(in []byte) ([]byte, error) {
 	var buf bytes.Buffer
-	gw, _ := gzip.NewWriterLevel(&buf, gzip.BestCompression)
+	gw, err := gzip.NewWriterLevel(&buf, gzip.BestCompression)
+	if err != nil {
+		return nil, fmt.Errorf("gzip writer: %w", err)
+	}
 	gw.ModTime = time.Time{} // omit mtime
 	gw.OS = 255              // unknown OS, stable across platforms
-	_, _ = gw.Write(in)
-	_ = gw.Close()
-	return buf.Bytes()
+	if _, err := gw.Write(in); err != nil {
+		return nil, fmt.Errorf("gzip write: %w", err)
+	}
+	if err := gw.Close(); err != nil {
+		return nil, fmt.Errorf("closing gzip: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func tarGzip(entries []tarEntry, epoch int64) ([]byte, error) {
+	tarBytes, err := writeTar(entries, epoch)
+	if err != nil {
+		return nil, err
+	}
+	return gzipBytes(tarBytes)
 }
 
 func sha256hex(b []byte) string { s := sha256.Sum256(b); return hex.EncodeToString(s[:]) }
@@ -79,18 +114,27 @@ func sha256hex(b []byte) string { s := sha256.Sum256(b); return hex.EncodeToStri
 // This path-based, nontransactional constructor is unqualified. It must
 // not consume or produce an authority-bearing artifact.
 func OCIImage(binaryPath, name string, epoch int64, arch, outDir string) (string, error) {
+	if err := validateExecutableName(name); err != nil {
+		return "", err
+	}
 	bin, err := os.ReadFile(binaryPath)
 	if err != nil {
 		return "", err
 	}
-	layerTar := writeTar([]tarEntry{
+	layerTar, err := writeTar([]tarEntry{
 		{name: "usr/", mode: 0o755, dir: true},
 		{name: "usr/local/", mode: 0o755, dir: true},
 		{name: "usr/local/bin/", mode: 0o755, dir: true},
 		{name: "usr/local/bin/" + name, mode: 0o755, data: bin},
 	}, epoch)
+	if err != nil {
+		return "", nvkrerr.Wrap(nvkrerr.CodeInternal, err, "assembling OCI layer for %q", name)
+	}
 	diffID := "sha256:" + sha256hex(layerTar)
-	layerGz := gzipBytes(layerTar)
+	layerGz, err := gzipBytes(layerTar)
+	if err != nil {
+		return "", nvkrerr.Wrap(nvkrerr.CodeInternal, err, "compressing OCI layer for %q", name)
+	}
 	layerDigest := "sha256:" + sha256hex(layerGz)
 
 	created := time.Unix(epoch, 0).UTC().Format(time.RFC3339)
@@ -101,7 +145,10 @@ func OCIImage(binaryPath, name string, epoch int64, arch, outDir string) (string
 		Config:       ociRunConfig{Entrypoint: []string{"/usr/local/bin/" + name}},
 		RootFS:       ociRootFS{Type: "layers", DiffIDs: []string{diffID}},
 	}
-	configJSON, _ := json.Marshal(config)
+	configJSON, err := json.Marshal(config)
+	if err != nil {
+		return "", nvkrerr.Wrap(nvkrerr.CodeInternal, err, "encoding OCI config for %q", name)
+	}
 	configDigest := "sha256:" + sha256hex(configJSON)
 
 	manifest := ociManifest{
@@ -110,8 +157,25 @@ func OCIImage(binaryPath, name string, epoch int64, arch, outDir string) (string
 		Config:        ociDescriptor{MediaType: "application/vnd.oci.image.config.v1+json", Digest: configDigest, Size: len(configJSON)},
 		Layers:        []ociDescriptor{{MediaType: "application/vnd.oci.image.layer.v1.tar+gzip", Digest: layerDigest, Size: len(layerGz)}},
 	}
-	manifestJSON, _ := json.Marshal(manifest)
+	manifestJSON, err := json.Marshal(manifest)
+	if err != nil {
+		return "", nvkrerr.Wrap(nvkrerr.CodeInternal, err, "encoding OCI manifest for %q", name)
+	}
 	manifestDigest := "sha256:" + sha256hex(manifestJSON)
+	index := ociIndex{
+		SchemaVersion: 2,
+		MediaType:     "application/vnd.oci.image.index.v1+json",
+		Manifests: []ociDescriptor{{
+			MediaType:   "application/vnd.oci.image.manifest.v1+json",
+			Digest:      manifestDigest,
+			Size:        len(manifestJSON),
+			Annotations: map[string]string{"org.opencontainers.image.ref.name": name},
+		}},
+	}
+	indexJSON, err := json.Marshal(index)
+	if err != nil {
+		return "", nvkrerr.Wrap(nvkrerr.CodeInternal, err, "encoding OCI index for %q", name)
+	}
 
 	// Write an OCI image layout so the artifact is real and inspectable.
 	blobs := filepath.Join(outDir, "blobs", "sha256")
@@ -126,17 +190,6 @@ func OCIImage(binaryPath, name string, epoch int64, arch, outDir string) (string
 			return "", err
 		}
 	}
-	index := ociIndex{
-		SchemaVersion: 2,
-		MediaType:     "application/vnd.oci.image.index.v1+json",
-		Manifests: []ociDescriptor{{
-			MediaType:   "application/vnd.oci.image.manifest.v1+json",
-			Digest:      manifestDigest,
-			Size:        len(manifestJSON),
-			Annotations: map[string]string{"org.opencontainers.image.ref.name": name},
-		}},
-	}
-	indexJSON, _ := json.Marshal(index)
 	if err := os.WriteFile(filepath.Join(outDir, "index.json"), indexJSON, 0o644); err != nil {
 		return "", err
 	}
@@ -185,6 +238,9 @@ type ociIndex struct {
 // This path-based, nontransactional constructor is unqualified. It must
 // not consume or produce an authority-bearing artifact.
 func Deb(binaryPath, name, version string, epoch int64, arch, outPath string) (string, error) {
+	if err := validateExecutableName(name); err != nil {
+		return "", err
+	}
 	bin, err := os.ReadFile(binaryPath)
 	if err != nil {
 		return "", err
@@ -193,16 +249,22 @@ func Deb(binaryPath, name, version string, epoch int64, arch, outPath string) (s
 		"Maintainer: NVKR <nvkr@nvidia.invalid>\nSection: admin\nPriority: optional\n"+
 		"Description: from-source %s built reproducibly by nvkr\n", name, version, arch, name)
 
-	controlGz := gzipBytes(writeTar([]tarEntry{
+	controlGz, err := tarGzip([]tarEntry{
 		{name: "./", mode: 0o755, dir: true},
 		{name: "./control", mode: 0o644, data: []byte(control)},
-	}, epoch))
-	dataGz := gzipBytes(writeTar([]tarEntry{
+	}, epoch)
+	if err != nil {
+		return "", nvkrerr.Wrap(nvkrerr.CodeInternal, err, "assembling Debian control archive for %q", name)
+	}
+	dataGz, err := tarGzip([]tarEntry{
 		{name: "./", mode: 0o755, dir: true},
 		{name: "./usr/", mode: 0o755, dir: true},
 		{name: "./usr/bin/", mode: 0o755, dir: true},
 		{name: "./usr/bin/" + name, mode: 0o755, data: bin},
-	}, epoch))
+	}, epoch)
+	if err != nil {
+		return "", nvkrerr.Wrap(nvkrerr.CodeInternal, err, "assembling Debian data archive for %q", name)
+	}
 
 	var ar bytes.Buffer
 	ar.WriteString("!<arch>\n")
