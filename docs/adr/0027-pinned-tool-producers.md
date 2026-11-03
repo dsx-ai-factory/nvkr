@@ -8,9 +8,9 @@
   Run or consumer verification exercises a pinned-tool producer.
 - **Deciders:** Pending; release-engineering, catalog, execution and evidence owners must be named before
   ratification.
-- **Index:** Proposed ADR-27 supplements ADR-01–22 and proposed ADR-23/24/26; it remains outside the consolidated
-  contract set until accepted. It coordinates with two separately drafted decisions that are not on this branch:
-  the generic OCI bundle decision (#239, drafted as ADR-25) and producer OCI layout import (#285).
+- **Index:** Proposed ADR-27 supplements ADR-01–22 and proposed ADR-23–26; it remains outside the consolidated
+  contract set until accepted. It builds on proposed ADR-25, whose generic OCI bundle selection and packaging are
+  implemented, and waits for producer OCI layout import (#285), the remaining T6 dependency.
 - **Relates to:** ADR-01 (typed digest families), ADR-02 §3 (logical identity versus transport), ADR-03 (coded
   errors), ADR-09 §5 (production provenance), ADR-10 §1 and source lanes (builder taxonomy, `wrapped-build`),
   ADR-11 §1–§2 (direct selection, explicit closures, declared edges and independent outputs), ADR-12 §1 (concrete
@@ -391,5 +391,6 @@ suite drives a fake container runtime, so it proves executor behavior, not conta
 run on Docker (linux/arm64) executed the AICR v1.2.0-rc1 `recipe` producer offline and observed one regular file
 bound to the tool executable digest. With that recipe as its material, the `bundle --deployer flux --output
 oci-layout:{{.Output}}` producer wrote one OCI layout at the absent path; its index names the manifest digest AICR
-reported. These are not recorded Runs and prove nothing about hosted isolation. No hosted Run or consumer
+reported. `catalog pin` resolves the `1.2.x` constraint to stable releases only, so that run's lock record named
+`v1.2.0-rc1` directly. These are not recorded Runs and prove nothing about hosted isolation. No hosted Run or consumer
 verification exists, T6 is unimplemented, and no claim follows from the #239 source-built AICR renders.

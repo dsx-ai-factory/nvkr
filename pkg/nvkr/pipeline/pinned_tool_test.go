@@ -143,7 +143,9 @@ func TestAdmitPinnedToolOutputForm(t *testing.T) {
 	}
 }
 
-// writeTestLayout writes the minimal OCI layout root a layout producer leaves.
+// writeTestLayout writes the physical form of an OCI layout root only: its index lists
+// nothing and its blob name does not authenticate its bytes. The executor observes the
+// index alone; the layout import owns OCI semantics and blob integrity (ADR-27 §5).
 func writeTestLayout(dir string) error {
 	return errors.Join(os.MkdirAll(filepath.Join(dir, "blobs", "sha256"), 0o755),
 		os.WriteFile(filepath.Join(dir, "oci-layout"), []byte(`{"imageLayoutVersion":"1.0.0"}`), 0o644),

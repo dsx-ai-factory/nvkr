@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -78,14 +79,23 @@ printf '{"schemaVersion":2,"manifests":[]}' > "$target/index.json"
 printf blob > "$target/blobs/sha256/` + strings.Repeat("a", 64) + `"`
 	executable := []byte("#!/bin/sh\nexit 0\n")
 	for _, test := range []struct {
-		name  string
-		extra string
-		code  e.Code
+		name    string
+		extra   string
+		timeout time.Duration
+		code    e.Code
 	}{
 		{name: "layout at the absent path"},
 		{name: "file beside the layout", extra: `; printf s > "$out/layout.sig"`, code: e.CodeBuildFailed},
+		{name: "layout writer exits nonzero", extra: "; exit 3", code: e.CodeBuildFailed},
+		{name: "layout writer canceled", extra: "; sleep 30", timeout: 200 * time.Millisecond, code: e.CodeTimeout},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+			if test.timeout != 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, test.timeout)
+				defer cancel()
+			}
 			root := t.TempDir()
 			tool := filepath.Join(root, "tools", "aicr")
 			if err := os.MkdirAll(filepath.Dir(tool), 0o755); err != nil {
@@ -98,7 +108,7 @@ printf blob > "$target/blobs/sha256/` + strings.Repeat("a", 64) + `"`
 			node.Platform = "linux/" + runtime.GOARCH
 			node.OutputType, node.ArtifactPath = "oci-layout", ""
 			node.Command = []string{"bundle", "--output", "oci-layout:/nvkr/output/layout"}
-			result, err := (Local{}).ExecNode(node, RunOptions{Ctx: t.Context(), Launch: true,
+			result, err := (Local{}).ExecNode(node, RunOptions{Ctx: ctx, Launch: true,
 				Runtime: fakePinnedToolRuntime(t, refuseExisting+test.extra), SourceRoot: filepath.Join(root, "src"),
 				ToolExecutable: tool, Stdout: &strings.Builder{}, Stderr: &strings.Builder{}})
 			if got := pinnedToolCode(err); got != test.code {
@@ -122,6 +132,27 @@ printf blob > "$target/blobs/sha256/` + strings.Repeat("a", 64) + `"`
 				t.Fatalf("layout is not the output root: %v", err)
 			}
 		})
+	}
+}
+
+// The layout walk admits only directories and regular files; a FIFO is neither.
+func TestAdmitPinnedToolLayoutRefusesSpecialFile(t *testing.T) {
+	root := t.TempDir()
+	staging, outRoot := filepath.Join(root, "staging"), filepath.Join(root, "out")
+	layout := filepath.Join(staging, "layout")
+	if err := writeTestLayout(layout); err != nil {
+		t.Fatal(err)
+	}
+	if err := syscall.Mkfifo(filepath.Join(layout, "blobs", "sha256", "fifo"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	node := pinnedToolNode(nil)
+	node.OutputType, node.ArtifactPath = "oci-layout", ""
+	if _, _, err := admitPinnedToolLayout(t.Context(), staging, outRoot, node); pinnedToolCode(err) != e.CodeBuildFailed {
+		t.Fatalf("admitPinnedToolLayout() = %v; want %s", err, e.CodeBuildFailed)
+	}
+	if _, err := os.Lstat(outRoot); !os.IsNotExist(err) {
+		t.Fatalf("refused layout reached the output root: %v", err)
 	}
 }
 
