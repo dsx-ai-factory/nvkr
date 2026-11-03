@@ -12,7 +12,7 @@ are tracked below; governance, CI and broader acceptance remain pending.
 
 [ADR-24](../0024-imported-validator-catalog.md) proposes an imported-validator catalog, explicit artifact-role
 bindings and versioned diagnostic profiles outside the consolidated set. The provisional CLI catalog implements loading, discovery and frozen local-plan dispatch, with contract tests but no new
-actual upstream catalog execution. Published-profile migration and controller/chart adapters remain deferred.
+actual upstream catalog execution. `validators` (hidden, in development) is the sole NVKR interface for these suites. Published-profile migration and controller/chart adapters remain deferred.
 
 [ADR-25](../0025-generic-oci-bundles-and-aicr-producers.md) additionally admits generic OCI bundles and
 ordinary pinned AICR producers. Its contract and rendering evidence remain distinct from hosted delivery

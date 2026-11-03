@@ -54,7 +54,11 @@ accelerator: gb200, os: ubuntu, intent: training, platform: kubeflow` in three f
 `helm`, `flux` and `argocd-helm`. Output names carry the coordinate; the Definition
 carries no hardware model. The producers share the GB300 example's source, lock and
 layout handling, add `--platform` to the recipe, and build `helm` and `argocd-helm`
-with `--readiness-hooks` as AICR's NVKE guide directs. AICR labels this coordinate Preview.
+with `--readiness-hooks` as AICR's NVKE guide directs. GPU Operator installs the NVKE driver,
+so every format also passes `--dra-eviction-node-label nvidia.com/dra-kubelet-plugin=true`
+to opt in to AICR's
+[DRA driver upgrade eviction](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/docs/user/cli-reference.md#dra-driver-upgrade-eviction).
+AICR labels this coordinate Preview.
 
 AICR `v1.2.0` refuses criteria that no applied overlay covers. The producer also
 requires the last `metadata.appliedOverlays` entry of the rendered recipe to be
@@ -76,7 +80,14 @@ no Dynamo inference output. NVKE does not apply these bundles; install them out 
 following AICR's pinned
 [NVKE GB200 setup guide](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/docs/integrator/nvke-gb200-setup.md).
 Flux has no readiness hooks, so `sriov-ib-networks` can race the IPPool CRD; the guide
-gives the wait-and-reset steps.
+gives the wait-and-reset steps. The DRA eviction opt-in adds AICR's `dra-node-labeler`
+DaemonSet, which labels every node carrying `nvidia.com/gpu.present=true`, NVKE control-plane
+nodes included, and limits the DRA kubelet plugin to labeled nodes. AICR documents the eviction
+as best-effort: under `k8s-driver-manager` v0.12, ordering against DRA claim holders and completion
+of the plugin's teardown are not guaranteed. A GPU node without the label runs no DRA kubelet
+plugin, and `deploy.sh` still reports success. The pinned
+[DRA driver upgrade eviction](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/docs/user/cli-reference.md#dra-driver-upgrade-eviction)
+section gives the checks to run after applying.
 
 These outputs use the source-built producer and NVKR wrapper described above. The ADR-27
 pinned-tool migration changes their published digests and media type, and #288 may move
