@@ -73,15 +73,24 @@ func TestAdmitPinnedToolBeforeWork(t *testing.T) {
 
 func TestPinnedToolRunArgsAreFixed(t *testing.T) {
 	node := pinnedToolNode([]byte("tool"))
-	got := pinnedToolRunArgs(node, "nvkr-1", "/private/tool", "aicr", "/private/inputs", "/private/out")
-	want := []string{"run", "--rm", "--name", "nvkr-1", "--platform", "linux/arm64", "--network=none", "--read-only",
-		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "--tmpfs", "/nvkr/home:mode=1777", "--tmpfs", "/nvkr/tmp:mode=1777", "--tmpfs", "/nvkr/work:mode=1777",
-		"-v", "/private/tool:/nvkr/tool:ro", "-v", "/private/out:/nvkr/output", "-v", "/private/inputs:/nvkr/inputs:ro",
-		"-w", "/nvkr/work", "--entrypoint", "/bin/sh", node.Toolchain, "-c", pinnedToolBootstrap, "nvkr-pinned-tool",
-		"HOME=/nvkr/home", "LC_ALL=C", "TMPDIR=/nvkr/tmp", "TZ=UTC", "AICR_LOG_FORMAT=text",
-		"/nvkr/tool/aicr", "recipe", "--output", "/nvkr/output/recipe.yaml"}
-	if !slices.Equal(got, want) {
-		t.Fatalf("pinned tool invocation\n got %q\nwant %q", got, want)
+	invocation := func(identity ...string) []string {
+		args := append([]string{"run", "--rm", "--name", "nvkr-1", "--platform", "linux/arm64", "--network=none", "--read-only"}, identity...)
+		return append(args, "--tmpfs", "/nvkr/home:mode=1777", "--tmpfs", "/nvkr/tmp:mode=1777", "--tmpfs", "/nvkr/work:mode=1777",
+			"-v", "/private/tool:/nvkr/tool:ro", "-v", "/private/out:/nvkr/output", "-v", "/private/inputs:/nvkr/inputs:ro",
+			"-w", "/nvkr/work", "--entrypoint", "/bin/sh", node.Toolchain, "-c", pinnedToolBootstrap, "nvkr-pinned-tool",
+			"HOME=/nvkr/home", "LC_ALL=C", "TMPDIR=/nvkr/tmp", "TZ=UTC", "AICR_LOG_FORMAT=text",
+			"/nvkr/tool/aicr", "recipe", "--output", "/nvkr/output/recipe.yaml")
+	}
+	// Docker runs as the host user (ADR-18); rootless Podman's mapping already makes
+	// container root the invoking user, and a host UID would map to a subordinate one.
+	for runtimeName, want := range map[string][]string{
+		"docker": invocation("--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid())),
+		"podman": invocation(),
+	} {
+		got := pinnedToolRunArgs(node, runtimeName, "nvkr-1", "/private/tool", "aicr", "/private/inputs", "/private/out")
+		if !slices.Equal(got, want) {
+			t.Fatalf("%s pinned tool invocation\n got %q\nwant %q", runtimeName, got, want)
+		}
 	}
 }
 

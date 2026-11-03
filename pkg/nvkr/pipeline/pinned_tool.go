@@ -158,7 +158,7 @@ func buildPinnedTool(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 	if err := registerContainer(opts, name); err != nil {
 		return nil, err
 	}
-	if err := runContainerRuntime(opts, pinnedToolRunArgs(n, name, toolDir, toolName, inputs, mount)...); err != nil {
+	if err := runContainerRuntime(opts, pinnedToolRunArgs(n, filepath.Base(opts.Runtime), name, toolDir, toolName, inputs, mount)...); err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return nil, e.Wrap(e.CodeTimeout, ctxErr, "pinned tool for %s did not finish", n.Component)
 		}
@@ -236,15 +236,20 @@ func stagePinnedToolExecutable(ctx context.Context, n ir.Node, source, parent st
 // pinnedToolRunArgs is the complete, fixed container invocation. Only the exact
 // executable and declared materials are mounted, both read-only; HOME, TMPDIR and
 // the working directory are private and empty.
-func pinnedToolRunArgs(n ir.Node, name, toolDir, toolName, inputs, output string) []string {
-	// The invoking identity owns everything the tool writes, so a rootful runtime
-	// never leaves root-owned output the executor cannot admit or remove. Each tmpfs
-	// states its mode: Docker mounts the -w directory 0755 root-owned, which a
-	// non-root tool cannot write.
-	args := []string{"run", "--rm", "--name", name, "--platform", n.Platform, "--network=none", "--read-only",
-		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "--tmpfs", ir.PinnedToolExecutorEnv["HOME"] + ":mode=1777",
-		"--tmpfs", ir.PinnedToolExecutorEnv["TMPDIR"] + ":mode=1777", "--tmpfs", ir.PinnedToolWorkdir + ":mode=1777",
-		"-v", toolDir + ":" + pinnedToolContainerDir + ":ro", "-v", output + ":" + ir.PinnedToolOutputDir}
+func pinnedToolRunArgs(n ir.Node, runtimeName, name, toolDir, toolName, inputs, output string) []string {
+	args := []string{"run", "--rm", "--name", name, "--platform", n.Platform, "--network=none", "--read-only"}
+	// ADR-18: Docker containers run as the host runner's UID/GID, so the executor
+	// can admit and remove everything the tool writes. Rootless Podman keeps its own
+	// mapping, where container root is already the invoking user; a host UID there
+	// would map to a subordinate UID that cannot write the output mount.
+	if runtimeName == "docker" {
+		args = append(args, "--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()))
+	}
+	// Each tmpfs states its mode: Docker mounts the -w directory 0755 root-owned,
+	// which a non-root tool cannot write.
+	args = append(args, "--tmpfs", ir.PinnedToolExecutorEnv["HOME"]+":mode=1777",
+		"--tmpfs", ir.PinnedToolExecutorEnv["TMPDIR"]+":mode=1777", "--tmpfs", ir.PinnedToolWorkdir+":mode=1777",
+		"-v", toolDir+":"+pinnedToolContainerDir+":ro", "-v", output+":"+ir.PinnedToolOutputDir)
 	if inputs != "" {
 		args = append(args, buildMaterialMountArgs(inputs)...)
 	}
