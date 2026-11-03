@@ -35,6 +35,9 @@ func generateFiles(ctx context.Context, definitionPath, environmentPath, generat
 	if err := factory.ValidateGenerationEngine(engine); err != nil {
 		return "", err
 	}
+	if runtimePlan && factory.ProjectionAdapterSelected(ctx) {
+		return "", e.New(e.CodeEngineCapability, "runtime Plan refresh is unavailable for a selected projection adapter")
+	}
 	if runtimePlan {
 		environment, err := LoadEnvironment(ctx, environmentPath)
 		if err != nil {
@@ -77,7 +80,9 @@ func generateFiles(ctx context.Context, definitionPath, environmentPath, generat
 		return plan.Digest()
 	}
 	// Generated bootstraps run check mode, so it never takes the Render seam.
-	if check {
+	// Only a top-level diagnostic check that selected a projection adapter
+	// renders through the seam; no generated command can select one.
+	if check && !factory.ProjectionAdapterSelected(ctx) {
 		if err := factory.CheckGenerated(ctx, plan, engine, root); err != nil {
 			return "", err
 		}
@@ -86,6 +91,12 @@ func generateFiles(ctx context.Context, definitionPath, environmentPath, generat
 	bundle, err := factory.Render(ctx, plan, engine)
 	if err != nil {
 		return "", err
+	}
+	if check {
+		if err := factory.CheckGeneratedBundle(ctx, root, bundle); err != nil {
+			return "", err
+		}
+		return bundle.PlanDigest, nil
 	}
 	if err := factory.WriteGeneratedBundle(ctx, root, bundle); err != nil {
 		return "", err
