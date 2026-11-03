@@ -318,6 +318,12 @@ func TestRejectFieldAliasesRefusesEmbeddedStructs(t *testing.T) {
 	if err := RejectFieldAliases([]byte(`{"PREDICATETYPE":"v1"}`), &statement{}); !errors.As(err, &coded) || coded.Code != e.CodeInternal {
 		t.Fatalf("embedded struct error = %v, want %q", err, e.CodeInternal)
 	}
+	type ignored struct {
+		promoted `json:"-"`
+	}
+	if err := RejectFieldAliases([]byte(`{"PREDICATETYPE":"v1"}`), &ignored{}); err != nil {
+		t.Fatalf("explicitly ignored embedded struct refused: %v", err)
+	}
 }
 
 func TestCanonicalIntegerProfilePreservesUint64AndRejectsFractionalNumbers(t *testing.T) {

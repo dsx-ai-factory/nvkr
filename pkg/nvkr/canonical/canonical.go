@@ -324,7 +324,8 @@ func walkDocument(raw []byte, key func(string) string) error {
 // not the exact name is also present. Members bound to maps, interfaces or
 // json.RawMessage stay opaque, so free-form upstream parameters keep their names.
 // It supports plain structs only: an embedded struct field, whose members
-// encoding/json would promote, is refused rather than checked partially.
+// encoding/json would promote, is refused rather than checked partially, unless
+// its tag is exactly json:"-".
 // Call it after ValidateJSONDocument.
 func RejectFieldAliases(raw []byte, out any) error {
 	dec := json.NewDecoder(bytes.NewReader(raw))
@@ -362,11 +363,15 @@ func rejectFieldAliases(value any, t reflect.Type) error {
 		folded := map[string]string{}
 		for i := 0; i < t.NumField(); i++ {
 			field := t.Field(i)
+			tag := field.Tag.Get("json")
+			if tag == "-" {
+				continue // encoding/json neither binds nor promotes it
+			}
 			if field.Anonymous {
 				return e.New(e.CodeInternal, "field alias admission does not support embedded field %s in %s", field.Name, t)
 			}
-			name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
-			if !field.IsExported() || name == "-" {
+			name, _, _ := strings.Cut(tag, ",")
+			if !field.IsExported() {
 				continue
 			}
 			if name == "" {
