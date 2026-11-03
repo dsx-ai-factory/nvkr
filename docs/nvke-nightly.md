@@ -100,20 +100,10 @@ invalid JSON, changed ownership, cancellation and unjoined work remain failures.
 
 ## Evidence and privacy
 
-[Run #29](https://github.com/depohmel/nvkr/actions/runs/41456443314) completed on
-November 2, 2026 in 1h31m35s, testing NVKR
-`d000f377c0f0be4af10b3c13da24c89e1f02dbaf` with frozen NVKE
-`1ce10b480cf52f955b6d018cc7ba7ad141c6faf9`.
-Fresh builds, identity policy/handoff/final proof, both Go subtests, natural tenant
-deletion and deletion waiting, and joined bootstrap/VM/backend/DNS/network cleanup
-passed in that one attempt. The parent passed in 5208.20 seconds; site in 7.89
-seconds and tenant in 470.17 seconds. All post-steps succeeded and Actions artifact
-count was zero. The passing tenant path enforces the private cloud-init and
-workload/image/marker/DNS checks; those raw captures were not published.
-
-That record covers its exact source revision, before the diagnostic cleanup and
-configuration extraction. Later changes require their own full run. It does not
-prove the causes of earlier failures, minimum hardware, conformance or qualification.
+The [reconciliation record](adr/reconciliation.md#consumer-acceptance-scopes)
+owns completed runtime evidence, its exact NVKR/NVKE revisions and its limits.
+A passing run covers only its recorded revision; it does not prove the causes of
+earlier failures, minimum hardware, conformance or qualification.
 
 Build stdout/stderr and ordinary Go test outcomes appear in the public job log.
 Raw deployment errors, host output and identity values remain in private local

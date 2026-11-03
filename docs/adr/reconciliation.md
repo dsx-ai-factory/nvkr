@@ -3784,17 +3784,17 @@ inventory, changed ownership and unsafe or canceled work are not retryable. Temp
 classifiers, failure-only health/curl probes, console drop-ins and the resource
 sampler are removed; required behavior retains focused regression coverage.
 
-[Run #33](https://github.com/depohmel/nvkr/actions/runs/41541604588) completed on
-November 2, 2026 (New York) on exact NVKR `1afa2b33748dec0c85271ff94ad2117e3660c7f3`,
-with frozen NVKE `8625e4784ceeab54583007f54d5a8385864ab1de`. Fresh local builds,
+[Run #35](https://github.com/depohmel/nvkr/actions/runs/41573982089) completed on
+November 3, 2026 (UTC) on exact NVKR `828c100c457b1cd33d5398eb306eedcb78b8ceb7`,
+with frozen NVKE `5293831ce0eb1ec3f8864b2fd8b53a6621a83cc8`. Fresh local builds,
 identity policy/handoff/final proof, site and tenant CP/worker checks, actual host
 cloud-init and exact workload/image/marker/DNS acceptance, natural deletion and
 waiting, and joined VM/backend/DNS/network cleanup all passed in one attempt.
-The parent passed in 5553.16 seconds, site in 11.91 and tenant in 431.58. All
+The parent passed in 5133.91 seconds, site in 8.03 and tenant in 464.51. All
 post-steps succeeded and Actions artifact count was zero. Raw marker/host output
 remained private; the passed tenant path enforces those checks. This record
-covers that exact revision, including diagnostic removal and the first review
-fixes; it does not establish acceptance of later main merges or test/doc edits,
+covers that exact revision, including diagnostic removal, review fixes and main
+merges; it does not establish acceptance of later commits,
 prove that earlier failed reads recurred, or resolve their private causes.
 
 Trusted source code retains sudo/Docker access on the disposable hosted machine.

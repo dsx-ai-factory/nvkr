@@ -24,7 +24,7 @@ The [34-concept reference](user-concepts.md) explains the vocabulary and connect
 | Visualize dependencies and generate GitHub Actions | [Pipeline generation](generate-pipeline.md) |
 | Understand how heterogeneous materials become a disk | [Node images](node-images.md) |
 | Find published outputs, download a named output, and verify a consumer claim | [Release quickstart](release-quickstart.md) |
-| Build nightly NVKR candidates and run NVKE end-to-end tests | [Nightly workflow and current admission](nvke-nightly.md) |
+| Run the nightly NVKE build and end-to-end test | [Nightly workflow and current admission](nvke-nightly.md) |
 | Run full build/site/tenant E2E on my PR before merging | [Run E2E tests for your pull request](nvke-nightly.md#run-a-workflow-branch-before-merging) |
 | Check a producing Run and configure qualification once | [Artifact checks and hosted qualification](lifecycle.md#authenticate-a-qualification-candidate), [candidate readiness](../inputs/definitions/nvke/README.md#qualification-readiness) |
 | Try component replacements locally | [Runnable authoring lab](examples/authoring-lab/README.md) |

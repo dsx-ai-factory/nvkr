@@ -65,7 +65,7 @@ func TestNightlyUsesOnlyHostedBuildAndGoE2E(t *testing.T) {
 			t.Fatal("nightly schedules must run only upstream while forks retain manual dispatch")
 		}
 		built, tenant, source, host, deadline, kvm := false, false, false, false, false, false
-		nvkrCheckouts := 0
+		nvkrCheckouts, nvkeCheckouts := 0, 0
 		for _, step := range job.Steps {
 			for _, line := range strings.Split(step.Run, "\n") {
 				if strings.Contains(line, "/dev/kvm") && (strings.Contains(line, "chmod") || strings.Contains(line, "setfacl")) {
@@ -73,7 +73,8 @@ func TestNightlyUsesOnlyHostedBuildAndGoE2E(t *testing.T) {
 				}
 			}
 			host = host || strings.Contains(step.Run, `test "$RUNNER_ENVIRONMENT" = github-hosted`)
-			source = source || strings.Contains(step.Run, "NVKR_NVKE_E2E_SOURCE_COMMIT=")
+			source = source || (strings.Contains(step.Run, "commit=$(git -C nvke-source rev-parse HEAD)") &&
+				strings.Contains(step.Run, `printf 'NVKR_NVKE_E2E_SOURCE_COMMIT=%s\n' "$commit" >> "$GITHUB_ENV"`))
 			// Assert the access boundary, not every udev command or its spelling.
 			if strings.Contains(step.Run, "(exec 3<>/dev/kvm)") {
 				kvm = strings.Contains(step.Run, "udevadm") && strings.Contains(step.Run, `MODE="0660"`)
@@ -96,6 +97,11 @@ func TestNightlyUsesOnlyHostedBuildAndGoE2E(t *testing.T) {
 					if step.With["ref"] != "${{ github.sha }}" {
 						t.Fatal("NVKR checkout must use the dispatched commit")
 					}
+				} else {
+					nvkeCheckouts++
+					if step.With["repository"] != "dsx-ai-factory/nvke" || step.With["ref"] != "main" || step.With["path"] != "nvke-source" {
+						t.Fatal("NVKE checkout must resolve dsx-ai-factory/nvke main into nvke-source")
+					}
 				}
 			}
 			if strings.Contains(step.Run, "go test ./internal/nvkedemo -run '^TestEndToEnd$'") {
@@ -115,7 +121,7 @@ func TestNightlyUsesOnlyHostedBuildAndGoE2E(t *testing.T) {
 			}
 
 		}
-		if !built || !tenant || !source || !host || !deadline || !kvm || nvkrCheckouts != 1 {
+		if !built || !tenant || !source || !host || !deadline || !kvm || nvkrCheckouts != 1 || nvkeCheckouts != 1 {
 			t.Fatal("nightly must build the frozen main source and run the native site/tenant Go E2E on an admitted hosted runner")
 		}
 	}
