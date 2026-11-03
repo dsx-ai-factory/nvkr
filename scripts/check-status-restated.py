@@ -52,6 +52,7 @@ REASON = re.compile(r"^\s*:\s*\S")
 OWNER_ROW = re.compile(r"^\| (\d\d)(?:[–-](\d\d))? ([^|]+?) \|")
 ADR_PATH = re.compile(r"^docs/adr/(\d{4})-")
 ADR_REF = re.compile(r"\bADR-(\d{1,2})\b")
+LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s")
 
 
 def git(repo, *args, hint=None):
@@ -97,19 +98,20 @@ def untracked_lines(repo):
 
 
 def paragraphs(text, added):
-    """Yield blank-line-delimited paragraphs that hold an added line, as [(number, text, added)].
+    """Yield paragraphs and list items that hold an added line, as [(number, text, added)].
 
-    Matching whole paragraphs lets a phrase wrap from unchanged lines onto an added one without
-    crossing into the next paragraph; added=None marks every line added.
+    A blank line or a list-item marker starts a new block. Matching whole blocks lets a phrase
+    wrap from unchanged lines onto an added one without crossing into the next paragraph or
+    item; added=None marks every line added.
     """
     run = []
     for number, line in enumerate([*text.splitlines(), ""], 1):
-        if line.strip():
-            run.append((number, line, added is None or number in added))
-        elif run:
+        if run and (not line.strip() or LIST_ITEM.match(line)):
             if any(is_added for _, _, is_added in run):
                 yield run
             run = []
+        if line.strip():
+            run.append((number, line, added is None or number in added))
 
 
 def has_reason(line):
@@ -138,7 +140,7 @@ def scan(run):
             if not added or added[0] in seen or any(has_reason(run[i][1]) for i in lines):
                 continue
             seen.add(added[0])
-            # The matched lines decide the ADR row first, then the rest of the paragraph.
+            # The matched lines decide the ADR row first, then the rest of the block.
             span = " ".join(run[i][1] for i in lines) + " " + text
             findings.append((added[0], f'status restated ("{" ".join(m.group().split())}")', span))
     return findings
@@ -148,7 +150,10 @@ def scan(run):
 def ledger(repo, head):
     """Return the ledger lines at head, or in the working tree when head is None."""
     if head is None:
-        return Path(repo, LEDGER).read_text(encoding="utf-8").splitlines()
+        try:
+            return Path(repo, LEDGER).read_text(encoding="utf-8").splitlines()
+        except OSError as err:
+            raise SystemExit(f"check-status-restated: cannot read {LEDGER} to name the owner row: {err}") from err
     return git(repo, "show", f"{head}:{LEDGER}").splitlines()
 
 
@@ -168,8 +173,8 @@ def ledger_row(repo, head, path, text):
 def check(repo, base, head=None):
     """Return (merge base, formatted findings) for Markdown lines added since the merge base."""
     since = git(repo, "merge-base", base, head or "HEAD", hint=REVISION_HINT).strip()
-    diff = git(repo, "-c", "core.quotePath=false", "diff", "--no-color", "--no-ext-diff", "-U0", "-M",
-               "--src-prefix=a/", "--dst-prefix=b/", "--diff-filter=AMR", since, *([head] if head else []),
+    diff = git(repo, "-c", "core.quotePath=false", "diff", "--no-color", "--no-ext-diff", "--no-textconv", "-U0",
+               "-M", "--src-prefix=a/", "--dst-prefix=b/", "--diff-filter=AMRT", since, *([head] if head else []),
                "--", *MARKDOWN, hint=REVISION_HINT)
     changed = added_lines(diff) | ({} if head else untracked_lines(repo))
     out = set()
@@ -177,7 +182,7 @@ def check(repo, base, head=None):
         if path == LEDGER or path.startswith(EVIDENCE):
             continue
         if head:
-            text = git(repo, "show", f"{head}:{path}")
+            text = git(repo, "cat-file", "blob", f"{head}:{path}")
         else:
             text = Path(repo, path).read_text(encoding="utf-8", errors="replace")
         for run in paragraphs(text, added):

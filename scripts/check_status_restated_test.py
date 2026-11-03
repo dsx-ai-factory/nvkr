@@ -15,6 +15,10 @@ spec = importlib.util.spec_from_file_location("restated", Path(__file__).with_na
 restated = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(restated)
 
+class Link(str):
+    """A fixture value committed as a symbolic link to this target."""
+
+
 LINK = "link its docs/adr/reconciliation.md row instead"
 OWNERS = "link docs/adr/reconciliation.md#support-by-owner row"
 LEDGER = "| Owner | Implemented | Remaining |\n|---|---|---|\n| 01–03 Identity | x | y |\n| 21 Generation | x | y |\n"
@@ -27,6 +31,8 @@ BASE = {
     "docs/straddle.md": "Intro.\nCompletion requires a recorded\nOld tail.\n",
     "docs/three.md": "It requires a\nrecorded\nOld tail.\n",
     "docs/split.md": "The release is\nunrecorded.\n",
+    "docs/link.md": Link("old.md"),
+    "docs/items.md": "- ADR-02 identity.\n",
 }
 # Each case owns distinct paths, so one base...head diff exercises them all.
 CASES = {
@@ -67,6 +73,18 @@ CASES = {
     "adr in another paragraph is not the owner": (
         {"docs/neighbour.md": "ADR-02 owns identity.\n\nHosted signing remains unproven.\n"},
         [f'docs/neighbour.md:3: status restated ("remains unproven"); {LINK}']),
+    "adr in a neighbouring list item is not the owner": (
+        {"docs/items.md": BASE["docs/items.md"] + "- Hosted signing remains unproven.\n"},
+        [f'docs/items.md:2: status restated ("remains unproven"); {LINK}']),
+    "symlink replaced by a file": (
+        {"docs/link.md": "Hosted acceptance remains unrecorded.\n"},
+        [f'docs/link.md:1: status restated ("remains unrecorded"); {LINK}']),
+    "path with a space": (
+        {"docs/my file.md": "Signing is untested.\n"},
+        [f'docs/my file.md:1: status restated ("is untested"); {LINK}']),
+    "path git quotes": (
+        {'docs/naïve "q".md': "Signing is untested.\n"},
+        [f'docs/naïve "q".md:1: status restated ("is untested"); {LINK}']),
     "ledger look-alike is checked": (
         {"docs/adr/reconciliation.md-backup.md": "Hosted signing remains unproven.\n"},
         [f'docs/adr/reconciliation.md-backup.md:1: status restated ("remains unproven"); {LINK}']),
@@ -97,11 +115,15 @@ def git(repo, *args):
 def commit(repo, files):
     for name, text in files.items():
         path = Path(repo, name)
-        if text is None:
+        if text is None or path.is_symlink():
             path.unlink()
+        if text is None:
             continue
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text)
+        if isinstance(text, Link):
+            path.symlink_to(text)
+        else:
+            path.write_text(text)
     git(repo, "add", "-A")
     git(repo, "commit", "-q", "-m", "change")
     return git(repo, "rev-parse", "HEAD")
@@ -138,13 +160,34 @@ class StatusRestatedTest(unittest.TestCase):
         self.assertIn("no-such-revision", str(raised.exception.code))
         self.assertIn("STATUS_BASE", str(raised.exception.code))
 
+    def test_textconv_ignored(self):
+        """A local Markdown textconv driver cannot hide added lines from the check."""
+        attributes = Path(self.repo, ".git/info/attributes")
+        attributes.parent.mkdir(exist_ok=True)
+        attributes.write_text("*.md diff=hide\n")
+        git(self.repo, "config", "diff.hide.textconv", "true")
+        try:
+            self.assertEqual(restated.check(self.repo, self.base, self.head)[1], self.findings)
+        finally:
+            attributes.write_text("")
+            git(self.repo, "config", "--unset", "diff.hide.textconv")
+
+    def test_missing_local_ledger(self):
+        """Without a local ledger, naming an owner row fails closed with a concise message."""
+        with tempfile.TemporaryDirectory() as empty, self.assertRaises(SystemExit) as raised:
+            restated.ledger(empty, None)
+        self.assertIn("cannot read docs/adr/reconciliation.md", str(raised.exception.code))
+
     def test_working_tree(self):
         """Without a head, check uncommitted and untracked Markdown since the merge base."""
         Path(self.repo, "docs/old.md").write_text(BASE["docs/old.md"] + "Signing is unproven.\n")
         Path(self.repo, "docs/new.md").write_text("Publication has not been recorded.\n")
+        Path(self.repo, "docs/notes.md").write_text(
+            "Intro.\n\nRelease requires a\nrecorded run.\n\nThe release is\n\nunrecorded.\n")
         _, findings = restated.check(self.repo, self.head)
         self.assertEqual(findings, [
             f'docs/new.md:1: status restated ("has not been recorded"); {LINK}',
+            f'docs/notes.md:3: status restated ("requires a recorded run"); {LINK}',
             f'docs/old.md:2: status restated ("is unproven"); {LINK}',
         ])
 
