@@ -187,7 +187,7 @@ func runReaperCleanupCommand(ctx context.Context, grace time.Duration, docker st
 	if runtimeExecutable != nil {
 		return runtimeExecutable.runCleanup(ctx, grace, nil, nil, args...)
 	}
-	cmd := execCmd(RunOptions{Ctx: ctx}, docker, args...) //nvkr:allow-nondeterminism best-effort cleanup, not identity
+	cmd := execCmd(RunOptions{Ctx: ctx}, docker, args...)
 	cmd.WaitDelay = grace
 	return runOwnedCommand(ctx, cmd)
 }
