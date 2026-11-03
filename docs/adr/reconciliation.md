@@ -3470,6 +3470,12 @@ references and own any required association or compatibility decision. See the
 Proposed [ADR-26](0026-definition-composition.md) designs a composite of these four families as one Release;
 units U1–U7 are implemented and contract-tested only, and it adds no authored input.
 
+The [GPU target matrix](../../inputs/definitions/nvke/README.md#gpu-target-matrix) maps GB200, GB300, VR200
+and the site controller to family outputs in documentation only. It adds no Definition axis, input or
+generated file. NVKR builds and publishes those outputs and records no GPU driver, fabric or runtime
+acceptance; that evidence belongs to AICR and NVKE. The matrix's Ubuntu 24.04 disks, `controller-profiles`,
+offline CAPI repository, GB200 AICR bundle and composite site Release are pending and have no Run.
+
 The maintained release node-image catalog selects the NVIDIA OVN fork `v2.4.2`
 (`8af51273d52dfa07454435d18d37230e582d797a`) for `ovn-kube-ubuntu`, `ovn-kubernetes-chart` and
 `nvke-cni-ovn`. It reuses the native NVIDIA demo producers and pins, so the release disks stage
