@@ -5,6 +5,7 @@ package factory
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -119,21 +120,23 @@ func TestCompileDocumentsLoadsEachCatalogStackOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The first output repeats the top-level selection and shares its load. The
+	// second differs only by an empty overlay entry and must load on its own.
 	definition, delivery := fixtureInputs("ai-factory", "containerd-tools", "")
-	shared := authored.Catalog{Base: "output-catalog"}
-	definition.Outputs[0].Components, definition.Outputs[0].Catalog = []string{"containerd"}, &shared
+	topLevel := definition.Catalog.Base
+	definition.Outputs[0].Components, definition.Outputs[0].Catalog = []string{"containerd"}, &authored.Catalog{Base: topLevel}
 	definition.Outputs = append(definition.Outputs, authored.DefinitionOutput{Name: "kubelet-tools", Platform: "linux/amd64",
-		Format: authored.OutputExecutable, Components: []string{"kubelet"}, Catalog: &authored.Catalog{Base: "output-catalog"}})
+		Format: authored.OutputExecutable, Components: []string{"kubelet"}, Catalog: &authored.Catalog{Base: topLevel, Overlays: []string{""}}})
 	loads := map[string]int{}
 	plan, err := compileDocumentsWithLoader(t.Context(), "definition.yaml", definition, "environment.yaml", delivery, "test",
 		func(_ context.Context, spec authored.Catalog) (*catalog.Stack, error) {
-			loads[spec.Base]++
+			loads[fmt.Sprintf("%q", spec.Overlays)]++
 			return stack, nil
 		})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(plan.LifecycleOutputs) != 2 || len(loads) != 2 || loads["testdata/catalogs/kubernetes-layered"] != 1 || loads["output-catalog"] != 1 {
+	if len(plan.LifecycleOutputs) != 2 || len(loads) != 2 || loads["[]"] != 1 || loads[`[""]`] != 1 {
 		t.Fatalf("catalog stacks were not loaded exactly once each: outputs=%d loads=%v", len(plan.LifecycleOutputs), loads)
 	}
 }

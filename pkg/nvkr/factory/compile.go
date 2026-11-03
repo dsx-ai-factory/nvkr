@@ -5,8 +5,8 @@ package factory
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
-	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
@@ -52,7 +52,8 @@ func compileDocumentsFor(ctx context.Context, definitionPath string, definition 
 	stacks := map[string]*catalog.Stack{}
 	load := loadStack
 	loadStack = func(ctx context.Context, spec authored.Catalog) (*catalog.Stack, error) {
-		key := spec.Base + "\x00" + strings.Join(spec.Overlays, "\x00")
+		// Quote every element so no overlay list aliases another (nil and [""] differ).
+		key := fmt.Sprintf("%q", append([]string{spec.Base}, spec.Overlays...))
 		if stack, ok := stacks[key]; ok {
 			return stack, nil
 		}
