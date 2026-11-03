@@ -249,8 +249,8 @@ selects AICR's Preview `gb200-nvke-ubuntu-training-kubeflow` leaf in the `helm`,
 `argocd-helm` formats from the same catalog. AICR `v1.2.0` refuses criteria that no applied overlay covers;
 these producers also fail the build unless the rendered recipe's last applied overlay is that leaf. The
 admission lines of each compiled producer are contract-tested under the host's bash and awk against
-hand-written recipe fixtures, including a removed or malformed leaf. Native Helm examples and publication
-Environments remain out of scope.
+hand-written recipe fixtures, including a removed or malformed leaf and a list outside top-level
+`metadata`. Native Helm examples and publication Environments remain out of scope.
 
 On November 2, the current six-output GB300 Definition with the `v1.2.0` layout producers finished
 local attempt `aicr-gb300-v120-local-20261102-r1` with exit code 0. Its immutable
@@ -264,12 +264,16 @@ and producers ran in the pinned Linux ARM64 Go 1.27.2 container. These are local
 evidence or signed Releases.
 
 On November 3, the three-output GB200 NVKE Kubeflow training Definition finished local attempt
-`aicr-nvke-gb200-local-20261103-r5` with exit code 0 under the same host and container. Its
+`aicr-nvke-gb200-local-20261103-r7` with exit code 0 under the same host and container. Its
 `lifecycle.json` records status `complete`, lane `unqualified-local-execution`, Plan digest
-`sha256:f396614a348a292592c27742d850598c5cbfec754916dff40be16199fdfbf635` and content subject
-`sha256:6086823c928396914011fa96195a2e5403fb56e34e03080426eea0f268e0489f`; all three outputs were
-observed after the leaf check passed. A scratch attempt for the uncovered `dynamo` platform failed in
-`aicr recipe` with AICR's coverage error and produced no output.
+`sha256:cb28c9acee5559f1e8ab6d721b77de56c1873b51796a819984bf5b585ae40208` and content subject
+`sha256:a259f44e50eec14aca41cac8008d14410434f2bf843d09a6292f564ecdc173d2`; all three outputs were
+observed after the metadata-scoped leaf check passed. Each producer passed
+`--dra-eviction-node-label nvidia.com/dra-kubelet-plugin=true`, and `helm` and `argocd-helm` also passed
+`--readiness-hooks`. Inspection of each retained, extracted layer found the `dra-node-labeler` chart and
+GPU Operator's `NODE_LABEL_FOR_GPU_POD_EVICTION` in all three formats, and readiness gates only in
+`helm` and `argocd-helm`. A scratch attempt for the uncovered `dynamo`
+platform failed in `aicr recipe` with AICR's coverage error and produced no output.
 AICR's own [NVKE conformance record](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/docs/conformance/cncf/v1.36/nvke/README.md)
 used this leaf at AICR commit `864dd60065f1`, not the `v1.2.0` pin. NVKR claims no hardware or AICR
 validation evidence for these bundles.
