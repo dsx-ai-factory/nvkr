@@ -148,14 +148,23 @@ func (reader evidenceContextReader) Read(buffer []byte) (int, error) {
 }
 
 // evidenceBundleVerifier selects the pinned cosign verifier for signed upstream
-// evidence. Without --cosign-digest it is nil: signed upstream provenance then
-// fails closed, while unsigned digest-pinned declarations behave as before.
+// evidence. Without --cosign-digest, signed upstream provenance fails closed with
+// the flag to pass, while unsigned digest-pinned declarations behave as before.
 func evidenceBundleVerifier(c *cli.Context) (sbom.EvidenceBundleVerifier, error) {
 	digest := strings.TrimSpace(c.String("cosign-digest"))
 	if digest == "" {
-		return nil, nil
+		return missingEvidenceVerifier{}, nil
 	}
 	return sign.NewCosignEvidenceVerifier(strings.TrimSpace(c.String("cosign")), digest, nil)
+}
+
+// missingEvidenceVerifier never verifies; it only names the command flag that
+// selects the pinned verifier.
+type missingEvidenceVerifier struct{}
+
+func (missingEvidenceVerifier) VerifyEvidenceBundle(_ context.Context, _ []byte, policy sbom.EvidenceBundlePolicy) error {
+	return e.New(e.CodeUnavailable,
+		"signed upstream provenance for artifact %s requires the pinned cosign verifier; pass --cosign-digest", policy.SubjectDigest)
 }
 
 func buildVerifiedSBOM(ctx context.Context, resolved *buildgraph.Resolved, buildDigest string,
