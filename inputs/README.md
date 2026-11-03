@@ -77,7 +77,8 @@ and the existing composer/Packer folder handoff. These development inputs do not
 change the maintained NVKE release or demonstrate current NVSentinel build/runtime acceptance.
 
 The [AICR example](definitions/aicr/README.md) selects six deployment-bundle formats
-from one pinned catalog with a local build-only Environment.
+from one pinned catalog with a local build-only Environment. Its GB200 NVKE Kubeflow
+training Definition selects three of those formats from the same catalog.
 
 `definitions/diagnostics/demo-arm64/` retains the existing components, OS, profiles, providers,
 simulator, site and installer-tool loops used by the local launcher. Additional controller and OVN

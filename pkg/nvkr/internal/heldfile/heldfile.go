@@ -61,13 +61,9 @@ type File struct {
 	executable bool
 }
 
-// Open snapshots one opened regular file, validates its bounds and optional
-// external digest pin, and returns an anonymous immutable capability.
-func Open(path string, options Options) (*File, error) {
-	return OpenContext(context.Background(), path, options)
-}
-
-// OpenContext is Open with cancellation observed throughout the snapshot copy.
+// OpenContext snapshots one opened regular file, validates its bounds and optional
+// external digest pin, and returns an anonymous immutable capability. Cancellation
+// is observed throughout the snapshot copy.
 func OpenContext(ctx context.Context, path string, options Options) (*File, error) {
 	if ctx == nil {
 		return nil, errors.New("held input requires a non-nil context")
@@ -209,14 +205,9 @@ func (f *File) Size() int64 {
 	return f.size
 }
 
-// ReadAll returns the exact held bytes only when they fit the caller's explicit
-// memory bound. Large disk callers should use ReadAt or WriteToContext.
-func (f *File) ReadAll(maxBytes int64) ([]byte, error) {
-	return f.ReadAllContext(context.Background(), maxBytes)
-}
-
 // ReadAllContext returns the exact held bytes within an explicit memory bound,
-// observing cancellation while waiting for and reading the capability.
+// observing cancellation while waiting for and reading the capability. Large disk
+// callers should use ReadAt or WriteToContext.
 func (f *File) ReadAllContext(ctx context.Context, maxBytes int64) ([]byte, error) {
 	if ctx == nil {
 		return nil, errors.New("reading held file requires a non-nil context")

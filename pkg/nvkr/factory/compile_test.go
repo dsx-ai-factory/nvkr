@@ -128,11 +128,11 @@ func containsPrefix(values []string, prefix string) bool {
 	return false
 }
 
-func testCatalogProvider(t *testing.T) catalog.DataProvider {
+func testCatalogProvider(t *testing.T) catalog.ContextDataProvider {
 	t.Helper()
 	_, source, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("locate factory test catalog")
 	}
-	return catalog.Dir(filepath.Join(filepath.Dir(source), "..", "..", "..", "testdata", "catalogs", "kubernetes-layered"))
+	return catalog.Dir(filepath.Join(filepath.Dir(source), "..", "..", "..", "testdata", "catalogs", "kubernetes-layered")).(catalog.ContextDataProvider)
 }

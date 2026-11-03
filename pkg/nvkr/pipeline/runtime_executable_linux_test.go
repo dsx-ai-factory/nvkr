@@ -26,7 +26,7 @@ func TestQualifiedRuntimeUsesSealedDescriptorForObservationBuildAndCleanup(t *te
 	if err := os.WriteFile(source, []byte(original), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	held, err := snapshotRuntimeExecutable(source)
+	held, err := snapshotRuntimeExecutableContext(t.Context(), source)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ printf '%s|%s|%s|%s|%s|%s' "${LD_PRELOAD-unset}" "${LD_LIBRARY_PATH-unset}" "$PA
 	if err := os.WriteFile(source, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	held, err := snapshotRuntimeExecutable(source)
+	held, err := snapshotRuntimeExecutableContext(t.Context(), source)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ printf '%s|%s|%s|%s|%s|%s|%s|%s|%s' "$HOME" "$XDG_RUNTIME_DIR" "$XDG_DATA_HOME" 
 	if err := os.WriteFile(source, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	held, err := snapshotRuntimeExecutable(source)
+	held, err := snapshotRuntimeExecutableContext(t.Context(), source)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,9 +205,9 @@ func TestQualifiedPodmanRuntimeRejectsUnsafeRootlessPaths(t *testing.T) {
 			t.Setenv("XDG_DATA_HOME", filepath.Join(root, "data"))
 			t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
 			t.Setenv(test.variable, test.value)
-			held, err := snapshotRuntimeExecutable(source)
+			held, err := snapshotRuntimeExecutableContext(t.Context(), source)
 			if held != nil || code(err) != e.CodeEngineCapability {
-				t.Fatalf("snapshotRuntimeExecutable() = %#v, %v; want nil, %s", held, err, e.CodeEngineCapability)
+				t.Fatalf("snapshotRuntimeExecutableContext() = %#v, %v; want nil, %s", held, err, e.CodeEngineCapability)
 			}
 		})
 	}
@@ -223,7 +223,7 @@ func TestQualifiedRuntimeAcceptsSymlinkInstallButPinsResolvedBytes(t *testing.T)
 	if err := os.Symlink(original, link); err != nil {
 		t.Fatal(err)
 	}
-	held, err := snapshotRuntimeExecutable(link)
+	held, err := snapshotRuntimeExecutableContext(t.Context(), link)
 	if err != nil {
 		t.Fatalf("ordinary symlink runtime installation did not qualify: %v", err)
 	}
