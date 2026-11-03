@@ -25,7 +25,7 @@ The [34-concept reference](user-concepts.md) explains the vocabulary and connect
 | Understand how heterogeneous materials become a disk | [Node images](node-images.md) |
 | Build AICR deployment bundles as OCI artifacts | [AICR inputs, supported hardware recipes and rendering limits](../inputs/definitions/aicr/README.md) |
 | Find published outputs, download a named output, and verify a consumer claim | [Release quickstart](release-quickstart.md) |
-| Stand up an NVKE GPU site from NVKR Releases | [Working Definitions and GPU target matrix](../inputs/definitions/nvke/README.md#working-definitions-for-an-nvke-gpu-site), [site install walkthrough](release-quickstart.md#install-an-nvke-site-from-the-releases) |
+| Plan an NVKE GPU site from NVKR Releases (not yet runnable end to end) | [Working Definitions and GPU system matrix](../inputs/definitions/nvke/README.md#working-definitions-for-an-nvke-gpu-site), [site install outline](release-quickstart.md#install-an-nvke-site-from-the-releases) |
 | Build nightly NVKR candidates and run NVKE end-to-end tests | [Nightly workflow and current admission](nvke-nightly.md) |
 | Check a producing Run and configure qualification once | [Artifact checks and hosted qualification](lifecycle.md#authenticate-a-qualification-candidate), [candidate readiness](../inputs/definitions/nvke/README.md#qualification-readiness) |
 | Try component replacements locally | [Runnable authoring lab](examples/authoring-lab/README.md) |

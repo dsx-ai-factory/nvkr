@@ -163,63 +163,76 @@ See [release navigation](release-navigation.md) for local layouts and inspection
 
 ## Install an NVKE site from the Releases
 
-An NVKE GPU site consumes the NVKE family Releases: core, services and telemetry for the site controller
-cluster, and the disks family for node images. The
-[working Definitions and GPU target matrix](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md#working-definitions-for-an-nvke-gpu-site)
-list each family's outputs and the disk and AICR bundle for GB200, GB300 and VR200.
+An NVKE GPU site installs from the NVKE family Releases. The
+[working Definitions and GPU system matrix](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md#working-definitions-for-an-nvke-gpu-site)
+list each family's outputs and the disk and AICR bundle for GB200, GB300 and VR200. NVKE `v0.22.0`, the
+version `main` pins, takes its management-plane inputs from the core family. Its install fetches the charts a
+Release lacks, including PostgreSQL, SPIRE and Temporal, from their public repositories
+([NVKE deploy path](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/deploy/nico/README.md?plain=1#L55-L68)).
 
-This path cannot yet run end to end. No hosted family Release is recorded, and the steps marked pending
-need the named issue. The NVKE commands come from NVKE `v0.22.0`, the version `main` pins; NVKE owns them.
+This path cannot yet run end to end. No hosted family Run is recorded, and no issue tracks one yet. The
+steps below name the issue that each missing Release input waits on.
 
-1. **Find each Release.** Set `RELEASE_REF` to the core family's publication root and browse it as in
-   [Find an output](#find-an-output). Repeat for the disks family with `DISKS_RELEASE_REF`.
+### Get the inputs from NVKR
+
+1. **Find each Release.** Set `CORE_RELEASE_REF` and `DISKS_RELEASE_REF` to the core and disks families'
+   publication roots, and browse each as in [Find an output](#find-an-output).
 2. **Verify each Release** with `--scope artifact-publication`, as in
-   [Verify against an accepted policy](#verify-against-an-accepted-policy). NVKE reads release descriptions
-   without verifying them, so verify first. Then export the core description that NVKE reads:
+   [Verify against an accepted policy](#verify-against-an-accepted-policy). Each family is signed by its own
+   workflow on `main`, so use that family's signer identity; a mismatch fails closed. Verifying the disks
+   family at this scope downloads all four disks.
+3. **Export the core description** that NVKE's `--release` reads. NVKE does not verify it, so export the
+   reference you verified:
 
    ```sh
-   bin/nvkr release export --reference "$RELEASE_REF" > release.json
+   bin/nvkr release export --reference "$CORE_RELEASE_REF" > nvkr-release.json
    ```
 
-3. **Serve the node disks.** Pull each disk your node pools use, such as `nvke-node-image-arm64` for GB200
-   workers. Pulling writes `<output-name>.qcow2`.
+4. **Pull `nvkectl` and the node disks** you need. The core family has `nvkectl` (AMD64) and
+   `nvkectl-linux-arm64`. A disk pull writes `<output-name>.qcow2`. For AMD64 management nodes on Ubuntu 26.04:
 
    ```sh
+   bin/nvkr release pull --reference "$CORE_RELEASE_REF" --output nvkectl --out ./nvkectl
    bin/nvkr release pull --reference "$DISKS_RELEASE_REF" \
-     --output nvke-node-image-arm64 --out ./nvke-node-image-arm64
+     --output nvke-node-image-amd64 --out ./nvke-node-image-amd64
    ```
 
-   iPXE cannot pull OCI, so upload the QCOW2 to an HTTP(S) endpoint the machines can reach and register it,
-   as NVKE's [node image guide](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/operate/build-node-images.md?plain=1#L26-L41)
-   describes. NVKR does not build the `qcow-imager.efi` that writes the disk; take it from your NICo site.
-   The Ubuntu 24.04 disks that NVKE's GB200 golden path uses are pending
-   [#323](https://github.com/dsx-ai-factory/nvkr/issues/323).
-4. **Install the Cluster API providers.** NVKE runs `clusterctl init`, which today reads the provider
-   releases from GitHub
-   ([NVKE](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/get-started/local-site.md?plain=1#L19)).
-   A local repository delivered in the core Release is pending
-   [#324](https://github.com/dsx-ai-factory/nvkr/issues/324).
-5. **Render and install the management plane** with the `nvkectl` output for your host, against the
-   management nodes' architecture:
+   GB200 workers use the Ubuntu 24.04 ARM64 disk, which is pending
+   [#323](https://github.com/dsx-ai-factory/nvkr/issues/323). The `nvke-node-fde-*` disks use a public
+   bootstrap passphrase, so every node built from one shares its volume key and gets no data-at-rest
+   protection.
 
-   ```sh
-   nvkectl render deploy-path --deploy-path deploy/nico \
-     --sitespec sitespec.yaml --stack-config stack-config.json \
-     --arch linux/arm64 --release release.json --out ./render
-   ```
+### Install with NVKE
 
-   Pending [#324](https://github.com/dsx-ai-factory/nvkr/issues/324): NVKE refuses a release without
+Each stage links the NVKE `v0.22.0` page that owns it. Run them from an NVKE checkout at that tag.
+
+1. [Plan the installation](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/operate/plan-installation.md).
+2. [Serve the disk over HTTP(S)](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/operate/build-node-images.md#serve-the-boot-artifacts-over-https).
+   NVKR does not build the `qcow-imager.efi` that writes the disk; take it from your NICo site.
+3. [Prepare the management nodes](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/operate/prepare-nodes.md).
+4. [Bootstrap the management cluster](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/operate/bootstrap-management-cluster.md). `nvkectl bootstrap
+   site --release nvkr-release.json` takes the CAPNICo image from the core Release; its `--arch` is the
+   bootstrap host's architecture.
+5. Give the cluster a default StorageClass; the bootstrap installs none
+   ([troubleshooting](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/operate/troubleshoot.md?plain=1#L215-L219)). The services family's
+   `local-path-provisioner` chart can supply one for one architecture.
+6. [Install Cluster API](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/get-started/local-site.md#install-the-management-plane) at the version NVKE
+   pins. `clusterctl init` reads the provider releases from GitHub; a local repository in the core Release is
+   pending [#324](https://github.com/dsx-ai-factory/nvkr/issues/324).
+7. [Install the management plane](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/site-bootstrap/deploy-repository.md) with
+   `deploy/nvke-deploy.sh install --release nvkr-release.json`. NVKE refuses a release without
    `controller-profiles`
-   ([troubleshooting](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/operate/troubleshoot.md?plain=1#L209-L213)),
-   and the core Release does not carry it yet. Until then, install without `--release` and name each image
-   in the stack config's `images`. `--release` reads one description, and charts it lacks
-   resolve from NVKE's tree, so the services and telemetry charts come from NVKE until the composite
-   GPU site Release lands ([#326](https://github.com/dsx-ai-factory/nvkr/issues/326)).
-6. **Set your profiles.** The core Release's `nico-reference-profiles-fixture` holds NVKE test profiles, not
-   fleet configuration. Set `images.profiles` in the stack config to your site's profile image.
-7. **Apply the GPU stack to a tenant.** The GB200 Kubeflow training bundle is pending
-   [#325](https://github.com/dsx-ai-factory/nvkr/issues/325). Once published, pull it, verify it, and follow
-   AICR's instructions for its deployer; NVKR does not apply it.
+   ([troubleshooting](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/operate/troubleshoot.md?plain=1#L209-L213)), and the core Release does not
+   carry it until [#324](https://github.com/dsx-ai-factory/nvkr/issues/324). Until then, install without
+   `--release`: set the stack config's `images.controller` to the `reference` of the `cwe` output in
+   `nvkr-release.json`, and `images.profiles` to your site's profile image. Every other image and chart then
+   comes from NVKE's pinned upstream sources. The core Release's `nico-reference-profiles-fixture` holds NVKE
+   test profiles, not fleet configuration.
+8. [Register the image for provisioning](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/operate/build-node-images.md#register-the-image-for-provisioning).
+9. [Create a workload cluster](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/workload-clusters/create.md).
+10. Apply the GPU stack. The GB200 Kubeflow training bundle is pending
+    [#325](https://github.com/dsx-ai-factory/nvkr/issues/325); once published, verify it and follow AICR's
+    instructions for its deployer. NVKR does not apply it.
 
-NVKR builds, signs and publishes these outputs. GPU driver, fabric and runtime acceptance belongs to AICR and
-NVKE, and NVKR records none.
+NVKR builds, signs and publishes outputs. GPU driver, fabric and runtime acceptance belongs to AICR and NVKE,
+and NVKR records none.

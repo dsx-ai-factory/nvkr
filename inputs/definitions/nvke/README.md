@@ -11,7 +11,7 @@ An NVKE GPU site needs a site controller cluster, node disks for the site and te
 deploy bundle for each GPU workload. These Definitions supply them. Status reflects `main`. A pending row names
 the issue that adds it.
 
-| Definition | Environment | Produces | Lane | Status |
+| Definition | Environment | Produces | Lane when run | Status |
 |---|---|---|---|---|
 | [Core](core.yaml) | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) | Site controller: `nvkectl`, operator tools, AICR CLI, controller image and chart, CAPNICo, NICo charts and images, CAPI and cert-manager images | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | [Services](services.yaml) | [github-nvke-services.yaml](../../environments/github-nvke-services.yaml) | SPIRE, PostgreSQL, Temporal and local-path-provisioner charts and images | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
@@ -37,29 +37,30 @@ with the credentials in [Four-family pilot](#four-family-pilot). Each Run publis
 `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/<family>`. To consume them, follow
 [Install an NVKE site from the Releases](../../../docs/release-quickstart.md#install-an-nvke-site-from-the-releases).
 
-### GPU target matrix
+### GPU system matrix
 
 Definitions select outputs, not hardware: targets are platforms, and downstream systems own placement
 ([ADR-12](../../../docs/adr/0012-criteria-model-and-aicr-activation.md#1-concrete-target-platforms),
 [ADR-19](../../../docs/adr/0019-clusterdefinition-and-provisioning-adapter-boundary.md#3-downstream-systems-own-deployment)).
-This table maps each target to the outputs it uses. NVKE's node image excludes GPU drivers and NVIDIA fabric
+This table maps each GPU system to the outputs it uses. NVKE's node image excludes GPU drivers and NVIDIA fabric
 ([NVKE `os-image/SPEC.md`](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/os-image/SPEC.md?plain=1#L191-L194)),
 so one disk per Ubuntu series and architecture serves every GPU, and the AICR bundle installs the GPU stack.
 
-| Target | CPU/arch | Worker disks | AICR bundle | Upstream status |
+| GPU system | CPU/arch | Worker disks | AICR bundle | Upstream status |
 |---|---|---|---|---|
 | GB200 | Grace, arm64 | `nvke-node-image-ubuntu24-arm64` (24.04, pending #323) or `nvke-node-image-arm64` (26.04), and their `nvke-node-fde-*` variants | `aicr-nvke-gb200-ubuntu-training-kubeflow-*`, pending #325. Its recipe requires Ubuntu 24.04 ([leaf](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/recipes/overlays/gb200-nvke-ubuntu-training-kubeflow.yaml#L25-L34), [`os-ubuntu`](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/recipes/mixins/os-ubuntu.yaml#L23-L24)). AICR v1.2.0 has no NVKE inference leaf | NVKE's golden path is Ubuntu 24.04 on GB200, with streams on both series ([policy](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/release/policy.yaml#L23-L24), [streams](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/release/policy.yaml#L68-L75)). NVKE qualifies GB200 only to nodes Ready, with no GPU driver check ([overview](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/qualification/overview.md?plain=1#L178-L180)). NICo lists GB200 trays ([HCL](https://github.com/dsx-ai-factory/infra-controller/blob/abc446b33dc773d9b8c7f41b54cccf812758b165/docs/hcl.md?plain=1#L24-L25)) |
 | GB300 | Grace, arm64 | Same as GB200 | None: AICR v1.2.0 has no GB300 NVKE leaf ([overlays](https://github.com/NVIDIA/aicr/tree/935e0746dc54da890a23c1ecca998244b3a25de7/recipes/overlays)) | NVKE roadmap ([ROADMAP](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/ROADMAP.md?plain=1#L26)). NICo lists only the Lenovo GB300 tray ([HCL](https://github.com/dsx-ai-factory/infra-controller/blob/abc446b33dc773d9b8c7f41b54cccf812758b165/docs/hcl.md?plain=1#L27)) |
-| VR200 | Vera, arm64 | Same disk outputs; AICR's VR200 recipes require Ubuntu 26.04 ([recipe](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/recipes/overlays/vr200-rke2-ubuntu-training.yaml#L47-L63)) | None: AICR v1.2.0 VR200 leaves are RKE2-only | NVKE roadmap ([ROADMAP](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/ROADMAP.md?plain=1#L27)). Not in the NICo v2.3.0 [HCL](https://github.com/dsx-ai-factory/infra-controller/blob/abc446b33dc773d9b8c7f41b54cccf812758b165/docs/hcl.md) |
-| Site controller | amd64 or arm64 | Either series, plain or FDE, for the management nodes' architecture | n/a | NVKE management nodes are all one architecture, either one ([supported platforms](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/overview/supported-platforms.md?plain=1#L79)). NICo documents x86_64 site controller hardware on Ubuntu 24.04 ([hardware](https://github.com/dsx-ai-factory/infra-controller/blob/abc446b33dc773d9b8c7f41b54cccf812758b165/docs/getting-started/prerequisites/hardware.md?plain=1#L12-L21)) |
+| VR200 | Vera, arm64 | Same disk outputs; AICR's VR200 recipes require Ubuntu 26.04 and kernel 7.0 or later ([recipe](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/recipes/overlays/vr200-rke2-ubuntu-training.yaml#L47-L65)), which NVKR does not check against the disk | None: AICR v1.2.0 VR200 leaves are RKE2-only | NVKE roadmap ([ROADMAP](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/ROADMAP.md?plain=1#L27)). Not in the NICo v2.3.0 [HCL](https://github.com/dsx-ai-factory/infra-controller/blob/abc446b33dc773d9b8c7f41b54cccf812758b165/docs/hcl.md) |
+| Site controller | amd64 or arm64 | The management nodes' architecture: Ubuntu 26.04 today, Ubuntu 24.04 pending #323, plain or FDE | n/a | NVKE management nodes are all one architecture, either one ([supported platforms](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/overview/supported-platforms.md?plain=1#L79)). NICo documents x86_64 site controller hardware on Ubuntu 24.04 ([hardware](https://github.com/dsx-ai-factory/infra-controller/blob/abc446b33dc773d9b8c7f41b54cccf812758b165/docs/getting-started/prerequisites/hardware.md?plain=1#L12-L21)) |
 
-NVKE and NICo links are to private repositories at NVKE `v0.22.0`, which `main` pins, and NICo `v2.3.0`. NVKR
-does not build NICo's boot artifacts or the `qcow-imager.efi` that iPXE chainloads to write a disk; the site
+NVKE links are at `v0.22.0`, which `main` pins, and NICo links at `v2.3.0`. The `nvke-node-fde-*` disks use
+a public bootstrap passphrase, so every node built from one shares its volume key and gets no data-at-rest
+protection ([Native execution and publication](#native-execution-and-publication)). NVKR does not build NICo's boot artifacts or the `qcow-imager.efi` that iPXE chainloads to write a disk; the site
 takes them from its NICo deployment or builds them as
 [NVKE describes](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/operate/build-node-images.md?plain=1#L22).
 
-These outputs are built and published only. GPU driver, fabric and runtime acceptance belongs to AICR and NVKE
-evidence, and NVKR records none ([reconciliation](../../../docs/adr/reconciliation.md#maintained-input-and-schema-boundaries)).
+NVKR's role ends at building, signing and publishing these outputs. GPU driver, fabric and runtime acceptance
+belongs to AICR and NVKE evidence, and NVKR records none ([reconciliation](../../../docs/adr/reconciliation.md#maintained-input-and-schema-boundaries)).
 
 ## Four-family pilot
 
