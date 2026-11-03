@@ -74,6 +74,25 @@ func CheckGenerated(ctx context.Context, plan *Plan, engine, root string) error 
 	return err
 }
 
+// Generate checks or writes one hosted bundle and returns its Plan digest.
+// Generated bootstraps run check mode, so only write mode takes the Render seam.
+func Generate(ctx context.Context, plan *Plan, engine, root string, check bool) (string, error) {
+	if check {
+		if err := CheckGenerated(ctx, plan, engine, root); err != nil {
+			return "", err
+		}
+		return plan.Digest()
+	}
+	bundle, err := Render(ctx, plan, engine)
+	if err != nil {
+		return "", err
+	}
+	if err := WriteGeneratedBundle(ctx, root, bundle); err != nil {
+		return "", err
+	}
+	return bundle.PlanDigest, nil
+}
+
 // checkCoreGitHubBundle admits exact committed bytes against the core's
 // in-binary projection and returns that projection for further comparison.
 func checkCoreGitHubBundle(ctx context.Context, plan *Plan, root string) (*GeneratedBundle, error) {
