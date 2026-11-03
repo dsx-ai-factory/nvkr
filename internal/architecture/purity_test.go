@@ -165,13 +165,43 @@ func TestIdentityPathsArePure(t *testing.T) {
 		findings = append(findings, pkgFindings...)
 		checked[pkg.ImportPath] = true
 	}
-	for _, pkg := range slices.Concat(identityPackages, packages) {
-		if !checked[pkg] {
-			t.Errorf("identity package %s was not checked", pkg)
-		}
+	for _, pkg := range uncheckedPackages(slices.Concat(identityPackages, packages), checked) {
+		t.Errorf("identity package %s was not checked", pkg)
 	}
 	for _, problem := range applyPurityExceptions(findings, purityExceptions) {
 		t.Error(problem)
+	}
+}
+
+// uncheckedPackages returns the required packages absent from checked, in order.
+func uncheckedPackages(required []string, checked map[string]bool) []string {
+	var missing []string
+	for _, pkg := range required {
+		if !checked[pkg] {
+			missing = append(missing, pkg)
+		}
+	}
+	return missing
+}
+
+func TestUncheckedPackages(t *testing.T) {
+	required := []string{"root", "root/sub"}
+	tests := []struct {
+		name    string
+		checked map[string]bool
+		want    []string
+	}{
+		{name: "complete inventory", checked: map[string]bool{"root": true, "root/sub": true}},
+		{name: "discovered package missing", checked: map[string]bool{"root": true, "other": true}, want: []string{"root/sub"}},
+		{name: "root missing", checked: map[string]bool{"root/sub": true}, want: []string{"root"}},
+		{name: "nothing checked", want: []string{"root", "root/sub"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := uncheckedPackages(required, tt.checked); !slices.Equal(got, tt.want) {
+				t.Errorf("uncheckedPackages = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -420,7 +450,11 @@ func goListExports(t *testing.T, dir string, patterns ...string) []listedPackage
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if err := ownedcmd.Run(ctx, command); err != nil {
-		t.Fatalf("go %s: %v\n%s(offline: run \"go mod download\" if modules are missing)", strings.Join(args, " "), err, stderr.String())
+		hint := "(offline: run \"go mod download\" if modules are missing)"
+		if ctx.Err() != nil {
+			hint = "" // canceled or timed out: cache advice would mislead
+		}
+		t.Fatalf("go %s: %v\n%s%s", strings.Join(args, " "), err, stderr.String(), hint)
 	}
 	var listed []listedPackage
 	for decoder := json.NewDecoder(&stdout); ; {
