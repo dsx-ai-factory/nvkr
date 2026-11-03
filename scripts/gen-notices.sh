@@ -39,11 +39,12 @@ trap 'rm -f "$linked" "$generated"' EXIT
 
 # The module excludes itself: `go list -deps` reports the main module, and its
 # own licence is LICENSE, not a third-party notice. Exclude the renamed main
-# module rather than reproducing its own license as a dependency notice.
+# module rather than reproducing its own license as a dependency notice. Byte
+# order keeps the file identical under any locale (CI sorts in C).
 for goos in linux darwin; do
   GOOS="$goos" GOARCH=amd64 \
     go list -deps -f '{{if .Module}}{{.Module.Path}}{{end}}' ./cmd/nvkr ./cmd/nvke-demo ./cmd/nvkr-site-identity-helper
-done | sort -u | grep -v '^$' | grep -v '^github.com/dsx-ai-factory/nvkr' > "$linked"
+done | LC_ALL=C sort -u | grep -v '^$' | grep -v '^github.com/dsx-ai-factory/nvkr' > "$linked"
 
 python3 scripts/gen_notices.py "$linked" > "$generated"
 
