@@ -238,10 +238,12 @@ or deployment; authenticated consumption retains the normal signed Release/evide
 
 The [focused AICR example](../../inputs/definitions/aicr/README.md) retains one GB300
 selection across six renderer formats and one local build-only Environment. A second Definition
-selects AICR's `gb200-nvke-ubuntu-training-kubeflow` leaf in the `helm`, `flux` and `argocd-helm`
-formats from the same catalog. Its producers fail the build unless the rendered recipe's last applied
-overlay is that leaf; the parser is contract-tested against rendered shapes. Native Helm examples and
-publication Environments remain out of scope.
+selects AICR's Preview `gb200-nvke-ubuntu-training-kubeflow` leaf in the `helm`, `flux` and
+`argocd-helm` formats from the same catalog. AICR `v1.2.0` refuses criteria that no applied overlay covers;
+these producers also fail the build unless the rendered recipe's last applied overlay is that leaf. The
+admission lines of each compiled producer are contract-tested under the host's bash and awk against
+hand-written recipe fixtures, including a removed or malformed leaf. Native Helm examples and publication
+Environments remain out of scope.
 
 On November 2, the current six-output GB300 Definition with the `v1.2.0` layout producers finished
 local attempt `aicr-gb300-v120-local-20261102-r1` with exit code 0. Its immutable
@@ -255,12 +257,15 @@ and producers ran in the pinned Linux ARM64 Go 1.27.2 container. These are local
 evidence or signed Releases.
 
 On November 3, the three-output GB200 NVKE Kubeflow training Definition finished local attempt
-`aicr-nvke-gb200-local-20261102-r2` with exit code 0 under the same host and container. Its
+`aicr-nvke-gb200-local-20261103-r5` with exit code 0 under the same host and container. Its
 `lifecycle.json` records status `complete`, lane `unqualified-local-execution`, Plan digest
-`sha256:5771526090e64f27af5ba83c06b61222d136e7d8b7f4c8616444eb019eac4406` and content subject
-`sha256:9db6222f7cb1939fa93ab2be4e414754d13e4e3bfa304affa327cb9f3372c6a1`; all three outputs were
-observed after the leaf check passed. This is not NVKE hardware or AICR validation evidence; AICR
-holds that evidence for its leaf, and NVKR claims none.
+`sha256:f396614a348a292592c27742d850598c5cbfec754916dff40be16199fdfbf635` and content subject
+`sha256:6086823c928396914011fa96195a2e5403fb56e34e03080426eea0f268e0489f`; all three outputs were
+observed after the leaf check passed. A scratch attempt for the uncovered `dynamo` platform failed in
+`aicr recipe` with AICR's coverage error and produced no output.
+AICR's own [NVKE conformance record](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/docs/conformance/cncf/v1.36/nvke/README.md)
+used this leaf at AICR commit `864dd60065f1`, not the `v1.2.0` pin. NVKR claims no hardware or AICR
+validation evidence for these bundles.
 
 Hosted AICR publication/signing and independent production consumption remain unexercised. Argo CD
 reconciliation, cluster installation, hardware behavior, air-gap dependency closure and qualified bundle
