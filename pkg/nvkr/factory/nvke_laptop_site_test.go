@@ -57,7 +57,7 @@ func TestLaptopNKTPDependencyArchiveChecks(t *testing.T) {
 	if len(command) == 0 {
 		t.Fatal("missing compiled NKTP preparation command")
 	}
-	archives := []string{"metrics-server-3.13.1.tgz", "opentelemetry-kube-stack-0.22.0.tgz", "prometheus-node-exporter-4.56.1.tgz"}
+	archives := []string{"metrics-server-3.13.1.tgz", "opentelemetry-kube-stack-0.25.1.tgz", "prometheus-node-exporter-4.56.1.tgz"}
 	for _, tc := range []struct {
 		name, message string
 		count         int
@@ -202,7 +202,7 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 							command := strings.Join(node.VendorCmd, " ")
 							for _, required := range []string{"sh -euc", "HELM_REPOSITORY_CONFIG=/tmp/", "HELM_REPOSITORY_CACHE=/tmp/", "helm repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts", "helm repo add nktp-prometheus https://prometheus-community.github.io/helm-charts", "helm repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/", "helm dependency build nktp/deploy/charts/nktp --skip-refresh", "sha256sum -c -",
 								"084e6edb680cf4e2acc30bd496568c53fdf663cbacf6e17876b25785c35b7a13  nktp/deploy/charts/nktp/charts/metrics-server-3.13.1.tgz",
-								"df7d63a331d9d164a276f5b4395c6383c00fe801abcc6b2ea969de182914dc32  nktp/deploy/charts/nktp/charts/opentelemetry-kube-stack-0.22.0.tgz",
+								"e3460a7572a2b9c98ff421a29501dc26cdd09d83859f0556f6c3f5443793afda  nktp/deploy/charts/nktp/charts/opentelemetry-kube-stack-0.25.1.tgz",
 								"70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/deploy/charts/nktp/charts/prometheus-node-exporter-4.56.1.tgz",
 								`[ "$#" -ne 3 ]`} {
 								if !strings.Contains(command, required) {
