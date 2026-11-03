@@ -4,13 +4,16 @@
 package cicontract
 
 import (
+	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
 
 	"sigs.k8s.io/yaml"
 )
@@ -107,7 +110,8 @@ func fernStepViolations(steps []storageWorkflowStep) []string {
 			}
 		}
 		if installs && strings.HasPrefix(step.Uses, "actions/download-artifact@") {
-			if path, _ := step.With["path"].(string); !strings.HasPrefix(path, "${{ runner.temp }}/") {
+			path, _ := step.With["path"].(string)
+			if rest, ok := strings.CutPrefix(path, "${{ runner.temp }}/"); !ok || !filepath.IsLocal(rest) {
 				problems = append(problems, step.Name+" extracts an artifact into the workspace holding the trusted Fern install")
 			}
 		}
@@ -136,6 +140,7 @@ func TestFernStepViolations(t *testing.T) {
 		{"install and invoke in one step without env", []storageWorkflowStep{{Name: "both", Run: "make fern-install\n" + locked}}, "redirect"},
 		{"artifact in workspace", []storageWorkflowStep{install, {Name: "download", Uses: "actions/download-artifact@x", With: map[string]any{}}}, "trusted Fern install"},
 		{"artifact under runner temp", []storageWorkflowStep{install, {Name: "download", Uses: "actions/download-artifact@x", With: map[string]any{"path": "${{ runner.temp }}/docs"}}}, ""},
+		{"artifact escaping runner temp", []storageWorkflowStep{install, {Name: "download", Uses: "actions/download-artifact@x", With: map[string]any{"path": "${{ runner.temp }}/../work/nvkr"}}}, "trusted Fern install"},
 		{"artifact without a Fern install", []storageWorkflowStep{{Name: "download", Uses: "actions/download-artifact@x"}}, ""},
 	}
 	for _, test := range tests {
@@ -156,7 +161,10 @@ func assertFernMakeRecipes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	output, err := exec.CommandContext(t.Context(), "make", "-n", "-C", root, "fern-install", "docs-check").CombinedOutput()
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	// make -n still runs the Makefile's $(shell ...) calls, so own the whole process group.
+	output, err := ownedcmd.CombinedOutput(ctx, "make", "-n", "-C", root, "fern-install", "docs-check")
 	if err != nil {
 		t.Fatalf("make -n fern-install docs-check: %v\n%s", err, output)
 	}
