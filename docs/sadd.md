@@ -1209,7 +1209,7 @@ identities rather than rebuilding those members merely to describe the compositi
 Incremental equality identifies candidates for reuse. Required named outputs remain independent even when their
 Build Digests match; no cross-output execution or evidence reuse is authorized by digest equality. Qualified
 reuse requires prior authenticated evidence rebound to the current policy and member; unused incremental and
-rollback helpers are removed and those workflows remain deferred (ADR-16). Proposed ADR-25 designs
+rollback helpers are removed and those workflows remain deferred (ADR-16). Proposed ADR-30 designs
 pipeline-attested cross-Run reuse of complete named outputs: a Plan-derived key binding output, build inputs,
 toolchain profile, platform, evidence set, lane, origin and signer policy; untrusted discovery; owner-issued
 acceptance; and a `reused` Run origin that retains original provenance instead of claiming current execution.

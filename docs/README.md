@@ -91,9 +91,6 @@ adapter selection and artifact bindings across repositories, including its diagn
 The provisional local-plan CLI slice implements catalog discovery and versioned-profile execution;
 broader adapter and profile support remains deferred.
 
-Proposed [ADR-25: authenticated result reuse](adr/0025-authenticated-result-reuse.md) designs cross-Run reuse
-of complete named outputs and the test matrix for implementing it; reuse is not implemented.
-
 Proposed [ADR-26: Definition composition](adr/0026-definition-composition.md) designs composite Definitions
 that release several digest-pinned Definitions as one Release, with a worked NVKE four-family example and
 implementation units. Units U1–U7 are implemented and contract-tested only; no hosted composite Run, publication or
@@ -107,6 +104,9 @@ Proposed [ADR-28: Multi-platform executables](adr/0028-multi-platform-executable
 source for every platform of a release, where the platforms share a format, companions and admitted URL
 spellings, and executable outputs published as standard OCI image indexes. The AICR CLI is the first
 migration, and the ADR inventories existing executables to retrofit. It is design only.
+
+Proposed [ADR-30: authenticated result reuse](adr/0030-authenticated-result-reuse.md) designs cross-Run reuse
+of complete named outputs and the test matrix for implementing it; reuse is not implemented.
 
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
 Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) covers branch
