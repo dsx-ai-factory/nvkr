@@ -1,9 +1,9 @@
 # Definition partitioning and related Releases
 
-The four-family NVKE pilot implements separate authored Definitions and named production bundles alongside
+The NVKE family pilot implements separate authored Definitions and named production bundles alongside
 the combined candidate. It reuses the current lifecycle and catalog owners; it adds no cross-Release import,
 automatic association file or qualification capability. Hosted family execution and consumer acceptance remain
-unrecorded. The [input instructions](../inputs/definitions/nvke/README.md#four-family-pilot) own commands and
+unrecorded. The [input instructions](../inputs/definitions/nvke/README.md#family-pilot) own commands and
 current selections; [reconciliation](adr/reconciliation.md#maintained-input-and-schema-boundaries) owns
 implementation and acceptance status.
 
@@ -271,7 +271,7 @@ commands or trust assumptions; moving or splitting a catalog also requires revie
 overlays. The temporary OS SPIRE packaging-source exception and incomplete DSX IMDS requirement remain
 unchanged by selecting separate output families.
 
-The [catalog-maintenance policy](../inputs/policies/nvke-catalog-maintenance.yaml) lists all four family
+The [catalog-maintenance policy](../inputs/policies/nvke-catalog-maintenance.yaml) lists all five family
 pairs in `additionalRuns`, alongside its existing dependent bundles. One policy checks and regenerates
 the complete explicit bundle closure when shared pins change. Maintenance rejects committed bundles omitted
 from that closure; it does not infer consumers from directory names. Its `sameRelease` groups coordinate

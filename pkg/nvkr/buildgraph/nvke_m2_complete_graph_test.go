@@ -15,7 +15,7 @@ import (
 
 // This opt-in integration authenticates the source-owned chart pin set through
 // actual Git acquisition. Static completeness is not runtime admission or a
-// successful runtime build. Ordinary tests still require 69 declared outputs and
+// successful runtime build. Ordinary tests still require 73 declared outputs and
 // independently load/resolve/compile all 24 native image rows.
 func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 	t.Chdir("../../..")
@@ -24,13 +24,15 @@ func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(authored.Outputs) != 69 {
+	if len(authored.Outputs) != 73 {
 		t.Fatal("required output membership changed")
 	}
 	declaredImages := 0
 	disks := map[string]string{
 		"nvke-node-fde-amd64": "linux/amd64", "nvke-node-fde-arm64": "linux/arm64",
 		"nvke-node-image-amd64": "linux/amd64", "nvke-node-image-arm64": "linux/arm64",
+		"nvke-node-fde-ubuntu24-amd64": "linux/amd64", "nvke-node-fde-ubuntu24-arm64": "linux/arm64",
+		"nvke-node-image-ubuntu24-amd64": "linux/amd64", "nvke-node-image-ubuntu24-arm64": "linux/arm64",
 	}
 	declaredDisks := 0
 	for _, output := range authored.Outputs {
@@ -48,7 +50,7 @@ func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 		t.Fatalf("declared %d required image rows, want 24", declaredImages)
 	}
 	if declaredDisks != len(disks) {
-		t.Fatal("both native architectures must retain FDE and non-FDE outputs")
+		t.Fatal("both native architectures must retain FDE and non-FDE outputs for each Ubuntu series")
 	}
 	if os.Getenv("NVKR_TEST_M2_ALL_OUTPUT_GRAPHS") != "1" {
 		t.Skip("explicit pinned-source Git integration was not requested; native image graphs are tested separately")
@@ -68,7 +70,7 @@ func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 	if err := plan.Graph.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	if len(plan.Builds) != 73 || len(plan.LifecycleOutputs) != len(authored.Outputs) {
+	if len(plan.Builds) != 77 || len(plan.LifecycleOutputs) != len(authored.Outputs) {
 		t.Fatal("compiled Plan does not preserve every required output")
 	}
 	builds := make(map[string]factory.BuildPlan, len(plan.Builds))
@@ -120,7 +122,7 @@ func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 	if images != 24 {
 		t.Fatalf("compiled %d required image rows, want 24", images)
 	}
-	if graphs != 73 {
-		t.Fatalf("validated %d required build graphs, want 73", graphs)
+	if graphs != 77 {
+		t.Fatalf("validated %d required build graphs, want 77", graphs)
 	}
 }

@@ -1493,7 +1493,8 @@ This subsection is proposed design, not implemented behavior. Today every `id-to
 inline, and no code path relocates a signer. Local measurements of the committed bundles show where those
 jobs fall. In the partitioned development entry, the 139 inline signing and SBOM-attestation jobs account
 for 10,984 of 13,308 expanded YAML parsing events and 104,357 of 264,038 bytes. The maintained release
-producer selects the same inline-signer partition layout; its entry has 13,333 events and 272,696 bytes.
+producer selects the same inline-signer partition layout; with the Ubuntu 24.04 disks its entry has 14,016
+events and 291,704 bytes.
 Before that selection, its flat workflow had reached 47,731 events, above the maintained 95% headroom
 threshold. These are local generation measurements, not provider evidence.
 

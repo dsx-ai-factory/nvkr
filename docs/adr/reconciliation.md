@@ -117,9 +117,9 @@ contracts and retained-disk diagnostics exist, but a successful real native NVKE
 has not been demonstrated. Qualified release authorization, full v1 qualification/tag/revocation automation,
 qualified provider adapters, secret-valued encrypted VM execution and air-gap operation remain unavailable.
 
-The maintained M2 candidate selects 69 named outputs, retaining the previous 37 and adding CAPNICo,
+The maintained M2 candidate selects 73 named outputs, retaining the previous 37 and adding CAPNICo,
 explicitly named reference-profile fixtures, the provisioned infrastructure provider, NVKE telemetry pipelines and native bootstrap/telemetry
-images. Both native architectures retain plain and public-bootstrap FDE disks. Native ARC publication admits those disks only with explicit
+images. Both native architectures retain plain and public-bootstrap FDE disks, now for Ubuntu 26.04 and 24.04. Native ARC publication admits those disks only with explicit
 `build-provenance-v1`: actual producer encryption, wrapper annotations, signed disk metadata and expected
 output membership must agree. Strict inspection/publication, qualified reproduction and private-passphrase
 FDE remain closed. The consumer's strict evidence policy still rejects producer-only disks. This integration
@@ -1562,8 +1562,16 @@ Other M2 materials and the Packer host runtime retain their existing scope and e
 Single-output hosted Definitions cover plain and public-bootstrap FDE on AMD64 and ARM64;
 the existing native local wrapper also selects the two plain variants. Hosted build-only
 finalization retains its one-disk limit. The supplied Environments generate raw-disk
-`static-unqualified` Runs without signing or publication. Ubuntu 26 defaults, maintained
-M2 membership, and committed workflow bundles retain their existing selections.
+`static-unqualified` Runs without signing or publication.
+
+Maintained publication selects the same overlay stack. The combined M2 candidate and the sibling
+`inputs/definitions/nvke/disks-ubuntu24.yaml` family each add `nvke-node-image-ubuntu24-<arch>` and
+`nvke-node-fde-ubuntu24-<arch>` for AMD64 and ARM64. The family uses its own `github-nvke-disks-ubuntu24`
+Environment, main-only `nvkr-run-nvke-disks-ubuntu24.yml` signer and `m2-candidate/disks-ubuntu24` prefix.
+Private toolchain preparation admits that exact prefix. The Ubuntu 26.04 outputs and the `disks` family are
+unchanged. Split, composite, closure and maintained-bundle contracts cover membership, signer isolation and
+credential projection, and generation is deterministic. No Ubuntu 24.04 hosted bake, publication, release
+verification or guest boot is recorded.
 `pkg/nvkr/lifecycle/nvke_ubuntu24_test.go` covers compilation, exact closure/pins, changed
 Build identity, native KVM admission and deterministic generation. Script fixtures cover
 selection and frozen-input routing through the shared release catalog. Disk producers
@@ -3233,7 +3241,8 @@ reporting, is unrecorded. Signer relocation remains a proposed ADR-18 §8 design
 The maintained release Environment now also selects `githubExecutionPartitions`. The NVKE v0.23.0 DOCA OVS
 producer added one source fetch per release disk and took the flat release workflow to 47,731 events,
 above the 47,500 maintained threshold. Partitioned, the release entry has 272,696 bytes and 13,333 events;
-the largest of its 30 workers has 4,947. Every OIDC job stays in the entry, so the signer identity
+the largest of its 30 workers has 4,947. Adding the four Ubuntu 24.04 disks takes the entry to 291,704 bytes
+and 14,016 events, still 30 workers, the largest with 4,959. Every OIDC job stays in the entry, so the signer identity
 `nvkr-run.yml@refs/heads/main` is unchanged. The maintained bundle contract checks the private-image
 credential boundary on the flat reference that the workers must project exactly. These are local generation
 results. No partitioned release Run is recorded; the hosted development Run above is the closest evidence.
@@ -3448,7 +3457,7 @@ is recorded. The combined production/development and qualification paths remain 
 qualification cutover. Named producer qualification and named development remain unsupported; the pilot
 emits no automatic association file or parent Release. Consumers independently verify exact family
 references and own any required association or compatibility decision. See the
-[pilot inputs](../../inputs/definitions/nvke/README.md#four-family-pilot) and
+[pilot inputs](../../inputs/definitions/nvke/README.md#family-pilot) and
 [partitioning strategy](../definition-partitioning-strategy.md) for scope and historical measurements.
 Proposed [ADR-26](0026-definition-composition.md) designs a composite of these four families as one Release;
 units U1–U7 are implemented and contract-tested only, and it adds no authored input.
@@ -3528,10 +3537,10 @@ named-runtime helpers. No hosted family execution of this boundary is recorded.
 [ADR-18](0018-pipeline-ir-and-ci-adapter-emission.md) owns the contract;
 [bootstrap dispatch tests](../../pkg/nvkr/factory/github_bootstrap_dispatch_test.go) cover refusal.
 
-All four family Environments retain the maintained production `NVKR_REGISTRY_WRITE` publication policy.
-The exact `m2-candidate/disks` prefix also admits the existing pinned M2 toolchains for separate preparation
+All five family Environments retain the maintained production `NVKR_REGISTRY_WRITE` publication policy.
+The exact `m2-candidate/disks` and `m2-candidate/disks-ubuntu24` prefixes also admit the existing pinned M2 toolchains for separate preparation
 with the fixed independent registry reader. Focused contracts reproduce and fix the previously omitted
-preparation, require it before all four disk producers and source-vendor execution, and reject lookalike,
+preparation, require it before each family's four disk producers and source-vendor execution, and reject lookalike,
 child, other-family and foreign-owner exceptions. Credential projection and cleanup contracts pass; they
 do not establish provisioned registry access or hosted family execution.
 

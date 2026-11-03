@@ -73,6 +73,12 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 		"nvke-node-fde-arm64":   {"linux/arm64", "nvke-node-fde-arm64", "fde", "luks2"},
 		"nvke-node-image-amd64": {"linux/amd64", "nvke-node-image-amd64", "non-fde", "none"},
 		"nvke-node-image-arm64": {"linux/arm64", "nvke-node-image", "non-fde", "none"},
+		// Ubuntu 24.04 outputs keep the same roots; this check loads only each output's
+		// base catalog, so the Ubuntu 24 overlay is covered by lifecycle's Ubuntu 24 contract.
+		"nvke-node-fde-ubuntu24-amd64":   {"linux/amd64", "nvke-node-fde-amd64", "fde", "luks2"},
+		"nvke-node-fde-ubuntu24-arm64":   {"linux/arm64", "nvke-node-fde-arm64", "fde", "luks2"},
+		"nvke-node-image-ubuntu24-amd64": {"linux/amd64", "nvke-node-image-amd64", "non-fde", "none"},
+		"nvke-node-image-ubuntu24-arm64": {"linux/arm64", "nvke-node-image", "non-fde", "none"},
 	}
 	seen := make(map[string]bool)
 	for _, output := range authored.Outputs {

@@ -26,6 +26,7 @@ var nvkeSplitFamilies = []struct {
 	{"services", 34, 34},
 	{"telemetry", 17, 17},
 	{"disks", 4, 4},
+	{"disks-ubuntu24", 4, 4},
 }
 
 // Family-only outputs are not in the combined Definition, whose flat workflow
@@ -108,7 +109,7 @@ func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 				if !bytes.Equal(nvkeSplitCanonical(t, output), original[output.Name]) {
 					t.Fatalf("output %q is added or changes the combined selection", output.Name)
 				}
-				if (output.Format == definition.OutputDiskImage) != (family.name == "disks") {
+				if (output.Format == definition.OutputDiskImage) != nvkeDiskFamily(family.name) {
 					t.Fatalf("disk output %q escaped its native execution family", output.Name)
 				}
 				native += max(1, len(output.Platforms))
@@ -173,7 +174,7 @@ func TestNVKEDefinitionSplitEnvironmentIsolation(t *testing.T) {
 			// Each family's workflow fits flat; only the combined producer partitions.
 			want.GitHubExecutionPartitions = false
 			sources := map[string]bool{"https://github.com/dsx-ai-factory/nvke": true}
-			if family.name == "disks" {
+			if nvkeDiskFamily(family.name) {
 				// Disks also build the release catalog's NVIDIA OVN fork producers.
 				sources = map[string]bool{"https://github.com/dsx-ai-factory/nvke.git": true, "https://github.com/dsx-ai-factory/ovn-kubernetes": true}
 			} else {
@@ -300,7 +301,7 @@ func TestNVKEDefinitionSplitCompiledIdentityAndGeneratedBundles(t *testing.T) {
 					t.Fatalf("family helper %s permits nondefault-ref execution: %q", id, job.If)
 				}
 			}
-			if family.name != "disks" {
+			if !nvkeDiskFamily(family.name) {
 				assertNoPrivateToolchainPreparation(t, bundle)
 			}
 			if bundle.WorkflowPath != ".github/workflows/nvkr-run-nvke-"+family.name+".yml" ||
@@ -387,6 +388,12 @@ func nvkeSplitRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(root)
+}
+
+// nvkeDiskFamily reports whether a family owns native disk execution; each Ubuntu
+// series is a sibling disk family, not an exception to the other.
+func nvkeDiskFamily(family string) bool {
+	return family == "disks" || family == "disks-ubuntu24"
 }
 
 func nvkeSplitPaths(family string) (string, string) {

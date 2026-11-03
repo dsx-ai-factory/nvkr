@@ -286,16 +286,16 @@ workflows-generate: workflow-generator pipeline-dev-generate nvke-split-generate
 	$(MAKE) catalog-refresh-generate
 
 .PHONY: nvke-split-generate
-nvke-split-generate: workflow-generator ## Regenerate the four independent NVKE family bundles.
-	@set -e; for family in core services telemetry disks; do \
+nvke-split-generate: workflow-generator ## Regenerate the five independent NVKE family bundles.
+	@set -e; for family in core services telemetry disks disks-ubuntu24; do \
 		bin/nvkr-exec run generate --engine github \
 			--definition "inputs/definitions/nvke/$$family.yaml" \
 			--environment "inputs/environments/github-nvke-$$family.yaml" --root .; \
 	done
 
 .PHONY: nvke-split-check
-nvke-split-check: workflow-generator ## Check the four independent NVKE family bundles without changing files.
-	@set -e; for family in core services telemetry disks; do \
+nvke-split-check: workflow-generator ## Check the five independent NVKE family bundles without changing files.
+	@set -e; for family in core services telemetry disks disks-ubuntu24; do \
 		bin/nvkr-exec run generate --engine github \
 			--definition "inputs/definitions/nvke/$$family.yaml" \
 			--environment "inputs/environments/github-nvke-$$family.yaml" --root . --check; \
