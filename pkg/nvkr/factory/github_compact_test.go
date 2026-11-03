@@ -548,6 +548,20 @@ func assertGitHubPartitionCallerSecrets(t *testing.T, bundle *GeneratedBundle, i
 		t.Fatal(err)
 	}
 	declared := githubYAMLField(githubYAMLField(githubYAMLField(document.Content[0], "on"), "workflow_call"), "secrets")
+	// Only the secrets mapping may reference a credential; with values reach
+	// the worker's inputs and if expressions are logged.
+	for index := 0; index < len(call.Content); index += 2 {
+		if call.Content[index].Value == "secrets" {
+			continue
+		}
+		text, err := yamlv3.Marshal(call.Content[index+1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(text), "secrets.NKE_SOURCE_TOKEN") || strings.Contains(string(text), "NVKR_PIN_SOURCE_TOKEN_") {
+			t.Fatalf("entry job %s carries a pin or source credential outside secrets", id)
+		}
+	}
 	forwarded := githubYAMLField(call, "secrets")
 	if (declared == nil) != (forwarded == nil) || forwarded != nil && (forwarded.Kind != yamlv3.MappingNode || len(forwarded.Content) != len(declared.Content)) {
 		t.Fatalf("entry job %s forwards secrets beyond %s's declarations", id, worker)
