@@ -20,7 +20,7 @@ the issue that adds it.
 | [Disks Ubuntu 24](disks-ubuntu24.yaml) | [github-nvke-disks-ubuntu24.yaml](../../environments/github-nvke-disks-ubuntu24.yaml) | Ubuntu 24.04 `nvke-node-image-ubuntu24-{amd64,arm64}` and `nvke-node-fde-ubuntu24-{amd64,arm64}` | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | Offline CAPI repository in Core | — | `clusterctl` provider manifests | — | Pending [#324](https://github.com/dsx-ai-factory/nvkr/issues/324) |
 | [GB200 AICR bundle](../aicr/nvke-gb200.yaml) | [aicr-local-arm64.yaml](../../environments/aicr-local-arm64.yaml) (local build only) | `aicr-nvke-gb200-ubuntu-training-kubeflow-{helm,flux,argocd-helm}` | `unqualified-local-execution` | One local Run recorded ([AICR inputs](../aicr/README.md#gb200-nvke-kubeflow-training)); a hosted Release is pending [#325](https://github.com/dsx-ai-factory/nvkr/issues/325) |
-| GPU site composite | — | Every output above in one Release ([ADR-26](../../../docs/adr/0026-definition-composition.md)) | — | Pending [#326](https://github.com/dsx-ai-factory/nvkr/issues/326) |
+| [GPU site composite](gpu-site.composite.yaml) | [github-nvke-gpu-site.yaml](../../environments/github-nvke-gpu-site.yaml) | Every output of the five NVKE families above, 87 in all, in one Release ([GPU site composite](#gpu-site-composite)) | `pipeline-attested` | Generated production and named development bundles; no hosted Release recorded. The GB200 AICR bundle is not yet a member |
 
 The [AICR inputs](../aicr/README.md) also hold a `generic` GB300 example, which is not an NVKE recipe and is
 not part of an NVKE site.
@@ -36,6 +36,55 @@ Each family Run is a manual `workflow_dispatch` of `.github/workflows/nvkr-run-n
 with the credentials in [Family pilot](#family-pilot). Each Run publishes one Release under
 `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/<family>`. To consume them, follow
 [Install an NVKE site from the Releases](../../../docs/release-quickstart.md#install-an-nvke-site-from-the-releases).
+
+### GPU site composite
+
+[`gpu-site.composite.yaml`](gpu-site.composite.yaml) is the whole-site entry point. It is an
+[ADR-26](../../../docs/adr/0026-definition-composition.md) composite that pins the core, services, telemetry,
+disks and disks-ubuntu24 Definitions by their `nvkr.definition` digests. One Run builds all 87 outputs and
+publishes one Release whose membership is the exact union of the members' outputs. The family Definitions,
+Runs and Releases stay as they are; the composite reads the family files and changes none of them.
+
+Both disk families select the same disk, agent, installer and DOCA OVS components, and the Ubuntu 24.04
+overlay replaces their producers. The composite declares those eight components as variants of the two disk
+families, so the different producers are admitted for those two members only.
+
+After editing a member Definition, re-pin the composite in the same change, then regenerate its bundles:
+
+```sh
+bin/nvkr definition pin --definition inputs/definitions/nvke/gpu-site.composite.yaml
+make nvke-gpu-site-generate
+make nvke-gpu-site-check
+```
+
+`make workflows-generate`, `make workflows-check` and NVKE catalog maintenance include both bundles.
+
+| Environment | Workflow | Publication | Signer |
+|---|---|---|---|
+| [github-nvke-gpu-site.yaml](../../environments/github-nvke-gpu-site.yaml) | `nvkr-run-nvke-gpu-site.yml`, partitioned | `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site` | That workflow on `main` |
+| [github-nvke-gpu-site-development.yaml](../../environments/github-nvke-gpu-site-development.yaml) | `nvkr-dev-nvke-gpu-site.yml`, partitioned | `ghcr.io/dsx-ai-factory/nvkr/development-nvke-gpu-site/runs/<run>/attempts/<attempt>` | That workflow on any admitted branch |
+
+Each Environment starts from the combined candidate's (`github-release.yaml` or `github-development.yaml`):
+disks run on the native ARC KVM pools and every other job on hosted runners, with the same credentials. The
+development bundle is ADR-26's named development layout. It shares the `nvkr-dev-release` and `nvkr-dev-arc`
+GitHub environments with `nvkr-dev.yml`, and those environments admit only allowlisted branches.
+`make pipeline-dev-run` dispatches only `nvkr-dev.yml`. GitHub dispatches a workflow only once it is on the
+default branch, so a development Run of a branch needs `nvkr-dev-nvke-gpu-site.yml` on `main`, the branch
+pushed to this repository and admitted by both environments:
+
+```sh
+gh workflow run nvkr-dev-nvke-gpu-site.yml --ref BRANCH --repo dsx-ai-factory/nvkr
+```
+
+Every composite Run rebuilds every output, including eight native disk bakes; it does not reuse a family
+Release. Composite qualification, member Release reuse and composite runtime Plans are refused with
+`engine-capability`. Verifying a composite Release establishes nothing about the family Releases, and the
+reverse also holds.
+
+The [GB200 AICR bundle](../aicr/nvke-gb200.yaml) is not yet a member. Adding it would bring the composite's
+finalizer to 779 jobs, and ADR-18's 16 fixed result-collector buckets would route 65 of them into one bucket,
+over its 64-job limit, so generation refuses it with `engine-capability`. Its Definition also omits the
+`sbomTool: syft` that every family selects, which ADR-26 requires members to share.
 
 ### GPU system matrix
 
@@ -83,9 +132,9 @@ shared catalogs and pins; they do not import each other or change the combined D
 The two disk families are sibling Ubuntu series, not a default and an exception; consumers choose the
 series. Each family has its own Run, signer and publication namespace, so one series can release without
 rebuilding the other. The Ubuntu 24.04 disks stay out of the combined candidate: adding them would make every
-combined release and development dispatch wait on four more native disk bakes, and
-[ADR-26](../../../docs/adr/0026-definition-composition.md) requires both series in one member of any composite.
-Folding them in waits on that composite design and recorded hosted bake capacity.
+combined release and development dispatch wait on four more native disk bakes. The
+[GPU site composite](#gpu-site-composite) releases both series together, as separate members with declared
+variants.
 
 Each Environment selects `githubBundle: nvke-<family>`, the corresponding
 `.github/workflows/nvkr-run-nvke-<family>.yml`, an explicit main-only signer identity, and publication prefix
@@ -108,8 +157,8 @@ Generated Plans, actions and manifests retain their normal ownership; edit the a
 regenerate. Generation and drift checking do not build, publish or qualify any family.
 
 This is a reversible pilot alongside the combined production, development and qualification workflows.
-Named production bundles have no generated qualification pair, and named development bundles remain
-unsupported. The existing combined qualification policies do not cover five independent family Runs.
+Named production bundles have no generated qualification pair, and the family Definitions cannot have named
+development bundles; ADR-26 admits those for composites only. The existing combined qualification policies do not cover five independent family Runs.
 Keep the combined path until the consumer and qualification cutover has its own accepted contract.
 
 Consumers select each exact digest-pinned family Release and verify it under independently chosen policy.

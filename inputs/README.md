@@ -4,7 +4,8 @@ This directory owns the repository's NVKE, NVSentinel and AICR build and release
 from pinned catalog producers; Environments select execution and publication policy. The maintained
 release candidate starts at [the NVKE Definition](definitions/nvke/definition.yaml).
 The [family pilot](definitions/nvke/README.md#family-pilot) supplies independent core, services,
-telemetry and disk Definitions alongside that combined candidate.
+telemetry and disk Definitions alongside that combined candidate, and the
+[GPU site composite](definitions/nvke/README.md#gpu-site-composite) releases the five families together.
 
 ```text
 inputs/
@@ -36,6 +37,8 @@ the move preserves each file's existing format.
 | [`definitions/nvke/telemetry.yaml`](definitions/nvke/telemetry.yaml) | [`environments/github-nvke-telemetry.yaml`](environments/github-nvke-telemetry.yaml) | 17-output telemetry pilot |
 | [`definitions/nvke/disks.yaml`](definitions/nvke/disks.yaml) | [`environments/github-nvke-disks.yaml`](environments/github-nvke-disks.yaml) | Four-output native Ubuntu 26.04 plain/public-bootstrap FDE disk pilot |
 | [`definitions/nvke/disks-ubuntu24.yaml`](definitions/nvke/disks-ubuntu24.yaml) | [`environments/github-nvke-disks-ubuntu24.yaml`](environments/github-nvke-disks-ubuntu24.yaml) | Four-output native Ubuntu 24.04 plain/public-bootstrap FDE disk pilot |
+| [`definitions/nvke/gpu-site.composite.yaml`](definitions/nvke/gpu-site.composite.yaml) | [`environments/github-nvke-gpu-site.yaml`](environments/github-nvke-gpu-site.yaml) | 87-output [GPU site composite](definitions/nvke/README.md#gpu-site-composite) of the five families; one partitioned Run and one Release |
+| Same GPU site composite | [`environments/github-nvke-gpu-site-development.yaml`](environments/github-nvke-gpu-site-development.yaml) | Named development bundle with its own signer and disposable publication namespace |
 | [`definitions/demo/arm64-nvidia-tcg.json`](definitions/demo/arm64-nvidia-tcg.json) | [`environments/local-arm64-tcg.json`](environments/local-arm64-tcg.json) | Local 32-output NVIDIA OVN demo |
 | [`definitions/demo/arm64-upstream-tcg.json`](definitions/demo/arm64-upstream-tcg.json) | Same local TCG Environment | Local 32-output upstream OVN diagnostic demo |
 | [`definitions/demo/arm64-nvidia-kvm.json`](definitions/demo/arm64-nvidia-kvm.json) | [`environments/github-nightly-nvidia.json`](environments/github-nightly-nvidia.json) | Named NVIDIA nightly producer; current content differences remain explicit |

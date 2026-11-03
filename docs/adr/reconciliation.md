@@ -3550,8 +3550,14 @@ emits no automatic association file or parent Release. Consumers independently v
 references and own any required association or compatibility decision. See the
 [pilot inputs](../../inputs/definitions/nvke/README.md#family-pilot) and
 [partitioning strategy](../definition-partitioning-strategy.md) for scope and historical measurements.
-Proposed [ADR-26](0026-definition-composition.md) designs a composite of these four families as one Release;
-units U1–U7 are implemented and contract-tested only, and it adds no authored input.
+Proposed [ADR-26](0026-definition-composition.md) designs a composite of these families as one Release;
+units U1–U7 are implemented and contract-tested only. The authored
+[GPU site composite](../../inputs/definitions/nvke/README.md#gpu-site-composite) pins the five families,
+declares the eight components the Ubuntu 24.04 overlay replaces as variants of the two disk families, and has
+generated named production and named development bundles enrolled in `make workflows-check` and catalog
+maintenance. No hosted composite Run, publication or consumer verification is recorded. Generation refuses
+the GB200 AICR Definition as a sixth member with `engine-capability`: ADR-18's 16 fixed result-collector
+buckets would route 65 of the 779 finalizer jobs into one bucket, over its 64-job limit.
 A fifth, `disks-ubuntu24` family selects four Ubuntu 24.04 disks that the combined candidate omits; see
 [Ubuntu 24 node-image inputs](#ubuntu-24-node-image-inputs).
 
