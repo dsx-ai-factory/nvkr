@@ -178,6 +178,18 @@ func TestObserveResultRequiresLiveContextBeforeReading(t *testing.T) {
 	}
 }
 
+// pinnedToolConsumption makes the fixture a pinned-tool producer whose executable is
+// the recorded input, then optionally records another executable.
+func pinnedToolConsumption(recorded string) func(*ir.Node, *ArtifactResult) {
+	return func(n *ir.Node, r *ArtifactResult) {
+		n.BuilderType, n.Digest = ir.BuilderPinnedTool, r.InputDigest
+		r.BuilderType, r.EngineClass = n.BuilderType, n.BuilderType
+		if recorded != "" {
+			r.InputDigest = recorded
+		}
+	}
+}
+
 func TestAuthenticateResultForConsumptionRejectsUnauthenticatedBuildMetadata(t *testing.T) {
 	for _, test := range []struct {
 		name   string
@@ -190,6 +202,8 @@ func TestAuthenticateResultForConsumptionRejectsUnauthenticatedBuildMetadata(t *
 			r.MaterialManifestDigest = ""
 		}},
 		{name: "missing input digest", change: func(_ *ir.Node, r *ArtifactResult) { r.InputDigest = "" }, want: e.CodeVerifyFailed},
+		{name: "pinned tool records its executable", change: pinnedToolConsumption("")},
+		{name: "pinned tool records another executable", change: pinnedToolConsumption("sha256:" + repeatHex("e")), want: e.CodeVerifyFailed},
 		{name: "missing material manifest", change: func(_ *ir.Node, r *ArtifactResult) { r.MaterialManifestDigest = "" }, want: e.CodeVerifyFailed},
 		{name: "undeclared material manifest", change: func(n *ir.Node, r *ArtifactResult) {
 			n.Materials = nil
