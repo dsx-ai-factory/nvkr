@@ -920,9 +920,13 @@ container isolation or runtime authentication. Disk observation retains its orig
 hosted utility jobs are unchanged.
 
 Local execution schedules the whole Run graph once in bounded ready batches, retains source receipts
-through `pipeline.NodeSession`, and cancels and joins pending operations on failure. Hosted build and utility jobs enter through
-`factory.ExecuteNode`; hosted source fetch delegates through a private factory source owner to the same producer primitive. Neither path converts a whole producer
-report into a second scheduling result model.
+through `pipeline.NodeSession`, and cancels and joins pending operations on failure. Local scheduling, hosted build
+and utility steps and `factory execute-node` dispatch each exact operation through one factory ordinary-operation
+session.
+Placement chooses only the producer runtime, workspace and whether an offline utility launches its pinned
+`execute-node` child; every in-process operation that the opening Run did not already admit passes the same
+complete-Plan execute-node admission. Hosted source fetch delegates through a private factory source owner to the
+same producer primitive. Neither path converts a whole producer report into a second scheduling result model.
 Source receipts remain reusable; result slots and completeness still belong to each exact named output.
 
 Authenticated source patches are checked, applied and reverse-checked by Git in the private build snapshot.

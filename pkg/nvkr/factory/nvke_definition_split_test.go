@@ -22,7 +22,7 @@ var nvkeSplitFamilies = []struct {
 	name            string
 	outputs, native int
 }{
-	{"core", 25, 31},
+	{"core", 26, 32},
 	{"services", 34, 34},
 	{"telemetry", 17, 17},
 	{"disks", 4, 4},
@@ -44,6 +44,7 @@ var nvkeFamilyOnlyOutputs = map[string]struct {
 	"operator-tools-linux-arm64":         {"core", definition.DefinitionOutput{Name: "operator-tools-linux-arm64", Platform: "linux/arm64", Catalog: &definition.Catalog{Base: "../../catalogs/tools/operator-arm64"}, Components: []string{"helm", "kubectl"}, Format: definition.OutputExecutable}},
 	"nico":                               {"core", nvkeFamilyOnlyOutput("nico", "linux/amd64", "nico", definition.OutputHelm, "nico-chart", nil)},
 	"nico-core-image":                    {"core", definition.DefinitionOutput{Name: "nico-core-image", Platforms: []string{"linux/amd64", "linux/arm64"}, Catalog: &definition.Catalog{Base: "../../catalogs/nico"}, Components: []string{"nico-core-image"}, Format: definition.OutputOCI}},
+	"nico-flow":                          {"core", nvkeFamilyOnlyOutput("nico-flow", "linux/amd64", "nico", definition.OutputHelm, "nico-flow-chart", nil)},
 	"nico-flow-image":                    {"core", definition.DefinitionOutput{Name: "nico-flow-image", Platforms: []string{"linux/amd64", "linux/arm64"}, Catalog: &definition.Catalog{Base: "../../catalogs/nico"}, Components: []string{"nico-flow-image"}, Format: definition.OutputOCI}},
 	"nico-prereqs":                       {"core", nvkeFamilyOnlyOutput("nico-prereqs", "linux/amd64", "nico", definition.OutputHelm, "nico-prereqs-chart", nil)},
 }
