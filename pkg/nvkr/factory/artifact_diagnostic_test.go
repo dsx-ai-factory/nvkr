@@ -179,7 +179,7 @@ func TestArtifactDiagnosticStagingResultsAndCleanup(t *testing.T) {
 
 func TestArtifactDiagnosticAdmissionAndExit(t *testing.T) {
 	root := t.TempDir()
-	err := TestCLIArtifact(t.Context(), ArtifactTestOptions{Plan: filepath.Join(root, "missing-plan"), Artifact: "missing", WorkspaceRoot: filepath.Join(root, "workspace")})
+	err := testCLIArtifact(t.Context(), ArtifactTestOptions{Plan: filepath.Join(root, "missing-plan"), Artifact: "missing", WorkspaceRoot: filepath.Join(root, "workspace")}, nil, nil)
 	if err == nil {
 		t.Fatal("missing Plan accepted")
 	}
@@ -375,7 +375,7 @@ func TestAdmittedCLIArtifactFreezesPlanAndSelection(t *testing.T) {
 				}
 				configuration := []byte(`{"check":"frozen"}`)
 				options := ArtifactTestOptions{Plan: plan, Artifact: artifact, Suite: suite, WorkspaceRoot: filepath.Join(root, "workspace"), Keep: true, DiagnosticConfiguration: configuration}
-				admitted, err := AdmitCLIArtifact(t.Context(), options)
+				admitted, err := admitCLIArtifact(t.Context(), options)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -462,4 +462,27 @@ func TestAdmittedCLIArtifactChecksExecutableBeforeWorkspace(t *testing.T) {
 			}
 		})
 	}
+}
+
+// admitCLIArtifact and testCLIArtifact mirror the validators adapter's load-then-Admit
+// route with injectable source and container seams; production code has no other caller.
+func admitCLIArtifact(ctx context.Context, options ArtifactTestOptions) (*CLIArtifactInvocation, error) {
+	if options.Suite != "" && options.Suite != "contract" && options.Suite != "cli" {
+		return nil, e.New(e.CodeUsage, "suite must be contract or cli")
+	}
+	plan, err := LoadCLIArtifactPlan(ctx, options.Plan)
+	if err != nil {
+		return nil, err
+	}
+	return plan.Admit(ctx, options)
+}
+
+func testCLIArtifact(ctx context.Context, options ArtifactTestOptions,
+	importSource func(context.Context, []string, string, string, string, string, io.Writer) error,
+	run func(context.Context, pipeline.ArtifactDiagnostic, io.Writer, io.Writer) error) error {
+	invocation, err := admitCLIArtifact(ctx, options)
+	if err != nil {
+		return err
+	}
+	return runCLIArtifact(ctx, invocation.options, &invocation.inputs, importSource, run)
 }

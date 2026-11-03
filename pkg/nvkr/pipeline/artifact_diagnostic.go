@@ -21,7 +21,7 @@ import (
 // ArtifactDiagnostic describes a trusted-input test invocation, not an admitted
 // producer or an authenticated Run. Each call uses a private empty cache.
 type ArtifactDiagnostic struct {
-	// DependencyTimeout overrides only acquisition; zero retains the legacy bound.
+	// DependencyTimeout overrides only acquisition; zero reuses Timeout.
 	DependencyTimeout                                    time.Duration
 	Workspace, Artifact, Image, Platform, Version, Suite string
 	Timeout                                              time.Duration
