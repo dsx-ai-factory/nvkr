@@ -39,7 +39,9 @@ func TestExternalModuleAndReleaseDependencyBoundary(t *testing.T) {
 		arguments       []string
 	}{
 		{"external consumer", consumer, []string{"test", "-mod=mod", "-count=1", "."}},
-		{"release dependencies", repo, []string{"list", "-deps", "./cmd/nvkr"}},
+		// The outcome packages stay SDK-free; only cmd/nvkr-results-publish links the
+		// cloud SDK and the client libraries it brings.
+		{"release dependencies", repo, []string{"list", "-deps", "./cmd/nvkr", "./pkg/nvkr/resultspublish", "./pkg/nvkr/qualificationoutcome"}},
 	} {
 		t.Run(check.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
@@ -55,9 +57,9 @@ func TestExternalModuleAndReleaseDependencyBoundary(t *testing.T) {
 			}
 			if check.name == "release dependencies" {
 				for _, dependency := range strings.Fields(output.String()) {
-					for _, excluded := range []string{"github.com/dsx-ai-factory/nvkr/internal/nvkedemo", "github.com/dsx-ai-factory/nvkr/pkg/nvkr/demo", "github.com/dsx-ai-factory/nvkr/pkg/nvkr/siteidentity", "github.com/spiffe/", "google.golang.org/grpc"} {
+					for _, excluded := range []string{"github.com/dsx-ai-factory/nvkr/internal/nvkedemo", "github.com/dsx-ai-factory/nvkr/pkg/nvkr/demo", "github.com/dsx-ai-factory/nvkr/pkg/nvkr/siteidentity", "github.com/spiffe/", "google.golang.org/grpc", "cloud.google.com/go/", "google.golang.org/api/", "golang.org/x/oauth2", "go.opentelemetry.io/", "github.com/googleapis/", "github.com/google/s2a-go"} {
 						if strings.HasPrefix(dependency, excluded) {
-							t.Fatalf("release CLI imports diagnostic runtime dependency %s", dependency)
+							t.Fatalf("release CLI or outcome packages import diagnostic or cloud dependency %s", dependency)
 						}
 					}
 				}

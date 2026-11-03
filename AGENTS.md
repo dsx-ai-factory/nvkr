@@ -82,6 +82,7 @@ retains its original scope; superseded requirements and plans are available only
 5. **Generated CI defaults to generic hosted runners.** ADR-18 permits only the explicit `native-kvm-v1`
    ARC disk route on `arc-amd64-kvm` and `arc-arm64-kvm`; no arbitrary self-hosted labels or qualified
    claims. Maintained execution targets are local and GitHub; publication and signing are GitHub-only in v1.
+   ADR-31's unsigned qualification results index is a description, not publication.
 6. **Do not commit, push, tag, or open PRs unless explicitly asked.** Leave the working tree for the user to
    review.
 7. **Prefer file tools and `git mv` over destructive shell commands.** Do not use `rm`-style commands when a

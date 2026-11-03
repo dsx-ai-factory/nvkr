@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="nvke-m2" tests="5" failures="1" skipped="2">
+  <testcase name="tool/build-signature-and-provenance"></testcase>
+  <testcase name="tool/delivered-tool-version"></testcase>
+  <testcase name="tool/sbom-attestation">
+    <skipped message="not required in this lane">not required in this lane</skipped>
+  </testcase>
+  <testcase name="release-manifest/issue">
+    <skipped message="not issued: qualification failed">not issued: qualification failed</skipped>
+  </testcase>
+  <testcase name="qualify">
+    <failure message="NVKR-E-GATE-UNMET: qualification refused">NVKR-E-GATE-UNMET: qualification refused</failure>
+  </testcase>
+</testsuite>
