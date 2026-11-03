@@ -121,6 +121,9 @@ func WriteGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 // syncGeneratedDirectory is the publication fsync. Tests inject a raw failure.
 var syncGeneratedDirectory = (*os.File).Sync
 
+// syncStagedMember is the staged-member fsync. Tests inject a raw failure.
+var syncStagedMember = (*os.File).Sync
+
 func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBundle) error {
 	if ctx == nil {
 		return e.New(e.CodeUsage, "generated Run write requires a context")
@@ -176,19 +179,24 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 		}
 		entry := staged{destination: destination, temporary: tmp.Name()}
 		stagedFiles = append(stagedFiles, entry)
-		if err := tmp.Chmod(0o644); err != nil {
+		// Name the logical member; %w keeps the os.PathError and any owner code.
+		fail := func(err error) error {
 			_ = tmp.Close()
-			return err
+			return fmt.Errorf("staging generated member %s: %w", relative, err)
+		}
+		if err := tmp.Chmod(0o644); err != nil {
+			return fail(err)
 		}
 		if _, err := copyContext(ctx, tmp, bytes.NewReader(raw)); err != nil {
-			_ = tmp.Close()
-			return err
+			return fail(err)
 		}
-		if err := tmp.Sync(); err != nil {
-			_ = tmp.Close()
-			return err
+		if err := syncStagedMember(tmp); err != nil {
+			return fail(err)
 		}
-		return tmp.Close()
+		if err := tmp.Close(); err != nil {
+			return fmt.Errorf("staging generated member %s: %w", relative, err)
+		}
+		return nil
 	}
 	for _, name := range names {
 		if err := stage(name, bundle.Files[name]); err != nil {
