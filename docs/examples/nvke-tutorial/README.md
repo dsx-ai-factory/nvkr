@@ -210,7 +210,7 @@ the `nvkectl`, `cwe` and `nvke-helm` repositories under `ghcr.io/dsx-ai-factory/
 exact pinned cosign executable for keyless signing and provenance attestation. Configure the GitHub deployment
 environment `nvkr-release` with a deployment branch policy admitting only `main`. Registry access and NVKE source
 access must be available to the hosted runner. Real operational acceptance is recorded separately in the
-[implementation/evidence record](../../adr/reconciliation.md).
+[implementation/evidence record](../../adr/reconciliation/README.md).
 
 The GitHub Environment fetches pinned source directly from the internal `dsx-ai-factory/nvke` repository.
 Its `sourceAccess` entry references the repository Actions secret `NKE_SOURCE_TOKEN`, which must grant

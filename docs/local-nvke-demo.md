@@ -63,7 +63,7 @@ matching 1.36.3 suite image and tools.
 Site installation adds a controller startup probe through the source installer's
 Helm extension point so migrations can finish before HTTP liveness checks start.
 Its allowance follows the remaining operation budget; see the
-[implementation and evidence limits](adr/reconciliation.md#local-arm64-demo-presentation).
+[implementation and evidence limits](adr/reconciliation/local-arm64-demo-presentation.md#local-arm64-demo-presentation).
 
 The native path remains a local diagnostic.
 Ordinary `build` and `e2e` select the host-matched Definition and Environment
@@ -85,7 +85,7 @@ creation. An ordinary Run without those outputs is rejected at admission.
 Local qualification retains its separate ARM64 evidence lane. Architecture contract tests and Plan compilation do not
 establish a completed AMD64 KVM deployment.
 A complete fresh Mac/Linux build, deployment and cleanup result has not yet been
-established for this candidate. See [current implementation and evidence](adr/reconciliation.md)
+established for this candidate. See [current implementation and evidence](adr/reconciliation/README.md)
 and [remaining source-build gaps](full-nvke-source-build.md).
 
 ## 1. Choose your Linux execution host
@@ -952,7 +952,7 @@ included by that producer.
 Tenant nodes use join-token attestation and the site uses TPM. This package does
 not provide the plugin for `dsxImds` attestation.
 
-The [implementation and evidence ledger](adr/reconciliation.md#local-arm64-demo-presentation)
+The [implementation and evidence ledger](adr/reconciliation/local-arm64-demo-presentation.md#local-arm64-demo-presentation)
 owns the exact Ubuntu conformance result, completed cleanup, failed Mac attempt
 and limits of each recorded revision. Earlier retained-artifact diagnostics used
 a two-node tenant and do not establish the current four-guest conformance topology.

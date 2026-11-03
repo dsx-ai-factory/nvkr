@@ -5,7 +5,7 @@ Definition → Run → Release architecture. Exact-byte reproduction is a separa
 subject; it is not inherited by every pipeline or aggregate artifact. This guide covers the dev loop, the
 contribution mechanics, and the invariants a change must respect. See **[DEVELOPMENT.md](DEVELOPMENT.md)**
 for a deeper environment walkthrough and **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)**. The
-**[ADR reconciliation](docs/adr/reconciliation.md)** is the authority for current support and evidence claims.
+**[ADR reconciliation](docs/adr/reconciliation/README.md)** is the authority for current support and evidence claims.
 
 ## Getting started
 
@@ -63,7 +63,7 @@ New source files carry the two-line SPDX header; run `make license` to add it. G
 ## The invariants your change must respect
 
 These are load-bearing. The proposed decisions in [`docs/adr/`](docs/adr/) are the maintained engineering
-baseline pending ratification, and [`docs/adr/reconciliation.md`](docs/adr/reconciliation.md) records the
+baseline pending ratification, and [`docs/adr/reconciliation/README.md`](docs/adr/reconciliation/README.md) records the
 current implementation boundary:
 
 - **Fail closed.** An unpinned source ref, a tag-pinned toolchain, an unknown component or unsupported target platform must error with a coded, distinct exit status — never a silent default.
@@ -115,7 +115,7 @@ may go directly to a focused PR. Report security vulnerabilities privately throu
    contribute the change under Apache-2.0. The `-S` cryptographically signs the commit. See
    [Signing your commits](#signing-your-commits) for one-time setup — both are required.
 4. **Update authority and docs** when behavior changes: update the owning primary ADR directly when its decision
-   changes; add an ADR only for a distinct decision, and update `docs/adr/reconciliation.md` when implementation maturity, evidence, or a disabled path
+   changes; add an ADR only for a distinct decision, and update the affected ADR file under `docs/adr/reconciliation/` when implementation maturity, evidence, or a disabled path
    changes. Current product requirements belong in the milestone specification; engineering contracts belong
    in the owning ADR. Superseded plans and requirement exports are available in Git history.
 5. Open the PR with a clear description of *what* and *why*; link any issue.

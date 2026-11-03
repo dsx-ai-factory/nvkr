@@ -1,9 +1,9 @@
 # ADR-20 — Artifact publication & target-registry configuration
 
 - **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
-- **Implementation maturity:** Tracked separately in `reconciliation.md`; implementation and test evidence do not
+- **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
-- **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
+- **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
 - **Index:** ADR-20 in the consolidated NVKR ADR set (added to close the publish-targets gap).
@@ -162,7 +162,7 @@ Receipt-gated packaging and consumer APIs are implemented. The explicit native A
 the live inspection-and-packaging operation in strict mode; producer-provenance mode skips inspection and consumes
 the original producer/material owners instead. Producer provenance is the M2 and M3 MVP disk acceptance scope;
 full inspection and material reconciliation are deferred hardening (ADR-13 §6). Run outcomes and remaining operational evidence are tracked
-in [reconciliation: Native ARC disk route](reconciliation.md#native-arc-disk-route). The ordinary local scheduler
+in [reconciliation: Native ARC disk route](reconciliation/native-arc-disk-route.md#native-arc-disk-route). The ordinary local scheduler
 still rejects disk publication.
 Local admission rejects that unsupported publication graph before runtime, source or workspace work;
 compiler-only and dry-run inspection remain available. Transport construction alone does not authenticate
@@ -196,7 +196,7 @@ This section freezes the proposed engineering contract for customer-controlled S
 selected artifact set: QCOW2 disk images for VM boot and imaging, compatible EFI and iPXE assets, and Debian
 packages. Implementations must support that complete selected set. This section specifies the contract;
 the S3 adapter, native-file codecs and decoders remain implementation work, tracked in
-[reconciliation](reconciliation.md#s3-boot-and-package-delivery-contract). Ratification by
+[reconciliation](reconciliation/s3-boot-and-package-delivery-contract.md#s3-boot-and-package-delivery-contract). Ratification by
 the named deciders, provider acceptance and boot acceptance remain outstanding. Existing OCI behavior and
 existing schema readers are unchanged.
 

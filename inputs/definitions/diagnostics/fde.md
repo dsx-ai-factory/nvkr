@@ -72,7 +72,7 @@ On October 13, 2026, [Run 38443178035](https://github.com/dsx-ai-factory/nvkr/ac
 completed this generated feature-branch workflow at commit `68c219845398b8ef5890e5c76a13d4901a22630d`.
 It retained an [image artifact containing the 6.28 GiB QCOW2](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035/artifacts/11840209683)
 and a [complete, static-unqualified Run record](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035/artifacts/11841676055).
-The [reconciliation record](../../../docs/adr/reconciliation.md#native-arc-disk-route) binds the exact raw
+The [reconciliation record](../../../docs/adr/reconciliation/native-arc-disk-route.md#native-arc-disk-route) binds the exact raw
 QCOW2 digest and size, Plan and Build digests, producer result and terminal observation. The native build
 step took 29m 48s; uploads and finalization added time. This validates the pinned FDE-target bake and
 artifact transport, with the security and inspection limits described above.

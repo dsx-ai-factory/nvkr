@@ -2,7 +2,7 @@
 
 This is the engineering reference for the process-local staged-material trace and optional local
 installed-package diagnostic. [Node images](node-images.md) explains ordinary authoring and execution.
-[ADR-13](adr/0013-supply-chain-evidence.md) owns evidence contracts; [reconciliation](adr/reconciliation.md)
+[ADR-13](adr/0013-supply-chain-evidence.md) owns evidence contracts; [reconciliation](adr/reconciliation/README.md)
 owns current implementation and externally exercised scope.
 
 Factory records staged producer/material handoffs during successful local disk execution. The optional

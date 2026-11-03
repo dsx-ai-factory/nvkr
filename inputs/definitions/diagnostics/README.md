@@ -137,4 +137,4 @@ cannot be shared through an unauthenticated directory/cache copy.
 
 The workflow owns selection and transport. NVKR modules own catalog validation, execution admission,
 held disk observation and completeness. [ADR-18](../../../docs/adr/0018-pipeline-ir-and-ci-adapter-emission.md)
-owns execution policy; [reconciliation](../../../docs/adr/reconciliation.md) owns current evidence status.
+owns execution policy; [reconciliation](../../../docs/adr/reconciliation/README.md) owns current evidence status.

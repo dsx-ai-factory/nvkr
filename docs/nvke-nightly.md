@@ -100,7 +100,7 @@ invalid JSON, changed ownership, cancellation and unjoined work remain failures.
 
 ## Evidence and privacy
 
-The [reconciliation record](adr/reconciliation.md#consumer-acceptance-scopes)
+The [reconciliation record](adr/reconciliation/consumer-acceptance-scopes.md#consumer-acceptance-scopes)
 owns completed runtime evidence, its exact NVKR/NVKE revisions and its limits.
 A passing run covers only its recorded revision; it does not prove the causes of
 earlier failures, minimum hardware, conformance or qualification.

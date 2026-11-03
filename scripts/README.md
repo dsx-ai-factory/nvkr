@@ -78,7 +78,7 @@ It prepares fresh local keys, a Plan-bound demo policy, pinned cosign, scratch a
 loopback registry, then stops that registry after qualification while retaining data and evidence.
 See [local qualification setup](../docs/local-development.md#qualify-local-artifacts)
 for prerequisites and the advanced explicit setup/stop commands.
-See [reconciliation](../docs/adr/reconciliation.md) for recorded runtime results;
+See [reconciliation](../docs/adr/reconciliation/README.md) for recorded runtime results;
 the reduced flow has not passed a new clean-machine end-to-end run. This is not
 a [full source-built distribution](../docs/full-nvke-source-build.md).
 
