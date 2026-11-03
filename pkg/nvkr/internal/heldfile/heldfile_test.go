@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -70,7 +71,7 @@ func TestOpenHoldsOriginalAfterPathReplacementAndRejectsSymlink(t *testing.T) {
 	if err := os.WriteFile(path, []byte("original"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	held, err := Open(path, Options{Label: "input", MaxBytes: 1024})
+	held, err := OpenContext(t.Context(), path, Options{Label: "input", MaxBytes: 1024})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +83,7 @@ func TestOpenHoldsOriginalAfterPathReplacementAndRejectsSymlink(t *testing.T) {
 	if err := os.WriteFile(path, []byte("replacement"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	raw, err := held.ReadAll(1024)
+	raw, err := held.ReadAllContext(t.Context(), 1024)
 	if err != nil || string(raw) != "original" {
 		t.Fatalf("held bytes=%q err=%v", raw, err)
 	}
@@ -90,7 +91,7 @@ func TestOpenHoldsOriginalAfterPathReplacementAndRejectsSymlink(t *testing.T) {
 	if err := os.Symlink(path, link); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Open(link, Options{Label: "link", MaxBytes: 1024}); err == nil {
+	if _, err := OpenContext(t.Context(), link, Options{Label: "link", MaxBytes: 1024}); err == nil {
 		t.Fatal("final-component symlink was accepted")
 	}
 }
@@ -184,7 +185,7 @@ func TestRunContextExecutesHeldMachOOrELFAndReusesInput(t *testing.T) {
 	if err := os.WriteFile(configured, raw, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	executable, err := Open(configured, Options{
+	executable, err := OpenContext(t.Context(), configured, Options{
 		Label: "helper", Executable: true, MaxBytes: int64(len(raw)) + 1,
 	})
 	if runtime.GOOS == "darwin" {
@@ -236,7 +237,7 @@ func TestRunContextScrubsLoaderEnvironmentAndHonorsCancellation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	executable, err := Open(executablePath, Options{
+	executable, err := OpenContext(t.Context(), executablePath, Options{
 		Label: "helper", Executable: true, MaxBytes: info.Size() + 1,
 	})
 	if runtime.GOOS == "darwin" {
@@ -283,38 +284,58 @@ func TestRunContextSerializesSharedInputUntilChildExit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	executable, err := Open(executablePath, Options{Label: "helper", Executable: true, MaxBytes: info.Size() + 1})
+	executable, err := OpenContext(t.Context(), executablePath, Options{Label: "helper", Executable: true, MaxBytes: info.Size() + 1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer executable.Close()
+	t.Cleanup(func() { _ = executable.Close() })
 	input, err := FromBytesContext(t.Context(), []byte("shared"), Options{Label: "shared", MaxBytes: 1024})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer input.Close()
+	t.Cleanup(func() { _ = input.Close() })
 	inputPath, err := ChildPath(1)
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, inputLock := input.commandIdentity()
+	contended := make(chan struct{})
+	var observeOnce sync.Once
+	observe := func(mutex *sync.Mutex) {
+		if mutex == inputLock {
+			observeOnce.Do(func() { close(contended) })
+		}
+	}
+	lockContended.Store(&observe)
+	t.Cleanup(func() { lockContended.Store(nil) })
 	dir := t.TempDir()
 	ready1, release1 := filepath.Join(dir, "ready-1"), filepath.Join(dir, "release-1")
 	ready2, release2 := filepath.Join(dir, "ready-2"), filepath.Join(dir, "release-2")
 	run := func(ready, release string) error {
 		environment := append(os.Environ(), "NVKR_HELDFILE_HELPER=1", "NVKR_HELDFILE_MODE=serialized",
 			"NVKR_HELDFILE_READY="+ready, "NVKR_HELDFILE_RELEASE="+release)
-		return RunContext(context.Background(), executable,
+		return RunContext(t.Context(), executable,
 			[]string{"-test.run=^TestHeldProcessHelper$", "--", inputPath},
 			RunOptions{Env: environment}, input)
 	}
 	first := make(chan error, 1)
 	second := make(chan error, 1)
-	go func() { first <- run(ready1, release1) }()
+	// t.Context is canceled before cleanups run, so a failed assertion
+	// terminates both children; joining them precedes closing the held files.
+	var runs sync.WaitGroup
+	t.Cleanup(runs.Wait)
+	runs.Go(func() { first <- run(ready1, release1) })
 	if !waitForPath(ready1, 5*time.Second) {
 		t.Fatal("first held child did not start")
 	}
-	go func() { second <- run(ready2, release2) }()
-	time.Sleep(75 * time.Millisecond)
+	runs.Go(func() { second <- run(ready2, release2) })
+	select {
+	case <-contended:
+	case err := <-second:
+		t.Fatalf("second run returned without contending for the shared input: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("second run did not contend for the shared input")
+	}
 	if _, err := os.Stat(ready2); err == nil {
 		t.Fatal("second child started while the first still owned their shared input")
 	}

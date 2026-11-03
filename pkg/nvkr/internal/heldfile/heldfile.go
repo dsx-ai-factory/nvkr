@@ -61,13 +61,9 @@ type File struct {
 	executable bool
 }
 
-// Open snapshots one opened regular file, validates its bounds and optional
-// external digest pin, and returns an anonymous immutable capability.
-func Open(path string, options Options) (*File, error) {
-	return OpenContext(context.Background(), path, options)
-}
-
-// OpenContext is Open with cancellation observed throughout the snapshot copy.
+// OpenContext snapshots one opened regular file, validates its bounds and optional
+// external digest pin, and returns an anonymous immutable capability. Cancellation
+// is observed throughout the snapshot copy.
 func OpenContext(ctx context.Context, path string, options Options) (*File, error) {
 	if ctx == nil {
 		return nil, errors.New("held input requires a non-nil context")
@@ -209,14 +205,9 @@ func (f *File) Size() int64 {
 	return f.size
 }
 
-// ReadAll returns the exact held bytes only when they fit the caller's explicit
-// memory bound. Large disk callers should use ReadAt or WriteToContext.
-func (f *File) ReadAll(maxBytes int64) ([]byte, error) {
-	return f.ReadAllContext(context.Background(), maxBytes)
-}
-
 // ReadAllContext returns the exact held bytes within an explicit memory bound,
-// observing cancellation while waiting for and reading the capability.
+// observing cancellation while waiting for and reading the capability. Large disk
+// callers should use ReadAt or WriteToContext.
 func (f *File) ReadAllContext(ctx context.Context, maxBytes int64) ([]byte, error) {
 	if ctx == nil {
 		return nil, errors.New("reading held file requires a non-nil context")
@@ -692,6 +683,10 @@ func copyContext(ctx context.Context, destination io.Writer, source io.Reader) (
 	return io.CopyBuffer(destination, contextReader{ctx: ctx, source: source}, make([]byte, sparseCopyBlock))
 }
 
+// lockContended is a test-only observation seam: when set, it is called with
+// each mutex a lockMutexContext attempt found held. It is always nil in production.
+var lockContended atomic.Pointer[func(*sync.Mutex)]
+
 func lockMutexContext(ctx context.Context, mutex *sync.Mutex) error {
 	if ctx == nil {
 		return errors.New("held operation requires a non-nil context")
@@ -702,6 +697,9 @@ func lockMutexContext(ctx context.Context, mutex *sync.Mutex) error {
 	for {
 		if mutex.TryLock() {
 			return nil
+		}
+		if observe := lockContended.Load(); observe != nil {
+			(*observe)(mutex)
 		}
 		timer := time.NewTimer(5 * time.Millisecond)
 		select {

@@ -75,8 +75,8 @@ require authenticated Git access because NVKE chart pin sets are checked against
 the pinned tree. Dry-run/preflight are not runtime acceptance.
 
 The site catalog pins CLI, controller and charts to one exact NVKE candidate;
-the installer and every NVKE source, including SPIRE, select v0.22.0 at
-`400c24fb6465b042be883d6b62472528520d6291`. The demo uses its site-spec renderer
+the installer and every NVKE source, including SPIRE, select v0.23.0 at
+`2cfd00081b468d85a4894ec17e9deac13c9d8169`. The demo uses its site-spec renderer
 and deployment entrypoint with verified local charts and image digests. Tenant
 setup creates MachineImage, ClusterRelease and NodePoolRelease resources from
 the observed profiles container and selected disk before requesting the tenant.
@@ -91,7 +91,7 @@ packages and demo tenant select stream `2.4.0`. Packer still consumes staged
 materials; it does not fetch the fork or compile OVN. A fresh bake and tenant
 acceptance are separate gates from compiling this selection.
 
-The shared OS catalog selects NVKE `v0.22.0` for every NVKE producer, including SPIRE
+The shared OS catalog selects NVKE `v0.23.0` for every NVKE producer, including SPIRE
 packaging revision `4`. That source-owned package excludes DSX IMDS and requires no DSX
 build credentials. The updated inputs do not establish a new runtime acceptance result.
 

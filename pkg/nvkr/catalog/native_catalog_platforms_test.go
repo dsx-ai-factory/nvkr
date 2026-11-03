@@ -26,12 +26,11 @@ func TestNativeNKTPDependencyArchiveChecks(t *testing.T) {
 		name, version, digest         string
 		extra, badChecksum, wantError bool
 	}{
-		{name: "tagged release", version: "0.22.0", digest: "df7d63a331d9d164a276f5b4395c6383c00fe801abcc6b2ea969de182914dc32"},
-		{name: "reviewed main", version: "0.25.1", digest: "e3460a7572a2b9c98ff421a29501dc26cdd09d83859f0556f6c3f5443793afda"},
+		{name: "reviewed release", version: "0.25.1", digest: "e3460a7572a2b9c98ff421a29501dc26cdd09d83859f0556f6c3f5443793afda"},
+		{name: "retired release", version: "0.22.0", wantError: true},
 		{name: "unknown version", version: "0.25.2", wantError: true},
 		{name: "extra archive", version: "0.25.1", extra: true, wantError: true},
-		{name: "release checksum failure", version: "0.22.0", badChecksum: true, wantError: true},
-		{name: "main checksum failure", version: "0.25.1", badChecksum: true, wantError: true},
+		{name: "checksum failure", version: "0.25.1", badChecksum: true, wantError: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -140,7 +139,7 @@ func TestNativeAMD64AcquisitionsKeepReleaseAndPlatform(t *testing.T) {
 		})
 	}
 	legacy, current := cat.Components["native-capi-exec-init-image"], cat.Components["native-capi-exec-init-image-main"]
-	if legacy.Prebuilt.ImageParentDigest != "sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6" || current.Prebuilt.ImageParentDigest != "sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a" {
+	if legacy.Prebuilt.ImageParentDigest != "sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a" || current.Prebuilt.ImageParentDigest != "sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a" {
 		t.Fatal("reviewed CAPI init parents changed")
 	}
 }

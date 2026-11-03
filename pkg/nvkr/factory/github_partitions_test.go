@@ -129,7 +129,7 @@ func TestGitHubExecutionBoundsMatchRenderedTimeouts(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		jobs := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle)).Jobs
+		jobs := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, githubFlatReference(t, plan, bundle))).Jobs
 		for _, id := range sortedKeys(layout.Bounds) {
 			job, ok := jobs[id]
 			if !ok || job.TimeoutMinutes != layout.Bounds[id] {

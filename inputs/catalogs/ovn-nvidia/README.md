@@ -95,8 +95,8 @@ is informational, not an enforced Debian revision. InstallCNI strips that
 suffix before checking package presence and never runs APT. Install the exact
 package names with `=1+git.8af51273d52d` separately, for example through
 InstallPackages, then validate chart deployment. See the
-[pinned InstallCNI contract](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/agent/pkg/agent/proto/node_agent.proto)
-and its [package-presence implementation](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/agent/internal/agent/cni.go).
+[pinned InstallCNI contract](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/agent/pkg/agent/proto/node_agent.proto)
+and its [package-presence implementation](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/agent/internal/agent/cni.go).
 The current agent accepts both `nvke-cni-*` and the candidate's retained `nke-cni-*`
 installed package names when checking chart presence.
 

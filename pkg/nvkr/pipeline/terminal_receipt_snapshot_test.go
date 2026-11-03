@@ -69,7 +69,7 @@ func TestTerminalReceiptMintVerifiesDescriptorDerivedOCISnapshot(t *testing.T) {
 	node, artifact := terminalPullFixture(digest, malicious)
 	verifier := &swappingOCIVerifier{original: malicious, valid: valid}
 
-	_, err := captureTerminalArtifact(context.Background(), node, artifact, RunOptions{OCI: verifier})
+	_, err := captureTerminalArtifact(context.Background(), node, artifact, RunOptions{Ctx: t.Context(), OCI: verifier})
 	if err == nil {
 		t.Fatalf("temporarily substituting a valid layout at the producer path authorized malicious bytes: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestTerminalReceiptRequireConsumesSamePrivateOCISnapshot(t *testing.T) {
 		Artifacts:   []ArtifactResult{artifact},
 	}
 	receipt, err := issueTerminalReceipt(context.Background(), report,
-		map[string]ir.Node{node.ID: node}, map[string]bool{node.ID: true}, RunOptions{})
+		map[string]ir.Node{node.ID: node}, map[string]bool{node.ID: true}, RunOptions{Ctx: t.Context()})
 	if err != nil {
 		t.Fatal(err)
 	}
