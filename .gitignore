@@ -17,6 +17,8 @@
 
 # advisory-lock guard `catalog pin`/`bump` leaves beside a machine-managed lock
 .pins.lock.yaml.lock
+# persistent advisory-lock guard `definition pin` leaves beside a composite Definition
+.*.pin.lock
 
 # test / coverage
 coverage.out
