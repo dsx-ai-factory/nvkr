@@ -99,7 +99,7 @@ func NewDiskManifestContext(ctx context.Context, diskKind, rawPath string, block
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = snapshot.Close() }()
+	defer func() { _ = snapshot.Close() }() //nolint:errcheck // read-only snapshot release; closing cannot change bytes already read
 	if diskKind == DiskKindRAW {
 		// The held descriptor's initial size makes the retained manifest allocation
 		// predictable before any content is scanned.
@@ -153,7 +153,7 @@ func (m *DiskManifest) AddEnvelope(ctx context.Context, codec *QemuImgCodec, for
 	if err != nil {
 		return err
 	}
-	defer func() { _ = snapshot.Close() }()
+	defer func() { _ = snapshot.Close() }() //nolint:errcheck // read-only snapshot release; closing cannot change bytes already read
 	if err := assertHeldPreEncryption(ctx, snapshot, "disk envelope "+envelopePath); err != nil {
 		return err
 	}
