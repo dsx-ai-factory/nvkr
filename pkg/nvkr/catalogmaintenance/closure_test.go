@@ -229,6 +229,8 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		{Definition: "inputs/definitions/nvke/telemetry.yaml", Environment: "inputs/environments/github-nvke-telemetry.yaml"},
 		{Definition: "inputs/definitions/nvke/disks.yaml", Environment: "inputs/environments/github-nvke-disks.yaml"},
 		{Definition: "inputs/definitions/nvke/disks-ubuntu24.yaml", Environment: "inputs/environments/github-nvke-disks-ubuntu24.yaml"},
+		{Definition: "inputs/definitions/nvke/gpu-site.composite.yaml", Environment: "inputs/environments/github-nvke-gpu-site.yaml"},
+		{Definition: "inputs/definitions/nvke/gpu-site.composite.yaml", Environment: "inputs/environments/github-nvke-gpu-site-development.yaml"},
 		{Definition: "inputs/definitions/demo/arm64-nvidia-kvm.json", Environment: "inputs/environments/github-nightly-nvidia.json"},
 		{Definition: "inputs/definitions/demo/arm64-upstream-kvm.json", Environment: "inputs/environments/github-nightly-upstream.json"},
 	}
@@ -292,12 +294,14 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 	directories, files := members.paths()
 	wantDirectories := []string{
 		".github/nvkr-dev",
+		".github/nvkr-dev-nvke-gpu-site",
 		".github/nvkr-dev-qualification",
 		".github/nvkr-qualification",
 		".github/nvkr-run",
 		".github/nvkr-run-nvke-core",
 		".github/nvkr-run-nvke-disks",
 		".github/nvkr-run-nvke-disks-ubuntu24",
+		".github/nvkr-run-nvke-gpu-site",
 		".github/nvkr-run-nvke-nightly-arm64",
 		".github/nvkr-run-nvke-nightly-upstream-ovn-arm64",
 		".github/nvkr-run-nvke-services",
@@ -307,6 +311,7 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		t.Fatalf("closure directories = %v, want %v", directories, wantDirectories)
 	}
 	wantFiles := []string{
+		".github/workflows/nvkr-dev-nvke-gpu-site.yml",
 		".github/workflows/nvkr-dev-qualify.yml",
 		".github/workflows/nvkr-dev-smoke.yml",
 		".github/workflows/nvkr-dev.yml",
@@ -314,6 +319,7 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		".github/workflows/nvkr-run-nvke-core.yml",
 		".github/workflows/nvkr-run-nvke-disks-ubuntu24.yml",
 		".github/workflows/nvkr-run-nvke-disks.yml",
+		".github/workflows/nvkr-run-nvke-gpu-site.yml",
 		".github/workflows/nvkr-run-nvke-nightly-arm64.yml",
 		".github/workflows/nvkr-run-nvke-nightly-upstream-ovn-arm64.yml",
 		".github/workflows/nvkr-run-nvke-services.yml",
