@@ -77,10 +77,40 @@ func rewriteFixtureManifest(t *testing.T, root string, edit func(map[string]any)
 	if raw, err = json.Marshal(manifest); err != nil {
 		t.Fatal(err)
 	}
+	return replaceFixtureManifest(t, root, raw)
+}
+
+// replaceFixtureManifest swaps in exact manifest bytes and returns their digest.
+func replaceFixtureManifest(t *testing.T, root string, raw []byte) string {
+	t.Helper()
 	removeFixtureBlob(t, root, aicrFixtureManifest)
 	digest := writeFixtureBlob(t, root, raw)
 	writeFixtureIndex(t, root, Descriptor{MediaType: MediaOCIManifest, Digest: digest, Size: int64(len(raw))})
 	return digest
+}
+
+// spliceFixtureManifest replaces the producer's config data member in its raw bytes,
+// keeping member order that a map round trip would sort.
+func spliceFixtureManifest(t *testing.T, root, data string) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(root, "blobs", "sha256", strings.TrimPrefix(aicrFixtureManifest, "sha256:")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(raw, []byte(`"data":"e30="`)) {
+		t.Fatal("fixture manifest lacks config data")
+	}
+	return replaceFixtureManifest(t, root, bytes.Replace(raw, []byte(`"data":"e30="`), []byte(data), 1))
+}
+
+// moveFixtureEntry moves a fixture entry outside the layout and returns its new path.
+func moveFixtureEntry(t *testing.T, path string) string {
+	t.Helper()
+	moved := filepath.Join(t.TempDir(), filepath.Base(path))
+	if err := os.Rename(path, moved); err != nil {
+		t.Fatal(err)
+	}
+	return moved
 }
 
 func fixtureLayers(manifest map[string]any) []any { return manifest["layers"].([]any) }
@@ -171,6 +201,38 @@ func TestImportBundleLayoutRefusesBeforeOutput(t *testing.T) {
 			writeFixtureIndex(t, root, Descriptor{MediaType: MediaOCIIndex, Digest: aicrFixtureManifest, Size: 930})
 			return aicrFixtureManifest
 		}},
+		{name: "descriptor size", mutate: func(t *testing.T, root string) string {
+			writeFixtureIndex(t, root, Descriptor{MediaType: MediaOCIManifest, Digest: aicrFixtureManifest, Size: 931})
+			return aicrFixtureManifest
+		}},
+		{name: "root symlink", mutate: func(t *testing.T, root string) string {
+			if err := os.Symlink(moveFixtureEntry(t, root), root); err != nil {
+				t.Fatal(err)
+			}
+			return aicrFixtureManifest
+		}},
+		{name: "root file", mutate: func(t *testing.T, root string) string {
+			moveFixtureEntry(t, root)
+			if err := os.WriteFile(root, []byte("layout"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			return aicrFixtureManifest
+		}},
+		{name: "blobs symlink", mutate: func(t *testing.T, root string) string {
+			blobs := filepath.Join(root, "blobs")
+			if err := os.Symlink(moveFixtureEntry(t, blobs), blobs); err != nil {
+				t.Fatal(err)
+			}
+			return aicrFixtureManifest
+		}},
+		{name: "blobs file", mutate: func(t *testing.T, root string) string {
+			blobs := filepath.Join(root, "blobs")
+			moveFixtureEntry(t, blobs)
+			if err := os.WriteFile(blobs, []byte("blobs"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			return aicrFixtureManifest
+		}},
 		{name: "descriptor artifact type", mutate: func(t *testing.T, root string) string {
 			writeFixtureIndex(t, root, Descriptor{MediaType: MediaOCIManifest, Digest: aicrFixtureManifest, Size: 930, ArtifactType: MediaBundle})
 			return aicrFixtureManifest
@@ -203,6 +265,12 @@ func TestImportBundleLayoutRefusesBeforeOutput(t *testing.T) {
 			return rewriteFixtureManifest(t, root, func(manifest map[string]any) {
 				manifest["config"].(map[string]any)["data"] = "eyJhIjoxfQ=="
 			})
+		}},
+		{name: "config data alias after", mutate: func(t *testing.T, root string) string {
+			return spliceFixtureManifest(t, root, `"data":"eyJhIjoxfQ==","DATA":"e30="`)
+		}},
+		{name: "config data alias before", mutate: func(t *testing.T, root string) string {
+			return spliceFixtureManifest(t, root, `"DATA":"e30=","data":"eyJhIjoxfQ=="`)
 		}},
 		{name: "layer media type", mutate: func(t *testing.T, root string) string {
 			return rewriteFixtureManifest(t, root, func(manifest map[string]any) {
@@ -265,11 +333,11 @@ func TestImportBundleLayoutCanceledDuringRootCheck(t *testing.T) {
 }
 
 func TestImportBundleLayoutCodesOutputFailure(t *testing.T) {
-	parent := t.TempDir()
-	if err := os.Chmod(parent, 0o555); err != nil {
+	// A regular file as the output parent fails for root too, unlike a read-only directory.
+	parent := filepath.Join(t.TempDir(), "parent")
+	if err := os.WriteFile(parent, []byte("file"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = os.Chmod(parent, 0o700) })
-	_, err := ImportBundleLayout(t.Context(), filepath.Join(parent, "nested", "imported"), aicrLayoutFixture(t), aicrFixtureManifest)
+	_, err := ImportBundleLayout(t.Context(), filepath.Join(parent, "imported"), aicrLayoutFixture(t), aicrFixtureManifest)
 	assertRegistryCode(t, err, e.CodeInternal)
 }

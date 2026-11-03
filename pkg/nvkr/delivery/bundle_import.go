@@ -148,15 +148,17 @@ func admitBundleManifest(raw []byte) (ociManifest, error) {
 	if err := canonical.ValidateJSONDocument(raw); err != nil {
 		return ociManifest{}, err
 	}
-	if err := validateImageSchemaNames(raw, reflect.TypeFor[ociManifest]()); err != nil {
-		return ociManifest{}, err
-	}
 	var manifest ociManifest
 	// Descriptor omits the OCI data member, so the config's embedded copy is checked separately.
 	var embedded struct {
 		Config struct {
 			Data *[]byte `json:"data"`
 		} `json:"config"`
+	}
+	for _, schema := range []reflect.Type{reflect.TypeFor[ociManifest](), reflect.TypeOf(embedded)} {
+		if err := validateImageSchemaNames(raw, schema); err != nil {
+			return ociManifest{}, err
+		}
 	}
 	if err := json.Unmarshal(raw, &manifest); err != nil {
 		return ociManifest{}, e.Wrap(e.CodeVerifyFailed, err, "decoding bundle OCI manifest")
