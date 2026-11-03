@@ -71,7 +71,7 @@ structured identity hashed through the ADR-01 codec under a new family, proposed
 | Named output and artifact format | Definition via Plan | Prevents sibling and format substitution |
 | Required target platform set, and per child `(platform, component, native Build Digest)` | Plan | Exact build inputs per ADR-02 T1, including source pins, builder type, toolchain pins and platform |
 | Aggregate Build Digest when applicable | Plan | ADR-02 aggregate identity |
-| Byte-changing packaging relationships | Definition via Plan | Excluded from Build identity but changes delivered bytes |
+| Byte-changing packaging relationships and, for each output whose result the packaging embeds (such as a Helm image binding), that output's name and current reuse key | Definition via Plan | Excluded from Build identity but changes delivered bytes |
 | Builder-profile identity, producer execution class and execution binding | Plan (ADR-02 T2, ADR-18) | Toolchain execution environment and provenance builder semantics |
 | Generated helper and evidence-tool pins (SBOM generators, cosign) | Plan / lock | Evidence produced by a different tool is a different evidence result |
 | Required evidence set for the output | Plan | A prior entry with fewer evidence kinds cannot satisfy more |
@@ -82,6 +82,13 @@ structured identity hashed through the ADR-01 codec under a new family, proposed
 The key excludes the Run ID, attempt, timestamps, runner hostnames, transport locators and registry hosts. Any
 unrecognized or missing field makes the output ineligible. Equality of two reuse keys is necessary for
 eligibility and never sufficient for acceptance (§3).
+
+An output whose packaging embeds another output's delivered result, such as a chart that binds an image digest,
+is also bound by that result. Equal dependency reuse keys or Build identities do not prove equal delivered bytes
+in this lane. Admission therefore decides embedded dependencies before the outputs that embed them, and accepts
+the embedding output only when every embedded dependency is reused in the current Run from a candidate whose
+payload digest equals the digest the prior packaging embedded. If an embedded dependency executes, or is reused
+with a different digest, the embedding output is refused as `incompatible` and executes.
 
 Reuse is opt-in. A Run attempts reuse only when its Environment selects an explicit reuse policy (proposed
 field `resultReuse`, default disabled) with a positive maximum entry age. The policy is bound into Plan identity,
@@ -113,8 +120,10 @@ for one candidate and one current output. It completes every step before issuing
    the issued-at time of a GitHub Actions OIDC token that the admission step (§5) requests and verifies against
    the GitHub issuer for the current repository, workflow, run ID and run attempt; the runner clock and the
    provider's run metadata are not authority. If the step cannot obtain and verify that token, freshness cannot
-   be established and every candidate is refused as `stale`. When an authenticated ADR-06 status checkpoint
-   exists for the candidate publication, a withdrawn or non-current status refuses it.
+   be established and every candidate is refused as `stale`. Status is a separate, current check: when an
+   authenticated ADR-06 status checkpoint exists for the candidate publication, a withdrawn or non-current
+   status refuses it. Status is always evaluated through ADR-06's current checkpoint protocol when the check
+   runs, never at the reference instant or from an earlier observation.
 7. Require exactly one surviving **original origin**. A candidate's original origin is the authenticated prior
    Run origin of its production provenance; a digest-preserving copy published by a later Run (§5) keeps that
    original origin. Survivors with the same original origin and byte-identical closure digests are one
@@ -125,6 +134,14 @@ for one candidate and one current output. It completes every step before issuing
 Steps run in order and the first failing step assigns the refusal reason. Authentication (steps 1–2) always
 precedes reading any prior claim, so a candidate that does not verify under the current signer policy is
 `corrupt` even when its unauthenticated metadata would also show a different reuse key.
+
+Within those steps, an absent signature or an unfinalized root is `incomplete`, while a present signature that
+fails under the current signer policy is `corrupt`. Undecodable or noncanonical bytes are `corrupt`; an
+authenticated record with an unknown schema major is `incompatible`. Exceeding the count, byte or time budget
+that this module sets is `bounded`; cancellation or deadline expiry of the caller's context is an error (§4).
+Each refusal also records a diagnostic naming the failed step and check, such as a digest mismatch or a signer
+identity the current policy does not admit. The diagnostic is descriptive: it never changes the reason, the
+step order or what counts as authenticated.
 
 Success yields an opaque, process-local **reuse receipt** bound to the current Run owner, the named output, the
 current reuse key, the candidate publication reference, the prior origin and the exact verified closure bytes.
@@ -144,7 +161,7 @@ Failures after the binding in §5 fail the Run; they never revert silently to ex
 | Stale | Older than maximum age; production time after the reference instant; no verified reference instant; ADR-06 withdrawal or non-current status | `stale` |
 | Incomplete | Missing native child, payload blob, provenance, SBOM or required evidence; root not finalized or signed; prior output failed | `incomplete` |
 | Corrupt | Digest or size mismatch; noncanonical or undecodable bytes; signature under the current signer policy or provenance verification fails | `corrupt` |
-| Incompatible | Authenticated reuse key differs (Build Digest, platform set, packaging, toolchain/profile, evidence set, lane, mode, origin, signer policy) or unknown schema | `incompatible` |
+| Incompatible | Authenticated reuse key differs (Build Digest, platform set, packaging, toolchain/profile, evidence set, lane, publication-origin policy (mode, repository, workflow, class), signer policy) or unknown schema; an embedded dependency is not reused with the embedded digest | `incompatible` |
 | Sibling | Candidate's authenticated output name differs from the current output | `incompatible` (never a lookup by Build Digest alone) |
 | Conflict | More than one authenticated original origin, or different closure bytes, among surviving candidates | `conflict` |
 | Over budget | Discovery or acceptance exceeds count, byte or time bounds | `bounded` |
@@ -168,15 +185,21 @@ freezes a new set; it never inherits an earlier attempt's decisions.
 
 The decision set is a description, not authority, and the admission step's receipts end with its process. The set
 carries the admission step's verified OIDC token, requested with an NVKR-only audience that no cloud trust policy
-admits. Each receiving process verifies the current Plan digest and re-verifies the token's signature, issuer,
+admits. The token proves the run identity and the reference instant, not the set's decisions, so the admission
+step hands the exact canonical set bytes to receivers only through the same-Run Actions delivery that ADR-18 §3
+already trusts for pipeline-attested control data, as one record bound to the current repository, run ID, run
+attempt and the set's digest. Each receiving process accepts the set only from that handoff and checks its exact
+digest before decoding it. It then verifies the current Plan digest and re-verifies the token's signature, issuer,
 audience, repository, workflow, run ID and run attempt against the set and its own run, ignoring only token
-expiry; any mismatch or verification failure fails the Run before producer work. A process that only omits a
-reused output's operations needs nothing more. Any process that consumes a reused output's closure (a descendant
-operation, Run record binding or publication copy) repeats §3 acceptance from bytes for exactly the recorded
-candidate and output, evaluates step 6 at that token's issued-at instant rather than a new one, and holds its own
-receipt, so a delayed re-acceptance reaches admission's freshness result. A re-acceptance that refuses, or that
-selects a different candidate, fails the Run rather than reverting to execution, because the producer operations
-have already been omitted.
+expiry. A set obtained any other way, any byte difference from the handed-off record, and any mismatch or
+verification failure fail the Run before producer work. A process that only omits a reused output's operations
+needs nothing more. Any process that consumes a reused output's closure (a descendant operation, Run record
+binding or publication copy) repeats §3 acceptance from bytes for exactly the recorded candidate and output and
+holds its own receipt. It evaluates step 6's age and future-time comparison at that token's issued-at instant
+rather than a new one, so a delayed re-acceptance reaches admission's freshness result; the status check stays
+current, so a candidate withdrawn after admission is refused. A re-acceptance that refuses, or that selects a
+different candidate, fails the Run rather than reverting to execution, because the producer operations have
+already been omitted.
 
 For a reused output:
 
@@ -194,10 +217,16 @@ For a reused output:
   ADR-09 already does for same-Run attempts.
 - **Publication.** Reused payload and evidence blobs are copied by digest into the current Run's publication
   namespace before release assembly, so the Release does not depend on another Run's retention. The copy is
-  transport; publication re-verifies the exact digests after the copy.
+  transport; publication re-verifies the exact digests after the copy. The Run record keeps the copied locations
+  separate from the original production identity (prior root, Plan and Run origin). Payload, evidence and
+  signature retrieval for the current Release uses only the copied locations; the original identity is
+  provenance, never a locator.
 - **Lane and qualification.** The Release keeps its `pipeline-attested` lane. Qualification (ADR-16) verifies the
   complete current Release closure, including reused outputs; no qualification verdict, smoke result or check
-  receipt is reused.
+  receipt is reused. Predicate, output-origin and Plan-binding checks keep the current completion identity (the
+  current Plan and Run) separate from each reused output's authenticated original Plan and origin: a reused
+  output's original predicate validates against its original Plan, and existing same-Run origin checks gain an
+  explicit reused-origin path rather than being relaxed.
 
 ### 6. Lanes
 
@@ -242,7 +271,12 @@ For a reused output:
 - **ADR-01:** register the reuse-key family and the reuse decision set schema when implemented.
 - **ADR-17 / ADR-19:** add the `reused` slot origin to the Run record schema (new major).
 - **ADR-18 §8:** add the `reused` execution outcome to the execution graph.
-- **ADR-20:** specify the digest-preserving copy and the reuse statement in release assembly.
+- **ADR-20:** specify the digest-preserving copy and the reuse statement in release assembly, and record copied
+  locations separately from the original publication origin, so locator derivation and same-Run origin checks
+  read the copy (row 51).
+- **ADR-09 / ADR-16 qualification and factory validators:** define the receiving contract for reused outputs
+  through handoff capture, predicate admission against each output's original Plan, output-origin checks,
+  Run disk Plan binding, complete evidence validation and publisher rechecks (row 38).
 - **ADR-06:** production status discovery replaces age as the primary staleness control.
 
 ## Acceptance evidence
@@ -268,7 +302,7 @@ asserts the stable coded error.
 | 13 | Mode mismatch | Development candidate in production, and the reverse | `incompatible` |
 | 14 | Signer policy change | Candidate signed only under the old identity; separately, signed by an identity the current policy admits but bound to a different signer policy in its prior Plan | Old identity only: `corrupt` (step 1 precedes key comparison); admitted signer with different bound policy: `incompatible` |
 | 15 | Stale by age | Production finish older than maximum age | `stale` |
-| 16 | Future-dated | Production finish after current Run start | `stale` |
+| 16 | Future-dated | Production finish exactly at, and just after, the admission reference instant (§3 step 6) | At the instant: accepted; just after: `stale` |
 | 17 | Withdrawn | Authenticated status checkpoint withdraws candidate | `stale` |
 | 18 | Missing native child | Aggregate root lacks one platform | `incomplete`; whole aggregate executes |
 | 19 | Missing SBOM or provenance | Blob or bundle absent | `incomplete` |
@@ -290,7 +324,7 @@ asserts the stable coded error.
 | 35 | Skipped is not reused | Producer skipped by an upstream failure | Accounted `skipped`; slot incomplete; Run fails |
 | 36 | Reused prerequisite | Descendant consuming reused closure | Runs with accepted closure; unrelated descendants unaffected |
 | 37 | No re-signing | Inspect current Run signatures | No production predicate for reused outputs; reuse statement binds prior origin |
-| 38 | Qualification | Qualify a Release with reused outputs | Full closure verified; no prior verdict or smoke result consumed |
+| 38 | Qualification | Qualify a Release with reused outputs through handoff capture, predicate admission, output origin, complete evidence validation and publisher rechecks | Each reused predicate validates against its original Plan and origin; current completion identity unchanged; full closure verified; no prior verdict or smoke result consumed |
 | 39 | Generation determinism | Regenerate with different cache contents | Byte-identical bundle; `run generate --check` passes |
 | 40 | Mixed Run | Some outputs reused, others executed | Complete Release; each slot exactly one origin |
 | 41 | Same payload, different origins | Two authenticated candidates with equal payload digests from different original Runs | `conflict`; output executes |
@@ -300,6 +334,13 @@ asserts the stable coded error.
 | 45 | Reference instant | OIDC token missing, unverifiable or bound to another attempt; candidate exactly at and just past the age bound | Token failure refuses every candidate as `stale`; boundary candidate accepted, one past it `stale` |
 | 46 | Retry attempt | Same run, new attempt after candidate ages past bound | New attempt freezes its own set; candidate refused `stale`; earlier attempt's set rejected |
 | 47 | Delayed re-acceptance | Consumer re-accepts after the candidate has aged past the bound measured from a new token; separately, the set carries an expired admission token, a token from another attempt, or one with a non-NVKR audience | Freshness evaluated at the admission token's issued-at; candidate accepted despite token expiry; foreign-attempt or wrong-audience token fails the Run before producer work |
+| 48 | Decision set altered under the same token | Same token, Plan and invocation; the set changes one output's outcome, a candidate reference or the required-output inventory, or arrives outside the same-Run handoff | Run fails before producer work |
+| 49 | Late child failure in an aggregate | Complete two-platform candidate whose second child carries invalid signed evidence | `corrupt`; no receipt; no child reused; whole output executes |
+| 50 | Withdrawn after admission | Candidate accepted at admission, then withdrawn by an authenticated status checkpoint before re-acceptance | Re-acceptance refuses `stale`; Run fails; no fallback to execution |
+| 51 | Copied transport locations | Mixed development Run after the copy, with ordinary caller-selected sibling transport as a control | Payload, evidence and signatures fetched only from the current namespace; original origin recorded as provenance only; control unchanged |
+| 52 | Changed bound dependency | Chart with unchanged source and binding relationship; bound image's reuse key changes | Image `incompatible` and executes; chart `incompatible` and executes |
+| 53 | Equal dependency identity, different result | Bound image has an equal Build identity but executes in the current Run, or is reused with a digest other than the one the prior chart embedded | Chart `incompatible`; executes against the current image digest |
+| 54 | Refusal discriminators | Absent versus invalid signature; unknown authenticated schema versus undecodable bytes; internal budget versus caller deadline; one candidate both key-incompatible and stale | `incomplete` versus `corrupt`; `incompatible` versus `corrupt`; `bounded` versus coded error; `incompatible` (step 3 precedes step 6); each refusal names its failed check |
 
-Rows 2, 32, 33 and 37–47 also need one hosted development Run before reconciliation may claim the path was
+Rows 2, 32, 33, 37–48 and 51 also need one hosted development Run before reconciliation may claim the path was
 externally exercised. No qualified or production claim follows from these tests.

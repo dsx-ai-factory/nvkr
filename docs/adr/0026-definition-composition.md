@@ -9,8 +9,8 @@
 - **Deciders:** Pending; release-engineering, publication, catalog and qualification owners must be named before
   ratification.
 - **Index:** Proposed ADR-26 supplements ADR-01–22 and proposed ADR-23/24; it remains outside the consolidated
-  contract set until accepted. It coordinates with the separately drafted authenticated result-reuse decision
-  (backlog item 4), which is not on this branch.
+  contract set until accepted. It coordinates with the separately drafted authenticated result-reuse decision,
+  proposed [ADR-30](0030-authenticated-result-reuse.md) (backlog item 4).
 - **Relates to:** ADR-01 (canonical codec and digest families), ADR-03 (coded errors), ADR-04 §5 (consumer
   verification), ADR-09 (production provenance), ADR-11 §1–§2 (direct selection, independent output uses),
   ADR-12 (target platforms), ADR-16 §5 (evidence lanes and qualification), ADR-17 §1 and §6 (public lifecycle,
