@@ -232,9 +232,9 @@ components:
         # AICR's NVKE guide gates network-operator readiness before the IB pools; Flux cannot.
         hooks=()
         case "$4" in helm | argocd-helm) hooks=(--readiness-hooks) ;; esac
-        # The DRA eviction label lets driver upgrades evict the DRA kubelet plugin, as AICR's
-        # AKS and GKE guides set it. Layout output stages in the working directory; the source
-        # tree is read-only.
+        # NVKE's GPU Operator installs the driver, so the bundle opts in to AICR's DRA eviction:
+        # Driver Manager deschedules the DRA kubelet plugin before a driver restart.
+        # Layout output stages in the working directory; the source tree is read-only.
         (
           cd "$out"
           timeout --kill-after=10s 120s "$out/aicr" bundle \

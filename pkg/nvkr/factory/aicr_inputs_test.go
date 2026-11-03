@@ -39,7 +39,6 @@ func TestMaintainedAICRBundleInputs(t *testing.T) {
 			contract: []string{
 				`--service "$1" --accelerator "$2" --platform "$3"`, "--os ubuntu --intent training",
 				`leaf="$2-$1-ubuntu-training-$3"`, `[ "$applied" = "$leaf" ] ||`, `--deployer "$4"`,
-				"--dra-eviction-node-label nvidia.com/dra-kubelet-plugin=true",
 			},
 		},
 	} {
@@ -155,6 +154,55 @@ func TestAICRNVKELeafAdmission(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// The NVKE producers pass the DRA eviction label to every deployer and readiness hooks
+// to every deployer except flux, which rejects them. This runs each compiled producer's
+// bundle call, with its own positional arguments, against a stub aicr that records argv.
+func TestAICRNVKEBundleFlags(t *testing.T) {
+	aicrInputTestRoot(t)
+	plan := compileAICRInput(t, "nvke-gb200.yaml", "aicr-local-arm64.yaml")
+	for _, build := range plan.Builds {
+		t.Run(build.Name, func(t *testing.T) {
+			var command []string
+			for _, node := range build.Graph.Nodes {
+				if node.Kind == ir.KindBuild {
+					command = node.Command
+				}
+			}
+			if len(command) < 6 || !slices.Equal(command[:4], []string{"bash", "-euo", "pipefail", "-c"}) {
+				t.Fatalf("producer is not one bash script with positional arguments: %q", command)
+			}
+			script := command[4]
+			start, end := strings.Index(script, "hooks=()"), strings.Index(script, "# Publish AICR's own layer bytes")
+			if start < 0 || end < start {
+				t.Fatalf("bundle invocation not found:\n%s", script)
+			}
+			out := t.TempDir()
+			stub := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$(dirname \"$0\")/argv\"\n"
+			if err := os.WriteFile(filepath.Join(out, "aicr"), []byte(stub), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			// The stub replaces timeout's two duration arguments, leaving the bundle argv.
+			bundle := "out=\"$NVKR_TEST_OUT\"\ntimeout() { shift 2; \"$@\"; }\n" + script[start:end]
+			run := exec.CommandContext(t.Context(), "bash", append([]string{"-euo", "pipefail", "-c", bundle}, command[5:]...)...)
+			run.Env = append(os.Environ(), "NVKR_TEST_OUT="+out)
+			if output, err := run.CombinedOutput(); err != nil {
+				t.Fatalf("%v\n%s", err, output)
+			}
+			raw, err := os.ReadFile(filepath.Join(out, "argv"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			argv, deployer := "\n"+string(raw), command[len(command)-1]
+			if !strings.Contains(argv, "\n--dra-eviction-node-label\nnvidia.com/dra-kubelet-plugin=true\n") {
+				t.Fatalf("%s bundle omits the DRA eviction label: %q", deployer, argv)
+			}
+			if hooks := strings.Contains(argv, "\n--readiness-hooks\n"); hooks != (deployer != "flux") {
+				t.Fatalf("%s readiness hooks = %v: %q", deployer, hooks, argv)
+			}
+		})
 	}
 }
 
