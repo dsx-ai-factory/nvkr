@@ -195,7 +195,7 @@ The producer's private output directory must contain exactly one declared form w
 
 | `outputType` | Admission | Use |
 |---|---|---|
-| `file` | Exactly one regular file at `artifactPath`, a single file name; nothing else in the output directory | A material for another producer in the same output |
+| `file` | Exactly one regular file at `artifactPath`, a single file name; nothing else in the output directory | A material for another producer in the same output, and like every selected component a member of that output; an executable bundle installs it non-executable (mode 0644) |
 | `oci-layout` | Exactly one OCI image layout at `{{.Output}}`, with nothing beside it, whose root holds exactly `blobs`, `index.json` and `oci-layout` and no link or special file; the executor then moves it to the output root and observes its `index.json`. Further shape checks belong to the layout import owner (#285) | The payload of a `bundle-oci` output, imported byte-for-byte rather than rewrapped |
 
 Directory trees, archives NVKR would have to create, symbolic links, special files and extra entries are

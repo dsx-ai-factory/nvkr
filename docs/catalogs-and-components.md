@@ -161,8 +161,10 @@ components:
 so tool modes that push, download or sign keylessly fail. The toolchain image must provide `/bin/sh` and
 `/usr/bin/env` for the executor's fixed bootstrap.
 
-A `file` result is a material only: the output must also select a producer that binds it, and the tool must
-leave exactly that one regular file. A material is staged under its binding name, so name the binding with the
+A `file` result must be a material: the output must also select a producer that binds it, and the tool must
+leave exactly that one regular file. Like every selected component, the file is also a member of that output.
+An executable bundle installs it at `/usr/local/bin/<name>` with mode 0644, as it does tarball assets, never as
+an executable. A material is staged under its binding name, so name the binding with the
 extension the tool expects, such as `recipe.yaml` for AICR. For `outputType: oci-layout`, `{{.Output}}` is an
 absent path the tool creates, and it must leave exactly one OCI layout there. That form is reserved for bundle
 outputs, and selecting it fails until layout import is available. Execution requires Linux, and a Definition that selects `sbomTool` cannot yet include a

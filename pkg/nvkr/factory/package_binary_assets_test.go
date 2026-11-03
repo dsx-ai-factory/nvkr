@@ -22,6 +22,7 @@ func TestBinaryPackageTarballModeFollowsDeclaredType(t *testing.T) {
 			plan := &Plan{Builds: []BuildPlan{{Name: "mixed", Platform: "linux/arm64"}}}
 			inputs := []Artifact{
 				{Name: "assets", Kind: "tarball", BuildTarget: "mixed", Path: payload},
+				{Name: "recipe", Kind: "file", BuildTarget: "mixed", Path: payload},
 				{Name: "tool.tar.gz", Kind: "host-package", BuildTarget: "mixed", Path: payload},
 			}
 			var firstDigest string
@@ -34,10 +35,11 @@ func TestBinaryPackageTarballModeFollowsDeclaredType(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if len(bundle.Entries) != 2 || bundle.Entries[0].Name != "assets" || bundle.Entries[0].Mode != 0o644 || bundle.Entries[1].Name != "tool.tar.gz" || bundle.Entries[1].Mode != 0o755 {
+				if len(bundle.Entries) != 3 || bundle.Entries[0].Name != "assets" || bundle.Entries[0].Mode != 0o644 ||
+					bundle.Entries[1].Name != "recipe" || bundle.Entries[1].Mode != 0o644 || bundle.Entries[2].Name != "tool.tar.gz" || bundle.Entries[2].Mode != 0o755 {
 					t.Fatalf("producer types lost in bundle: %+v", bundle.Entries)
 				}
-				if bundle.Entries[0].SHA256 != bundle.Entries[1].SHA256 {
+				if bundle.Entries[0].SHA256 != bundle.Entries[2].SHA256 || bundle.Entries[1].SHA256 != bundle.Entries[2].SHA256 {
 					t.Fatal("packaging changed identical source bytes")
 				}
 				if firstDigest != "" && result.RootDigest != firstDigest {
