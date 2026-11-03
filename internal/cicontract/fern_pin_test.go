@@ -161,6 +161,10 @@ func assertFernMakeRecipes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Make expands $(CURDIR) to the physical path, so compare against the same.
+	if root, err = filepath.EvalSymlinks(root); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 	// make -n still runs the Makefile's $(shell ...) calls, so own the whole process group.
