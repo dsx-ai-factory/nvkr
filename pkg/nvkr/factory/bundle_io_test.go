@@ -188,18 +188,29 @@ func TestWriteGeneratedBundleRejectsSymlinkedOwnedDirectory(t *testing.T) {
 // Raw staging, sync and publication I/O must not reach callers uncoded, and
 // an owner's own code (usage, drift, timeout) must survive unchanged.
 func TestWriteGeneratedBundleCodesEveryFailure(t *testing.T) {
-	drift := e.New(e.CodePipelineDrift, "drift")
+	bundle, err := RenderGitHub(t.Context(), githubTestPlan(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous := syncGeneratedDirectory
+	t.Cleanup(func() { syncGeneratedDirectory = previous })
 	for _, test := range []struct {
 		name string
-		err  error
+		sync error
 		want e.Code
 	}{
 		{"success", nil, ""},
-		{"coded", drift, e.CodePipelineDrift},
-		{"raw sync", os.ErrPermission, e.CodeInternal},
+		{"coded", e.New(e.CodeUnavailable, "injected coded sync failure"), e.CodeUnavailable},
+		{"raw directory sync", errors.New("injected raw sync failure"), e.CodeInternal},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			err := codeGeneratedWriteError(test.err)
+			syncGeneratedDirectory = func(directory *os.File) error {
+				if test.sync != nil {
+					return test.sync
+				}
+				return previous(directory)
+			}
+			err := WriteGeneratedBundle(t.Context(), t.TempDir(), bundle)
 			if test.want == "" {
 				if err != nil {
 					t.Fatal(err)
@@ -207,7 +218,7 @@ func TestWriteGeneratedBundleCodesEveryFailure(t *testing.T) {
 				return
 			}
 			assertFactoryErrorCode(t, err, test.want)
-			if !errors.Is(err, test.err) {
+			if !errors.Is(err, test.sync) {
 				t.Fatal("coded write error lost its cause")
 			}
 		})
