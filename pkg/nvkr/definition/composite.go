@@ -183,6 +183,30 @@ func (composite CompositeDefinition) Clone() CompositeDefinition {
 	return composite
 }
 
+// checkVariantSelection requires each declared variant member to select its
+// component in an output attributed to it (ADR-26 §3). Selection is authored,
+// so admission and record validation check it without catalogs.
+func checkVariantSelection(effective Definition, attribution []OutputAttribution, variants []DeclaredVariant) error {
+	owners := make(map[string]string, len(attribution))
+	for _, owner := range attribution {
+		owners[owner.Output] = owner.Member
+	}
+	selected := map[[2]string]bool{}
+	for _, output := range effective.Outputs {
+		for _, component := range output.Components {
+			selected[[2]string{owners[output.Name], component}] = true
+		}
+	}
+	for _, variant := range variants {
+		for _, member := range variant.Members {
+			if !selected[[2]string{member, variant.Component}] {
+				return e.New(e.CodeInvalidCatalog, "declared variant of component %q names member %q, which does not select it", variant.Component, member)
+			}
+		}
+	}
+	return nil
+}
+
 func cloneVariants(variants []DeclaredVariant) []DeclaredVariant {
 	if len(variants) == 0 {
 		return nil
@@ -355,6 +379,9 @@ func AdmitComposite(ctx context.Context, compositePath string, raw []byte, read 
 		composition.members = append(composition.members, AdmittedMember{Name: member.Name, Path: paths[i], Digest: memberDigest, Definition: definition})
 	}
 	if composition.effective, composition.attribution, err = mergeComposite(compositePath, composite.Metadata, composition.members); err != nil {
+		return Composition{}, err
+	}
+	if err := checkVariantSelection(composition.effective, composition.attribution, composite.Variants); err != nil {
 		return Composition{}, err
 	}
 	return composition, nil

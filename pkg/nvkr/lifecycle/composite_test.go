@@ -134,7 +134,18 @@ func TestCompositeAdmissionMatrix(t *testing.T) {
 
 func TestCompositeViewShowsDeclaredVariants(t *testing.T) {
 	composite := compositeLifecycleFixture(t, nil)
+	// beta selects only kubelet, so admission refuses a containerd declaration before compilation.
 	composite.Variants = []definition.DeclaredVariant{{Component: "containerd", Members: []string{"alpha", "beta"}}}
+	writeCompositeTestDocument(t, compositeTestPath, composite)
+	_, err := LoadDefinitionInput(t.Context(), compositeTestPath)
+	requireLifecycleCode(t, err, e.CodeInvalidCatalog)
+
+	beta := Definition{APIVersion: DefinitionAPIVersion, Kind: DefinitionKind, Metadata: Metadata{Name: "beta"}, Catalog: Catalog{Base: "../catalog"},
+		Outputs: []DefinitionOutput{{Name: "beta-tools", Platform: "linux/amd64", Format: OutputExecutable, Components: []string{"containerd", "kubelet"}}}}
+	writeCompositeTestDocument(t, "defs/beta.yaml", beta)
+	if composite.Members[1].Digest, err = beta.Digest(); err != nil {
+		t.Fatal(err)
+	}
 	writeCompositeTestDocument(t, compositeTestPath, composite)
 	input, err := LoadDefinitionInput(t.Context(), compositeTestPath)
 	if err != nil {
@@ -144,9 +155,10 @@ func TestCompositeViewShowsDeclaredVariants(t *testing.T) {
 	if err != nil || len(view.Variants) != 1 || view.Variants[0].Component != "containerd" || strings.Join(view.Variants[0].Members, ",") != "alpha,beta" {
 		t.Fatalf("inspect variants = %+v, %v", view.Variants, err)
 	}
-	// beta selects only kubelet, so compilation refuses the declaration.
-	_, err = CompileFiles(t.Context(), compositeTestPath, compositeTestEnv, "composite-test")
-	requireLifecycleCode(t, err, e.CodeInvalidCatalog)
+	plan, err := CompileFiles(t.Context(), compositeTestPath, compositeTestEnv, "composite-test")
+	if err != nil || len(plan.Composition.Variants) != 1 {
+		t.Fatalf("compiled variants = %+v, %v", plan, err)
+	}
 }
 
 func TestCompositeRuntimePlanRefusedBeforeMembers(t *testing.T) {

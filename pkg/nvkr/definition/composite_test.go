@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -179,8 +180,11 @@ func TestCompositeAdmissionContract(t *testing.T) {
 			writeCompositeFile(t, filepath.Join(root, "defs", "beta.yaml"), compositeMemberFixture("beta", "beta-cli", "beta-tool"))
 			return nil
 		}},
-		// Admission checks a variant's shape; compilation checks its producers.
-		{name: "declared variant", mutate: declareVariants(DeclaredVariant{Component: "shared-cli", Members: []string{"alpha", "beta"}})},
+		// Admission checks a variant's shape and selection; compilation checks its producers.
+		{name: "declared variant", mutate: shareComponent(DeclaredVariant{Component: "base-cli", Members: []string{"alpha", "beta"}})},
+		{name: "declared member without the component", code: e.CodeInvalidCatalog, mutate: declareVariants(DeclaredVariant{Component: "alpha-cli", Members: []string{"alpha", "beta"}})},
+		{name: "later variant member without the component", code: e.CodeInvalidCatalog, mutate: shareComponent(
+			DeclaredVariant{Component: "base-cli", Members: []string{"alpha", "beta"}}, DeclaredVariant{Component: "beta-cli", Members: []string{"alpha", "beta"}})},
 		{name: "unknown variant field", code: e.CodeInvalidCatalog, mutate: func(t *testing.T, _ string, composite *CompositeDefinition) []byte {
 			composite.Variants = []DeclaredVariant{{Component: "shared-cli", Members: []string{"alpha", "beta"}}}
 			raw, err := canonical.Marshal(composite)
@@ -241,6 +245,51 @@ func declareVariants(variants ...DeclaredVariant) func(*testing.T, string, *Comp
 	return func(_ *testing.T, _ string, composite *CompositeDefinition) []byte {
 		composite.Variants = variants
 		return nil
+	}
+}
+
+// shareComponent makes both members also select base-cli, then declares variants.
+func shareComponent(variants ...DeclaredVariant) func(*testing.T, string, *CompositeDefinition) []byte {
+	return func(t *testing.T, root string, composite *CompositeDefinition) []byte {
+		for i, name := range []string{"alpha", "beta"} {
+			member := compositeMemberFixture(name, name+"-cli")
+			member.Outputs[0].Components = []string{"base-cli", name + "-cli"}
+			slices.Sort(member.Outputs[0].Components)
+			writeCompositeFile(t, filepath.Join(root, "defs", name+".yaml"), member)
+			composite.Members[i] = memberPin(t, name, name+".yaml", member)
+		}
+		composite.Variants = variants
+		return nil
+	}
+}
+
+func TestCompositionRecordDeclaresVariant(t *testing.T) {
+	record := CompositionRecord{Variants: []DeclaredVariant{
+		{Component: "agent", Members: []string{"alpha", "beta"}},
+		{Component: "installer", Members: []string{"beta", "delta", "gamma"}},
+	}}
+	for _, tc := range []struct {
+		component, left, right string
+		want                   bool
+	}{
+		{"agent", "alpha", "beta", true},
+		{"agent", "beta", "alpha", true},
+		{"agent", "alpha", "gamma", false},
+		{"agent", "gamma", "alpha", false},
+		{"installer", "gamma", "delta", true},
+		{"installer", "beta", "gamma", true},
+		{"installer", "alpha", "beta", false},
+		{"installer", "beta", "alpha", false},
+		{"kernel", "alpha", "beta", false},
+	} {
+		if got := record.DeclaresVariant(tc.component, tc.left, tc.right); got != tc.want {
+			t.Errorf("DeclaresVariant(%q, %q, %q) = %t, want %t", tc.component, tc.left, tc.right, got, tc.want)
+		}
+	}
+	clone := record.Clone()
+	clone.Variants[0].Members[0] = "mutated"
+	if record.Variants[0].Members[0] != "alpha" {
+		t.Fatal("record clone shares variant members")
 	}
 }
 

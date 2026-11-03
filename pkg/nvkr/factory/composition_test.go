@@ -128,18 +128,22 @@ func TestCompositeCompilationContract(t *testing.T) {
 // declares them as variants of that component, and each variant stays
 // attributed to its member.
 func TestCompositeDeclaredVariantContract(t *testing.T) {
-	shared := func(catalog *authored.Catalog) func(*authored.Definition) {
-		return func(beta *authored.Definition) {
-			beta.Outputs = append(beta.Outputs, authored.DefinitionOutput{Name: "shared", Platform: "linux/amd64", Format: authored.OutputExecutable,
-				Components: []string{"containerd"}, Catalog: catalog})
+	shared := func(name, component string, catalog *authored.Catalog) func(*authored.Definition) {
+		return func(member *authored.Definition) {
+			member.Outputs = append(member.Outputs, authored.DefinitionOutput{Name: name, Platform: "linux/amd64", Format: authored.OutputExecutable,
+				Components: []string{component}, Catalog: catalog})
 		}
 	}
-	diverge, converge := shared(&authored.Catalog{Base: "../override"}), shared(nil)
+	override := &authored.Catalog{Base: "../override"}
+	diverge, converge := shared("shared", "containerd", override), shared("shared", "containerd", nil)
+	// alpha also selects beta's kubectl producer, so a kubectl declaration is selected by both.
+	alphaKubectl := shared("tools-kubectl", "kubectl", override)
 	variant := func(component string, members ...string) []authored.DeclaredVariant {
 		return []authored.DeclaredVariant{{Component: component, Members: members}}
 	}
 	for _, tc := range []struct {
 		name     string
+		alpha    func(*authored.Definition)
 		beta     func(*authored.Definition)
 		gamma    bool // gamma selects containerd from beta's divergent catalog
 		variants []authored.DeclaredVariant
@@ -148,20 +152,24 @@ func TestCompositeDeclaredVariantContract(t *testing.T) {
 	}{
 		{name: "undeclared divergence", beta: diverge, code: e.CodeInvalidCatalog},
 		{name: "declared pair", beta: diverge, variants: variant("containerd", "alpha", "beta"), distinct: 2},
-		{name: "declared pair on the wrong component", beta: diverge, variants: variant("kubectl", "alpha", "beta"), code: e.CodeInvalidCatalog},
+		{name: "declared pair on the wrong component", alpha: alphaKubectl, beta: diverge, variants: variant("kubectl", "alpha", "beta"), code: e.CodeInvalidCatalog},
 		{name: "declared pair on the wrong member", beta: diverge, gamma: true, variants: variant("containerd", "alpha", "gamma"), code: e.CodeInvalidCatalog},
+		{name: "declared pair on the other wrong member", beta: diverge, gamma: true, variants: variant("containerd", "beta", "gamma"), code: e.CodeInvalidCatalog},
 		{name: "declared member set", beta: diverge, gamma: true, variants: variant("containerd", "alpha", "beta", "gamma"), distinct: 2},
 		{name: "declared pair with converged producers", beta: converge, variants: variant("containerd", "alpha", "beta"), distinct: 1},
 		{name: "declared member without the component", variants: variant("containerd", "alpha", "beta"), code: e.CodeInvalidCatalog},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var gamma authored.Definition
-			root, composite := compositeFactoryFixture(t, func(_, beta *authored.Definition) {
+			root, composite := compositeFactoryFixture(t, func(alpha, beta *authored.Definition) {
 				gamma = beta.Clone()
 				gamma.Metadata.Name = "gamma"
 				gamma.Outputs = nil
 				diverge(&gamma)
 				gamma.Outputs[0].Name = "gamma-tools"
+				if tc.alpha != nil {
+					tc.alpha(alpha)
+				}
 				if tc.beta != nil {
 					tc.beta(beta)
 				}
@@ -217,6 +225,18 @@ func TestCompositeDeclaredVariantContract(t *testing.T) {
 						t.Fatalf("containerd variant attributed to undeclared member %q", member)
 					}
 				}
+			}
+			// A saved Plan stripped of its declaration, with a recomputed digest, still fails validation.
+			forged := *plan
+			forged.Composition = plan.Composition.Clone()
+			forged.Composition.Variants = nil
+			if forged.DefinitionDigest, err = authored.CompositeDigest(forged.Composition.Metadata, forged.Composition.Members); err != nil {
+				t.Fatal(err)
+			}
+			if err := forged.Validate(); tc.distinct > 1 {
+				assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
+			} else if err != nil {
+				t.Fatalf("converged Plan without its declaration = %v", err)
 			}
 		})
 	}

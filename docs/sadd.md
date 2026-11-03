@@ -292,7 +292,8 @@ A proposed composite Definition (ADR-26) would enter this flow before the compil
 digest-pinned member, rejects drift and structural conflicts, and derives one effective Definition that the same
 compiler consumes; once catalogs are resolved, the compiler rejects any cross-member producer divergence that the
 composite does not declare as a variant. Composition changes Definition, Plan, Run and Release identities and
-records every member digest, declared variant and output attribution; it never changes an output's Build Digest. This path is implemented and contract-tested, not externally exercised.
+records every member digest, declared variant and output attribution; it never changes an output's Build Digest.
+This path is implemented and contract-tested, not externally exercised.
 
 A proposed pinned-tool producer (ADR-27) is an ordinary selected component inside this flow. ADR-27 owns its
 [execution](adr/0027-pinned-tool-producers.md#3-execution-offline-isolated-fixed), its

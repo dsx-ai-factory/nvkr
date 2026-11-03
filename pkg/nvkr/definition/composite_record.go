@@ -123,7 +123,7 @@ func (record CompositionRecord) Validate(effective Definition, definitionDigest 
 	if record.EffectiveDefinitionDigest != digest || effective.Metadata != record.Metadata {
 		return e.New(e.CodeUnverifiedRef, "composition record does not bind the effective Definition")
 	}
-	return nil
+	return checkVariantSelection(effective, record.Outputs, record.Variants)
 }
 
 // MemberOf returns the member that declared output, if any.

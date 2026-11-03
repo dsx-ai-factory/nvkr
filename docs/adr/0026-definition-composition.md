@@ -95,8 +95,9 @@ locator finds bytes; only the digest admits them.
    `nvkr.dev/definition/v5` Definition on its own, including its own Helm image bindings;
 4. rejects any member whose document kind is `CompositeDefinition` (§8);
 5. recomputes each member's canonical digest and requires equality with the pinned digest;
-6. performs the structural merge of §3 (every rule except the cross-member producer comparison) and validates
-   the resulting effective Definition with the ordinary `Definition.Validate`.
+6. performs the structural merge of §3 (every rule except the cross-member producer comparison), validates
+   the resulting effective Definition with the ordinary `Definition.Validate`, and requires every declared
+   variant member to select its component in one of its own outputs.
 
 Only after all six steps may factory open catalogs. The cross-member producer rule of §3 needs resolved catalogs
 and overlays, so compilation (U3) checks it after opening them and before it returns any Plan, bundle or output.
@@ -116,7 +117,7 @@ consumes unchanged. The derivation is a pure, deterministic function of the comp
 | `sbomTool`, `cosignTool` | Every member must select the same value (including omission). | Any difference is an error. |
 | Helm image bindings | Copied unchanged. Each member was validated standalone (§2 step 3), so every binding already resolves inside its own member; preserved names keep it resolving to the same output. | A binding cannot reach another member's output by construction. |
 | Platforms | Copied unchanged per output; aggregate `platforms` sets keep their exact membership (ADR-11 §2, ADR-12). | Unsupported platforms fail in the existing compiler and Environment admission, as for any Definition. |
-| Producer pins | Catalog locks remain the only pin owner (ADR-22). One catalog file loads once per compile. For every `(component, target platform)` that outputs of **different** members select, the effective producer snapshot (after overlays and toolchain substitutions) must be identical unless the composite declares both members as variants of that component. | Divergent effective producers for the same component and platform across members are an error unless both members are listed in that component's declared variant. A declared member that selects the component in no native build is an error. Within one member, existing ADR-11 semantics are unchanged. |
+| Producer pins | Catalog locks remain the only pin owner (ADR-22). One catalog file loads once per compile. For every `(component, target platform)` that outputs of **different** members select, the effective producer snapshot (after overlays and toolchain substitutions) must be identical unless the composite declares both members as variants of that component. | Divergent effective producers for the same component and platform across members are an error unless both members are listed in that component's declared variant. A declared member that selects the component in none of its outputs is an error. Within one member, existing ADR-11 semantics are unchanged. |
 | Environment | Not merged. A composite Run selects exactly one Environment authored for the composite. Member Environments are not inputs and are never read. | The composite Environment is admitted against the effective Definition by the existing rules: unsupported platforms, missing execution classes and unrelated source-access entries fail as they do today. |
 | Metadata | The composite's own `metadata` names the effective Definition. Member descriptions are not concatenated. | — |
 
@@ -127,7 +128,7 @@ a `variants` entry names the component and the members that may diverge on it. T
 composite, so review sees it, and the composite digest binds it (§4). It permits divergence only between the
 listed members for that component, on every platform they select. Any other divergence still fails, including
 one between a declared member and an unlisted member that selects the same component. Every declared member must
-select the component in at least one native build, so a misspelled or stale declaration fails. A declaration
+select the component in at least one of its outputs, so admission refuses a misspelled or stale declaration. A declaration
 does not require the producers to differ: catalog maintenance that converges the pins does not break the
 composite. Authors may still put both outputs in one member, where ADR-11 already admits the variant.
 
@@ -157,7 +158,9 @@ records and publication roots that carry a composition record use new schema maj
 Definitions keep their current schemas and bytes. A record without declared variants omits the field and keeps
 its bytes. A reader that does not admit the new major rejects it. A reader that admits it requires a complete,
 consistent record: every output attributed to exactly one listed member, no unlisted member, declared variants
-that name only listed members, and an effective Definition digest that recomputes from the recorded Plan inputs.
+that name only listed members that select their components, and an effective Definition digest that recomputes
+from the recorded Plan inputs. Plan validation also repeats the §3 cross-member producer comparison over the
+Plan's resolved producers, so a saved Plan cannot drop a declaration it needs.
 
 Each variant producer is attributed to the member that selected it. Every native build belongs to one named
 output, the record attributes that output to one member, and the Plan records the build's resolved producers.
@@ -275,7 +278,8 @@ Policy (ADR-04 §5), with the same lane and scope rules. The policy schema does 
 
 - Optional exact-input expectations (ADR-17 §1) may pin the composite digest, the Environment and the Plan.
   Lifecycle additionally exposes the authenticated composition record in the Release view, so a consumer can
-  require an exact member `(name, digest)` set.
+  require an exact member `(name, digest)` set. A member-set requirement does not constrain declared variants;
+  a consumer that cares reads them from the same record, and a composite-digest expectation binds them.
 - An expectation prepared from a member Definition does not match a composite Release, and a composite
   expectation does not match a member Release. There is no implicit acceptance across forms.
 - Verifying a composite Release establishes nothing about any family Release, and verifying all four family
@@ -445,8 +449,9 @@ Acceptance tests per unit:
   duplicate name/locator/digest, name mismatch, `..` escape, symlink locator, non-regular file, nested
   composite, self-reference); digest mismatch → `unverified-ref`; formatting-only member edit keeps the digest;
   pre-cancelled context → `timeout` with no member read; composite digest excludes locators (moving a member and
-  updating its locator keeps the composite digest); each malformed-variant row of §11 → `invalid-catalog`;
-  declared variants change the composite digest and an empty declaration does not.
+  updating its locator keeps the composite digest); each malformed-variant row of §11, and a declared member
+  that selects its component in none of its outputs, → `invalid-catalog`; declared variants change the
+  composite digest and an empty declaration does not.
 - **U2:** deterministic output (shuffled member order in memory yields identical bytes); duplicate output name,
   even with identical declarations → `invalid-catalog`; differing top-level stack, `sbomTool` or `cosignTool`
   → `invalid-catalog`; absolute member base or overlay locator → `invalid-catalog`, matching captured
@@ -456,11 +461,11 @@ Acceptance tests per unit:
   existing split contract), every output's Build Digest and native records equal the family Plans and the
   combined Plan; divergent cross-member producer for one `(component, platform)` → `invalid-catalog` with no
   Plan; a declared pair compiles, records its variants, keeps identity invariance and attributes each producer
-  only to declared members; a declaration on the wrong component or member, or naming a member that does not
-  select the component, → `invalid-catalog`; converged producers under a declaration still compile; a record
-  with an added or unlisted-member variant fails Plan validation; within-member variants still compile; captured
-  inputs include every member file and replay without the checkout; plain-Definition Plans are byte-identical
-  to before.
+  only to declared members; a declaration on the wrong component or member → `invalid-catalog`; converged
+  producers under a declaration still compile; a record with an added or unlisted-member variant, or a compiled
+  Plan stripped of a needed declaration with a recomputed digest, fails Plan validation; within-member variants
+  still compile; captured inputs include every member file and replay without the checkout; plain-Definition
+  Plans are byte-identical to before.
 - **U4:** each deferred row of §9 → `engine-capability` before catalog resolution, with no attempt directory;
   `definition pin --check` reports drift without writing; pin rewrite uses byte-CAS and loses cleanly to a
   concurrent writer with `write-conflict`; CLI and SDK both reach the same owner.
@@ -548,8 +553,9 @@ The questions left open by the first draft were decided on 2026-10-29:
 
 ## Acceptance evidence
 
-Contract suites only. U1–U7, including declared variants, are implemented with table-driven contract tests
-that assert coded errors;
+Contract suites only. U1–U7 are implemented with table-driven contract tests that assert coded errors. Declared
+variants are contract-tested at admission (U1), compilation and Plan validation (U3) and in the inspect view
+(U4); no Run record, publication root or consumer check has exercised a variant-bearing record.
 `NVKR_TEST_EXTENDED=1` additionally compiles the worked example above against the combined Plan's resolved
 catalogs and shows that every composite output and native build keeps the Build Digest and native build records
 of the combined Definition and the four families, including family-only outputs the combined Definition lacks,
