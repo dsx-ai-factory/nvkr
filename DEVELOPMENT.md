@@ -32,6 +32,11 @@ make build
 make check
 ```
 
+`make ci-check` runs every merge-gate check that can run locally: the code gate plus the build, actionlint,
+notices drift, workflow drift and Fern docs checks. Workflow drift re-reads the pinned NVKE source, so it needs
+read access to the private NVKE repository; the docs check needs Node and the Fern CLI. CodeQL runs only on
+GitHub.
+
 `make help` lists targets. The full release-blocking verification includes:
 
 ```sh

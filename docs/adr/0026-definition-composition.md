@@ -115,7 +115,11 @@ consumes unchanged. The derivation is a pure, deterministic function of the comp
 The cross-member producer rule is deliberately stricter than a single Definition: two family owners releasing the
 same component at different pins is exactly the silent incompatibility a combined Release must not hide. Authors
 who intend two variants of one component must put both outputs in one member, where the variant is explicit. The
-four NVKE families select no `(component, platform)` in common, so the rule does not affect them.
+core, services, telemetry and Ubuntu 26.04 disks families select no `(component, platform)` in common, so the rule
+does not affect them. The Ubuntu 24.04 disks family replaces the same disk, agent, installer and DOCA OVS
+components through its overlay, so it is a separately released sibling that the combined Definition omits.
+A composite that holds both Ubuntu series must select both in one member; the worked example below composes
+the other four families.
 
 The effective Definition is a derived internal record, like a Plan. It is never written as an authored input,
 cannot be selected with `--definition` and has no file. `definition inspect` may show it as a description.

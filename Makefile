@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # nvkr — Definition -> Run -> Release tooling.
-# Run `make help` for targets; `make check` is the full local completion gate.
+# Run `make help` for targets. `make check` is the code gate; `make ci-check` runs every
+# merge-gate check that can run locally.
 
 BIN         := bin/nvkr
 DEMO_BIN    ?= bin/nvke-demo
@@ -102,6 +103,13 @@ shellcheck: ## Check executable shell surfaces for warning-or-higher defects.
 vulncheck: go-version-check ## Check reachable Go vulnerabilities using the pinned upstream scanner.
 	GOBIN="$(CURDIR)/bin" go -C toolchains/govulncheck install tool
 	"$(CURDIR)/bin/govulncheck" ./...
+
+.PHONY: actionlint
+actionlint: go-version-check ## Lint GitHub workflows with the actionlint pinned in toolchains/actionlint.
+	@# actionlint silently skips its run-script checks when shellcheck is absent.
+	@command -v shellcheck >/dev/null 2>&1 || { echo "shellcheck not installed — https://www.shellcheck.net/"; exit 1; }
+	GOBIN="$(CURDIR)/bin" go -C toolchains/actionlint install tool
+	"$(CURDIR)/bin/actionlint"
 
 .PHONY: test
 test: ## Fast default tests for CI and agents (no extended fixtures or instrumentation).
@@ -292,16 +300,16 @@ workflows-generate: workflow-generator pipeline-dev-generate nvke-split-generate
 	$(MAKE) catalog-refresh-generate
 
 .PHONY: nvke-split-generate
-nvke-split-generate: workflow-generator ## Regenerate the four independent NVKE family bundles.
-	@set -e; for family in core services telemetry disks; do \
+nvke-split-generate: workflow-generator ## Regenerate the five independent NVKE family bundles.
+	@set -e; for family in core services telemetry disks disks-ubuntu24; do \
 		bin/nvkr-exec run generate --engine github \
 			--definition "inputs/definitions/nvke/$$family.yaml" \
 			--environment "inputs/environments/github-nvke-$$family.yaml" --root .; \
 	done
 
 .PHONY: nvke-split-check
-nvke-split-check: workflow-generator ## Check the four independent NVKE family bundles without changing files.
-	@set -e; for family in core services telemetry disks; do \
+nvke-split-check: workflow-generator ## Check the five independent NVKE family bundles without changing files.
+	@set -e; for family in core services telemetry disks disks-ubuntu24; do \
 		bin/nvkr-exec run generate --engine github \
 			--definition "inputs/definitions/nvke/$$family.yaml" \
 			--environment "inputs/environments/github-nvke-$$family.yaml" --root . --check $(PROJECTION_PILOT_FLAG); \
@@ -326,7 +334,17 @@ pipeline-dev-run: pipeline-dev-check ## Dispatch the clean, pushed current branc
 	python3 scripts/pipeline-dev.py --repo "$$PIPELINE_DEV_REPO"
 
 .PHONY: check
-check: go-version-check fmt-check definitions-location-check license-header-check vet lint shellcheck test-ci-tools test vulncheck ## Full local gate — run before pushing.
+check: go-version-check fmt-check definitions-location-check license-header-check vet lint shellcheck test-ci-tools test vulncheck ## Code gate: format, Definition location, license, vet, lint, shell, tool tests, Go tests, vulnerabilities.
+
+# Every merge-gate check that can run locally; CI runs `make test` as test-shard
+# slices. internal/cicontract requires this list to equal the make targets the
+# merge gate runs. CodeQL and the DCO App run only on GitHub.
+# Checks needing extra tools or private access run before the long test suite.
+CI_CHECKS := fmt-check definitions-location-check license-header-check shellcheck actionlint \
+	notices-check workflows-check docs-check vet test-ci-tools build lint vulncheck test
+
+.PHONY: ci-check
+ci-check: go-version-check $(CI_CHECKS) ## Complete local merge gate (needs private NVKE access, Node and Fern; see CONTRIBUTING.md).
 
 .PHONY: clean
 clean: ## Remove build output, coverage, and the local engine workspace.

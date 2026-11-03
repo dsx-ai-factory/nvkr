@@ -13,7 +13,8 @@ for a deeper environment walkthrough and **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.
 git clone https://github.com/dsx-ai-factory/nvkr && cd nvkr
 make help          # list all targets
 make build         # compile bin/nvkr; catalogs are supplied explicitly
-make check         # the full local gate, including the Go vulnerability check
+make check         # the code gate, including the Go vulnerability check
+make ci-check      # every merge-gate check that runs locally
 ```
 
 - [`.go-version`](.go-version) pins the exact Go patch used by CI. The local
@@ -31,11 +32,18 @@ make check         # the full local gate, including the Go vulnerability check
 
 ## Local development equals CI
 
-CI (`.github/workflows/merge-gate.yaml`) runs the same format, license header, vet, lint,
-shellcheck, Python report-tool tests, fast tests, and Go vulnerability checks as `make check`, then also
-compiles the binary. Run `make check` and `make build` before opening a PR. The
-vulnerability check needs access to the Go vulnerability database; see the
-[maintainer procedure](docs/cve-management.md) for triage and scope.
+`make ci-check` runs every check in the merge gate (`.github/workflows/merge-gate.yaml`) that can run locally:
+the `make check` code gate (format, Definition location, license header, vet, lint, shellcheck, Python
+report-tool tests, fast tests and Go vulnerability checks), the binary build, actionlint, third-party notices
+drift, generated-workflow drift and the Fern docs check. Workflow drift needs read access to the private NVKE
+source, and the docs check needs Node and the Fern CLI. CodeQL and the DCO App run only on GitHub. A test in
+`internal/cicontract` fails when the Makefile's `CI_CHECKS` list and the make targets the merge gate runs
+differ, so add a new hosted check to both.
+
+On a pull request the merge gate runs only the checks whose inputs changed; `make ci-check` runs all of
+them. Run `make ci-check` before opening a PR; without NVKE access, run `make check` and `make build` and say
+which hosted checks you could not run. The vulnerability check needs access to the Go vulnerability
+database; see the [maintainer procedure](docs/cve-management.md) for triage and scope.
 
 Expensive capacity and full-product integration fixtures require
 `NVKR_TEST_EXTENDED=1`; `make test-full` sets it for the race-and-coverage run.
