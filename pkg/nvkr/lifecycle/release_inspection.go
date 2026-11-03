@@ -72,6 +72,9 @@ func inspectReleaseMetadata(ctx context.Context, reference string, options Inspe
 		}
 		return delivery.PublicationDescription{}, err
 	}
+	if err := requireCompleteComposition(description); err != nil {
+		return delivery.PublicationDescription{}, err
+	}
 	if verifyEvidence != nil {
 		if err := delivery.VisitMetadataEvidence(ctx, layout, description.RootDigest, verifyEvidence); err != nil {
 			return delivery.PublicationDescription{}, err

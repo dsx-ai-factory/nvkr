@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
@@ -70,8 +71,10 @@ func referenceMetadataFixtureForPlan(t *testing.T, plan *Plan, attempts ...strin
 	for key, value := range map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "example/nvkr", "GITHUB_WORKFLOW_REF": "example/nvkr/.github/workflows/nvkr-factory.yml@refs/heads/main", "GITHUB_RUN_ID": "12345", "GITHUB_RUN_ATTEMPT": "1"} {
 		t.Setenv(key, value)
 	}
+	workflow := development.ProducerWorkflowFor(plan.Environment.GitHubBundle)
 	if plan.Environment.GitHubDevelopment {
 		setDevelopmentRun(t)
+		t.Setenv("GITHUB_WORKFLOW_REF", "example/nvkr/"+workflow+"@refs/heads/feature/pipeline")
 	}
 	nodes, artifacts := planIndex(plan)
 	for _, a := range artifacts {
@@ -89,7 +92,7 @@ func referenceMetadataFixtureForPlan(t *testing.T, plan *Plan, attempts ...strin
 	}
 	signer := &referenceSigner{}
 	if plan.Environment.GitHubDevelopment {
-		signer.observedIdentity = "https://github.com/example/nvkr/.github/workflows/nvkr-dev.yml@refs/heads/feature/pipeline"
+		signer.observedIdentity = "https://github.com/example/nvkr/" + workflow + "@refs/heads/feature/pipeline"
 	}
 	for i, output := range plan.LifecycleOutputs {
 		if i < len(attempts) {
@@ -340,4 +343,35 @@ func TestReferenceReleaseMixedAttemptsAndResigning(t *testing.T) {
 	t.Setenv("GITHUB_RUN_ATTEMPT", "4")
 	_, err = authenticateReferenceMetadata(t.Context(), plan, Route{Name: second, Target: second}, artifacts, referenceSignerFactory(signer))
 	assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
+}
+
+// Each per-output publication carries the complete composition record with one
+// output; assembly restores exact membership over the whole Plan.
+func TestReferenceReleaseAssemblesCompositeOutputs(t *testing.T) {
+	composite, err := signedComposite(t, false, compositeEnvironment(t, namedDevelopment(t, "product", "ghcr.io/example/nvkr/development-product")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(composite.LifecycleOutputs) != 2 || len(composite.Composition.Members) != 2 {
+		t.Fatalf("fixture is not a two-member, two-output composite: %+v", composite.Composition)
+	}
+	plan, artifacts, signer := referenceMetadataFixtureForPlan(t, composite)
+	node := planNode(plan, "package/release")
+	if err := executeReferenceRelease(t.Context(), plan, node, artifacts, referenceSignerFactory(signer)); err != nil {
+		t.Fatal(err)
+	}
+	result, err := delivery.InspectMetadata(t.Context(), artifacts[node.Outputs[0]].Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Root.Release.Composition.Equal(plan.Composition) {
+		t.Fatal("assembled Release lost the Plan composition record")
+	}
+	outputs, err := delivery.MetadataOutputs(result.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateLifecycleOutputs(plan.LifecycleOutputs, outputs); err != nil {
+		t.Fatal(err)
+	}
 }

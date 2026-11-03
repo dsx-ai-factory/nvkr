@@ -72,9 +72,21 @@ func executeGitHubNode(ctx context.Context, plan *Plan, node Node, options GitHu
 	if node.Kind == NodeFetch {
 		return executeGitHubSourceFetch(ctx, plan, node.ID, options.Stdout, options.Stderr)
 	}
-	if node.IRNode != "" || node.Container == "" {
-		return ExecuteNode(ctx, plan, node.ID, options.Stdout, options.Stderr)
-	}
+	return githubOperationSession(plan, options).execute(ctx, node)
+}
+
+// githubOperationSession runs hosted producers and in-process operations in the
+// compiled layout and launches every utility that names a pinned container.
+func githubOperationSession(plan *Plan, options GitHubStepOptions) *operationSession {
+	placement := compiledPlacement(plan)
+	placement.contained = func(_ *Plan, node Node) bool { return node.Container != "" }
+	placement.launch = func(ctx context.Context, node Node) error { return launchGitHubUtility(ctx, plan, node, options) }
+	return newOperationSession(plan, placement, options.Stdout, options.Stderr)
+}
+
+// launchGitHubUtility runs one hosted utility in its pinned container within
+// the operation's provider stage budget.
+func launchGitHubUtility(ctx context.Context, plan *Plan, node Node, options GitHubStepOptions) error {
 	bounded, cancel, err := githubUtilityContext(ctx, plan, node.ID)
 	if err != nil {
 		return err
