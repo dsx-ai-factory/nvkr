@@ -121,7 +121,7 @@ def git(repo, *args):
 def commit(repo, files):
     for name, text in files.items():
         path = Path(repo, name)
-        if path.is_symlink() or path.exists() and (text is None or isinstance(text, Link)):
+        if path.is_symlink() or (path.exists() and (text is None or isinstance(text, Link))):
             path.unlink()
         if text is None:
             continue
@@ -190,6 +190,7 @@ class StatusRestatedTest(unittest.TestCase):
         Path(self.repo, "docs/new.md").write_text("Publication has not been recorded.\n")
         Path(self.repo, "docs/guide.md").unlink()
         Path(self.repo, "docs/guide.md").symlink_to("../outside.txt")  # local mode must not follow it
+        Path(self.repo, "docs/untracked-link.md").symlink_to("../outside.txt")
         Path(self.repo, "docs/notes.md").write_text(
             "Intro.\n\nRelease requires a\nrecorded run.\n\nThe release is\n\nunrecorded.\n")
         _, findings = restated.check(self.repo, self.head)
