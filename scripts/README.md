@@ -27,6 +27,14 @@ read. `ci-test-summary.py` summarizes the retained Go JSON events. Partition, co
 small offline Go composition contracts run with `make test-ci-tools`; the Go fixture exercises every
 matrix entry without rebuilding the product suite.
 
+`check-status-restated.py BASE HEAD` keeps validation status in the
+[reconciliation ledger](../docs/adr/reconciliation.md): it fails when Markdown lines added since the merge
+base restate status outside the ledger and `docs/evidence/`, and names the ledger row to link instead.
+The Merge Gate runs it on every pull request; `make status-restated-check` runs it locally against
+`origin/main` (override with `STATUS_BASE` and `STATUS_HEAD`). It matches phrases from fixed review findings,
+so it cannot judge whether a sentence is true and ignores text already in the tree. For a deliberate
+exception, add `<!-- status-ok: reason -->` to the matched line; an escape without a reason is a finding.
+
 ## CLI artifact test baseline
 
 ```sh

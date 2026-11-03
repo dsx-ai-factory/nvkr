@@ -125,6 +125,14 @@ test-ci-tools: ## Require Python and check CI sharding, reports and local adapte
 	python3 -B -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else "Python 3.12+ is required for CI report tests")'
 	python3 -B -m unittest discover -s scripts -p '*_test.py'
 
+# Diff-scoped: only Markdown lines added since the merge base with STATUS_BASE are checked.
+STATUS_BASE ?= origin/main
+STATUS_HEAD ?= HEAD
+
+.PHONY: status-restated-check
+status-restated-check: ## Fail when added docs restate validation status outside the reconciliation ledger.
+	python3 -B scripts/check-status-restated.py '$(STATUS_BASE)' '$(STATUS_HEAD)'
+
 .PHONY: cover
 cover: test-race ## Open the HTML coverage report in a browser.
 	go tool cover -html=coverage.out
@@ -320,7 +328,7 @@ pipeline-dev-run: pipeline-dev-check ## Dispatch the clean, pushed current branc
 	python3 scripts/pipeline-dev.py --repo "$$PIPELINE_DEV_REPO"
 
 .PHONY: check
-check: go-version-check fmt-check definitions-location-check license-header-check vet lint shellcheck test-ci-tools test vulncheck ## Full local gate — run before pushing.
+check: go-version-check fmt-check definitions-location-check license-header-check status-restated-check vet lint shellcheck test-ci-tools test vulncheck ## Full local gate — run before pushing.
 
 .PHONY: clean
 clean: ## Remove build output, coverage, and the local engine workspace.
