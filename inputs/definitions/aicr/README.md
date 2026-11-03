@@ -82,7 +82,12 @@ following AICR's pinned
 Flux has no readiness hooks, so `sriov-ib-networks` can race the IPPool CRD; the guide
 gives the wait-and-reset steps. The DRA eviction opt-in adds AICR's `dra-node-labeler`
 DaemonSet, which labels every node carrying `nvidia.com/gpu.present=true`, NVKE control-plane
-nodes included, and limits the DRA kubelet plugin to labeled nodes.
+nodes included, and limits the DRA kubelet plugin to labeled nodes. AICR documents the eviction
+as best-effort: under `k8s-driver-manager` v0.12, ordering against DRA claim holders and completion
+of the plugin's teardown are not guaranteed. A GPU node without the label runs no DRA kubelet
+plugin, and `deploy.sh` still reports success. The pinned
+[DRA driver upgrade eviction](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/docs/user/cli-reference.md#dra-driver-upgrade-eviction)
+section gives the checks to run after applying.
 
 These outputs use the source-built producer and NVKR wrapper described above. The ADR-27
 pinned-tool migration changes their published digests and media type, and #288 may move
