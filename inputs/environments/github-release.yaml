@@ -6,6 +6,7 @@ kind: Environment
 metadata:
   description: M2 candidate publication namespace; native disk execution with build provenance; deep inspection and material reconciliation deferred beyond the M3 MVP.
   name: nvke-m2-github
+githubExecutionPartitions: true
 githubARC: native-kvm-v1
 githubRunners:
   linux/amd64: ubuntu-24.04

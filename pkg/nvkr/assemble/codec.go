@@ -78,19 +78,14 @@ func OpenQemuImgCodec(ctx context.Context, qemuImg, expectedDigest string) (*Qem
 			"capturing pinned qemu-img executable %s", resolved)
 	}
 	if err := ctx.Err(); err != nil {
-		_ = executable.Close()
+		_ = executable.Close() //nolint:errcheck // read-only executable release; the cancellation error is returned
 		return nil, e.Wrap(e.CodeTimeout, err, "opening pinned qemu-img codec")
 	}
 	return &QemuImgCodec{executable: executable, digest: executable.Digest()}, nil
 }
 
-// Digest returns the exact decoder executable identity bound by this capability.
-func (codec *QemuImgCodec) Digest() (string, error) {
-	return codec.DigestContext(context.Background())
-}
-
-// DigestContext returns the exact decoder executable identity after revalidating
-// the held capability with cancellation.
+// DigestContext returns the exact decoder executable identity bound by this
+// capability after revalidating the held capability with cancellation.
 func (codec *QemuImgCodec) DigestContext(ctx context.Context) (string, error) {
 	if codec == nil {
 		return "", e.New(e.CodeTrustPolicyMissing, "qualified qemu-img codec is required")
@@ -144,7 +139,7 @@ func (codec *QemuImgCodec) EnvelopeLogicalDigest(ctx context.Context, format, en
 	if err != nil {
 		return "", 0, err
 	}
-	defer func() { _ = input.Close() }()
+	defer func() { _ = input.Close() }() //nolint:errcheck // read-only envelope release; closing cannot change bytes already read
 	return codec.envelopeLogicalDigest(ctx, format, input, envelopePath)
 }
 
@@ -179,7 +174,7 @@ func (codec *QemuImgCodec) envelopeLogicalDigest(ctx context.Context, format str
 	if err != nil {
 		return "", 0, e.Wrap(e.CodeEngineCapability, err, "creating held decoded RAW output")
 	}
-	defer func() { _ = decoded.Close() }()
+	defer func() { _ = decoded.Close() }() //nolint:errcheck // no-op after sealing; before sealing the scratch output is discarded
 	inputPath, err := heldfile.ChildPath(1)
 	if err != nil {
 		return "", 0, e.Wrap(e.CodeEngineCapability, err, "mapping held disk envelope")
@@ -213,7 +208,7 @@ func (codec *QemuImgCodec) envelopeLogicalDigest(ctx context.Context, format str
 		}
 		return "", 0, e.Wrap(e.CodeVerifyFailed, err, "sealing decoded RAW output")
 	}
-	defer func() { _ = sealed.Close() }()
+	defer func() { _ = sealed.Close() }() //nolint:errcheck // read-only sealed RAW release; closing cannot change bytes already read
 	if err := assertHeldPreEncryption(ctx, sealed, "decoded RAW"); err != nil {
 		return "", 0, err
 	}

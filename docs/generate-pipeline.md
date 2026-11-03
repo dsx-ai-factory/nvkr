@@ -41,9 +41,9 @@ For one Definition whose generated workflow is too large, the Environment can se
 `githubExecutionPartitions: true`. Generation then emits an entry workflow and bounded sibling workers;
 all belong to one generated manifest, use one complete Plan and feed one Run finalizer and Release.
 Jobs requiring an OIDC token stay in the entry workflow to preserve their signing identity policy.
-Do not edit or dispatch workers independently. The default remains the flat workflow. This opt-in topology
-has local generation contracts; hosted execution, signing and failure/cancellation behavior still require
-external validation before production adoption.
+Do not edit or dispatch workers independently. The default remains the flat workflow. The maintained
+release and development Environments select this topology. It has local generation contracts and a hosted
+development Run; hosted release execution, including failure and cancellation reporting, is unrecorded.
 
 ```sh
 mkdir "$NVKR_PIPELINE_DIR/generated"

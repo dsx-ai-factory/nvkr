@@ -4,6 +4,7 @@
 package buildgraph_test
 
 import (
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -86,7 +87,13 @@ func TestNightlyDOCAAcquisitionFeedsOfflineImageComposition(t *testing.T) {
 		}
 	}
 	producer := stack.Catalog.Components["nvke-image-inputs"]
-	if !producer.FromSource || producer.Tag != producer.Commit || !reflect.DeepEqual(producer.Materials, prior.Catalog.Components["nvke-image-inputs"].Materials) {
+	// The overlay acquires DOCA itself, so it omits only the release's DOCA material.
+	priorMaterials := maps.Clone(prior.Catalog.Components["nvke-image-inputs"].Materials)
+	if priorMaterials["doca-ovs"] != "nvke-doca-ovs" {
+		t.Fatal("release image inputs lost their DOCA material")
+	}
+	delete(priorMaterials, "doca-ovs")
+	if !producer.FromSource || producer.Tag != producer.Commit || !reflect.DeepEqual(producer.Materials, priorMaterials) {
 		t.Fatal("current-main recipe lost its exact source descriptor or original material closure")
 	}
 	staging, _, found := strings.Cut(prior.Catalog.Components["nvke-image-inputs"].BuildCommand[2], "python3 ")
