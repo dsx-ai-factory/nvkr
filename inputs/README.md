@@ -3,7 +3,7 @@
 This directory owns the repository's NVKE, NVSentinel and AICR build and release inputs. Definitions select named outputs
 from pinned catalog producers; Environments select execution and publication policy. The maintained
 release candidate starts at [the NVKE Definition](definitions/nvke/definition.yaml).
-The [four-family pilot](definitions/nvke/README.md#four-family-pilot) supplies independent core, services,
+The [family pilot](definitions/nvke/README.md#family-pilot) supplies independent core, services,
 telemetry and disk Definitions alongside that combined candidate.
 
 ```text
@@ -31,10 +31,11 @@ the move preserves each file's existing format.
 |---|---|---|
 | [`definitions/nvke/definition.yaml`](definitions/nvke/definition.yaml) | [`environments/github-release.yaml`](environments/github-release.yaml) | Maintained 69-output release candidate; existing main-only signed publication |
 | Same NVKE Definition | [`environments/github-development.yaml`](environments/github-development.yaml) | Separate signed development bundle and publication namespace |
-| [`definitions/nvke/core.yaml`](definitions/nvke/core.yaml) | [`environments/github-nvke-core.yaml`](environments/github-nvke-core.yaml) | 20-output core pilot with its own named production bundle and publication namespace |
-| [`definitions/nvke/services.yaml`](definitions/nvke/services.yaml) | [`environments/github-nvke-services.yaml`](environments/github-nvke-services.yaml) | 28-output supporting-services pilot |
+| [`definitions/nvke/core.yaml`](definitions/nvke/core.yaml) | [`environments/github-nvke-core.yaml`](environments/github-nvke-core.yaml) | 27-output core pilot with its own named production bundle and publication namespace |
+| [`definitions/nvke/services.yaml`](definitions/nvke/services.yaml) | [`environments/github-nvke-services.yaml`](environments/github-nvke-services.yaml) | 34-output supporting-services pilot |
 | [`definitions/nvke/telemetry.yaml`](definitions/nvke/telemetry.yaml) | [`environments/github-nvke-telemetry.yaml`](environments/github-nvke-telemetry.yaml) | 17-output telemetry pilot |
-| [`definitions/nvke/disks.yaml`](definitions/nvke/disks.yaml) | [`environments/github-nvke-disks.yaml`](environments/github-nvke-disks.yaml) | Four-output native plain/public-bootstrap FDE disk pilot |
+| [`definitions/nvke/disks.yaml`](definitions/nvke/disks.yaml) | [`environments/github-nvke-disks.yaml`](environments/github-nvke-disks.yaml) | Four-output native Ubuntu 26.04 plain/public-bootstrap FDE disk pilot |
+| [`definitions/nvke/disks-ubuntu24.yaml`](definitions/nvke/disks-ubuntu24.yaml) | [`environments/github-nvke-disks-ubuntu24.yaml`](environments/github-nvke-disks-ubuntu24.yaml) | Four-output native Ubuntu 24.04 plain/public-bootstrap FDE disk pilot |
 | [`definitions/demo/arm64-nvidia-tcg.json`](definitions/demo/arm64-nvidia-tcg.json) | [`environments/local-arm64-tcg.json`](environments/local-arm64-tcg.json) | Local 32-output NVIDIA OVN demo |
 | [`definitions/demo/arm64-upstream-tcg.json`](definitions/demo/arm64-upstream-tcg.json) | Same local TCG Environment | Local 32-output upstream OVN diagnostic demo |
 | [`definitions/demo/arm64-nvidia-kvm.json`](definitions/demo/arm64-nvidia-kvm.json) | [`environments/github-nightly-nvidia.json`](environments/github-nightly-nvidia.json) | Named NVIDIA nightly producer; current content differences remain explicit |
@@ -63,7 +64,8 @@ do not imply fresh-machine or full native Linux runtime acceptance.
 The opt-in [Ubuntu 24 node-image inputs](definitions/diagnostics/ubuntu24/README.md) select
 native AMD64 and ARM64 plain local builds, plus plain or public-bootstrap FDE GitHub builds.
 The hosted variants use the matching `environments/github-ubuntu24-<arch>.yaml` Environment
-and remain build-only; they do not change maintained release membership or Ubuntu 26 defaults.
+and remain single-disk, build-only diagnostics. The maintained `disks-ubuntu24` family above selects
+the same four disks for signed publication; no publication is recorded yet.
 
 ## Focused inputs and examples
 

@@ -25,6 +25,8 @@ additionalRuns:
     environment: inputs/environments/github-nvke-telemetry.yaml
   - definition: inputs/definitions/nvke/disks.yaml
     environment: inputs/environments/github-nvke-disks.yaml
+  - definition: inputs/definitions/nvke/disks-ubuntu24.yaml
+    environment: inputs/environments/github-nvke-disks-ubuntu24.yaml
   - definition: inputs/definitions/demo/arm64-nvidia-kvm.json
     environment: inputs/environments/github-nightly-nvidia.json
   - definition: inputs/definitions/demo/arm64-upstream-kvm.json
