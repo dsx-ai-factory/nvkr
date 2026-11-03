@@ -556,8 +556,10 @@ The questions left open by the first draft were decided on 2026-10-29:
 ## Acceptance evidence
 
 Contract suites only. U1–U7 are implemented with table-driven contract tests that assert coded errors. Declared
-variants are contract-tested at admission (U1), compilation and Plan validation (U3) and in the inspect view
-(U4); no Run record, publication root or consumer check has exercised a variant-bearing record.
+variants are contract-tested at admission (U1), compilation and Plan validation (U3), in the inspect view (U4),
+in prepared Run records and publication metadata (U6), and in the verified consumer view (U7). The opt-in
+extended contract also compiles the 26.04 and 24.04 disk families as separate members: refused without
+declarations and admitted with the eight components the 24.04 overlay replaces declared.
 `NVKR_TEST_EXTENDED=1` additionally compiles the worked example above against the combined Plan's resolved
 catalogs and shows that every composite output and native build keeps the Build Digest and native build records
 of the combined Definition and the four families, including family-only outputs the combined Definition lacks,
