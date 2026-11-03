@@ -25,6 +25,8 @@ BASE = {
     "docs/moved-from.md": "Old text remains unproven.\nTwo.\nThree.\nFour.\nFive.\n",
     "docs/dash.md": "-- intro\n",
     "docs/straddle.md": "Intro.\nCompletion requires a recorded\nOld tail.\n",
+    "docs/three.md": "It requires a\nrecorded\nOld tail.\n",
+    "docs/split.md": "The release is\nunrecorded.\n",
 }
 # Each case owns distinct paths, so one base...head diff exercises them all.
 CASES = {
@@ -58,6 +60,13 @@ CASES = {
     "phrase starting on an unchanged line": (
         {"docs/straddle.md": "Intro.\nCompletion requires a recorded\nrun of the workflow.\n"},
         [f'docs/straddle.md:3: status restated ("requires a recorded run"); {LINK}']),
+    "phrase wrapping over several unchanged lines": (
+        {"docs/three.md": "It requires a\nrecorded\nrun of the workflow.\n"},
+        [f'docs/three.md:3: status restated ("requires a recorded run"); {LINK}']),
+    "blank line ends a paragraph": ({"docs/split.md": "The release is\n\nunrecorded.\n"}, []),
+    "adr in another paragraph is not the owner": (
+        {"docs/neighbour.md": "ADR-02 owns identity.\n\nHosted signing remains unproven.\n"},
+        [f'docs/neighbour.md:3: status restated ("remains unproven"); {LINK}']),
     "ledger look-alike is checked": (
         {"docs/adr/reconciliation.md-backup.md": "Hosted signing remains unproven.\n"},
         [f'docs/adr/reconciliation.md-backup.md:1: status restated ("remains unproven"); {LINK}']),

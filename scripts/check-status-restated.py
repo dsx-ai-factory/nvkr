@@ -72,17 +72,10 @@ def header_path(line):
     return None if name == "/dev/null" else name.removeprefix("b/")
 
 
-def added_runs(diff):
-    """Yield (path, [(line_number, text, added)]) for the new-side lines of each -U1 hunk.
-
-    One context line on each side lets a phrase that wraps between an unchanged and an
-    added line match; scan() reports only matches that touch an added line.
-    """
-    path, run, nxt, in_header = None, [], 0, False
+def added_lines(diff):
+    """Return {path: {new-side line numbers}} for the added lines of a -U0 diff."""
+    added, path, nxt, in_header = {}, None, 0, False
     for line in diff.splitlines():
-        if line.startswith(("diff --git ", "@@")) and run:
-            yield path, run
-            run = []
         if line.startswith("diff --git "):
             path, in_header = None, True
         elif in_header and line.startswith("+++ "):
@@ -90,20 +83,33 @@ def added_runs(diff):
         elif line.startswith("@@"):
             in_header = False
             nxt = int(re.match(r"@@ -\S+ \+(\d+)", line).group(1))
-        elif not in_header and line.startswith(("+", " ")) and path:
-            run.append((nxt, line[1:], line.startswith("+")))
+        elif not in_header and line.startswith("+") and path:
+            added.setdefault(path, set()).add(nxt)
             nxt += 1
-    if run:
-        yield path, run
+    return added
 
 
-def untracked_runs(repo):
-    """Yield every line of each untracked, non-ignored Markdown file as one added run."""
+def untracked_lines(repo):
+    """Return {path: None} for untracked, non-ignored Markdown files, whose every line is added."""
     listed = git(repo, "-c", "core.quotePath=false", "ls-files", "-z", "--others", "--exclude-standard",
                  "--", *MARKDOWN)
-    for path in filter(None, listed.split("\0")):
-        text = Path(repo, path).read_text(encoding="utf-8", errors="replace")
-        yield path, [(number, line, True) for number, line in enumerate(text.splitlines(), 1)]
+    return dict.fromkeys(filter(None, listed.split("\0")))
+
+
+def paragraphs(text, added):
+    """Yield blank-line-delimited paragraphs that hold an added line, as [(number, text, added)].
+
+    Matching whole paragraphs lets a phrase wrap from unchanged lines onto an added one without
+    crossing into the next paragraph; added=None marks every line added.
+    """
+    run = []
+    for number, line in enumerate([*text.splitlines(), ""], 1):
+        if line.strip():
+            run.append((number, line, added is None or number in added))
+        elif run:
+            if any(is_added for _, _, is_added in run):
+                yield run
+            run = []
 
 
 def has_reason(line):
@@ -132,7 +138,7 @@ def scan(run):
             if not added or added[0] in seen or any(has_reason(run[i][1]) for i in lines):
                 continue
             seen.add(added[0])
-            # The matched lines decide the ADR row first, then the rest of the hunk.
+            # The matched lines decide the ADR row first, then the rest of the paragraph.
             span = " ".join(run[i][1] for i in lines) + " " + text
             findings.append((added[0], f'status restated ("{" ".join(m.group().split())}")', span))
     return findings
@@ -162,18 +168,23 @@ def ledger_row(repo, head, path, text):
 def check(repo, base, head=None):
     """Return (merge base, formatted findings) for Markdown lines added since the merge base."""
     since = git(repo, "merge-base", base, head or "HEAD", hint=REVISION_HINT).strip()
-    diff = git(repo, "-c", "core.quotePath=false", "diff", "--no-color", "--no-ext-diff", "-U1", "-M",
+    diff = git(repo, "-c", "core.quotePath=false", "diff", "--no-color", "--no-ext-diff", "-U0", "-M",
                "--src-prefix=a/", "--dst-prefix=b/", "--diff-filter=AMR", since, *([head] if head else []),
                "--", *MARKDOWN, hint=REVISION_HINT)
-    runs = list(added_runs(diff)) + ([] if head else list(untracked_runs(repo)))
+    changed = added_lines(diff) | ({} if head else untracked_lines(repo))
     out = set()
-    for path, run in runs:
+    for path, added in changed.items():
         if path == LEDGER or path.startswith(EVIDENCE):
             continue
-        for number, message, span in scan(run):
-            if span:
-                message += f"; link {ledger_row(repo, head, path, span)} instead"
-            out.add((path, number, message))
+        if head:
+            text = git(repo, "show", f"{head}:{path}")
+        else:
+            text = Path(repo, path).read_text(encoding="utf-8", errors="replace")
+        for run in paragraphs(text, added):
+            for number, message, span in scan(run):
+                if span:
+                    message += f"; link {ledger_row(repo, head, path, span)} instead"
+                out.add((path, number, message))
     return since, [f"{path}:{number}: {message}" for path, number, message in sorted(out)]
 
 
