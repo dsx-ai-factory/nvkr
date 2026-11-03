@@ -43,7 +43,7 @@ Related: <!-- #123 or N/A -->
 ## Testing
 
 ```bash
-# Commands run (the canonical local gate)
+# Commands run (the code gate; make ci-check adds every other locally reproducible merge-gate check)
 make check
 ```
 

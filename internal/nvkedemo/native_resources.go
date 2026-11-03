@@ -19,15 +19,19 @@ import (
 // Zero selects the existing shared defaults; a memory/headroom override must be
 // complete. Zero VCPUs preserves the existing six-vCPU site and tenant shape.
 type NativeResources struct {
-	SiteMemoryGiB   int `yaml:"siteMemoryGiB" json:"siteMemoryGiB"`
-	TenantMemoryGiB int `yaml:"tenantMemoryGiB" json:"tenantMemoryGiB"`
-	HeadroomMiB     int `yaml:"headroomMiB" json:"headroomMiB"`
-	VCPUs           int `yaml:"vcpus,omitempty" json:"vcpus,omitempty"`
+	SiteMemoryGiB   int    `yaml:"siteMemoryGiB" json:"siteMemoryGiB"`
+	TenantMemoryGiB int    `yaml:"tenantMemoryGiB" json:"tenantMemoryGiB"`
+	HeadroomMiB     int    `yaml:"headroomMiB" json:"headroomMiB"`
+	VCPUs           int    `yaml:"vcpus,omitempty" json:"vcpus,omitempty"`
+	Profile         string `yaml:"profile,omitempty" json:"profile,omitempty"`
 }
 
 func selectedNativeResources(value NativeResources) (NativeResources, error) {
-	if value == (NativeResources{}) {
-		value = NativeResources{SiteMemoryGiB: 12, TenantMemoryGiB: tenantDemoMemoryGiB, HeadroomMiB: 4096}
+	if err := admitNativeResourceProfile(value.Profile, siteOVNVersion); err != nil {
+		return NativeResources{}, err
+	}
+	if value == (NativeResources{Profile: value.Profile}) {
+		value = NativeResources{SiteMemoryGiB: 12, TenantMemoryGiB: tenantDemoMemoryGiB, HeadroomMiB: 4096, Profile: value.Profile}
 	}
 	if value.VCPUs == 0 {
 		value.VCPUs = tenantDemoVCPUs
@@ -37,6 +41,88 @@ func selectedNativeResources(value NativeResources) (NativeResources, error) {
 		return NativeResources{}, configUsage("native resources require positive bounded siteMemoryGiB, tenantMemoryGiB, headroomMiB and vcpus")
 	}
 	return value, nil
+}
+
+// Small is an explicit functional-test candidate, not a physical minimum or
+// performance qualification. Empty preserves the existing native configuration.
+func admitNativeResourceProfile(profile, ovnVersion string) error {
+	switch profile {
+	case "":
+		return nil
+	case "small":
+		if ovnVersion == siteOVNVersion {
+			return nil
+		}
+		return nvkrerr.New(nvkrerr.CodeEngineCapability, "small native resource profile requires NVIDIA OVN %s", siteOVNVersion)
+	default:
+		return configUsage(fmt.Sprintf("unknown native resource profile %q", profile))
+	}
+}
+
+// An opt-in profile must be admitted before host, path or artifact work. Empty
+// keeps each existing boundary's validation order and default behavior intact.
+func admitNativeResourcesForNetwork(resources NativeResources, network string) error {
+	if resources.Profile == "" {
+		return nil
+	}
+	if _, err := selectedNativeResources(resources); err != nil {
+		return err
+	}
+	mode, err := nativeDeploymentNetwork(network)
+	if err != nil {
+		return err
+	}
+	version, _, _, err := selectedOVNOutputs(mode)
+	if err != nil {
+		return err
+	}
+	return admitNativeResourceProfile(resources.Profile, version)
+}
+
+func nativeReservedMemory(profile string) string {
+	if profile == "small" {
+		return "256Mi"
+	}
+	return "1Gi"
+}
+
+func nativeSmallKubeletScript(operatorFile, unitFile string) string {
+	// A map-valued flag replaces the whole map. Preserve source CPU/disk values.
+	const flags = "--kube-reserved=cpu=1000m,memory=256Mi,ephemeral-storage=1Gi"
+	const args = "\nKUBELET_EXTRA_ARGS=\"" + flags + "\"\n"
+	// systemd owns EnvironmentFile parsing; no shell eval or approximate parser.
+	// The transient child has independent bounds and is joined and collected.
+	// https://www.freedesktop.org/software/systemd/man/systemd-run.html
+	owner := func(file string) string {
+		return "systemd-run --quiet --wait --pipe --collect --expand-environment=no --property=Type=oneshot --property=TimeoutStartSec=10s --property=TimeoutStopSec=5s " + file + " /bin/sh -ec "
+	}
+	return "( test -f " + operatorQuote(unitFile) + " && test ! -L " + operatorQuote(unitFile) + " || exit 1; " +
+		"grep -Fx -- 'EnvironmentFile=-/etc/default/kubelet' " + operatorQuote(unitFile) + " >/dev/null; " +
+		"grep -Fx -- 'ExecStart=/usr/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS' " + operatorQuote(unitFile) + " >/dev/null; " +
+		"test -f " + operatorQuote(operatorFile) + " && test ! -L " + operatorQuote(operatorFile) + " && test -O " + operatorQuote(operatorFile) + " || exit 1; " +
+		"test \"$(wc -c < " + operatorQuote(operatorFile) + ")\" -le 65536; " +
+		owner(operatorQuote("--property=EnvironmentFile="+operatorFile)) + operatorQuote(`test -z "${KUBELET_EXTRA_ARGS-}"`) + "; " +
+		"candidate=$(mktemp " + operatorQuote(operatorFile+".nvkr-small.XXXXXX") + "); trap 'rm -f -- \"$candidate\"' EXIT; " +
+		"cat " + operatorQuote(operatorFile) + " > \"$candidate\"; printf '%s' " + operatorQuote(args) + " >> \"$candidate\"; " +
+		owner(`"--property=EnvironmentFile=$candidate"`) + operatorQuote(`test "$KUBELET_EXTRA_ARGS" = `+operatorQuote(flags)) + "; " +
+		"mv -f -- \"$candidate\" " + operatorQuote(operatorFile) + " )"
+}
+
+func nativeKubeletProfilePreparation(ctx context.Context, profile string) (string, error) {
+	if err := admitNativeResourceProfile(profile, siteOVNVersion); err != nil {
+		return "", err
+	}
+	if profile != "small" {
+		return "", nil
+	}
+	if _, err := remainingWork(ctx); err != nil {
+		return "", err
+	}
+	deadline, _ := ctx.Deadline()
+	// Two manager-owned oneshots each allow start/stop 10+5s. Unlike Type=exec,
+	// a signal cannot count as successful completion of the shell predicate.
+	// Refuse before spawning if the outer guest deadline cannot join both.
+	return fmt.Sprintf("test $((%d - $(date +%%s))) -ge 60\nsystemctl stop kubelet.service\n", deadline.Unix()) + nativeSmallKubeletScript("/etc/default/kubelet", "/lib/systemd/system/kubelet.service.d/10-kubeadm.conf") + "\n", nil
 }
 
 type nativeResourceAdmission struct {

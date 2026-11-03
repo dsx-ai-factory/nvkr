@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # nvkr — Definition -> Run -> Release tooling.
-# Run `make help` for targets; `make check` is the full local completion gate.
+# Run `make help` for targets. `make check` is the code gate; `make ci-check` runs every
+# merge-gate check that can run locally.
 
 BIN         := bin/nvkr
 DEMO_BIN    ?= bin/nvke-demo
@@ -103,6 +104,13 @@ vulncheck: go-version-check ## Check reachable Go vulnerabilities using the pinn
 	GOBIN="$(CURDIR)/bin" go -C toolchains/govulncheck install tool
 	"$(CURDIR)/bin/govulncheck" ./...
 
+.PHONY: actionlint
+actionlint: go-version-check ## Lint GitHub workflows with the actionlint pinned in toolchains/actionlint.
+	@# actionlint silently skips its run-script checks when shellcheck is absent.
+	@command -v shellcheck >/dev/null 2>&1 || { echo "shellcheck not installed — https://www.shellcheck.net/"; exit 1; }
+	GOBIN="$(CURDIR)/bin" go -C toolchains/actionlint install tool
+	"$(CURDIR)/bin/actionlint"
+
 .PHONY: test
 test: ## Fast default tests for CI and agents (no extended fixtures or instrumentation).
 	go test -timeout $(GO_TEST_TIMEOUT) $(GO_TEST_FLAGS) $(PKG)
@@ -143,8 +151,13 @@ notices-check: ## Verify THIRD_PARTY_NOTICES.md matches the linked module set (d
 	./scripts/gen-notices.sh --check
 
 # Only the pages listed in docs/index.yml are published to the Fern site; contributor,
-# ADR and evidence documents stay on GitHub and are not checked here. Fern is
-# deliberately unpinned: install it with `npm install -g fern-api@latest`.
+# ADR and evidence documents stay on GitHub and are not checked here.
+#
+# The Fern CLI and its dependencies are locked with integrity hashes in
+# tools/fern/package-lock.json, and fern/fern.config.json names the same version.
+# `make fern-install` is the only install path, for local use and CI alike. Every Fern
+# invocation sets FERN_NO_VERSION_REDIRECTION so the CLI never swaps itself for a
+# version that a fern.config.json names; update the pin as a reviewed dependency change.
 #
 # The Fern checks run on an isolated copy holding only index.yml, the listed pages and
 # fern/ without its registered versions. A link from a published page to anything else
@@ -153,11 +166,16 @@ notices-check: ## Verify THIRD_PARTY_NOTICES.md matches the linked module set (d
 # Registered release snapshots are materialized only when publishing, so they are
 # left out of this check. `broken-links --strict` is required: without it Fern prints
 # the errors and still exits 0.
+FERN := $(CURDIR)/tools/fern/node_modules/.bin/fern
 DOCS_PAGES := $(shell sed -n 's|^ *path: \(.*\.md\)$$|docs/\1|p' docs/index.yml 2>/dev/null)
 
+.PHONY: fern-install
+fern-install: ## Install the locked Fern CLI into tools/fern (needs node and npm).
+	npm ci --prefix tools/fern --omit=optional --ignore-scripts --no-audit --no-fund
+
 .PHONY: docs-check
-docs-check: ## Validate the published Fern docs (needs node and fern-api).
-	@command -v fern >/dev/null 2>&1 || { echo "fern not installed — npm install -g fern-api@latest" >&2; exit 1; }
+docs-check: ## Validate the published Fern docs (needs node and `make fern-install`).
+	@[ -x "$(FERN)" ] || { echo "locked Fern CLI not installed — run make fern-install" >&2; exit 1; }
 	@[ -n "$(DOCS_PAGES)" ] || { echo "no pages listed in docs/index.yml" >&2; exit 1; }
 	python3 tools/check-docs-mdx $(DOCS_PAGES)
 	@set -e; \
@@ -169,10 +187,10 @@ docs-check: ## Validate the published Fern docs (needs node and fern-api).
 	   command -v yq >/dev/null 2>&1 || { echo "yq is required to ignore registered versions in fern/docs.yml" >&2; exit 1; }; \
 	   yq -i 'del(.products[].versions)' "$$work/fern/docs.yml"; \
 	 fi; \
-	 cd "$$work"; \
-	 echo "fern check"; fern check; \
-	 echo "fern docs md check"; fern docs md check; \
-	 echo "fern docs broken-links --strict"; fern docs broken-links --strict
+	 cd "$$work"; export FERN_NO_VERSION_REDIRECTION=true; \
+	 echo "fern check"; "$(FERN)" check; \
+	 echo "fern docs md check"; "$(FERN)" docs md check; \
+	 echo "fern docs broken-links --strict"; "$(FERN)" docs broken-links --strict
 
 ADDLICENSE_VERSION := v1.1.1
 LICENSE_HOLDER     := NVIDIA CORPORATION & AFFILIATES
@@ -230,6 +248,12 @@ workflow-generator: go-version-check
 		-ldflags '-X main.version=dev -X main.commit=unknown' \
 		-o bin/nvkr-exec ./cmd/nvkr
 
+# Diagnostic: `make workflows-check PROJECTION_PILOT=in-process` or `=out-of-process` checks the
+# production, development and NVKE family producer bundles through the reference projection
+# plugin over that transport. Qualification workflows and runtime bundles stay core-only.
+PROJECTION_PILOT ?=
+PROJECTION_PILOT_FLAG = $(if $(PROJECTION_PILOT),--projection-pilot=$(PROJECTION_PILOT))
+
 .PHONY: workflows-check
 workflows-check: workflow-generator pipeline-dev-check nvke-split-check catalog-refresh-check ## Check committed producer, qualification, development and family bundles and the catalog refresh workflow for drift.
 	@# Repeat the committed Plan's authored selection, including focused feature-branch
@@ -238,7 +262,7 @@ workflows-check: workflow-generator pipeline-dev-check nvke-split-check catalog-
 	 environment="$$(jq -er '.environmentPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
 	 bin/nvkr-exec run generate --engine github \
 		--definition "$$definition" --environment "$$environment" \
-		--qualification-policy inputs/policies/nvke-qualification.yaml --root . --check
+		--qualification-policy inputs/policies/nvke-qualification.yaml --root . --check $(PROJECTION_PILOT_FLAG)
 	bin/nvkr-exec run generate --engine github \
 		--definition inputs/definitions/demo/arm64-nvidia-kvm.json \
 		--environment inputs/environments/github-nightly-nvidia.json \
@@ -286,19 +310,19 @@ workflows-generate: workflow-generator pipeline-dev-generate nvke-split-generate
 	$(MAKE) catalog-refresh-generate
 
 .PHONY: nvke-split-generate
-nvke-split-generate: workflow-generator ## Regenerate the four independent NVKE family bundles.
-	@set -e; for family in core services telemetry disks; do \
+nvke-split-generate: workflow-generator ## Regenerate the five independent NVKE family bundles.
+	@set -e; for family in core services telemetry disks disks-ubuntu24; do \
 		bin/nvkr-exec run generate --engine github \
 			--definition "inputs/definitions/nvke/$$family.yaml" \
 			--environment "inputs/environments/github-nvke-$$family.yaml" --root .; \
 	done
 
 .PHONY: nvke-split-check
-nvke-split-check: workflow-generator ## Check the four independent NVKE family bundles without changing files.
-	@set -e; for family in core services telemetry disks; do \
+nvke-split-check: workflow-generator ## Check the five independent NVKE family bundles without changing files.
+	@set -e; for family in core services telemetry disks disks-ubuntu24; do \
 		bin/nvkr-exec run generate --engine github \
 			--definition "inputs/definitions/nvke/$$family.yaml" \
-			--environment "inputs/environments/github-nvke-$$family.yaml" --root . --check; \
+			--environment "inputs/environments/github-nvke-$$family.yaml" --root . --check $(PROJECTION_PILOT_FLAG); \
 	done
 
 .PHONY: pipeline-dev-generate
@@ -313,14 +337,24 @@ pipeline-dev-check: workflow-generator ## Check development workflow generation 
 	bin/nvkr-exec run generate --engine github \
 		--definition inputs/definitions/nvke/definition.yaml \
 		--environment inputs/environments/github-development.yaml \
-		--qualification-policy inputs/policies/nvke-development-qualification.yaml --root . --check
+		--qualification-policy inputs/policies/nvke-development-qualification.yaml --root . --check $(PROJECTION_PILOT_FLAG)
 
 .PHONY: pipeline-dev-run
 pipeline-dev-run: pipeline-dev-check ## Dispatch the clean, pushed current branch (PIPELINE_DEV_REPO=owner/repo).
 	python3 scripts/pipeline-dev.py --repo "$$PIPELINE_DEV_REPO"
 
 .PHONY: check
-check: go-version-check fmt-check definitions-location-check license-header-check vet lint shellcheck test-ci-tools test vulncheck ## Full local gate — run before pushing.
+check: go-version-check fmt-check definitions-location-check license-header-check vet lint shellcheck test-ci-tools test vulncheck ## Code gate: format, Definition location, license, vet, lint, shell, tool tests, Go tests, vulnerabilities.
+
+# Every merge-gate check that can run locally; CI runs `make test` as test-shard
+# slices. internal/cicontract requires this list to equal the make targets the
+# merge gate runs. CodeQL and the DCO App run only on GitHub.
+# Checks needing extra tools or private access run before the long test suite.
+CI_CHECKS := fmt-check definitions-location-check license-header-check shellcheck actionlint \
+	notices-check workflows-check docs-check vet test-ci-tools build lint vulncheck test
+
+.PHONY: ci-check
+ci-check: go-version-check $(CI_CHECKS) ## Complete local merge gate (needs private NVKE access, Node and Fern; see CONTRIBUTING.md).
 
 .PHONY: clean
 clean: ## Remove build output, coverage, and the local engine workspace.

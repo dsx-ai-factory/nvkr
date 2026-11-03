@@ -191,6 +191,7 @@ func TestNativeIdentityCompletionControlsDependencyLifetime(t *testing.T) {
 		{name: "joined success", completion: siteidentity.JoinedSuccess},
 		{name: "joined helper failure", completion: siteidentity.JoinedFailure, commandErr: &CommandError{ExitCode: 17}, wantError: true},
 		{name: "unknown exit zero", completion: siteidentity.Unknown, wantUnknown: true, wantError: true},
+		{name: "unknown exit nonzero", completion: siteidentity.Unknown, commandErr: &CommandError{ExitCode: 22}, wantUnknown: true, wantError: true},
 		{name: "missing result", raw: "missing", wantUnknown: true, wantError: true},
 		{name: "unjoined local child", completion: siteidentity.JoinedSuccess, commandErr: ErrUnjoined, wantUnknown: true, wantError: true},
 		{name: "parent cancellation drains accepted call", completion: siteidentity.JoinedSuccess, cancel: true, wantError: true},
@@ -217,6 +218,9 @@ func TestNativeIdentityCompletionControlsDependencyLifetime(t *testing.T) {
 			})
 			if (err != nil) != tc.wantError || errors.Is(err, ErrUnjoined) != tc.wantUnknown || errors.Is(attempt.unjoinedWork, ErrUnjoined) != tc.wantUnknown {
 				t.Fatalf("err=%v retained=%v", err, attempt.unjoinedWork)
+			}
+			if tc.commandErr != nil && !errors.Is(err, tc.commandErr) {
+				t.Fatal("completion handling lost its original command failure", err)
 			}
 		})
 	}
@@ -252,7 +256,7 @@ func TestNativeIdentityCompletionControlsDependencyLifetime(t *testing.T) {
 
 func TestNativeIdentityStagingUsesObservedCommandCompletion(t *testing.T) {
 	digest := strings.Repeat("a", 64)
-	receipt := digest + "  /tmp/nvkr-site-identity.fixture/helper\n"
+	receipt := digest + "  /tmp/nvkr-site-identity/stage.fixture/helper\n"
 	for _, tc := range []struct {
 		name       string
 		raw        string
@@ -261,6 +265,10 @@ func TestNativeIdentityStagingUsesObservedCommandCompletion(t *testing.T) {
 	}{
 		{"joined exact receipt", receipt, nil, false},
 		{"joined wrong hash", strings.Replace(receipt, digest, strings.Repeat("b", 64), 1), nil, false},
+		{"old unmounted temporary path", digest + "  /tmp/nvkr-site-identity.fixture/helper\n", nil, false},
+		{"another directory", digest + "  /tmp/another/stage.fixture/helper\n", nil, false},
+		{"escaped staging path", digest + "  /tmp/nvkr-site-identity/../stage.fixture/helper\n", nil, false},
+		{"empty attempt name", digest + "  /tmp/nvkr-site-identity/stage./helper\n", nil, false},
 		{"joined malformed receipt", "untrusted response", nil, false},
 		{"joined exit failure", "", &CommandError{ExitCode: 7, Cause: errors.New("synthetic remote staging failure")}, false},
 		{"no remote exit observed", "", &CommandError{ExitCode: -1, Cause: context.DeadlineExceeded}, true},

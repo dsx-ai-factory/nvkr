@@ -4,6 +4,7 @@
 package nvkedemo
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,14 +14,20 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/siteidentity"
 )
 
 func TestNativeSharedSetupPrecedesOrdinaryTenantAndStopsDiagnostic(t *testing.T) {
 	for _, tc := range []struct {
 		name                    string
 		ordinary, importFailure bool
+		handoffResult           string
+		profile                 string
 	}{
-		{"site", false, false}, {"tenant", true, false}, {"policy import failure", false, true},
+		{name: "site"}, {name: "small site", profile: "small"}, {name: "tenant", ordinary: true}, {name: "policy import failure", importFailure: true},
+		{name: "wrong handoff caller", handoffResult: "caller"}, {name: "missing handoff status", handoffResult: "status"}, {name: "wrong permanent endpoint", handoffResult: "endpoint"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ordinary := tc.ordinary
@@ -45,6 +52,7 @@ umask 077
 case "$1:$2" in
  generate:sitespec)
   case "$*" in *"cluster.podCidr=10.244.0.0/16"*"cluster.serviceCidr=10.96.0.0/16"*) ;; *) exit 54;; esac
+  case " $* " in *" cluster.kubeletConfig.systemReservedMemory=$EXPECTED_RESERVED "*) ;; *) exit 61;; esac
   test -f "$NVKECTL_SPIRE_CA_CERT_FILE"
   test -f "$NVKECTL_SPIRE_CA_KEY_FILE"
   case "$*" in *spire.upstreamCA=true*) ;; *) exit 50;; esac
@@ -56,6 +64,8 @@ case "$1:$2" in
   case " $* " in *" --nvke-controller-image $EXPECTED_CONTROLLER_IMAGE "*) ;; *) exit 56;; esac
   case " $* " in *" --provisioned-provider-image docker.io/library/provider:fixture "*) ;; *) exit 57;; esac
   printf 'bootstrap\n' >> "$EVENTS"
+  printf 'PRIVATE_BOOTSTRAP_STDOUT\n'
+  printf 'PRIVATE_BOOTSTRAP_STDERR\n' >&2
   while test "$#" -gt 0; do
    if test "$1" = --kubeconfig-out; then shift; printf 'private-fixture-config\n' > "$1"; break; fi
    shift
@@ -73,6 +83,7 @@ esac
 			for name, event := range map[string]string{"deploy/nvke-deploy.sh": "deploy", "controller/hack/apply-capi-spiffe-exec-auth.sh": "spiffe"} {
 				body := "#!/bin/sh\nset -eu\n"
 				if event == "deploy" {
+					body += "printf 'PRIVATE_DEPLOY_STDOUT\\n'\nprintf 'PRIVATE_DEPLOY_STDERR\\n' >&2\n"
 					body += ` test -n "$NVKECTL_NICO_TOKEN"
  test -n "$NVKECTL_NODE_USER"
  test -n "$NVKECTL_NODE_PASSWORD"
@@ -80,6 +91,8 @@ esac
  test -f "$NVKECTL_SPIRE_CA_CERT_FILE"
  test -f "$NVKECTL_SPIRE_CA_KEY_FILE"
  case "$*" in *--stack-config*) ;; *) exit 53;; esac
+ case " $* " in *" --values-for controller=$FIXTURE/controller-native-tenant-security.json "*) ;; *) exit 59;; esac
+ case " $* " in *" --values-for spire=$FIXTURE/spire-native-tenant-security.json "*) ;; *) exit 60;; esac
  test "$HELM_PLUGINS" = "$FIXTURE/site-helm/plugins"
  test "$NVKR_SITE_KUBECTL" = "$FIXTURE/tools/kubectl"
  test -f "$HELM_PLUGINS/nvkr-site-startup/plugin.yaml"
@@ -93,12 +106,12 @@ esac
 set -eu
 printf 'kubectl\n' >> "$EVENTS"
 case "$*" in
- *"get deployments"*) printf '%s\n' '{"items":[{"metadata":{"namespace":"nke-controller"},"spec":{"selector":{"matchLabels":{"app.kubernetes.io/instance":"nke-controller","app.kubernetes.io/name":"cloud-workflow-engine"}}}}]}' ;;
+ *"get deployments"*) printf '%s\n' '{"items":[{"metadata":{"name":"nke-controller","namespace":"nke-controller"},"spec":{"selector":{"matchLabels":{"app.kubernetes.io/instance":"nke-controller","app.kubernetes.io/name":"nke-controller"}},"template":{"spec":{"containers":[{"name":"nke-controller"}]}}}}]}' ;;
 esac
 `), 0700)
 			handoff := &nativeHandoff{result: make(chan error, 1)}
 			handoff.result <- nil
-			attempt := nativeSiteAttempt{use: runNativeDemo, bridge: linuxNativeBridge(), bootstrap: &hostBootstrap{}, network: "upstream-ovn", handoff: handoff, files: filepath.Join(root, "files"), assets: NativeAssets{arch: "arm64", CLI: cli, HostTools: tools, Installer: installer, installerSelection: selection, Images: map[string]NativeImageAsset{
+			attempt := nativeSiteAttempt{resources: NativeResources{Profile: tc.profile}, use: runNativeDemo, bridge: linuxNativeBridge(), bootstrap: &hostBootstrap{}, network: "upstream-ovn", handoff: handoff, files: filepath.Join(root, "files"), assets: NativeAssets{arch: "arm64", CLI: cli, HostTools: tools, Installer: installer, installerSelection: selection, Images: map[string]NativeImageAsset{
 				"controller": {File: "controller.tar", Reference: "docker.io/library/controller:fixture"}, "provisioned-provider": {File: "provider.tar", Reference: "docker.io/library/provider:fixture"}, "profiles": {Reference: "docker.io/library/profiles:fixture"},
 			}}}
 			tenantFixture := nativeCAPITenantFixture(t, GuestCIDR, "upstream-ovn")
@@ -107,7 +120,37 @@ esac
 				attempt.assets.Images[role] = tenantFixture.assets.Images[role]
 			}
 			installNativeIdentityFixture(t, &attempt, tools, root)
-			runner := Runner{Work: root, Env: []string{"PATH=" + tools + ":/usr/bin:/bin", "FIXTURE=" + root, "EVENTS=" + events, "EXPECTED_CONTROLLER_IMAGE=" + attempt.assets.Images["controller"].Reference}}
+			if tc.handoffResult != "" {
+				path := filepath.Join(root, "identity-result.json")
+				raw, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var result siteidentity.Result
+				if err := json.Unmarshal(raw, &result); err != nil {
+					t.Fatal(err)
+				}
+				switch tc.handoffResult {
+				case "caller":
+					result.CallerID = "spiffe://other.example.test/controller"
+				case "status":
+					result.Status = nil
+				case "endpoint":
+					result.Status.ServerAddress = "192.0.2.42"
+				}
+				raw, err = canonical.Marshal(result)
+				if err != nil {
+					t.Fatal(err)
+				}
+				writeTenantFixture(t, path, raw, 0600)
+			}
+			var public bytes.Buffer
+			runner := Runner{Work: root, Progress: &public, output: &public, Env: []string{"PATH=" + tools + ":/usr/bin:/bin", "FIXTURE=" + root, "EVENTS=" + events, "EXPECTED_CONTROLLER_IMAGE=" + attempt.assets.Images["controller"].Reference}}
+			reserved := "1Gi"
+			if tc.profile == "small" {
+				reserved = "256Mi"
+			}
+			runner.Env = SetEnv(runner.Env, map[string]string{"EXPECTED_RESERVED": reserved})
 			var row nativeInstance
 			if err = json.Unmarshal([]byte("{\"id\":\"site-fixture\",\"interfaces\":[{\"ipAddresses\":[\"172.30.0.2\",\"172.30.0.3\"]}]}"), &row); err != nil {
 				t.Fatal(err)
@@ -124,6 +167,36 @@ esac
 				err = attempt.ready(ctx, runner, row, tools, root, server)
 			} else {
 				_, err = attempt.setup(ctx, runner, row, tools, root, server)
+			}
+			for item, expected := range nativeTenantSecurityValues() {
+				raw, readErr := os.ReadFile(filepath.Join(root, item+"-native-tenant-security.json"))
+				if readErr != nil {
+					t.Fatal(readErr)
+				}
+				var got, want any
+				encoded, encodeErr := json.Marshal(expected)
+				if encodeErr != nil || json.Unmarshal(encoded, &want) != nil || json.Unmarshal(raw, &got) != nil || !reflect.DeepEqual(got, want) {
+					t.Fatal("installer must receive only its selected chart's values", item)
+				}
+			}
+			if strings.Contains(public.String(), "PRIVATE_BOOTSTRAP_") || strings.Contains(public.String(), "PRIVATE_DEPLOY_") {
+				t.Fatal("bootstrap or deployment output escaped its private capture")
+			}
+			if tc.handoffResult != "" {
+				want := "source-owned SPIRE status differs from its selected permanent endpoint"
+				if tc.handoffResult == "caller" {
+					want = "handoff caller differs from the admitted controller"
+				}
+				var failure *nativeSiteIdentityFailure
+				if !errors.As(err, &failure) || failure.cause.Error() != want {
+					t.Fatal("handoff result crossed its caller or permanent-endpoint admission", err)
+				}
+				events, readErr := os.ReadFile(events)
+				receipts, globErr := filepath.Glob(filepath.Join(root, "site-identity-*", "completed.json"))
+				if readErr != nil || globErr != nil || len(receipts) != 0 || strings.Count(string(events), "identity-import\n") != 1 || strings.Count(string(events), "identity-handoff\n") != 1 {
+					t.Fatal("rejected handoff retried mutation or issued completion", readErr, globErr)
+				}
+				return
 			}
 			if tc.importFailure {
 				var failure *nativeSiteIdentityFailure

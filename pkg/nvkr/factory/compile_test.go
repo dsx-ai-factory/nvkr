@@ -5,6 +5,8 @@ package factory
 
 import (
 	"context"
+	"fmt"
+	"maps"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -108,6 +110,47 @@ func TestCompileBuildsExplicitArtifactAndDeliveryGraph(t *testing.T) {
 		t.Fatal("accepted unavailable APT publisher")
 	}
 
+}
+
+func TestCompileDocumentsLoadsEachCatalogStackOnce(t *testing.T) {
+	base, err := catalog.LoadContext(t.Context(), testCatalogProvider(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stack, err := catalog.ApplyStack(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Each output names the top-level base with its own overlays. Equal selections
+	// share one load; an empty overlay entry or a different order is a new selection.
+	for _, tc := range []struct {
+		name          string
+		first, second []string
+		want          map[string]int
+	}{
+		{"empty overlay entry", nil, []string{""}, map[string]int{"[]": 1, `[""]`: 1}},
+		{"reversed overlay order", []string{"a", "b"}, []string{"b", "a"}, map[string]int{"[]": 1, `["a" "b"]`: 1, `["b" "a"]`: 1}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			definition, delivery := fixtureInputs("ai-factory", "containerd-tools", "")
+			topLevel := definition.Catalog.Base
+			definition.Outputs[0].Components, definition.Outputs[0].Catalog = []string{"containerd"}, &authored.Catalog{Base: topLevel, Overlays: tc.first}
+			definition.Outputs = append(definition.Outputs, authored.DefinitionOutput{Name: "kubelet-tools", Platform: "linux/amd64",
+				Format: authored.OutputExecutable, Components: []string{"kubelet"}, Catalog: &authored.Catalog{Base: topLevel, Overlays: tc.second}})
+			loads := map[string]int{}
+			plan, err := compileDocumentsWithLoader(t.Context(), "definition.yaml", definition, "environment.yaml", delivery, "test",
+				func(_ context.Context, spec authored.Catalog) (*catalog.Stack, error) {
+					loads[fmt.Sprintf("%q", spec.Overlays)]++
+					return stack, nil
+				})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(plan.LifecycleOutputs) != 2 || !maps.Equal(loads, tc.want) {
+				t.Fatalf("catalog stacks were not loaded exactly once each: outputs=%d loads=%v want %v", len(plan.LifecycleOutputs), loads, tc.want)
+			}
+		})
+	}
 }
 
 func contains(values []string, wanted string) bool {

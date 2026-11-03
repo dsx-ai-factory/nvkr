@@ -19,17 +19,40 @@ import (
 // input; tests admit it from memory through the real bounded reader.
 const nvkeCompositePath = "inputs/definitions/nvke/composite.yaml"
 
+// nvkeCompositeFamilies are the worked example's members. The Ubuntu 24.04 disk
+// family shares component names with the Ubuntu 26.04 one, so ADR-26 refuses it
+// as a separate member; a composite holding both series needs them in one member.
+var nvkeCompositeFamilies = []string{"core", "disks", "services", "telemetry"}
+
+const nvkeCompositeExcludedFamily = "disks-ubuntu24"
+
+func nvkeCompositeMember(t *testing.T, family string) authored.CompositeMember {
+	t.Helper()
+	path, _ := nvkeSplitPaths(family)
+	digest, err := nvkeSplitDefinition(t, path).Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return authored.CompositeMember{Name: "nvke-" + family, Definition: family + ".yaml", Digest: digest}
+}
+
+// nvkeCompositeExcludedOutputs names the family-only outputs the worked example omits.
+func nvkeCompositeExcludedOutputs(t *testing.T) map[string]bool {
+	t.Helper()
+	path, _ := nvkeSplitPaths(nvkeCompositeExcludedFamily)
+	excluded := map[string]bool{}
+	for _, output := range nvkeSplitDefinition(t, path).Outputs {
+		excluded[output.Name] = true
+	}
+	return excluded
+}
+
 func nvkeComposite(t *testing.T, extra ...authored.CompositeMember) authored.CompositeDefinition {
 	t.Helper()
 	composite := authored.CompositeDefinition{APIVersion: authored.CompositeAPIVersion, Kind: authored.CompositeKind,
 		Metadata: authored.Metadata{Name: "nvke-composite"}}
-	for _, family := range []string{"core", "disks", "services", "telemetry"} {
-		path, _ := nvkeSplitPaths(family)
-		digest, err := nvkeSplitDefinition(t, path).Digest()
-		if err != nil {
-			t.Fatal(err)
-		}
-		composite.Members = append(composite.Members, authored.CompositeMember{Name: "nvke-" + family, Definition: family + ".yaml", Digest: digest})
+	for _, family := range nvkeCompositeFamilies {
+		composite.Members = append(composite.Members, nvkeCompositeMember(t, family))
 	}
 	composite.Members = append(composite.Members, extra...)
 	slices.SortFunc(composite.Members, func(a, b authored.CompositeMember) int { return strings.Compare(a.Name, b.Name) })
@@ -52,9 +75,9 @@ func TestNVKECompositeAdmission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	effective, want := composition.Effective(), len(combined.Outputs)+len(nvkeFamilyOnlyOutputs)
-	if len(composition.Members()) != 4 || len(effective.Outputs) != want || len(composition.Attribution()) != want {
-		t.Fatalf("composite admits %d members and %d outputs, want 4 and %d", len(composition.Members()), len(effective.Outputs), want)
+	effective, want := composition.Effective(), len(combined.Outputs)+len(nvkeFamilyOnlyOutputs)-len(nvkeCompositeExcludedOutputs(t))
+	if len(composition.Members()) != len(nvkeCompositeFamilies) || len(effective.Outputs) != want || len(composition.Attribution()) != want {
+		t.Fatalf("composite admits %d members and %d outputs, want %d and %d", len(composition.Members()), len(effective.Outputs), len(nvkeCompositeFamilies), want)
 	}
 	if !bytes.Equal(mustCanonical(t, effective.Catalog), mustCanonical(t, combined.Catalog)) {
 		t.Fatal("rebasing beside the families changed the shared catalog stack")
@@ -65,7 +88,7 @@ func TestNVKECompositeAdmission(t *testing.T) {
 		mutate        func(*authored.CompositeDefinition)
 		code          e.Code
 	}{
-		{name: "combined Definition as fifth member", code: e.CodeInvalidCatalog, message: "is declared by members",
+		{name: "combined Definition as extra member", code: e.CodeInvalidCatalog, message: "is declared by members",
 			extra: authored.CompositeMember{Name: combined.Metadata.Name, Definition: "definition.yaml", Digest: combinedDigest}},
 		{name: "stale family pin", code: e.CodeUnverifiedRef, message: "run definition pin", mutate: func(composite *authored.CompositeDefinition) {
 			composite.Members[3].Digest = combinedDigest
@@ -111,7 +134,19 @@ func TestNVKECompositeIdentityInvariance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := len(combined.Definition.Outputs) + len(nvkeFamilyOnlyOutputs); len(plan.LifecycleOutputs) != want || len(plan.Composition.Members) != 4 {
+	// Both Ubuntu disk series as separate members select divergent producers
+	// for the same components, which ADR-26 refuses at compilation.
+	bothSeries, err := admitNVKEComposite(t, nvkeComposite(t, nvkeCompositeMember(t, nvkeCompositeExcludedFamily)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = compileComposition(t.Context(), bothSeries, "inputs/environments/github-release.yaml", environment, combined.GeneratorVersion, loadStack)
+	assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
+	if !strings.Contains(err.Error(), "select divergent producers") {
+		t.Fatalf("refused for an unexpected reason: %v", err)
+	}
+	excluded := nvkeCompositeExcludedOutputs(t)
+	if want := len(combined.Definition.Outputs) + len(nvkeFamilyOnlyOutputs) - len(excluded); len(plan.LifecycleOutputs) != want || len(plan.Composition.Members) != len(nvkeCompositeFamilies) {
 		t.Fatalf("composite Plan has %d outputs, want %d", len(plan.LifecycleOutputs), want)
 	}
 	// The combined Definition lacks family-only outputs, so the plain baseline is the effective Definition.
@@ -123,6 +158,9 @@ func TestNVKECompositeIdentityInvariance(t *testing.T) {
 	assertPartitionsIgnoreMembers(t, partitioned, plan)
 	baselines, familyBuilds := []*Plan{combined}, 0
 	for _, family := range nvkeSplitFamilies {
+		if family.name == nvkeCompositeExcludedFamily {
+			continue
+		}
 		definitionPath, environmentPath := nvkeSplitPaths(family.name)
 		familyPlan, err := compileDocumentsWithLoader(t.Context(), definitionPath, nvkeSplitDefinition(t, definitionPath), environmentPath,
 			nvkeSplitEnvironment(t, environmentPath), combined.GeneratorVersion, loadStack)
@@ -149,11 +187,17 @@ func TestNVKECompositeIdentityInvariance(t *testing.T) {
 	}
 	for _, baseline := range baselines {
 		for _, build := range baseline.Builds {
+			if output, _, _ := strings.Cut(build.Name, "/"); excluded[output] {
+				continue
+			}
 			if !bytes.Equal(mustCanonical(t, build), builds[build.Name]) {
 				t.Fatalf("composition changed native build %q relative to %s", build.Name, baseline.Name)
 			}
 		}
 		for _, output := range baseline.LifecycleOutputs {
+			if excluded[output.Name] {
+				continue
+			}
 			if !bytes.Equal(mustCanonical(t, output), outputs[output.Name]) {
 				t.Fatalf("composition changed output %q relative to %s", output.Name, baseline.Name)
 			}

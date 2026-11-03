@@ -4,6 +4,7 @@
 package catalog
 
 import (
+	"slices"
 	"sort"
 	"strings"
 
@@ -15,13 +16,14 @@ func validateMaterialBindings(name string, component Component) error {
 	if len(component.Materials) == 0 {
 		return nil
 	}
-	if !component.FromSource {
+	pinnedTool := component.BuilderType == BuilderPinnedTool
+	if !component.FromSource && !pinnedTool {
 		return e.New(e.CodeInvalidCatalog,
-			"component %q: material bindings require a from-source component", name)
+			"component %q: material bindings require a from-source component or builderType pinned-tool", name)
 	}
-	if component.BuilderType != "" && component.BuilderType != BuilderVMImage && component.BuilderType != BuilderOCIHermetic {
+	if component.BuilderType != "" && component.BuilderType != BuilderVMImage && component.BuilderType != BuilderOCIHermetic && !pinnedTool {
 		return e.New(e.CodeInvalidCatalog,
-			"component %q: material bindings require builderType oci-hermetic or vm-image", name)
+			"component %q: material bindings require builderType oci-hermetic or vm-image, or pinned-tool", name)
 	}
 	boundComponents := make(map[string]string, len(component.Materials))
 	for _, binding := range sortedStringKeys(component.Materials) {
@@ -94,9 +96,12 @@ func validateMaterialGraph(components map[string]Component) error {
 				return e.New(e.CodeInvalidCatalog,
 					"component %q material binding %q references unknown component %q", name, binding, targetName)
 			}
-			if !target.FromSource && target.Prebuilt == nil {
+			if !target.FromSource && target.Prebuilt == nil && target.BuilderType != BuilderPinnedTool {
 				return e.New(e.CodeInvalidCatalog,
 					"component %q material binding %q references excluded component %q", name, binding, targetName)
+			}
+			if err := validateRegularFileMaterial(name, components[name], binding, targetName, target); err != nil {
+				return err
 			}
 		}
 	}
@@ -127,6 +132,29 @@ func validateMaterialGraph(components map[string]Component) error {
 	for _, name := range names {
 		if err := visit(name); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// validateRegularFileMaterial enforces ADR-27 §4: an OCI layout is never a material,
+// and a pinned-tool consumer stages only one regular file produced for its platform.
+func validateRegularFileMaterial(name string, consumer Component, binding, targetName string, target Component) error {
+	if target.OutputType == PinnedToolOutputOCILayout {
+		return e.New(e.CodeEngineCapability,
+			"component %q material %q binds OCI layout producer %q; layouts are not materials", name, binding, targetName)
+	}
+	if consumer.BuilderType != BuilderPinnedTool && target.BuilderType != BuilderPinnedTool {
+		return nil
+	}
+	if consumer.BuilderType == BuilderPinnedTool && !pinnedToolMaterialForm(target) {
+		return e.New(e.CodeEngineCapability,
+			"pinned-tool component %q material %q (%s) is not one regular file", name, binding, target.OutputType)
+	}
+	for _, platform := range consumer.Platforms {
+		if !slices.Contains(target.Platforms, platform) {
+			return e.New(e.CodeInvalidCatalog,
+				"component %q material %q is not produced by %q for platform %s", name, binding, targetName, platform)
 		}
 	}
 	return nil

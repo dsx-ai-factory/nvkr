@@ -19,7 +19,7 @@ import (
 )
 
 func resolveComponent(name string, raw rawComponent, sources map[string]Source, lock *PinLock) (Component, error) {
-	if raw.ToolchainImage != "" && !raw.FromSource {
+	if raw.ToolchainImage != "" && !raw.FromSource && raw.BuilderType != BuilderPinnedTool {
 		return Component{}, e.New(e.CodeInvalidCatalog, "component %q: toolchain override requires a from-source build", name)
 	}
 	c := Component{
@@ -42,6 +42,12 @@ func resolveComponent(name string, raw rawComponent, sources map[string]Source, 
 		ExclusionReason:        raw.ExclusionReason,
 
 		BuildRequirements: execution.Clone(raw.BuildRequirements),
+	}
+	if raw.BuilderType == BuilderPinnedTool {
+		return resolvePinnedTool(name, raw, sources, lock, c)
+	}
+	if raw.Tool != "" || len(raw.ToolArgs) != 0 || len(raw.ToolEnv) != 0 {
+		return c, e.New(e.CodeInvalidCatalog, "component %q: tool, toolArgs and toolEnv require builderType pinned-tool", name)
 	}
 	// Default the from-source builder to oci-hermetic so existing catalogs need no
 	// edit; nix is opt-in per component (ADR-10 §3).
@@ -160,10 +166,14 @@ func resolvePrebuilt(name string, raw rawComponent, src Source, pin Pin, lock *P
 		if pin.Tool == nil {
 			return c, e.New(e.CodeUnpinnedSource, "release executable %q has no source tool pin", name)
 		}
+		evidence, err := renderEvidence(name, raw.Prebuilt.Evidence, pin)
+		if err != nil {
+			return c, err
+		}
 		tool := pin.Tool.clone()
 		c.Prebuilt = &Prebuilt{URL: tool.URL, Executable: &tool,
 			Digests:  map[string]string{target.ExecutableArch(tool.Platform): tool.ExecutableDigest},
-			Evidence: raw.Prebuilt.Evidence}
+			Evidence: evidence}
 		return c, nil
 	}
 	url, err := renderRef("prebuilt.url", raw.Prebuilt.URL, pin)
@@ -181,7 +191,11 @@ func resolvePrebuilt(name string, raw rawComponent, src Source, pin Pin, lock *P
 	if raw.Prebuilt.Chart != nil {
 		url = lock.Artifacts[name].URL
 	}
-	c.Prebuilt = &Prebuilt{URL: url, Image: img, ImageParentDigest: lock.Artifacts[name].ImageParentDigest, Digests: digests, Evidence: raw.Prebuilt.Evidence}
+	evidence, err := renderEvidence(name, raw.Prebuilt.Evidence, pin)
+	if err != nil {
+		return c, err
+	}
+	c.Prebuilt = &Prebuilt{URL: url, Image: img, ImageParentDigest: lock.Artifacts[name].ImageParentDigest, Digests: digests, Evidence: evidence}
 	if raw.Prebuilt.Chart != nil && strings.HasPrefix(raw.Prebuilt.Chart.Repository, "oci://") {
 		for _, digest := range digests {
 			c.Prebuilt.OCIArchive = strings.TrimRight(strings.TrimPrefix(raw.Prebuilt.Chart.Repository, "oci://"), "/") + "/" + raw.Prebuilt.Chart.Name + "@" + digest
@@ -190,6 +204,25 @@ func resolvePrebuilt(name string, raw rawComponent, src Source, pin Pin, lock *P
 		c.Prebuilt.URL = ""
 	}
 	return c, nil
+}
+
+// renderEvidence copies the authored evidence declaration and renders its signer
+// identity against the version pin, so the identity names the pinned release.
+func renderEvidence(name string, authored *ExternalEvidence, pin Pin) (*ExternalEvidence, error) {
+	if authored == nil {
+		return nil, nil
+	}
+	evidence := *authored
+	if authored.Signer != nil {
+		signer := *authored.Signer
+		identity, err := renderRef("prebuilt.evidence.signer.identity", signer.Identity, pin)
+		if err != nil {
+			return nil, e.Wrap(e.CodeInvalidCatalog, err, "prebuilt component %q", name)
+		}
+		signer.Identity = identity
+		evidence.Signer = &signer
+	}
+	return &evidence, nil
 }
 
 // refData is the template context for rendering a prebuilt acquisition ref against
