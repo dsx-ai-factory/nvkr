@@ -54,7 +54,9 @@ accelerator: gb200, os: ubuntu, intent: training, platform: kubeflow` in three f
 `helm`, `flux` and `argocd-helm`. Output names carry the coordinate; the Definition
 carries no hardware model. The producers share the GB300 example's source, lock and
 layout handling, add `--platform` to the recipe, and build `helm` and `argocd-helm`
-with `--readiness-hooks` as AICR's NVKE guide directs. AICR labels this coordinate Preview.
+with `--readiness-hooks` as AICR's NVKE guide directs. Every format passes
+`--dra-eviction-node-label nvidia.com/dra-kubelet-plugin=true`, the label AICR's AKS and GKE
+guides set so driver upgrades can evict the DRA kubelet plugin. AICR labels this coordinate Preview.
 
 AICR `v1.2.0` refuses criteria that no applied overlay covers. The producer also
 requires the last `metadata.appliedOverlays` entry of the rendered recipe to be

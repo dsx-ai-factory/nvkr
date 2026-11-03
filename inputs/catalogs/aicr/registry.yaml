@@ -232,11 +232,14 @@ components:
         # AICR's NVKE guide gates network-operator readiness before the IB pools; Flux cannot.
         hooks=()
         case "$4" in helm | argocd-helm) hooks=(--readiness-hooks) ;; esac
-        # Layout output stages in the working directory; the source tree is read-only.
+        # The DRA eviction label lets driver upgrades evict the DRA kubelet plugin, as AICR's
+        # AKS and GKE guides set it. Layout output stages in the working directory; the source
+        # tree is read-only.
         (
           cd "$out"
           timeout --kill-after=10s 120s "$out/aicr" bundle \
             --recipe "$out/recipe.yaml" --deployer "$4" "${hooks[@]}" \
+            --dra-eviction-node-label nvidia.com/dra-kubelet-plugin=true \
             --output "oci-layout:$out/layout"
         )
         # Publish AICR's own layer bytes: one manifest holding the config and exactly one layer.

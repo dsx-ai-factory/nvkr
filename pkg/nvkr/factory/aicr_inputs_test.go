@@ -39,6 +39,7 @@ func TestMaintainedAICRBundleInputs(t *testing.T) {
 			contract: []string{
 				`--service "$1" --accelerator "$2" --platform "$3"`, "--os ubuntu --intent training",
 				`leaf="$2-$1-ubuntu-training-$3"`, `[ "$applied" = "$leaf" ] ||`, `--deployer "$4"`,
+				"--dra-eviction-node-label nvidia.com/dra-kubelet-plugin=true",
 			},
 		},
 	} {
