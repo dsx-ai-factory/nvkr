@@ -9,7 +9,7 @@ metadata:
 sources:
   nvke-os:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: v0.22.0
+    constraint: v0.23.0
     toolchainImagesByArch:
       # AMD64 is a substitution-only local baseline. ARM64 selects the native
       # Go 1.27.3 rebuild from workflow run 39522193703.
@@ -46,7 +46,7 @@ sources:
         }
   nvke-cni-calico-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: v0.22.0
+    constraint: v0.23.0
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
@@ -64,7 +64,7 @@ sources:
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
   nvke-kubeadm-distro-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: v0.22.0
+    constraint: v0.23.0
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
@@ -83,7 +83,7 @@ sources:
         cp -a "$bundle_root/dist" os-image/packages/kubeadm-distro/dist
   nvke-spire-agent-source:
     repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: v0.22.0
+    constraint: v0.23.0
     toolchainImagesByArch:
       amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
       arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
@@ -93,6 +93,28 @@ sources:
       - |
         make -C os-image/packages/spire-agent bundle nfpm \
           ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
+  nvke-doca-ovs-source:
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    constraint: v0.23.0
+    toolchainImagesByArch:
+      amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
+    vendorCommand:
+      - bash
+      - -ec
+      - |
+        test ! -e os-image/packages/doca-ovs/nvkr-debs
+        test ! -L os-image/packages/doca-ovs/nvkr-debs
+        # The source Makefile owns the DOCA version, package set and committed
+        # per-deb SHA-256 lock. Stage beside the checkout; protected vendors
+        # mount /tmp with noexec.
+        bundle_root="$(mktemp -d "$(dirname "$PWD")/nvkr-doca.XXXXXXXX")"
+        trap 'rm -rf -- "$bundle_root"' EXIT
+        timeout --kill-after=10s 540s make -C os-image/packages/doca-ovs debs \
+          ARCH={{.Arch}} UBUNTU_SERIES=26.04 \
+          DIST_DIR="$bundle_root/dist" OUT_DIR="$bundle_root/debs"
+        mkdir os-image/packages/doca-ovs/nvkr-debs
+        cp "$bundle_root/debs/"*.deb os-image/packages/doca-ovs/nvkr-debs/
 components:
   nvke-agent:
     platforms: [linux/amd64, linux/arm64]
@@ -231,6 +253,31 @@ components:
           -cf /src/nvkr-output/ovn-kubernetes-chart.tar ovn-kubernetes
     writeDir: nvkr-output
     artifactPath: nvkr-output/ovn-kubernetes-chart.tar
+  nvke-doca-ovs:
+    platforms: [linux/amd64, linux/arm64]
+    fromSource: true
+    source: nvke-doca-ovs-source
+    outputType: tarball
+    buildCommand:
+      - bash
+      - -ec
+      - |
+        # NVIDIA publishes these DOCA OVS debs without source; the vendor stage
+        # verified each against NVKE's committed lock.
+        cd /src/os-image/packages/doca-ovs/nvkr-debs
+        packages=(*.deb)
+        test "${#packages[@]}" -eq 8
+        switch=(doca-openvswitch-switch_*_{{.Arch}}.deb)
+        test "${#switch[@]}" -eq 1 && test -f "${switch[0]}"
+        test "$(dpkg-deb --field "${switch[0]}" Package)" = doca-openvswitch-switch
+        test "$(dpkg-deb --field "${switch[0]}" Architecture)" = "{{.Arch}}"
+        mkdir -p /src/nvkr-output
+        # The composer accepts only .deb archive members.
+        tar --format=ustar --sort=name --mtime="@$SOURCE_DATE_EPOCH" \
+          --owner=0 --group=0 --numeric-owner \
+          -cf /src/nvkr-output/nvke-doca-ovs.tar -- *.deb
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/nvke-doca-ovs.tar
   nvke-image-inputs:
     platforms: [linux/amd64, linux/arm64]
     fromSource: true
@@ -243,6 +290,7 @@ components:
       kubeadm-distro: nvke-kubeadm-distro
       ovn: nvke-cni-ovn
       spire-agent: nvke-spire-agent
+      doca-ovs: nvke-doca-ovs
     buildCommand:
       - bash
       - -ec

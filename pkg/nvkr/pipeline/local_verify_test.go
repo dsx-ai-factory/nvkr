@@ -18,7 +18,7 @@ import (
 // --keep-going gap and the "presence != verification" gap.
 func TestVerifyRunAuthoritative(t *testing.T) {
 	root := t.TempDir()
-	opts := withDefaults(RunOptions{SourceRoot: filepath.Join(root, "work", "src")})
+	opts := withDefaults(RunOptions{Ctx: t.Context(), SourceRoot: filepath.Join(root, "work", "src")})
 	producer := ir.Node{ID: "build-kubectl", Kind: ir.KindBuild, Component: "kubectl",
 		OutputType: "host-package", WriteDir: "out", ArtifactPath: "out/kubectl"}
 	full := artifactHostPath(opts, producer)

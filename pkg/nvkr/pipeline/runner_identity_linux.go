@@ -15,14 +15,10 @@ import (
 
 const maxQualifiedRunnerBytes int64 = 1 << 30
 
-// snapshotMappedRunnerExecutable copies the executable inode mapped by the current
+// snapshotMappedRunnerExecutableContext copies the executable inode mapped by the current
 // process, not the mutable pathname returned by os.Executable. Linux's proc magic
 // link retains access to the mapped inode even if the original path is renamed,
 // replaced, or unlinked. The returned descriptor remains held through stage two.
-func snapshotMappedRunnerExecutable() (*heldfile.File, func(), error) {
-	return snapshotMappedRunnerExecutableContext(context.Background())
-}
-
 func snapshotMappedRunnerExecutableContext(ctx context.Context) (*heldfile.File, func(), error) {
 	if ctx == nil {
 		return nil, nil, e.New(e.CodeUsage, "holding the mapped runner requires a non-nil context")

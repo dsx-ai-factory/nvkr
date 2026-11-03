@@ -5,10 +5,70 @@ controller and chart builds, operator executables, native node images and third-
 into one release with **69 named outputs**. This remains a candidate; completed pipeline delivery and
 full product acceptance are separate facts.
 
+## Working Definitions for an NVKE GPU site
+
+An NVKE GPU site needs a site controller cluster, node disks for the site and tenant node pools, and the AICR
+deploy bundle for each GPU workload. These Definitions supply them. Status reflects `main`. A pending row names
+the issue that adds it.
+
+| Definition | Environment | Produces | Lane when run | Status |
+|---|---|---|---|---|
+| [Core](core.yaml) | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) | Site controller: `nvkectl`, operator tools, AICR CLI, controller image and chart, CAPNICo, NICo charts and images, CAPI and cert-manager images | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
+| [Services](services.yaml) | [github-nvke-services.yaml](../../environments/github-nvke-services.yaml) | SPIRE, PostgreSQL, Temporal and local-path-provisioner charts and images | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
+| [Telemetry](telemetry.yaml) | [github-nvke-telemetry.yaml](../../environments/github-nvke-telemetry.yaml) | NKTP chart and images | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
+| [Disks](disks.yaml) | [github-nvke-disks.yaml](../../environments/github-nvke-disks.yaml) | Ubuntu 26.04 `nvke-node-image-{amd64,arm64}` and `nvke-node-fde-{amd64,arm64}` | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
+| Ubuntu 24.04 disks | — | `nvke-node-image-ubuntu24-{amd64,arm64}` and `nvke-node-fde-ubuntu24-{amd64,arm64}` | — | Pending [#323](https://github.com/dsx-ai-factory/nvkr/issues/323). Today only the build-only `static-unqualified` [Ubuntu 24 diagnostics](../diagnostics/ubuntu24/README.md) exist |
+| `controller-profiles` and an offline CAPI repository in Core | — | The profiles image NVKE's deploy path names, and `clusterctl` provider manifests | — | Pending [#324](https://github.com/dsx-ai-factory/nvkr/issues/324) |
+| [GB200 AICR bundle](../aicr/nvke-gb200.yaml) | [aicr-local-arm64.yaml](../../environments/aicr-local-arm64.yaml) (local build only) | `aicr-nvke-gb200-ubuntu-training-kubeflow-{helm,flux,argocd-helm}` | `unqualified-local-execution` | One local Run recorded ([AICR inputs](../aicr/README.md#gb200-nvke-kubeflow-training)); a hosted Release is pending [#325](https://github.com/dsx-ai-factory/nvkr/issues/325) |
+| GPU site composite | — | Every output above in one Release ([ADR-26](../../../docs/adr/0026-definition-composition.md)) | — | Pending [#326](https://github.com/dsx-ai-factory/nvkr/issues/326) |
+
+The [AICR inputs](../aicr/README.md) also hold a `generic` GB300 example, which is not an NVKE recipe and is
+not part of an NVKE site.
+
+From the repository root, regenerate or check the four family bundles:
+
+```sh
+make nvke-split-generate
+make nvke-split-check
+```
+
+Each family Run is a manual `workflow_dispatch` of `.github/workflows/nvkr-run-nvke-<family>.yml` on `main`,
+with the credentials in [Four-family pilot](#four-family-pilot). Each Run publishes one Release under
+`ghcr.io/dsx-ai-factory/nvkr/m2-candidate/<family>`. To consume them, follow
+[Install an NVKE site from the Releases](../../../docs/release-quickstart.md#install-an-nvke-site-from-the-releases).
+
+### GPU system matrix
+
+Definitions select outputs, not hardware: targets are platforms, and downstream systems own placement
+([ADR-12](../../../docs/adr/0012-criteria-model-and-aicr-activation.md#1-concrete-target-platforms),
+[ADR-19](../../../docs/adr/0019-clusterdefinition-and-provisioning-adapter-boundary.md#3-downstream-systems-own-deployment)).
+This table maps each GPU system to the outputs it uses. NVKE's node image excludes GPU drivers and NVIDIA fabric
+([NVKE `os-image/SPEC.md`](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/os-image/SPEC.md?plain=1#L192-L195)),
+so the disks are per Ubuntu series and architecture, not per GPU system. Each row's Ubuntu series, kernel and
+recipe requirements decide which disk a GPU system can use. Where a row names an AICR bundle, that bundle
+installs the GPU stack.
+
+| GPU system | CPU/arch | Worker disks | AICR bundle | Upstream status |
+|---|---|---|---|---|
+| GB200 | Grace, arm64 | `nvke-node-image-ubuntu24-arm64` (24.04, pending #323) and its FDE variant. The 26.04 `nvke-node-image-arm64` and `nvke-node-fde-arm64` are built, but the GB200 AICR recipe does not admit 26.04 | `aicr-nvke-gb200-ubuntu-training-kubeflow-*` from the [GB200 Definition](../aicr/README.md#gb200-nvke-kubeflow-training); hosted Release pending #325. Its recipe requires Ubuntu 24.04 ([leaf](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/recipes/overlays/gb200-nvke-ubuntu-training-kubeflow.yaml#L25-L34), [`os-ubuntu`](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/recipes/mixins/os-ubuntu.yaml#L23-L24)). AICR v1.2.0 has no NVKE inference leaf | NVKE's golden path is Ubuntu 24.04 on GB200, with streams on both series ([policy](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/release/policy.yaml#L23-L24), [streams](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/release/policy.yaml#L68-L75)). NVKE qualifies GB200 only to nodes Ready, with no GPU driver check ([overview](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/docs/qualification/overview.md?plain=1#L185-L187)). NICo lists GB200 trays ([HCL](https://github.com/dsx-ai-factory/infra-controller/blob/abc446b33dc773d9b8c7f41b54cccf812758b165/docs/hcl.md?plain=1#L24-L25)) |
+| GB300 | Grace, arm64 | Same as GB200 | None: AICR v1.2.0 has no GB300 NVKE leaf ([overlays](https://github.com/NVIDIA/aicr/tree/935e0746dc54da890a23c1ecca998244b3a25de7/recipes/overlays)) | NVKE roadmap ([ROADMAP](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/ROADMAP.md?plain=1#L26)). NICo lists only the Lenovo GB300 tray ([HCL](https://github.com/dsx-ai-factory/infra-controller/blob/abc446b33dc773d9b8c7f41b54cccf812758b165/docs/hcl.md?plain=1#L27)) |
+| VR200 | Vera, arm64 | Same disk outputs; AICR's VR200 recipes require Ubuntu 26.04 and kernel 7.0 or later ([recipe](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/recipes/overlays/vr200-rke2-ubuntu-training.yaml#L47-L65)), which NVKR does not check against the disk | None: AICR v1.2.0 VR200 leaves are RKE2-only | NVKE roadmap ([ROADMAP](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/ROADMAP.md?plain=1#L27)). Not in the NICo v2.3.0 [HCL](https://github.com/dsx-ai-factory/infra-controller/blob/abc446b33dc773d9b8c7f41b54cccf812758b165/docs/hcl.md) |
+| Site controller | amd64 or arm64 | The management nodes' architecture: Ubuntu 26.04 today, Ubuntu 24.04 pending #323, plain or FDE | n/a | NVKE management nodes are all one architecture, either one ([supported platforms](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/docs/overview/supported-platforms.md?plain=1#L79)). NICo documents x86_64 site controller hardware on Ubuntu 24.04 ([hardware](https://github.com/dsx-ai-factory/infra-controller/blob/abc446b33dc773d9b8c7f41b54cccf812758b165/docs/getting-started/prerequisites/hardware.md?plain=1#L12-L21)) |
+
+NVKE links are at `v0.23.0`, which `main` pins, and NICo links at `v2.3.0`. The `nvke-node-fde-*` disks use
+a public bootstrap passphrase, so every node built from one shares its volume key and gets no data-at-rest
+protection ([Native execution and publication](#native-execution-and-publication)). NVKR does not build NICo's boot artifacts or the `qcow-imager.efi` that iPXE chainloads to write a disk; the site
+takes them from its NICo deployment or builds them as
+[NVKE describes](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/docs/operate/build-node-images.md?plain=1#L22).
+
+NVKR's role ends at building, signing and publishing these outputs. GPU driver, fabric and runtime acceptance
+belongs to AICR and NVKE evidence, and NVKR records none ([reconciliation](../../../docs/adr/reconciliation.md#maintained-input-and-schema-boundaries)).
+
 ## Four-family pilot
 
-Four independent Definitions partition the combined candidate's exact named outputs. The core family also
-selects the NICo charts, the NICo Core and Flow images and the ARM64 AICR CLI, and the services family selects local-path-provisioner, which the combined Definition omits because its flat workflow has no remaining YAML
+Four independent Definitions partition the combined candidate's 69 named outputs, and together add 13
+family-only outputs, for 82 in all. The core family also
+selects the NICo charts, the NICo Core and Flow images and the ARM64 AICR CLI, and the services family selects local-path-provisioner, which the combined Definition omits; they were added while its flat workflow had no remaining YAML
 parsing headroom. They reuse the
 shared catalogs and pins; they do not import each other or change the combined Definition into a parent.
 
@@ -56,7 +116,7 @@ historical capacity measurements and remaining cutover work.
 
 | Output group | Owning inputs | Selection |
 |---|---|---|
-| CLI | `../../catalogs/nvke/module-tags` | AMD64 `nvkectl` and ARM64 `nvkectl-linux-arm64`, from their shared NVKE v0.22.0 source pin |
+| CLI | `../../catalogs/nvke/module-tags` | AMD64 `nvkectl` and ARM64 `nvkectl-linux-arm64`, from their shared NVKE v0.23.0 source pin |
 | Controller and charts | `../../catalogs/nvke/release` | AMD64/ARM64 aggregate `cwe`, image-bound `controller-chart`, PostgreSQL, SPIRE, SPIRE CRDs and Temporal chart packages |
 | Operator tools | `../../catalogs/tools/operator-amd64`, `../../catalogs/tools/operator-arm64` | AMD64 `operator-tools` and, in the core family only, ARM64 `operator-tools-linux-arm64` Helm and kubectl executables, at the same pinned versions |
 | AICR CLI (core family only) | `../../catalogs/tools/aicr-arm64` | ARM64 `aicr` release executable with its `aicr-attestation.sigstore.json` companion beside it; upstream evidence is not verified (`evidence.none`) |
@@ -84,8 +144,8 @@ built OCI exports only. The architecture-independent NKTP chart is packaged once
 | NICo charts | Not selected by NVKE's pin set; the site installs `nico`, `nico-prereqs` and `nico-flow` from infra-controller's `helm`, `helm-prereqs` and `helm/nico-flow` directories. `v2.3.0` is the latest non-candidate release; subcharts are vendored as local directories and the Flow chart has no dependencies, so packaging is offline | Charts plus the Core and Flow images. Since `v2.3.0` Flow is a standalone release that the umbrella excludes, so it is packaged as its own chart. The prerequisite chart's helmfile-installed operators and third-party images are not selected |
 | NICo images | infra-controller `v2.3.0`'s own Dockerfiles. Flow: `rest-api/docker/production/Dockerfile.nico-flow` with `golang:1.26.4` and `nvcr.io/nvidia/distroless/go:v4.0.8`, both bound by index digest. Core: `dev/docker/Dockerfile.release-container-{x86_64,aarch64}` on bases built from the native `Dockerfile.build-container-*` and `Dockerfile.runtime-container-*`, bound by digest. Those bases' `FROM` lines carry upstream's own digest pins, and both receive the Kea package version recorded in `dev/docker/kea.version` | Flow is the only REST image the packaged charts reference, through the standalone `nico-flow` chart; the standalone REST charts are excluded from the umbrella package and not selected. A cold Core Rust build may exceed the generated hosted build-job budget; a hosted Run must prove it. Apart from Kea, both bases still install unpinned public packages and tools at build time. Core stamps version `v2.3.0`, revision `abc446b3` and the pinned commit's date from build arguments derived from the source lock; the date argument is upstream [#6896](https://github.com/dsx-ai-factory/infra-controller/pull/6896)'s `CI_COMMIT_TIMESTAMP`, rendered in UTC rather than with upstream CI's committer offset. Flow stamps the same version, but its Dockerfile declares no revision argument |
 | Default StorageClass | Rancher publishes `rancher/local-path-provisioner` images but no Helm repository; the chart is packaged from `deploy/chart/local-path-provisioner` at `v0.0.37`, whose values select image `v0.0.37`. The chart's `busybox:latest` helper is replaced by an explicit `1.37.0` selection | A hashed source patch adds empty `image.digest` and `helperImage.digest` values that render `@digest` when set; unset renders are unchanged. Acquired images are native outputs, so each chart binds one architecture's digests; a mixed-architecture cluster needs a source-built image index |
-| NKTP chart and dependencies | The same NVKE `v0.22.0` source as the maintained controller; `nktp/deploy/charts/nktp/Chart.yaml` and `Chart.lock` select three exact dependencies; packaging stamps chart `0.22.0` | Fetch verifies Helm `v4.2.4` and all three acquired chart archives; packaging uses the retained closure with no network |
-| NKTP images | Selected source values and authenticated dependency charts: collector `0.162.0`, operator `0.159.0`, LGTM `0.32.0`, kube-state-metrics `v2.20.0`, node-exporter `v1.12.1`, optional metrics-server `v0.8.1`, uninstall kubectl `v1.34.1`; Operator `0.159.0`'s `versions.txt` selects Target Allocator `0.159.0` | Acquired images, not source builds; native subjects and parent indexes are lock-owned. Helm test-only BusyBox is excluded. Images are delivered separately; chart references are not automatically rewritten to publication repositories |
+| NKTP chart and dependencies | The same NVKE `v0.23.0` source as the maintained controller; `nktp/deploy/charts/nktp/Chart.yaml` and `Chart.lock` select three exact dependencies; packaging stamps chart `0.23.0` | Fetch verifies Helm `v4.2.4` and all three acquired chart archives; packaging uses the retained closure with no network |
+| NKTP images | Selected source values and authenticated dependency charts: collector `0.162.0`, operator `0.161.0` (the OpenTelemetry kube-stack `0.25.1` subchart's app version), LGTM `0.38.0`, kube-state-metrics `v2.20.0`, node-exporter `v1.12.1`, optional metrics-server `v0.8.1`, uninstall kubectl `v1.35.6`; the NKTP values select Target Allocator `0.161.0` | Acquired images, not source builds; native subjects and parent indexes are lock-owned. Helm test-only BusyBox is excluded. Images are delivered separately; chart references are not automatically rewritten to publication repositories |
 | Reference-profile fixture | The selected NVKE fixture Dockerfile, `nico-vms-cp.yaml`, `nico-vms-worker.yaml` and sibling runbooks | Explicitly named `nico-reference-profiles-fixture`: the control-plane profile skips its pre-join reboot. It must not be installed as production fleet configuration. No empty/failure-test config profile, placeholder example, copied OSProfile or new Dockerfile/patch is added |
 | CAPI and cert-manager images | Selected NVKE `make/tool-versions.mk` chooses CAPI `v1.13.6`; its published provider manifests name the three controllers, and its clusterctl config selects cert-manager `v1.21.1` | Acquired runtime images only. Provider manifests/metadata and installation remain a separate consumer contract |
 
@@ -162,7 +222,7 @@ published digest and testing rendered manifests for both architectures without m
 Until then, consumers must explicitly relocate/bind those references; chart and image delivery alone
 does not prove offline installation or that a deployed workload uses the signed image outputs.
 
-The controller and CLI now select NVKE `v0.22.0`. The config-only reference image is not a complete
+The controller and CLI now select NVKE `v0.23.0`. The config-only reference image is not a complete
 provisioning configuration. Fleet payload selection and delivery of the Kubernetes release resources
 remain separate consumer work; updating source pins does not establish deployment acceptance.
 
@@ -171,11 +231,13 @@ native image digests. Do not maintain a second digest table in documentation. Po
 retain their source-owned index digests as well as the selected native child pins; acquisition checks
 actual parent-to-child membership before using the native image.
 
-OS assembly, agent, Calico, kubeadm and SPIRE packaging all select NVKE `v0.22.0` at
-`400c24fb6465b042be883d6b62472528520d6291`. SPIRE stages `1.14.1` and TPM plugin `1.9.0`,
+OS assembly, agent, Calico, kubeadm, SPIRE packaging and DOCA OVS acquisition all select NVKE `v0.23.0` at
+`2cfd00081b468d85a4894ec17e9deac13c9d8169`. The `nvke-doca-ovs` producer fetches the source-locked DOCA OVS
+`3.5.0` debs for Ubuntu `26.04` (`24.04` under the Ubuntu 24 overlay) and supplies them as the sixth
+image-inputs material, which the source's composer requires. NVIDIA publishes these packages without source. SPIRE stages `1.14.1` and TPM plugin `1.9.0`,
 then packages Debian revision `4` offline before image-input composition and Packer.
 That source-owned packaging excludes DSX IMDS. SPIRE server/container outputs retain their
-separately pinned chart-selected versions. The agent package stamps `v0.22.0`.
+separately pinned chart-selected versions. The agent package stamps `v0.23.0`.
 These updated inputs do not establish a new build, source-review acceptance or runtime result.
 The pinned commit's source-owned direct-Packer contract receives `capture_apt_acquisitions=true` and exports
 `non-fde/apt-acquisitions.tar` or `fde/apt-acquisitions.tar`, which each producer declares through `packer.acquisitionArchive`.

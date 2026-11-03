@@ -728,7 +728,7 @@ func (s *nativeSiteAttempt) runTenantRequest(ctx context.Context, runner Runner,
 		}
 		progress.conditions = fresh.Conditions
 		progress.update(time.Now(), stage, nodes)
-		// NVKE v0.22.0 clusterstate.IsProvisioningFailed uses exactly these
+		// NVKE v0.23.0 clusterstate.IsProvisioningFailed uses exactly these
 		// two statuses. Missing or Unknown conditions do not prove failure.
 		if fresh.Conditions.Provisioning.Status == TenantConditionFalse && fresh.Conditions.Provisioned.Status == TenantConditionFalse {
 			return errors.New("NVKE reported native tenant provisioning failed")
@@ -897,11 +897,14 @@ func (s *nativeSiteAttempt) selectBootNetwork(network nativeBridgeConfig, diskUR
 	return network, nil
 }
 
+// nativeMachineImageDiskSlot is the pinned NVKE MachineImage fixture's local QCOW URL.
+const nativeMachineImageDiskSlot = "http://127.0.0.1:18080/files/images/nvke-node.qcow2"
+
 func projectNativeSiteBoot(ctx context.Context, source, diskURL string) (*nativeSiteBoot, error) {
 	if err := requireContext(ctx); err != nil {
 		return nil, err
 	}
-	if strings.Count(source, "http://127.0.0.1/nvke-node.qcow2") != 1 {
+	if strings.Count(source, nativeMachineImageDiskSlot) != 1 {
 		return nil, errors.New("source MachineImage must expose one local QCOW URL slot")
 	}
 	location, err := url.Parse(diskURL)
@@ -912,7 +915,7 @@ func projectNativeSiteBoot(ctx context.Context, source, diskURL string) (*native
 	if err != nil || !address.Is4() || !address.IsPrivate() {
 		return nil, errors.New("native site boot requires the owned private disk endpoint")
 	}
-	projected := strings.Replace(source, "http://127.0.0.1/nvke-node.qcow2", diskURL, 1)
+	projected := strings.Replace(source, nativeMachineImageDiskSlot, diskURL, 1)
 	parsed, err := template.New("source-machine-image").Option("missingkey=error").Parse(projected)
 	if err != nil {
 		return nil, err

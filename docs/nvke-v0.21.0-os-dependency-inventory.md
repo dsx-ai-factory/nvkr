@@ -65,8 +65,8 @@ Use ADR-22 catalog pinning to record commit, tree and source epoch once producer
 
 ## Current NVKR comparison
 
-Current M2 uses NVKE `v0.22.0` at `400c24fb6465b042be883d6b62472528520d6291` for image preparation, including SPIRE.
-The v0.22.0 SPIRE package omits the DSX plugin.
+Current M2 uses NVKE `v0.23.0` at `2cfd00081b468d85a4894ec17e9deac13c9d8169` for image preparation, including SPIRE.
+The v0.23.0 SPIRE package omits the DSX plugin.
 Those are not the release source `33fb71b2f4224b470ebc628a9165fc4b92870406`.
 NVKR compiles the NVKE agent and builds the upstream OVN image, but other OS-package producers currently invoke NVKE package preparation or packaging.
 The current selection does not claim v0.21.0 membership.

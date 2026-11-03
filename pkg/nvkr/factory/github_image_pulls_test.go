@@ -208,9 +208,15 @@ func TestMaintainedNamedPrivateImageCredentialBoundary(t *testing.T) {
 // workflow contract. Negative mutations use the focused fixture below.
 func assertGitHubPrivateImageCredentialBoundary(t *testing.T, plan *Plan, bundle *GeneratedBundle, wantDisks int) {
 	t.Helper()
-	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
+	assertGitHubPrivateImageJobs(t, decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle)).Jobs, wantDisks)
+}
+
+// assertGitHubPrivateImageJobs checks each expanded job keeps the read-only
+// image credential in one preparation step that precedes execution.
+func assertGitHubPrivateImageJobs(t *testing.T, jobs map[string]githubJob, wantDisks int) {
+	t.Helper()
 	disks, fetches := 0, 0
-	for _, job := range document.Jobs {
+	for _, job := range jobs {
 		prepared := false
 		prepareIndex, executionIndex := -1, -1
 		for index, step := range job.Steps {

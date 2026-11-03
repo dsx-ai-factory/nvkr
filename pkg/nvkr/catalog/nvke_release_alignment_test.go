@@ -21,7 +21,11 @@ func TestNVKEReleasePinsStayAligned(t *testing.T) {
 	} {
 		t.Run(directory, func(t *testing.T) {
 			root := filepath.Join("../../../inputs/catalogs", directory)
-			registry, err := readRegistry(Dir(root))
+			bound, err := BindContext(t.Context(), Dir(root))
+			if err != nil {
+				t.Fatal(err)
+			}
+			registry, err := readRegistry(bound)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -34,8 +38,8 @@ func TestNVKEReleasePinsStayAligned(t *testing.T) {
 					continue
 				}
 				pin := lock.Pins[name]
-				if source.Constraint != "v0.22.0" || source.TagPrefix != "" || pin.Tag != "v0.22.0" || pin.Commit != "400c24fb6465b042be883d6b62472528520d6291" || pin.TreeHash != "f3afc02f5c92f4aacda3a1655836a91bef093bfe" || pin.SourceDateEpoch != 1792548398 {
-					t.Fatalf("%s must select the complete NVKE v0.22.0 identity: %+v", name, pin)
+				if source.Constraint != "v0.23.0" || source.TagPrefix != "" || pin.Tag != "v0.23.0" || pin.Commit != "2cfd00081b468d85a4894ec17e9deac13c9d8169" || pin.TreeHash != "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53" || pin.SourceDateEpoch != 1793236039 {
+					t.Fatalf("%s must select the complete NVKE v0.23.0 identity: %+v", name, pin)
 				}
 				for component, producer := range registry.Components {
 					if producer.Source == name && producer.Prebuilt != nil && producer.Prebuilt.Image != "" && lock.Artifacts[component].Tag != pin.Tag {
@@ -58,8 +62,8 @@ func TestNVKEOverlayPinsStayAligned(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			tag, commit := "v0.22.0", "400c24fb6465b042be883d6b62472528520d6291"
-			tree, epoch := "f3afc02f5c92f4aacda3a1655836a91bef093bfe", int64(1792548398)
+			tag, commit := "v0.23.0", "2cfd00081b468d85a4894ec17e9deac13c9d8169"
+			tree, epoch := "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53", int64(1793236039)
 			if filepath.Base(path) == "current-main-doca-ovs.json" {
 				if overlay.Name != "nvke-current-main-doca-ovs" || len(overlay.Components) != 1 || overlay.Components["nvke-image-inputs"].Component == nil {
 					t.Fatal("current-main DOCA overlay must replace only image composition")
@@ -79,6 +83,41 @@ func TestNVKEOverlayPinsStayAligned(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// NVKE v0.23.0's image-input composer requires a doca-ovs archive whose debs
+// match the image's Ubuntu series.
+func TestNVKEImageInputsSelectSeriesDOCAOVS(t *testing.T) {
+	for _, directory := range []string{"node-images/release", "node-images/diagnostic"} {
+		t.Run(directory, func(t *testing.T) {
+			bound, err := BindContext(t.Context(), Dir(filepath.Join("../../../inputs/catalogs", directory)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			registry, err := readRegistry(bound)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := registry.Components["nvke-image-inputs"].Materials["doca-ovs"]; got != "nvke-doca-ovs" {
+				t.Fatalf("image inputs bind doca-ovs to %q", got)
+			}
+			if got := registry.Components["nvke-doca-ovs"].Source; got != "nvke-doca-ovs-source" {
+				t.Fatalf("DOCA producer selects source %q", got)
+			}
+			vendor := strings.Join(registry.Sources["nvke-doca-ovs-source"].VendorCommand, "\n")
+			if !strings.Contains(vendor, "make -C os-image/packages/doca-ovs debs") || !strings.Contains(vendor, "UBUNTU_SERIES=26.04") {
+				t.Fatal("release DOCA source must stage NVKE's locked Ubuntu 26.04 debs")
+			}
+		})
+	}
+	overlay, err := LoadOverlayContext(t.Context(), "../../../inputs/catalogs/node-images/variants/ubuntu24.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	replacement := overlay.Components["nvke-doca-ovs"].Component
+	if replacement == nil || !strings.Contains(strings.Join(replacement.VendorCommand, "\n"), "UBUNTU_SERIES=24.04") {
+		t.Fatal("Ubuntu 24 images must stage the 24.04 DOCA debs")
 	}
 }
 
