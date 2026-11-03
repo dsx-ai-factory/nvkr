@@ -509,11 +509,10 @@ milestone specification.
 
 ## Current support boundary
 
-ADR-20 specifies, but does not enable, complete S3 delivery for selected VM/iPXE/EFI/QCOW2 and Debian package
-artifacts. The contract keeps OCI source publications immutable, adds native file/member representations,
-and authenticates a derived delivery root with portable original proofs. Typed configuration, executable
-adapters, provider acceptance and actual boot/package-install acceptance remain required. Existing schema
-constants, whole-Plan verification and current capability admission are unchanged by this documentation freeze.
+ADR-20 specifies required object-store copying of complete existing signed publications, with S3 as the
+first byte provider. It reuses original artifacts, provenance and SBOMs, complete Plan verification and ordinary
+generated publication/finalization. External provider, workflow and downstream boot/install acceptance remain
+separate evidence; the transport adds no deployment or qualification claim.
 
 [Reconciliation](adr/reconciliation/README.md) owns the current support matrix. Local immutable attempts,
 Plan/graph inspection, GitHub generation, metadata-only release navigation and the scoped
@@ -577,18 +576,12 @@ The current publication input owner admits omitted or explicit OCI selection and
 combined APT/OCI selection before catalog, generation or execution work. Required selections never fall back
 to another transport; a direct APT publisher and its service/signing contract remain deferred (ADR-20 §2).
 
-The file-delivery contract reserves Definition v6 `file` outputs, Environment v2 `publication.fileTargets`,
-Run Plan/artifact-graph v6, PublicationRoot v5 native-file membership and Run v5 requirements/completion.
-Release v4 remains the unchanged OCI source view; S3 coordinates, selected delivery completion and separate
-effective policies belong to generated delivery records and receipts. The extension's new native-file and
-delivery-root families are distinct from
-Build, payload and OCI wrapper identity. A lifecycle selection receipt retains selected complete output-local
-publications and actual source proof bytes; it does not relax whole-Plan completeness. Separate caller policies
-authenticate source and delivery roles. Transfer uses conditional writes and full read-back; detached completion
-is published last. An ambiguous final write may leave a valid completion, so producer success requires
-reconciliation and consumers always authenticate the complete required closure. Boot HTTPS access is
-separate from S3 API access. Downstream owners render machine-specific boot configuration and prove actual
-EFI imaging/reboot, direct VM boot and package installation; NVKR supplies no new provisioning service.
+Environment v2 adds required object-store destinations. Existing original publication identities and
+whole-Plan verification remain authoritative. Immutable conditional writes and complete pinned readback precede
+a small transport inventory written last. Independent consumers restore the original closure and authenticate
+all original proof subjects, SBOMs and exact aggregate/local output descriptors under their own policy without
+registry discovery. No new signed delivery root, native schema, namespace state or supervisor is required.
+A failed or uncertain copy cannot yield successful Run completion; remote immutable bytes are not rolled back.
 
 The qualified lane additionally consumes signed builder profiles, immutable promotion and evidence policies,
 and an operator trust store. It generates the exact Inventory compatibility form only after authenticated

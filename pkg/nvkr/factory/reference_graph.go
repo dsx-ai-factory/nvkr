@@ -96,6 +96,9 @@ func selectedPublicationOutputs(plan *Plan, node Node) []LifecycleOutputPlan {
 // publication records; payloads remain in their own publications. Provider job
 // outcomes still cover the whole DAG.
 func finalizerArtifact(plan *Plan, a Artifact) bool {
+	if a.Kind == ArtifactObjectPublication {
+		return true
+	}
 	if !PerOutputPublication(plan) {
 		_, raw := diskPublicationRequirement(plan, a)
 		return !raw

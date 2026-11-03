@@ -27,9 +27,8 @@ native disk and pipeline-attested stages with separate signer policy, credential
 registry namespaces. Cleanup admits only internal-visibility packages in those namespaces.
 Unsigned development remains static-unqualified. Neither setting grants production
 acceptance, provider access or qualified evidence.
-ADR-20 specifies an S3 extension with typed file destinations under Environment publication settings.
-Destinations and clean boot URLs remain transport configuration; they do not change producer Build identity.
-Its future schema reservation does not change the implemented Environment version or enable delivery.
+ADR-20's object-store publication configures required S3 destinations separately from producer identity.
+It copies complete existing signed publications and original evidence through a generic byte transport.
 _Avoid_: Delivery profile, component catalog, build identity
 
 **Run**:
@@ -231,26 +230,12 @@ producer. The same package bytes can be supplied as an OS build material. Local 
 installation or runtime acceptance.
 _Avoid_: APT repository, installed package, builder type
 
-**Native file output**:
-The Artifact representation specified in ADR-20 for unchanged producer-created Debian packages, EFI/iPXE
-files and installer assets. All regular files in an archive retain the parent archive identity, canonical
-member name, digest, size, mode and declared kind. File integrity is distinct from package dependencies and
-boot readiness. Implementation remains outstanding under the ADR-20 contract.
-_Avoid_: Reconstructed package, executable tool, installed inventory
-
-**File-delivery root**:
-A generated record with a detached signature, binding selected authenticated source publications and exact
-named payload and evidence objects to their S3 routes and read-back observations. It preserves original
-provenance and adds no build, boot or qualification verdict. Implementation remains outstanding under the
-specified contract.
-_Avoid_: Authored lifecycle object, replacement source release, successful upload flag
-
-**File-delivery locator**:
-Caller-pinned transport coordinates and raw hashes/sizes for the delivery document and detached bundle.
-It locates proof; independent consumer policy and complete-byte checks establish acceptance. A final commit
-may exist after lost acknowledgement, so an indeterminate producer result requires independent reconciliation.
-Implementation remains outstanding under the ADR-20 contract.
-_Avoid_: Trusted policy, mutable release name, atomic bucket transaction
+**Object-store publication**:
+A required immutable copy of a complete original signed publication and its artifact/evidence closure.
+S3 is the first provider. The transport inventory locates original bytes and proof bundles; consumer policy
+and complete verification establish acceptance. It changes neither Build identity nor the original signature
+subject and grants no destination authorization, boot, installation or qualification claim.
+_Avoid_: New signed release, successful upload flag, mutable channel, atomic bucket transaction
 
 ## Evidence and authority
 

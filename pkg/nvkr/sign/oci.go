@@ -113,8 +113,8 @@ func (s Subject) Validate() error {
 
 // SigningRecord is the durable record of one sign+attest operation. In dry-run
 // mode WouldRun is populated and Ran is empty; in cosign mode the opposite. A
-// record is never evidence that a signature verifies — only a Verify result
-// against a real registry is.
+// record is never evidence that a signature verifies; the exact proof bundles
+// must pass the verifier under the consumer's policy.
 type SigningRecord struct {
 	SchemaVersion   string     `json:"schemaVersion"`
 	DryRun          bool       `json:"dryRun"`
@@ -598,6 +598,10 @@ func (s *CosignOCISigner) SignAndAttest(ctx context.Context, subject Subject, pr
 // from presentation output or caller assertions. No artifact copy or legacy
 // attachment fallback is used.
 func (s *CosignOCISigner) Verify(ctx context.Context, subject Subject, policy VerifyPolicy) (VerificationRecord, error) {
+	return s.verifyAndCapture(ctx, subject, policy, nil, nil)
+}
+
+func (s *CosignOCISigner) verifyAndCapture(ctx context.Context, subject Subject, policy VerifyPolicy, capture func(string, []byte), supplied func() *ociBundleSource) (VerificationRecord, error) {
 	if s == nil || s.runner == nil {
 		return VerificationRecord{}, e.New(e.CodeInternal, "cosign OCI signer is not initialized")
 	}
@@ -614,7 +618,13 @@ func (s *CosignOCISigner) Verify(ctx context.Context, subject Subject, policy Ve
 	if err != nil {
 		return VerificationRecord{}, err
 	}
-	if _, err := admitOCIRegistry(subject, s.credential); err != nil {
+	credential := Credential{}
+	if supplied == nil {
+		credential = s.credential
+	}
+	// Supplied proof still names an exact canonical OCI source subject, even
+	// though no registry access or registry credential is needed to verify it.
+	if _, err := admitOCIRegistry(subject, credential); err != nil {
 		return VerificationRecord{}, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
@@ -624,16 +634,25 @@ func (s *CosignOCISigner) Verify(ctx context.Context, subject Subject, policy Ve
 		return VerificationRecord{}, err
 	}
 	defer cleanup()
-	dockerConfig, err := s.writeDockerConfig(ctx, workspace)
-	if err != nil {
-		return VerificationRecord{}, err
+	var dockerConfig string
+	if supplied == nil {
+		dockerConfig, err = s.writeDockerConfig(ctx, workspace)
+		if err != nil {
+			return VerificationRecord{}, err
+		}
 	}
 	environment := ociCosignEnvironment(os.Environ(), dockerConfig)
-	source, err := s.newOCIBundleSource(ctx, subject)
-	if err != nil {
-		return VerificationRecord{}, err
+	var source *ociBundleSource
+	if supplied == nil {
+		source, err = s.newOCIBundleSource(ctx, subject)
+		if err != nil {
+			return VerificationRecord{}, err
+		}
+	} else {
+		source = supplied()
 	}
 	defer source.close()
+	source.authenticated = capture
 
 	record := VerificationRecord{
 		SchemaVersion: VerificationRecordSchemaVersion,

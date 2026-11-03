@@ -18,6 +18,12 @@ import (
 // Root edges describe inclusion in this artifact, not inferred package-to-package
 // relationships. No timestamps, scanner locations or random scanner IDs survive.
 func WithDependencies(bom *BOM, components []Component, method, scannerDigest string) (*BOM, error) {
+	return withDependencies(bom, components, method, scannerDigest, nil)
+}
+
+type debianInspectionBinding struct{ packageReader, platform string }
+
+func withDependencies(bom *BOM, components []Component, method, scannerDigest string, deb *debianInspectionBinding) (*BOM, error) {
 	if err := bom.Validate(); err != nil {
 		return nil, err
 	}
@@ -30,6 +36,9 @@ func WithDependencies(bom *BOM, components []Component, method, scannerDigest st
 	}
 	if dependencyMethodNeedsScanner(method) && !canonical.IsDigest(scannerDigest) {
 		return nil, e.New(e.CodeUnverifiedRef, "dependency inventory requires the scanner executable digest")
+	}
+	if method == DebianPayloadMethod && (deb == nil || !canonical.IsDigest(deb.packageReader) || (deb.platform != "linux/amd64" && deb.platform != "linux/arm64")) {
+		return nil, e.New(e.CodeUnverifiedRef, "Debian payload inventory requires original package-reader and platform receipt")
 	}
 	if len(components) == 0 {
 		return nil, e.New(e.CodeProvenanceMissing, "dependency inspection returned no components for %q", bom.Metadata.Component.Name)
@@ -85,6 +94,9 @@ func WithDependencies(bom *BOM, components []Component, method, scannerDigest st
 	if scannerDigest != "" {
 		result.Metadata.Props = append(result.Metadata.Props, Property{Name: "nvkr:dependencyScannerDigest", Value: scannerDigest})
 	}
+	if deb != nil {
+		result.Metadata.Props = append(result.Metadata.Props, Property{Name: "nvkr:packageReaderDigest", Value: deb.packageReader}, Property{Name: "nvkr:dependencyPlatform", Value: deb.platform})
+	}
 	sort.Slice(result.Metadata.Props, func(i, j int) bool { return result.Metadata.Props[i].Name < result.Metadata.Props[j].Name })
 	if err := result.Validate(); err != nil {
 		return nil, err
@@ -108,7 +120,7 @@ func validateInventorySemantics(bom *BOM, artifact string) error {
 			method = property.Value
 		}
 	}
-	diskInventory := method == "disk-content/v1" || method == "disk-reconciled/v1"
+	diskInventory := method == "disk-content/v1" || method == "disk-reconciled/v1" || method == DebianPayloadMethod
 	archiveInventory := method == archiveContentMethod
 	if archiveInventory {
 		outputType := ""
@@ -159,12 +171,19 @@ func validateInventorySemantics(bom *BOM, artifact string) error {
 
 func validateDependencies(bom *BOM) error {
 	method, scanner := "", ""
+	reader, platform := "", ""
 	for _, property := range bom.Metadata.Props {
 		if property.Name == "nvkr:dependencyInspection" {
 			method = property.Value
 		}
 		if property.Name == "nvkr:dependencyScannerDigest" {
 			scanner = property.Value
+		}
+		if property.Name == "nvkr:packageReaderDigest" {
+			reader = property.Value
+		}
+		if property.Name == "nvkr:dependencyPlatform" {
+			platform = property.Value
 		}
 	}
 	if len(bom.Components) == 0 {
@@ -181,6 +200,13 @@ func validateDependencies(bom *BOM) error {
 	}
 	if dependencyMethodNeedsScanner(method) && !canonical.IsDigest(scanner) {
 		return e.New(e.CodeUnverifiedRef, "dependency inventory has no scanner pin")
+	}
+	if method == DebianPayloadMethod {
+		if !canonical.IsDigest(reader) || (platform != "linux/amd64" && platform != "linux/arm64") {
+			return e.New(e.CodeUnverifiedRef, "serialized Debian payload inventory omits exact reader/platform bindings")
+		}
+	} else if reader != "" || platform != "" {
+		return e.New(e.CodeVerifyFailed, "Debian payload bindings are invalid for another inspection method")
 	}
 	if method == BundleFilesMethod && scanner != "" {
 		return e.New(e.CodeVerifyFailed, "bundle file inventory uses the internal archive reader, not an external scanner")
@@ -200,7 +226,7 @@ func validateDependencies(bom *BOM) error {
 }
 
 func supportedDependencyMethod(method string) bool {
-	return method == "helm-manifests/v1" || method == "syft-cyclonedx/v1" || method == "disk-reconciled/v1" || method == "disk-content/v1" || method == archiveContentMethod || method == BundleFilesMethod
+	return method == "helm-manifests/v1" || method == "syft-cyclonedx/v1" || method == "disk-reconciled/v1" || method == "disk-content/v1" || method == archiveContentMethod || method == BundleFilesMethod || method == DebianPayloadMethod
 }
 
 func dependencyMethodNeedsScanner(method string) bool {

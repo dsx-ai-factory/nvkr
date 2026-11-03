@@ -137,6 +137,12 @@ func pullOutput(ctx context.Context, reference, output, out, workspace string, o
 	}
 	result := PulledOutput{Output: *selected}
 	switch selected.Kind {
+	case outputFormatDebian:
+		file, err := pullDebianOutput(ctx, selected.Reference, out, layout, stage, object, options)
+		if err != nil {
+			return PulledOutput{}, err
+		}
+		result.Files = []PulledFile{file}
 	case "executable":
 		bundle, err := pullExecutableOutput(ctx, selected.Reference, out, layout, stage, object, options)
 		if err != nil {
