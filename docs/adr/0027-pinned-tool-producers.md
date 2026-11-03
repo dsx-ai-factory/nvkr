@@ -162,12 +162,15 @@ A pinned-tool node runs through the shared helper launcher as an ordinary build 
   configuration, kubeconfig or cache is passed. The tool runs as the invoking user, never as a user the image
   declares: under Docker as that user's numeric uid and gid, as ADR-18 runs Docker utility containers, and under
   Podman as container root, which Podman's own mapping makes the invoking user. Either way the executor can read
-  and remove everything the tool writes.
+  and remove everything the tool writes. The runtime executable's name selects that identity, so a runtime named
+  other than `docker` or `podman` fails admission with `engine-capability`; a name does not authenticate the
+  runtime behind it.
 - **Fixed sandbox paths.** For a `file` producer `{{.Output}}` renders to `/nvkr/output`, an existing empty
   directory. A layout writer may refuse an existing directory, even an empty one, so for an `oci-layout` producer
   `{{.Output}}` renders to `/nvkr/output/layout`, an absent path the tool creates. A material renders to
   `/nvkr/inputs/materials/<escaped binding>`; a binding name may carry the file extension a tool reads it by. The working directory is `/nvkr/work`, `HOME` is `/nvkr/home`,
-  `TMPDIR` is `/nvkr/tmp`, and the executable is mounted read-only at `/nvkr/tool/<member name>`. The root
+  `TMPDIR` is `/nvkr/tmp`, and the executable is mounted read-only at `/nvkr/tool/<base name of the member>`,
+  without the member's parent directories or archive siblings. The root
   filesystem is read-only. An executor-owned bootstrap, `umask 022 && exec /usr/bin/env -i "$@"`, sets the umask
   and replaces the image environment. The toolchain image must therefore provide `/bin/sh` and `/usr/bin/env`;
   no producer value is interpreted by that shell. A tool path containing `=` is refused with `invalid-catalog`,

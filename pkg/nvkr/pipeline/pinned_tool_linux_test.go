@@ -27,7 +27,7 @@ out=
 for a in "$@"; do case "$a" in *:/nvkr/output) out=${a%:/nvkr/output};; esac; done
 [ -n "$out" ] || exit 91
 ` + body + "\n"
-	path := filepath.Join(t.TempDir(), "runtime")
+	path := filepath.Join(t.TempDir(), "docker")
 	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,18 @@ func TestAdmitPinnedToolRequiresToolInput(t *testing.T) {
 	if err := admitPinnedTool(node, opts); err != nil {
 		t.Fatalf("matching host refused: %v", err)
 	}
-	opts.ToolExecutable = ""
+	// The runtime's name selects the container identity, so any other name is refused.
+	for _, runtimePath := range []string{"docker", "/usr/bin/docker", "/usr/bin/podman"} {
+		opts.Runtime = runtimePath
+		if err := admitPinnedTool(node, opts); err != nil {
+			t.Fatalf("runtime %q refused: %v", runtimePath, err)
+		}
+	}
+	opts.Runtime = "/usr/local/bin/nerdctl"
+	if got := pinnedToolCode(admitPinnedTool(node, opts)); got != e.CodeEngineCapability {
+		t.Fatalf("runtime %q admitted with code %q", opts.Runtime, got)
+	}
+	opts.Runtime, opts.ToolExecutable = "", ""
 	if got := pinnedToolCode(admitPinnedTool(node, opts)); got != e.CodeEngineCapability {
 		t.Fatalf("missing tool input admitted with code %q", got)
 	}

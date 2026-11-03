@@ -49,6 +49,11 @@ func admitPinnedTool(n ir.Node, opts RunOptions) error {
 	if opts.DryRun {
 		return nil
 	}
+	// The runtime's name selects the container identity (pinnedToolRunArgs); a name
+	// does not authenticate the runtime behind it. Empty defaults to docker.
+	if name := filepath.Base(opts.Runtime); opts.Runtime != "" && name != "docker" && name != "podman" {
+		return e.New(e.CodeEngineCapability, "pinned-tool build %q requires a runtime named docker or podman, not %q", n.ID, opts.Runtime)
+	}
 	if err := AdmitPinnedToolHost(n); err != nil {
 		return err
 	}
