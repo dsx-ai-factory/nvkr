@@ -6,6 +6,7 @@ package factory
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -120,11 +122,19 @@ func serveProjectionTestAdapter(fault string) int {
 		fmt.Fprintf(os.Stderr, "adapter launched with environment %q in %q\n", os.Environ(), wd)
 		return 5
 	}
-	switch fault {
-	case "hang":
+	// hang:<path> publishes the adapter's PID at path once it ignores SIGTERM,
+	// so a test cancels only an adapter that is really hanging.
+	if ready, announce := strings.CutPrefix(fault, "hang:"); announce || fault == "hang" {
 		signal.Ignore(syscall.SIGTERM)
+		if announce {
+			if os.WriteFile(ready+".tmp", []byte(strconv.Itoa(os.Getpid())), 0o600) != nil || os.Rename(ready+".tmp", ready) != nil {
+				return 1
+			}
+		}
 		time.Sleep(time.Hour)
 		return 1
+	}
+	switch fault {
 	case "refuse":
 		fmt.Fprintln(os.Stderr, "adapter refuses this Plan")
 		return 3
@@ -402,17 +412,190 @@ func TestProjectionHostSeparatesRefusalFromLaunchFailure(t *testing.T) {
 
 func TestProjectionHostStopsAdapterOnCancellation(t *testing.T) {
 	plan, record := githubTestPlan(t), recordProjectionLaunches(t)
+	ready := filepath.Join(t.TempDir(), "ready")
+	adapter := projectionTestAdapter(t, "hang:"+ready)
 	ctx, cancel := context.WithCancel(t.Context())
-	timer := time.AfterFunc(200*time.Millisecond, cancel)
-	defer timer.Stop()
-	started := time.Now()
-	_, err := Render(WithProjectionAdapter(ctx, projectionTestAdapter(t, "hang")), plan, EngineGitHub)
+	defer cancel()
+	result := make(chan error, 1)
+	go func() {
+		_, err := Render(WithProjectionAdapter(ctx, adapter), plan, EngineGitHub)
+		result <- err
+	}()
+	var pid int
+	for deadline := time.Now().Add(time.Minute); pid == 0; {
+		if raw, err := os.ReadFile(ready); err == nil {
+			if pid, err = strconv.Atoi(string(raw)); err != nil || pid <= 0 {
+				t.Fatalf("adapter readiness %q: %v", raw, err)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			cancel()
+			t.Fatalf("adapter never became ready: %v", <-result)
+		}
+		select {
+		case err := <-result:
+			t.Fatalf("Render returned before the adapter was ready: %v", err)
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	canceled := time.Now()
+	cancel()
+	err := <-result
 	assertFactoryErrorCode(t, err, e.CodeTimeout)
 	if record.launches != 1 {
 		t.Fatalf("cancellation reached %d adapter launches, want 1", record.launches)
 	}
-	if elapsed := time.Since(started); elapsed > 10*time.Second {
+	// The adapter ignores SIGTERM, so only the owner's kill and join remove it.
+	for _, target := range []int{pid, -pid} {
+		if err := syscall.Kill(target, 0); !errors.Is(err, syscall.ESRCH) {
+			t.Fatalf("adapter process %d survived cancellation: %v", target, err)
+		}
+	}
+	if elapsed := time.Since(canceled); elapsed > 10*time.Second {
 		t.Fatalf("canceled adapter was not reaped promptly: %s", elapsed)
+	}
+}
+
+// ServeProjectionAdapter honors cancellation before any I/O and during a
+// blocked read or write, through a stream deadline or by closing the stream,
+// and joins the interrupted call before returning CodeTimeout.
+func TestProjectionAdapterHonorsCancellation(t *testing.T) {
+	frame, err := encodeProjectionFrame(projectionRequest{Protocol: projectionProtocol})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Run("before read", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		in, out := &countingReader{}, &bytes.Buffer{}
+		err := ServeProjectionAdapter(ctx, projectionTestRelease, in, out)
+		assertFactoryErrorCode(t, err, e.CodeTimeout)
+		if in.reads != 0 || out.Len() != 0 {
+			t.Fatalf("canceled adapter read %d times and wrote %d bytes", in.reads, out.Len())
+		}
+	})
+	for _, test := range []struct {
+		name    string
+		streams func(t *testing.T, entered chan<- struct{}) (io.Reader, io.Writer)
+	}{
+		{"read deadline", func(t *testing.T, entered chan<- struct{}) (io.Reader, io.Writer) {
+			r, _ := projectionTestPipe(t) // the open, silent writer blocks the read
+			return enteredFile{r, entered}, &bytes.Buffer{}
+		}},
+		{"read close", func(t *testing.T, entered chan<- struct{}) (io.Reader, io.Writer) {
+			r, w := io.Pipe()
+			t.Cleanup(func() { _ = w.Close() })
+			return enteredPipeReader{r, entered}, &bytes.Buffer{}
+		}},
+		{"write deadline", func(t *testing.T, entered chan<- struct{}) (io.Reader, io.Writer) {
+			_, w := projectionTestPipe(t)
+			// Fill the pipe so the response write blocks.
+			if err := w.SetWriteDeadline(time.Now().Add(50 * time.Millisecond)); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := w.Write(make([]byte, 4<<20)); !errors.Is(err, os.ErrDeadlineExceeded) {
+				t.Fatalf("filling pipe: %v", err)
+			}
+			if err := w.SetWriteDeadline(time.Time{}); err != nil {
+				t.Fatal(err)
+			}
+			return bytes.NewReader(frame), enteredFile{w, entered}
+		}},
+		{"write close", func(t *testing.T, entered chan<- struct{}) (io.Reader, io.Writer) {
+			r, w := io.Pipe()
+			t.Cleanup(func() { _ = r.Close() })
+			return bytes.NewReader(frame), enteredPipeWriter{w, entered}
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			entered := make(chan struct{}, 1)
+			in, out := test.streams(t, entered)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			result := make(chan error, 1)
+			go func() { result <- ServeProjectionAdapter(ctx, projectionTestRelease, in, out) }()
+			select {
+			case <-entered:
+			case err := <-result:
+				t.Fatalf("adapter returned before blocking: %v", err)
+			case <-time.After(30 * time.Second):
+				t.Fatal("adapter never reached its blocking call")
+			}
+			cancel()
+			select {
+			case err := <-result:
+				assertFactoryErrorCode(t, err, e.CodeTimeout)
+				if !errors.Is(err, context.Canceled) {
+					t.Fatalf("cancellation cause lost: %v", err)
+				}
+			case <-time.After(30 * time.Second):
+				t.Fatal("canceled adapter stayed blocked")
+			}
+		})
+	}
+	t.Run("write failure", func(t *testing.T) {
+		cause := errors.New("response stream failed")
+		err := ServeProjectionAdapter(t.Context(), projectionTestRelease, bytes.NewReader(frame), failingWriter{cause})
+		assertFactoryErrorCode(t, err, e.CodeUnavailable)
+		if !errors.Is(err, cause) {
+			t.Fatalf("write cause lost: %v", err)
+		}
+	})
+}
+
+func projectionTestPipe(t *testing.T) (*os.File, *os.File) {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = r.Close(); _ = w.Close() })
+	return r, w
+}
+
+type countingReader struct{ reads int }
+
+func (r *countingReader) Read([]byte) (int, error) { r.reads++; return 0, io.EOF }
+
+type failingWriter struct{ err error }
+
+func (w failingWriter) Write([]byte) (int, error) { return 0, w.err }
+
+// The entered* streams report entry to a blocking call so a test cancels a
+// stream that is in use; each keeps its stream's deadline or Close method.
+type enteredFile struct {
+	*os.File
+	entered chan<- struct{}
+}
+
+func (f enteredFile) Read(p []byte) (int, error)  { signalEntered(f.entered); return f.File.Read(p) }
+func (f enteredFile) Write(p []byte) (int, error) { signalEntered(f.entered); return f.File.Write(p) }
+
+type enteredPipeReader struct {
+	*io.PipeReader
+	entered chan<- struct{}
+}
+
+func (r enteredPipeReader) Read(p []byte) (int, error) {
+	signalEntered(r.entered)
+	return r.PipeReader.Read(p)
+}
+
+type enteredPipeWriter struct {
+	*io.PipeWriter
+	entered chan<- struct{}
+}
+
+func (w enteredPipeWriter) Write(p []byte) (int, error) {
+	signalEntered(w.entered)
+	return w.PipeWriter.Write(p)
+}
+
+func signalEntered(entered chan<- struct{}) {
+	select {
+	case entered <- struct{}{}:
+	default:
 	}
 }
 

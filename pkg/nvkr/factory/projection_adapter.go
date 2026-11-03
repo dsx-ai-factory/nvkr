@@ -6,6 +6,7 @@ package factory
 import (
 	"context"
 	"io"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -45,14 +46,30 @@ func (referenceProjection) emit(ctx context.Context, request projectionEmitReque
 
 // ServeProjectionAdapter serves the reference projection plugin as an
 // out-of-process adapter: it reads one request frame from in, answers Describe
-// or Emit with one frame on out and exits.
+// or Emit with one frame on out and exits. It owns in and out for the call. A
+// canceled ctx stops it before any I/O. Cancellation during the read or write
+// sets that stream's deadline or, when it has none, closes it, and the call
+// returns CodeTimeout only after the interrupted read or write returns. A
+// blocking descriptor that neither call interrupts stays bounded by its owner:
+// the projection host closes the adapter's stdin after one frame and owns the
+// adapter's process group.
 func ServeProjectionAdapter(ctx context.Context, release string, in io.Reader, out io.Writer) error {
 	return serveProjection(ctx, referenceProjection{release: release}, in, out)
 }
 
 // serveProjection carries one framed request to any contract implementation.
 func serveProjection(ctx context.Context, plugin projectionPlugin, in io.Reader, out io.Writer) error {
-	raw, err := io.ReadAll(io.LimitReader(in, 4+maxProjectionRequestBytes+1))
+	if err := ctx.Err(); err != nil {
+		return e.Wrap(e.CodeTimeout, err, "projection request canceled")
+	}
+	var raw []byte
+	err := interruptStreamOnCancel(ctx, in, func() (err error) {
+		raw, err = io.ReadAll(io.LimitReader(in, 4+maxProjectionRequestBytes+1))
+		return err
+	})
+	if ctx.Err() != nil {
+		return e.Wrap(e.CodeTimeout, ctx.Err(), "projection request canceled")
+	}
 	if err != nil {
 		return e.Wrap(e.CodeUsage, err, "reading projection request")
 	}
@@ -76,6 +93,39 @@ func serveProjection(ctx context.Context, plugin projectionPlugin, in io.Reader,
 	if err != nil {
 		return err
 	}
-	_, err = out.Write(frame)
+	if err := ctx.Err(); err != nil {
+		return e.Wrap(e.CodeTimeout, err, "projection response canceled")
+	}
+	err = interruptStreamOnCancel(ctx, out, func() error {
+		_, err := out.Write(frame)
+		return err
+	})
+	if ctx.Err() != nil {
+		return e.Wrap(e.CodeTimeout, ctx.Err(), "projection response canceled")
+	}
+	if err != nil {
+		return e.Wrap(e.CodeUnavailable, err, "writing projection response")
+	}
+	return nil
+}
+
+// interruptStreamOnCancel runs one blocking read or write on stream in the
+// caller's goroutine. Cancellation sets the stream's deadline or, failing that,
+// closes it; the interruption is joined before return, so nothing outlives the call.
+func interruptStreamOnCancel(ctx context.Context, stream any, operation func() error) error {
+	interrupted := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() {
+		defer close(interrupted)
+		if deadline, ok := stream.(interface{ SetDeadline(time.Time) error }); ok && deadline.SetDeadline(time.Now()) == nil {
+			return
+		}
+		if closer, ok := stream.(io.Closer); ok {
+			_ = closer.Close()
+		}
+	})
+	err := operation()
+	if !stop() {
+		<-interrupted
+	}
 	return err
 }

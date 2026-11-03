@@ -294,6 +294,8 @@ func runProjectionAdapter(ctx context.Context, adapter ProjectionAdapter, reques
 	cmd := exec.CommandContext(ctx, adapter.Path, adapter.Args...)
 	cmd.Dir, cmd.Env = scratch, []string{}
 	cmd.Stdin = bytes.NewReader(request)
+	// These limits bound the wire buffers, not peak heap: strict decoding,
+	// decoded members and canonical re-encoding hold further copies of a frame.
 	stdout := &projectionBuffer{limit: 4 + limit}
 	stderr := &projectionBuffer{limit: maxProjectionDiagnosticBytes, truncate: true}
 	cmd.Stdout, cmd.Stderr = stdout, stderr
