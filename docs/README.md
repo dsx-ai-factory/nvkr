@@ -25,6 +25,7 @@ The [34-concept reference](user-concepts.md) explains the vocabulary and connect
 | Understand how heterogeneous materials become a disk | [Node images](node-images.md) |
 | Build AICR deployment bundles as OCI artifacts | [AICR inputs, supported hardware recipes and rendering limits](../inputs/definitions/aicr/README.md) |
 | Find published outputs, download a named output, and verify a consumer claim | [Release quickstart](release-quickstart.md) |
+| Plan an NVKE GPU site from NVKR Releases (not yet runnable end to end) | [Working Definitions and GPU system matrix](../inputs/definitions/nvke/README.md#working-definitions-for-an-nvke-gpu-site), [site install outline](release-quickstart.md#install-an-nvke-site-from-the-releases) |
 | Run the nightly NVKE build and end-to-end test | [Nightly workflow and current admission](nvke-nightly.md) |
 | Run full build/site/tenant E2E on my PR before merging | [Run E2E tests for your pull request](nvke-nightly.md#run-a-workflow-branch-before-merging) |
 | Check a producing Run and configure qualification once | [Artifact checks and hosted qualification](lifecycle.md#authenticate-a-qualification-candidate), [candidate readiness](../inputs/definitions/nvke/README.md#qualification-readiness) |
@@ -106,6 +107,9 @@ Proposed [ADR-28: Multi-platform executables](adr/0028-multi-platform-executable
 source for every platform of a release, where the platforms share a format, companions and admitted URL
 spellings, and executable outputs published as standard OCI image indexes. The AICR CLI is the first
 migration, and the ADR inventories existing executables to retrofit. It is design only.
+
+Proposed [ADR-30: authenticated result reuse](adr/0030-authenticated-result-reuse.md) designs cross-Run reuse
+of complete named outputs and the test matrix for implementing it; reuse is not implemented.
 
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
 Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) covers branch
