@@ -91,11 +91,18 @@ type nightlyCoordinatorStep struct {
 	Run             string            `json:"run"`
 	Uses            string            `json:"uses"`
 	If              string            `json:"if"`
+	Shell           string            `json:"shell"`
 	ContinueOnError any               `json:"continue-on-error"`
 	Env             map[string]string `json:"env"`
 	With            map[string]any    `json:"with"`
 }
+type nightlyRunDefaults struct {
+	Run struct {
+		Shell string `json:"shell"`
+	} `json:"run"`
+}
 type nightlyCoordinatorJob struct {
+	Defaults       nightlyRunDefaults       `json:"defaults"`
 	Outputs        map[string]string        `json:"outputs"`
 	Needs          []string                 `json:"needs"`
 	TimeoutMinutes int                      `json:"timeout-minutes"`
@@ -105,6 +112,7 @@ type nightlyCoordinatorJob struct {
 type nightlyCoordinatorDocument struct {
 	On          map[string]json.RawMessage       `json:"on"`
 	Permissions map[string]string                `json:"permissions"`
+	Defaults    nightlyRunDefaults               `json:"defaults"`
 	Jobs        map[string]nightlyCoordinatorJob `json:"jobs"`
 	Concurrency struct {
 		CancelInProgress bool `json:"cancel-in-progress"`
@@ -155,6 +163,10 @@ func TestNightlyDispatchesGeneratedProducerBeforeNativeConsumer(t *testing.T) {
 	if len(dispatch) != 1 || dispatch[0].If != "" || dispatch[0].ContinueOnError != nil && dispatch[0].ContinueOnError != false ||
 		dispatch[0].Env["PROFILE"] != "${{ matrix.name }}" || dispatch[0].Env["NVKE_COMMIT"] != "${{ needs.select.outputs.nvke_commit }}" {
 		t.Fatal("producer dispatch must be one unconditional step bound to the selected profile and exact NVKE revision")
+	}
+	// The contract executes GitHub's default bash; a shell override would run something else.
+	if workflow.Defaults.Run.Shell != "" || build.Defaults.Run.Shell != "" || dispatch[0].Shell != "" {
+		t.Fatal("producer dispatch must run under the default shell the executed contract models")
 	}
 	if err := nightlyDispatchContract(t, dispatch[0].Run); err != nil {
 		t.Fatal(err)
