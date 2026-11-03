@@ -91,7 +91,11 @@ func TestNVKEOverlayPinsStayAligned(t *testing.T) {
 func TestNVKEImageInputsSelectSeriesDOCAOVS(t *testing.T) {
 	for _, directory := range []string{"node-images/release", "node-images/diagnostic"} {
 		t.Run(directory, func(t *testing.T) {
-			registry, err := readRegistry(Dir(filepath.Join("../../../inputs/catalogs", directory)))
+			bound, err := BindContext(t.Context(), Dir(filepath.Join("../../../inputs/catalogs", directory)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			registry, err := readRegistry(bound)
 			if err != nil {
 				t.Fatal(err)
 			}
