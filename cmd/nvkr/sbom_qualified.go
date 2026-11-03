@@ -15,13 +15,12 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
+	"github.com/urfave/cli/v2"
 	"golang.org/x/sys/unix"
 )
 
-const (
-	maxExternalEvidenceBytes int64 = 64 << 20
-	externalEvidenceTimeout        = 5 * time.Minute
-)
+const externalEvidenceTimeout = 5 * time.Minute
 
 // commandEvidenceReader is a transport adapter only. It returns bytes; the SBOM
 // module verifies those bytes and their artifact subject against the catalog's
@@ -30,9 +29,12 @@ type commandEvidenceReader struct {
 	client *http.Client
 }
 
-func (reader commandEvidenceReader) ReadEvidence(ctx context.Context, ref string) ([]byte, error) {
+func (reader commandEvidenceReader) ReadEvidence(ctx context.Context, ref string, maxBytes int64) ([]byte, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "external evidence retrieval requires a context")
+	}
+	if maxBytes <= 0 {
+		return nil, e.New(e.CodeUsage, "external evidence retrieval requires a positive byte limit")
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "external evidence retrieval canceled")
@@ -56,10 +58,10 @@ func (reader commandEvidenceReader) ReadEvidence(ctx context.Context, ref string
 		}
 		pathInfo, pathErr := os.Lstat(path)
 		if pathErr != nil || !before.Mode().IsRegular() || !pathInfo.Mode().IsRegular() ||
-			!os.SameFile(before, pathInfo) || before.Size() < 0 || before.Size() > maxExternalEvidenceBytes {
-			return nil, e.New(e.CodeUnavailable, "external evidence %s must be a regular file no larger than %d bytes", ref, maxExternalEvidenceBytes)
+			!os.SameFile(before, pathInfo) || before.Size() < 0 || before.Size() > maxBytes {
+			return nil, e.New(e.CodeUnavailable, "external evidence %s must be a regular file no larger than %d bytes", ref, maxBytes)
 		}
-		raw, err := readBoundedEvidence(ctx, file)
+		raw, err := readBoundedEvidence(ctx, file, maxBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -91,10 +93,10 @@ func (reader commandEvidenceReader) ReadEvidence(ctx context.Context, ref string
 		if response.StatusCode != http.StatusOK {
 			return nil, e.New(e.CodeUnavailable, "reading external evidence %s returned HTTP %d", ref, response.StatusCode)
 		}
-		if response.ContentLength > maxExternalEvidenceBytes {
-			return nil, e.New(e.CodeUnavailable, "external evidence %s exceeds %d bytes", ref, maxExternalEvidenceBytes)
+		if response.ContentLength > maxBytes {
+			return nil, e.New(e.CodeUnavailable, "external evidence %s exceeds %d bytes", ref, maxBytes)
 		}
-		return readBoundedEvidence(ctx, response.Body)
+		return readBoundedEvidence(ctx, response.Body, maxBytes)
 	default:
 		return nil, e.New(e.CodeUnsupported,
 			"external evidence reference %q needs an https:// or file:// reader adapter", ref)
@@ -110,14 +112,14 @@ func newEvidenceHTTPClient() *http.Client {
 	return &http.Client{Transport: transport, Timeout: externalEvidenceTimeout}
 }
 
-func readBoundedEvidence(ctx context.Context, reader io.Reader) ([]byte, error) {
+func readBoundedEvidence(ctx context.Context, reader io.Reader, maxBytes int64) ([]byte, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "reading external evidence requires a context")
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "reading external evidence canceled")
 	}
-	raw, err := io.ReadAll(io.LimitReader(evidenceContextReader{ctx: ctx, source: reader}, maxExternalEvidenceBytes+1))
+	raw, err := io.ReadAll(io.LimitReader(evidenceContextReader{ctx: ctx, source: reader}, maxBytes+1))
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "reading external evidence canceled")
@@ -127,8 +129,8 @@ func readBoundedEvidence(ctx context.Context, reader io.Reader) ([]byte, error) 
 	if err := ctx.Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "reading external evidence canceled")
 	}
-	if int64(len(raw)) > maxExternalEvidenceBytes {
-		return nil, e.New(e.CodeUnavailable, "external evidence exceeds %d bytes", maxExternalEvidenceBytes)
+	if int64(len(raw)) > maxBytes {
+		return nil, e.New(e.CodeUnavailable, "external evidence exceeds %d bytes", maxBytes)
 	}
 	return raw, nil
 }
@@ -145,20 +147,40 @@ func (reader evidenceContextReader) Read(buffer []byte) (int, error) {
 	return reader.source.Read(buffer)
 }
 
+// evidenceBundleVerifier selects the pinned cosign verifier for signed upstream
+// evidence. Without --cosign-digest, signed upstream provenance fails closed with
+// the flag to pass, while unsigned digest-pinned declarations behave as before.
+func evidenceBundleVerifier(c *cli.Context) (sbom.EvidenceBundleVerifier, error) {
+	digest := strings.TrimSpace(c.String("cosign-digest"))
+	if digest == "" {
+		return missingEvidenceVerifier{}, nil
+	}
+	return sign.NewCosignEvidenceVerifier(strings.TrimSpace(c.String("cosign")), digest, nil)
+}
+
+// missingEvidenceVerifier never verifies; it only names the command flag that
+// selects the pinned verifier.
+type missingEvidenceVerifier struct{}
+
+func (missingEvidenceVerifier) VerifyEvidenceBundle(_ context.Context, _ []byte, policy sbom.EvidenceBundlePolicy) error {
+	return e.New(e.CodeUnavailable,
+		"signed upstream provenance for artifact %s requires the pinned cosign verifier; pass --cosign-digest", policy.SubjectDigest)
+}
+
 func buildVerifiedSBOM(ctx context.Context, resolved *buildgraph.Resolved, buildDigest string,
-	artifactHashes map[string]string,
+	artifactHashes map[string]string, verifier sbom.EvidenceBundleVerifier,
 ) (*sbom.VerifiedSet, error) {
-	return sbom.BuildVerified(ctx, resolved, buildDigest, artifactHashes, commandEvidenceReader{})
+	return sbom.BuildVerified(ctx, resolved, buildDigest, artifactHashes, commandEvidenceReader{}, verifier)
 }
 
 func buildDiagnosticSelectedSBOM(ctx context.Context, resolved *buildgraph.Resolved, buildDigest string,
-	artifactHashes map[string]string,
+	artifactHashes map[string]string, verifier sbom.EvidenceBundleVerifier,
 ) (*sbom.VerifiedSet, error) {
-	return sbom.BuildDiagnosticSelected(ctx, resolved, buildDigest, artifactHashes, commandEvidenceReader{})
+	return sbom.BuildDiagnosticSelected(ctx, resolved, buildDigest, artifactHashes, commandEvidenceReader{}, verifier)
 }
 
 func buildVerifiedSBOMFromReport(ctx context.Context, resolved *buildgraph.Resolved,
-	report *pipeline.Report,
+	report *pipeline.Report, verifier sbom.EvidenceBundleVerifier,
 ) (*sbom.VerifiedSet, error) {
-	return sbom.BuildVerifiedFromReport(ctx, resolved, report, commandEvidenceReader{})
+	return sbom.BuildVerifiedFromReport(ctx, resolved, report, commandEvidenceReader{}, verifier)
 }
