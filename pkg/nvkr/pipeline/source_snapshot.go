@@ -499,25 +499,17 @@ type sourceClosureEntry struct {
 	Target        string `json:"target,omitempty"`
 }
 
-// sourceTreeDigest hashes the canonical manifest of all build-visible bytes,
+// sourceTreeDigestContext hashes the canonical manifest of all build-visible bytes,
 // relative paths, entry types, permission bits, and symlink targets while
 // excluding Git's administrative directory. It does not hash mtimes: the
 // materializer normalizes those to SOURCE_DATE_EPOCH and mtime is not a
 // source-content identity.
-func sourceTreeDigest(root string) (string, error) {
-	return sourceTreeDigestContext(context.Background(), root)
-}
-
 func sourceTreeDigestContext(ctx context.Context, root string) (string, error) {
 	manifest, err := sourceTreeManifestContext(ctx, root)
 	if err != nil {
 		return "", err
 	}
 	return canonical.Digest(canonical.KindSourceClosure, manifest)
-}
-
-func sourceTreeManifest(root string) (sourceClosureManifest, error) {
-	return sourceTreeManifestContext(context.Background(), root)
 }
 
 func sourceTreeManifestContext(ctx context.Context, root string) (sourceClosureManifest, error) {
@@ -626,10 +618,6 @@ func sourceChildNames(directory *os.File) ([]string, error) {
 	}
 	sort.Strings(names)
 	return names, nil
-}
-
-func copySourceTree(src, dst string, epoch int64) error {
-	return copySourceTreeContext(context.Background(), src, dst, epoch)
 }
 
 func copySourceTreeContext(ctx context.Context, src, dst string, epoch int64) error {
@@ -917,10 +905,6 @@ func readSourceReceiptContext(ctx context.Context, path string, directories ...*
 		return out, false, e.Wrap(e.CodeFetchFailed, err, "decoding source receipt %s", path)
 	}
 	return out, true, nil
-}
-
-func writeSourceReceipt(path string, receipt sourceReceipt) error {
-	return writeSourceReceiptContext(context.Background(), path, receipt)
 }
 
 func writeSourceReceiptContext(ctx context.Context, path string, receipt sourceReceipt, directories ...*os.File) error {
