@@ -95,7 +95,8 @@ retains its original scope; superseded requirements and plans are available only
 ## Commands
 
 ```sh
-make check          # full local gate (run before pushing; prerequisites in DEVELOPMENT.md)
+make check          # code gate (run before pushing; prerequisites in DEVELOPMENT.md)
+make ci-check       # every merge-gate check that runs locally; CodeQL runs only on GitHub
 make test           # fast default tests; matches PR checks
 make test-race      # opt-in race + coverage for the default suite
 make test-full      # opt-in extended fixtures, race + coverage
@@ -111,7 +112,7 @@ go test ./pkg/nvkr/factory/... -run TestName -count=1
 # generated-bundle drift check (repeats the committed Plan's input selection)
 make workflows-check
 
-# Fern operator docs (pages in docs/index.yml; needs node + `npm install -g fern-api@latest`)
+# Fern operator docs (pages in docs/index.yml; needs node, then `make fern-install` for the locked CLI)
 make docs-check
 
 # M1 local demo (needs Docker and a local NVKE clone; see demos/m1-local.md)
@@ -230,8 +231,9 @@ pages listed in `docs/index.yml`, which do not include this skill or the documen
 
 ## Completion gate
 
-Run checks proportionate to the change, with the full release-blocking gate before claiming repository-wide
-completion:
+Run checks proportionate to the change. `make ci-check` is the full local merge gate: run it before claiming
+repository-wide completion and report any check it could not run. The code gate, as direct commands with
+uncached tests:
 
 ```sh
 gofmt -l cmd client internal pkg
@@ -245,8 +247,10 @@ make vulncheck
 git diff --check
 ```
 
-`make check` runs the repository gate, including the license header check, shellcheck, Python report-tool tests
-and the Go vulnerability scan. New source files need the two-line SPDX header; `make license` adds it. The direct commands above also include uncached tests and `git diff --check`. Tests that need local listeners may require execution
+`make check` runs the code gate, including the license header check, shellcheck, Python report-tool tests
+and the Go vulnerability scan. `make ci-check` adds the build, actionlint, notices, workflow drift and Fern
+checks; workflow drift needs read access to the private NVKE source. New source files need the two-line SPDX
+header; `make license` adds it. The direct commands above also include uncached tests and `git diff --check`. Tests that need local listeners may require execution
 outside a restricted sandbox. `make vulncheck` needs access to the Go module proxy and vulnerability database;
 run it with network access or report it as unverified. Default tests omit expensive capacity and integration
 matrices. Do not routinely enable `NVKR_TEST_EXTENDED`, whole-suite race detection, or coverage. For concurrency
