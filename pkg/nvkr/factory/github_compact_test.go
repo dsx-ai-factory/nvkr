@@ -383,7 +383,7 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 		planPath             string
 		privateDiskProducers int // -1 explicitly exempts the separate development credential policy.
 	}{
-		{FactoryPlanPath, 8},
+		{FactoryPlanPath, 4},
 		{GitHubDevelopmentPlanPath, -1},
 		{".github/nvkr-run-nvke-nightly-arm64/plan.json", 1},
 		{".github/nvkr-run-nvke-nightly-upstream-ovn-arm64/plan.json", 1},

@@ -217,8 +217,8 @@ func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(authored.Outputs) != 73 {
-		t.Fatalf("got %d outputs, want 37 original outputs plus 36 additional release members", len(authored.Outputs))
+	if len(authored.Outputs) != 69 {
+		t.Fatalf("got %d outputs, want 37 original outputs plus 32 additional release members", len(authored.Outputs))
 	}
 	provider := catalog.Dir(filepath.Join(root, "../../catalogs/runtime-dependencies")).(catalog.ContextDataProvider)
 	cat, err := catalog.LoadContext(t.Context(), provider)
