@@ -460,9 +460,11 @@ of NVKE's source-owned host workflow. Neither Calico nor upstream is NVIDIA-fork
 ## Conformance on the fresh tenant
 
 Add `--conformance` to native Mac or Ubuntu ARM64 `e2e`. Both use the same
-38-output Definition and source pins: the ordinary 32 plus Linux and Darwin
+conformance Definition and source pins: the ordinary selection plus Linux and Darwin
 Hydrophone/kubectl outputs, the matching Linux ARM64 Kubernetes v1.36.3
-conformance image and BusyBox. Each host executes its native tools; the suite
+conformance image and BusyBox. Run
+`bin/nvkr definition inspect --definition inputs/definitions/demo/arm64-nvidia-local-kvm-conformance.json`
+to list the exact outputs. Each host executes its native tools; the suite
 pods run in the same fresh Linux tenant. The kubectl source is v1.36.3 with the
 catalog's declared dependency updates, built using Go 1.27.2. It reports
 `v1.36.3-dirty`; see the [conformance producer](../inputs/definitions/kubernetes-conformance-arm64/README.md)
@@ -936,8 +938,9 @@ owns the exact Ubuntu conformance result, completed cleanup, failed Mac attempt
 and limits of each recorded revision. Earlier retained-artifact diagnostics used
 a two-node tenant and do not establish the current four-guest conformance topology.
 
-Native ARM64 NVIDIA Definitions select 32 outputs, or 38 with conformance.
-The default AMD64 Definition selects 34 outputs, including host and site tools.
+`bin/nvkr definition inspect --definition <path>` prints each Definition's exact
+output selection; the default AMD64 Definition,
+`inputs/definitions/demo/amd64-nvidia-local-kvm.json`, also selects host and site tools.
 Package producers inspect actual Debian `Package`/`Architecture` metadata, and the disk
 uses NVKE's renamed Packer build/material schema and QCOW2 output. Changed package
 bytes require a fresh disk build. Maintained release, upstream and TCG product
