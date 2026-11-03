@@ -372,15 +372,11 @@ type terminalHeldTreeEntryView struct {
 	Size   int64  `json:"size,omitempty"`
 }
 
-// snapshotRegularTree turns a producer-controlled tree into immutable in-process
+// snapshotRegularTreeContext turns a producer-controlled tree into immutable in-process
 // facts while walking only already-open directory descriptors. Large blobs are
 // retained as their independently computed digest and size; bounded OCI documents
 // are defensively copied into private memory for semantic parsing. No retained
 // pathname exists for a same-UID process to rename, replace, or temporarily swap.
-func snapshotRegularTree(root string) (*terminalHeldTree, error) {
-	return snapshotRegularTreeContext(context.Background(), root)
-}
-
 func snapshotRegularTreeContext(ctx context.Context, root string) (*terminalHeldTree, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("artifact-tree capture requires a non-nil context")

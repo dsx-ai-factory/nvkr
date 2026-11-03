@@ -100,7 +100,7 @@ func TestSourceFetchWorkspaceCloseCancelsAndJoinsActualGit(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("workspace Close returned without a bounded join")
 	}
-	assertVendorReceiptAbsent(t, node, RunOptions{SourceRoot: "src"})
+	assertVendorReceiptAbsent(t, node, RunOptions{Ctx: t.Context(), SourceRoot: "src"})
 }
 
 func TestSourceVendorFetchCoreUsesHeldTransportBeforeReceipt(t *testing.T) {

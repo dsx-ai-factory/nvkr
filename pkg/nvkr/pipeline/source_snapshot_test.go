@@ -73,7 +73,7 @@ func TestMaterializeSourceAppliesAuthenticatedPatchPrivately(t *testing.T) {
 	}
 	var progress bytes.Buffer
 	snapshot, err := materializeSource(build, RunOptions{
-		SourceRoot: root, progress: &progressSink{w: &progress},
+		Ctx: t.Context(), SourceRoot: root, progress: &progressSink{w: &progress},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -174,7 +174,7 @@ func checkAuthenticatedNewFilePatch(t *testing.T) string {
 			Name: "patches/add-generated-script.patch", SHA256: digestBytes([]byte(patch)), Content: patch,
 		}},
 	}
-	snapshot, err := materializeSource(build, RunOptions{SourceRoot: root})
+	snapshot, err := materializeSource(build, RunOptions{Ctx: t.Context(), SourceRoot: root})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,7 +273,7 @@ func TestMaterializeSourceRejectsDriftAfterFetch(t *testing.T) {
 	_, err := materializeSource(ir.Node{
 		Component: "r", SourceDest: dest, SourceCommit: fetch.Commit,
 		SourceTreeHash: fetch.TreeHash, VendorSpecDigest: vendorDigest,
-	}, RunOptions{SourceRoot: root})
+	}, RunOptions{Ctx: t.Context(), SourceRoot: root})
 	if code(err) != nvkrerr.CodeBuildFailed {
 		t.Fatalf("source drift must fail closed, got %v", err)
 	}
@@ -299,7 +299,7 @@ func TestApplyPatchesRejectsForgedContent(t *testing.T) {
 	n := ir.Node{Component: "r", Patches: []ir.PatchRef{{
 		Name: "fix.patch", SHA256: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Content: "forged",
 	}}}
-	if err := applyPatches(n, dir, RunOptions{}); code(err) != nvkrerr.CodeBuildFailed {
+	if err := applyPatches(n, dir, RunOptions{Ctx: t.Context()}); code(err) != nvkrerr.CodeBuildFailed {
 		t.Fatalf("forged in-IR patch content must fail closed, got %v", err)
 	}
 }

@@ -39,7 +39,7 @@ binary-scan finding is not cleared by tool compilation or demo checks. Installin
 containerd daemon or make Docker's API a containerd endpoint. Tool acquisition, native compilation and daemon
 readiness remain separate from complete demo acceptance.
 
-The separately reviewed `native-capi-exec-init-image-main` acquisition retains the current-main
-CAPI init image parent. The tagged-release `native-capi-exec-init-image` stays unchanged.
-The nightly source-freeze owner selects the reviewed alternate under the original logical
-producer name; the runtime still verifies the source-owned image parent exactly.
+NVKE v0.23.0 selects the same CAPI init image parent as current main, so the tagged-release
+`native-capi-exec-init-image` and the separately reviewed `native-capi-exec-init-image-main`
+acquisition now pin identical digests, and the nightly no longer needs a current-main overlay.
+The runtime still verifies the source-owned image parent exactly.

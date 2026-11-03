@@ -16,6 +16,7 @@ outputs:
       - nvke-agent
       - nvke-cni-calico
       - nvke-cni-ovn
+      - nvke-doca-ovs
       - nvke-image-inputs
       - nvke-kubeadm-distro
       - nvke-node-image-amd64
