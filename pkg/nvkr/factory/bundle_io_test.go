@@ -184,3 +184,32 @@ func TestWriteGeneratedBundleRejectsSymlinkedOwnedDirectory(t *testing.T) {
 		t.Fatalf("factory writer escaped through symlink: %v", entries)
 	}
 }
+
+// Raw staging, sync and publication I/O must not reach callers uncoded, and
+// an owner's own code (usage, drift, timeout) must survive unchanged.
+func TestWriteGeneratedBundleCodesEveryFailure(t *testing.T) {
+	drift := e.New(e.CodePipelineDrift, "drift")
+	for _, test := range []struct {
+		name string
+		err  error
+		want e.Code
+	}{
+		{"success", nil, ""},
+		{"coded", drift, e.CodePipelineDrift},
+		{"raw sync", os.ErrPermission, e.CodeInternal},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := codeGeneratedWriteError(test.err)
+			if test.want == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			assertFactoryErrorCode(t, err, test.want)
+			if !errors.Is(err, test.err) {
+				t.Fatal("coded write error lost its cause")
+			}
+		})
+	}
+}

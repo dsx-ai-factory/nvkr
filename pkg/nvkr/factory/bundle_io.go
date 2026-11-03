@@ -107,8 +107,21 @@ func validateBundleNamespace(bundle *GeneratedBundle) error {
 
 // WriteGeneratedBundle stages generated payloads, retires unchanged prior members,
 // and writes the root manifest last. Interrupted writes are detected by the check
-// gate; this is not an atomic replacement of the entire directory.
+// gate; this is not an atomic replacement of the entire directory. Every failure
+// carries a stable code; raw staging, sync and publication I/O is internal.
 func WriteGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBundle) error {
+	return codeGeneratedWriteError(writeGeneratedBundle(ctx, root, bundle))
+}
+
+func codeGeneratedWriteError(err error) error {
+	var coded *e.Error
+	if err == nil || errors.As(err, &coded) {
+		return err
+	}
+	return e.Wrap(e.CodeInternal, err, "writing generated Run bundle")
+}
+
+func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBundle) error {
 	if ctx == nil {
 		return e.New(e.CodeUsage, "generated Run write requires a context")
 	}
