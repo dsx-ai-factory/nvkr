@@ -250,47 +250,9 @@ Each producer required one manifest with one layer in AICR's layout, rechecked t
 and producers ran in the pinned Linux ARM64 Go 1.27.2 container. These are local records, not hosted
 evidence or signed Releases.
 
-The following October 18 results apply to the original catalog before this scope reduction and
-upstream integration; they are historical evidence, not validation of the current inputs.
-
-On October 18, the complete six-output GB300 Definition finished local attempt
-`aicr-gb300-local-20261018-r2` with exit code 0 and complete cleanup. Its immutable
-`.nvkr/runs/aicr-gb300-local-20261018-r2/lifecycle.json` records status `complete`, lane
-`unqualified-local-execution`, Plan digest
-`sha256:34a006d3caa099af8ec284c77a4489cc6a22d61edb144650f6eaef9bbf2c6b33` and content subject
-`sha256:101165a75a35b41e85116a0c38b42ffd74617111db42c6e9847b096277396ff7`.
-All 30 source-fetch, offline build, terminal-observation, file-inventory and OCI-packaging nodes completed;
-independent lifecycle observation bound all six required output manifests. The host was macOS ARM64
-Go 1.27.2 and producers ran in the pinned Linux ARM64 Go 1.27.2 container. The earlier attempt stopped
-at its dependency-vendoring timeout with no observed outputs; the retained command now bounds vendoring
-at 900 seconds. These are local records, not hosted evidence or signed Releases.
-
-The Linux ARM64 generator retained by that Run, version `0.0.0-nvkr.fa705ec263a5`, was reused offline
-for two complete passes across all 18 recipe/renderer selections. All 36 renders passed upstream checksum
-verification; every pair retained identical resolved recipe bytes, rendered files and normalized gzip-tar
-bytes. All six GB300 archives also matched the completed Run's archives byte for byte. NVKR's local OCI
-builder admitted all 18 resulting archives. This is repeat-render evidence from one retained binary,
-not independently qualified reproduction.
-
-That same binary rendered the optional native Helm root chart. Helm 4.2.3 accepted it in lint, template
-and package checks. NVKR built a native Helm OCI layout and exported the identical chart archive, with
-manifest `sha256:2f597484d2ae24c8a5f2b25b3395977110778d913cba1f1181bcaa4575793999` and archive
-`sha256:f229addc1ff50804b24361c2327d4d5afc477539805454ffd51e364cff08b85e` (35,757 bytes).
-This separate renderer and delivery smoke is not a complete native Helm Run or registry publication.
-
-The uncached default Go suite passed on Linux ARM64 Go 1.27.2 across the full suite and reruns of the
-three packages whose fixtures required a non-root user or writable `.nvkr` scratch space. The corrected
-reruns retained read-only source, Git and module-cache mounts with private writable test volumes. Formatting,
-license headers, vet, lint, shellcheck, Python report tests, vulnerability scanning, documentation checks,
-maintained-workflow drift checks and the final CLI build also passed. The macOS full gate did not pass:
-delivery exceeded a deadline and its 20-minute package timeout under slow filesystem operations; its
-remaining run was stopped after the Linux package passed. The Linux results do not imply a macOS gate pass.
-
-Hosted AICR publication/signing and independent production consumption remain unexercised. Helm lint and
-template rendering do not prove Argo reconciliation: the pinned native chart's child OCI subpaths need
-separate downstream validation, as observed in the historical renderer smoke. Cluster installation, hardware behavior,
-air-gap dependency closure and qualified bundle reproduction remain outside these results. No test or
-render upgrades VR200 Preview to operational acceptance.
+Hosted AICR publication/signing and independent production consumption remain unexercised. Argo CD
+reconciliation, cluster installation, hardware behavior, air-gap dependency closure and qualified bundle
+reproduction remain outside these results. No test or render upgrades VR200 Preview to operational acceptance.
 
 ## External test output and local diagnostic boundary
 

@@ -47,6 +47,6 @@ Referenced charts, images and providers are not vendored: these are not air-gap
 payloads. GitOps repository settings and cluster acceptance belong downstream.
 
 [Reconciliation](../../../docs/adr/reconciliation.md#aicr-deployment-bundles)
-records the local six-output Runs and their limits. Changes to the catalog
-change build identity; those Runs do not validate the inputs against hardware or
+records the local six-output Run and its limits. Changes to the catalog
+change build identity; that Run does not validate the inputs against hardware or
 hosted services.
