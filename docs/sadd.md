@@ -82,7 +82,8 @@ their [logical identity](adr/0027-pinned-tool-producers.md#2-logical-identity-co
 [execution](adr/0027-pinned-tool-producers.md#3-execution-offline-isolated-fixed),
 [inputs](adr/0027-pinned-tool-producers.md#4-declared-inputs-are-typed-material-bindings) and
 [outputs](adr/0027-pinned-tool-producers.md#5-outputs-one-file-or-a-producer-written-oci-layout).
-Nothing is implemented.
+The `file` form is implemented and contract-tested; the OCI layout form waits for the layout import, and no
+recorded Run has executed a pinned tool.
 
 Proposed [ADR-28](adr/0028-multi-platform-executable-indexes.md) designs multi-platform executables. ADR-28 owns
 when [one tool source covers several platforms](adr/0028-multi-platform-executable-indexes.md#1-one-tool-source-declares-every-platform),
@@ -297,7 +298,7 @@ A proposed pinned-tool producer (ADR-27) is an ordinary selected component insid
 [execution](adr/0027-pinned-tool-producers.md#3-execution-offline-isolated-fixed), its
 [admitted output forms](adr/0027-pinned-tool-producers.md#5-outputs-one-file-or-a-producer-written-oci-layout)
 and the [authority of tool-side signing](adr/0027-pinned-tool-producers.md#6-tool-evidence-companions-and-tool-side-signing).
-This path is designed, not implemented.
+The single-file path is implemented and contract-tested; OCI layout handoff is not.
 
 A proposed multi-platform executable output (ADR-28) compiles like an OCI aggregate. ADR-28 owns its
 [native per-platform identity](adr/0028-multi-platform-executable-indexes.md#3-native-producer-identity-is-unchanged),

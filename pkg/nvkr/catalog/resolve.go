@@ -19,7 +19,7 @@ import (
 )
 
 func resolveComponent(name string, raw rawComponent, sources map[string]Source, lock *PinLock) (Component, error) {
-	if raw.ToolchainImage != "" && !raw.FromSource {
+	if raw.ToolchainImage != "" && !raw.FromSource && raw.BuilderType != BuilderPinnedTool {
 		return Component{}, e.New(e.CodeInvalidCatalog, "component %q: toolchain override requires a from-source build", name)
 	}
 	c := Component{
@@ -42,6 +42,12 @@ func resolveComponent(name string, raw rawComponent, sources map[string]Source, 
 		ExclusionReason:        raw.ExclusionReason,
 
 		BuildRequirements: execution.Clone(raw.BuildRequirements),
+	}
+	if raw.BuilderType == BuilderPinnedTool {
+		return resolvePinnedTool(name, raw, sources, lock, c)
+	}
+	if raw.Tool != "" || len(raw.ToolArgs) != 0 || len(raw.ToolEnv) != 0 {
+		return c, e.New(e.CodeInvalidCatalog, "component %q: tool, toolArgs and toolEnv require builderType pinned-tool", name)
 	}
 	// Default the from-source builder to oci-hermetic so existing catalogs need no
 	// edit; nix is opt-in per component (ADR-10 §3).

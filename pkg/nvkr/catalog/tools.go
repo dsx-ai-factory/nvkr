@@ -120,8 +120,11 @@ func validateToolURL(raw string) error {
 	}
 	return nil
 }
+
+// safeToolPath also refuses '=': a pinned-tool executable's staged name follows
+// NAME=VALUE pairs in an env(1) argument list, where '=' would make it an assignment.
 func safeToolPath(p string) bool {
-	return p != "" && p != "." && p != ".." && !strings.HasPrefix(p, "../") && !path.IsAbs(p) && path.Clean(p) == p && !strings.ContainsAny(p, "\\\x00")
+	return p != "" && p != "." && p != ".." && !strings.HasPrefix(p, "../") && !path.IsAbs(p) && path.Clean(p) == p && !strings.ContainsAny(p, "\\\x00=")
 }
 func validateToolPin(pin ToolPin) error {
 	if err := validateToolSource(ToolSource{Format: pin.Format, URL: pin.URL, Platform: pin.Platform, ExecutablePath: pin.ExecutablePath,
