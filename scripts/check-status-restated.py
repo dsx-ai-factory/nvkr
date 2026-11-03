@@ -15,6 +15,7 @@ exception on the matched line with <!-- status-ok: reason -->.
 import argparse
 import codecs
 import functools
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -95,6 +96,14 @@ def untracked_lines(repo):
     listed = git(repo, "-c", "core.quotePath=false", "ls-files", "-z", "--others", "--exclude-standard",
                  "--", *MARKDOWN)
     return dict.fromkeys(filter(None, listed.split("\0")))
+
+
+def worktree_text(repo, path):
+    """Return a working-tree file as git stores it: a symlink is its target path, never followed."""
+    file = Path(repo, path)
+    if file.is_symlink():
+        return os.readlink(file)
+    return file.read_text(encoding="utf-8", errors="replace")
 
 
 def paragraphs(text, added):
@@ -184,7 +193,7 @@ def check(repo, base, head=None):
         if head:
             text = git(repo, "cat-file", "blob", f"{head}:{path}")
         else:
-            text = Path(repo, path).read_text(encoding="utf-8", errors="replace")
+            text = worktree_text(repo, path)
         for run in paragraphs(text, added):
             for number, message, span in scan(run):
                 if span:

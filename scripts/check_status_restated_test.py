@@ -33,6 +33,8 @@ BASE = {
     "docs/split.md": "The release is\nunrecorded.\n",
     "docs/link.md": Link("old.md"),
     "docs/items.md": "- ADR-02 identity.\n",
+    "docs/swap.md": "Plain.\n",
+    "outside.txt": "Hosted acceptance remains unrecorded.\n",
 }
 # Each case owns distinct paths, so one base...head diff exercises them all.
 CASES = {
@@ -76,6 +78,10 @@ CASES = {
     "adr in a neighbouring list item is not the owner": (
         {"docs/items.md": BASE["docs/items.md"] + "- Hosted signing remains unproven.\n"},
         [f'docs/items.md:2: status restated ("remains unproven"); {LINK}']),
+    "numbered item with a wrapped phrase": (
+        {"docs/numbered.md": "1. ADR-02 identity.\n2. Hosted signing remains\n   unproven.\n  - ADR-21 note.\n"},
+        [f'docs/numbered.md:2: status restated ("remains unproven"); {LINK}']),
+    "file replaced by a symlink is its target path": ({"docs/swap.md": Link("../outside.txt")}, []),
     "symlink replaced by a file": (
         {"docs/link.md": "Hosted acceptance remains unrecorded.\n"},
         [f'docs/link.md:1: status restated ("remains unrecorded"); {LINK}']),
@@ -115,7 +121,7 @@ def git(repo, *args):
 def commit(repo, files):
     for name, text in files.items():
         path = Path(repo, name)
-        if text is None or path.is_symlink():
+        if path.is_symlink() or path.exists() and (text is None or isinstance(text, Link)):
             path.unlink()
         if text is None:
             continue
@@ -182,6 +188,8 @@ class StatusRestatedTest(unittest.TestCase):
         """Without a head, check uncommitted and untracked Markdown since the merge base."""
         Path(self.repo, "docs/old.md").write_text(BASE["docs/old.md"] + "Signing is unproven.\n")
         Path(self.repo, "docs/new.md").write_text("Publication has not been recorded.\n")
+        Path(self.repo, "docs/guide.md").unlink()
+        Path(self.repo, "docs/guide.md").symlink_to("../outside.txt")  # local mode must not follow it
         Path(self.repo, "docs/notes.md").write_text(
             "Intro.\n\nRelease requires a\nrecorded run.\n\nThe release is\n\nunrecorded.\n")
         _, findings = restated.check(self.repo, self.head)
