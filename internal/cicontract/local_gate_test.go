@@ -6,6 +6,7 @@ package cicontract
 import (
 	"context"
 	"errors"
+	"maps"
 	"os/exec"
 	"slices"
 	"strings"
@@ -20,8 +21,14 @@ var (
 	providerOnlyJobs = []string{"analyze"} // CodeQL analysis and result upload.
 	// Actions that prepare a job without checking anything.
 	provisioningActions = []string{"actions/checkout@", "actions/setup-go@", "actions/setup-node@", "actions/upload-artifact@"}
-	// Actions that run a make target's check through a hosted wrapper.
-	targetActions = map[string]string{"golangci/golangci-lint-action@": "lint"}
+	// Actions that run a make target's check through a hosted wrapper, with
+	// the only inputs they may set: another input could narrow the check.
+	targetActions = map[string]struct {
+		target string
+		inputs []string
+	}{
+		"golangci/golangci-lint-action@": {"lint", []string{"install-mode", "skip-cache", "version"}},
+	}
 	// Run steps that install a tool or report results, keyed by job and step name.
 	supportSteps = [][2]string{
 		{"docs", "Install Fern CLI"},
@@ -74,6 +81,11 @@ func hostedMakeTargets(t *testing.T, jobs map[string]mergeGateJob) []string {
 			}
 			if slices.Contains(providerOnlyJobs, name) {
 				used["job "+name] = true
+				for _, step := range job.Steps {
+					if _, ok := makeStepTarget(step); ok {
+						t.Fatalf("provider-only job %s runs make step %q; move the check to a reproducible job", name, step.Name)
+					}
+				}
 				continue
 			}
 			for _, step := range job.Steps {
@@ -82,15 +94,20 @@ func hostedMakeTargets(t *testing.T, jobs map[string]mergeGateJob) []string {
 						continue
 					}
 					target, ok := "", false
-					for prefix, candidate := range targetActions {
+					for prefix, action := range targetActions {
 						if strings.HasPrefix(step.Uses, prefix) {
-							target, ok = candidate, true
+							inputs := slices.Sorted(maps.Keys(step.With))
+							if !slices.Equal(inputs, action.inputs) {
+								t.Fatalf("%s step %q sets inputs %v, want exactly %v", name, step.Name, inputs, action.inputs)
+							}
+							target, ok = action.target, true
 							used["action "+prefix] = true
 						}
 					}
 					if !ok {
 						t.Fatalf("%s step %q uses unclassified action %s", name, step.Name, step.Uses)
 					}
+					requireUnconditional(t, name, step)
 					targets[target] = true
 					continue
 				}
@@ -98,10 +115,11 @@ func hostedMakeTargets(t *testing.T, jobs map[string]mergeGateJob) []string {
 					used["step "+name+"/"+step.Name] = true
 					continue
 				}
-				target, ok := makeStepTarget(step.Run)
+				target, ok := makeStepTarget(step)
 				if !ok {
 					t.Fatalf("%s step %q must run one make target: %q", name, step.Name, step.Run)
 				}
+				requireUnconditional(t, name, step)
 				if local, sliced := hostedSlices[target]; sliced {
 					used["slice "+target] = true
 					target = local
@@ -142,16 +160,28 @@ func appendUnused(stale []string, used map[string]bool, key string) []string {
 	return stale
 }
 
-// makeStepTarget accepts `make <target>`, optionally piped into tee to retain
-// its output.
-func makeStepTarget(run string) (string, bool) {
-	run = strings.TrimSpace(run)
+// requireUnconditional rejects a counted step that may not run or whose
+// failure would not fail its job.
+func requireUnconditional(t *testing.T, job string, step mergeGateStep) {
+	t.Helper()
+	if step.If != "" || step.ContinueOnError != nil && step.ContinueOnError != false {
+		t.Fatalf("%s step %q must run unconditionally and propagate failures", job, step.Name)
+	}
+}
+
+// makeStepTarget accepts `make <target>`, optionally piped into one tee to
+// retain its output under bash, whose pipefail propagates make's failure.
+func makeStepTarget(step mergeGateStep) (string, bool) {
+	run := strings.TrimSpace(step.Run)
 	if strings.Contains(run, "\n") {
 		return "", false
 	}
 	command, rest, piped := strings.Cut(run, "|")
-	if piped && !strings.HasPrefix(strings.TrimSpace(rest), "tee ") {
-		return "", false
+	if piped {
+		tee := strings.Fields(rest)
+		if step.Shell != "bash" || len(tee) != 2 || tee[0] != "tee" || strings.ContainsAny(rest, ";&|<>`") {
+			return "", false
+		}
 	}
 	fields := strings.Fields(command)
 	if len(fields) != 2 || fields[0] != "make" || strings.HasPrefix(fields[1], "-") || strings.Contains(fields[1], "=") {

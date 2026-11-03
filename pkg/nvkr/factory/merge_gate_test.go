@@ -37,8 +37,11 @@ func TestMergeGateActionlintConfigurationTriggersCheck(t *testing.T) {
 		if err := yaml.Unmarshal([]byte(step.With.Filters), &filters); err != nil {
 			t.Fatal(err)
 		}
-		if !slices.Contains(filters["actions"], ".github/actionlint.yaml") {
-			t.Fatal("actionlint config-only changes skip workflow lint")
+		// A change to the linter's configuration, pin, recipe or toolchain must run it.
+		for _, input := range []string{".github/actionlint.yaml", "toolchains/actionlint/**", "Makefile", ".go-version"} {
+			if !slices.Contains(filters["actions"], input) {
+				t.Fatalf("%s-only changes skip workflow lint", input)
+			}
 		}
 		return
 	}

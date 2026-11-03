@@ -106,6 +106,8 @@ vulncheck: go-version-check ## Check reachable Go vulnerabilities using the pinn
 
 .PHONY: actionlint
 actionlint: go-version-check ## Lint GitHub workflows with the actionlint pinned in toolchains/actionlint.
+	@# actionlint silently skips its run-script checks when shellcheck is absent.
+	@command -v shellcheck >/dev/null 2>&1 || { echo "shellcheck not installed — https://www.shellcheck.net/"; exit 1; }
 	GOBIN="$(CURDIR)/bin" go -C toolchains/actionlint install tool
 	"$(CURDIR)/bin/actionlint"
 
@@ -326,16 +328,17 @@ pipeline-dev-run: pipeline-dev-check ## Dispatch the clean, pushed current branc
 	python3 scripts/pipeline-dev.py --repo "$$PIPELINE_DEV_REPO"
 
 .PHONY: check
-check: go-version-check fmt-check definitions-location-check license-header-check vet lint shellcheck test-ci-tools test vulncheck ## Code gate: format, license, vet, lint, shell, tool tests, Go tests, vulnerabilities.
+check: go-version-check fmt-check definitions-location-check license-header-check vet lint shellcheck test-ci-tools test vulncheck ## Code gate: format, Definition location, license, vet, lint, shell, tool tests, Go tests, vulnerabilities.
 
 # Every merge-gate check that can run locally; CI runs `make test` as test-shard
 # slices. internal/cicontract requires this list to equal the make targets the
 # merge gate runs. CodeQL and the DCO App run only on GitHub.
-CI_CHECKS := fmt-check definitions-location-check license-header-check vet shellcheck test-ci-tools build \
-	lint vulncheck test actionlint workflows-check notices-check docs-check
+# Checks needing extra tools or private access run before the long test suite.
+CI_CHECKS := fmt-check definitions-location-check license-header-check shellcheck actionlint \
+	notices-check workflows-check docs-check vet test-ci-tools build lint vulncheck test
 
 .PHONY: ci-check
-ci-check: go-version-check $(CI_CHECKS) ## Complete local merge gate (needs private NVKE access and Fern; see CONTRIBUTING.md).
+ci-check: go-version-check $(CI_CHECKS) ## Complete local merge gate (needs private NVKE access, Node and Fern; see CONTRIBUTING.md).
 
 .PHONY: clean
 clean: ## Remove build output, coverage, and the local engine workspace.

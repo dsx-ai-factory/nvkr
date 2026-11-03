@@ -41,9 +41,9 @@ source, and the docs check needs Node and the Fern CLI. CodeQL and the DCO App r
 differ, so add a new hosted check to both.
 
 On a pull request the merge gate runs only the checks whose inputs changed; `make ci-check` runs all of
-them. Run `make check` and `make build` before opening a PR, and `make ci-check` when a change touches
-workflows, generated bundles, dependencies or published docs. The vulnerability check needs access to the
-Go vulnerability database; see the [maintainer procedure](docs/cve-management.md) for triage and scope.
+them. Run `make ci-check` before opening a PR; without NVKE access, run `make check` and `make build` and say
+which hosted checks you could not run. The vulnerability check needs access to the Go vulnerability
+database; see the [maintainer procedure](docs/cve-management.md) for triage and scope.
 
 Expensive capacity and full-product integration fixtures require
 `NVKR_TEST_EXTENDED=1`; `make test-full` sets it for the race-and-coverage run.
