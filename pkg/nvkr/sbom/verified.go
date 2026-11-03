@@ -922,6 +922,9 @@ func validateExternalProvenance(ctx context.Context, raw []byte, subject, artifa
 			Payload     string `json:"payload"`
 		} `json:"dsseEnvelope"`
 	}
+	if err := canonical.RejectFieldAliases(raw, &bundle); err != nil {
+		return e.Wrap(e.CodeUnverifiedRef, err, "external provenance for %s has an ambiguous field name", subject)
+	}
 	if err := json.Unmarshal(raw, &bundle); err != nil {
 		return e.Wrap(e.CodeUnverifiedRef, err, "decoding external provenance for %s", subject)
 	}
@@ -973,6 +976,9 @@ func validateExternalProvenance(ctx context.Context, raw []byte, subject, artifa
 
 func validateExternalSLSA(raw []byte, component, artifactDigest string) error {
 	var statement externalSLSAStatement
+	if err := canonical.RejectFieldAliases(raw, &statement); err != nil {
+		return e.Wrap(e.CodeUnverifiedRef, err, "external provenance for %s has an ambiguous field name", component)
+	}
 	if err := json.Unmarshal(raw, &statement); err != nil {
 		return e.Wrap(e.CodeUnverifiedRef, err, "decoding external SLSA provenance for %s", component)
 	}

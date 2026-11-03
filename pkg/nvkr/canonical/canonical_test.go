@@ -4,6 +4,7 @@
 package canonical
 
 import (
+	"encoding/json"
 	"errors"
 	"math"
 	"testing"
@@ -252,6 +253,44 @@ func TestValidateFoldedJSONDocumentRejectsCaseAliases(t *testing.T) {
 	}
 	if err := ValidateJSONDocument([]byte(`{"name":"a","NAME":"b"}`)); err != nil {
 		t.Fatalf("exact-name validation rejected case-distinct names: %v", err)
+	}
+}
+
+func TestRejectFieldAliasesBindsOnlyStructFields(t *testing.T) {
+	type statement struct {
+		PredicateType string `json:"predicateType"`
+		Subject       []struct {
+			Name   string            `json:"name"`
+			Digest map[string]string `json:"digest"`
+		} `json:"subject"`
+		Parameters json.RawMessage `json:"parameters"`
+		Untagged   string
+	}
+	for _, tc := range []struct {
+		name string
+		raw  string
+		ok   bool
+	}{
+		{name: "exact names", raw: `{"predicateType":"v1","subject":[{"name":"a","digest":{"sha256":"x"}}],"Untagged":"u"}`, ok: true},
+		{name: "unknown member", raw: `{"predicateType":"v1","other":"o"}`, ok: true},
+		{name: "case variants inside a map", raw: `{"subject":[{"digest":{"sha256":"x","SHA256":"y"}}]}`, ok: true},
+		{name: "case variants inside raw parameters", raw: `{"parameters":{"Path":"a","PATH":"b"}}`, ok: true},
+		{name: "later alias", raw: `{"predicateType":"v0.2","PREDICATETYPE":"v1"}`},
+		{name: "earlier alias", raw: `{"PREDICATETYPE":"v1","predicateType":"v0.2"}`},
+		{name: "lone alias", raw: `{"PredicateType":"v1"}`},
+		{name: "alias in a slice of structs", raw: `{"subject":[{"name":"a","NAME":"b"}]}`},
+		{name: "alias of an untagged field", raw: `{"untagged":"u"}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := RejectFieldAliases([]byte(tc.raw), &statement{})
+			var coded *e.Error
+			if tc.ok && err != nil {
+				t.Fatalf("rejected unambiguous member names: %v", err)
+			}
+			if !tc.ok && (!errors.As(err, &coded) || coded.Code != e.CodeVerifyFailed) {
+				t.Fatalf("error = %v, want %q", err, e.CodeVerifyFailed)
+			}
+		})
 	}
 }
 

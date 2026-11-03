@@ -319,6 +319,75 @@ func walkDocument(raw []byte, key func(string) string) error {
 	return requireEOF(dec)
 }
 
+// RejectFieldAliases rejects a JSON member that encoding/json would bind to a
+// field of out's struct type only through its case-insensitive match, whether or
+// not the exact name is also present. Members bound to maps, interfaces or
+// json.RawMessage stay opaque, so free-form upstream parameters keep their names.
+// Call it after ValidateJSONDocument.
+func RejectFieldAliases(raw []byte, out any) error {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	var document any
+	if err := dec.Decode(&document); err != nil {
+		return e.Wrap(e.CodeVerifyFailed, err, "decoding JSON for field alias admission")
+	}
+	return rejectFieldAliases(document, reflect.TypeOf(out))
+}
+
+var rawMessageType = reflect.TypeOf(json.RawMessage(nil))
+
+func rejectFieldAliases(value any, t reflect.Type) error {
+	for t != nil && t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	if t == nil || t == rawMessageType {
+		return nil
+	}
+	switch t.Kind() {
+	case reflect.Slice, reflect.Array:
+		items, _ := value.([]any)
+		for _, item := range items {
+			if err := rejectFieldAliases(item, t.Elem()); err != nil {
+				return err
+			}
+		}
+	case reflect.Struct:
+		object, ok := value.(map[string]any)
+		if !ok {
+			return nil
+		}
+		fields := map[string]reflect.Type{}
+		folded := map[string]string{}
+		for i := 0; i < t.NumField(); i++ {
+			field := t.Field(i)
+			name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
+			if !field.IsExported() || name == "-" {
+				continue
+			}
+			if name == "" {
+				name = field.Name
+			}
+			fields[name] = field.Type
+			folded[foldJSONName(name)] = name
+		}
+		members := make([]string, 0, len(object))
+		for member := range object {
+			members = append(members, member)
+		}
+		sort.Strings(members)
+		for _, member := range members {
+			if fieldType, exact := fields[member]; exact {
+				if err := rejectFieldAliases(object[member], fieldType); err != nil {
+					return err
+				}
+			} else if field, alias := folded[foldJSONName(member)]; alias {
+				return e.New(e.CodeVerifyFailed, "JSON member %q is a case alias of field %q", member, field)
+			}
+		}
+	}
+	return nil
+}
+
 // foldJSONName maps each rune to the smallest rune of its case-fold set, the
 // same key encoding/json uses for its case-insensitive field match.
 func foldJSONName(name string) string {
