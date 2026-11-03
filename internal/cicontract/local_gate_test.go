@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"maps"
 	"os/exec"
+	"path"
 	"slices"
 	"strings"
 	"testing"
@@ -131,6 +132,12 @@ func TestLocalGateRejectsInventoryDrift(t *testing.T) {
 				job.Steps = append(job.Steps, mergeGateStep{storageWorkflowStep: storageWorkflowStep{Run: "echo start\ntrue && make -k vet GOFLAGS=-short"}})
 				jobs["analyze"] = job
 			}},
+		{"provider-only job runs make by path", `provider-only job analyze runs make step`,
+			func(t *testing.T, jobs map[string]mergeGateJob) {
+				job := jobs["analyze"]
+				job.Steps = append(job.Steps, mergeGateStep{storageWorkflowStep: storageWorkflowStep{Run: "/usr/bin/make test-race"}})
+				jobs["analyze"] = job
+			}},
 		{"stale support step", `classification entries match no merge gate step: [step tests/Summarize test timings]`,
 			func(t *testing.T, jobs map[string]mergeGateJob) {
 				job := jobs["tests"]
@@ -223,8 +230,12 @@ func hostedMakeTargets(jobs map[string]mergeGateJob) ([]string, error) {
 			if slices.Contains(providerOnlyJobs, name) {
 				used["job "+name] = true
 				for _, step := range job.Steps {
-					// Any make word, not only the canonical form, would hide a local check here.
-					if slices.Contains(strings.FieldsFunc(step.Run, isShellSeparator), "make") {
+					// Any make word or path, not only the canonical form, would hide a local
+					// check here. Matching words rather than parsing shell fails closed: prose
+					// containing "make" is rejected too.
+					if slices.ContainsFunc(strings.FieldsFunc(step.Run, isShellSeparator), func(word string) bool {
+						return path.Base(word) == "make"
+					}) {
 						return nil, fmt.Errorf("provider-only job %s runs make step %q; move the check to a reproducible job", name, step.Name)
 					}
 				}
