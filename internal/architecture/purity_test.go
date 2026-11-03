@@ -173,11 +173,12 @@ func TestIdentityPathsArePure(t *testing.T) {
 	}
 }
 
-// uncheckedPackages returns the required packages absent from checked, in order.
+// uncheckedPackages returns the required packages absent from checked, once each in
+// first-seen order; a root that is also a discovered package is required twice.
 func uncheckedPackages(required []string, checked map[string]bool) []string {
 	var missing []string
 	for _, pkg := range required {
-		if !checked[pkg] {
+		if !checked[pkg] && !slices.Contains(missing, pkg) {
 			missing = append(missing, pkg)
 		}
 	}
@@ -185,7 +186,7 @@ func uncheckedPackages(required []string, checked map[string]bool) []string {
 }
 
 func TestUncheckedPackages(t *testing.T) {
-	required := []string{"root", "root/sub"}
+	required := []string{"root", "root/sub", "root"}
 	tests := []struct {
 		name    string
 		checked map[string]bool
@@ -450,11 +451,7 @@ func goListExports(t *testing.T, dir string, patterns ...string) []listedPackage
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if err := ownedcmd.Run(ctx, command); err != nil {
-		hint := "(offline: run \"go mod download\" if modules are missing)"
-		if ctx.Err() != nil {
-			hint = "" // canceled or timed out: cache advice would mislead
-		}
-		t.Fatalf("go %s: %v\n%s%s", strings.Join(args, " "), err, stderr.String(), hint)
+		t.Fatalf("go %s: %v\n%s%s", strings.Join(args, " "), err, stderr.String(), goListFailureHint(ctx))
 	}
 	var listed []listedPackage
 	for decoder := json.NewDecoder(&stdout); ; {
@@ -468,6 +465,38 @@ func goListExports(t *testing.T, dir string, patterns ...string) []listedPackage
 			t.Fatalf("go list %s: %s", pkg.ImportPath, pkg.Error.Err)
 		}
 		listed = append(listed, pkg)
+	}
+}
+
+// goListFailureHint returns module-cache advice for an ordinary go list failure, and
+// nothing once ctx is canceled or past its deadline, where that advice would mislead.
+func goListFailureHint(ctx context.Context) string {
+	if ctx.Err() != nil {
+		return ""
+	}
+	return "(offline: run \"go mod download\" if modules are missing)"
+}
+
+func TestGoListFailureHint(t *testing.T) {
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	expired, stop := context.WithDeadline(t.Context(), time.Unix(0, 0))
+	defer stop()
+	tests := []struct {
+		name string
+		ctx  context.Context
+		want bool
+	}{
+		{name: "ordinary failure", ctx: t.Context(), want: true},
+		{name: "canceled", ctx: canceled},
+		{name: "deadline exceeded", ctx: expired},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := strings.Contains(goListFailureHint(tt.ctx), "go mod download"); got != tt.want {
+				t.Errorf("hint mentions go mod download = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
