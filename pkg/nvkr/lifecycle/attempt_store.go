@@ -16,11 +16,7 @@ import (
 
 func recordRunFailure(ctx context.Context, path string, run *Run, cause error, operation string) (*Run, error) {
 	failed := failedRun(run, cause)
-	base := context.Background()
-	if ctx != nil {
-		base = context.WithoutCancel(ctx)
-	}
-	commitCtx, cancel := context.WithTimeout(base, 5*time.Second)
+	commitCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 	if err := writeRunRecord(commitCtx, path, failed); err != nil {
 		return nil, e.Wrap(e.CodeImmutableViolation, errors.Join(cause, err), "%s", operation)

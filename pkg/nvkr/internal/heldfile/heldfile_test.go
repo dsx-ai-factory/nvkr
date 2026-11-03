@@ -71,7 +71,7 @@ func TestOpenHoldsOriginalAfterPathReplacementAndRejectsSymlink(t *testing.T) {
 	if err := os.WriteFile(path, []byte("original"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	held, err := Open(path, Options{Label: "input", MaxBytes: 1024})
+	held, err := OpenContext(t.Context(), path, Options{Label: "input", MaxBytes: 1024})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestOpenHoldsOriginalAfterPathReplacementAndRejectsSymlink(t *testing.T) {
 	if err := os.WriteFile(path, []byte("replacement"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	raw, err := held.ReadAll(1024)
+	raw, err := held.ReadAllContext(t.Context(), 1024)
 	if err != nil || string(raw) != "original" {
 		t.Fatalf("held bytes=%q err=%v", raw, err)
 	}
@@ -91,7 +91,7 @@ func TestOpenHoldsOriginalAfterPathReplacementAndRejectsSymlink(t *testing.T) {
 	if err := os.Symlink(path, link); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Open(link, Options{Label: "link", MaxBytes: 1024}); err == nil {
+	if _, err := OpenContext(t.Context(), link, Options{Label: "link", MaxBytes: 1024}); err == nil {
 		t.Fatal("final-component symlink was accepted")
 	}
 }
@@ -185,7 +185,7 @@ func TestRunContextExecutesHeldMachOOrELFAndReusesInput(t *testing.T) {
 	if err := os.WriteFile(configured, raw, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	executable, err := Open(configured, Options{
+	executable, err := OpenContext(t.Context(), configured, Options{
 		Label: "helper", Executable: true, MaxBytes: int64(len(raw)) + 1,
 	})
 	if runtime.GOOS == "darwin" {
@@ -237,7 +237,7 @@ func TestRunContextScrubsLoaderEnvironmentAndHonorsCancellation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	executable, err := Open(executablePath, Options{
+	executable, err := OpenContext(t.Context(), executablePath, Options{
 		Label: "helper", Executable: true, MaxBytes: info.Size() + 1,
 	})
 	if runtime.GOOS == "darwin" {
@@ -284,7 +284,7 @@ func TestRunContextSerializesSharedInputUntilChildExit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	executable, err := Open(executablePath, Options{Label: "helper", Executable: true, MaxBytes: info.Size() + 1})
+	executable, err := OpenContext(t.Context(), executablePath, Options{Label: "helper", Executable: true, MaxBytes: info.Size() + 1})
 	if err != nil {
 		t.Fatal(err)
 	}

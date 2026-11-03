@@ -20,9 +20,7 @@ const nativeMachineImageBootTemplate = `#!ipxe
 # than pointing at CloudFront, which nothing would fetch. Same value as
 # controller/test/kubeadm/internal/nicovms/launch.go.
 set boot-loader http://127.0.0.1/qcow-imager.efi
-# The lane rewrites this to the qcow2 it pulled from GHCR. Unreachable here for
-# the same reason as boot-loader: this repository names no CloudFront host.
-set image-url http://127.0.0.1/nvke-node.qcow2
+set image-url http://127.0.0.1:18080/files/images/nvke-node.qcow2
 set disk-strategy {{ .DiskSelectionStrategy }}
 
 # You probably don't need to change these.
@@ -48,7 +46,7 @@ func TestNativeSiteBootUsesTheActualSourceFixture(t *testing.T) {
 	}{
 		{"source", nativeMachineImageBootTemplate, disk, true},
 		{"empty", "", disk, false},
-		{"missing image", strings.ReplaceAll(nativeMachineImageBootTemplate, "http://127.0.0.1/nvke-node.qcow2", ""), disk, false},
+		{"missing image", strings.ReplaceAll(nativeMachineImageBootTemplate, nativeMachineImageDiskSlot, ""), disk, false},
 		{"duplicate", nativeMachineImageBootTemplate + nativeMachineImageBootTemplate, disk, false},
 		{"unknown template", strings.ReplaceAll(nativeMachineImageBootTemplate, ".DiskSelectionStrategy", ".Other"), disk, false},
 		{"remote disk", nativeMachineImageBootTemplate, "https://registry.example.test/image.qcow2", false},
@@ -64,7 +62,7 @@ func TestNativeSiteBootUsesTheActualSourceFixture(t *testing.T) {
 				}
 				return
 			}
-			want := strings.Replace(strings.Replace(nativeMachineImageBootTemplate, "http://127.0.0.1/nvke-node.qcow2", disk, 1), "{{ .DiskSelectionStrategy }}", "smallest", 1)
+			want := strings.Replace(strings.Replace(nativeMachineImageBootTemplate, nativeMachineImageDiskSlot, disk, 1), "{{ .DiskSelectionStrategy }}", "smallest", 1)
 			if boot.script != want || boot.diskURL != disk || !strings.Contains(boot.script, "${cloudinit-url}") {
 				t.Fatal("source-owned image boot projection changed unrelated bytes")
 			}
