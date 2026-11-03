@@ -91,6 +91,8 @@ func TestPinnedToolCatalogForm(t *testing.T) {
 		{name: "build command", edits: []edit{{registry: [2]string{"    outputType: file\n", "    outputType: file\n    buildCommand: [sh]\n"}}}, code: e.CodeInvalidCatalog},
 		{name: "patches", edits: []edit{{registry: [2]string{"    outputType: file\n", "    outputType: file\n    patches: [{name: p.patch, sha256: " + goodArtifactDigest + "}]\n"}}}, code: e.CodeInvalidCatalog},
 		{name: "executor-owned environment", edits: []edit{{registry: [2]string{"AICR_LOG_FORMAT: text", "HOME: /root"}}}, code: e.CodeInvalidCatalog},
+		{name: "template in environment value", edits: []edit{{registry: [2]string{"AICR_LOG_FORMAT: text", "AICR_LOG_FORMAT: '{{.Output}}'"}}}, code: e.CodeInvalidCatalog},
+		{name: "binding containing the closing delimiter", edits: []edit{{registry: [2]string{"materials: {recipe: recipe}", `materials: {"re}}cipe": recipe}`}}, {registry: [2]string{`'{{.Material "recipe"}}'`, `'{{.Material "re}}cipe"}}'`}}}},
 		{name: "tool fields on another builder", append: "  stray:\n    source: plain\n    fromSource: true\n    tool: aicr\n    platforms: [linux/arm64]\n    outputType: raw\n    buildCommand: [make]\n    artifactPath: out/x\n", code: e.CodeInvalidCatalog},
 		{name: "unknown tool source", edits: []edit{{registry: [2]string{"    tool: aicr\n    toolchainImage", "    tool: missing\n    toolchainImage"}}}, code: e.CodeInvalidCatalog},
 		{name: "source without tool declaration", edits: []edit{{registry: [2]string{"    tool: aicr\n    toolchainImage", "    tool: plain\n    toolchainImage"}}}, code: e.CodeUnpinnedSource},
@@ -139,11 +141,12 @@ func TestPinnedToolCatalogForm(t *testing.T) {
 }
 
 func TestRenderToolArgs(t *testing.T) {
+	staged := map[string]string{"re cipe": "/in/re%20cipe", "re}}cipe": "/in/re%7D%7Dcipe", `re"cipe`: "/in/re%22cipe"}
 	values := ToolArgValues{Output: "/out", Arch: "arm64", Material: func(binding string) (string, error) {
-		if binding != "re cipe" {
-			return "", e.New(e.CodeInvalidCatalog, "unknown %q", binding)
+		if path, ok := staged[binding]; ok {
+			return path, nil
 		}
-		return "/in/re%20cipe", nil
+		return "", e.New(e.CodeInvalidCatalog, "unknown %q", binding)
 	}}
 	for _, test := range []struct {
 		args []string
@@ -152,6 +155,8 @@ func TestRenderToolArgs(t *testing.T) {
 	}{
 		{args: []string{"--out={{.Output}}/r.yaml", "{{.Arch}}", `{{.Material "re cipe"}}`, "plain"}, want: []string{"--out=/out/r.yaml", "arm64", "/in/re%20cipe", "plain"}},
 		{args: []string{"{{.Output}}{{.Output}}"}, want: []string{"/out/out"}},
+		// A quoted binding is one unit: a delimiter or escaped quote inside it does not end the token.
+		{args: []string{`--recipe={{.Material "re}}cipe"}}`, `{{.Material "re\"cipe"}}`}, want: []string{"--recipe=/in/re%7D%7Dcipe", "/in/re%22cipe"}},
 		{args: []string{`{{.Material "other"}}`}, code: e.CodeInvalidCatalog},
 		{args: []string{"{{ .Output }}"}, code: e.CodeInvalidCatalog},
 		{args: []string{"{{.Output}"}, code: e.CodeInvalidCatalog},

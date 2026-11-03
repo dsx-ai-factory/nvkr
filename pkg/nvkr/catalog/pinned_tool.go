@@ -31,8 +31,9 @@ var (
 	// producer variable cannot redefine them.
 	pinnedToolExecutorEnv = map[string]bool{"HOME": true, "TMPDIR": true, "TZ": true, "LC_ALL": true}
 	pinnedToolEnvName     = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
-	pinnedToolToken       = regexp.MustCompile(`\{\{.*?\}\}`)
-	pinnedToolMaterial    = regexp.MustCompile(`^\{\{\.Material ("(?:[^"\\]|\\.)*")\}\}$`)
+	// A token consumes a quoted string whole, so a binding may contain "}}".
+	pinnedToolToken    = regexp.MustCompile(`\{\{(?:[^"]|"(?:[^"\\]|\\.)*")*?\}\}`)
+	pinnedToolMaterial = regexp.MustCompile(`^\{\{\.Material ("(?:[^"\\]|\\.)*")\}\}$`)
 )
 
 // ToolArgValues supplies the sandbox values a pinned-tool argument vector's typed
