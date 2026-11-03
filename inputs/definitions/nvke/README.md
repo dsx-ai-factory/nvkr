@@ -14,7 +14,7 @@ shared catalogs and pins; they do not import each other or change the combined D
 
 | Definition | Outputs | Membership | Environment |
 |---|---:|---|---|
-| [Core](core.yaml) | 25 | CLI/operator tools, controller and bound chart, NICo charts and Core/Flow images, providers/reference fixture, CAPI and cert-manager images | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) |
+| [Core](core.yaml) | 26 | CLI/operator tools, controller and bound chart, NICo charts and Core/Flow images, providers/reference fixture, CAPI and cert-manager images | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) |
 | [Services](services.yaml) | 34 | SPIRE, PostgreSQL, Temporal and local-path-provisioner charts and native images | [github-nvke-services.yaml](../../environments/github-nvke-services.yaml) |
 | [Telemetry](telemetry.yaml) | 17 | NKTP chart and native runtime images | [github-nvke-telemetry.yaml](../../environments/github-nvke-telemetry.yaml) |
 | [Disks](disks.yaml) | 4 | Native AMD64/ARM64 plain and public-bootstrap FDE disks, each with its complete material closure | [github-nvke-disks.yaml](../../environments/github-nvke-disks.yaml) |
@@ -58,7 +58,7 @@ historical capacity measurements and remaining cutover work.
 |---|---|---|
 | CLI | `../../catalogs/nvke/module-tags` | AMD64 `nvkectl` and ARM64 `nvkectl-linux-arm64`, from their shared NVKE v0.22.0 source pin |
 | Controller and charts | `../../catalogs/nvke/release` | AMD64/ARM64 aggregate `cwe`, image-bound `controller-chart`, PostgreSQL, SPIRE, SPIRE CRDs and Temporal chart packages |
-| Operator tools | `../../catalogs/tools/operator-amd64` | AMD64 Helm and kubectl executables, selected from the NVKE distribution lock |
+| Operator tools | `../../catalogs/tools/operator-amd64`, `../../catalogs/tools/operator-arm64` | AMD64 `operator-tools` and, in the core family only, ARM64 `operator-tools-linux-arm64` Helm and kubectl executables, at the same pinned versions |
 | Node images | `../../catalogs/node-images/release`, `../../catalogs/node-images/variants/native-toolchains.yaml` | Separate native AMD64 and ARM64 plain and public-bootstrap FDE QCOW2s, with explicit material producers |
 | Deployment images | `../../catalogs/runtime-dependencies` | Twelve non-test runtime images for each native architecture: PostgreSQL, eight SPIRE images and three Temporal images |
 | CAPNICo | `../../catalogs/nvke/release-components` | Source-built `capnico-controller`, one OCI index requiring AMD64 and ARM64 |
