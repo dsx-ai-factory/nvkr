@@ -9,11 +9,15 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.yaml.in/yaml/v3"
 )
 
-// Original69ef9924 ARM64 MachineImage boot script, not a DHCP sentinel.
+// ARM64 MachineImage boot script, not a DHCP sentinel.
 const nativeMachineImageBootTemplate = `#!ipxe
 # nico-sim boots the qcow2 directly and never chains an EFI, so this URL is
 # only here because the chain line's grammar needs it. Kept unreachable rather
@@ -40,14 +44,18 @@ boot
 
 func TestNativeSiteBootUsesTheActualSourceFixture(t *testing.T) {
 	const disk = "http://172.30.0.1:18082/disk.qcow2"
+	legacy := strings.ReplaceAll(nativeMachineImageBootTemplate, nativeMachineImageDiskSlot, "http://127.0.0.1/nvke-node.qcow2")
 	for _, tc := range []struct {
 		name, source, url string
 		valid             bool
 	}{
 		{"source", nativeMachineImageBootTemplate, disk, true},
+		{"retained source", legacy, disk, true},
 		{"empty", "", disk, false},
 		{"missing image", strings.ReplaceAll(nativeMachineImageBootTemplate, nativeMachineImageDiskSlot, ""), disk, false},
 		{"duplicate", nativeMachineImageBootTemplate + nativeMachineImageBootTemplate, disk, false},
+		{"duplicate retained", legacy + legacy, disk, false},
+		{"mixed source slots", nativeMachineImageBootTemplate + legacy, disk, false},
 		{"unknown template", strings.ReplaceAll(nativeMachineImageBootTemplate, ".DiskSelectionStrategy", ".Other"), disk, false},
 		{"remote disk", nativeMachineImageBootTemplate, "https://registry.example.test/image.qcow2", false},
 	} {
@@ -62,7 +70,9 @@ func TestNativeSiteBootUsesTheActualSourceFixture(t *testing.T) {
 				}
 				return
 			}
-			want := strings.Replace(strings.Replace(nativeMachineImageBootTemplate, nativeMachineImageDiskSlot, disk, 1), "{{ .DiskSelectionStrategy }}", "smallest", 1)
+			want := strings.ReplaceAll(tc.source, nativeMachineImageDiskSlot, disk)
+			want = strings.ReplaceAll(want, "http://127.0.0.1/nvke-node.qcow2", disk)
+			want = strings.ReplaceAll(want, "{{ .DiskSelectionStrategy }}", "smallest")
 			if boot.script != want || boot.diskURL != disk || !strings.Contains(boot.script, "${cloudinit-url}") {
 				t.Fatal("source-owned image boot projection changed unrelated bytes")
 			}
@@ -182,6 +192,45 @@ func TestNativeSiteBootNetworkRejectsMissingOrStaleSelection(t *testing.T) {
 			attempt := nativeSiteAttempt{bridge: original, boot: tc.boot}
 			if _, err := attempt.selectBootNetwork(original, tc.url); err == nil || attempt.bridge != original {
 				t.Fatal("invalid boot selection changed site address mode")
+			}
+		})
+	}
+}
+
+// These unmodified Apache-2.0 NVKE fixtures are from commit
+// 890784eba904ef0da6aa9d8cc3d7bd491b2ee32e, controller/test/fixtures/releases/.
+// Keep both architectures: their console/kernel settings belong to NVKE.
+func TestNativeSiteBootUsesCurrentNVKESourceFixtures(t *testing.T) {
+	const sourceURL = "http://127.0.0.1:18080/files/images/nvke-node.qcow2"
+	const disk = "http://172.30.0.1:18082/disk.qcow2"
+	for _, arch := range []string{"amd64", "arm64"} {
+		t.Run(arch, func(t *testing.T) {
+			raw, err := os.ReadFile(filepath.Join("testdata", "nvke-machineimage-"+arch+".yaml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var image struct {
+				Spec struct {
+					Architecture string `yaml:"architecture"`
+					NICo         struct {
+						Script string `yaml:"ipxeScript"`
+					} `yaml:"nico"`
+				} `yaml:"spec"`
+			}
+			if err := yaml.Unmarshal(raw, &image); err != nil {
+				t.Fatal(err)
+			}
+			if image.Spec.Architecture != arch || strings.Count(image.Spec.NICo.Script, sourceURL) != 1 {
+				t.Fatal("fixture does not carry its source architecture and single local image slot")
+			}
+			boot, err := projectNativeSiteBoot(t.Context(), image.Spec.NICo.Script, disk)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := strings.Replace(image.Spec.NICo.Script, sourceURL, disk, 1)
+			want = strings.Replace(want, "{{ .DiskSelectionStrategy }}", "smallest", 1)
+			if boot.script != want || boot.diskURL != disk {
+				t.Fatal("boot projection changed unrelated source bytes or lost the selected local disk")
 			}
 		})
 	}

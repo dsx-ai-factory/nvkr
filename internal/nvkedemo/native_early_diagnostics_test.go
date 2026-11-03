@@ -31,7 +31,8 @@ printf 'private-diagnostic\n'
 				writeTenantFixture(t, filepath.Join(root, "site.kubeconfig"), []byte("private-config"), 0o600)
 			}
 			runner := Runner{Work: root, Env: []string{"PATH=/usr/bin:/bin", "FIXTURE=" + root, "EVENTS=" + events, "MODE=" + mode}}
-			attempt := nativeSiteAttempt{assets: NativeAssets{HostTools: root}, bootstrapRunner: &runner, bootstrapName: "owned"}
+			controller := nativeControllerFixture(t, root, "nke-controller")
+			attempt := nativeSiteAttempt{assets: NativeAssets{HostTools: root, Installer: root, installerSelection: &nativeInstallerSelection{controller: controller}}, bootstrapRunner: &runner, bootstrapName: "owned"}
 			primary := errors.New("original deploy OpenAPI failure")
 			if mode == "unjoined operation" {
 				primary = errors.Join(primary, ErrUnjoined)

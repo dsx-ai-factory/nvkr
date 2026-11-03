@@ -271,6 +271,18 @@ func TestARCAdmissionRejectsUnsupportedPolicy(t *testing.T) {
 	}
 }
 
+// A pinned-tool producer has no execution requirements, so it would otherwise
+// pass the disk-instruction checks and run in the ARC disk group (ADR-27 §8).
+func TestARCAdmissionRejectsPinnedToolProducer(t *testing.T) {
+	plan := arcTestPlan(t, "linux/amd64")
+	if err := admitGitHubRequirements(plan, "test"); err != nil {
+		t.Fatalf("baseline ARC disk plan refused: %v", err)
+	}
+	plan.Builds[0].Graph.Nodes = append(plan.Builds[0].Graph.Nodes, ir.Node{ID: "build-recipe", Kind: ir.KindBuild,
+		Component: "recipe", BuilderType: ir.BuilderPinnedTool, Network: ir.NetworkNone, OutputType: ir.OutputFile})
+	assertFactoryErrorCode(t, admitGitHubRequirements(plan, "test"), e.CodeEngineCapability)
+}
+
 func TestARCGroupedNodesRejectIndividualDispatch(t *testing.T) {
 	plan := arcTestPlan(t, "linux/amd64")
 	for _, node := range plan.Graph.Nodes {

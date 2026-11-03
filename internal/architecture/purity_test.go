@@ -132,40 +132,9 @@ type purityFinding struct {
 
 func TestIdentityPathsArePure(t *testing.T) {
 	root := filepath.Join("..", "..")
-	// go list runs in a child the test cache cannot observe; walking the trees here makes
-	// an added file or package invalidate a cached pass. Listing explicit packages instead
-	// of "tree/..." patterns also keeps go list from needing every module in the build
-	// list, which an offline module cache may not hold.
-	var packages []string
-	for _, tree := range identityPackages {
-		dir := filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(tree, modulePath+"/")))
-		err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			name := entry.Name()
-			// Match the go tool's "..." rules: skip testdata and _ or . prefixed names.
-			if path != dir && (name == "testdata" || strings.HasPrefix(name, "_") || strings.HasPrefix(name, ".")) {
-				if entry.IsDir() {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-				return nil
-			}
-			rel, err := filepath.Rel(root, filepath.Dir(path))
-			if err != nil {
-				return err
-			}
-			if pkg := modulePath + "/" + filepath.ToSlash(rel); !slices.Contains(packages, pkg) {
-				packages = append(packages, pkg)
-			}
-			return nil
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
+	packages, err := identityPackagePaths(root, identityPackages)
+	if err != nil {
+		t.Fatal(err)
 	}
 	listed := goListExports(t, root, packages...)
 	fset := token.NewFileSet()
@@ -196,13 +165,124 @@ func TestIdentityPathsArePure(t *testing.T) {
 		findings = append(findings, pkgFindings...)
 		checked[pkg.ImportPath] = true
 	}
-	for _, pkg := range identityPackages {
-		if !checked[pkg] {
-			t.Errorf("identity package %s was not checked", pkg)
-		}
+	for _, pkg := range uncheckedPackages(slices.Concat(identityPackages, packages), checked) {
+		t.Errorf("identity package %s was not checked", pkg)
 	}
 	for _, problem := range applyPurityExceptions(findings, purityExceptions) {
 		t.Error(problem)
+	}
+}
+
+// uncheckedPackages returns the required packages absent from checked, once each in
+// first-seen order; a root that is also a discovered package is required twice.
+func uncheckedPackages(required []string, checked map[string]bool) []string {
+	var missing []string
+	for _, pkg := range required {
+		if !checked[pkg] && !slices.Contains(missing, pkg) {
+			missing = append(missing, pkg)
+		}
+	}
+	return missing
+}
+
+func TestUncheckedPackages(t *testing.T) {
+	required := []string{"root", "root/sub", "root"}
+	tests := []struct {
+		name    string
+		checked map[string]bool
+		want    []string
+	}{
+		{name: "complete inventory", checked: map[string]bool{"root": true, "root/sub": true}},
+		{name: "discovered package missing", checked: map[string]bool{"root": true, "other": true}, want: []string{"root/sub"}},
+		{name: "root missing", checked: map[string]bool{"root/sub": true}, want: []string{"root"}},
+		{name: "nothing checked", want: []string{"root", "root/sub"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := uncheckedPackages(required, tt.checked); !slices.Equal(got, tt.want) {
+				t.Errorf("uncheckedPackages = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// identityPackagePaths walks each tree under the module root and returns the import
+// path of every directory holding a non-test Go file, sorted. go list runs in a child
+// the test cache cannot observe; walking here makes an added file or package invalidate
+// a cached pass. Listing explicit packages instead of "tree/..." patterns also keeps go
+// list from needing every module in the build list.
+func identityPackagePaths(root string, trees []string) ([]string, error) {
+	var packages []string
+	for _, tree := range trees {
+		dir := filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(tree, modulePath+"/")))
+		err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			name := entry.Name()
+			// Match the go tool's "..." rules: skip testdata and _ or . prefixed names.
+			if path != dir && (name == "testdata" || strings.HasPrefix(name, "_") || strings.HasPrefix(name, ".")) {
+				if entry.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+				return nil
+			}
+			rel, err := filepath.Rel(root, filepath.Dir(path))
+			if err != nil {
+				return err
+			}
+			if pkg := modulePath + "/" + filepath.ToSlash(rel); !slices.Contains(packages, pkg) {
+				packages = append(packages, pkg)
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+	slices.Sort(packages)
+	return packages, nil
+}
+
+func TestIdentityPackageDiscovery(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{
+		"pkg/a/a.go",
+		"pkg/a/a2.go",
+		"pkg/a/sub/sub.go",
+		"pkg/a/sub/deeper/deeper.go",
+		"pkg/a/onlytests/x_test.go",
+		"pkg/a/notgo/README.md",
+		"pkg/a/testdata/fixture.go",
+		"pkg/a/_hidden/h.go",
+		"pkg/a/.dot/d.go",
+		"pkg/a/skipfile/_skip.go",
+		"pkg/a/skipfile/.skip.go",
+		"pkg/b/b_windows.go",
+		"pkg/c/c.go",
+	} {
+		path := filepath.Join(root, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := identityPackagePaths(root, []string{modulePath + "/pkg/b", modulePath + "/pkg/a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// pkg/b is listed so go list reports its build-constrained file as an error.
+	want := []string{modulePath + "/pkg/a", modulePath + "/pkg/a/sub", modulePath + "/pkg/a/sub/deeper", modulePath + "/pkg/b"}
+	if !slices.Equal(got, want) {
+		t.Errorf("packages = %q, want %q", got, want)
+	}
+	if _, err := identityPackagePaths(root, []string{modulePath + "/pkg/missing"}); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("missing tree error = %v, want fs.ErrNotExist", err)
 	}
 }
 
@@ -356,7 +436,10 @@ type listedPackage struct {
 }
 
 // goListExports lists patterns and their dependencies with compiler export data, the
-// input go/types needs to resolve imported objects.
+// input go/types needs to resolve imported objects. It runs offline (GOPROXY=off), so
+// the module cache must already hold every module the patterns transitively depend on.
+// "go list ./..." in CI, "go test ./..." or "go mod download" fills it; running only
+// this package against an empty module cache does not.
 func goListExports(t *testing.T, dir string, patterns ...string) []listedPackage {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
@@ -368,7 +451,7 @@ func goListExports(t *testing.T, dir string, patterns ...string) []listedPackage
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if err := ownedcmd.Run(ctx, command); err != nil {
-		t.Fatalf("go %s: %v\n%s", strings.Join(args, " "), err, stderr.String())
+		t.Fatalf("go %s: %v\n%s%s", strings.Join(args, " "), err, stderr.String(), goListFailureHint(ctx))
 	}
 	var listed []listedPackage
 	for decoder := json.NewDecoder(&stdout); ; {
@@ -382,6 +465,38 @@ func goListExports(t *testing.T, dir string, patterns ...string) []listedPackage
 			t.Fatalf("go list %s: %s", pkg.ImportPath, pkg.Error.Err)
 		}
 		listed = append(listed, pkg)
+	}
+}
+
+// goListFailureHint returns module-cache advice for an ordinary go list failure, and
+// nothing once ctx is canceled or past its deadline, where that advice would mislead.
+func goListFailureHint(ctx context.Context) string {
+	if ctx.Err() != nil {
+		return ""
+	}
+	return "(offline: run \"go mod download\" if modules are missing)"
+}
+
+func TestGoListFailureHint(t *testing.T) {
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	expired, stop := context.WithDeadline(t.Context(), time.Unix(0, 0))
+	defer stop()
+	tests := []struct {
+		name string
+		ctx  context.Context
+		want bool
+	}{
+		{name: "ordinary failure", ctx: t.Context(), want: true},
+		{name: "canceled", ctx: canceled},
+		{name: "deadline exceeded", ctx: expired},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := strings.Contains(goListFailureHint(tt.ctx), "go mod download"); got != tt.want {
+				t.Errorf("hint mentions go mod download = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 

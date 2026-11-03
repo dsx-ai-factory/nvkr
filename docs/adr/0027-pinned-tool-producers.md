@@ -1,15 +1,16 @@
 # ADR-27 — Producers that run pinned release tools
 
 - **Decision status:** Proposed (design only; pending named-decider ratification)
-- **Implementation maturity:** Designed, not implemented. No `pinned-tool` builder type, catalog form, IR
-  field, executor or provenance mapping exists; see `reconciliation.md`.
-- **Acceptance-test maturity:** None. The implementation units below name the contract suites that must pass;
-  no contract test, generated bundle, hosted Run or consumer verification exercises a pinned-tool producer.
+- **Implementation maturity:** Units T1–T5 and T7 are implemented. The executor runs both output forms, but
+  selecting an `oci-layout` producer fails closed until T6 joins the #285 layout import; see `reconciliation.md`.
+- **Acceptance-test maturity:** Contract-tested. Linux executor tests use a fake container runtime. One unrecorded
+  local run executed the AICR v1.2.0-rc1 recipe producer through the executor on Docker; no recorded Run, hosted
+  Run or consumer verification exercises a pinned-tool producer.
 - **Deciders:** Pending; release-engineering, catalog, execution and evidence owners must be named before
   ratification.
-- **Index:** Proposed ADR-27 supplements ADR-01–22 and proposed ADR-23/24/26; it remains outside the consolidated
-  contract set until accepted. It coordinates with two separately drafted decisions that are not on this branch:
-  the generic OCI bundle decision (#239, drafted as ADR-25) and producer OCI layout import (#285).
+- **Index:** Proposed ADR-27 supplements ADR-01–22 and proposed ADR-23–26; it remains outside the consolidated
+  contract set until accepted. It builds on proposed ADR-25, whose generic OCI bundle selection and packaging are
+  implemented, and waits for producer OCI layout import (#285), the remaining T6 dependency.
 - **Relates to:** ADR-01 (typed digest families), ADR-02 §3 (logical identity versus transport), ADR-03 (coded
   errors), ADR-09 §5 (production provenance), ADR-10 §1 and source lanes (builder taxonomy, `wrapped-build`),
   ADR-11 §1–§2 (direct selection, explicit closures, declared edges and independent outputs), ADR-12 §1 (concrete
@@ -66,7 +67,7 @@ acquisition: its output is new bytes made by running the tool.
 sources:
   aicr:
     repo: https://github.com/NVIDIA/aicr
-    constraint: 1.1.x
+    constraint: 1.2.x
     tool:
       format: tar-gzip
       url: https://github.com/NVIDIA/aicr/releases/download/{{.Tag}}/aicr_{{.Version}}_linux_arm64.tar.gz
@@ -91,10 +92,11 @@ components:
     materials:
       recipe: aicr-gb300-generic-training-recipe
     toolArgs: [bundle, --recipe, '{{.Material "recipe"}}', --deployer, flux,
-      <aicr#3534 layout flag>, '{{.Output}}']
+      --output, 'oci-layout:{{.Output}}']
 ```
 
-Field names are proposed; the catalog owner fixes them at implementation. The contract is:
+The implemented field names are `tool`, `toolArgs` and `toolEnv`; the loader resolves the tool pin from the named
+source's lock record. The contract is:
 
 - **Exactly one tool invocation per producer.** A producer runs the pinned executable once with a fixed argument
   vector. A multi-step tool flow is a chain of producers joined by material bindings (§4), never an ordered step
@@ -157,7 +159,22 @@ A pinned-tool node runs through the shared helper launcher as an ordinary build 
 - **Fixed, credential-free environment.** The executor fixes the working directory, a private empty `HOME` and
   `TMPDIR`, `TZ=UTC`, `LC_ALL=C` and umask `022`. The child environment holds only those values and the
   producer's literal variables, which cannot redefine them (§1); no ambient credential, token, registry
-  configuration, kubeconfig or cache is passed.
+  configuration, kubeconfig or cache is passed. The tool runs as the invoking user, never as a user the image
+  declares: under Docker as that user's numeric uid and gid, as ADR-18 runs Docker utility containers, and under
+  Podman as container root, which Podman's own mapping makes the invoking user. Either way the executor can read
+  and remove everything the tool writes. The runtime executable's name selects that identity, so a runtime named
+  other than `docker` or `podman` fails admission with `engine-capability`; a name does not authenticate the
+  runtime behind it.
+- **Fixed sandbox paths.** For a `file` producer `{{.Output}}` renders to `/nvkr/output`, an existing empty
+  directory. A layout writer may refuse an existing directory, even an empty one, so for an `oci-layout` producer
+  `{{.Output}}` renders to `/nvkr/output/layout`, an absent path the tool creates. A material renders to
+  `/nvkr/inputs/materials/<escaped binding>`; a binding name may carry the file extension a tool reads it by. The working directory is `/nvkr/work`, `HOME` is `/nvkr/home`,
+  `TMPDIR` is `/nvkr/tmp`, and the executable is mounted read-only at `/nvkr/tool/<base name of the member>`,
+  without the member's parent directories or archive siblings. The root
+  filesystem is read-only. An executor-owned bootstrap, `umask 022 && exec /usr/bin/env -i "$@"`, sets the umask
+  and replaces the image environment. The toolchain image must therefore provide `/bin/sh` and `/usr/bin/env`;
+  no producer value is interpreted by that shell. A tool path containing `=` is refused with `invalid-catalog`,
+  because `env` would read the staged name as an assignment and run the next argument instead.
 - **Bounded and owned.** The node honors its execution requirements' wall-time budget and the caller's context;
   cancellation terminates and joins the child before returning.
 - **Linux only.** Held executable capabilities are Linux-only (ADR-22); other hosts fail admission.
@@ -183,8 +200,8 @@ The producer's private output directory must contain exactly one declared form w
 
 | `outputType` | Admission | Use |
 |---|---|---|
-| `file` | Exactly one regular file at `artifactPath`; nothing else in the output directory | A material for another producer in the same output |
-| `oci-layout` | Exactly one OCI image layout at the output directory root, with nothing beside it; shape checks belong to the layout import owner (#285) | The payload of a `bundle-oci` output, imported byte-for-byte rather than rewrapped |
+| `file` | Exactly one regular file at `artifactPath`, a single file name; nothing else in the output directory | A material for another producer in the same output, and like every selected component a member of that output; an executable bundle installs it non-executable (mode 0644) |
+| `oci-layout` | Exactly one OCI image layout at `{{.Output}}`, with nothing beside it, whose root holds exactly `blobs`, `index.json` and `oci-layout` and no link or special file; the executor then moves it to the output root and observes its `index.json`. Further shape checks belong to the layout import owner (#285) | The payload of a `bundle-oci` output, imported byte-for-byte rather than rewrapped |
 
 Directory trees, archives NVKR would have to create, symbolic links, special files and extra entries are
 refused. NVKR never archives or normalizes a tool's directory output: doing so would create a second definition
@@ -260,7 +277,8 @@ The AICR pin that #286 adds for the executable output is the same pin the bundle
   Bundle producers wait until the catalog pins an AICR release that writes a local OCI layout
   (NVIDIA/aicr#3534). `v1.2.0` is the first stable one; #239's interim source-built producers already render with it.
 
-Shipping AICR bundles (#288) therefore needs that AICR release, layout import (#285) and this decision's
+NVIDIA/aicr#3538 adds `aicr bundle --output oci-layout:<dir>[:tag]`, released in AICR `v1.2.0-rc1`. Shipping AICR
+bundles (#288) therefore needs a pin to that or a later AICR release, layout import (#285) and this decision's
 implementation. When it ships, `bundle-oci` outputs select the bundle producer and its recipe producer as an
 explicit material closure (§4). This adjusts the #239 draft's single-component `bundle-oci` selection, which
 the layout-import change revises. Bundles rendered this way carry no AICR in-bundle attestation (v1.1.2
@@ -366,5 +384,13 @@ The design questions left open by the issue were decided on 2026-10-30:
 
 ## Acceptance evidence
 
-None yet. The implementation units above are the contract target. No pinned-tool producer has run, and no claim
-follows from the #239 source-built AICR renders.
+Contract suites cover T1–T5 and T7: catalog form and refusals, Build Digest coverage of every §2 logical field,
+selection rules, the shared tool acquisition and one-pin-per-name, executor admission, invocation and output form,
+`wrapped-build` provenance with tool dependencies, and byte-stable default hosted generation. The Linux executor
+suite drives a fake container runtime, so it proves executor behavior, not container isolation. A local developer
+run on Docker (linux/arm64) executed the AICR v1.2.0-rc1 `recipe` producer offline and observed one regular file
+bound to the tool executable digest. With that recipe as its material, the `bundle --deployer flux --output
+oci-layout:{{.Output}}` producer wrote one OCI layout at the absent path; its index names the manifest digest AICR
+reported. `catalog pin` resolves the `1.2.x` constraint to stable releases only, so that run's lock record named
+`v1.2.0-rc1` directly. These are not recorded Runs and prove nothing about hosted isolation. No hosted Run or consumer
+verification exists, T6 is unimplemented, and no claim follows from the #239 source-built AICR renders.

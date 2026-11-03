@@ -26,6 +26,8 @@ const (
 	BuilderBuildKit    = "buildkit-rootless"
 	BuilderVMImage     = "vm-image"
 	BuilderNativeGo    = "native-go"
+	// BuilderPinnedTool runs one pinned release executable with no source fetch (ADR-27).
+	BuilderPinnedTool = "pinned-tool"
 )
 
 // DiskSpec describes the disk payload emitted by a component. It is required
@@ -285,6 +287,14 @@ type Component struct {
 	// VM lowering turns these declarations into build-graph edges and stages
 	// only the verified outputs named here.
 	Materials map[string]string `json:"materials,omitempty"`
+	// Tool names the catalog source whose tool pin a pinned-tool producer runs.
+	// ToolExecutable is loader-resolved from that source's lock record; registries
+	// cannot author it. ToolArgs follow the executable and may carry only the typed
+	// tokens RenderToolArgs admits; ToolEnv holds literal variables (ADR-27 §1).
+	Tool           string            `json:"tool,omitempty"`
+	ToolExecutable *ToolPin          `json:"toolExecutable,omitempty"`
+	ToolArgs       []string          `json:"toolArgs,omitempty"`
+	ToolEnv        map[string]string `json:"toolEnv,omitempty"`
 	// For direct Packer, ArtifactPath is relative to the private output directory.
 	// Other builders retain their existing workspace-relative interpretation.
 	ArtifactPath  string            `json:"artifactPath,omitempty"`

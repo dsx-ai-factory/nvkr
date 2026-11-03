@@ -17,6 +17,9 @@ import (
 // AdmitDemoDeployment checks native capabilities and the fresh output destination
 // before build, sudo prompts, artifact capture, storage, or guest creation.
 func AdmitDemoDeployment(ctx context.Context, cfg Config) error {
+	if err := admitNativeResourcesForNetwork(cfg.Resources, cfg.Network); err != nil {
+		return err
+	}
 	if _, err := selectedNativeTenantNodes(cfg.TenantWorkers, cfg.Conformance); err != nil {
 		return err
 	}
@@ -130,6 +133,9 @@ func DeployArtifacts(ctx context.Context, cfg Config) error {
 }
 
 func nativeDeploymentConfig(ctx context.Context, cfg Config, platform string) (NativeConfig, error) {
+	if err := admitNativeResourcesForNetwork(cfg.Resources, cfg.Network); err != nil {
+		return NativeConfig{}, err
+	}
 	if err := requireContext(ctx); err != nil {
 		return NativeConfig{}, err
 	}

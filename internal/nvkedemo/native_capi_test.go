@@ -37,7 +37,8 @@ func nativeInstallerFixture(t *testing.T, installer, commit, version string) *na
 	}
 	spec := []byte(nativeInstallerSiteSpecFixture)
 	writeTenantFixture(t, filepath.Join(installer, nativeSiteSpecPath), spec, 0600)
-	return &nativeInstallerSelection{arch: "arm64", commit: commit, capiVersion: version, versionsDigest: plainSHA(versions), siteSpecDigest: plainSHA(spec)}
+	controller := nativeControllerFixture(t, installer, "nke-controller")
+	return &nativeInstallerSelection{arch: "arm64", commit: commit, capiVersion: version, versionsDigest: plainSHA(versions), siteSpecDigest: plainSHA(spec), controller: controller}
 }
 
 func TestNativeCAPIRechecksSelectedMetadataBeforeCommands(t *testing.T) {
