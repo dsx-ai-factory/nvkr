@@ -14,16 +14,28 @@ import (
 
 const projectionAdapterCommand = "projection-adapter"
 
-// projectionPilotContext selects this binary's hidden reference adapter for
-// top-level generation. It is a diagnostic pilot selector: generated commands
-// never pass --projection-pilot, so no generated stage launches the adapter.
-func projectionPilotContext(ctx context.Context) (context.Context, error) {
-	self, err := os.Executable()
-	if err != nil {
-		return nil, e.Wrap(e.CodeEngineCapability, err, "locating the projection pilot adapter")
+// selectProjectionPilot is the only CLI route to a projection selection.
+// Tests trap it to prove generated bootstrap invocations never reach it.
+var selectProjectionPilot = projectionPilotContext
+
+// projectionPilotContext selects this binary's reference projection plugin
+// over the named transport for top-level generation. It is a diagnostic pilot
+// selector: generated commands never pass --projection-pilot, so no generated
+// stage reaches the plugin.
+func projectionPilotContext(ctx context.Context, transport string) (context.Context, error) {
+	adapter := factory.ProjectionAdapter{Transport: factory.ProjectionTransport(transport), Release: factoryGeneratorVersion()}
+	switch adapter.Transport {
+	case factory.ProjectionInProcess:
+	case factory.ProjectionOutOfProcess:
+		self, err := os.Executable()
+		if err != nil {
+			return nil, e.Wrap(e.CodeEngineCapability, err, "locating the projection pilot adapter")
+		}
+		adapter.Path, adapter.Args = self, []string{projectionAdapterCommand}
+	default:
+		return nil, e.New(e.CodeUsage, "--projection-pilot must be %s or %s", factory.ProjectionInProcess, factory.ProjectionOutOfProcess)
 	}
-	return factory.WithProjectionAdapter(ctx, factory.ProjectionAdapter{
-		Path: self, Args: []string{projectionAdapterCommand}, Release: factoryGeneratorVersion()}), nil
+	return factory.WithProjectionAdapter(ctx, adapter), nil
 }
 
 func cmdProjectionAdapter() *cli.Command {

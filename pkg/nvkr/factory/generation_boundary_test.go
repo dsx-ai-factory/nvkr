@@ -47,7 +47,7 @@ func forbidGenerationSeam(t *testing.T) {
 // leakedProjectionSelection selects an adapter that does not exist, so a
 // stage owner that consulted the selection would fail instead of passing.
 func leakedProjectionSelection(ctx context.Context) context.Context {
-	return WithProjectionAdapter(ctx, ProjectionAdapter{Path: "/nonexistent/nvkr-projection-adapter", Release: "trap"})
+	return WithProjectionAdapter(ctx, ProjectionAdapter{Transport: ProjectionOutOfProcess, Path: "/nonexistent/nvkr-projection-adapter", Release: "trap"})
 }
 
 func TestRenderIsTheGenerationSeam(t *testing.T) {
@@ -212,6 +212,7 @@ func TestGeneratedScriptCheckRejectsProjectionAdapterRoutes(t *testing.T) {
 	}{
 		{"./nvkr-exec run generate --engine github --definition d --environment e --root . --check", true},
 		{"./nvkr-exec run generate --engine github --definition d --environment e --root . --check --projection-pilot", false},
+		{"./nvkr-exec run generate --engine github --definition d --environment e --root . --check --projection-pilot=in-process", false},
 		{"./nvkr-exec run generate --engine github --definition d --environment e --root .", false},
 		{"./nvkr-exec projection-adapter < request", false},
 		{`"$NVKR" projection-adapter < request`, false},

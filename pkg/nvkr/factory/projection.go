@@ -18,11 +18,12 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-// The out-of-process projection pilot is a diagnostic: a top-level generation
-// caller may select a same-module adapter process, core sends it the complete
-// canonical Plan, and core admits the returned bundle with the existing exact
-// validator before anything is written. Generated stages never consult the
-// selection, so no generated job or worker launches an adapter.
+// The projection pilot is a diagnostic: a top-level generation caller may
+// select the reference GitHub projection plugin through one plugin contract,
+// reached in-process or as an out-of-process adapter. Core sends the plugin the
+// complete canonical Plan and admits the returned bundle with the existing
+// exact validator before anything is written. Generated stages never consult
+// the selection, so no generated job or worker reaches a selected plugin.
 
 const (
 	projectionProtocol = "projection/v0-pilot"
@@ -38,23 +39,39 @@ const (
 	maxProjectionRequestBytes = 2 * MaxPlanBytes
 )
 
-// ProjectionAdapter names the out-of-process projection adapter a top-level
-// generation caller selected. It only describes what to launch: core admits
-// the adapter's description and every byte it emits.
+// ProjectionTransport selects how core reaches the projection plugin. The
+// plugin contract and core's admission of its results do not depend on it.
+type ProjectionTransport string
+
+const (
+	// ProjectionInProcess calls the built-in reference plugin directly.
+	ProjectionInProcess ProjectionTransport = "in-process"
+	// ProjectionOutOfProcess launches the plugin as an owned child process and
+	// exchanges length-framed canonical messages over stdin and stdout.
+	ProjectionOutOfProcess ProjectionTransport = "out-of-process"
+)
+
+// ProjectionAdapter is the projection plugin a top-level generation caller
+// selected and the transport that reaches it. It only describes the plugin:
+// core admits the plugin's description and every byte it emits.
 type ProjectionAdapter struct {
-	// Path is the absolute adapter executable; Args follow it in argv.
+	Transport ProjectionTransport
+	// Path is the absolute out-of-process adapter executable; Args follow it
+	// in argv. The in-process transport takes neither.
 	Path string
 	Args []string
-	// Release is the exact adapter release core requires from Describe.
+	// Release is the exact plugin release core requires from Describe.
 	Release string
-	// Timeout bounds each adapter launch; zero selects two minutes.
+	// Timeout bounds each out-of-process launch; zero selects two minutes.
 	Timeout time.Duration
 }
 
 type projectionAdapterKey struct{}
 
 // WithProjectionAdapter selects adapter for Render under ctx. It is the hidden
-// diagnostic pilot selector for top-level generation only.
+// diagnostic pilot selector for top-level generation only. It accepts any
+// absolute out-of-process executable and runs it as a trusted plugin; only the
+// CLI pins it to this nvkr binary. Core still admits every emitted byte.
 func WithProjectionAdapter(ctx context.Context, adapter ProjectionAdapter) context.Context {
 	return context.WithValue(ctx, projectionAdapterKey{}, adapter)
 }
@@ -71,6 +88,50 @@ func selectedProjectionAdapter(ctx context.Context) (ProjectionAdapter, bool) {
 	}
 	adapter, ok := ctx.Value(projectionAdapterKey{}).(ProjectionAdapter)
 	return adapter, ok
+}
+
+// projectionPlugin is the one projection plugin contract. The built-in
+// reference plugin implements it in-binary, and outOfProcessProjection carries
+// the same two calls to an adapter process. The selection chooses the
+// transport; neither the plugin nor core's admission depends on it.
+type projectionPlugin interface {
+	describe(ctx context.Context) (projectionDescription, error)
+	emit(ctx context.Context, request projectionEmitRequest) (projectionEmission, error)
+}
+
+// plugin resolves the selected transport to the contract implementation.
+func (adapter ProjectionAdapter) plugin() (projectionPlugin, error) {
+	switch adapter.Transport {
+	case ProjectionInProcess:
+		if adapter.Path != "" || len(adapter.Args) != 0 {
+			return nil, e.New(e.CodeEngineCapability, "the in-process projection transport takes no adapter executable")
+		}
+		return builtinProjection(adapter.Release), nil
+	case ProjectionOutOfProcess:
+		return outOfProcessProjection{adapter: adapter}, nil
+	default:
+		return nil, e.New(e.CodeEngineCapability, "projection transport %q is unsupported (%s or %s)",
+			adapter.Transport, ProjectionInProcess, ProjectionOutOfProcess)
+	}
+}
+
+// builtinProjection registers the in-binary reference plugin for the
+// in-process transport. Tests wrap it to count contract calls.
+var builtinProjection = func(release string) projectionPlugin { return referenceProjection{release: release} }
+
+// outOfProcessProjection is the contract over one launch per call.
+type outOfProcessProjection struct{ adapter ProjectionAdapter }
+
+func (plugin outOfProcessProjection) describe(ctx context.Context) (projectionDescription, error) {
+	var description projectionDescription
+	err := exchangeProjection(ctx, plugin.adapter, projectionRequest{Protocol: projectionProtocol}, &description, maxProjectionDescriptionBytes)
+	return description, err
+}
+
+func (plugin outOfProcessProjection) emit(ctx context.Context, request projectionEmitRequest) (projectionEmission, error) {
+	var emission projectionEmission
+	err := exchangeProjection(ctx, plugin.adapter, projectionRequest{Protocol: projectionProtocol, Emit: &request}, &emission, maxProjectionResponseBytes)
+	return emission, err
 }
 
 // projectionRequest is one adapter request: Describe when Emit is absent.
@@ -115,9 +176,10 @@ func projectionLayoutFor(layout generationLayout) projectionLayout {
 	return projectionLayout{Workflow: layout.workflowPath, Manifest: layout.manifestPath, Plan: layout.planPath}
 }
 
-// renderProjected obtains a candidate bundle from the selected adapter and
-// admits it exactly as core admits its own projection. It never writes files.
-func renderProjected(ctx context.Context, plan *Plan, adapter ProjectionAdapter) (*GeneratedBundle, error) {
+// renderProjected obtains a candidate bundle from the selected plugin and
+// admits it exactly as core admits its own projection, whatever the transport.
+// It never writes files. release is the plugin release the selection requires.
+func renderProjected(ctx context.Context, plan *Plan, plugin projectionPlugin, release string) (*GeneratedBundle, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "projection canceled")
 	}
@@ -136,20 +198,19 @@ func renderProjected(ctx context.Context, plan *Plan, adapter ProjectionAdapter)
 		return nil, e.New(e.CodeEngineCapability, "complete Plan exceeds the %d-byte projection request bound", MaxPlanBytes)
 	}
 	layout := githubLayoutFor(plan)
-	want := projectionDescription{Protocol: projectionProtocol, Release: adapter.Release, Engine: EngineGitHub,
+	want := projectionDescription{Protocol: projectionProtocol, Release: release, Engine: EngineGitHub,
 		PlanSchema: PlanSchemaVersion, GeneratorABI: projectionGeneratorABI}
-	var description projectionDescription
-	if err := exchangeProjection(ctx, adapter, projectionRequest{Protocol: projectionProtocol}, &description, maxProjectionDescriptionBytes); err != nil {
+	description, err := plugin.describe(ctx)
+	if err != nil {
 		return nil, err
 	}
-	// Refuse a mismatched adapter before it receives any Plan bytes.
+	// Refuse a mismatched plugin before it receives any Plan bytes.
 	if description != want {
-		return nil, e.New(e.CodeEngineCapability, "projection adapter describes %+v; core requires %+v", description, want)
+		return nil, e.New(e.CodeEngineCapability, "projection plugin describes %+v; core requires %+v", description, want)
 	}
-	var emission projectionEmission
-	request := projectionRequest{Protocol: projectionProtocol, Emit: &projectionEmitRequest{
-		Plan: planBytes, GeneratorVersion: plan.GeneratorVersion, Layout: projectionLayoutFor(layout)}}
-	if err := exchangeProjection(ctx, adapter, request, &emission, maxProjectionResponseBytes); err != nil {
+	emission, err := plugin.emit(ctx, projectionEmitRequest{
+		Plan: planBytes, GeneratorVersion: plan.GeneratorVersion, Layout: projectionLayoutFor(layout)})
+	if err != nil {
 		return nil, err
 	}
 	files, err := admitProjectionEmission(emission, layout, planDigest)
@@ -161,7 +222,7 @@ func renderProjected(ctx context.Context, plan *Plan, adapter ProjectionAdapter)
 		if ctx.Err() != nil {
 			return nil, err
 		}
-		return nil, e.Wrap(e.CodePipelineDrift, err, "projection adapter bundle fails core admission")
+		return nil, e.Wrap(e.CodePipelineDrift, err, "projection plugin bundle fails core admission")
 	}
 	return bundle, nil
 }
@@ -171,24 +232,24 @@ func renderProjected(ctx context.Context, plan *Plan, adapter ProjectionAdapter)
 // core's own Plan digest and workflow path.
 func admitProjectionEmission(emission projectionEmission, layout generationLayout, planDigest string) (map[string][]byte, error) {
 	if emission.PlanDigest != planDigest {
-		return nil, e.New(e.CodePipelineDrift, "projection adapter echoes planDigest %q, want %q", emission.PlanDigest, planDigest)
+		return nil, e.New(e.CodePipelineDrift, "projection plugin echoes planDigest %q, want %q", emission.PlanDigest, planDigest)
 	}
 	if emission.WorkflowPath != layout.workflowPath {
-		return nil, e.New(e.CodePipelineDrift, "projection adapter workflow path %q is not the admitted %q", emission.WorkflowPath, layout.workflowPath)
+		return nil, e.New(e.CodePipelineDrift, "projection plugin workflow path %q is not the admitted %q", emission.WorkflowPath, layout.workflowPath)
 	}
 	if len(emission.Members) == 0 || len(emission.Members) > maxGeneratedDirEntries {
-		return nil, e.New(e.CodePipelineDrift, "projection adapter emitted %d members", len(emission.Members))
+		return nil, e.New(e.CodePipelineDrift, "projection plugin emitted %d members", len(emission.Members))
 	}
 	files := make(map[string][]byte, len(emission.Members))
 	for index, member := range emission.Members {
 		if !safeGeneratedPath(member.Path) || strings.Count(member.Path, "/") > maxProjectionPathDepth {
-			return nil, e.New(e.CodePipelineDrift, "projection adapter member path %q is unsafe", member.Path)
+			return nil, e.New(e.CodePipelineDrift, "projection plugin member path %q is unsafe", member.Path)
 		}
 		if index > 0 && member.Path <= emission.Members[index-1].Path {
-			return nil, e.New(e.CodePipelineDrift, "projection adapter members are not sorted and unique at %q", member.Path)
+			return nil, e.New(e.CodePipelineDrift, "projection plugin members are not sorted and unique at %q", member.Path)
 		}
 		if member.Mode != projectionMemberMode || int64(len(member.Bytes)) > maxGeneratedFileBytes {
-			return nil, e.New(e.CodePipelineDrift, "projection adapter member %q has mode %o or is oversized", member.Path, member.Mode)
+			return nil, e.New(e.CodePipelineDrift, "projection plugin member %q has mode %o or is oversized", member.Path, member.Mode)
 		}
 		files[member.Path] = member.Bytes
 	}
@@ -283,17 +344,14 @@ func encodeProjectionFrame(message any) ([]byte, error) {
 }
 
 // decodeProjectionFrame admits exactly one complete frame of canonical JSON in
-// the strict selected schema; unknown fields and trailing bytes are errors.
+// the strict selected schema. UnmarshalExact refuses unknown fields, duplicate
+// names, trailing values and any non-canonical encoding.
 func decodeProjectionFrame(frame []byte, out any, code e.Code) error {
 	if len(frame) < 4 || uint64(len(frame)-4) != uint64(binary.BigEndian.Uint32(frame)) {
 		return e.New(code, "projection frame is truncated or has trailing bytes")
 	}
-	raw := frame[4:]
-	if err := canonical.UnmarshalExact(raw, out); err != nil {
+	if err := canonical.UnmarshalExact(frame[4:], out); err != nil {
 		return e.Wrap(code, err, "decoding projection frame")
-	}
-	if again, err := canonical.Marshal(out); err != nil || !bytes.Equal(again, raw) {
-		return e.New(code, "projection frame is not canonical JSON")
 	}
 	return nil
 }

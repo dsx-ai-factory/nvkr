@@ -11,38 +11,17 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-// ServeProjectionAdapter is the same-module reference GitHub projection adapter
-// of the out-of-process pilot. It reads one request frame from in, answers
-// Describe or Emit with one frame on out and exits; it ports the in-binary
-// renderer verbatim and never writes files. release is the adapter's own label.
-func ServeProjectionAdapter(ctx context.Context, release string, in io.Reader, out io.Writer) error {
-	raw, err := io.ReadAll(io.LimitReader(in, 4+maxProjectionRequestBytes+1))
-	if err != nil {
-		return e.Wrap(e.CodeUsage, err, "reading projection request")
-	}
-	var request projectionRequest
-	if err := decodeProjectionFrame(raw, &request, e.CodeUsage); err != nil {
-		return err
-	}
-	if request.Protocol != projectionProtocol {
-		return e.New(e.CodeEngineCapability, "projection protocol %q is unsupported; this adapter speaks %s", request.Protocol, projectionProtocol)
-	}
-	var response any = projectionDescription{Protocol: projectionProtocol, Release: release, Engine: EngineGitHub,
-		PlanSchema: PlanSchemaVersion, GeneratorABI: projectionGeneratorABI}
-	if request.Emit != nil {
-		if response, err = emitProjection(ctx, *request.Emit); err != nil {
-			return err
-		}
-	}
-	frame, err := encodeProjectionFrame(response)
-	if err != nil {
-		return err
-	}
-	_, err = out.Write(frame)
-	return err
+// referenceProjection is the same-module reference GitHub projection plugin. It
+// ports the in-binary renderer verbatim, never writes files, and serves both
+// transports unchanged. release is the plugin's own label.
+type referenceProjection struct{ release string }
+
+func (plugin referenceProjection) describe(context.Context) (projectionDescription, error) {
+	return projectionDescription{Protocol: projectionProtocol, Release: plugin.release, Engine: EngineGitHub,
+		PlanSchema: PlanSchemaVersion, GeneratorABI: projectionGeneratorABI}, nil
 }
 
-func emitProjection(ctx context.Context, request projectionEmitRequest) (projectionEmission, error) {
+func (referenceProjection) emit(ctx context.Context, request projectionEmitRequest) (projectionEmission, error) {
 	var plan Plan
 	if err := canonical.UnmarshalExact(request.Plan, &plan); err != nil {
 		return projectionEmission{}, e.Wrap(e.CodeUsage, err, "decoding projection Plan")
@@ -62,4 +41,41 @@ func emitProjection(ctx context.Context, request projectionEmitRequest) (project
 		members = append(members, projectionMember{Path: name, Mode: projectionMemberMode, Bytes: bundle.Files[name]})
 	}
 	return projectionEmission{PlanDigest: bundle.PlanDigest, WorkflowPath: bundle.WorkflowPath, Members: members}, nil
+}
+
+// ServeProjectionAdapter serves the reference projection plugin as an
+// out-of-process adapter: it reads one request frame from in, answers Describe
+// or Emit with one frame on out and exits.
+func ServeProjectionAdapter(ctx context.Context, release string, in io.Reader, out io.Writer) error {
+	return serveProjection(ctx, referenceProjection{release: release}, in, out)
+}
+
+// serveProjection carries one framed request to any contract implementation.
+func serveProjection(ctx context.Context, plugin projectionPlugin, in io.Reader, out io.Writer) error {
+	raw, err := io.ReadAll(io.LimitReader(in, 4+maxProjectionRequestBytes+1))
+	if err != nil {
+		return e.Wrap(e.CodeUsage, err, "reading projection request")
+	}
+	var request projectionRequest
+	if err := decodeProjectionFrame(raw, &request, e.CodeUsage); err != nil {
+		return err
+	}
+	if request.Protocol != projectionProtocol {
+		return e.New(e.CodeEngineCapability, "projection protocol %q is unsupported; this adapter speaks %s", request.Protocol, projectionProtocol)
+	}
+	var response any
+	if request.Emit == nil {
+		response, err = plugin.describe(ctx)
+	} else {
+		response, err = plugin.emit(ctx, *request.Emit)
+	}
+	if err != nil {
+		return err
+	}
+	frame, err := encodeProjectionFrame(response)
+	if err != nil {
+		return err
+	}
+	_, err = out.Write(frame)
+	return err
 }

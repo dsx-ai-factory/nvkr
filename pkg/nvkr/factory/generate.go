@@ -62,11 +62,15 @@ func Render(ctx context.Context, plan *Plan, engine string) (*GeneratedBundle, e
 }
 
 // renderSelected is the projection behind Render: the in-binary GitHub renderer,
-// or the out-of-process adapter a top-level caller selected through
+// or the projection plugin and transport a top-level caller selected through
 // WithProjectionAdapter. Boundary tests trap it.
 var renderSelected = func(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 	if adapter, ok := selectedProjectionAdapter(ctx); ok {
-		return renderProjected(ctx, plan, adapter)
+		plugin, err := adapter.plugin()
+		if err != nil {
+			return nil, err
+		}
+		return renderProjected(ctx, plan, plugin, adapter.Release)
 	}
 	return RenderGitHub(ctx, plan)
 }

@@ -445,7 +445,7 @@ func generatedDestination(root, relative string) (string, error) {
 }
 
 func safeGeneratedPath(value string) bool {
-	if value == "" || filepath.IsAbs(value) || filepath.ToSlash(filepath.Clean(value)) != value || value == "." || strings.HasPrefix(value, "../") {
+	if value == "" || filepath.IsAbs(value) || filepath.ToSlash(filepath.Clean(value)) != value || value == "." || value == ".." || strings.HasPrefix(value, "../") {
 		return false
 	}
 	return !strings.ContainsRune(value, '\x00')

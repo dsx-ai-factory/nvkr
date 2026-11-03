@@ -230,11 +230,11 @@ workflow-generator: go-version-check
 		-ldflags '-X main.version=dev -X main.commit=unknown' \
 		-o bin/nvkr-exec ./cmd/nvkr
 
-# Diagnostic: `make workflows-check PROJECTION_PILOT=1` checks the top-level producer,
-# qualification, development and family bundles through the out-of-process reference
-# projection adapter. Runtime refresh refuses the pilot, so runtime checks stay core-only.
+# Diagnostic: `make workflows-check PROJECTION_PILOT=in-process` or `=out-of-process` checks the
+# production, development and NVKE family producer bundles through the reference projection
+# plugin over that transport. Qualification workflows and runtime bundles stay core-only.
 PROJECTION_PILOT ?=
-PROJECTION_PILOT_FLAG = $(if $(PROJECTION_PILOT),--projection-pilot)
+PROJECTION_PILOT_FLAG = $(if $(PROJECTION_PILOT),--projection-pilot=$(PROJECTION_PILOT))
 
 .PHONY: workflows-check
 workflows-check: workflow-generator pipeline-dev-check nvke-split-check catalog-refresh-check ## Check committed producer, qualification, development and family bundles and the catalog refresh workflow for drift.

@@ -51,7 +51,7 @@ func TestGenerateFilesUsesLifecycleInputsForSupportedHostedEngines(t *testing.T)
 // nothing on refusal, and runtime refresh refuses it before reading inputs.
 func TestGenerateFilesHonorsProjectionSelectionOnlyAtTopLevel(t *testing.T) {
 	selected := factory.WithProjectionAdapter(context.Background(),
-		factory.ProjectionAdapter{Path: "/nonexistent/nvkr-projection-adapter", Release: "test"})
+		factory.ProjectionAdapter{Transport: factory.ProjectionOutOfProcess, Path: "/nonexistent/nvkr-projection-adapter", Release: "test"})
 	untouched := filepath.Join(t.TempDir(), "must-not-exist")
 	_, err := GenerateRuntimeFiles(selected, "missing-definition.yaml", "missing-environment.yaml", "test", factory.EngineGitHub, untouched, true)
 	assertCode(t, err, nvkrerr.CodeEngineCapability)
