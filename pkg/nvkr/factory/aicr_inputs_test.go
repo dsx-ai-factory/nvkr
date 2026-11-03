@@ -94,50 +94,64 @@ func TestMaintainedAICRBundleInputs(t *testing.T) {
 	}
 }
 
-// The NVKE producer admits a recipe only when its most specific applied overlay is
-// the coordinate's own leaf. This runs the catalog's exact parser on rendered shapes.
-func TestAICRNVKELeafAdmissionParser(t *testing.T) {
+// The NVKE producers admit a recipe only when its most specific applied overlay is
+// the coordinate's own leaf. This runs each compiled producer's exact admission
+// lines, with its own positional arguments, against recipe shapes.
+func TestAICRNVKELeafAdmission(t *testing.T) {
 	aicrInputTestRoot(t)
 	plan := compileAICRInput(t, "nvke-gb200.yaml", "aicr-local-arm64.yaml")
-	var script string
-	for _, node := range plan.Builds[0].Graph.Nodes {
-		if node.Kind == ir.KindBuild {
-			script = node.Command[4]
-		}
-	}
-	const open, closing = "applied=\"$(awk '\n", "\n' \"$out/recipe.yaml\")\""
-	start := strings.Index(script, open)
-	end := strings.Index(script, closing)
-	if start < 0 || end < start {
-		t.Fatalf("leaf admission parser not found in producer script:\n%s", script)
-	}
-	program := script[start+len(open) : end]
 	const leaf = "gb200-nvke-ubuntu-training-kubeflow"
+	const overlays = "  appliedOverlays:\n    - base\n    - monitoring-hpa\n    - nvke\n    - gb200-any\n" +
+		"    - gb200-nvke-ubuntu-training\n"
 	for _, test := range []struct {
-		name, recipe, want string
+		name, recipe string
+		admit        bool
 	}{
-		{"curated leaf last", "kind: RecipeResult\nmetadata:\n  appliedOverlays:\n    - base\n    - nvke\n" +
-			"    - gb200-nvke-ubuntu-training\n    - " + leaf + "\n  version: v1.2.0\n", leaf},
-		{"wildcard merge without the leaf", "metadata:\n  appliedOverlays:\n    - base\n    - nvke\n" +
-			"    - gb200-nvke-ubuntu-training\n  excludedOverlays:\n    - " + leaf + "\n", "gb200-nvke-ubuntu-training"},
-		{"flow sequence", "metadata:\n  appliedOverlays: [base, " + leaf + "]\n", ""},
-		{"duplicate lists", "metadata:\n  appliedOverlays:\n    - " + leaf + "\nother:\n  appliedOverlays:\n    - " + leaf + "\n", ""},
-		{"absent list", "metadata:\n  version: v1.2.0\n", ""},
-		{"quoted item", "metadata:\n  appliedOverlays:\n    - \"" + leaf + "\"\n", "\"" + leaf + "\""},
+		{"curated leaf last", "componentRefs: []\nmetadata:\n" + overlays + "    - " + leaf + "\n  version: v1.2.0\n", true},
+		{"wildcard merge without the leaf", "metadata:\n" + overlays + "  excludedOverlays:\n    - name: " + leaf + "\n", false},
+		{"leaf not last", "metadata:\n" + overlays + "    - " + leaf + "\n    - later\n", false},
+		{"unreadable item after the leaf", "metadata:\n" + overlays + "    - " + leaf + "\n    - \"later overlay\"\n", false},
+		{"commented item after the leaf", "metadata:\n" + overlays + "    - " + leaf + "\n    - later # note\n", false},
+		{"blank line inside the list", "metadata:\n" + overlays + "    - " + leaf + "\n\n    - later\n", false},
+		{"comment line inside the list", "metadata:\n" + overlays + "    - " + leaf + "\n    # note\n", false},
+		{"flow sequence", "metadata:\n  appliedOverlays: [base, " + leaf + "]\n", false},
+		{"duplicate lists", "metadata:\n  appliedOverlays:\n    - " + leaf + "\nother:\n  appliedOverlays:\n    - " + leaf + "\n", false},
+		{"absent list", "metadata:\n  version: v1.2.0\n", false},
+		{"quoted leaf", "metadata:\n  appliedOverlays:\n    - \"" + leaf + "\"\n", false},
+		{"CRLF line endings", "metadata:\r\n  appliedOverlays:\r\n    - " + leaf + "\r\n", false},
 	} {
-		t.Run(test.name, func(t *testing.T) {
-			recipe := filepath.Join(t.TempDir(), "recipe.yaml")
-			if err := os.WriteFile(recipe, []byte(test.recipe), 0o600); err != nil {
-				t.Fatal(err)
-			}
-			got, err := exec.CommandContext(t.Context(), "awk", program, recipe).Output()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if strings.TrimSuffix(string(got), "\n") != test.want {
-				t.Fatalf("parser printed %q, want %q", got, test.want)
-			}
-		})
+		for _, build := range plan.Builds {
+			t.Run(test.name+"/"+build.Name, func(t *testing.T) {
+				var command []string
+				for _, node := range build.Graph.Nodes {
+					if node.Kind == ir.KindBuild {
+						command = node.Command
+					}
+				}
+				if len(command) < 6 || !slices.Equal(command[:4], []string{"bash", "-euo", "pipefail", "-c"}) {
+					t.Fatalf("producer is not one bash script with positional arguments: %q", command)
+				}
+				script := command[4]
+				start := strings.Index(script, `leaf="`)
+				check := strings.Index(script, `[ "$applied" = "$leaf" ] ||`)
+				bundle := strings.Index(script, `"$out/aicr" bundle`)
+				if start < 0 || check < start || bundle < check {
+					t.Fatalf("leaf admission must precede bundle rendering:\n%s", script)
+				}
+				end := check + strings.IndexByte(script[check:], '\n')
+				out := t.TempDir()
+				if err := os.WriteFile(filepath.Join(out, "recipe.yaml"), []byte(test.recipe), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				args := append([]string{"-euo", "pipefail", "-c", "out=\"$NVKR_TEST_OUT\"\n" + script[start:end]}, command[5:]...)
+				admission := exec.CommandContext(t.Context(), "bash", args...)
+				admission.Env = append(os.Environ(), "NVKR_TEST_OUT="+out)
+				output, err := admission.CombinedOutput()
+				if test.admit != (err == nil) {
+					t.Fatalf("admission = %v, want %v: %v\n%s", err == nil, test.admit, err, output)
+				}
+			})
+		}
 	}
 }
 

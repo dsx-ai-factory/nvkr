@@ -43,7 +43,7 @@ case-insensitive, Unicode-normalization or reserved-name collisions on their des
 The pinned source is AICR `v1.2.0` (`935e0746dc54da890a23c1ecca998244b3a25de7`),
 the first stable release that writes an OCI layout without pushing. Other coordinates
 are ordinary catalog selections, not NVKR capabilities or hardware guarantees.
-The pinned upstream lacks a generic GB200 recipe and labels VR200 Preview.
+The pinned upstream has no `generic` GB200 recipe and labels VR200 Preview.
 Referenced charts, images and providers are not vendored: these are not air-gap
 payloads. GitOps repository settings and cluster acceptance belong downstream.
 
@@ -53,12 +53,14 @@ payloads. GitOps repository settings and cluster acceptance belong downstream.
 accelerator: gb200, os: ubuntu, intent: training, platform: kubeflow` in three formats:
 `helm`, `flux` and `argocd-helm`. Output names carry the coordinate; the Definition
 carries no hardware model. The producers share the GB300 example's source, lock and
-layout handling, and add `--platform` to the recipe.
+layout handling, add `--platform` to the recipe, and build `helm` and `argocd-helm`
+with `--readiness-hooks` as AICR's NVKE guide directs. AICR labels this coordinate Preview.
 
-AICR resolves a coordinate without a curated leaf by merging broader overlays. The
-producer therefore requires the last `metadata.appliedOverlays` entry of the rendered
-recipe to be `gb200-nvke-ubuntu-training-kubeflow`. Any other result, or a recipe whose
-list it cannot read, fails the build before `aicr bundle` runs.
+AICR `v1.2.0` refuses criteria that no applied overlay covers. The producer also
+requires the last `metadata.appliedOverlays` entry of the rendered recipe to be
+`gb200-nvke-ubuntu-training-kubeflow`, so an AICR pin that resolves this coordinate
+through any other overlay fails the build before `aicr bundle` runs. A recipe whose
+list it cannot read fails the same way.
 
 ```sh
 bin/nvkr run local \
@@ -67,16 +69,21 @@ bin/nvkr run local \
   --attempt aicr-nvke-gb200-local-1 --jobs 1
 ```
 
-AICR's GB200 NVKE recipes require Ubuntu `24.04` nodes, so these bundles pair with
-the Ubuntu 24.04 ARM64 node image. AICR `v1.2.0` has no recipe for a 26.04 GB200 node.
-It also has no `gb200-nvke-ubuntu-inference-dynamo` leaf, so this Definition has no
-Dynamo inference output. NVKE does not apply these bundles: install them out of band
-with Helm, Flux or Argo CD.
+AICR's recipe constrains nodes to Ubuntu `24.04`, and its NVKE guide assumes NVIDIA's
+`-nvidia-64k` kernel. No NVKR Run has paired these bundles with a node image. AICR `v1.2.0` has no GB200 recipe
+for Ubuntu 26.04 and no `gb200-nvke-ubuntu-inference-dynamo` leaf, so this Definition has
+no Dynamo inference output. NVKE does not apply these bundles; install them out of band
+following AICR's pinned
+[NVKE GB200 setup guide](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/docs/integrator/nvke-gb200-setup.md).
+Flux has no readiness hooks, so `sriov-ib-networks` can race the IPPool CRD; the guide
+gives the wait-and-reset steps.
 
-This selection is the interim form above. Moving to ADR-27 pinned-tool producers and
-AICR's own manifest changes the published digests, as it does for GB300.
+These outputs use the source-built producer and NVKR wrapper described above. The ADR-27
+pinned-tool migration changes their published digests and media type, and #288 may move
+`argocd-helm` to native `helm-oci`. The leaf check needs a non-shell owner after that
+migration.
 
 [Reconciliation](../../../docs/adr/reconciliation.md#aicr-deployment-bundles)
-records the local six-output Run and its limits. Changes to the catalog
+records the local GB300 and GB200 Runs and their limits. Changes to the catalog
 change build identity; that Run does not validate the inputs against hardware or
 hosted services.

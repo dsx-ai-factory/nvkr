@@ -211,21 +211,26 @@ components:
         timeout --kill-after=10s 120s "$out/aicr" recipe \
           --service "$1" --accelerator "$2" --platform "$3" \
           --os ubuntu --intent training --output "$out/recipe.yaml"
-        # Exact-leaf admission: AICR merges wildcard overlays when a coordinate has no curated
-        # leaf, so the most specific applied overlay must be this coordinate's own leaf.
+        # Exact-leaf admission: the most specific applied overlay must be this coordinate's own
+        # leaf, whatever a later AICR pin resolves. Any list line other than a plain item
+        # rejects the whole list.
         leaf="$2-$1-ubuntu-training-$3"
         applied="$(awk '
           /^[[:space:]]*appliedOverlays:[[:space:]]*$/ { lists++; inlist = 1; next }
           inlist && /^[[:space:]]*- [^[:space:]]+[[:space:]]*$/ { last = $2; next }
+          inlist && (/^[[:space:]]*-/ || /^[[:space:]]*#/ || /^[[:space:]]*$/) { bad = 1 }
           { inlist = 0 }
-          END { if (lists == 1) print last }
+          END { if (lists == 1 && !bad) print last }
         ' "$out/recipe.yaml")"
         [ "$applied" = "$leaf" ] || { echo "AICR recipe must end in leaf $leaf, got '$applied'" >&2; exit 1; }
+        # AICR's NVKE guide gates network-operator readiness before the IB pools; Flux cannot.
+        hooks=()
+        case "$4" in helm | argocd-helm) hooks=(--readiness-hooks) ;; esac
         # Layout output stages in the working directory; the source tree is read-only.
         (
           cd "$out"
           timeout --kill-after=10s 120s "$out/aicr" bundle \
-            --recipe "$out/recipe.yaml" --deployer "$4" \
+            --recipe "$out/recipe.yaml" --deployer "$4" "${hooks[@]}" \
             --output "oci-layout:$out/layout"
         )
         # Publish AICR's own layer bytes: one manifest holding the config and exactly one layer.
