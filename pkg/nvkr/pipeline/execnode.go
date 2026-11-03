@@ -37,6 +37,9 @@ func (l Local) ExecNode(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 	if err := rejectUnsupportedExecutionRequirements([]ir.Node{n}, "exec-node"); err != nil {
 		return nil, err
 	}
+	if n.BuilderType == ir.BuilderPinnedTool && !opts.Launch {
+		return nil, e.New(e.CodeEngineCapability, "pinned-tool build %q requires launched execution", n.ID)
+	}
 	if n.BuilderType == ir.BuilderBuildKit && (!opts.Launch || opts.Qualification != nil || opts.Package) {
 		return nil, e.New(e.CodeEngineCapability, "rootless BuildKit requires launched, unqualified OCI export execution")
 	}

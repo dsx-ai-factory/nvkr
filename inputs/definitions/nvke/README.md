@@ -17,7 +17,7 @@ the issue that adds it.
 | [Services](services.yaml) | [github-nvke-services.yaml](../../environments/github-nvke-services.yaml) | SPIRE, PostgreSQL, Temporal and local-path-provisioner charts and images | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | [Telemetry](telemetry.yaml) | [github-nvke-telemetry.yaml](../../environments/github-nvke-telemetry.yaml) | NKTP chart and images | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | [Disks](disks.yaml) | [github-nvke-disks.yaml](../../environments/github-nvke-disks.yaml) | Ubuntu 26.04 `nvke-node-image-{amd64,arm64}` and `nvke-node-fde-{amd64,arm64}` | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
-| Ubuntu 24.04 disks | — | `nvke-node-image-ubuntu24-{amd64,arm64}` and `nvke-node-fde-ubuntu24-{amd64,arm64}` | — | Pending [#323](https://github.com/dsx-ai-factory/nvkr/issues/323). Today only the build-only `static-unqualified` [Ubuntu 24 diagnostics](../diagnostics/ubuntu24/README.md) exist |
+| [Disks Ubuntu 24](disks-ubuntu24.yaml) | [github-nvke-disks-ubuntu24.yaml](../../environments/github-nvke-disks-ubuntu24.yaml) | Ubuntu 24.04 `nvke-node-image-ubuntu24-{amd64,arm64}` and `nvke-node-fde-ubuntu24-{amd64,arm64}` | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | `controller-profiles` and an offline CAPI repository in Core | — | The profiles image NVKE's deploy path names, and `clusterctl` provider manifests | — | Pending [#324](https://github.com/dsx-ai-factory/nvkr/issues/324) |
 | [GB200 AICR bundle](../aicr/nvke-gb200.yaml) | [aicr-local-arm64.yaml](../../environments/aicr-local-arm64.yaml) (local build only) | `aicr-nvke-gb200-ubuntu-training-kubeflow-{helm,flux,argocd-helm}` | `unqualified-local-execution` | One local Run recorded ([AICR inputs](../aicr/README.md#gb200-nvke-kubeflow-training)); a hosted Release is pending [#325](https://github.com/dsx-ai-factory/nvkr/issues/325) |
 | GPU site composite | — | Every output above in one Release ([ADR-26](../../../docs/adr/0026-definition-composition.md)) | — | Pending [#326](https://github.com/dsx-ai-factory/nvkr/issues/326) |
@@ -25,7 +25,7 @@ the issue that adds it.
 The [AICR inputs](../aicr/README.md) also hold a `generic` GB300 example, which is not an NVKE recipe and is
 not part of an NVKE site.
 
-From the repository root, regenerate or check the four family bundles:
+From the repository root, regenerate or check the five family bundles:
 
 ```sh
 make nvke-split-generate
@@ -33,7 +33,7 @@ make nvke-split-check
 ```
 
 Each family Run is a manual `workflow_dispatch` of `.github/workflows/nvkr-run-nvke-<family>.yml` on `main`,
-with the credentials in [Four-family pilot](#four-family-pilot). Each Run publishes one Release under
+with the credentials in [Family pilot](#family-pilot). Each Run publishes one Release under
 `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/<family>`. To consume them, follow
 [Install an NVKE site from the Releases](../../../docs/release-quickstart.md#install-an-nvke-site-from-the-releases).
 
@@ -50,10 +50,10 @@ installs the GPU stack.
 
 | GPU system | CPU/arch | Worker disks | AICR bundle | Upstream status |
 |---|---|---|---|---|
-| GB200 | Grace, arm64 | `nvke-node-image-ubuntu24-arm64` (24.04, pending #323) and its FDE variant. The 26.04 `nvke-node-image-arm64` and `nvke-node-fde-arm64` are built, but the GB200 AICR recipe does not admit 26.04 | `aicr-nvke-gb200-ubuntu-training-kubeflow-*` from the [GB200 Definition](../aicr/README.md#gb200-nvke-kubeflow-training); hosted Release pending #325. Its recipe requires Ubuntu 24.04 ([leaf](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/recipes/overlays/gb200-nvke-ubuntu-training-kubeflow.yaml#L25-L34), [`os-ubuntu`](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/recipes/mixins/os-ubuntu.yaml#L23-L24)). AICR v1.2.0 has no NVKE inference leaf | NVKE's golden path is Ubuntu 24.04 on GB200, with streams on both series ([policy](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/release/policy.yaml#L23-L24), [streams](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/release/policy.yaml#L68-L75)). NVKE qualifies GB200 only to nodes Ready, with no GPU driver check ([overview](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/docs/qualification/overview.md?plain=1#L185-L187)). NICo lists GB200 trays ([HCL](https://github.com/dsx-ai-factory/infra-controller/blob/abc446b33dc773d9b8c7f41b54cccf812758b165/docs/hcl.md?plain=1#L24-L25)) |
+| GB200 | Grace, arm64 | `nvke-node-image-ubuntu24-arm64` (24.04, from the Disks Ubuntu 24 family) and its FDE variant. The 26.04 `nvke-node-image-arm64` and `nvke-node-fde-arm64` are built, but the GB200 AICR recipe does not admit 26.04 | `aicr-nvke-gb200-ubuntu-training-kubeflow-*` from the [GB200 Definition](../aicr/README.md#gb200-nvke-kubeflow-training); hosted Release pending #325. Its recipe requires Ubuntu 24.04 ([leaf](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/recipes/overlays/gb200-nvke-ubuntu-training-kubeflow.yaml#L25-L34), [`os-ubuntu`](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/recipes/mixins/os-ubuntu.yaml#L23-L24)). AICR v1.2.0 has no NVKE inference leaf | NVKE's golden path is Ubuntu 24.04 on GB200, with streams on both series ([policy](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/release/policy.yaml#L23-L24), [streams](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/release/policy.yaml#L68-L75)). NVKE qualifies GB200 only to nodes Ready, with no GPU driver check ([overview](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/docs/qualification/overview.md?plain=1#L185-L187)). NICo lists GB200 trays ([HCL](https://github.com/dsx-ai-factory/infra-controller/blob/abc446b33dc773d9b8c7f41b54cccf812758b165/docs/hcl.md?plain=1#L24-L25)) |
 | GB300 | Grace, arm64 | Same as GB200 | None: AICR v1.2.0 has no GB300 NVKE leaf ([overlays](https://github.com/NVIDIA/aicr/tree/935e0746dc54da890a23c1ecca998244b3a25de7/recipes/overlays)) | NVKE roadmap ([ROADMAP](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/ROADMAP.md?plain=1#L26)). NICo lists only the Lenovo GB300 tray ([HCL](https://github.com/dsx-ai-factory/infra-controller/blob/abc446b33dc773d9b8c7f41b54cccf812758b165/docs/hcl.md?plain=1#L27)) |
 | VR200 | Vera, arm64 | Same disk outputs; AICR's VR200 recipes require Ubuntu 26.04 and kernel 7.0 or later ([recipe](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/recipes/overlays/vr200-rke2-ubuntu-training.yaml#L47-L65)), which NVKR does not check against the disk | None: AICR v1.2.0 VR200 leaves are RKE2-only | NVKE roadmap ([ROADMAP](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/ROADMAP.md?plain=1#L27)). Not in the NICo v2.3.0 [HCL](https://github.com/dsx-ai-factory/infra-controller/blob/abc446b33dc773d9b8c7f41b54cccf812758b165/docs/hcl.md) |
-| Site controller | amd64 or arm64 | The management nodes' architecture: Ubuntu 26.04 today, Ubuntu 24.04 pending #323, plain or FDE | n/a | NVKE management nodes are all one architecture, either one ([supported platforms](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/docs/overview/supported-platforms.md?plain=1#L79)). NICo documents x86_64 site controller hardware on Ubuntu 24.04 ([hardware](https://github.com/dsx-ai-factory/infra-controller/blob/abc446b33dc773d9b8c7f41b54cccf812758b165/docs/getting-started/prerequisites/hardware.md?plain=1#L12-L21)) |
+| Site controller | amd64 or arm64 | The management nodes' architecture: Ubuntu 26.04 or 24.04, plain or FDE | n/a | NVKE management nodes are all one architecture, either one ([supported platforms](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/docs/overview/supported-platforms.md?plain=1#L79)). NICo documents x86_64 site controller hardware on Ubuntu 24.04 ([hardware](https://github.com/dsx-ai-factory/infra-controller/blob/abc446b33dc773d9b8c7f41b54cccf812758b165/docs/getting-started/prerequisites/hardware.md?plain=1#L12-L21)) |
 
 NVKE links are at `v0.23.0`, which `main` pins, and NICo links at `v2.3.0`. The `nvke-node-fde-*` disks use
 a public bootstrap passphrase, so every node built from one shares its volume key and gets no data-at-rest
@@ -64,12 +64,12 @@ takes them from its NICo deployment or builds them as
 NVKR's role ends at building, signing and publishing these outputs. GPU driver, fabric and runtime acceptance
 belongs to AICR and NVKE evidence, and NVKR records none ([reconciliation](../../../docs/adr/reconciliation.md#maintained-input-and-schema-boundaries)).
 
-## Four-family pilot
+## Family pilot
 
-Four independent Definitions partition the combined candidate's 69 named outputs, and together add 13
-family-only outputs, for 82 in all. The core family also
+Five independent Definitions partition the combined candidate's 69 named outputs, and together add 17
+family-only outputs, for 86 in all. The core family also
 selects the NICo charts, the NICo Core and Flow images and the ARM64 AICR CLI, and the services family selects local-path-provisioner, which the combined Definition omits; they were added while its flat workflow had no remaining YAML
-parsing headroom. They reuse the
+parsing headroom. The Disks Ubuntu 24 family's four outputs are also absent from the combined Definition. They reuse the
 shared catalogs and pins; they do not import each other or change the combined Definition into a parent.
 
 | Definition | Outputs | Membership | Environment |
@@ -77,15 +77,23 @@ shared catalogs and pins; they do not import each other or change the combined D
 | [Core](core.yaml) | 27 | CLI/operator tools, AICR CLI, controller and bound chart, NICo charts and Core/Flow images, providers/reference fixture, CAPI and cert-manager images | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) |
 | [Services](services.yaml) | 34 | SPIRE, PostgreSQL, Temporal and local-path-provisioner charts and native images | [github-nvke-services.yaml](../../environments/github-nvke-services.yaml) |
 | [Telemetry](telemetry.yaml) | 17 | NKTP chart and native runtime images | [github-nvke-telemetry.yaml](../../environments/github-nvke-telemetry.yaml) |
-| [Disks](disks.yaml) | 4 | Native AMD64/ARM64 plain and public-bootstrap FDE disks, each with its complete material closure | [github-nvke-disks.yaml](../../environments/github-nvke-disks.yaml) |
+| [Disks](disks.yaml) | 4 | Ubuntu 26.04 native AMD64/ARM64 plain and public-bootstrap FDE disks, each with its complete material closure | [github-nvke-disks.yaml](../../environments/github-nvke-disks.yaml) |
+| [Disks Ubuntu 24](disks-ubuntu24.yaml) | 4 | The same four disks on Ubuntu 24.04 through the [Ubuntu 24 overlay](../../catalogs/node-images/variants/ubuntu24.json) | [github-nvke-disks-ubuntu24.yaml](../../environments/github-nvke-disks-ubuntu24.yaml) |
+
+The two disk families are sibling Ubuntu series, not a default and an exception; consumers choose the
+series. Each family has its own Run, signer and publication namespace, so one series can release without
+rebuilding the other. The Ubuntu 24.04 disks stay out of the combined candidate: adding them would make every
+combined release and development dispatch wait on four more native disk bakes, and
+[ADR-26](../../../docs/adr/0026-definition-composition.md) requires both series in one member of any composite.
+Folding them in waits on that composite design and recorded hosted bake capacity.
 
 Each Environment selects `githubBundle: nvke-<family>`, the corresponding
 `.github/workflows/nvkr-run-nvke-<family>.yml`, an explicit main-only signer identity, and publication prefix
 `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/<family>`. Its Release publishes by digest beneath that prefix's
 `releases` repository. Source-access and disk settings are scoped to the family's selected producers.
-All four families retain the maintained production registry policy: `NVKR_REGISTRY_WRITE` handles
+All five families retain the maintained production registry policy: `NVKR_REGISTRY_WRITE` handles
 publication, and `NVKR_REGISTRY_READ` with `NVKR_REGISTRY_READ_USER` handles publication verification.
-Only the disks family also uses that reader for private native toolchain preparation. These credentials
+Only the two disk families also use that reader for private native toolchain preparation. These credentials
 require the same operator provisioning as the combined candidate; generation does not verify package access.
 
 From the repository root:
@@ -101,7 +109,7 @@ regenerate. Generation and drift checking do not build, publish or qualify any f
 
 This is a reversible pilot alongside the combined production, development and qualification workflows.
 Named production bundles have no generated qualification pair, and named development bundles remain
-unsupported. The existing combined qualification policies do not cover four independent family Runs.
+unsupported. The existing combined qualification policies do not cover five independent family Runs.
 Keep the combined path until the consumer and qualification cutover has its own accepted contract.
 
 Consumers select each exact digest-pinned family Release and verify it under independently chosen policy.
@@ -120,7 +128,7 @@ historical capacity measurements and remaining cutover work.
 | Controller and charts | `../../catalogs/nvke/release` | AMD64/ARM64 aggregate `cwe`, image-bound `controller-chart`, PostgreSQL, SPIRE, SPIRE CRDs and Temporal chart packages |
 | Operator tools | `../../catalogs/tools/operator-amd64`, `../../catalogs/tools/operator-arm64` | AMD64 `operator-tools` and, in the core family only, ARM64 `operator-tools-linux-arm64` Helm and kubectl executables, at the same pinned versions |
 | AICR CLI (core family only) | `../../catalogs/tools/aicr-arm64` | ARM64 `aicr` release executable with its `aicr-attestation.sigstore.json` companion beside it; upstream evidence is not verified (`evidence.none`) |
-| Node images | `../../catalogs/node-images/release`, `../../catalogs/node-images/variants/native-toolchains.yaml` | Separate native AMD64 and ARM64 plain and public-bootstrap FDE QCOW2s, with explicit material producers |
+| Node images | `../../catalogs/node-images/release`, `../../catalogs/node-images/variants/native-toolchains.yaml` | Separate native AMD64 and ARM64 plain and public-bootstrap FDE QCOW2s, with explicit material producers; the Disks Ubuntu 24 family adds `../../catalogs/node-images/variants/ubuntu24.json` |
 | Deployment images | `../../catalogs/runtime-dependencies` | Twelve non-test runtime images for each native architecture: PostgreSQL, eight SPIRE images and three Temporal images |
 | CAPNICo | `../../catalogs/nvke/release-components` | Source-built `capnico-controller`, one OCI index requiring AMD64 and ARM64 |
 | Default StorageClass (services family only) | `../../catalogs/local-path-provisioner` | Source-packaged `local-path-provisioner` chart from Rancher `v0.0.37`, one chart per native architecture with its acquired provisioner and BusyBox helper images bound by digest |
@@ -340,6 +348,14 @@ the wrapper and signed release metadata. Strict FDE inspection/publication and q
 unsupported. The [historical source audit](../diagnostics/fde-audit.md) records the prior pin's shared-key
 limitations; it is not an audit of the beta update. These diagnostic images make no deployed confidentiality
 claim, even after TPM enrollment. `swtpm` is not required for the bake.
+
+The Disks Ubuntu 24 family's `nvke-node-image-ubuntu24-<arch>` and `nvke-node-fde-ubuntu24-<arch>` outputs add the
+[Ubuntu 24 overlay](../../catalogs/node-images/variants/ubuntu24.json) to the same catalog stack. It replaces the
+installers, the agent, DOCA OVS and the four disk producers with their 24.04 declarations; the targets,
+passphrase, evidence mode and every other material producer are unchanged. The
+[Ubuntu 24 inputs](../diagnostics/ubuntu24/README.md) record the agent's libc contract and installer pins.
+The family's Environment keeps this candidate's native ARC route, execution classes, inspection profiles and
+`build-provenance-v1` disk evidence. No Ubuntu 24.04 disk has a hosted bake, publication or guest boot recorded.
 
 The [recorded AMD64 diagnostic Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035)
 completed a standalone FDE bake and raw artifact retention. It did not exercise FDE publication, an ARM64

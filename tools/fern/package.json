@@ -1,0 +1,8 @@
+{
+  "name": "nvkr-fern-cli",
+  "private": true,
+  "description": "Pinned Fern CLI for the docs check and publication workflows. Install with `make fern-install`.",
+  "dependencies": {
+    "fern-api": "5.163.1"
+  }
+}

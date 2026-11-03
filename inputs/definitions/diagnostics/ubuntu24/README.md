@@ -1,7 +1,9 @@
 # Ubuntu 24 NVKE node images
 
-These opt-in inputs select Ubuntu **24.04.5** installers for native AMD64 and ARM64 NVKE
-QCOW2 builds. Ubuntu 26.04 remains the existing default. The release catalog pins NVKE
+These opt-in inputs select Ubuntu **24.04.5** installers for single native AMD64 and ARM64 NVKE
+QCOW2 builds. The maintained [`disks-ubuntu24` family](../../nvke/disks-ubuntu24.yaml) selects the same
+four disks and overlay stack for signed publication; see [the NVKE inputs](../../nvke/README.md#family-pilot).
+No publication is recorded yet. The release catalog pins NVKE
 `v0.23.0` at `2cfd00081b468d85a4894ec17e9deac13c9d8169`, which contains upstream's
 [Ubuntu 24 support](https://github.com/dsx-ai-factory/nvke/commit/96ccc50cb7f8ed8bb08f7cf8655906982774f809).
 The installer material and required `ubuntu_series=24.04` Packer variable select the guest OS together.
@@ -15,13 +17,12 @@ The installer material and required `ubuntu_series=24.04` Packer variable select
 | GitHub FDE AMD64 | `definition-github-fde-amd64.yaml` | `nvke-node-fde-ubuntu24-amd64` |
 | GitHub FDE ARM64 | `definition-github-fde-arm64.yaml` | `nvke-node-fde-ubuntu24-arm64` |
 
-Each selects the complete eleven-producer closure. The ordered stack is the shared
+Each selects the complete twelve-producer closure. The ordered stack is the shared
 [release node-image catalog](../../../catalogs/node-images/release/registry.yaml), its
 [native-toolchain overlay](../../../catalogs/node-images/variants/native-toolchains.yaml), then
 [Ubuntu 24 overlay](../../../catalogs/node-images/variants/ubuntu24.json). The last overlay
-replaces the two installer suppliers, the agent and four disk producers as complete declarations, bound
-to the predecessor catalog digest. The Ubuntu 24 selection does not change existing locks, release outputs, or
-committed workflows.
+replaces the two installer suppliers, the agent, DOCA OVS and four disk producers as complete declarations, bound
+to the predecessor catalog digest. The overlay does not change existing locks or the Ubuntu 26.04 outputs.
 
 ## Agent compatibility and pins
 
@@ -103,8 +104,7 @@ roots. Runner access, private NVKE source access, and read access to the retaine
 Packer toolchain packages are prerequisites. Generated workflows also require their existing
 private GHCR carrier storage and scoped storage credentials. The generated workflow uses
 manual dispatch under the existing branch policy. It retains raw QCOW2 and a `static-unqualified` Run;
-it does not publish or sign a Release. These inputs are separate from maintained
-release membership.
+it does not publish or sign a Release. Use the maintained family for signed publication.
 
 FDE uses the existing public bootstrap passphrase `changeit`. It provides no deployed
 confidentiality claim; private-passphrase FDE and strict FDE inspection remain unavailable.

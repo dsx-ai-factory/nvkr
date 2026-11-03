@@ -76,6 +76,10 @@ type RunOptions struct {
 	// producer bytes selected by the factory Plan. It is required for a build node
 	// with material bindings and rejected by every other node.
 	BuildMaterials *BuildMaterials
+	// ToolExecutable is the planned tool/<name> acquisition a pinned-tool build runs.
+	// It is a path, not authority: the executor re-hashes it against the node's
+	// executable digest before launch and rejects it for every other node.
+	ToolExecutable string
 	// NativeGo is a process-local receipt over installed SDK/compiler bytes.
 	// It admits only explicitly declared local native-go producers.
 	NativeGo *NativeGoToolchain

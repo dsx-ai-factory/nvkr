@@ -144,7 +144,7 @@ type Index struct {
 
 const IndexSchemaVersion = "nvkr.dev/sbom-index/v2"
 
-// PerArtifact builds one SBOM per from-source/prebuilt component (bound to its
+// PerArtifact builds one SBOM per from-source, prebuilt or pinned-tool component (bound to its
 // artifact digest) plus the aggregate index linking them, all deterministic.
 // These documents describe observed composition. Publisher-qualified flows use
 // BuildVerifiedFromReport and its PerArtifact method to obtain evidence receipts.
@@ -154,7 +154,7 @@ func PerArtifact(res *buildgraph.Resolved, buildDigest string, artifactHashes ma
 	boms := make(map[string]*BOM, len(comps))
 	idx := &Index{SchemaVersion: IndexSchemaVersion, BuildDigest: buildDigest}
 	for _, nc := range comps {
-		if !nc.FromSource && nc.Prebuilt == nil {
+		if !nc.FromSource && nc.Prebuilt == nil && nc.BuilderType != catalog.BuilderPinnedTool {
 			continue // an exclusion has no artifact SBOM
 		}
 		b := fromComponentForArch(nc, buildDigest, artifactHashes[nc.Name], target.ExecutableArch(res.Platform))
@@ -242,6 +242,30 @@ func componentForEvidence(nc catalog.NamedComponent, artifactHash, arch string,
 		props = append(props, evidenceProps...)
 		sort.Slice(props, func(i, j int) bool { return props[i].Name < props[j].Name })
 		c := Component{Type: "application", Name: nc.Name, Version: catalog.NormalizeVersion(nc.Tag), Properties: props}
+		if artifactHash != "" {
+			c.Hashes = []Hash{{Alg: "SHA-256", Content: strings.TrimPrefix(artifactHash, "sha256:")}}
+		}
+		return c
+	}
+	if nc.BuilderType == catalog.BuilderPinnedTool {
+		// A pinned-tool result is produced bytes, never from-source: it records the
+		// wrapped-build lane and the exact executable that made it (ADR-27 §7).
+		toolchain := nc.ToolchainImage
+		if transportIndependent {
+			toolchain = contentDigestIdentity(toolchain)
+		}
+		executable := ""
+		if nc.ToolExecutable != nil {
+			executable = nc.ToolExecutable.ExecutableDigest
+		}
+		c := Component{Type: "file", Name: nc.Name, Version: catalog.NormalizeVersion(nc.Tag), Properties: []Property{
+			{Name: "nvkr:fromSource", Value: "false"},
+			{Name: "nvkr:lane", Value: "wrapped-build"},
+			{Name: "nvkr:outputType", Value: nc.OutputType},
+			{Name: "nvkr:tool", Value: "nvkr:tool/" + nc.Tool},
+			{Name: "nvkr:toolExecutable", Value: executable},
+			{Name: "nvkr:toolchain", Value: toolchain},
+		}}
 		if artifactHash != "" {
 			c.Hashes = []Hash{{Alg: "SHA-256", Content: strings.TrimPrefix(artifactHash, "sha256:")}}
 		}

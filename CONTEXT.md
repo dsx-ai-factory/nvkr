@@ -418,7 +418,8 @@ acquisition of the tool. Proposed in [ADR-27](docs/adr/0027-pinned-tool-producer
 [execution](docs/adr/0027-pinned-tool-producers.md#3-execution-offline-isolated-fixed),
 [inputs](docs/adr/0027-pinned-tool-producers.md#4-declared-inputs-are-typed-material-bindings) and
 [outputs](docs/adr/0027-pinned-tool-producers.md#5-outputs-one-file-or-a-producer-written-oci-layout);
-not implemented.
+the `file` form is implemented and contract-tested, and the OCI layout form waits for the layout
+import.
 _Avoid_: Run-wide pipeline tool, release executable output, build script
 
 **Component catalog overlay**:

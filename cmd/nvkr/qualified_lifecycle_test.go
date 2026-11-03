@@ -576,7 +576,7 @@ func TestCommandSBOMReaderBindsExternalEvidenceOnlyAfterRehash(t *testing.T) {
 		t.Fatal(err)
 	}
 	set, err := buildVerifiedSBOM(context.Background(), resolved, buildDigest,
-		map[string]string{"artifact": testArtifactDigest})
+		map[string]string{"artifact": testArtifactDigest}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -596,7 +596,7 @@ func TestCommandSBOMReaderBindsExternalEvidenceOnlyAfterRehash(t *testing.T) {
 	}
 	resolved.Components[0].Prebuilt.Evidence.SBOMDigest = testInputDigest
 	if _, err := buildVerifiedSBOM(context.Background(), resolved, buildDigest,
-		map[string]string{"artifact": testArtifactDigest}); cliErrorCode(err) == "" {
+		map[string]string{"artifact": testArtifactDigest}, nil); cliErrorCode(err) == "" {
 		t.Fatalf("expected digest mismatch to fail closed, got %v", err)
 	}
 }

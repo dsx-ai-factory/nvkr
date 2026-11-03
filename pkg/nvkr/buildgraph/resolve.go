@@ -96,6 +96,9 @@ func Resolve(cat *catalog.Catalog, selection Selection) (*Resolved, error) {
 	if err := catalog.ValidateMaterialSet(resolved.Components); err != nil {
 		return nil, e.Wrap(e.CodeInvalidCatalog, err, "selected output has an incomplete material set")
 	}
+	if err := validatePinnedToolOutputs(resolved.Components); err != nil {
+		return nil, err
+	}
 	if selection.OutputFormat == definition.OutputBundle {
 		if len(resolved.Components) != 1 || !resolved.Components[0].FromSource || resolved.Components[0].Prebuilt != nil || resolved.Components[0].OutputType != "tarball" {
 			return nil, e.New(e.CodeInvalidCatalog, "bundle output requires exactly one source-built tarball component")
@@ -219,6 +222,13 @@ func cloneComponent(component catalog.Component) catalog.Component {
 	component.VersionStamp = maps.Clone(component.VersionStamp)
 	component.Patches = slices.Clone(component.Patches)
 	component.BuildRequirements = execution.Clone(component.BuildRequirements)
+	component.ToolArgs = slices.Clone(component.ToolArgs)
+	component.ToolEnv = maps.Clone(component.ToolEnv)
+	if component.ToolExecutable != nil {
+		tool := *component.ToolExecutable
+		tool.Companions = slices.Clone(tool.Companions)
+		component.ToolExecutable = &tool
+	}
 	if component.Flake != nil {
 		copy := *component.Flake
 		component.Flake = &copy
@@ -242,6 +252,10 @@ func cloneComponent(component catalog.Component) catalog.Component {
 		}
 		if copy.Evidence != nil {
 			evidence := *copy.Evidence
+			if evidence.Signer != nil {
+				signer := *evidence.Signer
+				evidence.Signer = &signer
+			}
 			copy.Evidence = &evidence
 		}
 		component.Prebuilt = &copy
@@ -294,6 +308,10 @@ func requireComponentRoute(name string, component catalog.Component, platform st
 	}
 	arch := target.ExecutableArch(platform)
 	switch {
+	case component.BuilderType == catalog.BuilderPinnedTool:
+		if component.ToolExecutable == nil || component.ToolExecutable.Platform != platform {
+			return e.New(e.CodeEngineCapability, "pinned-tool component %q has no tool pinned for target %q", name, platform)
+		}
 	case component.Prebuilt != nil:
 		if component.Prebuilt.Digests[arch] == "" {
 			return e.New(e.CodeUnpinnedSource, "prebuilt component %q has no pinned digest for arch %q", name, arch)

@@ -321,6 +321,9 @@ func validateProductionPredicateOrigin(raw []byte, plan *Plan, signing *definiti
 	if err := provenance.ValidateProduction(predicate); err != nil {
 		return err
 	}
+	if err := requirePinnedToolDependencies(plan, predicate.BuildDefinition.ResolvedDependencies); err != nil {
+		return err
+	}
 	identity, err := regexp.Compile(signing.Identity)
 	if err != nil || !identity.MatchString(predicate.RunDetails.Builder.ID) {
 		return e.New(e.CodeVerifyFailed, "hosted production predicate builder does not match the signing identity policy")

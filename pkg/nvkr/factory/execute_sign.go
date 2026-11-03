@@ -440,6 +440,10 @@ func productionPredicateForRun(plan *Plan, signing *definition.Signing, run prov
 		return nil, e.New(e.CodeProvenanceMissing,
 			"run plan carries no definition digest to attest; recompile it with signing configured")
 	}
+	dependencies := resolvedDependencies(plan)
+	if err := requirePinnedToolDependencies(plan, dependencies); err != nil {
+		return nil, err
+	}
 	return provenance.MarshalProduction(provenance.ProductionPredicate(run, provenance.ProductionInputs{
 		BuildType:            productionBuildType(plan),
 		PlanDigest:           planDigest,
@@ -449,7 +453,7 @@ func productionPredicateForRun(plan *Plan, signing *definition.Signing, run prov
 		CatalogDigest:        plan.CatalogDigest,
 		GeneratorVersion:     plan.GeneratorVersion,
 		SigningMode:          signing.Mode,
-		ResolvedDependencies: resolvedDependencies(plan),
+		ResolvedDependencies: dependencies,
 	}))
 }
 
@@ -465,8 +469,9 @@ func factoryRunContext(planDigest string, startedOn, finishedOn time.Time) (prov
 }
 
 // productionBuildType classifies the whole plan. A wrapped/networked build
-// prevents a hermetic claim even when another build builds offline. A plan
-// without build nodes only acquired existing artifacts.
+// prevents a hermetic claim even when another build builds offline; a pinned-tool
+// build runs an upstream release entrypoint, so it is wrapped too (ADR-27 §7). A
+// plan without build nodes only acquired existing artifacts.
 func productionBuildType(plan *Plan) string {
 	hasBuild := false
 	for _, buildPlan := range plan.Builds {
@@ -475,7 +480,7 @@ func productionBuildType(plan *Plan) string {
 		}
 		for _, node := range buildPlan.Graph.Nodes {
 			if node.Kind == ir.KindBuild {
-				if node.BuilderType == ir.BuilderBuildKit || node.Network != ir.NetworkNone {
+				if node.BuilderType == ir.BuilderBuildKit || node.BuilderType == ir.BuilderPinnedTool || node.Network != ir.NetworkNone {
 					return provenance.BuildTypeWrappedBuild
 				}
 				hasBuild = true
@@ -511,6 +516,13 @@ func resolvedDependencies(plan *Plan) []provenance.Dependency {
 				dependency = provenance.SourceDependency(node.Repo, node.Commit, node.TreeHash)
 			case node.Kind == ir.KindBuild && node.Toolchain != "":
 				dependency = provenance.ToolchainDependency(node.Toolchain)
+				if node.BuilderType == ir.BuilderPinnedTool && node.ExecutableArchive != nil {
+					for _, tool := range pinnedToolDependencies(node) {
+						if _, seen := byURI[tool.URI]; !seen {
+							byURI[tool.URI] = tool
+						}
+					}
+				}
 			case node.Kind == ir.KindPull && node.Artifact != "" && node.Digest != "":
 				digest := node.Digest
 				if node.OutputType == "oci-image" && node.ImageParentDigest != "" {
