@@ -447,12 +447,18 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 					t.Fatal("partitioned producer bundle omitted its workers")
 				}
 				assertGitHubPartitionMembership(t, plan, bundle.Files[bundle.WorkflowPath], workers)
+				emitted := githubEmittedWorkflows(t, plan, bundle)
+				if planPath == FactoryPlanPath {
+					// The default suite checks the combined bundle's emitted pin and
+					// source credential scope; the extended suite covers the others.
+					assertMaintainedPinSetCredentialScope(t, plan, emitted, true)
+				}
 				if selected.privateDiskProducers >= 0 {
 					// The emitted workers, not only their flat reference, keep each
 					// image credential in its read-only preparation step.
 					emittedJobs := map[string]githubJob{}
-					for _, emitted := range githubEmittedWorkflows(t, plan, bundle) {
-						maps.Copy(emittedJobs, emitted.Jobs)
+					for _, document := range emitted {
+						maps.Copy(emittedJobs, document.Jobs)
 					}
 					assertGitHubPrivateImageJobs(t, emittedJobs, selected.privateDiskProducers)
 				}
@@ -496,6 +502,7 @@ func githubEmittedWorkflows(t *testing.T, plan *Plan, bundle *GeneratedBundle) [
 			jobs := githubYAMLField(document.Content[0], "jobs")
 			for index := len(jobs.Content) - 2; index >= 0; index -= 2 {
 				if githubYAMLField(jobs.Content[index+1], "uses") != nil {
+					assertGitHubPartitionCallerSecrets(t, bundle, jobs.Content[index].Value, jobs.Content[index+1])
 					jobs.Content = slices.Delete(jobs.Content, index, index+2)
 				}
 			}
@@ -525,4 +532,30 @@ func githubFlatReference(t *testing.T, plan *Plan, bundle *GeneratedBundle) *Gen
 		t.Fatal(err)
 	}
 	return flat
+}
+
+// assertGitHubPartitionCallerSecrets requires an entry caller to forward exactly
+// its worker's declared secrets, each from the same repository secret.
+func assertGitHubPartitionCallerSecrets(t *testing.T, bundle *GeneratedBundle, id string, call *yamlv3.Node) {
+	t.Helper()
+	worker := strings.TrimPrefix(githubYAMLValue(call, "uses"), "./")
+	raw, ok := bundle.Files[worker]
+	if !ok || !githubPartitionWorkflowSuffix.MatchString(worker) {
+		t.Fatalf("entry job %s calls unexpected workflow %q", id, worker)
+	}
+	var document yamlv3.Node
+	if err := yamlv3.Unmarshal(raw, &document); err != nil {
+		t.Fatal(err)
+	}
+	declared := githubYAMLField(githubYAMLField(githubYAMLField(document.Content[0], "on"), "workflow_call"), "secrets")
+	forwarded := githubYAMLField(call, "secrets")
+	if (declared == nil) != (forwarded == nil) || forwarded != nil && (forwarded.Kind != yamlv3.MappingNode || len(forwarded.Content) != len(declared.Content)) {
+		t.Fatalf("entry job %s forwards secrets beyond %s's declarations", id, worker)
+	}
+	for index := 0; forwarded != nil && index < len(forwarded.Content); index += 2 {
+		name := forwarded.Content[index].Value
+		if githubYAMLField(declared, name) == nil || forwarded.Content[index+1].Value != "${{ secrets."+name+" }}" {
+			t.Fatalf("entry job %s forwards undeclared or renamed secret %s", id, name)
+		}
+	}
 }

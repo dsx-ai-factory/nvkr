@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -328,6 +329,12 @@ func assertMaintainedPinSetCredentialScope(t *testing.T, plan *Plan, documents [
 		}
 		return false
 	}
+	// Credentials enter only through the env maps checked below.
+	hasCredentialText := func(values ...string) bool {
+		return slices.ContainsFunc(values, func(value string) bool {
+			return strings.Contains(value, "secrets.NKE_SOURCE_TOKEN") || strings.Contains(value, "NVKR_PIN_SOURCE_TOKEN_")
+		})
+	}
 	_, nodeJobs, err := githubStages(plan)
 	if err != nil {
 		t.Fatal(err)
@@ -357,7 +364,13 @@ func assertMaintainedPinSetCredentialScope(t *testing.T, plan *Plan, documents [
 			if hasPinCredential(job.Env) || hasSourceSecret(job.Env) {
 				t.Fatalf("job-scoped pin credential in %s", id)
 			}
+			if hasCredentialText(append(slices.Collect(maps.Values(job.Outputs)), job.If, string(job.Container))...) {
+				t.Fatalf("pin or source credential in job condition, outputs or container of %s", id)
+			}
 			for _, step := range job.Steps {
+				if hasCredentialText(append(slices.Collect(maps.Values(step.With)), step.If)...) {
+					t.Fatalf("pin or source credential in step inputs or condition of %s/%s", id, step.ID)
+				}
 				if strings.Contains(step.Run, "secrets.NKE_SOURCE_TOKEN") {
 					t.Fatalf("source secret entered command text in %s/%s", id, step.ID)
 				}

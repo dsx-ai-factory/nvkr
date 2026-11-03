@@ -150,7 +150,8 @@ func compileDOCAOVS(t *testing.T, selected *catalog.Catalog, arch string) *ir.Gr
 func TestDOCAOVSArchiveWrapperExecutesWithFixtures(t *testing.T) {
 	gnuTar := gnuTarPath(t)
 	stubs := t.TempDir()
-	if err := os.WriteFile(filepath.Join(stubs, "dpkg-deb"), []byte("#!/bin/sh\n[ \"$1\" = --field ] || exit 2\nsed -n \"s/^$3: //p\" \"$2\"\n"), 0o700); err != nil {
+	// The stub logs each control-field read so a case proves which guard stopped it.
+	if err := os.WriteFile(filepath.Join(stubs, "dpkg-deb"), []byte("#!/bin/sh\n[ \"$1\" = --field ] || exit 2\nprintf '%s\\n' \"$2\" >> \"$NVKR_DOCA_FIELD_LOG\"\nsed -n \"s/^$3: //p\" \"$2\"\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(gnuTar, filepath.Join(stubs, "tar")); err != nil {
@@ -173,22 +174,27 @@ func TestDOCAOVSArchiveWrapperExecutesWithFixtures(t *testing.T) {
 				name  string
 				edit  func(debs map[string]string)
 				valid bool
+				reads int // control fields read before acceptance or rejection
 			}{
-				{"valid", func(map[string]string) {}, true},
-				{"seven packages", func(debs map[string]string) { delete(debs, "doca-ovs-fixture-7_1.0_"+arch+".deb") }, false},
+				{"valid", func(map[string]string) {}, true, 2},
+				{"seven packages", func(debs map[string]string) { delete(debs, "doca-ovs-fixture-7_1.0_"+arch+".deb") }, false, 0},
 				{"nine packages", func(debs map[string]string) {
 					debs["doca-ovs-fixture-9_1.0_"+arch+".deb"] = "Package: doca-ovs-fixture-9\n"
-				}, false},
+				}, false, 0},
 				{"switch for other architecture", func(debs map[string]string) {
 					delete(debs, "doca-openvswitch-switch_1.0_"+arch+".deb")
 					debs["doca-openvswitch-switch_1.0_"+other+".deb"] = "Package: doca-openvswitch-switch\nArchitecture: " + other + "\n"
-				}, false},
+				}, false, 0},
+				{"two switch packages", func(debs map[string]string) {
+					delete(debs, "doca-ovs-fixture-7_1.0_"+arch+".deb")
+					debs["doca-openvswitch-switch_2.0_"+arch+".deb"] = "Package: doca-openvswitch-switch\nArchitecture: " + arch + "\n"
+				}, false, 0},
 				{"switch package field", func(debs map[string]string) {
 					debs["doca-openvswitch-switch_1.0_"+arch+".deb"] = "Package: doca-openvswitch-common\nArchitecture: " + arch + "\n"
-				}, false},
+				}, false, 1},
 				{"switch architecture field", func(debs map[string]string) {
 					debs["doca-openvswitch-switch_1.0_"+arch+".deb"] = "Package: doca-openvswitch-switch\nArchitecture: " + other + "\n"
-				}, false},
+				}, false, 2},
 			} {
 				t.Run(directory+"/"+arch+"/"+tc.name, func(t *testing.T) {
 					debs := map[string]string{"doca-openvswitch-switch_1.0_" + arch + ".deb": "Package: doca-openvswitch-switch\nArchitecture: " + arch + "\n"}
@@ -209,10 +215,19 @@ func TestDOCAOVSArchiveWrapperExecutesWithFixtures(t *testing.T) {
 					// Only the absolute source/output root moves into this fixture.
 					script := strings.ReplaceAll(command[2], "/src/", `"${NVKR_DOCA_FIXTURE_ROOT}/"`)
 					cmd := exec.CommandContext(t.Context(), command[0], command[1], script)
-					cmd.Env = append(os.Environ(), "NVKR_DOCA_FIXTURE_ROOT="+root, "SOURCE_DATE_EPOCH=1793236039",
-						"PATH="+stubs+string(os.PathListSeparator)+os.Getenv("PATH"))
+					fieldLog := filepath.Join(t.TempDir(), "reads")
+					// A minimal environment keeps host shell, tar and locale settings out.
+					cmd.Env = []string{"NVKR_DOCA_FIELD_LOG=" + fieldLog, "NVKR_DOCA_FIXTURE_ROOT=" + root, "SOURCE_DATE_EPOCH=1793236039",
+						"LC_ALL=C", "HOME=" + t.TempDir(), "PATH=" + stubs + string(os.PathListSeparator) + os.Getenv("PATH")}
 					output, err := cmd.CombinedOutput()
 					archive := filepath.Join(root, "nvkr-output", "nvke-doca-ovs.tar")
+					reads, readErr := os.ReadFile(fieldLog)
+					if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
+						t.Fatal(readErr)
+					}
+					if got := strings.Count(string(reads), "\n"); got != tc.reads {
+						t.Fatalf("wrapper read %d control fields, want %d: %s", got, tc.reads, output)
+					}
 					if !tc.valid {
 						if err == nil {
 							t.Fatalf("wrapper accepted invalid fixture: %s", output)
@@ -246,6 +261,9 @@ func gnuTarPath(t *testing.T) string {
 		if err == nil && strings.Contains(string(version), "GNU tar") {
 			return path
 		}
+	}
+	if os.Getenv("CI") != "" {
+		t.Fatal("the DOCA OVS archive wrapper requires GNU tar in CI")
 	}
 	t.Skip("the DOCA OVS archive wrapper requires GNU tar; Linux CI provides it")
 	return ""
