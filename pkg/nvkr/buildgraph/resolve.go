@@ -38,7 +38,7 @@ func (selection Selection) Validate() error {
 	}
 	switch selection.OutputFormat {
 	case "", definition.OutputExecutable, definition.OutputOCI, definition.OutputAPT,
-		definition.OutputHelm, definition.OutputDiskImage, definition.OutputDebianPackage:
+		definition.OutputHelm, definition.OutputBundle, definition.OutputDiskImage, definition.OutputDebianPackage:
 	default:
 		return e.New(e.CodeInvalidCatalog, "output format %q is unsupported", selection.OutputFormat)
 	}
@@ -98,6 +98,11 @@ func Resolve(cat *catalog.Catalog, selection Selection) (*Resolved, error) {
 	}
 	if err := validatePinnedToolOutputs(resolved.Components); err != nil {
 		return nil, err
+	}
+	if selection.OutputFormat == definition.OutputBundle {
+		if len(resolved.Components) != 1 || !resolved.Components[0].FromSource || resolved.Components[0].Prebuilt != nil || resolved.Components[0].OutputType != "tarball" {
+			return nil, e.New(e.CodeInvalidCatalog, "bundle output requires exactly one source-built tarball component")
+		}
 	}
 	hasDiskRoot := containsDiskRoot(resolved.Components)
 	if hasDiskRoot && selection.OutputFormat != "" && selection.OutputFormat != definition.OutputDiskImage {
