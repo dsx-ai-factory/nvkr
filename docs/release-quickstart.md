@@ -211,7 +211,7 @@ Each stage links the NVKE `v0.22.0` page that owns it. Run them from an NVKE che
    NVKR does not build the `qcow-imager.efi` that writes the disk; take it from your NICo site.
 3. [Prepare the management nodes](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/operate/prepare-nodes.md).
 4. [Bootstrap the management cluster](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/operate/bootstrap-management-cluster.md). `nvkectl bootstrap
-   site --release nvkr-release.json` takes the CAPNICo image from the core Release; its `--arch` is the
+   site -f sitespec.yaml --release nvkr-release.json` takes the CAPNICo image from the core Release; its `--arch` is the
    bootstrap host's architecture.
 5. Give the cluster a default StorageClass; the bootstrap installs none
    ([troubleshooting](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/operate/troubleshoot.md?plain=1#L215-L219)). The services family's
@@ -220,7 +220,8 @@ Each stage links the NVKE `v0.22.0` page that owns it. Run them from an NVKE che
    pins. `clusterctl init` reads the provider releases from GitHub; a local repository in the core Release is
    pending [#324](https://github.com/dsx-ai-factory/nvkr/issues/324).
 7. [Install the management plane](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/site-bootstrap/deploy-repository.md) with
-   `deploy/nvke-deploy.sh install --release nvkr-release.json`. NVKE refuses a release without
+   `deploy/nvke-deploy.sh install --deploy-path deploy/nico --sitespec sitespec.yaml --stack-config stack-config.json --release nvkr-release.json`.
+   NVKE refuses a release without
    `controller-profiles`
    ([troubleshooting](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/docs/operate/troubleshoot.md?plain=1#L209-L213)), and the core Release does not
    carry it until [#324](https://github.com/dsx-ai-factory/nvkr/issues/324). Until then, install without
