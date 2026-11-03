@@ -61,6 +61,10 @@ func TestValidatorCommandRefusals(t *testing.T) {
 		{"run-extra", []string{"run", "--profile", "missing.yaml", "extra"}},
 		{"run-missing-profile", []string{"run", "--profile", filepath.Join(t.TempDir(), "missing.yaml")}},
 		{"list-no-catalog", []string{"list"}},
+		{"list-empty-catalog", []string{"list", "--catalog", ""}},
+		{"describe-empty-catalog", []string{"describe", "--catalog", "", "nvke/nvkectl/contract"}},
+		{"describe-no-id-no-catalog", []string{"describe"}},
+		{"run-empty-profile", []string{"run", "--profile", ""}},
 		{"describe-no-catalog", []string{"describe", "nvke/nvkectl/contract"}},
 		{"run-no-profile", []string{"run"}},
 	} {

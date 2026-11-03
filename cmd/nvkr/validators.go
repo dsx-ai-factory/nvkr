@@ -26,6 +26,7 @@ func cmdValidators() *cli.Command {
 			if (!describe && c.Args().Present()) || (describe && c.Args().Len() != 1) {
 				return e.New(e.CodeUsage, "invalid validator discovery arguments")
 			}
+			// Not cli's Required flag: that check runs before OnUsageError and returns an uncoded error (exit 1).
 			if c.String("catalog") == "" {
 				return e.New(e.CodeUsage, "validators %s requires --catalog", name)
 			}
