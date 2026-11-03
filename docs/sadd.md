@@ -690,15 +690,12 @@ prerequisite closure preserved; authored setup, runtime variables, images or ser
 direct dependency context retain the original lists.
 Large finalizers receive exact original job results through fixed, bounded collectors. A collector must
 succeed and report its complete Plan-derived membership before recovery; its aggregate status never replaces
-individual producer outcomes. Opt-in execution partitioning groups dependency layers into same-commit callable
-workers, with original job IDs and per-job controls; declared job timeouts split a layer so short work
-need not wait for long siblings. OIDC-signing jobs stay in the entry workflow to preserve
-the authored signer identity policy. Generation refuses OIDC in workers, and relocating signers remains a
-proposed identity and trust-policy migration (ADR-18 §8). Workers export per-consumer result fragments, so the
-entry does not repeat member projections. Partitions may delay independent work behind an earlier
-group, but original prerequisite results govern ordinary job admission. One complete Plan and one finalizer
-retain the Run and Release boundary. Exact regeneration admits every worker and caller connection under the
-same ownership manifest. Factory's provider-independent execution graph owns operation membership,
+individual producer outcomes. Opt-in execution partitioning moves jobs into same-commit callable workers
+within one complete Plan, finalizer, Run and Release.
+[ADR-18 §8](adr/0018-pipeline-ir-and-ci-adapter-emission.md#8-pipeline-attested-generation-and-credential-admission)
+owns the grouping, the jobs that stay in the entry workflow, result forwarding and the proposed signer
+migration; [ADR-21](adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold)
+owns the worker files under the bundle's ownership manifest. Factory's provider-independent execution graph owns operation membership,
 success/completion conditions, recovery prerequisites, partition validation and exact outcome accounting;
 GitHub renders the typed model rather than deriving scheduling semantics from YAML. Reconciliation records
 full development execution and hosted signing/verification evidence. Local equivalence contracts cover
