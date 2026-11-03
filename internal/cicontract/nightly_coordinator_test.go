@@ -6,11 +6,13 @@ package cicontract
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -85,11 +87,13 @@ func TestNightlyFreezesAuthenticatedNVKEMainOnce(t *testing.T) {
 }
 
 type nightlyCoordinatorStep struct {
-	Name string            `json:"name"`
-	Run  string            `json:"run"`
-	Uses string            `json:"uses"`
-	Env  map[string]string `json:"env"`
-	With map[string]any    `json:"with"`
+	Name            string            `json:"name"`
+	Run             string            `json:"run"`
+	Uses            string            `json:"uses"`
+	If              string            `json:"if"`
+	ContinueOnError any               `json:"continue-on-error"`
+	Env             map[string]string `json:"env"`
+	With            map[string]any    `json:"with"`
 }
 type nightlyCoordinatorJob struct {
 	Outputs        map[string]string        `json:"outputs"`
@@ -139,16 +143,24 @@ func TestNightlyDispatchesGeneratedProducerBeforeNativeConsumer(t *testing.T) {
 	if !reflect.DeepEqual(build.Needs, []string{"select"}) || build.Permissions["actions"] != "write" {
 		t.Fatal("producer dispatch lost selection or dispatch permission")
 	}
-	dispatched, sourceBound := false, false
+	var dispatch []nightlyCoordinatorStep
 	for _, step := range build.Steps {
-		dispatched = dispatched || strings.Contains(step.Run, "bash scripts/nightly-build.sh")
-		sourceBound = sourceBound || step.Env["NVKE_COMMIT"] == "${{ needs.select.outputs.nvke_commit }}"
+		if step.Run != "" {
+			dispatch = append(dispatch, step)
+		}
 		if strings.Contains(step.Run, "run local") || strings.Contains(step.Run, "TestEndToEnd") {
 			t.Fatal("coordinator rebuilt products instead of dispatching the generated producer")
 		}
 	}
+	if len(dispatch) != 1 || dispatch[0].If != "" || dispatch[0].ContinueOnError != nil && dispatch[0].ContinueOnError != false ||
+		dispatch[0].Env["PROFILE"] != "${{ matrix.name }}" || dispatch[0].Env["NVKE_COMMIT"] != "${{ needs.select.outputs.nvke_commit }}" {
+		t.Fatal("producer dispatch must be one unconditional step bound to the selected profile and exact NVKE revision")
+	}
+	if err := nightlyDispatchContract(t, dispatch[0].Run); err != nil {
+		t.Fatal(err)
+	}
 	runtime := workflow.Jobs["runtime-test"]
-	if !dispatched || !sourceBound || !reflect.DeepEqual(runtime.Needs, []string{"select-runtime"}) || runtime.Permissions["actions"] != "read" {
+	if !reflect.DeepEqual(runtime.Needs, []string{"select-runtime"}) || runtime.Permissions["actions"] != "read" {
 		t.Fatal("consumer omitted exact completed-producer selection")
 	}
 	ran, deadline := false, false
@@ -175,6 +187,55 @@ func TestNightlyDispatchesGeneratedProducerBeforeNativeConsumer(t *testing.T) {
 	}
 	if !ran || !deadline {
 		t.Fatal("consumer lost exact private frozen inputs, direct Go test or owned cleanup reserve")
+	}
+}
+
+// nightlyDispatchContract executes run against a recording producer stub. The
+// step must invoke the producer exactly once with the exact arguments and exit
+// with the producer's status, so commented, skipped or swallowed dispatch fails.
+func nightlyDispatchContract(t *testing.T, run string) error {
+	t.Helper()
+	for _, exit := range []int{0, 23} {
+		root := t.TempDir()
+		if err := os.Mkdir(filepath.Join(root, "scripts"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		stub := "printf '%s\\n' \"$#\" \"$@\" >>\"$RUNNER_TEMP/calls\"\nexit \"$STUB_EXIT\"\n"
+		if err := os.WriteFile(filepath.Join(root, "scripts", "nightly-build.sh"), []byte(stub), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		output, code := runMergeGateStep(t, mergeGateStep{storageWorkflowStep: storageWorkflowStep{Run: run}}, root,
+			[]string{"PROFILE=nvke-nightly-arm64", "STUB_EXIT=" + strconv.Itoa(exit)})
+		want := "3\ninputs/testing/nightly-profiles.json\nnvke-nightly-arm64\n" + root + "/nightly-build-nvke-nightly-arm64\n"
+		calls, err := os.ReadFile(filepath.Join(root, "calls"))
+		if err != nil || string(calls) != want {
+			return fmt.Errorf("producer dispatch recorded %q (read error: %v), want exactly %q: %s", calls, err, want, output)
+		}
+		if code != exit {
+			return fmt.Errorf("dispatch step exited %d after producer exited %d: %s", code, exit, output)
+		}
+	}
+	return nil
+}
+
+func TestNightlyDispatchContractRejectsUnexecutedOrSwallowedDispatch(t *testing.T) {
+	const dispatch = `bash scripts/nightly-build.sh inputs/testing/nightly-profiles.json "$PROFILE" "$RUNNER_TEMP/nightly-build-$PROFILE"`
+	for _, test := range []struct {
+		name, run string
+		valid     bool
+	}{
+		{"exact dispatch", "set -euo pipefail\n" + dispatch + "\n", true},
+		{"commented dispatch", "set -euo pipefail\n# " + dispatch + "\n", false},
+		{"early exit", "exit 0\n" + dispatch + "\n", false},
+		{"dropped argument", `bash scripts/nightly-build.sh inputs/testing/nightly-profiles.json "$PROFILE"` + "\n", false},
+		{"repeated dispatch", dispatch + "\n" + dispatch + "\n", false},
+		{"swallowed failure", dispatch + " || true\n", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if err := nightlyDispatchContract(t, test.run); (err == nil) != test.valid {
+				t.Fatalf("contract accepted=%t, want %t: %v", err == nil, test.valid, err)
+			}
+		})
 	}
 }
 
