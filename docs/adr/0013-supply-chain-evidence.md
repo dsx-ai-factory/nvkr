@@ -524,8 +524,10 @@ or unbound documents and stages. Finalization compares the published documents w
 handoffs and final package inventory. The current consumer has no old-layout fallback. This establishes
 pipeline artifact-publication evidence, not qualified receipts, vulnerability clearance or signed completion.
 
-SBOMs remain `static-unqualified` in dry-run. Generation alone is no signature or reproduction proof. Acquired components retain `evidence: none` unless pinned upstream evidence is declared. Declared upstream
-evidence is verified as §2 states, including Sigstore provenance signatures when a signer policy is declared;
+SBOMs remain `static-unqualified` in dry-run. Generation alone is no signature or reproduction proof, and dry-run
+does not retrieve or verify upstream evidence. Acquired components retain `evidence: none` unless pinned upstream
+evidence is declared. Evidence intake verifies declared upstream evidence as §2 states, including Sigstore provenance
+signatures through the pinned cosign verifier when a signer policy is declared;
 air-gapped signature verification is not yet supported. Vulnerability scanning stays outside v1.
 Curated/embedded aggregates use dependency edges from aggregate to members (ADR-10/22).
 
