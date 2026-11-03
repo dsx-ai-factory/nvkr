@@ -176,7 +176,7 @@ for storage, toolchain and release packages. Previously retained Actions artifac
 old workflow refs also require separate handling; this change does not migrate or delete historical payloads.
 Compiled-output caches and CodeQL database uploads are disabled. Candidate OS builds retain private files
 only for the exact trusted workflow commit, so arbitrary candidate code cannot access a later storage writer.
-The nightly coordinator attaches its constructed cycle summary; raw suite report files are not public artifacts.
+The maintained hosted AMD64 nightly uploads no attachments; product bytes and raw deployment captures stay on its disposable runner.
 
 Generated workflows admit at most 2,000 record uploads per attempt, including conditional diagnostic and
 finalization uploads. The helper looks up exact selected names and fetches their record ZIPs serially,
@@ -277,8 +277,8 @@ bundle and the downstream nightly E2E adapter. They add no generated cron or
 general callable producer interface.
 Current qualification policy admission selects the default producer workflow,
 `.github/workflows/nvkr-run.yml`; named-producer qualification is not an admitted
-configuration. The named nightly producers instead use the separate downstream
-E2E adapter.
+configuration. No maintained nightly dispatches the named nightly producers; the separate
+downstream AMD64 E2E adapter builds its inputs locally.
 
 Read the top-level workflow to review which jobs can run, their dependency order, permissions, protected
 Environments and time limits. Follow a job's local `uses: ./.github/nvkr-run/actions/...` reference to inspect

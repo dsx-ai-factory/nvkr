@@ -51,13 +51,14 @@ NVKR does not operate a registry, provision clusters, or manage fleet lifecycle.
 access, registry retention, runtime acceptance and deployment policy. NVKR offers explicit descriptive local
 diagnostics under ADR-16 §6; these do not qualify a cluster. Downstream systems consume accepted artifact
 references and own deployment descriptions and acceptance decisions (ADR-19/20).
-A separately authored nightly CI workflow resolves one NVKE main commit and
-dispatches the existing generated producer. Its ARM64 NVIDIA consumer authenticates
-that Run's artifacts and invokes existing native Go site bootstrap, readiness and
-joined VM/backend/network cleanup owners, without rebuilding products. Binary
-transport/publication remains private; public coordinator attachments contain
-constructed JSON metadata only. These trusted-code integration results remain
-outside product lifecycle and v1 qualification acceptance (ADR-16/18).
+A separately authored nightly CI workflow freezes one NVKE main commit, builds
+fresh local products on a disposable GitHub-hosted AMD64 runner and invokes the
+existing native Go site/tenant workload and DNS tests. Natural tenant deletion and
+VM/backend/network cleanup must join before success. Product bytes and raw
+deployment captures stay private on that runner; no products are published or
+uploaded. The ARM64 dispatch-and-consume nightly is retired. These trusted-code
+integration results remain outside product lifecycle and v1 qualification
+acceptance (ADR-16/18).
 
 Proposed [ADR-24](adr/0024-imported-validator-catalog.md) separates imported-validator discovery from upstream
 test ownership and binds named artifact roles through explicit diagnostic profiles. The provisional CLI
@@ -1210,7 +1211,11 @@ identities rather than rebuilding those members merely to describe the compositi
 Incremental equality identifies candidates for reuse. Required named outputs remain independent even when their
 Build Digests match; no cross-output execution or evidence reuse is authorized by digest equality. Qualified
 reuse requires prior authenticated evidence rebound to the current policy and member; unused incremental and
-rollback helpers are removed and those workflows remain deferred (ADR-16). v1 production acceptance retains its AMD64 floor. Additional ARM64 candidate outputs remain mandatory
+rollback helpers are removed and those workflows remain deferred (ADR-16). Proposed ADR-30 designs
+pipeline-attested cross-Run reuse of complete named outputs: a Plan-derived key binding output, build inputs,
+toolchain profile, platform, evidence set, lane, origin and signer policy; untrusted discovery; owner-issued
+acceptance; and a `reused` Run origin that retains original provenance instead of claiming current execution.
+One frozen decision set serves every execution partition. It is not implemented. v1 production acceptance retains its AMD64 floor. Additional ARM64 candidate outputs remain mandatory
 when selected by the Definition. M2 and the M3 MVP retain producer-only disk evidence; strict inspection and
 material reconciliation are deferred hardening (ADR-13 §6). Organizational ratification remains separate.
 

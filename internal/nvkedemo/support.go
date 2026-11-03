@@ -73,6 +73,9 @@ type Runner struct {
 	// Only the artifact launcher opts into streaming public build output. Other
 	// commands keep potentially sensitive deployment diagnostics private.
 	output io.Writer
+	// Machine stdout remains captured/private while stderr and uncaptured build
+	// output still stream. Used by exact-source builds.
+	privateCaptureStdout bool
 	// Opted in only for the directly executed final nvkr local Run. Bootstrap
 	// shells and every source/utility command receive no inherited activity FD.
 	buildActivity bool
@@ -671,7 +674,14 @@ func (r Runner) start(ctx context.Context, args []string, phase string, capture,
 	}
 	// The uncaptured public build stream owns its retention at the presenter.
 	// Private command logs and captured diagnostics retain their failure bound.
-	p.stdout = &boundedDiagnostic{writer: sink, remaining: diagnosticLimit, capture: capture,
+	stdoutSink := sink
+	if capture && r.privateCaptureStdout {
+		stdoutSink = nil
+		if p.diagnostic != nil {
+			stdoutSink = p.diagnostic
+		}
+	}
+	p.stdout = &boundedDiagnostic{writer: stdoutSink, remaining: diagnosticLimit, capture: capture,
 		publicStream: r.output != nil && r.Work == "" && !capture}
 	p.stderr = p.stdout
 	if capture {
