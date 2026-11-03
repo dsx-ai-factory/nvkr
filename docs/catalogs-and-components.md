@@ -136,6 +136,13 @@ both identities and scans all archive entries with bounded standard-library read
 archive paths into the filesystem. Archive format is part of the compiled identity. Existing tar-gzip IR
 records retain their original encoding.
 
+An archive `tool` may also list sorted `companions`, exact members that ship beside the executable. A
+companion is delivered under its base name with mode 0644 in the same executable output. `catalog pin`
+records each companion digest, and observation and packaging check it against that pin. The
+[AICR CLI catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/tools/aicr-arm64/README.md)
+delivers `aicr-attestation.sigstore.json` beside `aicr` this way. A companion is pinned bytes, not verified
+upstream evidence.
+
 ## Build tools and version stamps
 
 The catalog also selects how source components are built:

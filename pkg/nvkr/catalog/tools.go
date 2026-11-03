@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"slices"
 	"strings"
 	"time"
 
@@ -23,21 +24,43 @@ import (
 
 // ToolSource declares an upstream release executable, without byte identities.
 // URL accepts the same Tag/Version templates as other catalog acquisitions.
+// Companions name further archive members delivered beside the executable.
 type ToolSource struct {
-	Format         string `json:"format"`
-	URL            string `json:"url"`
-	Platform       string `json:"platform"`
-	ExecutablePath string `json:"executablePath"`
+	Format         string   `json:"format"`
+	URL            string   `json:"url"`
+	Platform       string   `json:"platform"`
+	ExecutablePath string   `json:"executablePath"`
+	Companions     []string `json:"companions,omitempty"`
 }
 
 // ToolPin binds the release asset and executable bytes to the enclosing source pin.
 type ToolPin struct {
-	Format           string `json:"format"`
-	URL              string `json:"url"`
-	Platform         string `json:"platform"`
-	ExecutablePath   string `json:"executablePath"`
-	ArchiveDigest    string `json:"archiveDigest"`
-	ExecutableDigest string `json:"executableDigest"`
+	Format           string          `json:"format"`
+	URL              string          `json:"url"`
+	Platform         string          `json:"platform"`
+	ExecutablePath   string          `json:"executablePath"`
+	ArchiveDigest    string          `json:"archiveDigest"`
+	ExecutableDigest string          `json:"executableDigest"`
+	Companions       []ToolCompanion `json:"companions,omitempty"`
+}
+
+// ToolCompanion pins one non-executable archive member selected beside the executable.
+type ToolCompanion struct {
+	Path   string `json:"path"`
+	Digest string `json:"digest"`
+}
+
+func (p ToolPin) clone() ToolPin {
+	p.Companions = slices.Clone(p.Companions)
+	return p
+}
+
+func (p ToolPin) companionPaths() []string {
+	paths := make([]string, 0, len(p.Companions))
+	for _, companion := range p.Companions {
+		paths = append(paths, companion.Path)
+	}
+	return paths
 }
 
 const maxToolArchiveBytes = releaseasset.MaxToolTransportBytes
@@ -56,11 +79,39 @@ func validateToolSource(tool ToolSource) error {
 	if !safeToolPath(tool.ExecutablePath) {
 		return e.New(e.CodeInvalidCatalog, "unsafe tool executable path %q", tool.ExecutablePath)
 	}
+	if err := validateToolCompanions(tool); err != nil {
+		return err
+	}
 	rendered, err := renderRef("tool URL", tool.URL, Pin{Tag: "v1.2.3", Commit: strings.Repeat("a", 40)})
 	if err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "invalid tool URL template")
 	}
 	return validateToolURL(rendered)
+}
+
+// Companions land beside the executable under their base names, so names must
+// be exact, sorted and distinct from each other and from the executable.
+func validateToolCompanions(tool ToolSource) error {
+	if len(tool.Companions) == 0 {
+		return nil
+	}
+	if tool.Format == "raw" {
+		return e.New(e.CodeInvalidCatalog, "raw tool asset has no archive members for companions")
+	}
+	names := map[string]bool{path.Base(tool.ExecutablePath): true}
+	for i, companion := range tool.Companions {
+		if !safeToolPath(companion) {
+			return e.New(e.CodeInvalidCatalog, "unsafe tool companion path %q", companion)
+		}
+		if i > 0 && tool.Companions[i-1] >= companion {
+			return e.New(e.CodeInvalidCatalog, "tool companions must be sorted and unique")
+		}
+		if names[path.Base(companion)] {
+			return e.New(e.CodeInvalidCatalog, "tool companion %q collides with another delivered name", companion)
+		}
+		names[path.Base(companion)] = true
+	}
+	return nil
 }
 func validateToolURL(raw string) error {
 	u, err := url.Parse(raw)
@@ -73,11 +124,17 @@ func safeToolPath(p string) bool {
 	return p != "" && p != "." && p != ".." && !strings.HasPrefix(p, "../") && !path.IsAbs(p) && path.Clean(p) == p && !strings.ContainsAny(p, "\\\x00")
 }
 func validateToolPin(pin ToolPin) error {
-	if err := validateToolSource(ToolSource{Format: pin.Format, URL: pin.URL, Platform: pin.Platform, ExecutablePath: pin.ExecutablePath}); err != nil {
+	if err := validateToolSource(ToolSource{Format: pin.Format, URL: pin.URL, Platform: pin.Platform, ExecutablePath: pin.ExecutablePath,
+		Companions: pin.companionPaths()}); err != nil {
 		return err
 	}
 	if !canonical.IsDigest(pin.ArchiveDigest) || !canonical.IsDigest(pin.ExecutableDigest) || (pin.Format == "raw" && pin.ArchiveDigest != pin.ExecutableDigest) {
 		return e.New(e.CodeUnpinnedSource, "tool requires exact archive and executable digests")
+	}
+	for _, companion := range pin.Companions {
+		if !canonical.IsDigest(companion.Digest) {
+			return e.New(e.CodeUnpinnedSource, "tool companion %q requires an exact digest", companion.Path)
+		}
 	}
 	return nil
 }
@@ -95,7 +152,8 @@ func checkToolPin(source *ToolSource, pin Pin) error {
 	if err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "rendering pinned tool URL")
 	}
-	if pin.Tool.URL != expected || pin.Tool.Format != source.Format || pin.Tool.Platform != source.Platform || pin.Tool.ExecutablePath != source.ExecutablePath {
+	if pin.Tool.URL != expected || pin.Tool.Format != source.Format || pin.Tool.Platform != source.Platform || pin.Tool.ExecutablePath != source.ExecutablePath ||
+		!slices.Equal(pin.Tool.companionPaths(), source.Companions) {
 		return e.New(e.CodeUnpinnedSource, "tool pin does not match source declaration and version")
 	}
 	return validateToolPin(*pin.Tool)
@@ -158,5 +216,14 @@ func resolveToolWithClient(ctx context.Context, source ToolSource, pin Pin, clie
 		}
 		executableDigest = fmt.Sprintf("sha256:%x", sha256.Sum256(member))
 	}
-	return ToolPin{Format: source.Format, URL: location, Platform: source.Platform, ExecutablePath: source.ExecutablePath, ArchiveDigest: archiveDigest, ExecutableDigest: executableDigest}, nil
+	var companions []ToolCompanion
+	for _, companion := range source.Companions {
+		member, err := releaseasset.Select(ctx, bytes.NewReader(raw), int64(len(raw)), source.Format, companion, toolArchiveLimits())
+		if err != nil {
+			return ToolPin{}, err
+		}
+		companions = append(companions, ToolCompanion{Path: companion, Digest: fmt.Sprintf("sha256:%x", sha256.Sum256(member))})
+	}
+	return ToolPin{Format: source.Format, URL: location, Platform: source.Platform, ExecutablePath: source.ExecutablePath,
+		ArchiveDigest: archiveDigest, ExecutableDigest: executableDigest, Companions: companions}, nil
 }

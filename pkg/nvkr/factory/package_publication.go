@@ -146,7 +146,7 @@ func collectPublicationObjects(ctx context.Context, plan *Plan, output Artifact,
 				return nil, nil, err
 			}
 			object.Layout, object.SemanticDigest, object.BlobDigest = true, inspected.SemanticDigest, inspected.RootDigest
-		case PackageHelm:
+		case PackageHelm, PackageBundle:
 			_, payload, err := delivery.ReadArtifact(ctx, input.Path)
 			if err != nil {
 				return nil, nil, err

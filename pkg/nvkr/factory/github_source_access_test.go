@@ -282,9 +282,11 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			assertMaintainedPinSetCredentialScope(t, plan, bundle, fixture.pinSet)
+			// Partition workers project the flat reference's jobs exactly.
+			reference := githubFlatReference(t, plan, bundle)
+			assertMaintainedPinSetCredentialScope(t, plan, reference, fixture.pinSet)
 			if fixture.name == "combined" {
-				assertMaintainedPinSetCredentialMutations(t, plan, bundle)
+				assertMaintainedPinSetCredentialMutations(t, plan, reference)
 			}
 		})
 	}
@@ -432,7 +434,9 @@ func assertMaintainedPinSetCredentialMutations(t *testing.T, plan *Plan, bundle 
 			if err := validateGitHubWorkflowSize(changed.Files[bundle.WorkflowPath]); err != nil {
 				t.Fatal(err)
 			}
-			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), e.CodeEngineCapability)
+			// The flat validator owns credential semantics; a partitioned bundle
+			// reaches it through its exact flat reference.
+			assertFactoryErrorCode(t, validateGitHubBundleFlat(t.Context(), plan, changed), e.CodeEngineCapability)
 		})
 	}
 }

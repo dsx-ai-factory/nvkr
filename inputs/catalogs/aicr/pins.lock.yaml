@@ -1,0 +1,10 @@
+# Machine-managed by `nvkr catalog pin` / `nvkr catalog bump`. Do not hand-edit.
+apiVersion: nvkr.dev/lock/v1
+kind: PinLock
+pins:
+  aicr:
+    commit: 935e0746dc54da890a23c1ecca998244b3a25de7
+    goVersion: 1.27.3
+    sourceDateEpoch: 1793648938
+    tag: v1.2.0
+    treeHash: 1d4bfa6d824159dbb4c8077303fe8de154946405
