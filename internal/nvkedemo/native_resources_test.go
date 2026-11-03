@@ -23,15 +23,15 @@ func TestNativeResourceProfilesRequireCompleteBoundedDescriptions(t *testing.T) 
 		fail    bool
 	}{
 		{"defaults", NativeResources{}, false},
-		{"explicit shared sizing", NativeResources{12, 8, 4096, 0}, false},
+		{"explicit shared sizing", NativeResources{12, 8, 4096, 0, ""}, false},
 		{"partial", NativeResources{TenantMemoryGiB: 8}, true},
-		{"negative", NativeResources{12, -8, 4096, 0}, true},
-		{"missing headroom", NativeResources{12, 8, 0, 0}, true},
-		{"arithmetic bound", NativeResources{1 << 21, 8, 4096, 0}, true},
-		{"explicit four CPUs", NativeResources{12, 8, 4096, 4}, false},
+		{"negative", NativeResources{12, -8, 4096, 0, ""}, true},
+		{"missing headroom", NativeResources{12, 8, 0, 0, ""}, true},
+		{"arithmetic bound", NativeResources{1 << 21, 8, 4096, 0, ""}, true},
+		{"explicit four CPUs", NativeResources{12, 8, 4096, 4, ""}, false},
 		{"CPU-only incomplete", NativeResources{VCPUs: 4}, true},
-		{"negative CPUs", NativeResources{12, 8, 4096, -1}, true},
-		{"CPU arithmetic bound", NativeResources{12, 8, 4096, 1 << 21}, true},
+		{"negative CPUs", NativeResources{12, 8, 4096, -1, ""}, true},
+		{"CPU arithmetic bound", NativeResources{12, 8, 4096, 1 << 21, ""}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := selectedNativeResources(tc.profile)
@@ -59,21 +59,24 @@ func TestNativeCapacityChecksAggregatePhasesAndIncrementalTenants(t *testing.T) 
 		{"ordinary forty GiB budget", NativeResources{}, false, false, false, 40 * 1024, 14000, 0},
 		{"four guests cannot fill a 48 GiB host", NativeResources{}, true, false, true, 48 * 1024, 14000, 0},
 		{"conformance full budget", NativeResources{}, true, false, false, 52 * 1024, 14000, 0},
-		{"explicit shared 8 GiB tenants", NativeResources{12, 8, 4096, 0}, true, false, false, 40 * 1024, 14000, 0},
-		{"headroom included", NativeResources{12, 8, 4096, 0}, true, false, true, 36 * 1024, 14000, 0},
-		{"site already consumes memory", NativeResources{12, 8, 4096, 0}, true, true, false, 28 * 1024, 14000, 0},
-		{"incremental budget fell", NativeResources{12, 8, 4096, 0}, true, true, true, 27 * 1024, 14000, 0},
+		{"explicit shared 8 GiB tenants", NativeResources{12, 8, 4096, 0, ""}, true, false, false, 40 * 1024, 14000, 0},
+		{"headroom included", NativeResources{12, 8, 4096, 0, ""}, true, false, true, 36 * 1024, 14000, 0},
+		{"site already consumes memory", NativeResources{12, 8, 4096, 0, ""}, true, true, false, 28 * 1024, 14000, 0},
+		{"incremental budget fell", NativeResources{12, 8, 4096, 0, ""}, true, true, true, 27 * 1024, 14000, 0},
 		{"time shared guest CPUs", NativeResources{}, true, false, false, 52 * 1024, 6000, 0},
 		{"largest guest CPU unavailable", NativeResources{}, true, false, true, 52 * 1024, 5999, 0},
 		{"memory unobserved", NativeResources{}, true, false, true, 0, 14000, 0},
-		{"ordinary two workers full budget", NativeResources{12, 6, 4096, 0}, false, false, false, 34 * 1024, 6000, 2},
-		{"ordinary second worker needs memory", NativeResources{12, 6, 4096, 0}, false, false, true, 33 * 1024, 6000, 2},
-		{"ordinary two workers incremental budget", NativeResources{12, 6, 4096, 0}, false, true, false, 22 * 1024, 6000, 2},
-		{"ordinary incremental budget fell", NativeResources{12, 6, 4096, 0}, false, true, true, 21 * 1024, 6000, 2},
-		{"selected four CPUs", NativeResources{6, 3, 1024, 4}, false, false, false, 13 * 1024, 4000, 0},
-		{"selected four CPUs unavailable", NativeResources{6, 3, 1024, 4}, false, false, true, 13 * 1024, 3999, 0},
-		{"bootstrap larger than guests", NativeResources{6, 3, 1024, 2}, false, false, true, 13 * 1024, 2000, 0},
-		{"joined bootstrap excluded", NativeResources{6, 3, 1024, 2}, false, true, false, 7 * 1024, 2000, 0},
+		{"ordinary two workers full budget", NativeResources{12, 6, 4096, 0, ""}, false, false, false, 34 * 1024, 6000, 2},
+		{"ordinary second worker needs memory", NativeResources{12, 6, 4096, 0, ""}, false, false, true, 33 * 1024, 6000, 2},
+		{"ordinary two workers incremental budget", NativeResources{12, 6, 4096, 0, ""}, false, true, false, 22 * 1024, 6000, 2},
+		{"ordinary incremental budget fell", NativeResources{12, 6, 4096, 0, ""}, false, true, true, 21 * 1024, 6000, 2},
+		{"selected four CPUs", NativeResources{6, 3, 1024, 4, ""}, false, false, false, 13 * 1024, 4000, 0},
+		{"selected four CPUs unavailable", NativeResources{6, 3, 1024, 4, ""}, false, false, true, 13 * 1024, 3999, 0},
+		{"bootstrap larger than guests", NativeResources{6, 3, 1024, 2, ""}, false, false, true, 13 * 1024, 2000, 0},
+		{"joined bootstrap excluded", NativeResources{6, 3, 1024, 2, ""}, false, true, false, 7 * 1024, 2000, 0},
+		{"seven GiB site full budget", NativeResources{7, 3, 1024, 4, "small"}, false, false, false, 14 * 1024, 4000, 1},
+		{"seven GiB site headroom required", NativeResources{7, 3, 1024, 4, "small"}, false, false, true, 14*1024 - 1, 4000, 1},
+		{"seven GiB site incremental tenants", NativeResources{7, 3, 1024, 4, "small"}, false, true, false, 7 * 1024, 4000, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			admission := nativeResourceAdmission{resources: tc.profile, tenantWorkers: tc.workers, conformance: tc.conformance, observe: func(context.Context, string) (execution.ResourceCapacity, error) {
@@ -110,7 +113,7 @@ func TestNativeCapacityCancellationDoesNotObserve(t *testing.T) {
 func TestNativeTenantRechecksCapacityBeforeCreateOnReusedSite(t *testing.T) {
 	attempt, runner, _ := nativeSessionFixture(t, true, 0)
 	observations := 0
-	admission := &nativeResourceAdmission{resources: NativeResources{12, 8, 4096, 0}, conformance: true, observe: func(context.Context, string) (execution.ResourceCapacity, error) {
+	admission := &nativeResourceAdmission{resources: NativeResources{12, 8, 4096, 0, ""}, conformance: true, observe: func(context.Context, string) (execution.ResourceCapacity, error) {
 		observations++
 		memory := uint64(64 * 1024)
 		if observations > 1 {
@@ -146,7 +149,7 @@ func TestNativeResourceConfigurationReachesSeedWithoutChangingSource(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	if configured.Resources != (NativeResources{12, 8, 4096, 4}) {
+	if configured.Resources != (NativeResources{12, 8, 4096, 4, ""}) {
 		t.Fatalf("configured resources lost: %+v", configured.Resources)
 	}
 	seed := []byte("instance_types:\n  - {id: a1b2c3d4-0005-4000-8000-000000000004, name: cpu6-mem32gb-disk60gb, site_id: a1b2c3d4-0001-4000-8000-000000000001, gpu_count: 0, cpu_count: 6, memory_gib: 32, disk_gib: 60}\n  - {id: a1b2c3d4-0005-4000-8000-000000000003, name: cpu4-mem6gb-disk60gb, site_id: a1b2c3d4-0001-4000-8000-000000000001, gpu_count: 0, cpu_count: 4, memory_gib: 6, disk_gib: 60}\n")

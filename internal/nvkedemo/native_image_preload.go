@@ -106,6 +106,13 @@ func nativeImagePreloadScriptForArchitecture(image nativeImagePreload, arch stri
 // The maintained catalogs admit the two chart schemas; the NVIDIA lane
 // preserves NVKE's hostPort owner.
 func nativeOVNValues(version, reference string) (string, error) {
+	return nativeOVNValuesForProfile(version, reference, "")
+}
+
+func nativeOVNValuesForProfile(version, reference, profile string) (string, error) {
+	if err := admitNativeResourceProfile(profile, version); err != nil {
+		return "", err
+	}
 	ref, err := name.NewDigest(reference, name.StrictValidation)
 	if err != nil || ref.Name() != reference || ref.Repository.Name() != "localhost/nvke/ovn-kubernetes" || !canonical.IsDigest(ref.DigestStr()) {
 		return "", errors.New("native OVN requires the exact selected local manifest reference")
@@ -130,7 +137,11 @@ func nativeOVNValues(version, reference string) (string, error) {
 				component = make(map[string]any)
 				values[binding.component] = component
 			}
-			component[binding.workload] = map[string]any{"image": map[string]any{"repository": ref.Repository.Name(), "tag": "nvkr", "sha256": strings.TrimPrefix(ref.DigestStr(), "sha256:")}}
+			settings := map[string]any{"image": map[string]any{"repository": ref.Repository.Name(), "tag": "nvkr", "sha256": strings.TrimPrefix(ref.DigestStr(), "sha256:")}}
+			if profile == "small" && (binding.workload == "ovnkubeControlPlane" || binding.workload == "ovnkubeSingleNodeZone") {
+				settings["resources"] = map[string]any{"requests": map[string]string{"memory": "128Mi"}}
+			}
+			component[binding.workload] = settings
 		}
 	case upstreamSiteOVNVersion:
 		values = map[string]any{"skipCallToK8s": true, "global": map[string]any{"enableOvnKubeIdentity": false,
@@ -144,8 +155,8 @@ func nativeOVNValues(version, reference string) (string, error) {
 	return string(raw), err
 }
 
-func nativeOVNValuesScript(version, reference string) (string, error) {
-	values, err := nativeOVNValues(version, reference)
+func nativeOVNValuesScriptForProfile(version, reference, profile string) (string, error) {
+	values, err := nativeOVNValuesForProfile(version, reference, profile)
 	if err != nil {
 		return "", err
 	}

@@ -24,6 +24,7 @@ type nativeInstallerSelection struct {
 	repo, commit, capiVersion, versionsDigest, siteSpecDigest string
 	sourceDate                                                int64
 	arch                                                      string
+	controller                                                nativeControllerIdentity
 }
 
 func nativeInstallerSelectionFromRun(ctx context.Context, root, bundle string) (*nativeInstallerSelection, error) {

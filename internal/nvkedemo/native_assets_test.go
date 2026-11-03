@@ -362,7 +362,7 @@ func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *test
 				{"deploy/nvke-deploy.sh", tar.TypeReg, "installer", 0},
 				{"deploy/lib/nvke-deploy-items.py", tar.TypeReg, "items", 0},
 				{"deploy/lib/render-template.py", tar.TypeReg, "renderer", 0},
-				{"controller/deploy/charts/controller/Chart.yaml", tar.TypeReg, "controller chart", 0},
+				{"controller/deploy/charts/controller/Chart.yaml", tar.TypeReg, "name: nvke-controller\n", 0},
 				{"nktp/deploy/charts/nktp/Chart.yaml", tar.TypeReg, "nktp chart", 0},
 				{"controller/deploy/k8s/capi-spiffe-exec-auth/capi-controller-manager.yaml", tar.TypeReg, "capi overlay", 0},
 				{"controller/test/fixtures/releases/nvke-nico-vms-24.04-arm64-fde-machineimage.yaml", tar.TypeReg, "machineimage", 0},
@@ -371,6 +371,11 @@ func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *test
 				{"deploy/nico/nvke-deploy.yaml", tar.TypeReg, "deployment", 0},
 				{"controller/nico-sim/internal/seed/default-seed.yaml", tar.TypeReg, "seed", 0},
 				{"controller/nico-sim/ui/index.html", tar.TypeReg, "index", 0},
+			}
+			for index, raw := range nativeControllerFixtureFiles("nke-controller") {
+				if index < 3 {
+					entries = append(entries, assetEntry{nativeControllerSourceFiles[index], tar.TypeReg, raw, 0})
+				}
 			}
 			if scenario != "missing site specification" {
 				entries = append(entries, assetEntry{nativeSiteSpecPath, tar.TypeReg, nativeInstallerSiteSpecFixture, 0})
@@ -401,9 +406,12 @@ func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *test
 				cancel()
 			}
 			before := *selected
-			_, err := extractNativeInstaller(ctx, writeAssetArchive(t, entries), privateTestDir(t), selected)
+			extracted, err := extractNativeInstaller(ctx, writeAssetArchive(t, entries), privateTestDir(t), selected)
 			if (err == nil) != (scenario == "complete") {
 				t.Fatalf("unexpected extraction admission: %v", err)
+			}
+			if scenario == "complete" && (extracted == nil || extracted.controller.name != "nke-controller" || extracted.controller.digests == [4]string{}) {
+				t.Fatal("valid extraction lost source controller selection")
 			}
 			if *selected != before {
 				t.Fatal("extraction mutated the caller's checked selection")

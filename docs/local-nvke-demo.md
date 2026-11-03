@@ -752,8 +752,8 @@ the corresponding input is `NVKE_LOCAL_CLONE`.
 Execution is noninteractive and cannot accept sudo passwords. Linux requires the
 documented unattended administrator policy; Mac requires its installed native/vmnet
 prerequisites. These test paths and budgets do not establish a completed runtime
-or conformance result. The [scheduled nightly](nvke-nightly.md) separately consumes
-authenticated published artifacts through `TestNightlyPublishedCandidate`.
+or conformance result. The [scheduled nightly](nvke-nightly.md) uses this fresh-build
+Go flow on public hosted AMD64; its exact-run evidence is recorded separately.
 
 ### Reuse a native site from Go tests
 
@@ -847,8 +847,26 @@ ARM64 guests consume `site-startup-tools-arm64`; AMD64 guests consume
 `site-startup-tools-amd64`. The Mac host uses the Linux ARM64 companion for its
 ARM64 guest. It is built from catalog-selected source;
 the normal startup owner invokes it in its existing admitted controller container.
+The runtime admission and inherited-pipe adapter both support Linux ARM64 and
+AMD64; unsupported platforms remain errors before identity or remote work.
 Building the helper alone
 does not deploy, import SPIRE policy or repair a site.
+
+The controller receives a dedicated, disk-backed 256-MiB `emptyDir` at
+`/tmp/nvkr-site-identity` through its chart's supported `volumes` and
+`volumeMounts` values in the existing per-item override file. Runtime admission
+requires the exact writable mount and bounded volume before staging the held helper. The
+fixed staging command uses the source image's PATH-resolved `sh`; current
+distroless debug images have no `/bin/sh`. Staging and its digest receipt remain
+confined to the dedicated directory. The selected source's root-filesystem and
+user/security settings remain unchanged.
+
+After creating the source policy once, convergence may wait within its existing
+two-minute deadline for the same running containers to become Ready again. Each
+wait validates the pinned pod/container identities, configuration and host boot.
+Other runtime-check failures remain errors. Initial admission, helper probes,
+host mutation and final proof still require Ready containers. Raw identity values
+and errors stay private; unknown completion retains dependent controls.
 
 It uses the upstream generated NodeAgent client and the existing controller CSI
 workload identity. No arbitrary script, credential, socket relay, downloader or
@@ -906,8 +924,9 @@ and refuses an automatic retry. The Go scoped API retains its documented
 callback lifetime and joined cleanup rules. The TUI reports the handoff as a
 site stage; a site failure does not complete tenant or conformance checks.
 The earlier three-member helper Run exercised the preceding shell implementation;
-it does not validate this source-owned RPC revision. Fresh integrated Mac and Ubuntu
-acceptance of the reduced helper remains externally unverified.
+it does not validate this source-owned RPC revision. The [nightly evidence](nvke-nightly.md#evidence-and-privacy)
+records integrated AMD64 acceptance at its exact NVKR/NVKE revisions. Mac and
+ARM64 integrated acceptance of the reduced helper remain externally unverified.
 
 ## Where the NVKE versions come from
 
@@ -946,16 +965,17 @@ uses NVKE's renamed Packer build/material schema and QCOW2 output. Changed packa
 bytes require a fresh disk build. Maintained release, upstream and TCG product
 selections also use NVKE `v0.23.0`; their third-party pins and historical runtime
 evidence remain separate. The [scheduled nightly](nvke-nightly.md) resolves latest
-NVKE main, dispatches the NVIDIA ARM64 producer and runs its native Go site smoke
-against that exact Run's authenticated published artifacts. Its runtime consumer
-does not rebuild products or use the upstream OVN producer. The local
-`TestEndToEnd` flow above retains its separate fresh-build scope.
+NVKE main once and runs a fresh local build plus the full native Go site/tenant
+E2E in one public GitHub-hosted AMD64 job. It retains NVIDIA OVN and publishes no
+products. The retired ARM64 published-artifact consumer is not invoked.
 
 The native VM recipe stages `dhcp-identifier: mac` for both hosts through NVKE's
 existing image-input composer. This makes DHCPv4 use the NIC MAC rather than an
 interface-dependent client identifier when NVKE moves networking to its OVS
 bridge. The pinned NVKE checkout stays unchanged. This input change requires a
-fresh image build; complete runtime validation remains pending.
+fresh image build. The [nightly record](nvke-nightly.md#evidence-and-privacy)
+covers its exact AMD64 source overlay; retained defaults and other hosts need
+separate runtime evidence.
 
 For an actual attempt, its Plan and Run own exact source/output identities.
 Update pins with `nvkr catalog pin`, then review matching installer interfaces,

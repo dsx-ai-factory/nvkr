@@ -70,6 +70,13 @@ func (s *nativeSiteAttempt) capiTenantCommands(ctx context.Context, request Tena
 	if err := requireContext(ctx); err != nil {
 		return "", err
 	}
+	if err := admitNativeResourceProfile(s.resources.Profile, request.CNIVersion); err != nil {
+		return "", err
+	}
+	kubeletPreparation, err := nativeKubeletProfilePreparation(ctx, s.resources.Profile)
+	if err != nil {
+		return "", err
+	}
 	if request.CNI != "ovn-kubernetes" || request.Kubernetes == "" || request.CNIVersion == "" {
 		return "", errors.New("native CAPI tenant requires selected Kubernetes and OVN packages")
 	}
@@ -86,7 +93,7 @@ func (s *nativeSiteAttempt) capiTenantCommands(ctx context.Context, request Tena
 		"test ! -e /run/nvkr-native-tenant-preparation.ready\nsystemctl daemon-reload\n" +
 		"systemctl stop nvke-agent.service spire-agent.service\n" +
 		"NVKE_AGENT_SKIP_START=1 DEBIAN_FRONTEND=noninteractive apt-get install -y -o DPkg::Lock::Timeout=600 nvke-agent " + operatorQuote("nvke-kubeadm-distro-"+request.Kubernetes) + " spire-agent " + operatorQuote("nvke-cni-ovn-images-"+request.CNIVersion) + " " + operatorQuote("nvke-cni-ovn-charts-"+request.CNIVersion) + "\n" +
-		"test ! -e /etc/nke/spire.env\n" +
+		kubeletPreparation + "test ! -e /etc/nke/spire.env\n" +
 		"test -s /etc/spire-agent/agent.conf\n" +
 		"test -s /etc/spire-agent/initial-trust-bundle.pem\n" +
 		"install -d -m 0755 -o spire -g spire /tmp/spire-agent /tmp/spire-agent/public\n" +
@@ -117,7 +124,7 @@ func (s *nativeSiteAttempt) capiTenantCommands(ctx context.Context, request Tena
 		}
 		script += preload + "\n"
 	}
-	values, err := nativeOVNValuesScript(request.CNIVersion, s.assets.Images["ovn"].Reference)
+	values, err := nativeOVNValuesScriptForProfile(request.CNIVersion, s.assets.Images["ovn"].Reference, s.resources.Profile)
 	if err != nil {
 		return "", err
 	}
@@ -176,8 +183,11 @@ func sameMachineInfra(a, b *TenantMachineInfra) bool {
 		reflect.DeepEqual(a.PreCommands, b.PreCommands) && len(a.BootstrapFiles) == 0 && len(b.BootstrapFiles) == 0
 }
 
-func (t *tenant) nativeCAPIRow(ctx context.Context, rows []tenantRow) (*tenantRow, error) {
+func (t *tenant) nativeCAPIClusterRow(rows []tenantRow) (*tenantRow, error) {
 	for _, row := range rows {
+		if row.Name == "" || !safeTenantIdentity(row.ID) {
+			return nil, errors.New("native cluster inventory received an invalid cluster identity")
+		}
 		if t.id != "" && row.ID == t.id && row.Name != t.name {
 			return nil, errors.New("native tenant identity changed its name; refusing adoption or removal")
 		}
@@ -192,7 +202,18 @@ func (t *tenant) nativeCAPIRow(ctx context.Context, rows []tenantRow) (*tenantRo
 		!sameMachineInfra(row.ControlPlane.Infra, &ownership.controlPlane) {
 		return nil, errors.New("native tenant infrastructure changed; refusing adoption or removal")
 	}
-	raw, err := t.capture(ctx, []string{t.cli(), "get", "nodepools", "--cluster", t.name, "-o", "json"}, "native-pool-ownership", 30*time.Second)
+	return row, nil
+}
+
+func (t *tenant) nativeCAPIRow(ctx context.Context, rows []tenantRow) (*tenantRow, error) {
+	row, err := t.nativeCAPIClusterRow(rows)
+	if err != nil || row == nil {
+		return row, err
+	}
+	ownership := t.nativeCAPI
+	// JSON inventory avoids NVKE's separate name lookup. Select only the
+	// already observed cluster ID; unrelated pools confer no ownership.
+	raw, err := t.capture(ctx, []string{t.cli(), "get", "nodepools", "-o", "json"}, "native-pool-ownership", 30*time.Second)
 	if err != nil {
 		return t.nativeCAPIDeletionObserved(ctx, err)
 	}
@@ -206,6 +227,24 @@ func (t *tenant) nativeCAPIRow(ctx context.Context, rows []tenantRow) (*tenantRo
 	if err := json.Unmarshal(raw, &pools); err != nil {
 		return nil, err
 	}
+	if pools == nil {
+		return nil, errors.New("native worker ownership requires a node pool inventory array")
+	}
+	ownedPools := pools[:0]
+	seenPools := make(map[string]bool, len(pools))
+	for _, pool := range pools {
+		if !safeTenantIdentity(pool.ID) || !safeTenantIdentity(pool.ClusterID) || seenPools[pool.ID] {
+			return nil, errors.New("native node pool inventory contains an invalid identity")
+		}
+		seenPools[pool.ID] = true
+		if ownership.workerID != "" && pool.ID == ownership.workerID && pool.ClusterID != row.ID {
+			return nil, errors.New("native tenant worker changed its cluster; refusing adoption or removal")
+		}
+		if pool.ClusterID == row.ID {
+			ownedPools = append(ownedPools, pool)
+		}
+	}
+	pools = ownedPools
 	if len(pools) == 0 && ownership.deleting && ownership.workerID != "" {
 		return row, nil
 	}
@@ -218,30 +257,33 @@ func (t *tenant) nativeCAPIRow(ctx context.Context, rows []tenantRow) (*tenantRo
 	return row, nil
 }
 
-// NVKE resolves the cluster name again before listing its pools. During owned
-// deletion it may disappear between our inventory and that lookup. Confirm the
-// absence with one fresh inventory; never infer deletion from a query failure.
+// A pool observation can fail while owned deletion is in progress. Confirm
+// cluster absence with one fresh inventory; a query failure alone is never
+// deletion evidence. Unavailable reads may wait only within the deletion owner.
 func (t *tenant) nativeCAPIDeletionObserved(ctx context.Context, queryErr error) (*tenantRow, error) {
 	if !t.nativeCAPI.deleting || t.id == "" || ctx.Err() != nil || errors.Is(queryErr, ErrUnjoined) {
 		return nil, queryErr
 	}
+	pending, canWait := t.nativeDeletionReadFailure(ctx, queryErr).(*nativeDeletionReadPending)
 	rows, err := t.inventory(ctx)
 	if err != nil {
+		if _, unavailable := err.(*nativeDeletionReadPending); canWait && unavailable {
+			return nil, &nativeDeletionReadPending{cause: errors.Join(queryErr, err)}
+		}
 		return nil, errors.Join(queryErr, err)
 	}
 	if ctx.Err() != nil {
 		return nil, errors.Join(queryErr, ctx.Err())
 	}
-	if rows == nil {
-		return nil, errors.Join(queryErr, errors.New("native deletion confirmation requires a cluster inventory array"))
+	row, err := t.nativeCAPIClusterRow(rows)
+	if err != nil {
+		return nil, errors.Join(queryErr, err)
 	}
-	for _, row := range rows {
-		if row.Name == "" || !safeTenantIdentity(row.ID) {
-			return nil, errors.Join(queryErr, errors.New("native deletion confirmation received an invalid cluster identity"))
+	if row != nil {
+		if canWait {
+			return nil, pending
 		}
-		if row.Name == t.name || row.ID == t.id {
-			return nil, queryErr
-		}
+		return nil, queryErr
 	}
 	return nil, nil
 }
@@ -250,6 +292,10 @@ func nativeTenantSecurityValues() map[string]any {
 	return map[string]any{
 		"controller": map[string]any{
 			"supportedInfraProviders": "nico,infra", "nodeAgent": map[string]string{"spireAttestationMethod": "joinToken"},
+			// Keep the source's root filesystem and security context unchanged.
+			// Only the held, hash-checked identity helper uses this bounded scratch.
+			"volumes":      []map[string]any{{"name": nativeIdentityStagingVolume, "emptyDir": map[string]string{"sizeLimit": nativeIdentityStagingLimit}}},
+			"volumeMounts": []map[string]any{{"name": nativeIdentityStagingVolume, "mountPath": nativeIdentityStagingRoot}},
 			// Match NVKE's site qualification values. Its SPIRE Service exposes
 			// 443; the controller's 8081 default is the backing Pod port.
 			// Helm replaces the env list, so retain the site node-agent port.
