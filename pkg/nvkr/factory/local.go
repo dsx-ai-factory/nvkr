@@ -154,6 +154,9 @@ func AdmitLocal(ctx context.Context, plan *Plan, options LocalRunOptions) error 
 	if err := admitLocalDiskPublication(plan); err != nil {
 		return err
 	}
+	if err := admitLocalPinnedTools(plan); err != nil {
+		return err
+	}
 	toolchains, err := admitLocalNativeGo(ctx, plan)
 	if err != nil {
 		return err
@@ -246,6 +249,11 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	}
 	if !options.DryRun {
 		if err := admitLocalDiskPublication(plan); err != nil {
+			return nil, err
+		}
+		// A VM Plan reaches runLocal without AdmitLocal, and a pinned-tool file can
+		// be a material of its disk root.
+		if err := admitLocalPinnedTools(plan); err != nil {
 			return nil, err
 		}
 	}

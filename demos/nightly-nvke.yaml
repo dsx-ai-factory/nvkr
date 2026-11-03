@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# One invocation per fresh hosted workspace; paths are relative to its checkout.
+# The workflow supplies the frozen source commit through the existing E2E input.
+version: 1
+build:
+  repo: .
+  attempt: nightly-e2e
+  jobs: 1
+  nvkeClone: nvke-source
+run:
+  out: nightly-site
+  timeoutSeconds: 3600
+  tenantWorkers: 1
+  resources:
+    profile: small
+    siteMemoryGiB: 7
+    tenantMemoryGiB: 3
+    headroomMiB: 1024
+    vcpus: 4

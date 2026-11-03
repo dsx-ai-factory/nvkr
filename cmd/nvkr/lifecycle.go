@@ -144,10 +144,16 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 			&cli.StringFlag{Name: "qualification-policy", Usage: "also generate hosted qualification from this independent policy"},
 			&cli.BoolFlag{Name: "runtime", Usage: "refresh named production Plan data within its reviewed workflow contract"},
 			&cli.StringFlag{Name: "source-commit", Usage: "freeze one exact source commit under the authored GitHub runtime source policy (requires --runtime)"},
-			&cli.BoolFlag{Name: "check", Usage: "write nothing; fail on generated drift"}), Action: func(c *cli.Context) error {
+			&cli.BoolFlag{Name: "check", Usage: "write nothing; fail on generated drift"},
+			&cli.StringFlag{Name: "projection-pilot", Hidden: true, Usage: "diagnostic: render through the reference projection plugin over `TRANSPORT` (in-process or out-of-process)"}), Action: func(c *cli.Context) error {
 			view, err := selectCommandPresentation(c)
 			if err != nil {
 				return err
+			}
+			if c.IsSet("projection-pilot") {
+				if c.Context, err = selectProjectionPilot(c.Context, c.String("projection-pilot")); err != nil {
+					return err
+				}
 			}
 			var digest string
 			if c.IsSet("source-commit") && !c.Bool("runtime") {

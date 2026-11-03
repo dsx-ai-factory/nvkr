@@ -41,7 +41,16 @@ func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string,
 	}
 	var buildMaterials *pipeline.BuildMaterials
 	var observedMaterials *observedProducerMaterials
-	if instruction.Kind == ir.KindBuild && instruction.BuilderType == ir.BuilderOCIHermetic && len(instruction.Materials) != 0 {
+	pinnedTool := instruction.Kind == ir.KindBuild && instruction.BuilderType == ir.BuilderPinnedTool
+	var toolExecutable string
+	if pinnedTool {
+		tool := artifacts["tool/"+instruction.Tool]
+		if !containsString(node.Inputs, tool.ID) || tool.Kind != "pipeline-tool" || tool.Path == "" {
+			return e.New(e.CodeProvenanceMissing, "pinned-tool producer %q omits its tool/%s input", node.ID, instruction.Tool)
+		}
+		toolExecutable = tool.Path
+	}
+	if instruction.Kind == ir.KindBuild && (instruction.BuilderType == ir.BuilderOCIHermetic || pinnedTool) && len(instruction.Materials) != 0 {
 		observedMaterials, err = observeBuildMaterials(ctx, plan, node)
 		if err != nil {
 			return err
@@ -56,7 +65,7 @@ func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string,
 	}
 	result, err := run(instruction, pipeline.RunOptions{
 		Ctx: ctx, SourceRoot: sourceRoot, Runtime: runtime, Jobs: jobs, Launch: true,
-		BuildMaterials: buildMaterials, Stdout: stdout, Stderr: stderr,
+		BuildMaterials: buildMaterials, ToolExecutable: toolExecutable, Stdout: stdout, Stderr: stderr,
 	})
 	if err != nil {
 		return err

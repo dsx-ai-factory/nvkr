@@ -40,6 +40,7 @@ const (
 	BuilderBuildKit    = "buildkit-rootless" // networked wrapped Dockerfile build; not qualified execution
 	BuilderVMImage     = "vm-image"          // source-owned command or Packer project producing one disk image
 	BuilderNativeGo    = "native-go"         // local, unqualified compilation with an observed installed SDK
+	BuilderPinnedTool  = "pinned-tool"       // one pinned release executable run offline, with no source fetch (ADR-27)
 )
 
 // DiskSpec is the exact disk payload contract carried by a VM build node.
@@ -86,6 +87,24 @@ type MaterialBinding struct {
 	Producer  string `json:"producer"`
 }
 
+// Fixed pinned-tool sandbox paths (ADR-27 §1, §3). The compiler renders typed tool
+// tokens only into these paths and the executor stages exactly these paths, so a
+// rendered argument vector is identity-bearing and names no host path.
+const (
+	PinnedToolInputsRoot = "/nvkr/inputs"
+	PinnedToolOutputDir  = "/nvkr/output"
+	// PinnedToolLayoutDir is the absent child an oci-layout producer creates: layout
+	// writers may refuse an existing directory, even an empty one.
+	PinnedToolLayoutDir = "/nvkr/output/layout"
+	PinnedToolWorkdir   = "/nvkr/work"
+)
+
+// Pinned-tool output forms (ADR-27 §5).
+const (
+	OutputFile      = "file"
+	OutputOCILayout = "oci-layout"
+)
+
 // Engine classes (ADR-07 §1) are the OBSERVED build substrate a component was
 // actually built under — recorded in the detached build record and verified equal to
 // the builder the producer declared. Because it is an observation, it never enters the
@@ -114,7 +133,8 @@ type PatchRef struct {
 // ExecutableArchive binds the release transport separately from the selected
 // executable's Node.Digest. Neither digest can substitute for the other.
 type ExecutableArchive struct {
-	// Format is empty for the original tar-gzip encoding, or zip.
+	// Format is empty for the original tar-gzip encoding, or zip. A pinned-tool
+	// build always names its format explicitly: raw, tar-gzip or zip.
 	Format string `json:"format,omitempty"`
 	Digest string `json:"digest"`
 	Member string `json:"member"`
@@ -169,6 +189,11 @@ type Node struct {
 	// ADR-10). It is a build-semantic input, so it participates in buildDigest; the
 	// runner dispatches on it and records the observed engineClass for verify.
 	BuilderType string `json:"builderType,omitempty"`
+	// Tool names the catalog tool a pinned-tool build runs. Artifact carries its
+	// release URL as transport, Digest its executable digest and ExecutableArchive
+	// its archive digest and member; together they bind the shared tool/<name>
+	// acquisition. Empty for every other builder.
+	Tool string `json:"tool,omitempty"`
 	// FlakeRef / FlakeOutput / FlakeLockDigest pin a nix build's locked flake, output
 	// attribute, and transitive-closure lock digest (ADR-10 §2); empty for an
 	// oci-hermetic build. FlakeRef is transport (not in buildDigest); FlakeLockDigest

@@ -240,6 +240,12 @@ workflow-generator: go-version-check
 		-ldflags '-X main.version=dev -X main.commit=unknown' \
 		-o bin/nvkr-exec ./cmd/nvkr
 
+# Diagnostic: `make workflows-check PROJECTION_PILOT=in-process` or `=out-of-process` checks the
+# production, development and NVKE family producer bundles through the reference projection
+# plugin over that transport. Qualification workflows and runtime bundles stay core-only.
+PROJECTION_PILOT ?=
+PROJECTION_PILOT_FLAG = $(if $(PROJECTION_PILOT),--projection-pilot=$(PROJECTION_PILOT))
+
 .PHONY: workflows-check
 workflows-check: workflow-generator pipeline-dev-check nvke-split-check catalog-refresh-check ## Check committed producer, qualification, development and family bundles and the catalog refresh workflow for drift.
 	@# Repeat the committed Plan's authored selection, including focused feature-branch
@@ -248,7 +254,7 @@ workflows-check: workflow-generator pipeline-dev-check nvke-split-check catalog-
 	 environment="$$(jq -er '.environmentPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
 	 bin/nvkr-exec run generate --engine github \
 		--definition "$$definition" --environment "$$environment" \
-		--qualification-policy inputs/policies/nvke-qualification.yaml --root . --check
+		--qualification-policy inputs/policies/nvke-qualification.yaml --root . --check $(PROJECTION_PILOT_FLAG)
 	bin/nvkr-exec run generate --engine github \
 		--definition inputs/definitions/demo/arm64-nvidia-kvm.json \
 		--environment inputs/environments/github-nightly-nvidia.json \
@@ -308,7 +314,7 @@ nvke-split-check: workflow-generator ## Check the four independent NVKE family b
 	@set -e; for family in core services telemetry disks; do \
 		bin/nvkr-exec run generate --engine github \
 			--definition "inputs/definitions/nvke/$$family.yaml" \
-			--environment "inputs/environments/github-nvke-$$family.yaml" --root . --check; \
+			--environment "inputs/environments/github-nvke-$$family.yaml" --root . --check $(PROJECTION_PILOT_FLAG); \
 	done
 
 .PHONY: pipeline-dev-generate
@@ -323,7 +329,7 @@ pipeline-dev-check: workflow-generator ## Check development workflow generation 
 	bin/nvkr-exec run generate --engine github \
 		--definition inputs/definitions/nvke/definition.yaml \
 		--environment inputs/environments/github-development.yaml \
-		--qualification-policy inputs/policies/nvke-development-qualification.yaml --root . --check
+		--qualification-policy inputs/policies/nvke-development-qualification.yaml --root . --check $(PROJECTION_PILOT_FLAG)
 
 .PHONY: pipeline-dev-run
 pipeline-dev-run: pipeline-dev-check ## Dispatch the clean, pushed current branch (PIPELINE_DEV_REPO=owner/repo).

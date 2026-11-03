@@ -20,7 +20,7 @@ import (
 // RunHelper files: duplicates share O_NONBLOCK with the original open file
 // description. RunHelper retains its existing pollable, borrowed-file contract.
 func runHelperWithProcessStdio(ctx context.Context) error {
-	if ctx == nil || ctx.Err() != nil || runtime.GOARCH != "arm64" {
+	if ctx == nil || ctx.Err() != nil || runtime.GOARCH != "arm64" && runtime.GOARCH != "amd64" {
 		// The identity owner returns the exact runtime/context admission error
 		// before this adapter performs descriptor work.
 		_, err := siteidentity.RunHelper(ctx, os.Stdin, os.Stdout)

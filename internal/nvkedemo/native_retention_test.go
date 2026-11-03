@@ -59,7 +59,7 @@ func TestNativeScopeRetainsUntilExplicitCleanup(t *testing.T) {
 			}
 			select {
 			case err := <-joined:
-				if (err == nil) != (mode == "ready") || scope == nil || !scope.closed {
+				if (err == nil) != (mode == "ready") || scope == nil || !scope.closed.Load() {
 					t.Fatal("cleanup lost scope invalidation or original failure", err)
 				}
 			case <-time.After(5 * time.Second):
@@ -128,7 +128,7 @@ func TestNativePanicCleanupRequiresExplicitRequestAndJoinedScope(t *testing.T) {
 	select {
 	case result := <-joined:
 		var coded *nvkrerr.Error
-		if !errors.As(result, &coded) || coded.Code != nvkrerr.CodeInternal || errors.Is(result, ErrRetainedControls) || scope == nil || !scope.closed || attempt.bootstrapRunner != nil {
+		if !errors.As(result, &coded) || coded.Code != nvkrerr.CodeInternal || errors.Is(result, ErrRetainedControls) || scope == nil || !scope.closed.Load() || attempt.bootstrapRunner != nil {
 			t.Fatal("native cleanup lost failure, scope invalidation or known bootstrap cleanup", result)
 		}
 		if _, err := os.Stat(deleted); err != nil {
@@ -182,7 +182,7 @@ func TestNativeScopeConcurrentCleanupCancelsExactlyOnce(t *testing.T) {
 	group.Wait()
 	select {
 	case err := <-joined:
-		if err != nil || scope == nil || !scope.closed || cancellations.Load() != 1 {
+		if err != nil || scope == nil || !scope.closed.Load() || cancellations.Load() != 1 {
 			t.Fatal("concurrent cleanup repeated cancellation or lost scope invalidation", err, cancellations.Load())
 		}
 	case <-time.After(2 * time.Second):
