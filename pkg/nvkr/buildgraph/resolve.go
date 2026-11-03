@@ -232,6 +232,7 @@ func cloneComponent(component catalog.Component) catalog.Component {
 		copy.Digests = maps.Clone(copy.Digests)
 		if copy.Executable != nil {
 			executable := *copy.Executable
+			executable.Companions = slices.Clone(executable.Companions)
 			copy.Executable = &executable
 		}
 		if copy.Evidence != nil {
