@@ -6,6 +6,7 @@ package cicontract
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -19,7 +20,7 @@ const lockedFernBinary = "tools/fern/node_modules/.bin/fern"
 var (
 	exactSemver = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 	// A bare `fern` command resolves through PATH instead of the locked install.
-	bareFernCommand = regexp.MustCompile(`(?m)(^|[;&|(]\s*|\$\(\s*)fern\s`)
+	bareFernCommand = regexp.MustCompile(`(?m)(^\s*|[;&|(]\s*|\$\(\s*)fern(\s|$)`)
 	fernInstall     = regexp.MustCompile(`(?m)^\s*make\s+(-C\s+\S+\s+)?fern-install\s*$`)
 )
 
@@ -37,13 +38,7 @@ func TestFernCLIIsLockedAndSharedByEveryInstallSite(t *testing.T) {
 		t.Fatalf("fern/fern.config.json version %q, want the locked %q", config.Version, version)
 	}
 
-	makefile, err := os.ReadFile("../../Makefile")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(makefile), "npm ci --prefix tools/fern ") || strings.Contains(string(makefile), "fern-api@") {
-		t.Fatal("Makefile must install Fern only from the tools/fern lock")
-	}
+	assertFernMakeRecipes(t)
 
 	const directory = "../../.github/workflows"
 	files, err := os.ReadDir(directory)
@@ -68,30 +63,118 @@ func TestFernCLIIsLockedAndSharedByEveryInstallSite(t *testing.T) {
 			t.Fatalf("%s: %v", file.Name(), err)
 		}
 		for jobID, job := range workflow.Jobs {
-			installed := false
+			for _, problem := range fernStepViolations(job.Steps) {
+				t.Errorf("%s: %s: %s", file.Name(), jobID, problem)
+			}
 			for _, step := range job.Steps {
-				where := file.Name() + ": " + jobID + ": " + step.Name
-				switch {
-				case strings.Contains(step.Run, "fern-api"):
-					t.Errorf("%s installs fern-api outside the tools/fern lock", where)
-				case bareFernCommand.MatchString(step.Run):
-					t.Errorf("%s runs a PATH-resolved fern instead of %s", where, lockedFernBinary)
-				case fernInstall.MatchString(step.Run):
-					installed = true
-				case strings.Contains(step.Run, lockedFernBinary):
+				if strings.Contains(step.Run, lockedFernBinary) {
 					invocations++
-					if !installed {
-						t.Errorf("%s runs Fern before make fern-install", where)
-					}
-					if step.Env["FERN_NO_VERSION_REDIRECTION"] != "true" {
-						t.Errorf("%s lets Fern redirect to the version a fern.config.json names", where)
-					}
 				}
 			}
 		}
 	}
 	if invocations == 0 {
 		t.Fatal("no workflow runs the locked Fern CLI")
+	}
+}
+
+// fernStepViolations checks one job's steps: Fern comes only from the lock,
+// runs only after `make fern-install` with redirection disabled, and a job
+// that installs it keeps downloaded artifacts outside the trusted workspace.
+func fernStepViolations(steps []storageWorkflowStep) []string {
+	var problems []string
+	installs := false
+	for _, step := range steps {
+		installs = installs || fernInstall.MatchString(step.Run)
+	}
+	installed := false
+	for _, step := range steps {
+		if strings.Contains(step.Run, "fern-api") {
+			problems = append(problems, step.Name+" installs fern-api outside the tools/fern lock")
+		}
+		if bareFernCommand.MatchString(step.Run) {
+			problems = append(problems, step.Name+" runs a PATH-resolved fern instead of "+lockedFernBinary)
+		}
+		if fernInstall.MatchString(step.Run) {
+			installed = true
+		}
+		if strings.Contains(step.Run, lockedFernBinary) {
+			if !installed {
+				problems = append(problems, step.Name+" runs Fern before make fern-install")
+			}
+			if step.Env["FERN_NO_VERSION_REDIRECTION"] != "true" {
+				problems = append(problems, step.Name+" lets Fern redirect to the version a fern.config.json names")
+			}
+		}
+		if installs && strings.HasPrefix(step.Uses, "actions/download-artifact@") {
+			if path, _ := step.With["path"].(string); !strings.HasPrefix(path, "${{ runner.temp }}/") {
+				problems = append(problems, step.Name+" extracts an artifact into the workspace holding the trusted Fern install")
+			}
+		}
+	}
+	return problems
+}
+
+func TestFernStepViolations(t *testing.T) {
+	const locked = `"$GITHUB_WORKSPACE/tools/fern/node_modules/.bin/fern" check`
+	install := storageWorkflowStep{Name: "install", Run: "make fern-install"}
+	safe := map[string]string{"FERN_NO_VERSION_REDIRECTION": "true"}
+	tests := []struct {
+		name  string
+		steps []storageWorkflowStep
+		want  string
+	}{
+		{"locked after install", []storageWorkflowStep{install, {Name: "run", Run: locked, Env: safe}}, ""},
+		{"install from a shared checkout", []storageWorkflowStep{{Name: "install", Run: "make -C nvkr-tools fern-install"}, {Name: "run", Run: locked, Env: safe}}, ""},
+		{"floating npm install", []storageWorkflowStep{{Name: "npm", Run: "npm install -g fern-api@latest"}}, "outside the tools/fern lock"},
+		{"npx", []storageWorkflowStep{{Name: "npx", Run: "npx fern-api check"}}, "outside the tools/fern lock"},
+		{"bare call", []storageWorkflowStep{{Name: "bare", Run: "fern check"}}, "PATH-resolved"},
+		{"indented bare call", []storageWorkflowStep{{Name: "bare", Run: "set -e\n  fern generate --docs\n"}}, "PATH-resolved"},
+		{"bare final word", []storageWorkflowStep{{Name: "bare", Run: "fern"}}, "PATH-resolved"},
+		{"bare after pipe", []storageWorkflowStep{{Name: "bare", Run: "true && fern check"}}, "PATH-resolved"},
+		{"locked before install", []storageWorkflowStep{{Name: "run", Run: locked, Env: safe}, install}, "before make fern-install"},
+		{"install and invoke in one step without env", []storageWorkflowStep{{Name: "both", Run: "make fern-install\n" + locked}}, "redirect"},
+		{"artifact in workspace", []storageWorkflowStep{install, {Name: "download", Uses: "actions/download-artifact@x", With: map[string]any{}}}, "trusted Fern install"},
+		{"artifact under runner temp", []storageWorkflowStep{install, {Name: "download", Uses: "actions/download-artifact@x", With: map[string]any{"path": "${{ runner.temp }}/docs"}}}, ""},
+		{"artifact without a Fern install", []storageWorkflowStep{{Name: "download", Uses: "actions/download-artifact@x"}}, ""},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			problems := strings.Join(fernStepViolations(test.steps), "; ")
+			if test.want == "" && problems != "" || test.want != "" && !strings.Contains(problems, test.want) {
+				t.Fatalf("violations %q, want %q", problems, test.want)
+			}
+		})
+	}
+}
+
+// assertFernMakeRecipes dry-runs the shared Make entrypoints and checks the
+// commands they would execute.
+func assertFernMakeRecipes(t *testing.T) {
+	t.Helper()
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	output, err := exec.CommandContext(t.Context(), "make", "-n", "-C", root, "fern-install", "docs-check").CombinedOutput()
+	if err != nil {
+		t.Fatalf("make -n fern-install docs-check: %v\n%s", err, output)
+	}
+	got := string(output)
+	if strings.Contains(got, "fern-api@") {
+		t.Fatal("Makefile installs a floating fern-api")
+	}
+	binary := `"` + filepath.Join(root, lockedFernBinary) + `"`
+	for _, want := range []string{
+		"npm ci --prefix tools/fern --omit=optional --ignore-scripts",
+		"export FERN_NO_VERSION_REDIRECTION=true",
+		binary + " check",
+		binary + " docs md check",
+		binary + " docs broken-links --strict",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("make -n fern-install docs-check lacks %q:\n%s", want, got)
+		}
 	}
 }
 
