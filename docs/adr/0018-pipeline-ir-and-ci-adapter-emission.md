@@ -358,7 +358,8 @@ disk producer's full material closure.
 
 Internal native toolchains beneath the candidate publication prefix's `toolchains/`
 repositories use a separate preparation step with `contents: read` and no workflow package scope.
-The maintained M2, exact `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks` family and two NVKE
+The maintained M2, exact `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks` and
+`ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-ubuntu24` families and two NVKE
 nightly publication prefixes also reuse the already-published
 `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/` pins. Reusing these toolchain subjects does
 not relocate them into family or nightly output namespaces. Other family prefixes, child or lookalike
@@ -1493,8 +1494,7 @@ This subsection is proposed design, not implemented behavior. Today every `id-to
 inline, and no code path relocates a signer. Local measurements of the committed bundles show where those
 jobs fall. In the partitioned development entry, the 139 inline signing and SBOM-attestation jobs account
 for 10,984 of 13,308 expanded YAML parsing events and 104,357 of 264,038 bytes. The maintained release
-producer selects the same inline-signer partition layout; with the Ubuntu 24.04 disks its entry has 14,016
-events and 291,704 bytes.
+producer selects the same inline-signer partition layout; its entry has 13,333 events and 272,696 bytes.
 Before that selection, its flat workflow had reached 47,731 events, above the maintained 95% headroom
 threshold. These are local generation measurements, not provider evidence.
 

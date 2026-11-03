@@ -2,14 +2,14 @@
 
 The combined [Definition](definition.yaml) is used by the committed `nvkr-run.yml`. It joins independently pinned NVKE CLI,
 controller and chart builds, operator executables, native node images and third-party deployment images
-into one release with **73 named outputs**. This remains a candidate; completed pipeline delivery and
+into one release with **69 named outputs**. This remains a candidate; completed pipeline delivery and
 full product acceptance are separate facts.
 
 ## Family pilot
 
 Five independent Definitions partition the combined candidate's exact named outputs. The core family also
 selects the NICo charts and NICo Core and Flow images and the services family selects local-path-provisioner, which the combined Definition omits; they were added while its flat workflow had no remaining YAML
-parsing headroom. They reuse the
+parsing headroom. The Disks Ubuntu 24 family's four outputs are also absent from the combined Definition. They reuse the
 shared catalogs and pins; they do not import each other or change the combined Definition into a parent.
 
 | Definition | Outputs | Membership | Environment |
@@ -20,9 +20,12 @@ shared catalogs and pins; they do not import each other or change the combined D
 | [Disks](disks.yaml) | 4 | Ubuntu 26.04 native AMD64/ARM64 plain and public-bootstrap FDE disks, each with its complete material closure | [github-nvke-disks.yaml](../../environments/github-nvke-disks.yaml) |
 | [Disks Ubuntu 24](disks-ubuntu24.yaml) | 4 | The same four disks on Ubuntu 24.04 through the [Ubuntu 24 overlay](../../catalogs/node-images/variants/ubuntu24.json) | [github-nvke-disks-ubuntu24.yaml](../../environments/github-nvke-disks-ubuntu24.yaml) |
 
-The two disk families are sibling Ubuntu series, not a default and an exception. Operators choose the series
-per node pool; each family has its own Run, signer and publication namespace, so one series can release
-without rebuilding the other.
+The two disk families are sibling Ubuntu series, not a default and an exception; consumers choose the
+series. Each family has its own Run, signer and publication namespace, so one series can release without
+rebuilding the other. The Ubuntu 24.04 disks stay out of the combined candidate: adding them would make every
+combined release and development dispatch wait on four more native disk bakes, and
+[ADR-26](../../../docs/adr/0026-definition-composition.md) requires both series in one member of any composite.
+Folding them in waits on that composite design and recorded hosted bake capacity.
 
 Each Environment selects `githubBundle: nvke-<family>`, the corresponding
 `.github/workflows/nvkr-run-nvke-<family>.yml`, an explicit main-only signer identity, and publication prefix
@@ -64,7 +67,7 @@ historical capacity measurements and remaining cutover work.
 | CLI | `../../catalogs/nvke/module-tags` | AMD64 `nvkectl` and ARM64 `nvkectl-linux-arm64`, from their shared NVKE v0.23.0 source pin |
 | Controller and charts | `../../catalogs/nvke/release` | AMD64/ARM64 aggregate `cwe`, image-bound `controller-chart`, PostgreSQL, SPIRE, SPIRE CRDs and Temporal chart packages |
 | Operator tools | `../../catalogs/tools/operator-amd64`, `../../catalogs/tools/operator-arm64` | AMD64 `operator-tools` and, in the core family only, ARM64 `operator-tools-linux-arm64` Helm and kubectl executables, at the same pinned versions |
-| Node images | `../../catalogs/node-images/release`, `../../catalogs/node-images/variants/native-toolchains.yaml`, `../../catalogs/node-images/variants/ubuntu24.json` | Separate native AMD64 and ARM64 plain and public-bootstrap FDE QCOW2s for Ubuntu 26.04 and, through the Ubuntu 24 overlay, Ubuntu 24.04, with explicit material producers |
+| Node images | `../../catalogs/node-images/release`, `../../catalogs/node-images/variants/native-toolchains.yaml` | Separate native AMD64 and ARM64 plain and public-bootstrap FDE QCOW2s, with explicit material producers; the Disks Ubuntu 24 family adds `../../catalogs/node-images/variants/ubuntu24.json` |
 | Deployment images | `../../catalogs/runtime-dependencies` | Twelve non-test runtime images for each native architecture: PostgreSQL, eight SPIRE images and three Temporal images |
 | CAPNICo | `../../catalogs/nvke/release-components` | Source-built `capnico-controller`, one OCI index requiring AMD64 and ARM64 |
 | Default StorageClass (services family only) | `../../catalogs/local-path-provisioner` | Source-packaged `local-path-provisioner` chart from Rancher `v0.0.37`, one chart per native architecture with its acquired provisioner and BusyBox helper images bound by digest |
@@ -216,14 +219,14 @@ it declares no storage-driver field or ambient runtime-variable workaround. Stor
 is admitted and observed by the existing runtime owner. The historical explicit-VFS probe
 is diagnostic evidence, not this Environment's configuration or production approval.
 Runner labels do not supply runtime-capacity or full-inspector profile authority.
-The current candidate selects `diskEvidence: build-provenance-v1`, authenticating all eight held disks and their
+The current candidate selects `diskEvidence: build-provenance-v1`, authenticating all four held disks and their
 material producers without deep inspection. Profiles remain available for plain-image strict mode but are not pulled or
 executed in this mode; its signed evidence reports inspection as `not-performed`. The approved October 12
 M3 MVP retains this producer-provenance floor. Full disk inspection and material reconciliation are deferred
 beyond that MVP ([ADR-13](../../../docs/adr/0013-supply-chain-evidence.md#6-pipeline-sbom-and-acquisition-scope)
 and [NKX-18052](https://nvidia.atlassian.net/browse/NKX-18052)).
 The product acceptance floor remains AMD64; this candidate retains the separately selected ARM64
-extension, and all eight disk outputs remain mandatory for completion of this Definition.
+extension, and all four disk outputs remain mandatory for completion of this Definition.
 Omitting producer `diskEvidence` still selects the strict contract. A complete producer-provenance
 M2 candidate requires publication, signatures and consumer verification for every selected output.
 The [failed delivery attempt](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-release-carrier-transport.md)
@@ -285,16 +288,17 @@ unsupported. The [historical source audit](../diagnostics/fde-audit.md) records 
 limitations; it is not an audit of the beta update. These diagnostic images make no deployed confidentiality
 claim, even after TPM enrollment. `swtpm` is not required for the bake.
 
-The Ubuntu 24.04 outputs `nvke-node-image-ubuntu24-<arch>` and `nvke-node-fde-ubuntu24-<arch>` add the
+The Disks Ubuntu 24 family's `nvke-node-image-ubuntu24-<arch>` and `nvke-node-fde-ubuntu24-<arch>` outputs add the
 [Ubuntu 24 overlay](../../catalogs/node-images/variants/ubuntu24.json) to the same catalog stack. It replaces the
 installers, the agent, DOCA OVS and the four disk producers with their 24.04 declarations; the targets,
 passphrase, evidence mode and every other material producer are unchanged. The
 [Ubuntu 24 inputs](../diagnostics/ubuntu24/README.md) record the agent's libc contract and installer pins.
-No Ubuntu 24.04 disk has a hosted bake, publication or guest boot recorded.
+The family's Environment keeps this candidate's native ARC route, execution classes, inspection profiles and
+`build-provenance-v1` disk evidence. No Ubuntu 24.04 disk has a hosted bake, publication or guest boot recorded.
 
 The [recorded AMD64 diagnostic Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035)
 completed a standalone FDE bake and raw artifact retention. It did not exercise FDE publication, an ARM64
-FDE bake, or this combined pipeline. Those operational acceptance checks remain outstanding.
+FDE bake, or this combined 69-output pipeline. Those operational acceptance checks remain outstanding.
 
 `../../environments/github-release.yaml` admits only ADR-18's `githubARC: native-kvm-v1` route on
 `arc-amd64-kvm` and `arc-arm64-kvm`, with required native KVM. Each execution class requests 8 CPUs,
@@ -335,7 +339,7 @@ provider access restrictions remain operator obligations.
 ## Generate and check the maintained workflow
 
 The same Definition also supplies the committed feature-branch development workflow through
-`../../environments/github-development.yaml`. It retains all 73 outputs, including Ubuntu 26.04 and 24.04 plain and public-bootstrap FDE disks on both native routes, signing and verification.
+`../../environments/github-development.yaml`. It retains all 69 outputs, including plain and public-bootstrap FDE disks on both native routes, signing and verification.
 Only execution/publication policy changes: separate development environments and credentials, the
 `nvkr-dev.yml` signer identity, and run-attempt-scoped repositories beneath
 `ghcr.io/dsx-ai-factory/nvkr/development`. `make pipeline-dev-generate` regenerates it;

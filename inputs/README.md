@@ -29,7 +29,7 @@ the move preserves each file's existing format.
 
 | Definition | Environment | Scope |
 |---|---|---|
-| [`definitions/nvke/definition.yaml`](definitions/nvke/definition.yaml) | [`environments/github-release.yaml`](environments/github-release.yaml) | Maintained 73-output release candidate; existing main-only signed publication |
+| [`definitions/nvke/definition.yaml`](definitions/nvke/definition.yaml) | [`environments/github-release.yaml`](environments/github-release.yaml) | Maintained 69-output release candidate; existing main-only signed publication |
 | Same NVKE Definition | [`environments/github-development.yaml`](environments/github-development.yaml) | Separate signed development bundle and publication namespace |
 | [`definitions/nvke/core.yaml`](definitions/nvke/core.yaml) | [`environments/github-nvke-core.yaml`](environments/github-nvke-core.yaml) | 20-output core pilot with its own named production bundle and publication namespace |
 | [`definitions/nvke/services.yaml`](definitions/nvke/services.yaml) | [`environments/github-nvke-services.yaml`](environments/github-nvke-services.yaml) | 28-output supporting-services pilot |
@@ -64,8 +64,8 @@ do not imply fresh-machine or full native Linux runtime acceptance.
 The opt-in [Ubuntu 24 node-image inputs](definitions/diagnostics/ubuntu24/README.md) select
 native AMD64 and ARM64 plain local builds, plus plain or public-bootstrap FDE GitHub builds.
 The hosted variants use the matching `environments/github-ubuntu24-<arch>.yaml` Environment
-and remain single-disk, build-only diagnostics. The maintained, published Ubuntu 24.04 disks are the
-combined candidate's `*-ubuntu24-*` outputs and the `disks-ubuntu24` family above.
+and remain single-disk, build-only diagnostics. The maintained `disks-ubuntu24` family above selects
+the same four disks for signed publication; no publication is recorded yet.
 
 ## Focused inputs and examples
 

@@ -117,9 +117,9 @@ contracts and retained-disk diagnostics exist, but a successful real native NVKE
 has not been demonstrated. Qualified release authorization, full v1 qualification/tag/revocation automation,
 qualified provider adapters, secret-valued encrypted VM execution and air-gap operation remain unavailable.
 
-The maintained M2 candidate selects 73 named outputs, retaining the previous 37 and adding CAPNICo,
+The maintained M2 candidate selects 69 named outputs, retaining the previous 37 and adding CAPNICo,
 explicitly named reference-profile fixtures, the provisioned infrastructure provider, NVKE telemetry pipelines and native bootstrap/telemetry
-images. Both native architectures retain plain and public-bootstrap FDE disks, now for Ubuntu 26.04 and 24.04. Native ARC publication admits those disks only with explicit
+images. Both native architectures retain plain and public-bootstrap FDE disks. Native ARC publication admits those disks only with explicit
 `build-provenance-v1`: actual producer encryption, wrapper annotations, signed disk metadata and expected
 output membership must agree. Strict inspection/publication, qualified reproduction and private-passphrase
 FDE remain closed. The consumer's strict evidence policy still rejects producer-only disks. This integration
@@ -1548,11 +1548,11 @@ No new external Run or deleted package is claimed. ADR-04/18/20/21 own the contr
 
 ## Ubuntu 24 node-image inputs
 
-The opt-in `inputs/definitions/diagnostics/ubuntu24` selections reuse M2's NVKE source
-`ff21ba8c07cafff74b68e238a8876af11e5beded`, including upstream Ubuntu 24 support from
+The opt-in `inputs/definitions/diagnostics/ubuntu24` selections reuse M2's NVKE source, now
+`v0.23.0` at `2cfd00081b468d85a4894ec17e9deac13c9d8169`, including upstream Ubuntu 24 support from
 `96ccc50cb7f8ed8bb08f7cf8655906982774f809`. A predecessor-bound whole-producer overlay
-selects Ubuntu 24.04.5 installer bytes for each native architecture and a separate
-Go 1.27.2 Bookworm agent builder. The authenticated installer material selects the guest
+selects Ubuntu 24.04.5 installer bytes for each native architecture, the 24.04 DOCA OVS packages and a
+separate Go 1.27.3 Bookworm agent builder. The authenticated installer material selects the guest
 OS; no new Packer variable or NVKR platform axis is introduced. Preparation checks both
 nFPM archive and executable pins; the agent stays dynamically linked and must pass the
 pinned upstream ELF checker for the Ubuntu loader and GLIBC <= 2.39. Its updater must
@@ -1563,15 +1563,6 @@ Single-output hosted Definitions cover plain and public-bootstrap FDE on AMD64 a
 the existing native local wrapper also selects the two plain variants. Hosted build-only
 finalization retains its one-disk limit. The supplied Environments generate raw-disk
 `static-unqualified` Runs without signing or publication.
-
-Maintained publication selects the same overlay stack. The combined M2 candidate and the sibling
-`inputs/definitions/nvke/disks-ubuntu24.yaml` family each add `nvke-node-image-ubuntu24-<arch>` and
-`nvke-node-fde-ubuntu24-<arch>` for AMD64 and ARM64. The family uses its own `github-nvke-disks-ubuntu24`
-Environment, main-only `nvkr-run-nvke-disks-ubuntu24.yml` signer and `m2-candidate/disks-ubuntu24` prefix.
-Private toolchain preparation admits that exact prefix. The Ubuntu 26.04 outputs and the `disks` family are
-unchanged. Split, composite, closure and maintained-bundle contracts cover membership, signer isolation and
-credential projection, and generation is deterministic. No Ubuntu 24.04 hosted bake, publication, release
-verification or guest boot is recorded.
 `pkg/nvkr/lifecycle/nvke_ubuntu24_test.go` covers compilation, exact closure/pins, changed
 Build identity, native KVM admission and deterministic generation. Script fixtures cover
 selection and frozen-input routing through the shared release catalog. Disk producers
@@ -1580,8 +1571,18 @@ and build recipe used in the package exercise below. This is contract evidence: 
 guest boot, full acquired-payload ABI inspection, agent-start smoke, release publication
 or qualification is established by these tests. ADR-10/11/18/22 own the unchanged contracts.
 
-On 2026-10-19 (UTC), a local native ARM64 container exercise ran the exact overlay preparation
-and offline build commands against that pinned source with the declared Bookworm image
+Maintained publication uses the sibling `inputs/definitions/nvke/disks-ubuntu24.yaml` family. It selects
+`nvke-node-image-ubuntu24-<arch>` and `nvke-node-fde-ubuntu24-<arch>` for AMD64 and ARM64 through the same
+overlay stack, with its own `github-nvke-disks-ubuntu24` Environment, main-only
+`nvkr-run-nvke-disks-ubuntu24.yml` signer and `m2-candidate/disks-ubuntu24` prefix. Private toolchain
+preparation admits that exact prefix. The combined M2 candidate, its Ubuntu 26.04 disks and the `disks`
+family are unchanged; ADR-26 refuses both series as separate composite members. Split, composite, closure
+and credential-boundary contracts pin each output's exact overlay stack and closure, signer isolation and
+credential projection; generation is deterministic. No Ubuntu 24.04 hosted bake, publication, release
+verification or guest boot is recorded.
+
+On 2026-10-19 (UTC), a local native ARM64 container exercise ran the then-current overlay preparation
+and offline build commands against the earlier `ff21ba8c07cafff74b68e238a8876af11e5beded` source with the declared Bookworm image
 `sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9`.
 Module verification, both nFPM checksum checks, packaging and the ELF guards passed.
 The resulting `nke-agent` Debian package, version `0.2.1-81-gff21ba8`, had SHA-256
@@ -3241,8 +3242,7 @@ reporting, is unrecorded. Signer relocation remains a proposed ADR-18 §8 design
 The maintained release Environment now also selects `githubExecutionPartitions`. The NVKE v0.23.0 DOCA OVS
 producer added one source fetch per release disk and took the flat release workflow to 47,731 events,
 above the 47,500 maintained threshold. Partitioned, the release entry has 272,696 bytes and 13,333 events;
-the largest of its 30 workers has 4,947. Adding the four Ubuntu 24.04 disks takes the entry to 291,704 bytes
-and 14,016 events, still 30 workers, the largest with 4,959. Every OIDC job stays in the entry, so the signer identity
+the largest of its 30 workers has 4,947. Every OIDC job stays in the entry, so the signer identity
 `nvkr-run.yml@refs/heads/main` is unchanged. The maintained bundle contract checks the private-image
 credential boundary on the flat reference that the workers must project exactly. These are local generation
 results. No partitioned release Run is recorded; the hosted development Run above is the closest evidence.
@@ -3461,6 +3461,8 @@ references and own any required association or compatibility decision. See the
 [partitioning strategy](../definition-partitioning-strategy.md) for scope and historical measurements.
 Proposed [ADR-26](0026-definition-composition.md) designs a composite of these four families as one Release;
 units U1–U7 are implemented and contract-tested only, and it adds no authored input.
+A fifth, `disks-ubuntu24` family selects four Ubuntu 24.04 disks that the combined candidate omits; see
+[Ubuntu 24 node-image inputs](#ubuntu-24-node-image-inputs).
 
 The maintained release node-image catalog selects the NVIDIA OVN fork `v2.4.2`
 (`8af51273d52dfa07454435d18d37230e582d797a`) for `ovn-kube-ubuntu`, `ovn-kubernetes-chart` and
