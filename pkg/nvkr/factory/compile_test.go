@@ -110,6 +110,34 @@ func TestCompileBuildsExplicitArtifactAndDeliveryGraph(t *testing.T) {
 
 }
 
+func TestCompileDocumentsLoadsEachCatalogStackOnce(t *testing.T) {
+	base, err := catalog.LoadContext(t.Context(), testCatalogProvider(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stack, err := catalog.ApplyStack(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	definition, delivery := fixtureInputs("ai-factory", "containerd-tools", "")
+	shared := authored.Catalog{Base: "output-catalog"}
+	definition.Outputs[0].Components, definition.Outputs[0].Catalog = []string{"containerd"}, &shared
+	definition.Outputs = append(definition.Outputs, authored.DefinitionOutput{Name: "kubelet-tools", Platform: "linux/amd64",
+		Format: authored.OutputExecutable, Components: []string{"kubelet"}, Catalog: &authored.Catalog{Base: "output-catalog"}})
+	loads := map[string]int{}
+	plan, err := compileDocumentsWithLoader(t.Context(), "definition.yaml", definition, "environment.yaml", delivery, "test",
+		func(_ context.Context, spec authored.Catalog) (*catalog.Stack, error) {
+			loads[spec.Base]++
+			return stack, nil
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.LifecycleOutputs) != 2 || len(loads) != 2 || loads["testdata/catalogs/kubernetes-layered"] != 1 || loads["output-catalog"] != 1 {
+		t.Fatalf("catalog stacks were not loaded exactly once each: outputs=%d loads=%v", len(plan.LifecycleOutputs), loads)
+	}
+}
+
 func contains(values []string, wanted string) bool {
 	for _, value := range values {
 		if value == wanted {

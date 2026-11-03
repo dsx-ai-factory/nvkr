@@ -6,6 +6,7 @@ package factory
 import (
 	"context"
 	"path/filepath"
+	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
@@ -33,6 +34,7 @@ func compileDocumentsWithLoader(ctx context.Context, definitionPath string, defi
 
 // compileDocumentsFor compiles a plain Definition (nil record) or a composite's
 // effective Definition, binding the composition record before Plan validation.
+// Each distinct catalog stack loads once per compile.
 func compileDocumentsFor(ctx context.Context, definitionPath string, definition authored.Definition,
 	environmentPath string, delivery authored.Environment, generatorVersion string,
 	loadStack func(context.Context, authored.Catalog) (*catalog.Stack, error), record *CompositionRecord,
@@ -46,6 +48,20 @@ func compileDocumentsFor(ctx context.Context, definitionPath string, definition 
 	}
 	if err := admitDefinitionForm(delivery, record); err != nil {
 		return nil, err
+	}
+	stacks := map[string]*catalog.Stack{}
+	load := loadStack
+	loadStack = func(ctx context.Context, spec authored.Catalog) (*catalog.Stack, error) {
+		key := spec.Base + "\x00" + strings.Join(spec.Overlays, "\x00")
+		if stack, ok := stacks[key]; ok {
+			return stack, nil
+		}
+		stack, err := load(ctx, spec)
+		if err != nil {
+			return nil, err
+		}
+		stacks[key] = stack
+		return stack, nil
 	}
 	stack, err := loadStack(ctx, definition.Catalog)
 	if err != nil {
