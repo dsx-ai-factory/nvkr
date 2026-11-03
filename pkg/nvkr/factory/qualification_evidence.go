@@ -35,6 +35,9 @@ func AdmitQualificationHandoff(plan *Plan) error {
 	if plan == nil {
 		return e.New(e.CodeUsage, "qualification handoff requires an original Plan")
 	}
+	if plan.Composition != nil {
+		return e.New(e.CodeEngineCapability, "qualification of a composite Definition Run is deferred (ADR-26 §7)")
+	}
 	if plan.Environment.GitHubRuntimeSource != nil {
 		return e.New(e.CodeEngineCapability, "qualification handoff cannot replay an exact runtime source selection")
 	}
@@ -151,7 +154,7 @@ func qualificationPayloadPredicates(ctx context.Context, plan *Plan, metadataPat
 		return nil, err
 	}
 	metadata := inspection.Root.Release
-	if metadata == nil || metadata.PlanDigest != planDigest || metadata.DefinitionDigest != plan.DefinitionDigest || metadata.EnvironmentDigest != plan.EnvironmentDigest {
+	if metadata == nil || metadata.PlanDigest != planDigest || metadata.DefinitionDigest != plan.DefinitionDigest || metadata.EnvironmentDigest != plan.EnvironmentDigest || !metadata.Composition.Equal(plan.Composition) {
 		return nil, e.New(e.CodeVerifyFailed, "qualification metadata differs from the original Plan")
 	}
 	rootInvocation, err := qualificationPredicateInvocation(root.Predicate)

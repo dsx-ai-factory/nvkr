@@ -7,3 +7,15 @@ docs/proposals/nvsentinel/*.patch whitespace=-blank-at-eol,-space-before-tab
 # Unified patch context preserves source whitespace and a leading context marker.
 inputs/catalogs/nicosim/patches/version-interface.patch -whitespace
 inputs/catalogs/local-path-provisioner/patches/chart-image-digest.patch -whitespace
+
+# Generated workflow bundles collapse in pull request diffs. Regenerate them;
+# never edit them by hand.
+.github/nvkr-*/** linguist-generated
+.github/workflows/nvkr-run*.yml linguist-generated
+.github/workflows/nvkr-dev.yml linguist-generated
+.github/workflows/nvkr-dev__partition-*.yml linguist-generated
+.github/workflows/nvkr-dev-qualify.yml linguist-generated
+.github/workflows/nvkr-dev-smoke.yml linguist-generated
+.github/workflows/nvkr-qualify.yml linguist-generated
+.github/workflows/nvkr-smoke.yml linguist-generated
+.github/workflows/catalog-refresh.yaml linguist-generated

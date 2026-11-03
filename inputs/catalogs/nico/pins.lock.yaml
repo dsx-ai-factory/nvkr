@@ -3,7 +3,7 @@ apiVersion: nvkr.dev/lock/v1
 kind: PinLock
 pins:
   nico:
-    commit: 80d131a5cd3280f9cef3131fa0c5647bdf3e79d0
-    sourceDateEpoch: 1792084745
-    tag: v2.2.2
-    treeHash: b77c2b056fee4c34ea3fa189b6578ffb985cc4f5
+    commit: abc446b33dc773d9b8c7f41b54cccf812758b165
+    sourceDateEpoch: 1793405579
+    tag: v2.3.0
+    treeHash: 328295ebab68c4895083b76233f9a8d2803b3045

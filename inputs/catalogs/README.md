@@ -20,7 +20,7 @@ output-scoped selections retain the same NVKE release producers.
 The [native ARM64 AICR CLI](tools/aicr-arm64/README.md) pins AICR's release executable and
 delivers its binary attestation beside it as a pinned companion.
 
-[`nico`](nico/registry.yaml) owns the source-packaged NICo and NICo prerequisite charts and the
+[`nico`](nico/registry.yaml) owns the source-packaged NICo, NICo prerequisite and NICo Flow charts and the
 source-built NICo Core and Flow images, pinned independently of NVKE to one infra-controller release.
 Both images use the generic rootless BuildKit route with digest-pinned bases. Core chains the source's
 native build, runtime and release Dockerfiles in one producer per architecture. The core family selects
