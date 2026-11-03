@@ -264,6 +264,7 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 		{"services", "nvkr-run-nvke-services", true},
 		{"telemetry", "nvkr-run-nvke-telemetry", false},
 		{"disks", "nvkr-run-nvke-disks", false},
+		{"disks-ubuntu24", "nvkr-run-nvke-disks-ubuntu24", false},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
 			plan, err := LoadPlanContext(t.Context(), "../../../.github/"+fixture.bundle+"/plan.json")

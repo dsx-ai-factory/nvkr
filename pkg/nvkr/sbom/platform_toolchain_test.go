@@ -96,7 +96,7 @@ func TestSBOMSelectsToolchainForExecutablePlatform(t *testing.T) {
 				check(t, boms, index)
 			})
 			t.Run("verified", func(t *testing.T) {
-				set, err := BuildVerified(context.Background(), resolved, digest, hashes, nil)
+				set, err := BuildVerified(context.Background(), resolved, digest, hashes, nil, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -134,7 +134,7 @@ func TestSBOMSelectsToolchainForExecutablePlatform(t *testing.T) {
 					if _, _, err := PerArtifact(resolved, digest, hashes); sbomCode(err) != nvkrerr.CodeInvalidCatalog {
 						t.Fatalf("native SBOM fell back to vendoring image: %v", err)
 					}
-					if _, err := BuildVerified(context.Background(), resolved, digest, hashes, nil); sbomCode(err) != nvkrerr.CodeEngineCapability {
+					if _, err := BuildVerified(context.Background(), resolved, digest, hashes, nil, nil); sbomCode(err) != nvkrerr.CodeEngineCapability {
 						t.Fatalf("verified native SBOM fell back to vendoring image: %v", err)
 					}
 				})

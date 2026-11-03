@@ -21,13 +21,13 @@ func cmdSBOM() *cli.Command {
 		Name:   "sbom",
 		Hidden: true, // retained as legacy compatibility for attest --sbom
 		Usage:  "emit an UNQUALIFIED diagnostic CycloneDX SBOM from a caller-supplied manifest",
-		Flags: append(selectionFlags(),
+		Flags: append(append(selectionFlags(),
 			&cli.StringFlag{Name: "out", Aliases: []string{"o"}, Value: "sbom.cdx.json", Usage: "SBOM output path (or output dir with --per-artifact)"},
 			&cli.BoolFlag{Name: "per-artifact", Usage: "emit one SBOM per built artifact + an aggregate index (ADR-13 §1)"},
 			&cli.BoolFlag{Name: "diagnostic", Usage: "accept an UNQUALIFIED bake-off observed-digests record instead of a publishable validation vector"},
 			&cli.StringFlag{Name: "expected-digests", Aliases: []string{"e"}, Required: true,
 				Usage: "canonical vector, or with --diagnostic an observed-digests record supplying the selected exact artifact digest(s)"},
-		),
+		), qualifiedDocumentVerifierFlags()...),
 		Action: func(c *cli.Context) error {
 			res, digest, err := resolveBuild(c)
 			if err != nil {
@@ -49,11 +49,15 @@ func cmdSBOM() *cli.Command {
 			for _, comp := range m.Components {
 				hashes[comp.Name] = comp.SHA256
 			}
+			evidenceVerifier, err := evidenceBundleVerifier(c)
+			if err != nil {
+				return err
+			}
 			var verified *sbom.VerifiedSet
 			if c.Bool("diagnostic") {
-				verified, err = buildDiagnosticSelectedSBOM(c.Context, res, digest, hashes)
+				verified, err = buildDiagnosticSelectedSBOM(c.Context, res, digest, hashes, evidenceVerifier)
 			} else {
-				verified, err = buildVerifiedSBOM(c.Context, res, digest, hashes)
+				verified, err = buildVerifiedSBOM(c.Context, res, digest, hashes, evidenceVerifier)
 			}
 			if err != nil {
 				return err

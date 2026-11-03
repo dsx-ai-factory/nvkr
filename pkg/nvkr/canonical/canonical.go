@@ -31,6 +31,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"unicode"
 	"unicode/utf16"
 	"unicode/utf8"
 
@@ -294,16 +295,124 @@ func ValidateJSONDocument(raw []byte) error {
 	return rejectDuplicateNames(raw)
 }
 
+// ValidateFoldedJSONDocument is ValidateJSONDocument for an external document
+// decoded into Go structs. It also rejects member names that encoding/json would
+// match to the same field, such as "spdxVersion" and "SPDXVERSION", so a later
+// alias cannot replace the value a reviewer reads under the exact name.
+func ValidateFoldedJSONDocument(raw []byte) error {
+	if !utf8.Valid(raw) {
+		return e.New(e.CodeVerifyFailed, "JSON document is not valid UTF-8")
+	}
+	return walkDocument(raw, foldJSONName)
+}
+
 func rejectDuplicateNames(raw []byte) error {
+	return walkDocument(raw, func(name string) string { return name })
+}
+
+func walkDocument(raw []byte, key func(string) string) error {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.UseNumber()
-	if err := walkJSON(dec); err != nil {
+	if err := walkJSON(dec, key); err != nil {
 		return e.Wrap(e.CodeVerifyFailed, err, "validating canonical JSON member names")
 	}
 	return requireEOF(dec)
 }
 
-func walkJSON(dec *json.Decoder) error {
+// RejectFieldAliases rejects a JSON member that encoding/json would bind to a
+// field of out's struct type only through its case-insensitive match, whether or
+// not the exact name is also present. Members bound to maps, interfaces or
+// json.RawMessage stay opaque, so free-form upstream parameters keep their names.
+// It supports plain structs only: an embedded struct field, whose members
+// encoding/json would promote, is refused rather than checked partially, unless
+// its tag is exactly json:"-".
+// Call it after ValidateJSONDocument.
+func RejectFieldAliases(raw []byte, out any) error {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	var document any
+	if err := dec.Decode(&document); err != nil {
+		return e.Wrap(e.CodeVerifyFailed, err, "decoding JSON for field alias admission")
+	}
+	return rejectFieldAliases(document, reflect.TypeOf(out))
+}
+
+var rawMessageType = reflect.TypeOf(json.RawMessage(nil))
+
+func rejectFieldAliases(value any, t reflect.Type) error {
+	for t != nil && t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	if t == nil || t == rawMessageType {
+		return nil
+	}
+	switch t.Kind() {
+	case reflect.Slice, reflect.Array:
+		items, _ := value.([]any)
+		for _, item := range items {
+			if err := rejectFieldAliases(item, t.Elem()); err != nil {
+				return err
+			}
+		}
+	case reflect.Struct:
+		object, ok := value.(map[string]any)
+		if !ok {
+			return nil
+		}
+		fields := map[string]reflect.Type{}
+		folded := map[string]string{}
+		for i := 0; i < t.NumField(); i++ {
+			field := t.Field(i)
+			tag := field.Tag.Get("json")
+			if tag == "-" {
+				continue // encoding/json neither binds nor promotes it
+			}
+			if field.Anonymous {
+				return e.New(e.CodeInternal, "field alias admission does not support embedded field %s in %s", field.Name, t)
+			}
+			name, _, _ := strings.Cut(tag, ",")
+			if !field.IsExported() {
+				continue
+			}
+			if name == "" {
+				name = field.Name
+			}
+			fields[name] = field.Type
+			folded[foldJSONName(name)] = name
+		}
+		members := make([]string, 0, len(object))
+		for member := range object {
+			members = append(members, member)
+		}
+		sort.Strings(members)
+		for _, member := range members {
+			if fieldType, exact := fields[member]; exact {
+				if err := rejectFieldAliases(object[member], fieldType); err != nil {
+					return err
+				}
+			} else if field, alias := folded[foldJSONName(member)]; alias {
+				return e.New(e.CodeVerifyFailed, "JSON member %q is a case alias of field %q", member, field)
+			}
+		}
+	}
+	return nil
+}
+
+// foldJSONName maps each rune to the smallest rune of its case-fold set, the
+// same key encoding/json uses for its case-insensitive field match.
+func foldJSONName(name string) string {
+	return strings.Map(func(r rune) rune {
+		for {
+			next := unicode.SimpleFold(r)
+			if next <= r {
+				return next
+			}
+			r = next
+		}
+	}, name)
+}
+
+func walkJSON(dec *json.Decoder, key func(string) string) error {
 	token, err := dec.Token()
 	if err != nil {
 		return err
@@ -324,11 +433,11 @@ func walkJSON(dec *json.Decoder) error {
 			if !ok {
 				return e.New(e.CodeVerifyFailed, "JSON object member name is not a string")
 			}
-			if seen[name] {
+			if seen[key(name)] {
 				return e.New(e.CodeVerifyFailed, "duplicate JSON object member %q", name)
 			}
-			seen[name] = true
-			if err := walkJSON(dec); err != nil {
+			seen[key(name)] = true
+			if err := walkJSON(dec, key); err != nil {
 				return err
 			}
 		}
@@ -338,7 +447,7 @@ func walkJSON(dec *json.Decoder) error {
 		}
 	case '[':
 		for dec.More() {
-			if err := walkJSON(dec); err != nil {
+			if err := walkJSON(dec, key); err != nil {
 				return err
 			}
 		}
