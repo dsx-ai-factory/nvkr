@@ -108,6 +108,10 @@ func TestAICRNVKELeafAdmission(t *testing.T) {
 		admit        bool
 	}{
 		{"curated leaf last", "componentRefs: []\nmetadata:\n" + overlays + "    - " + leaf + "\n  version: v1.2.0\n", true},
+		// Verbatim top-level neighbors and metadata of the recipe AICR v1.2.0 wrote in local
+		// attempt aicr-nvke-gb200-local-20261103-r7 (sha256:80c875d6…).
+		{"AICR v1.2.0 writer output", "kind: RecipeResult\nmetadata:\n  appliedOverlays:\n    - base\n    - monitoring-hpa\n" +
+			"    - gb200-any\n    - nvke\n    - gb200-nvke-ubuntu-training\n    - " + leaf + "\n  version: 1.2.0\nvalidation:\n", true},
 		{"wildcard merge without the leaf", "metadata:\n" + overlays + "  excludedOverlays:\n    - name: " + leaf + "\n", false},
 		{"leaf not last", "metadata:\n" + overlays + "    - " + leaf + "\n    - later\n", false},
 		{"unreadable item after the leaf", "metadata:\n" + overlays + "    - " + leaf + "\n    - \"later overlay\"\n", false},
@@ -195,7 +199,17 @@ func TestAICRNVKEBundleFlags(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			argv, deployer := "\n"+string(raw), command[len(command)-1]
+			// The output name, not the producer's positional arguments, names the expected deployer.
+			deployer, ok := strings.CutPrefix(build.Name, "aicr-nvke-gb200-ubuntu-training-kubeflow-")
+			if !ok {
+				t.Fatalf("unexpected GB200 output %q", build.Name)
+			}
+			argv := "\n" + string(raw)
+			for _, pair := range []string{"--recipe\n" + out + "/recipe.yaml", "--deployer\n" + deployer, "--output\noci-layout:" + out + "/layout"} {
+				if !strings.Contains(argv, "\n"+pair+"\n") {
+					t.Fatalf("%s bundle omits %q: %q", deployer, pair, argv)
+				}
+			}
 			if !strings.Contains(argv, "\n--dra-eviction-node-label\nnvidia.com/dra-kubelet-plugin=true\n") {
 				t.Fatalf("%s bundle omits the DRA eviction label: %q", deployer, argv)
 			}
