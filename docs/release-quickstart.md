@@ -236,7 +236,12 @@ Each stage links the NVKE `v0.23.0` page that owns it. Run them from an NVKE che
    ([troubleshooting](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/docs/operate/troubleshoot.md?plain=1#L249-L253)). The core Release
    carries it as the same build as `nico-reference-profiles-fixture`: NVKE's reference test profiles, not fleet
    configuration. Set the stack config's `images.profiles` to your site's profile image; it replaces the image
-   only after NVKE finds `controller-profiles` in the Release.
+   only after NVKE finds `controller-profiles` in the Release. If you leave `images.profiles` unset, NVKE installs
+   the Release's image instead
+   ([`site.go`](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/cli/internal/deploypath/site.go#L131-L139)).
+   Its `nico-vms-cp` and `nico-vms-worker` profiles then appear among the controller's config profiles, and a node
+   set uses one only when it names it in `configProfile`
+   ([`get_node_config_profile.go`](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/controller/internal/temporal/activities/get_node_config_profile.go#L55-L87)).
 8. [Register the image for provisioning](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/docs/operate/build-node-images.md#register-the-image-for-provisioning).
 9. [Create a workload cluster](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/docs/workload-clusters/create.md).
 10. Apply the GPU stack. The
