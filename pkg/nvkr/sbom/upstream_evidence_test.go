@@ -314,6 +314,8 @@ func TestExternalProvenanceStatementVersions(t *testing.T) {
 			[]byte(`"externalParameters":{"Path":"a","PATH":"b"}`), 1)},
 		{name: "bundle media type alias", want: nvkrerr.CodeUnverifiedRef,
 			body: []byte(`{"mediaType":"application/vnd.dev.sigstore.bundle+json;version=0.2","MEDIATYPE":"` + BundleMediaType + `","dsseEnvelope":{}}`)},
+		{name: "DSSE payloadType alias", want: nvkrerr.CodeUnverifiedRef,
+			body: []byte(`{"mediaType":"` + BundleMediaType + `","dsseEnvelope":{"payloadType":"text/plain","PAYLOADTYPE":"application/vnd.in-toto+json","payload":""}}`)},
 		{name: "older Sigstore bundle", body: []byte(`{"mediaType":"application/vnd.dev.sigstore.bundle+json;version=0.2","dsseEnvelope":{}}`),
 			want: nvkrerr.CodeUnverifiedRef},
 	} {

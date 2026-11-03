@@ -265,6 +265,14 @@ func TestRejectFieldAliasesBindsOnlyStructFields(t *testing.T) {
 		} `json:"subject"`
 		Parameters json.RawMessage `json:"parameters"`
 		Untagged   string
+		Envelope   *struct {
+			PayloadType string `json:"payloadType"`
+		} `json:"envelope"`
+		Signatures [1]struct {
+			KeyID string `json:"keyid"`
+		} `json:"signatures"`
+		Ignored  string `json:"-"`
+		Optional string `json:"optional,omitempty"`
 	}
 	for _, tc := range []struct {
 		name string
@@ -280,6 +288,11 @@ func TestRejectFieldAliasesBindsOnlyStructFields(t *testing.T) {
 		{name: "lone alias", raw: `{"PredicateType":"v1"}`},
 		{name: "alias in a slice of structs", raw: `{"subject":[{"name":"a","NAME":"b"}]}`},
 		{name: "alias of an untagged field", raw: `{"untagged":"u"}`},
+		{name: "exact nested pointer and array members", raw: `{"envelope":{"payloadType":"p"},"signatures":[{"keyid":"k"}],"optional":"o"}`, ok: true},
+		{name: "alias inside a nested pointer", raw: `{"envelope":{"PAYLOADTYPE":"p"}}`},
+		{name: "alias inside an array of structs", raw: `{"signatures":[{"KEYID":"k"}]}`},
+		{name: "alias of a tag with options", raw: `{"OPTIONAL":"o"}`},
+		{name: "member named like an ignored field", raw: `{"ignored":"i","IGNORED":"j"}`, ok: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := RejectFieldAliases([]byte(tc.raw), &statement{})
@@ -291,6 +304,19 @@ func TestRejectFieldAliasesBindsOnlyStructFields(t *testing.T) {
 				t.Fatalf("error = %v, want %q", err, e.CodeVerifyFailed)
 			}
 		})
+	}
+}
+
+func TestRejectFieldAliasesRefusesEmbeddedStructs(t *testing.T) {
+	type promoted struct {
+		PredicateType string `json:"predicateType"`
+	}
+	type statement struct {
+		promoted
+	}
+	var coded *e.Error
+	if err := RejectFieldAliases([]byte(`{"PREDICATETYPE":"v1"}`), &statement{}); !errors.As(err, &coded) || coded.Code != e.CodeInternal {
+		t.Fatalf("embedded struct error = %v, want %q", err, e.CodeInternal)
 	}
 }
 
