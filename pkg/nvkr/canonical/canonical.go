@@ -31,6 +31,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"unicode"
 	"unicode/utf16"
 	"unicode/utf8"
 
@@ -294,16 +295,45 @@ func ValidateJSONDocument(raw []byte) error {
 	return rejectDuplicateNames(raw)
 }
 
+// ValidateFoldedJSONDocument is ValidateJSONDocument for an external document
+// decoded into Go structs. It also rejects member names that encoding/json would
+// match to the same field, such as "spdxVersion" and "SPDXVERSION", so a later
+// alias cannot replace the value a reviewer reads under the exact name.
+func ValidateFoldedJSONDocument(raw []byte) error {
+	if !utf8.Valid(raw) {
+		return e.New(e.CodeVerifyFailed, "JSON document is not valid UTF-8")
+	}
+	return walkDocument(raw, foldJSONName)
+}
+
 func rejectDuplicateNames(raw []byte) error {
+	return walkDocument(raw, func(name string) string { return name })
+}
+
+func walkDocument(raw []byte, key func(string) string) error {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.UseNumber()
-	if err := walkJSON(dec); err != nil {
+	if err := walkJSON(dec, key); err != nil {
 		return e.Wrap(e.CodeVerifyFailed, err, "validating canonical JSON member names")
 	}
 	return requireEOF(dec)
 }
 
-func walkJSON(dec *json.Decoder) error {
+// foldJSONName maps each rune to the smallest rune of its case-fold set, the
+// same key encoding/json uses for its case-insensitive field match.
+func foldJSONName(name string) string {
+	return strings.Map(func(r rune) rune {
+		for {
+			next := unicode.SimpleFold(r)
+			if next <= r {
+				return next
+			}
+			r = next
+		}
+	}, name)
+}
+
+func walkJSON(dec *json.Decoder, key func(string) string) error {
 	token, err := dec.Token()
 	if err != nil {
 		return err
@@ -324,11 +354,11 @@ func walkJSON(dec *json.Decoder) error {
 			if !ok {
 				return e.New(e.CodeVerifyFailed, "JSON object member name is not a string")
 			}
-			if seen[name] {
+			if seen[key(name)] {
 				return e.New(e.CodeVerifyFailed, "duplicate JSON object member %q", name)
 			}
-			seen[name] = true
-			if err := walkJSON(dec); err != nil {
+			seen[key(name)] = true
+			if err := walkJSON(dec, key); err != nil {
 				return err
 			}
 		}
@@ -338,7 +368,7 @@ func walkJSON(dec *json.Decoder) error {
 		}
 	case '[':
 		for dec.More() {
-			if err := walkJSON(dec); err != nil {
+			if err := walkJSON(dec, key); err != nil {
 				return err
 			}
 		}

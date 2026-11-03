@@ -226,6 +226,35 @@ func TestValidateJSONDocumentRejectsAmbiguousExternalJSON(t *testing.T) {
 	}
 }
 
+func TestValidateFoldedJSONDocumentRejectsCaseAliases(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		raw  string
+		ok   bool
+	}{
+		{name: "distinct names", raw: `{"spdxVersion":"SPDX-2.3","name":"a","nested":[{"name":"b"}]}`, ok: true},
+		{name: "exact duplicate", raw: `{"spdxVersion":"SPDX-2.2","spdxVersion":"SPDX-2.3"}`},
+		{name: "ascii alias after", raw: `{"spdxVersion":"SPDX-2.2","SPDXVERSION":"SPDX-2.3"}`},
+		{name: "ascii alias before", raw: `{"SPDXVERSION":"SPDX-2.3","spdxVersion":"SPDX-2.2"}`},
+		{name: "kelvin sign alias", raw: `{"kind":"a","\u212aind":"b"}`},
+		{name: "nested alias", raw: `{"packages":[{"name":"a","NAME":"b"}]}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateFoldedJSONDocument([]byte(tc.raw))
+			if tc.ok && err != nil {
+				t.Fatalf("rejected distinct names: %v", err)
+			}
+			var coded *e.Error
+			if !tc.ok && (!errors.As(err, &coded) || coded.Code != e.CodeVerifyFailed) {
+				t.Fatalf("error = %v, want %q", err, e.CodeVerifyFailed)
+			}
+		})
+	}
+	if err := ValidateJSONDocument([]byte(`{"name":"a","NAME":"b"}`)); err != nil {
+		t.Fatalf("exact-name validation rejected case-distinct names: %v", err)
+	}
+}
+
 func TestCanonicalIntegerProfilePreservesUint64AndRejectsFractionalNumbers(t *testing.T) {
 	got, err := Marshal(struct {
 		Sequence uint64 `json:"sequence"`

@@ -783,7 +783,7 @@ func validateExternalSBOM(raw []byte, subject, artifactDigest string) error {
 		return e.New(e.CodeUnverifiedRef,
 			"external SBOM for %s is SPDX tag-value; only SPDX 2.3 JSON and CycloneDX JSON are supported", subject)
 	}
-	if err := canonical.ValidateJSONDocument(raw); err != nil {
+	if err := canonical.ValidateFoldedJSONDocument(raw); err != nil {
 		return e.Wrap(e.CodeUnverifiedRef, err, "external sbom for %s is not an unambiguous JSON document", subject)
 	}
 	var format struct {
