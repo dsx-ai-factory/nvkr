@@ -9,6 +9,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -421,7 +422,8 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 				}
 			}
 			if selected.privateDiskProducers >= 0 {
-				assertGitHubPrivateImageCredentialBoundary(t, plan, githubFlatReference(t, plan, bundle), selected.privateDiskProducers)
+				flatReference := githubFlatReference(t, plan, bundle)
+				assertGitHubPrivateImageCredentialBoundary(t, plan, flatReference, selected.privateDiskProducers)
 			}
 			workers := map[string][]byte{}
 			for name, raw := range bundle.Files {
@@ -448,15 +450,11 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 				if selected.privateDiskProducers >= 0 {
 					// The emitted workers, not only their flat reference, keep each
 					// image credential in its read-only preparation step.
-					jobs := map[string]githubJob{}
-					for _, raw := range workers {
-						expanded, err := expandGitHubActions(plan, raw, bundle.Files)
-						if err != nil {
-							t.Fatal(err)
-						}
-						maps.Copy(jobs, decodeGitHubWorkflow(t, expanded).Jobs)
+					emittedJobs := map[string]githubJob{}
+					for _, emitted := range githubEmittedWorkflows(t, plan, bundle) {
+						maps.Copy(emittedJobs, emitted.Jobs)
 					}
-					assertGitHubPrivateImageJobs(t, jobs, selected.privateDiskProducers)
+					assertGitHubPrivateImageJobs(t, emittedJobs, selected.privateDiskProducers)
 				}
 				t.Logf("one entry: %d bytes, %d workers with exact original membership", len(bundle.Files[bundle.WorkflowPath]), len(workers))
 				return
@@ -477,6 +475,42 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 			t.Logf("one entry: %d bytes, %d execution/result jobs", len(bundle.Files[bundle.WorkflowPath]), len(workflow.Jobs))
 		})
 	}
+}
+
+// githubEmittedWorkflows decodes each workflow file a bundle emits, the entry
+// and any partition workers, with its local actions expanded. An entry's
+// worker-calling jobs have no steps; their bodies are the worker documents.
+func githubEmittedWorkflows(t *testing.T, plan *Plan, bundle *GeneratedBundle) []githubWorkflowDocument {
+	t.Helper()
+	var documents []githubWorkflowDocument
+	for _, name := range slices.Sorted(maps.Keys(bundle.Files)) {
+		if name != bundle.WorkflowPath && !githubPartitionWorkflowSuffix.MatchString(name) {
+			continue
+		}
+		raw := bundle.Files[name]
+		if name == bundle.WorkflowPath && plan.Environment.GitHubExecutionPartitions {
+			var document yamlv3.Node
+			if err := yamlv3.Unmarshal(raw, &document); err != nil {
+				t.Fatal(err)
+			}
+			jobs := githubYAMLField(document.Content[0], "jobs")
+			for index := len(jobs.Content) - 2; index >= 0; index -= 2 {
+				if githubYAMLField(jobs.Content[index+1], "uses") != nil {
+					jobs.Content = slices.Delete(jobs.Content, index, index+2)
+				}
+			}
+			var err error
+			if raw, err = encodeGitHubYAML(&document); err != nil {
+				t.Fatal(err)
+			}
+		}
+		expanded, err := expandGitHubActions(plan, raw, bundle.Files)
+		if err != nil {
+			t.Fatal(err)
+		}
+		documents = append(documents, decodeGitHubWorkflow(t, expanded))
+	}
+	return documents
 }
 
 // githubFlatReference returns the single-workflow rendering whose job bodies a

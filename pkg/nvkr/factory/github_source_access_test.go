@@ -281,17 +281,20 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			// Partition workers project the flat reference's jobs exactly.
-			reference := githubFlatReference(t, plan, bundle)
-			assertMaintainedPinSetCredentialScope(t, plan, reference, fixture.pinSet)
+			// Check both the flat reference that partition workers project and
+			// the workflow files actually emitted, entry and workers.
+			flatReference := githubFlatReference(t, plan, bundle)
+			flatDocument := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, flatReference))
+			assertMaintainedPinSetCredentialScope(t, plan, []githubWorkflowDocument{flatDocument}, fixture.pinSet)
+			assertMaintainedPinSetCredentialScope(t, plan, githubEmittedWorkflows(t, plan, bundle), fixture.pinSet)
 			if fixture.name == "combined" {
-				assertMaintainedPinSetCredentialMutations(t, plan, reference)
+				assertMaintainedPinSetCredentialMutations(t, plan, flatReference)
 			}
 		})
 	}
 }
 
-func assertMaintainedPinSetCredentialScope(t *testing.T, plan *Plan, bundle *GeneratedBundle, wantPinSet bool) {
+func assertMaintainedPinSetCredentialScope(t *testing.T, plan *Plan, documents []githubWorkflowDocument, wantPinSet bool) {
 	t.Helper()
 	wantEnvironment := map[string]string{
 		"NVKR_PIN_SOURCE_TOKEN_0": "${{ secrets.NKE_SOURCE_TOKEN }}",
@@ -340,50 +343,51 @@ func assertMaintainedPinSetCredentialScope(t *testing.T, plan *Plan, bundle *Gen
 		}
 		allowedFetches[jobID][githubJobID(node.ID)] = true
 	}
-	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
-	if hasPinCredential(document.Env) || hasSourceSecret(document.Env) {
-		t.Fatal("workflow-scoped pin credential")
-	}
 	found := map[string]int{}
 	bootstraps := 0
-	for id, job := range document.Jobs {
-		bootstrap := strings.HasPrefix(id, "build-runner-")
-		if bootstrap {
-			bootstraps++
+	for _, document := range documents {
+		if hasPinCredential(document.Env) || hasSourceSecret(document.Env) {
+			t.Fatal("workflow-scoped pin credential")
 		}
-		if hasPinCredential(job.Env) || hasSourceSecret(job.Env) {
-			t.Fatalf("job-scoped pin credential in %s", id)
-		}
-		for _, step := range job.Steps {
-			if strings.Contains(step.Run, "secrets.NKE_SOURCE_TOKEN") {
-				t.Fatalf("source secret entered command text in %s/%s", id, step.ID)
+		for id, job := range document.Jobs {
+			bootstrap := strings.HasPrefix(id, "build-runner-")
+			if bootstrap {
+				bootstraps++
 			}
-			// Source fetches may independently receive this secret, but only
-			// under the source token key on their exact mapped fetch step.
-			if !hasPinCredential(step.Env) && !strings.Contains(step.Run, "NVKR_PIN_SOURCE_TOKEN_") {
-				if hasSourceSecret(step.Env) {
-					if !allowedFetches[id][step.ID] || step.Env[sourceTokenEnv] != sourceCredential {
-						t.Fatalf("source secret escaped catalog or selected fetch steps: %s/%s", id, step.ID)
-					}
-					for key, value := range step.Env {
-						if key != sourceTokenEnv && strings.Contains(value, "secrets.NKE_SOURCE_TOKEN") {
-							t.Fatalf("source secret appeared under an unrelated key in %s/%s", id, step.ID)
+			if hasPinCredential(job.Env) || hasSourceSecret(job.Env) {
+				t.Fatalf("job-scoped pin credential in %s", id)
+			}
+			for _, step := range job.Steps {
+				if strings.Contains(step.Run, "secrets.NKE_SOURCE_TOKEN") {
+					t.Fatalf("source secret entered command text in %s/%s", id, step.ID)
+				}
+				// Source fetches may independently receive this secret, but only
+				// under the source token key on their exact mapped fetch step.
+				if !hasPinCredential(step.Env) && !strings.Contains(step.Run, "NVKR_PIN_SOURCE_TOKEN_") {
+					if hasSourceSecret(step.Env) {
+						if !allowedFetches[id][step.ID] || step.Env[sourceTokenEnv] != sourceCredential {
+							t.Fatalf("source secret escaped catalog or selected fetch steps: %s/%s", id, step.ID)
+						}
+						for key, value := range step.Env {
+							if key != sourceTokenEnv && strings.Contains(value, "secrets.NKE_SOURCE_TOKEN") {
+								t.Fatalf("source secret appeared under an unrelated key in %s/%s", id, step.ID)
+							}
 						}
 					}
+					continue
 				}
-				continue
-			}
-			found[step.ID]++
-			if !wantPinSet || !maps.Equal(step.Env, wantEnvironment) {
-				t.Fatalf("catalog token, repository helper or mirror changed in %s/%s", id, step.ID)
-			}
-			if !(bootstrap && step.ID == "validate-catalog") && !(id == "nvkr-lifecycle-run" && step.ID == "finalize-catalog") {
-				t.Fatalf("catalog credential escaped revalidation: %s/%s", id, step.ID)
-			}
-			if !strings.Contains(job.If, githubDispatchCondition(plan)) ||
-				!strings.Contains(step.Run, strings.ReplaceAll(requireSourceToken, sourceTokenEnv, "NVKR_PIN_SOURCE_TOKEN_0")) ||
-				strings.Contains(step.Run, "secrets.") {
-				t.Fatal("catalog credential lost dispatch/presence guards or entered command text")
+				found[step.ID]++
+				if !wantPinSet || !maps.Equal(step.Env, wantEnvironment) {
+					t.Fatalf("catalog token, repository helper or mirror changed in %s/%s", id, step.ID)
+				}
+				if !(bootstrap && step.ID == "validate-catalog") && !(id == "nvkr-lifecycle-run" && step.ID == "finalize-catalog") {
+					t.Fatalf("catalog credential escaped revalidation: %s/%s", id, step.ID)
+				}
+				if !strings.Contains(job.If, githubDispatchCondition(plan)) ||
+					!strings.Contains(step.Run, strings.ReplaceAll(requireSourceToken, sourceTokenEnv, "NVKR_PIN_SOURCE_TOKEN_0")) ||
+					strings.Contains(step.Run, "secrets.") {
+					t.Fatal("catalog credential lost dispatch/presence guards or entered command text")
+				}
 			}
 		}
 	}
