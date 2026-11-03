@@ -27,6 +27,18 @@ updates:
       govulncheck-tool:
         patterns: ["*"]
 
+  # The workflow linter, kept out of the production module graph the same way.
+  - package-ecosystem: gomod
+    directory: /toolchains/actionlint
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    allow:
+      - dependency-type: all
+    groups:
+      actionlint-tool:
+        patterns: ["*"]
+
   - package-ecosystem: github-actions
     directory: /
     # Generated workflow pins must change through NVKR inputs and regeneration.

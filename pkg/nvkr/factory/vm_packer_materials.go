@@ -127,9 +127,10 @@ func observeProducerMaterialsWithLimits(
 				"VM producer %q is not a direct Packer build", instruction.ID)
 		}
 		projection = instruction.Packer.MaterialManifest
-	} else if instruction.BuilderType != ir.BuilderOCIHermetic || instruction.Packer != nil || len(instruction.Materials) == 0 {
+	} else if instruction.BuilderType != ir.BuilderOCIHermetic && instruction.BuilderType != ir.BuilderPinnedTool ||
+		instruction.Packer != nil || len(instruction.Materials) == 0 {
 		return nil, e.New(e.CodeEngineCapability,
-			"producer %q is not an OCI-hermetic material consumer", instruction.ID)
+			"producer %q is not an OCI-hermetic or pinned-tool material consumer", instruction.ID)
 	}
 	if limits.files <= 0 || limits.perFile <= 0 || limits.total <= 0 || limits.manifest <= 0 {
 		return nil, e.New(e.CodeInternal, "producer material limits are incomplete")

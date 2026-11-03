@@ -28,8 +28,9 @@
 #   1. Add a real job + companion -skip job with inverse `if:` conditions.
 #   2. Add both job names to the gate job's `needs:` list and its check/skip
 #      pair table. The gate rejects a dependency the table does not classify.
-#   3. Add a make target for it, so `make check` stays equal to CI
-#      (CONTRIBUTING.md, "Local development equals CI").
+#   3. Run it as a make target listed in the Makefile's CI_CHECKS, so
+#      `make ci-check` stays equal to CI (CONTRIBUTING.md, "Local development
+#      equals CI"). internal/cicontract fails when the two lists differ.
 #   No ruleset change is needed — "gate" is the only required check.
 #
 # A GATE MUST WATCH ITS OWN INPUTS
@@ -156,6 +157,10 @@ jobs:
               - '.github/actionlint.yaml'
               - '.github/workflows/**'
               - '.github/actions/**'
+              # The pinned linter and its make recipe.
+              - 'toolchains/actionlint/**'
+              - 'Makefile'
+              - '.go-version'
             pipeline:
               # Everything `run generate` consumes or emits, plus the files that
               # define the check itself, so a change to the gate cannot skip the
@@ -203,16 +208,19 @@ jobs:
             docs:
               # The published pages, their navigation and the Fern site
               # configuration, plus the files that define the check itself: the
-              # MDX checker, the Makefile recipe, and this workflow. A page can
+              # MDX checker, the locked Fern CLI, the Makefile recipe, and this
+              # workflow. A page can
               # break the site through any page it links to, so the whole docs
               # tree is watched rather than only the pages listed in the nav.
               - 'docs/**'
               - 'fern/**'
               - 'tools/check-docs-mdx'
+              - 'tools/fern/**'
               - 'Makefile'
               - '.github/workflows/merge-gate.yaml'
 
-  # Repository checks — the same gates `make check` runs locally, plus build
+  # Repository checks — the same gates `make check` runs locally, plus build.
+  # `make ci-check` runs these and every other locally reproducible job below.
 
   check:
     needs: [check-paths]
@@ -389,37 +397,15 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install actionlint
-        # Pinned by version, with the downloaded binary verified against the
-        # upstream-published checksum file. The upstream one-liner installer
-        # pipes a script from the default branch into bash and downloads the
-        # binary with no checksum verification.
-        env:
-          ACTIONLINT_VERSION: '1.7.12'
-        run: |
-          set -euo pipefail
-          BASE="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}"
-          TAR="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-          TMP="$(mktemp -d)"
-          curl -fsSL -o "${TMP}/${TAR}" "${BASE}/${TAR}"
-          curl -fsSL -o "${TMP}/checksums.txt" "${BASE}/actionlint_${ACTIONLINT_VERSION}_checksums.txt"
-          EXPECTED=$(awk -v t="${TAR}" '$2 == t {print $1}' "${TMP}/checksums.txt")
-          if [[ -z "${EXPECTED}" ]]; then
-            echo "::error::no checksum entry for ${TAR} in upstream checksums.txt"
-            exit 1
-          fi
-          ACTUAL=$(sha256sum "${TMP}/${TAR}" | awk '{print $1}')
-          if [[ "${ACTUAL}" != "${EXPECTED}" ]]; then
-            echo "::error::actionlint checksum mismatch: expected ${EXPECTED}, got ${ACTUAL}"
-            exit 1
-          fi
-          tar -xzf "${TMP}/${TAR}" -C "${TMP}" actionlint
-          mv "${TMP}/actionlint" "${PWD}/actionlint"
-          rm -rf "${TMP}"
-          echo "${PWD}" >> "$GITHUB_PATH"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
 
-      - name: Run actionlint
-        run: actionlint -color
+      # Builds the version and go.sum pinned in toolchains/actionlint, the
+      # same binary `make ci-check` runs locally.
+      - name: actionlint
+        run: make actionlint
 
   actionlint-skip:
     needs: [check-paths]
@@ -546,9 +532,9 @@ jobs:
   #
   # `make docs-check` runs the MDX safety checker, `fern check`, `fern docs md
   # check` and `fern docs broken-links`. No secrets are used, so it is safe on
-  # fork PRs. The Fern CLI is intentionally installed unpinned (`@latest`), so
-  # an upstream Fern release can fail this check without a change in this
-  # repository; Node itself is pinned by setup-node.
+  # fork PRs. `make fern-install` installs the Fern CLI from its integrity-locked
+  # tools/fern dependency set, the same install path used locally and by the
+  # publish and preview workflows; Node itself is pinned by setup-node.
 
   docs:
     needs: [check-paths]
@@ -566,7 +552,7 @@ jobs:
           package-manager-cache: false
 
       - name: Install Fern CLI
-        run: npm install -g fern-api@latest
+        run: make fern-install
 
       - name: Check Fern docs
         run: make docs-check
@@ -580,6 +566,8 @@ jobs:
       - run: echo "No docs or Fern inputs changed — docs check not required"
 
   # Static analysis (CodeQL)
+  #
+  # Provider-only: `make ci-check` cannot reproduce the hosted CodeQL analysis.
   #
   # Uploading results needs `security-events: write`. On a private or internal
   # repository that also requires GitHub Advanced Security; on a public one it

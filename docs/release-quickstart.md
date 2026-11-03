@@ -201,8 +201,9 @@ steps below name the issue that each missing Release input waits on.
    Release but does not check the signer. Put the pulled `./nvkectl/nvkectl` first on `PATH`, or set
    `NVKECTL` to it, so the stages below and `nvke-deploy.sh` use this CLI.
 
-   GB200 workers use the Ubuntu 24.04 ARM64 disk, which is pending
-   [#323](https://github.com/dsx-ai-factory/nvkr/issues/323). The `nvke-node-fde-*` disks use a public
+   GB200 workers use the Ubuntu 24.04 ARM64 disk, `nvke-node-image-ubuntu24-arm64` or
+   `nvke-node-fde-ubuntu24-arm64`, from the separate Ubuntu 24.04 disks family. Find and verify that family's
+   Release as in steps 1 and 2, with its own signer identity. The `nvke-node-fde-*` disks use a public
    bootstrap passphrase, so every node built from one shares its volume key and gets no data-at-rest
    protection.
 

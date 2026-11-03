@@ -32,6 +32,11 @@ make build
 make check
 ```
 
+`make ci-check` runs every merge-gate check that can run locally: the code gate plus the build, actionlint,
+notices drift, workflow drift and Fern docs checks. Workflow drift re-reads the pinned NVKE source, so it needs
+read access to the private NVKE repository; the docs check needs Node and the Fern CLI. CodeQL runs only on
+GitHub.
+
 `make help` lists targets. The full release-blocking verification includes:
 
 ```sh
@@ -48,8 +53,8 @@ git diff --check
 
 The operator-facing site published with Fern is a separate gate. Pages are those listed in
 [docs/index.yml](docs/index.yml); other documents stay on GitHub. After changing a published page, its navigation
-or `fern/`, run `make docs-check`, which needs Node and the Fern CLI (`npm install -g fern-api@latest`; Fern is not
-pinned). CI runs the same target as the `docs` job of the merge gate. The Fern checks run on an isolated copy of
+or `fern/`, run `make fern-install` once (needs Node) and then `make docs-check`. The Fern CLI and its dependencies
+are locked in `tools/fern/package-lock.json`; `fern/fern.config.json` names the same version. CI runs the same target as the `docs` job of the merge gate. The Fern checks run on an isolated copy of
 only the listed pages, so a published page must not link to an unpublished page or to a file outside `docs/`; use a
 GitHub URL for those. Registered release versions are ignored by this check (it needs `yq` once any exist).
 
