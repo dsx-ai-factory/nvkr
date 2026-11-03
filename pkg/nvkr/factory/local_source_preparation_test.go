@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -81,9 +82,38 @@ func TestPrepareLocalNVKESourceFreezesCapturedAMD64Graph(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	trace := filepath.Join(t.TempDir(), "git-trace.jsonl")
+	previousTrace := os.Getenv("GIT_TRACE2_EVENT")
+	t.Setenv("GIT_TRACE2_EVENT", trace)
 	prepared, err := PrepareLocalNVKESource(t.Context(), root, definitionPath, environmentPath, ".nvkr/source", commit)
+	t.Setenv("GIT_TRACE2_EVENT", previousTrace)
 	if err != nil {
 		t.Fatal(err)
+	}
+	rawTrace, err := os.ReadFile(trace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(rawTrace))
+	catalogFetches := 0
+	for {
+		var event struct {
+			Event string   `json:"event"`
+			Argv  []string `json:"argv"`
+		}
+		if err := decoder.Decode(&event); err == io.EOF {
+			break
+		} else if err != nil {
+			t.Fatal(err)
+		}
+		if event.Event == "start" && slices.Contains(event.Argv, "fetch") && strings.Contains(strings.Join(event.Argv, "\x00"), "nvkr-pin-tree-") {
+			catalogFetches++
+		}
+	}
+	// Nine site outputs share the same pinned metadata catalog. Preparation must
+	// authenticate that stack once, rather than fetch it again for each output.
+	if catalogFetches != 1 {
+		t.Fatalf("shared catalog fetched %d times, want once per preparation", catalogFetches)
 	}
 	after, _, err := CaptureCompileFiles(t.Context(), root, prepared.Definition, prepared.Environment, "source-test")
 	if err != nil {
