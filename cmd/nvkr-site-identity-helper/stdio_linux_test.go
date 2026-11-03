@@ -141,8 +141,8 @@ func TestTransferredPipeContextRefusalConsumesOriginal(t *testing.T) {
 
 func stdioChild(t *testing.T, mode string) (*exec.Cmd, *bytes.Buffer, *bytes.Buffer) {
 	t.Helper()
-	if runtime.GOARCH != "arm64" {
-		t.Skip("actual identity helper execution requires Linux ARM64; pipe ownership tests run on every Linux architecture")
+	if runtime.GOARCH != "arm64" && runtime.GOARCH != "amd64" {
+		t.Skip("actual identity helper execution requires Linux AMD64 or ARM64; pipe ownership tests run on every Linux architecture")
 	}
 	program, err := os.Executable()
 	if err != nil {
@@ -176,7 +176,7 @@ func assertNotStarted(t *testing.T, raw []byte, code e.Code) {
 		t.Fatal(err)
 	}
 	if result.SchemaVersion != siteidentity.SchemaVersion || result.Completion != siteidentity.NotStarted ||
-		result.FailureCode != code || result.CallerID != "" || result.Status != nil || result.Reconfiguration != "" || result.After != nil {
+		result.FailureCode != code || result.CallerID != "" || result.Before != (siteidentity.PeerProof{}) || result.Status != nil || result.Reconfiguration != "" || result.After != nil {
 		t.Fatalf("invalid input reached identity or changed completion: %+v", result)
 	}
 }
@@ -212,8 +212,8 @@ func TestCommandContextAdmissionBeforeStdio(t *testing.T) {
 }
 
 func TestUnsupportedArchitectureRefusesBeforeStdio(t *testing.T) {
-	if runtime.GOARCH == "arm64" {
-		t.Skip("Linux ARM64 is the supported helper runtime")
+	if runtime.GOARCH == "arm64" || runtime.GOARCH == "amd64" {
+		t.Skip("Linux AMD64 and ARM64 are supported helper runtimes")
 	}
 	err := run(t.Context(), nil)
 	var coded *e.Error

@@ -122,7 +122,7 @@ func TestNativeIdentityContextRequiresExactArtifactPodAndCSI(t *testing.T) {
 			if tc.change != nil {
 				tc.change(&rows)
 			}
-			_, err := nativeIdentitySelectedPod(rows, ref)
+			_, err := nativeIdentityObservedPod(rows, ref)
 			if (err != nil) != tc.wantError {
 				t.Fatalf("pod error=%v wantError=%v", err, tc.wantError)
 			}

@@ -78,17 +78,21 @@ func (s *nativeSiteAttempt) presentStatus(ctx context.Context, runner Runner, ac
 	return presentNativeStatus(ctx, runner, access)
 }
 
-func retainNativeSiteFailure(ctx context.Context, runner Runner, tools, kubeconfig string, cause error) error {
+func retainNativeSiteFailure(ctx context.Context, runner Runner, assets NativeAssets, kubeconfig string, cause error) error {
 	if cause == nil || errors.Is(cause, ErrUnjoined) {
 		return cause
 	}
 	bounded, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
+	controller, err := nativeControllerForAssets(bounded, assets)
+	if err != nil {
+		return cause
+	}
 	private, err := nativeObservationRunner(bounded, runner, "native-site-failure-")
 	if err != nil {
 		return cause
 	}
-	kubectl := filepath.Join(tools, "kubectl")
+	kubectl := filepath.Join(assets.HostTools, "kubectl")
 	prefix := []string{kubectl, "--kubeconfig", kubeconfig, "--request-timeout=5s"}
 	commands := []struct {
 		phase string
@@ -99,9 +103,7 @@ func retainNativeSiteFailure(ctx context.Context, runner Runner, tools, kubeconf
 		{"site-services", []string{"get", "services", "--all-namespaces", "-o", "json"}},
 		{"site-endpointslices", []string{"get", "endpointslices.discovery.k8s.io", "--all-namespaces", "-o", "json"}},
 	}
-	// Exact b615 deploy/nico/controller selects namespace nke-controller;
-	// its effective overlay selects the controller name and container.
-	logs := []string{"-n", "nke-controller", "logs", "--selector=app.kubernetes.io/name=nke-controller,app.kubernetes.io/instance=nke-controller", "--container=nke-controller", "--tail=100", "--limit-bytes=262144", "--timestamps=true"}
+	logs := []string{"-n", controller.name, "logs", "--selector=app.kubernetes.io/name=" + controller.name + ",app.kubernetes.io/instance=" + controller.name, "--container=" + controller.name, "--tail=100", "--limit-bytes=262144", "--timestamps=true"}
 	commands = append(commands, struct {
 		phase string
 		args  []string
@@ -114,9 +116,9 @@ func retainNativeSiteFailure(ctx context.Context, runner Runner, tools, kubeconf
 			break
 		}
 		args := append(append([]string{}, prefix...), command.args...)
-		if err := captureNativeObservation(bounded, private, args, command.phase, 5*time.Second); errors.Is(err, ErrUnjoined) {
-			// An unjoined observation must not race subsequent destructive
-			// cleanup. Ordinary diagnostic failure never blocks cleanup.
+		err := captureNativeObservation(bounded, private, args, command.phase, 5*time.Second)
+		if errors.Is(err, ErrUnjoined) {
+			// An unjoined observation must not race subsequent destructive cleanup.
 			return errors.Join(cause, err)
 		}
 	}
@@ -139,7 +141,7 @@ func (s *nativeSiteAttempt) preserveFailure(ctx context.Context, cause error) er
 	if closeErr := file.Close(); closeErr != nil || !currentOwner(info) || info.Mode().Perm()&0o077 != 0 || info.Size() == 0 {
 		return cause
 	}
-	return retainNativeSiteFailure(ctx, *s.bootstrapRunner, s.assets.HostTools, kubeconfig, cause)
+	return retainNativeSiteFailure(ctx, *s.bootstrapRunner, s.assets, kubeconfig, cause)
 }
 
 // Retain backend-owned serial logs before deletion through the bounded,

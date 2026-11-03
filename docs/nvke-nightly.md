@@ -1,92 +1,117 @@
 # Nightly NVKR builds and NVKE end-to-end tests
 
-The authored [GitHub workflow](../.github/workflows/nvkr-nightly.yml) runs daily at
-03:17 UTC and supports manual dispatch. It resolves NVKE `main` once, dispatches
-the existing generated NVKR producer, and tests the artifacts that producer
-built and published. The first maintained runtime target is NVIDIA OVN on the
-native ARM64 `arc-arm64-kvm` runner.
+The authored [workflow](../.github/workflows/nvkr-nightly.yml) runs daily at
+03:17 UTC in `dsx-ai-factory/nvkr` and supports ordinary manual branch dispatch.
+Forks can dispatch their branches manually; scheduled jobs run only upstream.
+One public `ubuntu-24.04` AMD64 job builds and tests together, without NVIDIA
+runners, repository secrets, signing permissions or registry writes.
 
-The four coordinator jobs select a candidate, dispatch and join its producer,
-select a completed candidate, and run its native Go E2E test:
+The job checks out the selected NVKR commit and resolves NVKE `main` once.
+The existing `TestEndToEnd` Go test uses that exact source revision to build fresh
+local Runs, bootstrap a real site-controller KVM VM through kind/Lima, and test
+one tenant control-plane node and one worker. Acceptance requires actual host
+cloud-init completion on both tenant nodes, the selected workload image and
+architecture, workload completion and cluster DNS. The parent passes only after
+natural tenant deletion, deletion verification and joined VM/backend/network cleanup.
 
-1. Pass the cycle's exact NVKE commit to the existing
-   `nvkr-run-nvke-nightly-arm64.yml` producer. Its admitted runtime source policy
-   selects that commit for every source-built NVKE component, including disk
-   materials and the installer. Independent dependency pins retain their owners.
-2. Build the Definition's 34 outputs through the generated producer's existing
-   execution, private transport, publication, signing and verification stages.
-   Runtime preparation and finalization bind the same frozen source selection;
-   checked-in catalog pins need no nightly version-bump commit.
-3. Retrieve the exact producer Run, frozen Plan and aggregate publication locator.
-   `PrepareExactInputs` and `VerifyExactInputs` authenticate the selected closure
-   under its signing policy. The native consumer requires the exact-input receipt
-   and producing invocation, and rejects a Plan with a different cycle commit.
-4. Run `TestNightlyPublishedCandidate`. Existing Go owners extract the authenticated
-   inputs and invoke the built `nvkectl bootstrap site`, using a temporary
-   kind/Lima backend and a real QEMU/KVM site-controller VM.
-5. Check the live Kubernetes API `/readyz`, the identified Ready node and native
-   VM evidence, then stop and join owned VM, backend and network cleanup.
+Source preparation reuses the existing AMD64 NVIDIA Definition and v0.23.0
+catalogs, preserving their producer commands, material graph and toolchains. It leaves
+committed catalogs and the NVKE checkout unchanged; other dependency pins retain
+their owners. NVIDIA OVN remains selected. The existing native helper self-pin
+has its separate maintenance owner, including its post-squash canonical-main re-pin.
 
-Manual `tenant_checks` additionally creates a tenant and checks workload and DNS.
-The nightly consumer builds no product artifacts. The separate local
-`TestEndToEnd` test retains its build-and-test developer flow; the nightly does
-not invoke it. Published native conformance remains unsupported.
+## Run a workflow branch before merging
 
-## Inputs and access
+Push the branch used by your PR to your fork and enable Actions there if GitHub
+prompts you. The workflow must also exist on the fork's default branch for manual
+dispatch; sync an older fork with upstream after this workflow is merged.
 
-The maintained producer uses
-[`arm64-nvidia-kvm.json`](../inputs/definitions/demo/arm64-nvidia-kvm.json) and
-[`github-nightly-nvidia.json`](../inputs/environments/github-nightly-nvidia.json).
-The Environment's `githubRuntimeSource` policy admits the exact NVKE commit
-through the existing `run generate --runtime --source-commit` option. The
-generator, source-pin and finalization owners validate that selection. Git
-ancestry admission requires the selected commit to belong to `main`, allowing
-the branch to advance during the cycle. A branch name, caller path or detached
-digest alone grants no artifact authority.
+Replace the repository and branch below with your fork and PR branch:
 
-Finalization repeats the proof against the then-current `main`. A delayed retry
-outside the 64-commit fetch window, or a ref rewrite that removes the frozen
-commit, fails closed before a Run record is issued even if signing and publication
-already completed.
+```sh
+gh workflow run nvkr-nightly.yml --repo YOUR_GITHUB_USERNAME/nvkr --ref YOUR_PR_BRANCH
+gh run list --repo YOUR_GITHUB_USERNAME/nvkr --workflow nvkr-nightly.yml \
+  --branch YOUR_PR_BRANCH --event workflow_dispatch \
+  --json databaseId,headSha,status,conclusion,url
+gh run watch RUN_ID --repo YOUR_GITHUB_USERNAME/nvkr --exit-status
+```
 
-The coordinator's `NKE_SOURCE_TOKEN` resolves NVKE `main`; producer source access
-uses its existing credential policy. Dispatch and metadata reads use separate
-job-scoped GitHub token permissions. Product publication remains in the generated
-producer. The runtime job receives only `NVKR_REGISTRY_READ` and
-`NVKR_REGISTRY_READ_USER` for publication reads, and
-`NVKR_CI_STORAGE_READ_TOKEN`/`NVKR_CI_STORAGE_READ_USER` for private CI transport.
-The native runtime owners start candidate processes with their separate native
-environment. Source code and the existing network helper remain trusted with
-sudo and Docker access; this is no independent sandbox.
+The Actions UI also supports **NVKR nightly NVKE end-to-end tests → Run workflow**
+with the PR branch selected. No workflow inputs are required. This nightly
+intentionally freezes NVKE main once per cycle; it accepts no NVKE-ref override.
+The versioned catalog selections do not promise support for arbitrary
+older source revisions. Contributors with
+upstream write access can use `dsx-ai-factory/nvkr` instead of a fork.
 
-Binary bundles, OCI images, QCOW payloads and raw diagnostics use private storage
-under the existing fail-closed transport/publication policies. Coordinator
-Actions uploads contain only constructed selection JSON, exact producing-Run
-locator JSON and the cycle verdict JSON. The runtime job has no registry writer
-or OIDC signing permission, and Go's shared Actions cache is disabled.
+Verify that `headSha` matches the PR commit and that the complete run concludes
+`success`; ordinary PR CI and passing child subtests alone do not prove the full
+lifecycle. The run summary records both source commits. Share the run URL and
+tested NVKR commit on the PR. After pushing a fix, dispatch the branch again:
+[re-running an old workflow](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs)
+retains its original NVKR commit. A re-run resolves NVKE main again; compare the
+NVKE commit in each run summary. GitHub documents the default-branch requirement
+under [manual dispatch](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
 
-The native Go consumer admits AMD64 and ARM64 only when the profile's VM target,
-selected disk in the Plan and native execution host agree. It repeats that check
-after restoring the exact producer Plan; publication receipts still own artifact
-authentication. The maintained coordinator and producer currently select ARM64.
-No additional AMD64 producer bundle is introduced. A public AMD64 runner lane
-requires matching AMD64 artifacts and a measured complete consumer run before
-operational acceptance. The upstream-OVN producer remains a separate manual
-diagnostic; the maintained native consumer currently selects NVIDIA OVN only.
+## Resources and ownership
 
-## Timeouts and evidence
+The committed [hosted configuration](../demos/nightly-nvke.yaml) owns the test's
+resource selection; the workflow does not construct configuration in shell.
+The standard Go `-exec` option starts the test binary in the checkout root, so
+the existing loader and exact-source owner resolve these relative paths there.
+A fixed local attempt/output name is safe because each job gets a fresh
+workspace, runs once and publishes no build products.
 
-Selection and completed-candidate selection have ten-minute job limits. Producer
-dispatch/join and native runtime jobs each have a 360-minute limit; subprocesses
-and setup operations have smaller bounds. The runtime Go test receives the time
-remaining below a deadline set five minutes before its job limit. It reserves
-125 minutes for native cleanup, verdict reporting and margin, and refuses to
-start work when that reserve would consume the remaining time. SIGINT/SIGTERM
-cancel work through the same owned cleanup lifecycle.
+The explicit `small` profile selects a 7-GiB site, 3 GiB per tenant VM, four
+vCPUs per guest and 1 GiB headroom. The temporary 6-GiB bootstrap backend stops
+before tenant creation. Initial admission requires 14 GiB actually available:
+site plus the larger of bootstrap or two tenants, plus headroom. Tenant creation
+rechecks 7 GiB beside the existing site. These checks reserve no resources.
+An unset profile retains the existing scheduling defaults. These allocations
+are functional-test settings, not proven hardware minima or performance qualification.
+The small profile also sets the site's system reservation and the tenant's
+Reserved/SystemReserved/KubeReserved memory to 256Mi, appends the guest kubelet
+`--kube-reserved=cpu=1000m,memory=256Mi,ephemeral-storage=1Gi` override and restarts
+it, sets OVN control-plane/node-zone memory requests to 128Mi, and adds 64Mi
+memory requests to the seven site telemetry collector roles and three target
+allocators. Recorded small-profile runtime acceptance covers these settings,
+not the default reservations.
 
-The Go cycle verdict is an unsigned repository integration result, outside
-qualified release acceptance. Local contracts cover exact producer/source joins,
-publication receipts, native input selection, deadlines and orderly signals.
-They do not establish a completed hosted build, publication, bootstrap and cleanup
-cycle. That full current ARM64 cycle remains unverified until a recorded run
-completes.
+The six-hour job passes its remaining deadline to Go, which preserves two hours
+for independently bounded cleanup. Setup requires a GitHub-hosted AMD64 machine,
+KVM, unattended administrator access and sufficient disk/memory. A runner-scoped
+udev rule preserves mode-0660 KVM access when device policy is reapplied; an actual
+unprivileged read/write open admits the device. Unused Android, .NET and Haskell
+SDK directories are reclaimed before builds; product files, Docker and Go remain.
+The Packer producer still requires 64 GiB free workspace. Its authenticated
+transport archives close after staging, while original material capabilities
+remain held through producer-consumption recording.
+
+Runtime compatibility changes retain the source's security and identity checks:
+the selected installer owns legacy/current controller resource names; helper
+staging uses source-supported `sh` and a bounded disk-backed scratch mount;
+policy convergence waits only for the unchanged pinned running context to become
+Ready within its existing deadline. Identity changes and unknown completion remain
+terminal. Tenant pool observation uses the supported unfiltered inventory with
+exact cluster/worker ownership, avoiding a separate name lookup during deletion.
+After owned deletion starts, joined read-command exit-1 observations can be
+retried within the existing 45-minute wait. They never establish absence or retry
+the delete command. Success still requires a fresh valid inventory proving absence;
+invalid JSON, changed ownership, cancellation and unjoined work remain failures.
+
+## Evidence and privacy
+
+The [reconciliation record](adr/reconciliation.md#consumer-acceptance-scopes)
+owns completed runtime evidence, its exact NVKR/NVKE revisions and its limits.
+A passing run covers only its recorded revision; it does not prove the causes of
+earlier failures, minimum hardware, conformance or qualification.
+
+Build stdout/stderr and ordinary Go test outcomes appear in the public job log.
+Raw deployment errors, host output and identity values remain in private local
+captures. The workflow uploads no Actions artifacts or shared caches; binaries,
+OCI images, QCOW2 files and private diagnostics remain on the disposable runner.
+There is no public-error option. Trusted NVKE code retains sudo/Docker access on
+that runner; these unsigned diagnostics grant no release or publication authority.
+
+The ARM64 build/publish/consume nightly is retired. Generated ARM64 producer
+workflows retain their existing admission policies, but no nightly invokes them
+or the legacy published-artifact consumer.

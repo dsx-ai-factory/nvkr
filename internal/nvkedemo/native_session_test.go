@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -168,6 +169,47 @@ func TestNativeSessionReusesSiteAndRetainsFailedSuiteUntilExplicitDeletion(t *te
 			events, err := os.ReadFile(filepath.Join(root, "session-events"))
 			if err != nil || string(events) != "create first\ndelete first\ncreate second\ndelete second\n" {
 				t.Fatalf("site/tenant operation order: %q %v", events, err)
+			}
+		})
+	}
+}
+
+func TestNativeSessionEndedHandlePrecedesCancellation(t *testing.T) {
+	for _, canceled := range []bool{false, true} {
+		t.Run(fmt.Sprint(canceled), func(t *testing.T) {
+			var escaped *NativeSite
+			if err := withNativeSiteScope(t.Context(), &nativeSiteAttempt{}, Runner{}, "", "", func(_ context.Context, site *NativeSite) error {
+				escaped = site
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if canceled {
+				cancel()
+			}
+			// Copied handles racing for the old permit must all reject the
+			// ended scope, including when caller cancellation is also ready.
+			copied := *escaped
+			const calls = 64
+			results := make(chan error, calls)
+			var joined sync.WaitGroup
+			for range calls {
+				joined.Add(1)
+				go func() {
+					defer joined.Done()
+					_, err := copied.Kubeconfig(ctx)
+					results <- err
+				}()
+			}
+			joined.Wait()
+			close(results)
+			for err := range results {
+				var coded *nvkrerr.Error
+				if !errors.As(err, &coded) || coded.Code != nvkrerr.CodeUsage {
+					t.Fatalf("ended handle returned a nondeterministic error: %v", err)
+				}
 			}
 		})
 	}

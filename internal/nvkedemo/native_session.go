@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
@@ -39,7 +40,7 @@ type nativeSiteScope struct {
 	tools   string
 	out     string
 	active  *nativeTenantState
-	closed  bool
+	closed  atomic.Bool
 }
 
 // WithNativeSite verifies the completed Run outputs selected by cfg, prepares the
@@ -76,7 +77,7 @@ func withNativeSiteScope(ctx context.Context, attempt *nativeSiteAttempt, runner
 		// their subprocess owners to join. Outer guest cleanup starts afterward.
 		cancel()
 		scope.gate <- struct{}{}
-		scope.closed = true
+		scope.closed.Store(true)
 		if attempt.unjoinedWork != nil && !errors.Is(result, attempt.unjoinedWork) {
 			result = errors.Join(result, attempt.unjoinedWork)
 		}
@@ -226,6 +227,11 @@ func (s *NativeSite) operate(ctx context.Context, tenant *nativeTenantState, ope
 		return configUsage("operation requires a context and live site-issued handle")
 	}
 	scope := s.scope
+	// Scope exit cancels its context before joining the last operation. Once
+	// it has joined and closed, handle admission must not race that cancellation.
+	if scope.closed.Load() {
+		return configUsage("native site or tenant scope has ended")
+	}
 	call, cancel := context.WithCancel(ctx)
 	stop := context.AfterFunc(scope.ctx, cancel)
 	defer func() { stop(); cancel() }()
@@ -235,7 +241,7 @@ func (s *NativeSite) operate(ctx context.Context, tenant *nativeTenantState, ope
 	case scope.gate <- struct{}{}:
 	}
 	defer func() { <-scope.gate }()
-	if scope.closed || tenant != nil && scope.active != tenant {
+	if scope.closed.Load() || tenant != nil && scope.active != tenant {
 		return configUsage("native site or tenant scope has ended")
 	}
 	if scope.attempt.unjoinedWork != nil {
