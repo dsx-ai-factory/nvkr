@@ -55,6 +55,39 @@ var nvkeFamilyOnlyOutputs = map[string]struct {
 	"nvke-node-image-ubuntu24-arm64":     {"disks-ubuntu24", nvkeUbuntu24Disk("nvke-node-image-ubuntu24-arm64", "linux/arm64", "nvke-node-image")},
 }
 
+// TestNVKEUbuntu24DisksMatchDiagnostics binds each maintained Ubuntu 24.04 disk to
+// the build-only diagnostic selection whose 24.04 producers, ISO and Packer series
+// the lifecycle tests resolve (nvke_ubuntu24_test.go), so that coverage applies here.
+func TestNVKEUbuntu24DisksMatchDiagnostics(t *testing.T) {
+	nvkeSplitRepository(t)
+	family := nvkeSplitDefinition(t, "inputs/definitions/nvke/disks-ubuntu24.yaml")
+	if len(family.Outputs) != 4 {
+		t.Fatalf("Ubuntu 24.04 disks family has %d outputs, want 4", len(family.Outputs))
+	}
+	for _, output := range family.Outputs {
+		t.Run(output.Name, func(t *testing.T) {
+			variant := strings.Replace(strings.TrimPrefix(output.Name, "nvke-node-"), "-ubuntu24", "", 1)
+			diagnostic := nvkeSplitDefinition(t, "inputs/definitions/diagnostics/ubuntu24/definition-github-"+variant+".yaml")
+			if len(diagnostic.Outputs) != 1 || diagnostic.Outputs[0].Catalog == nil {
+				t.Fatalf("diagnostic %s does not select one catalog-scoped output", variant)
+			}
+			// The diagnostic Definition sits one directory deeper, so its catalog
+			// paths carry one extra "../" to reach the same inputs/catalogs files.
+			want := diagnostic.Outputs[0]
+			stack := *want.Catalog
+			stack.Base = strings.TrimPrefix(stack.Base, "../")
+			stack.Overlays = nil
+			for _, overlay := range want.Catalog.Overlays {
+				stack.Overlays = append(stack.Overlays, strings.TrimPrefix(overlay, "../"))
+			}
+			want.Catalog = &stack
+			if !bytes.Equal(nvkeSplitCanonical(t, output), nvkeSplitCanonical(t, want)) {
+				t.Fatalf("maintained %s diverges from its diagnostic selection", output.Name)
+			}
+		})
+	}
+}
+
 // nvkeUbuntu24Disk is a native disk with its complete material closure, selected
 // through the release node-image stack plus the Ubuntu 24 overlay.
 func nvkeUbuntu24Disk(name, platform, root string) definition.DefinitionOutput {
