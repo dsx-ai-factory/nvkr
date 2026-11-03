@@ -89,8 +89,8 @@ func TestMaintainedM2OSFetchCredentialProjection(t *testing.T) {
 					t.Errorf("private source fetch %s has no exact approved credential/mirror projection", source.ID)
 				}
 			}
-			if privateFetches[repository] != 4 || privateFetches[ovnRepository] != 3 || len(privateFetches) != 2 {
-				t.Fatalf("private source fetches = %v, want four NVKE and three OVN fork source closures only", privateFetches)
+			if privateFetches[repository] != 5 || privateFetches[ovnRepository] != 3 || len(privateFetches) != 2 {
+				t.Fatalf("private source fetches = %v, want five NVKE and three OVN fork source closures only", privateFetches)
 			}
 		})
 	}

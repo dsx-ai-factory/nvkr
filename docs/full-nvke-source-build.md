@@ -58,7 +58,7 @@ images per architecture: PostgreSQL, eight SPIRE images and three Temporal image
 selected NVKE deployment values and do not cover every installation mode. The bootstrap CLI's embedded
 PostgreSQL selection differs from the NICo deployment's Bitnami chart image.
 
-The [local site catalog](../inputs/catalogs/nvke/local-site-arm64/registry.yaml) bundles the NVKE telemetry pipelines
+The [local site catalog](../inputs/catalogs/nvke/local-site-arm64/registry.yaml) then bundled the NVKE telemetry pipelines
 dependency charts `opentelemetry-kube-stack` 0.22.0, `prometheus-node-exporter` 4.56.1 and
 `metrics-server` 3.13.1. Rendering the inspected NVKE source with NICo values and those exact archives
 selected these additional runtime images; the archive hashes matched the catalog pins during inspection:

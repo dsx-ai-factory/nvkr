@@ -13,10 +13,7 @@
       "name": "capi-exec-init-image-arm64",
       "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/tools/native",
-        "overlays": [
-          "../../catalogs/tools/native/current-main-capi.json"
-        ]
+        "base": "../../catalogs/tools/native"
       },
       "components": [
         "native-capi-exec-init-image"
