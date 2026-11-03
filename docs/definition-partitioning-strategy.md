@@ -24,7 +24,7 @@ This document changes no ADR contract or organizational acceptance decision.
 | [Services](../inputs/definitions/nvke/services.yaml) | 34 | 34 | SPIRE, PostgreSQL, Temporal and local-path-provisioner charts and native runtime images |
 | [Telemetry](../inputs/definitions/nvke/telemetry.yaml) | 17 | 17 | NKTP chart and native runtime images |
 | [Disks](../inputs/definitions/nvke/disks.yaml) | 4 | 4 | AMD64/ARM64 plain and public-bootstrap FDE disks with complete material closures |
-| Total | 83 | 90 | The combined candidate's complete named output set plus the core family's three NICo charts, two NICo images, ARM64 operator tools, ARM64 AICR CLI and `controller-profiles` image, and the services family's six local-path-provisioner outputs |
+| Total | 83 | 90 | 69 + 14 = 83: the combined candidate's 69 named outputs plus 14 family-only outputs, which are the core family's three NICo charts, two NICo images, ARM64 operator tools, ARM64 AICR CLI and `controller-profiles` image, and the services family's six local-path-provisioner outputs |
 
 Each family selects `inputs/environments/github-nvke-<family>.yaml`, with
 `githubBundle: nvke-<family>`. Generation owns `.github/workflows/nvkr-run-nvke-<family>.yml`
