@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
+	"github.com/urfave/cli/v2"
 	"golang.org/x/sys/unix"
 )
 
@@ -108,6 +110,67 @@ func TestEvidenceReaderHonorsRequestedLimit(t *testing.T) {
 	}
 	if _, err := readBoundedEvidence(context.Background(), strings.NewReader("pinned release archive"), size-1); cliErrorCode(err) != nvkrerr.CodeUnavailable {
 		t.Fatalf("bounded stream over its limit: %v", err)
+	}
+}
+
+func TestEvidenceReaderHonorsRequestedLimitOverHTTPS(t *testing.T) {
+	const body = "pinned release archive"
+	size := int64(len(body))
+	for _, tc := range []struct {
+		name          string
+		contentLength int64
+		limit         int64
+		want          nvkrerr.Code
+	}{
+		{name: "exact limit", contentLength: size, limit: size},
+		{name: "advertised length over limit", contentLength: size, limit: size - 1, want: nvkrerr.CodeUnavailable},
+		{name: "unknown length over limit", contentLength: -1, limit: size - 1, want: nvkrerr.CodeUnavailable},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			responseBody := &closeRecordingBody{Reader: strings.NewReader(body)}
+			client := &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: http.StatusOK, ContentLength: tc.contentLength,
+					Body: responseBody, Request: request}, nil
+			})}
+			raw, err := (commandEvidenceReader{client: client}).ReadEvidence(context.Background(),
+				"https://evidence.example.test/archive.tar.gz", tc.limit)
+			if cliErrorCode(err) != tc.want {
+				t.Fatalf("error = %v, want %q", err, tc.want)
+			}
+			if tc.want == "" && string(raw) != body {
+				t.Fatalf("read %q, want %q", raw, body)
+			}
+			if !responseBody.closed {
+				t.Fatal("evidence response body was not closed")
+			}
+		})
+	}
+}
+
+type closeRecordingBody struct {
+	*strings.Reader
+	closed bool
+}
+
+func (body *closeRecordingBody) Close() error {
+	body.closed = true
+	return nil
+}
+
+func TestEvidenceBundleVerifierWithoutDigestNamesTheFlag(t *testing.T) {
+	flags := flag.NewFlagSet("sbom", flag.ContinueOnError)
+	for _, f := range qualifiedDocumentVerifierFlags() {
+		if err := f.Apply(flags); err != nil {
+			t.Fatal(err)
+		}
+	}
+	verifier, err := evidenceBundleVerifier(cli.NewContext(&cli.App{}, flags, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = verifier.VerifyEvidenceBundle(context.Background(), []byte("{}"), sbom.EvidenceBundlePolicy{SubjectDigest: "sha256:" + strings.Repeat("a", 64)})
+	if cliErrorCode(err) != nvkrerr.CodeUnavailable || !strings.Contains(err.Error(), "--cosign-digest") {
+		t.Fatalf("missing verifier error = %v, want %q naming --cosign-digest", err, nvkrerr.CodeUnavailable)
 	}
 }
 
