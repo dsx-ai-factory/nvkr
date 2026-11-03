@@ -69,7 +69,8 @@ A Definition form that names complete member Definitions by locator and exact `n
 releases the exact union of their named outputs through one Plan, Run and Release. Output names are preserved;
 duplicates, divergent shared producers, differing base catalogs or tools, and digest drift are coded errors,
 never precedence. Members keep their own Runs and Releases; a composite neither references nor inherits them.
-Proposed [ADR-26](docs/adr/0026-definition-composition.md) designs it; it is not implemented.
+Proposed [ADR-26](docs/adr/0026-definition-composition.md) designs it; units U1–U7 are implemented and contract-tested
+only, with no hosted composite Run, publication or consumer verification yet.
 _Avoid_: Recipe, selection group, parent Release, association file, include
 
 **Effective Definition (proposed)**:
@@ -194,6 +195,14 @@ _Avoid_: Release publication root, native image manifest, qualification receipt
 **Binary bundle**:
 An Artifact format containing exact executable files and their installation metadata.
 _Avoid_: Release, arbitrary archive
+
+**Executable image index (proposed)**:
+An Artifact format for an executable output that declares a `platforms` set: a standard OCI image index whose
+children are minimal per-platform images, each holding one layer with that platform's executables and declared
+companions. Children carry no entrypoint and make no runtime claim. Each child keeps its native Build Digest
+and evidence; the output has an aggregate Build Digest. Proposed in
+[ADR-28](docs/adr/0028-multi-platform-executable-indexes.md); not implemented.
+_Avoid_: Runnable OCI image index, binary bundle, upstream-published image
 
 **Debian package**:
 An Artifact format (`debian-package`) containing one raw Debian archive from an explicitly selected source

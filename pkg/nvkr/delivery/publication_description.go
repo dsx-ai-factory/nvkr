@@ -98,6 +98,7 @@ func publicationDescription(reference string, inspection Inspection, outputs []O
 		DeclaredQualification: root.Qualification, Metadata: *root.Release,
 		Outputs: make([]PublicationOutput, 0, len(outputs)), Evidence: []PublicationEvidence{},
 	}
+	view.Metadata.Composition = root.Release.Composition.Clone()
 	objects := make(map[string]PublishedObject, len(root.Objects))
 	for _, object := range root.Objects {
 		objects[object.Name] = object
