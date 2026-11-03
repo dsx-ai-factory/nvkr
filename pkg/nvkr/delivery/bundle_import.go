@@ -170,6 +170,7 @@ func admitBundleManifest(raw []byte) (ociManifest, error) {
 	if !bundleImportArtifactTypes[manifest.ArtifactType] {
 		return ociManifest{}, e.New(e.CodeVerifyFailed, "bundle artifact type %q is not admitted", manifest.ArtifactType)
 	}
+	// A nil Data means the member was omitted; an explicit null is present and refused.
 	if manifest.SchemaVersion != 2 || manifest.MediaType != MediaOCIManifest || manifest.Subject != nil ||
 		manifest.Config.MediaType != MediaEmptyConfig || manifest.Config.Digest != digestBytes([]byte("{}")) || manifest.Config.Size != 2 ||
 		(embedded.Config.Data != nil && !emptyConfigData(embedded.Config.Data)) ||
@@ -180,13 +181,11 @@ func admitBundleManifest(raw []byte) (ociManifest, error) {
 	return manifest, nil
 }
 
-// emptyConfigData admits only the OCI form of a present config data member:
-// a base64 JSON string whose decoded bytes are exactly {}.
+// emptyConfigData admits only the OCI form of a present config data member: a
+// JSON string holding the one RFC 4648 encoding of {}. The standard decoder
+// would also skip line breaks and ignore nonzero padding bits.
 func emptyConfigData(raw json.RawMessage) bool {
 	var encoded string
-	if len(raw) == 0 || raw[0] != '"' || json.Unmarshal(raw, &encoded) != nil {
-		return false
-	}
-	decoded, err := base64.StdEncoding.DecodeString(encoded)
-	return err == nil && string(decoded) == "{}"
+	return len(raw) > 0 && raw[0] == '"' && json.Unmarshal(raw, &encoded) == nil &&
+		encoded == base64.StdEncoding.EncodeToString([]byte("{}"))
 }

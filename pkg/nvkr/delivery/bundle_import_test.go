@@ -285,6 +285,15 @@ func TestImportBundleLayoutRefusesBeforeOutput(t *testing.T) {
 		{name: "config data not base64", mutate: func(t *testing.T, root string) string {
 			return spliceFixtureManifest(t, root, `"data":"{}"`)
 		}},
+		{name: "config data line feed", mutate: func(t *testing.T, root string) string {
+			return spliceFixtureManifest(t, root, `"data":"e3\n0="`)
+		}},
+		{name: "config data carriage return", mutate: func(t *testing.T, root string) string {
+			return spliceFixtureManifest(t, root, `"data":"e3\r\n0="`)
+		}},
+		{name: "config data padding bits", mutate: func(t *testing.T, root string) string {
+			return spliceFixtureManifest(t, root, `"data":"e31="`)
+		}},
 		{name: "config data alias after", mutate: func(t *testing.T, root string) string {
 			return spliceFixtureManifest(t, root, `"data":"eyJhIjoxfQ==","DATA":"e30="`)
 		}},
