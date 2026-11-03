@@ -156,6 +156,18 @@ func TestLocalGateRejectsInventoryDrift(t *testing.T) {
 				job.Steps = append(job.Steps, mergeGateStep{storageWorkflowStep: storageWorkflowStep{Run: `echo $(make vet)`}})
 				jobs["analyze"] = job
 			}},
+		{"provider-only job: backslash-escaped make", `provider-only job analyze step "" contains the word make`,
+			func(t *testing.T, jobs map[string]mergeGateJob) {
+				job := jobs["analyze"]
+				job.Steps = append(job.Steps, mergeGateStep{storageWorkflowStep: storageWorkflowStep{Run: "\\make vet"}})
+				jobs["analyze"] = job
+			}},
+		{"provider-only job: make in backticks", `provider-only job analyze step "" contains the word make`,
+			func(t *testing.T, jobs map[string]mergeGateJob) {
+				job := jobs["analyze"]
+				job.Steps = append(job.Steps, mergeGateStep{storageWorkflowStep: storageWorkflowStep{Run: "echo `make vet`"}})
+				jobs["analyze"] = job
+			}},
 		{"provider-only job: prose mentioning make", `provider-only job analyze step "" contains the word make`,
 			func(t *testing.T, jobs map[string]mergeGateJob) {
 				job := jobs["analyze"]
