@@ -4,6 +4,7 @@
 package factory
 
 import (
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -94,15 +95,27 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 			}
 			output := "artifact/" + target + "/" + irNode.Component
 			result := "result/" + target + "/" + irNode.Component
+			outputs := []string{output, result}
+			if irNode.ExecutableArchive != nil {
+				for _, companion := range irNode.ExecutableArchive.Companions {
+					name := path.Base(companion.Member)
+					id := releaseCompanionID(target, irNode.Component, name)
+					artifacts[id] = Artifact{ID: id, Name: name, Kind: ArtifactReleaseCompanion,
+						MediaType: artifactMediaType(ArtifactReleaseCompanion), Producer: nodeID, BuildTarget: target,
+						Component: irNode.Component, Path: filepath.ToSlash(filepath.Join(".nvkr", "factory", target, "fetch", irNode.Component, name))}
+					outputs = append(outputs, id)
+				}
+			}
+			sort.Strings(outputs)
 			nodes[nodeID] = Node{ID: nodeID, Kind: NodeAcquire, BuildTarget: target, IRNode: irNode.ID,
-				Outputs: []string{output, result}}
+				Outputs: outputs}
 			artifacts[output] = Artifact{ID: output, Name: irNode.Component, Kind: irNode.OutputType,
 				MediaType: artifactMediaType(irNode.OutputType), Producer: nodeID, BuildTarget: target,
 				Component: irNode.Component, Path: factoryPullArtifactPath(target, irNode)}
 			artifacts[result] = Artifact{ID: result, Name: irNode.Component + "-result", Kind: "producer-result",
 				Producer: nodeID, BuildTarget: target, Component: irNode.Component,
 				Path: filepath.ToSlash(filepath.Join(".nvkr", "factory", target, "results", irNode.ID+".json"))}
-			producerOutputs = append(producerOutputs, output, result)
+			producerOutputs = append(producerOutputs, outputs...)
 		}
 	}
 	sort.Strings(producerOutputs)
@@ -147,6 +160,14 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 			Path: filepath.ToSlash(filepath.Join(".nvkr", "factory", target, "sbom"))}
 	}
 	return nil
+}
+
+// ArtifactReleaseCompanion is a pinned non-executable archive member delivered
+// beside its release executable (ADR-22).
+const ArtifactReleaseCompanion = "release-companion"
+
+func releaseCompanionID(target, component, name string) string {
+	return "companion/" + target + "/" + component + "/" + name
 }
 
 func factoryBuildArtifactPath(target string, node ir.Node) string {

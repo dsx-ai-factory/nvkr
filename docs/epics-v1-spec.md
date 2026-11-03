@@ -6,7 +6,7 @@ completion requirements. The [roadmap](milestones.md) summarizes outcomes; the
 ADRs own the engineering contracts pending named-decider ratification. Candidate success is not
 organizational approval or complete milestone acceptance.
 
-**What NVKR v1 is.** A generator and evidence layer. From a digest-pinned Definition of NVKE artifacts and a
+**What NVKR v1 is.** A generator and evidence layer. From a digest-pinned Definition of NVKE and AICR artifacts and a
 separately selected Environment it emits committed GitHub Actions workflows that build or acquire each artifact, publish it to an OCI
 registry, sign it, attach production provenance, qualify it, and tag releases. NVIDIA runs the generated
 workflows; consumers verify the results with standard tooling and no NVKR software.
@@ -100,11 +100,31 @@ separately delivered artifact is signed and attested; the Release binds exact na
 | Third-party container images | Digest-pinned acquisition when outside OS image | OCI images / M2 |
 | NVKE Helm charts | Pinned chart sources | OCI packages / M2 |
 | Operator tooling | Acquired kubectl and Helm | OCI package / M2 |
+| AICR deployment bundles | Pinned AICR source and explicit recipe selection | OCI bundle or genuine Helm chart / additional selected outputs |
 
 A deferred member stays explicit in authored requirements and planning; the M3 MVP accepts no waivers and
 requires every selected member to complete. A member must never disappear because a build failed.
 Disk inventory proves composition for the exact disk subject,
 not reproduction of the QCOW2, decoded RAW stream or encrypted delivery bytes.
+
+### AICR bundle acceptance
+
+An AICR selection names its exact hardware recipe and deployment format. Argo CD, Argo CD Helm, Flux,
+Helm, Helmfile and Terraform bundles use the same Definition, Run and Release lifecycle. Every selected
+format remains an independently required output with its own observed bytes, source provenance, signed
+inventory evidence and Release membership. Generic bundles carry an exact file inventory. Only a genuine
+chart may be delivered as a native Helm artifact; it retains the chart metadata and declared-dependency
+inventory contract.
+
+Acceptance requires a recorded producing workflow and independent consumer verification for the selected
+outputs. The delivered bundle preserves all rendered files and can be retrieved without running deployment
+code. A generic bundle's inventory describes included files; it does not establish the identity or availability of referenced
+charts, container images, providers or other deployment dependencies.
+
+GB300 bare-metal and Vera Rubin recipe selections retain their upstream prerequisites and maturity. Preview
+recipes remain previews. A missing GB200 bare-metal recipe must be reported as unavailable; a cloud recipe
+cannot substitute for it. Cluster installation, runtime testing on each selected hardware SKU and offline
+dependency completeness remain separate downstream acceptance responsibilities.
 
 ---
 
