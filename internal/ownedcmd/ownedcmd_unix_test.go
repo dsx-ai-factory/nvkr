@@ -94,9 +94,20 @@ func TestCombinedOutputPreservesContextCancellation(t *testing.T) {
 		_, runErr = CombinedOutput(ctx, "/bin/sh", "-c",
 			`trap '' TERM; sleep 30 & printf '%s\n' "$$" > "$1"; wait`, "sh", ready)
 	}()
+	var pid int
 	defer func() {
 		cancel()
-		<-done
+		select {
+		case <-done:
+		case <-time.After(processWatchdog(t)):
+			// The owner hung, which already failed the test; force-stop the
+			// reported group so the 30 s descendant cannot outlive the test.
+			t.Error("canceled command did not return during cleanup")
+			if pid > 0 {
+				_ = syscall.Kill(-pid, syscall.SIGKILL)
+				awaitProcessGroupExit(t, pid)
+			}
+		}
 	}()
 	reported := make(chan []byte, 1)
 	// Opening the FIFO blocks until the shell opens it for writing. If the shell
@@ -113,8 +124,8 @@ func TestCombinedOutputPreservesContextCancellation(t *testing.T) {
 	case <-watchdog.Done():
 		t.Fatal("command did not report readiness")
 	}
-	pid, err := strconv.Atoi(strings.TrimSpace(string(line)))
-	if err != nil {
+	var err error
+	if pid, err = strconv.Atoi(strings.TrimSpace(string(line))); err != nil {
 		t.Fatalf("child pid %q: %v", line, err)
 	}
 	cancel()
