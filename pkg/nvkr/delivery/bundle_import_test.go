@@ -146,6 +146,18 @@ func TestImportBundleLayoutRefusesBeforeOutput(t *testing.T) {
 			}
 			return aicrFixtureManifest
 		}},
+		{name: "entry beside layout", mutate: func(t *testing.T, root string) string {
+			if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("extra"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			return aicrFixtureManifest
+		}},
+		{name: "other blob algorithm", mutate: func(t *testing.T, root string) string {
+			if err := os.Mkdir(filepath.Join(root, "blobs", "sha512"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			return aicrFixtureManifest
+		}},
 		{name: "second manifest", mutate: func(t *testing.T, root string) string {
 			raw, err := os.ReadFile(filepath.Join(root, "blobs", "sha256", strings.TrimPrefix(aicrFixtureManifest, "sha256:")))
 			if err != nil {

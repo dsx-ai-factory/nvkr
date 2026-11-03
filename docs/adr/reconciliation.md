@@ -237,13 +237,14 @@ referenced charts, images or providers. Diagnostic pulling writes the exact arch
 or deployment; authenticated consumption retains the normal signed Release/evidence requirements.
 
 Delivery can also import a producer-written OCI image layout without rebuilding its manifest. The source
-must hold exactly one pinned OCI image manifest with the empty config and one gzip tar layer, an
-artifact type on the import allowlist (initially `application/vnd.nvidia.aicr.artifact`), and no
-unreachable blobs. The layer must also pass the bounded archive reader, all before output work. Contract
-tests import a layout copied from AICR v1.1.2's own registry push with the same manifest digest, and they
-refuse each malformed shape with no output. No producer, Definition format or publication path uses the
-import yet: wiring waits on the pinned-tool producer decision and AICR's local layout output. Until then
-`bundle-oci` publication still uses the NVKR-built wrapper above.
+root must hold only the layout entries and exactly one pinned OCI image manifest with the empty config and
+one gzip tar layer, an artifact type on the import allowlist (initially
+`application/vnd.nvidia.aicr.artifact`), and no unreachable blobs. The layer must also pass the bounded
+archive reader, all before output work. Contract tests import a layout copied from AICR v1.1.2's own
+registry push with the same manifest digest, and they refuse each malformed shape with no output. No
+producer, Definition format or publication path uses the import yet. Proposed ADR-27 routes pinned-tool
+`oci-layout` results to it, but no pinned-tool producer exists. The `v1.2.0` producers above write AICR's
+layout and emit only its layer, so `bundle-oci` publication still uses the NVKR-built wrapper.
 
 The [focused AICR example](../../inputs/definitions/aicr/README.md) retains one GB300
 selection across six renderer formats and one local build-only Environment. Additional hardware

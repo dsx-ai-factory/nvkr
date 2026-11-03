@@ -10,6 +10,7 @@ import (
 	"reflect"
 
 	"github.com/dsx-ai-factory/nvkr/internal/bundlearchive"
+	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
@@ -31,6 +32,9 @@ func ImportBundleLayout(ctx context.Context, out, source, expectedDigest string)
 	}
 	if !isDigest(expectedDigest) {
 		return Result{}, e.New(e.CodeVerifyFailed, "bundle layout import requires an exact manifest digest")
+	}
+	if err := verifyBundleLayoutRoot(source); err != nil {
+		return Result{}, err
 	}
 	if err := verifyImageLayoutMarker(ctx, source); err != nil {
 		return Result{}, err
@@ -107,6 +111,25 @@ func ImportBundleLayout(ctx context.Context, out, source, expectedDigest string)
 		return Result{}, err
 	}
 	return Result{LayoutPath: out, RootDigest: rootDigest, SemanticDigest: held.Digest()}, nil
+}
+
+// verifyBundleLayoutRoot admits only the OCI layout entries, so nothing sits
+// beside the producer's layout and no other digest algorithm hides blobs.
+func verifyBundleLayoutRoot(source string) error {
+	directory, _, err := securepath.OpenDirectory(source)
+	if err != nil {
+		return e.Wrap(e.CodeVerifyFailed, err, "opening bundle layout")
+	}
+	defer directory.Close()
+	if err := exactImageDirectory(directory, []string{"blobs", "index.json", "oci-layout"}); err != nil {
+		return err
+	}
+	blobs, _, err := securepath.OpenChild(directory, "blobs", true)
+	if err != nil {
+		return e.Wrap(e.CodeVerifyFailed, err, "opening bundle layout blobs")
+	}
+	defer blobs.Close()
+	return exactImageDirectory(blobs, []string{"sha256"})
 }
 
 // admitBundleManifest checks the fixed producer shape: one OCI image manifest
