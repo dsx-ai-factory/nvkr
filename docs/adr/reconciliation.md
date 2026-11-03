@@ -3512,7 +3512,8 @@ The [GPU system matrix](../../inputs/definitions/nvke/README.md#gpu-system-matri
 and the site controller to family outputs in documentation only. It adds no Definition axis, input or
 generated file. NVKR records no GPU driver, fabric or runtime acceptance for any of them; that evidence
 belongs to AICR and NVKE. No maintained Definition yet selects the matrix's Ubuntu 24.04 disks,
-`controller-profiles` output, offline CAPI repository, GB200 AICR bundle or composite site Release.
+`controller-profiles` output, offline CAPI repository or composite site Release. The GB200 AICR bundle
+Definition has one local Run and no hosted Release.
 
 The maintained release node-image catalog selects the NVIDIA OVN fork `v2.4.2`
 (`8af51273d52dfa07454435d18d37230e582d797a`) for `ovn-kube-ubuntu`, `ovn-kubernetes-chart` and
