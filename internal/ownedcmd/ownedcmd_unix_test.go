@@ -78,8 +78,6 @@ func TestOutputCleansDescendantsAfterSuccessfulParent(t *testing.T) {
 }
 
 func TestCombinedOutputPreservesContextCancellation(t *testing.T) {
-	watchdog, stop := context.WithTimeout(t.Context(), processWatchdog(t))
-	defer stop()
 	ctx, cancel := context.WithCancel(t.Context())
 	ready := filepath.Join(t.TempDir(), "ready")
 	if err := unix.Mkfifo(ready, 0o600); err != nil {
@@ -121,7 +119,7 @@ func TestCombinedOutputPreservesContextCancellation(t *testing.T) {
 	case line = <-reported:
 	case <-done:
 		t.Fatalf("command exited before readiness: %v", runErr)
-	case <-watchdog.Done():
+	case <-time.After(processWatchdog(t)):
 		t.Fatal("command did not report readiness")
 	}
 	var err error
@@ -131,7 +129,7 @@ func TestCombinedOutputPreservesContextCancellation(t *testing.T) {
 	cancel()
 	select {
 	case <-done:
-	case <-watchdog.Done():
+	case <-time.After(processWatchdog(t)):
 		t.Fatal("canceled command did not return")
 	}
 	if !errors.Is(runErr, context.Canceled) {
