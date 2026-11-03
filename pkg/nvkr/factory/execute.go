@@ -242,6 +242,9 @@ func executeObservationWithHeldDisk(ctx context.Context, plan *Plan, node Node,
 				if _, err := observeProducerPayload(ctx, plan, input, visible); err != nil {
 					return err
 				}
+				if _, err := observeReleaseCompanions(ctx, plan, input, visible); err != nil {
+					return err
+				}
 			}
 		}
 	}

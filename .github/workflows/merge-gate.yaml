@@ -26,7 +26,8 @@
 #
 # TO ADD A NEW GATING CHECK
 #   1. Add a real job + companion -skip job with inverse `if:` conditions.
-#   2. Add both job names to the gate job's `needs:` list.
+#   2. Add both job names to the gate job's `needs:` list and its check/skip
+#      pair table. The gate rejects a dependency the table does not classify.
 #   3. Add a make target for it, so `make check` stays equal to CI
 #      (CONTRIBUTING.md, "Local development equals CI").
 #   No ruleset change is needed — "gate" is the only required check.
@@ -676,39 +677,72 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Check gate
+        # Each `if:` above is mirrored here: the fork predicates exactly as
+        # workflows-regen and analyze evaluate them.
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          SAME_REPOSITORY: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+          FORK_PULL_REQUEST: ${{ github.event.pull_request.head.repo.fork == true }}
         run: |
           set -euo pipefail
           echo "Gate results:"
-          echo '${{ toJSON(needs) }}' | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<<"$NEEDS"
 
           # check-paths must succeed — if it fails, all downstream jobs are
           # skipped (not failed), which would silently pass the gate.
-          if [ "${{ needs.check-paths.result }}" != "success" ]; then
-            echo "::error::check-paths did not succeed (result: ${{ needs.check-paths.result }})"
+          paths_result=$(jq -r '.["check-paths"].result' <<<"$NEEDS")
+          if [ "$paths_result" != "success" ]; then
+            echo "::error::check-paths did not succeed (result: $paths_result)"
             exit 1
           fi
 
-          # A successful matrix means every test shard passed. Never treat a
-          # skipped code job as success when the classifier required it.
-          if [ "${{ needs.check-paths.outputs.code }}" = 'true' ]; then
-            echo '${{ toJSON(needs) }}' | jq -e \
-              '[.check, .lint, .vulnerabilities, .tests] | all(.result == "success")' >/dev/null
-          elif [ "${{ needs.check-paths.outputs.code }}" = 'false' ]; then
-            echo '${{ toJSON(needs) }}' | jq -e \
-              '.["check-skip"].result == "success" and ([.check, .lint, .vulnerabilities, .tests] | all(.result == "skipped"))' >/dev/null
-          else
-            echo '::error::Code classification must be true or false'
+          # Every other dependency belongs to exactly one check/skip pair. The
+          # classifier selects one side: it must succeed and the other must be
+          # skipped. Both skipped means required work never ran. A missing job,
+          # any other result, a classifier value other than true/false, or a
+          # dependency absent from this table fails the gate.
+          if ! violations=$(jq -r \
+            --arg same_repository "$SAME_REPOSITORY" \
+            --arg fork_pull_request "$FORK_PULL_REQUEST" '
+            def flag($value; $label):
+              if $value == "true" then true
+              elif $value == "false" then false
+              else error("\($label) must be true or false, got \($value | tojson)")
+              end;
+            . as $needs
+            | $needs["check-paths"].outputs as $paths
+            | flag($same_repository; "same-repository status") as $same_repository
+            | flag($fork_pull_request; "fork status") as $fork_pull_request
+            | [
+                {skip: "check-skip", jobs: ["check", "lint", "vulnerabilities", "tests"],
+                 run: flag($paths.code; "code classification")},
+                {skip: "actionlint-skip", jobs: ["actionlint"],
+                 run: flag($paths.actions; "actions classification")},
+                {skip: "workflows-regen-skip", jobs: ["workflows-regen"],
+                 run: (flag($paths.pipeline; "pipeline classification") and $same_repository)},
+                {skip: "notices-regen-skip", jobs: ["notices-regen"],
+                 run: flag($paths.notices; "notices classification")},
+                {skip: "docs-skip", jobs: ["docs"],
+                 run: flag($paths.docs; "docs classification")},
+                {skip: "analyze-skip", jobs: ["analyze"],
+                 run: (flag($paths.code; "code classification") and ($fork_pull_request | not))}
+              ] as $pairs
+            | ($pairs | map(.skip, .jobs[]) + ["check-paths"]) as $classified
+            | ($needs | keys - $classified | .[] | "\(.): dependency is not classified by the gate"),
+              ($pairs[]
+                | .run as $run
+                | (.jobs[] | [., (if $run then "success" else "skipped" end)]),
+                  [.skip, (if $run then "skipped" else "success" end)]
+                | select($needs[.[0]].result != .[1])
+                | "\(.[0]): result \($needs[.[0]].result // "missing"), want \(.[1])")
+          ' <<<"$NEEDS"); then
+            echo "::error::Gate inputs could not be classified"
             exit 1
           fi
-
-          # Fail if ANY other dependency failed or was cancelled.
-          # Skipped is OK — it means the inverse job ran instead.
-          # Split the parse from the predicate so a jq error aborts under
-          # `set -e` rather than being read as "no failures" and passing.
-          failed=$(echo '${{ toJSON(needs.*.result) }}' \
-            | jq -r 'map(select(. == "failure" or . == "cancelled")) | length')
-          if [ "$failed" -gt 0 ]; then
-            echo "::error::One or more gating checks failed or were cancelled"
+          if [ -n "$violations" ]; then
+            while IFS= read -r violation; do
+              echo "::error::$violation"
+            done <<<"$violations"
             exit 1
           fi
 

@@ -56,6 +56,11 @@ func TestRenderIsTheGenerationSeam(t *testing.T) {
 	if err != nil || reached != 1 || !reflect.DeepEqual(got, want) {
 		t.Fatalf("Render did not take the seam exactly once for the admitted engine: reached=%d err=%v", reached, err)
 	}
+	// `run generate` writes are the lifecycle caller's only seam route.
+	digest, err := Generate(t.Context(), plan, EngineGitHub, t.TempDir(), false)
+	if err != nil || reached != 2 || digest != want.PlanDigest {
+		t.Fatalf("Generate write mode did not take the seam: reached=%d err=%v", reached, err)
+	}
 }
 
 func TestGeneratedStageOwnersNeverTakeTheGenerationSeam(t *testing.T) {
@@ -70,6 +75,10 @@ func TestGeneratedStageOwnersNeverTakeTheGenerationSeam(t *testing.T) {
 		tampered e.Code
 	}{
 		{"run generate --check", func(ctx context.Context, root string) error {
+			_, err := Generate(ctx, plan, EngineGitHub, root, true)
+			return err
+		}, e.CodePipelineDrift},
+		{"run generate --runtime --source-commit --check", func(ctx context.Context, root string) error {
 			return CheckGenerated(ctx, plan, EngineGitHub, root)
 		}, e.CodePipelineDrift},
 		{"run generate --runtime --check", func(ctx context.Context, root string) error {
@@ -124,6 +133,10 @@ func TestGeneratedStageOwnersNeverTakeTheGenerationSeam(t *testing.T) {
 // with aliases expanded. A generation command there must be a core admission
 // or runtime refresh, never a write-mode regeneration or another selection.
 func TestGeneratedClosuresInvokeOnlyCoreStageCommands(t *testing.T) {
+	// The exact inventory of commands generated stages may run. Before adding
+	// one, confirm its owner never reaches Render. If it re-emits committed
+	// bytes, add it to the seam-trap table above. Remove a command here when
+	// generation stops emitting it.
 	stageCommands := map[string]bool{
 		"factory github check-runtime-inputs": true, "factory github ci-download": true,
 		"factory github ci-fetch-locators": true, "factory github ci-upload": true,
