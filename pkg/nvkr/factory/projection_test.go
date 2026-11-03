@@ -488,6 +488,11 @@ func TestProjectionAdapterHonorsCancellation(t *testing.T) {
 			t.Cleanup(func() { _ = w.Close() })
 			return enteredPipeReader{r, entered}, &bytes.Buffer{}
 		}},
+		{"read deadline refused then close", func(t *testing.T, entered chan<- struct{}) (io.Reader, io.Writer) {
+			r, w := io.Pipe()
+			t.Cleanup(func() { _ = w.Close() })
+			return deadlineRefusingPipeReader{enteredPipeReader{r, entered}}, &bytes.Buffer{}
+		}},
 		{"write deadline", func(t *testing.T, entered chan<- struct{}) (io.Reader, io.Writer) {
 			_, w := projectionTestPipe(t)
 			// Fill the pipe so the response write blocks.
@@ -580,6 +585,14 @@ type enteredPipeReader struct {
 func (r enteredPipeReader) Read(p []byte) (int, error) {
 	signalEntered(r.entered)
 	return r.PipeReader.Read(p)
+}
+
+// deadlineRefusingPipeReader offers a deadline that always fails, so only the
+// Close fallback can interrupt its read.
+type deadlineRefusingPipeReader struct{ enteredPipeReader }
+
+func (deadlineRefusingPipeReader) SetDeadline(time.Time) error {
+	return errors.New("deadline unsupported")
 }
 
 type enteredPipeWriter struct {
