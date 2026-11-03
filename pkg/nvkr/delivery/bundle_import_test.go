@@ -253,3 +253,23 @@ func TestImportBundleLayoutCanceled(t *testing.T) {
 		t.Fatalf("canceled import left output: %v", statErr)
 	}
 }
+
+func TestImportBundleLayoutCanceledDuringRootCheck(t *testing.T) {
+	root := aicrLayoutFixture(t)
+	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("extra"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	assertRegistryCode(t, verifyBundleLayoutRoot(ctx, root), e.CodeTimeout)
+}
+
+func TestImportBundleLayoutCodesOutputFailure(t *testing.T) {
+	parent := t.TempDir()
+	if err := os.Chmod(parent, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(parent, 0o700) })
+	_, err := ImportBundleLayout(t.Context(), filepath.Join(parent, "nested", "imported"), aicrLayoutFixture(t), aicrFixtureManifest)
+	assertRegistryCode(t, err, e.CodeInternal)
+}

@@ -6,6 +6,7 @@ package delivery
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"reflect"
 
@@ -26,14 +27,23 @@ var bundleImportArtifactTypes = map[string]bool{MediaAICRArtifact: true}
 // output digest equals the producer's own push. expectedDigest pins the
 // manifest. Shape, artifact type and archive admission complete before output
 // work; any failure leaves no output.
-func ImportBundleLayout(ctx context.Context, out, source, expectedDigest string) (Result, error) {
+func ImportBundleLayout(ctx context.Context, out, source, expectedDigest string) (result Result, err error) {
+	defer func() {
+		if err != nil {
+			var coded *e.Error
+			if !errors.As(err, &coded) {
+				err = e.Wrap(e.CodeInternal, err, "importing bundle layout")
+			}
+			err = classifyContext(ctx, err)
+		}
+	}()
 	if err := deliveryContext(ctx); err != nil {
 		return Result{}, err
 	}
 	if !isDigest(expectedDigest) {
 		return Result{}, e.New(e.CodeVerifyFailed, "bundle layout import requires an exact manifest digest")
 	}
-	if err := verifyBundleLayoutRoot(source); err != nil {
+	if err := verifyBundleLayoutRoot(ctx, source); err != nil {
 		return Result{}, err
 	}
 	if err := verifyImageLayoutMarker(ctx, source); err != nil {
@@ -115,21 +125,21 @@ func ImportBundleLayout(ctx context.Context, out, source, expectedDigest string)
 
 // verifyBundleLayoutRoot admits only the OCI layout entries, so nothing sits
 // beside the producer's layout and no other digest algorithm hides blobs.
-func verifyBundleLayoutRoot(source string) error {
+func verifyBundleLayoutRoot(ctx context.Context, source string) error {
 	directory, _, err := securepath.OpenDirectory(source)
 	if err != nil {
-		return e.Wrap(e.CodeVerifyFailed, err, "opening bundle layout")
+		return classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "opening bundle layout"))
 	}
 	defer directory.Close()
 	if err := exactImageDirectory(directory, []string{"blobs", "index.json", "oci-layout"}); err != nil {
-		return err
+		return classifyContext(ctx, err)
 	}
 	blobs, _, err := securepath.OpenChild(directory, "blobs", true)
 	if err != nil {
-		return e.Wrap(e.CodeVerifyFailed, err, "opening bundle layout blobs")
+		return classifyContext(ctx, e.Wrap(e.CodeVerifyFailed, err, "opening bundle layout blobs"))
 	}
 	defer blobs.Close()
-	return exactImageDirectory(blobs, []string{"sha256"})
+	return classifyContext(ctx, exactImageDirectory(blobs, []string{"sha256"}))
 }
 
 // admitBundleManifest checks the fixed producer shape: one OCI image manifest
