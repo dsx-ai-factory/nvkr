@@ -342,11 +342,15 @@ func TestLaptopAMD64OSExecutionClassAdmission(t *testing.T) {
 		{name: "foreign execution host", change: func(env *authored.Environment) { env.ExecutionClasses[0].HostPlatform = "linux/arm64" }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			// Each compile waits on pinned-tree Git fetches for every catalog stack.
+			// Concurrent subtests bound the wall time to the slowest compile; the
+			// parent's working directory is restored only after all of them finish.
+			t.Parallel()
 			selected := env.Clone()
 			if tc.change != nil {
 				tc.change(&selected)
 			}
-			plan, err := factory.CompileDocuments(t.Context(), definitionPath, d, environmentPath, selected, "test")
+			plan, err := factory.CompileDocuments(t.Context(), definitionPath, d.Clone(), environmentPath, selected, "test")
 			if tc.change != nil {
 				var coded *e.Error
 				if plan != nil || !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
