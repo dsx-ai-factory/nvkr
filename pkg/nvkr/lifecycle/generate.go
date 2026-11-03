@@ -70,13 +70,16 @@ func generateFiles(ctx context.Context, definitionPath, environmentPath, generat
 			return "", err
 		}
 		if check && len(sourceCommit) != 0 {
-			bundle, err := factory.Render(ctx, plan, engine)
-			if err != nil {
+			if err := factory.CheckGenerated(ctx, plan, engine, root); err != nil {
 				return "", err
 			}
-			if err := factory.CheckGeneratedBundle(ctx, root, bundle); err != nil {
-				return "", err
-			}
+		}
+		return plan.Digest()
+	}
+	// Generated bootstraps run check mode, so it never takes the Render seam.
+	if check {
+		if err := factory.CheckGenerated(ctx, plan, engine, root); err != nil {
+			return "", err
 		}
 		return plan.Digest()
 	}
@@ -84,11 +87,7 @@ func generateFiles(ctx context.Context, definitionPath, environmentPath, generat
 	if err != nil {
 		return "", err
 	}
-	if check {
-		if err := factory.CheckGeneratedBundle(ctx, root, bundle); err != nil {
-			return "", err
-		}
-	} else if err := factory.WriteGeneratedBundle(ctx, root, bundle); err != nil {
+	if err := factory.WriteGeneratedBundle(ctx, root, bundle); err != nil {
 		return "", err
 	}
 	return bundle.PlanDigest, nil

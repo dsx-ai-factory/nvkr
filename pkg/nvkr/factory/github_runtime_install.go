@@ -27,11 +27,7 @@ func InstallGitHubRuntimeInputs(ctx context.Context, baseline *Plan, root string
 	if err := admitGitHubRuntimeInputs(ctx, baseline, root); err != nil {
 		return err
 	}
-	committed, err := RenderGitHub(ctx, baseline)
-	if err != nil {
-		return err
-	}
-	if err := CheckGeneratedBundle(ctx, root, committed); err != nil {
+	if _, err := checkCoreGitHubBundle(ctx, baseline, root); err != nil {
 		return err
 	}
 	staged, err := readGitHubRuntimeInputSet(ctx, root)
