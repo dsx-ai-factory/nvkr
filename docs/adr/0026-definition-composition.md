@@ -159,10 +159,13 @@ metadata carry a **composition record**: the composite digest, the effective Def
 records and publication roots that carry a composition record use new schema majors; records of plain
 Definitions keep their current schemas and bytes. A record without declared variants omits the field and keeps
 its bytes. A reader that does not admit the new major rejects it. A reader that admits it requires a complete,
-consistent record: every output attributed to exactly one listed member, no unlisted member, declared variants
-that name only listed members that select their components, and an effective Definition digest that recomputes
-from the recorded Plan inputs. Plan validation also repeats the §3 cross-member producer comparison over the
-Plan's resolved producers, so a saved Plan cannot drop a declaration it needs.
+consistent record that recomputes the composite digest: every output attributed to exactly one listed member, no
+unlisted member, and declared variants that name only listed members. Run-record and publication readers stop
+there; they establish the record's identity, membership and attribution and have no effective Definition. Plan
+validation has the effective Definition, so it also requires the effective Definition digest to recompute, every
+declared variant member to select its component, and the §3 cross-member producer comparison to hold over the
+Plan's resolved producers; a saved Plan cannot drop a declaration it needs. A consumer that needs those checks
+binds the Plan through an exact-input expectation (§10).
 
 Each variant producer is attributed to the member that selected it. Every native build belongs to one named
 output, the record attributes that output to one member, and the Plan records the build's resolved producers.
