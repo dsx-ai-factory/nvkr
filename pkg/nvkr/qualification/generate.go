@@ -25,6 +25,11 @@ import (
 // whether it did as this job output.
 const qualificationOutcomeWrittenOutput = "outcome-written"
 
+// qualificationOutcomeFile is the outcome path as the run steps see it: the
+// shell expands ${GITHUB_RUN_ATTEMPT}. The upload's `with:` path is not a shell,
+// so qualificationOutcomeUpload names the same attempt with
+// ${{ github.run_attempt }}. Both come from qualificationoutcome.Directory and
+// FileName, so change them together.
 var qualificationOutcomeFile = qualificationoutcome.Directory + "/" + qualificationoutcome.FileName("${GITHUB_RUN_ATTEMPT}")
 
 const DevelopmentQualificationManifestPath = ".github/nvkr-dev-qualification/manifest.json"

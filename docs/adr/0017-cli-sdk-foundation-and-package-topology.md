@@ -380,7 +380,8 @@ check dispatch; `conformance` owns the supported suite/harness protocol, subject
 and cleanup. Catalog, lifecycle, delivery and held-file owners retain their existing responsibilities.
 `qualificationoutcome` owns the qualification outcome schema, its strict decoding, the triggering event's
 description and text scrubbing, in lane **none (descriptive)**. It is a leaf that directly imports only the canonical
-codec, coded errors and held files. `releasemanifest` classifies its own result into an outcome. An outcome
+codec, coded errors and held files. `releasemanifest` admits an outcome's inputs before qualification and
+classifies its own result into an outcome. An outcome
 points at qualification evidence and the release manifest by digest; it adds no public lifecycle object,
 receipt or authority.
 

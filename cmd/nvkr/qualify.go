@@ -16,7 +16,6 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualification"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationoutcome"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/releasemanifest"
 	"github.com/urfave/cli/v2"
 )
@@ -89,7 +88,7 @@ func cmdRunQualifyWithClock(publish qualificationRunPublisher, issue qualificati
 			}
 		}
 		if outcomeInputs != nil {
-			outcomeInputs.StartedAt, outcomeInputs.FinishedAt = started, finished
+			outcomeInputs.FinishedAt = finished
 			if err := writeQualificationOutcome(c.Context, out, manifestResult, publishErr, *outcomeInputs); err != nil {
 				// The record grants no authority, so it never changes the
 				// qualification's exit status; the job's outcome-written output
@@ -110,22 +109,11 @@ func cmdRunQualifyWithClock(publish qualificationRunPublisher, issue qualificati
 }
 
 // admitQualificationOutcome checks everything the record needs before
-// qualification does any work: the qualifier Run, the triggering event and the
-// errored record it would yield, the secrets to redact, and a destination the
-// command can write.
+// qualification does any work: the record's inputs, which releasemanifest
+// admits from this process's environment, and a destination the command can
+// write.
 func admitQualificationOutcome(ctx context.Context, path string, at time.Time) (*releasemanifest.OutcomeInputs, error) {
-	qualifier, err := qualificationoutcome.QualifierFromEnv(os.LookupEnv)
-	if err != nil {
-		return nil, err
-	}
-	event, err := qualificationoutcome.ReadEvent(ctx, os.Getenv("GITHUB_EVENT_PATH"))
-	if err != nil {
-		return nil, err
-	}
-	if _, err := qualificationoutcome.FromEvent(event, qualifier, qualificationoutcome.StageQualify, at, at); err != nil {
-		return nil, err
-	}
-	secrets, err := qualification.OutcomeSecrets(os.Environ())
+	inputs, err := releasemanifest.AdmitOutcome(ctx, os.Environ(), at)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +131,7 @@ func admitQualificationOutcome(ctx context.Context, path string, at time.Time) (
 	}
 	_ = probe.Close()
 	_ = os.Remove(probe.Name())
-	return &releasemanifest.OutcomeInputs{Qualifier: qualifier, Event: event, Secrets: secrets}, nil
+	return inputs, nil
 }
 
 // writeQualificationOutcome records the attempt after its diagnostics. A canceled
@@ -157,5 +145,7 @@ func writeQualificationOutcome(ctx context.Context, path string, result *release
 	if err != nil {
 		return err
 	}
-	return writeAtomic(ctx, path, raw, 0o644)
+	// Owner-only: the record is redacted, but a caller's directory may be
+	// readable by others.
+	return writeAtomic(ctx, path, raw, 0o600)
 }

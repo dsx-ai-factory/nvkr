@@ -602,10 +602,14 @@ GitHub tokens, JWTs, `gs://` URLs and email-shaped principals are redacted, and 
 bytes, from their start and their end.
 
 `--out` requires `--issue-manifest`. Before qualification starts, it admits the qualifier's GitHub Actions
-identity, the `workflow_run` event and the errored record it would yield, a destination it can write (not a
-directory), and secrets long enough to redact; a refusal stops the command before any qualification work.
-Stdout and the exit status do not otherwise change: if the record cannot be written after qualification, the
-command prints a coded error and keeps the qualification's exit status. The generated job uploads the record as
+identity, the `workflow_run` event and the errored record it would yield, secrets long enough to redact, and a
+destination it can write (not a directory); a refusal stops the command before any qualification work. Stdout
+and the exit status do not otherwise change: if the record cannot be written after qualification, the command
+prints a coded error and keeps the qualification's exit status. The record is readable only by its owner. It is
+replaced atomically, so a reused `--out` path keeps an earlier attempt's complete record when a later attempt
+writes none. Use a fresh, attempt-specific path, as the generated job does; a caller that reuses a path must
+compare the record's qualifier Run ID and attempt before treating it as the current attempt's record. The
+generated job uploads the record as
 `nvkr-qualification-outcome-<run>-<attempt>`, kept 30 days, for any result except a canceled job, and exports
 `outcome-written`. No record exists for an attempt that ends before the command runs (such as a failed setup
 step or an empty source credential), that the command refuses before qualification, or whose record cannot be

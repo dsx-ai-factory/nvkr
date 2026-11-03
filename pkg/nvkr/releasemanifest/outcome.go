@@ -4,6 +4,7 @@
 package releasemanifest
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -25,6 +26,42 @@ type OutcomeInputs struct {
 	StartedAt  time.Time
 	FinishedAt time.Time
 	Secrets    []string
+}
+
+// AdmitOutcome checks, before qualification does any work, everything a run
+// qualify --out record needs from the environment, in this order: the
+// qualifier Run, the triggering event and the errored record it would yield,
+// and the secrets to redact. environ is the caller's whole environment: names
+// are looked up like os.LookupEnv (the first entry wins), and every entry is
+// scanned for secrets, so both come from one source and an empty environment
+// fails closed. The inputs keep at as the attempt's start; the caller sets
+// FinishedAt once the attempt ends, and owns the destination.
+func AdmitOutcome(ctx context.Context, environ []string, at time.Time) (*OutcomeInputs, error) {
+	lookup := func(name string) (string, bool) {
+		for _, entry := range environ {
+			if key, value, ok := strings.Cut(entry, "="); ok && key == name {
+				return value, true
+			}
+		}
+		return "", false
+	}
+	qualifier, err := qualificationoutcome.QualifierFromEnv(lookup)
+	if err != nil {
+		return nil, err
+	}
+	eventPath, _ := lookup("GITHUB_EVENT_PATH")
+	event, err := qualificationoutcome.ReadEvent(ctx, eventPath)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := qualificationoutcome.FromEvent(event, qualifier, qualificationoutcome.StageQualify, at, at); err != nil {
+		return nil, err
+	}
+	secrets, err := qualification.OutcomeSecrets(environ)
+	if err != nil {
+		return nil, err
+	}
+	return &OutcomeInputs{Qualifier: qualifier, Event: event, StartedAt: at, Secrets: secrets}, nil
 }
 
 // NewOutcome classifies one production qualification attempt for run qualify

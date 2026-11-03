@@ -105,15 +105,20 @@ type qualifyOutRun struct {
 	called  bool
 }
 
+// runQualifyOut runs qualify with a clock that advances a minute per reading.
 func runQualifyOut(t *testing.T, ctx context.Context, issue qualificationManifestPublisher, start time.Time, args ...string) qualifyOutRun {
+	t.Helper()
+	calls := 0
+	return runQualifyOutWithClock(t, ctx, issue, func() time.Time {
+		calls++
+		return start.Add(time.Duration(calls) * time.Minute)
+	}, args...)
+}
+
+func runQualifyOutWithClock(t *testing.T, ctx context.Context, issue qualificationManifestPublisher, clock func() time.Time, args ...string) qualifyOutRun {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
 	run := qualifyOutRun{}
-	calls := 0
-	clock := func() time.Time {
-		calls++
-		return start.Add(time.Duration(calls) * time.Minute)
-	}
 	app := &cli.App{Writer: &stdout, ErrWriter: &stderr, Commands: []*cli.Command{cmdRunQualifyWithClock(
 		func(context.Context, string, lifecycle.QualificationRuntimeOptions) (*qualification.Publication, error) {
 			t.Fatal("manifest request used the qualification-only publisher")
@@ -216,6 +221,117 @@ func TestQualificationCLIQualifyOut(t *testing.T) {
 		}
 		if !strings.Contains(run.stderr, "recording the qualification outcome; the qualification result stands") || !strings.Contains(run.stderr, string(e.CodeTimeout)) {
 			t.Fatalf("stderr does not explain the missing outcome: %q", run.stderr)
+		}
+	})
+
+	// A reused --out path keeps an earlier attempt's complete record when a later
+	// attempt writes none; the record's qualifier attempt tells them apart.
+	t.Run("reused path keeps the earlier record when a later attempt writes none", func(t *testing.T) {
+		qualifyOutEnvironment(t)
+		issue := func(context.Context, string, lifecycle.QualificationRuntimeOptions) (*releasemanifest.RunResult, error) {
+			return qualifyOutPassed(), nil
+		}
+		path := filepath.Join(t.TempDir(), "outcome.json")
+		first := runQualifyOut(t, t.Context(), issue, time.Now(), "--issue-manifest", "--out", path)
+		if first.err != nil || first.outcome == nil || first.outcome.Qualifier.Attempt != "1" {
+			t.Fatalf("first attempt: err=%v outcome=%v", first.err, first.outcome)
+		}
+		t.Setenv("GITHUB_RUN_ATTEMPT", "2")
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		canceled := func(context.Context, string, lifecycle.QualificationRuntimeOptions) (*releasemanifest.RunResult, error) {
+			cancel()
+			return qualifyOutPassed(), nil
+		}
+		second := runQualifyOut(t, ctx, canceled, time.Now(), "--issue-manifest", "--out", path)
+		if second.err != nil || !strings.Contains(second.stderr, string(e.CodeTimeout)) || !bytes.Equal(second.raw, first.raw) {
+			t.Fatalf("second attempt replaced or lost the first record: err=%v stderr=%q", second.err, second.stderr)
+		}
+	})
+
+	// The destination can change after admission, for example when another
+	// process removes it: the exit and stdout stand, stderr says what was lost,
+	// and nothing is written.
+	for _, tc := range []struct {
+		name   string
+		result func() *releasemanifest.RunResult
+		err    error
+	}{
+		{"passed", qualifyOutPassed, nil},
+		{"failed", func() *releasemanifest.RunResult {
+			return &releasemanifest.RunResult{Qualification: qualifyOutPublication(false)}
+		}, gate},
+	} {
+		t.Run("destination replaced after admission keeps the "+tc.name+" verdict", func(t *testing.T) {
+			qualifyOutEnvironment(t)
+			start := time.Date(2026, 11, 2, 10, 0, 0, 0, time.UTC)
+			plain := func(context.Context, string, lifecycle.QualificationRuntimeOptions) (*releasemanifest.RunResult, error) {
+				return tc.result(), tc.err
+			}
+			without := runQualifyOut(t, t.Context(), plain, start, "--issue-manifest")
+			dir := filepath.Join(t.TempDir(), qualificationoutcome.Directory)
+			replaced := func(ctx context.Context, policy string, options lifecycle.QualificationRuntimeOptions) (*releasemanifest.RunResult, error) {
+				// Admission created the directory; a file now takes its place.
+				if err := os.RemoveAll(dir); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(dir, nil, 0o600); err != nil {
+					t.Fatal(err)
+				}
+				return plain(ctx, policy, options)
+			}
+			run := runQualifyOut(t, t.Context(), replaced, start, "--issue-manifest", "--out", filepath.Join(dir, qualificationoutcome.FileName("1")))
+			if !run.called || run.outcome != nil || !bytes.Equal(run.stdout, without.stdout) || run.err != without.err || e.ExitCode(run.err) != e.ExitCode(without.err) {
+				t.Fatalf("got called=%v outcome=%v err=%v, want err=%v", run.called, run.outcome, run.err, without.err)
+			}
+			if !strings.Contains(run.stderr, "recording the qualification outcome; the qualification result stands") || !strings.Contains(run.stderr, string(e.CodeInternal)) {
+				t.Fatalf("stderr does not explain the missing outcome: %q", run.stderr)
+			}
+		})
+	}
+
+	// A clock that steps back cannot put the finish before the start.
+	t.Run("a clock stepping back records a zero-length attempt", func(t *testing.T) {
+		qualifyOutEnvironment(t)
+		issue := func(context.Context, string, lifecycle.QualificationRuntimeOptions) (*releasemanifest.RunResult, error) {
+			return qualifyOutPassed(), nil
+		}
+		start := time.Date(2026, 11, 2, 10, 0, 0, 0, time.UTC)
+		readings := []time.Time{start, start.Add(-time.Hour)}
+		clock := func() time.Time {
+			reading := readings[0]
+			if len(readings) > 1 {
+				readings = readings[1:]
+			}
+			return reading
+		}
+		dir := t.TempDir()
+		back := runQualifyOutWithClock(t, t.Context(), issue, clock, "--issue-manifest", "--out", filepath.Join(dir, "back.json"))
+		forward := runQualifyOut(t, t.Context(), issue, start, "--issue-manifest", "--out", filepath.Join(dir, "forward.json"))
+		if back.err != nil || back.outcome == nil || back.outcome.StartedAt != "2026-11-02T10:00:00Z" || back.outcome.FinishedAt != back.outcome.StartedAt {
+			t.Fatalf("got err=%v outcome=%#v", back.err, back.outcome)
+		}
+		if forward.outcome == nil || !bytes.Equal(back.outcome.Result, forward.outcome.Result) ||
+			back.outcome.EvidenceDigest != forward.outcome.EvidenceDigest || back.outcome.ManifestDigest != forward.outcome.ManifestDigest {
+			t.Fatal("the clock reached the result or a digest")
+		}
+	})
+
+	// The record is owner-only even in a caller's world-readable directory.
+	t.Run("record is owner-only", func(t *testing.T) {
+		qualifyOutEnvironment(t)
+		issue := func(context.Context, string, lifecycle.QualificationRuntimeOptions) (*releasemanifest.RunResult, error) {
+			return qualifyOutPassed(), nil
+		}
+		dir := t.TempDir()
+		if err := os.Chmod(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(dir, "outcome-1.json")
+		run := runQualifyOut(t, t.Context(), issue, time.Now(), "--issue-manifest", "--out", path)
+		info, err := os.Stat(path)
+		if run.err != nil || err != nil || info.Mode().Perm() != 0o600 {
+			t.Fatalf("err=%v stat=%v info=%v", run.err, err, info)
 		}
 	})
 

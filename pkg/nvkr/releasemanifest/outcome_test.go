@@ -5,9 +5,13 @@ package releasemanifest
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -303,6 +307,101 @@ func TestReleaseManifestOutcomeRunPatternsMatchOrigin(t *testing.T) {
 			t.Errorf("%+v: origin admits=%v, outcome admits=%v", run, origin == nil, outcome == nil)
 		}
 	}
+}
+
+// AdmitOutcome reads only the environment it is given and refuses in order: the
+// qualifier Run, then the event and the errored record it would yield, then the
+// secrets.
+func TestReleaseManifestAdmitOutcome(t *testing.T) {
+	writeEvent := func(change func(run map[string]any)) string {
+		repository := map[string]any{"full_name": "example/nvkr", "id": json.Number("7")}
+		run := map[string]any{"id": json.Number("101"), "run_attempt": json.Number("1"), "head_sha": strings.Repeat("a", 40), "head_branch": "main",
+			"path": ".github/workflows/nvkr-run.yml", "event": "push", "status": "completed", "conclusion": "success", "repository": repository, "head_repository": repository}
+		change(run)
+		raw, err := json.Marshal(map[string]any{"action": "completed", "workflow_run": run})
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(t.TempDir(), "event.json")
+		if err := os.WriteFile(path, raw, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	eventPath := writeEvent(func(map[string]any) {})
+	// A readable event the errored record refuses: its head is a fork.
+	forkHead := writeEvent(func(run map[string]any) {
+		run["head_repository"] = map[string]any{"full_name": "fork/nvkr", "id": json.Number("8")}
+	})
+	// An event that reading itself refuses: it names no head commit.
+	headless := writeEvent(func(run map[string]any) { delete(run, "head_sha") })
+	// The process environment must not leak in: if it did, the "no qualifier
+	// Run" and "no event" cases would find these.
+	t.Setenv("GITHUB_RUN_ID", "999")
+	t.Setenv("GITHUB_EVENT_PATH", eventPath)
+	// environment applies change to the qualify job's environment; an empty
+	// value unsets the variable.
+	environment := func(change map[string]string) []string {
+		env := map[string]string{"GITHUB_REPOSITORY": "example/nvkr", "GITHUB_WORKFLOW_REF": "example/nvkr/.github/workflows/nvkr-qualify.yml@refs/heads/main",
+			"GITHUB_RUN_ID": "202", "GITHUB_RUN_ATTEMPT": "1", "GITHUB_SHA": strings.Repeat("b", 40), "GITHUB_EVENT_PATH": eventPath,
+			"NVKR_REGISTRY_PASSWORD": outcomeSecret}
+		for name, value := range change {
+			if value == "" {
+				delete(env, name)
+			} else {
+				env[name] = value
+			}
+		}
+		var environ []string
+		for name, value := range env {
+			environ = append(environ, name+"="+value)
+		}
+		return environ
+	}
+	at := time.Date(2026, 11, 2, 10, 0, 0, 0, time.UTC)
+
+	inputs, err := AdmitOutcome(t.Context(), environment(nil), at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	event, err := qualificationoutcome.ReadEvent(t.Context(), eventPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if inputs.Qualifier.RunID != "202" || !reflect.DeepEqual(inputs.Event, event) || !slices.Contains(inputs.Secrets, outcomeSecret) ||
+		!inputs.StartedAt.Equal(at) || !inputs.FinishedAt.IsZero() {
+		t.Fatalf("admitted %#v", inputs)
+	}
+	// Like os.LookupEnv, the first entry for a name wins.
+	shadowed, err := AdmitOutcome(t.Context(), append([]string{"GITHUB_RUN_ID=303"}, environment(nil)...), at)
+	if err != nil || shadowed.Qualifier.RunID != "303" {
+		t.Fatalf("the first entry did not win: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name   string
+		change map[string]string
+		code   e.Code
+	}{
+		{"no qualifier Run", map[string]string{"GITHUB_RUN_ID": ""}, e.CodeProvenanceMissing},
+		{"no event", map[string]string{"GITHUB_EVENT_PATH": ""}, e.CodeProvenanceMissing},
+		{"an event reading refuses", map[string]string{"GITHUB_EVENT_PATH": headless}, e.CodeVerifyFailed},
+		{"an event the errored record refuses", map[string]string{"GITHUB_EVENT_PATH": forkHead}, e.CodeVerifyFailed},
+		{"secret too short to redact", map[string]string{"NVKR_REGISTRY_PASSWORD": "abc"}, e.CodeUsage},
+		// Each refusal comes before every later one.
+		{"the qualifier Run before the event", map[string]string{"GITHUB_RUN_ID": "", "GITHUB_EVENT_PATH": headless}, e.CodeProvenanceMissing},
+		{"no event before the secrets", map[string]string{"GITHUB_EVENT_PATH": "", "NVKR_REGISTRY_PASSWORD": "abc"}, e.CodeProvenanceMissing},
+		{"the errored record before the secrets", map[string]string{"GITHUB_EVENT_PATH": forkHead, "NVKR_REGISTRY_PASSWORD": "abc"}, e.CodeVerifyFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := AdmitOutcome(t.Context(), environment(tc.change), at)
+			requireOutcomeCode(t, err, tc.code)
+		})
+	}
+	t.Run("an empty environment fails closed", func(t *testing.T) {
+		_, err := AdmitOutcome(t.Context(), nil, at)
+		requireOutcomeCode(t, err, e.CodeProvenanceMissing)
+	})
 }
 
 func requireOutcomeCode(t *testing.T, err error, code e.Code) {
