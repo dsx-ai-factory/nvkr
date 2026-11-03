@@ -4,14 +4,17 @@
 // Package architecture hosts the ADR-02 §4 static purity guard: identity-producing
 // packages must not reach wall-clock reads, randomness, UUID generation, hostname, or
 // host-environment reads, because a leak there would make buildDigest host-dependent.
-// The guard type-checks those packages and inspects resolved references, so import
-// aliases, dot imports and function values cannot hide a forbidden source and comments
-// cannot trip it. It does not follow calls into other packages. The empirical
-// invariance test lives in pkg/nvkr/ir (TestDigestHostInvariance).
+// The guard type-checks those packages. Their imports must be on an exact allowlist,
+// and resolved references to clock and host functions are rejected even when an
+// allowlisted import would otherwise admit them, so import aliases, dot imports and
+// function values cannot hide a forbidden source and comments cannot trip it. It does
+// not follow calls into imported packages. The empirical invariance test lives in
+// pkg/nvkr/ir (TestDigestHostInvariance).
 package architecture
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -22,6 +25,8 @@ import (
 	"go/token"
 	"go/types"
 	"io"
+	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,43 +39,89 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
 )
 
+const modulePath = "github.com/dsx-ai-factory/nvkr"
+
 // identityPackages are the package trees whose output flows into a digest-addressed
 // identity (buildDigest / builder-profile / trust objects). They MUST be pure.
 var identityPackages = []string{
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph/...",
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical/...",
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir/...",
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target/...",
+	modulePath + "/pkg/nvkr/buildgraph/...",
+	modulePath + "/pkg/nvkr/canonical/...",
+	modulePath + "/pkg/nvkr/ir/...",
+	modulePath + "/pkg/nvkr/target/...",
 }
 
-// forbiddenImports are nondeterministic packages; importing one under any name, including
-// a blank import, is a violation.
-var forbiddenImports = map[string]bool{
-	"crypto/rand":            true,
-	"github.com/google/uuid": true,
-	"math/rand":              true,
-	"math/rand/v2":           true,
+// allowedIdentityImports is the exact set of packages identity packages may import.
+// Clock, randomness, UUID, host and unsafe packages are absent. Adding an entry is a
+// reviewed decision; it does not prove the imported package pure.
+var allowedIdentityImports = map[string]bool{
+	"bytes":            true,
+	"crypto/sha256":    true,
+	"encoding/hex":     true,
+	"encoding/json":    true,
+	"fmt":              true,
+	"io":               true,
+	"io/fs":            true,
+	"maps":             true,
+	"math/big":         true,
+	"net/url":          true,
+	"path":             true,
+	"reflect":          true,
+	"regexp":           true,
+	"slices":           true,
+	"sort":             true,
+	"strconv":          true,
+	"strings":          true,
+	"unicode":          true,
+	"unicode/utf16":    true,
+	"unicode/utf8":     true,
+	"sigs.k8s.io/yaml": true,
+	"github.com/google/go-containerregistry/pkg/name": true,
+	modulePath + "/pkg/nvkr/canonical":                true,
+	modulePath + "/pkg/nvkr/catalog":                  true,
+	modulePath + "/pkg/nvkr/definition":               true,
+	modulePath + "/pkg/nvkr/errors":                   true,
+	modulePath + "/pkg/nvkr/execution":                true,
+	modulePath + "/pkg/nvkr/internal/packertransport": true,
+	modulePath + "/pkg/nvkr/internal/safetext":        true,
+	modulePath + "/pkg/nvkr/ir":                       true,
+	modulePath + "/pkg/nvkr/material":                 true,
+	modulePath + "/pkg/nvkr/target":                   true,
 }
 
-// forbiddenFuncs are package-level functions that read the clock or the host. Any
-// resolved reference is a violation, whether called or taken as a value.
-var forbiddenFuncs = map[string]bool{
-	"os.Environ":   true,
-	"os.Getenv":    true,
-	"os.Hostname":  true,
-	"os.LookupEnv": true,
-	"time.Now":     true,
-	"time.Since":   true,
-	"time.Until":   true,
+// forbiddenSymbols are package-level functions and variables that observe the clock or
+// the host. Any resolved reference is a violation, whether called or taken as a value,
+// even if its package is later allowlisted. Methods such as Time.Local are kept out by
+// the import allowlist instead.
+var forbiddenSymbols = map[string]bool{
+	"os.Environ":      true,
+	"os.ExpandEnv":    true,
+	"os.Getenv":       true,
+	"os.Getwd":        true,
+	"os.Hostname":     true,
+	"os.LookupEnv":    true,
+	"os.TempDir":      true,
+	"os.UserHomeDir":  true,
+	"syscall.Environ": true,
+	"syscall.Getenv":  true,
+	"time.After":      true,
+	"time.AfterFunc":  true,
+	"time.Local":      true,
+	"time.NewTicker":  true,
+	"time.NewTimer":   true,
+	"time.Now":        true,
+	"time.Since":      true,
+	"time.Tick":       true,
+	"time.Until":      true,
 }
 
-// purityException permits one forbidden symbol or import path in one file of one package.
+// purityException permits one finding ("import <path>" or a forbidden symbol) in one
+// file of one package.
 type purityException struct {
 	pkg, file, symbol, reason string
 }
 
-// purityExceptions is the only allowlist. Each entry needs a reason and must still match
-// a finding; there is no inline source marker.
+// purityExceptions is the only per-site allowlist. Each entry needs a reason and must
+// still match a finding; there is no inline source marker.
 var purityExceptions []purityException
 
 type purityFinding struct {
@@ -79,7 +130,16 @@ type purityFinding struct {
 }
 
 func TestIdentityPathsArePure(t *testing.T) {
-	listed := goListExports(t, filepath.Join("..", ".."), identityPackages...)
+	root := filepath.Join("..", "..")
+	for _, pattern := range identityPackages {
+		// go list runs in a child the test cache cannot observe; walking the trees here makes
+		// an added file or package invalidate a cached pass.
+		dir := filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(strings.TrimSuffix(pattern, "/..."), modulePath+"/")))
+		if err := filepath.WalkDir(dir, func(_ string, _ fs.DirEntry, err error) error { return err }); err != nil {
+			t.Fatal(err)
+		}
+	}
+	listed := goListExports(t, root, identityPackages...)
 	fset := token.NewFileSet()
 	imp := exportImporter(fset, listed)
 	var findings []purityFinding
@@ -88,8 +148,10 @@ func TestIdentityPathsArePure(t *testing.T) {
 		if pkg.DepOnly {
 			continue
 		}
-		if len(pkg.IgnoredGoFiles) > 0 || len(pkg.CgoFiles) > 0 {
-			t.Errorf("%s: files outside the checked build configuration: ignored %v, cgo %v", pkg.ImportPath, pkg.IgnoredGoFiles, pkg.CgoFiles)
+		// Test files are not checked, so only excluded non-test files leave a gap.
+		ignored := slices.DeleteFunc(slices.Clone(pkg.IgnoredGoFiles), func(name string) bool { return strings.HasSuffix(name, "_test.go") })
+		if len(ignored) > 0 || len(pkg.CgoFiles) > 0 {
+			t.Errorf("%s: files outside the checked build configuration: ignored %v, cgo %v", pkg.ImportPath, ignored, pkg.CgoFiles)
 		}
 		var files []*ast.File
 		for _, name := range pkg.GoFiles {
@@ -99,7 +161,7 @@ func TestIdentityPathsArePure(t *testing.T) {
 			}
 			files = append(files, file)
 		}
-		pkgFindings, err := purityFindings(pkg.ImportPath, fset, files, imp)
+		pkgFindings, err := purityFindings(pkg.ImportPath, fset, files, imp, allowedIdentityImports)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -117,30 +179,39 @@ func TestIdentityPathsArePure(t *testing.T) {
 }
 
 // TestPurityRuleMatrix pins the ADR-02 guard against the counterexamples that defeated
-// the previous line-substring matcher, plus the exception contract.
+// the previous line-substring matcher, plus the import allowlist and exception contract.
 func TestPurityRuleMatrix(t *testing.T) {
 	const pkgPath = "example.test/p"
 	exception := func(symbol, reason string) []purityException {
 		return []purityException{{pkg: pkgPath, file: "p.go", symbol: symbol, reason: reason}}
 	}
-	tests := []struct {
+	type matrixCase struct {
 		name       string
 		src        string
+		allowed    []string // nil admits time and os, isolating the symbol rule
 		exceptions []purityException
 		want       []string
-	}{
+	}
+	tests := []matrixCase{
 		{name: "direct call", src: `import "time"; var x = time.Now()`, want: []string{"p.go:2:29: time.Now"}},
 		{name: "import alias", src: `import clock "time"; var x = clock.Now()`, want: []string{"p.go:2:36: time.Now"}},
 		{name: "function value", src: `import "time"; var now = time.Now; var x = now()`, want: []string{"p.go:2:31: time.Now"}},
 		{name: "dot import", src: `import . "time"; var x = Now()`, want: []string{"p.go:2:26: time.Now"}},
 		{name: "host environment", src: `import "os"; var x, _ = os.LookupEnv("HOME")`, want: []string{"p.go:2:28: os.LookupEnv"}},
-		{name: "aliased forbidden import", src: `import r "math/rand"; var x = r.Int()`, want: []string{"p.go:2:10: math/rand"}},
-		{name: "blank forbidden import", src: `import _ "crypto/rand"`, want: []string{"p.go:2:10: crypto/rand"}},
 		{name: "retired inline marker", src: `import "time"; var x = time.Now() //nvkr:allow-nondeterminism`, want: []string{"p.go:2:29: time.Now"}},
 		{name: "comment only", src: "\n// Never call time.Now() in identity code."},
 		{name: "shadowed identifier", src: `type clock struct{}; func (clock) Now() int { return 0 }; var time clock; var x = time.Now()`},
 		{name: "deterministic time API", src: `import "time"; var x = time.Unix(0, 0).UTC()`},
+		{name: "import outside allowlist", src: `import "time"; var x = time.Unix(0, 0).Local()`, allowed: []string{},
+			want: []string{"p.go:2:8: import time"}},
+		{name: "aliased import outside allowlist", src: `import r "math/rand"; var x = r.Int()`, allowed: []string{},
+			want: []string{"p.go:2:10: import math/rand"}},
+		{name: "blank import outside allowlist", src: `import _ "crypto/rand"`, allowed: []string{},
+			want: []string{"p.go:2:10: import crypto/rand"}},
+		{name: "allowlisted import", src: `import "strings"; var x = strings.ToUpper("a")`, allowed: []string{"strings"}},
 		{name: "exact exception", src: `import "time"; var x = time.Now()`, exceptions: exception("time.Now", "fixture reason")},
+		{name: "import exception", src: `import "time"; var x = time.Unix(0, 0)`, allowed: []string{},
+			exceptions: exception("import time", "fixture reason")},
 		{name: "exception without reason", src: `import "time"; var x = time.Now()`, exceptions: exception("time.Now", " "),
 			want: []string{`exception example.test/p p.go time.Now has no reason`}},
 		{name: "unused exception", src: `var x = 1`, exceptions: exception("time.Now", "fixture reason"),
@@ -148,15 +219,30 @@ func TestPurityRuleMatrix(t *testing.T) {
 		{name: "exception for another symbol", src: `import "time"; var x = time.Since(time.Time{})`, exceptions: exception("time.Now", "fixture reason"),
 			want: []string{"p.go:2:29: time.Since", `exception example.test/p p.go time.Now matches no finding`}},
 	}
-	listed := goListExports(t, ".", "crypto/rand", "math/rand", "os", "time")
+	// Every forbidden name must resolve to a real package-level object; a misspelled key
+	// would otherwise disable itself silently.
+	for _, symbol := range slices.Sorted(maps.Keys(forbiddenSymbols)) {
+		pkg, name, _ := strings.Cut(symbol, ".")
+		src := fmt.Sprintf("import %q; var _ = %s.%s", pkg, pkg, name)
+		tests = append(tests, matrixCase{name: "resolves " + symbol, src: src, allowed: []string{pkg},
+			want: []string{fmt.Sprintf("p.go:2:%d: %s", len(src)-len(name)+1, symbol)}})
+	}
+	listed := goListExports(t, ".", "crypto/rand", "math/rand", "os", "strings", "syscall", "time")
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			allowed := map[string]bool{"time": true, "os": true}
+			if tc.allowed != nil {
+				allowed = map[string]bool{}
+				for _, path := range tc.allowed {
+					allowed[path] = true
+				}
+			}
 			fset := token.NewFileSet()
 			file, err := parser.ParseFile(fset, "p.go", "package p\n"+tc.src, parser.ParseComments)
 			if err != nil {
 				t.Fatal(err)
 			}
-			findings, err := purityFindings(pkgPath, fset, []*ast.File{file}, exportImporter(fset, listed))
+			findings, err := purityFindings(pkgPath, fset, []*ast.File{file}, exportImporter(fset, listed), allowed)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -171,9 +257,9 @@ func TestPurityRuleMatrix(t *testing.T) {
 	}
 }
 
-// purityFindings type-checks one package and returns its forbidden imports and resolved
-// references to forbidden functions, sorted by position.
-func purityFindings(pkgPath string, fset *token.FileSet, files []*ast.File, imp types.Importer) ([]purityFinding, error) {
+// purityFindings type-checks one package and returns its imports outside allowed and
+// its resolved references to forbidden symbols, sorted by position.
+func purityFindings(pkgPath string, fset *token.FileSet, files []*ast.File, imp types.Importer, allowed map[string]bool) ([]purityFinding, error) {
 	info := &types.Info{Uses: map[*ast.Ident]types.Object{}}
 	if _, err := (&types.Config{Importer: imp}).Check(pkgPath, fset, files, info); err != nil {
 		return nil, fmt.Errorf("type-check %s: %w", pkgPath, err)
@@ -189,22 +275,21 @@ func purityFindings(pkgPath string, fset *token.FileSet, files []*ast.File, imp 
 			if err != nil {
 				return nil, err
 			}
-			if forbiddenImports[path] {
-				add(spec.Path.Pos(), path)
+			if !allowed[path] {
+				add(spec.Path.Pos(), "import "+path)
 			}
 		}
 	}
 	for ident, obj := range info.Uses {
-		fn, ok := obj.(*types.Func)
-		if !ok || fn.Pkg() == nil || fn.Signature().Recv() != nil {
-			continue
+		if obj.Pkg() == nil || obj.Parent() != obj.Pkg().Scope() {
+			continue // local, universe, or method object
 		}
-		if symbol := fn.Pkg().Path() + "." + fn.Name(); forbiddenFuncs[symbol] {
+		if symbol := obj.Pkg().Path() + "." + obj.Name(); forbiddenSymbols[symbol] {
 			add(ident.Pos(), symbol)
 		}
 	}
 	slices.SortFunc(findings, func(a, b purityFinding) int {
-		return strings.Compare(a.pos.String(), b.pos.String())
+		return cmp.Or(strings.Compare(a.pos.Filename, b.pos.Filename), cmp.Compare(a.pos.Line, b.pos.Line), cmp.Compare(a.pos.Column, b.pos.Column))
 	})
 	return findings, nil
 }
@@ -219,7 +304,7 @@ func applyPurityExceptions(findings []purityFinding, exceptions []purityExceptio
 			return e.pkg == finding.pkg && e.file == finding.file && e.symbol == finding.symbol
 		})
 		if i < 0 {
-			problems = append(problems, fmt.Sprintf("%s: %s in an identity package (ADR-02 §4)", finding.pos, finding.symbol))
+			problems = append(problems, fmt.Sprintf("%s: %s in an identity package (ADR-02 §4; see allowedIdentityImports and purityExceptions in internal/architecture/purity_test.go)", finding.pos, finding.symbol))
 			continue
 		}
 		used[i] = true
@@ -251,7 +336,7 @@ func goListExports(t *testing.T, dir string, patterns ...string) []listedPackage
 	args := append([]string{"list", "-deps", "-export", "-json=ImportPath,Dir,Export,GoFiles,CgoFiles,IgnoredGoFiles,DepOnly,Error"}, patterns...)
 	command := exec.CommandContext(ctx, "go", args...)
 	command.Dir = dir
-	command.Env = append(os.Environ(), "GOTOOLCHAIN=local", "GOWORK=off", "GOFLAGS=")
+	command.Env = append(os.Environ(), "GOTOOLCHAIN=local", "GOENV=off", "GOWORK=off", "GOPROXY=off", "GOSUMDB=off", "GOFLAGS=")
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if err := ownedcmd.Run(ctx, command); err != nil {

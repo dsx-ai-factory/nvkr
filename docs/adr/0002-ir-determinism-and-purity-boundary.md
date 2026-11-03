@@ -110,10 +110,11 @@ preparation freezes attempt state from that Plan without completing or repairing
 An automated two-part guard enforces the boundary; documentation alone does not:
 
 - **Static check** — forbids nondeterministic sources (wall-clock reads, randomness, UUID generation, hostname,
-  host-environment-into-identity) in the identity-producing code paths. It type-checks those packages and
-  rejects forbidden imports and resolved references, so aliases and function values cannot hide a use. It does
-  not follow calls into other packages. An exception names one package, file and symbol with a nonempty reason,
-  and an exception that no longer matches a use fails the check.
+  host-environment-into-identity) in the identity-producing code paths. It type-checks those packages, limits
+  their imports to an exact reviewed allowlist that excludes clock, randomness, UUID, host and unsafe packages,
+  and rejects resolved references to clock and host functions, so aliases and function values cannot hide a use.
+  It does not follow calls into imported packages. A per-site exception names one package, file and symbol with
+  a nonempty reason, and an exception that no longer matches a use fails the check.
 - **Empirical invariance and sensitivity tests**: `TestDigestHostInvariance` mutates host- and clock-related
   process environment values and asserts that the Build Digest is byte-stable. Separate tests assert that
   mutating a **pinned content input** changes Build identity, while mutating an authored execution request changes
