@@ -196,16 +196,20 @@ func assertNoPrivateToolchainPreparation(t *testing.T, bundle *GeneratedBundle) 
 
 func TestMaintainedNamedPrivateImageCredentialBoundary(t *testing.T) {
 	// The combined and nightly bundles share their assertions with
-	// TestMaintainedGitHubBundles. Keep the disks-family namespace covered too.
-	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke-disks/plan.json")
-	if err != nil {
-		t.Fatal(err)
+	// TestMaintainedGitHubBundles. Keep both disk-family namespaces covered too.
+	for _, bundleName := range []string{"nvkr-run-nvke-disks", "nvkr-run-nvke-disks-ubuntu24"} {
+		t.Run(bundleName, func(t *testing.T) {
+			plan, err := LoadPlanContext(t.Context(), "../../../.github/"+bundleName+"/plan.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertGitHubPrivateImageCredentialBoundary(t, plan, bundle, 4)
+		})
 	}
-	bundle, err := RenderGitHub(t.Context(), plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertGitHubPrivateImageCredentialBoundary(t, plan, bundle, 4)
 }
 
 // Maintained product checks share their already-rendered bundle with the entry

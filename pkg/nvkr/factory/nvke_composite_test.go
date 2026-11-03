@@ -36,7 +36,7 @@ func nvkeCompositeMember(t *testing.T, family string) authored.CompositeMember {
 	return authored.CompositeMember{Name: "nvke-" + family, Definition: family + ".yaml", Digest: digest}
 }
 
-// nvkeCompositeExcludedOutputs names the combined outputs the worked example omits.
+// nvkeCompositeExcludedOutputs names the family-only outputs the worked example omits.
 func nvkeCompositeExcludedOutputs(t *testing.T) map[string]bool {
 	t.Helper()
 	path, _ := nvkeSplitPaths(nvkeCompositeExcludedFamily)

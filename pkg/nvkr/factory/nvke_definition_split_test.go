@@ -29,9 +29,9 @@ var nvkeSplitFamilies = []struct {
 	{"disks-ubuntu24", 4, 4},
 }
 
-// Family-only outputs are not in the combined Definition, whose flat workflow
-// has no remaining YAML parsing headroom. Each declaration is pinned exactly so a
-// valid but unintended selection fails here rather than only after regeneration.
+// Family-only outputs are not in the combined Definition. Each declaration is
+// pinned exactly so a valid but unintended selection fails here rather than only
+// after regeneration; the Ubuntu 24.04 disks must keep the Ubuntu 24 overlay.
 var nvkeFamilyOnlyOutputs = map[string]struct {
 	family string
 	output definition.DefinitionOutput
@@ -48,6 +48,28 @@ var nvkeFamilyOnlyOutputs = map[string]struct {
 	"nico-flow":                          {"core", nvkeFamilyOnlyOutput("nico-flow", "linux/amd64", "nico", definition.OutputHelm, "nico-flow-chart", nil)},
 	"nico-flow-image":                    {"core", definition.DefinitionOutput{Name: "nico-flow-image", Platforms: []string{"linux/amd64", "linux/arm64"}, Catalog: &definition.Catalog{Base: "../../catalogs/nico"}, Components: []string{"nico-flow-image"}, Format: definition.OutputOCI}},
 	"nico-prereqs":                       {"core", nvkeFamilyOnlyOutput("nico-prereqs", "linux/amd64", "nico", definition.OutputHelm, "nico-prereqs-chart", nil)},
+	"nvke-node-fde-ubuntu24-amd64":       {"disks-ubuntu24", nvkeUbuntu24Disk("nvke-node-fde-ubuntu24-amd64", "linux/amd64", "nvke-node-fde-amd64")},
+	"nvke-node-fde-ubuntu24-arm64":       {"disks-ubuntu24", nvkeUbuntu24Disk("nvke-node-fde-ubuntu24-arm64", "linux/arm64", "nvke-node-fde-arm64")},
+	"nvke-node-image-ubuntu24-amd64":     {"disks-ubuntu24", nvkeUbuntu24Disk("nvke-node-image-ubuntu24-amd64", "linux/amd64", "nvke-node-image-amd64")},
+	"nvke-node-image-ubuntu24-arm64":     {"disks-ubuntu24", nvkeUbuntu24Disk("nvke-node-image-ubuntu24-arm64", "linux/arm64", "nvke-node-image")},
+}
+
+// nvkeUbuntu24Disk is a native disk with its complete material closure, selected
+// through the release node-image stack plus the Ubuntu 24 overlay.
+func nvkeUbuntu24Disk(name, platform, root string) definition.DefinitionOutput {
+	installer, patched := "ubuntu-installer-iso", "nvke-patched-installer-iso"
+	if platform == "linux/amd64" {
+		installer, patched = installer+"-amd64", patched+"-amd64"
+	}
+	return definition.DefinitionOutput{
+		Name:     name,
+		Platform: platform,
+		Catalog: &definition.Catalog{Base: "../../catalogs/node-images/release", Overlays: []string{
+			"../../catalogs/node-images/variants/native-toolchains.yaml", "../../catalogs/node-images/variants/ubuntu24.json"}},
+		Format: definition.OutputDiskImage,
+		Components: []string{"nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-doca-ovs", "nvke-image-inputs",
+			"nvke-kubeadm-distro", root, patched, "nvke-spire-agent", "ovn-kube-ubuntu", "ovn-kubernetes-chart", installer},
+	}
 }
 
 func nvkeFamilyOnlyOutput(name, platform, catalog, format, component string, images map[string]string) definition.DefinitionOutput {
@@ -64,7 +86,8 @@ func nvkeFamilyOnlyOutput(name, platform, catalog, format, component string, ima
 	return output
 }
 
-// Family-only catalogs hold only public sources, so they load from disk.
+// Family-only catalogs declare no pin set to revalidate, so they load from disk:
+// these public catalogs, plus each pinned family-only overlay stack.
 var nvkeFamilyOnlyCatalogs = map[string]bool{"../../catalogs/local-path-provisioner": true, "../../catalogs/nico": true, "../../catalogs/tools/operator-arm64": true}
 
 func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
@@ -371,7 +394,7 @@ func nvkeSplitCatalogLoader(t *testing.T, combined *Plan) func(context.Context, 
 			return nil, e.Wrap(e.CodeTimeout, err, "split fixture catalog load canceled")
 		}
 		stack, ok := stacks[string(nvkeSplitCanonical(t, spec))]
-		if !ok && nvkeFamilyOnlyCatalogs[spec.Base] && len(spec.Overlays) == 0 {
+		if !ok && (nvkeFamilyOnlyCatalogs[spec.Base] && len(spec.Overlays) == 0 || nvkeFamilyOnlyStack(t, spec)) {
 			return loadFactoryCatalogStack(ctx, "inputs/definitions/nvke/core.yaml", spec)
 		}
 		if !ok {
@@ -379,6 +402,18 @@ func nvkeSplitCatalogLoader(t *testing.T, combined *Plan) func(context.Context, 
 		}
 		return stack, nil
 	}
+}
+
+// nvkeFamilyOnlyStack admits exactly a pinned family-only output's catalog stack.
+func nvkeFamilyOnlyStack(t *testing.T, spec definition.Catalog) bool {
+	t.Helper()
+	for _, only := range nvkeFamilyOnlyOutputs {
+		if only.output.Catalog != nil && len(only.output.Catalog.Overlays) != 0 &&
+			bytes.Equal(nvkeSplitCanonical(t, *only.output.Catalog), nvkeSplitCanonical(t, spec)) {
+			return true
+		}
+	}
+	return false
 }
 
 func nvkeSplitRepository(t *testing.T) {
