@@ -95,7 +95,8 @@ retains its original scope; superseded requirements and plans are available only
 ## Commands
 
 ```sh
-make check          # full local gate (run before pushing; prerequisites in DEVELOPMENT.md)
+make check          # code gate (run before pushing; prerequisites in DEVELOPMENT.md)
+make ci-check       # every merge-gate check that runs locally; CodeQL and DCO are GitHub-only
 make test           # fast default tests; matches PR checks
 make test-race      # opt-in race + coverage for the default suite
 make test-full      # opt-in extended fixtures, race + coverage
@@ -245,8 +246,8 @@ make vulncheck
 git diff --check
 ```
 
-`make check` runs the repository gate, including the license header check, shellcheck, Python report-tool tests
-and the Go vulnerability scan. New source files need the two-line SPDX header; `make license` adds it. The direct commands above also include uncached tests and `git diff --check`. Tests that need local listeners may require execution
+`make check` runs the code gate, including the license header check, shellcheck, Python report-tool tests
+and the Go vulnerability scan; `make ci-check` adds the build, actionlint, notices, workflow drift and Fern checks. New source files need the two-line SPDX header; `make license` adds it. The direct commands above also include uncached tests and `git diff --check`. Tests that need local listeners may require execution
 outside a restricted sandbox. `make vulncheck` needs access to the Go module proxy and vulnerability database;
 run it with network access or report it as unverified. Default tests omit expensive capacity and integration
 matrices. Do not routinely enable `NVKR_TEST_EXTENDED`, whole-suite race detection, or coverage. For concurrency
