@@ -50,9 +50,11 @@ var operationEntries = []operationEntry{
 }
 
 // newOperationHarness isolates the working directory and installs a recording
-// runtime. The script tail runs after argv is recorded.
+// runtime. The script tail runs after argv is recorded. No worker case may
+// reach the generation seam.
 func newOperationHarness(t *testing.T, script string) (*Plan, string) {
 	t.Helper()
+	forbidGenerationSeam(t)
 	plan := githubTestPlan(t)
 	bin := t.TempDir()
 	calls := filepath.Join(bin, "runtime-calls")
