@@ -206,12 +206,15 @@ transport-plan writer are removed. The opt-in M3 qualification pair has its own 
 manifest; it does not replace or reinterpret the producer Plan bundle.
 
 Top-level regeneration and generated-stage admission take separate routes. Only `run generate` writes,
-qualification generation and catalog maintenance render through the `factory.Render` generation seam.
+qualification generation and catalog maintenance render through the `factory.Render` generation seam. A
+top-level `run generate --check` also takes it, but only when the hidden diagnostic `--projection-pilot`
+flag selects the out-of-process reference projection adapter.
 Generated bootstraps and stages run `run generate --check`, runtime Plan preparation, runtime input
 installation and checking, and action description. These re-emit only through the core's in-binary GitHub
 projection, never that seam, so a generator selected at top-level generation cannot run inside a generated
-stage. A seam trap over every stage owner and an inventory of every committed generated closure
-contract-test this boundary.
+stage. A seam and adapter-launcher trap over every stage owner and an inventory of every committed generated
+closure contract-test this boundary. The pilot is diagnostic only: runtime Plan refresh refuses its
+selection, and core admits the adapter's bundle with the exact validator before any write.
 
 Committed bundle members and `exec-node`'s diagnostic canonical graph are opened as bounded, nonblocking,
 no-follow regular file capabilities and revalidated against their live pathname after reading. A symlink, FIFO,
