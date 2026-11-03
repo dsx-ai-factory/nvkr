@@ -84,11 +84,14 @@ unrecognized or missing field makes the output ineligible. Equality of two reuse
 eligibility and never sufficient for acceptance (§3).
 
 An output whose packaging embeds another output's delivered result, such as a chart that binds an image digest,
-is also bound by that result. Equal dependency reuse keys or Build identities do not prove equal delivered bytes
-in this lane. Admission therefore decides embedded dependencies before the outputs that embed them, and accepts
-the embedding output only when every embedded dependency is reused in the current Run from a candidate whose
-payload digest equals the digest the prior packaging embedded. If an embedded dependency executes, or is reused
-with a different digest, the embedding output is refused as `incompatible` and executes.
+is also bound by that result. The two safeguards are distinct. A changed dependency key changes the embedding
+output's key, so a prior embedding candidate that discovery offers is refused at §3 step 3. Equal dependency reuse keys or Build identities
+still do not prove equal delivered bytes in this lane, which only a result comparison catches. Keys are derived
+in the validated Plan's acyclic dependency order, so each dependency's key exists before the outputs that embed
+it. Admission likewise decides embedded dependencies before the outputs that embed them, and accepts the
+embedding output only when every embedded dependency is reused in the current Run from a candidate whose payload
+digest equals the digest the prior packaging embedded (§3 step 4). If an embedded dependency executes, or is
+reused with a different digest, the embedding output is refused as `incompatible` and executes.
 
 Reuse is opt-in. A Run attempts reuse only when its Environment selects an explicit reuse policy (proposed
 field `resultReuse`, default disabled) with a positive maximum entry age. The policy is bound into Plan identity,
@@ -112,7 +115,11 @@ for one candidate and one current output. It completes every step before issuing
 3. Recompute the reuse key from the authenticated prior Plan for the same output name and require byte-equality
    with the current key.
 4. Retrieve and digest-check the complete payload and evidence closure (artifact-publication scope, not the
-   payload-free authenticity scope), including every native child of an aggregate.
+   payload-free authenticity scope), including every native child of an aggregate. For an output that embeds
+   dependency results, then read each embedded digest from the verified payload through the prior Plan's frozen
+   packaging binding (ADR-20), and compare it with the payload digest (manifest digest for a native image, index
+   digest for an aggregate) of that dependency's current reuse; an executing dependency or a different digest
+   refuses the candidate as `incompatible` at this step.
 5. Validate the production provenance predicate semantically against the prior Plan and exact subjects (ADR-09)
    and verify every required SBOM bundle (ADR-13).
 6. Check freshness: the signed production finish time of the prior output must be no older than the policy's
@@ -195,7 +202,10 @@ expiry. A set obtained any other way, any byte difference from the handed-off re
 verification failure fail the Run before producer work. A process that only omits a reused output's operations
 needs nothing more. Any process that consumes a reused output's closure (a descendant operation, Run record
 binding or publication copy) repeats §3 acceptance from bytes for exactly the recorded candidate and output and
-holds its own receipt. It evaluates step 6's age and future-time comparison at that token's issued-at instant
+holds its own receipt. For an output that embeds dependency results, that process first re-accepts each embedded
+dependency's recorded candidate, or holds a receipt for it, and step 4 compares against that receipt's payload
+digest, never against the decision set or a dependency package carried in the embedding output's own closure. It
+evaluates step 6's age and future-time comparison at that token's issued-at instant
 rather than a new one, so a delayed re-acceptance reaches admission's freshness result; the status check stays
 current, so a candidate withdrawn after admission is refused. A re-acceptance that refuses, or that selects a
 different candidate, fails the Run rather than reverting to execution, because the producer operations have
@@ -341,6 +351,9 @@ asserts the stable coded error.
 | 52 | Changed bound dependency | Chart with unchanged source and binding relationship; bound image's reuse key changes | Image `incompatible` and executes; chart `incompatible` and executes |
 | 53 | Equal dependency identity, different result | Bound image has an equal Build identity but executes in the current Run, or is reused with a digest other than the one the prior chart embedded | Chart `incompatible`; executes against the current image digest |
 | 54 | Refusal discriminators | Absent versus invalid signature; unknown authenticated schema versus undecodable bytes; internal budget versus caller deadline; one candidate both key-incompatible and stale | `incomplete` versus `corrupt`; `incompatible` versus `corrupt`; `bounded` versus coded error; `incompatible` (step 3 precedes step 6); each refusal names its failed check |
+| 55 | Embedded-result refusal order | Chart candidate whose embedded image digest differs from the current reuse, and that is also stale; separately, one that also has an unsigned root; separately, one whose chart payload also fails its digest check | `incompatible` (step 4 precedes step 6); `incomplete` (step 1 precedes step 4); `corrupt` (the closure digest check precedes the embedded comparison within step 4) |
+| 56 | Dependency-first reuse | Image reused at exactly the digest the prior chart embedded; chart candidate otherwise exact | Image and chart both reused; chart receipt issued; embedded payload digest equals the reused image |
+| 57 | Two-slot partial mismatch | Chart with two image slots; one image reused at its embedded digest, the other reused at a different digest or executed | Chart `incompatible`, no chart receipt, and executes against each current image digest; the matching image's own reuse is unaffected |
 
 Rows 2, 32, 33, 37–48 and 51 also need one hosted development Run before reconciliation may claim the path was
 externally exercised. No qualified or production claim follows from these tests.
