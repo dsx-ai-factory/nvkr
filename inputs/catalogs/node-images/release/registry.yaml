@@ -385,7 +385,8 @@ components:
         packages=(*.deb)
         test "${#packages[@]}" -eq 8
         switch=(doca-openvswitch-switch_*_{{.Arch}}.deb)
-        test "${#switch[@]}" -eq 1 && test -f "${switch[0]}"
+        test "${#switch[@]}" -eq 1
+        test -f "${switch[0]}"
         test "$(dpkg-deb --field "${switch[0]}" Package)" = doca-openvswitch-switch
         test "$(dpkg-deb --field "${switch[0]}" Architecture)" = "{{.Arch}}"
         mkdir -p /src/nvkr-output
