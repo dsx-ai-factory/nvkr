@@ -229,12 +229,10 @@ Each stage links the NVKE `v0.23.0` page that owns it. Run them from an NVKE che
    `deploy/nvke-deploy.sh install --deploy-path deploy/nico --sitespec sitespec.yaml --stack-config stack-config.json --release nvkr-release.json`.
    NVKE refuses a release without
    `controller-profiles`
-   ([troubleshooting](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/docs/operate/troubleshoot.md?plain=1#L249-L253)), and the core Release does not
-   carry it until [#324](https://github.com/dsx-ai-factory/nvkr/issues/324). Until then, install without
-   `--release`: set the stack config's `images.controller` to the `reference` of the `cwe` output in
-   `nvkr-release.json`, and `images.profiles` to your site's profile image. Every other image and chart then
-   comes from NVKE's pinned upstream sources. The core Release's `nico-reference-profiles-fixture` holds NVKE
-   test profiles, not fleet configuration.
+   ([troubleshooting](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/docs/operate/troubleshoot.md?plain=1#L249-L253)). The core Release
+   carries it as the same build as `nico-reference-profiles-fixture`: NVKE's reference test profiles, not fleet
+   configuration. Set the stack config's `images.profiles` to your site's profile image; it replaces the image
+   only after NVKE finds `controller-profiles` in the Release.
 8. [Register the image for provisioning](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/docs/operate/build-node-images.md#register-the-image-for-provisioning).
 9. [Create a workload cluster](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/docs/workload-clusters/create.md).
 10. Apply the GPU stack. The

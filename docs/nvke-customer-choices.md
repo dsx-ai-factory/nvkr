@@ -17,7 +17,7 @@ There is no generic Definition `overrides` field or arbitrary Packer/HCL rewriti
 | DOCA OVS packages | The same v0.23.0 lock selects `nvke-doca-ovs-source` | NVIDIA's DOCA OVS 3.5.0 debs for the image's Ubuntu series, each checked against NVKE's committed lock; binary-only, with no published source. |
 | Runtime image selection | `inputs/catalogs/runtime-dependencies` plus NVKE deploy values at `2cfd00081b468d85a4894ec17e9deac13c9d8169` and their pinned charts | Exact native manifest pins for the twelve selected non-test images on both architectures. |
 | Release-component pins | CLI/controller/operator catalogs and their own locks | Validate each source independently; one shared repository URL does not imply one release. |
-| Reference-profile fixture | `inputs/catalogs/nvke/release-components`, output `nico-reference-profiles-fixture` | Test configuration and runbooks only; not the demo's runnable `controller-profiles` or approved fleet configuration. |
+| Reference-profile fixture | `inputs/catalogs/nvke/release-components`, output `nico-reference-profiles-fixture` | Test configuration and runbooks only, also delivered by the core family as `controller-profiles`; not approved fleet configuration. |
 | Customer replacement | Ordered catalog overlay, bound to its exact predecessor snapshot | Preserve the logical component's output type and supported platforms; validate its new material closure. |
 
 The [maintained NVKE input guide](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md) records the detailed source paths and remaining
