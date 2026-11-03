@@ -145,7 +145,7 @@ func newAcquiredPinSetFixture(t *testing.T) acquiredPinSetFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := provider.ReadFile(catalog.LockFile)
+	raw, err := provider.ReadFileContext(t.Context(), catalog.LockFile)
 	if err != nil {
 		t.Fatal(err)
 	}
