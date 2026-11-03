@@ -4,6 +4,7 @@
 package canonical
 
 import (
+	"encoding/json"
 	"errors"
 	"math"
 	"testing"
@@ -223,6 +224,110 @@ func TestValidateJSONDocumentRejectsAmbiguousExternalJSON(t *testing.T) {
 	}
 	if err := ValidateJSONDocument([]byte(" {\n\t\"subject\": \"a\"\n} \n")); err != nil {
 		t.Fatalf("valid non-canonical external JSON rejected: %v", err)
+	}
+}
+
+func TestValidateFoldedJSONDocumentRejectsCaseAliases(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		raw  string
+		ok   bool
+	}{
+		{name: "distinct names", raw: `{"spdxVersion":"SPDX-2.3","name":"a","nested":[{"name":"b"}]}`, ok: true},
+		{name: "exact duplicate", raw: `{"spdxVersion":"SPDX-2.2","spdxVersion":"SPDX-2.3"}`},
+		{name: "ascii alias after", raw: `{"spdxVersion":"SPDX-2.2","SPDXVERSION":"SPDX-2.3"}`},
+		{name: "ascii alias before", raw: `{"SPDXVERSION":"SPDX-2.3","spdxVersion":"SPDX-2.2"}`},
+		{name: "kelvin sign alias", raw: `{"kind":"a","\u212aind":"b"}`},
+		{name: "nested alias", raw: `{"packages":[{"name":"a","NAME":"b"}]}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateFoldedJSONDocument([]byte(tc.raw))
+			if tc.ok && err != nil {
+				t.Fatalf("rejected distinct names: %v", err)
+			}
+			var coded *e.Error
+			if !tc.ok && (!errors.As(err, &coded) || coded.Code != e.CodeVerifyFailed) {
+				t.Fatalf("error = %v, want %q", err, e.CodeVerifyFailed)
+			}
+		})
+	}
+	if err := ValidateJSONDocument([]byte(`{"name":"a","NAME":"b"}`)); err != nil {
+		t.Fatalf("exact-name validation rejected case-distinct names: %v", err)
+	}
+}
+
+func TestRejectFieldAliasesBindsOnlyStructFields(t *testing.T) {
+	type statement struct {
+		PredicateType string `json:"predicateType"`
+		Subject       []struct {
+			Name   string            `json:"name"`
+			Digest map[string]string `json:"digest"`
+		} `json:"subject"`
+		Parameters json.RawMessage `json:"parameters"`
+		Untagged   string
+		Envelope   *struct {
+			PayloadType string `json:"payloadType"`
+		} `json:"envelope"`
+		Signatures [1]struct {
+			KeyID string `json:"keyid"`
+		} `json:"signatures"`
+		Ignored  string `json:"-"`
+		Optional string `json:"optional,omitempty"`
+		Dash     struct {
+			Kind string `json:"kind"`
+		} `json:"-,omitempty"` //nolint:staticcheck // deliberate: names the member "-" rather than ignoring the field
+	}
+	for _, tc := range []struct {
+		name string
+		raw  string
+		ok   bool
+	}{
+		{name: "exact names", raw: `{"predicateType":"v1","subject":[{"name":"a","digest":{"sha256":"x"}}],"Untagged":"u"}`, ok: true},
+		{name: "unknown member", raw: `{"predicateType":"v1","other":"o"}`, ok: true},
+		{name: "case variants inside a map", raw: `{"subject":[{"digest":{"sha256":"x","SHA256":"y"}}]}`, ok: true},
+		{name: "case variants inside raw parameters", raw: `{"parameters":{"Path":"a","PATH":"b"}}`, ok: true},
+		{name: "later alias", raw: `{"predicateType":"v0.2","PREDICATETYPE":"v1"}`},
+		{name: "earlier alias", raw: `{"PREDICATETYPE":"v1","predicateType":"v0.2"}`},
+		{name: "lone alias", raw: `{"PredicateType":"v1"}`},
+		{name: "alias in a slice of structs", raw: `{"subject":[{"name":"a","NAME":"b"}]}`},
+		{name: "alias of an untagged field", raw: `{"untagged":"u"}`},
+		{name: "exact nested pointer and array members", raw: `{"envelope":{"payloadType":"p"},"signatures":[{"keyid":"k"}],"optional":"o"}`, ok: true},
+		{name: "alias inside a nested pointer", raw: `{"envelope":{"PAYLOADTYPE":"p"}}`},
+		{name: "alias inside an array of structs", raw: `{"signatures":[{"KEYID":"k"}]}`},
+		{name: "alias of a tag with options", raw: `{"OPTIONAL":"o"}`},
+		{name: "member named like an ignored field", raw: `{"ignored":"i","IGNORED":"j"}`, ok: true},
+		{name: "exact members under a field named dash", raw: `{"-":{"kind":"k"}}`, ok: true},
+		{name: "alias under a field named dash", raw: `{"-":{"KIND":"k"}}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := RejectFieldAliases([]byte(tc.raw), &statement{})
+			var coded *e.Error
+			if tc.ok && err != nil {
+				t.Fatalf("rejected unambiguous member names: %v", err)
+			}
+			if !tc.ok && (!errors.As(err, &coded) || coded.Code != e.CodeVerifyFailed) {
+				t.Fatalf("error = %v, want %q", err, e.CodeVerifyFailed)
+			}
+		})
+	}
+}
+
+func TestRejectFieldAliasesRefusesEmbeddedStructs(t *testing.T) {
+	type promoted struct {
+		PredicateType string `json:"predicateType"`
+	}
+	type statement struct {
+		promoted
+	}
+	var coded *e.Error
+	if err := RejectFieldAliases([]byte(`{"PREDICATETYPE":"v1"}`), &statement{}); !errors.As(err, &coded) || coded.Code != e.CodeInternal {
+		t.Fatalf("embedded struct error = %v, want %q", err, e.CodeInternal)
+	}
+	type ignored struct {
+		promoted `json:"-"`
+	}
+	if err := RejectFieldAliases([]byte(`{"PREDICATETYPE":"v1"}`), &ignored{}); err != nil {
+		t.Fatalf("explicitly ignored embedded struct refused: %v", err)
 	}
 }
 
