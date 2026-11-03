@@ -49,6 +49,8 @@ func compileDocumentsFor(ctx context.Context, definitionPath string, definition 
 	if err := admitDefinitionForm(delivery, record); err != nil {
 		return nil, err
 	}
+	// Equal selections share one *catalog.Stack for this compile. Consumers treat
+	// it as read-only and clone or snapshot catalog state before changing it.
 	stacks := map[string]*catalog.Stack{}
 	load := loadStack
 	loadStack = func(ctx context.Context, spec authored.Catalog) (*catalog.Stack, error) {
