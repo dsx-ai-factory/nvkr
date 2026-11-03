@@ -104,6 +104,12 @@ func TestLocalGateRejectsInventoryDrift(t *testing.T) {
 			}},
 		{"soft failure", `check step "vet" must run unconditionally`,
 			func(t *testing.T, jobs map[string]mergeGateJob) { step(t, jobs, "check", "vet").ContinueOnError = true }},
+		{"conditional action", `lint step "lint" must run unconditionally`,
+			func(t *testing.T, jobs map[string]mergeGateJob) {
+				step(t, jobs, "lint", "lint").If = "github.event_name == 'push'"
+			}},
+		{"soft-failing action", `lint step "lint" must run unconditionally`,
+			func(t *testing.T, jobs map[string]mergeGateJob) { step(t, jobs, "lint", "lint").ContinueOnError = true }},
 		{"unclassified action", `uses unclassified action example/other-linter@v1`,
 			func(t *testing.T, jobs map[string]mergeGateJob) {
 				step(t, jobs, "lint", "lint").Uses = "example/other-linter@v1"
