@@ -219,6 +219,10 @@ func readTarGzip(t *testing.T, archive []byte) ([]string, map[string][]byte) {
 			data[h.Name] = b
 		}
 	}
+	// Read through gzip EOF so the trailer checksum is verified.
+	if _, err := io.Copy(io.Discard, gz); err != nil {
+		t.Fatalf("gzip trailer: %v", err)
+	}
 	return names, data
 }
 
