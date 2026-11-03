@@ -412,14 +412,18 @@ func observedStatus(ctx context.Context, r Request, source agentIdentity) (_ *Ag
 }
 
 func admitRuntime(ctx context.Context) error {
+	return admitRuntimePlatform(ctx, runtime.GOOS, runtime.GOARCH)
+}
+
+func admitRuntimePlatform(ctx context.Context, goos, goarch string) error {
 	if ctx == nil {
 		return e.New(e.CodeUsage, "site identity requires a context")
 	}
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "site identity canceled before admission")
 	}
-	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
-		return e.New(e.CodeEngineCapability, "site identity helper requires Linux ARM64")
+	if goos != "linux" || goarch != "arm64" && goarch != "amd64" {
+		return e.New(e.CodeEngineCapability, "site identity helper requires Linux AMD64 or ARM64")
 	}
 	return nil
 }

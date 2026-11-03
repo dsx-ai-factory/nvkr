@@ -78,6 +78,10 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 						"build %q has unsupported producer input %q", irNode.ID, dependency)
 				}
 			}
+			if irNode.BuilderType == ir.BuilderPinnedTool {
+				// The producer consumes the shared acquisition explicitly (ADR-27 §2).
+				inputs = append(inputs, "tool/"+irNode.Tool)
+			}
 			output := "artifact/" + target + "/" + irNode.Component
 			result := "result/" + target + "/" + irNode.Component
 			nodes[nodeID] = Node{ID: nodeID, Kind: NodeBuild, BuildTarget: target, IRNode: irNode.ID,

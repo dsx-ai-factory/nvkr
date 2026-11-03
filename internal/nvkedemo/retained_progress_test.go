@@ -267,7 +267,7 @@ func TestRetainedPrimaryFailureIsReadableBeforeCleanup(t *testing.T) {
 				}
 				select {
 				case result := <-joined:
-					if mode == "native finalizer" && (!errors.Is(result, primary) || scope == nil || !scope.closed) {
+					if mode == "native finalizer" && (!errors.Is(result, primary) || scope == nil || !scope.closed.Load()) {
 						t.Error("native finalizer lost its primary failure or scope invalidation", result)
 					}
 				case <-time.After(2 * time.Second):
@@ -332,7 +332,7 @@ func TestRetainedDiagnosticFailureDoesNotSkipExplicitTeardown(t *testing.T) {
 		if !errors.Is(result, primary) || !errors.Is(owner.retainFailure(primary), diagnosticErr) {
 			t.Fatal("primary/recording failures were lost", result)
 		}
-		if scope == nil || !scope.closed {
+		if scope == nil || !scope.closed.Load() {
 			t.Fatal("diagnostic storage failure skipped native scope invalidation")
 		}
 		owner.recordTeardownReturn(result)
