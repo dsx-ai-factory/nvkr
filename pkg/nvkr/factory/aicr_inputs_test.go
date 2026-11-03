@@ -120,7 +120,7 @@ func TestAICRNVKELeafAdmission(t *testing.T) {
 		{"quoted leaf", "metadata:\n  appliedOverlays:\n    - \"" + leaf + "\"\n", false},
 		{"CRLF line endings", "metadata:\r\n  appliedOverlays:\r\n    - " + leaf + "\r\n", false},
 		{"metadata child at another indent", "metadata:\n    appliedOverlays:\n      - " + leaf + "\n", true},
-		{"comments before the metadata child", "metadata:\n# note\n  # note\n  appliedOverlays:\n    - " + leaf + "\n", true},
+		{"comments before the metadata child", "metadata:\n# note\n    # note\n  appliedOverlays:\n    - " + leaf + "\n", true},
 		{"lone list outside metadata", "spec:\n  appliedOverlays:\n    - " + leaf + "\n", false},
 		{"lone top-level list", "appliedOverlays:\n  - " + leaf + "\n", false},
 		{"lone list nested below metadata", "metadata:\n  labels:\n    appliedOverlays:\n      - " + leaf + "\n", false},
