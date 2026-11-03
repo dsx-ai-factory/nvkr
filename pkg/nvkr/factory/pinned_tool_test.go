@@ -96,6 +96,15 @@ func TestPinnedToolProducerConsumesSharedToolAcquisition(t *testing.T) {
 	if shared, err := withProducerTools(map[string]catalog.ToolPin{"aicr": pinnedToolFixturePin}, plan.Builds); err != nil || len(shared) != 1 {
 		t.Fatalf("identical run-wide and producer pins did not share one acquisition: %v, %v", shared, err)
 	}
+	withCompanion := pinnedToolFixturePin
+	withCompanion.Companions = []catalog.ToolCompanion{{Path: "aicr-attestation.sigstore.json", Digest: "sha256:" + strings.Repeat("c", 64)}}
+	if shared, err := withProducerTools(map[string]catalog.ToolPin{"aicr": withCompanion}, plan.Builds); err != nil || len(shared) != 1 {
+		t.Fatalf("a run-wide pin with companions did not share the producer's acquisition: %v, %v", shared, err)
+	}
+	conflicting := pinnedToolFixturePin
+	conflicting.ExecutableDigest = "sha256:" + strings.Repeat("d", 64)
+	_, err = withProducerTools(map[string]catalog.ToolPin{"aicr": conflicting}, plan.Builds)
+	assertFactoryErrorCode(t, err, e.CodeUnpinnedSource)
 
 	var received pipeline.RunOptions
 	stop := errors.New("stop after admission")

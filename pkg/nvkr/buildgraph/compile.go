@@ -135,6 +135,10 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 					g.Nodes[len(g.Nodes)-1].ExecutableArchive = &ir.ExecutableArchive{
 						Digest: tool.ArchiveDigest, Member: tool.ExecutablePath,
 					}
+					for _, companion := range tool.Companions {
+						g.Nodes[len(g.Nodes)-1].ExecutableArchive.Companions = append(g.Nodes[len(g.Nodes)-1].ExecutableArchive.Companions,
+							ir.ArchiveMember{Member: companion.Path, Digest: companion.Digest})
+					}
 					if tool.Format == "zip" {
 						g.Nodes[len(g.Nodes)-1].ExecutableArchive.Format = tool.Format
 					}

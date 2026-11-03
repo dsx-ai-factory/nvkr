@@ -6,6 +6,7 @@ package factory
 import (
 	"maps"
 	"net/url"
+	"reflect"
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
@@ -36,8 +37,12 @@ func withProducerTools(tools map[string]catalog.ToolPin, builds []BuildPlan) (ma
 			if err != nil {
 				return nil, err
 			}
-			if previous, exists := merged[node.Tool]; exists && previous != pin {
-				return nil, e.New(e.CodeUnpinnedSource, "catalog tool %q is selected with conflicting pins", node.Tool)
+			if previous, exists := merged[node.Tool]; exists {
+				// The shared acquisition stages only the executable; companions are delivery-only.
+				previous.Companions = nil
+				if !reflect.DeepEqual(previous, pin) {
+					return nil, e.New(e.CodeUnpinnedSource, "catalog tool %q is selected with conflicting pins", node.Tool)
+				}
 			}
 			merged[node.Tool] = pin
 		}

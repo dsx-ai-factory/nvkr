@@ -69,27 +69,15 @@ func generateFiles(ctx context.Context, definitionPath, environmentPath, generat
 		if err := factory.PrepareGitHubRuntimeBundle(ctx, plan, root, check); err != nil {
 			return "", err
 		}
+		// A secondary bootstrap runs this after installing the restored runtime
+		// inputs, so the committed bundle already holds the frozen attempt. The
+		// exact check verifies that attempt and rejects a different dispatch source.
 		if check && len(sourceCommit) != 0 {
-			bundle, err := factory.Render(ctx, plan, engine)
-			if err != nil {
-				return "", err
-			}
-			if err := factory.CheckGeneratedBundle(ctx, root, bundle); err != nil {
+			if err := factory.CheckGenerated(ctx, plan, engine, root); err != nil {
 				return "", err
 			}
 		}
 		return plan.Digest()
 	}
-	bundle, err := factory.Render(ctx, plan, engine)
-	if err != nil {
-		return "", err
-	}
-	if check {
-		if err := factory.CheckGeneratedBundle(ctx, root, bundle); err != nil {
-			return "", err
-		}
-	} else if err := factory.WriteGeneratedBundle(ctx, root, bundle); err != nil {
-		return "", err
-	}
-	return bundle.PlanDigest, nil
+	return factory.Generate(ctx, plan, engine, root, check)
 }

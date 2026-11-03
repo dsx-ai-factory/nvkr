@@ -4,6 +4,7 @@
 package ir
 
 import (
+	"slices"
 	"sort"
 	"strings"
 
@@ -230,6 +231,7 @@ func cloneExecutableArchive(archive *ExecutableArchive) *ExecutableArchive {
 		return nil
 	}
 	clone := *archive
+	clone.Companions = slices.Clone(archive.Companions)
 	return &clone
 }
 
