@@ -39,7 +39,7 @@ func admitExecuteNodeRequirements(plan *Plan, nodeID string) error {
 	case NodeVerify, NodeSBOM:
 	case NodePackage:
 		if node.PackageKind != PackageBinaryBundle && node.PackageKind != PackageImage &&
-			node.PackageKind != PackageHelm && node.PackageKind != PackageAPT {
+			node.PackageKind != PackageHelm && node.PackageKind != PackageBundle && node.PackageKind != PackageAPT {
 			return e.New(e.CodeEngineCapability, "%s cannot package disk or release output %q", adapter, nodeID)
 		}
 	default:

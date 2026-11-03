@@ -118,6 +118,14 @@ type ExecutableArchive struct {
 	Format string `json:"format,omitempty"`
 	Digest string `json:"digest"`
 	Member string `json:"member"`
+	// Companions are further exact members delivered beside the executable.
+	Companions []ArchiveMember `json:"companions,omitempty"`
+}
+
+// ArchiveMember pins one regular member selected from an ExecutableArchive.
+type ArchiveMember struct {
+	Member string `json:"member"`
+	Digest string `json:"digest"`
 }
 
 // Node is one vertex of the build DAG. Field presence depends on Kind; unused

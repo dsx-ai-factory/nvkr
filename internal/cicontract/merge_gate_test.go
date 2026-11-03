@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -53,78 +54,171 @@ func readMergeGateJobs(t *testing.T) map[string]mergeGateJob {
 	return workflow.Jobs
 }
 
-func TestMergeGateRequiresEveryCodeJob(t *testing.T) {
-	gate := readMergeGateJobs(t)["gate"]
+// mergeGatePairs is the aggregate gate's inventory: each check and its skip
+// companion, the check-paths output that selects the check, and whether a fork
+// pull request deselects it.
+var mergeGatePairs = []struct {
+	skip, output string
+	jobs         []string
+	forkExempt   bool
+}{
+	{"check-skip", "code", []string{"check", "lint", "vulnerabilities", "tests"}, false},
+	{"actionlint-skip", "actions", []string{"actionlint"}, false},
+	{"workflows-regen-skip", "pipeline", []string{"workflows-regen"}, true},
+	{"notices-regen-skip", "notices", []string{"notices-regen"}, false},
+	{"docs-skip", "docs", []string{"docs"}, false},
+	{"analyze-skip", "code", []string{"analyze"}, true},
+}
+
+// mergeGateInputs is one observed gate run: classifier outputs, event origin,
+// and per-job results. A result of "missing" omits the job from needs.
+type mergeGateInputs struct {
+	checkPaths string
+	outputs    map[string]string
+	fork       bool
+	results    map[string]string
+}
+
+// newMergeGateInputs returns the consistent run for the given classifier
+// outputs: each selected check succeeds and its companion is skipped.
+func newMergeGateInputs(outputs map[string]string, fork bool) mergeGateInputs {
+	in := mergeGateInputs{checkPaths: "success", outputs: outputs, fork: fork, results: map[string]string{}}
+	for _, pair := range mergeGatePairs {
+		jobResult, skipResult := "skipped", "success"
+		if outputs[pair.output] == "true" && !(fork && pair.forkExempt) {
+			jobResult, skipResult = "success", "skipped"
+		}
+		for _, job := range pair.jobs {
+			in.results[job] = jobResult
+		}
+		in.results[pair.skip] = skipResult
+	}
+	return in
+}
+
+func (in mergeGateInputs) env(t *testing.T) []string {
+	t.Helper()
+	needs := map[string]any{"check-paths": map[string]any{"result": in.checkPaths, "outputs": in.outputs}}
+	for job, result := range in.results {
+		if result != "missing" {
+			needs[job] = map[string]string{"result": result}
+		}
+	}
+	encoded, err := json.Marshal(needs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return []string{
+		"NEEDS=" + string(encoded),
+		fmt.Sprintf("SAME_REPOSITORY=%t", !in.fork),
+		fmt.Sprintf("FORK_PULL_REQUEST=%t", in.fork),
+	}
+}
+
+func TestMergeGateRequiresCompleteCheckPairs(t *testing.T) {
+	jobs := readMergeGateJobs(t)
+	gate := jobs["gate"]
 	if gate.If != "always()" {
 		t.Fatal("aggregate gate must always run, including after failed or skipped dependencies")
 	}
-	codeJobs := []string{"check", "lint", "vulnerabilities", "tests"}
-	for _, name := range append(slices.Clone(codeJobs), "check-skip", "check-paths") {
-		if !slices.Contains(gate.Needs, name) {
-			t.Fatalf("gate does not depend on %s", name)
+	inventory := []string{"check-paths"}
+	for _, pair := range mergeGatePairs {
+		inventory = append(append(inventory, pair.skip), pair.jobs...)
+	}
+	slices.Sort(inventory)
+	var defined []string
+	for name := range jobs {
+		if name != "gate" {
+			defined = append(defined, name)
 		}
+	}
+	slices.Sort(defined)
+	needs := slices.Sorted(slices.Values(gate.Needs))
+	if !slices.Equal(needs, inventory) || !slices.Equal(defined, inventory) {
+		t.Fatalf("every job must be a gate dependency in a check/skip pair:\ninventory %v\ngate needs %v\nworkflow jobs %v", inventory, needs, defined)
 	}
 	if len(gate.Steps) != 1 || gate.Steps[0].Run == "" {
 		t.Fatal("missing executable aggregate gate")
 	}
-	cases := []struct {
-		name, code, job, result string
-		wantSuccess             bool
-	}{
-		{"all code checks pass", "true", "", "", true},
-		{"unchanged code", "false", "", "", true},
-		{"missing skip companion", "false", "check-skip", "skipped", false},
-		{"classifier failed", "true", "check-paths", "failure", false},
-		{"another gate failed", "true", "docs", "failure", false},
-		{"unknown classification", "", "", "", false},
-	}
-	for _, job := range codeJobs {
-		for _, result := range []string{"skipped", "failure", "cancelled"} { //nolint:misspell // GitHub result enum spelling.
-			cases = append(cases, struct {
-				name, code, job, result string
-				wantSuccess             bool
-			}{job + " " + result, "true", job, result, false})
+	step := gate.Steps[0]
+	for name, want := range map[string]string{
+		"NEEDS":             "${{ toJSON(needs) }}",
+		"SAME_REPOSITORY":   "${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}",
+		"FORK_PULL_REQUEST": "${{ github.event.pull_request.head.repo.fork == true }}",
+	} {
+		if step.Env[name] != want {
+			t.Fatalf("%s must bind to %s, got %q", name, want, step.Env[name])
 		}
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			needs := map[string]map[string]string{}
-			for _, job := range gate.Needs {
-				needs[job] = map[string]string{"result": "success"}
-			}
-			if tc.code == "true" {
-				needs["check-skip"]["result"] = "skipped"
-			} else {
-				for _, job := range codeJobs {
-					needs[job]["result"] = "skipped"
+
+	allTrue := func(overrides map[string]string) map[string]string {
+		outputs := map[string]string{"code": "true", "actions": "true", "pipeline": "true", "notices": "true", "docs": "true"}
+		for name, value := range overrides {
+			outputs[name] = value
+		}
+		return outputs
+	}
+	type gateCase struct {
+		name        string
+		in          mergeGateInputs
+		wantSuccess bool
+	}
+	cases := []gateCase{
+		{"every check selected", newMergeGateInputs(allTrue(nil), false), true},
+		{"fork pull request skips exempt checks", newMergeGateInputs(allTrue(nil), true), true},
+	}
+	with := func(in mergeGateInputs, job, result string) mergeGateInputs {
+		in.results = maps.Clone(in.results)
+		in.results[job] = result
+		return in
+	}
+	results := []string{"success", "skipped", "failure", "cancelled", "neutral", "missing"} //nolint:misspell // GitHub result enum spelling.
+	for _, pair := range mergeGatePairs {
+		modes := map[string]mergeGateInputs{
+			"selected":   newMergeGateInputs(allTrue(nil), false),
+			"unselected": newMergeGateInputs(allTrue(map[string]string{pair.output: "false"}), false),
+		}
+		if pair.forkExempt {
+			modes["fork pull request"] = newMergeGateInputs(allTrue(nil), true)
+		}
+		for mode, consistent := range modes {
+			mode = pair.skip + " pair " + mode
+			cases = append(cases, gateCase{mode, consistent, true})
+			// Any other result on either side of the pair, including both
+			// skipped or both successful, means the selected work did not run.
+			for _, job := range append(slices.Clone(pair.jobs), pair.skip) {
+				for _, result := range results {
+					if result != consistent.results[job] {
+						cases = append(cases, gateCase{mode + "/" + job + " " + result, with(consistent, job, result), false})
+					}
 				}
 			}
-			if tc.job != "" {
-				needs[tc.job]["result"] = tc.result
+		}
+	}
+	for _, output := range []string{"code", "actions", "pipeline", "notices", "docs"} {
+		cases = append(cases, gateCase{"unknown " + output + " classification", newMergeGateInputs(allTrue(map[string]string{output: ""}), false), false})
+	}
+	for _, result := range []string{"failure", "cancelled", "skipped"} { //nolint:misspell // GitHub result enum spelling.
+		in := newMergeGateInputs(allTrue(nil), false)
+		in.checkPaths = result
+		cases = append(cases, gateCase{"classifier " + result, in, false})
+	}
+	cases = append(cases, gateCase{"unclassified dependency", with(newMergeGateInputs(allTrue(nil), false), "new-check", "success"), false})
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			output, code := runMergeGateStep(t, step, t.TempDir(), tc.in.env(t))
+			if (code == 0) != tc.wantSuccess {
+				t.Fatalf("gate exit %d, want success=%t:\n%s", code, tc.wantSuccess, output)
 			}
-			results := make([]string, 0, len(gate.Needs))
-			for _, job := range gate.Needs {
-				results = append(results, needs[job]["result"])
-			}
-			encodedNeeds, err := json.Marshal(needs)
-			if err != nil {
-				t.Fatal(err)
-			}
-			encodedResults, err := json.Marshal(results)
-			if err != nil {
-				t.Fatal(err)
-			}
-			script := strings.NewReplacer(
-				"${{ toJSON(needs) }}", string(encodedNeeds),
-				"${{ toJSON(needs.*.result) }}", string(encodedResults),
-				"${{ needs.check-paths.result }}", needs["check-paths"]["result"],
-				"${{ needs.check-paths.outputs.code }}", tc.code,
-			).Replace(gate.Steps[0].Run)
-			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-			defer cancel()
-			output, err := exec.CommandContext(ctx, "bash", "-eu", "-c", script).CombinedOutput()
-			if (err == nil) != tc.wantSuccess {
-				t.Fatalf("gate success=%t, want %t: %v\n%s", err == nil, tc.wantSuccess, err, output)
+		})
+	}
+	for _, env := range []string{"SAME_REPOSITORY=", "FORK_PULL_REQUEST="} {
+		t.Run("unknown event "+strings.TrimSuffix(env, "="), func(t *testing.T) {
+			t.Parallel()
+			output, code := runMergeGateStep(t, step, t.TempDir(), append(newMergeGateInputs(allTrue(nil), false).env(t), env))
+			if code == 0 {
+				t.Fatalf("gate accepted an unknown event origin:\n%s", output)
 			}
 		})
 	}

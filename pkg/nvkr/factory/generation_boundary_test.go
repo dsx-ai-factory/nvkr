@@ -67,6 +67,17 @@ func TestRenderIsTheGenerationSeam(t *testing.T) {
 	if err != nil || reached != 1 || !reflect.DeepEqual(got, want) {
 		t.Fatalf("Render did not take the seam exactly once for the admitted engine: reached=%d err=%v", reached, err)
 	}
+	// `run generate` writes are the lifecycle caller's only seam route.
+	digest, err := Generate(t.Context(), plan, EngineGitHub, t.TempDir(), false)
+	if err != nil || reached != 2 || digest != want.PlanDigest {
+		t.Fatalf("Generate write mode did not take the seam: reached=%d err=%v", reached, err)
+	}
+	// Check mode takes the seam only for an explicit projection selection.
+	_, err = Generate(leakedProjectionSelection(t.Context()), plan, EngineGitHub, t.TempDir(), true)
+	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+	if reached != 3 {
+		t.Fatalf("Generate pilot check did not take the seam: reached=%d", reached)
+	}
 }
 
 func TestGeneratedStageOwnersNeverTakeTheGenerationSeam(t *testing.T) {
@@ -79,33 +90,46 @@ func TestGeneratedStageOwnersNeverTakeTheGenerationSeam(t *testing.T) {
 		// tampered is the refusal for drifted committed action data; the
 		// descriptor regenerates its values and never trusts that file.
 		tampered e.Code
+		// pilotCheck marks the top-level check, which honors the selection
+		// its hidden diagnostic flag makes. Generated closures never pass that
+		// flag (TestGeneratedClosuresInvokeOnlyCoreStageCommands), so this
+		// route runs here as bootstraps run it: with no selection.
+		pilotCheck bool
 	}{
 		{"run generate --check", func(ctx context.Context, root string) error {
+			_, err := Generate(ctx, plan, EngineGitHub, root, true)
+			return err
+		}, e.CodePipelineDrift, true},
+		{"run generate --runtime --source-commit --check", func(ctx context.Context, root string) error {
 			return CheckGenerated(ctx, plan, EngineGitHub, root)
-		}, e.CodePipelineDrift},
+		}, e.CodePipelineDrift, false},
 		{"run generate --runtime --check", func(ctx context.Context, root string) error {
 			return PrepareGitHubRuntimeBundle(ctx, fresh, root, true)
-		}, e.CodePipelineDrift},
+		}, e.CodePipelineDrift, false},
 		{"run generate --runtime", func(ctx context.Context, root string) error {
 			return PrepareGitHubRuntimeBundle(ctx, fresh, root, false)
-		}, e.CodePipelineDrift},
+		}, e.CodePipelineDrift, false},
 		{"check-runtime-inputs", func(ctx context.Context, root string) error {
 			return CheckGitHubRuntimeInputs(ctx, plan, root)
-		}, e.CodePipelineDrift},
+		}, e.CodePipelineDrift, false},
 		{"install-runtime-inputs", func(ctx context.Context, root string) error {
 			stageGitHubRuntimeInputs(t, root, fresh)
 			return InstallGitHubRuntimeInputs(ctx, plan, root)
-		}, e.CodePipelineDrift},
+		}, e.CodePipelineDrift, false},
 		{"describe-action", func(ctx context.Context, root string) error {
 			return WriteGitHubActionData(ctx, plan, selector, filepath.Join(root, "github-output"))
-		}, ""},
+		}, "", false},
 	} {
 		for _, outcome := range []string{"admitted", "tampered", "canceled"} {
 			t.Run(owner.name+"/"+outcome, func(t *testing.T) {
 				forbidGenerationSeam(t)
 				root := copyGitHubRuntimeRoot(t, original)
 				// Even a selection leaked into a stage's context launches nothing.
-				ctx, cancel := context.WithCancel(leakedProjectionSelection(t.Context()))
+				ctx := t.Context()
+				if !owner.pilotCheck {
+					ctx = leakedProjectionSelection(ctx)
+				}
+				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
 				var want e.Code
 				switch outcome {
@@ -201,6 +225,10 @@ func TestGeneratedScriptCheckRejectsProjectionAdapterRoutes(t *testing.T) {
 }
 
 var (
+	// The exact inventory of commands generated stages may run. Before adding
+	// one, confirm its owner never reaches Render. If it re-emits committed
+	// bytes, add it to the seam-trap table above. Remove a command here when
+	// generation stops emitting it.
 	generatedStageCommands = map[string]bool{
 		"factory github check-runtime-inputs": true, "factory github ci-download": true,
 		"factory github ci-fetch-locators": true, "factory github ci-upload": true,
