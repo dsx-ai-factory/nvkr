@@ -4,6 +4,8 @@
 package factory
 
 import (
+	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -19,14 +21,32 @@ import (
 func TestMaintainedAICRBundleInputs(t *testing.T) {
 	aicrInputTestRoot(t)
 	for _, test := range []struct {
-		file, service, accelerator string
+		file      string
+		recipe    []string // positional recipe coordinate preceding the renderer
+		renderers []string
+		contract  []string // selection-specific rendering contract
 	}{
-		{"definition.yaml", "generic", "gb300"},
+		{
+			file:      "definition.yaml",
+			recipe:    []string{"generic", "gb300"},
+			renderers: []string{"argocd", "argocd-helm", "flux", "helm", "helmfile", "terraform"},
+			contract:  []string{"--os ubuntu --intent training", `--deployer "$3"`},
+		},
+		{
+			file:      "nvke-gb200.yaml",
+			recipe:    []string{"nvke", "gb200", "kubeflow"},
+			renderers: []string{"argocd-helm", "flux", "helm"},
+			contract: []string{
+				`--service "$1" --accelerator "$2" --platform "$3"`, "--os ubuntu --intent training",
+				`leaf="$2-$1-ubuntu-training-$3"`, `[ "$applied" = "$leaf" ] ||`, `--deployer "$4"`,
+			},
+		},
 	} {
 		t.Run(test.file, func(t *testing.T) {
 			plan := compileAICRInput(t, test.file, "aicr-local-arm64.yaml")
-			if len(plan.Definition.Outputs) != 6 || len(plan.Builds) != 6 || len(plan.LifecycleOutputs) != 6 {
-				t.Fatal("maintained AICR selection must retain all six independent renderer outputs")
+			count := len(test.renderers)
+			if len(plan.Definition.Outputs) != count || len(plan.Builds) != count || len(plan.LifecycleOutputs) != count {
+				t.Fatalf("AICR selection must retain all %d independent renderer outputs", count)
 			}
 			for _, output := range plan.Definition.Outputs {
 				if output.Format != definition.OutputBundle || output.Platform != "linux/arm64" ||
@@ -50,9 +70,10 @@ func TestMaintainedAICRBundleInputs(t *testing.T) {
 						t.Fatal("maintained AICR producer became an acquired artifact")
 					}
 				}
-				assertAICRSourceProducer(t, producer, fetch)
+				assertAICRSourceProducer(t, producer, fetch, test.contract)
 				command := producer.Command
-				if len(command) < 4 || command[len(command)-3] != test.service || command[len(command)-2] != test.accelerator {
+				coordinate := len(command) - 1 - len(test.recipe)
+				if coordinate < 0 || !slices.Equal(command[coordinate:len(command)-1], test.recipe) {
 					t.Fatalf("recipe coordinate changed: %q", command)
 				}
 				renderer := command[len(command)-1]
@@ -61,7 +82,7 @@ func TestMaintainedAICRBundleInputs(t *testing.T) {
 				}
 				renderers[renderer], digests[build.BuildDigest] = true, true
 			}
-			for _, renderer := range []string{"argocd", "argocd-helm", "flux", "helm", "helmfile", "terraform"} {
+			for _, renderer := range test.renderers {
 				if !renderers[renderer] {
 					t.Fatalf("missing maintained renderer %q", renderer)
 				}
@@ -73,7 +94,54 @@ func TestMaintainedAICRBundleInputs(t *testing.T) {
 	}
 }
 
-func assertAICRSourceProducer(t *testing.T, producer, fetch ir.Node) {
+// The NVKE producer admits a recipe only when its most specific applied overlay is
+// the coordinate's own leaf. This runs the catalog's exact parser on rendered shapes.
+func TestAICRNVKELeafAdmissionParser(t *testing.T) {
+	aicrInputTestRoot(t)
+	plan := compileAICRInput(t, "nvke-gb200.yaml", "aicr-local-arm64.yaml")
+	var script string
+	for _, node := range plan.Builds[0].Graph.Nodes {
+		if node.Kind == ir.KindBuild {
+			script = node.Command[4]
+		}
+	}
+	const open, closing = "applied=\"$(awk '\n", "\n' \"$out/recipe.yaml\")\""
+	start := strings.Index(script, open)
+	end := strings.Index(script, closing)
+	if start < 0 || end < start {
+		t.Fatalf("leaf admission parser not found in producer script:\n%s", script)
+	}
+	program := script[start+len(open) : end]
+	const leaf = "gb200-nvke-ubuntu-training-kubeflow"
+	for _, test := range []struct {
+		name, recipe, want string
+	}{
+		{"curated leaf last", "kind: RecipeResult\nmetadata:\n  appliedOverlays:\n    - base\n    - nvke\n" +
+			"    - gb200-nvke-ubuntu-training\n    - " + leaf + "\n  version: v1.2.0\n", leaf},
+		{"wildcard merge without the leaf", "metadata:\n  appliedOverlays:\n    - base\n    - nvke\n" +
+			"    - gb200-nvke-ubuntu-training\n  excludedOverlays:\n    - " + leaf + "\n", "gb200-nvke-ubuntu-training"},
+		{"flow sequence", "metadata:\n  appliedOverlays: [base, " + leaf + "]\n", ""},
+		{"duplicate lists", "metadata:\n  appliedOverlays:\n    - " + leaf + "\nother:\n  appliedOverlays:\n    - " + leaf + "\n", ""},
+		{"absent list", "metadata:\n  version: v1.2.0\n", ""},
+		{"quoted item", "metadata:\n  appliedOverlays:\n    - \"" + leaf + "\"\n", "\"" + leaf + "\""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			recipe := filepath.Join(t.TempDir(), "recipe.yaml")
+			if err := os.WriteFile(recipe, []byte(test.recipe), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			got, err := exec.CommandContext(t.Context(), "awk", program, recipe).Output()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.TrimSuffix(string(got), "\n") != test.want {
+				t.Fatalf("parser printed %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+func assertAICRSourceProducer(t *testing.T, producer, fetch ir.Node, contract []string) {
 	t.Helper()
 	const commit = "935e0746dc54da890a23c1ecca998244b3a25de7"
 	const tree = "1d4bfa6d824159dbb4c8077303fe8de154946405"
@@ -99,7 +167,7 @@ func assertAICRSourceProducer(t *testing.T, producer, fetch ir.Node) {
 			t.Fatalf("AICR dependency fetch omits %q", required)
 		}
 	}
-	for _, required := range []string{"-mod=vendor", "GOPROXY=off", "--os ubuntu --intent training", `--deployer "$3"`, `--output "oci-layout:$out/layout"`, `"$out/aicr" verify`, `cp "$layer" "$out/bundle.tar.gz"`} {
+	for _, required := range append([]string{"-mod=vendor", "GOPROXY=off", `--output "oci-layout:$out/layout"`, `"$out/aicr" verify`, `cp "$layer" "$out/bundle.tar.gz"`}, contract...) {
 		if !strings.Contains(strings.Join(producer.Command, "\n"), required) {
 			t.Fatalf("AICR build omits its offline rendering/layer contract %q", required)
 		}

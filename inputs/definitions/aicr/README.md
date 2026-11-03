@@ -3,9 +3,10 @@
 This focused example builds pinned AICR source and delivers its rendered directories
 as ordinary `bundle-oci` artifacts through Definition → Run → Release. One GB300
 `generic / gb300 / ubuntu / training` selection demonstrates Argo CD, Argo CD Helm,
-Flux, Helm, Helmfile and Terraform without adding a hardware-profile model.
+Flux, Helm, Helmfile and Terraform without adding a hardware-profile model. A second
+Definition selects the [GB200 NVKE Kubeflow training](#gb200-nvke-kubeflow-training) bundles.
 
-The [catalog](../../catalogs/aicr/registry.yaml) owns the six producers and
+The [catalog](../../catalogs/aicr/registry.yaml) owns the producers and
 [source lock](../../catalogs/aicr/pins.lock.yaml). Source preparation downloads,
 verifies and vendors dependencies without changing upstream module pins. Builds
 compile and render offline with `aicr bundle --output oci-layout:<dir>`, check that
@@ -45,6 +46,35 @@ are ordinary catalog selections, not NVKR capabilities or hardware guarantees.
 The pinned upstream lacks a generic GB200 recipe and labels VR200 Preview.
 Referenced charts, images and providers are not vendored: these are not air-gap
 payloads. GitOps repository settings and cluster acceptance belong downstream.
+
+## GB200 NVKE Kubeflow training
+
+[`nvke-gb200.yaml`](nvke-gb200.yaml) selects the AICR coordinate `service: nvke,
+accelerator: gb200, os: ubuntu, intent: training, platform: kubeflow` in three formats:
+`helm`, `flux` and `argocd-helm`. Output names carry the coordinate; the Definition
+carries no hardware model. The producers share the GB300 example's source, lock and
+layout handling, and add `--platform` to the recipe.
+
+AICR resolves a coordinate without a curated leaf by merging broader overlays. The
+producer therefore requires the last `metadata.appliedOverlays` entry of the rendered
+recipe to be `gb200-nvke-ubuntu-training-kubeflow`. Any other result, or a recipe whose
+list it cannot read, fails the build before `aicr bundle` runs.
+
+```sh
+bin/nvkr run local \
+  --definition inputs/definitions/aicr/nvke-gb200.yaml \
+  --environment inputs/environments/aicr-local-arm64.yaml \
+  --attempt aicr-nvke-gb200-local-1 --jobs 1
+```
+
+AICR's GB200 NVKE recipes require Ubuntu `24.04` nodes, so these bundles pair with
+the Ubuntu 24.04 ARM64 node image. AICR `v1.2.0` has no recipe for a 26.04 GB200 node.
+It also has no `gb200-nvke-ubuntu-inference-dynamo` leaf, so this Definition has no
+Dynamo inference output. NVKE does not apply these bundles: install them out of band
+with Helm, Flux or Argo CD.
+
+This selection is the interim form above. Moving to ADR-27 pinned-tool producers and
+AICR's own manifest changes the published digests, as it does for GB300.
 
 [Reconciliation](../../../docs/adr/reconciliation.md#aicr-deployment-bundles)
 records the local six-output Run and its limits. Changes to the catalog

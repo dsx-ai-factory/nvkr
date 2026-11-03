@@ -184,3 +184,110 @@ components:
       - generic
       - gb300
       - terraform
+  aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm:
+    fromSource: true
+    source: aicr
+    cgo: false
+    platforms: [linux/amd64, linux/arm64]
+    outputType: tarball
+    artifactPath: bin/nvkr-aicr/bundle.tar.gz
+    writeDir: bin/nvkr-aicr
+    versionStamp:
+      BUILD_VERSION: '{{.Version}}'
+      GIT_VERSION: '{{.Commit}}'
+    buildCommand:
+      - bash
+      - -euo
+      - pipefail
+      - -c
+      - &render-aicr-nvke-bundle |
+        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off
+        build_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
+        out=/src/bin/nvkr-aicr
+        mkdir -p "$out"
+        timeout --kill-after=10s 900s go build -mod=vendor -trimpath -buildvcs=false \
+          -ldflags "-s -w -buildid= -X github.com/NVIDIA/aicr/pkg/cli.version=$BUILD_VERSION -X github.com/NVIDIA/aicr/pkg/cli.commit=$GIT_VERSION -X github.com/NVIDIA/aicr/pkg/cli.date=$build_date" \
+          -o "$out/aicr" ./cmd/aicr
+        timeout --kill-after=10s 120s "$out/aicr" recipe \
+          --service "$1" --accelerator "$2" --platform "$3" \
+          --os ubuntu --intent training --output "$out/recipe.yaml"
+        # Exact-leaf admission: AICR merges wildcard overlays when a coordinate has no curated
+        # leaf, so the most specific applied overlay must be this coordinate's own leaf.
+        leaf="$2-$1-ubuntu-training-$3"
+        applied="$(awk '
+          /^[[:space:]]*appliedOverlays:[[:space:]]*$/ { lists++; inlist = 1; next }
+          inlist && /^[[:space:]]*- [^[:space:]]+[[:space:]]*$/ { last = $2; next }
+          { inlist = 0 }
+          END { if (lists == 1) print last }
+        ' "$out/recipe.yaml")"
+        [ "$applied" = "$leaf" ] || { echo "AICR recipe must end in leaf $leaf, got '$applied'" >&2; exit 1; }
+        # Layout output stages in the working directory; the source tree is read-only.
+        (
+          cd "$out"
+          timeout --kill-after=10s 120s "$out/aicr" bundle \
+            --recipe "$out/recipe.yaml" --deployer "$4" \
+            --output "oci-layout:$out/layout"
+        )
+        # Publish AICR's own layer bytes: one manifest holding the config and exactly one layer.
+        digests() { grep -o '"digest":"sha256:[0-9a-f]\{64\}"' "$1" | cut -d: -f3 | tr -d '"'; }
+        mapfile -t manifest < <(digests "$out/layout/index.json")
+        [ "${#manifest[@]}" -eq 1 ] || { echo 'AICR layout must index one manifest' >&2; exit 1; }
+        mapfile -t blobs < <(digests "$out/layout/blobs/sha256/${manifest[0]}")
+        [ "${#blobs[@]}" -eq 2 ] || { echo 'AICR manifest must reference one config and one layer' >&2; exit 1; }
+        layer="$out/layout/blobs/sha256/${blobs[1]}"
+        printf '%s  %s\n' "${blobs[1]}" "$layer" | sha256sum --quiet -c -
+        mkdir "$out/verify"
+        tar -xzf "$layer" -C "$out/verify"
+        root="$out/verify"
+        [ "$4" != argocd-helm ] || root="$root/aicr-bundle"
+        timeout --kill-after=10s 120s "$out/aicr" verify "$root"
+        cp "$layer" "$out/bundle.tar.gz"
+      - nvkr-aicr-bundle
+      - nvke
+      - gb200
+      - kubeflow
+      - argocd-helm
+  aicr-nvke-gb200-ubuntu-training-kubeflow-flux:
+    fromSource: true
+    source: aicr
+    cgo: false
+    platforms: [linux/amd64, linux/arm64]
+    outputType: tarball
+    artifactPath: bin/nvkr-aicr/bundle.tar.gz
+    writeDir: bin/nvkr-aicr
+    versionStamp:
+      BUILD_VERSION: '{{.Version}}'
+      GIT_VERSION: '{{.Commit}}'
+    buildCommand:
+      - bash
+      - -euo
+      - pipefail
+      - -c
+      - *render-aicr-nvke-bundle
+      - nvkr-aicr-bundle
+      - nvke
+      - gb200
+      - kubeflow
+      - flux
+  aicr-nvke-gb200-ubuntu-training-kubeflow-helm:
+    fromSource: true
+    source: aicr
+    cgo: false
+    platforms: [linux/amd64, linux/arm64]
+    outputType: tarball
+    artifactPath: bin/nvkr-aicr/bundle.tar.gz
+    writeDir: bin/nvkr-aicr
+    versionStamp:
+      BUILD_VERSION: '{{.Version}}'
+      GIT_VERSION: '{{.Commit}}'
+    buildCommand:
+      - bash
+      - -euo
+      - pipefail
+      - -c
+      - *render-aicr-nvke-bundle
+      - nvkr-aicr-bundle
+      - nvke
+      - gb200
+      - kubeflow
+      - helm
