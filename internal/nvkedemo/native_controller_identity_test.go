@@ -45,7 +45,7 @@ func nativeControllerFixture(t *testing.T, installer, name string) nativeControl
 
 func TestNativeControllerIdentitySourceAdmission(t *testing.T) {
 	for _, name := range []string{"nke-controller", "nvke-controller"} {
-		for _, scenario := range []string{"selected", "source-owned duplicate env", "unknown", "mixed namespace", "mixed fullname", "mixed name", "null override", "base null override", "ambiguous values", "mismatched chart", "missing declaration", "duplicate declaration", "multiple value documents", "multiple release documents", "alias override", "merge override", "changed source", "symlink declaration", "canceled"} {
+		for _, scenario := range []string{"selected", "source-owned duplicate env", "unknown", "mixed namespace", "mixed fullname", "mixed name", "null override", "base null override", "ambiguous values", "mismatched chart", "moved chart", "renamed chart artifact", "renamed image artifact", "renamed profiles artifact", "missing declaration", "duplicate declaration", "multiple value documents", "multiple release documents", "alias override", "merge override", "changed source", "symlink declaration", "canceled"} {
 			t.Run(name+"/"+scenario, func(t *testing.T) {
 				root := privateTestDir(t)
 				selected := nativeControllerFixture(t, root, name)
@@ -69,6 +69,14 @@ func TestNativeControllerIdentitySourceAdmission(t *testing.T) {
 					files[0] = strings.Replace(files[0], "values.yaml, overlay.yaml", "overlay.yaml, values.yaml", 1)
 				case "mismatched chart":
 					files[3] = "name: other-controller\n"
+				case "moved chart":
+					files[0] = strings.Replace(files[0], "path: ../../controller/deploy/charts/controller", "path: ../../other/chart", 1)
+				case "renamed chart artifact":
+					files[0] = strings.Replace(files[0], "artifact: controller-chart", "artifact: other-chart", 1)
+				case "renamed image artifact":
+					files[0] = strings.Replace(files[0], "imageArtifact: cwe", "imageArtifact: other-image", 1)
+				case "renamed profiles artifact":
+					files[0] = strings.Replace(files[0], "profilesArtifact: controller-profiles", "profilesArtifact: other-profiles", 1)
 				case "missing declaration":
 					files[2] = "namespaceOverride: " + name + "\n"
 				case "duplicate declaration":

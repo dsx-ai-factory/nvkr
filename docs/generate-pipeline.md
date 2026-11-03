@@ -277,8 +277,8 @@ bundle and the downstream nightly E2E adapter. They add no generated cron or
 general callable producer interface.
 Current qualification policy admission selects the default producer workflow,
 `.github/workflows/nvkr-run.yml`; named-producer qualification is not an admitted
-configuration. The named nightly producers instead use the separate downstream
-E2E adapter.
+configuration. No maintained nightly dispatches the named nightly producers; the separate
+downstream AMD64 E2E adapter builds its inputs locally.
 
 Read the top-level workflow to review which jobs can run, their dependency order, permissions, protected
 Environments and time limits. Follow a job's local `uses: ./.github/nvkr-run/actions/...` reference to inspect

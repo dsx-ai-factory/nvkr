@@ -208,27 +208,7 @@ func TestNativeIdentityPolicyReadinessBoundAndCancellation(t *testing.T) {
 		t.Run(scenario, func(t *testing.T) {
 			attempt, runner, root, _ := nativeIdentityReadinessFixture(t)
 			runner.Env = SetEnv(runner.Env, map[string]string{"IDENTITY_POLICY_UNREADY": "always"})
-			sourceRaw, err := os.ReadFile(filepath.Join(root, "clusterstaticentries.yaml"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			tpm := strings.Repeat("a", 64)
-			source, spec, err := nativeSourceStaticEntry(sourceRaw, tpm)
-			if err != nil {
-				t.Fatal(err)
-			}
-			k := nativeIdentityCommands{runner: runner, kubectl: filepath.Join(attempt.assets.HostTools, "kubectl"), kubeconfig: "unused"}
-			runtime, err := k.runtime(t.Context(), attempt.assets, spec, "172.30.0.2")
-			if err != nil {
-				t.Fatal(err)
-			}
-			// The fixture's policy is already created. Keep all setup outside the wait's budget.
-			writeTenantFixture(t, filepath.Join(root, "identity-imported"), nil, 0600)
-			budget := 5 * time.Second
-			if scenario == "cancel" {
-				budget = time.Minute
-			}
-			ctx, cancel := context.WithTimeout(t.Context(), budget)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 			defer cancel()
 			want := context.DeadlineExceeded
 			if scenario == "cancel" {
@@ -254,14 +234,38 @@ func TestNativeIdentityPolicyReadinessBoundAndCancellation(t *testing.T) {
 				defer func() { cancel(); <-done }()
 				want = context.Canceled
 			}
-			err = k.waitPolicy(ctx, runtime, attempt.assets, spec, "172.30.0.2", source, tpm, "created-fixture")
+			var err error
+			if scenario == "cancel" {
+				var receipt *nativeSiteIdentityReceipt
+				receipt, err = attempt.completeNativeSiteIdentity(ctx, runner, "172.30.0.2", root)
+				if receipt != nil {
+					t.Fatal("canceled identity completion issued a receipt")
+				}
+				assertIdentityPolicyNotDispatched(t, root)
+			} else {
+				sourceRaw, readErr := os.ReadFile(filepath.Join(root, "clusterstaticentries.yaml"))
+				if readErr != nil {
+					t.Fatal(readErr)
+				}
+				tpm := strings.Repeat("a", 64)
+				source, spec, sourceErr := nativeSourceStaticEntry(sourceRaw, tpm)
+				if sourceErr != nil {
+					t.Fatal(sourceErr)
+				}
+				k := nativeIdentityCommands{runner: runner, kubectl: filepath.Join(attempt.assets.HostTools, "kubectl"), kubeconfig: "unused"}
+				runtime, runtimeErr := k.runtime(ctx, attempt.assets, spec, "172.30.0.2")
+				if runtimeErr != nil {
+					t.Fatal(runtimeErr)
+				}
+				// Keep fixture setup outside the policy wait's deadline budget.
+				writeTenantFixture(t, filepath.Join(root, "identity-imported"), nil, 0600)
+				waitCtx, stop := context.WithTimeout(ctx, 5*time.Second)
+				defer stop()
+				err = k.waitPolicy(waitCtx, runtime, attempt.assets, spec, "172.30.0.2", source, tpm, "created-fixture")
+			}
 			polls, pollErr := os.ReadFile(filepath.Join(root, "identity-policy-polls"))
 			if !errors.Is(err, want) || !errors.Is(err, errNativeIdentityUnready) || pollErr != nil || len(polls) == 0 {
 				t.Fatal("unready wait lost its bound, cause or observed poll", err, pollErr)
-			}
-			events, readErr := os.ReadFile(filepath.Join(root, "events"))
-			if readErr == nil && strings.Contains(string(events), "identity-handoff") {
-				t.Fatal("canceled wait dispatched mutation")
 			}
 		})
 	}

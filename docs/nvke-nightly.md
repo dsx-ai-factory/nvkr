@@ -48,7 +48,8 @@ Verify that `headSha` matches the PR commit and that the complete run concludes
 lifecycle. The run summary records both source commits. Share the run URL and
 tested NVKR commit on the PR. After pushing a fix, dispatch the branch again:
 [re-running an old workflow](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs)
-retains its original NVKR commit. GitHub documents the default-branch requirement
+retains its original NVKR commit. A re-run resolves NVKE main again; compare the
+NVKE commit in each run summary. GitHub documents the default-branch requirement
 under [manual dispatch](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
 
 ## Resources and ownership
@@ -70,9 +71,10 @@ are functional-test settings, not proven hardware minima or performance qualific
 The small profile also sets the site's system reservation and the tenant's
 Reserved/SystemReserved/KubeReserved memory to 256Mi, appends the guest kubelet
 `--kube-reserved=cpu=1000m,memory=256Mi,ephemeral-storage=1Gi` override and restarts
-it, and sets OVN control-plane/node-zone memory requests to 128Mi. Recorded
-small-profile runtime acceptance covers these settings, not the default reservations.
-
+it, sets OVN control-plane/node-zone memory requests to 128Mi, and adds 64Mi
+memory requests to the seven site telemetry collector roles and three target
+allocators. Recorded small-profile runtime acceptance covers these settings,
+not the default reservations.
 
 The six-hour job passes its remaining deadline to Go, which preserves two hours
 for independently bounded cleanup. Setup requires a GitHub-hosted AMD64 machine,
