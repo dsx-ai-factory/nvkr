@@ -111,7 +111,7 @@ go test ./pkg/nvkr/factory/... -run TestName -count=1
 # generated-bundle drift check (repeats the committed Plan's input selection)
 make workflows-check
 
-# Fern operator docs (pages in docs/index.yml; needs node + `npm install -g fern-api@latest`)
+# Fern operator docs (pages in docs/index.yml; needs node, then `make fern-install` for the locked CLI)
 make docs-check
 
 # M1 local demo (needs Docker and a local NVKE clone; see demos/m1-local.md)
