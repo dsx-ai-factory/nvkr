@@ -36,7 +36,7 @@ var nvkeFamilyOnlyOutputs = map[string]struct {
 	output definition.DefinitionOutput
 }{
 	"aicr":                               {"core", nvkeFamilyOnlyOutput("aicr", "linux/arm64", "tools/aicr-arm64", definition.OutputExecutable, "aicr", nil)},
-	"controller-profiles":                {"core", definition.DefinitionOutput{Name: "controller-profiles", Platforms: []string{"linux/amd64", "linux/arm64"}, Catalog: &definition.Catalog{Base: "../../catalogs/nvke/release"}, Components: []string{"nvke-controller-profiles-image"}, Format: definition.OutputOCI}},
+	"controller-profiles":                {"core", definition.DefinitionOutput{Name: "controller-profiles", Platforms: []string{"linux/amd64", "linux/arm64"}, Catalog: &definition.Catalog{Base: "../../catalogs/nvke/release-components"}, Components: []string{"nvke-nico-reference-profiles"}, Format: definition.OutputOCI}},
 	"local-path-helper-image":            {"services", nvkeFamilyOnlyOutput("local-path-helper-image", "linux/amd64", "local-path-provisioner", definition.OutputOCI, "local-path-helper-image", nil)},
 	"local-path-helper-image-arm64":      {"services", nvkeFamilyOnlyOutput("local-path-helper-image-arm64", "linux/arm64", "local-path-provisioner", definition.OutputOCI, "local-path-helper-image", nil)},
 	"local-path-provisioner":             {"services", nvkeFamilyOnlyOutput("local-path-provisioner", "linux/amd64", "local-path-provisioner", definition.OutputHelm, "local-path-provisioner-chart", map[string]string{"helper": "local-path-helper-image", "provisioner": "local-path-provisioner-image"})},

@@ -3453,9 +3453,10 @@ execution remain external acceptance requirements.
 
 ## Maintained input and schema boundaries
 
-The NVKE four-family pilot adds independent core (20 outputs), services (28), telemetry (17) and disks (4)
+The NVKE four-family pilot adds independent core (28 outputs), services (34), telemetry (17) and disks (4)
 Definitions under `inputs/definitions/nvke/`, with corresponding `github-nvke-<family>` Environments and
-named production bundles. Their selected output union is the combined candidate's 69 outputs, retaining
+named production bundles. Their selected output union is the combined candidate's 69 outputs plus 14
+family-only outputs (eight core, six services) that the combined Definition omits for workflow headroom, retaining
 aggregate native children, bound chart/image relationships and complete disk material selections. They
 reuse shared catalog/pin owners and publish into separate family prefixes beneath the existing candidate
 namespace. `make nvke-split-generate` and `make nvke-split-check` own the family subset; the repository-wide
@@ -3592,7 +3593,7 @@ CAPNICo and explicitly named reference-profile fixtures, the existing provisione
 and fourteen acquired runtime-image components delivered separately for both native architectures.
 The selected NVKE/CAPI sources and NVKE telemetry pipelines dependency charts own their versions; Helm test-only images are
 excluded. `nico-reference-profiles-fixture` identifies reference test data in the release membership itself,
-not fleet configuration, the runnable demo's `controller-profiles`, or a complete legacy OSProfile set.
+not fleet configuration or a complete legacy OSProfile set; the core family also delivers that build as `controller-profiles`.
 Provider manifests, image-reference relocation and installation remain consumer work, not delivery proved here.
 Native children are locked separately from source-owned index parents, and materialization authenticates actual
 membership. Controlled source/pin/image tests and exact-source approval do not prove external layer acquisition,
@@ -3652,14 +3653,15 @@ catalog command as it was before intermediate-digest validation built both sourc
 the compiler was killed by signal 9 in an 8 GiB Docker VM; no Core image was produced. Neither has been rebuilt
 at `v2.3.0`, and no hosted Run has built, published or signed either image or the Flow chart.
 
-The core family also selects `controller-profiles` from the existing `nvke-controller-profiles-image` producer
-in `inputs/catalogs/nvke/release`. NVKE's controller deploy item names `profilesArtifact: controller-profiles`
-(`deploy/nico/controller/release.yaml:20` at `v0.22.0`, `v0.23.0` and main on 2026-11-02), and a `--release`
-render fails when the Release lacks it; the stack config's `images.profiles` overrides it but cannot replace it.
-The image packages NVKE's controller test fixture profiles and runbooks, not fleet configuration. It is
-contract-tested by the family membership matrix and the regenerated core bundle only; no hosted Run has built
-or published it, and no NVKE render has consumed it. CAPI provider manifests and a clusterctl local repository
-are not delivered.
+The core family also selects `controller-profiles` from the curated `nvke-nico-reference-profiles` producer, the
+same build as `nico-reference-profiles-fixture`. NVKE's controller deploy item names `profilesArtifact:
+controller-profiles` (`deploy/nico/controller/release.yaml:20` at `v0.22.0`, `v0.23.0` and main `5293831c`), and a
+`--release` render fails when the Release lacks it; the stack config's `images.profiles` overrides it but cannot
+replace it. The image holds the two NICO test config profiles and their runbooks, not fleet configuration; NVKE's
+full fixture tree, with its empty and failure-injection profiles, is not selected. The combined Definition does not
+select it. It is contract-tested by the family membership matrix and the regenerated core bundle only; no hosted
+Run has built or published it, and no NVKE render has consumed it. CAPI provider manifests and a clusterctl local
+repository are not delivered.
 
 Current Definition v5/catalog v3/IR v4/Plan and artifact-graph v5 reject retired recipe, cluster, category,
 role, composition and staging fields, including empty legacy fields. Runs/Releases use v4 and validation vectors retain v3; publication roots and Inventory/ReleaseSet use v4; disk manifests use v2. Removed compiler-handoff,

@@ -16,7 +16,7 @@ There is no generic Definition `overrides` field or arbitrary Packer/HCL rewriti
 | SPIRE packaging selection | The same v0.22.0 lock selects `nvke-spire-agent-source` | Source-owned SPIRE 1.14.1 and TPM plugin 1.9.0, Debian revision 4; this release package omits DSX IMDS. |
 | Runtime image selection | `inputs/catalogs/runtime-dependencies` plus NVKE deploy values at `400c24fb6465b042be883d6b62472528520d6291` and their pinned charts | Exact native manifest pins for the twelve selected non-test images on both architectures. |
 | Release-component pins | CLI/controller/operator catalogs and their own locks | Validate each source independently; one shared repository URL does not imply one release. |
-| Reference-profile fixture | `inputs/catalogs/nvke/release-components`, output `nico-reference-profiles-fixture` | Test configuration and runbooks only; not the demo's runnable `controller-profiles` or approved fleet configuration. |
+| Reference-profile fixture | `inputs/catalogs/nvke/release-components`, output `nico-reference-profiles-fixture` | Test configuration and runbooks only, also delivered by the core family as `controller-profiles`; not approved fleet configuration. |
 | Customer replacement | Ordered catalog overlay, bound to its exact predecessor snapshot | Preserve the logical component's output type and supported platforms; validate its new material closure. |
 
 The [maintained NVKE input guide](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md) records the detailed source paths and remaining
