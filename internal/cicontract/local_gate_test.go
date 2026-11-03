@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode"
 
 	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
 )
@@ -124,6 +125,12 @@ func TestLocalGateRejectsInventoryDrift(t *testing.T) {
 				job.Steps = append(job.Steps, mergeGateStep{storageWorkflowStep: storageWorkflowStep{Run: "make vet"}})
 				jobs["analyze"] = job
 			}},
+		{"provider-only job runs flagged make", `provider-only job analyze runs make step`,
+			func(t *testing.T, jobs map[string]mergeGateJob) {
+				job := jobs["analyze"]
+				job.Steps = append(job.Steps, mergeGateStep{storageWorkflowStep: storageWorkflowStep{Run: "echo start\ntrue && make -k vet GOFLAGS=-short"}})
+				jobs["analyze"] = job
+			}},
 		{"stale support step", `classification entries match no merge gate step: [step tests/Summarize test timings]`,
 			func(t *testing.T, jobs map[string]mergeGateJob) {
 				job := jobs["tests"]
@@ -216,7 +223,8 @@ func hostedMakeTargets(jobs map[string]mergeGateJob) ([]string, error) {
 			if slices.Contains(providerOnlyJobs, name) {
 				used["job "+name] = true
 				for _, step := range job.Steps {
-					if _, ok := makeStepTarget(step); ok {
+					// Any make word, not only the canonical form, would hide a local check here.
+					if slices.Contains(strings.FieldsFunc(step.Run, isShellSeparator), "make") {
 						return nil, fmt.Errorf("provider-only job %s runs make step %q; move the check to a reproducible job", name, step.Name)
 					}
 				}
@@ -284,6 +292,10 @@ func hostedMakeTargets(jobs map[string]mergeGateJob) ([]string, error) {
 		return nil, fmt.Errorf("classification entries match no merge gate step: %v", stale)
 	}
 	return slices.Sorted(maps.Keys(targets)), nil
+}
+
+func isShellSeparator(r rune) bool {
+	return unicode.IsSpace(r) || strings.ContainsRune(";&|()`$", r)
 }
 
 func appendUnused(stale []string, used map[string]bool, key string) []string {
