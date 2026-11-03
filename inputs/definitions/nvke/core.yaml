@@ -129,6 +129,13 @@ outputs:
     format: oci
     components:
       - nico-core-image
+  - name: nico-flow
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nico
+    format: helm-oci
+    components:
+      - nico-flow-chart
   - name: nico-flow-image
     platforms: [linux/amd64, linux/arm64]
     catalog:
@@ -165,6 +172,14 @@ outputs:
     platform: linux/amd64
     catalog:
       base: ../../catalogs/tools/operator-amd64
+    format: executable
+    components:
+      - helm
+      - kubectl
+  - name: operator-tools-linux-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/tools/operator-arm64
     format: executable
     components:
       - helm
