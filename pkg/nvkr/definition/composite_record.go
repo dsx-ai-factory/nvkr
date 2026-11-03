@@ -4,18 +4,21 @@
 package definition
 
 import (
+	"slices"
+
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-// CompositionRecord binds a composite's identity, its members and every
-// output's declaring member into a Plan, Run record or publication root
-// (ADR-26 §4). Attribution is descriptive membership inside the authenticated
-// record; it grants no member-scoped authority.
+// CompositionRecord binds a composite's identity, its members, its declared
+// variants and every output's declaring member into a Plan, Run record or
+// publication root (ADR-26 §4). Attribution is descriptive membership inside
+// the authenticated record; it grants no member-scoped authority.
 type CompositionRecord struct {
 	Kind                      string              `json:"kind"`
 	Metadata                  Metadata            `json:"metadata"`
 	Members                   []MemberIdentity    `json:"members"`
+	Variants                  []DeclaredVariant   `json:"variants,omitempty"`
 	EffectiveDefinitionDigest string              `json:"effectiveDefinitionDigest"`
 	Outputs                   []OutputAttribution `json:"outputs"`
 }
@@ -27,7 +30,7 @@ func NewCompositionRecord(composition Composition) (*CompositionRecord, error) {
 		return nil, err
 	}
 	return &CompositionRecord{Kind: CompositeKind, Metadata: composition.composite.Metadata, Members: composition.composite.MemberIdentities(),
-		EffectiveDefinitionDigest: digest, Outputs: composition.Attribution()}, nil
+		Variants: cloneVariants(composition.composite.Variants), EffectiveDefinitionDigest: digest, Outputs: composition.Attribution()}, nil
 }
 
 // ValidateMembership requires a complete record whose members recompute
@@ -70,7 +73,7 @@ func (record CompositionRecord) validate(definitionDigest string) error {
 	if record.Kind != CompositeKind {
 		return e.New(e.CodeUnverifiedRef, "composition record has unsupported definition kind %q", record.Kind)
 	}
-	compositeDigest, err := CompositeDigest(record.Metadata, record.Members)
+	compositeDigest, err := CompositeDigest(record.Metadata, record.Members, record.Variants...)
 	if err != nil {
 		return e.Wrap(e.CodeUnverifiedRef, err, "composition record members")
 	}
@@ -133,6 +136,17 @@ func (record CompositionRecord) MemberOf(output string) (string, bool) {
 	return "", false
 }
 
+// DeclaresVariant reports whether the composite lets members left and right
+// resolve different producers for component.
+func (record CompositionRecord) DeclaresVariant(component, left, right string) bool {
+	for _, variant := range record.Variants {
+		if variant.Component == component {
+			return slices.Contains(variant.Members, left) && slices.Contains(variant.Members, right)
+		}
+	}
+	return false
+}
+
 // Clone returns an independent record.
 func (record *CompositionRecord) Clone() *CompositionRecord {
 	if record == nil {
@@ -140,6 +154,7 @@ func (record *CompositionRecord) Clone() *CompositionRecord {
 	}
 	value := *record
 	value.Members = append([]MemberIdentity(nil), record.Members...)
+	value.Variants = cloneVariants(record.Variants)
 	value.Outputs = append([]OutputAttribution(nil), record.Outputs...)
 	return &value
 }

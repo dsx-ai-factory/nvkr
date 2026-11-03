@@ -132,6 +132,23 @@ func TestCompositeAdmissionMatrix(t *testing.T) {
 	}
 }
 
+func TestCompositeViewShowsDeclaredVariants(t *testing.T) {
+	composite := compositeLifecycleFixture(t, nil)
+	composite.Variants = []definition.DeclaredVariant{{Component: "containerd", Members: []string{"alpha", "beta"}}}
+	writeCompositeTestDocument(t, compositeTestPath, composite)
+	input, err := LoadDefinitionInput(t.Context(), compositeTestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err := InspectComposite(input)
+	if err != nil || len(view.Variants) != 1 || view.Variants[0].Component != "containerd" || strings.Join(view.Variants[0].Members, ",") != "alpha,beta" {
+		t.Fatalf("inspect variants = %+v, %v", view.Variants, err)
+	}
+	// beta selects only kubelet, so compilation refuses the declaration.
+	_, err = CompileFiles(t.Context(), compositeTestPath, compositeTestEnv, "composite-test")
+	requireLifecycleCode(t, err, e.CodeInvalidCatalog)
+}
+
 func TestCompositeRuntimePlanRefusedBeforeMembers(t *testing.T) {
 	compositeLifecycleFixture(t, func(environment *definition.Environment) {
 		environment.GitHubBundle, environment.GitHubRuntimePlan = "product", true

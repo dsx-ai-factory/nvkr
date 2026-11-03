@@ -31,6 +31,7 @@ type CompositeView struct {
 	Name                      string                         `json:"name"`
 	Digest                    string                         `json:"digest"`
 	Members                   []CompositeMemberView          `json:"members"`
+	Variants                  []definition.DeclaredVariant   `json:"variants,omitempty"`
 	EffectiveDefinitionDigest string                         `json:"effectiveDefinitionDigest"`
 	EffectiveDefinition       Definition                     `json:"effectiveDefinition"`
 	Outputs                   []definition.OutputAttribution `json:"outputs"`
@@ -54,7 +55,8 @@ func InspectComposite(input DefinitionInput) (CompositeView, error) {
 		return CompositeView{}, err
 	}
 	view := CompositeView{Kind: definition.CompositeKind, Name: effective.Metadata.Name, Digest: input.Composition.Digest(),
-		EffectiveDefinitionDigest: effectiveDigest, EffectiveDefinition: effective, Outputs: input.Composition.Attribution()}
+		Variants: input.Composition.Composite().Variants, EffectiveDefinitionDigest: effectiveDigest, EffectiveDefinition: effective,
+		Outputs: input.Composition.Attribution()}
 	for _, member := range input.Composition.Members() {
 		view.Members = append(view.Members, CompositeMemberView{Name: member.Name, Digest: member.Digest, Definition: member.Path})
 	}

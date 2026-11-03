@@ -91,13 +91,16 @@ func admitCompositeEnvironment(environment authored.Environment) error {
 
 // checkCrossMemberProducers enforces ADR-26 §3: outputs of different members
 // that select one (component, platform) must resolve the identical effective
-// producer. Variants inside one member keep ADR-11 semantics.
+// producer unless the composite declares both members as variants of that
+// component. Every declared member must select its component. Variants inside
+// one member keep ADR-11 semantics.
 func checkCrossMemberProducers(plan Plan, record *CompositionRecord) error {
 	type producer struct {
 		member string
 		bytes  []byte
 	}
 	seen := map[string][]producer{}
+	selected := map[[2]string]bool{}
 	for _, build := range plan.Builds {
 		output, _, _ := strings.Cut(build.Name, "/")
 		member, ok := record.MemberOf(output)
@@ -105,18 +108,26 @@ func checkCrossMemberProducers(plan Plan, record *CompositionRecord) error {
 			return e.New(e.CodeUnverifiedRef, "native build %q has no attributed output", build.Name)
 		}
 		for _, component := range build.ResolvedComponents {
+			selected[[2]string{member, component.Name}] = true
 			resolved, err := canonical.Marshal(component)
 			if err != nil {
 				return e.Wrap(e.CodeInternal, err, "encoding producer %q", component.Name)
 			}
 			key := component.Name + "\x00" + build.Platform
 			for _, previous := range seen[key] {
-				if previous.member != member && !bytes.Equal(previous.bytes, resolved) {
-					return e.New(e.CodeInvalidCatalog, "members %q and %q select divergent producers for component %q on %s",
+				if previous.member != member && !bytes.Equal(previous.bytes, resolved) && !record.DeclaresVariant(component.Name, previous.member, member) {
+					return e.New(e.CodeInvalidCatalog, "members %q and %q select divergent producers for component %q on %s without a declared variant",
 						previous.member, member, component.Name, build.Platform)
 				}
 			}
 			seen[key] = append(seen[key], producer{member: member, bytes: resolved})
+		}
+	}
+	for _, variant := range record.Variants {
+		for _, member := range variant.Members {
+			if !selected[[2]string{member, variant.Component}] {
+				return e.New(e.CodeInvalidCatalog, "declared variant of component %q names member %q, which does not select it", variant.Component, member)
+			}
 		}
 	}
 	return nil

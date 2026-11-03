@@ -179,6 +179,25 @@ func TestCompositeAdmissionContract(t *testing.T) {
 			writeCompositeFile(t, filepath.Join(root, "defs", "beta.yaml"), compositeMemberFixture("beta", "beta-cli", "beta-tool"))
 			return nil
 		}},
+		// Admission checks a variant's shape; compilation checks its producers.
+		{name: "declared variant", mutate: declareVariants(DeclaredVariant{Component: "shared-cli", Members: []string{"alpha", "beta"}})},
+		{name: "unknown variant field", code: e.CodeInvalidCatalog, mutate: func(t *testing.T, _ string, composite *CompositeDefinition) []byte {
+			composite.Variants = []DeclaredVariant{{Component: "shared-cli", Members: []string{"alpha", "beta"}}}
+			raw, err := canonical.Marshal(composite)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return []byte(strings.Replace(string(raw), `"component":`, `"platform":"linux/amd64","component":`, 1))
+		}},
+		{name: "variant with one member", code: e.CodeInvalidCatalog, mutate: declareVariants(DeclaredVariant{Component: "shared-cli", Members: []string{"alpha"}})},
+		{name: "variant naming unlisted member", code: e.CodeInvalidCatalog, mutate: declareVariants(DeclaredVariant{Component: "shared-cli", Members: []string{"alpha", "gamma"}})},
+		{name: "unsorted variant members", code: e.CodeInvalidCatalog, mutate: declareVariants(DeclaredVariant{Component: "shared-cli", Members: []string{"beta", "alpha"}})},
+		{name: "repeated variant member", code: e.CodeInvalidCatalog, mutate: declareVariants(DeclaredVariant{Component: "shared-cli", Members: []string{"alpha", "alpha"}})},
+		{name: "non-canonical variant component", code: e.CodeInvalidCatalog, mutate: declareVariants(DeclaredVariant{Component: "Shared CLI", Members: []string{"alpha", "beta"}})},
+		{name: "repeated variant component", code: e.CodeInvalidCatalog, mutate: declareVariants(
+			DeclaredVariant{Component: "shared-cli", Members: []string{"alpha", "beta"}}, DeclaredVariant{Component: "shared-cli", Members: []string{"alpha", "beta"}})},
+		{name: "unsorted variants", code: e.CodeInvalidCatalog, mutate: declareVariants(
+			DeclaredVariant{Component: "shared-cli", Members: []string{"alpha", "beta"}}, DeclaredVariant{Component: "agent", Members: []string{"alpha", "beta"}})},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root, composite := compositeFixture(t)
@@ -206,7 +225,51 @@ func TestCompositeAdmissionContract(t *testing.T) {
 			if len(members) != 2 || members[0].Path != "defs/alpha.yaml" || members[1].Name != "beta" || members[1].Digest != composite.Members[1].Digest {
 				t.Fatalf("admitted members = %+v", members)
 			}
+			if variants := admitted.Composite().Variants; len(variants) != len(composite.Variants) {
+				t.Fatalf("admitted variants = %+v, want %+v", variants, composite.Variants)
+			} else if len(variants) > 0 {
+				variants[0].Members[0] = "mutated"
+				if admitted.Composite().Variants[0].Members[0] != composite.Variants[0].Members[0] {
+					t.Fatal("admitted composite shares variant members with its caller")
+				}
+			}
 		})
+	}
+}
+
+func declareVariants(variants ...DeclaredVariant) func(*testing.T, string, *CompositeDefinition) []byte {
+	return func(_ *testing.T, _ string, composite *CompositeDefinition) []byte {
+		composite.Variants = variants
+		return nil
+	}
+}
+
+// TestCompositeDigestBindsDeclaredVariants keeps variants in the composite
+// identity while an absent or empty declaration keeps the earlier digest.
+func TestCompositeDigestBindsDeclaredVariants(t *testing.T) {
+	_, composite := compositeFixture(t)
+	none, err := composite.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	empty := composite.Clone()
+	empty.Variants = []DeclaredVariant{}
+	declared := composite.Clone()
+	declared.Variants = []DeclaredVariant{{Component: "shared-cli", Members: []string{"alpha", "beta"}}}
+	other := composite.Clone()
+	other.Variants = []DeclaredVariant{{Component: "other-cli", Members: []string{"alpha", "beta"}}}
+	digests := map[string]string{"none": none}
+	for name, value := range map[string]CompositeDefinition{"empty": empty, "declared": declared, "other": other} {
+		if digests[name], err = value.Digest(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if digests["empty"] != none || digests["declared"] == none || digests["declared"] == digests["other"] {
+		t.Fatalf("variant identity = %v", digests)
+	}
+	raw, err := canonical.Marshal(compositeIdentity{Metadata: composite.Metadata, Members: composite.MemberIdentities()})
+	if err != nil || strings.Contains(string(raw), "variants") {
+		t.Fatalf("undeclared composite identity bytes = %s (%v)", raw, err)
 	}
 }
 
