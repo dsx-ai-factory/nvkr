@@ -44,15 +44,13 @@ linters:
     rules:
       # User-facing CLI/report writers and the bake-off env harness intentionally
       # ignore the write/flush/setenv error — the process is exiting or the output
-      # is advisory. Migrated packages, listed in path-except, check every write.
+      # is advisory. Outside the migrated packages in path-except, errors assigned
+      # to _ are also not reported yet, along with any other unchecked call on such
+      # a line. Migrated non-test files get neither exemption; exclude-functions
+      # and the test-file rule below still apply to them. Migrate package by package.
       - linters: [errcheck]
         path-except: '^pkg/nvkr/assemble/'
-        source: '(fmt\.Fprint|\.Write\(|\.Flush\(|os\.Setenv)'
-      # Blank-error checking is enabled only for migrated packages; keep this
-      # path-except identical to the rule above and extend both package by package.
-      - linters: [errcheck]
-        path-except: '^pkg/nvkr/assemble/'
-        source: '\b_\s*:?=[^=]'
+        source: '(fmt\.Fprint|\.Write\(|\.Flush\(|os\.Setenv)|\b_\s*:?='
       # QF1001 (apply De Morgan's law) is a stylistic quickfix, not a correctness issue.
       - linters: [staticcheck]
         text: 'QF1001'
