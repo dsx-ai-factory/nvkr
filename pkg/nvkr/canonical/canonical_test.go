@@ -275,7 +275,7 @@ func TestRejectFieldAliasesBindsOnlyStructFields(t *testing.T) {
 		Optional string `json:"optional,omitempty"`
 		Dash     struct {
 			Kind string `json:"kind"`
-		} `json:"-,omitempty"`
+		} `json:"-,omitempty"` //nolint:staticcheck // deliberate: names the member "-" rather than ignoring the field
 	}
 	for _, tc := range []struct {
 		name string
