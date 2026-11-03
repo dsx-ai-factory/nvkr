@@ -93,13 +93,14 @@ func buildPinnedTool(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 	if err != nil {
 		return nil, e.Wrap(e.CodeBuildFailed, err, "resolving output dir for %s", n.Component)
 	}
-	if err := os.RemoveAll(outRoot); err != nil {
+	// A tool may leave read-only directories; the private-tree removal clears them.
+	if err := removePrivateTree(outRoot); err != nil {
 		return nil, e.Wrap(e.CodeBuildFailed, err, "resetting output dir for %s", n.Component)
 	}
 	defer func() {
 		if returnErr != nil {
 			result = nil
-			if err := os.RemoveAll(outRoot); err != nil {
+			if err := removePrivateTree(outRoot); err != nil {
 				returnErr = errors.Join(returnErr, e.Wrap(e.CodeInternal, err, "removing failed pinned-tool output"))
 			}
 		}
@@ -116,7 +117,7 @@ func buildPinnedTool(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 			return nil, e.Wrap(e.CodeBuildFailed, err, "creating layout staging root for %s", n.Component)
 		}
 		defer func() {
-			if err := os.RemoveAll(mount); err != nil {
+			if err := removePrivateTree(mount); err != nil {
 				returnErr = errors.Join(returnErr, e.Wrap(e.CodeInternal, err, "removing layout staging root"))
 			}
 		}()
@@ -231,8 +232,10 @@ func stagePinnedToolExecutable(ctx context.Context, n ir.Node, source, parent st
 // executable and declared materials are mounted, both read-only; HOME, TMPDIR and
 // the working directory are private and empty.
 func pinnedToolRunArgs(n ir.Node, name, toolDir, toolName, inputs, output string) []string {
+	// The invoking identity owns everything the tool writes, so a rootful runtime
+	// never leaves root-owned output the executor cannot admit or remove.
 	args := []string{"run", "--rm", "--name", name, "--platform", n.Platform, "--network=none", "--read-only",
-		"--tmpfs", ir.PinnedToolExecutorEnv["HOME"], "--tmpfs", ir.PinnedToolExecutorEnv["TMPDIR"], "--tmpfs", ir.PinnedToolWorkdir,
+		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "--tmpfs", ir.PinnedToolExecutorEnv["HOME"], "--tmpfs", ir.PinnedToolExecutorEnv["TMPDIR"], "--tmpfs", ir.PinnedToolWorkdir,
 		"-v", toolDir + ":" + pinnedToolContainerDir + ":ro", "-v", output + ":" + ir.PinnedToolOutputDir}
 	if inputs != "" {
 		args = append(args, buildMaterialMountArgs(inputs)...)

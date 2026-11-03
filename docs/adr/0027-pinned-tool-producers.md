@@ -159,7 +159,8 @@ A pinned-tool node runs through the shared helper launcher as an ordinary build 
 - **Fixed, credential-free environment.** The executor fixes the working directory, a private empty `HOME` and
   `TMPDIR`, `TZ=UTC`, `LC_ALL=C` and umask `022`. The child environment holds only those values and the
   producer's literal variables, which cannot redefine them (§1); no ambient credential, token, registry
-  configuration, kubeconfig or cache is passed.
+  configuration, kubeconfig or cache is passed. The tool runs as the invoking user's numeric uid and gid, so a
+  rootful runtime never leaves output the executor cannot read or remove.
 - **Fixed sandbox paths.** For a `file` producer `{{.Output}}` renders to `/nvkr/output`, an existing empty
   directory. A layout writer may refuse an existing directory, even an empty one, so for an `oci-layout` producer
   `{{.Output}}` renders to `/nvkr/output/layout`, an absent path the tool creates. A material renders to

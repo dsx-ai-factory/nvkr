@@ -113,6 +113,8 @@ func TestPinnedToolExecutorContract(t *testing.T) {
 		{name: "one observed file", runtime: `printf recipe > "$out/recipe.yaml"`},
 		{name: "tool exits nonzero", runtime: `printf partial > "$out/recipe.yaml"; exit 3`, code: e.CodeBuildFailed},
 		{name: "directory output", runtime: `mkdir "$out/recipe.yaml"`, code: e.CodeBuildFailed},
+		// Cleanup must clear a read-only tree, or every later run fails resetting it.
+		{name: "read-only directory left by a failed run", runtime: `mkdir "$out/cache"; printf x > "$out/cache/x"; chmod 0555 "$out/cache"; exit 3`, code: e.CodeBuildFailed},
 		{name: "signature beside output", runtime: `printf r > "$out/recipe.yaml"; printf s > "$out/recipe.yaml.sig"`, code: e.CodeBuildFailed},
 		{name: "held executable differs from pin", runtime: `printf r > "$out/recipe.yaml"`, tool: []byte("other"), code: e.CodeVerifyFailed},
 		{name: "cancellation", runtime: `printf r > "$out/recipe.yaml"; sleep 30`, timeout: 200 * time.Millisecond, code: e.CodeTimeout},
