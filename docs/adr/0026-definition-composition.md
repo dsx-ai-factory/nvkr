@@ -9,8 +9,8 @@
 - **Deciders:** Pending; release-engineering, publication, catalog and qualification owners must be named before
   ratification.
 - **Index:** Proposed ADR-26 supplements ADR-01–22 and proposed ADR-23/24; it remains outside the consolidated
-  contract set until accepted. It coordinates with the separately drafted authenticated result-reuse decision
-  (backlog item 4), which is not on this branch.
+  contract set until accepted. It coordinates with the separately drafted authenticated result-reuse decision,
+  proposed [ADR-30](0030-authenticated-result-reuse.md) (backlog item 4).
 - **Relates to:** ADR-01 (canonical codec and digest families), ADR-03 (coded errors), ADR-04 §5 (consumer
   verification), ADR-09 (production provenance), ADR-11 §1–§2 (direct selection, independent output uses),
   ADR-12 (target platforms), ADR-16 §5 (evidence lanes and qualification), ADR-17 §1 and §6 (public lifecycle,
@@ -172,7 +172,7 @@ one is the existing coded failure, admitted before output work wherever the exis
 
 ### 6. Reusing already-published member Releases: only through authenticated acceptance, a planned follow-up
 
-Decided: composites rebuild every output until the authenticated result-reuse decision (draft ADR-25,
+Decided: composites rebuild every output until the authenticated result-reuse decision (draft ADR-30,
 backlog item 4) lands. Cross-workflow reuse of member outputs is then planned as follow-up unit U9.
 
 In this decision every composite Run builds every output. No member Release, family Run or prior publication
@@ -413,7 +413,7 @@ not only failure, and are table-driven.
 | U6 Run and publication records | `pkg/nvkr/lifecycle`, `pkg/nvkr/delivery` | Run-record and publication-root schema majors with composition binding and per-output attribution; release description export | U3 |
 | U7 Consumer view | `pkg/nvkr/lifecycle`, `client/v1` | Composite exact-input expectation, member-set requirement, cross-form refusal | U6 |
 | U8 Deferred: qualification | ADR-16/21 owners | Bind the composition record into handoff, artifact checks, qualification evidence and release manifest | U6; separate decision update |
-| U9 Follow-up: member Release reuse | result-reuse owner | Cross-workflow origin admission in the reuse decision, §6 and §7 | draft ADR-25 (backlog item 4) landing |
+| U9 Follow-up: member Release reuse | result-reuse owner | Cross-workflow origin admission in the reuse decision, §6 and §7 | draft ADR-30 (backlog item 4) landing |
 | U10 Cutover: retire combined `definition.yaml` | NVKE release owner | Move the combined production, development and qualification paths to the composite; retire the combined bundles and input | U5–U8; hosted composite Run and consumer verification |
 
 Acceptance tests per unit:
@@ -501,7 +501,7 @@ Acceptance tests per unit:
 - **ADR-20:** record the composition binding in publication-root metadata (U6).
 - **ADR-21:** enroll composite bundles in maintenance and drift checks, and admit named composite development
   bundles (U5).
-- **Result reuse (draft ADR-25, backlog item 4):** once it lands, add authored cross-workflow origin admission
+- **Result reuse (draft ADR-30, backlog item 4):** once it lands, add authored cross-workflow origin admission
   for member outputs (U9). Until then composites rebuild every output.
 - **NVKE cutover:** retire the combined `definition.yaml` and its bundles after a hosted composite Run and
   independent consumer verification succeed (U10).
@@ -512,7 +512,7 @@ The questions left open by the first draft were decided on 2026-10-29:
 
 1. Error codes: reuse `invalid-catalog`, `unverified-ref`, `engine-capability` and `timeout`; no new ADR-03 band (§11).
 2. Cross-member pin divergence: rejected; the stricter rule stays (§3).
-3. Cross-workflow reuse: a follow-up after draft ADR-25 lands; composites rebuild everything until then (§6, U9).
+3. Cross-workflow reuse: a follow-up after draft ADR-30 lands; composites rebuild everything until then (§6, U9).
 4. Combined `definition.yaml`: a separate cutover gated on a hosted composite Run and consumer verification (U10).
 5. Development bundles: pulled forward into U5 (§9).
 
