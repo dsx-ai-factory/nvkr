@@ -18,11 +18,11 @@ def go(*a):
 
 mods = [l.strip() for l in open(sys.argv[1]) if l.strip()]
 print("# Third-Party Notices\n")
-print("NVKR (`nvkr`, `nvke-demo`, and the private `nvkr-site-identity-helper`) is")
+print("NVKR (`nvkr`, `nvke-demo`, and the private `nvkr-site-identity-helper` and `nvkr-results-publish`) is")
 print("distributed under the Apache License 2.0. These binaries link the third-party")
 print("modules listed below. Each module's license, copyright")
 print("notice, and NOTICE file (where one exists) is reproduced in full.\n")
-print("This file lists modules linked into those three binaries. Tools invoked as")
+print("This file lists modules linked into those four binaries. Tools invoked as")
 print("separate processes (the Go and GCC toolchains, `cosign`, `syft`, and `docker`)")
 print("are not linked and are not covered here.\n")
 print("The License column in the Summary is a best-effort SPDX guess from each")

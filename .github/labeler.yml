@@ -48,15 +48,18 @@ area/pipeline:
 area/release:
   - changed-files:
       - any-glob-to-any-file:
+          - 'cmd/nvkr-results-publish/**'
           - 'inputs/policies/**'
           - 'pkg/nvkr/cistore/**'
           - 'pkg/nvkr/conformance/**'
           - 'pkg/nvkr/delivery/**'
           - 'pkg/nvkr/qualification/**'
           - 'pkg/nvkr/qualificationorigin/**'
+          - 'pkg/nvkr/qualificationoutcome/**'
           - 'pkg/nvkr/release/**'
           - 'pkg/nvkr/releasemanifest/**'
           - 'pkg/nvkr/releaseview/**'
+          - 'pkg/nvkr/resultspublish/**'
           - 'pkg/nvkr/testresults/**'
           - 'pkg/nvkr/validation/**'
 

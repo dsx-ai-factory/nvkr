@@ -119,6 +119,11 @@ test, signing or qualification capability.
 Proposed [ADR-30: authenticated result reuse](adr/0030-authenticated-result-reuse.md) designs cross-Run reuse
 of complete named outputs and the test matrix for implementing it; reuse is not implemented.
 
+Proposed [ADR-31: Qualification results index](adr/0031-qualification-results-index.md) publishes each production
+qualification attempt, failures included, as an unsigned outcome and a TestGrid build. The selection, projection
+and separate publisher helper are implemented and contract-tested only; the generated publish job is not
+implemented, and nothing has been published.
+
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
 Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) covers branch
 dispatch, separate generated development bundles, artifact downloads and short retention.
