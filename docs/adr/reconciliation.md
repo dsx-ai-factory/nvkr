@@ -3854,6 +3854,10 @@ temporary source overlays through the existing catalog/local-input owners before
 the normal toolchain preparation. The existing AMD64 NVIDIA Definition/catalogs
 remain the authored selection. The v0.23.0 image-input producer retains its explicit
 DOCA material edge; source freezing preserves commands, materials and toolchains.
+Source preparation loads each distinct catalog stack once within its bounded
+invocation, retaining full per-output overlays and graph validation. Its real-Git
+regression checks that shared outputs do not repeat the pinned metadata fetch;
+there is no cross-invocation cache or change to the five-minute deadline.
 The runtime NVKE source freeze leaves committed catalog
 inputs unchanged; the native helper self-pin follows its separate maintenance owner.
 `TestEndToEnd` builds fresh local Runs, bootstraps the real site
