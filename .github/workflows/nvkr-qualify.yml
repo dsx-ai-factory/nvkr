@@ -35,6 +35,8 @@ jobs:
       actions: read
       id-token: write
     environment: nvkr-release
+    outputs:
+      outcome-written: ${{ steps.outcome.outputs.written }}
     steps:
       - name: Admit trusted same-commit workflow
         timeout-minutes: 1
@@ -97,4 +99,23 @@ jobs:
         run: |
           set -euo pipefail
           [ -n "${NVKR_PIN_SOURCE_TOKEN_0:-}" ] || { printf '%s\n' 'nvkr: [NVKR-E-FETCH-FAILED] source credential is empty' >&2; exit 20; }
-          exec ./nvkr-exec run qualify --policy 'inputs/policies/nvke-qualification.yaml' --issue-manifest
+          exec ./nvkr-exec run qualify --policy 'inputs/policies/nvke-qualification.yaml' --issue-manifest --out ".nvkr/qualification-outcome/outcome-${GITHUB_RUN_ATTEMPT}.json"
+      - name: Record whether the qualification outcome was written
+        id: outcome
+        if: ${{ !cancelled() }}
+        timeout-minutes: 1
+        run: |
+          set -euo pipefail
+          written=false
+          if [ -f ".nvkr/qualification-outcome/outcome-${GITHUB_RUN_ATTEMPT}.json" ]; then written=true; fi
+          printf 'written=%s\n' "$written" >> "$GITHUB_OUTPUT"
+      - name: Upload the qualification outcome
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        timeout-minutes: 5
+        with:
+          name: nvkr-qualification-outcome-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .nvkr/qualification-outcome/outcome-${{ github.run_attempt }}.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 30

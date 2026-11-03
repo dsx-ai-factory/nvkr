@@ -18,7 +18,14 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationoutcome"
 )
+
+// The production qualify job writes one outcome per Run attempt and exports
+// whether it did as this job output.
+const qualificationOutcomeWrittenOutput = "outcome-written"
+
+var qualificationOutcomeFile = qualificationoutcome.Directory + "/" + qualificationoutcome.FileName("${GITHUB_RUN_ATTEMPT}")
 
 const DevelopmentQualificationManifestPath = ".github/nvkr-dev-qualification/manifest.json"
 const QualificationManifestPath = ".github/nvkr-qualification/manifest.json"
@@ -260,6 +267,7 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 		fmt.Fprint(&top, "    environment: nvkr-dev-release\n")
 	} else {
 		fmt.Fprint(&top, "    environment: nvkr-release\n")
+		fmt.Fprintf(&top, "    outputs:\n      %s: ${{ steps.outcome.outputs.written }}\n", qualificationOutcomeWrittenOutput)
 	}
 	fmt.Fprint(&top, "    steps:\n")
 	qualificationBootstrap(&top, plan, actions, linker, policy, "amd64")
@@ -276,9 +284,12 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 	sourceAuth.writeEnvironment(&top)
 	manifestFlag := ""
 	if !policy.Source.Development {
-		manifestFlag = " --issue-manifest"
+		manifestFlag = " --issue-manifest --out \"" + qualificationOutcomeFile + "\""
 	}
 	fmt.Fprintf(&top, "        run: |\n          set -euo pipefail\n%s          exec ./nvkr-exec run qualify --policy %s%s\n", sourceAuth.requireTokens(), qualificationShell(policyPath), manifestFlag)
+	if !policy.Source.Development {
+		qualificationOutcomeUpload(&top, plan, actions)
+	}
 	fmt.Fprintf(&worker, "name: %s\n'on':\n  workflow_call:\n", qualificationYAML("nvkr-smoke-"+plan.Name))
 	sourceAuth.writeCallContract(&worker)
 	fmt.Fprintf(&worker, "permissions:\n  contents: read\nconcurrency:\n  group: nvkr-native-smoke-${{ github.run_id }}-${{ github.run_attempt }}\n  cancel-in-progress: false\njobs:\n  native:\n    name: native-${{ matrix.arch }}\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: %d\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n", hostedJobTimeoutMinutes)
@@ -325,6 +336,17 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 	}
 	sort.Slice(members, func(i, j int) bool { return members[i].Path < members[j].Path })
 	return &GeneratedWorkflows{files: files, manifest: qualificationManifest{SchemaVersion: qualificationGeneratedSchema, PlanDigest: planDigest, PolicyDigest: policyDigest, ProducerWorkflow: policy.Source.Workflow, QualificationWorkflow: policy.QualificationWorkflow, SmokeWorkflow: policy.Smoke.Workflow, Members: members}}, nil
+}
+
+// qualificationOutcomeUpload keeps the qualify step's outcome whatever its result;
+// only a canceled job skips it. The presence output lets a later job tell an
+// attempt that wrote no outcome from an upload it cannot see. The upload names
+// the one outcome file, so nothing else in the directory, such as an
+// interrupted write's temporary file, can reach the artifact.
+func qualificationOutcomeUpload(out *bytes.Buffer, plan *factory.Plan, actions pipeline.GitHubActionRefs) {
+	const notCanceled = "${{ !cancelled() }}" //nolint:misspell // GitHub status function uses this exact spelling.
+	fmt.Fprintf(out, "      - name: Record whether the qualification outcome was written\n        id: outcome\n        if: %s\n        timeout-minutes: 1\n        run: |\n          set -euo pipefail\n          written=false\n          if [ -f \"%s\" ]; then written=true; fi\n          printf 'written=%%s\\n' \"$written\" >> \"$GITHUB_OUTPUT\"\n", notCanceled, qualificationOutcomeFile)
+	fmt.Fprintf(out, "      - name: Upload the qualification outcome\n        if: %s\n        uses: %s # %s\n        timeout-minutes: 5\n        with:\n          name: %s${{ github.run_id }}-${{ github.run_attempt }}\n          path: %s/%s\n          include-hidden-files: true\n          if-no-files-found: warn\n          retention-days: 30\n", notCanceled, actions.Upload, plan.Actions["upload-artifact"].Version, qualificationoutcome.ArtifactPrefix, qualificationoutcome.Directory, qualificationoutcome.FileName("${{ github.run_attempt }}"))
 }
 
 func qualificationPermissions(out *bytes.Buffer, indent string, _ bool) {

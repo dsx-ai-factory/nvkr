@@ -20,6 +20,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	yaml "go.yaml.in/yaml/v3"
 )
 
@@ -61,6 +62,7 @@ type qualificationWorkflowDocument struct {
 	Name        string                              `yaml:"name"`
 	On          map[string]any                      `yaml:"on"`
 	Permissions map[string]string                   `yaml:"permissions"`
+	Env         map[string]string                   `yaml:"env"`
 	Jobs        map[string]qualificationWorkflowJob `yaml:"jobs"`
 }
 type qualificationWorkflowJob struct {
@@ -71,11 +73,13 @@ type qualificationWorkflowJob struct {
 	Permissions map[string]string           `yaml:"permissions"`
 	Secrets     map[string]string           `yaml:"secrets"`
 	Env         map[string]string           `yaml:"env"`
+	Outputs     map[string]string           `yaml:"outputs"`
 	RunsOn      string                      `yaml:"runs-on"`
 	Timeout     int                         `yaml:"timeout-minutes"`
 	Steps       []qualificationWorkflowStep `yaml:"steps"`
 }
 type qualificationWorkflowStep struct {
+	ID              string            `yaml:"id"`
 	If              string            `yaml:"if"`
 	ContinueOnError bool              `yaml:"continue-on-error"`
 	Name            string            `yaml:"name"`
@@ -126,7 +130,7 @@ func TestQualificationGeneratedCommandsOwnStepProcess(t *testing.T) {
 					lines := strings.Split(strings.TrimSpace(step.Run), "\n")
 					want := "exec ./nvkr-exec run " + command.name + " --policy 'qualification.yaml'"
 					if !policy.Source.Development && command.name == "qualify" {
-						want += " --issue-manifest"
+						want += ` --issue-manifest --out ".nvkr/qualification-outcome/outcome-${GITHUB_RUN_ATTEMPT}.json"`
 					}
 					if lines[len(lines)-1] != want {
 						t.Fatalf("%s does not replace its shell with the final owner command", command.workflow)
@@ -141,6 +145,66 @@ func TestQualificationGeneratedCommandsOwnStepProcess(t *testing.T) {
 				if found != 1 {
 					t.Fatalf("%s has %d owner commands", command.workflow, found)
 				}
+			}
+		})
+	}
+}
+
+func TestQualificationGenerationOutcomeUpload(t *testing.T) {
+	const file = ".nvkr/qualification-outcome/outcome-${GITHUB_RUN_ATTEMPT}.json"
+	for _, tc := range []struct {
+		name    string
+		fixture func(*testing.T) (*factory.Plan, lifecycle.QualificationPolicy)
+	}{
+		{"production", generationFixture},
+		{"development", developmentGenerationFixture},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan, policy := tc.fixture(t)
+			bundle, err := RenderWorkflows(t.Context(), plan, policy, "qualification.yaml")
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw := bundle.files[policy.QualificationWorkflow]
+			qualify := decodeQualificationWorkflow(t, raw).Jobs["qualify"]
+			if policy.Source.Development {
+				if len(qualify.Outputs) != 0 || bytes.Contains(raw, []byte("qualification-outcome")) || bytes.Contains(raw, []byte(" --out ")) {
+					t.Fatal("development qualification records a qualification outcome")
+				}
+				return
+			}
+			if !reflect.DeepEqual(qualify.Outputs, map[string]string{"outcome-written": "${{ steps.outcome.outputs.written }}"}) {
+				t.Fatalf("qualify job outputs are %v", qualify.Outputs)
+			}
+			owner := -1
+			for i, step := range qualify.Steps {
+				if strings.Contains(step.Run, "./nvkr-exec run qualify ") {
+					owner = i
+				}
+			}
+			if owner < 0 || owner+3 != len(qualify.Steps) {
+				t.Fatal("the outcome steps must directly follow the owner command and end the job")
+			}
+			lines := strings.Split(strings.TrimSpace(qualify.Steps[owner].Run), "\n")
+			if lines[len(lines)-1] != `exec ./nvkr-exec run qualify --policy 'qualification.yaml' --issue-manifest --out "`+file+`"` {
+				t.Fatalf("owner command is %q", lines[len(lines)-1])
+			}
+			presence, upload := qualify.Steps[owner+1], qualify.Steps[owner+2]
+			if presence.ID != "outcome" || presence.If != "${{ !cancelled() }}" || presence.Uses != "" || presence.Timeout != 1 || len(presence.Env) != 0 || //nolint:misspell // GitHub status function uses this exact spelling.
+				!strings.Contains(presence.Run, `if [ -f "`+file+`" ]; then written=true; fi`) || !strings.Contains(presence.Run, `printf 'written=%s\n' "$written" >> "$GITHUB_OUTPUT"`) {
+				t.Fatalf("presence step is %#v", presence)
+			}
+			actions, err := pipeline.ResolveGitHubActions(plan.Actions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			with := map[string]string{"name": "nvkr-qualification-outcome-${{ github.run_id }}-${{ github.run_attempt }}", "path": ".nvkr/qualification-outcome/outcome-${{ github.run_attempt }}.json",
+				"include-hidden-files": "true", "if-no-files-found": "warn", "retention-days": "30"}
+			if upload.If != "${{ !cancelled() }}" || upload.Uses != actions.Upload || upload.Timeout != 5 || len(upload.Env) != 0 || !reflect.DeepEqual(upload.With, with) { //nolint:misspell // GitHub status function uses this exact spelling.
+				t.Fatalf("upload step is %#v", upload)
+			}
+			if !bytes.Contains(raw, []byte("uses: "+actions.Upload+" # "+plan.Actions["upload-artifact"].Version+"\n")) {
+				t.Fatal("the outcome upload is not hash-pinned with its version comment")
 			}
 		})
 	}
