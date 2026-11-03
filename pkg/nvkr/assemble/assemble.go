@@ -145,7 +145,10 @@ func OCIImage(binaryPath, name string, epoch int64, arch, outDir string) (string
 		Config:       ociRunConfig{Entrypoint: []string{"/usr/local/bin/" + name}},
 		RootFS:       ociRootFS{Type: "layers", DiffIDs: []string{diffID}},
 	}
-	configJSON, _ := json.Marshal(config)
+	configJSON, err := json.Marshal(config)
+	if err != nil {
+		return "", nvkrerr.Wrap(nvkrerr.CodeInternal, err, "encoding OCI config for %q", name)
+	}
 	configDigest := "sha256:" + sha256hex(configJSON)
 
 	manifest := ociManifest{
@@ -154,8 +157,25 @@ func OCIImage(binaryPath, name string, epoch int64, arch, outDir string) (string
 		Config:        ociDescriptor{MediaType: "application/vnd.oci.image.config.v1+json", Digest: configDigest, Size: len(configJSON)},
 		Layers:        []ociDescriptor{{MediaType: "application/vnd.oci.image.layer.v1.tar+gzip", Digest: layerDigest, Size: len(layerGz)}},
 	}
-	manifestJSON, _ := json.Marshal(manifest)
+	manifestJSON, err := json.Marshal(manifest)
+	if err != nil {
+		return "", nvkrerr.Wrap(nvkrerr.CodeInternal, err, "encoding OCI manifest for %q", name)
+	}
 	manifestDigest := "sha256:" + sha256hex(manifestJSON)
+	index := ociIndex{
+		SchemaVersion: 2,
+		MediaType:     "application/vnd.oci.image.index.v1+json",
+		Manifests: []ociDescriptor{{
+			MediaType:   "application/vnd.oci.image.manifest.v1+json",
+			Digest:      manifestDigest,
+			Size:        len(manifestJSON),
+			Annotations: map[string]string{"org.opencontainers.image.ref.name": name},
+		}},
+	}
+	indexJSON, err := json.Marshal(index)
+	if err != nil {
+		return "", nvkrerr.Wrap(nvkrerr.CodeInternal, err, "encoding OCI index for %q", name)
+	}
 
 	// Write an OCI image layout so the artifact is real and inspectable.
 	blobs := filepath.Join(outDir, "blobs", "sha256")
@@ -170,17 +190,6 @@ func OCIImage(binaryPath, name string, epoch int64, arch, outDir string) (string
 			return "", err
 		}
 	}
-	index := ociIndex{
-		SchemaVersion: 2,
-		MediaType:     "application/vnd.oci.image.index.v1+json",
-		Manifests: []ociDescriptor{{
-			MediaType:   "application/vnd.oci.image.manifest.v1+json",
-			Digest:      manifestDigest,
-			Size:        len(manifestJSON),
-			Annotations: map[string]string{"org.opencontainers.image.ref.name": name},
-		}},
-	}
-	indexJSON, _ := json.Marshal(index)
 	if err := os.WriteFile(filepath.Join(outDir, "index.json"), indexJSON, 0o644); err != nil {
 		return "", err
 	}

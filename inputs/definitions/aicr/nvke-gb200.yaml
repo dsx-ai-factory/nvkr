@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+kind: Definition
+metadata:
+  name: aicr-nvke-gb200
+  description: AICR nvke/gb200/ubuntu/training/kubeflow bundles for Helm, Flux and Argo CD Helm; build evidence only.
+# Reuse maintained action and cosign pins; bundle producers use the catalog below.
+catalog:
+  base: ../../catalogs/nvke/module-tags
+cosignTool: cosign
+outputs:
+  - name: aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/aicr
+    format: bundle-oci
+    components: [aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm]
+  - name: aicr-nvke-gb200-ubuntu-training-kubeflow-flux
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/aicr
+    format: bundle-oci
+    components: [aicr-nvke-gb200-ubuntu-training-kubeflow-flux]
+  - name: aicr-nvke-gb200-ubuntu-training-kubeflow-helm
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/aicr
+    format: bundle-oci
+    components: [aicr-nvke-gb200-ubuntu-training-kubeflow-helm]

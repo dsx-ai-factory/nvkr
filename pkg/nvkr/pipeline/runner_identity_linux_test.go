@@ -16,7 +16,7 @@ import (
 )
 
 func TestMappedRunnerSnapshotIgnoresExecutablePathReplacement(t *testing.T) {
-	before, cleanupBefore, err := snapshotMappedRunnerExecutable()
+	before, cleanupBefore, err := snapshotMappedRunnerExecutableContext(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestMappedRunnerSnapshotIgnoresExecutablePathReplacement(t *testing.T) {
 		t.Fatal("runner replacement fixture did not change pathname bytes")
 	}
 
-	after, cleanupAfter, err := snapshotMappedRunnerExecutable()
+	after, cleanupAfter, err := snapshotMappedRunnerExecutableContext(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestMappedRunnerSnapshotIgnoresExecutablePathReplacement(t *testing.T) {
 }
 
 func TestMappedRunnerSnapshotIsAnonymousAndImmutable(t *testing.T) {
-	held, cleanup, err := snapshotMappedRunnerExecutable()
+	held, cleanup, err := snapshotMappedRunnerExecutableContext(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}

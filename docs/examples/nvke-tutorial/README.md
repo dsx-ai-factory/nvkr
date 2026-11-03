@@ -50,7 +50,7 @@ Its output names are `nvkectl`, `cwe` and `nvke-helm`. The instructions below de
 Use the architecture-specific files above for the quickstart.
 
 This retained example builds `nvkectl`, the NVKE controller image (output identifier `cwe`), and the
-source controller Helm chart from NVKE `v0.22.0`. The chart depends on the exact built controller image. Producer
+source controller Helm chart from NVKE `v0.23.0`. The chart depends on the exact built controller image. Producer
 instructions live in the catalog; the Definition selects and packages outputs; the Environment selects
 runtime, destination and signing.
 
@@ -191,13 +191,13 @@ bin/nvkr run generate \
 Generated CI recompiles these repository-relative inputs, executes the internal graph, and finalizes an immutable Run record from exact restored outcomes. Static generation and contract tests do not establish that GitHub, a registry, OIDC, or cosign ran.
 
 The CLI source `nvke` and the shared controller/chart source `nvke-controller` are pinned to
-`v0.22.0` (`400c24fb6465b042be883d6b62472528520d6291`). The controller pin supplies the
+`v0.23.0` (`2cfd00081b468d85a4894ec17e9deac13c9d8169`). The controller pin supplies the
 source chart's existing digest support. Each source role has its own lock entry;
 update both for a shared NVKE release:
 
 ```sh
-bin/nvkr catalog pin --dir inputs/catalogs/nvke/module-tags --tag v0.22.0 nvke
-bin/nvkr catalog pin --dir inputs/catalogs/nvke/module-tags --tag v0.22.0 nvke-controller
+bin/nvkr catalog pin --dir inputs/catalogs/nvke/module-tags --tag v0.23.0 nvke
+bin/nvkr catalog pin --dir inputs/catalogs/nvke/module-tags --tag v0.23.0 nvke-controller
 ```
 
 Repin only through `nvkr catalog pin`; never hand-edit the lock. Regenerate CI after changing pins.

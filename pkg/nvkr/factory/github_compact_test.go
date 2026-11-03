@@ -6,6 +6,7 @@ package factory
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -420,7 +421,7 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 				}
 			}
 			if selected.privateDiskProducers >= 0 {
-				assertGitHubPrivateImageCredentialBoundary(t, plan, bundle, selected.privateDiskProducers)
+				assertGitHubPrivateImageCredentialBoundary(t, plan, githubFlatReference(t, plan, bundle), selected.privateDiskProducers)
 			}
 			workers := map[string][]byte{}
 			for name, raw := range bundle.Files {
@@ -444,6 +445,19 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 					t.Fatal("partitioned producer bundle omitted its workers")
 				}
 				assertGitHubPartitionMembership(t, plan, bundle.Files[bundle.WorkflowPath], workers)
+				if selected.privateDiskProducers >= 0 {
+					// The emitted workers, not only their flat reference, keep each
+					// image credential in its read-only preparation step.
+					jobs := map[string]githubJob{}
+					for _, raw := range workers {
+						expanded, err := expandGitHubActions(plan, raw, bundle.Files)
+						if err != nil {
+							t.Fatal(err)
+						}
+						maps.Copy(jobs, decodeGitHubWorkflow(t, expanded).Jobs)
+					}
+					assertGitHubPrivateImageJobs(t, jobs, selected.privateDiskProducers)
+				}
 				t.Logf("one entry: %d bytes, %d workers with exact original membership", len(bundle.Files[bundle.WorkflowPath]), len(workers))
 				return
 			}
@@ -463,4 +477,18 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 			t.Logf("one entry: %d bytes, %d execution/result jobs", len(bundle.Files[bundle.WorkflowPath]), len(workflow.Jobs))
 		})
 	}
+}
+
+// githubFlatReference returns the single-workflow rendering whose job bodies a
+// partitioned bundle's workers project exactly; a flat bundle is its own.
+func githubFlatReference(t *testing.T, plan *Plan, bundle *GeneratedBundle) *GeneratedBundle {
+	t.Helper()
+	if !plan.Environment.GitHubExecutionPartitions {
+		return bundle
+	}
+	flat, err := renderGitHubFlat(t.Context(), plan, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return flat
 }

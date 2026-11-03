@@ -97,7 +97,7 @@ func TestRunContextTerminatesGracefullyThenEscalates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	executable, err := Open(executablePath, Options{
+	executable, err := OpenContext(t.Context(), executablePath, Options{
 		Label: "termination-helper", Executable: true, MaxBytes: info.Size() + 1,
 	})
 	if err != nil {
@@ -183,7 +183,7 @@ func TestRunContextCancellationReapsDescendantProcessGroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	executable, err := Open(executablePath, Options{
+	executable, err := OpenContext(t.Context(), executablePath, Options{
 		Label: "descendant-helper", Executable: true, MaxBytes: info.Size() + 1,
 	})
 	if err != nil {
@@ -251,7 +251,7 @@ func TestRunContextSuccessfulChildCannotLeaveDescendant(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	executable, err := Open(executablePath, Options{
+	executable, err := OpenContext(t.Context(), executablePath, Options{
 		Label: "successful-descendant-helper", Executable: true, MaxBytes: info.Size() + 1,
 	})
 	if err != nil {

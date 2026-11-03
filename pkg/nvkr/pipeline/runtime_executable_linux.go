@@ -69,13 +69,9 @@ func resolvedPodmanRuntimeEnvironment() ([]string, error) {
 	return environment, nil
 }
 
-// snapshotRuntimeExecutable copies the resolved runtime inode into the shared
+// snapshotRuntimeExecutableContext copies the resolved runtime inode into the shared
 // sealed-held-file boundary. There is no snapshot pathname to rename or replace;
 // qualified observation and execution inherit this descriptor directly.
-func snapshotRuntimeExecutable(runtimePath string) (*heldRuntimeExecutable, error) {
-	return snapshotRuntimeExecutableContext(context.Background(), runtimePath)
-}
-
 func snapshotRuntimeExecutableContext(ctx context.Context, runtimePath string) (*heldRuntimeExecutable, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "holding a container runtime requires a non-nil context")
