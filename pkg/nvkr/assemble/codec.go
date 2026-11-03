@@ -84,13 +84,8 @@ func OpenQemuImgCodec(ctx context.Context, qemuImg, expectedDigest string) (*Qem
 	return &QemuImgCodec{executable: executable, digest: executable.Digest()}, nil
 }
 
-// Digest returns the exact decoder executable identity bound by this capability.
-func (codec *QemuImgCodec) Digest() (string, error) {
-	return codec.DigestContext(context.Background())
-}
-
-// DigestContext returns the exact decoder executable identity after revalidating
-// the held capability with cancellation.
+// DigestContext returns the exact decoder executable identity bound by this
+// capability after revalidating the held capability with cancellation.
 func (codec *QemuImgCodec) DigestContext(ctx context.Context) (string, error) {
 	if codec == nil {
 		return "", e.New(e.CodeTrustPolicyMissing, "qualified qemu-img codec is required")
