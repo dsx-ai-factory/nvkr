@@ -26,6 +26,8 @@ const (
 	BuilderBuildKit    = "buildkit-rootless"
 	BuilderVMImage     = "vm-image"
 	BuilderNativeGo    = "native-go"
+	// BuilderPinnedTool runs one pinned release executable with no source fetch (ADR-27).
+	BuilderPinnedTool = "pinned-tool"
 )
 
 // DiskSpec describes the disk payload emitted by a component. It is required
@@ -211,13 +213,24 @@ type Prebuilt struct {
 // ExternalEvidence references the upstream's external SBOM/provenance for a prebuilt
 // (no-compile) artifact (ADR-13 §2/§9). Each Ref, when present, must carry a pinned
 // Digest the referenced bytes must hash to. None=true is the honest "no upstream
-// evidence exists" marker; it is mutually exclusive with any Ref.
+// evidence exists" marker; it is mutually exclusive with any Ref. A Ref is
+// file://, https://, or archive:<member> inside a release executable's pinned
+// archive. Signer is required exactly when the provenance is a Sigstore bundle.
 type ExternalEvidence struct {
-	None             bool   `json:"none,omitempty"`
-	SBOMRef          string `json:"sbomRef,omitempty"`
-	SBOMDigest       string `json:"sbomDigest,omitempty"`
-	ProvenanceRef    string `json:"provenanceRef,omitempty"`
-	ProvenanceDigest string `json:"provenanceDigest,omitempty"`
+	None             bool            `json:"none,omitempty"`
+	SBOMRef          string          `json:"sbomRef,omitempty"`
+	SBOMDigest       string          `json:"sbomDigest,omitempty"`
+	ProvenanceRef    string          `json:"provenanceRef,omitempty"`
+	ProvenanceDigest string          `json:"provenanceDigest,omitempty"`
+	Signer           *EvidenceSigner `json:"signer,omitempty"`
+}
+
+// EvidenceSigner is the keyless identity policy for upstream Sigstore provenance.
+// Identity accepts the prebuilt URL version templates and is rendered from the
+// source pin at load, so a tag bump cannot keep an older release's identity.
+type EvidenceSigner struct {
+	Issuer   string `json:"issuer"`
+	Identity string `json:"identity"`
 }
 
 // Component is a fully-resolved SourceBuildRegistry entry: either a from-source
@@ -274,6 +287,14 @@ type Component struct {
 	// VM lowering turns these declarations into build-graph edges and stages
 	// only the verified outputs named here.
 	Materials map[string]string `json:"materials,omitempty"`
+	// Tool names the catalog source whose tool pin a pinned-tool producer runs.
+	// ToolExecutable is loader-resolved from that source's lock record; registries
+	// cannot author it. ToolArgs follow the executable and may carry only the typed
+	// tokens RenderToolArgs admits; ToolEnv holds literal variables (ADR-27 §1).
+	Tool           string            `json:"tool,omitempty"`
+	ToolExecutable *ToolPin          `json:"toolExecutable,omitempty"`
+	ToolArgs       []string          `json:"toolArgs,omitempty"`
+	ToolEnv        map[string]string `json:"toolEnv,omitempty"`
 	// For direct Packer, ArtifactPath is relative to the private output directory.
 	// Other builders retain their existing workspace-relative interpretation.
 	ArtifactPath  string            `json:"artifactPath,omitempty"`

@@ -104,6 +104,11 @@ func AuthenticateResultForConsumption(ctx context.Context, node ir.Node, payload
 			return ArtifactResult{}, e.New(e.CodeVerifyFailed,
 				"build result %q has no exact prepared-source identity", node.ID)
 		}
+		// A pinned-tool producer's input is its executable (ADR-27 §2).
+		if node.BuilderType == ir.BuilderPinnedTool && result.InputDigest != node.Digest {
+			return ArtifactResult{}, e.New(e.CodeVerifyFailed,
+				"pinned-tool result %q does not record its pinned executable %s", node.ID, node.Digest)
+		}
 		if len(node.Materials) != 0 && !canonical.IsDigest(result.MaterialManifestDigest) {
 			return ArtifactResult{}, e.New(e.CodeVerifyFailed,
 				"build result %q has no exact material-manifest identity", node.ID)

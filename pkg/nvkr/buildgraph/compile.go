@@ -148,6 +148,15 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 			}
 			continue
 		}
+		if nc.BuilderType == catalog.BuilderPinnedTool {
+			node, err := pinnedToolNode(nc, components, r.Platform)
+			if err != nil {
+				return nil, err
+			}
+			verifyNeeds = append(verifyNeeds, node.ID)
+			g.Nodes = append(g.Nodes, node)
+			continue
+		}
 		if !nc.FromSource {
 			continue
 		}

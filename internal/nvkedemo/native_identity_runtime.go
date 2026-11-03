@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -27,6 +28,16 @@ import (
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"go.yaml.in/yaml/v3"
 )
+
+const (
+	nativeIdentityStagingVolume = "nvkr-site-identity"
+	nativeIdentityStagingRoot   = "/tmp/nvkr-site-identity"
+	nativeIdentityStagingLimit  = "256Mi"
+)
+
+// Only a fully reobserved, unchanged running identity context may wait for
+// readiness. This private condition never authorizes probe, mutation or proof.
+var errNativeIdentityUnready = errors.New("pinned identity containers are not ready")
 
 type nativePodConfigMap struct {
 	Name  string
@@ -141,7 +152,7 @@ func nativeIdentityEnvironment(container nativeIdentityContainer, name string) (
 	}
 	return *found, nil
 }
-func nativeIdentitySelectedPod(rows nativeIdentityPodList, reference string) (nativeIdentityPod, error) {
+func nativeIdentityObservedPod(rows nativeIdentityPodList, reference string) (nativeIdentityPod, error) {
 	var selected *nativeIdentityPod
 	for _, pod := range rows.Items {
 		for _, container := range pod.Spec.Containers {
@@ -149,7 +160,7 @@ func nativeIdentitySelectedPod(rows nativeIdentityPodList, reference string) (na
 				if state.Name != container.Name || state.ImageID != reference {
 					continue
 				}
-				if selected != nil || pod.Metadata.Name == "" || pod.Metadata.Namespace == "" || pod.Metadata.UID == "" || !state.Ready || state.State.Running == nil || state.ContainerID == "" {
+				if selected != nil || pod.Metadata.Name == "" || pod.Metadata.Namespace == "" || pod.Metadata.UID == "" || state.State.Running == nil || state.ContainerID == "" {
 					return nativeIdentityPod{}, errors.New("selected identity container is unavailable or ambiguous")
 				}
 				value := nativeIdentityPod{pod: pod, container: container, state: state}
@@ -158,7 +169,7 @@ func nativeIdentitySelectedPod(rows nativeIdentityPodList, reference string) (na
 		}
 	}
 	if selected == nil {
-		return nativeIdentityPod{}, errors.New("selected identity image has no exact ready container")
+		return nativeIdentityPod{}, errors.New("selected identity image has no exact running container")
 	}
 	return *selected, nil
 }
@@ -221,6 +232,38 @@ func nativeIdentityCSI(pod nativeIdentityPod) error {
 	}
 	return nil
 }
+
+// Kubernetes owns volume validation and mounting. Admit only the exact bounded,
+// disk-backed writable staging volume authored for this helper, never /tmp or
+// a host path, subpath, read-only mount, or another container's scratch space.
+func nativeIdentityStaging(pod nativeIdentityPod) error {
+	matches := 0
+	for _, mount := range pod.container.VolumeMounts {
+		if strings.HasPrefix(mount.MountPath, nativeIdentityStagingRoot+"/") {
+			return errors.New("identity helper staging contains a shadowing mount")
+		}
+		if mount.MountPath != nativeIdentityStagingRoot {
+			continue
+		}
+		if mount.Name != nativeIdentityStagingVolume || mount.ReadOnly || mount.SubPath != "" || mount.SubPathExpr != "" {
+			return errors.New("identity helper requires its dedicated writable staging mount")
+		}
+		for _, volume := range pod.pod.Spec.Volumes {
+			if volume.Name != mount.Name {
+				continue
+			}
+			var empty struct{ Medium, SizeLimit string }
+			if volume.EmptyDir == nil || volume.HostPath != nil || volume.ConfigMap != nil || volume.CSI != nil || json.Unmarshal(*volume.EmptyDir, &empty) != nil || empty.Medium != "" || empty.SizeLimit != nativeIdentityStagingLimit {
+				return errors.New("identity helper requires its bounded disk-backed emptyDir")
+			}
+			matches++
+		}
+	}
+	if matches != 1 {
+		return errors.New("identity helper staging mount is absent or ambiguous")
+	}
+	return nil
+}
 func nativeIdentityPort(raw string) (string, error) {
 	n, err := strconv.ParseUint(raw, 10, 16)
 	if err != nil || n == 0 || strconv.FormatUint(n, 10) != raw {
@@ -245,6 +288,25 @@ func nativeIdentityConfigProjection(raw string) (nativeIdentityConfig, error) {
 	return cfg, err
 }
 func (k *nativeIdentityCommands) runtime(ctx context.Context, assets NativeAssets, spec nativeStaticEntrySpec, ip string) (nativeIdentityRuntime, error) {
+	current, err := k.observeRuntime(ctx, assets, spec, ip)
+	if err == nil {
+		err = nativeIdentityRuntimeReady(current)
+	}
+	return current, err
+}
+
+func nativeIdentityRuntimeReady(current nativeIdentityRuntime) error {
+	if !current.controller.state.Ready || !current.server.state.Ready {
+		return errNativeIdentityUnready
+	}
+	return nil
+}
+
+// Recheck issues this exact sentinel only after full identity validation. A
+// wrapped/joined error may carry another failure and must never become a wait.
+func nativeIdentityReadinessPending(err error) bool { return err == errNativeIdentityUnready }
+
+func (k *nativeIdentityCommands) observeRuntime(ctx context.Context, assets NativeAssets, spec nativeStaticEntrySpec, ip string) (nativeIdentityRuntime, error) {
 	var runtime nativeIdentityRuntime
 	var pods nativeIdentityPodList
 	if err := k.get(ctx, &pods, "pods", "--all-namespaces"); err != nil {
@@ -258,13 +320,16 @@ func (k *nativeIdentityCommands) runtime(ctx context.Context, assets NativeAsset
 	if err != nil {
 		return runtime, err
 	}
-	if runtime.controller, err = nativeIdentitySelectedPod(pods, controllerRef); err != nil {
+	if runtime.controller, err = nativeIdentityObservedPod(pods, controllerRef); err != nil {
 		return runtime, err
 	}
-	if runtime.server, err = nativeIdentitySelectedPod(pods, serverRef); err != nil {
+	if runtime.server, err = nativeIdentityObservedPod(pods, serverRef); err != nil {
 		return runtime, err
 	}
 	if err := nativeIdentityCSI(runtime.controller); err != nil {
+		return runtime, err
+	}
+	if err := nativeIdentityStaging(runtime.controller); err != nil {
 		return runtime, err
 	}
 	configEnv, err := nativeIdentityEnvironment(runtime.controller.container, "CONTROLLER_CONFIG_PATH")
@@ -383,15 +448,52 @@ func (k *nativeIdentityCommands) runtime(ctx context.Context, assets NativeAsset
 	runtime.bootID = nodes.Items[0].Status.NodeInfo.BootID
 	return runtime, nil
 }
+
+// waitPolicy owns only post-create observations. Setup and the single policy
+// mutation finish before this independently bounded convergence wait starts.
+func (k *nativeIdentityCommands) waitPolicy(ctx context.Context, runtime nativeIdentityRuntime, assets NativeAssets, spec nativeStaticEntrySpec, ip string, source nativeStaticEntry, tpm, createdUID string) error {
+	policyCtx, stopPolicy := context.WithTimeout(ctx, 2*time.Minute)
+	var policyErr error
+	for policyCtx.Err() == nil {
+		err := k.recheck(policyCtx, runtime, assets, spec, ip)
+		if err != nil && !nativeIdentityReadinessPending(err) {
+			policyErr = errors.Join(policyErr, err)
+			break
+		}
+		if err == nil {
+			observed, observeErr := k.observe(policyCtx, runtime, spec)
+			err = observeErr
+			if err == nil {
+				_, _, err = nativeIdentityPolicy(source, spec, tpm, createdUID, observed)
+			}
+		}
+		if err == nil {
+			policyErr = nil
+			break
+		}
+		policyErr = err
+		if errors.Is(err, ErrUnjoined) {
+			break
+		}
+		if err := pause(policyCtx, 2*time.Second); err != nil {
+			policyErr = errors.Join(policyErr, err)
+			break
+		}
+	}
+	policyErr = errors.Join(policyErr, policyCtx.Err())
+	stopPolicy()
+	return policyErr
+}
+
 func (k *nativeIdentityCommands) recheck(ctx context.Context, selected nativeIdentityRuntime, assets NativeAssets, spec nativeStaticEntrySpec, ip string) error {
-	current, err := k.runtime(ctx, assets, spec, ip)
+	current, err := k.observeRuntime(ctx, assets, spec, ip)
 	if err != nil {
 		return err
 	}
 	if current.controller.pod.Metadata.UID != selected.controller.pod.Metadata.UID || current.server.pod.Metadata.UID != selected.server.pod.Metadata.UID || current.controller.state.ContainerID != selected.controller.state.ContainerID || current.server.state.ContainerID != selected.server.state.ContainerID || current.configUID != selected.configUID || current.configSHA != selected.configSHA || current.bootID != selected.bootID || !reflect.DeepEqual(current.config, selected.config) {
 		return errors.New("admitted identity context changed during handoff")
 	}
-	return nil
+	return nativeIdentityRuntimeReady(current)
 }
 func (k *nativeIdentityCommands) observe(ctx context.Context, runtime nativeIdentityRuntime, spec nativeStaticEntrySpec) (nativeIdentityObservation, error) {
 	var observed nativeIdentityObservation
@@ -576,7 +678,7 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 		return nil, err
 	}
 	// Fixed file staging only. No caller supplies a command or shell contents.
-	staged, err := k.exec(ctx, runtime.controller, "stage-helper", 45*time.Second, helper, "/bin/sh", "-c", `umask 077; d=$(mktemp -d /tmp/nvkr-site-identity.XXXXXXXX) || exit; cat > "$d/helper" && chmod 0700 "$d/helper" && sha256sum "$d/helper"`)
+	staged, err := k.exec(ctx, runtime.controller, "stage-helper", 45*time.Second, helper, "sh", "-c", `umask 077; d=$(mktemp -d `+nativeIdentityStagingRoot+`/stage.XXXXXXXX) || exit; cat > "$d/helper" && chmod 0700 "$d/helper" && sha256sum "$d/helper"`)
 	helperPath, err := nativeIdentityStagedHelper(staged, s.assets.identity.helperSHA, err)
 	if err != nil {
 		return nil, err
@@ -625,35 +727,8 @@ func (s *nativeSiteAttempt) completeNativeSiteIdentity(ctx context.Context, runn
 	}
 	// Only observations are retried. Source policy is created once; there is no
 	// automatic overwrite, guest retry, rollback or partial-state adoption.
-	policyCtx, stopPolicy := context.WithTimeout(ctx, 2*time.Minute)
-	var policyErr error
-	for policyCtx.Err() == nil {
-		if err := k.recheck(policyCtx, runtime, s.assets, spec, ip); err != nil {
-			stopPolicy()
-			return nil, err
-		}
-		observed, err := k.observe(policyCtx, runtime, spec)
-		if err == nil {
-			_, _, err = nativeIdentityPolicy(source, spec, prepared.TPM, createdUID, observed)
-		}
-		if err == nil {
-			policyErr = nil
-			break
-		}
-		policyErr = err
-		if errors.Is(err, ErrUnjoined) {
-			stopPolicy()
-			return nil, err
-		}
-		if err := pause(policyCtx, 2*time.Second); err != nil {
-			policyErr = errors.Join(policyErr, err)
-			break
-		}
-	}
-	policyErr = errors.Join(policyErr, policyCtx.Err())
-	stopPolicy()
-	if policyErr != nil {
-		return nil, policyErr
+	if err := k.waitPolicy(ctx, runtime, s.assets, spec, ip, source, prepared.TPM, createdUID); err != nil {
+		return nil, err
 	}
 	check, err := k.exec(ctx, runtime.controller, "verify-helper", 15*time.Second, nil, "sha256sum", helperPath)
 	if err != nil {
@@ -730,7 +805,7 @@ func nativeIdentityStagedHelper(raw []byte, digest string, commandErr error) (st
 		return "", commandErr
 	}
 	fields := strings.Fields(string(raw))
-	if len(fields) != 2 || fields[0] != strings.TrimPrefix(digest, "sha256:") || path.Base(fields[1]) != "helper" || path.Clean(fields[1]) != fields[1] || path.Dir(path.Dir(fields[1])) != "/tmp" || !strings.HasPrefix(path.Base(path.Dir(fields[1])), "nvkr-site-identity.") {
+	if len(fields) != 2 || fields[0] != strings.TrimPrefix(digest, "sha256:") || path.Base(fields[1]) != "helper" || path.Clean(fields[1]) != fields[1] || path.Dir(path.Dir(fields[1])) != nativeIdentityStagingRoot || !strings.HasPrefix(path.Base(path.Dir(fields[1])), "stage.") || len(path.Base(path.Dir(fields[1]))) <= len("stage.") {
 		return "", errors.New("remote helper staging returned no exact artifact receipt")
 	}
 	return fields[1], nil

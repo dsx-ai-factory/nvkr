@@ -228,6 +228,7 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		{Definition: "inputs/definitions/nvke/services.yaml", Environment: "inputs/environments/github-nvke-services.yaml"},
 		{Definition: "inputs/definitions/nvke/telemetry.yaml", Environment: "inputs/environments/github-nvke-telemetry.yaml"},
 		{Definition: "inputs/definitions/nvke/disks.yaml", Environment: "inputs/environments/github-nvke-disks.yaml"},
+		{Definition: "inputs/definitions/nvke/disks-ubuntu24.yaml", Environment: "inputs/environments/github-nvke-disks-ubuntu24.yaml"},
 		{Definition: "inputs/definitions/demo/arm64-nvidia-kvm.json", Environment: "inputs/environments/github-nightly-nvidia.json"},
 		{Definition: "inputs/definitions/demo/arm64-upstream-kvm.json", Environment: "inputs/environments/github-nightly-upstream.json"},
 	}
@@ -296,6 +297,7 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		".github/nvkr-run",
 		".github/nvkr-run-nvke-core",
 		".github/nvkr-run-nvke-disks",
+		".github/nvkr-run-nvke-disks-ubuntu24",
 		".github/nvkr-run-nvke-nightly-arm64",
 		".github/nvkr-run-nvke-nightly-upstream-ovn-arm64",
 		".github/nvkr-run-nvke-services",
@@ -310,6 +312,7 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		".github/workflows/nvkr-dev.yml",
 		".github/workflows/nvkr-qualify.yml",
 		".github/workflows/nvkr-run-nvke-core.yml",
+		".github/workflows/nvkr-run-nvke-disks-ubuntu24.yml",
 		".github/workflows/nvkr-run-nvke-disks.yml",
 		".github/workflows/nvkr-run-nvke-nightly-arm64.yml",
 		".github/workflows/nvkr-run-nvke-nightly-upstream-ovn-arm64.yml",

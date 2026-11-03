@@ -18,6 +18,7 @@ import (
 	"time"
 
 	pb "github.com/dsx-ai-factory/nvke/agent/pkg/agent/proto"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/spiffe/go-spiffe/v2/bundle/x509bundle"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig"
@@ -32,9 +33,49 @@ func validRequest() Request {
 	return Request{SchemaVersion: SchemaVersion, Operation: "probe", Endpoint: "192.168.70.10:15005", ExpectedPeer: "spiffe://example.test/host/one", ExpectedCaller: "spiffe://example.test/nvke-service/controller", WorkloadAPI: "unix:///spiffe-workload-api/spire-agent.sock", TrustDomain: "example.test", BudgetSeconds: 240}
 }
 
+func TestRuntimeAdmissionPlatformsAndContexts(t *testing.T) {
+	canceled, cancel := context.WithCancel(t.Context())
+	cancel()
+	expired, stop := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+	defer stop()
+	for _, tc := range []struct {
+		name, goos, goarch string
+		ctx                context.Context
+		code               e.Code
+		cause              error
+	}{
+		{"Linux AMD64", "linux", "amd64", t.Context(), "", nil},
+		{"Linux ARM64", "linux", "arm64", t.Context(), "", nil},
+		{"Darwin ARM64", "darwin", "arm64", t.Context(), e.CodeEngineCapability, nil},
+		{"Darwin AMD64", "darwin", "amd64", t.Context(), e.CodeEngineCapability, nil},
+		{"Windows AMD64", "windows", "amd64", t.Context(), e.CodeEngineCapability, nil},
+		{"Linux 386", "linux", "386", t.Context(), e.CodeEngineCapability, nil},
+		{"Linux PPC64LE", "linux", "ppc64le", t.Context(), e.CodeEngineCapability, nil},
+		{"missing platform", "", "", t.Context(), e.CodeEngineCapability, nil},
+		{"nil context", "linux", "amd64", nil, e.CodeUsage, nil},
+		{"canceled context", "linux", "amd64", canceled, e.CodeTimeout, context.Canceled},
+		{"expired context", "linux", "arm64", expired, e.CodeTimeout, context.DeadlineExceeded},
+		{"canceled unsupported platform", "darwin", "amd64", canceled, e.CodeTimeout, context.Canceled},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := admitRuntimePlatform(tc.ctx, tc.goos, tc.goarch)
+			if tc.code == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			var coded *e.Error
+			if !errors.As(err, &coded) || coded.Code != tc.code || tc.cause != nil && !errors.Is(err, tc.cause) {
+				t.Fatalf("admission err=%v; want code=%s cause=%v", err, tc.code, tc.cause)
+			}
+		})
+	}
+}
+
 func TestAdmissionBeforeWork(t *testing.T) {
-	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" {
-		t.Skip("runtime admission is Linux ARM64")
+	if runtime.GOOS != "linux" || runtime.GOARCH != "arm64" && runtime.GOARCH != "amd64" {
+		t.Skip("runtime admission requires Linux AMD64 or ARM64")
 	}
 	for _, tc := range []struct {
 		name string
@@ -55,7 +96,8 @@ func TestAdmissionBeforeWork(t *testing.T) {
 			r := validRequest()
 			tc.edit(&r)
 			ret, err := Run(context.Background(), r)
-			if err == nil || ret.CallerID != "" {
+			var coded *e.Error
+			if !errors.As(err, &coded) || coded.Code != e.CodeUsage || ret.FailureCode != e.CodeUsage || ret.Completion != NotStarted || ret.CallerID != "" || ret.Before != (PeerProof{}) || ret.After != nil || ret.Status != nil {
 				t.Fatalf("rejected Request reached workload or RPC work: result=%+v err=%v", ret, err)
 			}
 		})

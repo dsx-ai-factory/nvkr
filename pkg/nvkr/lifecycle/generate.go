@@ -35,6 +35,9 @@ func generateFiles(ctx context.Context, definitionPath, environmentPath, generat
 	if err := factory.ValidateGenerationEngine(engine); err != nil {
 		return "", err
 	}
+	if runtimePlan && factory.ProjectionAdapterSelected(ctx) {
+		return "", e.New(e.CodeEngineCapability, "runtime Plan refresh is unavailable for a selected projection adapter")
+	}
 	if runtimePlan {
 		environment, err := LoadEnvironment(ctx, environmentPath)
 		if err != nil {
