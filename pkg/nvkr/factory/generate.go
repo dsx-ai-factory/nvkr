@@ -47,12 +47,63 @@ func ValidateGenerationEngine(engine string) error {
 	}
 }
 
-// Render selects a concrete topology/transport adapter at the engine seam.
+// Render selects a concrete topology/transport adapter at the engine seam. It
+// is the top-level generation seam: only `run generate` writes, qualification
+// generation and catalog maintenance call it. Generated bootstrap and worker
+// commands admit committed bytes through CheckGenerated and the GitHub runtime
+// owners, which use only the core projection, so no generator selected here
+// runs inside a generated stage.
 func Render(ctx context.Context, plan *Plan, engine string) (*GeneratedBundle, error) {
 	if err := ValidateGenerationEngine(engine); err != nil {
 		return nil, err
 	}
-	return RenderGitHub(ctx, plan)
+	return renderSelected(ctx, plan)
+}
+
+// renderSelected is the projection behind Render. Boundary tests trap it.
+var renderSelected = RenderGitHub
+
+// CheckGenerated is the check twin of Render that never takes the generation
+// seam: it compares the committed bundle under root with the core projection of
+// plan. Generated bootstraps run it through `run generate --check`.
+func CheckGenerated(ctx context.Context, plan *Plan, engine, root string) error {
+	if err := ValidateGenerationEngine(engine); err != nil {
+		return err
+	}
+	_, err := checkCoreGitHubBundle(ctx, plan, root)
+	return err
+}
+
+// Generate checks or writes one hosted bundle and returns its Plan digest.
+// Generated bootstraps run check mode, so only write mode takes the Render seam.
+func Generate(ctx context.Context, plan *Plan, engine, root string, check bool) (string, error) {
+	if check {
+		if err := CheckGenerated(ctx, plan, engine, root); err != nil {
+			return "", err
+		}
+		return plan.Digest()
+	}
+	bundle, err := Render(ctx, plan, engine)
+	if err != nil {
+		return "", err
+	}
+	if err := WriteGeneratedBundle(ctx, root, bundle); err != nil {
+		return "", err
+	}
+	return bundle.PlanDigest, nil
+}
+
+// checkCoreGitHubBundle admits exact committed bytes against the core's
+// in-binary projection and returns that projection for further comparison.
+func checkCoreGitHubBundle(ctx context.Context, plan *Plan, root string) (*GeneratedBundle, error) {
+	bundle, err := RenderGitHub(ctx, plan)
+	if err != nil {
+		return nil, err
+	}
+	if err := CheckGeneratedBundle(ctx, root, bundle); err != nil {
+		return nil, err
+	}
+	return bundle, nil
 }
 
 func generationCommand(plan *Plan, engine string) string {

@@ -6,11 +6,22 @@ package lifecycle
 import (
 	"context"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 )
 
 // CompileFiles admits authored inputs and delegates their complete compilation.
+// A composite compiles through bounded capture beneath the working directory,
+// its admitted input root, so every member and catalog read stays confined.
 func CompileFiles(ctx context.Context, definitionPath, environmentPath, generatorVersion string) (*factory.Plan, error) {
+	kind, err := definition.ReadDocumentKind(ctx, definitionPath)
+	if err != nil {
+		return nil, err
+	}
+	if kind == definition.CompositeKind {
+		plan, _, err := captureComposite(ctx, definitionPath, environmentPath, generatorVersion)
+		return plan, err
+	}
 	definition, err := LoadDefinition(ctx, definitionPath)
 	if err != nil {
 		return nil, err

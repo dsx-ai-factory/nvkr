@@ -21,12 +21,15 @@ and signing identity policy. Selecting an unavailable transport fails before wor
 substitute for it.
 Native hosted platform routes are explicit execution settings; they do not change logical Build identity
 or prove provider allocation. Tool releases are catalog-owned dependencies selected by purpose in the Definition. GitHub action releases
-are also catalog dependencies; the workflow adapter consumes their locked commits.
+are also catalog dependencies ([ADR-22](docs/adr/0022-catalog-pinning-and-the-lock-contract.md#github-action-dependencies)).
 An explicit GitHub development setting selects branch dispatch. Signed development uses the same admitted
 native disk and pipeline-attested stages with separate signer policy, credentials and disposable run-attempt
 registry namespaces. Cleanup admits only internal-visibility packages in those namespaces.
 Unsigned development remains static-unqualified. Neither setting grants production
 acceptance, provider access or qualified evidence.
+ADR-20 specifies an S3 extension with typed file destinations under Environment publication settings.
+Destinations and clean boot URLs remain transport configuration; they do not change producer Build identity.
+Its future schema reservation does not change the implemented Environment version or enable delivery.
 _Avoid_: Delivery profile, component catalog, build identity
 
 **Run**:
@@ -39,6 +42,12 @@ _Avoid_: Plan, release, proof of qualification
 **Artifact**:
 Immutable bytes produced or acquired for delivery, such as an executable, image, chart, or packaged collection.
 _Avoid_: Producer, expected output, release
+
+**OCI bundle**:
+A generic archive artifact carrying a pinned producer's rendered files, including AICR deployment bundles.
+The OCI manifest identifies the output; the archive and its file inventory retain separate exact byte bindings.
+Rendering and file integrity do not establish deployed dependency closure or hardware compatibility.
+_Avoid_: Native Helm chart, container image, cluster topology, new lifecycle object
 
 **Release**:
 An immutable selection of artifacts and evidence accessible through one pinned reference, with an explicit evidence lane. Acceptance depends on the consumer's Verification Policy.
@@ -63,10 +72,12 @@ _Avoid_: Signing configuration, verification result, producer assertion
 
 **Composite Definition (proposed)**:
 A Definition form that names complete member Definitions by locator and exact `nvkr.definition` digest and
-releases the exact union of their named outputs through one Plan, Run and Release. Output names are preserved;
-duplicates, divergent shared producers, differing base catalogs or tools, and digest drift are coded errors,
-never precedence. Members keep their own Runs and Releases; a composite neither references nor inherits them.
-Proposed [ADR-26](docs/adr/0026-definition-composition.md) designs it; it is not implemented.
+releases their named outputs through one Plan, Run and Release. Proposed
+[ADR-26](docs/adr/0026-definition-composition.md) designs it and owns its
+[merge rules](docs/adr/0026-definition-composition.md#3-merge-rules-exact-union-never-precedence) and
+[member Release reuse](docs/adr/0026-definition-composition.md#6-reusing-already-published-member-releases-only-through-authenticated-acceptance-a-planned-follow-up);
+units U1–U7 are implemented and contract-tested only, with no hosted composite Run, publication or consumer
+verification yet.
 _Avoid_: Recipe, selection group, parent Release, association file, include
 
 **Effective Definition (proposed)**:
@@ -134,14 +145,14 @@ byte-exact drift gate. Actions expose fixed semantic interfaces for Plan operati
 interfaces without generating group-size or output-count variants. Named invocation parameters are recomputed
 from the admitted Plan at runtime. Identical admitted step sequences can share descriptive YAML aliases;
 expansion preserves independent job parameters, policies and exact result membership. Every job retains its
-ID, runner, timeout, permissions and condition in the default entry workflow. Redundant scheduling edges may be
+ID, runner, timeout, permissions and condition. Redundant scheduling edges may be
 removed while preserving the prerequisite closure.
 Large finalizers collect the exact original per-job results through fixed, bounded diagnostic buckets;
 collector success never substitutes for producer success. Neither scripts supplied as data nor separately
 authored lifecycle inputs are admitted.
 Opt-in execution partitioning moves original jobs into bounded same-commit worker workflows under the same
-manifest; OIDC-signing jobs remain in the entry to preserve signer identity. Moving them requires an explicit
-certificate-identity and trust-policy migration, which is proposed but not implemented. A partition is generated
+manifest; [ADR-18 §8](docs/adr/0018-pipeline-ir-and-ci-adapter-emission.md#8-pipeline-attested-generation-and-credential-admission)
+owns which jobs stay in the entry workflow and the proposed signer migration. A partition is generated
 scheduling structure, not a Definition, Run or Release, and never follows proposed composite member
 boundaries. It forwards original
 job results to the single finalizer; it does not authorize artifact acceptance. The complete Plan and required
@@ -183,20 +194,50 @@ _Avoid_: Release, qualified reproduction, automatic promotion
 **Runnable OCI image index**:
 An Artifact representation: a standard OCI index selecting exact native child image manifests by explicit platform. Its blob digest is
 separate from each child's identity and from logical Build identity. Delivery can hold and verify its byte
-closure. One named output can freeze an explicit platform set, an aggregate logical Build Digest and each
-child's native build and evidence bindings (ADR-11/12/20). The aggregate logical Build identity remains distinct
-from the runnable index digest.
+closure. [ADR-11](docs/adr/0011-composition-and-resolution-semantics.md#2-generated-closure-and-identity) owns
+the named output's platform set and aggregate logical Build identity;
+[ADR-20](docs/adr/0020-artifact-publication-and-target-configuration.md#runnable-image-indexes--pipeline-attested-lifecycle-integration)
+owns its child membership and publication.
 _Avoid_: Release publication root, native image manifest, qualification receipt
 
 **Binary bundle**:
 An Artifact format containing exact executable files and their installation metadata.
 _Avoid_: Release, arbitrary archive
 
+**Executable image index (proposed)**:
+An Artifact format for an executable output that declares a `platforms` set: a standard OCI image index over
+minimal per-platform images. Proposed in [ADR-28](docs/adr/0028-multi-platform-executable-indexes.md), which
+owns its [aggregate identity](docs/adr/0028-multi-platform-executable-indexes.md#5-aggregate-identity) and
+[child image contents](docs/adr/0028-multi-platform-executable-indexes.md#6-publication-a-standard-image-index-over-minimal-per-platform-images);
+not implemented.
+_Avoid_: Runnable OCI image index, binary bundle, upstream-published image
+
 **Debian package**:
 An Artifact format (`debian-package`) containing one raw Debian archive from an explicitly selected source
 producer. The same package bytes can be supplied as an OS build material. Local retention does not establish
 installation or runtime acceptance.
 _Avoid_: APT repository, installed package, builder type
+
+**Native file output**:
+The Artifact representation specified in ADR-20 for unchanged producer-created Debian packages, EFI/iPXE
+files and installer assets. All regular files in an archive retain the parent archive identity, canonical
+member name, digest, size, mode and declared kind. File integrity is distinct from package dependencies and
+boot readiness. Implementation remains outstanding under the ADR-20 contract.
+_Avoid_: Reconstructed package, executable tool, installed inventory
+
+**File-delivery root**:
+A generated record with a detached signature, binding selected authenticated source publications and exact
+named payload and evidence objects to their S3 routes and read-back observations. It preserves original
+provenance and adds no build, boot or qualification verdict. Implementation remains outstanding under the
+specified contract.
+_Avoid_: Authored lifecycle object, replacement source release, successful upload flag
+
+**File-delivery locator**:
+Caller-pinned transport coordinates and raw hashes/sizes for the delivery document and detached bundle.
+It locates proof; independent consumer policy and complete-byte checks establish acceptance. A final commit
+may exist after lost acknowledgement, so an indeterminate producer result requires independent reconciliation.
+Implementation remains outstanding under the ADR-20 contract.
+_Avoid_: Trusted policy, mutable release name, atomic bucket transaction
 
 ## Evidence and authority
 
@@ -360,6 +401,17 @@ _Avoid_: Inventory, registry destination
 A catalog declaration describing how to build or acquire a named component from pinned inputs and which target
 platforms it supports. It carries build or acquisition instructions, never a deployment placement taxonomy.
 _Avoid_: Named output, artifact, authored build group
+
+**Pinned-tool producer**:
+A component producer that runs one released, digest-pinned executable inside a digest-pinned container. Its
+builder type is `pinned-tool` and it belongs to the existing `wrapped-build` source lane; it is not an
+acquisition of the tool. Proposed in [ADR-27](docs/adr/0027-pinned-tool-producers.md), which owns its
+[Build identity](docs/adr/0027-pinned-tool-producers.md#2-logical-identity-covers-the-tool-its-arguments-and-its-inputs),
+[execution](docs/adr/0027-pinned-tool-producers.md#3-execution-offline-isolated-fixed),
+[inputs](docs/adr/0027-pinned-tool-producers.md#4-declared-inputs-are-typed-material-bindings) and
+[outputs](docs/adr/0027-pinned-tool-producers.md#5-outputs-one-file-or-a-producer-written-oci-layout);
+not implemented.
+_Avoid_: Run-wide pipeline tool, release executable output, build script
 
 **Component catalog overlay**:
 An ordered, predecessor-bound catalog change replacing a complete component producer or performing an exact

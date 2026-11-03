@@ -164,7 +164,7 @@ func resolvePrebuilt(name string, raw rawComponent, src Source, pin Pin, lock *P
 		if err != nil {
 			return c, err
 		}
-		tool := *pin.Tool
+		tool := pin.Tool.clone()
 		c.Prebuilt = &Prebuilt{URL: tool.URL, Executable: &tool,
 			Digests:  map[string]string{target.ExecutableArch(tool.Platform): tool.ExecutableDigest},
 			Evidence: evidence}

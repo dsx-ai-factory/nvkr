@@ -3,7 +3,8 @@
 Candidate, selectable CNI producer catalog for the
 `[dsx-ai-factory/ovn-kubernetes](https://github.com/dsx-ai-factory/ovn-kubernetes)` fork.
 It does not remove Calico or change the maintained
-OS/M2 Definitions. Do not stack it blindly with the old OS catalog: `ovn-kube-ubuntu`
+OS/M2 Definitions. The maintained release node-image catalog now selects the same
+fork pin with `nvke-*` Debian package names; this catalog keeps the earlier `nke-*` packaging. Do not stack it blindly with the old OS catalog: `ovn-kube-ubuntu`
 and `nvke-cni-ovn` are authored component names; packaged Debian names remain source-owned. A maintained
 replacement must use the predecessor-digest-bound catalog overlay contract and
 regenerate its dependent inputs.
@@ -11,7 +12,7 @@ regenerate its dependent inputs.
 ## Before and after
 
 
-| Boundary         | Existing OS catalog                                     | This candidate option                                                        |
+| Boundary         | Former upstream OS catalog                              | This candidate option                                                        |
 | ---------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | Source           | Upstream `ovn-kubernetes/ovn-kubernetes`, 1.4.x         | DSX fork tag `v2.4.2`, commit `8af51273d52dfa07454435d18d37230e582d797a` |
 | Image            | Source-owned upstream Ubuntu Dockerfile                 | Fork's source-owned `dist/images/Dockerfile.ubuntu.nv`                       |
@@ -88,13 +89,12 @@ containerd readiness and import, then imports the archive into the `k8s.io`
 namespace. Import failures fail package configuration.
 
 These packages select stream `2.4.2` and Debian version `1+git.8af51273d52d`,
-not the pinned NVKE agent's default stream `1.4.0`. `InstallCNI.version=2.4.2`
-selects the existing stream-suffixed chart package; its logical `=2.4.2` suffix
+the pinned NVKE agent's default stream. An empty `InstallCNI.version` or
+`InstallCNI.version=2.4.2` selects the existing stream-suffixed chart package; the logical `=2.4.2` suffix
 is informational, not an enforced Debian revision. InstallCNI strips that
 suffix before checking package presence and never runs APT. Install the exact
 package names with `=1+git.8af51273d52d` separately, for example through
-InstallPackages, then validate chart deployment. These packages are not a
-drop-in for an empty-version request using the default stream. See the
+InstallPackages, then validate chart deployment. See the
 [pinned InstallCNI contract](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/agent/pkg/agent/proto/node_agent.proto)
 and its [package-presence implementation](https://github.com/dsx-ai-factory/nvke/blob/400c24fb6465b042be883d6b62472528520d6291/agent/internal/agent/cni.go).
 The current agent accepts both `nvke-cni-*` and the candidate's retained `nke-cni-*`

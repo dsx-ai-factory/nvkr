@@ -23,6 +23,7 @@ The [34-concept reference](user-concepts.md) explains the vocabulary and connect
 | Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |
 | Visualize dependencies and generate GitHub Actions | [Pipeline generation](generate-pipeline.md) |
 | Understand how heterogeneous materials become a disk | [Node images](node-images.md) |
+| Build AICR deployment bundles as OCI artifacts | [AICR inputs, supported hardware recipes and rendering limits](../inputs/definitions/aicr/README.md) |
 | Find published outputs, download a named output, and verify a consumer claim | [Release quickstart](release-quickstart.md) |
 | Build nightly NVKR candidates and run NVKE end-to-end tests | [Nightly workflow and current admission](nvke-nightly.md) |
 | Check a producing Run and configure qualification once | [Artifact checks and hosted qualification](lifecycle.md#authenticate-a-qualification-candidate), [candidate readiness](../inputs/definitions/nvke/README.md#qualification-readiness) |
@@ -50,6 +51,7 @@ records source availability and remaining gaps.
 | Canonical Plans, graph views, comparison, and drift | [Plan and graph inspection](plan-and-graph-inspection.md) |
 | Registry/layout browsing, generic JSON export, output downloads, credentials, and metadata limits | [Release navigation](release-navigation.md) |
 | Publication graph, artifact subjects, and signing scope | [Publication architecture](publication-architecture.md) |
+| Review the S3 boot and package delivery contract | [ADR-20 contract](adr/0020-artifact-publication-and-target-configuration.md#s3-file-delivery-contract), [implementation boundary](adr/reconciliation.md#s3-boot-and-package-delivery-contract) |
 | Coordinated upstream versions and exact locks | [Generic pin-set example](generic-pin-set-example.md), [NVKE acquired charts](nvke-pin-set-usage.md) |
 | Reviewable updates and matching regeneration (the installed `catalog-refresh.yaml` is generated, never hand-edited) | [Catalog maintenance](catalog-maintenance.md) |
 | Chart slots, image outputs, and registry-independent bytes | [Declarative Helm bindings](declarative-helm-bindings.md) |
@@ -92,7 +94,17 @@ broader adapter and profile support remains deferred.
 
 Proposed [ADR-26: Definition composition](adr/0026-definition-composition.md) designs composite Definitions
 that release several digest-pinned Definitions as one Release, with a worked NVKE four-family example and
-implementation units. It is design only.
+implementation units. Units U1–U7 are implemented and contract-tested only; no hosted composite Run, publication or
+consumer verification has been exercised or recorded, and qualification and member Release reuse remain deferred.
+
+Proposed [ADR-27: Pinned-tool producers](adr/0027-pinned-tool-producers.md) designs producers that run one
+released, digest-pinned tool offline with fixed arguments and typed inputs, with AICR bundles as the first use.
+It is design only.
+
+Proposed [ADR-28: Multi-platform executables](adr/0028-multi-platform-executable-indexes.md) designs one tool
+source for every platform of a release, where the platforms share a format, companions and admitted URL
+spellings, and executable outputs published as standard OCI image indexes. The AICR CLI is the first
+migration, and the ADR inventories existing executables to retrofit. It is design only.
 
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
 Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) covers branch

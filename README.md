@@ -3,10 +3,11 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.27.3-00ADD8.svg)](.go-version)
 
-**Build NVKE artifacts from pinned inputs and trace releases back to their sources.**
+**Build NVKE and AICR artifacts from pinned inputs and trace releases back to their sources.**
 NVKR gives release engineers a CLI, reusable component catalogs and declarative
-Definitions for NVIDIA Kubernetes® Engine (NVKE). Select the executables, container
-images, Helm charts or node images to produce; NVKR derives the dependency graph
+Definitions for NVIDIA Kubernetes® Engine (NVKE) and AI Cluster Runtime (AICR).
+Select the executables, container images, Helm charts, deployment bundles or node
+images to produce; NVKR derives the dependency graph
 and runs local builds or generates GitHub Actions workflows. The hosted workflows
 build, sign and publish releases with evidence consumers can verify against their
 own policy.
@@ -96,6 +97,7 @@ Runs and the limits of what each establishes.
 | Select components, pins and overlays | [Catalogs and components](docs/catalogs-and-components.md) |
 | Inspect Plans, graphs and changes | [Plan and graph inspection](docs/plan-and-graph-inspection.md) |
 | Generate a hosted build and publication workflow | [Pipeline generation](docs/generate-pipeline.md) |
+| Build AICR deployment bundles | [AICR inputs and hardware limits](inputs/definitions/aicr/README.md) |
 | Build NVKE node images | [Node images](docs/node-images.md) |
 | Browse, pull or verify a published Release | [Release quickstart](docs/release-quickstart.md) |
 | Work with an AI agent | [Use NVKR with your AI agent](docs/use-with-agents.md) and the [operator skill](.agents/skills/nvkr-operator/SKILL.md) |

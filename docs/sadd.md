@@ -45,8 +45,8 @@ an artifact was signed. `pipeline-attested` never satisfies a gate requiring `qu
 
 The tool and its catalogs are separate products: the tool owns resolution and verification rules; catalogs
 provide reusable component producers and pins, including tool releases and GitHub actions.
-Generated Runs bind action commits from the catalog; compatible action updates need a lock bump and workflow
-regeneration without rebuilding the generator. Definitions declare named deliverable outputs once.
+[ADR-22](adr/0022-catalog-pinning-and-the-lock-contract.md#github-action-dependencies) owns how generated
+Runs bind action commits from the catalog lock. Definitions declare named deliverable outputs once.
 NVKR does not operate a registry, provision clusters, or manage fleet lifecycle. External owners provide source
 access, registry retention, runtime acceptance and deployment policy. NVKR offers explicit descriptive local
 diagnostics under ADR-16 §6; these do not qualify a cluster. Downstream systems consume accepted artifact
@@ -66,11 +66,29 @@ owners; native upstream catalog execution remains unexercised. Shared schema sta
 adapters and controller/chart integration are deferred. Existing CLI and legacy validation diagnostics
 retain their separate admission and result contracts; catalog registration grants no qualification authority.
 
-Proposed [ADR-26](adr/0026-definition-composition.md) designs composite Definitions: complete member Definitions
-pinned by exact digest compile to one Plan, Run and Release whose membership is the exact union of their named
-outputs. Members keep independent ownership, Runs and Releases; a composite rebuilds every output and inherits
-no member Run, Release or lane. Development bundles are planned with generation; member Release reuse and
-composite qualification are deferred. Nothing is implemented.
+Proposed [ADR-26](adr/0026-definition-composition.md) designs composite Definitions, which release the outputs of
+several digest-pinned member Definitions through one Plan, Run and Release. Its
+[merge rules](adr/0026-definition-composition.md#3-merge-rules-exact-union-never-precedence) own membership,
+and [member Release reuse](adr/0026-definition-composition.md#6-reusing-already-published-member-releases-only-through-authenticated-acceptance-a-planned-follow-up)
+and [evidence lanes](adr/0026-definition-composition.md#7-evidence-lanes-no-stronger-than-the-weakest-contribution)
+own what a composite inherits. Admission, merge, composite Plans, generation including named development
+bundles, Run and publication records and consumer expectations are implemented and contract-tested only; member
+Release reuse and composite qualification are deferred and refused, and no hosted composite Run exists.
+
+Proposed [ADR-27](adr/0027-pinned-tool-producers.md) designs pinned-tool producers: catalog components that run
+one released, digest-pinned executable in the `wrapped-build` lane. AICR bundles are the first use. ADR-27 owns
+their [logical identity](adr/0027-pinned-tool-producers.md#2-logical-identity-covers-the-tool-its-arguments-and-its-inputs),
+[execution](adr/0027-pinned-tool-producers.md#3-execution-offline-isolated-fixed),
+[inputs](adr/0027-pinned-tool-producers.md#4-declared-inputs-are-typed-material-bindings) and
+[outputs](adr/0027-pinned-tool-producers.md#5-outputs-one-file-or-a-producer-written-oci-layout).
+Nothing is implemented.
+
+Proposed [ADR-28](adr/0028-multi-platform-executable-indexes.md) designs multi-platform executables. ADR-28 owns
+when [one tool source covers several platforms](adr/0028-multi-platform-executable-indexes.md#1-one-tool-source-declares-every-platform),
+how an [executable output declares a platform set](adr/0028-multi-platform-executable-indexes.md#4-an-executable-output-may-declare-a-platform-set),
+its [aggregate identity](adr/0028-multi-platform-executable-indexes.md#5-aggregate-identity) and its
+[image-index publication](adr/0028-multi-platform-executable-indexes.md#6-publication-a-standard-image-index-over-minimal-per-platform-images).
+Nothing is implemented.
 
 ## Assumptions {#assumptions}
 
@@ -135,7 +153,11 @@ The [domain vocabulary](../CONTEXT.md) defines six high-level public objects:
 | Release | Immutable selected artifacts and evidence accessible through one pinned reference |
 | Verification Policy | Consumer requirements for acceptable identities, evidence, and lifecycle state |
 
-A binary bundle is an Artifact format. Deployment topology and node placement are downstream concerns,
+A binary bundle or generic OCI bundle is an Artifact format. Generic bundles wrap one pinned producer's
+gzip tar archive and receive a bounded delivered-file inventory. AICR renderers use this path without new
+profile or lifecycle objects; native Helm charts retain their own media contract. See
+[ADR-25](adr/0025-generic-oci-bundles-and-aicr-producers.md) for integrity and evidence boundaries.
+Deployment topology and node placement are downstream concerns,
 without another NVKR authored object or generated realization.
 
 The internal records appear where needed to explain trust: plans describe admitted execution; Inventory and
@@ -266,8 +288,21 @@ Specialized byte-changing transformations remain explicit product intent.
 
 A proposed composite Definition (ADR-26) would enter this flow before the compiler: admission loads each
 digest-pinned member, rejects drift and structural conflicts, and derives one effective Definition that the same
-compiler consumes; the compiler rejects divergent cross-member producers once catalogs are resolved. Composition changes Definition, Plan, Run and Release identities and records every member digest and
-output attribution; it never changes an output's Build Digest. This path is designed, not implemented.
+compiler consumes; the compiler rejects divergent cross-member producers once catalogs are resolved. Composition
+changes Definition, Plan, Run and Release identities and records every member digest and output attribution; it
+never changes an output's Build Digest. This path is implemented and contract-tested, not externally exercised.
+
+A proposed pinned-tool producer (ADR-27) is an ordinary selected component inside this flow. ADR-27 owns its
+[execution](adr/0027-pinned-tool-producers.md#3-execution-offline-isolated-fixed), its
+[admitted output forms](adr/0027-pinned-tool-producers.md#5-outputs-one-file-or-a-producer-written-oci-layout)
+and the [authority of tool-side signing](adr/0027-pinned-tool-producers.md#6-tool-evidence-companions-and-tool-side-signing).
+This path is designed, not implemented.
+
+A proposed multi-platform executable output (ADR-28) compiles like an OCI aggregate. ADR-28 owns its
+[native per-platform identity](adr/0028-multi-platform-executable-indexes.md#3-native-producer-identity-is-unchanged),
+[aggregate identity](adr/0028-multi-platform-executable-indexes.md#5-aggregate-identity) and
+[index publication](adr/0028-multi-platform-executable-indexes.md#6-publication-a-standard-image-index-over-minimal-per-platform-images).
+This path is designed, not implemented.
 
 The compiler derives each output's graph from its exact selected components and concrete
 target. `nvkr.build` identifies the logical projection of that validated graph. Output names, packaging and execution settings remain bound by their owning records. Equal Build
@@ -361,12 +396,10 @@ are rejected, and malformed or unsupported format metadata fails with a coded er
 destination work. Pulling executes or installs nothing and grants no signature or policy acceptance. The
 explicit Release verifier remains the authenticated consumer boundary.
 
-Delivery owns a held runnable OCI index capability with explicit Linux AMD64/ARM64 child membership,
-unchanged native manifest/config/layer bytes and atomic no-replace layout emission. Definition v5 can declare
-one image output with a sorted finite platform set; the compiler freezes a native Build, result and SBOM use
-for every member and derives a separate logical aggregate Build Digest. Run completeness and publication
-metadata retain that exact membership. Helm binds the complete index digest. Native image bytes and native
-IR identity are unchanged. Contract tests cover these joins; they do not establish native dual-architecture
+Delivery owns a held runnable OCI index capability. [ADR-11](adr/0011-composition-and-resolution-semantics.md#2-generated-closure-and-identity)
+owns how one image output expands into native per-platform uses and its aggregate logical Build identity;
+[ADR-20](adr/0020-artifact-publication-and-target-configuration.md#runnable-image-indexes--pipeline-attested-lifecycle-integration)
+owns index assembly, child membership, publication and Helm binding. Contract tests cover these joins; they do not establish native dual-architecture
 hosted execution, registry services, signing or operational release acceptance (ADR-11/12/16/20).
 
 | Identity or record | Owner and purpose | Boundary |
@@ -467,6 +500,12 @@ milestone specification.
 
 ## Current support boundary
 
+ADR-20 specifies, but does not enable, complete S3 delivery for selected VM/iPXE/EFI/QCOW2 and Debian package
+artifacts. The contract keeps OCI source publications immutable, adds native file/member representations,
+and authenticates a derived delivery root with portable original proofs. Typed configuration, executable
+adapters, provider acceptance and actual boot/package-install acceptance remain required. Existing schema
+constants, whole-Plan verification and current capability admission are unchanged by this documentation freeze.
+
 [Reconciliation](adr/reconciliation.md) owns the current support matrix. Local immutable attempts,
 Plan/graph inspection, GitHub generation, metadata-only release navigation and the scoped
 `pipeline-attested` consumers for `authenticity` and `artifact-publication` are implemented. Authenticity
@@ -529,6 +568,19 @@ The current publication input owner admits omitted or explicit OCI selection and
 combined APT/OCI selection before catalog, generation or execution work. Required selections never fall back
 to another transport; a direct APT publisher and its service/signing contract remain deferred (ADR-20 §2).
 
+The file-delivery contract reserves Definition v6 `file` outputs, Environment v2 `publication.fileTargets`,
+Run Plan/artifact-graph v6, PublicationRoot v5 native-file membership and Run v5 requirements/completion.
+Release v4 remains the unchanged OCI source view; S3 coordinates, selected delivery completion and separate
+effective policies belong to generated delivery records and receipts. The extension's new native-file and
+delivery-root families are distinct from
+Build, payload and OCI wrapper identity. A lifecycle selection receipt retains selected complete output-local
+publications and actual source proof bytes; it does not relax whole-Plan completeness. Separate caller policies
+authenticate source and delivery roles. Transfer uses conditional writes and full read-back; detached completion
+is published last. An ambiguous final write may leave a valid completion, so producer success requires
+reconciliation and consumers always authenticate the complete required closure. Boot HTTPS access is
+separate from S3 API access. Downstream owners render machine-specific boot configuration and prove actual
+EFI imaging/reboot, direct VM boot and package installation; NVKR supplies no new provisioning service.
+
 The qualified lane additionally consumes signed builder profiles, immutable promotion and evidence policies,
 and an operator trust store. It generates the exact Inventory compatibility form only after authenticated
 binding of the requirements frozen before execution. Trust precedence is explicit: CLI policy overrides operator
@@ -587,9 +639,9 @@ material where applicable. These dependencies cannot be replaced by caller-suppl
 Compilation resolves the selected Definition, Environment, and component catalogs into a plan, validates the
 complete artifact graph, and renders only admitted engines and lanes. The committed bundle is regenerated from
 the same inputs and engine; missing, extra or changed owned files cause drift failure (ADR-21).
-In the default flat projection, GitHub keeps named jobs, prerequisite closure and conditions visible in the
-entry workflow, and all jobs retain their runner, permissions and time bounds inline. Opt-in partitioning
-moves them, with those controls, into workers described below. Manifest-owned composite actions expose fixed interfaces
+GitHub keeps named jobs, prerequisite closure and conditions visible, and every job retains its runner,
+permissions and time bounds. [ADR-21](adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold)
+owns which bundle workflow carries each job, including the opt-in partition workers described below. Manifest-owned composite actions expose fixed interfaces
 for node/source execution, preparation, output collection and transport. Grouped jobs reuse the node interface; optional slots and
 individual transfer calls preserve arbitrary admitted output counts without new action variants. One canonical
 invocation-data member holds parameters with named operation roles. The runtime descriptor operation
@@ -601,10 +653,9 @@ Before checkout or input transfer, disk producers reject missing, symlink or non
 If the runner cannot open the fixed device read/write, one bounded noninteractive permission bootstrap
 sets mode 0666 and requires a successful open afterward. Failed mutation or access remains a capability
 rejection. Full helper-owned capacity and held KVM API admission remain required before work.
-In the default flat projection, operator setup, timed producers and steps with referenced outcomes/outputs
-remain inline in the entry workflow; opt-in partition workers carry those jobs instead, except OIDC signers.
-This includes finalization and the final Run upload used by the
-closing summary; shared recovery precedes inline finalization. Static Plan/manifest references and source scheduling by target/consumer cohort
+[ADR-18 §8](adr/0018-pipeline-ir-and-ci-adapter-emission.md#8-pipeline-attested-generation-and-credential-admission)
+owns which jobs, including finalization and the final Run upload used by the closing summary, stay in the
+entry workflow under opt-in partitioning; shared recovery precedes finalization. Static Plan/manifest references and source scheduling by target/consumer cohort
 reduce routine pin churn without changing executable Plan/IR identities. Workflow bytes remain stable only
 while topology, labels/interfaces, visible policy and required inline action pins stay unchanged; every input change still requires
 complete bundle regeneration and checking. Static validation expands templates with their invocation data and checks their exact generated
@@ -646,15 +697,12 @@ prerequisite closure preserved; authored setup, runtime variables, images or ser
 direct dependency context retain the original lists.
 Large finalizers receive exact original job results through fixed, bounded collectors. A collector must
 succeed and report its complete Plan-derived membership before recovery; its aggregate status never replaces
-individual producer outcomes. Opt-in execution partitioning groups dependency layers into same-commit callable
-workers, with original job IDs and per-job controls; declared job timeouts split a layer so short work
-need not wait for long siblings. OIDC-signing jobs stay in the entry workflow to preserve
-the authored signer identity policy. Generation refuses OIDC in workers, and relocating signers remains a
-proposed identity and trust-policy migration (ADR-18 §8). Workers export per-consumer result fragments, so the
-entry does not repeat member projections. Partitions may delay independent work behind an earlier
-group, but original prerequisite results govern ordinary job admission. One complete Plan and one finalizer
-retain the Run and Release boundary. Exact regeneration admits every worker and caller connection under the
-same ownership manifest. Factory's provider-independent execution graph owns operation membership,
+individual producer outcomes. Opt-in execution partitioning moves jobs into same-commit callable workers
+within one complete Plan, finalizer, Run and Release.
+[ADR-18 §8](adr/0018-pipeline-ir-and-ci-adapter-emission.md#8-pipeline-attested-generation-and-credential-admission)
+owns the grouping, the jobs that stay in the entry workflow, result forwarding and the proposed signer
+migration; [ADR-21](adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold)
+owns the worker files under the bundle's ownership manifest. Factory's provider-independent execution graph owns operation membership,
 success/completion conditions, recovery prerequisites, partition validation and exact outcome accounting;
 GitHub renders the typed model rather than deriving scheduling semantics from YAML. Reconciliation records
 full development execution and hosted signing/verification evidence. Local equivalence contracts cover
@@ -1200,6 +1248,8 @@ already obtained.
 | Qualified helper-image admission | Execution/trust owners | Exact executable/runtime receipt protocol; image pin alone is insufficient |
 | Deferred release registration transport | Registry/integration owners | Optional downstream discovery |
 | Proposed ADR-26 composite Definitions, then member Release reuse and composite qualification | Release-engineering, catalog, qualification and result-reuse owners | One combined Release from independently owned Definitions without a hand-maintained combined copy |
+| Proposed ADR-27 pinned-tool producers, then AICR layout output (NVIDIA/aicr#3534) and layout import | Catalog, execution, evidence and release-engineering owners | Outputs rendered by released tools, starting with AICR bundles, without rebuilding the tool from source |
+| Proposed ADR-28 multi-platform executables, then the AICR migration and the per-platform retrofits | Catalog, release-engineering, delivery and evidence owners | One tool source per release where [ADR-28 §1](adr/0028-multi-platform-executable-indexes.md#1-one-tool-source-declares-every-platform) admits it, and one image-index output per executable, consumable by standard OCI clients |
 
 Qualified helper-image use remains unavailable until it satisfies ADR-07/18's executable/runtime admission.
 Source bootstrap records only the identities that actually participated; delivery by image cannot imply

@@ -26,6 +26,10 @@ belongs to the downstream deployment owner and is not part of the Definition or 
 sets, clearance, publication roots, and qualification records are generated/authenticated internals available
 through inspection. Normal callers neither construct nor connect their receipt graph.
 
+Generic `bundle-oci` outputs select one pinned source tarball producer and retain the same complete lifecycle,
+independent output observation and evidence obligations. [ADR-25](0025-generic-oci-bundles-and-aicr-producers.md)
+owns their archive/OCI contract and the AICR integration; a deployment bundle is distinct from a native Helm chart.
+
 Definition declares named outputs directly. Each native output selects exact catalog components and a concrete target
 platform, together with its artifact format. An OCI aggregate instead declares a sorted, unique `platforms`
 set; the compiler derives one native producer target per member and one required image-index output
@@ -66,7 +70,8 @@ strict inventory hardening, M3 qualification acceptance and organizational accep
 Definition v5, Run/Release v4, and compiled Run Plan/artifact graph v5 records reject the
 retired cluster, role, category and composition fields. Signer policy roles remain a distinct security concept.
 Proposed [ADR-26](0026-definition-composition.md) designs a separate composite Definition form that joins
-complete, digest-pinned Definitions into one Plan, Run and Release. It is not implemented, adds no Recipe,
+complete, digest-pinned Definitions into one Plan, Run and Release. Its units U1–U7 are implemented and contract-tested
+only (see reconciliation); it adds no Recipe,
 selection group or inheritance, and does not reintroduce those retired fields.
 
 An explicit `debian-package` output selects one ordinary from-source `host-package` producer on an
@@ -80,6 +85,33 @@ publication routes remain capability-gated.
 Environment separately supplies runtime, runner, publication namespace, credential references and signing policy
 (ADR-20). Output-affecting tools stay in the build identity they affect.
 Changing transport or signing configuration cannot silently change logical Build identity.
+
+ADR-20 reserves, without implementing them, Definition v6 native `file` outputs, Environment v2 typed
+`publication.fileTargets`, Run Plan/artifact-graph v6 delivery edges, PublicationRoot v5 native-file
+membership and Run v5 requirements/completion. Release v4 retains the unchanged OCI source view; S3
+coordinates, selected delivery completion and separate source/delivery policies remain generated records
+and receipt bindings, not repurposed Release fields. Current schema constants and input behavior stay
+unchanged. Source-created DEBs, EFI and iPXE files are not executable-tool bundles or reconstructed APT
+packages. The six public lifecycle objects remain unchanged; native manifests, selection receipts, delivery
+roots and locators are generated/authenticated internals rather than independently authored lifecycle inputs.
+
+The S3 delivery use case specified in ADR-20 belongs to `lifecycle`. It authenticates aggregate membership
+under source policy and retains each selected complete output-local publication plus its actual verified proof bytes.
+Its separate opaque receipt binds named selection, source roots/Plan/invocations, delivery target and effective
+consumer policies. The complete-set `ExactInputReceipt` and `ExportForInvocation` are not relaxed for this
+subset operation. A descriptive pull result, copied path or decoded delivery document cannot reconstruct
+the receipt. `delivery` owns byte-preserving member projection and authenticated storage/read-back receipts;
+`sign` owns retained proofs and detached signing/verification. The lifecycle owner joins their exact subjects
+and owns cancellation/Close through stop and join. CLI and SDK adapt the same use case without implementing
+another scheduler or upload mechanism. Legacy monolithic-root subset consumption remains unsupported.
+`lifecycle` exclusively owns ADR-20's private durable delivery-namespace store, including atomic enrollment,
+overlap reservation, generation-checked transitions, verified completion and retirement across Runs.
+It is separate from the immutable attempt store below and retained job artifacts; no cross-Run backend is
+admitted by this contract. The S3 retry gate delegates namespace serialization to that store.
+Enrollment, preparing/commit-authorized transitions, undispatched closure and
+operator retirement remain owned internal records. Recovery retains and reauthenticates exact root, bundle and locator bytes before
+same-key conditional replay. Each public Run remains one immutable attempt; recovery records a new observation
+with the original signed invocation, without rewriting that attempt or minting another signature.
 
 `pkg/nvkr/definition` owns authored Definition/Environment loading, validation and identity. `factory.Compile`
 accepts those exact inputs and owns the complete Plan, output joins and evidence requirements. It returns no

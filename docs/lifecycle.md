@@ -54,6 +54,20 @@ bin/nvkr run plan \
   --environment docs/examples/nvke-tutorial/environment-local.yaml
 ```
 
+A composite Definition (proposed ADR-26) pins complete member
+Definitions by their exact `nvkr.definition` digest. `--definition` accepts either kind; a composite path
+and every member and catalog it reaches must lie beneath the working directory. `definition inspect`
+describes the composite, its members and the derived effective Definition. After editing a member,
+re-pin the composite in the same change; generation fails with `unverified-ref` until then:
+
+```sh
+bin/nvkr definition pin --definition <composite.yaml> --check   # report drift, write nothing
+bin/nvkr definition pin --definition <composite.yaml>           # rewrite only the stale digests
+```
+
+Composite qualification, release manifests and runtime Plans are not implemented and fail with
+`engine-capability`.
+
 For saved generated Plans, `run plan --plan <path>` prints the required outputs and instructions;
 `--pretty` provides an indented display view. `run graph` exports complete linked producer/artifact graphs,
 and `run diff` explains changes between canonical Plans. See [Plan and graph inspection](plan-and-graph-inspection.md).

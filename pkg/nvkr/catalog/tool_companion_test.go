@@ -5,175 +5,206 @@ package catalog
 
 import (
 	"archive/tar"
-	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-func companionArchive(t *testing.T, format string, members map[string][]byte) []byte {
+func companionArchive(t *testing.T, members map[string]string) []byte {
 	t.Helper()
 	var b bytes.Buffer
-	names := []string{"aicr", "aicr-attestation.sigstore.json"}
-	switch format {
-	case "tar-gzip":
-		gz := gzip.NewWriter(&b)
-		tw := tar.NewWriter(gz)
-		for _, name := range names {
-			if err := tw.WriteHeader(&tar.Header{Name: name, Size: int64(len(members[name])), Mode: 0o644, Typeflag: tar.TypeReg}); err != nil {
-				t.Fatal(err)
-			}
-			if _, err := tw.Write(members[name]); err != nil {
-				t.Fatal(err)
-			}
+	gz := gzip.NewWriter(&b)
+	tw := tar.NewWriter(gz)
+	for _, name := range []string{"bin/tool", "tool.sig", "extra.sig"} {
+		content, ok := members[name]
+		if !ok {
+			continue
 		}
-		if err := tw.Close(); err != nil {
+		if err := tw.WriteHeader(&tar.Header{Name: name, Size: int64(len(content)), Mode: 0o644, Typeflag: tar.TypeReg}); err != nil {
 			t.Fatal(err)
 		}
-		if err := gz.Close(); err != nil {
+		if _, err := tw.Write([]byte(content)); err != nil {
 			t.Fatal(err)
 		}
-	case "zip":
-		zw := zip.NewWriter(&b)
-		for _, name := range names {
-			f, err := zw.Create(name)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, err := f.Write(members[name]); err != nil {
-				t.Fatal(err)
-			}
-		}
-		if err := zw.Close(); err != nil {
-			t.Fatal(err)
-		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
 	}
 	return b.Bytes()
 }
 
-func TestToolPinArchiveMember(t *testing.T) {
-	members := map[string][]byte{"aicr": []byte("executable"), "aicr-attestation.sigstore.json": []byte(`{"bundle":true}`)}
-	for _, tc := range []struct {
-		name, format, member string
-		maxBytes             int64
-		change               func(*ToolPin, []byte) []byte
-		want                 e.Code
-	}{
-		{name: "tar companion", format: "tar-gzip", member: "aicr-attestation.sigstore.json", maxBytes: 1 << 20},
-		{name: "zip companion", format: "zip", member: "aicr-attestation.sigstore.json", maxBytes: 1 << 20},
-		{name: "substituted archive", format: "tar-gzip", member: "aicr-attestation.sigstore.json", maxBytes: 1 << 20,
-			change: func(_ *ToolPin, raw []byte) []byte { return append(raw, 0) }, want: e.CodeVerifyFailed},
-		{name: "missing member", format: "tar-gzip", member: "absent.json", maxBytes: 1 << 20, want: e.CodeVerifyFailed},
-		{name: "oversized member", format: "tar-gzip", member: "aicr-attestation.sigstore.json", maxBytes: 4, want: e.CodeVerifyFailed},
-		{name: "executable is not a companion", format: "tar-gzip", member: "aicr", maxBytes: 1 << 20, want: e.CodeInvalidCatalog},
-		{name: "unsafe member", format: "tar-gzip", member: "../aicr-attestation.sigstore.json", maxBytes: 1 << 20, want: e.CodeInvalidCatalog},
-		{name: "unbounded", format: "tar-gzip", member: "aicr-attestation.sigstore.json", want: e.CodeInvalidCatalog},
-		{name: "raw tool has no archive", format: "tar-gzip", member: "aicr-attestation.sigstore.json", maxBytes: 1 << 20,
-			change: func(pin *ToolPin, raw []byte) []byte {
-				pin.Format, pin.ExecutableDigest = "raw", pin.ArchiveDigest
-				return raw
-			}, want: e.CodeInvalidCatalog},
-		{name: "unpinned archive", format: "tar-gzip", member: "aicr-attestation.sigstore.json", maxBytes: 1 << 20,
-			change: func(pin *ToolPin, raw []byte) []byte { pin.ArchiveDigest = ""; return raw }, want: e.CodeUnpinnedSource},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			raw := companionArchive(t, tc.format, members)
-			pin := ToolPin{Format: tc.format, URL: "https://example.invalid/aicr.tar.gz", Platform: "linux/amd64", ExecutablePath: "aicr",
-				ArchiveDigest: fmt.Sprintf("sha256:%x", sha256.Sum256(raw)), ExecutableDigest: fmt.Sprintf("sha256:%x", sha256.Sum256(members["aicr"]))}
-			if tc.change != nil {
-				raw = tc.change(&pin, raw)
-			}
-			got, err := pin.ArchiveMember(t.Context(), raw, tc.member, tc.maxBytes)
-			if pinErrorCode(err) != tc.want {
-				t.Fatalf("%v, want %q", err, tc.want)
-			}
-			if tc.want == "" && !bytes.Equal(got, members[tc.member]) {
-				t.Fatalf("selected %q, want %q", got, members[tc.member])
-			}
-		})
-	}
-}
-
-func TestPrebuiltEvidenceSignerAndArchiveRefs(t *testing.T) {
-	const identity = "https://github.com/NVIDIA/aicr/.github/workflows/on-tag.yaml@refs/tags/v1.1.2"
-	signed := func() *ExternalEvidence {
-		return &ExternalEvidence{ProvenanceRef: "archive:aicr-attestation.sigstore.json", ProvenanceDigest: goodArtifactDigest,
-			SBOMRef: "https://example.invalid/aicr.sbom.json", SBOMDigest: goodArtifactDigest,
-			Signer: &EvidenceSigner{Issuer: "https://token.actions.githubusercontent.com", Identity: identity}}
-	}
-	for _, tc := range []struct {
+func TestToolCompanionPinResolution(t *testing.T) {
+	for _, test := range []struct {
 		name       string
-		change     func(*Component)
-		code       e.Code
-		executable bool
+		members    map[string]string
+		companions []string
+		want       e.Code
 	}{
-		{name: "signed archive provenance", executable: true},
-		{name: "archive ref without release executable", code: e.CodeInvalidCatalog},
-		{name: "archive ref names the executable", executable: true, code: e.CodeInvalidCatalog,
-			change: func(c *Component) { c.Prebuilt.Evidence.ProvenanceRef = "archive:aicr" }},
-		{name: "archive ref escapes", executable: true, code: e.CodeInvalidCatalog,
-			change: func(c *Component) { c.Prebuilt.Evidence.SBOMRef = "archive:../aicr.sbom.json" }},
-		{name: "raw tool archive ref", executable: true, code: e.CodeInvalidCatalog,
-			change: func(c *Component) {
-				c.Prebuilt.Executable.Format = "raw"
-				c.Prebuilt.Executable.ArchiveDigest = c.Prebuilt.Executable.ExecutableDigest
-			}},
-		{name: "signer without provenance", executable: true, code: e.CodeTrustPolicyMissing,
-			change: func(c *Component) { c.Prebuilt.Evidence.ProvenanceRef, c.Prebuilt.Evidence.ProvenanceDigest = "", "" }},
-		{name: "plain HTTP issuer", executable: true, code: e.CodeTrustPolicyMissing,
-			change: func(c *Component) { c.Prebuilt.Evidence.Signer.Issuer = "http://token.actions.githubusercontent.com" }},
-		{name: "empty identity", executable: true, code: e.CodeTrustPolicyMissing,
-			change: func(c *Component) { c.Prebuilt.Evidence.Signer.Identity = "" }},
-		{name: "unrendered identity", executable: true, code: e.CodeTrustPolicyMissing,
-			change: func(c *Component) { c.Prebuilt.Evidence.Signer.Identity = identity + "{{.Arch}}" }},
-		{name: "none with signer", executable: true, code: e.CodeInvalidCatalog,
-			change: func(c *Component) {
-				c.Prebuilt.Evidence = &ExternalEvidence{None: true, Signer: c.Prebuilt.Evidence.Signer}
-			}},
+		{name: "companion pinned", members: map[string]string{"bin/tool": "exe", "tool.sig": "attestation"}, companions: []string{"tool.sig"}},
+		{name: "no companions", members: map[string]string{"bin/tool": "exe", "tool.sig": "attestation"}},
+		{name: "missing companion", members: map[string]string{"bin/tool": "exe"}, companions: []string{"tool.sig"}, want: e.CodeVerifyFailed},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			component := Component{OutputType: "host-package", Platforms: []string{"linux/amd64"},
-				Prebuilt: &Prebuilt{URL: "https://example.invalid/aicr", Digests: map[string]string{"amd64": goodArtifactDigest}, Evidence: signed()}}
-			if tc.executable {
-				tool := ToolPin{Format: "tar-gzip", URL: "https://example.invalid/aicr.tar.gz", Platform: "linux/amd64", ExecutablePath: "aicr",
-					ArchiveDigest: "sha256:" + strings.Repeat("b", 64), ExecutableDigest: goodArtifactDigest}
-				component.Prebuilt.URL, component.Prebuilt.Executable = tool.URL, &tool
+		t.Run(test.name, func(t *testing.T) {
+			raw := companionArchive(t, test.members)
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(raw) }))
+			defer server.Close()
+			source := ToolSource{Format: "tar-gzip", URL: server.URL + "/{{.Tag}}/tool.tar.gz", Platform: "linux/amd64",
+				ExecutablePath: "bin/tool", Companions: test.companions}
+			pin := Pin{Tag: "v1.2.3"}
+			tool, err := resolveToolWithClient(t.Context(), source, pin, server.Client())
+			if pinErrorCode(err) != test.want {
+				t.Fatalf("error %v; want %s", err, test.want)
 			}
-			if tc.change != nil {
-				tc.change(&component)
+			if test.want != "" {
+				return
 			}
-			if err := validatePrebuilt("aicr", component); pinErrorCode(err) != tc.code {
-				t.Fatalf("%v, want %q", err, tc.code)
+			if len(tool.Companions) != len(test.companions) {
+				t.Fatalf("companions %+v; want %v", tool.Companions, test.companions)
+			}
+			for i, path := range test.companions {
+				want := ToolCompanion{Path: path, Digest: fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(test.members[path])))}
+				if tool.Companions[i] != want {
+					t.Fatalf("companion %+v; want %+v", tool.Companions[i], want)
+				}
+			}
+			pin.Tool = &tool
+			if err := checkToolPin(&source, pin); err != nil {
+				t.Fatal(err)
+			}
+			source.Companions = append(source.Companions, "x.sig")
+			if pinErrorCode(checkToolPin(&source, pin)) != e.CodeUnpinnedSource {
+				t.Fatal("stale companion declaration accepted")
 			}
 		})
 	}
 }
 
-func TestPrebuiltEvidenceSignerIdentityRendersFromPin(t *testing.T) {
-	tool := ToolSource{Format: "tar-gzip", URL: "https://example.invalid/{{.Tag}}/aicr.tar.gz", Platform: "linux/amd64", ExecutablePath: "aicr"}
-	pin := Pin{Tag: "v1.1.2", Tool: &ToolPin{Format: tool.Format, URL: "https://example.invalid/v1.1.2/aicr.tar.gz", Platform: tool.Platform,
-		ExecutablePath: tool.ExecutablePath, ArchiveDigest: goodArtifactDigest, ExecutableDigest: goodArtifactDigest}}
-	authored := &ExternalEvidence{ProvenanceRef: "archive:aicr-attestation.sigstore.json", ProvenanceDigest: goodArtifactDigest,
-		Signer: &EvidenceSigner{Issuer: "https://token.actions.githubusercontent.com",
-			Identity: "https://github.com/NVIDIA/aicr/.github/workflows/on-tag.yaml@refs/tags/{{.Tag}}"}}
-	raw := rawComponent{Prebuilt: &Prebuilt{ReleaseExecutable: true, Evidence: authored}}
-	resolved, err := resolvePrebuilt("aicr", raw, Source{Repo: "https://github.com/NVIDIA/aicr", Tool: &tool}, pin, &PinLock{}, Component{})
-	if err != nil {
-		t.Fatal(err)
+func TestToolCompanionDeclarationRejectsAmbiguity(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		format     string
+		companions []string
+	}{
+		{name: "raw asset", format: "raw", companions: []string{"tool.sig"}},
+		{name: "unsafe path", companions: []string{"../tool.sig"}},
+		{name: "absolute path", companions: []string{"/tool.sig"}},
+		{name: "unsorted", companions: []string{"b.sig", "a.sig"}},
+		{name: "duplicate", companions: []string{"a.sig", "a.sig"}},
+		{name: "executable name", companions: []string{"dist/tool"}},
+		{name: "colliding names", companions: []string{"a/tool.sig", "b/tool.sig"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			format := test.format
+			if format == "" {
+				format = "tar-gzip"
+			}
+			source := ToolSource{Format: format, URL: "https://example.test/{{.Tag}}/tool", Platform: "linux/amd64",
+				ExecutablePath: "bin/tool", Companions: test.companions}
+			if pinErrorCode(validateToolSource(source)) != e.CodeInvalidCatalog {
+				t.Fatal("ambiguous companion declaration admitted")
+			}
+		})
 	}
-	if got := resolved.Prebuilt.Evidence.Signer.Identity; got != "https://github.com/NVIDIA/aicr/.github/workflows/on-tag.yaml@refs/tags/v1.1.2" {
-		t.Fatalf("rendered identity %q", got)
+	pin := ToolPin{Format: "tar-gzip", URL: "https://example.test/tool", Platform: "linux/amd64", ExecutablePath: "bin/tool",
+		ArchiveDigest: goodArtifactDigest, ExecutableDigest: goodArtifactDigest, Companions: []ToolCompanion{{Path: "tool.sig"}}}
+	if pinErrorCode(validateToolPin(pin)) != e.CodeUnpinnedSource {
+		t.Fatal("unpinned companion accepted")
 	}
-	if !strings.Contains(authored.Signer.Identity, "{{.Tag}}") {
-		t.Fatal("rendering mutated the authored declaration")
+	lock := &PinLock{Pins: map[string]Pin{"tool": {Tool: &pin}}}
+	clone := clonePinLock(lock)
+	clone.Pins["tool"].Tool.Companions[0].Path = "changed"
+	if lock.Pins["tool"].Tool.Companions[0].Path != "tool.sig" {
+		t.Fatal("lock clone aliases tool companions")
 	}
-	authored.Signer.Identity = "{{.Unknown}}"
-	if _, err := resolvePrebuilt("aicr", raw, Source{Repo: "https://github.com/NVIDIA/aicr", Tool: &tool}, pin, &PinLock{}, Component{}); pinErrorCode(err) != e.CodeInvalidCatalog {
-		t.Fatalf("unknown identity token: %v", err)
+}
+
+func TestReleaseExecutableCompanionOwnership(t *testing.T) {
+	registry := `apiVersion: nvkr.dev/catalog/v3
+kind: SourceBuildRegistry
+sources:
+  upstream:
+    repo: https://github.com/example/tool
+    constraint: 1.2.3
+    tool:
+      format: tar-gzip
+      url: https://example.test/{{.Tag}}/tool.tar.gz
+      platform: linux/amd64
+      executablePath: bin/tool
+      companions: [tool-attestation.sigstore.json]
+components:
+  tool:
+    source: upstream
+    platforms: [linux/amd64]
+    outputType: host-package
+    prebuilt:
+      releaseExecutable: true
+      evidence: {none: true}
+`
+	companionDigest := "sha256:" + strings.Repeat("c", 64)
+	lock := `apiVersion: nvkr.dev/lock/v1
+kind: PinLock
+pins:
+  upstream:
+    tag: v1.2.3
+    commit: ` + goodCommit + `
+    treeHash: ` + goodTree + `
+    sourceDateEpoch: 123
+    tool:
+      format: tar-gzip
+      url: https://example.test/v1.2.3/tool.tar.gz
+      platform: linux/amd64
+      executablePath: bin/tool
+      archiveDigest: ` + goodArtifactDigest + `
+      executableDigest: sha256:` + strings.Repeat("b", 64) + `
+      companions:
+        - path: tool-attestation.sigstore.json
+          digest: ` + companionDigest + `
+`
+	for _, test := range []struct {
+		name     string
+		registry string
+		lock     string
+		code     e.Code
+	}{
+		{name: "source owns companion pins", registry: registry, lock: lock},
+		{name: "lock lacks companion", registry: registry,
+			lock: lock[:strings.Index(lock, "      companions:")], code: e.CodeUnpinnedSource},
+		{name: "lock pins undeclared companion",
+			registry: strings.ReplaceAll(registry, "      companions: [tool-attestation.sigstore.json]\n", ""), lock: lock, code: e.CodeUnpinnedSource},
+		{name: "companion digest missing", registry: registry,
+			lock: strings.ReplaceAll(lock, "          digest: "+companionDigest+"\n", ""), code: e.CodeUnpinnedSource},
+		{name: "companion shadows executable", registry: strings.ReplaceAll(registry, "[tool-attestation.sigstore.json]", "[dist/tool]"),
+			lock: strings.ReplaceAll(lock, "path: tool-attestation.sigstore.json", "path: dist/tool"), code: e.CodeInvalidCatalog},
+		{name: "companion shadows component name", registry: strings.ReplaceAll(strings.ReplaceAll(registry,
+			"[tool-attestation.sigstore.json]", "[dist/kit]"), "  tool:\n    source:", "  kit:\n    source:"),
+			lock: strings.ReplaceAll(lock, "path: tool-attestation.sigstore.json", "path: dist/kit"), code: e.CodeInvalidCatalog},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cat, err := LoadContext(t.Context(), bytesProvider{RegistryFile: []byte(test.registry), LockFile: []byte(test.lock)})
+			if pinErrorCode(err) != test.code {
+				t.Fatalf("error %v; want %s", err, test.code)
+			}
+			if test.code != "" {
+				return
+			}
+			executable := cat.Components["tool"].Prebuilt.Executable
+			if len(executable.Companions) != 1 || executable.Companions[0] != (ToolCompanion{Path: "tool-attestation.sigstore.json", Digest: companionDigest}) {
+				t.Fatalf("wrong resolved companions %+v", executable.Companions)
+			}
+			executable.Companions[0].Path = "changed"
+			if cat.Tools["upstream"].Companions[0].Path != "tool-attestation.sigstore.json" {
+				t.Fatal("resolved component aliases catalog tool pin")
+			}
+		})
 	}
 }

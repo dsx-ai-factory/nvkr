@@ -5,12 +5,19 @@ apiVersion: nvkr.dev/definition/v5
 kind: Definition
 metadata:
   name: nvke-core
-  description: Build the maintained AMD64 and ARM64 CLI, controller and provider images with their image-bound controller chart and reference-profile fixture, and acquire operator tools plus native CAPI and cert-manager images.
+  description: Build the maintained AMD64 and ARM64 CLI, controller and provider images with their image-bound controller chart and reference-profile fixture, and acquire operator tools and the ARM64 AICR CLI plus native CAPI and cert-manager images.
 catalog:
   base: ../../catalogs/nvke/module-tags
 sbomTool: syft
 cosignTool: cosign
 outputs:
+  - name: aicr
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/tools/aicr-arm64
+    format: executable
+    components:
+      - aicr
   - name: capi-controller-image
     platform: linux/amd64
     catalog:
@@ -114,7 +121,7 @@ outputs:
     format: oci
     components:
       - nvke-controller
-  # NICo charts are site-installed outside NVKE's pin set; their images stay consumer-supplied.
+  # NICo charts and images are site-installed outside NVKE's pin set.
   - name: nico
     platform: linux/amd64
     catalog:
@@ -122,6 +129,27 @@ outputs:
     format: helm-oci
     components:
       - nico-chart
+  - name: nico-core-image
+    platforms: [linux/amd64, linux/arm64]
+    catalog:
+      base: ../../catalogs/nico
+    format: oci
+    components:
+      - nico-core-image
+  - name: nico-flow
+    platform: linux/amd64
+    catalog:
+      base: ../../catalogs/nico
+    format: helm-oci
+    components:
+      - nico-flow-chart
+  - name: nico-flow-image
+    platforms: [linux/amd64, linux/arm64]
+    catalog:
+      base: ../../catalogs/nico
+    format: oci
+    components:
+      - nico-flow-image
   - name: nico-prereqs
     platform: linux/amd64
     catalog:
@@ -151,6 +179,14 @@ outputs:
     platform: linux/amd64
     catalog:
       base: ../../catalogs/tools/operator-amd64
+    format: executable
+    components:
+      - helm
+      - kubectl
+  - name: operator-tools-linux-arm64
+    platform: linux/arm64
+    catalog:
+      base: ../../catalogs/tools/operator-arm64
     format: executable
     components:
       - helm

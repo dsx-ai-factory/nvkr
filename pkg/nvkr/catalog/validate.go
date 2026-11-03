@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"net/url"
+	"path"
 	"slices"
 	"sort"
 	"strings"
@@ -482,6 +483,11 @@ func validatePrebuilt(name string, c Component) error {
 		if c.OutputType != "host-package" || len(c.Platforms) != 1 || c.Platforms[0] != p.Executable.Platform ||
 			p.URL != p.Executable.URL || len(p.Digests) != 1 || p.Digests[arch] != p.Executable.ExecutableDigest {
 			return e.New(e.CodeInvalidCatalog, "release executable %q disagrees with its exact source tool pin", name)
+		}
+		for _, companion := range p.Executable.Companions {
+			if path.Base(companion.Path) == name {
+				return e.New(e.CodeInvalidCatalog, "release executable %q companion %q shadows the delivered executable", name, companion.Path)
+			}
 		}
 	}
 	if p.Chart != nil {

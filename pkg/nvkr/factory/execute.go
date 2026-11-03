@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -65,64 +64,15 @@ func loadPlanDocument(ctx context.Context, path string) (*Plan, string, error) {
 	return &plan, held.Digest(), nil
 }
 
-// ExecuteNode validates and executes one operation from the complete Plan.
-// Producer instructions remain owned by the embedded build IR; all callers use
-// the same dispatch for acquisition, builds, observation, packaging and publication.
+// ExecuteNode validates and executes one operation from the complete Plan in
+// this process. It is the execute-node helper's projection of the shared
+// operation session that local and hosted execution also use.
 func ExecuteNode(ctx context.Context, plan *Plan, nodeID string, stdout, stderr io.Writer) error {
-	node, err := admitExecutionNode(ctx, plan, nodeID)
+	node, err := admitOperation(ctx, plan, nodeID)
 	if err != nil {
 		return err
 	}
-	if githubDiskOutput(plan, node) != "" {
-		return e.New(e.CodeEngineCapability, "ARC disk operations require the original grouped executor")
-	}
-	if err := rejectUnsupportedRuntimeStorage(plan, "factory execute-node"); err != nil {
-		return err
-	}
-	_, artifacts := planIndex(plan)
-	if len(plan.Environment.GitHubRunners) > 0 {
-		if err := admitGitHubNodePlatform(plan, node, runtime.GOOS+"/"+runtime.GOARCH); err != nil {
-			return err
-		}
-		// Producer admission runs here; hosted utility admission runs on the host
-		// in executeGitHubNode before entering a container without daemon access.
-		if node.IRNode != "" {
-			if err := checkNodeContainerPlatform(ctx, plan, node, pipeline.CheckContainerPlatform); err != nil {
-				return err
-			}
-		}
-	}
-	if stdout == nil {
-		stdout = io.Discard
-	}
-	if stderr == nil {
-		stderr = io.Discard
-	}
-	if node.IRNode != "" {
-		return executeProducer(ctx, plan, node, plan.Environment.RuntimeBinary(), 1, stdout, stderr, (pipeline.Local{}).ExecNode, nil)
-	}
-	switch node.Kind {
-	case NodeAcquire:
-		return executeToolAcquire(ctx, node, artifacts[node.Outputs[0]], stdout)
-	case NodeVerify:
-		return executeObservation(ctx, plan, node, artifacts)
-	case NodeSBOM:
-		return executeSBOM(ctx, plan, node, artifacts, stdout)
-	case NodeAssembleRelease:
-		return executeReferenceRelease(ctx, plan, node, artifacts, productionOCISigner)
-	case NodePackage:
-		return executePackage(ctx, plan, node, artifacts, stdout)
-	case NodePublish:
-		return executePublish(ctx, plan, node, artifacts, stdout)
-	case NodeAttestEvidence:
-		return executeAttestEvidence(ctx, plan, node, artifacts, productionOCISigner, stdout)
-	case NodeSign:
-		return executeSign(ctx, plan, node, artifacts, productionOCISigner, stdout)
-	case NodeVerifyPublication:
-		return executeVerifyPublication(ctx, plan, node, artifacts, productionOCISigner, stdout)
-	default:
-		return e.New(e.CodeEngineCapability, "factory node kind %q has no executable adapter", node.Kind)
-	}
+	return newOperationSession(plan, compiledPlacement(plan), stdout, stderr).dispatch(ctx, plan, node)
 }
 
 func planIndex(plan *Plan) (map[string]Node, map[string]Artifact) {
@@ -290,6 +240,9 @@ func executeObservationWithHeldDisk(ctx context.Context, plan *Plan, node Node,
 					continue
 				}
 				if _, err := observeProducerPayload(ctx, plan, input, visible); err != nil {
+					return err
+				}
+				if _, err := observeReleaseCompanions(ctx, plan, input, visible); err != nil {
 					return err
 				}
 			}

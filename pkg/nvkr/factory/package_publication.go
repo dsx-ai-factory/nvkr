@@ -146,7 +146,7 @@ func collectPublicationObjects(ctx context.Context, plan *Plan, output Artifact,
 				return nil, nil, err
 			}
 			object.Layout, object.SemanticDigest, object.BlobDigest = true, inspected.SemanticDigest, inspected.RootDigest
-		case PackageHelm:
+		case PackageHelm, PackageBundle:
 			_, payload, err := delivery.ReadArtifact(ctx, input.Path)
 			if err != nil {
 				return nil, nil, err
@@ -214,7 +214,7 @@ func bindPublicationMetadata(ctx context.Context, plan *Plan, node Node, artifac
 			return nil, err
 		}
 		metadata = &delivery.ReleaseMetadata{DefinitionDigest: plan.DefinitionDigest, EnvironmentDigest: plan.EnvironmentDigest,
-			PlanDigest: planDigest, ContentSubject: contentSubject}
+			PlanDigest: planDigest, ContentSubject: contentSubject, Composition: plan.Composition.Clone()}
 		if PerOutputPublication(plan) {
 			run, err := publicationRunContext(plan, planDigest, time.Now().UTC(), time.Now().UTC())
 			if err != nil {

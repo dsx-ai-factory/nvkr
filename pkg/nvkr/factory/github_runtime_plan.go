@@ -42,13 +42,10 @@ func PrepareGitHubRuntimeBundle(ctx context.Context, freshPlan *Plan, root strin
 	if err != nil {
 		return err
 	}
-	baseline, err := RenderGitHub(ctx, baselinePlan)
-	if err != nil {
-		return err
-	}
 	// Validate all old bytes before considering the new pins. Stale authored pins
 	// do not excuse edits to a committed Plan, descriptor, template or manifest.
-	if err := CheckGeneratedBundle(ctx, root, baseline); err != nil {
+	baseline, err := checkCoreGitHubBundle(ctx, baselinePlan, root)
+	if err != nil {
 		return err
 	}
 	if baselinePlan.EnvironmentDigest != freshPlan.EnvironmentDigest ||

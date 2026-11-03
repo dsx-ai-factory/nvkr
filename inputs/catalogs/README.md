@@ -17,8 +17,14 @@ The [native ARM64 SBOM tool](tools/sbom-arm64/README.md) supplies the scanner fo
 quickstart. Its tool pin is separate from the AMD64 scanner in the maintained release catalog;
 output-scoped selections retain the same NVKE release producers.
 
-[`nico`](nico/registry.yaml) owns the source-packaged NICo and NICo prerequisite charts, pinned
-independently of NVKE to one infra-controller release. NICo images remain consumer-supplied.
+The [native ARM64 AICR CLI](tools/aicr-arm64/README.md) pins AICR's release executable and
+delivers its binary attestation beside it as a pinned companion.
+
+[`nico`](nico/registry.yaml) owns the source-packaged NICo, NICo prerequisite and NICo Flow charts and the
+source-built NICo Core and Flow images, pinned independently of NVKE to one infra-controller release.
+Both images use the generic rootless BuildKit route with digest-pinned bases. Core chains the source's
+native build, runtime and release Dockerfiles in one producer per architecture. The core family selects
+both images. A cold Core build may exceed the generated hosted build-job budget; no hosted Run has built it.
 
 [`local-path-provisioner`](local-path-provisioner/registry.yaml) packages Rancher's chart from
 source, patched to accept image digests, and binds its acquired provisioner and helper images.
@@ -98,8 +104,10 @@ ordered NVIDIA and native KVM overlays. Their other selections are:
 
 [`node-images/variants/native-nvidia.json`](node-images/variants/native-nvidia.json)
 binds its complete producer replacements to the shared release catalog's exact
-snapshot. The native KVM overlay binds the resulting NVIDIA stack. The release,
-upstream, TCG and hosted nightly selections retain their source pin cohorts.
+snapshot. The release catalog now carries the same NVIDIA fork 2.4.2 OVN producers
+and pins, so this overlay leaves the snapshot unchanged. The native KVM overlay binds
+the resulting NVIDIA stack. The upstream, TCG and hosted nightly selections retain
+their source pin cohorts.
 Package metadata checks and Plan compilation establish input
 alignment; a fresh package/disk build and full native runtime acceptance remain required.
 

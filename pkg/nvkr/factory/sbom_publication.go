@@ -105,7 +105,7 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 			}
 			continue
 		}
-		if plan.Definition.SBOMTool != "" {
+		if plan.Definition.SBOMTool != "" || plan.hasBundleTarget(artifact.BuildTarget) {
 			if len(bom.Components) == 0 {
 				return nil, e.New(e.CodeProvenanceMissing, "hosted SBOM omits required dependency inventory")
 			}
@@ -133,6 +133,8 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 			switch kind {
 			case "tarball":
 				matches = method == "helm-manifests/v1" && scanner == ""
+			case "bundle-archive":
+				matches = method == sbom.BundleFilesMethod && scanner == ""
 			case "file-archive":
 				matches = method == "archive-content/v1" && scanner == ""
 			case "host-package", "oci-image":

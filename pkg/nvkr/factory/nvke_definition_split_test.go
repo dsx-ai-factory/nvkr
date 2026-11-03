@@ -22,7 +22,7 @@ var nvkeSplitFamilies = []struct {
 	name            string
 	outputs, native int
 }{
-	{"core", 22, 26},
+	{"core", 27, 33},
 	{"services", 34, 34},
 	{"telemetry", 17, 17},
 	{"disks", 4, 4},
@@ -35,13 +35,18 @@ var nvkeFamilyOnlyOutputs = map[string]struct {
 	family string
 	output definition.DefinitionOutput
 }{
+	"aicr":                               {"core", nvkeFamilyOnlyOutput("aicr", "linux/arm64", "tools/aicr-arm64", definition.OutputExecutable, "aicr", nil)},
 	"local-path-helper-image":            {"services", nvkeFamilyOnlyOutput("local-path-helper-image", "linux/amd64", "local-path-provisioner", definition.OutputOCI, "local-path-helper-image", nil)},
 	"local-path-helper-image-arm64":      {"services", nvkeFamilyOnlyOutput("local-path-helper-image-arm64", "linux/arm64", "local-path-provisioner", definition.OutputOCI, "local-path-helper-image", nil)},
 	"local-path-provisioner":             {"services", nvkeFamilyOnlyOutput("local-path-provisioner", "linux/amd64", "local-path-provisioner", definition.OutputHelm, "local-path-provisioner-chart", map[string]string{"helper": "local-path-helper-image", "provisioner": "local-path-provisioner-image"})},
 	"local-path-provisioner-arm64":       {"services", nvkeFamilyOnlyOutput("local-path-provisioner-arm64", "linux/arm64", "local-path-provisioner", definition.OutputHelm, "local-path-provisioner-chart", map[string]string{"helper": "local-path-helper-image-arm64", "provisioner": "local-path-provisioner-image-arm64"})},
 	"local-path-provisioner-image":       {"services", nvkeFamilyOnlyOutput("local-path-provisioner-image", "linux/amd64", "local-path-provisioner", definition.OutputOCI, "local-path-provisioner-image", nil)},
 	"local-path-provisioner-image-arm64": {"services", nvkeFamilyOnlyOutput("local-path-provisioner-image-arm64", "linux/arm64", "local-path-provisioner", definition.OutputOCI, "local-path-provisioner-image", nil)},
+	"operator-tools-linux-arm64":         {"core", definition.DefinitionOutput{Name: "operator-tools-linux-arm64", Platform: "linux/arm64", Catalog: &definition.Catalog{Base: "../../catalogs/tools/operator-arm64"}, Components: []string{"helm", "kubectl"}, Format: definition.OutputExecutable}},
 	"nico":                               {"core", nvkeFamilyOnlyOutput("nico", "linux/amd64", "nico", definition.OutputHelm, "nico-chart", nil)},
+	"nico-core-image":                    {"core", definition.DefinitionOutput{Name: "nico-core-image", Platforms: []string{"linux/amd64", "linux/arm64"}, Catalog: &definition.Catalog{Base: "../../catalogs/nico"}, Components: []string{"nico-core-image"}, Format: definition.OutputOCI}},
+	"nico-flow":                          {"core", nvkeFamilyOnlyOutput("nico-flow", "linux/amd64", "nico", definition.OutputHelm, "nico-flow-chart", nil)},
+	"nico-flow-image":                    {"core", definition.DefinitionOutput{Name: "nico-flow-image", Platforms: []string{"linux/amd64", "linux/arm64"}, Catalog: &definition.Catalog{Base: "../../catalogs/nico"}, Components: []string{"nico-flow-image"}, Format: definition.OutputOCI}},
 	"nico-prereqs":                       {"core", nvkeFamilyOnlyOutput("nico-prereqs", "linux/amd64", "nico", definition.OutputHelm, "nico-prereqs-chart", nil)},
 }
 
@@ -60,7 +65,7 @@ func nvkeFamilyOnlyOutput(name, platform, catalog, format, component string, ima
 }
 
 // Family-only catalogs hold only public sources, so they load from disk.
-var nvkeFamilyOnlyCatalogs = map[string]bool{"../../catalogs/local-path-provisioner": true, "../../catalogs/nico": true}
+var nvkeFamilyOnlyCatalogs = map[string]bool{"../../catalogs/local-path-provisioner": true, "../../catalogs/nico": true, "../../catalogs/tools/aicr-arm64": true, "../../catalogs/tools/operator-arm64": true}
 
 func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 	nvkeSplitRepository(t)
@@ -69,6 +74,7 @@ func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 	for _, output := range combined.Outputs {
 		original[output.Name] = nvkeSplitCanonical(t, output)
 	}
+	wantOutputs, wantNative := nvkeSplitExpectedTotals(combined)
 	seen := make(map[string]string)
 	nativeTotal := 0
 	for _, family := range nvkeSplitFamilies {
@@ -114,9 +120,21 @@ func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 			nativeTotal += native
 		})
 	}
-	if len(original) != 69 || len(seen) != len(original)+len(nvkeFamilyOnlyOutputs) || nativeTotal != 81 {
-		t.Fatalf("partition requires %d of %d original plus family-only outputs and %d native targets; want 77/69 and 81", len(seen), len(original), nativeTotal)
+	if len(seen) != wantOutputs || nativeTotal != wantNative {
+		t.Fatalf("partition requires %d outputs and %d native targets; want %d and %d", len(seen), nativeTotal, wantOutputs, wantNative)
 	}
+}
+
+// nvkeSplitExpectedTotals derives the family aggregate from the authored combined
+// Definition plus the pinned family-only declarations, independent of the families.
+func nvkeSplitExpectedTotals(combined definition.Definition) (outputs, native int) {
+	for _, output := range combined.Outputs {
+		native += max(1, len(output.Platforms))
+	}
+	for _, only := range nvkeFamilyOnlyOutputs {
+		native += max(1, len(only.output.Platforms))
+	}
+	return len(combined.Outputs) + len(nvkeFamilyOnlyOutputs), native
 }
 
 func TestNVKEDefinitionSplitEnvironmentIsolation(t *testing.T) {
@@ -153,21 +171,22 @@ func TestNVKEDefinitionSplitEnvironmentIsolation(t *testing.T) {
 			want.GitHubBundle = bundleName
 			want.Publication.RepositoryPrefix += "/" + family.name
 			want.Signing.Identity = "^" + regexp.QuoteMeta(identity) + "@refs/heads/main$"
-			source := "https://github.com/dsx-ai-factory/nvke"
+			sources := map[string]bool{"https://github.com/dsx-ai-factory/nvke": true}
 			if family.name == "disks" {
-				source += ".git"
+				// Disks also build the release catalog's NVIDIA OVN fork producers.
+				sources = map[string]bool{"https://github.com/dsx-ai-factory/nvke.git": true, "https://github.com/dsx-ai-factory/ovn-kubernetes": true}
 			} else {
 				want.GitHubARC, want.DiskEvidence = "", ""
 				want.ExecutionClasses, want.DiskInspectionProfiles = nil, nil
 			}
 			for selected := range want.SourceAccess {
-				if selected != source {
+				if !sources[selected] {
 					delete(want.SourceAccess, selected)
 				}
 			}
 			// Services still needs the private NVKE catalog pin-set credential,
 			// even when every selected image/chart is acquired rather than built.
-			if len(want.SourceAccess) != 1 || !bytes.Equal(nvkeSplitCanonical(t, env), nvkeSplitCanonical(t, want)) {
+			if len(want.SourceAccess) != len(sources) || !bytes.Equal(nvkeSplitCanonical(t, env), nvkeSplitCanonical(t, want)) {
 				t.Fatal("family changes policy outside its namespace or retains the wrong source/disk capabilities")
 			}
 		})
@@ -252,7 +271,8 @@ func TestNVKEDefinitionSplitCompiledIdentityAndGeneratedBundles(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, build := range plan.Builds {
-				if _, familyOnly := nvkeFamilyOnlyOutputs[build.Name]; familyOnly {
+				// Multi-platform outputs name each native build <output>/<os>/<arch>.
+				if _, familyOnly := nvkeFamilyOnlyOutputs[strings.SplitN(build.Name, "/", 2)[0]]; familyOnly {
 					continue
 				}
 				if !bytes.Equal(nvkeSplitCanonical(t, build), builds[build.Name]) {
@@ -311,8 +331,8 @@ func TestNVKEDefinitionSplitCompiledIdentityAndGeneratedBundles(t *testing.T) {
 				len(plan.LifecycleOutputs), len(plan.Builds), len(plan.Graph.Nodes), len(jobs), len(workflow), len(bundle.Files[bundle.PlanPath]), events)
 		})
 	}
-	if buildCount != 81 || outputCount != 77 {
-		t.Fatalf("compiled families retain %d native builds and %d outputs, want 81 and 77", buildCount, outputCount)
+	if wantOutputs, wantNative := nvkeSplitExpectedTotals(combined.Definition); buildCount != wantNative || outputCount != wantOutputs {
+		t.Fatalf("compiled families retain %d native builds and %d outputs, want %d and %d", buildCount, outputCount, wantNative, wantOutputs)
 	}
 }
 
