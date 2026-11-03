@@ -49,12 +49,3 @@ runs and their limits; the former ARM64 published-artifact cycle is retired.
 M2’s product floor remains AMD64 producer provenance. The approved initial scope defers strict
 inspection and material reconciliation without organizational ADR ratification. ARM64 is an implementation extension; every additional
 output explicitly selected by a Definition remains mandatory for that Run and Release.
-
-## Proposed follow-on: cluster observation and evidence
-
-The [cluster observation proposal](cluster-observation-and-artifact-attribution.md) connects upstream
-validation results to the selected artifacts by recording which images, charts, operating systems and
-packages the tested cluster actually runs. It includes portable, independently verifiable evidence with
-public/TestGrid reporting. It proposes AICR Go API integration subject to dependency-policy approval,
-with explicit coverage gaps. It is not an accepted milestone or
-implemented feature, does not change M1–M4 acceptance, and grants no release qualification authority.

@@ -1,153 +1,163 @@
 # Cluster observation and artifact attribution
 
-**Status:** proposed feature design; no implementation or runtime acceptance.
-**Date:** 2026-11-02
+**Status:** proposed design; no standalone collector or live acceptance.
 
-[ADR-29](adr/0029-cluster-observation-and-artifact-attribution.md) records the architectural decision.
-This design owns the proposed workflow, reuse assessment, delivery slices and acceptance criteria.
-It does not allocate a command, wire schema, digest family or approved collector/dependency version.
+**Updated:** 2026-11-03
+
+[ADR-29](adr/0029-cluster-observation-and-artifact-attribution.md) owns the decision. This design covers
+information gathering, Go API integration, descriptive comparison rules, examples and delivery prerequisites.
+It allocates no command, wire schema, digest family or approved dependency version.
 
 ## User outcome
 
-A user wants to validate selected artifacts or run tests against a cluster. Establish which built or acquired
-artifacts the test environment actually runs, using the selected NVKR Run or Release and its SBOMs. Save
-cluster observations and comparisons with the upstream-owned test results so that someone else can verify
-what those results cover. Share readable results and evidence through public/TestGrid links.
-The complete feature covers OCI images, Helm charts, OS images, and host packages/binaries.
+Show what is deployed in an existing cluster, where each fact came from and what could not be read.
+Optionally compare the observation with selected NVKR artifacts and their SBOMs. A build baseline is not
+required to collect information.
 
-The report answers three separate questions: what was produced or acquired, what was installed, and what
-content was measured at observation time. It reports differences and unknowns as useful results. A successful
-functional test cannot establish installed identity; an intact signature cannot establish a truthful host.
+The scope is unsigned, descriptive diagnostics, lane none. Test execution, test-result interpretation,
+signed runtime evidence, public/TestGrid publication, qualification and release-gate acceptance are separate
+work. This design does not add a verdict parser, signer role or consumer trust protocol.
 
-## Workflow and ownership
+## Records and workflow
 
-1. Authenticate the selected Run/Release and subject-bound evidence through existing lifecycle owners.
-   Hold that exact baseline; a mutable tag or decoded release description is not acceptance. An admitted
-   local diagnostic stays explicitly unsigned/unqualified and acquires no hosted publication identity.
-2. Freeze the downstream deployment mapping and comparison policy. NVKE owns topology, installation,
-   supported configuration and output applicability. Distinguish standalone outputs, contained dependencies,
-   acquired artifacts, build-only tools and unused architectures; do not expect every SBOM row to be a Pod.
-   Reuse NVKE's pinned deployment and component release declarations for this mapping where supported,
-   extending the [existing import](nvke-pin-set-usage.md) rather than authoring a competing stack list.
-   Those declarations describe intended installation; they do not prove what is running.
-3. Discover the selected cluster scope, including unrecognized software. Save cluster/object/node identities,
-   observation intervals and available resource versions, plus denied reads, unreachable nodes, exclusions
-   and unsupported measurements. Do not describe several changing API reads as an atomic snapshot.
-4. Compare observed subjects/content with the authenticated baseline under that frozen policy. Preserve
-   installation-lineage gaps and ambiguous digest domains. Do not shrink the required scope after a failure.
-5. Invoke selected upstream-owned checks through admitted artifact/cluster adapters. Bind the test execution
-   to its selected artifacts, suite/harness revision, target cluster and required observation intervals.
-   A claim that these artifacts passed validation requires the upstream verdict and the required identity
-   and coverage checks. Tests may run diagnostically with gaps, but cannot silently validate another artifact.
-   Record selection, completeness, skips, original results and cleanup separately.
-   Tests that allocate tenants or create resources require capacity, access and lifecycle ownership even
-   when they use product APIs. Hardware provisioning remains downstream, outside the verifier.
-6. Retain private originals and construct a reviewed shareable projection before signing. Package covered
-   observations/results and a canonical file inventory bound to baseline, policy and target context.
-   Verify all covered files and recompute comparison/coverage independently before displaying an accepted
-   result. Public views disclose inaccessible observations; TestGrid links to the verified evidence.
+1. Admit an explicit kubeconfig, target, namespace/selector scope, required measurements and resource/time
+   limits. If comparison is requested, freeze the caller's selected outputs, platforms, expected targets
+   or counts, mapping and comparison policy before collection.
+2. Gather bounded API observations and any separately admitted installation or host records. Preserve
+   raw runtime imageIDs and their digest kind; do not reduce them to names/tags. Record each request's
+   scope, available resourceVersion, start/end time, objects/nodes and failed or omitted reads.
+3. Produce a **cluster observation** containing facts and coverage only. It may be useful and complete
+   for its requested information scope without proving artifact identity.
+4. If requested, produce an **artifact comparison** from those facts and the exact selected baseline.
+   Existing lifecycle owners issue any authenticated baseline receipt; a path, decoded SBOM, reporter
+   digest or pass value is not one. An unverified baseline stays visibly unverified.
+5. Display or privately export the observation and optional comparison, with sources and limits. Do not
+   rewrite the publisher SBOM, a Build identity or a Release.
 
-Cluster observations do not change producer identities or the signed publisher SBOM. They introduce no
-seventh authored public lifecycle input. They issue no conformance receipt or release authorization;
-[ADR-16](adr/0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
-continues to own the separate authenticated external-result qualification handoff.
+Deployment owners supply expected output-to-deployment mappings and applicable installation/boot records.
+Their pinned declarations describe intent, not observed state. The [pin-set import](nvke-pin-set-usage.md)
+may supply a read-only cross-check of existing build inputs; do not extend its catalog/lock data with
+runtime topology or placement. Distinguish deployed outputs, contained libraries, build-only tools and
+unused platforms; not every SBOM component is a separate workload. These remain downstream comparison inputs under
+[ADR-19](adr/0019-clusterdefinition-and-provisioning-adapter-boundary.md).
 
-## Attribution requirements
+## Go API integration
 
-| Class | Expected and observed relationship | Limit that remains visible |
+Use AICR Go libraries behind an NVKR adapter, not a second user-facing CLI. Pin and review the actual
+module revision and linked dependency closure before implementation. Pin agent images separately by digest.
+Current contribution policy directs AICR reuse through source adaptation; direct imports need an explicit
+reviewed exception, permitted licenses and provenance/compatibility/security checks. If admission fails,
+revisit the decision with owners. Do not silently substitute a CLI or copied collectors. No module or
+executable pin is added by ADR-29.
+
+| Source | Reuse and required work |
+| --- | --- |
+| Existing NVKR OCI observer | `pkg/nvkr/conformance/deployment.go` owns Pod/node reads, replica checks and native-manifest joins. `observe.go` reads node OS/kernel/runtime/boot information. Expose or refactor an admitted observation-only entrypoint; these are currently internal functions coupled to disposable-cluster conformance execution. Do not call `Produce` or invent existing public `Observe`/`ImageSubject` APIs. |
+| AICR installed inventory | [Read](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/inventory/read.go) / [ReadReleases](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/inventory/releases.go) supply scoped component/release metadata. Current reads can require cluster-wide Secret access; see admission below. They do not prove original archive bytes. |
+| Captured AICR input | [Client.LoadSnapshot](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/client/v1/snapshot.go) consumes a bounded local capture. Capture source bytes once before loading; its returned facade does not retain `Raw`. Reject URL and ConfigMap inputs in the NVKR route. |
+| Opt-in AICR agent | [Client.CollectSnapshot](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/client/v1/aicr.go#L2233) deploys a Job. Preserve `Snapshot.Raw`, target/node identities and collection gaps. Its success does not prove every collector or cleanup succeeded. |
+| Missing host/package information | The inspected AICR OS collector supplies OS/kernel configuration, not a complete installed-package or payload inventory. Select a reviewed upstream provider/extension before offering that capability. Do not claim a general node inventory from one agent's host facts. |
+
+AICR inventory matching needs caller-supplied component/deployer scope; it is not automatic discovery of
+every unrelated chart. Missing whole-scope discovery must remain a coverage gap until an admitted API
+or provider supplies it.
+
+The existing NVKR observation rules need GET of the kube-system namespace identity, LIST nodes, and LIST
+Pods within selected namespaces/selectors. They retain workload/container/node identity and raw imageID.
+They currently accept an exact repository/native-manifest identity, selecting the authenticated platform
+child of an index; config digests and index digests are not interchangeable. Reuse those rules in their
+owning module, rather than implement a second OCI join in the AICR adapter. Broad cluster admission and
+whole-scope discovery are proposed extensions, not existing standalone capabilities.
+
+## Access, collection and privacy
+
+Live collection requires an explicit target/kubeconfig and bounded get/list permissions for declared resources.
+No ambient credential fallback, exec, attach, port-forward, proxy, Secret read or watch is enabled by default.
+Record the actual verbs and scopes used. Unsupported requested capabilities fail with `engine-capability`
+before collection or output. Admitted reads can still fail; retain their partial facts and coded failure
+with incomplete coverage instead of presenting successful complete collection.
+
+Current AICR Helm reads list Secrets across all namespaces; its ConfigMap and Argo Application reads are
+also cluster-wide. Argo named-destination resolution can read cluster Secrets. Namespace-scoped Roles cannot
+turn these current calls into namespace-scoped reads. Require separately admitted read scope, including
+any Secret access, or an upstream namespace-aware API. Otherwise chart inventory is unavailable. Persist
+only permitted decoded metadata/digests, not raw Secret objects or credential-bearing release values.
+
+Agent/host collection is opt-in and separate from signing/publication credentials. Admission requires an
+explicit target, kubeconfig, namespace and node selection, digest-pinned image, positive limits, explicit tolerations and a
+service-account mode. Privilege is off unless separately admitted. An explicitly selected existing service
+account avoids managed RBAC creation; managed mode may create cluster-scoped RBAC and needs those explicit
+grants. Record UID-bound ownership of every created resource; never remove preexisting shared resources.
+
+Require `Cleanup=true`, bounded stop/join and confirmation that all run-owned resources are gone, including
+Jobs, RBAC and staging ConfigMaps. Preserve caller-owned output ConfigMaps and shared service accounts. AICR currently
+logs cleanup errors while returning success. Its flag alone cannot establish cleanup: require an upstream
+surfaced result or independent UID-bound verification before declaring complete collection. Until the
+route is implemented and exercised with these controls, it remains unavailable before resource creation.
+
+Imported AICR snapshots are reporter-asserted inputs, not fresh cluster measurements. Retain target UID
+and collection times when present; mark unavailable identity/time as unknown and separately supplied
+metadata as reporter-asserted. Do not invent missing fields or perform live reads during local import.
+Live collection records the observed kube-system namespace UID, caller-selected context and interval.
+Any expected UID must come from the caller independently of the capture. Object inventory, absence of extras and local timestamps are
+observation-source claims, not proof against a dishonest reporter, compromised API/server or replay.
+
+Keep admitted captures private. Never log, export or durably retain credentials, kubeconfigs, token-bearing
+values, raw Secret/Pod payloads or provider logs. A separately admitted Secret reader may process responses
+transiently inside the library; retain only the permitted metadata projection, not the original API object. Any sharing requires an explicit field projection excluding private
+endpoints/server identifiers and recording withheld fields and its limits. This decision supplies no
+public publication or independently trusted freshness protocol.
+
+## What can be compared?
+
+| Class | Facts that remain useful without identity proof | Prerequisite for an exact artifact connection |
 | --- | --- | --- |
-| OCI | Authenticated image/index and native child joined to actual runtime identity, workload/container/node and architecture | PodSpec strings are discovery hints; an image identity does not measure writable layers, mounted executables or process memory |
-| Helm | Exact archive and dependencies joined through an installation record to values, rendering inputs and live resources | A release version or stored manifest cannot retrospectively prove which archive was consumed; mutation/defaulting rules must be explicit |
-| OS image | Delivered disk and applicable content inventory joined through authenticated boot/provisioning records to node measurements | Kernel/OS labels are not disk identity; hashing a running mutable disk cannot reproduce original QCOW2 bytes |
-| Host package/binary | Exact package or binary and composition/file evidence compared with measured installed payloads | Package-manager names/versions alone are insufficient; generated files, configuration and package transformations need explicit policy |
+| OCI workload image | Requested reference, raw imageID, digest kind, workload/container/node and native platform | Existing lifecycle baseline receipt and supported conformance native-manifest join. Preserve unsupported imageID forms as unverified. |
+| Helm chart | Release/revision/status, chart name/version and available permitted metadata | Deployment-owner record tying exact archive and dependency digests to the installed release and allowed values/render inputs. Version agreement cannot reconstruct the archive. |
+| OS image | Node OS/kernel/runtime/version/boot metadata | Deployment-owner disk-to-node boot/provisioning record and admitted build-side content evidence/measurements. A live mutable disk is not the original QCOW2 byte stream. |
+| Package or host binary | Package/version metadata and separately supported file observations | Subject-bound package/file evidence, installed-path mapping and explicit configuration/generated-file/transformation rules. Names and versions alone are not installed-byte proof. |
 
-Each required member/measurement returns matched, mismatched, not observed, unverified, or explicitly
-non-applicable with a reason. Extra software remains visible and is evaluated by independent policy.
-Overall match requires complete applicable coverage. A collector error, missing node, absent SBOM content
-coverage, unsupported runtime identity or missing installation record cannot produce a complete match.
-OCI/Helm delivery may land first, but it remains partial until OS/package acceptance is exercised.
+The maintained [ADR-13 disk route](adr/0013-supply-chain-evidence.md) declares `nvkr:diskInspection` as
+`not-performed`. Its ordinary CycloneDX projection is not a published installed-file baseline. Strict disk
+inspection and narrower local package/material diagnostics have their own admission/receipt limits; this
+decision does not exercise or widen them. General installed package/file attribution remains unverified
+without a supported baseline. It does not prevent reporting observed OS or package metadata.
 
-Reuse NVKR's existing [CycloneDX evidence and signing owners](dependency-sboms.md) for subject-bound
-build evidence. The observation/comparison is an additional record; it must not rewrite the publisher's
-SBOM or introduce another SBOM implementation.
+No supported deployment-owner installation/boot-record producer is established by this design. Before
+claiming exact chart/disk attribution, name that owner, agree the record contract and verify its artifact,
+install/node and configuration bindings through an admitted owner. Do not create an NVKR-owned installer
+schema as a shortcut. Missing records permit useful inventory and negative comparisons, not invented positives.
 
-## Proposed integration: Go APIs behind an NVKR adapter
+Each comparison class needs an explicit rule for digest domain, permitted transformations and applicable
+measurements. Where that rule is not yet admitted, the result is **unverified**, never matched. Version
+agreement may be displayed as metadata agreement, not as an exact artifact match. Record build/acquired
+identity, installation attribution and measured content as separate claims.
 
-The proposed integration calls AICR Go APIs from a dedicated NVKR adapter. It does not invoke the AICR CLI
-or require users to operate a second CLI. This is a proposed architecture, not dependency approval or an
-implemented adapter. Pin and review the chosen module revision and its linked dependency closure before use.
-Pin any deployed collector image by digest separately; pinning the Go module does not pin an agent image.
+Use **matched**, **mismatched**, **not observed**, **unverified**, and **explicitly non-applicable** everywhere.
+Policy declares non-applicability before collection. Failed reads are gaps, not proof of absence. An overall
+match requires every applicable required member to match with complete required coverage. The policy's
+frozen scope and expected targets/counts cannot be narrowed to the reporter's successful subset. Retain
+unknown software and unsupported joins. A recorded list remains a reporter/API observation, not independent
+proof that it omitted nothing.
 
-| Task | API or owner | Integration responsibility |
-| --- | --- | --- |
-| Capture an AICR snapshot | [CollectSnapshot](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/client/v1/aicr.go#L2233) / [LoadSnapshot](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/client/v1/snapshot.go) | Collection deploys an agent Job and needs explicit access, privileges, resource limits and cleanup. Loading a captured local file deploys no agent; retain the exact bytes used. Neither route establishes every node was measured. |
-| Read installed chart records | [Read](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/inventory/read.go) / [ReadReleases](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/inventory/releases.go) | Supply deployment scope and naming; preserve provenance and gaps. These records do not establish original chart archive identity. Pin the package contract; do not assume all public packages share the client's stability guarantee. |
-| Fill missing observations | Reviewed AICR extensions and deployment-owner records | Preserve runtime image identities and add required chart-install, boot/image and package-file evidence. Do not reconstruct proof from version strings. |
-| Compare and report | Existing NVKR lifecycle/evidence owners plus the new comparison module | Verify the expected artifacts/SBOMs, compare covered facts, and bind suite/execution/target/time/results to them. Retain functional, identity, coverage and cleanup outcomes separately. |
+[Proposed ADR-28](adr/0028-multi-platform-executable-indexes.md) separates executable delivery from runnable
+images. Image-volume consumption uses an OCI identity comparison and needs a supported native-child/mount
+observation; existing container
+imageID checks do not cover it automatically. Copied/repackaged content needs downstream lineage to its
+source; extracted executables use package/file measurements. Until those joins are supported, report
+unverified. Transporting bytes in an OCI index does not make them a running workload.
 
-The adapter controls when collection is permitted and preserves exact observations. Persist `Snapshot.Raw`
-from collection; use the existing snapshot types/accessors for measurement inspection, rather than another
-parser or a lossy reserialization. Capture imported source bytes once before loading them, so the retained
-record is the same one evaluated. Read-only Kubernetes inspection remains the default; an AICR agent Job is a separate opt-in capability, not an invisible side
-effect. Imported observations retain their original collection scope and trust limits. AICR's current
-collector error handling needs explicit coverage accounting before a complete match can be claimed.
-
-Current contribution policy says to adapt source rather than import AICR. This proposal recommends a
-reviewed exception for these Go APIs, conditional on owner approval and the license, provenance,
-compatibility, transitive-dependency and vulnerability checks. Until that is approved, direct imports are
-blocked. Do not silently substitute CLI execution or copied collectors. Revisit the decision with owners
-if the import cannot be admitted. No module, vendored source or executable pin is added by this PR.
-
-AICR evidence code remains a separate compatibility assessment: it currently binds AICR recipe subjects.
-NVKR must retain its own authenticated artifact and test-result bindings; importing a package does not
-make an AICR recipe attestation evidence for an NVKR output.
-
-## AICR reuse assessment
-
-AICR already contains reusable implementations. The inspected source is
-[NVIDIA/aicr at 935e0746](https://github.com/NVIDIA/aicr/tree/935e0746dc54da890a23c1ecca998244b3a25de7).
-These are source/API findings, not proof that the proposed NVKR adapter already consumes those records
-or that a released module version has passed the required dependency review. Do not implement another
-collector or evidence stack before evaluating them.
-
-| Existing capability | Reuse candidate | NVKR integration still required |
-| --- | --- | --- |
-| Node snapshots | Public [snapshotter](https://github.com/NVIDIA/aicr/tree/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/snapshotter) API and collector implementations | Preserve collector failures/omissions and target/interval binding; a successful measurement call is not complete coverage |
-| Installed Helm/Argo inventory | Public [inventory](https://github.com/NVIDIA/aicr/tree/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/inventory) readers | Caller-scoped chart/version inventory is not whole-scope discovery, original archive-byte lineage or comparison with current live resources |
-| Evidence construction/publication | Public [attestation](https://github.com/NVIDIA/aicr/tree/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/evidence/attestation) APIs | Existing inputs/subjects describe AICR recipe, snapshot and phase results; NVKR source Run/output/baseline bindings need an admitted adapter or upstream extension |
-| Independent evidence verification | Public [verifier](https://github.com/NVIDIA/aicr/tree/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/evidence/verifier) API | Evaluate NVKR-specific expected subjects, observation trust, coverage and comparison; do not accept an AICR recipe digest as an NVKR artifact identity |
-
-The current AICR Kubernetes image collector normalizes PodSpec image references and deduplicates them by
-image name. That is useful discovery, but it cannot establish the actual runtime/native-manifest digest
-required here. Its OS collector covers OS/kernel configuration; it does not establish a delivered disk's
-boot lineage or measure all installed package payloads. These gaps require attribution adapters, upstream
-extensions or other admitted collectors, not a duplicate snapshot/evidence framework.
-
-AICR's root [license](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/LICENSE)
-is Apache-2.0. That alone does not approve a linked dependency closure. Current
-[contribution policy](../CONTRIBUTING.md#the-invariants-your-change-must-respect) directs AICR reuse through
-reading/source adaptation rather than importing. The integration proposed above therefore requires an
-explicit exception plus version, transitive-license, provenance, compatibility and vulnerability review.
-CLI integration or reviewed source adaptation remain alternatives if that decision is revisited; neither
-is silently selected by this proposal. This PR adds no module, vendored code or executable pin.
-
-[Proposed pinned-tool producers](adr/0027-pinned-tool-producers.md) and the separate AICR bundle work address
-build-time production of recipe bundles. They are related reuse paths, not implementations of live cluster
-observation, installed-byte attribution or this runtime evidence contract.
-
-## Worked example: was the built artifact deployed?
-
-AICR supplies reusable observations; NVKR supplies the join to its authenticated build baseline and the
-comparison/coverage decision. Additional runtime, host or installer measurements fill specific gaps in the
-existing observations. Prefer extending reusable upstream interfaces where practical. This does not require
-another snapshot framework, and the existing AICR snapshot is not a complete byte inventory of every node.
+## Worked examples
 
 ```mermaid
 flowchart LR
-    B["Authenticated NVKR outputs and SBOMs"] --> C["NVKR correlation and coverage checks"]
-    A["AICR snapshot and installed inventory"] --> C
-    M["Additional admitted measurements and installation records"] --> C
-    C --> R["Comparison, test results and portable evidence"]
+    K["NVKR Pod and node observation rules"] --> O["Cluster observation: facts and gaps"]
+    A["Admitted AICR Go APIs and host records"] --> O
+    O --> V["Private inventory view or export"]
+    O --> C["Optional artifact comparison"]
+    B["Selected NVKR artifacts and SBOMs"] --> C
+    D["Deployment-owner mapping and records"] --> C
+    C --> V
 ```
 
 ### Raw AICR observation
@@ -194,206 +204,78 @@ A successful collection call also does not prove every collector succeeded: indi
 logged and skipped. Where structured status is unavailable, retain unknown coverage or extend the upstream
 interface; do not infer successful complete collection from the call returning without an error.
 
-### Preserve identity and add missing measurements
+### Running image compared with a selected output
 
-The current [image collector](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/collector/k8s/image.go)
-reads PodSpec strings, removes registry paths/digests and deduplicates by image name. For example, these
-synthetic references can both become the same `controller: v1` summary:
-
-```text
-registry-a.example/team/controller:v1@sha256:<digest-A>
-registry-b.example/other/controller:v1@sha256:<digest-B>
-```
-
-Those digest labels are illustrative placeholders, not valid digests or executable inputs. Keep the original
-reference, target object/node identity and actual runtime identity rather than trying to reconstruct them
-from that summary. Normalize the runtime-reported digest through an admitted adapter: a config digest,
-manifest digest and multi-platform index digest cannot be compared as though they were interchangeable.
-
-| Existing observation | Additional observation or record | Purpose |
-| --- | --- | --- |
-| AICR image name/tag summary | Full requested reference, actual runtime identity and digest kind, native platform, container/Pod/workload/node IDs | Resolve the running native image subject and compare it to the correct named output |
-| AICR installed chart/version inventory | Exact consumed chart archive bound by an installation record, values/render inputs and live resources | Establish chart installation lineage and identify configuration/resource drift |
-| AICR OS release/kernel configuration | Node-bound disk boot/provisioning record and measured applicable contents | Connect a node to its delivered OS image; retain gaps for historical nodes without lineage |
-| AICR service/version facts | Installed package records and measured payload/executable files | Detect changed binaries or package contents despite equal names/versions |
-| Available measurements | Per-target collection status, denied reads, unsupported collectors and observation interval | Establish coverage; a skipped collector or unreachable node cannot become a match |
-
-### Correlate one built output
-
-The following is proposed comparison pseudodata. It illustrates required relationships, not a selected wire
-schema, implemented command or real result. Placeholders stand for independently authenticated references
-and full digests. The example uses the maintained `cwe` output and its `nvke-controller` component:
+The following is proposed pseudodata, not a wire schema, real capture or executable command. Digest
+placeholders stand for complete values and the digest domains remain explicit:
 
 ```yaml
-baseline:
-  release: <authenticated immutable release reference>
+selected:
   output: cwe
-  component: nvke-controller
-  sourceCommit: <recorded source commit>
-  imageIndex: <digest-I>
   platform: linux/arm64
-  nativeManifest: <digest-A>
-  sbom: <authenticated subject-bound SBOM reference>
+  imageIndex: <index-I>
+  nativeManifest: <native-A>
 observed:
-  clusterUID: <observed cluster identity>
-  workloadUID: <observed workload identity>
-  podUID: <observed Pod identity>
-  nodeUID: <observed node identity>
+  source: kubernetes-api
+  kubeSystemNamespaceUID: <observed-target-UID>
+  podUID: <observed-Pod-UID>
+  nodeUID: <observed-node-UID>
   requestedImage: registry.example/nvke-controller:v0.22.0
-  platform: linux/arm64
-  runtimeNativeManifest: <digest-B>
+  rawImageID: docker-pullable://registry.example/nvke-controller@sha256:<native-B>
+  digestKind: native-manifest
 comparison:
-  imageIdentity: mismatched
-  reason: Running native manifest differs from the selected output
-  runtimeFileMeasurement: unverified
+  outcome: mismatched
+  reason: Native manifest B differs from selected native manifest A
 ```
 
-The correlation owner authenticates the baseline, selects that exact named output and architecture, joins
-it to the downstream mapping, resolves the observed digest kind, and compares the admitted observations.
-The SBOM must bind to the selected artifact; source, transport and runtime identities remain distinct.
-Digest A and digest B differ here, so the image comparison fails even if the displayed tag/version agrees.
-A matching manifest alone would still leave unmeasured writable layers, mounts or executable contents outside
-its claim. An independent consumer repeats comparison/coverage evaluation from the covered facts.
+The comparison owner consumes a receipt from existing lifecycle owners for the selected output/platform;
+it does not authenticate a reporter-supplied digest. Preserve the original runtime imageID. An unsupported
+runtime digest kind leaves identity unverified. A matching image manifest still does not measure writable
+layers, mounts, configuration or process memory.
 
-### Chart collector and package correlation
+### Chart and host information without false identity claims
 
-Reuse AICR's existing [Helm inventory reader](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/inventory/doc.go).
-It reads the newest in-scope release revision from Helm Secrets/ConfigMaps, or Argo CD Applications for
-the selected deployer. Its public `Read` result provides a component-to-version table, unproven records
-and source accounting; `ReadReleases` provides attributed release records. The caller supplies component
-scope and deployer naming. Neither result is an automatic inventory of every unrelated chart.
-
-The [current decoder](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/inventory/decode.go)
-reads a subset of release data, including chart name/version, app version and annotations. It deliberately
-does not retain rendered manifests/hooks or values in that decoded shape. The public inventory interface
-does not establish the exact original chart archive consumed during installation.
-
-This hypothetical controller-chart example shows what the existing reader can contribute and the join
-that remains. These are explanatory facts, not an allocated API or actual cluster result:
+Reuse the AICR installed-release reader rather than another Helm decoder. It reads a subset of release
+metadata and does not retain full values/rendered manifests in its decoded shape. A hypothetical report:
 
 ```text
-NVKR expected output: controller-chart
-Expected chart archive: digest-C
-Expected bound controller image: index I with native child A for linux/arm64
-AICR installed component version: 0.22.0
-Record binding installed release to archive digest-C: unavailable
-Result: chart archive attribution UNVERIFIED
+Installed chart version: 0.22.0
+Selected chart archive: C
+Installation record connecting this release to archive C: unavailable
+Artifact comparison: unverified
 ```
 
-If the deployment owner supplies an authenticated record binding archive C to the exact Helm release,
-revision and admitted install inputs, the comparator can establish that package-to-install join. It must
-then evaluate configuration and live resources separately. For example, a release installed from archive C
-but configured to resolve to native controller image B on ARM64 cannot satisfy a policy requiring child A
-of index I on that platform, even though the chart version and archive identity agree. Compare resolved
-subjects, not an index digest directly with its child. A later live-resource change remains a separate drift
-observation.
+The release metadata is useful inventory. To claim archive attribution, the deployment owner must supply
+an admitted record binding archive C and its dependencies to the exact release/revision and install inputs.
+If configuration resolves to native controller image B while the selected output requires child A of index
+I, compare those resolved native subjects and report mismatched. Resource/configuration drift remains a
+separate field comparison under an explicit rule.
 
-The implementation should reuse/extend the reader for installed-release discovery, add the admitted
-archive/install record and values/render/live-resource observations, and let NVKR compare them with its
-authenticated outputs. It must not invent original archive bytes from Helm's stored manifest or introduce
-another ad hoc Helm decoder. Any richer reader must reuse an established upstream interface/implementation
-under the dependency and capability review rules. Values and manifests may contain secrets; their shareable
-projection and coverage must be defined before evidence publication.
+Similarly, an observed OS release is not disk-image identity. An installed package version is not a
+measurement of its executable files. Report both facts even when their corresponding artifact connection
+is unverified. A missing required node is incomplete capture, not evidence that its software is absent.
 
-### Four-class outcomes and incomplete coverage
+## Delivery and acceptance
 
-These are hypothetical cases for implementation and acceptance review, not recorded test results:
-
-| Case | Example | Required report |
+| Slice | Deliverable | Dependency and acceptance |
 | --- | --- | --- |
-| OCI | Expected native manifest A, observed native manifest B, same version label | Image identity mismatched |
-| Helm | Chart version agrees, but no trustworthy record identifies the installed archive | Archive attribution unverified; a stored release manifest cannot fill the gap |
-| OS image | OS release agrees, but the node has no authenticated boot/image lineage | Disk-to-node attribution unverified, even when the node is healthy |
-| Host package/binary | Package version agrees, but measured executable hash differs from the authenticated package/file baseline | Measured content mismatched under the explicit file/configuration policy |
-| Complete scoped positive | All required installation records, applicable payload subjects and measurements agree | Matched only for the recorded scope, interval and observation trust; no independent host attestation is implied |
-| Unreachable node | Nine nodes inspected, one required node unavailable | Incomplete coverage; no complete cluster match |
-| Unrecognized software | An extra workload has no baseline mapping | Retain it as extra/unattributed; independent policy decides whether it is allowed |
-| Contained/build-only item | A Go module is embedded in the controller, or a tool was used only for building | Account for containment/applicability; do not require an invented standalone Pod |
+| API observation | Observation-only entrypoint reusing NVKR's existing Pod/node identity rules | Real selected target, explicit access/scope, inventory without a build baseline; denied reads, wrong expected target, missing nodes and budgets remain explicit. No test run or API mutation. |
+| Installed-release inventory | Admitted AICR Go reader integration | Import policy/dependency review and a bounded access contract. Exercise Helm and Argo permission cases, including named-destination Secret reads; retain permitted metadata only. |
+| Host/package information | Separately admitted host provider or AICR extensions | Explicit agent/host admission and verified owned-resource cleanup, plus an actual package provider. Show useful real observations and denied/unsupported/cleanup-failure cases; do not describe one host as every node. |
+| Artifact comparison | Optional supported joins against selected outputs | Lifecycle baseline receipts, existing OCI owner and deployment-owner records. Chart/disk positive claims wait for verified downstream records; installed-file positives wait for admitted build/host baselines. Demonstrate mismatches and unknown joins. |
 
-Functional tests and attribution remain separate. A useful report can therefore say:
+For complete information-gathering support, exercise real observations and controlled metadata changes for
+each of the four classes, plus its denied/missing-data cases. A required unavailable provider keeps that
+collection slice partial. This does not require every observed artifact to have a provable build lineage.
 
-```text
-Functional tests: PASS
-Controller image identity: MISMATCHED
-Chart archive attribution: UNVERIFIED
-Host package coverage: INCOMPLETE
-Overall build match: NOT ESTABLISHED
-```
+Complete artifact attribution is a separate, stronger bar: each class needs a real matched positive, its
+required negative cases and a controlled mismatch. An all-unverified or explicitly non-applicable class
+cannot establish that capability. A caller may still receive a useful inventory while these joins remain
+unimplemented. No live acceptance is established by this design or its examples.
 
-### Portable evidence example
+## Follow-ups and ownership
 
-AICR's [evidence demo](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/demos/evidence.md)
-already combines a snapshot, resolved recipe, CycloneDX BOM, phase results, file inventory and signed
-statement. Reuse compatible collection/packaging/signature/integrity mechanisms. Its recipe subject does
-not automatically become an NVKR Run/output subject; an admitted adapter or upstream interface extension
-must bind the NVKR baseline and observations correctly.
-
-An illustrative NVKR observation bundle could contain the following. Names are explanatory placeholders,
-not an allocated layout or schema, and referenced evidence is verified only when available to the consumer:
-
-```text
-observation-bundle/
-  build-baseline.json       # exact Run/Release outputs, subjects and SBOM bindings
-  snapshot.yaml             # covered shareable AICR observations
-  deployment-records.json   # covered runtime/host/install records
-  comparison.json           # per-output comparison and reasons
-  coverage.json             # required/observed targets, exclusions and gaps
-  reports/                  # original approved upstream result files
-  manifest.json             # exact covered-file digest/length inventory
-  signed-observation        # baseline, policy, target and file-inventory bindings
-```
-
-Preserve private originals separately and define any public projection before signing. Missing private
-measurements cannot be treated as publicly verified facts. A consumer authenticates the signer and subjects,
-checks every covered file, and recomputes comparison/coverage under independently selected expectations.
-TestGrid and public pages present those same results and evidence locators. A signed mismatch or partial
-report remains inspectable, but satisfies no required passing policy and grants no qualification authority.
-
-## Collection and evidence trust
-
-Start with scoped, read-only Kubernetes API collection. Host access or installing a collector is opt-in:
-admit privileges, resource/time budgets and owned stop/join/cleanup before work. Reusing AICR does not
-implicitly admit its agent jobs, privileges, credentials or network access. Never hide SSH or deployment repair.
-
-Record whether facts came from authenticated APIs, deployment records or host assertions. Signed observations
-attest to a reporter and exact bytes, not physical existence or a trustworthy compromised node. Stronger host
-attestation is a separately admitted capability. Check freshness and target/baseline context to reject reuse
-for another cluster or build; before/after samples do not establish continuously unchanged contents.
-
-Exclude credentials, kubeconfigs, token-bearing configuration, private endpoints/server identifiers and raw
-provider logs from the shareable projection. Document its relationship to private originals. A public consumer
-can verify only accessible covered observations and must retain other claims as unverified.
-
-Preserve a valid signed failed/partial report. Keep evidence integrity/authenticity, artifact comparison,
-functional test verdict, coverage, cleanup and publication outcomes distinct. A raw JUnit reference or process
-exit status alone cannot establish an exhaustive passing suite. Reuse upstream verdict/completion contracts;
-do not copy expected test-name lists into NVKR. The verifier recomputes the comparison from covered facts,
-not from a reporter's pass boolean. Public dashboards are presentations, not trust anchors.
-
-## Delivery slices and acceptance
-
-| Slice | Deliverable | Required evidence |
-| --- | --- | --- |
-| Observation contract and API snapshot | Admit scope, trust and collector results; capture workloads/nodes and unfamiliar software | Real selected cluster; denied reads, unreachable targets and non-atomic observations remain visible; no API-collector mutations |
-| OCI/Helm attribution | Add authenticated native-image joins and chart installation-lineage adapters | Positive plus wrong subject/platform, mixed replicas, reused tags, mutated values/resources and absent chart-lineage negatives; explicit partial host coverage |
-| OS/package attribution | Add admitted host collection and boot/image-to-node joins with file/package reconciliation | Supported-node positive and changed payload, missing boot record, incomplete inventory and unsupported collector negatives; no overall match with required gaps |
-| Portable evidence and reporting | Emit, sign/publish, independently verify, inspect drift and link public/TestGrid views | Independent consumer round-trip; wrong signer/subject/target, tampering, replay and missing covered files fail; intact failed observations remain inspectable |
-
-Full acceptance requires a supported NVKE stack with all four classes accounted for, a controlled changed
-component detected, and an independent consumer verifying the same published evidence. Contract fixtures
-establish protocol behavior; they do not establish live collection, publication, hardware or production acceptance.
-No collector, dependency, runtime workflow or accepted result is added by this proposal.
-
-## Review boundaries
-
-NVKR owns build/evidence authentication and comparison. NVKE/downstream owners define deployment mapping,
-installation/boot records and upstream test assertions. Collector ownership and reusable AICR interfaces need
-review with those owners. Reconcile accepted changes at ADR-05/13/16/19/23/24 before authority-bearing
-implementation. Current required-suite qualification ingestion remains separate work under ADR-16.
-
-The architecture review must agree on observation trust and required coverage. The implementation review
-must approve the proposed Go-library policy exception and verify the exact pinned API/dependency contract,
-its admission boundary, target identity and supported host measurements. No arbitrary shell adapter,
-unreviewed schema, or new authority
-restored from serialized reports is admitted by this document. No schedule, approved owner or ratification
-is inferred from including the proposal in the roadmap.
+Agree on the observation-only entrypoint, pinned AICR module, namespace/Secret access contract and the
+host/package provider before implementation. Collection and comparison stay with their existing deep
+owners; deployment owners retain placement and installation records. Wire formats and CLI presentation
+need implementation review. No signer, test adapter, verdict protocol or qualification handoff is added.

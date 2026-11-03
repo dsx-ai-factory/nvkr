@@ -92,12 +92,11 @@ its [aggregate identity](adr/0028-multi-platform-executable-indexes.md#5-aggrega
 [image-index publication](adr/0028-multi-platform-executable-indexes.md#6-publication-a-standard-image-index-over-minimal-per-platform-images).
 Nothing is implemented.
 
-Proposed [ADR-29](adr/0029-cluster-observation-and-artifact-attribution.md) separates cluster observations
-and attribution from build identity and qualification. The [feature design](cluster-observation-and-artifact-attribution.md)
-connects test results to selected OCI, Helm, OS and host-package artifacts using observations and comparisons.
-It proposes AICR Go API integration behind an NVKR adapter, conditional on dependency-policy approval,
-with explicit observation gaps. It is design only;
-no new collector, dependency, runtime evidence publisher or provisioning authority is implemented.
+Proposed [ADR-29](adr/0029-cluster-observation-and-artifact-attribution.md) separates collected cluster
+facts from their optional comparison with selected artifacts. Its [design](cluster-observation-and-artifact-attribution.md)
+proposes AICR Go APIs and an observation-only entrypoint reusing the existing NVKR image observer. These
+remain unsigned descriptive diagnostics with explicit access and coverage limits. No standalone collector,
+test execution, signed runtime report or qualification capability is implemented.
 
 ## Assumptions {#assumptions}
 
