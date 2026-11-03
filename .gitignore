@@ -31,5 +31,8 @@ coverage.html
 # generated nvkr-exec helper build artifacts (binaries); the lock is committed
 /toolchains/nvkr-exec/out/
 
+# locked Fern CLI installed by `make fern-install`
+/tools/fern/node_modules/
+
 # personal agent overlay (see AGENTS.md "Local Overlay")
 AGENTS.local.md
