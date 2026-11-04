@@ -55,6 +55,13 @@ func TestCompositeMergeContract(t *testing.T) {
 		{name: "differing sbomTool", composite: "defs/composite.yaml", code: e.CodeInvalidCatalog, mutate: func(members []AdmittedMember) {
 			members[1].Definition.SBOMTool = "trivy"
 		}},
+		{name: "omitted sbomTool inherits the shared one", composite: "defs/composite.yaml", mutate: func(members []AdmittedMember) {
+			members[0].Definition.SBOMTool = ""
+		}},
+		{name: "differing sbomTool after an omitted one", composite: "defs/composite.yaml", code: e.CodeInvalidCatalog, mutate: func(members []AdmittedMember) {
+			members[0].Definition.SBOMTool = ""
+			members[2].Definition.SBOMTool = "trivy"
+		}},
 		{name: "omitted cosignTool", composite: "defs/composite.yaml", code: e.CodeInvalidCatalog, mutate: func(members []AdmittedMember) {
 			members[2].Definition.CosignTool = ""
 		}},

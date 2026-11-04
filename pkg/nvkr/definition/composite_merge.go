@@ -35,8 +35,19 @@ func mergeComposite(compositePath string, metadata Metadata, admitted []Admitted
 	sort.Slice(members, func(i, j int) bool { return members[i].Name < members[j].Name })
 	effective := Definition{APIVersion: DefinitionAPIVersion, Kind: DefinitionKind, Metadata: metadata}
 	owners := map[string]string{}
+	// A member that omits sbomTool inherits the one the other members share.
+	shared := ""
+	for _, member := range members {
+		if member.Definition.SBOMTool != "" {
+			shared = member.Definition.SBOMTool
+			break
+		}
+	}
 	for i, member := range members {
 		source := member.Definition.Clone()
+		if source.SBOMTool == "" {
+			source.SBOMTool = shared
+		}
 		stack, err := rebaseCatalog(member.Path, compositePath, source.Catalog)
 		if err != nil {
 			return Definition{}, nil, e.Wrap(e.CodeInvalidCatalog, err, "composite member %q catalog", member.Name)
@@ -48,7 +59,7 @@ func mergeComposite(compositePath string, metadata Metadata, admitted []Admitted
 				return Definition{}, nil, e.New(e.CodeInvalidCatalog, "composite member %q top-level catalog stack differs from member %q", member.Name, members[0].Name)
 			}
 			if source.SBOMTool != effective.SBOMTool || source.CosignTool != effective.CosignTool {
-				return Definition{}, nil, e.New(e.CodeInvalidCatalog, "composite member %q selects different sbomTool or cosignTool than member %q", member.Name, members[0].Name)
+				return Definition{}, nil, e.New(e.CodeInvalidCatalog, "composite member %q selects a different sbomTool or cosignTool than the other members", member.Name)
 			}
 		}
 		for _, output := range source.Outputs {
