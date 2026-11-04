@@ -19,11 +19,14 @@ class Link(str):
     """A fixture value committed as a symbolic link to this target."""
 
 
-LINK = "link its docs/adr/reconciliation.md row instead"
-OWNERS = "link docs/adr/reconciliation.md#support-by-owner row"
-LEDGER = "| Owner | Implemented | Remaining |\n|---|---|---|\n| 01–03 Identity | x | y |\n| 21 Generation | x | y |\n"
+LINK = "link its docs/adr/reconciliation/ row instead"
+OWNERS = "link docs/adr/reconciliation/"
+ROW = "| Owner | Implemented | Remaining |\n|---|---|---|\n"
 BASE = {
-    "docs/adr/reconciliation.md": LEDGER,
+    "docs/adr/reconciliation/README.md": "# Architecture implementation and evidence\n",
+    "docs/adr/reconciliation/adr-01-03.md": ROW + "| 01–03 Identity | x | y |\n",
+    "docs/adr/reconciliation/adr-21.md": ROW + "| 21 Generation | x | y |\n",
+    "docs/adr/reconciliation/adr-17-cli-presentation-and-inspection.md": "## ADR-17 CLI presentation\n",
     "docs/guide.md": "Existing text remains unrecorded.\n",
     "docs/old.md": "Old text remains unproven.\n",
     "docs/moved-from.md": "Old text remains unproven.\nTwo.\nThree.\nFour.\nFive.\n",
@@ -47,11 +50,14 @@ CASES = {
     "adr file names its owner row": (
         {"docs/adr/0021-generation.md": "Its hosted acceptance is unrecorded.\n"},
         ['docs/adr/0021-generation.md:1: status restated ("is unrecorded"); '
-         f'{OWNERS} "21 Generation" instead']),
+         f'{OWNERS}adr-21.md instead']),
     "adr reference names a range row": (
         {"docs/identity.md": "Identity has not been exercised\nfor ADR-02.\n"},
         ['docs/identity.md:1: status restated ("has not been exercised"); '
-         f'{OWNERS} "01 Identity" instead']),
+         f'{OWNERS}adr-01-03.md instead']),
+    "topic file is not an owner file": (
+        {"docs/cli.md": "The ADR-17 viewer is untested.\n"},
+        [f'docs/cli.md:1: status restated ("is untested"); {LINK}']),
     "renamed file reports only added lines": (
         {"docs/moved-from.md": None, "docs/moved.md": BASE["docs/moved-from.md"] + "Signing is untested.\n"},
         [f'docs/moved.md:6: status restated ("is untested"); {LINK}']),
@@ -92,10 +98,13 @@ CASES = {
         {'docs/naïve "q".md': "Signing is untested.\n"},
         [f'docs/naïve "q".md:1: status restated ("is untested"); {LINK}']),
     "ledger look-alike is checked": (
-        {"docs/adr/reconciliation.md-backup.md": "Hosted signing remains unproven.\n"},
-        [f'docs/adr/reconciliation.md-backup.md:1: status restated ("remains unproven"); {LINK}']),
+        {"docs/adr/reconciliation.md": "Hosted signing remains unproven.\n",
+         "docs/adr/reconciliation-notes.md": "Hosted signing remains unproven.\n"},
+        [f'docs/adr/reconciliation-notes.md:1: status restated ("remains unproven"); {LINK}',
+         f'docs/adr/reconciliation.md:1: status restated ("remains unproven"); {LINK}']),
     "ledger and evidence": (
-        {"docs/adr/reconciliation.md": LEDGER + "Hosted signing remains unproven.\n",
+        {"docs/adr/reconciliation/adr-21.md": BASE["docs/adr/reconciliation/adr-21.md"] + "Hosted signing remains unproven.\n",
+         "docs/adr/reconciliation/native-arc-disk-route.md": "Hosted signing remains unproven.\n",
          "docs/evidence/run.md": "Hosted signing remains unproven.\n"}, []),
     "lane names": ({"docs/lanes.md": "Dry-run stays static-unqualified; local runs remain unqualified.\n"}, []),
     "unchanged text": ({"docs/old.md": BASE["docs/old.md"] + "Unrelated.\n"}, []),
@@ -181,8 +190,8 @@ class StatusRestatedTest(unittest.TestCase):
     def test_missing_local_ledger(self):
         """Without a local ledger, naming an owner row fails closed with a concise message."""
         with tempfile.TemporaryDirectory() as empty, self.assertRaises(SystemExit) as raised:
-            restated.ledger(empty, None)
-        self.assertIn("cannot read docs/adr/reconciliation.md", str(raised.exception.code))
+            restated.owner_files(empty, None)
+        self.assertIn("cannot list docs/adr/reconciliation/", str(raised.exception.code))
 
     def test_working_tree(self):
         """Without a head, check uncommitted and untracked Markdown since the merge base."""

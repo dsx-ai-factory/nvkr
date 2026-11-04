@@ -4,7 +4,7 @@
 
 """Fail when a diff restates validation or evidence status outside the reconciliation ledger.
 
-Status lives only in docs/adr/reconciliation.md rows and dated docs/evidence/ records; every
+Status lives only in the docs/adr/reconciliation/ ledger and dated docs/evidence/ records; every
 other document links the row instead of restating it. This checks Markdown lines added since the
 merge base of BASE and HEAD (or the working tree, including untracked files, when HEAD is omitted)
 against a fixed list of status phrases taken from fixed review findings. Other phrasings pass; it
@@ -21,8 +21,7 @@ import re
 import subprocess
 import sys
 
-LEDGER = "docs/adr/reconciliation.md"
-OWNERS = f"{LEDGER}#support-by-owner"
+LEDGER = "docs/adr/reconciliation/"
 EVIDENCE = "docs/evidence/"
 MARKDOWN = ("*.md", "*.mdx")
 REVISION_HINT = "fetch BASE and HEAD with full history, or set STATUS_BASE/STATUS_HEAD"
@@ -50,7 +49,7 @@ PHRASES = [re.compile(p.replace(" ", r"\s+"), re.IGNORECASE) for p in (
 )]
 ESCAPE = re.compile(r"<!--\s*status-ok\b(.*?)-->")
 REASON = re.compile(r"^\s*:\s*\S")
-OWNER_ROW = re.compile(r"^\| (\d\d)(?:[–-](\d\d))? ([^|]+?) \|")
+OWNER_FILE = re.compile(r"^adr-(\d\d)(?:-(\d\d))?\.md$")
 ADR_PATH = re.compile(r"^docs/adr/(\d{4})-")
 ADR_REF = re.compile(r"\bADR-(\d{1,2})\b")
 LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s")
@@ -156,26 +155,31 @@ def scan(run):
 
 
 @functools.cache
-def ledger(repo, head):
-    """Return the ledger lines at head, or in the working tree when head is None."""
+def owner_files(repo, head):
+    """Return the ledger's adr-NN[-MM].md owner files at head, or in the working tree when head is None."""
     if head is None:
         try:
-            return Path(repo, LEDGER).read_text(encoding="utf-8").splitlines()
+            names = os.listdir(Path(repo, LEDGER))
         except OSError as err:
-            raise SystemExit(f"check-status-restated: cannot read {LEDGER} to name the owner row: {err}") from err
-    return git(repo, "show", f"{head}:{LEDGER}").splitlines()
+            raise SystemExit(f"check-status-restated: cannot list {LEDGER} to name the owner file: {err}") from err
+    else:
+        names = git(repo, "ls-tree", "--name-only", f"{head}:{LEDGER}").splitlines()
+    owners = sorted(name for name in names if OWNER_FILE.match(name))
+    if not owners:
+        raise SystemExit(f"check-status-restated: {LEDGER} has no adr-NN.md owner files to name")
+    return owners
 
 
 def ledger_row(repo, head, path, text):
-    """Name the ledger row to link: the Support-by-owner row of the ADR the line belongs to."""
+    """Name the ledger file to link: the Support-by-owner file of the ADR the line belongs to."""
     adr = ADR_PATH.match(path) or ADR_REF.search(text)
     if not adr:
         return f"its {LEDGER} row"
     number = int(adr.group(1))
-    for row in ledger(repo, head):
-        m = OWNER_ROW.match(row)
-        if m and int(m.group(1)) <= number <= int(m.group(2) or m.group(1)):
-            return f'{OWNERS} row "{m.group(1)} {m.group(3)}"'
+    for name in owner_files(repo, head):
+        m = OWNER_FILE.match(name)
+        if int(m.group(1)) <= number <= int(m.group(2) or m.group(1)):
+            return f"{LEDGER}{name}"
     return f"its {LEDGER} row"
 
 
@@ -188,7 +192,7 @@ def check(repo, base, head=None):
     changed = added_lines(diff) | ({} if head else untracked_lines(repo))
     out = set()
     for path, added in changed.items():
-        if path == LEDGER or path.startswith(EVIDENCE):
+        if path.startswith((LEDGER, EVIDENCE)):
             continue
         if head:
             text = git(repo, "cat-file", "blob", f"{head}:{path}")
