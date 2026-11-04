@@ -1,9 +1,9 @@
 # ADR-06 — Immutable publication & status lifecycle
 
 - **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
-- **Implementation maturity:** Tracked separately in `reconciliation.md`; implementation and test evidence do not
+- **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
-- **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
+- **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
 - **Index:** ADR-06 in the consolidated NVKR ADR set.

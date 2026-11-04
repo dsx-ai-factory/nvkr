@@ -22,9 +22,13 @@ func cmdValidators() *cli.Command {
 		if describe {
 			usage, argsUsage = "describe one exact validator ID without execution", "VALIDATOR-ID"
 		}
-		return &cli.Command{Name: name, Usage: usage, ArgsUsage: argsUsage, Flags: []cli.Flag{&cli.StringFlag{Name: "catalog", Required: true, Usage: "path to the versioned validator catalog index"}}, Action: func(c *cli.Context) error {
+		return &cli.Command{Name: name, Usage: usage, ArgsUsage: argsUsage, Flags: []cli.Flag{&cli.StringFlag{Name: "catalog", Usage: "path to the versioned validator catalog index (required)"}}, Action: func(c *cli.Context) error {
 			if (!describe && c.Args().Present()) || (describe && c.Args().Len() != 1) {
 				return e.New(e.CodeUsage, "invalid validator discovery arguments")
+			}
+			// Not cli's Required flag: that check runs before OnUsageError and returns an uncoded error (exit 1).
+			if c.String("catalog") == "" {
+				return e.New(e.CodeUsage, "validators %s requires --catalog", name)
 			}
 			sdk := client.New()
 			var result any
@@ -46,9 +50,12 @@ func cmdValidators() *cli.Command {
 	}
 	return &cli.Command{Name: "validators", Hidden: true, Usage: "discover and run provisional imported CLI diagnostics", Subcommands: []*cli.Command{
 		discovery(false), discovery(true),
-		{Name: "run", Usage: "execute an explicit versioned local-plan profile (unqualified)", Flags: []cli.Flag{&cli.StringFlag{Name: "profile", Required: true, Usage: "path to the versioned local-plan validation profile"}, &cli.BoolFlag{Name: "keep", Usage: "retain diagnostic workspaces after execution"}, &cli.StringFlag{Name: "workspace-root", Usage: "parent directory for private diagnostic workspaces"}}, Action: func(c *cli.Context) error {
+		{Name: "run", Usage: "execute an explicit versioned local-plan profile (unqualified)", Flags: []cli.Flag{&cli.StringFlag{Name: "profile", Usage: "path to the versioned local-plan validation profile (required)"}, &cli.BoolFlag{Name: "keep", Usage: "retain diagnostic workspaces after execution"}, &cli.StringFlag{Name: "workspace-root", Usage: "parent directory for private diagnostic workspaces"}}, Action: func(c *cli.Context) error {
 			if c.Args().Present() {
 				return e.New(e.CodeUsage, "validators run accepts flags only")
+			}
+			if c.String("profile") == "" {
+				return e.New(e.CodeUsage, "validators run requires --profile")
 			}
 			invocation, err := client.New().PrepareValidatorProfile(c.Context, c.String("profile"), client.ValidatorRuntime{Keep: c.Bool("keep"), WorkspaceRoot: c.String("workspace-root"), Stdout: c.App.Writer, Stderr: c.App.ErrWriter})
 			if err != nil {

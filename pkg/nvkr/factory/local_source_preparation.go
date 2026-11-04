@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -59,7 +60,31 @@ func PrepareLocalNVKESource(ctx context.Context, repository, definitionPath, env
 	if environment.Publication != nil || environment.Signing != nil {
 		return NativeBuildPreparation{}, e.New(e.CodeEngineCapability, "local source preparation requires unsigned inputs")
 	}
-	if _, err := CompileDocuments(ctx, definitionPath, definition, environmentPath, environment, "local-source-preparation"); err != nil {
+	// Hold each admitted stack for this preparation only. Shared outputs must
+	// not repeatedly acquire the same pinned metadata during the three passes.
+	type admittedStack struct {
+		selection authored.Catalog
+		stack     *catalog.Stack
+	}
+	var stacks []admittedStack
+	loadStack := func(ctx context.Context, selection authored.Catalog) (*catalog.Stack, error) {
+		if err := ctx.Err(); err != nil {
+			return nil, e.Wrap(e.CodeTimeout, err, "local source catalog admission canceled")
+		}
+		for _, admitted := range stacks {
+			if admitted.selection.Base == selection.Base && slices.Equal(admitted.selection.Overlays, selection.Overlays) {
+				return admitted.stack, nil
+			}
+		}
+		stack, err := loadFactoryCatalogStack(ctx, definitionPath, selection)
+		if err != nil {
+			return nil, err
+		}
+		selection.Overlays = slices.Clone(selection.Overlays)
+		stacks = append(stacks, admittedStack{selection: selection, stack: stack})
+		return stack, nil
+	}
+	if _, err := compileDocumentsWithLoader(ctx, definitionPath, definition, environmentPath, environment, "local-source-preparation", loadStack); err != nil {
 		return NativeBuildPreparation{}, err
 	}
 	revision, err := catalog.ResolveSourceRevisionAtRef(ctx, localNVKERepository, "refs/heads/main", commit)
@@ -72,7 +97,7 @@ func PrepareLocalNVKESource(ctx context.Context, repository, definitionPath, env
 		if output.Catalog != nil {
 			selection = *output.Catalog
 		}
-		stack, err := loadFactoryCatalogStack(ctx, definitionPath, selection)
+		stack, err := loadStack(ctx, selection)
 		if err != nil {
 			return NativeBuildPreparation{}, err
 		}
@@ -92,7 +117,7 @@ func PrepareLocalNVKESource(ctx context.Context, repository, definitionPath, env
 				return original, false, nil
 			}
 			return selected, true, nil
-		}, true)
+		}, true, loadStack)
 	if err != nil {
 		return NativeBuildPreparation{}, err
 	}

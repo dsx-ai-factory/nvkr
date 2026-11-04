@@ -2,7 +2,7 @@
 
 - **Decision status:** Proposed (pending named-decider ratification)
 - **Implementation maturity:** Initial provisional CLI catalog, strict loading/discovery and local-plan profile dispatch
-  are implemented. Broader migration, published adapters and stabilization remain deferred; see `reconciliation.md`.
+  are implemented. Broader migration, published adapters and stabilization remain deferred; see `reconciliation/README.md`.
 - **Acceptance-test maturity:** Initial discovery/admission/snapshot and mocked CLI dispatch contracts are tested.
   No new actual upstream catalog execution or native-platform catalog acceptance is claimed.
 - **Deciders:** Pending; validation, artifact-production and upstream interface owners must be named before ratification.
@@ -39,7 +39,7 @@ select checks. Its phase grouping and Kubernetes Job execution fit live-cluster 
 separation of discovery, implementation and selection, organized around repositories and artifact consumers.
 It must also preserve exact source relationships and support validators consuming several artifacts together.
 
-There are already two relevant execution surfaces. `run artifact-test` is a trusted-input local CLI diagnostic;
+There are already two relevant execution surfaces. `validators run` is a trusted-input local CLI diagnostic;
 `validate` dispatches explicitly configured published-source `kube-conformance` checks through Hydrophone.
 The latter retains publication authentication and separately admits complete local diagnostic Runs through
 its existing conformance owner. Its local Run route is distinct from the new CLI local-plan binding.
@@ -348,7 +348,7 @@ Resolve the complete selected configuration once before execution. Execute that 
 reopening mutable entry files between phases. Retained diagnostics include canonical resolved configuration
 and exact source-document byte digests, so a reviewer can distinguish an entry edit from an artifact change.
 Credential values are excluded; runtime secret handles remain with execution owners. Factory's opaque
-diagnostic invocation is shared by both CLI paths and freezes complete Plan interpretation before execution
+diagnostic invocation freezes complete Plan interpretation before execution
 without issuing an authenticated receipt. Artifact paths are frozen; bytes retain the staging-time integrity
 contract. Exact admitted Plan document integrity is retained with catalog selection metadata.
 
@@ -361,16 +361,14 @@ input bindings, suite revisions, tools or platform observations are distinct dia
 cannot be reused solely because Build Digests match. No result cache or cross-output reuse is introduced.
 File paths and display-only descriptions cannot determine artifact identity.
 
-### 9. Migrate through explicit compatibility boundaries
+### 9. Migrate through explicit boundaries
 
 First add catalog discovery and strict loading, then catalog the existing `contract` and `cli` suites through
-their current Go owners. Preserve the hidden `run artifact-test` diagnostic as a compatibility interface
-with direct factory dispatch. Preserve its documented error/exit behavior, cleanup and diagnostic limitations.
+their current Go owners. `validators run` is the sole NVKR interface for these suites and keeps the diagnostic's suite-failure exit status, timeout classification, cleanup and limitations; admission errors use the profile loader's codes. This lands before named-owner ratification of the profile schema, which remains pending.
 There is no automatic switch from a failed catalog lookup back to hard-coded execution.
 
-The legacy `run artifact-test --timeout` admits arbitrary positive per-container bounds, while `nvke-cli/v1`
-caps catalog suite execution at 30 minutes and retains a separate 30-minute dependency budget. The legacy
-command therefore retains direct factory dispatch; mapping its flags to catalog entries remains deferred.
+`nvke-cli/v1` caps catalog suite execution at 30 minutes and retains a separate 30-minute dependency budget;
+longer test timeouts are intentionally unsupported.
 
 The existing unversioned JSON `validate --config` profile keeps its current published-source semantics and
 its independently admitted complete-local-Run conformance route.

@@ -6,7 +6,7 @@
 
 > [!NOTE]
 > This document explains the system and the reasons for its boundaries. The [ADRs](adr/) govern design;
-> [reconciliation](adr/reconciliation.md) records implementation and evidence. Proposed ADRs are the engineering
+> [reconciliation](adr/reconciliation/README.md) records implementation and evidence. Proposed ADRs are the engineering
 > baseline pending ratification, not organizational approval.
 > Public lifecycle ownership is defined in [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md).
 > The current ADRs state the qualified and pipeline-attested contracts directly; [milestones](milestones.md)
@@ -177,7 +177,7 @@ evidence remains visible but never upgrades the aggregate that consumed it.
 
 | Reference | Use |
 |---|---|
-| [ADR set](adr/) and [reconciliation](adr/reconciliation.md) | Design decisions, maturity, evidence, and unresolved critiques |
+| [ADR set](adr/) and [reconciliation](adr/reconciliation/README.md) | Design decisions, maturity, evidence, and unresolved critiques |
 | [v1 milestones](milestones.md) and [epic specification](epics-v1-spec.md) | M1–M4 product acceptance |
 | [Domain vocabulary](../CONTEXT.md) and [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md) | Public object meanings and lifecycle contracts |
 | [Contribution guide](../CONTRIBUTING.md) and [development guide](../DEVELOPMENT.md) | Repository verification and engineering workflow |
@@ -458,7 +458,7 @@ single-build emitter or grant that adapter authority by analogy.
 ## ADR index & traceability
 
 This index locates design responsibility. Per-ADR maturity and remaining acceptance evidence live in
-[reconciliation](adr/reconciliation.md), avoiding a second detailed status ledger here.
+[reconciliation](adr/reconciliation/README.md), avoiding a second detailed status ledger here.
 
 | ADR | Design responsibility | Main view in this SADD |
 |---|---|---|
@@ -509,7 +509,7 @@ and authenticates a derived delivery root with portable original proofs. Typed c
 adapters, provider acceptance and actual boot/package-install acceptance remain required. Existing schema
 constants, whole-Plan verification and current capability admission are unchanged by this documentation freeze.
 
-[Reconciliation](adr/reconciliation.md) owns the current support matrix. Local immutable attempts,
+[Reconciliation](adr/reconciliation/README.md) owns the current support matrix. Local immutable attempts,
 Plan/graph inspection, GitHub generation, metadata-only release navigation and the scoped
 `pipeline-attested` consumers for `authenticity` and `artifact-publication` are implemented. Authenticity
 does not check artifact payload integrity or grant qualification; its contract tests establish no external
@@ -1189,7 +1189,7 @@ unavailable. Arbitrary devices, nested
 virtualization, NUMA, accelerators and additional provider-specific lowering are deferred. In-process
 cleanup owns success, failure and cancellation; authenticated orphan recovery after hard process/host
 failure is also deferred. ADR-10/18 own the detailed admission and driver contracts;
-[reconciliation](adr/reconciliation.md) separates their tests from recorded native runtime observations.
+[reconciliation](adr/reconciliation/README.md) separates their tests from recorded native runtime observations.
 
 Produced-artifact size remains an artifact and transport budget.
 
@@ -1271,5 +1271,5 @@ reproduction of helper bytes.
 | Revision | 2026-10-07 |
 | Related ADRs | ADR-01…ADR-22 (`docs/adr/`) |
 | Related acceptance documents | `docs/milestones.md` summarizes the roadmap; `docs/epics-v1-spec.md` owns product acceptance; ADRs own engineering contracts |
-| Current support record | `docs/adr/reconciliation.md` |
+| Current support record | `docs/adr/reconciliation/README.md` |
 | Related surface | `docs/lifecycle.md` |
