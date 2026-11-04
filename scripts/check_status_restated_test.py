@@ -192,6 +192,16 @@ class StatusRestatedTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as empty, self.assertRaises(SystemExit) as raised:
             restated.owner_files(empty, None)
         self.assertIn("cannot list docs/adr/reconciliation/", str(raised.exception.code))
+        self.assertIn("contains the per-section ledger", str(raised.exception.code))
+        for name, files in {"empty ledger": [], "topic files only": ["README.md", "adr-17-cli.md"]}.items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as checkout:
+                ledger_dir = Path(checkout, "docs/adr/reconciliation")
+                ledger_dir.mkdir(parents=True)
+                for file in files:
+                    Path(ledger_dir, file).write_text("# topic\n")
+                with self.assertRaises(SystemExit) as raised:
+                    restated.owner_files(checkout, None)
+                self.assertIn("has no adr-NN.md owner files", str(raised.exception.code))
         with self.assertRaises(SystemExit) as raised:
             restated.owner_files(self.repo, "4b825dc642cb6eb9a060e54bf8d69288fbee4904")  # git's empty tree
         self.assertIn("predates the per-section ledger; merge main", str(raised.exception.code))

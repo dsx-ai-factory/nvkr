@@ -572,8 +572,9 @@ jobs:
 
   # Restated validation status
   #
-  # Status lives in docs/adr/reconciliation.md rows and docs/evidence/ records;
-  # other documents link the row instead of restating it. The check reads only
+  # Status lives in the per-section ledger under docs/adr/reconciliation/
+  # (index README.md, owner files adr-NN.md) and in docs/evidence/ records;
+  # other documents link the owning row instead of restating it. The check reads only
   # the Markdown lines a PR adds, so it runs on pull requests only: a push or
   # dispatch has no base to diff against. Full history is fetched so the
   # merge base of the PR's base and head is available.

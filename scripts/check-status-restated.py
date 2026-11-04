@@ -161,7 +161,8 @@ def owner_files(repo, head):
         try:
             names = os.listdir(Path(repo, LEDGER))
         except OSError as err:
-            raise SystemExit(f"check-status-restated: cannot list {LEDGER} to name the owner file: {err}") from err
+            raise SystemExit(f"check-status-restated: cannot list {LEDGER} to name the owner file: {err} "
+                             "(update the checkout so it contains the per-section ledger)") from err
     else:
         names = git(repo, "ls-tree", "--name-only", f"{head}:{LEDGER}",
                     hint=f"{head} predates the per-section ledger; merge main to name the owner file").splitlines()
