@@ -9,8 +9,8 @@ reuse shared catalog/pin owners and publish into separate family prefixes beneat
 namespace. `make nvke-split-generate` and `make nvke-split-check` own the family subset; the repository-wide
 workflow targets include it. These are authored-input and generation changes, not a new lifecycle or
 cross-Run assembly contract. No hosted family execution, publication or independent consumer acceptance
-is recorded. The combined production/development and qualification paths remain until consumer and
-qualification cutover. Named producer qualification and named development remain unsupported; the pilot
+is recorded. The combined production and qualification paths remain until consumer and qualification
+cutover; the GPU site composite below owns the fixed development bundle. Named producer qualification and named development remain unsupported; the pilot
 emits no automatic association file or parent Release. Consumers independently verify exact family
 references and own any required association or compatibility decision. See the
 [pilot inputs](../../../inputs/definitions/nvke/README.md#family-pilot) and
@@ -67,8 +67,9 @@ checks and formatting failure/read-only fixtures also passed. New-head hosted CI
 Native Linux signing/pipeline race and pinned-cosign interoperability were not rerun locally; raw local
 logs remain unpublished. These local contracts establish no hosted family acceptance.
 
-The maintained closure inventory checks every committed producer bundle and both qualification pairs
-offline, without skipping when private sources are unavailable. It checks exact policy selections, member
+The maintained closure inventory checks every committed producer bundle and the production qualification
+pair offline; no development qualification pair is committed, and the plain-development qualification generator
+is contract-tested separately on a compiled fixture. It runs without skipping when private sources are unavailable. It checks exact policy selections, member
 bytes/modes and complete namespace inventory; authenticated recompilation remains owned by workflow checks.
 The existing combined/development/nightly credential matrix now states each disk expectation explicitly,
 including the development exemption. The separate actual disks-family assertion retains four producers.
