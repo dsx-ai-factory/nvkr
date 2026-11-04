@@ -33,12 +33,12 @@ make ci-check      # every merge-gate check that runs locally
 ## Local development equals CI
 
 `make ci-check` runs every check in the merge gate (`.github/workflows/merge-gate.yaml`) that can run locally:
-the `make check` code gate (format, Definition and ledger location, license header, vet, lint, shellcheck, Python
-report-tool tests, fast tests and Go vulnerability checks), the binary build, actionlint, third-party notices
-drift, generated-workflow drift and the Fern docs check. Workflow drift needs read access to the private NVKE
-source, and the docs check needs Node and the Fern CLI. CodeQL and the DCO App run only on GitHub. A test in
-`internal/cicontract` fails when the Makefile's `CI_CHECKS` list and the make targets the merge gate runs
-differ, so add a new hosted check to both.
+the `make check` code gate (format, Definition and ledger location, license header, restated status, vet, lint,
+shellcheck, Python report-tool tests, fast tests and Go vulnerability checks), the binary build, actionlint,
+third-party notices drift, generated-workflow drift and the Fern docs check. Workflow drift needs read access
+to the private NVKE source, and the docs check needs Node and the Fern CLI. CodeQL and the DCO App run only on
+GitHub. A test in `internal/cicontract` fails when the Makefile's `CI_CHECKS` list and the make targets the
+merge gate runs differ, so add a new hosted check to both.
 
 On a pull request the merge gate runs only the checks whose inputs changed; `make ci-check` runs all of
 them. Run `make ci-check` before opening a PR; without NVKE access, run `make check` and `make build` and say
