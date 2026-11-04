@@ -80,10 +80,12 @@ Release. Composite qualification, member Release reuse and composite runtime Pla
 `engine-capability`. Verifying a composite Release establishes nothing about the family Releases, and the
 reverse also holds.
 
-The [GB200 AICR bundle](../aicr/nvke-gb200.yaml) is not yet a member. Adding it would bring the composite's
-finalizer to 779 jobs, and ADR-18's 16 fixed result-collector buckets would route 65 of them into one bucket,
-over its 64-job limit, so generation refuses it with `engine-capability`. Its Definition also omits the
-`sbomTool: syft` that every family selects, which ADR-26 requires members to share.
+The [GB200 AICR bundle](../aicr/nvke-gb200.yaml) is not yet a member. Its Definition omits the
+`sbomTool: syft` that every family selects, which ADR-26 requires members to share. A measurement with
+`sbomTool: syft` added, taken before the core family dropped its NICo outputs and AICR CLI, put the
+six-member finalizer at 779 jobs, and ADR-18's 16 fixed result-collector buckets routed 65 of them into one
+bucket, over its 64-job limit, so generation refused it with `engine-capability`. The current 81-output
+selection has not been measured.
 
 ### GPU system matrix
 
@@ -129,11 +131,14 @@ shared catalogs and pins; they do not import each other or change the combined D
 | [Disks Ubuntu 24](disks-ubuntu24.yaml) | 4 | The same four disks on Ubuntu 24.04 through the [Ubuntu 24 overlay](../../catalogs/node-images/variants/ubuntu24.json) | [github-nvke-disks-ubuntu24.yaml](../../environments/github-nvke-disks-ubuntu24.yaml) |
 
 The core family no longer selects the five NICo outputs or the ARM64 AICR CLI; their catalogs remain. A
-development Run of the [GPU site composite](#gpu-site-composite)
-([41789718662](https://github.com/dsx-ai-factory/nvkr/actions/runs/41789718662)) failed both. Source
-admission refuses infra-controller `v2.3.0` because
+development Run of the [GPU site composite](#gpu-site-composite) at `ee5d61d1`, before this change, failed
+both ([41789718662](https://github.com/dsx-ai-factory/nvkr/actions/runs/41789718662)): the
+[NICo `nico-chart` fetch](https://github.com/dsx-ai-factory/nvkr/actions/runs/41789718662/job/126440623326)
+and the [AICR publication bundle](https://github.com/dsx-ai-factory/nvkr/actions/runs/41789718662/job/126445930388).
+Source admission refuses infra-controller `v2.3.0` because
 `pxe/mkosi.profiles/scout-oss-aarch64/mkosi.extra/etc/systemd/system/multi-user.target.wants/forge-scout.service`
-is an absolute symlink, so no NICo output can be fetched. Publication requires one bundle entry per subject,
+is an absolute symlink, so no NICo output can be fetched
+([#375](https://github.com/dsx-ai-factory/nvkr/issues/375)). Publication requires one bundle entry per subject,
 and the AICR executable output carries its `aicr-attestation.sigstore.json` companion as a second entry. The
 GB200 AICR bundle builds AICR from its own pinned source and does not need this CLI.
 
@@ -178,6 +183,9 @@ publication or independent consumer acceptance is established here. The
 historical capacity measurements and remaining cutover work.
 
 ## Selected artifacts and their owners
+
+Rows marked "not selected" are catalogs that stay in the repository although no maintained Definition
+selects their outputs.
 
 | Output group | Owning inputs | Selection |
 |---|---|---|
