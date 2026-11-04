@@ -27,8 +27,9 @@ support both CLIs; use `--paginate` and retain complete responses (`--full` with
 `gh-axi`). Filter out objects containing `pull_request` from the issues endpoint.
 
 ```sh
-gh-axi api '/repos/dsx-ai-factory/nvkr/labels?per_page=100' --paginate --full
-gh-axi api '/repos/dsx-ai-factory/nvkr/issues?state=open&per_page=100' --paginate --full
+repo="${REPO:-dsx-ai-factory/nvkr}"  # the selected repository
+gh-axi api "/repos/$repo/labels?per_page=100" --paginate --full
+gh-axi api "/repos/$repo/issues?state=open&per_page=100" --paginate --full
 ```
 
 For a named issue, fetch it directly, confirm its repository and object type, and

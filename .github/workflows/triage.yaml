@@ -38,9 +38,12 @@ jobs:
             const existing = new Set(issue.labels.map(label => label.name));
             const wanted = new Set(['needs-triage']);
             // Use the form's exact component, not keywords in logs or examples.
-            const component = (issue.body || '').match(
-              /^### Component(?:\r?\n)+([^\r\n]+)/m
-            )?.[1].trim();
+            // Free text before or after the dropdown can repeat the heading;
+            // infer nothing unless exactly one Component section exists.
+            const sections = [...(issue.body || '').matchAll(
+              /^### Component(?:\r?\n)+([^\r\n]+)/gm
+            )];
+            const component = sections.length === 1 ? sections[0][1].trim() : undefined;
             if (component === 'Docs / examples') wanted.add('documentation');
             // NVKR has no area/* taxonomy. Only infer existing labels from
             // an explicit title scope.
