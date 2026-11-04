@@ -47,12 +47,15 @@ type ociBundleResult struct {
 // accepted bundle separately. Failed candidates are cached too, so another
 // evidence type cannot turn the same operation into a second registry scan.
 type ociBundleSource struct {
-	descriptors []v1.Descriptor
-	load        func(context.Context, v1.Descriptor) ([]byte, error)
-	cache       map[string]ociBundleResult
-	bytes       int64
-	close       func()
-	check       func() error
+	// authenticated receives only the exact bundle that passed both claims and
+	// cryptographic checks. It is scoped to this verification operation.
+	authenticated func(string, []byte)
+	descriptors   []v1.Descriptor
+	load          func(context.Context, v1.Descriptor) ([]byte, error)
+	cache         map[string]ociBundleResult
+	bytes         int64
+	close         func()
+	check         func() error
 }
 
 func (s *ociBundleSource) failure() error {

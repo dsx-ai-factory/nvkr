@@ -167,7 +167,7 @@ func MetadataOutputs(root PublicationRoot) ([]Output, error) {
 		b := object.Output
 		o := Output{Name: object.Name, Kind: b.Format, Digest: object.DescriptorDigest, BuildDigest: b.BuildDigest, Components: append([]string(nil), b.Components...), Disk: cloneDiskOutput(b.Disk), ImageIndex: b.ImageIndex.Clone()}
 		o.OS, o.Arch = object.OS, object.Arch
-		if b.Format == "apt-repository" {
+		if b.Format == "apt-repository" || b.Format == outputFormatDebian {
 			o.Digest = object.SemanticDigest
 		}
 		if err := o.Validate(); err != nil {

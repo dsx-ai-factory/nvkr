@@ -120,6 +120,10 @@ func verifyReleaseEvidenceSources(ctx context.Context, root string, publication 
 				if output.Format == outputFormatBundle && subject != o.BlobDigest {
 					return e.New(e.CodeVerifyFailed, "bundle build subject differs from its preserved archive")
 				}
+			case outputFormatDebian:
+				if subject != o.BlobDigest || o.SemanticDigest != o.BlobDigest {
+					return e.New(e.CodeVerifyFailed, "Debian build subject differs from its preserved raw package")
+				}
 			case "executable", "apt-repository", "disk-image":
 			default:
 				return e.New(e.CodeVerifyFailed, "release has an unsupported output format")

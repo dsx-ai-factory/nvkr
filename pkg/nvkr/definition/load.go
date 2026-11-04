@@ -5,6 +5,7 @@ package definition
 
 import (
 	"context"
+	"strings"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"sigs.k8s.io/yaml"
@@ -82,6 +83,25 @@ func decodeStrict(raw []byte, label string, output any) error {
 	}
 	if err := yaml.UnmarshalStrict(raw, output); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "parsing %s", label)
+	}
+	// Explicit null/empty values must not extend the old version's vocabulary.
+	if environment, ok := output.(*Environment); ok && environment.APIVersion == EnvironmentAPIVersion {
+		var fields map[string]any
+		if err := yaml.UnmarshalStrict(raw, &fields); err != nil {
+			return e.Wrap(e.CodeInvalidCatalog, err, "reading Environment fields")
+		}
+		for name, value := range fields {
+			if !strings.EqualFold(name, "publication") {
+				continue
+			}
+			if publication, ok := value.(map[string]any); ok {
+				for field := range publication {
+					if strings.EqualFold(field, "objectStores") {
+						return e.New(e.CodeInvalidCatalog, "objectStores requires Environment v2")
+					}
+				}
+			}
+		}
 	}
 	return nil
 }

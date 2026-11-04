@@ -110,7 +110,7 @@ func captureRetainedOrdinaryPublication(ctx context.Context, plan *Plan, artifac
 		}
 	}()
 	output := Artifact{Path: filepath.Join(stage, "layout"), Producer: node.ID}
-	objects, cleanup, err := collectPublicationObjects(ctx, plan, output, packages, evidence)
+	objects, cleanup, err := collectPublicationObjects(ctx, plan, output, packages, evidence, artifacts)
 	if err != nil {
 		return nil, "", err
 	}

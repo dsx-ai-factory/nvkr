@@ -24,11 +24,12 @@ import (
 )
 
 const (
-	DefinitionAPIVersion  = definition.DefinitionAPIVersion
-	DefinitionKind        = definition.DefinitionKind
-	EnvironmentAPIVersion = definition.EnvironmentAPIVersion
-	EnvironmentKind       = definition.EnvironmentKind
-	RunSchemaVersion      = "nvkr.dev/run/v4"
+	DefinitionAPIVersion              = definition.DefinitionAPIVersion
+	DefinitionKind                    = definition.DefinitionKind
+	EnvironmentAPIVersion             = definition.EnvironmentAPIVersion
+	EnvironmentObjectStoresAPIVersion = definition.EnvironmentObjectStoresAPIVersion
+	EnvironmentKind                   = definition.EnvironmentKind
+	RunSchemaVersion                  = "nvkr.dev/run/v4"
 	// CompositeRunSchemaVersion is the Run major carrying an ADR-26
 	// composition record; plain Run records keep v4 bytes.
 	CompositeRunSchemaVersion = "nvkr.dev/run/v5"
@@ -72,6 +73,9 @@ type APTOutput = definition.APTOutput
 type Environment = definition.Environment
 type SourceAccess = definition.SourceAccess
 type Publication = definition.Publication
+type ObjectStoreDestination = definition.ObjectStoreDestination
+type S3ObjectStoreDestination = definition.S3ObjectStoreDestination
+type ObjectStoreTransfer = definition.ObjectStoreTransfer
 type Runtime = definition.Runtime
 type Signing = definition.Signing
 

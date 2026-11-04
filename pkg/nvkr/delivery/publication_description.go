@@ -35,9 +35,10 @@ type PublicationDescription struct {
 
 type PublicationOutput struct {
 	Output
-	Publication   *PublicationOrigin `json:"publication,omitempty"`
-	ArtifactType  string             `json:"artifactType"`
-	BuildSubjects []BuildSubject     `json:"buildSubjects"`
+	Publication      *PublicationOrigin `json:"publication,omitempty"`
+	ArtifactType     string             `json:"artifactType"`
+	DescriptorDigest string             `json:"descriptorDigest"`
+	BuildSubjects    []BuildSubject     `json:"buildSubjects"`
 }
 
 type PublicationEvidence struct {
@@ -131,7 +132,7 @@ func publicationDescription(reference string, inspection Inspection, outputs []O
 			origin = &value
 		}
 		view.Outputs = append(view.Outputs, PublicationOutput{
-			Output: output, Publication: origin, ArtifactType: object.ArtifactType,
+			Output: output, Publication: origin, ArtifactType: object.ArtifactType, DescriptorDigest: object.DescriptorDigest,
 			BuildSubjects: append([]BuildSubject{}, object.Output.BuildSubjects...),
 		})
 	}
