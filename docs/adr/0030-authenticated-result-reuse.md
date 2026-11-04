@@ -2,7 +2,7 @@
 
 - **Decision status:** Proposed (design only; pending named-decider ratification)
 - **Implementation maturity:** Designed, not implemented. No reuse key, discovery, acceptance, receipt or Run
-  binding exists; see `reconciliation.md`.
+  binding exists; see `reconciliation/README.md`.
 - **Acceptance-test maturity:** None. The test matrix below is the acceptance target for the implementing unit;
   no contract test, hosted Run or qualification result exercises reuse.
 - **Deciders:** Pending; release-engineering, publication and qualification owners must be named before ratification.

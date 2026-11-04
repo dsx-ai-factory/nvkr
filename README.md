@@ -87,7 +87,7 @@ walks through the commands and Docker-based verification from macOS.
 establish exact-byte reproduction, freedom from vulnerabilities or deployment
 readiness. The maintained node-image SBOMs record producer and material subjects;
 they do not inspect installed disk contents. See the
-[implementation and evidence record](docs/adr/reconciliation.md) for recorded
+[implementation and evidence record](docs/adr/reconciliation/README.md) for recorded
 Runs and the limits of what each establishes.
 
 ## Choose your next step

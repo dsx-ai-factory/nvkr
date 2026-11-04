@@ -14,7 +14,7 @@ acceptance. The [input index](../inputs/README.md) describes current entry point
 
 The engineering contracts remain [ADR-19](adr/0019-clusterdefinition-and-provisioning-adapter-boundary.md),
 [ADR-21](adr/0021-generated-pipeline-maintenance-and-lifecycle.md) and
-[ADR-22](adr/0022-catalog-pinning-and-the-lock-contract.md); [reconciliation](adr/reconciliation.md)
+[ADR-22](adr/0022-catalog-pinning-and-the-lock-contract.md); [reconciliation](adr/reconciliation/README.md)
 owns current implementation and external evidence. Product source, output membership and publication
 policy changes require their own explicit review, even when performed during this migration.
 
