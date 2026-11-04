@@ -4,6 +4,14 @@
 # Keep Go module deps and GitHub Actions current with minimal churn.
 version: 2
 updates:
+  - package-ecosystem: npm
+    directory: /.github/scripts
+    schedule:
+      interval: weekly
+    groups:
+      workflow-scripts:
+        patterns: ["*"]
+
   - package-ecosystem: gomod
     directory: /
     schedule:

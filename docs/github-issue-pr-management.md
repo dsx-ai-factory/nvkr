@@ -60,15 +60,38 @@ owners review their paths; maintainers handle review, requests for changes, and
 merge decisions under [GOVERNANCE.md](../GOVERNANCE.md). Draft PRs are not ready
 for maintainer review.
 
-The triage workflow adds `area/*` labels according to
-[changed paths](../.github/labeler.yml), preserving manual labels, and keeps one
-`size/*` label matching the changed line count. The separate
+The [PR labels workflow](../.github/workflows/pr-labels.yaml) computes `area/*`
+labels from [changed paths](../.github/labeler.yml) and one `size/*` label from
+the changed line count. It runs on `pull_request` with read-only permissions,
+including for forks, and uploads a JSON request. The
+[label writer](../.github/workflows/pr-labels-apply.yaml) runs on `workflow_run`
+completion with a PR write token. It executes only default-branch code and treats
+the artifact as untrusted data outside the checkout. It validates the schema and
+config-derived label allow-list, binds the request to the run's head repository,
+branch and commit and the current PR, and recomputes labels from current API data
+before writing. It preserves manual area/type labels and replaces stale sizes.
+Incomplete file lists, unknown labels, missing repository labels and mismatched
+requests fail before any write. Closed PRs and PRs retargeted away from `main`
+are skipped. Label writes are not atomic; rerunning the producer repairs partial
+application after a write failure.
+
+Both same-repository and fork PRs use this split. Fork runs remain subject to
+GitHub's normal approval requirements. The writer becomes active after its
+workflow reaches the default branch; stale requests need a new producer run.
+This automation needs no Actions policy exception for `pull_request_target`.
+
+The separate
 [title check](../.github/workflows/pr-title-lint.yaml) validates the Conventional
 Commit format on title edits as well as new commits, and the
 [label guard](../.github/workflows/pr-label-guard.yaml) fails while a PR carries
-`do-not-merge`. These workflows run the base branch's
-[scripts](../.github/scripts/triage.cjs) without checking out PR code; `make
-test-workflow-scripts` tests them. Both checks report independently of the required
+`do-not-merge`, including when an edit retargets the PR to `main`. These two
+checks use `pull_request` with read-only tokens and check out the base commit's
+[scripts](../.github/scripts/triage.cjs). As with other `pull_request` checks,
+GitHub does not run them while a PR has merge conflicts. Their workflow
+definitions can be changed by the PR, so they remain advisory checks.
+`make test-workflow-scripts` tests the decisions and artifact validation locally;
+it does not prove GitHub's fork approval or event delivery behavior.
+Both checks report independently of the required
 `gate` check; this automation does not change branch rules or make either check
 required.
 

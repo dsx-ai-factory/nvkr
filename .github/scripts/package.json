@@ -1,0 +1,9 @@
+{
+  "name": "nvkr-workflow-scripts",
+  "private": true,
+  "license": "Apache-2.0",
+  "dependencies": {
+    "minimatch": "11.0.4",
+    "yaml": "2.9.1"
+  }
+}

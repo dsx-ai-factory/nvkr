@@ -100,7 +100,7 @@ area/ci:
 area/docs:
   - changed-files:
       - any-glob-to-any-file:
-          - '*.md'
+          - '**/*.md'
           - '.agents/skills/**'
           - 'demos/**'
           - 'docs/**'
