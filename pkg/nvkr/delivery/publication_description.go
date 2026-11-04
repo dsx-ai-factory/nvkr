@@ -39,6 +39,9 @@ type PublicationOutput struct {
 	ArtifactType     string             `json:"artifactType"`
 	DescriptorDigest string             `json:"descriptorDigest"`
 	BuildSubjects    []BuildSubject     `json:"buildSubjects"`
+	// ChartArchiveDigest is the Helm content-layer digest checked against the
+	// publication binding. It describes the compressed .tgz, not the manifest.
+	ChartArchiveDigest string `json:"chartArchiveDigest,omitempty"`
 }
 
 type PublicationEvidence struct {
@@ -131,9 +134,14 @@ func publicationDescription(reference string, inspection Inspection, outputs []O
 			value := *object.Output.Publication
 			origin = &value
 		}
+		var chartArchiveDigest string
+		if object.Output.Format == outputFormatHelm {
+			chartArchiveDigest = object.BlobDigest
+		}
 		view.Outputs = append(view.Outputs, PublicationOutput{
 			Output: output, Publication: origin, ArtifactType: object.ArtifactType, DescriptorDigest: object.DescriptorDigest,
-			BuildSubjects: append([]BuildSubject{}, object.Output.BuildSubjects...),
+			BuildSubjects:      append([]BuildSubject{}, object.Output.BuildSubjects...),
+			ChartArchiveDigest: chartArchiveDigest,
 		})
 	}
 	sort.Slice(view.Evidence, func(i, j int) bool { return view.Evidence[i].Name < view.Evidence[j].Name })

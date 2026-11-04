@@ -39,6 +39,14 @@ func TestMetadataDescriptionExcludesPayloadVerification(t *testing.T) {
 			if kind == outputFormatHelm && (artifacts[0].ChartVersion != "1.2.3" || want.Outputs[0].ChartVersion != "1.2.3") {
 				t.Fatalf("Helm projection lost chart version: %+v, %+v", artifacts, want)
 			}
+			if kind == outputFormatHelm {
+				archive, err := os.ReadFile(fixtureBlobPath(root, want.Outputs[0].ChartArchiveDigest))
+				if err != nil || digestBytes(archive) != want.Outputs[0].ChartArchiveDigest || want.Outputs[0].ChartArchiveDigest == want.Outputs[0].Digest {
+					t.Fatalf("Helm description must retain the exact .tgz digest separately from the manifest: %+v, %v", want.Outputs[0], err)
+				}
+			} else if want.Outputs[0].ChartArchiveDigest != "" {
+				t.Fatalf("non-Helm output gained a chart digest: %+v", want.Outputs[0])
+			}
 			if err := publication.Close(); err != nil {
 				t.Fatal(err)
 			}
@@ -132,6 +140,13 @@ func TestMetadataDescriptionRejectsRerootedMembershipChanges(t *testing.T) {
 	}{
 		{"root schema", "executable", func(root *PublicationRoot) { root.SchemaVersion = "nvkr.dev/publication-root/v2" }, e.CodeVerifyFailed},
 		{"content subject", "executable", func(root *PublicationRoot) { root.Release.ContentSubject = digestBytes([]byte("other")) }, e.CodeVerifyFailed},
+		{"chart archive binding", outputFormatHelm, func(root *PublicationRoot) {
+			for i := range root.Objects {
+				if root.Objects[i].Output != nil {
+					root.Objects[i].BlobDigest = digestBytes([]byte("different chart archive"))
+				}
+			}
+		}, e.CodeVerifyFailed},
 		{"missing evidence", "executable", func(root *PublicationRoot) {
 			for i, object := range root.Objects {
 				if object.Evidence != nil {

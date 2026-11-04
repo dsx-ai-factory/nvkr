@@ -704,6 +704,14 @@ accepted. Export and unfiltered JSON browsing share one explicit versioned wire 
 same delivery-owned metadata reader. The schema does not directly serialize internal authority-bearing
 types or add a public lifecycle object, canonical identity or publication format.
 
+Helm output descriptions include `helm.defaultDigest` as an additive field in that read schema, using
+`sha256:<64 lowercase hex>` for the final compressed chart archive. Delivery projects the existing
+publication blob digest only after checking its binding to the single Helm chart-content layer.
+The output's existing digest and reference continue to identify the OCI manifest. Non-Helm outputs omit
+the Helm description. This spelling matches AICR's component-registry input; consumers still own mapping
+outputs to registry entries and chart coordinates. Existing publication records need no migration,
+and metadata-only export does not read or verify the archive bytes.
+
 Every named output is retained, without a consumer-role dictionary or producer allowlist. Native artifacts
 keep their config-declared OS/architecture; aggregate images keep the published index digest and exact child
 platform membership. Helm chart version remains distinct from appVersion and says nothing about workload
