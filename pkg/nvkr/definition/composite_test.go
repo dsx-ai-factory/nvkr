@@ -322,6 +322,37 @@ func TestCompositeDigestBindsDeclaredVariants(t *testing.T) {
 	}
 }
 
+// TestCompositionRecordEmptyVariantsKeepIdentity keeps a typed empty
+// declaration on the record path identical to an undeclared record.
+func TestCompositionRecordEmptyVariantsKeepIdentity(t *testing.T) {
+	root, composite := compositeFixture(t)
+	writeCompositeFile(t, filepath.Join(root, "defs", "composite.yaml"), composite)
+	admitted, err := LoadComposite(t.Context(), root, "defs/composite.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := NewCompositionRecord(admitted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	empty := record.Clone()
+	empty.Variants = []DeclaredVariant{}
+	if err := empty.ValidateMembership(admitted.Digest(), []string{"alpha-cli", "beta-cli"}); err != nil {
+		t.Fatalf("empty variants changed record membership: %v", err)
+	}
+	if err := empty.Validate(admitted.Effective(), admitted.Digest()); err != nil {
+		t.Fatalf("empty variants changed record validation: %v", err)
+	}
+	want, err := canonical.Marshal(*record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := canonical.Marshal(*empty)
+	if err != nil || string(got) != string(want) || strings.Contains(string(got), `"variants"`) {
+		t.Fatalf("empty-variant record bytes = %s, want %s (%v)", got, want, err)
+	}
+}
+
 func TestCompositeAdmissionKeepsDigestAcrossMemberFormatting(t *testing.T) {
 	root, composite := compositeFixture(t)
 	formatted := "# reformatted\napiVersion: nvkr.dev/definition/v5\nkind: Definition\nmetadata:\n  name: beta\n" +
