@@ -80,7 +80,7 @@ func makeTarget(t *testing.T, makefile, dir, target string) (string, error) {
 	defer cancel()
 	command := exec.CommandContext(ctx, "make", "-s", "-f", makefile, "-C", dir, "--no-print-directory", target)
 	// An enclosing make (for example `make test`) must not pass its flags down.
-	command.Env = append(command.Environ(), "MAKEFLAGS=", "MFLAGS=", "MAKELEVEL=")
+	command.Env = scratchGitEnv(command.Environ(), "MAKEFLAGS=", "MFLAGS=", "MAKELEVEL=")
 	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stderr, &stderr
 	err := ownedcmd.Run(ctx, command)
@@ -93,12 +93,28 @@ func runIn(t *testing.T, dir, name string, args ...string) {
 	defer cancel()
 	command := exec.CommandContext(ctx, name, args...)
 	command.Dir = dir
-	command.Env = append(command.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1")
+	command.Env = scratchGitEnv(command.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1")
 	var output bytes.Buffer
 	command.Stdout, command.Stderr = &output, &output
 	if err := ownedcmd.Run(ctx, command); err != nil {
 		t.Fatalf("%s %v: %v\n%s", name, args, err, output.Bytes())
 	}
+}
+
+// scratchGitEnv drops inherited variables that would point Git at the caller's
+// repository or index (for example from a hook), then appends overrides.
+func scratchGitEnv(inherited []string, overrides ...string) []string {
+	env := make([]string, 0, len(inherited)+len(overrides))
+	for _, value := range inherited {
+		key, _, _ := strings.Cut(value, "=")
+		switch key {
+		case "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+			"GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_SHALLOW_FILE", "GIT_PREFIX":
+			continue
+		}
+		env = append(env, value)
+	}
+	return append(env, overrides...)
 }
 
 func writeFile(t *testing.T, path string) {
