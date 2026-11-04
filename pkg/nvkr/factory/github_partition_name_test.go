@@ -22,6 +22,8 @@ func TestGitHubPartitionName(t *testing.T) {
 		{"fetch", "Fetch pinned source for controller (controller/linux/amd64)", "p03 Fetch controller/linux/amd64", 1},
 		{"verification", "Verify artifacts and generate SBOMs: controller-arm64", "p03 Verify controller-arm64 +1", 2},
 		{"release", "Verify release and deliverable signatures: output-controller", "p03 Verify release controller", 1},
+		{"release level", "Verify release and deliverable signatures: release", "p03 Verify release and deliverable signatures: release", 1},
+		{"unclosed build slot", "Build controller (controller/linux/arm64", "p03 Build controller (controller/linux/arm64", 1},
 		{"package", "Package publication bundle: publication-controller", "p03 Package controller", 1},
 		{"publication", "Publish output-controller", "p03 Publish controller", 1},
 		{"runner", "Prepare NVKR runner (ubuntu-24.04)", "p03 Prepare NVKR runner (ubuntu-24.04) +3", 4},
@@ -51,5 +53,24 @@ func TestGitHubPartitionName(t *testing.T) {
 				t.Fatalf("membership order changed name: %q versus %q", again, got)
 			}
 		})
+	}
+}
+
+// Ties the shortener to the label producer, so a wording change there cannot
+// silently fall back to the raw label.
+func TestGitHubPartitionNameShortensProducerLabels(t *testing.T) {
+	for _, test := range []struct {
+		node Node
+		want string
+	}{
+		{Node{ID: NodeAcquire + "/capi-controller-image-arm64/pull-capi-controller-image", Kind: NodeAcquire}, "Acquire capi-controller-image-arm64"},
+		{Node{ID: "package/publication-controller", Kind: NodePackage, PackageKind: PackageOCI}, "Package controller"},
+		{Node{ID: NodePublish + "/output-controller", Kind: NodePublish}, "Publish controller"},
+		{Node{ID: NodeVerifyPublication + "/output-controller", Kind: NodeVerifyPublication}, "Verify release controller"},
+		{Node{ID: NodeVerifyPublication + "/release", Kind: NodeVerifyPublication}, "Verify release and deliverable signatures: release"},
+	} {
+		if got := githubPartitionJobSummary(githubNodeLabel(&Plan{}, test.node)); got != test.want {
+			t.Errorf("summary of %s = %q, want %q", test.node.ID, got, test.want)
+		}
 	}
 }
