@@ -1,5 +1,13 @@
 # Delivery test fixtures
 
+## `publication-mirror-v1-{minimal,full}.json`
+
+Synthetic inventory descriptions captured with the original v1 types at
+`e22b876f9ab6f5329cd940b39178ff69b10c3da3`. Both satisfy inventory admission;
+the full form includes version/ETag observations, a UTF-8 version ID and a disk mapping.
+They pin canonical wire bytes and API conversions. Their placeholder digests and proof
+references do not supply real blob contents or signatures for an end-to-end restoration.
+
 ## `aicr-v1.1.2-helm`
 
 An OCI image layout holding the AICR v1.1.2 Helm deployment bundle exactly as AICR pushes it.

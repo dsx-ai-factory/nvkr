@@ -59,9 +59,10 @@ is written. The job records that exact inventory locator. Raw QCOW2 bytes are av
 key, with the original output name and payload binding in the inventory.
 
 Optional `transfer` fields on the destination are `maxObjectBytes`, `maxTotalBytes`, `maxObjects` and
-`operationTimeoutSeconds`; defaults are 64 GiB, 256 GiB, 8192 and 1200 seconds. The complete inventory must fit
-before any upload, including its worst-case provider-pin encoding. The inventory is bounded at 128 MiB,
-with retained proof bundles bounded at 8 MiB each and 16 MiB combined. Object-count ceilings also share
+`operationTimeoutSeconds`; defaults are 64 GiB, 256 GiB, 8192 and 1200 seconds. A total-only budget lowers the
+omitted per-object default to that total when smaller; explicitly inconsistent limits remain invalid.
+The complete inventory must fit before any upload, including its worst-case provider-pin encoding. The inventory
+is bounded at 128 MiB, with retained proof bundles bounded at 8 MiB each and 16 MiB combined. Object-count ceilings also share
 these independent byte limits. The operation timeout is at most 3509 seconds, leaving 60 seconds for
 cleanup plus 30 seconds of clock skew and one second of expiry precision within a one-hour workload session.
 A temporary session must cover

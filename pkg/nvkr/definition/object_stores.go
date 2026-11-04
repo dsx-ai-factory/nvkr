@@ -43,11 +43,11 @@ type ObjectStoreTransfer struct {
 // EffectiveTransfer applies bounded defaults without rewriting authored bytes.
 func (destination ObjectStoreDestination) EffectiveTransfer() ObjectStoreTransfer {
 	limits := destination.Transfer
-	if limits.MaxObjectBytes == 0 {
-		limits.MaxObjectBytes = 64 << 30
-	}
 	if limits.MaxTotalBytes == 0 {
 		limits.MaxTotalBytes = 256 << 30
+	}
+	if limits.MaxObjectBytes == 0 {
+		limits.MaxObjectBytes = min(64<<30, limits.MaxTotalBytes)
 	}
 	if limits.MaxObjects == 0 {
 		limits.MaxObjects = 8192

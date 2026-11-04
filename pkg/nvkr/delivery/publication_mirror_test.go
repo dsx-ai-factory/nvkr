@@ -292,9 +292,9 @@ func TestRestoreMirrorRejectsMalformedOrIncompleteInventory(t *testing.T) {
 					}
 				}
 			case "extra-object":
-				inventory.Objects = append(inventory.Objects, StoredObject{Object: Object{Key: "../../escape", SHA256: digestBytes([]byte("extra")), Size: 5, MediaType: MediaOctetStream}})
+				inventory.Objects = append(inventory.Objects, mirrorObject(StoredObject{Object: Object{Key: "../../escape", SHA256: digestBytes([]byte("extra")), Size: 5, MediaType: MediaOctetStream}}))
 			case "foreign-proof":
-				inventory.Proofs[0].Subject = sign.Subject{Ref: "registry.example.test/foreign@" + digestBytes([]byte("foreign")), Digest: digestBytes([]byte("foreign"))}
+				inventory.Proofs[0].Subject = mirrorSubject{Ref: "registry.example.test/foreign@" + digestBytes([]byte("foreign")), Digest: digestBytes([]byte("foreign"))}
 			case "missing-object":
 				delete(store.data, inventory.Objects[0].Key)
 			case "changed-object":

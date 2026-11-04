@@ -53,7 +53,7 @@ func TestObjectStoreEnvironmentAdmission(t *testing.T) {
 		{"maximum session timeout", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.OperationTimeoutSeconds = 3509 }, ""},
 		{"cleanup exceeds session", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.OperationTimeoutSeconds = 3510 }, e.CodeEngineCapability},
 		{"one hour omits cleanup", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.OperationTimeoutSeconds = 3600 }, e.CodeEngineCapability},
-		{"total", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.MaxTotalBytes = 1 }, e.CodeEngineCapability},
+		{"total only", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.MaxTotalBytes = 1 }, ""},
 		{"object capability", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.MaxObjectBytes = 64<<30 + 1 }, e.CodeEngineCapability},
 		{"inventory capability", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.MaxObjects = 32769 }, e.CodeEngineCapability},
 		{"maximum capabilities", func(x *Environment) {
@@ -82,6 +82,61 @@ func TestObjectStoreEnvironmentAdmission(t *testing.T) {
 			}
 			if err != nil {
 				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestObjectStoreTransferDefaultsAndAdmission(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		authored   ObjectStoreTransfer
+		wantObject uint64
+		wantTotal  uint64
+		code       e.Code
+	}{
+		{"omitted", ObjectStoreTransfer{}, 64 << 30, 256 << 30, ""},
+		{"explicit defaults", ObjectStoreTransfer{MaxObjectBytes: 64 << 30, MaxTotalBytes: 256 << 30}, 64 << 30, 256 << 30, ""},
+		{"total only below object default", ObjectStoreTransfer{MaxTotalBytes: 10 << 30}, 10 << 30, 10 << 30, ""},
+		{"total only minimum", ObjectStoreTransfer{MaxTotalBytes: 1}, 1, 1, ""},
+		{"total only at object default", ObjectStoreTransfer{MaxTotalBytes: 64 << 30}, 64 << 30, 64 << 30, ""},
+		{"total only above object default", ObjectStoreTransfer{MaxTotalBytes: 128 << 30}, 64 << 30, 128 << 30, ""},
+		{"object only", ObjectStoreTransfer{MaxObjectBytes: 10 << 30}, 10 << 30, 256 << 30, ""},
+		{"explicit equal limits", ObjectStoreTransfer{MaxObjectBytes: 10 << 30, MaxTotalBytes: 10 << 30}, 10 << 30, 10 << 30, ""},
+		{"explicit object below total", ObjectStoreTransfer{MaxObjectBytes: 5 << 30, MaxTotalBytes: 10 << 30}, 5 << 30, 10 << 30, ""},
+		{"explicit object above total", ObjectStoreTransfer{MaxObjectBytes: 64 << 30, MaxTotalBytes: 10 << 30}, 64 << 30, 10 << 30, e.CodeEngineCapability},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			environment := objectEnvironment()
+			environment.Publication.ObjectStores[0].Transfer = tc.authored
+			before, err := canonical.Marshal(environment)
+			if err != nil {
+				t.Fatal(err)
+			}
+			beforeDigest, err := canonical.Digest(canonical.KindEnvironment, environment)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := environment.Publication.ObjectStores[0].EffectiveTransfer()
+			want := ObjectStoreTransfer{MaxObjectBytes: tc.wantObject, MaxTotalBytes: tc.wantTotal, MaxObjects: 8192, OperationTimeoutSeconds: 1200}
+			if got != want {
+				t.Errorf("effective transfer: got %+v, want %+v", got, want)
+			}
+			err = environment.Validate()
+			if tc.code == "" {
+				if err != nil {
+					t.Error(err)
+				}
+				afterDigest, err := environment.Digest()
+				if err != nil || afterDigest != beforeDigest {
+					t.Errorf("defaulting changed Environment identity: before=%s after=%s err=%v", beforeDigest, afterDigest, err)
+				}
+			} else {
+				requireCode(t, err, tc.code)
+			}
+			after, err := canonical.Marshal(environment)
+			if err != nil || !bytes.Equal(before, after) {
+				t.Fatalf("defaulting changed authored bytes: %v", err)
 			}
 		})
 	}

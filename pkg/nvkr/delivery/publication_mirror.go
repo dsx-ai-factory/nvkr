@@ -74,9 +74,37 @@ type mirroredPublication struct {
 }
 
 type mirroredProof struct {
-	Subject    sign.Subject `json:"subject"`
-	Signature  string       `json:"signature"`
-	Provenance string       `json:"provenance"`
+	Subject    mirrorSubject `json:"subject"`
+	Signature  string        `json:"signature"`
+	Provenance string        `json:"provenance"`
+}
+
+// These v1 wire fields deliberately retain their original capitalized names.
+// Provider and signing API changes must not alter persisted inventory bytes.
+type mirrorSubject struct {
+	Ref    string `json:"Ref"`
+	Digest string `json:"Digest"`
+}
+
+func (subject mirrorSubject) signingSubject() sign.Subject {
+	return sign.Subject{Ref: subject.Ref, Digest: subject.Digest}
+}
+
+type mirrorStoredObject struct {
+	Key       string `json:"Key"`
+	SHA256    string `json:"SHA256"`
+	MediaType string `json:"MediaType"`
+	Size      int64  `json:"Size"`
+	VersionID string `json:"VersionID"`
+	ETag      string `json:"ETag"`
+}
+
+func mirrorObject(stored StoredObject) mirrorStoredObject {
+	return mirrorStoredObject{Key: stored.Key, SHA256: stored.SHA256, MediaType: stored.MediaType, Size: stored.Size, VersionID: stored.VersionID, ETag: stored.ETag}
+}
+
+func (object mirrorStoredObject) storedObject() StoredObject {
+	return StoredObject{Object: Object{Key: object.Key, SHA256: object.SHA256, MediaType: object.MediaType, Size: object.Size}, VersionID: object.VersionID, ETag: object.ETag}
 }
 
 // This is an immutable transport inventory, not a signed delivery root. Every
@@ -86,7 +114,7 @@ type mirrorInventory struct {
 	RootReference string                `json:"rootReference"`
 	Publications  []mirroredPublication `json:"publications"`
 	Proofs        []mirroredProof       `json:"proofs"`
-	Objects       []StoredObject        `json:"objects"`
+	Objects       []mirrorStoredObject  `json:"objects"`
 }
 
 func mirrorBlobKey(digest string) string {
@@ -185,7 +213,7 @@ func MirrorPublications(ctx context.Context, store ObjectStore, request MirrorRe
 			return StoredObject{}, e.New(e.CodeVerifyFailed, "original mirror proof has an absent or repeated source subject")
 		}
 		proofSubjects[subject.Ref] = true
-		binding := mirroredProof{Subject: subject, Signature: digestBytes(signature), Provenance: digestBytes(provenance)}
+		binding := mirroredProof{Subject: mirrorSubject{Ref: subject.Ref, Digest: subject.Digest}, Signature: digestBytes(signature), Provenance: digestBytes(provenance)}
 		for _, raw := range [][]byte{signature, provenance} {
 			digest := digestBytes(raw)
 			if int64(len(raw)) > maxMirrorProofBundleBytes {
@@ -213,7 +241,7 @@ func MirrorPublications(ctx context.Context, store ObjectStore, request MirrorRe
 	// Bound the control document before writes too. Provider observations are
 	// bounded independently when accepted below; reserve their maximum overhead.
 	for _, object := range objects {
-		inventory.Objects = append(inventory.Objects, StoredObject{Object: object})
+		inventory.Objects = append(inventory.Objects, mirrorObject(StoredObject{Object: object}))
 	}
 	sort.Slice(inventory.Objects, func(i, j int) bool { return inventory.Objects[i].SHA256 < inventory.Objects[j].SHA256 })
 	if err := admitMirrorInventory(inventory, request.Limits, total); err != nil {
@@ -250,7 +278,7 @@ func MirrorPublications(ctx context.Context, store ObjectStore, request MirrorRe
 		}
 	}
 	for _, object := range stored {
-		inventory.Objects = append(inventory.Objects, object)
+		inventory.Objects = append(inventory.Objects, mirrorObject(object))
 	}
 	sort.Slice(inventory.Objects, func(i, j int) bool { return inventory.Objects[i].SHA256 < inventory.Objects[j].SHA256 })
 	raw, err := canonical.Marshal(inventory)

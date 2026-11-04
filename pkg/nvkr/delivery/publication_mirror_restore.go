@@ -6,6 +6,7 @@ package delivery
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -59,6 +60,18 @@ func RestoreMirror(ctx context.Context, store ObjectStore, locator StoredObject,
 	var raw bytes.Buffer
 	if err := readMirrorObject(ctx, store, locator, &raw); err != nil {
 		return nil, err
+	}
+	if err := canonical.ValidateJSONDocument(raw.Bytes()); err != nil {
+		return nil, err
+	}
+	var header struct {
+		SchemaVersion string `json:"schemaVersion"`
+	}
+	if err := json.Unmarshal(raw.Bytes(), &header); err != nil {
+		return nil, e.Wrap(e.CodeVerifyFailed, err, "reading mirror inventory schema version")
+	}
+	if header.SchemaVersion != mirrorInventorySchema {
+		return nil, e.New(e.CodeVerifyFailed, "unsupported or missing mirror inventory schema version")
 	}
 	var inventory mirrorInventory
 	if err := canonical.UnmarshalExact(raw.Bytes(), &inventory); err != nil {
@@ -146,7 +159,7 @@ func RestoreMirror(ctx context.Context, store ObjectStore, locator StoredObject,
 			}
 			proofBytes[digest] = raw.Bytes()
 		}
-		result.Proofs = append(result.Proofs, RestoredProof{Subject: proof.Subject, Signature: proofBytes[proof.Signature], Provenance: proofBytes[proof.Provenance]})
+		result.Proofs = append(result.Proofs, RestoredProof{Subject: proof.Subject.signingSubject(), Signature: proofBytes[proof.Signature], Provenance: proofBytes[proof.Provenance]})
 	}
 	// Reuse the no-replace descriptor-relative transport publication owner.
 	if err := transportarchive.PublishRestoredRoots(ctx, outer, filepath.Dir(filepath.Clean(out)), []string{filepath.Base(filepath.Clean(out))}); err != nil {
@@ -188,7 +201,7 @@ func validateMirrorInventory(inventory mirrorInventory, locator StoredObject, li
 		if object.Size > limits.MaxObjectBytes || object.Size > limits.MaxTotalBytes-total {
 			return nil, e.New(e.CodeEngineCapability, "complete restored mirror exceeds consumer byte limits")
 		}
-		objects[object.SHA256] = object
+		objects[object.SHA256] = object.storedObject()
 		total += object.Size
 		previous = object.SHA256
 	}
@@ -250,7 +263,7 @@ func validateMirrorInventory(inventory mirrorInventory, locator StoredObject, li
 	proofBytes := map[string]bool{}
 	var retainedProofBytes int64
 	for _, proof := range inventory.Proofs {
-		if err := proof.Subject.Validate(); err != nil {
+		if err := proof.Subject.signingSubject().Validate(); err != nil {
 			return nil, err
 		}
 		if proof.Subject.Ref <= previous || !closure[proof.Subject.Digest] || objects[proof.Signature].Key == "" || objects[proof.Provenance].Key == "" {

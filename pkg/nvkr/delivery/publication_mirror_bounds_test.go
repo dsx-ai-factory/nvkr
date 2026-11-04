@@ -106,7 +106,7 @@ func TestRestoreMirrorAdmitsRetainedProofBytesBeforePayloadReads(t *testing.T) {
 			} else {
 				for i := range 2 {
 					digest := digestBytes([]byte(fmt.Sprintf("additional proof %d", i)))
-					inventory.Objects = append(inventory.Objects, StoredObject{Object: Object{Key: mirrorBlobKey(digest), SHA256: digest, Size: maxMirrorProofBundleBytes, MediaType: MediaOctetStream}})
+					inventory.Objects = append(inventory.Objects, mirrorObject(StoredObject{Object: Object{Key: mirrorBlobKey(digest), SHA256: digest, Size: maxMirrorProofBundleBytes, MediaType: MediaOctetStream}}))
 					alias := proof
 					alias.Subject.Ref = fmt.Sprintf("registry.example.test/extra-%d@%s", i, proof.Subject.Digest)
 					alias.Signature = digest
@@ -185,7 +185,7 @@ func TestMirrorInventoryDefaultCountFitsWorstCaseProviderPins(t *testing.T) {
 			publication := mirroredPublication{Reference: inventory.RootReference, RootDigest: "sha256:" + strings.Repeat("0", 64)}
 			for i := range count - 1 { // The final transport inventory is also an object.
 				digest := fmt.Sprintf("sha256:%064x", i)
-				inventory.Objects = append(inventory.Objects, StoredObject{Object: Object{Key: mirrorBlobKey(digest), SHA256: digest, Size: 1, MediaType: MediaOctetStream}})
+				inventory.Objects = append(inventory.Objects, mirrorObject(StoredObject{Object: Object{Key: mirrorBlobKey(digest), SHA256: digest, Size: 1, MediaType: MediaOctetStream}}))
 				publication.Members = append(publication.Members, mirrorMember{Path: mirrorBlobKey(digest), SHA256: digest})
 			}
 			inventory.Publications = []mirroredPublication{publication}
