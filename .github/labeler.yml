@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Existing NVKR labels. Keep dependency classification with Dependabot;
+# changed paths alone do not identify a dependency update.
+github_actions:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/workflows/**'
+          - '.github/actions/**'
+          - '.github/nvkr-*/**'
+          - '.github/labeler.yml'
+          - '.github/actionlint.yaml'
+          - '.github/dependabot.yml'
+          - 'toolchains/actionlint/**'
+          - 'scripts/ci-*.py'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - '.agents/skills/**'
+          - 'docs/**'
+          - 'demos/**'
+          - 'fern/**'
+
+go:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.go'
+          - '**/go.mod'
+          - '**/go.sum'
+          - '.go-version'
+          - '.golangci.yml'
+
+docker:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/Dockerfile'
+          - '**/Dockerfile.*'
+          - '**/*.Dockerfile'
