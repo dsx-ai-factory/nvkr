@@ -6,10 +6,12 @@
 import contextlib
 import importlib.util
 import io
+import os
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 spec = importlib.util.spec_from_file_location("restated", Path(__file__).with_name("check-status-restated.py"))
 restated = importlib.util.module_from_spec(spec)
@@ -120,11 +122,21 @@ CASES = {
 }
 
 
+# Variables such as GIT_DIR and GIT_INDEX_FILE override `git -C`, so an inherited one would point the
+# fixture at the caller's repository.
+LOCAL_GIT_ENV = subprocess.run(["git", "rev-parse", "--local-env-vars"], check=True, capture_output=True,
+                               text=True).stdout.split()
+
+
+def fixture_env():
+    return {name: value for name, value in os.environ.items() if name not in LOCAL_GIT_ENV}
+
+
 def git(repo, *args):
     return subprocess.run(
         ["git", "-C", repo, "-c", "user.name=t", "-c", "user.email=t@example.invalid",
          "-c", "commit.gpgsign=false", *args],
-        check=True, capture_output=True, text=True).stdout.strip()
+        check=True, capture_output=True, text=True, env=fixture_env()).stdout.strip()
 
 
 def commit(repo, files):
@@ -149,6 +161,9 @@ class StatusRestatedTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        environment = mock.patch.dict(os.environ, fixture_env(), clear=True)  # covers the checker's git calls
+        environment.start()
+        cls.addClassCleanup(environment.stop)
         tmp = tempfile.TemporaryDirectory()
         cls.addClassCleanup(tmp.cleanup)
         cls.repo = tmp.name
@@ -186,6 +201,21 @@ class StatusRestatedTest(unittest.TestCase):
         finally:
             attributes.write_text("")
             git(self.repo, "config", "--unset", "diff.hide.textconv")
+
+    def test_fixture_leaves_caller_index_alone(self):
+        """An inherited GIT_INDEX_FILE cannot make the fixture or the check write another repository's index."""
+        with tempfile.TemporaryDirectory() as outside, tempfile.TemporaryDirectory() as repo:
+            git(outside, "init", "-q")
+            Path(outside, "sentinel").write_text("keep\n")
+            git(outside, "add", "sentinel")
+            index = Path(outside, ".git/index")
+            before = index.read_bytes()
+            with mock.patch.dict(os.environ, {"GIT_INDEX_FILE": str(index)}):
+                git(repo, "init", "-q", "-b", "main")
+                first = commit(repo, {"docs/a.md": "Intro.\n"})
+                second = commit(repo, {"docs/a.md": "Signing is untested.\n"})
+                self.assertEqual(len(restated.check(repo, first, second)[1]), 1)
+            self.assertEqual(index.read_bytes(), before)
 
     def test_missing_local_ledger(self):
         """Without a local ledger, naming an owner row fails closed with a concise message."""
