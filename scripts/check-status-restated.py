@@ -163,7 +163,8 @@ def owner_files(repo, head):
         except OSError as err:
             raise SystemExit(f"check-status-restated: cannot list {LEDGER} to name the owner file: {err}") from err
     else:
-        names = git(repo, "ls-tree", "--name-only", f"{head}:{LEDGER}").splitlines()
+        names = git(repo, "ls-tree", "--name-only", f"{head}:{LEDGER}",
+                    hint=f"{head} predates the per-section ledger; merge main to name the owner file").splitlines()
     owners = sorted(name for name in names if OWNER_FILE.match(name))
     if not owners:
         raise SystemExit(f"check-status-restated: {LEDGER} has no adr-NN.md owner files to name")

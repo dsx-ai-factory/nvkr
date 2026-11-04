@@ -192,6 +192,9 @@ class StatusRestatedTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as empty, self.assertRaises(SystemExit) as raised:
             restated.owner_files(empty, None)
         self.assertIn("cannot list docs/adr/reconciliation/", str(raised.exception.code))
+        with self.assertRaises(SystemExit) as raised:
+            restated.owner_files(self.repo, "4b825dc642cb6eb9a060e54bf8d69288fbee4904")  # git's empty tree
+        self.assertIn("predates the per-section ledger; merge main", str(raised.exception.code))
 
     def test_working_tree(self):
         """Without a head, check uncommitted and untracked Markdown since the merge base."""
