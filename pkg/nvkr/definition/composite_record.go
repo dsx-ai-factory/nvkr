@@ -141,7 +141,9 @@ func (record CompositionRecord) MemberOf(output string) (string, bool) {
 }
 
 // DeclaresVariant reports whether the composite lets members left and right
-// resolve different producers for component.
+// resolve different producers for component. It expects a record that Validate
+// or ValidateMembership has admitted, which refuses repeated components; it
+// validates nothing itself and grants no authority.
 func (record CompositionRecord) DeclaresVariant(component, left, right string) bool {
 	for _, variant := range record.Variants {
 		if variant.Component == component {
