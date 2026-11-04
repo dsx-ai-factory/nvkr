@@ -98,13 +98,14 @@ telemetry and disks. Each uses its own named production bundle and publication p
 check just these bundles with `make nvke-split-generate` and `make nvke-split-check`; the full
 `workflows-generate` and `workflows-check` targets include them. Shared catalog maintenance enrolls all four
 pairs so a pin update regenerates every affected bundle in the same refresh. The combined selection remains the
-qualification and development baseline until named qualification is supported and independently exercised.
+production qualification baseline until named qualification is supported and independently exercised; the
+[GPU site composite](inputs/definitions/nvke/README.md#gpu-site-composite) owns the development bundle.
 
 ## Test pipeline changes on a feature branch
 
-The committed `nvkr-dev.yml` runs the **same 69-output M2 Definition** as the maintained production
-workflow, including native AMD64/ARM64 plain and public-bootstrap FDE disks, SBOM attestation, per-output publication, cosign signing,
-verification and finalization. Its generator and helper come from the dispatched branch. The separate
+The committed `nvkr-dev.yml` runs the **87-output NVKE GPU site composite**, the five NVKE family Definitions
+together, including native AMD64/ARM64 plain and public-bootstrap FDE disks for Ubuntu 26.04 and 24.04, SBOM
+attestation, per-output publication, cosign signing, verification and finalization. Its generator and helper come from the dispatched branch. The separate
 `inputs/environments/github-development.yaml` selects development credentials, protected environments,
 signer policy and disposable registry destinations. Its Plan and manifest live beneath `.github/nvkr-dev/`.
 The production bundle remains independently owned and checked.
@@ -220,9 +221,11 @@ After locator transfers expire, start a complete new Run.
 
 ### Qualify an existing development Run
 
-`make pipeline-dev-generate` also generates the development qualifier and native smoke worker from
-`inputs/policies/nvke-development-qualification.yaml`. Install those workflows on the default branch once,
-then dispatch a reviewed nondefault branch that contains the generated pair:
+The development bundle now belongs to the GPU site composite, and composite qualification is deferred
+(ADR-26 U8), so `make pipeline-dev-generate` no longer generates the development qualifier and native smoke
+worker; their committed pair is retired. The flow below describes the qualifier as generated for a plain
+development Definition from `inputs/policies/nvke-development-qualification.yaml`: install the pair on the
+default branch once, then dispatch a reviewed nondefault branch that contains it:
 
 ```sh
 gh workflow run nvkr-dev-qualify.yml --repo dsx-ai-factory/nvkr \

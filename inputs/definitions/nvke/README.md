@@ -20,7 +20,7 @@ the issue that adds it.
 | [Disks Ubuntu 24](disks-ubuntu24.yaml) | [github-nvke-disks-ubuntu24.yaml](../../environments/github-nvke-disks-ubuntu24.yaml) | Ubuntu 24.04 `nvke-node-image-ubuntu24-{amd64,arm64}` and `nvke-node-fde-ubuntu24-{amd64,arm64}` | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | Offline CAPI repository in Core | — | `clusterctl` provider manifests | — | Pending [#324](https://github.com/dsx-ai-factory/nvkr/issues/324) |
 | [GB200 AICR bundle](../aicr/nvke-gb200.yaml) | [aicr-local-arm64.yaml](../../environments/aicr-local-arm64.yaml) (local build only) | `aicr-nvke-gb200-ubuntu-training-kubeflow-{helm,flux,argocd-helm}` | `unqualified-local-execution` | One local Run recorded ([AICR inputs](../aicr/README.md#gb200-nvke-kubeflow-training)); a hosted Release is pending [#325](https://github.com/dsx-ai-factory/nvkr/issues/325) |
-| [GPU site composite](gpu-site.composite.yaml) | [github-nvke-gpu-site.yaml](../../environments/github-nvke-gpu-site.yaml) | Every output of the five NVKE families above, 87 in all, in one Release ([GPU site composite](#gpu-site-composite)) | `pipeline-attested` | Generated production and named development bundles; no hosted Release recorded. The GB200 AICR bundle is not yet a member |
+| [GPU site composite](gpu-site.composite.yaml) | [github-nvke-gpu-site.yaml](../../environments/github-nvke-gpu-site.yaml) | Every output of the five NVKE families above, 87 in all, in one Release ([GPU site composite](#gpu-site-composite)) | `pipeline-attested` | Generated named production bundle and the fixed development bundle; no hosted Release recorded. The GB200 AICR bundle is not yet a member |
 
 The [AICR inputs](../aicr/README.md) also hold a `generic` GB300 example, which is not an NVKE recipe and is
 not part of an NVKE site.
@@ -62,18 +62,17 @@ make nvke-gpu-site-check
 | Environment | Workflow | Publication | Signer |
 |---|---|---|---|
 | [github-nvke-gpu-site.yaml](../../environments/github-nvke-gpu-site.yaml) | `nvkr-run-nvke-gpu-site.yml`, partitioned | `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site` | That workflow on `main` |
-| [github-nvke-gpu-site-development.yaml](../../environments/github-nvke-gpu-site-development.yaml) | `nvkr-dev-nvke-gpu-site.yml`, partitioned | `ghcr.io/dsx-ai-factory/nvkr/development-nvke-gpu-site/runs/<run>/attempts/<attempt>` | That workflow on any admitted branch |
+| [github-development.yaml](../../environments/github-development.yaml) | The fixed `nvkr-dev.yml`, partitioned | `ghcr.io/dsx-ai-factory/nvkr/development/runs/<run>/attempts/<attempt>` | That workflow on any admitted branch |
 
-Each Environment starts from the combined candidate's (`github-release.yaml` or `github-development.yaml`):
-disks run on the native ARC KVM pools and every other job on hosted runners, with the same credentials. The
-development bundle is ADR-26's named development layout. It shares the `nvkr-dev-release` and `nvkr-dev-arc`
-GitHub environments with `nvkr-dev.yml`, and those environments admit only allowlisted branches.
-`make pipeline-dev-run` dispatches only `nvkr-dev.yml`. GitHub dispatches a workflow only once it is on the
-default branch, so a development Run of a branch needs `nvkr-dev-nvke-gpu-site.yml` on `main`, the branch
-pushed to this repository and admitted by both environments:
+The production Environment starts from the combined candidate's `github-release.yaml`. The composite owns the
+repository's fixed development bundle, `nvkr-dev.yml`, generated from the unchanged `github-development.yaml`.
+In both, disks run on the native ARC KVM pools and every other job on hosted runners. The combined candidate no
+longer has a development bundle, and the development qualifier pair is retired because composite qualification
+is deferred. Development jobs use the `nvkr-dev-release` and `nvkr-dev-arc` GitHub environments, which admit
+only allowlisted branches. Dispatch a clean pushed branch of this repository that those environments admit:
 
 ```sh
-gh workflow run nvkr-dev-nvke-gpu-site.yml --ref BRANCH --repo dsx-ai-factory/nvkr
+make pipeline-dev-run PIPELINE_DEV_REPO=dsx-ai-factory/nvkr
 ```
 
 Every composite Run rebuilds every output, including eight native disk bakes; it does not reuse a family
@@ -449,9 +448,10 @@ provider access restrictions remain operator obligations.
 
 ## Generate and check the maintained workflow
 
-The same Definition also supplies the committed feature-branch development workflow through
-`../../environments/github-development.yaml`. It retains all 69 outputs, including plain and public-bootstrap FDE disks on both native routes, signing and verification.
-Only execution/publication policy changes: separate development environments and credentials, the
+The committed feature-branch development workflow comes from the [GPU site composite](#gpu-site-composite)
+through `../../environments/github-development.yaml`, not from this Definition. It has 87 outputs, including
+plain and public-bootstrap FDE disks for both Ubuntu series on both native routes, signing and verification.
+Only execution/publication policy differs from production: separate development environments and credentials, the
 `nvkr-dev.yml` signer identity, and run-attempt-scoped repositories beneath
 `ghcr.io/dsx-ai-factory/nvkr/development`. `make pipeline-dev-generate` regenerates it;
 `make pipeline-dev-run PIPELINE_DEV_REPO=dsx-ai-factory/nvkr` dispatches a clean pushed branch.

@@ -290,8 +290,9 @@ bootstrap/finalization recompilation steps. Unrelated source-access entries rema
 build and publication steps do not receive the revalidation credential.
 [Source-access contract](adr/0020-artifact-publication-and-target-configuration.md#2-target-configuration-surface)
 
-Production and development qualification paths exist for the retained combined candidate. They do not
-qualify independently named family producers. Named producer qualification remains unsupported, as does
+A production qualification path exists for the retained combined candidate. The development bundle now belongs
+to the GPU site composite, whose qualification is deferred, so no development qualification pair is committed.
+Neither qualifies independently named family producers. Named producer qualification remains unsupported, as does
 `githubDevelopment: true` with a nonempty `githubBundle`. The pilot preserves those admission limits.
 A downstream coordinator may dispatch independent named workflows, but exact Run correlation, aggregate
 success decisions and deployment scheduling remain its responsibility.
