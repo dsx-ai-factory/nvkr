@@ -148,15 +148,40 @@ func TestCompositeHostedFinalizeAdmitsComposite(t *testing.T) {
 		t.Fatal(err)
 	}
 	run, err := FinalizeGenerated(t.Context(), compositeTestPath, compositeTestEnv, "plan.json", "composite-test", "attempt-1", ".nvkr/factory", ".nvkr/run.json")
-	var coded *e.Error
-	if err == nil || (errors.As(err, &coded) && coded.Code == e.CodeEngineCapability) {
-		t.Fatalf("want a recorded failure past composite admission; got %v", err)
-	}
-	if run == nil || run.SchemaVersion != CompositeRunSchemaVersion || run.Composition == nil || run.DefinitionDigest != plan.DefinitionDigest {
+	assertCode(t, err, e.CodeProvenanceMissing)
+	if run == nil || run.Status != RunFailed || run.SchemaVersion != CompositeRunSchemaVersion || run.Composition == nil || run.DefinitionDigest != plan.DefinitionDigest {
 		t.Fatalf("failed composite Run = %+v (%v)", run, err)
 	}
 	if _, err := os.Stat(".nvkr/run.json"); err != nil {
 		t.Fatalf("failed composite Run was not recorded: %v", err)
+	}
+}
+
+// TestCompositeHostedFinalizeHandoffRefusesComposite keeps composite
+// qualification deferred (ADR-26 §7): with an admitted producer context the
+// handoff wrapper still refuses a composite and writes no Run or handoff.
+func TestCompositeHostedFinalizeHandoffRefusesComposite(t *testing.T) {
+	compositeLifecycleFixture(t, nil)
+	for key, value := range qualificationProducerEnvironment() {
+		t.Setenv(key, value)
+	}
+	plan, err := CompileFiles(t.Context(), compositeTestPath, compositeTestEnv, "composite-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeCompositeTestDocument(t, "plan.json", plan)
+	if err := os.MkdirAll(".nvkr/factory", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	run, err := FinalizeGeneratedWithHandoff(t.Context(), compositeTestPath, compositeTestEnv, "plan.json", "composite-test", "42-2", ".nvkr/factory", ".nvkr/run.json", ".nvkr/handoff.json")
+	assertCode(t, err, e.CodeEngineCapability)
+	if run != nil {
+		t.Fatalf("refused composite handoff returned a Run: %+v", run)
+	}
+	for _, name := range []string{".nvkr/run.json", ".nvkr/handoff.json"} {
+		if _, err := os.Stat(name); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("refused composite handoff wrote %s: %v", name, err)
+		}
 	}
 }
 
