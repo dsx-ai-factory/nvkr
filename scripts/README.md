@@ -27,6 +27,17 @@ read. `ci-test-summary.py` summarizes the retained Go JSON events. Partition, co
 small offline Go composition contracts run with `make test-ci-tools`; the Go fixture exercises every
 matrix entry without rebuilding the product suite.
 
+`check-status-restated.py BASE [HEAD]` backs the rule that validation status lives in the
+[reconciliation ledger](../docs/adr/reconciliation/README.md). It fails when a Markdown line added since the
+merge base, outside the ledger directory and `docs/evidence/`, matches one of a fixed list of status phrases
+taken from fixed review findings. Other phrasings pass, it cannot judge whether a sentence is true, and it
+ignores text already in the tree. Each finding names the owner's `adr-NN.md` ledger file when the file, or the
+matched paragraph or list item, cites an ADR, and the ledger index otherwise. The Merge Gate runs it on every
+pull request against the PR's base and head. `make status-restated-check` runs it locally against
+`origin/main` and the working tree, including uncommitted and untracked files; set `STATUS_BASE` when
+`origin/main` is not your base, and `STATUS_HEAD` to check a commit instead. For a deliberate exception, add
+`<!-- status-ok: reason -->` to the matched line; an escape without a reason is itself a finding.
+
 ## CLI artifact validation baseline
 
 ```sh
