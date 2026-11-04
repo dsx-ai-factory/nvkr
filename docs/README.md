@@ -54,6 +54,7 @@ records source availability and remaining gaps.
 | Registry/layout browsing, generic JSON export, output downloads, credentials, and metadata limits | [Release navigation](release-navigation.md) |
 | Publication graph, artifact subjects, and signing scope | [Publication architecture](publication-architecture.md) |
 | Configure or review required object-store publication | [Publication guide](publication-architecture.md#required-s3-copy), [ADR-20 contract](adr/0020-artifact-publication-and-target-configuration.md#s3-file-delivery-contract), [implementation boundary](adr/reconciliation/object-store-publication.md#object-store-publication) |
+| Review object-store dependency admission | [Dated dependency evidence](evidence/2026-11-04-object-store-dependency-admission.md) |
 | Coordinated upstream versions and exact locks | [Generic pin-set example](generic-pin-set-example.md), [NVKE acquired charts](nvke-pin-set-usage.md) |
 | Reviewable updates and matching regeneration (the installed `catalog-refresh.yaml` is generated, never hand-edited) | [Catalog maintenance](catalog-maintenance.md) |
 | Chart slots, image outputs, and registry-independent bytes | [Declarative Helm bindings](declarative-helm-bindings.md) |

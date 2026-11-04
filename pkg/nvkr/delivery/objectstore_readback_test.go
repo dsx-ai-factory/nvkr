@@ -151,3 +151,26 @@ func TestObjectStoreAdaptsPartSizeBeforeWriting(t *testing.T) {
 		t.Fatal("oversized object performed provider I/O")
 	}
 }
+
+// Advertise a >10000-part object but retain only the first adapted part. The
+// fixture rejects that request permanently, so no remaining payload is read,
+// no inventory or receipt is issued, and only a few MiB cross the local SDK HTTP path.
+func TestObjectStoreMultipartUsesAdaptedPartSize(t *testing.T) {
+	store, fixture := newObjectFixture(t, "part-fail")
+	configured := store.(*s3ObjectStore).options.PartSizeBytes
+	size := configured*10000 + 1
+	want := configured + 1 // ceil((configured*10000+1)/10000), independent of the production helper.
+	source := io.NewSectionReader(bytes.NewReader(make([]byte, want)), 0, size)
+	object := objectDescription(nil)
+	object.Size = size
+	stored, err := store.PutIfAbsent(t.Context(), object, source)
+	requireObjectCode(t, err, e.CodeUnavailable)
+	fixture.mu.Lock()
+	defer fixture.mu.Unlock()
+	if fixture.firstPartBytes != want {
+		t.Fatalf("first SDK UploadPart body has %d bytes, want adapted %d", fixture.firstPartBytes, want)
+	}
+	if stored.Key != "" || fixture.calls["initiate"] != 1 || fixture.calls["part"] != 1 || fixture.calls["complete"] != 0 || fixture.calls["abort"] != 1 || fixture.calls["list"] != 1 || len(fixture.uploads) != 0 || !fixture.cleanupLive {
+		t.Fatalf("bounded first-part refusal did not clean up exactly its upload: calls=%v remaining=%d", fixture.calls, len(fixture.uploads))
+	}
+}

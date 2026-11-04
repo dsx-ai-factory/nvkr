@@ -22,7 +22,8 @@ The linked provider dependencies are official AWS SDK for Go v2 core `v1.47.5`, 
 S3 `v1.114.6`, STS `v1.51.6` and Smithy Go `v1.28.7`, with their required transitive AWS modules pinned in
 `go.mod`/`go.sum`. The official source/tag and Apache-2.0 license review is reflected in the generated linked
 module notice inventory; no SDK config/profile/SSO resolver or transfer-manager dependency is added.
-`go mod verify`, notice drift and the repository-pinned vulnerability scanner validate this dependency set;
+Notice drift and the repository-pinned vulnerability scanner are automated dependency gates.
+`go mod verify` is a separately recorded manual local check, outside `make check` and Merge Gate;
 the dated [dependency scan and notice evidence](../../evidence/2026-11-04-object-store-dependency-admission.md)
 records the exact scanned head, scanner outcome and engineering-admission scope. Dependency engineering admission is separate from
 operator IAM review, provider acceptance and named-decider ratification.

@@ -28,6 +28,7 @@ import (
 )
 
 type objectFixture struct {
+	firstPartBytes   int64
 	t                *testing.T
 	mu               sync.Mutex
 	data             map[string][]byte
@@ -170,6 +171,9 @@ func (fixture *objectFixture) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		fixture.uploads[id] = make(map[int][]byte)
 		_, _ = fmt.Fprintf(w, "<InitiateMultipartUploadResult><UploadId>%s</UploadId></InitiateMultipartUploadResult>", id)
 	case "part":
+		if count == 1 {
+			fixture.firstPartBytes = int64(len(raw))
+		}
 		if fixture.mode == "part-fail" {
 			fail(403, "AccessDenied")
 			return

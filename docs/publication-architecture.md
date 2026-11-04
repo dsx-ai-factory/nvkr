@@ -37,17 +37,24 @@ publication:
 ```
 
 Keep the original signing identity, pinned cosign selection and hosted execution settings. Set the protected
-workflow variable `ARTIFACT_PUBLISH_ROLE_ARN` to the operator-provisioned workload role. The publisher obtains
+workflow variable `ARTIFACT_PUBLISH_ROLE_ARN` in `nvkr-release` to the operator-provisioned workload role. The publisher obtains
 a short-lived AWS session from GitHub OIDC; credentials are never authored in the Environment. Configure
 role trust for audience `sts.amazonaws.com`, the exact repository and protected release Environment subject,
-and the default-branch ref. Match the repository's actual subject format and immutable repository/owner IDs;
+and the default-branch ref. The legacy subject is `repo:OWNER/REPO:environment:nvkr-release`; the immutable
+form is `repo:OWNER@OWNER_ID/REPO@REPOSITORY_ID:environment:nvkr-release`. Match the actual configured subject.
+In role trust, require the exact `token.actions.githubusercontent.com:repository_id`, `:repository_owner_id`,
+`:ref` and `:environment` condition keys alongside `:aud` and `:sub`; AWS maps these directly, without
+customizing the GitHub subject. The linked contract gives the complete condition-key names and example;
 protect deployment branches, reviewers and workflow changes. Signing jobs can share that Environment and
 OIDC permission, so this trusts the release context rather than isolating a single generated job. See
 [the role-trust contract and official setup links](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0020-artifact-publication-and-target-configuration.md#s3-file-delivery-contract).
 Its prefix-scoped permissions are `s3:PutObject`, `s3:GetObject`, `s3:GetObjectVersion`,
 `s3:AbortMultipartUpload` and `s3:ListMultipartUploadParts`. Independent consumers use separate read-only
 credentials with `s3:GetObject` and, for versioned locators, `s3:GetObjectVersion`. A denied version read
-fails without falling back to current bytes. A generic registry secret keeps its original grants; select a
+fails without falling back to current bytes. For general-purpose SSE-KMS buckets with a customer-managed
+key, the writer also needs `kms:GenerateDataKey` and `kms:Decrypt` on that key; read-only consumers need
+`kms:Decrypt`. The role and key policy must authorize these uses. See [SSE-KMS permissions](https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingKMSEncryption.html).
+A generic registry secret keeps its original grants; select a
 scoped `GITHUB_TOKEN` or separate read credential for read-only source access. Custom S3-compatible HTTPS
 endpoints and `addressing: path` are explicit
 options; provider compatibility must be tested separately.

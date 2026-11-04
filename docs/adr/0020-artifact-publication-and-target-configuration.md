@@ -216,7 +216,9 @@ Old inputs retain their original canonical bytes and logical Build identities. N
 publication-root identity family, public object or worker supervisor is introduced for transport.
 
 The transfer bounds are maximum unique object bytes, total unique stored bytes, object count and operation
-seconds. Defaults are 64 GiB per object, 256 GiB total, 8192 objects and 1200 seconds. Authored operation
+seconds. Defaults are 64 GiB per object, 256 GiB total, 8192 objects and 1200 seconds. A smaller total-only
+budget lowers the omitted per-object default to that total; explicitly inconsistent limits remain invalid.
+Authored operation
 timeouts are at most 3509 seconds, reserving the default 60-second cleanup bound and a 31-second session
 allowance (30 seconds of clock skew plus one second of expiry precision) within a one-hour workload session.
 Returned temporary credentials must still cover the actual operation and cleanup deadlines; the reserve does
@@ -233,22 +235,41 @@ Limits cannot exceed the source/publication and provider limits. One fresh store
 bounded operation; SDK request retries and whole multipart restarts remain separately bounded and do not
 reset its deadline. SDK retry counts apply per API invocation, rather than promising a cross-call request ledger.
 
-**Authentication.** Generated publication obtains an AWS-audience GitHub OIDC token only in the protected
-publisher operation and exchanges it through the official AWS SDK's web-identity provider.
-This generator placement is not an IAM authorization boundary: signing jobs also have OIDC permission and
-may share the protected Environment. The operator must bind role trust to the AWS audience
-`sts.amazonaws.com`, the exact repository and protected release Environment subject, and the admitted
-default-branch ref. Use immutable repository/owner ID conditions, an exact `sub` matching the repository's
-actual GitHub subject format, and the `ref`/`environment` conditions supported by AWS. Protect the GitHub
-Environment's deployment branches and reviewers and protect changes to workflows on that branch. Never use
-a repository-wide `repo:ORG/REPO:*` subject grant. These controls restrict the trusted release context;
-they do not isolate the publisher from another trusted job in that same context. A `job_workflow_ref`
-condition applies only when a reusable workflow actually supplies that claim. See the official
-[AWS GitHub claim mapping](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_iam-condition-keys.html#condition-keys-wif)
-and [GitHub AWS OIDC setup](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws). A single temporary
-session must expire after the operation and cleanup bounds. The S3 client uses that fixed session, without
-ambient credential discovery, profile fallback or background refresh. SDK callers may instead supply an
-explicit temporary runtime session. Consumers use their own scoped read credentials and signer policy.
+**Authentication.** Generated publication uses the protected GitHub Environment `nvkr-release` and exchanges
+an AWS-audience GitHub OIDC token through the official AWS SDK's web-identity provider. The operator binds
+role trust to that Environment, the exact repository and owner IDs, and the admitted default branch. This
+example is the `Condition` portion of the publishing role's trust policy, with exact operator values replacing
+uppercase placeholders:
+
+```json
+{
+  "StringEquals": {
+    "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+    "token.actions.githubusercontent.com:sub": "repo:OWNER/REPO:environment:nvkr-release",
+    "token.actions.githubusercontent.com:repository_id": "REPOSITORY_ID",
+    "token.actions.githubusercontent.com:repository_owner_id": "OWNER_ID",
+    "token.actions.githubusercontent.com:ref": "refs/heads/main",
+    "token.actions.githubusercontent.com:environment": "nvkr-release"
+  }
+}
+```
+
+The example shows the legacy subject format. For GitHub's immutable format the corresponding Environment
+subject is `repo:OWNER@OWNER_ID/REPO@REPOSITORY_ID:environment:nvkr-release`. Select the one exact subject
+matching the repository's actual configuration, including any custom template; do not allow both formats
+or a repository-wide `repo:ORG/REPO:*` wildcard by default. Substitute the actual default-branch ref when it
+is not `refs/heads/main`. AWS maps the listed `repository_id`, `repository_owner_id`, `ref` and `environment`
+claims directly to role-trust condition keys; these checks need no GitHub subject customization. They are
+not S3 session-policy keys. See the [AWS GitHub claim mapping](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_iam-condition-keys.html#condition-keys-wif)
+and [GitHub subject formats](https://docs.github.com/en/actions/reference/security/oidc).
+
+Protect the Environment's deployment branches and reviewers and protect workflow changes on that branch.
+Signing jobs also have OIDC permission and may share this Environment: the policy trusts the protected
+release context, rather than isolating the publisher from other trusted jobs satisfying the same conditions.
+A `job_workflow_ref` condition applies only when an actual reusable workflow supplies that claim.
+A single temporary session must expire after the operation and cleanup bounds. The S3 client uses that fixed
+session without ambient credential discovery, profile fallback or background refresh. SDK callers may instead
+supply an explicit temporary runtime session. Consumers use their own scoped read credentials and signer policy.
 
 The writer needs `s3:PutObject`, `s3:GetObject` for HEAD/current reads, `s3:GetObjectVersion` for
 exact-version reads, and `s3:AbortMultipartUpload`/`s3:ListMultipartUploadParts` for its own multipart IDs,
@@ -256,9 +277,13 @@ restricted to the literal bucket/prefix and expected owner. Read-only consumers 
 when a locator carries a version, `s3:GetObjectVersion`. On versioned buckets both writer readback and
 independent consumption require that exact-version permission; a denial never downgrades to a current read.
 See [S3 GetObject permissions](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html).
+For general-purpose buckets using SSE-KMS with a customer-managed key, the writer additionally needs
+`kms:GenerateDataKey` and `kms:Decrypt` on that exact key for multipart upload and mandatory readback.
+Read-only consumers need `kms:Decrypt`. Effective role and key-policy authorization must permit those uses;
+KMS actions target the KMS key, not the S3 bucket-policy action list. See [SSE-KMS permissions](https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingKMSEncryption.html).
 Neither path needs bucket listing, deletion, enrollment or bucket-policy changes. An SDK success cannot
-prove that the operator's effective IAM grants are narrow; provisioning and policy review remain operator
-responsibilities. Provider denial fails closed. No tool changes credentials or IAM policies on the user's behalf.
+prove that effective IAM grants are narrow; provisioning and policy review remain operator responsibilities.
+Provider denial fails closed. No tool changes credentials or IAM policies on the user's behalf.
 
 **Immutable storage and evidence.** Blob keys are `<prefix>/blobs/sha256/<raw-hex>`. Raw QCOW2 is the actual
 unchanged layer blob, with its name, digest, size and key recorded in the transport inventory; consumers need
