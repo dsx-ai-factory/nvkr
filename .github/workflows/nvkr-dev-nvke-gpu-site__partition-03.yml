@@ -10,16 +10,26 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.results }}
       statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
+      nvkr-partition-05:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-05 }}
       nvkr-partition-07:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-07 }}
-      nvkr-results-02:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-02 }}
-      nvkr-results-02-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-02-statuses }}
-      nvkr-results-03:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-03 }}
-      nvkr-results-03-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-03-statuses }}
+      nvkr-partition-08:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-08 }}
+      nvkr-partition-10:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-10 }}
+      nvkr-partition-11:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-11 }}
+      nvkr-partition-12:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-12 }}
+      nvkr-partition-14:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-14 }}
+      nvkr-partition-15:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-15 }}
+      nvkr-results-1e:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1e }}
+      nvkr-results-1e-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1e-statuses }}
     secrets:
       NVKR_CI_STORAGE_READ_TOKEN:
         required: true
@@ -28,10 +38,10 @@ name: NVKR execution partition
 permissions:
   contents: read
 jobs:
-  nvkr-process-capi-controller-image-pull-c-d7d51b217a77:
-    name: 'Acquire and prepare capi-controller-image'
+  nvkr-tool-syft:
+    name: 'Acquire pinned syft'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 180
+    timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
     steps:
       - name: Check native runner platform
@@ -52,59 +62,6 @@ jobs:
         uses: ./.github/nvkr-dev-nvke-gpu-site/actions/shared/execute-node
         with:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: execute node part-2
-        uses: ./.github/nvkr-dev-nvke-gpu-site/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: execute node part-3
-        uses: ./.github/nvkr-dev-nvke-gpu-site/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
-  nvkr-process-capi-kubeadm-bootstrap-image-8c3aef4dafbd:
-    name: 'Acquire and prepare capi-kubeadm-bootstrap-image'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 180
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
-    steps:
-      - name: Check native runner platform
-        run: |
-          set -eu
-          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
-      - name: Check out workflow source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: 'false'
-      - name: Prepare NVKR runner and job parameters
-        id: nvkr-context
-        uses: ./.github/nvkr-dev-nvke-gpu-site/actions/shared/prepare-stage
-        with:
-          runner-artifact: 'nvkr-exec-ubuntu-24-04'
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute node part-1
-        uses: ./.github/nvkr-dev-nvke-gpu-site/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: execute node part-2
-        uses: ./.github/nvkr-dev-nvke-gpu-site/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: execute node part-3
-        uses: ./.github/nvkr-dev-nvke-gpu-site/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
@@ -114,17 +71,22 @@ jobs:
     name: 'Collect provider results: nvkr-partition-results'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-process-capi-controller-image-pull-c-d7d51b217a77, nvkr-process-capi-kubeadm-bootstrap-image-8c3aef4dafbd]
+    needs: [nvkr-tool-syft]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     permissions: {}
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
-      nvkr-partition-07: ${{ format('"nvkr-process-capi-controller-image-pull-c-d7d51b217a77":{0},"nvkr-process-capi-kubeadm-bootstrap-image-8c3aef4dafbd":{1}', toJSON(needs['nvkr-process-capi-controller-image-pull-c-d7d51b217a77']), toJSON(needs['nvkr-process-capi-kubeadm-bootstrap-image-8c3aef4dafbd'])) }}
-      nvkr-results-02: ${{ format('"nvkr-process-capi-controller-image-pull-c-d7d51b217a77":{0}', toJSON(needs['nvkr-process-capi-controller-image-pull-c-d7d51b217a77'])) }}
-      nvkr-results-02-statuses: ${{ format('{0}', needs['nvkr-process-capi-controller-image-pull-c-d7d51b217a77'].result) }}
-      nvkr-results-03: ${{ format('"nvkr-process-capi-kubeadm-bootstrap-image-8c3aef4dafbd":{0}', toJSON(needs['nvkr-process-capi-kubeadm-bootstrap-image-8c3aef4dafbd'])) }}
-      nvkr-results-03-statuses: ${{ format('{0}', needs['nvkr-process-capi-kubeadm-bootstrap-image-8c3aef4dafbd'].result) }}
+      nvkr-partition-05: ${{ format('"nvkr-tool-syft":{0}', toJSON(needs['nvkr-tool-syft'])) }}
+      nvkr-partition-07: ${{ format('"nvkr-tool-syft":{0}', toJSON(needs['nvkr-tool-syft'])) }}
+      nvkr-partition-08: ${{ format('"nvkr-tool-syft":{0}', toJSON(needs['nvkr-tool-syft'])) }}
+      nvkr-partition-10: ${{ format('"nvkr-tool-syft":{0}', toJSON(needs['nvkr-tool-syft'])) }}
+      nvkr-partition-11: ${{ format('"nvkr-tool-syft":{0}', toJSON(needs['nvkr-tool-syft'])) }}
+      nvkr-partition-12: ${{ format('"nvkr-tool-syft":{0}', toJSON(needs['nvkr-tool-syft'])) }}
+      nvkr-partition-14: ${{ format('"nvkr-tool-syft":{0}', toJSON(needs['nvkr-tool-syft'])) }}
+      nvkr-partition-15: ${{ format('"nvkr-tool-syft":{0}', toJSON(needs['nvkr-tool-syft'])) }}
+      nvkr-results-1e: ${{ format('"nvkr-tool-syft":{0}', toJSON(needs['nvkr-tool-syft'])) }}
+      nvkr-results-1e-statuses: ${{ format('{0}', needs['nvkr-tool-syft'].result) }}
     steps:
       - name: Forward provider results
         run: ':'

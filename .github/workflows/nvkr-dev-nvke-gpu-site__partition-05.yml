@@ -48,10 +48,6 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09 }}
       nvkr-results-09-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09-statuses }}
-      nvkr-results-0b:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0b }}
-      nvkr-results-0b-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0b-statuses }}
       nvkr-results-0c:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0c }}
       nvkr-results-0c-statuses:
@@ -60,14 +56,50 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0d }}
       nvkr-results-0d-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0d-statuses }}
-      nvkr-results-0e:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0e }}
-      nvkr-results-0e-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0e-statuses }}
       nvkr-results-0f:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0f }}
       nvkr-results-0f-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0f-statuses }}
+      nvkr-results-11:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-11 }}
+      nvkr-results-11-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-11-statuses }}
+      nvkr-results-12:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-12 }}
+      nvkr-results-12-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-12-statuses }}
+      nvkr-results-14:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-14 }}
+      nvkr-results-14-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-14-statuses }}
+      nvkr-results-17:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-17 }}
+      nvkr-results-17-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-17-statuses }}
+      nvkr-results-18:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-18 }}
+      nvkr-results-18-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-18-statuses }}
+      nvkr-results-19:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-19 }}
+      nvkr-results-19-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-19-statuses }}
+      nvkr-results-1b:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1b }}
+      nvkr-results-1b-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1b-statuses }}
+      nvkr-results-1c:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1c }}
+      nvkr-results-1c-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1c-statuses }}
+      nvkr-results-1e:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1e }}
+      nvkr-results-1e-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1e-statuses }}
+      nvkr-results-1f:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1f }}
+      nvkr-results-1f-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1f-statuses }}
     secrets:
       NVKR_CI_STORAGE_READ_TOKEN:
         required: true
@@ -76,6 +108,93 @@ name: NVKR execution partition
 permissions:
   contents: read
 jobs:
+  nvkr-aicr-nvke-gb200-ubuntu-training-kube-1708a9efa847:
+    name: 'Build aicr-nvke-gb200-ubuntu-training-kubeflow-helm (aicr-nvke-gb200-ubuntu-training-kubeflow-helm)'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 60
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-aicr-nvke-gb200-ubuntu-training-kube-4b0b83d3519c'].result == 'success' }}
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/aarch64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/arm64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-dev-nvke-gpu-site/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev-nvke-gpu-site/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+  nvkr-aicr-nvke-gb200-ubuntu-training-kube-bf1c4a8c8b70:
+    name: 'Build aicr-nvke-gb200-ubuntu-training-kubeflow-flux (aicr-nvke-gb200-ubuntu-training-kubeflow-flux)'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 60
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-aicr-nvke-gb200-ubuntu-training-kube-4b097c4be6a1'].result == 'success' }}
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/aarch64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/arm64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-dev-nvke-gpu-site/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev-nvke-gpu-site/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+  nvkr-aicr-nvke-gb200-ubuntu-training-kube-c7891c8a286b:
+    name: 'Build aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm (aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm)'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 60
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-aicr-nvke-gb200-ubuntu-training-kube-cf2a271b834f'].result == 'success' }}
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/aarch64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/arm64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-dev-nvke-gpu-site/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev-nvke-gpu-site/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
   nvkr-capnico-controller-linux-arm64-build-f87f1492b304:
     name: 'Build capnico-controller (capnico-controller/linux/arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -1426,41 +1545,57 @@ jobs:
     name: 'Collect provider results: nvkr-partition-results'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-capnico-controller-linux-arm64-build-f87f1492b304, nvkr-cluster-api-provider-provisioned-lin-768a4d08b436, nvkr-controller-profiles-linux-arm64-buil-f8987efaba30, nvkr-cwe-linux-arm64-build-nvke-controller, nvkr-local-path-provisioner-arm64-build-l-8a6f3d006255, nvkr-nico-core-image-linux-arm64-build-ni-12b022c65acc, nvkr-nico-flow-image-linux-arm64-build-ni-fa5169c9de57, nvkr-nico-reference-profiles-fixture-linu-cd99e6119686, nvkr-nvkectl-linux-arm64-build-nvkectl, nvkr-process-aicr-terminal-observe-aicr-sbom, nvkr-process-capi-controller-image-arm64-7043f52cb345, nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6, nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd, nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77, nvkr-process-cert-manager-controller-imag-8684e5f78b05, nvkr-process-cert-manager-webhook-image-a-45233856fc27, nvkr-process-csi-node-driver-registrar-im-11c07063ce1a, nvkr-process-local-path-helper-image-arm6-3713b364b1fa, nvkr-process-local-path-provisioner-image-aea052087333, nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c, nvkr-process-nktp-kube-state-metrics-imag-280f7d54b4e3, nvkr-process-nktp-kubectl-image-arm64-ter-1a058c510d19, nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5, nvkr-process-nktp-metrics-server-image-ar-45096e344430, nvkr-process-nktp-node-exporter-image-arm-645d2587ce1d, nvkr-process-nktp-operator-image-arm64-te-4ccc4b61df9d, nvkr-process-nktp-target-allocator-image-3ea850cfd8b9, nvkr-process-operator-tools-linux-arm64-t-f2243b9bec83, nvkr-process-operator-tools-terminal-obse-ad40acf7eeda, nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79, nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f, nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd, nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6, nvkr-process-spire-controller-manager-ima-3e5db62fee30, nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b, nvkr-process-spire-server-image-arm64-ter-78345db78e5c, nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7, nvkr-process-temporal-admin-tools-image-a-2e37748f989e, nvkr-process-temporal-server-image-arm64-a7b9faf98be2, nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360]
+    needs: [nvkr-aicr-nvke-gb200-ubuntu-training-kube-1708a9efa847, nvkr-aicr-nvke-gb200-ubuntu-training-kube-bf1c4a8c8b70, nvkr-aicr-nvke-gb200-ubuntu-training-kube-c7891c8a286b, nvkr-capnico-controller-linux-arm64-build-f87f1492b304, nvkr-cluster-api-provider-provisioned-lin-768a4d08b436, nvkr-controller-profiles-linux-arm64-buil-f8987efaba30, nvkr-cwe-linux-arm64-build-nvke-controller, nvkr-local-path-provisioner-arm64-build-l-8a6f3d006255, nvkr-nico-core-image-linux-arm64-build-ni-12b022c65acc, nvkr-nico-flow-image-linux-arm64-build-ni-fa5169c9de57, nvkr-nico-reference-profiles-fixture-linu-cd99e6119686, nvkr-nvkectl-linux-arm64-build-nvkectl, nvkr-process-aicr-terminal-observe-aicr-sbom, nvkr-process-capi-controller-image-arm64-7043f52cb345, nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6, nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd, nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77, nvkr-process-cert-manager-controller-imag-8684e5f78b05, nvkr-process-cert-manager-webhook-image-a-45233856fc27, nvkr-process-csi-node-driver-registrar-im-11c07063ce1a, nvkr-process-local-path-helper-image-arm6-3713b364b1fa, nvkr-process-local-path-provisioner-image-aea052087333, nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c, nvkr-process-nktp-kube-state-metrics-imag-280f7d54b4e3, nvkr-process-nktp-kubectl-image-arm64-ter-1a058c510d19, nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5, nvkr-process-nktp-metrics-server-image-ar-45096e344430, nvkr-process-nktp-node-exporter-image-arm-645d2587ce1d, nvkr-process-nktp-operator-image-arm64-te-4ccc4b61df9d, nvkr-process-nktp-target-allocator-image-3ea850cfd8b9, nvkr-process-operator-tools-linux-arm64-t-f2243b9bec83, nvkr-process-operator-tools-terminal-obse-ad40acf7eeda, nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79, nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f, nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd, nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6, nvkr-process-spire-controller-manager-ima-3e5db62fee30, nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b, nvkr-process-spire-server-image-arm64-ter-78345db78e5c, nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7, nvkr-process-temporal-admin-tools-image-a-2e37748f989e, nvkr-process-temporal-server-image-arm64-a7b9faf98be2, nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     permissions: {}
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
-      nvkr-partition-10: ${{ format('"nvkr-capnico-controller-linux-arm64-build-f87f1492b304":{0},"nvkr-cluster-api-provider-provisioned-lin-768a4d08b436":{1},"nvkr-controller-profiles-linux-arm64-buil-f8987efaba30":{2},"nvkr-cwe-linux-arm64-build-nvke-controller":{3},"nvkr-local-path-provisioner-arm64-build-l-8a6f3d006255":{4},"nvkr-nico-core-image-linux-arm64-build-ni-12b022c65acc":{5},"nvkr-nico-flow-image-linux-arm64-build-ni-fa5169c9de57":{6},"nvkr-nico-reference-profiles-fixture-linu-cd99e6119686":{7},"nvkr-nvkectl-linux-arm64-build-nvkectl":{8},"nvkr-process-aicr-terminal-observe-aicr-sbom":{9},"nvkr-process-capi-controller-image-arm64-7043f52cb345":{10},"nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6":{11},"nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd":{12},"nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77":{13},"nvkr-process-cert-manager-controller-imag-8684e5f78b05":{14},"nvkr-process-cert-manager-webhook-image-a-45233856fc27":{15},"nvkr-process-csi-node-driver-registrar-im-11c07063ce1a":{16},"nvkr-process-local-path-helper-image-arm6-3713b364b1fa":{17},"nvkr-process-local-path-provisioner-image-aea052087333":{18},"nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c":{19},"nvkr-process-nktp-kube-state-metrics-imag-280f7d54b4e3":{20},"nvkr-process-nktp-kubectl-image-arm64-ter-1a058c510d19":{21},"nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5":{22},"nvkr-process-nktp-metrics-server-image-ar-45096e344430":{23},"nvkr-process-nktp-node-exporter-image-arm-645d2587ce1d":{24},"nvkr-process-nktp-operator-image-arm64-te-4ccc4b61df9d":{25},"nvkr-process-nktp-target-allocator-image-3ea850cfd8b9":{26},"nvkr-process-operator-tools-linux-arm64-t-f2243b9bec83":{27},"nvkr-process-operator-tools-terminal-obse-ad40acf7eeda":{28},"nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79":{29},"nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f":{30},"nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd":{31},"nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6":{32},"nvkr-process-spire-controller-manager-ima-3e5db62fee30":{33},"nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b":{34},"nvkr-process-spire-server-image-arm64-ter-78345db78e5c":{35},"nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7":{36},"nvkr-process-temporal-admin-tools-image-a-2e37748f989e":{37},"nvkr-process-temporal-server-image-arm64-a7b9faf98be2":{38},"nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360":{39}', toJSON(needs['nvkr-capnico-controller-linux-arm64-build-f87f1492b304']), toJSON(needs['nvkr-cluster-api-provider-provisioned-lin-768a4d08b436']), toJSON(needs['nvkr-controller-profiles-linux-arm64-buil-f8987efaba30']), toJSON(needs['nvkr-cwe-linux-arm64-build-nvke-controller']), toJSON(needs['nvkr-local-path-provisioner-arm64-build-l-8a6f3d006255']), toJSON(needs['nvkr-nico-core-image-linux-arm64-build-ni-12b022c65acc']), toJSON(needs['nvkr-nico-flow-image-linux-arm64-build-ni-fa5169c9de57']), toJSON(needs['nvkr-nico-reference-profiles-fixture-linu-cd99e6119686']), toJSON(needs['nvkr-nvkectl-linux-arm64-build-nvkectl']), toJSON(needs['nvkr-process-aicr-terminal-observe-aicr-sbom']), toJSON(needs['nvkr-process-capi-controller-image-arm64-7043f52cb345']), toJSON(needs['nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6']), toJSON(needs['nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd']), toJSON(needs['nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77']), toJSON(needs['nvkr-process-cert-manager-controller-imag-8684e5f78b05']), toJSON(needs['nvkr-process-cert-manager-webhook-image-a-45233856fc27']), toJSON(needs['nvkr-process-csi-node-driver-registrar-im-11c07063ce1a']), toJSON(needs['nvkr-process-local-path-helper-image-arm6-3713b364b1fa']), toJSON(needs['nvkr-process-local-path-provisioner-image-aea052087333']), toJSON(needs['nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c']), toJSON(needs['nvkr-process-nktp-kube-state-metrics-imag-280f7d54b4e3']), toJSON(needs['nvkr-process-nktp-kubectl-image-arm64-ter-1a058c510d19']), toJSON(needs['nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5']), toJSON(needs['nvkr-process-nktp-metrics-server-image-ar-45096e344430']), toJSON(needs['nvkr-process-nktp-node-exporter-image-arm-645d2587ce1d']), toJSON(needs['nvkr-process-nktp-operator-image-arm64-te-4ccc4b61df9d']), toJSON(needs['nvkr-process-nktp-target-allocator-image-3ea850cfd8b9']), toJSON(needs['nvkr-process-operator-tools-linux-arm64-t-f2243b9bec83']), toJSON(needs['nvkr-process-operator-tools-terminal-obse-ad40acf7eeda']), toJSON(needs['nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79']), toJSON(needs['nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f']), toJSON(needs['nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd']), toJSON(needs['nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6']), toJSON(needs['nvkr-process-spire-controller-manager-ima-3e5db62fee30']), toJSON(needs['nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b']), toJSON(needs['nvkr-process-spire-server-image-arm64-ter-78345db78e5c']), toJSON(needs['nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7']), toJSON(needs['nvkr-process-temporal-admin-tools-image-a-2e37748f989e']), toJSON(needs['nvkr-process-temporal-server-image-arm64-a7b9faf98be2']), toJSON(needs['nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360'])) }}
-      nvkr-partition-14: ${{ format('"nvkr-local-path-provisioner-arm64-build-l-8a6f3d006255":{0},"nvkr-nvkectl-linux-arm64-build-nvkectl":{1}', toJSON(needs['nvkr-local-path-provisioner-arm64-build-l-8a6f3d006255']), toJSON(needs['nvkr-nvkectl-linux-arm64-build-nvkectl'])) }}
+      nvkr-partition-10: ${{ format('"nvkr-aicr-nvke-gb200-ubuntu-training-kube-1708a9efa847":{0},"nvkr-aicr-nvke-gb200-ubuntu-training-kube-bf1c4a8c8b70":{1},"nvkr-aicr-nvke-gb200-ubuntu-training-kube-c7891c8a286b":{2},"nvkr-capnico-controller-linux-arm64-build-f87f1492b304":{3},"nvkr-cluster-api-provider-provisioned-lin-768a4d08b436":{4},"nvkr-controller-profiles-linux-arm64-buil-f8987efaba30":{5},"nvkr-cwe-linux-arm64-build-nvke-controller":{6},"nvkr-local-path-provisioner-arm64-build-l-8a6f3d006255":{7},"nvkr-nico-core-image-linux-arm64-build-ni-12b022c65acc":{8},"nvkr-nico-flow-image-linux-arm64-build-ni-fa5169c9de57":{9},"nvkr-nico-reference-profiles-fixture-linu-cd99e6119686":{10},"nvkr-nvkectl-linux-arm64-build-nvkectl":{11},"nvkr-process-aicr-terminal-observe-aicr-sbom":{12},"nvkr-process-capi-controller-image-arm64-7043f52cb345":{13},"nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6":{14},"nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd":{15},"nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77":{16},"nvkr-process-cert-manager-controller-imag-8684e5f78b05":{17},"nvkr-process-cert-manager-webhook-image-a-45233856fc27":{18},"nvkr-process-csi-node-driver-registrar-im-11c07063ce1a":{19},"nvkr-process-local-path-helper-image-arm6-3713b364b1fa":{20},"nvkr-process-local-path-provisioner-image-aea052087333":{21},"nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c":{22},"nvkr-process-nktp-kube-state-metrics-imag-280f7d54b4e3":{23},"nvkr-process-nktp-kubectl-image-arm64-ter-1a058c510d19":{24},"nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5":{25},"nvkr-process-nktp-metrics-server-image-ar-45096e344430":{26},"nvkr-process-nktp-node-exporter-image-arm-645d2587ce1d":{27},"nvkr-process-nktp-operator-image-arm64-te-4ccc4b61df9d":{28},"nvkr-process-nktp-target-allocator-image-3ea850cfd8b9":{29},"nvkr-process-operator-tools-linux-arm64-t-f2243b9bec83":{30},"nvkr-process-operator-tools-terminal-obse-ad40acf7eeda":{31},"nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79":{32},"nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f":{33},"nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd":{34},"nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6":{35},"nvkr-process-spire-controller-manager-ima-3e5db62fee30":{36},"nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b":{37},"nvkr-process-spire-server-image-arm64-ter-78345db78e5c":{38},"nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7":{39},"nvkr-process-temporal-admin-tools-image-a-2e37748f989e":{40},"nvkr-process-temporal-server-image-arm64-a7b9faf98be2":{41},"nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360":{42}', toJSON(needs['nvkr-aicr-nvke-gb200-ubuntu-training-kube-1708a9efa847']), toJSON(needs['nvkr-aicr-nvke-gb200-ubuntu-training-kube-bf1c4a8c8b70']), toJSON(needs['nvkr-aicr-nvke-gb200-ubuntu-training-kube-c7891c8a286b']), toJSON(needs['nvkr-capnico-controller-linux-arm64-build-f87f1492b304']), toJSON(needs['nvkr-cluster-api-provider-provisioned-lin-768a4d08b436']), toJSON(needs['nvkr-controller-profiles-linux-arm64-buil-f8987efaba30']), toJSON(needs['nvkr-cwe-linux-arm64-build-nvke-controller']), toJSON(needs['nvkr-local-path-provisioner-arm64-build-l-8a6f3d006255']), toJSON(needs['nvkr-nico-core-image-linux-arm64-build-ni-12b022c65acc']), toJSON(needs['nvkr-nico-flow-image-linux-arm64-build-ni-fa5169c9de57']), toJSON(needs['nvkr-nico-reference-profiles-fixture-linu-cd99e6119686']), toJSON(needs['nvkr-nvkectl-linux-arm64-build-nvkectl']), toJSON(needs['nvkr-process-aicr-terminal-observe-aicr-sbom']), toJSON(needs['nvkr-process-capi-controller-image-arm64-7043f52cb345']), toJSON(needs['nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6']), toJSON(needs['nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd']), toJSON(needs['nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77']), toJSON(needs['nvkr-process-cert-manager-controller-imag-8684e5f78b05']), toJSON(needs['nvkr-process-cert-manager-webhook-image-a-45233856fc27']), toJSON(needs['nvkr-process-csi-node-driver-registrar-im-11c07063ce1a']), toJSON(needs['nvkr-process-local-path-helper-image-arm6-3713b364b1fa']), toJSON(needs['nvkr-process-local-path-provisioner-image-aea052087333']), toJSON(needs['nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c']), toJSON(needs['nvkr-process-nktp-kube-state-metrics-imag-280f7d54b4e3']), toJSON(needs['nvkr-process-nktp-kubectl-image-arm64-ter-1a058c510d19']), toJSON(needs['nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5']), toJSON(needs['nvkr-process-nktp-metrics-server-image-ar-45096e344430']), toJSON(needs['nvkr-process-nktp-node-exporter-image-arm-645d2587ce1d']), toJSON(needs['nvkr-process-nktp-operator-image-arm64-te-4ccc4b61df9d']), toJSON(needs['nvkr-process-nktp-target-allocator-image-3ea850cfd8b9']), toJSON(needs['nvkr-process-operator-tools-linux-arm64-t-f2243b9bec83']), toJSON(needs['nvkr-process-operator-tools-terminal-obse-ad40acf7eeda']), toJSON(needs['nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79']), toJSON(needs['nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f']), toJSON(needs['nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd']), toJSON(needs['nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6']), toJSON(needs['nvkr-process-spire-controller-manager-ima-3e5db62fee30']), toJSON(needs['nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b']), toJSON(needs['nvkr-process-spire-server-image-arm64-ter-78345db78e5c']), toJSON(needs['nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7']), toJSON(needs['nvkr-process-temporal-admin-tools-image-a-2e37748f989e']), toJSON(needs['nvkr-process-temporal-server-image-arm64-a7b9faf98be2']), toJSON(needs['nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360'])) }}
+      nvkr-partition-14: ${{ format('"nvkr-aicr-nvke-gb200-ubuntu-training-kube-1708a9efa847":{0},"nvkr-aicr-nvke-gb200-ubuntu-training-kube-bf1c4a8c8b70":{1},"nvkr-aicr-nvke-gb200-ubuntu-training-kube-c7891c8a286b":{2},"nvkr-local-path-provisioner-arm64-build-l-8a6f3d006255":{3},"nvkr-nvkectl-linux-arm64-build-nvkectl":{4}', toJSON(needs['nvkr-aicr-nvke-gb200-ubuntu-training-kube-1708a9efa847']), toJSON(needs['nvkr-aicr-nvke-gb200-ubuntu-training-kube-bf1c4a8c8b70']), toJSON(needs['nvkr-aicr-nvke-gb200-ubuntu-training-kube-c7891c8a286b']), toJSON(needs['nvkr-local-path-provisioner-arm64-build-l-8a6f3d006255']), toJSON(needs['nvkr-nvkectl-linux-arm64-build-nvkectl'])) }}
       nvkr-partition-15: ${{ format('"nvkr-capnico-controller-linux-arm64-build-f87f1492b304":{0},"nvkr-cluster-api-provider-provisioned-lin-768a4d08b436":{1},"nvkr-controller-profiles-linux-arm64-buil-f8987efaba30":{2},"nvkr-cwe-linux-arm64-build-nvke-controller":{3},"nvkr-nico-core-image-linux-arm64-build-ni-12b022c65acc":{4},"nvkr-nico-flow-image-linux-arm64-build-ni-fa5169c9de57":{5},"nvkr-nico-reference-profiles-fixture-linu-cd99e6119686":{6}', toJSON(needs['nvkr-capnico-controller-linux-arm64-build-f87f1492b304']), toJSON(needs['nvkr-cluster-api-provider-provisioned-lin-768a4d08b436']), toJSON(needs['nvkr-controller-profiles-linux-arm64-buil-f8987efaba30']), toJSON(needs['nvkr-cwe-linux-arm64-build-nvke-controller']), toJSON(needs['nvkr-nico-core-image-linux-arm64-build-ni-12b022c65acc']), toJSON(needs['nvkr-nico-flow-image-linux-arm64-build-ni-fa5169c9de57']), toJSON(needs['nvkr-nico-reference-profiles-fixture-linu-cd99e6119686'])) }}
       nvkr-results-00: ${{ format('"nvkr-process-cert-manager-webhook-image-a-45233856fc27":{0}', toJSON(needs['nvkr-process-cert-manager-webhook-image-a-45233856fc27'])) }}
       nvkr-results-00-statuses: ${{ format('{0}', needs['nvkr-process-cert-manager-webhook-image-a-45233856fc27'].result) }}
-      nvkr-results-01: ${{ format('"nvkr-process-nktp-node-exporter-image-arm-645d2587ce1d":{0},"nvkr-process-nktp-target-allocator-image-3ea850cfd8b9":{1},"nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360":{2}', toJSON(needs['nvkr-process-nktp-node-exporter-image-arm-645d2587ce1d']), toJSON(needs['nvkr-process-nktp-target-allocator-image-3ea850cfd8b9']), toJSON(needs['nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360'])) }}
-      nvkr-results-01-statuses: ${{ format('{0} {1} {2}', needs['nvkr-process-nktp-node-exporter-image-arm-645d2587ce1d'].result, needs['nvkr-process-nktp-target-allocator-image-3ea850cfd8b9'].result, needs['nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360'].result) }}
-      nvkr-results-02: ${{ format('"nvkr-process-local-path-provisioner-image-aea052087333":{0},"nvkr-process-operator-tools-terminal-obse-ad40acf7eeda":{1},"nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f":{2},"nvkr-process-spire-controller-manager-ima-3e5db62fee30":{3}', toJSON(needs['nvkr-process-local-path-provisioner-image-aea052087333']), toJSON(needs['nvkr-process-operator-tools-terminal-obse-ad40acf7eeda']), toJSON(needs['nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f']), toJSON(needs['nvkr-process-spire-controller-manager-ima-3e5db62fee30'])) }}
-      nvkr-results-02-statuses: ${{ format('{0} {1} {2} {3}', needs['nvkr-process-local-path-provisioner-image-aea052087333'].result, needs['nvkr-process-operator-tools-terminal-obse-ad40acf7eeda'].result, needs['nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f'].result, needs['nvkr-process-spire-controller-manager-ima-3e5db62fee30'].result) }}
+      nvkr-results-01: ${{ format('"nvkr-process-nktp-target-allocator-image-3ea850cfd8b9":{0},"nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360":{1}', toJSON(needs['nvkr-process-nktp-target-allocator-image-3ea850cfd8b9']), toJSON(needs['nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360'])) }}
+      nvkr-results-01-statuses: ${{ format('{0} {1}', needs['nvkr-process-nktp-target-allocator-image-3ea850cfd8b9'].result, needs['nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360'].result) }}
+      nvkr-results-02: ${{ format('"nvkr-process-local-path-provisioner-image-aea052087333":{0},"nvkr-process-operator-tools-terminal-obse-ad40acf7eeda":{1}', toJSON(needs['nvkr-process-local-path-provisioner-image-aea052087333']), toJSON(needs['nvkr-process-operator-tools-terminal-obse-ad40acf7eeda'])) }}
+      nvkr-results-02-statuses: ${{ format('{0} {1}', needs['nvkr-process-local-path-provisioner-image-aea052087333'].result, needs['nvkr-process-operator-tools-terminal-obse-ad40acf7eeda'].result) }}
       nvkr-results-03: ${{ format('"nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6":{0}', toJSON(needs['nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6'])) }}
       nvkr-results-03-statuses: ${{ format('{0}', needs['nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6'].result) }}
-      nvkr-results-04: ${{ format('"nvkr-process-aicr-terminal-observe-aicr-sbom":{0},"nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79":{1}', toJSON(needs['nvkr-process-aicr-terminal-observe-aicr-sbom']), toJSON(needs['nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79'])) }}
-      nvkr-results-04-statuses: ${{ format('{0} {1}', needs['nvkr-process-aicr-terminal-observe-aicr-sbom'].result, needs['nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79'].result) }}
-      nvkr-results-07: ${{ format('"nvkr-local-path-provisioner-arm64-build-l-8a6f3d006255":{0},"nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7":{1}', toJSON(needs['nvkr-local-path-provisioner-arm64-build-l-8a6f3d006255']), toJSON(needs['nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7'])) }}
-      nvkr-results-07-statuses: ${{ format('{0} {1}', needs['nvkr-local-path-provisioner-arm64-build-l-8a6f3d006255'].result, needs['nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7'].result) }}
-      nvkr-results-08: ${{ format('"nvkr-controller-profiles-linux-arm64-buil-f8987efaba30":{0},"nvkr-nico-reference-profiles-fixture-linu-cd99e6119686":{1},"nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd":{2},"nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b":{3}', toJSON(needs['nvkr-controller-profiles-linux-arm64-buil-f8987efaba30']), toJSON(needs['nvkr-nico-reference-profiles-fixture-linu-cd99e6119686']), toJSON(needs['nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd']), toJSON(needs['nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b'])) }}
-      nvkr-results-08-statuses: ${{ format('{0} {1} {2} {3}', needs['nvkr-controller-profiles-linux-arm64-buil-f8987efaba30'].result, needs['nvkr-nico-reference-profiles-fixture-linu-cd99e6119686'].result, needs['nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd'].result, needs['nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b'].result) }}
-      nvkr-results-09: ${{ format('"nvkr-cwe-linux-arm64-build-nvke-controller":{0},"nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6":{1},"nvkr-process-csi-node-driver-registrar-im-11c07063ce1a":{2},"nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5":{3},"nvkr-process-spire-server-image-arm64-ter-78345db78e5c":{4},"nvkr-process-temporal-server-image-arm64-a7b9faf98be2":{5}', toJSON(needs['nvkr-cwe-linux-arm64-build-nvke-controller']), toJSON(needs['nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6']), toJSON(needs['nvkr-process-csi-node-driver-registrar-im-11c07063ce1a']), toJSON(needs['nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5']), toJSON(needs['nvkr-process-spire-server-image-arm64-ter-78345db78e5c']), toJSON(needs['nvkr-process-temporal-server-image-arm64-a7b9faf98be2'])) }}
-      nvkr-results-09-statuses: ${{ format('{0} {1} {2} {3} {4} {5}', needs['nvkr-cwe-linux-arm64-build-nvke-controller'].result, needs['nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6'].result, needs['nvkr-process-csi-node-driver-registrar-im-11c07063ce1a'].result, needs['nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5'].result, needs['nvkr-process-spire-server-image-arm64-ter-78345db78e5c'].result, needs['nvkr-process-temporal-server-image-arm64-a7b9faf98be2'].result) }}
-      nvkr-results-0b: ${{ format('"nvkr-capnico-controller-linux-arm64-build-f87f1492b304":{0},"nvkr-process-nktp-kubectl-image-arm64-ter-1a058c510d19":{1}', toJSON(needs['nvkr-capnico-controller-linux-arm64-build-f87f1492b304']), toJSON(needs['nvkr-process-nktp-kubectl-image-arm64-ter-1a058c510d19'])) }}
-      nvkr-results-0b-statuses: ${{ format('{0} {1}', needs['nvkr-capnico-controller-linux-arm64-build-f87f1492b304'].result, needs['nvkr-process-nktp-kubectl-image-arm64-ter-1a058c510d19'].result) }}
-      nvkr-results-0c: ${{ format('"nvkr-nico-flow-image-linux-arm64-build-ni-fa5169c9de57":{0},"nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77":{1},"nvkr-process-cert-manager-controller-imag-8684e5f78b05":{2},"nvkr-process-local-path-helper-image-arm6-3713b364b1fa":{3},"nvkr-process-operator-tools-linux-arm64-t-f2243b9bec83":{4}', toJSON(needs['nvkr-nico-flow-image-linux-arm64-build-ni-fa5169c9de57']), toJSON(needs['nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77']), toJSON(needs['nvkr-process-cert-manager-controller-imag-8684e5f78b05']), toJSON(needs['nvkr-process-local-path-helper-image-arm6-3713b364b1fa']), toJSON(needs['nvkr-process-operator-tools-linux-arm64-t-f2243b9bec83'])) }}
-      nvkr-results-0c-statuses: ${{ format('{0} {1} {2} {3} {4}', needs['nvkr-nico-flow-image-linux-arm64-build-ni-fa5169c9de57'].result, needs['nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77'].result, needs['nvkr-process-cert-manager-controller-imag-8684e5f78b05'].result, needs['nvkr-process-local-path-helper-image-arm6-3713b364b1fa'].result, needs['nvkr-process-operator-tools-linux-arm64-t-f2243b9bec83'].result) }}
+      nvkr-results-04: ${{ format('"nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79":{0}', toJSON(needs['nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79'])) }}
+      nvkr-results-04-statuses: ${{ format('{0}', needs['nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79'].result) }}
+      nvkr-results-07: ${{ format('"nvkr-aicr-nvke-gb200-ubuntu-training-kube-c7891c8a286b":{0}', toJSON(needs['nvkr-aicr-nvke-gb200-ubuntu-training-kube-c7891c8a286b'])) }}
+      nvkr-results-07-statuses: ${{ format('{0}', needs['nvkr-aicr-nvke-gb200-ubuntu-training-kube-c7891c8a286b'].result) }}
+      nvkr-results-08: ${{ format('"nvkr-aicr-nvke-gb200-ubuntu-training-kube-bf1c4a8c8b70":{0},"nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd":{1},"nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b":{2}', toJSON(needs['nvkr-aicr-nvke-gb200-ubuntu-training-kube-bf1c4a8c8b70']), toJSON(needs['nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd']), toJSON(needs['nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b'])) }}
+      nvkr-results-08-statuses: ${{ format('{0} {1} {2}', needs['nvkr-aicr-nvke-gb200-ubuntu-training-kube-bf1c4a8c8b70'].result, needs['nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd'].result, needs['nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b'].result) }}
+      nvkr-results-09: ${{ format('"nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6":{0},"nvkr-process-csi-node-driver-registrar-im-11c07063ce1a":{1},"nvkr-process-spire-server-image-arm64-ter-78345db78e5c":{2}', toJSON(needs['nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6']), toJSON(needs['nvkr-process-csi-node-driver-registrar-im-11c07063ce1a']), toJSON(needs['nvkr-process-spire-server-image-arm64-ter-78345db78e5c'])) }}
+      nvkr-results-09-statuses: ${{ format('{0} {1} {2}', needs['nvkr-process-capi-kubeadm-bootstrap-image-7350f1ee5bd6'].result, needs['nvkr-process-csi-node-driver-registrar-im-11c07063ce1a'].result, needs['nvkr-process-spire-server-image-arm64-ter-78345db78e5c'].result) }}
+      nvkr-results-0c: ${{ format('"nvkr-process-local-path-helper-image-arm6-3713b364b1fa":{0},"nvkr-process-operator-tools-linux-arm64-t-f2243b9bec83":{1}', toJSON(needs['nvkr-process-local-path-helper-image-arm6-3713b364b1fa']), toJSON(needs['nvkr-process-operator-tools-linux-arm64-t-f2243b9bec83'])) }}
+      nvkr-results-0c-statuses: ${{ format('{0} {1}', needs['nvkr-process-local-path-helper-image-arm6-3713b364b1fa'].result, needs['nvkr-process-operator-tools-linux-arm64-t-f2243b9bec83'].result) }}
       nvkr-results-0d: ${{ format('"nvkr-cluster-api-provider-provisioned-lin-768a4d08b436":{0},"nvkr-process-capi-controller-image-arm64-7043f52cb345":{1}', toJSON(needs['nvkr-cluster-api-provider-provisioned-lin-768a4d08b436']), toJSON(needs['nvkr-process-capi-controller-image-arm64-7043f52cb345'])) }}
       nvkr-results-0d-statuses: ${{ format('{0} {1}', needs['nvkr-cluster-api-provider-provisioned-lin-768a4d08b436'].result, needs['nvkr-process-capi-controller-image-arm64-7043f52cb345'].result) }}
-      nvkr-results-0e: ${{ format('"nvkr-nico-core-image-linux-arm64-build-ni-12b022c65acc":{0},"nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd":{1},"nvkr-process-nktp-kube-state-metrics-imag-280f7d54b4e3":{2},"nvkr-process-nktp-metrics-server-image-ar-45096e344430":{3},"nvkr-process-nktp-operator-image-arm64-te-4ccc4b61df9d":{4}', toJSON(needs['nvkr-nico-core-image-linux-arm64-build-ni-12b022c65acc']), toJSON(needs['nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd']), toJSON(needs['nvkr-process-nktp-kube-state-metrics-imag-280f7d54b4e3']), toJSON(needs['nvkr-process-nktp-metrics-server-image-ar-45096e344430']), toJSON(needs['nvkr-process-nktp-operator-image-arm64-te-4ccc4b61df9d'])) }}
-      nvkr-results-0e-statuses: ${{ format('{0} {1} {2} {3} {4}', needs['nvkr-nico-core-image-linux-arm64-build-ni-12b022c65acc'].result, needs['nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd'].result, needs['nvkr-process-nktp-kube-state-metrics-imag-280f7d54b4e3'].result, needs['nvkr-process-nktp-metrics-server-image-ar-45096e344430'].result, needs['nvkr-process-nktp-operator-image-arm64-te-4ccc4b61df9d'].result) }}
-      nvkr-results-0f: ${{ format('"nvkr-nvkectl-linux-arm64-build-nvkectl":{0},"nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c":{1},"nvkr-process-temporal-admin-tools-image-a-2e37748f989e":{2}', toJSON(needs['nvkr-nvkectl-linux-arm64-build-nvkectl']), toJSON(needs['nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c']), toJSON(needs['nvkr-process-temporal-admin-tools-image-a-2e37748f989e'])) }}
-      nvkr-results-0f-statuses: ${{ format('{0} {1} {2}', needs['nvkr-nvkectl-linux-arm64-build-nvkectl'].result, needs['nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c'].result, needs['nvkr-process-temporal-admin-tools-image-a-2e37748f989e'].result) }}
+      nvkr-results-0f: ${{ format('"nvkr-process-temporal-admin-tools-image-a-2e37748f989e":{0}', toJSON(needs['nvkr-process-temporal-admin-tools-image-a-2e37748f989e'])) }}
+      nvkr-results-0f-statuses: ${{ format('{0}', needs['nvkr-process-temporal-admin-tools-image-a-2e37748f989e'].result) }}
+      nvkr-results-11: ${{ format('"nvkr-process-nktp-node-exporter-image-arm-645d2587ce1d":{0}', toJSON(needs['nvkr-process-nktp-node-exporter-image-arm-645d2587ce1d'])) }}
+      nvkr-results-11-statuses: ${{ format('{0}', needs['nvkr-process-nktp-node-exporter-image-arm-645d2587ce1d'].result) }}
+      nvkr-results-12: ${{ format('"nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f":{0},"nvkr-process-spire-controller-manager-ima-3e5db62fee30":{1}', toJSON(needs['nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f']), toJSON(needs['nvkr-process-spire-controller-manager-ima-3e5db62fee30'])) }}
+      nvkr-results-12-statuses: ${{ format('{0} {1}', needs['nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f'].result, needs['nvkr-process-spire-controller-manager-ima-3e5db62fee30'].result) }}
+      nvkr-results-14: ${{ format('"nvkr-process-aicr-terminal-observe-aicr-sbom":{0}', toJSON(needs['nvkr-process-aicr-terminal-observe-aicr-sbom'])) }}
+      nvkr-results-14-statuses: ${{ format('{0}', needs['nvkr-process-aicr-terminal-observe-aicr-sbom'].result) }}
+      nvkr-results-17: ${{ format('"nvkr-local-path-provisioner-arm64-build-l-8a6f3d006255":{0},"nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7":{1}', toJSON(needs['nvkr-local-path-provisioner-arm64-build-l-8a6f3d006255']), toJSON(needs['nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7'])) }}
+      nvkr-results-17-statuses: ${{ format('{0} {1}', needs['nvkr-local-path-provisioner-arm64-build-l-8a6f3d006255'].result, needs['nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7'].result) }}
+      nvkr-results-18: ${{ format('"nvkr-controller-profiles-linux-arm64-buil-f8987efaba30":{0},"nvkr-nico-reference-profiles-fixture-linu-cd99e6119686":{1}', toJSON(needs['nvkr-controller-profiles-linux-arm64-buil-f8987efaba30']), toJSON(needs['nvkr-nico-reference-profiles-fixture-linu-cd99e6119686'])) }}
+      nvkr-results-18-statuses: ${{ format('{0} {1}', needs['nvkr-controller-profiles-linux-arm64-buil-f8987efaba30'].result, needs['nvkr-nico-reference-profiles-fixture-linu-cd99e6119686'].result) }}
+      nvkr-results-19: ${{ format('"nvkr-cwe-linux-arm64-build-nvke-controller":{0},"nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5":{1},"nvkr-process-temporal-server-image-arm64-a7b9faf98be2":{2}', toJSON(needs['nvkr-cwe-linux-arm64-build-nvke-controller']), toJSON(needs['nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5']), toJSON(needs['nvkr-process-temporal-server-image-arm64-a7b9faf98be2'])) }}
+      nvkr-results-19-statuses: ${{ format('{0} {1} {2}', needs['nvkr-cwe-linux-arm64-build-nvke-controller'].result, needs['nvkr-process-nktp-lgtm-image-arm64-termin-0aaeb8512bb5'].result, needs['nvkr-process-temporal-server-image-arm64-a7b9faf98be2'].result) }}
+      nvkr-results-1b: ${{ format('"nvkr-capnico-controller-linux-arm64-build-f87f1492b304":{0},"nvkr-process-nktp-kubectl-image-arm64-ter-1a058c510d19":{1}', toJSON(needs['nvkr-capnico-controller-linux-arm64-build-f87f1492b304']), toJSON(needs['nvkr-process-nktp-kubectl-image-arm64-ter-1a058c510d19'])) }}
+      nvkr-results-1b-statuses: ${{ format('{0} {1}', needs['nvkr-capnico-controller-linux-arm64-build-f87f1492b304'].result, needs['nvkr-process-nktp-kubectl-image-arm64-ter-1a058c510d19'].result) }}
+      nvkr-results-1c: ${{ format('"nvkr-nico-flow-image-linux-arm64-build-ni-fa5169c9de57":{0},"nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77":{1},"nvkr-process-cert-manager-controller-imag-8684e5f78b05":{2}', toJSON(needs['nvkr-nico-flow-image-linux-arm64-build-ni-fa5169c9de57']), toJSON(needs['nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77']), toJSON(needs['nvkr-process-cert-manager-controller-imag-8684e5f78b05'])) }}
+      nvkr-results-1c-statuses: ${{ format('{0} {1} {2}', needs['nvkr-nico-flow-image-linux-arm64-build-ni-fa5169c9de57'].result, needs['nvkr-process-cert-manager-cainjector-imag-5b59c94c2b77'].result, needs['nvkr-process-cert-manager-controller-imag-8684e5f78b05'].result) }}
+      nvkr-results-1e: ${{ format('"nvkr-aicr-nvke-gb200-ubuntu-training-kube-1708a9efa847":{0},"nvkr-nico-core-image-linux-arm64-build-ni-12b022c65acc":{1},"nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd":{2},"nvkr-process-nktp-kube-state-metrics-imag-280f7d54b4e3":{3},"nvkr-process-nktp-metrics-server-image-ar-45096e344430":{4},"nvkr-process-nktp-operator-image-arm64-te-4ccc4b61df9d":{5}', toJSON(needs['nvkr-aicr-nvke-gb200-ubuntu-training-kube-1708a9efa847']), toJSON(needs['nvkr-nico-core-image-linux-arm64-build-ni-12b022c65acc']), toJSON(needs['nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd']), toJSON(needs['nvkr-process-nktp-kube-state-metrics-imag-280f7d54b4e3']), toJSON(needs['nvkr-process-nktp-metrics-server-image-ar-45096e344430']), toJSON(needs['nvkr-process-nktp-operator-image-arm64-te-4ccc4b61df9d'])) }}
+      nvkr-results-1e-statuses: ${{ format('{0} {1} {2} {3} {4} {5}', needs['nvkr-aicr-nvke-gb200-ubuntu-training-kube-1708a9efa847'].result, needs['nvkr-nico-core-image-linux-arm64-build-ni-12b022c65acc'].result, needs['nvkr-process-capi-kubeadm-control-plane-i-0e66715338dd'].result, needs['nvkr-process-nktp-kube-state-metrics-imag-280f7d54b4e3'].result, needs['nvkr-process-nktp-metrics-server-image-ar-45096e344430'].result, needs['nvkr-process-nktp-operator-image-arm64-te-4ccc4b61df9d'].result) }}
+      nvkr-results-1f: ${{ format('"nvkr-nvkectl-linux-arm64-build-nvkectl":{0},"nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c":{1}', toJSON(needs['nvkr-nvkectl-linux-arm64-build-nvkectl']), toJSON(needs['nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c'])) }}
+      nvkr-results-1f-statuses: ${{ format('{0} {1}', needs['nvkr-nvkectl-linux-arm64-build-nvkectl'].result, needs['nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c'].result) }}
     steps:
       - name: Forward provider results
         run: ':'

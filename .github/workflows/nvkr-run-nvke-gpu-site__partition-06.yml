@@ -30,18 +30,22 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09 }}
       nvkr-results-09-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09-statuses }}
-      nvkr-results-0a:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0a }}
-      nvkr-results-0a-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0a-statuses }}
-      nvkr-results-0b:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0b }}
-      nvkr-results-0b-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0b-statuses }}
-      nvkr-results-0e:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0e }}
-      nvkr-results-0e-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0e-statuses }}
+      nvkr-results-19:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-19 }}
+      nvkr-results-19-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-19-statuses }}
+      nvkr-results-1a:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1a }}
+      nvkr-results-1a-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1a-statuses }}
+      nvkr-results-1b:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1b }}
+      nvkr-results-1b-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1b-statuses }}
+      nvkr-results-1e:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1e }}
+      nvkr-results-1e-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1e-statuses }}
     secrets:
       NVKR_CI_STORAGE_READ_TOKEN:
         required: true
@@ -383,14 +387,16 @@ jobs:
       nvkr-results-05-statuses: ${{ format('{0}', needs['nvkr-process-nico-core-image-linux-amd64-89c3aa2212c1'].result) }}
       nvkr-results-07: ${{ format('"nvkr-process-nico-flow-image-linux-amd64-2dcbb6d43e7a":{0},"nvkr-process-nico-reference-profiles-fixt-27b38ba12331":{1}', toJSON(needs['nvkr-process-nico-flow-image-linux-amd64-2dcbb6d43e7a']), toJSON(needs['nvkr-process-nico-reference-profiles-fixt-27b38ba12331'])) }}
       nvkr-results-07-statuses: ${{ format('{0} {1}', needs['nvkr-process-nico-flow-image-linux-amd64-2dcbb6d43e7a'].result, needs['nvkr-process-nico-reference-profiles-fixt-27b38ba12331'].result) }}
-      nvkr-results-09: ${{ format('"nvkr-process-capnico-controller-linux-amd-5f43e949be81":{0},"nvkr-process-local-path-provisioner-build-70de0d069de6":{1}', toJSON(needs['nvkr-process-capnico-controller-linux-amd-5f43e949be81']), toJSON(needs['nvkr-process-local-path-provisioner-build-70de0d069de6'])) }}
-      nvkr-results-09-statuses: ${{ format('{0} {1}', needs['nvkr-process-capnico-controller-linux-amd-5f43e949be81'].result, needs['nvkr-process-local-path-provisioner-build-70de0d069de6'].result) }}
-      nvkr-results-0a: ${{ format('"nvkr-process-cluster-api-provider-provisi-4c9d6fcd78ec":{0}', toJSON(needs['nvkr-process-cluster-api-provider-provisi-4c9d6fcd78ec'])) }}
-      nvkr-results-0a-statuses: ${{ format('{0}', needs['nvkr-process-cluster-api-provider-provisi-4c9d6fcd78ec'].result) }}
-      nvkr-results-0b: ${{ format('"nvkr-process-controller-profiles-linux-am-487059f86317":{0}', toJSON(needs['nvkr-process-controller-profiles-linux-am-487059f86317'])) }}
-      nvkr-results-0b-statuses: ${{ format('{0}', needs['nvkr-process-controller-profiles-linux-am-487059f86317'].result) }}
-      nvkr-results-0e: ${{ format('"nvkr-process-controller-chart-build-nvke-9024d4709c1b":{0}', toJSON(needs['nvkr-process-controller-chart-build-nvke-9024d4709c1b'])) }}
-      nvkr-results-0e-statuses: ${{ format('{0}', needs['nvkr-process-controller-chart-build-nvke-9024d4709c1b'].result) }}
+      nvkr-results-09: ${{ format('"nvkr-process-local-path-provisioner-build-70de0d069de6":{0}', toJSON(needs['nvkr-process-local-path-provisioner-build-70de0d069de6'])) }}
+      nvkr-results-09-statuses: ${{ format('{0}', needs['nvkr-process-local-path-provisioner-build-70de0d069de6'].result) }}
+      nvkr-results-19: ${{ format('"nvkr-process-capnico-controller-linux-amd-5f43e949be81":{0}', toJSON(needs['nvkr-process-capnico-controller-linux-amd-5f43e949be81'])) }}
+      nvkr-results-19-statuses: ${{ format('{0}', needs['nvkr-process-capnico-controller-linux-amd-5f43e949be81'].result) }}
+      nvkr-results-1a: ${{ format('"nvkr-process-cluster-api-provider-provisi-4c9d6fcd78ec":{0}', toJSON(needs['nvkr-process-cluster-api-provider-provisi-4c9d6fcd78ec'])) }}
+      nvkr-results-1a-statuses: ${{ format('{0}', needs['nvkr-process-cluster-api-provider-provisi-4c9d6fcd78ec'].result) }}
+      nvkr-results-1b: ${{ format('"nvkr-process-controller-profiles-linux-am-487059f86317":{0}', toJSON(needs['nvkr-process-controller-profiles-linux-am-487059f86317'])) }}
+      nvkr-results-1b-statuses: ${{ format('{0}', needs['nvkr-process-controller-profiles-linux-am-487059f86317'].result) }}
+      nvkr-results-1e: ${{ format('"nvkr-process-controller-chart-build-nvke-9024d4709c1b":{0}', toJSON(needs['nvkr-process-controller-chart-build-nvke-9024d4709c1b'])) }}
+      nvkr-results-1e-statuses: ${{ format('{0}', needs['nvkr-process-controller-chart-build-nvke-9024d4709c1b'].result) }}
     steps:
       - name: Forward provider results
         run: ':'

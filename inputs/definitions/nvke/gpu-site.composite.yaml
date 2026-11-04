@@ -6,8 +6,11 @@ apiVersion: nvkr.dev/composite-definition/v1
 kind: CompositeDefinition
 metadata:
   name: nvke-gpu-site
-  description: Build and publish an NVKE GPU site as one Release from the five NVKE family Definitions.
+  description: Build and publish an NVKE GPU site as one Release from the five NVKE family Definitions and the GB200 AICR bundles.
 members:
+  - name: aicr-nvke-gb200
+    definition: ../aicr/nvke-gb200.yaml
+    digest: sha256:60b4c299e5ce62c0c9c0e04582e6ac0b9d07d9ee6ae88d1dc3d20839e9f17784
   - name: nvke-core
     definition: core.yaml
     digest: sha256:6e1ed1da5232d4f36a8f273dca668ea1011261b956c153d81a3156d1675c6052

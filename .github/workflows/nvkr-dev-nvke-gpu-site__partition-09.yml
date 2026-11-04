@@ -10,14 +10,6 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.results }}
       statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
-      nvkr-results-01:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-01 }}
-      nvkr-results-01-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-01-statuses }}
-      nvkr-results-03:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-03 }}
-      nvkr-results-03-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-03-statuses }}
       nvkr-results-05:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-05 }}
       nvkr-results-05-statuses:
@@ -38,6 +30,14 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0f }}
       nvkr-results-0f-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0f-statuses }}
+      nvkr-results-11:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-11 }}
+      nvkr-results-11-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-11-statuses }}
+      nvkr-results-13:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-13 }}
+      nvkr-results-13-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-13-statuses }}
     secrets:
       NVKR_CI_STORAGE_READ_TOKEN:
         required: true
@@ -1202,10 +1202,6 @@ jobs:
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
-      nvkr-results-01: ${{ format('"nvkr-disk-nvke-node-fde-amd64":{0}', toJSON(needs['nvkr-disk-nvke-node-fde-amd64'])) }}
-      nvkr-results-01-statuses: ${{ format('{0}', needs['nvkr-disk-nvke-node-fde-amd64'].result) }}
-      nvkr-results-03: ${{ format('"nvkr-disk-nvke-node-image-ubuntu24-amd64":{0}', toJSON(needs['nvkr-disk-nvke-node-image-ubuntu24-amd64'])) }}
-      nvkr-results-03-statuses: ${{ format('{0}', needs['nvkr-disk-nvke-node-image-ubuntu24-amd64'].result) }}
       nvkr-results-05: ${{ format('"nvkr-disk-nvke-node-image-amd64":{0}', toJSON(needs['nvkr-disk-nvke-node-image-amd64'])) }}
       nvkr-results-05-statuses: ${{ format('{0}', needs['nvkr-disk-nvke-node-image-amd64'].result) }}
       nvkr-results-09: ${{ format('"nvkr-disk-nvke-node-image-arm64":{0}', toJSON(needs['nvkr-disk-nvke-node-image-arm64'])) }}
@@ -1216,6 +1212,10 @@ jobs:
       nvkr-results-0d-statuses: ${{ format('{0}', needs['nvkr-disk-nvke-node-fde-arm64'].result) }}
       nvkr-results-0f: ${{ format('"nvkr-disk-nvke-node-fde-ubuntu24-amd64":{0},"nvkr-disk-nvke-node-fde-ubuntu24-arm64":{1}', toJSON(needs['nvkr-disk-nvke-node-fde-ubuntu24-amd64']), toJSON(needs['nvkr-disk-nvke-node-fde-ubuntu24-arm64'])) }}
       nvkr-results-0f-statuses: ${{ format('{0} {1}', needs['nvkr-disk-nvke-node-fde-ubuntu24-amd64'].result, needs['nvkr-disk-nvke-node-fde-ubuntu24-arm64'].result) }}
+      nvkr-results-11: ${{ format('"nvkr-disk-nvke-node-fde-amd64":{0}', toJSON(needs['nvkr-disk-nvke-node-fde-amd64'])) }}
+      nvkr-results-11-statuses: ${{ format('{0}', needs['nvkr-disk-nvke-node-fde-amd64'].result) }}
+      nvkr-results-13: ${{ format('"nvkr-disk-nvke-node-image-ubuntu24-amd64":{0}', toJSON(needs['nvkr-disk-nvke-node-image-ubuntu24-amd64'])) }}
+      nvkr-results-13-statuses: ${{ format('{0}', needs['nvkr-disk-nvke-node-image-ubuntu24-amd64'].result) }}
     steps:
       - name: Forward provider results
         run: ':'

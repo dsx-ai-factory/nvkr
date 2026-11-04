@@ -12,26 +12,12 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
       nvkr-partition-05:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-05 }}
-      nvkr-partition-07:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-07 }}
       nvkr-partition-08:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-08 }}
       nvkr-partition-09:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-09 }}
       nvkr-partition-10:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-10 }}
-      nvkr-partition-11:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-11 }}
-      nvkr-partition-12:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-12 }}
-      nvkr-partition-14:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-14 }}
-      nvkr-partition-15:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-15 }}
-      nvkr-results-00:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00 }}
-      nvkr-results-00-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00-statuses }}
       nvkr-results-01:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-01 }}
       nvkr-results-01-statuses:
@@ -40,10 +26,6 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-02 }}
       nvkr-results-02-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-02-statuses }}
-      nvkr-results-03:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-03 }}
-      nvkr-results-03-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-03-statuses }}
       nvkr-results-04:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-04 }}
       nvkr-results-04-statuses:
@@ -76,10 +58,6 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0b }}
       nvkr-results-0b-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0b-statuses }}
-      nvkr-results-0c:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0c }}
-      nvkr-results-0c-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0c-statuses }}
       nvkr-results-0d:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0d }}
       nvkr-results-0d-statuses:
@@ -92,6 +70,66 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0f }}
       nvkr-results-0f-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0f-statuses }}
+      nvkr-results-10:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-10 }}
+      nvkr-results-10-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-10-statuses }}
+      nvkr-results-11:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-11 }}
+      nvkr-results-11-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-11-statuses }}
+      nvkr-results-12:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-12 }}
+      nvkr-results-12-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-12-statuses }}
+      nvkr-results-13:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-13 }}
+      nvkr-results-13-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-13-statuses }}
+      nvkr-results-14:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-14 }}
+      nvkr-results-14-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-14-statuses }}
+      nvkr-results-15:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-15 }}
+      nvkr-results-15-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-15-statuses }}
+      nvkr-results-16:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-16 }}
+      nvkr-results-16-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-16-statuses }}
+      nvkr-results-17:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-17 }}
+      nvkr-results-17-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-17-statuses }}
+      nvkr-results-18:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-18 }}
+      nvkr-results-18-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-18-statuses }}
+      nvkr-results-19:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-19 }}
+      nvkr-results-19-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-19-statuses }}
+      nvkr-results-1a:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1a }}
+      nvkr-results-1a-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1a-statuses }}
+      nvkr-results-1b:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1b }}
+      nvkr-results-1b-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1b-statuses }}
+      nvkr-results-1c:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1c }}
+      nvkr-results-1c-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1c-statuses }}
+      nvkr-results-1d:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1d }}
+      nvkr-results-1d-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1d-statuses }}
+      nvkr-results-1f:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1f }}
+      nvkr-results-1f-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1f-statuses }}
     secrets:
       NKE_SOURCE_TOKEN:
         required: true
@@ -102,6 +140,96 @@ name: NVKR execution partition
 permissions:
   contents: read
 jobs:
+  nvkr-nvke-node-fde-ubuntu24-amd64-fetch-nvke-doca-ovs:
+    name: 'Fetch pinned source for nvke-doca-ovs (nvke-node-fde-ubuntu24-amd64)'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute source part-1
+        uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
+        with:
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+  nvkr-nvke-node-fde-ubuntu24-amd64-fetch-o-285c4e706ab1:
+    name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-fde-ubuntu24-amd64)'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute source part-1
+        uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
+        with:
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+  nvkr-nvke-node-fde-ubuntu24-amd64-fetch-o-608c2630ffc7:
+    name: 'Fetch pinned source for ovn-kubernetes-chart (nvke-node-fde-ubuntu24-amd64)'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute source part-1
+        uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
+        with:
+          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
   nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-1de305b80d30:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-fde-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -1916,86 +2044,76 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-tool-syft:
-    name: 'Acquire pinned syft'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
-    steps:
-      - name: Check native runner platform
-        run: |
-          set -eu
-          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
-      - name: Check out workflow source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: 'false'
-      - name: Prepare NVKR runner and job parameters
-        id: nvkr-context
-        uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/prepare-stage
-        with:
-          runner-artifact: 'nvkr-exec-ubuntu-24-04'
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute node part-1
-        uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-partition-results:
     name: 'Collect provider results: nvkr-partition-results'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-1de305b80d30, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-4c94422bd941, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-832956f72ff8, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-be8398cf9bcc, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-agent, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-cni-ovn, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-doca-ovs, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-1fd69ba6cdeb, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-e6fdc891acb3, nvkr-nvke-node-image-amd64-fetch-nvke-age-693f047a753d, nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico, nvkr-nvke-node-image-amd64-fetch-nvke-cni-ovn, nvkr-nvke-node-image-amd64-fetch-nvke-doca-ovs, nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent, nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart, nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01, nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico, nvkr-nvke-node-image-arm64-fetch-nvke-cni-ovn, nvkr-nvke-node-image-arm64-fetch-nvke-doca-ovs, nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent, nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart, nvkr-nvke-node-image-ubuntu24-amd64-fetch-12e232109f78, nvkr-nvke-node-image-ubuntu24-amd64-fetch-16e1e414375e, nvkr-nvke-node-image-ubuntu24-amd64-fetch-29ac160699a1, nvkr-nvke-node-image-ubuntu24-amd64-fetch-3d59a97da677, nvkr-nvke-node-image-ubuntu24-amd64-fetch-4f05a918d224, nvkr-nvke-node-image-ubuntu24-amd64-fetch-6409eb5fab40, nvkr-nvke-node-image-ubuntu24-amd64-fetch-7cffe3abeab7, nvkr-nvke-node-image-ubuntu24-amd64-fetch-c424f98526aa, nvkr-nvke-node-image-ubuntu24-amd64-fetch-nvke-agent, nvkr-nvke-node-image-ubuntu24-arm64-fetch-41dbcd4a6616, nvkr-nvke-node-image-ubuntu24-arm64-fetch-706926c35475, nvkr-nvke-node-image-ubuntu24-arm64-fetch-8fb7112d8acd, nvkr-nvke-node-image-ubuntu24-arm64-fetch-996f23f8f46e, nvkr-nvke-node-image-ubuntu24-arm64-fetch-a56a7f64e80a, nvkr-nvke-node-image-ubuntu24-arm64-fetch-d730773a23b2, nvkr-nvke-node-image-ubuntu24-arm64-fetch-f3f2d4cda671, nvkr-nvke-node-image-ubuntu24-arm64-fetch-f76f6d2be7f5, nvkr-nvke-node-image-ubuntu24-arm64-fetch-nvke-agent, nvkr-nvkectl-fetch-nvkectl, nvkr-nvkectl-linux-arm64-fetch-nvkectl, nvkr-operator-tools-linux-arm64-pull-helm, nvkr-operator-tools-linux-arm64-pull-kubectl, nvkr-operator-tools-pull-helm, nvkr-operator-tools-pull-kubectl, nvkr-postgresql-image-arm64-pull-postgresql-image, nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image, nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-spire-bash-image-arm64-pull-spire-bash-image, nvkr-spire-controller-manager-image-arm64-92b22b7f2333, nvkr-spire-oidc-image-arm64-pull-spire-oidc-image, nvkr-spire-server-image-arm64-pull-spire-server-image, nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d, nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3, nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29, nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-tool-cosign, nvkr-tool-syft]
+    needs: [nvkr-nvke-node-fde-ubuntu24-amd64-fetch-nvke-doca-ovs, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-o-285c4e706ab1, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-o-608c2630ffc7, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-1de305b80d30, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-4c94422bd941, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-832956f72ff8, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-be8398cf9bcc, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-agent, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-cni-ovn, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-doca-ovs, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-1fd69ba6cdeb, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-e6fdc891acb3, nvkr-nvke-node-image-amd64-fetch-nvke-age-693f047a753d, nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico, nvkr-nvke-node-image-amd64-fetch-nvke-cni-ovn, nvkr-nvke-node-image-amd64-fetch-nvke-doca-ovs, nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent, nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart, nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01, nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico, nvkr-nvke-node-image-arm64-fetch-nvke-cni-ovn, nvkr-nvke-node-image-arm64-fetch-nvke-doca-ovs, nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro, nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent, nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu, nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart, nvkr-nvke-node-image-ubuntu24-amd64-fetch-12e232109f78, nvkr-nvke-node-image-ubuntu24-amd64-fetch-16e1e414375e, nvkr-nvke-node-image-ubuntu24-amd64-fetch-29ac160699a1, nvkr-nvke-node-image-ubuntu24-amd64-fetch-3d59a97da677, nvkr-nvke-node-image-ubuntu24-amd64-fetch-4f05a918d224, nvkr-nvke-node-image-ubuntu24-amd64-fetch-6409eb5fab40, nvkr-nvke-node-image-ubuntu24-amd64-fetch-7cffe3abeab7, nvkr-nvke-node-image-ubuntu24-amd64-fetch-c424f98526aa, nvkr-nvke-node-image-ubuntu24-amd64-fetch-nvke-agent, nvkr-nvke-node-image-ubuntu24-arm64-fetch-41dbcd4a6616, nvkr-nvke-node-image-ubuntu24-arm64-fetch-706926c35475, nvkr-nvke-node-image-ubuntu24-arm64-fetch-8fb7112d8acd, nvkr-nvke-node-image-ubuntu24-arm64-fetch-996f23f8f46e, nvkr-nvke-node-image-ubuntu24-arm64-fetch-a56a7f64e80a, nvkr-nvke-node-image-ubuntu24-arm64-fetch-d730773a23b2, nvkr-nvke-node-image-ubuntu24-arm64-fetch-f3f2d4cda671, nvkr-nvke-node-image-ubuntu24-arm64-fetch-f76f6d2be7f5, nvkr-nvke-node-image-ubuntu24-arm64-fetch-nvke-agent, nvkr-nvkectl-fetch-nvkectl, nvkr-nvkectl-linux-arm64-fetch-nvkectl, nvkr-operator-tools-linux-arm64-pull-helm, nvkr-operator-tools-linux-arm64-pull-kubectl, nvkr-operator-tools-pull-helm, nvkr-operator-tools-pull-kubectl, nvkr-postgresql-image-arm64-pull-postgresql-image, nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image, nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-spire-bash-image-arm64-pull-spire-bash-image, nvkr-spire-controller-manager-image-arm64-92b22b7f2333, nvkr-spire-oidc-image-arm64-pull-spire-oidc-image, nvkr-spire-server-image-arm64-pull-spire-server-image, nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d, nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3, nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29, nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-tool-cosign]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
-      nvkr-partition-05: ${{ format('"nvkr-nvkectl-linux-arm64-fetch-nvkectl":{0},"nvkr-operator-tools-linux-arm64-pull-helm":{1},"nvkr-operator-tools-linux-arm64-pull-kubectl":{2},"nvkr-operator-tools-pull-helm":{3},"nvkr-operator-tools-pull-kubectl":{4},"nvkr-postgresql-image-arm64-pull-postgresql-image":{5},"nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image":{6},"nvkr-spire-agent-image-arm64-pull-spire-agent-image":{7},"nvkr-spire-bash-image-arm64-pull-spire-bash-image":{8},"nvkr-spire-controller-manager-image-arm64-92b22b7f2333":{9},"nvkr-spire-oidc-image-arm64-pull-spire-oidc-image":{10},"nvkr-spire-server-image-arm64-pull-spire-server-image":{11},"nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d":{12},"nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3":{13},"nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29":{14},"nvkr-temporal-ui-image-arm64-pull-temporal-ui-image":{15},"nvkr-tool-syft":{16}', toJSON(needs['nvkr-nvkectl-linux-arm64-fetch-nvkectl']), toJSON(needs['nvkr-operator-tools-linux-arm64-pull-helm']), toJSON(needs['nvkr-operator-tools-linux-arm64-pull-kubectl']), toJSON(needs['nvkr-operator-tools-pull-helm']), toJSON(needs['nvkr-operator-tools-pull-kubectl']), toJSON(needs['nvkr-postgresql-image-arm64-pull-postgresql-image']), toJSON(needs['nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image']), toJSON(needs['nvkr-spire-agent-image-arm64-pull-spire-agent-image']), toJSON(needs['nvkr-spire-bash-image-arm64-pull-spire-bash-image']), toJSON(needs['nvkr-spire-controller-manager-image-arm64-92b22b7f2333']), toJSON(needs['nvkr-spire-oidc-image-arm64-pull-spire-oidc-image']), toJSON(needs['nvkr-spire-server-image-arm64-pull-spire-server-image']), toJSON(needs['nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d']), toJSON(needs['nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3']), toJSON(needs['nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29']), toJSON(needs['nvkr-temporal-ui-image-arm64-pull-temporal-ui-image']), toJSON(needs['nvkr-tool-syft'])) }}
-      nvkr-partition-07: ${{ format('"nvkr-tool-syft":{0}', toJSON(needs['nvkr-tool-syft'])) }}
-      nvkr-partition-08: ${{ format('"nvkr-nvkectl-fetch-nvkectl":{0},"nvkr-tool-syft":{1}', toJSON(needs['nvkr-nvkectl-fetch-nvkectl']), toJSON(needs['nvkr-tool-syft'])) }}
-      nvkr-partition-09: ${{ format('"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-1de305b80d30":{0},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-4c94422bd941":{1},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-832956f72ff8":{2},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-be8398cf9bcc":{3},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-agent":{4},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-cni-ovn":{5},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-doca-ovs":{6},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-1fd69ba6cdeb":{7},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-e6fdc891acb3":{8},"nvkr-nvke-node-image-amd64-fetch-nvke-age-693f047a753d":{9},"nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico":{10},"nvkr-nvke-node-image-amd64-fetch-nvke-cni-ovn":{11},"nvkr-nvke-node-image-amd64-fetch-nvke-doca-ovs":{12},"nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro":{13},"nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent":{14},"nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu":{15},"nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart":{16},"nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01":{17},"nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico":{18},"nvkr-nvke-node-image-arm64-fetch-nvke-cni-ovn":{19},"nvkr-nvke-node-image-arm64-fetch-nvke-doca-ovs":{20},"nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro":{21},"nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent":{22},"nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu":{23},"nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart":{24},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-12e232109f78":{25},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-16e1e414375e":{26},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-29ac160699a1":{27},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-3d59a97da677":{28},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-4f05a918d224":{29},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-6409eb5fab40":{30},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-7cffe3abeab7":{31},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-c424f98526aa":{32},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-nvke-agent":{33},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-41dbcd4a6616":{34},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-706926c35475":{35},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-8fb7112d8acd":{36},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-996f23f8f46e":{37},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-a56a7f64e80a":{38},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-d730773a23b2":{39},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-f3f2d4cda671":{40},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-f76f6d2be7f5":{41},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-nvke-agent":{42}', toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-1de305b80d30']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-4c94422bd941']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-832956f72ff8']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-be8398cf9bcc']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-agent']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-cni-ovn']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-doca-ovs']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-1fd69ba6cdeb']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-e6fdc891acb3']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-age-693f047a753d']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-cni-ovn']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-doca-ovs']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-cni-ovn']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-doca-ovs']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-12e232109f78']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-16e1e414375e']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-29ac160699a1']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-3d59a97da677']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-4f05a918d224']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-6409eb5fab40']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-7cffe3abeab7']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-c424f98526aa']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-nvke-agent']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-41dbcd4a6616']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-706926c35475']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-8fb7112d8acd']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-996f23f8f46e']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-a56a7f64e80a']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-d730773a23b2']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-f3f2d4cda671']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-f76f6d2be7f5']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-nvke-agent'])) }}
-      nvkr-partition-10: ${{ format('"nvkr-operator-tools-linux-arm64-pull-helm":{0},"nvkr-operator-tools-linux-arm64-pull-kubectl":{1},"nvkr-operator-tools-pull-helm":{2},"nvkr-operator-tools-pull-kubectl":{3},"nvkr-postgresql-image-arm64-pull-postgresql-image":{4},"nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image":{5},"nvkr-spire-agent-image-arm64-pull-spire-agent-image":{6},"nvkr-spire-bash-image-arm64-pull-spire-bash-image":{7},"nvkr-spire-controller-manager-image-arm64-92b22b7f2333":{8},"nvkr-spire-oidc-image-arm64-pull-spire-oidc-image":{9},"nvkr-spire-server-image-arm64-pull-spire-server-image":{10},"nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d":{11},"nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3":{12},"nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29":{13},"nvkr-temporal-ui-image-arm64-pull-temporal-ui-image":{14},"nvkr-tool-syft":{15}', toJSON(needs['nvkr-operator-tools-linux-arm64-pull-helm']), toJSON(needs['nvkr-operator-tools-linux-arm64-pull-kubectl']), toJSON(needs['nvkr-operator-tools-pull-helm']), toJSON(needs['nvkr-operator-tools-pull-kubectl']), toJSON(needs['nvkr-postgresql-image-arm64-pull-postgresql-image']), toJSON(needs['nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image']), toJSON(needs['nvkr-spire-agent-image-arm64-pull-spire-agent-image']), toJSON(needs['nvkr-spire-bash-image-arm64-pull-spire-bash-image']), toJSON(needs['nvkr-spire-controller-manager-image-arm64-92b22b7f2333']), toJSON(needs['nvkr-spire-oidc-image-arm64-pull-spire-oidc-image']), toJSON(needs['nvkr-spire-server-image-arm64-pull-spire-server-image']), toJSON(needs['nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d']), toJSON(needs['nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3']), toJSON(needs['nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29']), toJSON(needs['nvkr-temporal-ui-image-arm64-pull-temporal-ui-image']), toJSON(needs['nvkr-tool-syft'])) }}
-      nvkr-partition-11: ${{ format('"nvkr-tool-syft":{0}', toJSON(needs['nvkr-tool-syft'])) }}
-      nvkr-partition-12: ${{ format('"nvkr-tool-syft":{0}', toJSON(needs['nvkr-tool-syft'])) }}
-      nvkr-partition-14: ${{ format('"nvkr-tool-syft":{0}', toJSON(needs['nvkr-tool-syft'])) }}
-      nvkr-partition-15: ${{ format('"nvkr-tool-syft":{0}', toJSON(needs['nvkr-tool-syft'])) }}
-      nvkr-results-00: ${{ format('"nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu":{0}', toJSON(needs['nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu'])) }}
-      nvkr-results-00-statuses: ${{ format('{0}', needs['nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu'].result) }}
-      nvkr-results-01: ${{ format('"nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro":{0},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-4f05a918d224":{1},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-6409eb5fab40":{2},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-a56a7f64e80a":{3},"nvkr-spire-oidc-image-arm64-pull-spire-oidc-image":{4},"nvkr-spire-server-image-arm64-pull-spire-server-image":{5}', toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-4f05a918d224']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-6409eb5fab40']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-a56a7f64e80a']), toJSON(needs['nvkr-spire-oidc-image-arm64-pull-spire-oidc-image']), toJSON(needs['nvkr-spire-server-image-arm64-pull-spire-server-image'])) }}
-      nvkr-results-01-statuses: ${{ format('{0} {1} {2} {3} {4} {5}', needs['nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro'].result, needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-4f05a918d224'].result, needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-6409eb5fab40'].result, needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-a56a7f64e80a'].result, needs['nvkr-spire-oidc-image-arm64-pull-spire-oidc-image'].result, needs['nvkr-spire-server-image-arm64-pull-spire-server-image'].result) }}
-      nvkr-results-02: ${{ format('"nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico":{0},"nvkr-nvke-node-image-arm64-fetch-nvke-doca-ovs":{1},"nvkr-spire-controller-manager-image-arm64-92b22b7f2333":{2}', toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-doca-ovs']), toJSON(needs['nvkr-spire-controller-manager-image-arm64-92b22b7f2333'])) }}
-      nvkr-results-02-statuses: ${{ format('{0} {1} {2}', needs['nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico'].result, needs['nvkr-nvke-node-image-arm64-fetch-nvke-doca-ovs'].result, needs['nvkr-spire-controller-manager-image-arm64-92b22b7f2333'].result) }}
-      nvkr-results-03: ${{ format('"nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent":{0},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-nvke-agent":{1},"nvkr-spire-agent-image-arm64-pull-spire-agent-image":{2},"nvkr-temporal-ui-image-arm64-pull-temporal-ui-image":{3},"nvkr-tool-cosign":{4}', toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-nvke-agent']), toJSON(needs['nvkr-spire-agent-image-arm64-pull-spire-agent-image']), toJSON(needs['nvkr-temporal-ui-image-arm64-pull-temporal-ui-image']), toJSON(needs['nvkr-tool-cosign'])) }}
-      nvkr-results-03-statuses: ${{ format('{0} {1} {2} {3} {4}', needs['nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent'].result, needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-nvke-agent'].result, needs['nvkr-spire-agent-image-arm64-pull-spire-agent-image'].result, needs['nvkr-temporal-ui-image-arm64-pull-temporal-ui-image'].result, needs['nvkr-tool-cosign'].result) }}
-      nvkr-results-04: ${{ format('"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-4c94422bd941":{0},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-832956f72ff8":{1},"nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart":{2},"nvkr-nvke-node-image-arm64-fetch-nvke-cni-ovn":{3},"nvkr-operator-tools-pull-kubectl":{4}', toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-4c94422bd941']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-832956f72ff8']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-cni-ovn']), toJSON(needs['nvkr-operator-tools-pull-kubectl'])) }}
-      nvkr-results-04-statuses: ${{ format('{0} {1} {2} {3} {4}', needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-4c94422bd941'].result, needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-832956f72ff8'].result, needs['nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart'].result, needs['nvkr-nvke-node-image-arm64-fetch-nvke-cni-ovn'].result, needs['nvkr-operator-tools-pull-kubectl'].result) }}
-      nvkr-results-05: ${{ format('"nvkr-nvkectl-fetch-nvkectl":{0},"nvkr-postgresql-image-arm64-pull-postgresql-image":{1},"nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image":{2}', toJSON(needs['nvkr-nvkectl-fetch-nvkectl']), toJSON(needs['nvkr-postgresql-image-arm64-pull-postgresql-image']), toJSON(needs['nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image'])) }}
-      nvkr-results-05-statuses: ${{ format('{0} {1} {2}', needs['nvkr-nvkectl-fetch-nvkectl'].result, needs['nvkr-postgresql-image-arm64-pull-postgresql-image'].result, needs['nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image'].result) }}
-      nvkr-results-06: ${{ format('"nvkr-nvke-node-image-ubuntu24-amd64-fetch-16e1e414375e":{0},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-c424f98526aa":{1},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-706926c35475":{2},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-8fb7112d8acd":{3},"nvkr-operator-tools-pull-helm":{4}', toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-16e1e414375e']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-c424f98526aa']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-706926c35475']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-8fb7112d8acd']), toJSON(needs['nvkr-operator-tools-pull-helm'])) }}
-      nvkr-results-06-statuses: ${{ format('{0} {1} {2} {3} {4}', needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-16e1e414375e'].result, needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-c424f98526aa'].result, needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-706926c35475'].result, needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-8fb7112d8acd'].result, needs['nvkr-operator-tools-pull-helm'].result) }}
-      nvkr-results-07: ${{ format('"nvkr-nvke-node-image-ubuntu24-amd64-fetch-29ac160699a1":{0},"nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d":{1}', toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-29ac160699a1']), toJSON(needs['nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d'])) }}
-      nvkr-results-07-statuses: ${{ format('{0} {1}', needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-29ac160699a1'].result, needs['nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d'].result) }}
-      nvkr-results-08: ${{ format('"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-doca-ovs":{0},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-e6fdc891acb3":{1},"nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu":{2},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-d730773a23b2":{3},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-f3f2d4cda671":{4}', toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-doca-ovs']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-e6fdc891acb3']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-d730773a23b2']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-f3f2d4cda671'])) }}
-      nvkr-results-08-statuses: ${{ format('{0} {1} {2} {3} {4}', needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-doca-ovs'].result, needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-e6fdc891acb3'].result, needs['nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu'].result, needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-d730773a23b2'].result, needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-f3f2d4cda671'].result) }}
-      nvkr-results-09: ${{ format('"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-1de305b80d30":{0},"nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro":{1},"nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3":{2},"nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29":{3}', toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-1de305b80d30']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro']), toJSON(needs['nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3']), toJSON(needs['nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29'])) }}
-      nvkr-results-09-statuses: ${{ format('{0} {1} {2} {3}', needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-1de305b80d30'].result, needs['nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro'].result, needs['nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3'].result, needs['nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29'].result) }}
-      nvkr-results-0a: ${{ format('"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-1fd69ba6cdeb":{0},"nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico":{1},"nvkr-nvke-node-image-amd64-fetch-nvke-doca-ovs":{2},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-3d59a97da677":{3},"nvkr-operator-tools-linux-arm64-pull-kubectl":{4}', toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-1fd69ba6cdeb']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-doca-ovs']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-3d59a97da677']), toJSON(needs['nvkr-operator-tools-linux-arm64-pull-kubectl'])) }}
-      nvkr-results-0a-statuses: ${{ format('{0} {1} {2} {3} {4}', needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-1fd69ba6cdeb'].result, needs['nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico'].result, needs['nvkr-nvke-node-image-amd64-fetch-nvke-doca-ovs'].result, needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-3d59a97da677'].result, needs['nvkr-operator-tools-linux-arm64-pull-kubectl'].result) }}
-      nvkr-results-0b: ${{ format('"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-be8398cf9bcc":{0},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-agent":{1},"nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent":{2},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-12e232109f78":{3},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-7cffe3abeab7":{4},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-996f23f8f46e":{5},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-f76f6d2be7f5":{6}', toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-be8398cf9bcc']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-agent']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-12e232109f78']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-7cffe3abeab7']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-996f23f8f46e']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-f76f6d2be7f5'])) }}
-      nvkr-results-0b-statuses: ${{ format('{0} {1} {2} {3} {4} {5} {6}', needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-be8398cf9bcc'].result, needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-agent'].result, needs['nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent'].result, needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-12e232109f78'].result, needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-7cffe3abeab7'].result, needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-996f23f8f46e'].result, needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-f76f6d2be7f5'].result) }}
-      nvkr-results-0c: ${{ format('"nvkr-nvke-node-image-amd64-fetch-nvke-cni-ovn":{0},"nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart":{1},"nvkr-operator-tools-linux-arm64-pull-helm":{2}', toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-cni-ovn']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart']), toJSON(needs['nvkr-operator-tools-linux-arm64-pull-helm'])) }}
-      nvkr-results-0c-statuses: ${{ format('{0} {1} {2}', needs['nvkr-nvke-node-image-amd64-fetch-nvke-cni-ovn'].result, needs['nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart'].result, needs['nvkr-operator-tools-linux-arm64-pull-helm'].result) }}
-      nvkr-results-0d: ${{ format('"nvkr-nvke-node-image-amd64-fetch-nvke-age-693f047a753d":{0},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-41dbcd4a6616":{1},"nvkr-spire-bash-image-arm64-pull-spire-bash-image":{2}', toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-age-693f047a753d']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-41dbcd4a6616']), toJSON(needs['nvkr-spire-bash-image-arm64-pull-spire-bash-image'])) }}
-      nvkr-results-0d-statuses: ${{ format('{0} {1} {2}', needs['nvkr-nvke-node-image-amd64-fetch-nvke-age-693f047a753d'].result, needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-41dbcd4a6616'].result, needs['nvkr-spire-bash-image-arm64-pull-spire-bash-image'].result) }}
-      nvkr-results-0e: ${{ format('"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-cni-ovn":{0},"nvkr-tool-syft":{1}', toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-cni-ovn']), toJSON(needs['nvkr-tool-syft'])) }}
-      nvkr-results-0e-statuses: ${{ format('{0} {1}', needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-cni-ovn'].result, needs['nvkr-tool-syft'].result) }}
-      nvkr-results-0f: ${{ format('"nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01":{0},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-nvke-agent":{1},"nvkr-nvkectl-linux-arm64-fetch-nvkectl":{2}', toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-nvke-agent']), toJSON(needs['nvkr-nvkectl-linux-arm64-fetch-nvkectl'])) }}
-      nvkr-results-0f-statuses: ${{ format('{0} {1} {2}', needs['nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01'].result, needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-nvke-agent'].result, needs['nvkr-nvkectl-linux-arm64-fetch-nvkectl'].result) }}
+      nvkr-partition-05: ${{ format('"nvkr-nvkectl-linux-arm64-fetch-nvkectl":{0},"nvkr-operator-tools-linux-arm64-pull-helm":{1},"nvkr-operator-tools-linux-arm64-pull-kubectl":{2},"nvkr-operator-tools-pull-helm":{3},"nvkr-operator-tools-pull-kubectl":{4},"nvkr-postgresql-image-arm64-pull-postgresql-image":{5},"nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image":{6},"nvkr-spire-agent-image-arm64-pull-spire-agent-image":{7},"nvkr-spire-bash-image-arm64-pull-spire-bash-image":{8},"nvkr-spire-controller-manager-image-arm64-92b22b7f2333":{9},"nvkr-spire-oidc-image-arm64-pull-spire-oidc-image":{10},"nvkr-spire-server-image-arm64-pull-spire-server-image":{11},"nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d":{12},"nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3":{13},"nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29":{14},"nvkr-temporal-ui-image-arm64-pull-temporal-ui-image":{15}', toJSON(needs['nvkr-nvkectl-linux-arm64-fetch-nvkectl']), toJSON(needs['nvkr-operator-tools-linux-arm64-pull-helm']), toJSON(needs['nvkr-operator-tools-linux-arm64-pull-kubectl']), toJSON(needs['nvkr-operator-tools-pull-helm']), toJSON(needs['nvkr-operator-tools-pull-kubectl']), toJSON(needs['nvkr-postgresql-image-arm64-pull-postgresql-image']), toJSON(needs['nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image']), toJSON(needs['nvkr-spire-agent-image-arm64-pull-spire-agent-image']), toJSON(needs['nvkr-spire-bash-image-arm64-pull-spire-bash-image']), toJSON(needs['nvkr-spire-controller-manager-image-arm64-92b22b7f2333']), toJSON(needs['nvkr-spire-oidc-image-arm64-pull-spire-oidc-image']), toJSON(needs['nvkr-spire-server-image-arm64-pull-spire-server-image']), toJSON(needs['nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d']), toJSON(needs['nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3']), toJSON(needs['nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29']), toJSON(needs['nvkr-temporal-ui-image-arm64-pull-temporal-ui-image'])) }}
+      nvkr-partition-08: ${{ format('"nvkr-nvkectl-fetch-nvkectl":{0}', toJSON(needs['nvkr-nvkectl-fetch-nvkectl'])) }}
+      nvkr-partition-09: ${{ format('"nvkr-nvke-node-fde-ubuntu24-amd64-fetch-nvke-doca-ovs":{0},"nvkr-nvke-node-fde-ubuntu24-amd64-fetch-o-285c4e706ab1":{1},"nvkr-nvke-node-fde-ubuntu24-amd64-fetch-o-608c2630ffc7":{2},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-1de305b80d30":{3},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-4c94422bd941":{4},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-832956f72ff8":{5},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-be8398cf9bcc":{6},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-agent":{7},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-cni-ovn":{8},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-doca-ovs":{9},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-1fd69ba6cdeb":{10},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-e6fdc891acb3":{11},"nvkr-nvke-node-image-amd64-fetch-nvke-age-693f047a753d":{12},"nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico":{13},"nvkr-nvke-node-image-amd64-fetch-nvke-cni-ovn":{14},"nvkr-nvke-node-image-amd64-fetch-nvke-doca-ovs":{15},"nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro":{16},"nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent":{17},"nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu":{18},"nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart":{19},"nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01":{20},"nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico":{21},"nvkr-nvke-node-image-arm64-fetch-nvke-cni-ovn":{22},"nvkr-nvke-node-image-arm64-fetch-nvke-doca-ovs":{23},"nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro":{24},"nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent":{25},"nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu":{26},"nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart":{27},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-12e232109f78":{28},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-16e1e414375e":{29},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-29ac160699a1":{30},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-3d59a97da677":{31},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-4f05a918d224":{32},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-6409eb5fab40":{33},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-7cffe3abeab7":{34},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-c424f98526aa":{35},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-nvke-agent":{36},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-41dbcd4a6616":{37},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-706926c35475":{38},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-8fb7112d8acd":{39},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-996f23f8f46e":{40},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-a56a7f64e80a":{41},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-d730773a23b2":{42},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-f3f2d4cda671":{43},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-f76f6d2be7f5":{44},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-nvke-agent":{45}', toJSON(needs['nvkr-nvke-node-fde-ubuntu24-amd64-fetch-nvke-doca-ovs']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-amd64-fetch-o-285c4e706ab1']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-amd64-fetch-o-608c2630ffc7']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-1de305b80d30']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-4c94422bd941']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-832956f72ff8']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-be8398cf9bcc']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-agent']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-cni-ovn']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-doca-ovs']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-1fd69ba6cdeb']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-e6fdc891acb3']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-age-693f047a753d']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-cni-ovn']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-doca-ovs']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-cni-ovn']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-doca-ovs']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-12e232109f78']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-16e1e414375e']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-29ac160699a1']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-3d59a97da677']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-4f05a918d224']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-6409eb5fab40']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-7cffe3abeab7']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-c424f98526aa']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-nvke-agent']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-41dbcd4a6616']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-706926c35475']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-8fb7112d8acd']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-996f23f8f46e']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-a56a7f64e80a']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-d730773a23b2']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-f3f2d4cda671']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-f76f6d2be7f5']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-nvke-agent'])) }}
+      nvkr-partition-10: ${{ format('"nvkr-operator-tools-linux-arm64-pull-helm":{0},"nvkr-operator-tools-linux-arm64-pull-kubectl":{1},"nvkr-operator-tools-pull-helm":{2},"nvkr-operator-tools-pull-kubectl":{3},"nvkr-postgresql-image-arm64-pull-postgresql-image":{4},"nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image":{5},"nvkr-spire-agent-image-arm64-pull-spire-agent-image":{6},"nvkr-spire-bash-image-arm64-pull-spire-bash-image":{7},"nvkr-spire-controller-manager-image-arm64-92b22b7f2333":{8},"nvkr-spire-oidc-image-arm64-pull-spire-oidc-image":{9},"nvkr-spire-server-image-arm64-pull-spire-server-image":{10},"nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d":{11},"nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3":{12},"nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29":{13},"nvkr-temporal-ui-image-arm64-pull-temporal-ui-image":{14}', toJSON(needs['nvkr-operator-tools-linux-arm64-pull-helm']), toJSON(needs['nvkr-operator-tools-linux-arm64-pull-kubectl']), toJSON(needs['nvkr-operator-tools-pull-helm']), toJSON(needs['nvkr-operator-tools-pull-kubectl']), toJSON(needs['nvkr-postgresql-image-arm64-pull-postgresql-image']), toJSON(needs['nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image']), toJSON(needs['nvkr-spire-agent-image-arm64-pull-spire-agent-image']), toJSON(needs['nvkr-spire-bash-image-arm64-pull-spire-bash-image']), toJSON(needs['nvkr-spire-controller-manager-image-arm64-92b22b7f2333']), toJSON(needs['nvkr-spire-oidc-image-arm64-pull-spire-oidc-image']), toJSON(needs['nvkr-spire-server-image-arm64-pull-spire-server-image']), toJSON(needs['nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d']), toJSON(needs['nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3']), toJSON(needs['nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29']), toJSON(needs['nvkr-temporal-ui-image-arm64-pull-temporal-ui-image'])) }}
+      nvkr-results-01: ${{ format('"nvkr-nvke-node-image-ubuntu24-amd64-fetch-6409eb5fab40":{0},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-a56a7f64e80a":{1},"nvkr-spire-server-image-arm64-pull-spire-server-image":{2}', toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-6409eb5fab40']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-a56a7f64e80a']), toJSON(needs['nvkr-spire-server-image-arm64-pull-spire-server-image'])) }}
+      nvkr-results-01-statuses: ${{ format('{0} {1} {2}', needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-6409eb5fab40'].result, needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-a56a7f64e80a'].result, needs['nvkr-spire-server-image-arm64-pull-spire-server-image'].result) }}
+      nvkr-results-02: ${{ format('"nvkr-nvke-node-image-arm64-fetch-nvke-doca-ovs":{0},"nvkr-spire-controller-manager-image-arm64-92b22b7f2333":{1}', toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-doca-ovs']), toJSON(needs['nvkr-spire-controller-manager-image-arm64-92b22b7f2333'])) }}
+      nvkr-results-02-statuses: ${{ format('{0} {1}', needs['nvkr-nvke-node-image-arm64-fetch-nvke-doca-ovs'].result, needs['nvkr-spire-controller-manager-image-arm64-92b22b7f2333'].result) }}
+      nvkr-results-04: ${{ format('"nvkr-nvke-node-fde-ubuntu24-amd64-fetch-nvke-doca-ovs":{0},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-4c94422bd941":{1},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-832956f72ff8":{2},"nvkr-operator-tools-pull-kubectl":{3}', toJSON(needs['nvkr-nvke-node-fde-ubuntu24-amd64-fetch-nvke-doca-ovs']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-4c94422bd941']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-832956f72ff8']), toJSON(needs['nvkr-operator-tools-pull-kubectl'])) }}
+      nvkr-results-04-statuses: ${{ format('{0} {1} {2} {3}', needs['nvkr-nvke-node-fde-ubuntu24-amd64-fetch-nvke-doca-ovs'].result, needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-4c94422bd941'].result, needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-832956f72ff8'].result, needs['nvkr-operator-tools-pull-kubectl'].result) }}
+      nvkr-results-05: ${{ format('"nvkr-nvkectl-fetch-nvkectl":{0}', toJSON(needs['nvkr-nvkectl-fetch-nvkectl'])) }}
+      nvkr-results-05-statuses: ${{ format('{0}', needs['nvkr-nvkectl-fetch-nvkectl'].result) }}
+      nvkr-results-06: ${{ format('"nvkr-nvke-node-image-ubuntu24-amd64-fetch-16e1e414375e":{0},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-c424f98526aa":{1},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-706926c35475":{2}', toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-16e1e414375e']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-c424f98526aa']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-706926c35475'])) }}
+      nvkr-results-06-statuses: ${{ format('{0} {1} {2}', needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-16e1e414375e'].result, needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-c424f98526aa'].result, needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-706926c35475'].result) }}
+      nvkr-results-07: ${{ format('"nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d":{0}', toJSON(needs['nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d'])) }}
+      nvkr-results-07-statuses: ${{ format('{0}', needs['nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d'].result) }}
+      nvkr-results-08: ${{ format('"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-e6fdc891acb3":{0},"nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu":{1},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-d730773a23b2":{2}', toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-e6fdc891acb3']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-d730773a23b2'])) }}
+      nvkr-results-08-statuses: ${{ format('{0} {1} {2}', needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-e6fdc891acb3'].result, needs['nvkr-nvke-node-image-amd64-fetch-ovn-kube-ubuntu'].result, needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-d730773a23b2'].result) }}
+      nvkr-results-09: ${{ format('"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-1de305b80d30":{0},"nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro":{1},"nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3":{2}', toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-1de305b80d30']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro']), toJSON(needs['nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3'])) }}
+      nvkr-results-09-statuses: ${{ format('{0} {1} {2}', needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-1de305b80d30'].result, needs['nvkr-nvke-node-image-amd64-fetch-nvke-kubeadm-distro'].result, needs['nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3'].result) }}
+      nvkr-results-0a: ${{ format('"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-1fd69ba6cdeb":{0},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-3d59a97da677":{1}', toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-1fd69ba6cdeb']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-3d59a97da677'])) }}
+      nvkr-results-0a-statuses: ${{ format('{0} {1}', needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-1fd69ba6cdeb'].result, needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-3d59a97da677'].result) }}
+      nvkr-results-0b: ${{ format('"nvkr-nvke-node-image-ubuntu24-arm64-fetch-996f23f8f46e":{0}', toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-996f23f8f46e'])) }}
+      nvkr-results-0b-statuses: ${{ format('{0}', needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-996f23f8f46e'].result) }}
+      nvkr-results-0d: ${{ format('"nvkr-nvke-node-image-amd64-fetch-nvke-age-693f047a753d":{0}', toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-age-693f047a753d'])) }}
+      nvkr-results-0d-statuses: ${{ format('{0}', needs['nvkr-nvke-node-image-amd64-fetch-nvke-age-693f047a753d'].result) }}
+      nvkr-results-0e: ${{ format('"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-cni-ovn":{0}', toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-cni-ovn'])) }}
+      nvkr-results-0e-statuses: ${{ format('{0}', needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-cni-ovn'].result) }}
+      nvkr-results-0f: ${{ format('"nvkr-nvke-node-image-ubuntu24-arm64-fetch-nvke-agent":{0}', toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-nvke-agent'])) }}
+      nvkr-results-0f-statuses: ${{ format('{0}', needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-nvke-agent'].result) }}
+      nvkr-results-10: ${{ format('"nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu":{0}', toJSON(needs['nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu'])) }}
+      nvkr-results-10-statuses: ${{ format('{0}', needs['nvkr-nvke-node-image-arm64-fetch-ovn-kube-ubuntu'].result) }}
+      nvkr-results-11: ${{ format('"nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro":{0},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-4f05a918d224":{1},"nvkr-spire-oidc-image-arm64-pull-spire-oidc-image":{2}', toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-4f05a918d224']), toJSON(needs['nvkr-spire-oidc-image-arm64-pull-spire-oidc-image'])) }}
+      nvkr-results-11-statuses: ${{ format('{0} {1} {2}', needs['nvkr-nvke-node-image-arm64-fetch-nvke-kubeadm-distro'].result, needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-4f05a918d224'].result, needs['nvkr-spire-oidc-image-arm64-pull-spire-oidc-image'].result) }}
+      nvkr-results-12: ${{ format('"nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico":{0}', toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico'])) }}
+      nvkr-results-12-statuses: ${{ format('{0}', needs['nvkr-nvke-node-image-arm64-fetch-nvke-cni-calico'].result) }}
+      nvkr-results-13: ${{ format('"nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent":{0},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-nvke-agent":{1},"nvkr-spire-agent-image-arm64-pull-spire-agent-image":{2},"nvkr-temporal-ui-image-arm64-pull-temporal-ui-image":{3},"nvkr-tool-cosign":{4}', toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-nvke-agent']), toJSON(needs['nvkr-spire-agent-image-arm64-pull-spire-agent-image']), toJSON(needs['nvkr-temporal-ui-image-arm64-pull-temporal-ui-image']), toJSON(needs['nvkr-tool-cosign'])) }}
+      nvkr-results-13-statuses: ${{ format('{0} {1} {2} {3} {4}', needs['nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent'].result, needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-nvke-agent'].result, needs['nvkr-spire-agent-image-arm64-pull-spire-agent-image'].result, needs['nvkr-temporal-ui-image-arm64-pull-temporal-ui-image'].result, needs['nvkr-tool-cosign'].result) }}
+      nvkr-results-14: ${{ format('"nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart":{0},"nvkr-nvke-node-image-arm64-fetch-nvke-cni-ovn":{1}', toJSON(needs['nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-cni-ovn'])) }}
+      nvkr-results-14-statuses: ${{ format('{0} {1}', needs['nvkr-nvke-node-image-amd64-fetch-ovn-kubernetes-chart'].result, needs['nvkr-nvke-node-image-arm64-fetch-nvke-cni-ovn'].result) }}
+      nvkr-results-15: ${{ format('"nvkr-nvke-node-fde-ubuntu24-amd64-fetch-o-608c2630ffc7":{0},"nvkr-postgresql-image-arm64-pull-postgresql-image":{1},"nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image":{2}', toJSON(needs['nvkr-nvke-node-fde-ubuntu24-amd64-fetch-o-608c2630ffc7']), toJSON(needs['nvkr-postgresql-image-arm64-pull-postgresql-image']), toJSON(needs['nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image'])) }}
+      nvkr-results-15-statuses: ${{ format('{0} {1} {2}', needs['nvkr-nvke-node-fde-ubuntu24-amd64-fetch-o-608c2630ffc7'].result, needs['nvkr-postgresql-image-arm64-pull-postgresql-image'].result, needs['nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image'].result) }}
+      nvkr-results-16: ${{ format('"nvkr-nvke-node-image-ubuntu24-arm64-fetch-8fb7112d8acd":{0},"nvkr-operator-tools-pull-helm":{1}', toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-8fb7112d8acd']), toJSON(needs['nvkr-operator-tools-pull-helm'])) }}
+      nvkr-results-16-statuses: ${{ format('{0} {1}', needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-8fb7112d8acd'].result, needs['nvkr-operator-tools-pull-helm'].result) }}
+      nvkr-results-17: ${{ format('"nvkr-nvke-node-image-ubuntu24-amd64-fetch-29ac160699a1":{0}', toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-29ac160699a1'])) }}
+      nvkr-results-17-statuses: ${{ format('{0}', needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-29ac160699a1'].result) }}
+      nvkr-results-18: ${{ format('"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-doca-ovs":{0},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-f3f2d4cda671":{1}', toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-doca-ovs']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-f3f2d4cda671'])) }}
+      nvkr-results-18-statuses: ${{ format('{0} {1}', needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-doca-ovs'].result, needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-f3f2d4cda671'].result) }}
+      nvkr-results-19: ${{ format('"nvkr-nvke-node-fde-ubuntu24-amd64-fetch-o-285c4e706ab1":{0},"nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29":{1}', toJSON(needs['nvkr-nvke-node-fde-ubuntu24-amd64-fetch-o-285c4e706ab1']), toJSON(needs['nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29'])) }}
+      nvkr-results-19-statuses: ${{ format('{0} {1}', needs['nvkr-nvke-node-fde-ubuntu24-amd64-fetch-o-285c4e706ab1'].result, needs['nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29'].result) }}
+      nvkr-results-1a: ${{ format('"nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico":{0},"nvkr-nvke-node-image-amd64-fetch-nvke-doca-ovs":{1},"nvkr-operator-tools-linux-arm64-pull-kubectl":{2}', toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-doca-ovs']), toJSON(needs['nvkr-operator-tools-linux-arm64-pull-kubectl'])) }}
+      nvkr-results-1a-statuses: ${{ format('{0} {1} {2}', needs['nvkr-nvke-node-image-amd64-fetch-nvke-cni-calico'].result, needs['nvkr-nvke-node-image-amd64-fetch-nvke-doca-ovs'].result, needs['nvkr-operator-tools-linux-arm64-pull-kubectl'].result) }}
+      nvkr-results-1b: ${{ format('"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-be8398cf9bcc":{0},"nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-agent":{1},"nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent":{2},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-12e232109f78":{3},"nvkr-nvke-node-image-ubuntu24-amd64-fetch-7cffe3abeab7":{4},"nvkr-nvke-node-image-ubuntu24-arm64-fetch-f76f6d2be7f5":{5}', toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-be8398cf9bcc']), toJSON(needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-agent']), toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-12e232109f78']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-7cffe3abeab7']), toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-f76f6d2be7f5'])) }}
+      nvkr-results-1b-statuses: ${{ format('{0} {1} {2} {3} {4} {5}', needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-be8398cf9bcc'].result, needs['nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-agent'].result, needs['nvkr-nvke-node-image-amd64-fetch-nvke-spire-agent'].result, needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-12e232109f78'].result, needs['nvkr-nvke-node-image-ubuntu24-amd64-fetch-7cffe3abeab7'].result, needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-f76f6d2be7f5'].result) }}
+      nvkr-results-1c: ${{ format('"nvkr-nvke-node-image-amd64-fetch-nvke-cni-ovn":{0},"nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart":{1},"nvkr-operator-tools-linux-arm64-pull-helm":{2}', toJSON(needs['nvkr-nvke-node-image-amd64-fetch-nvke-cni-ovn']), toJSON(needs['nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart']), toJSON(needs['nvkr-operator-tools-linux-arm64-pull-helm'])) }}
+      nvkr-results-1c-statuses: ${{ format('{0} {1} {2}', needs['nvkr-nvke-node-image-amd64-fetch-nvke-cni-ovn'].result, needs['nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart'].result, needs['nvkr-operator-tools-linux-arm64-pull-helm'].result) }}
+      nvkr-results-1d: ${{ format('"nvkr-nvke-node-image-ubuntu24-arm64-fetch-41dbcd4a6616":{0},"nvkr-spire-bash-image-arm64-pull-spire-bash-image":{1}', toJSON(needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-41dbcd4a6616']), toJSON(needs['nvkr-spire-bash-image-arm64-pull-spire-bash-image'])) }}
+      nvkr-results-1d-statuses: ${{ format('{0} {1}', needs['nvkr-nvke-node-image-ubuntu24-arm64-fetch-41dbcd4a6616'].result, needs['nvkr-spire-bash-image-arm64-pull-spire-bash-image'].result) }}
+      nvkr-results-1f: ${{ format('"nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01":{0},"nvkr-nvkectl-linux-arm64-fetch-nvkectl":{1}', toJSON(needs['nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01']), toJSON(needs['nvkr-nvkectl-linux-arm64-fetch-nvkectl'])) }}
+      nvkr-results-1f-statuses: ${{ format('{0} {1}', needs['nvkr-nvke-node-image-arm64-fetch-nvke-age-db7d36f03e01'].result, needs['nvkr-nvkectl-linux-arm64-fetch-nvkectl'].result) }}
     steps:
       - name: Forward provider results
         run: ':'

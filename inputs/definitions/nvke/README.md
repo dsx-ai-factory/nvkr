@@ -20,7 +20,7 @@ the issue that adds it.
 | [Disks Ubuntu 24](disks-ubuntu24.yaml) | [github-nvke-disks-ubuntu24.yaml](../../environments/github-nvke-disks-ubuntu24.yaml) | Ubuntu 24.04 `nvke-node-image-ubuntu24-{amd64,arm64}` and `nvke-node-fde-ubuntu24-{amd64,arm64}` | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | Offline CAPI repository in Core | — | `clusterctl` provider manifests | — | Pending [#324](https://github.com/dsx-ai-factory/nvkr/issues/324) |
 | [GB200 AICR bundle](../aicr/nvke-gb200.yaml) | [aicr-local-arm64.yaml](../../environments/aicr-local-arm64.yaml) (local build only) | `aicr-nvke-gb200-ubuntu-training-kubeflow-{helm,flux,argocd-helm}` | `unqualified-local-execution` | One local Run recorded ([AICR inputs](../aicr/README.md#gb200-nvke-kubeflow-training)); a hosted Release is pending [#325](https://github.com/dsx-ai-factory/nvkr/issues/325) |
-| [GPU site composite](gpu-site.composite.yaml) | [github-nvke-gpu-site.yaml](../../environments/github-nvke-gpu-site.yaml) | Every output of the five NVKE families above, 87 in all, in one Release ([GPU site composite](#gpu-site-composite)) | `pipeline-attested` | Generated production and named development bundles; no hosted Release recorded. The GB200 AICR bundle is not yet a member |
+| [GPU site composite](gpu-site.composite.yaml) | [github-nvke-gpu-site.yaml](../../environments/github-nvke-gpu-site.yaml) | Every output of the five NVKE families and the GB200 AICR bundle above, 90 in all, in one Release ([GPU site composite](#gpu-site-composite)) | `pipeline-attested` | Generated production and named development bundles; no hosted Release recorded |
 
 The [AICR inputs](../aicr/README.md) also hold a `generic` GB300 example, which is not an NVKE recipe and is
 not part of an NVKE site.
@@ -41,7 +41,8 @@ with the credentials in [Family pilot](#family-pilot). Each Run publishes one Re
 
 [`gpu-site.composite.yaml`](gpu-site.composite.yaml) is the whole-site entry point. It is an
 [ADR-26](../../../docs/adr/0026-definition-composition.md) composite that pins the core, services, telemetry,
-disks and disks-ubuntu24 Definitions by their `nvkr.definition` digests. One Run builds all 87 outputs and
+disks and disks-ubuntu24 Definitions and the [GB200 AICR bundle](../aicr/nvke-gb200.yaml) by their
+`nvkr.definition` digests. One Run builds all 90 outputs and
 publishes one Release whose membership is the exact union of the members' outputs. The family Definitions,
 Runs and Releases stay as they are; the composite reads the family files and changes none of them.
 
@@ -81,10 +82,9 @@ Release. Composite qualification, member Release reuse and composite runtime Pla
 `engine-capability`. Verifying a composite Release establishes nothing about the family Releases, and the
 reverse also holds.
 
-The [GB200 AICR bundle](../aicr/nvke-gb200.yaml) is not yet a member. Adding it would bring the composite's
-finalizer to 779 jobs, and ADR-18's 16 fixed result-collector buckets would route 65 of them into one bucket,
-over its 64-job limit, so generation refuses it with `engine-capability`. Its Definition also omits the
-`sbomTool: syft` that every family selects, which ADR-26 requires members to share.
+The GB200 AICR Definition selects the same `sbomTool: syft` as every family, which ADR-26 requires members
+to share. With it the composite's finalizer waits on 779 jobs, more than ADR-18's 16 result-collector buckets
+hold, so generation uses its 32-bucket layout.
 
 ### GPU system matrix
 

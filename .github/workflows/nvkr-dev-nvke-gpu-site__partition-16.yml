@@ -22,10 +22,14 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0d }}
       nvkr-results-0d-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0d-statuses }}
-      nvkr-results-0f:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0f }}
-      nvkr-results-0f-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0f-statuses }}
+      nvkr-results-12:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-12 }}
+      nvkr-results-12-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-12-statuses }}
+      nvkr-results-1f:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1f }}
+      nvkr-results-1f-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1f-statuses }}
     secrets:
       NVKR_CI_STORAGE_READ_TOKEN:
         required: true
@@ -189,14 +193,16 @@ jobs:
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
-      nvkr-results-02: ${{ format('"nvkr-package-publication-nico":{0},"nvkr-package-publication-nktp":{1}', toJSON(needs['nvkr-package-publication-nico']), toJSON(needs['nvkr-package-publication-nktp'])) }}
-      nvkr-results-02-statuses: ${{ format('{0} {1}', needs['nvkr-package-publication-nico'].result, needs['nvkr-package-publication-nktp'].result) }}
+      nvkr-results-02: ${{ format('"nvkr-package-publication-nico":{0}', toJSON(needs['nvkr-package-publication-nico'])) }}
+      nvkr-results-02-statuses: ${{ format('{0}', needs['nvkr-package-publication-nico'].result) }}
       nvkr-results-0a: ${{ format('"nvkr-package-publication-nvkectl":{0}', toJSON(needs['nvkr-package-publication-nvkectl'])) }}
       nvkr-results-0a-statuses: ${{ format('{0}', needs['nvkr-package-publication-nvkectl'].result) }}
       nvkr-results-0d: ${{ format('"nvkr-package-publication-nico-flow":{0}', toJSON(needs['nvkr-package-publication-nico-flow'])) }}
       nvkr-results-0d-statuses: ${{ format('{0}', needs['nvkr-package-publication-nico-flow'].result) }}
-      nvkr-results-0f: ${{ format('"nvkr-package-publication-nico-prereqs":{0}', toJSON(needs['nvkr-package-publication-nico-prereqs'])) }}
-      nvkr-results-0f-statuses: ${{ format('{0}', needs['nvkr-package-publication-nico-prereqs'].result) }}
+      nvkr-results-12: ${{ format('"nvkr-package-publication-nktp":{0}', toJSON(needs['nvkr-package-publication-nktp'])) }}
+      nvkr-results-12-statuses: ${{ format('{0}', needs['nvkr-package-publication-nktp'].result) }}
+      nvkr-results-1f: ${{ format('"nvkr-package-publication-nico-prereqs":{0}', toJSON(needs['nvkr-package-publication-nico-prereqs'])) }}
+      nvkr-results-1f-statuses: ${{ format('{0}', needs['nvkr-package-publication-nico-prereqs'].result) }}
     steps:
       - name: Forward provider results
         run: ':'

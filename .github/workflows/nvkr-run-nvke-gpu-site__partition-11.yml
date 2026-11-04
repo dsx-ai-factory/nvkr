@@ -22,10 +22,6 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-04 }}
       nvkr-results-04-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-04-statuses }}
-      nvkr-results-07:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-07 }}
-      nvkr-results-07-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-07-statuses }}
       nvkr-results-08:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-08 }}
       nvkr-results-08-statuses:
@@ -38,6 +34,22 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0f }}
       nvkr-results-0f-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0f-statuses }}
+      nvkr-results-10:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-10 }}
+      nvkr-results-10-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-10-statuses }}
+      nvkr-results-14:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-14 }}
+      nvkr-results-14-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-14-statuses }}
+      nvkr-results-17:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-17 }}
+      nvkr-results-17-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-17-statuses }}
+      nvkr-results-1f:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1f }}
+      nvkr-results-1f-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1f-statuses }}
     secrets:
       NVKR_CI_STORAGE_READ_TOKEN:
         required: true
@@ -348,18 +360,24 @@ jobs:
       statuses: ${{ join(needs.*.result, ' ') }}
       nvkr-partition-15: ${{ format('"nvkr-capnico-controller-linux-amd64-sbom":{0},"nvkr-cluster-api-provider-provisioned-lin-eba583757c10":{1},"nvkr-controller-profiles-linux-amd64-sbom":{2},"nvkr-cwe-linux-amd64-sbom":{3},"nvkr-local-path-provisioner-sbom":{4},"nvkr-nico-core-image-linux-amd64-sbom":{5},"nvkr-nico-flow-image-linux-amd64-sbom":{6},"nvkr-nico-reference-profiles-fixture-linux-amd64-sbom":{7},"nvkr-package-local-path-provisioner":{8}', toJSON(needs['nvkr-capnico-controller-linux-amd64-sbom']), toJSON(needs['nvkr-cluster-api-provider-provisioned-lin-eba583757c10']), toJSON(needs['nvkr-controller-profiles-linux-amd64-sbom']), toJSON(needs['nvkr-cwe-linux-amd64-sbom']), toJSON(needs['nvkr-local-path-provisioner-sbom']), toJSON(needs['nvkr-nico-core-image-linux-amd64-sbom']), toJSON(needs['nvkr-nico-flow-image-linux-amd64-sbom']), toJSON(needs['nvkr-nico-reference-profiles-fixture-linux-amd64-sbom']), toJSON(needs['nvkr-package-local-path-provisioner'])) }}
       nvkr-partition-21: ${{ format('"nvkr-controller-chart-sbom":{0}', toJSON(needs['nvkr-controller-chart-sbom'])) }}
-      nvkr-results-00: ${{ format('"nvkr-cwe-linux-amd64-sbom":{0},"nvkr-package-local-path-provisioner":{1}', toJSON(needs['nvkr-cwe-linux-amd64-sbom']), toJSON(needs['nvkr-package-local-path-provisioner'])) }}
-      nvkr-results-00-statuses: ${{ format('{0} {1}', needs['nvkr-cwe-linux-amd64-sbom'].result, needs['nvkr-package-local-path-provisioner'].result) }}
-      nvkr-results-04: ${{ format('"nvkr-controller-chart-sbom":{0},"nvkr-nico-core-image-linux-amd64-sbom":{1}', toJSON(needs['nvkr-controller-chart-sbom']), toJSON(needs['nvkr-nico-core-image-linux-amd64-sbom'])) }}
-      nvkr-results-04-statuses: ${{ format('{0} {1}', needs['nvkr-controller-chart-sbom'].result, needs['nvkr-nico-core-image-linux-amd64-sbom'].result) }}
-      nvkr-results-07: ${{ format('"nvkr-nico-reference-profiles-fixture-linux-amd64-sbom":{0}', toJSON(needs['nvkr-nico-reference-profiles-fixture-linux-amd64-sbom'])) }}
-      nvkr-results-07-statuses: ${{ format('{0}', needs['nvkr-nico-reference-profiles-fixture-linux-amd64-sbom'].result) }}
+      nvkr-results-00: ${{ format('"nvkr-package-local-path-provisioner":{0}', toJSON(needs['nvkr-package-local-path-provisioner'])) }}
+      nvkr-results-00-statuses: ${{ format('{0}', needs['nvkr-package-local-path-provisioner'].result) }}
+      nvkr-results-04: ${{ format('"nvkr-controller-chart-sbom":{0}', toJSON(needs['nvkr-controller-chart-sbom'])) }}
+      nvkr-results-04-statuses: ${{ format('{0}', needs['nvkr-controller-chart-sbom'].result) }}
       nvkr-results-08: ${{ format('"nvkr-controller-profiles-linux-amd64-sbom":{0}', toJSON(needs['nvkr-controller-profiles-linux-amd64-sbom'])) }}
       nvkr-results-08-statuses: ${{ format('{0}', needs['nvkr-controller-profiles-linux-amd64-sbom'].result) }}
       nvkr-results-0d: ${{ format('"nvkr-nico-flow-image-linux-amd64-sbom":{0}', toJSON(needs['nvkr-nico-flow-image-linux-amd64-sbom'])) }}
       nvkr-results-0d-statuses: ${{ format('{0}', needs['nvkr-nico-flow-image-linux-amd64-sbom'].result) }}
-      nvkr-results-0f: ${{ format('"nvkr-capnico-controller-linux-amd64-sbom":{0},"nvkr-cluster-api-provider-provisioned-lin-eba583757c10":{1},"nvkr-local-path-provisioner-sbom":{2}', toJSON(needs['nvkr-capnico-controller-linux-amd64-sbom']), toJSON(needs['nvkr-cluster-api-provider-provisioned-lin-eba583757c10']), toJSON(needs['nvkr-local-path-provisioner-sbom'])) }}
-      nvkr-results-0f-statuses: ${{ format('{0} {1} {2}', needs['nvkr-capnico-controller-linux-amd64-sbom'].result, needs['nvkr-cluster-api-provider-provisioned-lin-eba583757c10'].result, needs['nvkr-local-path-provisioner-sbom'].result) }}
+      nvkr-results-0f: ${{ format('"nvkr-cluster-api-provider-provisioned-lin-eba583757c10":{0},"nvkr-local-path-provisioner-sbom":{1}', toJSON(needs['nvkr-cluster-api-provider-provisioned-lin-eba583757c10']), toJSON(needs['nvkr-local-path-provisioner-sbom'])) }}
+      nvkr-results-0f-statuses: ${{ format('{0} {1}', needs['nvkr-cluster-api-provider-provisioned-lin-eba583757c10'].result, needs['nvkr-local-path-provisioner-sbom'].result) }}
+      nvkr-results-10: ${{ format('"nvkr-cwe-linux-amd64-sbom":{0}', toJSON(needs['nvkr-cwe-linux-amd64-sbom'])) }}
+      nvkr-results-10-statuses: ${{ format('{0}', needs['nvkr-cwe-linux-amd64-sbom'].result) }}
+      nvkr-results-14: ${{ format('"nvkr-nico-core-image-linux-amd64-sbom":{0}', toJSON(needs['nvkr-nico-core-image-linux-amd64-sbom'])) }}
+      nvkr-results-14-statuses: ${{ format('{0}', needs['nvkr-nico-core-image-linux-amd64-sbom'].result) }}
+      nvkr-results-17: ${{ format('"nvkr-nico-reference-profiles-fixture-linux-amd64-sbom":{0}', toJSON(needs['nvkr-nico-reference-profiles-fixture-linux-amd64-sbom'])) }}
+      nvkr-results-17-statuses: ${{ format('{0}', needs['nvkr-nico-reference-profiles-fixture-linux-amd64-sbom'].result) }}
+      nvkr-results-1f: ${{ format('"nvkr-capnico-controller-linux-amd64-sbom":{0}', toJSON(needs['nvkr-capnico-controller-linux-amd64-sbom'])) }}
+      nvkr-results-1f-statuses: ${{ format('{0}', needs['nvkr-capnico-controller-linux-amd64-sbom'].result) }}
     steps:
       - name: Forward provider results
         run: ':'
