@@ -28,7 +28,9 @@ Maintained publication uses the sibling `inputs/definitions/nvke/disks-ubuntu24.
 overlay stack, with its own `github-nvke-disks-ubuntu24` Environment, main-only
 `nvkr-run-nvke-disks-ubuntu24.yml` signer and `m2-candidate/disks-ubuntu24` prefix. Private toolchain
 preparation admits that exact prefix. The combined M2 candidate, its Ubuntu 26.04 disks and the `disks`
-family are unchanged; ADR-26 refuses both series as separate composite members. Split, composite, closure
+family are unchanged. ADR-26 admits both series as separate composite members only when the composite declares
+each component the overlay replaces as a variant of the two disk families; an opt-in extended contract compiles
+that composite, and no maintained input selects it. Split, composite, closure
 and credential-boundary contracts pin each output's exact overlay stack and closure, signer isolation and
 credential projection; generation is deterministic. No Ubuntu 24.04 hosted bake, publication, release
 verification or guest boot is recorded.

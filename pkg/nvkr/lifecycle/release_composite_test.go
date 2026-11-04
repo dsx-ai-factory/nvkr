@@ -4,6 +4,7 @@
 package lifecycle
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
@@ -13,18 +14,60 @@ import (
 func compositeReleaseFixtures(t *testing.T) (composite, member exactInputFixture) {
 	t.Helper()
 	compositeLifecycleFixture(t, nil)
-	plan, err := CompileFiles(t.Context(), compositeTestPath, compositeTestEnv, "composite-test")
-	if err != nil {
-		t.Fatal(err)
-	}
 	alpha, err := CompileFiles(t.Context(), "defs/alpha.yaml", compositeTestEnv, "composite-test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	composite = exactInputFixtureForPlanAndInvocation(t, plan.Definition, plan.Environment, plan, "", func(request *delivery.PublicationRequest) {
+	return compositeReleaseFixture(t), exactInputFixtureForPlan(t, alpha.Definition, alpha.Environment, alpha)
+}
+
+// compositeReleaseFixture publishes the composite at compositeTestPath.
+func compositeReleaseFixture(t *testing.T) exactInputFixture {
+	t.Helper()
+	plan, err := CompileFiles(t.Context(), compositeTestPath, compositeTestEnv, "composite-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return exactInputFixtureForPlanAndInvocation(t, plan.Definition, plan.Environment, plan, "", func(request *delivery.PublicationRequest) {
 		request.Release.DefinitionDigest, request.Release.Composition = plan.DefinitionDigest, plan.Composition.Clone()
 	})
-	return composite, exactInputFixtureForPlan(t, alpha.Definition, alpha.Environment, alpha)
+}
+
+// TestCompositeReleaseCarriesVariants keeps a declared variant through
+// publication metadata and the verified consumer view, and refuses to publish
+// metadata that drops the declaration under the same composite identity.
+func TestCompositeReleaseCarriesVariants(t *testing.T) {
+	declareLifecycleVariant(t, compositeLifecycleFixture(t, nil))
+	release := compositeReleaseFixture(t)
+	verified, _, _, plan := release.open(t)
+	defer func() { _ = verified.Close() }()
+	record, err := verified.Composition()
+	if err != nil || len(record.Variants) != 1 || !record.Equal(plan.Composition) {
+		t.Fatalf("authenticated composition = %+v, %v", record, err)
+	}
+	record.Variants[0].Members[0] = "gamma"
+	if again, err := verified.Composition(); err != nil || !again.Equal(plan.Composition) {
+		t.Fatal("verified Release shares its declared variants")
+	}
+	expectation, err := PrepareExactInputs(release.definition, release.environment, release.plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := verified.RequireExactInputs(expectation); err != nil {
+		t.Fatalf("composite expectation against its own Release: %v", err)
+	}
+	// RequireMembers checks member pins only; the variants stay in the record.
+	if err := verified.RequireMembers(plan.Composition.Members); err != nil {
+		t.Fatal(err)
+	}
+	// Publication refuses metadata that drops the declaration under the same composite identity.
+	request := release.request
+	metadata := *request.Release
+	metadata.Composition = metadata.Composition.Clone()
+	metadata.Composition.Variants = nil
+	request.Release = &metadata
+	_, err = delivery.BuildPublicationRoot(t.Context(), filepath.Join(t.TempDir(), "publication"), request)
+	assertCode(t, err, e.CodeVerifyFailed)
 }
 
 func TestCompositeConsumerExpectations(t *testing.T) {

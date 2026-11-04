@@ -42,7 +42,8 @@ func (verified *VerifiedRelease) Composition() (*definition.CompositionRecord, e
 }
 
 // RequireMembers requires a verified composite Release whose authenticated
-// members are exactly members, by name and nvkr.definition digest.
+// members are exactly members, by name and nvkr.definition digest. It does not
+// constrain declared variants; Composition exposes them.
 func (verified *VerifiedRelease) RequireMembers(members []MemberIdentity) error {
 	record, err := verified.Composition()
 	if err != nil {

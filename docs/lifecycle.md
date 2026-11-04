@@ -57,8 +57,10 @@ bin/nvkr run plan \
 A composite Definition (proposed ADR-26) pins complete member
 Definitions by their exact `nvkr.definition` digest. `--definition` accepts either kind; a composite path
 and every member and catalog it reaches must lie beneath the working directory. `definition inspect`
-describes the composite, its members and the derived effective Definition. After editing a member,
-re-pin the composite in the same change; generation fails with `unverified-ref` until then:
+describes the composite, its members, its declared variants and the derived effective Definition. Members
+must resolve the same producer for every component they share, unless a `variants` entry names the component
+and the members allowed to differ. After editing a member, re-pin the composite in the same change; generation
+fails with `unverified-ref` until then:
 
 ```sh
 bin/nvkr definition pin --definition <composite.yaml> --check   # report drift, write nothing

@@ -4,18 +4,21 @@
 package definition
 
 import (
+	"slices"
+
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-// CompositionRecord binds a composite's identity, its members and every
-// output's declaring member into a Plan, Run record or publication root
-// (ADR-26 §4). Attribution is descriptive membership inside the authenticated
-// record; it grants no member-scoped authority.
+// CompositionRecord binds a composite's identity, its members, its declared
+// variants and every output's declaring member into a Plan, Run record or
+// publication root (ADR-26 §4). Attribution is descriptive membership inside
+// the authenticated record; it grants no member-scoped authority.
 type CompositionRecord struct {
 	Kind                      string              `json:"kind"`
 	Metadata                  Metadata            `json:"metadata"`
 	Members                   []MemberIdentity    `json:"members"`
+	Variants                  []DeclaredVariant   `json:"variants,omitempty"`
 	EffectiveDefinitionDigest string              `json:"effectiveDefinitionDigest"`
 	Outputs                   []OutputAttribution `json:"outputs"`
 }
@@ -27,12 +30,14 @@ func NewCompositionRecord(composition Composition) (*CompositionRecord, error) {
 		return nil, err
 	}
 	return &CompositionRecord{Kind: CompositeKind, Metadata: composition.composite.Metadata, Members: composition.composite.MemberIdentities(),
-		EffectiveDefinitionDigest: digest, Outputs: composition.Attribution()}, nil
+		Variants: cloneVariants(composition.composite.Variants), EffectiveDefinitionDigest: digest, Outputs: composition.Attribution()}, nil
 }
 
 // ValidateMembership requires a complete record whose members recompute
 // definitionDigest and whose attribution names exactly outputs, in order, each
-// to a listed member, with no listed member left without an output.
+// to a listed member, with no listed member left without an output. Without the
+// effective Definition it cannot check that declared variant members select
+// their components; Validate adds that check when the Definition is available.
 func (record CompositionRecord) ValidateMembership(definitionDigest string, outputs []string) error {
 	if err := record.validate(definitionDigest); err != nil {
 		return err
@@ -50,7 +55,8 @@ func (record CompositionRecord) ValidateMembership(definitionDigest string, outp
 
 // ValidateOutputLocal requires the same complete record but lets outputs be the
 // non-empty subset one output-local publication carries. Final Release issuance
-// still requires ValidateMembership over the complete output set.
+// still requires ValidateMembership over the complete output set. Like
+// ValidateMembership, it does not check variant selection; Validate does.
 func (record CompositionRecord) ValidateOutputLocal(definitionDigest string, outputs []string) error {
 	if err := record.validate(definitionDigest); err != nil {
 		return err
@@ -70,7 +76,7 @@ func (record CompositionRecord) validate(definitionDigest string) error {
 	if record.Kind != CompositeKind {
 		return e.New(e.CodeUnverifiedRef, "composition record has unsupported definition kind %q", record.Kind)
 	}
-	compositeDigest, err := CompositeDigest(record.Metadata, record.Members)
+	compositeDigest, err := CompositeDigest(record.Metadata, record.Members, record.Variants...)
 	if err != nil {
 		return e.Wrap(e.CodeUnverifiedRef, err, "composition record members")
 	}
@@ -104,7 +110,8 @@ func (record CompositionRecord) validate(definitionDigest string) error {
 	return nil
 }
 
-// Validate additionally binds the record to the effective Definition.
+// Validate additionally binds the record to the effective Definition and
+// requires every declared variant member to select its component there.
 func (record CompositionRecord) Validate(effective Definition, definitionDigest string) error {
 	names := make([]string, 0, len(effective.Outputs))
 	for _, output := range effective.Outputs {
@@ -120,7 +127,7 @@ func (record CompositionRecord) Validate(effective Definition, definitionDigest 
 	if record.EffectiveDefinitionDigest != digest || effective.Metadata != record.Metadata {
 		return e.New(e.CodeUnverifiedRef, "composition record does not bind the effective Definition")
 	}
-	return nil
+	return checkVariantSelection(effective, record.Outputs, record.Variants)
 }
 
 // MemberOf returns the member that declared output, if any.
@@ -133,6 +140,19 @@ func (record CompositionRecord) MemberOf(output string) (string, bool) {
 	return "", false
 }
 
+// DeclaresVariant reports whether the composite lets members left and right
+// resolve different producers for component. It expects a record that Validate
+// or ValidateMembership has admitted, which refuses repeated components; it
+// validates nothing itself and grants no authority.
+func (record CompositionRecord) DeclaresVariant(component, left, right string) bool {
+	for _, variant := range record.Variants {
+		if variant.Component == component {
+			return slices.Contains(variant.Members, left) && slices.Contains(variant.Members, right)
+		}
+	}
+	return false
+}
+
 // Clone returns an independent record.
 func (record *CompositionRecord) Clone() *CompositionRecord {
 	if record == nil {
@@ -140,6 +160,7 @@ func (record *CompositionRecord) Clone() *CompositionRecord {
 	}
 	value := *record
 	value.Members = append([]MemberIdentity(nil), record.Members...)
+	value.Variants = cloneVariants(record.Variants)
 	value.Outputs = append([]OutputAttribution(nil), record.Outputs...)
 	return &value
 }

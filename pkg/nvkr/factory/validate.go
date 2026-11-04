@@ -142,6 +142,11 @@ func (plan Plan) validatePlanInputs() ([]packageSpec, error) {
 			return nil, e.New(e.CodeUnverifiedRef, "run plan output %q differs from its Definition", output.Name)
 		}
 	}
+	if plan.Composition != nil {
+		if err := checkCrossMemberProducers(plan, plan.Composition); err != nil {
+			return nil, err
+		}
+	}
 	return packages, nil
 }
 

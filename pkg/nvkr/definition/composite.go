@@ -35,6 +35,7 @@ type CompositeDefinition struct {
 	Kind       string            `json:"kind"`
 	Metadata   Metadata          `json:"metadata"`
 	Members    []CompositeMember `json:"members"`
+	Variants   []DeclaredVariant `json:"variants,omitempty"`
 }
 
 // CompositeMember locates one member document; only Digest is its identity.
@@ -44,6 +45,14 @@ type CompositeMember struct {
 	Digest     string `json:"digest"`
 }
 
+// DeclaredVariant lets the listed members resolve different effective
+// producers for one component (ADR-26 §3). Any undeclared cross-member
+// divergence still fails compilation.
+type DeclaredVariant struct {
+	Component string   `json:"component"`
+	Members   []string `json:"members"`
+}
+
 // MemberIdentity is the identity-bearing part of one member pin.
 type MemberIdentity struct {
 	Name   string `json:"name"`
@@ -51,8 +60,9 @@ type MemberIdentity struct {
 }
 
 type compositeIdentity struct {
-	Metadata Metadata         `json:"metadata"`
-	Members  []MemberIdentity `json:"members"`
+	Metadata Metadata          `json:"metadata"`
+	Members  []MemberIdentity  `json:"members"`
+	Variants []DeclaredVariant `json:"variants,omitempty"`
 }
 
 // InputReader returns one bounded regular file named by a clean root-relative
@@ -65,7 +75,7 @@ func (composite CompositeDefinition) Validate() error {
 	if composite.APIVersion != CompositeAPIVersion || composite.Kind != CompositeKind {
 		return e.New(e.CodeInvalidCatalog, "composite definition has unsupported apiVersion/kind %q/%q", composite.APIVersion, composite.Kind)
 	}
-	if err := validateCompositeIdentity(composite.Metadata, composite.MemberIdentities()); err != nil {
+	if err := validateCompositeIdentity(composite.Metadata, composite.MemberIdentities(), composite.Variants); err != nil {
 		return err
 	}
 	for _, member := range composite.Members {
@@ -76,7 +86,7 @@ func (composite CompositeDefinition) Validate() error {
 	return nil
 }
 
-func validateCompositeIdentity(metadata Metadata, members []MemberIdentity) error {
+func validateCompositeIdentity(metadata Metadata, members []MemberIdentity, variants []DeclaredVariant) error {
 	if !namePattern.MatchString(metadata.Name) {
 		return e.New(e.CodeInvalidCatalog, "composite definition requires a canonical name")
 	}
@@ -105,16 +115,46 @@ func validateCompositeIdentity(metadata Metadata, members []MemberIdentity) erro
 		}
 		digests[member.Digest] = true
 	}
+	return validateVariants(members, variants)
+}
+
+// validateVariants requires variants sorted by unique component, each naming
+// at least two sorted, unique, listed members.
+func validateVariants(members []MemberIdentity, variants []DeclaredVariant) error {
+	listed := make(map[string]bool, len(members))
+	for _, member := range members {
+		listed[member.Name] = true
+	}
+	for i, variant := range variants {
+		if !namePattern.MatchString(variant.Component) {
+			return e.New(e.CodeInvalidCatalog, "composite variant component %q is not canonical", variant.Component)
+		}
+		if i > 0 && variant.Component <= variants[i-1].Component {
+			return e.New(e.CodeInvalidCatalog, "composite variants must be sorted by unique component")
+		}
+		if len(variant.Members) < 2 {
+			return e.New(e.CodeInvalidCatalog, "composite variant of component %q must name at least two members", variant.Component)
+		}
+		for j, member := range variant.Members {
+			if !listed[member] {
+				return e.New(e.CodeInvalidCatalog, "composite variant of component %q names unlisted member %q", variant.Component, member)
+			}
+			if j > 0 && member <= variant.Members[j-1] {
+				return e.New(e.CodeInvalidCatalog, "composite variant of component %q must list sorted unique members", variant.Component)
+			}
+		}
+	}
 	return nil
 }
 
-// Digest is the nvkr.composite-definition identity: metadata and the sorted
-// member (name, digest) list. Locators are transport and are excluded.
+// Digest is the nvkr.composite-definition identity: metadata, the sorted
+// member (name, digest) list and declared variants. Locators are transport
+// and are excluded.
 func (composite CompositeDefinition) Digest() (string, error) {
 	if err := composite.Validate(); err != nil {
 		return "", err
 	}
-	return CompositeDigest(composite.Metadata, composite.MemberIdentities())
+	return CompositeDigest(composite.Metadata, composite.MemberIdentities(), composite.Variants...)
 }
 
 // MemberIdentities returns the sorted identity-bearing member pins.
@@ -126,19 +166,56 @@ func (composite CompositeDefinition) MemberIdentities() []MemberIdentity {
 	return members
 }
 
-// CompositeDigest recomputes a composite identity from recorded metadata and
-// member pins, so records can be verified without member locators.
-func CompositeDigest(metadata Metadata, members []MemberIdentity) (string, error) {
-	if err := validateCompositeIdentity(metadata, members); err != nil {
+// CompositeDigest recomputes a composite identity from recorded metadata,
+// member pins and declared variants, so records can be verified without
+// member locators. A composite without variants keeps its earlier digest.
+func CompositeDigest(metadata Metadata, members []MemberIdentity, variants ...DeclaredVariant) (string, error) {
+	if err := validateCompositeIdentity(metadata, members, variants); err != nil {
 		return "", err
 	}
-	return canonical.Digest(canonical.KindCompositeDefinition, compositeIdentity{Metadata: metadata, Members: members})
+	return canonical.Digest(canonical.KindCompositeDefinition, compositeIdentity{Metadata: metadata, Members: members, Variants: variants})
 }
 
 // Clone returns an independent composite value.
 func (composite CompositeDefinition) Clone() CompositeDefinition {
 	composite.Members = append([]CompositeMember(nil), composite.Members...)
+	composite.Variants = cloneVariants(composite.Variants)
 	return composite
+}
+
+// checkVariantSelection requires each declared variant member to select its
+// component in an output attributed to it (ADR-26 §3). Selection is authored,
+// so admission and record validation check it without catalogs.
+func checkVariantSelection(effective Definition, attribution []OutputAttribution, variants []DeclaredVariant) error {
+	owners := make(map[string]string, len(attribution))
+	for _, owner := range attribution {
+		owners[owner.Output] = owner.Member
+	}
+	selected := map[[2]string]bool{}
+	for _, output := range effective.Outputs {
+		for _, component := range output.Components {
+			selected[[2]string{owners[output.Name], component}] = true
+		}
+	}
+	for _, variant := range variants {
+		for _, member := range variant.Members {
+			if !selected[[2]string{member, variant.Component}] {
+				return e.New(e.CodeInvalidCatalog, "declared variant of component %q names member %q, which does not select it", variant.Component, member)
+			}
+		}
+	}
+	return nil
+}
+
+func cloneVariants(variants []DeclaredVariant) []DeclaredVariant {
+	if len(variants) == 0 {
+		return nil
+	}
+	cloned := make([]DeclaredVariant, len(variants))
+	for i, variant := range variants {
+		cloned[i] = DeclaredVariant{Component: variant.Component, Members: append([]string(nil), variant.Members...)}
+	}
+	return cloned
 }
 
 // DecodeComposite strictly decodes and validates bounded composite bytes.
@@ -302,6 +379,9 @@ func AdmitComposite(ctx context.Context, compositePath string, raw []byte, read 
 		composition.members = append(composition.members, AdmittedMember{Name: member.Name, Path: paths[i], Digest: memberDigest, Definition: definition})
 	}
 	if composition.effective, composition.attribution, err = mergeComposite(compositePath, composite.Metadata, composition.members); err != nil {
+		return Composition{}, err
+	}
+	if err := checkVariantSelection(composition.effective, composition.attribution, composite.Variants); err != nil {
 		return Composition{}, err
 	}
 	return composition, nil

@@ -296,9 +296,10 @@ Specialized byte-changing transformations remain explicit product intent.
 
 A proposed composite Definition (ADR-26) would enter this flow before the compiler: admission loads each
 digest-pinned member, rejects drift and structural conflicts, and derives one effective Definition that the same
-compiler consumes; the compiler rejects divergent cross-member producers once catalogs are resolved. Composition
-changes Definition, Plan, Run and Release identities and records every member digest and output attribution; it
-never changes an output's Build Digest. This path is implemented and contract-tested, not externally exercised.
+compiler consumes; once catalogs are resolved, the compiler rejects any cross-member producer divergence that the
+composite does not declare as a variant. Composition changes Definition, Plan, Run and Release identities and
+records every member digest, declared variant and output attribution; it never changes an output's Build Digest.
+Its [reconciliation row](adr/reconciliation/adr-26.md) records the implementation and evidence.
 
 A proposed pinned-tool producer (ADR-27) is an ordinary selected component inside this flow. ADR-27 owns its
 [execution](adr/0027-pinned-tool-producers.md#3-execution-offline-isolated-fixed), its

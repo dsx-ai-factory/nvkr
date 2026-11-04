@@ -8,10 +8,12 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
@@ -132,6 +134,64 @@ func TestCompositeAdmissionMatrix(t *testing.T) {
 	}
 }
 
+// declareLifecycleVariant gives beta a containerd output whose overlay changes
+// the producer, so alpha and beta diverge, and declares containerd a variant of
+// the two members.
+func declareLifecycleVariant(t *testing.T, composite definition.CompositeDefinition) []definition.DeclaredVariant {
+	t.Helper()
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir("catalog"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseDigest, err := base.SnapshotDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	replacement := base.Components["containerd"]
+	replacement.ToolchainImage = "golang@sha256:" + strings.Repeat("a", 64)
+	writeCompositeTestDocument(t, "defs/overlay.json", catalog.Overlay{APIVersion: catalog.OverlayAPIVersion, Kind: catalog.OverlayKind,
+		Name: "beta-containerd", RequiresCatalogDigest: baseDigest, Components: map[string]catalog.ComponentReplacement{"containerd": {Component: &replacement}}})
+	beta := Definition{APIVersion: DefinitionAPIVersion, Kind: DefinitionKind, Metadata: Metadata{Name: "beta"}, Catalog: Catalog{Base: "../catalog"},
+		Outputs: []DefinitionOutput{
+			{Name: "beta-containerd", Platform: "linux/amd64", Format: OutputExecutable, Components: []string{"containerd"},
+				Catalog: &Catalog{Base: "../catalog", Overlays: []string{"overlay.json"}}},
+			{Name: "beta-tools", Platform: "linux/amd64", Format: OutputExecutable, Components: []string{"kubelet"}},
+		}}
+	writeCompositeTestDocument(t, "defs/beta.yaml", beta)
+	digest, err := beta.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	composite.Members = slices.Clone(composite.Members)
+	composite.Members[1].Digest = digest
+	composite.Variants = []definition.DeclaredVariant{{Component: "containerd", Members: []string{"alpha", "beta"}}}
+	writeCompositeTestDocument(t, compositeTestPath, composite)
+	return composite.Variants
+}
+
+func TestCompositeViewShowsDeclaredVariants(t *testing.T) {
+	composite := compositeLifecycleFixture(t, nil)
+	// beta selects only kubelet, so admission refuses a containerd declaration before compilation.
+	composite.Variants = []definition.DeclaredVariant{{Component: "containerd", Members: []string{"alpha", "beta"}}}
+	writeCompositeTestDocument(t, compositeTestPath, composite)
+	_, err := LoadDefinitionInput(t.Context(), compositeTestPath)
+	requireLifecycleCode(t, err, e.CodeInvalidCatalog)
+
+	declareLifecycleVariant(t, composite)
+	input, err := LoadDefinitionInput(t.Context(), compositeTestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err := InspectComposite(input)
+	if err != nil || len(view.Variants) != 1 || view.Variants[0].Component != "containerd" || strings.Join(view.Variants[0].Members, ",") != "alpha,beta" {
+		t.Fatalf("inspect variants = %+v, %v", view.Variants, err)
+	}
+	plan, err := CompileFiles(t.Context(), compositeTestPath, compositeTestEnv, "composite-test")
+	if err != nil || len(plan.Composition.Variants) != 1 {
+		t.Fatalf("compiled variants = %+v, %v", plan, err)
+	}
+}
+
 func TestCompositeRuntimePlanRefusedBeforeMembers(t *testing.T) {
 	compositeLifecycleFixture(t, func(environment *definition.Environment) {
 		environment.GitHubBundle, environment.GitHubRuntimePlan = "product", true
@@ -232,6 +292,47 @@ func TestCompositeRunRecordContract(t *testing.T) {
 				return
 			}
 			requireLifecycleCode(t, err, e.CodeVerifyFailed)
+		})
+	}
+}
+
+// TestCompositeRunRecordCarriesVariants keeps a declared variant through the
+// prepared Run record and refuses a record that drops or changes it.
+func TestCompositeRunRecordCarriesVariants(t *testing.T) {
+	declared := declareLifecycleVariant(t, compositeLifecycleFixture(t, nil))
+	prepared, err := PrepareFiles(t.Context(), compositeTestPath, compositeTestEnv, "composite-test", "attempt-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	run := prepared.run
+	if len(run.Composition.Variants) != 1 || run.Composition.Variants[0].Component != declared[0].Component ||
+		!slices.Equal(run.Composition.Variants[0].Members, declared[0].Members) || !run.Composition.Equal(prepared.plan.Composition) {
+		t.Fatalf("composite Run variants = %+v, want %+v", run.Composition.Variants, declared)
+	}
+	description := prepared.Description()
+	description.Composition.Variants[0].Members[0] = "gamma"
+	if !prepared.Description().Composition.Equal(prepared.plan.Composition) {
+		t.Fatal("prepared Run description shares its declared variants")
+	}
+	for _, tc := range []struct {
+		name   string
+		mutate func(run *Run)
+	}{
+		{"complete record", nil},
+		{"dropped variants", func(run *Run) { run.Composition.Variants = nil }},
+		{"changed variant", func(run *Run) { run.Composition.Variants[0].Component = "kubelet" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			candidate := *run
+			candidate.Composition = run.Composition.Clone()
+			if tc.mutate == nil {
+				if err := validateInspectedRun(&candidate); err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			tc.mutate(&candidate)
+			requireLifecycleCode(t, validateInspectedRun(&candidate), e.CodeVerifyFailed)
 		})
 	}
 }
