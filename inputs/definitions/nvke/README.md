@@ -82,8 +82,9 @@ Release. Composite qualification, member Release reuse and composite runtime Pla
 `engine-capability`. Verifying a composite Release establishes nothing about the family Releases, and the
 reverse also holds.
 
-The GB200 AICR Definition selects the same `sbomTool: syft` as every family, which ADR-26 requires members
-to share. With it the composite's finalizer waits on 779 jobs, more than ADR-18's 16 result-collector buckets
+The GB200 AICR Definition selects no `sbomTool`, so its standalone ARM64 local build needs no ARM64 scanner.
+Inside the composite it inherits the families' `syft` (ADR-26), so its bundles get SBOMs there. With it the
+composite's finalizer waits on 779 jobs, more than ADR-18's 16 result-collector buckets
 hold, so generation uses its 32-bucket layout.
 
 ### GPU system matrix

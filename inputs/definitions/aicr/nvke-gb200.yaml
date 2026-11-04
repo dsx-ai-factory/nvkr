@@ -9,7 +9,6 @@ metadata:
 # Reuse maintained action and cosign pins; bundle producers use the catalog below.
 catalog:
   base: ../../catalogs/nvke/module-tags
-sbomTool: syft
 cosignTool: cosign
 outputs:
   - name: aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm

@@ -52,8 +52,7 @@ payloads. GitOps repository settings and cluster acceptance belong downstream.
 [`nvke-gb200.yaml`](nvke-gb200.yaml) selects the AICR coordinate `service: nvke,
 accelerator: gb200, os: ubuntu, intent: training, platform: kubeflow` in three formats:
 `helm`, `flux` and `argocd-helm`. Output names carry the coordinate; the Definition
-carries no hardware model. It selects `sbomTool: syft` so it can be a
-[GPU site composite](../nvke/README.md#gpu-site-composite) member. The producers share the GB300 example's source, lock and
+carries no hardware model. The producers share the GB300 example's source, lock and
 layout handling, add `--platform` to the recipe, and build `helm` and `argocd-helm`
 with `--readiness-hooks` as AICR's NVKE guide directs. GPU Operator installs the NVKE driver,
 so every format also passes `--dra-eviction-node-label nvidia.com/dra-kubelet-plugin=true`
