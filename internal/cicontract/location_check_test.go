@@ -19,7 +19,8 @@ import (
 
 // TestRetiredPathChecksRejectOnlyTrackedRetiredPaths runs each retired-path
 // recipe from the real Makefile against a scratch Git repository, so a no-op
-// recipe or a widened or misspelled pathspec fails here.
+// recipe or a widened or misspelled pathspec fails here. Each case runs again
+// with Git variables naming a caller repository, which must stay unread and unchanged.
 func TestRetiredPathChecksRejectOnlyTrackedRetiredPaths(t *testing.T) {
 	makefile, err := filepath.Abs("../../Makefile")
 	if err != nil {
@@ -46,32 +47,73 @@ func TestRetiredPathChecksRejectOnlyTrackedRetiredPaths(t *testing.T) {
 			tracked:   []string{"definitions/nvke.yaml"},
 			wantError: "authored Definitions belong under inputs/"},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := t.TempDir()
-			runIn(t, repo, "git", "init", "-q")
-			for _, name := range append(append([]string{}, tt.tracked...), tt.untracked...) {
-				writeFile(t, filepath.Join(repo, name))
+	for _, callerRepository := range []bool{false, true} {
+		for _, tt := range tests {
+			name := tt.name
+			if callerRepository {
+				name += " with caller Git variables"
 			}
-			if len(tt.tracked) > 0 {
-				runIn(t, repo, "git", append([]string{"add", "--"}, tt.tracked...)...)
-			}
-			stderr, err := makeTarget(t, makefile, repo, tt.target)
-			if tt.wantError == "" {
-				if err != nil {
-					t.Fatalf("%s failed: %v\n%s", tt.target, err, stderr)
+			t.Run(name, func(t *testing.T) {
+				if callerRepository {
+					// A caller repository that tracks every retired path: a leaked variable
+					// makes the clean cases fail or changes the caller's index.
+					caller := t.TempDir()
+					runIn(t, caller, "git", "init", "-q")
+					retired := []string{"docs/adr/reconciliation.md", "definitions/nvke.yaml"}
+					for _, name := range retired {
+						writeFile(t, filepath.Join(caller, name))
+					}
+					runIn(t, caller, "git", append([]string{"add", "--"}, retired...)...)
+					index := filepath.Join(caller, ".git", "index")
+					before := readFile(t, index)
+					t.Setenv("GIT_DIR", filepath.Join(caller, ".git"))
+					t.Setenv("GIT_WORK_TREE", caller)
+					t.Setenv("GIT_INDEX_FILE", index)
+					t.Cleanup(func() {
+						if !bytes.Equal(readFile(t, index), before) {
+							t.Error("the caller's Git index changed")
+						}
+					})
 				}
-				return
-			}
-			var exitError *exec.ExitError
-			if !errors.As(err, &exitError) {
-				t.Fatalf("%s = %v, want a failing exit\n%s", tt.target, err, stderr)
-			}
-			if !strings.Contains(stderr, tt.wantError) || !strings.Contains(stderr, tt.tracked[0]) {
-				t.Fatalf("%s stderr lacks %q or the tracked path:\n%s", tt.target, tt.wantError, stderr)
-			}
-		})
+				checkRetiredPathCase(t, makefile, tt.target, tt.tracked, tt.untracked, tt.wantError)
+			})
+		}
 	}
+}
+
+func checkRetiredPathCase(t *testing.T, makefile, target string, tracked, untracked []string, wantError string) {
+	t.Helper()
+	repo := t.TempDir()
+	runIn(t, repo, "git", "init", "-q")
+	for _, name := range append(append([]string{}, tracked...), untracked...) {
+		writeFile(t, filepath.Join(repo, name))
+	}
+	if len(tracked) > 0 {
+		runIn(t, repo, "git", append([]string{"add", "--"}, tracked...)...)
+	}
+	stderr, err := makeTarget(t, makefile, repo, target)
+	if wantError == "" {
+		if err != nil {
+			t.Fatalf("%s failed: %v\n%s", target, err, stderr)
+		}
+		return
+	}
+	var exitError *exec.ExitError
+	if !errors.As(err, &exitError) {
+		t.Fatalf("%s = %v, want a failing exit\n%s", target, err, stderr)
+	}
+	if !strings.Contains(stderr, wantError) || !strings.Contains(stderr, tracked[0]) {
+		t.Fatalf("%s stderr lacks %q or the tracked path:\n%s", target, wantError, stderr)
+	}
+}
+
+func readFile(t *testing.T, path string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
 }
 
 func makeTarget(t *testing.T, makefile, dir, target string) (string, error) {
