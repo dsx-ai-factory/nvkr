@@ -9,6 +9,7 @@ Proposed ADR-26 composite Definitions (units U1–U7) are implemented and contra
 Proposed ADR-27 pinned-tool producers are implemented and contract-tested; selecting the OCI layout form waits for
 the layout import, and no recorded Run has executed a pinned release tool.
 Proposed ADR-28 multi-platform executable outputs are designed only; executable outputs remain single-platform.
+Proposed ADR-29 standalone observation is design only; existing conformance admission does not enable it.
 
 Planning, byte-exact GitHub generation, Plan/graph/diff views and metadata-only release navigation are
 implemented. Diagnostic pulling retrieves and checks one named output's complete payload closure from a
