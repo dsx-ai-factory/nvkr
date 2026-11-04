@@ -1,9 +1,9 @@
 # ADR-25 — Generic OCI bundles and AICR producers
 
 - **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
-- **Implementation maturity:** Tracked separately in `reconciliation.md`; implementation and test evidence do not
+- **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
-- **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; local contracts and rendering do not
+- **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; local contracts and rendering do not
   establish hosted publication, deployment compatibility or hardware acceptance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
 - **Index:** ADR-25, extending the consolidated NVKR ADR set.

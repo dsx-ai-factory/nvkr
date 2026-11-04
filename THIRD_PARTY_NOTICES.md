@@ -26,14 +26,14 @@ Regenerate with `make notices`.
 | `github.com/cpuguy83/go-md2man/v2` | v2.0.7 | MIT |
 | `github.com/docker/cli` | v29.7.2+incompatible | Apache-2.0 |
 | `github.com/docker/docker-credential-helpers` | v0.9.3 | MIT |
-| `github.com/dsx-ai-factory/nvke/agent` | v0.3.0 | Apache-2.0 |
+| `github.com/dsx-ai-factory/nvke/agent` | v0.4.0 | Apache-2.0 |
 | `github.com/gdamore/encoding` | v1.0.1 | Apache-2.0 |
 | `github.com/gdamore/tcell/v2` | v2.13.10 | Apache-2.0 |
 | `github.com/go-jose/go-jose/v4` | v4.1.6 | Apache-2.0 |
 | `github.com/google/go-containerregistry` | v0.22.1 | Apache-2.0 |
 | `github.com/klauspost/compress` | v1.19.2 | BSD-3-Clause |
 | `github.com/lucasb-eyer/go-colorful` | v1.3.0 | MIT |
-| `github.com/moby/sys/mountinfo` | v0.7.2 | Apache-2.0 |
+| `github.com/moby/sys/mountinfo` | v0.7.3 | Apache-2.0 |
 | `github.com/opencontainers/go-digest` | v1.0.0 | Apache-2.0 |
 | `github.com/opencontainers/image-spec` | v1.1.1 | Apache-2.0 |
 | `github.com/rivo/tview` | v0.42.0 | MIT |
@@ -46,14 +46,14 @@ Regenerate with `make notices`.
 | `github.com/urfave/cli/v2` | v2.27.7 | MIT |
 | `github.com/xrash/smetrics` | v0.0.0-20240521201337-686a1a2994c1 | MIT |
 | `go.yaml.in/yaml/v2` | v2.4.4 | Apache-2.0 |
-| `go.yaml.in/yaml/v3` | v3.0.5 | MIT |
-| `golang.org/x/net` | v0.61.0 | BSD-3-Clause |
+| `go.yaml.in/yaml/v3` | v3.0.6 | MIT |
+| `golang.org/x/net` | v0.62.0 | BSD-3-Clause |
 | `golang.org/x/sync` | v0.24.0 | BSD-3-Clause |
 | `golang.org/x/sys` | v0.49.0 | BSD-3-Clause |
 | `golang.org/x/term` | v0.47.0 | BSD-3-Clause |
 | `golang.org/x/text` | v0.43.0 | BSD-3-Clause |
 | `google.golang.org/genproto/googleapis/rpc` | v0.0.0-20261005182115-fad411399dd8 | Apache-2.0 |
-| `google.golang.org/grpc` | v1.84.0 | Apache-2.0 |
+| `google.golang.org/grpc` | v1.85.0 | Apache-2.0 |
 | `google.golang.org/protobuf` | v1.36.12 | BSD-3-Clause |
 | `oras.land/oras-go/v2` | v2.7.0 | Apache-2.0 |
 | `sigs.k8s.io/yaml` | v1.6.0 | MIT |
@@ -372,7 +372,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ## github.com/dsx-ai-factory/nvke/agent
 
-Version: v0.3.0
+Version: v0.4.0
 
 ```
 Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
@@ -1753,7 +1753,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ## github.com/moby/sys/mountinfo
 
-Version: v0.7.2
+Version: v0.7.3
 
 ```
 Apache License
@@ -3208,7 +3208,7 @@ limitations under the License.
 
 ## go.yaml.in/yaml/v3
 
-Version: v3.0.5
+Version: v3.0.6
 
 ```
 This project is covered by two different licenses: MIT and Apache.
@@ -3284,7 +3284,7 @@ limitations under the License.
 
 ## golang.org/x/net
 
-Version: v0.61.0
+Version: v0.62.0
 
 ```
 Copyright 2009 The Go Authors.
@@ -3674,7 +3674,7 @@ Apache License
 
 ## google.golang.org/grpc
 
-Version: v1.84.0
+Version: v1.85.0
 
 ```
 Apache License

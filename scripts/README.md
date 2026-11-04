@@ -27,20 +27,21 @@ read. `ci-test-summary.py` summarizes the retained Go JSON events. Partition, co
 small offline Go composition contracts run with `make test-ci-tools`; the Go fixture exercises every
 matrix entry without rebuilding the product suite.
 
-## CLI artifact test baseline
+## CLI artifact validation baseline
 
 ```sh
 GOTOOLCHAIN=local go build -o bin/nvkr ./cmd/nvkr
-bin/nvkr run artifact-test --artifact /path/to/nvkectl --plan /path/to/matching/plan.json
+bin/nvkr validators run --profile /path/to/validation.yaml --keep
 ```
 
 Imports the matching pinned NVKE tests and invokes their `test-artifact` target
 against a supplied NVKR-built binary, without rebuilding it. See
-[artifact testing](../docs/artifact-testing.md) for prerequisites, results, and scope.
+[artifact testing](../docs/artifact-testing.md) for prerequisites and a profile example.
 This trusted-input diagnostic is implemented in Go. The guide separates prior
 Python-adapter runtime results from validation of the Go replacement.
 The current production pin lacks the upstream entrypoint; upstream adoption and
-explicit maintained-input refresh remain follow-ups. The guide distinguishes prior results from committed regressions.
+explicit maintained-input refresh remain follow-ups. The guide distinguishes prior
+results from committed regressions.
 
 ## Definition → Run
 
@@ -78,7 +79,7 @@ It prepares fresh local keys, a Plan-bound demo policy, pinned cosign, scratch a
 loopback registry, then stops that registry after qualification while retaining data and evidence.
 See [local qualification setup](../docs/local-development.md#qualify-local-artifacts)
 for prerequisites and the advanced explicit setup/stop commands.
-See [reconciliation](../docs/adr/reconciliation.md) for recorded runtime results;
+See [reconciliation](../docs/adr/reconciliation/README.md) for recorded runtime results;
 the reduced flow has not passed a new clean-machine end-to-end run. This is not
 a [full source-built distribution](../docs/full-nvke-source-build.md).
 

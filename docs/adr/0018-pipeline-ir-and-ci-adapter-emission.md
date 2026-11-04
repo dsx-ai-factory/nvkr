@@ -1,9 +1,9 @@
 # ADR-18 — Pipeline IR & CI-adapter emission (hermetic execution)
 
 - **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
-- **Implementation maturity:** Tracked separately in `reconciliation.md`; implementation and test evidence do not
+- **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
-- **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
+- **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
 - **Index:** ADR-18 in the consolidated NVKR ADR set (added to close the Definition→realized-pipeline gap).
@@ -519,8 +519,11 @@ native Go E2E. It freezes NVKE main once, derives temporary source overlays thro
 the catalog/local-preparation owners and calls the existing `TestEndToEnd` flow.
 The AMD64 Definition and v0.23.0 catalogs own the complete material graph;
 source freezing preserves producer commands, materials, toolchains and independent
-dependency pins. Committed catalogs and locks are unchanged. The same job
-builds fresh local Runs, bootstraps the site VM,
+dependency pins. Committed catalogs and locks are unchanged. Source preparation
+authenticates each distinct catalog stack once within its bounded invocation and
+holds those values across its validation passes; no cross-invocation cache is used.
+Changed outputs retain separate overlays, and the complete derived graph is still validated.
+The same job builds fresh local Runs, bootstraps the site VM,
 checks site readiness and tenant workload/DNS, and joins owned cleanup.
 
 This workflow uses ordinary branch `workflow_dispatch` and retains its daily

@@ -6,7 +6,7 @@
 
 > [!NOTE]
 > This document explains the system and the reasons for its boundaries. The [ADRs](adr/) govern design;
-> [reconciliation](adr/reconciliation.md) records implementation and evidence. Proposed ADRs are the engineering
+> [reconciliation](adr/reconciliation/README.md) records implementation and evidence. Proposed ADRs are the engineering
 > baseline pending ratification, not organizational approval.
 > Public lifecycle ownership is defined in [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md).
 > The current ADRs state the qualified and pipeline-attested contracts directly; [milestones](milestones.md)
@@ -94,7 +94,7 @@ Nothing is implemented.
 
 Proposed [ADR-29](adr/0029-cluster-observation-and-artifact-attribution.md) separates collected cluster
 facts from their optional comparison with selected artifacts. Its [design](cluster-observation-and-artifact-attribution.md)
-proposes AICR Go APIs and an observation-only entrypoint reusing the existing NVKR image observer. These
+proposes AICR Go APIs and an observation-only entrypoint sharing NVKR's OCI identity rules. These
 remain unsigned descriptive diagnostics with explicit access and coverage limits. No standalone collector,
 test execution, signed runtime report or qualification capability is implemented.
 
@@ -183,7 +183,7 @@ evidence remains visible but never upgrades the aggregate that consumed it.
 
 | Reference | Use |
 |---|---|
-| [ADR set](adr/) and [reconciliation](adr/reconciliation.md) | Design decisions, maturity, evidence, and unresolved critiques |
+| [ADR set](adr/) and [reconciliation](adr/reconciliation/README.md) | Design decisions, maturity, evidence, and unresolved critiques |
 | [v1 milestones](milestones.md) and [epic specification](epics-v1-spec.md) | M1–M4 product acceptance |
 | [Domain vocabulary](../CONTEXT.md) and [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md) | Public object meanings and lifecycle contracts |
 | [Contribution guide](../CONTRIBUTING.md) and [development guide](../DEVELOPMENT.md) | Repository verification and engineering workflow |
@@ -463,7 +463,7 @@ single-build emitter or grant that adapter authority by analogy.
 ## ADR index & traceability
 
 This index locates design responsibility. Per-ADR maturity and remaining acceptance evidence live in
-[reconciliation](adr/reconciliation.md), avoiding a second detailed status ledger here.
+[reconciliation](adr/reconciliation/README.md), avoiding a second detailed status ledger here.
 
 | ADR | Design responsibility | Main view in this SADD |
 |---|---|---|
@@ -514,7 +514,7 @@ and authenticates a derived delivery root with portable original proofs. Typed c
 adapters, provider acceptance and actual boot/package-install acceptance remain required. Existing schema
 constants, whole-Plan verification and current capability admission are unchanged by this documentation freeze.
 
-[Reconciliation](adr/reconciliation.md) owns the current support matrix. Local immutable attempts,
+[Reconciliation](adr/reconciliation/README.md) owns the current support matrix. Local immutable attempts,
 Plan/graph inspection, GitHub generation, metadata-only release navigation and the scoped
 `pipeline-attested` consumers for `authenticity` and `artifact-publication` are implemented. Authenticity
 does not check artifact payload integrity or grant qualification; its contract tests establish no external
@@ -1194,7 +1194,7 @@ unavailable. Arbitrary devices, nested
 virtualization, NUMA, accelerators and additional provider-specific lowering are deferred. In-process
 cleanup owns success, failure and cancellation; authenticated orphan recovery after hard process/host
 failure is also deferred. ADR-10/18 own the detailed admission and driver contracts;
-[reconciliation](adr/reconciliation.md) separates their tests from recorded native runtime observations.
+[reconciliation](adr/reconciliation/README.md) separates their tests from recorded native runtime observations.
 
 Produced-artifact size remains an artifact and transport budget.
 
@@ -1262,6 +1262,7 @@ already obtained.
 | Proposed ADR-26 composite Definitions, then member Release reuse and composite qualification | Release-engineering, catalog, qualification and result-reuse owners | One combined Release from independently owned Definitions without a hand-maintained combined copy |
 | Proposed ADR-27 pinned-tool producers, then AICR layout output (NVIDIA/aicr#3534) and layout import | Catalog, execution, evidence and release-engineering owners | Outputs rendered by released tools, starting with AICR bundles, without rebuilding the tool from source |
 | Proposed ADR-28 multi-platform executables, then the AICR migration and the per-platform retrofits | Catalog, release-engineering, delivery and evidence owners | One tool source per release where [ADR-28 §1](adr/0028-multi-platform-executable-indexes.md#1-one-tool-source-declares-every-platform) admits it, and one image-index output per executable, consumable by standard OCI clients |
+| Proposed ADR-29 observation owner and AICR import exception, bounded access/log/field controls, host/package provider and downstream installation/boot records | NVKR observation, AICR and downstream deployment owners; named deciders unassigned | Standalone descriptive collection and supported exact chart/disk/package comparisons |
 
 Qualified helper-image use remains unavailable until it satisfies ADR-07/18's executable/runtime admission.
 Source bootstrap records only the identities that actually participated; delivery by image cannot imply
@@ -1276,5 +1277,5 @@ reproduction of helper bytes.
 | Revision | 2026-10-07 |
 | Related ADRs | ADR-01…ADR-22 (`docs/adr/`) |
 | Related acceptance documents | `docs/milestones.md` summarizes the roadmap; `docs/epics-v1-spec.md` owns product acceptance; ADRs own engineering contracts |
-| Current support record | `docs/adr/reconciliation.md` |
+| Current support record | `docs/adr/reconciliation/README.md` |
 | Related surface | `docs/lifecycle.md` |

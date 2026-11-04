@@ -1,9 +1,9 @@
 # ADR-17 — CLI/SDK foundation, seams & package topology
 
 - **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
-- **Implementation maturity:** Tracked separately in `reconciliation.md`; implementation and test evidence do not
+- **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
-- **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
+- **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
 - **Index:** ADR-17 in the consolidated NVKR ADR set.
@@ -65,7 +65,7 @@ qualified execution remain capability-gated.
 The strict live full-disk evidence/publication path has guarded APIs
 without a successful real NVKE join; main-only execution, independent full-payload disk consumption,
 strict inventory hardening, M3 qualification acceptance and organizational acceptance remain separate gaps in
-[reconciliation](reconciliation.md).
+[reconciliation](reconciliation/README.md).
 
 Definition v5, Run/Release v4, and compiled Run Plan/artifact graph v5 records reject the
 retired cluster, role, category and composition fields. Signer policy roles remain a distinct security concept.
@@ -530,7 +530,7 @@ Status operation and state contracts cover commit-before-withdrawal, authenticat
 protected reads and kernel-released locks. Catalog maintenance contracts cover no-op bytes, source check mode,
 whole-update CAS and artifact selection before upstream calls. Lifecycle binary observation now requires its
 complete Plan and retained raw producer bytes, including exact IR/result metadata; packaged bytes alone are
-insufficient. The owning package tests and [reconciliation](reconciliation.md) record these current
+insufficient. The owning package tests and [reconciliation](reconciliation/README.md) record these current
 ownership and contract boundaries; completed organization reports are not a second status owner.
 
 The Recipe-removal migration changes public requests, generated graphs and their wire versions. Native and

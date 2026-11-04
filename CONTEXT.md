@@ -281,8 +281,8 @@ _Avoid_: Artifact comparison, authored lifecycle object, complete host attestati
 
 **Artifact comparison (proposed)**:
 A descriptive comparison of a cluster observation with selected NVKR outputs and their evidence, under
-an explicit scope and comparison policy. Reports produced/acquired identity, installation attribution and
-measured contents separately. Missing baselines or unsupported joins remain unverified; observations can
+an explicit scope and comparison profile, distinct from the public Verification Policy. Reports produced/acquired
+identity, installation attribution and measured contents separately. Missing baselines or unsupported joins remain unverified; observations can
 still be useful without a comparison. Proposed in ADR-29; no qualification, signing or release authority.
 _Avoid_: Cluster observation, verified installation from a version label, qualification receipt
 

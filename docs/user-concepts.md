@@ -63,7 +63,7 @@ Choose a [task guide](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/READ
 
 | Concept | Meaning | Read more |
 |---|---|---|
-| Evidence lanes | `static-unqualified` describes previews; `pipeline-attested` uses hosted production evidence; `qualified` has stronger reproduction and authentication requirements that remain unavailable in the public acceptance path. | [Implementation scope](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md) |
+| Evidence lanes | `static-unqualified` describes previews; `pipeline-attested` uses hosted production evidence; `qualified` has stronger reproduction and authentication requirements that remain unavailable in the public acceptance path. | [Implementation scope](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/README.md) |
 | Software inventories and SBOMs | A software bill of materials describes software for an exact subject and stage. It is not a vulnerability verdict; disk build provenance is not a full disk inventory. | [Dependency SBOMs](dependency-sboms.md) |
 | Production provenance | A subject-bound statement describing the production process and inputs. It answers a different question from an inventory or a signature. | [Publication architecture](publication-architecture.md) |
 | Signing and attestations | Authenticate the signer of an exact artifact or statement. Keyless GitHub signing uses a workflow identity and OIDC issuer; consumer policy chooses which are accepted. | [Release quickstart](release-quickstart.md) |
@@ -72,7 +72,7 @@ Choose a [task guide](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/READ
 | Verification Policy | Consumer-owned identity, issuer, lane, and scope requirements. `authenticity` checks signatures and evidence without artifact payloads; `artifact-publication` includes payload integrity. Neither establishes deployment readiness or full release qualification. | [Release verification](lifecycle.md) |
 | Go SDK | `client/v1` exposes Definition, Run, and Release operations to applications. It preserves the CLI's platform, tool, and policy requirements. | [SDK lifecycle](https://github.com/dsx-ai-factory/nvkr/blob/main/client/v1/lifecycle.go) |
 | Errors and failed requirements | Stable `NVKR-E-*` codes identify invalid inputs, drift, missing capabilities, and failed verification. Unsupported requirements fail closed. | [Error contract](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0003-coded-error-and-exit-code-contract.md) |
-| Supported capabilities | Support depends on the chosen operation, producer, platform, runtime, and evidence scope. Contract tests and recorded external runs establish different facts. | [Implementation and evidence](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md) |
+| Supported capabilities | Support depends on the chosen operation, producer, platform, runtime, and evidence scope. Contract tests and recorded external runs establish different facts. | [Implementation and evidence](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/README.md) |
 
 For executable bundles, the component selection chooses which files are packaged together. For disk images,
 today's list explicitly repeats the root and dependency membership, and NVKR checks that it agrees with the

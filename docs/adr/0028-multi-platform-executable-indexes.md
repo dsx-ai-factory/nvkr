@@ -3,7 +3,7 @@
 - **Decision status:** Proposed (design only; pending named-decider ratification)
 - **Implementation maturity:** Designed, not implemented. No multi-platform tool declaration, `tools` lock entry,
   executable `platforms` output, executable-index identity projection or index packaging exists; see
-  `reconciliation.md`.
+  `reconciliation/README.md`.
 - **Acceptance-test maturity:** None. The implementation units below name the contract suites that must pass;
   no contract test, generated bundle, hosted Run or consumer verification exercises an executable index.
 - **Deciders:** Pending; catalog, release-engineering, delivery and evidence owners must be named before

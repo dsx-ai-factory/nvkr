@@ -60,6 +60,13 @@ func TestValidatorCommandRefusals(t *testing.T) {
 		{"describe-extra-id", []string{"describe", "--catalog", catalog, "a", "b"}},
 		{"run-extra", []string{"run", "--profile", "missing.yaml", "extra"}},
 		{"run-missing-profile", []string{"run", "--profile", filepath.Join(t.TempDir(), "missing.yaml")}},
+		{"list-no-catalog", []string{"list"}},
+		{"list-empty-catalog", []string{"list", "--catalog", ""}},
+		{"describe-empty-catalog", []string{"describe", "--catalog", "", "nvke/nvkectl/contract"}},
+		{"describe-no-id-no-catalog", []string{"describe"}},
+		{"run-empty-profile", []string{"run", "--profile", ""}},
+		{"describe-no-catalog", []string{"describe", "nvke/nvkectl/contract"}},
+		{"run-no-profile", []string{"run"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var out bytes.Buffer
@@ -81,4 +88,26 @@ func TestValidatorDiscoveryWriteFailure(t *testing.T) {
 	app := &cli.App{Writer: failedValidatorWriter{}, Commands: []*cli.Command{cmdValidators()}}
 	err := app.RunContext(t.Context(), []string{"nvkr", "validators", "list", "--catalog", "../../inputs/testing/validators/catalog.yaml"})
 	assertLifecycleCommandCode(t, err, e.CodeInternal)
+}
+
+func TestValidatorsRegisteredHiddenInRootApp(t *testing.T) {
+	var out bytes.Buffer
+	app := newApp()
+	app.Writer = &out
+	if err := app.RunContext(t.Context(), []string{"nvkr", "validators", "list", "--catalog", "../../inputs/testing/validators/catalog.yaml"}); err != nil {
+		t.Fatal(err)
+	}
+	var d []validation.Description
+	if err := json.Unmarshal(out.Bytes(), &d); err != nil || len(d) != 2 {
+		t.Fatalf("%s %v", out.Bytes(), err)
+	}
+	for _, c := range newApp().Commands {
+		if c.Name == "validators" {
+			if !c.Hidden {
+				t.Fatal("validators must stay hidden while in development")
+			}
+			return
+		}
+	}
+	t.Fatal("validators is not registered in the root app")
 }

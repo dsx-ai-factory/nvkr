@@ -55,7 +55,7 @@ temporary `kind-calico` diagnostic keeps Kind networking and uses tenant Calico;
 neither mode validates the NVIDIA fork, and neither is an automatic fallback.
 The final PASS and retained tenant result name the selection. See the
 [network alternatives](local-nvke-demo.md#explicit-upstream-ovn-alternative) and
-[current validation status](adr/reconciliation.md).
+[current validation status](adr/reconciliation/README.md).
 
 ## Prepare charts without rebuilding them
 
@@ -277,4 +277,4 @@ cleanup or full recorded E2E acceptance.
 A separate successful deployment replay does not establish a fresh one-shot
 rebuild, complete source-built distribution, full OS smoke or qualification.
 Current implementation and runtime limits are recorded in
-[reconciliation](adr/reconciliation.md).
+[reconciliation](adr/reconciliation/README.md).

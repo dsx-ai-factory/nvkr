@@ -1,9 +1,9 @@
 # ADR-21 — Generated-pipeline maintenance & lifecycle
 
 - **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
-- **Implementation maturity:** Tracked separately in `reconciliation.md`; implementation and test evidence do not
+- **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
-- **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
+- **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
 - **Index:** ADR-21 in the consolidated NVKR ADR set (added to close the day-2 pipeline-maintenance gap).
@@ -77,7 +77,7 @@ the largest worker at 134,308 bytes and unchanged signer jobs. These are local g
 Workers never contain OIDC jobs. A fixed `<entry-stem>__signer.yml` signer workflow is proposed only
 together with ADR-18 §8's explicit certificate-identity and trust-policy migration. It is not an admitted
 member name; the reserved child-namespace rules below fail closed on such a file. Workers share one complete Plan and do not add
-an authored lifecycle object or a child Release. ADR-18 owns scheduling and result propagation. [Reconciliation](reconciliation.md#output-local-publication-and-metadata-assembly)
+an authored lifecycle object or a child Release. ADR-18 owns scheduling and result propagation. [Reconciliation](reconciliation/output-local-publication-and-metadata-assembly.md#output-local-publication-and-metadata-assembly)
 records one successful earlier-head full development execution of this opt-in topology; it predates the core
 execution-model extraction and per-worker fragment forwarding, and proves neither current-head worker execution,
 full-product failure/cancellation recovery nor production qualification. Optional qualification

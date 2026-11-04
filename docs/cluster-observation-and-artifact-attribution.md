@@ -22,7 +22,8 @@ work. This design does not add a verdict parser, signer role or consumer trust p
 
 1. Admit an explicit kubeconfig, target, namespace/selector scope, required measurements and resource/time
    limits. If comparison is requested, freeze the caller's selected outputs, platforms, expected targets
-   or counts, mapping and comparison policy before collection.
+   or counts, mapping and comparison profile before collection. These descriptive settings are distinct
+   from the public Verification Policy used to authenticate a selected baseline.
 2. Gather bounded API observations and any separately admitted installation or host records. Preserve
    raw runtime imageIDs and their digest kind; do not reduce them to names/tags. Record each request's
    scope, available resourceVersion, start/end time, objects/nodes and failed or omitted reads.
@@ -52,26 +53,40 @@ executable pin is added by ADR-29.
 
 | Source | Reuse and required work |
 | --- | --- |
-| Existing NVKR OCI observer | `pkg/nvkr/conformance/deployment.go` owns Pod/node reads, replica checks and native-manifest joins. `observe.go` reads node OS/kernel/runtime/boot information. Expose or refactor an admitted observation-only entrypoint; these are currently internal functions coupled to disposable-cluster conformance execution. Do not call `Produce` or invent existing public `Observe`/`ImageSubject` APIs. |
+| Existing NVKR OCI rules | `pkg/nvkr/conformance/deployment.go` owns native-child selection and runtime-reference interpretation inside a strict execution gate. Extract shared pure identity classification there. Preserve all existing validate checks; do not call its `New`/`Produce` route or claim it already exposes an observation API. |
 | AICR installed inventory | [Read](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/inventory/read.go) / [ReadReleases](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/inventory/releases.go) supply scoped component/release metadata. Current reads can require cluster-wide Secret access; see admission below. They do not prove original archive bytes. |
-| Captured AICR input | [Client.LoadSnapshot](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/client/v1/snapshot.go) consumes a bounded local capture. Capture source bytes once before loading; its returned facade does not retain `Raw`. Reject URL and ConfigMap inputs in the NVKR route. |
-| Opt-in AICR agent | [Client.CollectSnapshot](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/client/v1/aicr.go#L2233) deploys a Job. Preserve `Snapshot.Raw`, target/node identities and collection gaps. Its success does not prove every collector or cleanup succeeded. |
+| Captured AICR input | [Client.LoadSnapshot](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/client/v1/snapshot.go) consumes a bounded local capture. Read source bytes once, then retain only the permitted parsed projection and original byte digest/length; its returned facade does not retain `Raw`. Reject URL and ConfigMap inputs. |
+| Opt-in AICR agent | [Client.CollectSnapshot](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/client/v1/aicr.go#L2233) deploys a Job. Project permitted facts, target/node identities and gaps; do not persist `Snapshot.Raw`. Its hard-coded agent-log streaming to process stderr needs upstream request-scoped log control or reviewed containment before admission. Success proves neither complete collection nor cleanup. |
 | Missing host/package information | The inspected AICR OS collector supplies OS/kernel configuration, not a complete installed-package or payload inventory. Select a reviewed upstream provider/extension before offering that capability. Do not claim a general node inventory from one agent's host facts. |
 
 AICR inventory matching needs caller-supplied component/deployer scope; it is not automatic discovery of
 every unrelated chart. Missing whole-scope discovery must remain a coverage gap until an admitted API
 or provider supplies it.
 
-The existing NVKR observation rules need GET of the kube-system namespace identity, LIST nodes, and LIST
-Pods within selected namespaces/selectors. They retain workload/container/node identity and raw imageID.
-They currently accept an exact repository/native-manifest identity, selecting the authenticated platform
-child of an index; config digests and index digests are not interchangeable. Reuse those rules in their
-owning module, rather than implement a second OCI join in the AICR adapter. Broad cluster admission and
-whole-scope discovery are proposed extensions, not existing standalone capabilities.
+The proposed operator-host route uses bounded in-process Kubernetes reads, shared with the AICR adapter
+through its existing [GetKubeClientWithConfig](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/k8s/client/client.go#L339)
+owner after dependency admission. It needs GET of the kube-system namespace identity, LIST nodes and scoped
+LIST Pods. This route follows ADR-18 §3's context, resource, credential-isolation and cleanup limits; it has
+no generated-CI lane, product/tools Release, suite inputs or disposable-cluster acknowledgement. Existing
+conformance keeps its held-kubectl transport and its own full admission.
+This is a proposed read-only extension of ADR-18's host model; it supplies no filesystem, network or privilege sandbox.
+
+Share pure native-child/digest interpretation in conformance, rather than a second OCI join in the adapter.
+For observation, keep a tagged PodSpec as requested-reference metadata; identity comes from a supported raw
+runtime imageID and authenticated native platform child. Different runtime bytes are mismatched; an unsupported
+digest kind is unverified; a missing required replica after a successful read is not observed. Failed reads
+remain gaps. Preserve other items and partial facts. Existing `validate` additionally requires its exact
+PodSpec reference, replica count, running/Ready state, IDs and restart checks; a matched identity cannot relax it.
 
 ## Access, collection and privacy
 
-Live collection requires an explicit target/kubeconfig and bounded get/list permissions for declared resources.
+Every live route runs without signing/publication credentials. Reuse the existing static kubeconfig admission
+profile: one exact context, HTTPS with embedded CA and one embedded token or certificate/key pair. Reject
+ambient lookup, exec/auth-provider plugins, external credential files and insecure TLS before client creation.
+Pass the admitted capture to AICR at a fresh 0600 path in a private 0700 directory for each admission; its
+client cache is path-keyed. Never rewrite/reuse that path for another target. Join calls before removing owned
+credentials. Exec-based EKS/GKE configurations require a separately reviewed profile; none is admitted here.
+Live collection requires bounded get/list permissions for declared resources.
 No ambient credential fallback, exec, attach, port-forward, proxy, Secret read or watch is enabled by default.
 Record the actual verbs and scopes used. Unsupported requested capabilities fail with `engine-capability`
 before collection or output. Admitted reads can still fail; retain their partial facts and coded failure
@@ -85,15 +100,26 @@ only permitted decoded metadata/digests, not raw Secret objects or credential-be
 
 Agent/host collection is opt-in and separate from signing/publication credentials. Admission requires an
 explicit target, kubeconfig, namespace and node selection, digest-pinned image, positive limits, explicit tolerations and a
-service-account mode. Privilege is off unless separately admitted. An explicitly selected existing service
-account avoids managed RBAC creation; managed mode may create cluster-scoped RBAC and needs those explicit
-grants. Record UID-bound ownership of every created resource; never remove preexisting shared resources.
+service-account mode. Privilege is off unless separately admitted. An existing service account must match the
+expected UID before and after collection and remain in existing-account mode, with no unexpected run-owned RBAC.
+Current AICR treats a missing named account as a prefix for managed creation. Prevent that fallback with credentials
+unable to create ServiceAccounts or RBAC, or require an upstream existing-only/expected-UID capability before enabling the mode.
+Pre/post checks alone only detect a deletion race with broad credentials. Managed mode needs separate explicit
+grants. Record UID-bound ownership of created resources; preserve shared resources.
+
+At the inspected AICR revision, host filesystem/SystemD measurements require hostPID, hostNetwork, hostIPC,
+root/privileged execution, `SYS_ADMIN`/`SYS_CHROOT` and host mounts. Restricted mode lacks those mounts;
+its container-local OS readings must not be reported as node-host facts. Retain only Kubernetes readings in
+that mode, mark host measurements not collected, and keep API NodeInfo clearly identified as an API source.
 
 Require `Cleanup=true`, bounded stop/join and confirmation that all run-owned resources are gone, including
 Jobs, RBAC and staging ConfigMaps. Preserve caller-owned output ConfigMaps and shared service accounts. AICR currently
 logs cleanup errors while returning success. Its flag alone cannot establish cleanup: require an upstream
 surfaced result or independent UID-bound verification before declaring complete collection. Until the
 route is implemented and exercised with these controls, it remains unavailable before resource creation.
+The pinned [agent collector](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/snapshotter/agent.go#L362)
+streams normal and failed-Job logs directly to process stderr. Require an upstream request-scoped writer or
+suppression control, or reviewed containment, before enabling it. Do not redirect process-global stderr.
 
 Imported AICR snapshots are reporter-asserted inputs, not fresh cluster measurements. Retain target UID
 and collection times when present; mark unavailable identity/time as unknown and separately supplied
@@ -102,11 +128,15 @@ Live collection records the observed kube-system namespace UID, caller-selected 
 Any expected UID must come from the caller independently of the capture. Object inventory, absence of extras and local timestamps are
 observation-source claims, not proof against a dishonest reporter, compromised API/server or replay.
 
-Keep admitted captures private. Never log, export or durably retain credentials, kubeconfigs, token-bearing
-values, raw Secret/Pod payloads or provider logs. A separately admitted Secret reader may process responses
-transiently inside the library; retain only the permitted metadata projection, not the original API object. Any sharing requires an explicit field projection excluding private
-endpoints/server identifiers and recording withheld fields and its limits. This decision supplies no
-public publication or independently trusted freshness protocol.
+Keep observations private. Parse bounded raw bytes transiently using AICR's parser, then retain a reviewed
+field-allowlisted projection, its projection/version description and, where permitted, the original byte
+digest/length. Do not copy or durably retain raw snapshots. AICR's
+[ClusterPolicy collector](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/collector/k8s/policy.go#L120)
+copies whole specs, including environment arrays, proxy and repository values that may carry credentials.
+Exclude these and unknown fields before logging, export or durable capture; the projection is not byte-identical
+to the raw snapshot. Never retain credentials, kubeconfigs, raw Secret/Pod payloads or provider/agent logs.
+Permitted Secret reads stay transient inside the library. Sharing needs a separate field projection excluding
+private endpoints/server identifiers and recording withheld fields. No public publication or freshness protocol is added.
 
 ## What can be compared?
 
@@ -134,7 +164,7 @@ agreement may be displayed as metadata agreement, not as an exact artifact match
 identity, installation attribution and measured content as separate claims.
 
 Use **matched**, **mismatched**, **not observed**, **unverified**, and **explicitly non-applicable** everywhere.
-Policy declares non-applicability before collection. Failed reads are gaps, not proof of absence. An overall
+The comparison profile declares non-applicability before collection. Failed reads are gaps, not proof of absence. An overall
 match requires every applicable required member to match with complete required coverage. The policy's
 frozen scope and expected targets/counts cannot be narrowed to the reporter's successful subset. Retain
 unknown software and unsupported joins. A recorded list remains a reporter/API observation, not independent
@@ -160,7 +190,7 @@ flowchart LR
     C --> V
 ```
 
-### Raw AICR observation
+### AICR fixture excerpt
 
 This shortened excerpt preserves values from AICR's checked-in
 [snapshot fixture](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/operator/aicrjob/testdata/v1.0.0/snapshot-eks-amazonlinux.json).
@@ -275,7 +305,12 @@ unimplemented. No live acceptance is established by this design or its examples.
 
 ## Follow-ups and ownership
 
-Agree on the observation-only entrypoint, pinned AICR module, namespace/Secret access contract and the
-host/package provider before implementation. Collection and comparison stay with their existing deep
-owners; deployment owners retain placement and installation records. Wire formats and CLI presentation
-need implementation review. No signer, test adapter, verdict protocol or qualification handoff is added.
+The proposed `pkg/nvkr/observation` module owns request/profile admission, the frozen scope, AICR adapter,
+observation records, comparison outcomes/coverage and descriptive serialization. `conformance` owns the
+shared pure OCI classification and its unchanged strict execution gate; `lifecycle` authenticates optional
+artifact baselines. CLI/SDK delegate. Deployment owners retain placement and installation records.
+
+Before implementation, assign named deciders and review the ADR-17 package map, ADR-18 host admission, pinned AICR dependency,
+shared client/kubeconfig admission, log and field controls, namespace/Secret access and host/package provider.
+These are proposed owners and refactors, not existing exported APIs. Wire formats and CLI presentation need
+implementation review. No signer, test adapter, verdict protocol or qualification handoff is added.

@@ -31,4 +31,4 @@ component toolchains remain Recipe inputs.
 Qualified helper-image execution remains unavailable until the exact executable/runtime observation protocol
 is implemented. A published, signed image alone cannot satisfy that admission gate. Existing image-mode
 rendering contracts do not establish qualified provider execution. Use the current source-bootstrap workflow
-and the [implementation record](../../docs/adr/reconciliation.md) for the supported boundary.
+and the [implementation record](../../docs/adr/reconciliation/README.md) for the supported boundary.
