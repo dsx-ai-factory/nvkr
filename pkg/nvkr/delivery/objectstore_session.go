@@ -17,6 +17,9 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
+// Thirty seconds of bounded clock tolerance plus one second of STS expiry precision.
+const objectSessionAllowance = 31 * time.Second
+
 // No credential cache is involved: the synchronous STS call must finish before
 // the store can be used. The admitted temporary session covers cleanup as well
 // as operation work. No SDK-suppressed refresh can outlive its caller.
@@ -42,8 +45,8 @@ func objectSession(ctx context.Context, options S3ObjectStoreOptions, client *ht
 		if len(token) < 4 || len(token) > 20000 {
 			return nil, e.New(e.CodeTrustPolicyMissing, "workload identity token exceeds STS bounds")
 		}
-		// STS expiration may have whole-second precision; retain coverage after truncation.
-		duration := max(15*time.Minute, ((time.Until(required)+time.Second-1)/time.Second)*time.Second+time.Second)
+		// Request bounded clock tolerance without weakening actual expiration coverage.
+		duration := max(15*time.Minute, ((time.Until(required)+time.Second-1)/time.Second)*time.Second+objectSessionAllowance)
 		if duration > 12*time.Hour {
 			return nil, e.New(e.CodeTrustPolicyMissing, "S3 operation exceeds maximum workload session duration")
 		}
@@ -61,9 +64,13 @@ func objectSession(ctx context.Context, options S3ObjectStoreOptions, client *ht
 	if err := deliveryContext(ctx); err != nil {
 		return nil, err
 	}
-	if session.AccessKeyID == "" || session.SecretAccessKey == "" || session.SessionToken == "" || !session.CanExpire || session.Expires.Before(required) {
-		return nil, e.New(e.CodeTrustPolicyMissing, "temporary S3 session must cover operation and cleanup deadlines")
+	if session.AccessKeyID == "" || session.SecretAccessKey == "" || session.SessionToken == "" || !session.CanExpire {
+		return nil, e.New(e.CodeTrustPolicyMissing, "S3 requires an explicit temporary session identity")
 	}
+	if session.Expires.Before(required) {
+		return nil, e.New(e.CodeUnavailable, "temporary S3 session lifetime does not cover operation and cleanup; check session duration and clock")
+	}
+
 	return credentials.StaticCredentialsProvider{Value: session}, nil
 }
 

@@ -15,6 +15,79 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
 )
 
+func TestDebianCarrierRejectsForeignMetadataBeforePull(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mutate func(*ociManifest)
+		config string
+	}{
+		{name: "subject", mutate: func(m *ociManifest) { m.Subject = &m.Layers[0] }},
+		{name: "annotations", mutate: func(m *ociManifest) { m.Annotations = map[string]string{"foreign": "metadata"} }},
+		{name: "schema", mutate: func(m *ociManifest) { m.SchemaVersion = 1 }},
+		{name: "media", mutate: func(m *ociManifest) { m.MediaType = MediaDockerManifest }},
+		{name: "layer media", mutate: func(m *ociManifest) { m.Layers[0].MediaType = "application/foreign" }},
+		{name: "raw digest", mutate: func(m *ociManifest) { m.Layers[0].Digest = digestBytes([]byte("foreign")) }},
+		{name: "config", config: `{"foreign":true}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			writer := layoutWriter{root: root, plain: true}
+			config := test.config
+			if config == "" {
+				config = "{}"
+			}
+			configuration, err := writer.addBlobBytes([]byte(config), MediaEmptyConfig)
+			if err != nil {
+				t.Fatal(err)
+			}
+			layer, err := writer.addBlobBytes([]byte("original raw Debian package"), MediaOctetStream)
+			if err != nil {
+				t.Fatal(err)
+			}
+			manifest := ociManifest{SchemaVersion: 2, MediaType: MediaOCIManifest, ArtifactType: MediaDeliveryObject, Config: configuration, Layers: []Descriptor{layer}}
+			if test.mutate != nil {
+				test.mutate(&manifest)
+			}
+			descriptor, err := writer.addJSONBlob(manifest, MediaOCIManifest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			descriptor.ArtifactType = MediaDeliveryObject
+			if _, err := writer.writeIndex(ociIndex{SchemaVersion: 2, MediaType: MediaOCIIndex, Manifests: []Descriptor{descriptor}}); err != nil {
+				t.Fatal(err)
+			}
+			_, err = InspectDebianArtifact(t.Context(), root, layer.Digest)
+			assertRegistryCode(t, err, e.CodeVerifyFailed)
+			out := filepath.Join(t.TempDir(), "refused")
+			_, err = pullDebianOutput(t.Context(), "registry.example.test/agent@"+descriptor.Digest, out, root, t.TempDir(), PublishedObject{Name: "agent", DescriptorDigest: descriptor.Digest, Size: descriptor.Size, BlobDigest: layer.Digest, SemanticDigest: layer.Digest, Output: &OutputBinding{Format: outputFormatDebian}}, RegistryOptions{})
+			assertRegistryCode(t, err, e.CodeVerifyFailed)
+			if _, err := os.Lstat(out); !os.IsNotExist(err) {
+				t.Fatal("foreign carrier exposed output")
+			}
+		})
+	}
+}
+
+func TestDebianReleaseEvidenceRejectsForeignRawSubject(t *testing.T) {
+	raw := digestBytes([]byte("raw Debian package"))
+	foreign := digestBytes([]byte("other package"))
+	for _, field := range []string{"build subject", "semantic subject"} {
+		t.Run(field, func(t *testing.T) {
+			object := PublishedObject{Name: "agent", BlobDigest: raw, SemanticDigest: raw, Output: &OutputBinding{Format: outputFormatDebian, Components: []string{"agent"}, BuildSubjects: []BuildSubject{{Component: "agent", Digest: raw}}}}
+			if field == "build subject" {
+				object.Output.BuildSubjects[0].Digest = foreign
+			} else {
+				object.SemanticDigest = foreign
+			}
+			err := verifyReleaseEvidence(t.Context(), t.TempDir(), PublicationRoot{Release: &ReleaseMetadata{}, Objects: []PublishedObject{object}})
+			assertRegistryCode(t, err, e.CodeVerifyFailed)
+			if !strings.Contains(err.Error(), "preserved raw package") {
+				t.Fatalf("wrong refusal boundary: %v", err)
+			}
+		})
+	}
+}
+
 func TestDebianPublicationPreservesRawSubjectAndOrdinaryCarrier(t *testing.T) {
 	root := t.TempDir()
 	source := filepath.Join(root, "original+package.deb")

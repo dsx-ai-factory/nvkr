@@ -133,9 +133,13 @@ there is no separate target-profile resolver or inferred distribution/platform d
 
 A standalone `debian-package` Definition output selects one archive producer. The normal producer session
 executes it; existing producer-result authentication, bounded held files and lifecycle staging preserve exact
-bytes and rollback on failure. OS consumers use the ordinary material handoff. These local artifacts carry
-composition metadata only. Full-content inspection, independent architecture/ABI acceptance and authenticated
-provenance remain separate; direct-node/hosted raw-DEB execution, signing and publication remain gated.
+bytes and rollback on failure. OS consumers use the ordinary material handoff. The archive retains its raw
+producer/result subject through ordinary hosted execution,
+SBOM inspection, signing and publication. Packaging wraps the unchanged bytes in a standard one-layer OCI
+carrier; the wrapper descriptor never replaces the raw subject. Selected package readers and scanners must
+bind the exact package, platform and pinned tools through the existing evidence owner. Independent
+architecture/ABI acceptance, installation and full-content qualification remain separate; see the
+[implementation and evidence boundary](reconciliation/adr-13.md).
 
 ### Disk-image authoring contract
 

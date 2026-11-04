@@ -32,8 +32,11 @@ func pullDebianOutput(ctx context.Context, reference, out, metadataRoot, workspa
 	if err != nil {
 		return PulledFile{}, err
 	}
-	if object.Output == nil || object.Output.Format != outputFormatDebian || object.Output.TransportPath != "" || manifest.Config.MediaType != MediaEmptyConfig || manifest.ArtifactType != MediaDeliveryObject || len(manifest.Layers) != 1 || manifest.Layers[0].Digest != object.BlobDigest || object.SemanticDigest != object.BlobDigest || manifest.Layers[0].Size <= 0 {
+	if object.Output == nil || object.Output.Format != outputFormatDebian || object.Output.TransportPath != "" || object.SemanticDigest != object.BlobDigest {
 		return PulledFile{}, e.New(e.CodeVerifyFailed, "selected Debian output changes original raw file binding")
+	}
+	if err := validateDebianCarrier(ctx, metadataRoot, manifest, object.BlobDigest); err != nil {
+		return PulledFile{}, err
 	}
 	file, err := fetchPullLayer(ctx, reference, manifest.Layers[0], workspace, options)
 	if err != nil {

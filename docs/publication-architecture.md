@@ -38,9 +38,18 @@ publication:
 
 Keep the original signing identity, pinned cosign selection and hosted execution settings. Set the protected
 workflow variable `ARTIFACT_PUBLISH_ROLE_ARN` to the operator-provisioned workload role. The publisher obtains
-a short-lived AWS session from GitHub OIDC; credentials are never authored in the Environment. Its role needs
-object write/read and owned multipart abort/list-parts access within the literal prefix. Independent consumers
-use their own read-only credentials. Custom S3-compatible HTTPS endpoints and `addressing: path` are explicit
+a short-lived AWS session from GitHub OIDC; credentials are never authored in the Environment. Configure
+role trust for audience `sts.amazonaws.com`, the exact repository and protected release Environment subject,
+and the default-branch ref. Match the repository's actual subject format and immutable repository/owner IDs;
+protect deployment branches, reviewers and workflow changes. Signing jobs can share that Environment and
+OIDC permission, so this trusts the release context rather than isolating a single generated job. See
+[the role-trust contract and official setup links](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0020-artifact-publication-and-target-configuration.md#s3-file-delivery-contract).
+Its prefix-scoped permissions are `s3:PutObject`, `s3:GetObject`, `s3:GetObjectVersion`,
+`s3:AbortMultipartUpload` and `s3:ListMultipartUploadParts`. Independent consumers use separate read-only
+credentials with `s3:GetObject` and, for versioned locators, `s3:GetObjectVersion`. A denied version read
+fails without falling back to current bytes. A generic registry secret keeps its original grants; select a
+scoped `GITHUB_TOKEN` or separate read credential for read-only source access. Custom S3-compatible HTTPS
+endpoints and `addressing: path` are explicit
 options; provider compatibility must be tested separately.
 
 The generated S3 publication step follows the original signature and verification steps. Its failure fails
@@ -51,12 +60,16 @@ key, with the original output name and payload binding in the inventory.
 
 Optional `transfer` fields on the destination are `maxObjectBytes`, `maxTotalBytes`, `maxObjects` and
 `operationTimeoutSeconds`; defaults are 64 GiB, 256 GiB, 8192 and 1200 seconds. The complete inventory must fit
-before any upload. The operation timeout is at most 3539 seconds, leaving 60 seconds for cleanup and one
-second for credential-expiry precision within a one-hour workload session. A temporary session must cover
+before any upload, including its worst-case provider-pin encoding. The inventory is bounded at 128 MiB,
+with retained proof bundles bounded at 8 MiB each and 16 MiB combined. Object-count ceilings also share
+these independent byte limits. The operation timeout is at most 3509 seconds, leaving 60 seconds for
+cleanup plus 30 seconds of clock skew and one second of expiry precision within a one-hour workload session.
+A temporary session must cover
 both deadlines; insufficient lifetime fails before writes. SDK callers use the same publication owner and
 byte-provider interface. A consumer restores
 the original closure and verifies every original proof and exact input/output binding under its own policy;
-an inventory, ETag or S3 metadata alone is not authenticity evidence.
+an inventory, ETag or S3 metadata alone is not authenticity evidence. See the
+[consumer API and implementation boundary](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/object-store-publication.md#object-store-publication).
 
 This is artifact publication. Serving an APT repository, extracting a new boot-file format, booting a disk,
 installing a package and qualifying a release retain their separate contracts and acceptance evidence.

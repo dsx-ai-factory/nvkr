@@ -25,3 +25,17 @@ func TestRequiredObjectPublicationRefusesLocalBeforeWorkspace(t *testing.T) {
 		}
 	}
 }
+
+func TestRequiredObjectPublicationRefusesDevelopmentBeforeCatalog(t *testing.T) {
+	_, destinationPlan := objectPublicationPlan(t, true)
+	plan := githubDevelopmentPublicationTestPlan(t)
+	definition, environment := plan.Definition.Clone(), plan.Environment.Clone()
+	definition.Catalog.Base = "missing-catalog"
+	environment.APIVersion = destinationPlan.Environment.APIVersion
+	environment.Publication.ObjectStores = destinationPlan.Environment.Publication.ObjectStores
+	compiled, err := CompileDocuments(t.Context(), "definition.yaml", definition, "environment.yaml", environment, "test")
+	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+	if compiled != nil {
+		t.Fatal("development object publication produced a Plan")
+	}
+}

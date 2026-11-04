@@ -19,37 +19,42 @@ import (
 // Parts are synchronous and sequential, so cleanup never races a part writer.
 // SDK Standard owns per-request retries, including embedded completion errors;
 // only a 409 can start a bounded fresh upload after reconciliation and cleanup.
-func (store *s3ObjectStore) putMultipart(ctx context.Context, object Object, body io.ReadSeeker) (stored StoredObject, returnErr error) {
+func (store *s3ObjectStore) putMultipart(ctx context.Context, object Object, body io.ReadSeeker) (stored StoredObject, readback *objectReadback, returnErr error) {
 	uploadID := ""
 	defer func() {
 		if uploadID != "" {
 			returnErr = errors.Join(returnErr, store.abortOwned(ctx, object.Key, uploadID))
 		}
+		if returnErr != nil {
+			stored = StoredObject{}
+			readback = nil
+		}
 	}()
 	reader := &objectReaderAt{body: body}
+	partSize := store.partSize(object.Size)
 	for attempt := 0; attempt < store.options.MaxUploadAttempts; attempt++ {
 		started, err := store.api.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{Bucket: aws.String(store.options.Bucket), ExpectedBucketOwner: aws.String(store.options.ExpectedBucketOwner),
 			Key: aws.String(store.physicalKey(object.Key)), ContentType: aws.String(object.MediaType), ChecksumAlgorithm: types.ChecksumAlgorithmCrc32, ChecksumType: types.ChecksumTypeComposite},
 			// Retrying an initiation with a lost response would strand an unknown ID.
 			func(o *s3.Options) { o.RetryMaxAttempts = 1 })
 		if err != nil {
-			return stored, objectFailure(ctx, err, "multipart initiation failed; unknown IDs require provider expiry")
+			return stored, nil, objectFailure(ctx, err, "multipart initiation failed; unknown IDs require provider expiry")
 		}
 		if started == nil || aws.ToString(started.UploadId) == "" {
-			return stored, objectFailure(ctx, nil, "multipart initiation returned no ID; provider expiry required")
+			return stored, nil, objectFailure(ctx, nil, "multipart initiation returned no ID; provider expiry required")
 		}
 		uploadID = *started.UploadId
-		parts := make([]types.CompletedPart, 0, (object.Size-1)/store.options.PartSizeBytes+1)
-		for offset := int64(0); offset < object.Size; offset += store.options.PartSizeBytes {
-			length := min(store.options.PartSizeBytes, object.Size-offset)
+		parts := make([]types.CompletedPart, 0, (object.Size-1)/partSize+1)
+		for offset := int64(0); offset < object.Size; offset += partSize {
+			length := min(partSize, object.Size-offset)
 			number := int32(len(parts) + 1)
 			part, err := store.api.UploadPart(ctx, &s3.UploadPartInput{Bucket: aws.String(store.options.Bucket), ExpectedBucketOwner: aws.String(store.options.ExpectedBucketOwner), Key: aws.String(store.physicalKey(object.Key)), UploadId: aws.String(uploadID),
 				PartNumber: aws.Int32(number), Body: io.NewSectionReader(reader, offset, length), ContentLength: aws.Int64(length), ChecksumAlgorithm: types.ChecksumAlgorithmCrc32})
 			if err != nil {
-				return stored, objectFailure(ctx, err, "multipart part failed")
+				return stored, nil, objectFailure(ctx, err, "multipart part failed")
 			}
 			if part == nil || aws.ToString(part.ETag) == "" || aws.ToString(part.ChecksumCRC32) == "" {
-				return stored, e.New(e.CodeVerifyFailed, "multipart part has no completion/checksum binding")
+				return stored, nil, e.New(e.CodeVerifyFailed, "multipart part has no completion/checksum binding")
 			}
 			parts = append(parts, types.CompletedPart{PartNumber: aws.Int32(number), ETag: part.ETag, ChecksumCRC32: part.ChecksumCRC32})
 		}
@@ -57,34 +62,34 @@ func (store *s3ObjectStore) putMultipart(ctx context.Context, object Object, bod
 			MultipartUpload: &types.CompletedMultipartUpload{Parts: parts}, IfNoneMatch: aws.String("*"), ChecksumType: types.ChecksumTypeComposite})
 		if err == nil {
 			if completed == nil {
-				return stored, objectFailure(ctx, nil, "empty multipart completion response")
+				return stored, nil, objectFailure(ctx, nil, "empty multipart completion response")
 			}
 			uploadID = ""
-			return StoredObject{Object: object, VersionID: aws.ToString(completed.VersionId), ETag: aws.ToString(completed.ETag)}, nil
+			return StoredObject{Object: object, VersionID: aws.ToString(completed.VersionId), ETag: aws.ToString(completed.ETag)}, nil, nil
 		}
 		if objectCode(err) == "NoSuchUpload" {
 			uploadID = ""
 		}
 		if !objectMayHaveCommitted(err) {
-			return stored, objectFailure(ctx, err, "multipart completion failed")
+			return stored, nil, objectFailure(ctx, err, "multipart completion failed")
 		}
-		observed, reconcileErr := store.reconcile(ctx, object)
+		observed, proof, reconcileErr := store.reconcile(ctx, object)
 		if reconcileErr == nil {
-			return observed, nil
+			return observed, proof, nil
 		}
 		if objectConflict(reconcileErr) || objectStatus(err) != 409 {
-			return stored, reconcileErr
+			return stored, nil, reconcileErr
 		}
 		if err := store.abortOwned(ctx, object.Key, uploadID); err != nil {
 			uploadID = ""
-			return stored, err
+			return stored, nil, err
 		}
 		uploadID = ""
 		if err := deliveryContext(ctx); err != nil {
-			return stored, err
+			return stored, nil, err
 		}
 	}
-	return stored, objectFailure(ctx, nil, "multipart restart budget exhausted; remote outcome remains unknown")
+	return stored, nil, objectFailure(ctx, nil, "multipart restart budget exhausted; remote outcome remains unknown")
 }
 
 // Only the known upload ID is cleaned up. WithoutCancel retains metadata while

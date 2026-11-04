@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"go.yaml.in/yaml/v3"
 )
@@ -18,6 +19,10 @@ func objectEnvironment() Environment {
 }
 
 func TestObjectStoreEnvironmentAdmission(t *testing.T) {
+	namespace, err := development.ParseNamespace("ghcr.io/example/nvkr/development")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tc := range []struct {
 		name string
 		edit func(*Environment)
@@ -27,6 +32,11 @@ func TestObjectStoreEnvironmentAdmission(t *testing.T) {
 		{"v1", func(x *Environment) { x.APIVersion = EnvironmentAPIVersion }, e.CodeInvalidCatalog},
 		{"empty v2", func(x *Environment) { x.Publication.ObjectStores = nil }, e.CodeInvalidCatalog},
 		{"provider", func(x *Environment) { x.Publication.ObjectStores[0].Provider = "gcs" }, e.CodeEngineCapability},
+		{"development", func(x *Environment) {
+			x.GitHubDevelopment = true
+			x.Publication.Mode, x.Publication.RepositoryPrefix, x.Publication.CredentialRef = "per-output-v1", namespace.Prefix(), development.WriteCredentialRef
+			x.Signing.Identity, x.Signing.Issuer = namespace.Identity(), development.Issuer
+		}, e.CodeEngineCapability},
 		{"unsigned", func(x *Environment) { x.Signing = nil }, e.CodeEngineCapability},
 		{"prefix escape", func(x *Environment) { x.Publication.ObjectStores[0].S3.Prefix = "../other" }, e.CodeInvalidCatalog},
 		{"endpoint credentials", func(x *Environment) { x.Publication.ObjectStores[0].S3.Endpoint = "https://user:secret@example.test" }, e.CodeInvalidCatalog},
@@ -40,8 +50,8 @@ func TestObjectStoreEnvironmentAdmission(t *testing.T) {
 		{"role value", func(x *Environment) {
 			x.Publication.ObjectStores[0].S3.RoleRef = "arn:aws:iam::123456789012:role/publisher"
 		}, e.CodeTrustPolicyMissing},
-		{"maximum session timeout", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.OperationTimeoutSeconds = 3539 }, ""},
-		{"cleanup exceeds session", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.OperationTimeoutSeconds = 3540 }, e.CodeEngineCapability},
+		{"maximum session timeout", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.OperationTimeoutSeconds = 3509 }, ""},
+		{"cleanup exceeds session", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.OperationTimeoutSeconds = 3510 }, e.CodeEngineCapability},
 		{"one hour omits cleanup", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.OperationTimeoutSeconds = 3600 }, e.CodeEngineCapability},
 		{"total", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.MaxTotalBytes = 1 }, e.CodeEngineCapability},
 		{"object capability", func(x *Environment) { x.Publication.ObjectStores[0].Transfer.MaxObjectBytes = 64<<30 + 1 }, e.CodeEngineCapability},
@@ -58,6 +68,13 @@ func TestObjectStoreEnvironmentAdmission(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			x := objectEnvironment()
 			tc.edit(&x)
+			if tc.name == "development" {
+				withoutStore := x.Clone()
+				withoutStore.APIVersion, withoutStore.Publication.ObjectStores = EnvironmentAPIVersion, nil
+				if err := withoutStore.Validate(); err != nil {
+					t.Fatal("development fixture must be valid without S3", err)
+				}
+			}
 			err := x.Validate()
 			if tc.code != "" {
 				requireCode(t, err, tc.code)

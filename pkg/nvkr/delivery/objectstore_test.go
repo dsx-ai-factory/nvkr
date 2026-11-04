@@ -34,6 +34,7 @@ type objectFixture struct {
 	uploads          map[string]map[int][]byte
 	calls            map[string]int
 	mode             string
+	getEcho          string
 	missingETag      bool
 	deniedVersion    bool
 	partStarted      chan struct{}
@@ -98,6 +99,13 @@ func (fixture *objectFixture) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 	switch operation {
 	case "PUT":
+		if fixture.mode == "put-retry-conflict" {
+			if count == 2 {
+				fixture.data[key] = bytes.Clone(fixture.completeConflict)
+			}
+			fail(500, "InternalError")
+			return
+		}
 		if fixture.mode == "always-fail" {
 			fail(500, "InternalError")
 			return
@@ -148,6 +156,14 @@ func (fixture *objectFixture) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		if query.Get("versionId") != "" {
 			w.Header().Set("X-Amz-Version-Id", query.Get("versionId"))
 		}
+		switch fixture.getEcho {
+		case "wrong-version":
+			w.Header().Set("X-Amz-Version-Id", "different")
+		case "missing-version":
+			w.Header().Del("X-Amz-Version-Id")
+		case "wrong-etag":
+			w.Header().Set("ETag", `"different"`)
+		}
 		_, _ = w.Write(data)
 	case "initiate":
 		id := fmt.Sprintf("owned-%d", count)
@@ -176,6 +192,11 @@ func (fixture *objectFixture) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			// A different writer wins before this SDK completion retry.
 			fixture.data[key] = bytes.Clone(fixture.completeConflict)
 			fail(200, "InternalError")
+			return
+		}
+		if fixture.mode == "complete-409-conflict" && count == 1 {
+			fixture.data[key] = bytes.Clone(fixture.completeConflict)
+			fail(409, "ConditionalRequestConflict")
 			return
 		}
 		if fixture.mode == "complete-409" && count == 1 {
@@ -400,7 +421,7 @@ func TestObjectStoreAdmissionAndTemporarySession(t *testing.T) {
 	}{
 		{"empty identity", func(o *S3ObjectStoreOptions) { o.Credentials = nil }, e.CodeTrustPolicyMissing},
 		{"static identity", func(o *S3ObjectStoreOptions) { o.Credentials.CanExpire = false }, e.CodeTrustPolicyMissing},
-		{"insufficient lifetime", func(o *S3ObjectStoreOptions) { o.Credentials.Expires = time.Now().Add(time.Second) }, e.CodeTrustPolicyMissing},
+		{"insufficient lifetime", func(o *S3ObjectStoreOptions) { o.Credentials.Expires = time.Now().Add(time.Second) }, e.CodeUnavailable},
 		{"ambiguous", func(o *S3ObjectStoreOptions) {
 			o.RoleARN = "arn:aws:iam::123456789012:role/synthetic"
 			o.TokenSource = func(context.Context) ([]byte, error) { t.Fatal("unadmitted token I/O"); return nil, nil }
@@ -519,24 +540,39 @@ func TestObjectStoreBoundsSDKAndWholePutRetries(t *testing.T) {
 }
 
 func TestObjectStoreBoundsProviderDocuments(t *testing.T) {
-	body := strings.Repeat("x", 2<<20)
-	transport := objectMetadataTransport{base: objectSessionHTTP(func(r *http.Request) (*http.Response, error) {
-		return &http.Response{StatusCode: 403, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header), Request: r}, nil
-	})}
-	request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://synthetic.test/blob", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	response, err := transport.RoundTrip(request)
-	if err != nil {
-		t.Fatal(err)
-	}
-	raw, err := io.ReadAll(response.Body)
-	if err == nil || len(raw) > 1<<20 {
-		t.Fatal("provider error response was not bounded")
-	}
-	if err := response.Body.Close(); err != nil {
-		t.Fatal(err)
+	for _, test := range []struct {
+		name, method, query string
+		status              int
+		bounded             bool
+	}{
+		{"error GET", http.MethodGet, "", 403, true}, {"list parts success", http.MethodGet, "?uploadId=owned", 200, true},
+		{"completion success", http.MethodPost, "?uploadId=owned", 200, true}, {"object payload", http.MethodGet, "", 200, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			body := strings.Repeat("x", 2<<20)
+			transport := objectMetadataTransport{base: objectSessionHTTP(func(r *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: test.status, Body: io.NopCloser(strings.NewReader(body)), Header: make(http.Header), Request: r}, nil
+			})}
+			request, err := http.NewRequestWithContext(t.Context(), test.method, "https://synthetic.test/blob"+test.query, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			response, err := transport.RoundTrip(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, err := io.ReadAll(response.Body)
+			if test.bounded {
+				if err == nil || len(raw) > 1<<20 {
+					t.Fatal("provider document was not bounded")
+				}
+			} else if err != nil || string(raw) != body {
+				t.Fatal("payload was subjected to metadata bound")
+			}
+			if err := response.Body.Close(); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 
@@ -572,6 +608,7 @@ func TestObjectStoreMultipartConditionalReuseAndConflict(t *testing.T) {
 		{name: "lost completion acknowledgement retries conditional key", mode: "complete-lost-retry", completions: 2},
 		{name: "lost completion rejects conflicting replacement", mode: "complete-lost-conflict", conflict: true, completions: 2},
 		{name: "embedded completion error races conflicting writer", mode: "embedded-conflict", conflict: true, completions: 2, lists: 1},
+		{name: "409 must not restart over conflicting bytes", mode: "complete-409-conflict", conflict: true, completions: 1, lists: 1},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			store, fixture := newObjectFixture(t, test.mode)
@@ -610,8 +647,73 @@ func TestObjectStoreMultipartConditionalReuseAndConflict(t *testing.T) {
 			if !bytes.Equal(fixture.data[object.Key], expected) {
 				t.Fatal("conditional completion or cleanup overwrote existing bytes")
 			}
-			if fixture.calls["initiate"] != 1 || fixture.calls["complete"] != test.completions || fixture.calls["abort"] != 1 || fixture.calls["list"] != test.lists || len(fixture.uploads) != 0 || !fixture.cleanupLive {
-				t.Fatalf("unexpected conditional completion/owned cleanup: calls=%v remaining=%d", fixture.calls, len(fixture.uploads))
+			if test.preexisting {
+				if fixture.calls["part"] != 0 || fixture.calls["initiate"] != 0 || fixture.calls["complete"] != 0 || fixture.calls["abort"] != 0 || fixture.calls["GET"] != 1 {
+					t.Fatalf("existing object uploaded multipart bytes or repeated reads: %v", fixture.calls)
+				}
+			} else if fixture.calls["initiate"] != 1 || fixture.calls["complete"] != test.completions || fixture.calls["abort"] != 1 || fixture.calls["list"] != test.lists || !fixture.cleanupLive {
+				t.Fatalf("unexpected conditional completion/owned cleanup: %v", fixture.calls)
+			}
+			if len(fixture.uploads) != 0 || fixture.calls["PUT"] != 0 {
+				t.Fatal("multipart reuse/conflict left an upload or overwrote via PUT")
+			}
+
+		})
+	}
+}
+
+func TestObjectStoreSinglePutRetryStopsOnConflictingReadback(t *testing.T) {
+	store, fixture := newObjectFixture(t, "put-retry-conflict")
+	raw := []byte("new bytes")
+	different := []byte("old bytes")
+	fixture.mu.Lock()
+	fixture.completeConflict = different
+	fixture.mu.Unlock()
+	stored, err := store.PutIfAbsent(t.Context(), objectDescription(raw), bytes.NewReader(raw))
+	requireObjectCode(t, err, e.CodeImmutableViolation)
+	fixture.mu.Lock()
+	defer fixture.mu.Unlock()
+	if stored.Key != "" || fixture.calls["PUT"] != 2 || fixture.calls["HEAD"] != 1 || fixture.calls["GET"] != 1 || !bytes.Equal(fixture.data["blob"], different) {
+		t.Fatalf("conflicting retry continued or issued an observation: %v", fixture.calls)
+	}
+}
+
+func TestObjectStoreRequiresExactGETPinEcho(t *testing.T) {
+	for _, test := range []struct{ name, version, etag, echo string }{
+		{"different version", "v1", "", "wrong-version"}, {"missing version", "v1", "", "missing-version"}, {"different ETag", "", `"stored"`, "wrong-etag"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store, fixture := newObjectFixture(t, "unversioned")
+			raw := []byte("payload")
+			object := objectDescription(raw)
+			fixture.mu.Lock()
+			fixture.data[object.Key] = raw
+			fixture.getEcho = test.echo
+			fixture.mu.Unlock()
+			body, err := store.OpenPinned(t.Context(), StoredObject{Object: object, VersionID: test.version, ETag: test.etag})
+			requireObjectCode(t, err, e.CodeVerifyFailed)
+			if body != nil {
+				_ = body.Close()
+				t.Fatal("different pin issued body")
+			}
+		})
+	}
+}
+
+func TestObjectStoreLocalFailureDoesNotInventS3Status(t *testing.T) {
+	for _, canceled := range []bool{false, true} {
+		t.Run(fmt.Sprint(canceled), func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			want := e.CodeUnavailable
+			if canceled {
+				cancel()
+				want = e.CodeTimeout
+			}
+			err := objectFailure(ctx, errors.New("synthetic-secret-local-detail"), "local operation could not finish")
+			requireObjectCode(t, err, want)
+			if strings.Contains(err.Error(), "S3 status 0") || strings.Contains(err.Error(), "synthetic-secret") || (!canceled && !strings.Contains(err.Error(), "no S3 response status available")) {
+				t.Fatal("local error invented a service response or leaked detail")
 			}
 		})
 	}

@@ -201,7 +201,7 @@ func objectIntegrationBundle(t *testing.T, cert []byte, digest, predicateType st
 }
 
 func TestObjectPublicationFullExactInputRoundTrip(t *testing.T) {
-	for _, scenario := range []string{"exact", "changed policy", "partial proof", "wrong original subject", "corrupt payload", "wrong invocation", "changed plan"} {
+	for _, scenario := range []string{"exact", "changed policy", "partial proof", "wrong original subject", "unused proof", "corrupt payload", "wrong invocation", "changed plan"} {
 		t.Run(scenario, func(t *testing.T) {
 			fixture, consumer, verifier, cert, invocation := objectIntegrationSource(t)
 			expectation, err := PrepareExactInputs(fixture.definition, fixture.environment, fixture.plan)
@@ -231,6 +231,21 @@ func TestObjectPublicationFullExactInputRoundTrip(t *testing.T) {
 			case "wrong original subject":
 				wrong := objectIntegrationBundle(t, cert, "sha256:"+strings.Repeat("f", 64), sign.CosignSignaturePredicateType, []byte(`{}`))
 				locator = replaceObjectIntegrationProof(t, store, locator, verifier.bundles[fixture.reference][0], wrong)
+			case "unused proof":
+				var inventory map[string]any
+				if err := json.Unmarshal(store.data[locator.Key], &inventory); err != nil {
+					t.Fatal(err)
+				}
+				proofs := inventory["proofs"].([]any)
+				original := proofs[0].(map[string]any)
+				digest := original["subject"].(map[string]any)["Digest"].(string)
+				alias := map[string]any{"subject": map[string]any{"Ref": "registry.example.test/unused@" + digest, "Digest": digest}, "signature": original["signature"], "provenance": original["provenance"]}
+				proofs = append(proofs, alias)
+				sort.Slice(proofs, func(i, j int) bool {
+					return proofs[i].(map[string]any)["subject"].(map[string]any)["Ref"].(string) < proofs[j].(map[string]any)["subject"].(map[string]any)["Ref"].(string)
+				})
+				inventory["proofs"] = proofs
+				locator = replaceObjectIntegrationInventory(t, store, inventory)
 			case "corrupt payload":
 				for key, raw := range store.data {
 					if key != locator.Key && len(raw) > 0 && !json.Valid(raw) {
@@ -317,12 +332,17 @@ func replaceObjectIntegrationProof(t *testing.T, store *objectIntegrationStore, 
 		return objects[i].(map[string]any)["SHA256"].(string) < objects[j].(map[string]any)["SHA256"].(string)
 	})
 	store.data["blobs/sha256/"+strings.TrimPrefix(newDigest, "sha256:")] = replacement
+	return replaceObjectIntegrationInventory(t, store, inventory)
+}
+
+func replaceObjectIntegrationInventory(t *testing.T, store *objectIntegrationStore, inventory map[string]any) delivery.StoredObject {
+	t.Helper()
 	raw, err := canonical.Marshal(inventory)
 	if err != nil {
 		t.Fatal(err)
 	}
 	digest := objectIntegrationDigest(raw)
-	locator.Object = delivery.Object{Key: "publications/" + strings.TrimPrefix(fixtureRootDigest(inventory), "sha256:") + "/" + strings.TrimPrefix(digest, "sha256:") + ".json", SHA256: digest, Size: int64(len(raw)), MediaType: "application/json"}
+	locator := delivery.StoredObject{Object: delivery.Object{Key: "publications/" + strings.TrimPrefix(fixtureRootDigest(inventory), "sha256:") + "/" + strings.TrimPrefix(digest, "sha256:") + ".json", SHA256: digest, Size: int64(len(raw)), MediaType: "application/json"}, VersionID: "synthetic-version", ETag: `"synthetic-etag"`}
 	store.data[locator.Key] = raw
 	return locator
 }

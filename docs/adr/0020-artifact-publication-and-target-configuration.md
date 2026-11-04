@@ -34,7 +34,8 @@ cross-environment byte-identity.
 
 ### 2. Target configuration surface
 
-Environment (`nvkr.dev/environment/v1`) owns runtime settings, required publication transport selection,
+Environment (`nvkr.dev/environment/v1`, or v2 with object-store destinations) owns runtime settings, required
+publication transport selection,
 the admitted OCI publication namespace, credential references and signing identity/issuer policy.
 `publication.transports`, when present, is a nonempty, sorted, unique selection of `apt`, `oci`, or both.
 Omission preserves the existing OCI selection and canonical bytes. Every selected transport is required;
@@ -208,28 +209,53 @@ Each destination is required for the whole selected Definition. There is no impl
 success. A normal generated publish operation follows the original aggregate verification; the existing
 provider-job finalizer requires its success alongside every original operation. Missing or failed publication
 fails the Run. The publisher reauthenticates the exact whole-Plan input receipt and every original output
-before copying. It admits original signing, Linux hosted execution, destination and budgets before writes.
+before copying. It admits original signing, hosted execution on Linux, destination and budgets before writes.
+Development Environments reject object-store destinations before catalog or generation work.
 OCI remains required as the source; this does not satisfy a selected unavailable APT publication transport.
 Old inputs retain their original canonical bytes and logical Build identities. No new Definition, Run,
 publication-root identity family, public object or worker supervisor is introduced for transport.
 
 The transfer bounds are maximum unique object bytes, total unique stored bytes, object count and operation
 seconds. Defaults are 64 GiB per object, 256 GiB total, 8192 objects and 1200 seconds. Authored operation
-timeouts are at most 3539 seconds, reserving the default 60-second cleanup bound and one second for credential
-expiry precision within a one-hour workload session. The complete known inventory, including original proof
+timeouts are at most 3509 seconds, reserving the default 60-second cleanup bound and a 31-second session
+allowance (30 seconds of clock skew plus one second of expiry precision) within a one-hour workload session.
+Returned temporary credentials must still cover the actual operation and cleanup deadlines; the reserve does
+not waive that check or tolerate an arbitrarily inaccurate host clock. The complete known inventory, including
+original proof
 bytes and conservative final-inventory headroom, is admitted before the
-first write. Limits cannot exceed the source/publication and provider limits. One fresh store owns each
+first write. The canonical `nvkr.dev/publication-mirror/v1` inventory has an independent 128 MiB control
+limit. Provider pins retain their 1024-byte UTF-8 limit; preflight reserves their worst-case JSON encoding.
+Object-count limits (default 8192, maximum 32768, including the final inventory) are ceilings jointly bounded
+by control and stored-byte limits, not a promise that every maximum-sized inventory fits. Distinct retained
+proof bundles are limited to 8 MiB each and 16 MiB combined, on both publication and independent consumption;
+shared proof bytes are retained once and every proof subject must be consumed.
+Limits cannot exceed the source/publication and provider limits. One fresh store owns each
 bounded operation; SDK request retries and whole multipart restarts remain separately bounded and do not
 reset its deadline. SDK retry counts apply per API invocation, rather than promising a cross-call request ledger.
 
 **Authentication.** Generated publication obtains an AWS-audience GitHub OIDC token only in the protected
-publisher operation and exchanges it through the official AWS SDK's web-identity provider. A single temporary
+publisher operation and exchanges it through the official AWS SDK's web-identity provider.
+This generator placement is not an IAM authorization boundary: signing jobs also have OIDC permission and
+may share the protected Environment. The operator must bind role trust to the AWS audience
+`sts.amazonaws.com`, the exact repository and protected release Environment subject, and the admitted
+default-branch ref. Use immutable repository/owner ID conditions, an exact `sub` matching the repository's
+actual GitHub subject format, and the `ref`/`environment` conditions supported by AWS. Protect the GitHub
+Environment's deployment branches and reviewers and protect changes to workflows on that branch. Never use
+a repository-wide `repo:ORG/REPO:*` subject grant. These controls restrict the trusted release context;
+they do not isolate the publisher from another trusted job in that same context. A `job_workflow_ref`
+condition applies only when a reusable workflow actually supplies that claim. See the official
+[AWS GitHub claim mapping](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_iam-condition-keys.html#condition-keys-wif)
+and [GitHub AWS OIDC setup](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws). A single temporary
 session must expire after the operation and cleanup bounds. The S3 client uses that fixed session, without
 ambient credential discovery, profile fallback or background refresh. SDK callers may instead supply an
 explicit temporary runtime session. Consumers use their own scoped read credentials and signer policy.
 
-The writer needs object PUT, GET/HEAD for reconciliation, and abort/list-parts for its own multipart IDs,
-restricted to the literal bucket/prefix. Read-only consumers need GET and, when used, exact-version GET.
+The writer needs `s3:PutObject`, `s3:GetObject` for HEAD/current reads, `s3:GetObjectVersion` for
+exact-version reads, and `s3:AbortMultipartUpload`/`s3:ListMultipartUploadParts` for its own multipart IDs,
+restricted to the literal bucket/prefix and expected owner. Read-only consumers need `s3:GetObject` and,
+when a locator carries a version, `s3:GetObjectVersion`. On versioned buckets both writer readback and
+independent consumption require that exact-version permission; a denial never downgrades to a current read.
+See [S3 GetObject permissions](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html).
 Neither path needs bucket listing, deletion, enrollment or bucket-policy changes. An SDK success cannot
 prove that the operator's effective IAM grants are narrow; provisioning and policy review remain operator
 responsibilities. Provider denial fails closed. No tool changes credentials or IAM policies on the user's behalf.
@@ -264,6 +290,11 @@ access disabled; require the original whole-Plan exact-input receipt. Rejoin eve
 descriptor, raw/semantic subject, build, platform, inputs and invocation to the authenticated aggregate.
 Equal logical inputs do not authorize a different descriptor. This is the existing artifact-publication
 scope, not qualified Release acceptance or a signature authorizing the chosen bucket/prefix.
+
+Provider dependencies must be pinned, permissively licensed and reviewed through the repository dependency,
+notice and vulnerability gates before engineering admission. Record the dated scan result and its exact
+implementation head in reconciliation or linked evidence; engineering admission does not establish
+organizational license approval or operational provider acceptance.
 
 The byte transport requires no new artifact parser or signer. New artifact formats, direct APT serving,
 EFI/iPXE extraction, clean boot URLs, Secure Boot, installation and runtime qualification retain their owning

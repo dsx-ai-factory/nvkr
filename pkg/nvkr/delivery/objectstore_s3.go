@@ -98,7 +98,7 @@ func newS3ObjectStore(ctx context.Context, options S3ObjectStoreOptions) (Object
 
 func admitObjectOptions(o S3ObjectStoreOptions) (S3ObjectStoreOptions, error) {
 	if o.OperationTimeout == 0 {
-		o.OperationTimeout = 59*time.Minute - time.Second
+		o.OperationTimeout = time.Hour - time.Minute - objectSessionAllowance
 	}
 	if o.CleanupTimeout == 0 {
 		o.CleanupTimeout = time.Minute
@@ -159,13 +159,17 @@ func (store *s3ObjectStore) physicalKey(key string) string { return store.option
 
 func (store *s3ObjectStore) validate(object Object) error {
 	if !validObjectKey(object.Key) || len(store.physicalKey(object.Key)) > 1024 || !canonical.IsDigest(object.SHA256) || object.Size < 0 ||
-		(object.Size > 0 && (object.Size-1)/store.options.PartSizeBytes >= 10000) {
+		(object.Size > 0 && (object.Size-1)/(5<<30) >= 10000) {
 		return e.New(e.CodeUsage, "object requires an in-prefix key, exact SHA256 and bounded multipart size")
 	}
 	if _, _, err := mime.ParseMediaType(object.MediaType); err != nil {
 		return e.New(e.CodeUsage, "object requires a valid media type")
 	}
 	return nil
+}
+
+func (store *s3ObjectStore) partSize(size int64) int64 {
+	return max(store.options.PartSizeBytes, (size-1)/10000+1)
 }
 
 func (store *s3ObjectStore) begin(ctx context.Context) (context.Context, func(), error) {
@@ -220,47 +224,65 @@ func (store *s3ObjectStore) Close() error {
 }
 
 func (store *s3ObjectStore) PutIfAbsent(ctx context.Context, object Object, body io.ReadSeeker) (StoredObject, error) {
+	stored, _, err := store.putIfAbsentWithReadback(ctx, object, body)
+	return stored, err
+}
+
+func (store *s3ObjectStore) putIfAbsentWithReadback(ctx context.Context, object Object, body io.ReadSeeker) (StoredObject, *objectReadback, error) {
 	if err := store.validate(object); err != nil {
-		return StoredObject{}, err
+		return StoredObject{}, nil, err
 	}
 	if body == nil {
-		return StoredObject{}, e.New(e.CodeUsage, "object upload requires an immutable replayable source")
+		return StoredObject{}, nil, e.New(e.CodeUsage, "object upload requires an immutable replayable source")
 	}
 	ctx, finish, err := store.begin(ctx)
 	if err != nil {
-		return StoredObject{}, err
+		return StoredObject{}, nil, err
 	}
 	defer finish()
 	if object.Size > store.options.PartSizeBytes {
+		// Successful HEAD can avoid sending every part on a rerun. Missing-key
+		// 403/404 is only permission to try conditional creation, never absence proof.
+		head, headErr := store.api.HeadObject(ctx, &s3.HeadObjectInput{Bucket: aws.String(store.options.Bucket), ExpectedBucketOwner: aws.String(store.options.ExpectedBucketOwner), Key: aws.String(store.physicalKey(object.Key))})
+		if headErr == nil {
+			expected, err := store.headObservation(StoredObject{Object: object}, head)
+			if err != nil {
+				return StoredObject{}, nil, err
+			}
+			return store.reconcilePinned(ctx, expected)
+		}
+		if status := objectStatus(headErr); status != 403 && status != 404 {
+			return StoredObject{}, nil, objectFailure(ctx, headErr, "S3 existing-object probe failed")
+		}
 		return store.putMultipart(ctx, object, body)
 	}
 	for attempt := 0; attempt < store.options.MaxUploadAttempts; attempt++ {
 		if _, err := body.Seek(0, io.SeekStart); err != nil {
-			return StoredObject{}, e.New(e.CodeVerifyFailed, "cannot rewind object source")
+			return StoredObject{}, nil, e.New(e.CodeVerifyFailed, "cannot rewind object source")
 		}
 		out, putErr := store.api.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(store.options.Bucket), ExpectedBucketOwner: aws.String(store.options.ExpectedBucketOwner), Key: aws.String(store.physicalKey(object.Key)),
 			Body: body, ContentLength: aws.Int64(object.Size), ContentType: aws.String(object.MediaType), IfNoneMatch: aws.String("*")})
 		if putErr == nil {
 			if out == nil {
-				return StoredObject{}, objectFailure(ctx, nil, "empty S3 PUT response")
+				return StoredObject{}, nil, objectFailure(ctx, nil, "empty S3 PUT response")
 			}
-			return StoredObject{Object: object, VersionID: aws.ToString(out.VersionId), ETag: aws.ToString(out.ETag)}, nil
+			return StoredObject{Object: object, VersionID: aws.ToString(out.VersionId), ETag: aws.ToString(out.ETag)}, nil, nil
 		}
 		if !objectMayHaveCommitted(putErr) {
-			return StoredObject{}, objectFailure(ctx, putErr, "S3 conditional PUT failed")
+			return StoredObject{}, nil, objectFailure(ctx, putErr, "S3 conditional PUT failed")
 		}
-		observed, reconcileErr := store.reconcile(ctx, object)
+		observed, readback, reconcileErr := store.reconcile(ctx, object)
 		if reconcileErr == nil {
-			return observed, nil
+			return observed, readback, nil
 		}
 		if objectConflict(reconcileErr) || objectStatus(putErr) == 412 {
-			return StoredObject{}, reconcileErr
+			return StoredObject{}, nil, reconcileErr
 		}
 		if ctx.Err() != nil {
-			return StoredObject{}, objectFailure(ctx, ctx.Err(), "S3 PUT outcome remains unknown")
+			return StoredObject{}, nil, objectFailure(ctx, ctx.Err(), "S3 PUT outcome remains unknown")
 		}
 	}
-	return StoredObject{}, objectFailure(ctx, nil, "S3 PUT budget exhausted; remote outcome remains unknown")
+	return StoredObject{}, nil, objectFailure(ctx, nil, "S3 PUT budget exhausted; remote outcome remains unknown")
 }
 
 func (store *s3ObjectStore) observe(ctx context.Context, expected StoredObject) (StoredObject, error) {
@@ -277,6 +299,9 @@ func (store *s3ObjectStore) observe(ctx context.Context, expected StoredObject) 
 	if err != nil {
 		return StoredObject{}, objectFailure(ctx, err, "S3 HEAD failed; absence is unknown")
 	}
+	return store.headObservation(expected, out)
+}
+func (store *s3ObjectStore) headObservation(expected StoredObject, out *s3.HeadObjectOutput) (StoredObject, error) {
 	if out == nil || out.ContentLength == nil || *out.ContentLength != expected.Size {
 		return StoredObject{}, e.New(e.CodeImmutableViolation, "existing object size differs")
 	}
@@ -338,28 +363,32 @@ func (store *s3ObjectStore) OpenPinned(ctx context.Context, expected StoredObjec
 	return body, nil
 }
 
-func (store *s3ObjectStore) reconcile(ctx context.Context, object Object) (StoredObject, error) {
+func (store *s3ObjectStore) reconcile(ctx context.Context, object Object) (StoredObject, *objectReadback, error) {
 	expected, err := store.observe(ctx, StoredObject{Object: object})
 	if err != nil {
-		return StoredObject{}, err
+		return StoredObject{}, nil, err
 	}
+	return store.reconcilePinned(ctx, expected)
+}
+func (store *s3ObjectStore) reconcilePinned(ctx context.Context, expected StoredObject) (StoredObject, *objectReadback, error) {
+	object := expected.Object
 	body, err := store.OpenPinned(ctx, expected)
 	if err != nil {
-		return StoredObject{}, err
+		return StoredObject{}, nil, err
 	}
 	hash := sha256.New()
 	size, readErr := io.Copy(hash, io.LimitReader(body, object.Size+1))
 	closeErr := body.Close()
 	if readErr != nil || closeErr != nil {
-		return StoredObject{}, objectFailure(ctx, errors.Join(readErr, closeErr), "S3 reconciliation read failed")
+		return StoredObject{}, nil, objectFailure(ctx, errors.Join(readErr, closeErr), "S3 reconciliation read failed")
 	}
 	if size != object.Size || "sha256:"+hex.EncodeToString(hash.Sum(nil)) != object.SHA256 {
-		return StoredObject{}, e.New(e.CodeImmutableViolation, "existing object bytes differ from requested SHA256 or size")
+		return StoredObject{}, nil, e.New(e.CodeImmutableViolation, "existing object bytes differ from requested SHA256 or size")
 	}
 	if err := deliveryContext(ctx); err != nil {
-		return StoredObject{}, err
+		return StoredObject{}, nil, err
 	}
-	return expected, nil
+	return expected, &objectReadback{store: store, stored: expected}, nil
 }
 
 type objectResponseBody struct {
@@ -432,7 +461,10 @@ func objectConflict(err error) bool {
 	return errors.As(err, &coded) && coded.Code == e.CodeImmutableViolation
 }
 func objectFailure(ctx context.Context, err error, message string) error {
-	return classifyContext(ctx, e.New(e.CodeUnavailable, "%s (S3 status %d)", message, objectStatus(err)))
+	if status := objectStatus(err); status != 0 {
+		return classifyContext(ctx, e.New(e.CodeUnavailable, "%s (S3 status %d)", message, status))
+	}
+	return classifyContext(ctx, e.New(e.CodeUnavailable, "%s (no S3 response status available)", message))
 }
 func objectCapability(message string) error { return e.New(e.CodeEngineCapability, "%s", message) }
 

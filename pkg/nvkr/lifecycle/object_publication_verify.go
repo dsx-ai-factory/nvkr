@@ -115,6 +115,9 @@ func (consumer *Consumer) VerifyObjectPublication(ctx context.Context, store del
 	if err == nil && len(request.Publications) != len(publications) {
 		err = e.New(e.CodeVerifyFailed, "object inventory includes publications outside the authenticated aggregate")
 	}
+	if err == nil && len(request.Proofs) != len(proofs) {
+		err = e.New(e.CodeVerifyFailed, "object inventory includes proofs outside the authenticated aggregate")
+	}
 	if err != nil {
 		return nil, nil, errors.Join(err, verified.Close())
 	}

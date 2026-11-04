@@ -1560,12 +1560,16 @@ all output-local descriptors and original proofs, copies and fully verifies immu
 the final content-bound transport inventory. Every destination operation is included in existing provider-job
 completion accounting; failed, skipped, missing or indeterminate required publication prevents Run success.
 
-Source, build and ARC jobs receive no S3 credential. Only the required publisher receives its explicit protected
-role variable and GitHub OIDC permission. Its source registry access is read-only. The OIDC token is exchanged
-synchronously for one bounded temporary session, without credential refresh workers or ambient fallback.
-Renderer and bundle validation admit this exact operation; arbitrary jobs, PRs and forks gain no storage or
-OIDC authority. Secret values never enter a Plan, artifact, command argument or log. Consumers supply their
-own read-only credentials and signer policy.
+The renderer passes the explicit protected role variable only to the required publisher; source, build and
+ARC jobs receive no S3 session. Development Environments reject these destinations before work. Signing
+jobs also request OIDC permission and may use the same protected Environment: generator placement alone
+cannot prevent another trusted job from attempting role assumption. The operator must enforce the exact
+repository, protected release Environment and default-branch role trust and GitHub protection policy in
+ADR-20. Registry access for the publisher is read-only when the scoped `GITHUB_TOKEN` or a separate read
+credential is selected; reusing a generic registry credential does not reduce its effective grants. The OIDC
+token is exchanged synchronously for one bounded temporary session, without refresh workers or ambient
+fallback. Secret values never enter a Plan, artifact, command argument or log. Consumers supply their own
+read-only credentials and signer policy.
 
 Immutable content keys and conditional writes permit independent Runs to share a prefix without a mutable
 namespace coordinator or new delivery signature. Bounded SDK requests, sequential multipart calls, owned

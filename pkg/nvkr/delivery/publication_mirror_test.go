@@ -50,6 +50,10 @@ func (store *mirrorMemoryStore) PutIfAbsent(_ context.Context, object Object, so
 	if store.corrupt == "write" {
 		store.data[object.Key] = append(bytes.Clone(raw), '!')
 	}
+	if store.corrupt == "same-size" && len(raw) > 0 {
+		store.data[object.Key] = bytes.Clone(raw)
+		store.data[object.Key][0] ^= 1
+	}
 	return StoredObject{Object: object, VersionID: "synthetic-version", ETag: "\"synthetic-etag\""}, nil
 }
 func (store *mirrorMemoryStore) OpenPinned(_ context.Context, object StoredObject) (io.ReadCloser, error) {
@@ -321,23 +325,27 @@ func TestRestoreMirrorRejectsMalformedOrIncompleteInventory(t *testing.T) {
 }
 
 func TestMirrorReadbackFailureDoesNotPublishInventory(t *testing.T) {
-	root, digest := releasePublicationFixture(t)
-	reference := "registry.example.test/original@" + digest
-	publication, err := OpenPublication(t.Context(), root, digest)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer publication.Close()
-	store := &mirrorMemoryStore{corrupt: "write"}
-	locator, err := MirrorPublications(t.Context(), store, MirrorRequest{RootReference: reference, Publications: []MirrorPublication{{Reference: reference, Publication: publication}}, Proofs: []*sign.VerifiedOCIEvidence{mirrorFixtureProof(t, mirrorFixtureSigner(t), reference)}, Limits: mirrorFixtureLimits()})
-	assertRegistryCode(t, err, e.CodeVerifyFailed)
-	if locator.Key != "" {
-		t.Fatal("failed readback returned completion locator")
-	}
-	for _, write := range store.writes {
-		if strings.HasPrefix(write.Key, "publications/") {
-			t.Fatal("failed object readback published inventory")
-		}
+	for _, corruption := range []string{"write", "same-size"} {
+		t.Run(corruption, func(t *testing.T) {
+			root, digest := releasePublicationFixture(t)
+			reference := "registry.example.test/original@" + digest
+			publication, err := OpenPublication(t.Context(), root, digest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer publication.Close()
+			store := &mirrorMemoryStore{corrupt: corruption}
+			locator, err := MirrorPublications(t.Context(), store, MirrorRequest{RootReference: reference, Publications: []MirrorPublication{{Reference: reference, Publication: publication}}, Proofs: []*sign.VerifiedOCIEvidence{mirrorFixtureProof(t, mirrorFixtureSigner(t), reference)}, Limits: mirrorFixtureLimits()})
+			assertRegistryCode(t, err, e.CodeVerifyFailed)
+			if locator.Key != "" {
+				t.Fatal("failed readback returned completion locator")
+			}
+			for _, write := range store.writes {
+				if strings.HasPrefix(write.Key, "publications/") {
+					t.Fatal("failed object readback published inventory")
+				}
+			}
+		})
 	}
 }
 
@@ -373,15 +381,28 @@ func TestMirrorPreflightsAggregateUniqueBytesBeforeWrites(t *testing.T) {
 	if total <= largest+1 {
 		t.Fatal("aggregate budget fixture has no meaningful unique-object excess")
 	}
-	limits := mirrorFixtureLimits()
-	limits.MaxTotalBytes = total - 1
-	if largest > limits.MaxTotalBytes {
-		t.Fatal("fixture accidentally makes an individual object exceed the aggregate budget")
-	}
-	store := &mirrorMemoryStore{}
-	locator, err := MirrorPublications(t.Context(), store, MirrorRequest{RootReference: reference, Publications: []MirrorPublication{{Reference: reference, Publication: publication}}, Proofs: []*sign.VerifiedOCIEvidence{proof}, Limits: limits})
-	assertRegistryCode(t, err, e.CodeEngineCapability)
-	if locator.Key != "" || len(store.writes) != 0 {
-		t.Fatal("aggregate unique-byte overflow wrote provider objects")
+	for _, scenario := range []string{"aggregate bytes", "inventory count", "control bytes"} {
+		t.Run(scenario, func(t *testing.T) {
+			limits := mirrorFixtureLimits()
+			failureStage := "transport inventory"
+			switch scenario {
+			case "aggregate bytes":
+				limits.MaxTotalBytes = total - 1
+				failureStage = "object/count/aggregate"
+			case "inventory count":
+				limits.MaxObjects = len(unique) // Every data object fits; the final inventory does not.
+			case "control bytes":
+				limits.MaxObjectBytes = largest // Every data object fits; inventory headroom does not.
+			}
+			store := &mirrorMemoryStore{}
+			locator, err := MirrorPublications(t.Context(), store, MirrorRequest{RootReference: reference, Publications: []MirrorPublication{{Reference: reference, Publication: publication}}, Proofs: []*sign.VerifiedOCIEvidence{proof}, Limits: limits})
+			assertRegistryCode(t, err, e.CodeEngineCapability)
+			if !strings.Contains(err.Error(), failureStage) {
+				t.Fatalf("refusal occurred at another budget backstop: %v", err)
+			}
+			if locator.Key != "" || len(store.writes) != 0 {
+				t.Fatal("complete inventory overflow wrote provider objects")
+			}
+		})
 	}
 }

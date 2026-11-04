@@ -4,6 +4,7 @@
 package lifecycle
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
@@ -267,15 +268,13 @@ func objectOriginAlternateCarrier(t *testing.T, source string) delivery.Result {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var manifest map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &manifest); err != nil {
+	// A distinct encoding preserves every admitted carrier field and raw payload.
+	// The aggregate must still reject a different actual descriptor.
+	var alternate bytes.Buffer
+	if err := json.Indent(&alternate, raw, "", "  "); err != nil {
 		t.Fatal(err)
 	}
-	manifest["annotations"] = json.RawMessage(`{"org.opencontainers.image.description":"different valid original wrapper"}`)
-	raw, err = json.Marshal(manifest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	raw = alternate.Bytes()
 	descriptor := original
 	descriptor.Digest = objectIntegrationDigest(raw)
 	descriptor.Size = int64(len(raw))

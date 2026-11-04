@@ -78,11 +78,7 @@ func publicationEvidenceObjects(ctx context.Context, plan *Plan, node Node, inpu
 
 // collectPublicationObjects owns any temporary carriers until its returned cleanup
 // runs. The caller retains them through metadata binding and publication assembly.
-func collectPublicationObjects(ctx context.Context, plan *Plan, output Artifact, inputs []Artifact, objects []delivery.ObjectInput, observations ...map[string]Artifact) ([]delivery.ObjectInput, func(), error) {
-	_, artifacts := planIndex(plan)
-	if len(observations) != 0 {
-		artifacts = observations[0]
-	}
+func collectPublicationObjects(ctx context.Context, plan *Plan, output Artifact, inputs []Artifact, objects []delivery.ObjectInput, artifacts map[string]Artifact) ([]delivery.ObjectInput, func(), error) {
 	var temporaryArchives []string
 	cleanup := func() {
 		for _, path := range temporaryArchives {

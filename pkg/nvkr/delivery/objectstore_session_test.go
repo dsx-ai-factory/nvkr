@@ -28,11 +28,11 @@ func (transport objectSessionHTTP) RoundTrip(r *http.Request) (*http.Response, e
 func TestObjectStoreWorkloadSessionIsSynchronousAndFixed(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
-		testObjectStoreWorkloadSession(t)
+		testObjectStoreWorkloadSession(t, 0, "")
 	})
 }
 
-func testObjectStoreWorkloadSession(t *testing.T) {
+func testObjectStoreWorkloadSession(t *testing.T, skew time.Duration, want e.Code) {
 	options := objectTestOptions()
 	options.Credentials = nil
 	options.RoleARN = "arn:aws:iam::123456789012:role/synthetic"
@@ -47,7 +47,7 @@ func testObjectStoreWorkloadSession(t *testing.T) {
 		return []byte("synthetic-workload-token"), nil
 	}
 	options, err := admitObjectOptions(options)
-	if err != nil || options.OperationTimeout != 59*time.Minute-time.Second || options.CleanupTimeout != time.Minute {
+	if err != nil || options.OperationTimeout != time.Hour-time.Minute-objectSessionAllowance || options.CleanupTimeout != time.Minute {
 		t.Fatalf("default session bounds: %v", err)
 	}
 	client := &http.Client{Transport: objectSessionHTTP(func(request *http.Request) (*http.Response, error) {
@@ -67,12 +67,16 @@ func testObjectStoreWorkloadSession(t *testing.T) {
 		if duration < 900 || duration > 3600 || values.Get("RoleArn") != options.RoleARN || values.Get("WebIdentityToken") != "synthetic-workload-token" {
 			t.Fatal("SDK did not bind token, role and session duration")
 		}
-		response := fmt.Sprintf(`<AssumeRoleWithWebIdentityResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/"><AssumeRoleWithWebIdentityResult><Credentials><AccessKeyId>synthetic-access</AccessKeyId><SecretAccessKey>synthetic-secret</SecretAccessKey><SessionToken>synthetic-session</SessionToken><Expiration>%s</Expiration></Credentials></AssumeRoleWithWebIdentityResult></AssumeRoleWithWebIdentityResponse>`, time.Now().Add(time.Duration(duration)*time.Second).UTC().Format(time.RFC3339))
+		response := fmt.Sprintf(`<AssumeRoleWithWebIdentityResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/"><AssumeRoleWithWebIdentityResult><Credentials><AccessKeyId>synthetic-access</AccessKeyId><SecretAccessKey>synthetic-secret</SecretAccessKey><SessionToken>synthetic-session</SessionToken><Expiration>%s</Expiration></Credentials></AssumeRoleWithWebIdentityResult></AssumeRoleWithWebIdentityResponse>`, time.Now().Add(time.Duration(duration)*time.Second-skew).UTC().Format(time.RFC3339))
 		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(response)), Request: request}, nil
 	})}
 	ctx, cancel := context.WithTimeout(t.Context(), options.OperationTimeout)
 	defer cancel()
 	provider, err := objectSession(ctx, options, client)
+	if want != "" {
+		requireObjectCode(t, err, want)
+		return
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,5 +144,37 @@ func TestObjectStoreCanceledSTSUsesCallerContext(t *testing.T) {
 	case <-stopped:
 	default:
 		t.Fatal("session returned before actual STS request stopped")
+	}
+}
+
+func TestObjectStoreRefusesSessionAboveTwelveHoursBeforeSTS(t *testing.T) {
+	options := objectTestOptions()
+	options.Credentials = nil
+	options.RoleARN = "arn:aws:iam::123456789012:role/synthetic"
+	options.TokenSource = func(context.Context) ([]byte, error) { return []byte("synthetic-token"), nil }
+	client := &http.Client{Transport: objectSessionHTTP(func(*http.Request) (*http.Response, error) {
+		t.Fatal("unadmitted session performed STS I/O")
+		return nil, nil
+	})}
+	ctx, cancel := context.WithTimeout(t.Context(), 12*time.Hour)
+	defer cancel()
+	_, err := objectSession(ctx, options, client)
+	requireObjectCode(t, err, e.CodeTrustPolicyMissing)
+}
+
+func TestObjectStoreWorkloadSessionAllowsBoundedClockSkew(t *testing.T) {
+	for _, phase := range []time.Duration{100 * time.Millisecond, 900 * time.Millisecond} {
+		for _, skew := range []time.Duration{250 * time.Millisecond, 600 * time.Millisecond, 30 * time.Second, 31 * time.Second} {
+			t.Run(fmt.Sprintf("phase_%s_skew_%s", phase, skew), func(t *testing.T) {
+				synctest.Test(t, func(t *testing.T) {
+					time.Sleep(phase)
+					var want e.Code
+					if skew > 30*time.Second {
+						want = e.CodeUnavailable
+					}
+					testObjectStoreWorkloadSession(t, skew, want)
+				})
+			})
+		}
 	}
 }

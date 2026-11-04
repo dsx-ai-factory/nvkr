@@ -154,7 +154,9 @@ Production SLSA build-type URIs use `/v2` for the replacement of compiler-handof
 `definitionDigest` and `environmentDigest`. SLSA provenance/v1 and in-toto Statement/v1 remain unchanged.
 Historical production predicates are rejected rather than relabeled or re-signed under the current contract.
 
-Environment stays `nvkr.dev/environment/v1`; the generated Run's unchanged exact-file commit manifest stays
+Environment uses `nvkr.dev/environment/v1` without object-store destinations and
+`nvkr.dev/environment/v2` when they are configured (ADR-20); omission preserves the v1 wire shape.
+The generated Run's unchanged exact-file commit manifest stays
 `nvkr.dev/generated-run/v1`. Unchanged wire shapes keep their existing major. Evidence,
 publication, and release owners version every field or meaning changed from Recipe identity to Build identity;
 they must not accept a former `recipeDigest` under a new `buildDigest` spelling. Existing family tags remain

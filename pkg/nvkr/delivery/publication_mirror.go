@@ -19,7 +19,9 @@ import (
 )
 
 const mirrorInventorySchema = "nvkr.dev/publication-mirror/v1"
-const maxMirrorInventoryBytes int64 = 16 << 20
+const maxMirrorInventoryBytes int64 = 128 << 20
+const maxMirrorProofBundleBytes int64 = 8 << 20
+const maxMirrorProofBytes int64 = 16 << 20
 const maxMirrorObjects = maxDeliveryObjects * 8
 
 type MirrorLimits struct {
@@ -95,6 +97,7 @@ func mirrorBlobKey(digest string) string {
 // conditional write. Original OCI bytes and proof bundles retain their subjects.
 // Every PUT is followed by a full pinned hash/size readback. Only then is the
 // content-bound inventory written last; failure returns no completion locator.
+// A provider-issued exact readback is reused; generic stores are always read here.
 // The caller owns the fresh store and all publication lifetimes through return.
 func MirrorPublications(ctx context.Context, store ObjectStore, request MirrorRequest) (StoredObject, error) {
 	if err := deliveryContext(ctx); err != nil {
@@ -167,6 +170,7 @@ func MirrorPublications(ctx context.Context, store ObjectStore, request MirrorRe
 		return StoredObject{}, e.New(e.CodeVerifyFailed, "mirror root is not among its checked publications")
 	}
 	proofBytes := map[string][]byte{}
+	var retainedProofBytes int64
 	closureDigests := make(map[string]bool, len(objects))
 	for digest := range objects {
 		closureDigests[digest] = true
@@ -184,6 +188,15 @@ func MirrorPublications(ctx context.Context, store ObjectStore, request MirrorRe
 		binding := mirroredProof{Subject: subject, Signature: digestBytes(signature), Provenance: digestBytes(provenance)}
 		for _, raw := range [][]byte{signature, provenance} {
 			digest := digestBytes(raw)
+			if int64(len(raw)) > maxMirrorProofBundleBytes {
+				return StoredObject{}, e.New(e.CodeSignatureInvalid, "original proof bundle exceeds verification bound")
+			}
+			if _, exists := proofBytes[digest]; !exists {
+				if int64(len(raw)) > maxMirrorProofBytes-retainedProofBytes {
+					return StoredObject{}, e.New(e.CodeEngineCapability, "complete original proof inventory exceeds retained-byte bound")
+				}
+				retainedProofBytes += int64(len(raw))
+			}
 			if err := add(Object{Key: mirrorBlobKey(digest), SHA256: digest, Size: int64(len(raw)), MediaType: MediaOctetStream}); err != nil {
 				return StoredObject{}, err
 			}
@@ -203,14 +216,8 @@ func MirrorPublications(ctx context.Context, store ObjectStore, request MirrorRe
 		inventory.Objects = append(inventory.Objects, StoredObject{Object: object})
 	}
 	sort.Slice(inventory.Objects, func(i, j int) bool { return inventory.Objects[i].SHA256 < inventory.Objects[j].SHA256 })
-	preflight, err := canonical.Marshal(inventory)
-	if err != nil {
+	if err := admitMirrorInventory(inventory, request.Limits, total); err != nil {
 		return StoredObject{}, err
-	}
-	// Worst-case JSON escaping for the two bounded opaque provider validators.
-	controlBound := int64(len(preflight)) + int64(len(objects))*(2*1024*6+64)
-	if controlBound > maxMirrorInventoryBytes || controlBound > request.Limits.MaxObjectBytes || controlBound > request.Limits.MaxTotalBytes-total || len(objects)+1 > request.Limits.MaxObjects {
-		return StoredObject{}, e.New(e.CodeEngineCapability, "complete mirror including transport inventory exceeds its control/count/byte budget")
 	}
 	inventory.Objects = nil
 	stored := map[string]StoredObject{}
@@ -257,15 +264,39 @@ func MirrorPublications(ctx context.Context, store ObjectStore, request MirrorRe
 	return putVerifiedMirrorObject(ctx, store, Object{Key: "publications/" + strings.TrimPrefix(rootDigest, "sha256:") + "/" + strings.TrimPrefix(digestBytes(raw), "sha256:") + ".json", SHA256: digestBytes(raw), Size: int64(len(raw)), MediaType: "application/json"}, bytes.NewReader(raw))
 }
 
+func admitMirrorInventory(inventory mirrorInventory, limits MirrorLimits, total int64) error {
+	preflight, err := canonical.Marshal(inventory)
+	if err != nil {
+		return err
+	}
+	// Preserve 1024-byte UTF-8 provider pins, including worst-case JSON escaping.
+	controlBound := int64(len(preflight)) + int64(len(inventory.Objects))*(2*1024*6+64)
+	if controlBound > maxMirrorInventoryBytes || controlBound > limits.MaxObjectBytes || controlBound > limits.MaxTotalBytes-total || len(inventory.Objects)+1 > limits.MaxObjects {
+		return e.New(e.CodeEngineCapability, "complete mirror including transport inventory exceeds its control/count/byte budget")
+	}
+	return nil
+}
+
 func putVerifiedMirrorObject(ctx context.Context, store ObjectStore, object Object, source io.ReadSeeker) (StoredObject, error) {
-	stored, err := store.PutIfAbsent(ctx, object, source)
+	var stored StoredObject
+	var readback *objectReadback
+	var err error
+	if provider, ok := store.(objectStoreReadback); ok {
+		stored, readback, err = provider.putIfAbsentWithReadback(ctx, object, source)
+	} else {
+		stored, err = store.PutIfAbsent(ctx, object, source)
+	}
 	if err != nil {
 		return StoredObject{}, e.Wrap(e.CodeVerifyFailed, err, "conditionally storing exact mirror object")
 	}
 	if stored.Object != object || len(stored.VersionID) > 1024 || len(stored.ETag) > 1024 {
 		return StoredObject{}, e.New(e.CodeVerifyFailed, "mirror storage observation changed the requested exact object")
 	}
-	if err := readMirrorObject(ctx, store, stored, io.Discard); err != nil {
+	if readback != nil {
+		if err := readback.require(ctx, store, stored); err != nil {
+			return StoredObject{}, err
+		}
+	} else if err := readMirrorObject(ctx, store, stored, io.Discard); err != nil {
 		return StoredObject{}, err
 	}
 	return stored, nil

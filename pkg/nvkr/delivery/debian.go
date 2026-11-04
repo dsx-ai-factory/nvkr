@@ -76,15 +76,28 @@ func InspectDebianArtifact(ctx context.Context, root, expectedDigest string) (De
 	if err != nil {
 		return Descriptor{}, err
 	}
-	if descriptor.ArtifactType != MediaDeliveryObject || manifest.ArtifactType != MediaDeliveryObject || manifest.Config.MediaType != MediaEmptyConfig || len(manifest.Layers) != 1 || manifest.Layers[0].MediaType != MediaOctetStream || manifest.Layers[0].Digest != expectedDigest || manifest.Layers[0].Size <= 0 {
+	if descriptor.ArtifactType != MediaDeliveryObject {
 		return Descriptor{}, e.New(e.CodeVerifyFailed, "Debian carrier changes original raw package binding")
+	}
+	if err := validateDebianCarrier(ctx, root, manifest, expectedDigest); err != nil {
+		return Descriptor{}, err
+	}
+	return descriptor, nil
+}
+
+// Both local inspection and selected-output pulls accept only the carrier
+// emitted by BuildDebianArtifact. Raw package identity remains independent of
+// the manifest's serialization and descriptor identity.
+func validateDebianCarrier(ctx context.Context, root string, manifest ociManifest, expectedDigest string) error {
+	if manifest.SchemaVersion != 2 || manifest.MediaType != MediaOCIManifest || manifest.Subject != nil || len(manifest.Annotations) != 0 || manifest.ArtifactType != MediaDeliveryObject || manifest.Config.MediaType != MediaEmptyConfig || len(manifest.Layers) != 1 || manifest.Layers[0].MediaType != MediaOctetStream || manifest.Layers[0].Digest != expectedDigest || manifest.Layers[0].Size <= 0 {
+		return e.New(e.CodeVerifyFailed, "Debian carrier changes standard metadata or original raw package binding")
 	}
 	config, err := readBlob(ctx, root, manifest.Config, 8<<20)
 	if err != nil {
-		return Descriptor{}, err
+		return err
 	}
 	if string(config) != "{}" {
-		return Descriptor{}, e.New(e.CodeVerifyFailed, "Debian carrier has nonstandard metadata config")
+		return e.New(e.CodeVerifyFailed, "Debian carrier has nonstandard metadata config")
 	}
-	return descriptor, nil
+	return nil
 }

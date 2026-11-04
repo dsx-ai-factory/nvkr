@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
@@ -19,7 +20,7 @@ func TestObjectPublicationJoinsActualLocalDescriptor(t *testing.T) {
 	hash := func(letter string) string { return "sha256:" + strings.Repeat(letter, 64) }
 	for _, kind := range []string{"executable", "apt-repository", "debian-package", "disk-image", "oci", "helm-oci", "bundle-oci"} {
 		t.Run(kind, func(t *testing.T) {
-			for _, scenario := range []string{"exact", "different descriptor", "different raw subject", "different inputs", "different invocation", "different output", "extra output", "different build"} {
+			for _, scenario := range []string{"exact", "different descriptor", "different raw subject", "different inputs", "different definition", "different environment", "different composition", "different invocation", "different output", "extra output", "different build"} {
 				t.Run(scenario, func(t *testing.T) {
 					metadata := delivery.ReleaseMetadata{DefinitionDigest: hash("1"), EnvironmentDigest: hash("2"), PlanDigest: hash("3"), InvocationID: invocation}
 					origin := &delivery.PublicationOrigin{Ref: "example.test/product/release@" + hash("4"), PreparedInvocationID: invocation, SignedInvocationID: invocation}
@@ -40,6 +41,12 @@ func TestObjectPublicationJoinsActualLocalDescriptor(t *testing.T) {
 						local.Outputs[0].Digest = hash("8")
 					case "different inputs":
 						local.Metadata.PlanDigest = hash("8")
+					case "different definition":
+						local.Metadata.DefinitionDigest = hash("8")
+					case "different environment":
+						local.Metadata.EnvironmentDigest = hash("8")
+					case "different composition":
+						local.Metadata.Composition = &definition.CompositionRecord{Metadata: definition.Metadata{Name: "different-composition"}}
 					case "different invocation":
 						local.Metadata.InvocationID = "https://github.com/example/project/actions/runs/2/attempts/1"
 					case "different output":

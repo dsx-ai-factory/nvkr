@@ -6,6 +6,8 @@ package delivery
 import (
 	"context"
 	"io"
+
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 // Object describes exact blob bytes. Key is canonical and relative to the store's
@@ -50,4 +52,33 @@ func NewObjectStore(ctx context.Context, options ObjectStoreOptions) (ObjectStor
 		return nil, objectCapability("unsupported object-store provider")
 	}
 	return newS3ObjectStore(ctx, options.S3)
+}
+
+// Only delivery-issued stores can offer this optimization. Generic providers
+// retain the public byte API and the mirror performs its independent full read.
+type objectStoreReadback interface {
+	putIfAbsentWithReadback(context.Context, Object, io.ReadSeeker) (StoredObject, *objectReadback, error)
+}
+
+// An in-process observation of one exact completed read, never serialized or a
+// caller boolean. It grants no signature or Run authority and holds no bytes.
+type objectReadback struct {
+	store  *s3ObjectStore
+	stored StoredObject
+}
+
+func (receipt *objectReadback) require(ctx context.Context, store ObjectStore, stored StoredObject) error {
+	if err := deliveryContext(ctx); err != nil {
+		return err
+	}
+	owner, ok := store.(*s3ObjectStore)
+	if receipt == nil || !ok || owner == nil || owner.lifetime == nil || receipt.store != owner || receipt.stored != stored {
+		return e.New(e.CodeVerifyFailed, "object readback does not bind this store, object and exact pin")
+	}
+	owner.mu.Lock()
+	defer owner.mu.Unlock()
+	if owner.closed || owner.lifetime.Err() != nil {
+		return e.New(e.CodeTimeout, "object readback store lifetime ended")
+	}
+	return nil
 }

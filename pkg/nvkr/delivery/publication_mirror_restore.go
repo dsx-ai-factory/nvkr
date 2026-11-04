@@ -134,18 +134,19 @@ func RestoreMirror(ctx context.Context, store ObjectStore, locator StoredObject,
 		}
 		result.Publications = append(result.Publications, RestoredPublication{Reference: publication.Reference, RootDigest: publication.RootDigest, Path: filepath.Join(out, name), DiskPayloads: append([]MirrorDiskPayload(nil), publication.DiskPayloads...)})
 	}
+	proofBytes := make(map[string][]byte)
 	for _, proof := range inventory.Proofs {
-		var signature, provenance bytes.Buffer
-		if objects[proof.Signature].Size > 8<<20 || objects[proof.Provenance].Size > 8<<20 {
-			return nil, e.New(e.CodeSignatureInvalid, "original proof bundle exceeds verification bound")
+		for _, digest := range []string{proof.Signature, proof.Provenance} {
+			if _, exists := proofBytes[digest]; exists {
+				continue
+			}
+			var raw bytes.Buffer
+			if err := readMirrorObject(ctx, store, objects[digest], &raw); err != nil {
+				return nil, err
+			}
+			proofBytes[digest] = raw.Bytes()
 		}
-		if err := readMirrorObject(ctx, store, objects[proof.Signature], &signature); err != nil {
-			return nil, err
-		}
-		if err := readMirrorObject(ctx, store, objects[proof.Provenance], &provenance); err != nil {
-			return nil, err
-		}
-		result.Proofs = append(result.Proofs, RestoredProof{Subject: proof.Subject, Signature: signature.Bytes(), Provenance: provenance.Bytes()})
+		result.Proofs = append(result.Proofs, RestoredProof{Subject: proof.Subject, Signature: proofBytes[proof.Signature], Provenance: proofBytes[proof.Provenance]})
 	}
 	// Reuse the no-replace descriptor-relative transport publication owner.
 	if err := transportarchive.PublishRestoredRoots(ctx, outer, filepath.Dir(filepath.Clean(out)), []string{filepath.Base(filepath.Clean(out))}); err != nil {
@@ -246,6 +247,8 @@ func validateMirrorInventory(inventory mirrorInventory, locator StoredObject, li
 	}
 	previous = ""
 	proved := map[string]bool{}
+	proofBytes := map[string]bool{}
+	var retainedProofBytes int64
 	for _, proof := range inventory.Proofs {
 		if err := proof.Subject.Validate(); err != nil {
 			return nil, err
@@ -254,6 +257,18 @@ func validateMirrorInventory(inventory mirrorInventory, locator StoredObject, li
 			return nil, e.New(e.CodeVerifyFailed, "mirror proof has an absent or repeated original subject")
 		}
 		proved[proof.Subject.Ref] = true
+		for _, digest := range []string{proof.Signature, proof.Provenance} {
+			if objects[digest].Size > maxMirrorProofBundleBytes {
+				return nil, e.New(e.CodeSignatureInvalid, "original proof bundle exceeds verification bound")
+			}
+			if !proofBytes[digest] {
+				if objects[digest].Size > maxMirrorProofBytes-retainedProofBytes {
+					return nil, e.New(e.CodeEngineCapability, "complete original proof inventory exceeds retained-byte bound")
+				}
+				retainedProofBytes += objects[digest].Size
+				proofBytes[digest] = true
+			}
+		}
 		used[proof.Signature] = true
 		used[proof.Provenance] = true
 		previous = proof.Subject.Ref

@@ -1,4 +1,4 @@
-## S3 boot and package delivery contract
+## Object-store publication
 
 ADR-20's [object-store publication contract](../0020-artifact-publication-and-target-configuration.md#s3-file-delivery-contract)
 uses the original signed OCI publication and whole-Plan consumer receipt. Environment v2 configures required
@@ -13,14 +13,18 @@ is exchanged once for a temporary session covering the operation/cleanup deadlin
 background refresh, namespace enrollment, cross-Run CAS state and a second signed delivery protocol are absent.
 `sign` retains and verifies original bundles. `lifecycle` owns exact-input and aggregate/local descriptor joins
 both before copying and during independent consumption. Raw/semantic subjects remain distinct from OCI
-wrapper descriptors. No new native-file taxonomy is required to transport existing artifacts.
+wrapper descriptors. Independent registry-disabled consumption is exposed through
+`lifecycle.VerifyObjectPublication`; no equivalent CLI or `client/v1` route is implemented. The
+[publication guide](../../publication-architecture.md#required-s3-copy) describes configuration and links this
+boundary. No new native-file taxonomy is required to transport existing artifacts.
 
 The linked provider dependencies are official AWS SDK for Go v2 core `v1.47.5`, credentials `v1.20.13`,
 S3 `v1.114.6`, STS `v1.51.6` and Smithy Go `v1.28.7`, with their required transitive AWS modules pinned in
 `go.mod`/`go.sum`. The official source/tag and Apache-2.0 license review is reflected in the generated linked
 module notice inventory; no SDK config/profile/SSO resolver or transfer-manager dependency is added.
 `go mod verify`, notice drift and the repository-pinned vulnerability scanner validate this dependency set;
-review results belong to the exact implementation head. Dependency engineering admission is separate from
+the dated [dependency scan and notice evidence](../../evidence/2026-11-04-object-store-dependency-admission.md)
+records the exact scanned head, scanner outcome and engineering-admission scope. Dependency engineering admission is separate from
 operator IAM review, provider acceptance and named-decider ratification.
 
 Local contract tests and repository checks are recorded with the implementation review. They are not a live
