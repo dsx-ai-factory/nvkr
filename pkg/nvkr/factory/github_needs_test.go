@@ -137,12 +137,15 @@ func githubResultPartitionFixture(count int) map[string][]string {
 }
 
 func TestGitHubResultCollectorsHaveStableExactMembership(t *testing.T) {
-	// Widths are pinned: 16 is the original layout, and 1011 and 1983 are the
-	// smallest fixtures whose fullest narrower bucket exceeds 64 members.
+	// Widths are pinned: 16 is the original layout, 1010 and 1982 are the last
+	// fixtures that fit 16 and 32 buckets, and 1011 and 1983 the first that do
+	// not. Adding one job to 1010 crosses to 32 buckets and reassigns members.
 	for _, test := range []struct {
 		count   int
 		buckets uint64
-	}{{64, 0}, {65, 16}, {596, 16}, {1000, 16}, {1011, 32}, {1983, 64}} {
+		widens  bool
+	}{{64, 0, false}, {65, 16, false}, {596, 16, false}, {1000, 16, false}, {1010, 16, true}, {1011, 32, false},
+		{1982, 32, false}, {1983, 64, false}} {
 		count := test.count
 		t.Run(fmt.Sprint(count), func(t *testing.T) {
 			full := githubResultPartitionFixture(count)
@@ -178,6 +181,16 @@ func TestGitHubResultCollectorsHaveStableExactMembership(t *testing.T) {
 			after, err := projectGitHubNeeds(t.Context(), added, false)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if test.widens {
+				for id, members := range after.Collectors {
+					for _, member := range members {
+						if githubResultCollectorID(member, 2*test.buckets) != id {
+							t.Fatalf("crossing to %d buckets left %s in %s", 2*test.buckets, member, id)
+						}
+					}
+				}
+				return
 			}
 			for id, members := range projection.Collectors {
 				want := slices.Clone(members)

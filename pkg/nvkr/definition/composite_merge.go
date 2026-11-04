@@ -29,7 +29,8 @@ func (composition Composition) Attribution() []OutputAttribution {
 
 // mergeComposite derives the effective Definition by ADR-26 §3: an exact
 // disjoint union of member outputs with every catalog stack rebased to the
-// composite's directory. It never applies precedence, defaults or renaming.
+// composite's directory. It never applies precedence or renaming; its one
+// default fills an omitted sbomTool from the value the other members share.
 func mergeComposite(compositePath string, metadata Metadata, admitted []AdmittedMember) (Definition, []OutputAttribution, error) {
 	members := slices.Clone(admitted)
 	sort.Slice(members, func(i, j int) bool { return members[i].Name < members[j].Name })
