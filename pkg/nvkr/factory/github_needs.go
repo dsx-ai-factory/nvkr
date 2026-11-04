@@ -16,9 +16,12 @@ import (
 
 const (
 	githubFinalizerJobID      = "nvkr-lifecycle-run"
-	githubResultBucketCount   = 16
 	githubMaximumResultInputs = 64
 )
+
+// Ordered result-collector widths. The first width is the original fixed
+// layout, so finalizers that fit it keep their exact membership and IDs.
+var githubResultBucketCounts = []uint64{16, 32, 64}
 
 // Full describes the original provider dependencies. Reduced describes every
 // emitted job, including result collectors. Collectors partition the original
@@ -113,19 +116,11 @@ func projectGitHubNeeds(ctx context.Context, full map[string][]string, retainOrd
 	if len(leaves) <= githubMaximumResultInputs {
 		return projection, githubNeedsContext(ctx)
 	}
-	for _, leaf := range leaves {
-		if err := githubNeedsContext(ctx); err != nil {
-			return nil, err
-		}
-		id := githubResultCollectorID(leaf)
-		if _, exists := full[id]; exists {
-			return nil, e.New(e.CodeEngineCapability, "GitHub result collector %q collides with an original job", id)
-		}
-		projection.Collectors[id] = append(projection.Collectors[id], leaf)
-		if len(projection.Collectors[id]) > githubMaximumResultInputs {
-			return nil, e.New(e.CodeEngineCapability, "GitHub result collector %q exceeds %d dependencies", id, githubMaximumResultInputs)
-		}
+	collectors, err := githubResultCollectors(ctx, full, leaves)
+	if err != nil {
+		return nil, err
 	}
+	projection.Collectors = collectors
 	for _, id := range sortedKeys(projection.Collectors) {
 		projection.Reduced[id] = slices.Clone(projection.Collectors[id])
 	}
@@ -133,12 +128,53 @@ func projectGitHubNeeds(ctx context.Context, full map[string][]string, retainOrd
 	return projection, githubNeedsContext(ctx)
 }
 
-// FNV is a fixed routing function, not an artifact or authority digest. Fixed
-// buckets keep existing membership unchanged when independent outputs are added.
-func githubResultCollectorID(job string) string {
+// githubResultCollectors uses the narrowest width whose fullest bucket fits
+// the result-input limit. A wider layout is chosen only when every narrower
+// one overflows, so it never changes a finalizer that fits a narrower width.
+func githubResultCollectors(ctx context.Context, full map[string][]string, leaves []string) (map[string][]string, error) {
+	var overflow string
+	for _, buckets := range githubResultBucketCounts {
+		collectors := map[string][]string{}
+		overflow = ""
+		for _, leaf := range leaves {
+			if err := githubNeedsContext(ctx); err != nil {
+				return nil, err
+			}
+			id := githubResultCollectorID(leaf, buckets)
+			collectors[id] = append(collectors[id], leaf)
+			if len(collectors[id]) > githubMaximumResultInputs {
+				overflow = id
+				break
+			}
+		}
+		if overflow != "" {
+			continue
+		}
+		for id := range collectors {
+			if _, exists := full[id]; exists {
+				return nil, e.New(e.CodeEngineCapability, "GitHub result collector %q collides with an original job", id)
+			}
+		}
+		// The finalizer parses all collected results under one token budget: two
+		// outer delimiters, twelve per collector report plus its decoded object's
+		// two, and eight per leaf (ID, result and GitHub's empty outputs object).
+		// Only the widest layouts can reach it; refuse them before any job runs.
+		if tokens := 2 + 14*len(collectors) + 8*len(leaves); tokens > maxGitHubProviderTokens {
+			return nil, e.New(e.CodeEngineCapability, "GitHub result collectors for %d jobs need %d finalizer parser tokens, over the %d limit",
+				len(leaves), tokens, maxGitHubProviderTokens)
+		}
+		return collectors, nil
+	}
+	return nil, e.New(e.CodeEngineCapability, "GitHub result collector %q exceeds %d dependencies at the widest %d-bucket layout",
+		overflow, githubMaximumResultInputs, githubResultBucketCounts[len(githubResultBucketCounts)-1])
+}
+
+// FNV is a fixed routing function, not an artifact or authority digest. At a
+// given width, membership is unchanged when independent outputs are added.
+func githubResultCollectorID(job string, buckets uint64) string {
 	hash := fnv.New64a()
 	_, _ = hash.Write([]byte(job))
-	return fmt.Sprintf("nvkr-results-%02x", hash.Sum64()%githubResultBucketCount)
+	return fmt.Sprintf("nvkr-results-%02x", hash.Sum64()%buckets)
 }
 
 func reduceGitHubNeeds(ctx context.Context, full map[string][]string) (map[string][]string, error) {
