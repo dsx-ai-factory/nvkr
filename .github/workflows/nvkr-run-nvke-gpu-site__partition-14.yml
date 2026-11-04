@@ -52,10 +52,6 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09 }}
       nvkr-results-09-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09-statuses }}
-      nvkr-results-0a:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0a }}
-      nvkr-results-0a-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0a-statuses }}
       nvkr-results-0b:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0b }}
       nvkr-results-0b-statuses:
@@ -118,35 +114,6 @@ jobs:
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-nvkectl-linux-arm64-build-nvkectl'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-process-nvkectl-linux-arm64-terminal-5504b08d0cab'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
-    steps:
-      - name: Check native runner platform
-        run: |
-          set -eu
-          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
-      - name: Check out workflow source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: 'false'
-      - name: Prepare NVKR runner and job parameters
-        id: nvkr-context
-        uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/prepare-stage
-        with:
-          runner-artifact: 'nvkr-exec-ubuntu-24-04'
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute node part-1
-        uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
-  nvkr-package-publication-aicr:
-    name: 'Package publication bundle: publication-aicr'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-package-aicr'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -1045,7 +1012,7 @@ jobs:
     name: 'Collect provider results: nvkr-partition-results'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-package-local-path-provisioner-arm64, nvkr-package-nvkectl-linux-arm64, nvkr-package-publication-aicr, nvkr-package-publication-capi-controller-image-arm64, nvkr-package-publication-capi-kubeadm-boo-1eda7b138eb0, nvkr-package-publication-capi-kubeadm-con-b43cc041198e, nvkr-package-publication-cert-manager-cai-ce1a9c1fcd69, nvkr-package-publication-cert-manager-con-552847309ea5, nvkr-package-publication-cert-manager-web-d17d677e59de, nvkr-package-publication-csi-node-driver-02a78ae16d16, nvkr-package-publication-local-path-helpe-6a7fb09add1d, nvkr-package-publication-local-path-provi-77db8aabee7a, nvkr-package-publication-nktp-collector-image-arm64, nvkr-package-publication-nktp-kube-state-40b969e892aa, nvkr-package-publication-nktp-kubectl-image-arm64, nvkr-package-publication-nktp-lgtm-image-arm64, nvkr-package-publication-nktp-metrics-ser-eebe54e615ac, nvkr-package-publication-nktp-node-export-749c6d4505fc, nvkr-package-publication-nktp-operator-image-arm64, nvkr-package-publication-nktp-target-allo-fd174f2cfe07, nvkr-package-publication-operator-tools, nvkr-package-publication-operator-tools-linux-arm64, nvkr-package-publication-postgresql-image-arm64, nvkr-package-publication-spiffe-csi-image-arm64, nvkr-package-publication-spire-agent-image-arm64, nvkr-package-publication-spire-bash-image-arm64, nvkr-package-publication-spire-controller-14366a611047, nvkr-package-publication-spire-oidc-image-arm64, nvkr-package-publication-spire-server-image-arm64, nvkr-package-publication-spire-tpm-server-image-arm64, nvkr-package-publication-temporal-admin-t-619203c9c277, nvkr-package-publication-temporal-server-image-arm64, nvkr-package-publication-temporal-ui-image-arm64]
+    needs: [nvkr-package-local-path-provisioner-arm64, nvkr-package-nvkectl-linux-arm64, nvkr-package-publication-capi-controller-image-arm64, nvkr-package-publication-capi-kubeadm-boo-1eda7b138eb0, nvkr-package-publication-capi-kubeadm-con-b43cc041198e, nvkr-package-publication-cert-manager-cai-ce1a9c1fcd69, nvkr-package-publication-cert-manager-con-552847309ea5, nvkr-package-publication-cert-manager-web-d17d677e59de, nvkr-package-publication-csi-node-driver-02a78ae16d16, nvkr-package-publication-local-path-helpe-6a7fb09add1d, nvkr-package-publication-local-path-provi-77db8aabee7a, nvkr-package-publication-nktp-collector-image-arm64, nvkr-package-publication-nktp-kube-state-40b969e892aa, nvkr-package-publication-nktp-kubectl-image-arm64, nvkr-package-publication-nktp-lgtm-image-arm64, nvkr-package-publication-nktp-metrics-ser-eebe54e615ac, nvkr-package-publication-nktp-node-export-749c6d4505fc, nvkr-package-publication-nktp-operator-image-arm64, nvkr-package-publication-nktp-target-allo-fd174f2cfe07, nvkr-package-publication-operator-tools, nvkr-package-publication-operator-tools-linux-arm64, nvkr-package-publication-postgresql-image-arm64, nvkr-package-publication-spiffe-csi-image-arm64, nvkr-package-publication-spire-agent-image-arm64, nvkr-package-publication-spire-bash-image-arm64, nvkr-package-publication-spire-controller-14366a611047, nvkr-package-publication-spire-oidc-image-arm64, nvkr-package-publication-spire-server-image-arm64, nvkr-package-publication-spire-tpm-server-image-arm64, nvkr-package-publication-temporal-admin-t-619203c9c277, nvkr-package-publication-temporal-server-image-arm64, nvkr-package-publication-temporal-ui-image-arm64]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -1072,8 +1039,6 @@ jobs:
       nvkr-results-08-statuses: ${{ format('{0} {1}', needs['nvkr-package-publication-nktp-operator-image-arm64'].result, needs['nvkr-package-publication-temporal-server-image-arm64'].result) }}
       nvkr-results-09: ${{ format('"nvkr-package-publication-capi-kubeadm-boo-1eda7b138eb0":{0},"nvkr-package-publication-capi-kubeadm-con-b43cc041198e":{1},"nvkr-package-publication-nktp-target-allo-fd174f2cfe07":{2}', toJSON(needs['nvkr-package-publication-capi-kubeadm-boo-1eda7b138eb0']), toJSON(needs['nvkr-package-publication-capi-kubeadm-con-b43cc041198e']), toJSON(needs['nvkr-package-publication-nktp-target-allo-fd174f2cfe07'])) }}
       nvkr-results-09-statuses: ${{ format('{0} {1} {2}', needs['nvkr-package-publication-capi-kubeadm-boo-1eda7b138eb0'].result, needs['nvkr-package-publication-capi-kubeadm-con-b43cc041198e'].result, needs['nvkr-package-publication-nktp-target-allo-fd174f2cfe07'].result) }}
-      nvkr-results-0a: ${{ format('"nvkr-package-publication-aicr":{0}', toJSON(needs['nvkr-package-publication-aicr'])) }}
-      nvkr-results-0a-statuses: ${{ format('{0}', needs['nvkr-package-publication-aicr'].result) }}
       nvkr-results-0b: ${{ format('"nvkr-package-publication-cert-manager-web-d17d677e59de":{0},"nvkr-package-publication-nktp-node-export-749c6d4505fc":{1},"nvkr-package-publication-temporal-admin-t-619203c9c277":{2}', toJSON(needs['nvkr-package-publication-cert-manager-web-d17d677e59de']), toJSON(needs['nvkr-package-publication-nktp-node-export-749c6d4505fc']), toJSON(needs['nvkr-package-publication-temporal-admin-t-619203c9c277'])) }}
       nvkr-results-0b-statuses: ${{ format('{0} {1} {2}', needs['nvkr-package-publication-cert-manager-web-d17d677e59de'].result, needs['nvkr-package-publication-nktp-node-export-749c6d4505fc'].result, needs['nvkr-package-publication-temporal-admin-t-619203c9c277'].result) }}
       nvkr-results-0c: ${{ format('"nvkr-package-publication-spire-bash-image-arm64":{0}', toJSON(needs['nvkr-package-publication-spire-bash-image-arm64'])) }}

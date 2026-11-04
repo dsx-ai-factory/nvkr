@@ -30,10 +30,6 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-08 }}
       nvkr-results-08-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-08-statuses }}
-      nvkr-results-0d:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0d }}
-      nvkr-results-0d-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0d-statuses }}
       nvkr-results-0f:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0f }}
       nvkr-results-0f-statuses:
@@ -220,64 +216,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-nico-core-image-linux-amd64-sbom:
-    name: 'Generate SBOMs: nico-core-image/linux/amd64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-process-nico-core-image-linux-amd64-89c3aa2212c1'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
-    steps:
-      - name: Check native runner platform
-        run: |
-          set -eu
-          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
-      - name: Check out workflow source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: 'false'
-      - name: Prepare NVKR runner and job parameters
-        id: nvkr-context
-        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
-        with:
-          runner-artifact: 'nvkr-exec-ubuntu-24-04'
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute node part-1
-        uses: ./.github/nvkr-dev/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
-  nvkr-nico-flow-image-linux-amd64-sbom:
-    name: 'Generate SBOMs: nico-flow-image/linux/amd64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-process-nico-flow-image-linux-amd64-2dcbb6d43e7a'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
-    steps:
-      - name: Check native runner platform
-        run: |
-          set -eu
-          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
-      - name: Check out workflow source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: 'false'
-      - name: Prepare NVKR runner and job parameters
-        id: nvkr-context
-        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
-        with:
-          runner-artifact: 'nvkr-exec-ubuntu-24-04'
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute node part-1
-        uses: ./.github/nvkr-dev/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nico-reference-profiles-fixture-linux-amd64-sbom:
     name: 'Generate SBOMs: nico-reference-profiles-fixture/linux/amd64'
     runs-on: 'ubuntu-24.04'
@@ -340,24 +278,22 @@ jobs:
     name: 'Collect provider results: nvkr-partition-results'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-capnico-controller-linux-amd64-sbom, nvkr-cluster-api-provider-provisioned-lin-eba583757c10, nvkr-controller-chart-sbom, nvkr-controller-profiles-linux-amd64-sbom, nvkr-cwe-linux-amd64-sbom, nvkr-local-path-provisioner-sbom, nvkr-nico-core-image-linux-amd64-sbom, nvkr-nico-flow-image-linux-amd64-sbom, nvkr-nico-reference-profiles-fixture-linux-amd64-sbom, nvkr-package-local-path-provisioner]
+    needs: [nvkr-capnico-controller-linux-amd64-sbom, nvkr-cluster-api-provider-provisioned-lin-eba583757c10, nvkr-controller-chart-sbom, nvkr-controller-profiles-linux-amd64-sbom, nvkr-cwe-linux-amd64-sbom, nvkr-local-path-provisioner-sbom, nvkr-nico-reference-profiles-fixture-linux-amd64-sbom, nvkr-package-local-path-provisioner]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     permissions: {}
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
-      nvkr-partition-15: ${{ format('"nvkr-capnico-controller-linux-amd64-sbom":{0},"nvkr-cluster-api-provider-provisioned-lin-eba583757c10":{1},"nvkr-controller-profiles-linux-amd64-sbom":{2},"nvkr-cwe-linux-amd64-sbom":{3},"nvkr-local-path-provisioner-sbom":{4},"nvkr-nico-core-image-linux-amd64-sbom":{5},"nvkr-nico-flow-image-linux-amd64-sbom":{6},"nvkr-nico-reference-profiles-fixture-linux-amd64-sbom":{7},"nvkr-package-local-path-provisioner":{8}', toJSON(needs['nvkr-capnico-controller-linux-amd64-sbom']), toJSON(needs['nvkr-cluster-api-provider-provisioned-lin-eba583757c10']), toJSON(needs['nvkr-controller-profiles-linux-amd64-sbom']), toJSON(needs['nvkr-cwe-linux-amd64-sbom']), toJSON(needs['nvkr-local-path-provisioner-sbom']), toJSON(needs['nvkr-nico-core-image-linux-amd64-sbom']), toJSON(needs['nvkr-nico-flow-image-linux-amd64-sbom']), toJSON(needs['nvkr-nico-reference-profiles-fixture-linux-amd64-sbom']), toJSON(needs['nvkr-package-local-path-provisioner'])) }}
+      nvkr-partition-15: ${{ format('"nvkr-capnico-controller-linux-amd64-sbom":{0},"nvkr-cluster-api-provider-provisioned-lin-eba583757c10":{1},"nvkr-controller-profiles-linux-amd64-sbom":{2},"nvkr-cwe-linux-amd64-sbom":{3},"nvkr-local-path-provisioner-sbom":{4},"nvkr-nico-reference-profiles-fixture-linux-amd64-sbom":{5},"nvkr-package-local-path-provisioner":{6}', toJSON(needs['nvkr-capnico-controller-linux-amd64-sbom']), toJSON(needs['nvkr-cluster-api-provider-provisioned-lin-eba583757c10']), toJSON(needs['nvkr-controller-profiles-linux-amd64-sbom']), toJSON(needs['nvkr-cwe-linux-amd64-sbom']), toJSON(needs['nvkr-local-path-provisioner-sbom']), toJSON(needs['nvkr-nico-reference-profiles-fixture-linux-amd64-sbom']), toJSON(needs['nvkr-package-local-path-provisioner'])) }}
       nvkr-partition-21: ${{ format('"nvkr-controller-chart-sbom":{0}', toJSON(needs['nvkr-controller-chart-sbom'])) }}
       nvkr-results-00: ${{ format('"nvkr-cwe-linux-amd64-sbom":{0},"nvkr-package-local-path-provisioner":{1}', toJSON(needs['nvkr-cwe-linux-amd64-sbom']), toJSON(needs['nvkr-package-local-path-provisioner'])) }}
       nvkr-results-00-statuses: ${{ format('{0} {1}', needs['nvkr-cwe-linux-amd64-sbom'].result, needs['nvkr-package-local-path-provisioner'].result) }}
-      nvkr-results-04: ${{ format('"nvkr-controller-chart-sbom":{0},"nvkr-nico-core-image-linux-amd64-sbom":{1}', toJSON(needs['nvkr-controller-chart-sbom']), toJSON(needs['nvkr-nico-core-image-linux-amd64-sbom'])) }}
-      nvkr-results-04-statuses: ${{ format('{0} {1}', needs['nvkr-controller-chart-sbom'].result, needs['nvkr-nico-core-image-linux-amd64-sbom'].result) }}
+      nvkr-results-04: ${{ format('"nvkr-controller-chart-sbom":{0}', toJSON(needs['nvkr-controller-chart-sbom'])) }}
+      nvkr-results-04-statuses: ${{ format('{0}', needs['nvkr-controller-chart-sbom'].result) }}
       nvkr-results-07: ${{ format('"nvkr-nico-reference-profiles-fixture-linux-amd64-sbom":{0}', toJSON(needs['nvkr-nico-reference-profiles-fixture-linux-amd64-sbom'])) }}
       nvkr-results-07-statuses: ${{ format('{0}', needs['nvkr-nico-reference-profiles-fixture-linux-amd64-sbom'].result) }}
       nvkr-results-08: ${{ format('"nvkr-controller-profiles-linux-amd64-sbom":{0}', toJSON(needs['nvkr-controller-profiles-linux-amd64-sbom'])) }}
       nvkr-results-08-statuses: ${{ format('{0}', needs['nvkr-controller-profiles-linux-amd64-sbom'].result) }}
-      nvkr-results-0d: ${{ format('"nvkr-nico-flow-image-linux-amd64-sbom":{0}', toJSON(needs['nvkr-nico-flow-image-linux-amd64-sbom'])) }}
-      nvkr-results-0d-statuses: ${{ format('{0}', needs['nvkr-nico-flow-image-linux-amd64-sbom'].result) }}
       nvkr-results-0f: ${{ format('"nvkr-capnico-controller-linux-amd64-sbom":{0},"nvkr-cluster-api-provider-provisioned-lin-eba583757c10":{1},"nvkr-local-path-provisioner-sbom":{2}', toJSON(needs['nvkr-capnico-controller-linux-amd64-sbom']), toJSON(needs['nvkr-cluster-api-provider-provisioned-lin-eba583757c10']), toJSON(needs['nvkr-local-path-provisioner-sbom'])) }}
       nvkr-results-0f-statuses: ${{ format('{0} {1} {2}', needs['nvkr-capnico-controller-linux-amd64-sbom'].result, needs['nvkr-cluster-api-provider-provisioned-lin-eba583757c10'].result, needs['nvkr-local-path-provisioner-sbom'].result) }}
     steps:

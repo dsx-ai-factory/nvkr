@@ -105,7 +105,7 @@ production qualification baseline until named qualification is supported and ind
 
 ## Test pipeline changes on a feature branch
 
-The committed `nvkr-dev.yml` runs the **87-output NVKE GPU site composite**, the five NVKE family Definitions
+The committed `nvkr-dev.yml` runs the **81-output NVKE GPU site composite**, the five NVKE family Definitions
 together, including native AMD64/ARM64 plain and public-bootstrap FDE disks for Ubuntu 26.04 and 24.04, SBOM
 attestation, per-output publication, cosign signing, verification and finalization. Its generator and helper come from the dispatched branch. The separate
 `inputs/environments/github-development.yaml` selects development credentials, protected environments,

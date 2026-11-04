@@ -22,7 +22,7 @@ var nvkeSplitFamilies = []struct {
 	name            string
 	outputs, native int
 }{
-	{"core", 28, 35},
+	{"core", 22, 27},
 	{"services", 34, 34},
 	{"telemetry", 17, 17},
 	{"disks", 4, 4},
@@ -36,7 +36,6 @@ var nvkeFamilyOnlyOutputs = map[string]struct {
 	family string
 	output definition.DefinitionOutput
 }{
-	"aicr":                               {"core", nvkeFamilyOnlyOutput("aicr", "linux/arm64", "tools/aicr-arm64", definition.OutputExecutable, "aicr", nil)},
 	"controller-profiles":                {"core", definition.DefinitionOutput{Name: "controller-profiles", Platforms: []string{"linux/amd64", "linux/arm64"}, Catalog: &definition.Catalog{Base: "../../catalogs/nvke/release-components"}, Components: []string{"nvke-nico-reference-profiles"}, Format: definition.OutputOCI}},
 	"local-path-helper-image":            {"services", nvkeFamilyOnlyOutput("local-path-helper-image", "linux/amd64", "local-path-provisioner", definition.OutputOCI, "local-path-helper-image", nil)},
 	"local-path-helper-image-arm64":      {"services", nvkeFamilyOnlyOutput("local-path-helper-image-arm64", "linux/arm64", "local-path-provisioner", definition.OutputOCI, "local-path-helper-image", nil)},
@@ -45,11 +44,6 @@ var nvkeFamilyOnlyOutputs = map[string]struct {
 	"local-path-provisioner-image":       {"services", nvkeFamilyOnlyOutput("local-path-provisioner-image", "linux/amd64", "local-path-provisioner", definition.OutputOCI, "local-path-provisioner-image", nil)},
 	"local-path-provisioner-image-arm64": {"services", nvkeFamilyOnlyOutput("local-path-provisioner-image-arm64", "linux/arm64", "local-path-provisioner", definition.OutputOCI, "local-path-provisioner-image", nil)},
 	"operator-tools-linux-arm64":         {"core", definition.DefinitionOutput{Name: "operator-tools-linux-arm64", Platform: "linux/arm64", Catalog: &definition.Catalog{Base: "../../catalogs/tools/operator-arm64"}, Components: []string{"helm", "kubectl"}, Format: definition.OutputExecutable}},
-	"nico":                               {"core", nvkeFamilyOnlyOutput("nico", "linux/amd64", "nico", definition.OutputHelm, "nico-chart", nil)},
-	"nico-core-image":                    {"core", definition.DefinitionOutput{Name: "nico-core-image", Platforms: []string{"linux/amd64", "linux/arm64"}, Catalog: &definition.Catalog{Base: "../../catalogs/nico"}, Components: []string{"nico-core-image"}, Format: definition.OutputOCI}},
-	"nico-flow":                          {"core", nvkeFamilyOnlyOutput("nico-flow", "linux/amd64", "nico", definition.OutputHelm, "nico-flow-chart", nil)},
-	"nico-flow-image":                    {"core", definition.DefinitionOutput{Name: "nico-flow-image", Platforms: []string{"linux/amd64", "linux/arm64"}, Catalog: &definition.Catalog{Base: "../../catalogs/nico"}, Components: []string{"nico-flow-image"}, Format: definition.OutputOCI}},
-	"nico-prereqs":                       {"core", nvkeFamilyOnlyOutput("nico-prereqs", "linux/amd64", "nico", definition.OutputHelm, "nico-prereqs-chart", nil)},
 	"nvke-node-fde-ubuntu24-amd64":       {"disks-ubuntu24", nvkeUbuntu24Disk("nvke-node-fde-ubuntu24-amd64", "linux/amd64", "nvke-node-fde-amd64")},
 	"nvke-node-fde-ubuntu24-arm64":       {"disks-ubuntu24", nvkeUbuntu24Disk("nvke-node-fde-ubuntu24-arm64", "linux/arm64", "nvke-node-fde-arm64")},
 	"nvke-node-image-ubuntu24-amd64":     {"disks-ubuntu24", nvkeUbuntu24Disk("nvke-node-image-ubuntu24-amd64", "linux/amd64", "nvke-node-image-amd64")},
@@ -123,7 +117,7 @@ func nvkeFamilyOnlyOutput(name, platform, catalog, format, component string, ima
 
 // Family-only catalogs declare no pin set to revalidate, so they load from disk:
 // these public catalogs, plus each pinned family-only overlay stack.
-var nvkeFamilyOnlyCatalogs = map[string]bool{"../../catalogs/local-path-provisioner": true, "../../catalogs/nico": true, "../../catalogs/tools/aicr-arm64": true, "../../catalogs/tools/operator-arm64": true}
+var nvkeFamilyOnlyCatalogs = map[string]bool{"../../catalogs/local-path-provisioner": true, "../../catalogs/tools/operator-arm64": true}
 
 func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 	nvkeSplitRepository(t)

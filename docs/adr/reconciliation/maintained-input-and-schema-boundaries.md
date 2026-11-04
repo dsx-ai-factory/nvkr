@@ -190,15 +190,16 @@ complete hosted Run is still required to establish the corrected candidate's exe
 
 The NICo catalog additionally declares source-built `nico-flow-image` and `nico-core-image` producers
 from the infra-controller `v2.3.0` pin, on the generic rootless BuildKit route with digest-bound bases.
-Only the core family selects them: Core backs the umbrella chart's `global.image`, and Flow is the one REST
-image the packaged charts reference. Since `v2.3.0` Flow is a standalone release outside the umbrella, so the
-core family also selects a source-packaged `nico-flow` chart beside `nico` and `nico-prereqs`; it is
-contract-tested by the family membership matrix and the regenerated core bundle only. Core chains the source's native build, runtime and release Dockerfiles in
+Core backs the umbrella chart's `global.image`, and Flow is the one REST image the packaged charts
+reference. Since `v2.3.0` Flow is a standalone release outside the umbrella, so the catalog also packages a
+`nico-flow` chart beside `nico` and `nico-prereqs`. No maintained Definition selects these five outputs:
+development Run [41789718662](https://github.com/dsx-ai-factory/nvkr/actions/runs/41789718662) showed that
+source admission refuses the `v2.3.0` tree's absolute systemd symlink under `pxe/`, so the core family
+dropped them until that is resolved. Core chains the source's native build, runtime and release Dockerfiles in
 one producer per architecture, because BuildKit admits no material inputs. The generated hosted budgets
 differ by architecture: the ARM64 Core build has its own 60-minute job, while AMD64 build and preparation share
 one 120-minute job. A cold Rust workspace build may not fit either, and hosted routes admit no longer
-execution budget; a hosted Run must establish it. Both producers are designed and contract-tested by catalog validation, the
-family membership/compiled-identity matrix and the regenerated core bundle. A recording-stub contract runs the
+execution budget; a hosted Run must establish it. Both producers are designed and contract-tested by catalog validation. A recording-stub contract runs the
 Core command for both architectures: it checks the native Dockerfile selection, the handoff of each base's OCI
 layout and digest to the release stage, and that a failed base or a missing, duplicate or malformed
 intermediate digest stops before the release stage. Both bases receive the Kea package version from the

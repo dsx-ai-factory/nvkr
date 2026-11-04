@@ -114,7 +114,7 @@ the contract suite; [Merge Gate 39276232245](https://github.com/dsx-ai-factory/n
 This is not a successful complete development Run or qualification claim.
 
 The explicit `githubDevelopment` Environment setting selects separate fixed workflow/Plan/manifest paths
-with the same compiler, complete graph and helper. The committed development bundle now uses the 87-output
+with the same compiler, complete graph and helper. The committed development bundle now uses the 81-output
 [GPU site composite](../../../inputs/definitions/nvke/README.md#gpu-site-composite), including all eight native plain/public-bootstrap
 FDE disk outputs of both Ubuntu series, output-local publication, SBOM attestation, cosign signing, verification,
 metadata assembly and finalization; the combined 69-output candidate no longer has a development bundle. It retains the candidate's existing disk
