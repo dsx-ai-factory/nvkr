@@ -92,6 +92,12 @@ its [aggregate identity](adr/0028-multi-platform-executable-indexes.md#5-aggrega
 [image-index publication](adr/0028-multi-platform-executable-indexes.md#6-publication-a-standard-image-index-over-minimal-per-platform-images).
 Nothing is implemented.
 
+Proposed [ADR-29](adr/0029-cluster-observation-and-artifact-attribution.md) separates collected cluster
+facts from their optional comparison with selected artifacts. Its [design](cluster-observation-and-artifact-attribution.md)
+proposes an `observation` owner using AICR Go APIs and sharing NVKR's OCI identity rules. These
+remain unsigned descriptive diagnostics with explicit access and coverage limits. No standalone collector,
+test execution, signed runtime report or qualification capability is implemented.
+
 ## Assumptions {#assumptions}
 
 These assumptions are subject to the current ADRs and milestone acceptance criteria.
@@ -1256,6 +1262,7 @@ already obtained.
 | Proposed ADR-26 composite Definitions, then member Release reuse and composite qualification | Release-engineering, catalog, qualification and result-reuse owners | One combined Release from independently owned Definitions without a hand-maintained combined copy |
 | Proposed ADR-27 pinned-tool producers, then AICR layout output (NVIDIA/aicr#3534) and layout import | Catalog, execution, evidence and release-engineering owners | Outputs rendered by released tools, starting with AICR bundles, without rebuilding the tool from source |
 | Proposed ADR-28 multi-platform executables, then the AICR migration and the per-platform retrofits | Catalog, release-engineering, delivery and evidence owners | One tool source per release where [ADR-28 §1](adr/0028-multi-platform-executable-indexes.md#1-one-tool-source-declares-every-platform) admits it, and one image-index output per executable, consumable by standard OCI clients |
+| Proposed ADR-29 observation owner and AICR import exception, bounded access/log/field controls, host/package provider and downstream installation/boot records | NVKR observation, AICR and downstream deployment owners; named deciders unassigned | Standalone descriptive collection and supported exact chart/disk/package comparisons |
 
 Qualified helper-image use remains unavailable until it satisfies ADR-07/18's executable/runtime admission.
 Source bootstrap records only the identities that actually participated; delivery by image cannot imply

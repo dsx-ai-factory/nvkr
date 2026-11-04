@@ -272,6 +272,20 @@ provisional; published adapters, controller/chart checks and broader migration a
 validation routes retain their separate admission and capture contracts.
 _Avoid_: Producer catalog, upstream test implementation, executable plugin, qualification policy
 
+**Cluster observation (proposed)**:
+A scoped, time-bounded record of discovered cluster facts, their sources and collection gaps. Raw AICR
+Snapshot inputs are distinct from this NVKR observation. Information gathering does not require a build
+baseline or test run. Lane none: unsigned and descriptive. Proposed in
+[ADR-29](docs/adr/0029-cluster-observation-and-artifact-attribution.md); the standalone route is not implemented.
+_Avoid_: Artifact comparison, authored lifecycle object, complete host attestation, test verdict
+
+**Artifact comparison (proposed)**:
+A descriptive comparison of a cluster observation with selected NVKR outputs and their evidence, under
+an explicit scope and comparison profile, distinct from the public Verification Policy. Reports produced/acquired
+identity, installation attribution and measured contents separately. Missing baselines or unsupported joins remain unverified; observations can
+still be useful without a comparison. Proposed in ADR-29; no qualification, signing or release authority.
+_Avoid_: Cluster observation, verified installation from a version label, qualification receipt
+
 **Release authenticity**:
 Acceptance of a Release's signed membership, each named output's signatures and production provenance, and required inventories under consumer policy, without checking artifact payload bytes. It establishes neither payload integrity nor release qualification.
 _Avoid_: Payload verification, deployment readiness, full release acceptance
