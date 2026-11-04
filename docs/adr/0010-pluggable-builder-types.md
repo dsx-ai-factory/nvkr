@@ -1,9 +1,9 @@
 # ADR-10 — Pluggable builder types (OCI-hermetic · Nix · VM image · prebuilt)
 
 - **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
-- **Implementation maturity:** Tracked separately in `reconciliation.md`; implementation and test evidence do not
+- **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
-- **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
+- **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
 - **Index:** ADR-10 in the consolidated NVKR ADR set.
@@ -465,7 +465,7 @@ material identities remain part of the build/evidence contract, alongside signat
 output membership. ADR-13 separately requires traced materials and read-only final-disk inspection for the
 strict evidence route. Its explicit M2 and M3 MVP `build-provenance-v1` mode instead binds live producer/material
 evidence and records inspection as not performed; strict inspection is deferred hardening. Current implementation
-and evidence remain in [reconciliation](reconciliation.md). Embedded-software correctness and runtime validation
+and evidence remain in [reconciliation](reconciliation/README.md). Embedded-software correctness and runtime validation
 remain the upstream build owner's duty. ADR-22's future curated-set derivation remains deferred.
 
 ## Consequences

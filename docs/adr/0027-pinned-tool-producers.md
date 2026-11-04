@@ -2,7 +2,7 @@
 
 - **Decision status:** Proposed (design only; pending named-decider ratification)
 - **Implementation maturity:** Units T1–T5 and T7 are implemented. The executor runs both output forms, but
-  selecting an `oci-layout` producer fails closed until T6 joins the #285 layout import; see `reconciliation.md`.
+  selecting an `oci-layout` producer fails closed until T6 joins the #285 layout import; see `reconciliation/README.md`.
 - **Acceptance-test maturity:** Contract-tested. Linux executor tests use a fake container runtime. One unrecorded
   local run executed the AICR v1.2.0-rc1 recipe producer through the executor on Docker; no recorded Run, hosted
   Run or consumer verification exercises a pinned-tool producer.

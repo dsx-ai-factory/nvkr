@@ -2,7 +2,7 @@
 
 This specification owns M1–M4 artifact scope, numbered acceptance criteria, approved fallbacks and
 completion requirements. The [roadmap](milestones.md) summarizes outcomes; the
-[implementation record](adr/reconciliation.md) owns current support and operational evidence. Current
+[implementation record](adr/reconciliation/README.md) owns current support and operational evidence. Current
 ADRs own the engineering contracts pending named-decider ratification. Candidate success is not
 organizational approval or complete milestone acceptance.
 
@@ -23,7 +23,7 @@ workflows; consumers verify the results with standard tooling and no NVKR softwa
   approved initial scope
   defers strict inspection and material reconciliation; scope approval is not organizational ADR ratification.
   ARM64 is an implementation extension recorded in the
-  [implementation record](adr/reconciliation.md#native-arc-disk-route). Any additional architecture explicitly selected
+  [implementation record](adr/reconciliation/native-arc-disk-route.md#native-arc-disk-route). Any additional architecture explicitly selected
   by a Definition remains mandatory for that Run and Release; the product floor cannot waive its completeness.
   The selected execution route must admit the OS build's
   virtualization and privilege requirements; broader upstream architecture support does not expand this scope.

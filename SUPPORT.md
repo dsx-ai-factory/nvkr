@@ -19,7 +19,7 @@ Maintainers route and review work under the
 1. Search existing [issues](https://github.com/dsx-ai-factory/nvkr/issues) and
    [discussions](https://github.com/dsx-ai-factory/nvkr/discussions) to avoid duplicates.
 2. Check the [documentation map](docs/README.md), [development guide](DEVELOPMENT.md), and
-   [current implementation record](docs/adr/reconciliation.md).
+   [current implementation record](docs/adr/reconciliation/README.md).
 3. Reproduce the problem from the latest commit on `main` when practical.
 4. Include the `nvkr` version or commit, platform, exact command, coded error, and a minimal reproduction.
    Remove credentials, tokens, private keys, and sensitive infrastructure details.

@@ -43,7 +43,7 @@ paths; macOS builds and runs tests and diagnostics.
 
 1. Current ADR-01–22 contain the engineering contracts directly, pending named-decider ratification.
    Each section states its lane and any deferred capability; proposed design is not organizational acceptance.
-2. `docs/adr/reconciliation.md` owns current implementation, evidence and disabled-path status.
+2. `docs/adr/reconciliation/` (index: `README.md`) owns current implementation, evidence and disabled-path status.
 3. Code and tests establish implementation; unit tests do not prove external services or production workflows.
 
 `docs/sadd.md` explains architecture, `CONTEXT.md` defines vocabulary, `docs/milestones.md` is the outcome
@@ -121,7 +121,7 @@ NVKE_LOCAL_CLONE=/path/to/nvke scripts/demo-m1-local.sh
 
 ## Architecture routing
 
-Read `docs/adr/reconciliation.md` for current support before claiming a capability. Read ADR-17 for public
+Read `docs/adr/reconciliation/README.md` for current support before claiming a capability. Read ADR-17 for public
 lifecycle/SDK ownership, ADR-18 for hosted execution/isolation, ADR-04/09/16 for evidence lanes, ADR-19 for
 artifact membership and downstream ownership, ADR-20 for publication, and ADR-21/22 for generated files and pins. `pkg/nvkr/lifecycle`
 owns the public workflow; `buildgraph` derives graphs from direct producer selections; `factory` owns

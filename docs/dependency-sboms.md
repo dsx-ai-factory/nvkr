@@ -49,7 +49,7 @@ covers all these exact bytes recursively. Source-archive evidence is never relab
 See [the registry graph](publication-architecture.md) for every remaining manifest and attachment.
 
 Current contract coverage and hosted publication evidence are recorded in
-[reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md). Signed producer evidence in the producer-only disk mode explicitly records
+[reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/README.md). Signed producer evidence in the producer-only disk mode explicitly records
 deferred inspection; it is not the dependency inventory described for binaries, images and charts above.
 The current qualification workflow preserves producer-only disk evidence. Strict disk inventory/reconciliation is separate deferred
 hardening; qualification of source metadata does not prove installed disk contents.
@@ -70,7 +70,7 @@ gzip/xz fixtures, not a compiled factory output. [Development prerequisites](htt
 identify its tool pins and command. The same bytes scanned without the diagnostic's hint must return
 `CodeProvenanceMissing`, with no accepted inventory, under the selected Syft version. Revalidate the discovery
 premise when changing either the factory catalog Syft pin or the Syft pin in `toolchains/nvkr-disk-inspect`. The
-[dated local observations](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md#external-run-references) record native ARM64 tool and
+[dated local observations](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/external-run-references.md#external-run-references) record native ARM64 tool and
 fixture identities; native amd64 execution has not been recorded. Non-archive bytes named `.deb` produce no
 accepted inventory; corrupt payload members and complete embedded dependency discovery are not established.
 

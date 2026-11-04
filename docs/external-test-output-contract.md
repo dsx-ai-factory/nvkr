@@ -3,7 +3,7 @@
 `pkg/nvkr/testresults` describes outputs supplied by external test producers. Its lane is **none
 (descriptive)**. It supplies an interface, wrapper validation and deterministic serialization, with no
 producer implementation, execution, report parser, file collector, signing or qualification integration.
-[Reconciliation](adr/reconciliation.md) owns implementation and disabled-path status.
+[Reconciliation](adr/reconciliation/README.md) owns implementation and disabled-path status.
 
 ## Producer boundary
 

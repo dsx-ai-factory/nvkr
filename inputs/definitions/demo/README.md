@@ -118,6 +118,6 @@ remains separate from production fleet profiles and does not authenticate the
 selected disk or establish tenant compatibility. Local image construction is
 a networked wrapped build, not qualified execution or publication authorization.
 
-See [reconciliation](../../../docs/adr/reconciliation.md) for implementation and
+See [reconciliation](../../../docs/adr/reconciliation/README.md) for implementation and
 test boundaries. Ordinary tests do not execute the full demo; a fresh complete
 build/deploy/cleanup acceptance record remains required.

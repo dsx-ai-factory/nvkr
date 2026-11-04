@@ -23,11 +23,11 @@ NVKR owns the build and release workflow that supplies their artifacts.
 ## Build your first artifact
 
 Build the NVKE CLI, controller container image and Helm chart locally, with dependency SBOMs.
-You need **Git 2.38 or later, Bash and running Docker**. The pinned Go compiler is required; the launcher asks before installing it locally if needed. No Make or host Python is required.
+You need **Git 2.38 or later, Bash and running Docker**. You also need the pinned Go compiler; if it is missing, the launcher asks before installing it locally. You do not need Make or host Python.
 Use Docker Desktop on macOS, or Docker on Linux.
-NVKR runs on your host; the NVKE CLI and image it builds target Linux.
+NVKR runs on your host. The NVKE CLI and image it builds target Linux.
 The launcher checks prerequisites, selects the required Go compiler and builds NVKR from source for your CPU architecture.
-Git must already be installed. Supported Docker installation actions and local Go setup are shown for approval before proceeding.
+Git must already be installed. The launcher shows supported Docker installation actions and local Go setup for your approval before it runs them.
 
 Open a terminal in a directory without an existing `nvkr` folder and copy the whole block:
 
@@ -87,7 +87,7 @@ walks through the commands and Docker-based verification from macOS.
 establish exact-byte reproduction, freedom from vulnerabilities or deployment
 readiness. The maintained node-image SBOMs record producer and material subjects;
 they do not inspect installed disk contents. See the
-[implementation and evidence record](docs/adr/reconciliation.md) for recorded
+[implementation and evidence record](docs/adr/reconciliation/README.md) for recorded
 Runs and the limits of what each establishes.
 
 ## Choose your next step
@@ -105,9 +105,9 @@ Runs and the limits of what each establishes.
 
 GitHub Actions is the maintained hosted generator and signing/publication provider.
 Builds require their declared runtime and source access. Hosted node-image disk
-jobs additionally need the explicit native Linux KVM runner routes described in
+jobs also need the explicit native Linux KVM runner routes described in
 the [preview limitations](docs/overview/preview-status.md).
-The [documentation map](docs/README.md) and [demo index](demos/README.md) connect
+The [documentation map](docs/README.md) and [demo index](demos/README.md) list
 all the guides and examples.
 
 ## Contributing and support

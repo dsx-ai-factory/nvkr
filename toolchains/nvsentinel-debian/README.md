@@ -76,6 +76,6 @@ tools. Its final ambient environment contains only PATH. BuildKit acquires the p
 the Dockerfile's build commands have no network access or package installation. SDK and base-image
 security acceptance remain separate from these assertions. No toolchain publication, production
 signing or package execution is established here. Native AMD64 package execution remains unverified.
-[Reconciliation](../../docs/adr/reconciliation.md#nvsentinel-catalog-and-package-inputs) distinguishes
+[Reconciliation](../../docs/adr/reconciliation/m3-mvp-scope-and-acceptance-boundary.md#nvsentinel-catalog-and-package-inputs) distinguishes
 the developer-local SDK/package observation from retired recipes' observations. The current
 route retains only the raw package, without dependency inspection or installation proof.
