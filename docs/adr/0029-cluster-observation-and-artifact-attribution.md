@@ -1,10 +1,10 @@
-# ADR-29: Cluster observation and artifact attribution
+# ADR-29 — Cluster observation and artifact attribution
 
 - **Decision status:** Proposed; pending named-owner review and ratification.
 - **Implementation maturity:** Design only; the standalone collection route is not implemented.
 - **Acceptance-test maturity:** No live acceptance for this proposal.
 - **Deciders:** Pending; NVKR observation and downstream deployment owners must be named.
-- **Index:** Proposed ADR-29 supplements ADR-01-22 and proposed ADR-28; it remains outside the
+- **Index:** Proposed ADR-29 supplements ADR-01–22 and proposed ADR-28; it remains outside the
   consolidated contract set until accepted.
 - **Relates to:** ADR-13 (build evidence), ADR-16/17 (observation ownership), ADR-18 §3
   (operator-host execution), ADR-19 (deployment mapping), proposed ADR-27/28 (released tools).
@@ -49,7 +49,7 @@ separate ADR-13 prerequisites for stronger comparisons; missing baselines do not
 ### 2. Reuse the existing owners
 
 - **Proposed NVKR `observation`:** owns request admission, frozen scope, the AICR adapter, observation
-  records, comparison outcomes/coverage and descriptive serialization. CLI/SDK delegate to it. Its comparison
+  records, comparison outcomes/coverage and descriptive serialization. CLI and admitted SDK routes delegate to it. Its comparison
   profile is invocation settings, distinct from the public Verification Policy and not another lifecycle object.
 - **NVKR `conformance`:** owns shared pure OCI identity classification, extracted from its current internal
   helpers. Observation reports each outcome and retains partial facts. Existing `validate` keeps its strict
@@ -69,7 +69,9 @@ If it cannot be admitted, revisit this decision with owners; there is no silent 
 Standalone observation runs on the operator host under ADR-18 §3, using bounded in-process Kubernetes reads
 through the admitted AICR/client-go client owner shared with the inventory adapter. It needs no product/tools
 Release or disposable-cluster acknowledgement. Conformance retains its held-kubectl execution route unchanged.
-Both retain explicit target/TLS admission, bounded I/O and owned cleanup. No generated-CI observation lane is admitted.
+Both require explicit target/TLS admission, bounded I/O and owned resource cleanup. In-process reads do not
+inherit conformance's restricted subprocess environment; §4 defines their separate transport controls.
+No generated-CI observation lane is admitted.
 This is a proposed read-only extension of that host model, without a filesystem, network or privilege sandbox claim.
 
 ### 3. Make collection scope and gaps visible
@@ -83,6 +85,11 @@ Use one comparison vocabulary: **matched**, **mismatched**, **not observed**, **
 item to match with complete required coverage. Unsupported or ambiguous comparisons stay unverified.
 Unknown joins remain unknown; unexpected software stays visible.
 
+Keep index, native-manifest and config digests distinct. An authenticated selected index supplies the
+expected child for the node platform. A matching runtime index ID supports index-level identity, not an
+independent measurement of that child. A requested index reference alone proves no running identity;
+an observed different native child is still mismatched. Unsupported or ambiguous runtime IDs stay unverified.
+
 Observation coverage and artifact matching are different results. Scope, listed objects, absence of
 extras and timestamps remain observation-source claims. A reporter-supplied digest or pass value carries
 no authority. Record the observed kube-system namespace UID and caller-selected target when available; missing imported
@@ -94,7 +101,17 @@ All live collection runs without signing/publication credentials and requires an
 existing self-contained kubeconfig profile: one exact context, HTTPS with embedded CA, and one embedded
 token or certificate/key pair. Reject ambient fallback, exec/auth-provider plugins, external files and insecure
 TLS before client creation. Pass AICR a fresh owner-only captured path for each admission; its client cache is
-path-keyed. Existing exec-based EKS/GKE configurations need a separately reviewed profile.
+path-keyed and retains credential-bearing client configuration until process exit. That cached API is
+limited to one-shot CLI processes with one target admission; deleting its file does not erase the cache.
+Long-lived SDK collection requires an upstream uncached/config-taking or bounded, evicting client owner
+and remains closed until its lifecycle is admitted. Existing exec-based EKS/GKE configurations need a separately reviewed profile.
+
+The in-process transport must disable ambient proxy use explicitly, reject proxy environment variables and
+kubeconfig proxy URLs, reject redirects, bound response bytes, pagination, total requests and deadlines,
+and capture warnings through a bounded request-owned handler without raw stderr output. These controls
+are ADR-29 requirements, not protections inherited from ADR-18. Enforcing them requires upstream
+configuration/client injection before reads; unsupported APIs fail admission. Do not mutate global environment,
+transport or warning handlers. No signing/publication credentials are admitted to this route.
 Default reads are bounded get/list operations. Watch, Secret reads, exec, attach, port-forward and proxy are not admitted by default.
 Record the resources and verbs used. Current AICR inventory APIs can read Secrets across namespaces,
 including Argo destination resolution; they need separately admitted access or an upstream bounded API.
@@ -133,15 +150,16 @@ extracted executables use file comparison. Container imageID checks cannot cover
 
 - **Build another collector framework:** duplicates AICR and NVKR observation owners.
 - **Compare version labels only:** useful inventory, insufficient artifact identity.
-- **Run conformance to obtain a snapshot:** unnecessarily couples information gathering to tests and mutations.
+- **Run conformance to gather cluster facts:** unnecessarily couples information gathering to tests and mutations.
 - **Held pinned AICR executable (ADR-27/28):** useful for build producers, but adds a subprocess/tool-acquisition
   and serialization boundary to this typed Go integration. Not selected for observation; reconsider explicitly if dependency admission fails.
-- **Adapt copied AICR source:** permitted only after separate review; duplicates maintenance rather than reusing its Go API owner.
+- **Adapt AICR source:** the current contribution-policy route. It avoids a direct Go import but duplicates
+  maintenance. This proposal instead requests the explicit import exception; a refusal requires revisiting the decision.
 - **Put deployment mapping in Definition:** violates ADR-19's downstream ownership boundary.
 
 ## Follow-ups
 
 The [feature design](../cluster-observation-and-artifact-attribution.md) records source/API references,
 collection modes, comparison prerequisites, examples and acceptance. Implementation must select and review
-the actual dependency versions and expose the observation-only entrypoint. No CLI, wire schema, signed
+the actual dependency versions and expose collection through the proposed `observation` owner. No CLI, wire schema, signed
 observation protocol or new qualification capability is admitted here.

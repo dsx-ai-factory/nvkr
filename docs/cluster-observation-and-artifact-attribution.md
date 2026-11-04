@@ -66,7 +66,9 @@ or provider supplies it.
 The proposed operator-host route uses bounded in-process Kubernetes reads, shared with the AICR adapter
 through its existing [GetKubeClientWithConfig](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/pkg/k8s/client/client.go#L339)
 owner after dependency admission. It needs GET of the kube-system namespace identity, LIST nodes and scoped
-LIST Pods. This route follows ADR-18 §3's context, resource, credential-isolation and cleanup limits; it has
+LIST Pods. This route extends ADR-18 §3's operator-host model with bounded context, resources and
+owned resource cleanup. Its in-process transport does not inherit conformance's restricted subprocess
+environment; the access section defines the separate ADR-29 controls. It has
 no generated-CI lane, product/tools Release, suite inputs or disposable-cluster acknowledgement. Existing
 conformance keeps its held-kubectl transport and its own full admission.
 This is a proposed read-only extension of ADR-18's host model; it supplies no filesystem, network or privilege sandbox.
@@ -78,14 +80,41 @@ digest kind is unverified; a missing required replica after a successful read is
 remain gaps. Preserve other items and partial facts. Existing `validate` additionally requires its exact
 PodSpec reference, replica count, running/Ready state, IDs and restart checks; a matched identity cannot relax it.
 
+Keep index, native-manifest and config digests distinct. Resolve the selected authenticated index to the
+expected native child for the node platform. A requested reference naming that index is a matching request,
+not proof of running bytes. If the supported runtime imageID names the same authenticated index, report
+matched index-level identity and the expected child, without claiming independent native-child measurement.
+A different observed native child is mismatched even when the requested index matches. A config digest
+cannot substitute for either identity; unsupported or ambiguous forms remain unverified.
+
 ## Access, collection and privacy
 
 Every live route runs without signing/publication credentials. Reuse the existing static kubeconfig admission
 profile: one exact context, HTTPS with embedded CA and one embedded token or certificate/key pair. Reject
 ambient lookup, exec/auth-provider plugins, external credential files and insecure TLS before client creation.
 Pass the admitted capture to AICR at a fresh 0600 path in a private 0700 directory for each admission; its
-client cache is path-keyed. Never rewrite/reuse that path for another target. Join calls before removing owned
-credentials. Exec-based EKS/GKE configurations require a separately reviewed profile; none is admitted here.
+client cache is path-keyed and unbounded, and retains the credential-bearing `rest.Config` after the file
+is removed. Never rewrite/reuse that path for another target. Restrict this cached entry point to one-shot
+CLI processes with one target admission. Join calls before removing owned credential files; residual cached
+credentials live until process exit, so file removal is not memory erasure. Long-lived SDK live collection
+requires an upstream uncached/config-taking or bounded, evicting client owner with an admitted credential
+and transport lifetime. It is not enabled by this path workaround. Imported-file processing does not need
+that live client. Exec-based EKS/GKE configurations require a separately reviewed profile; none is admitted here.
+
+The in-process transport has explicit ADR-29 requirements rather than an inherited restricted environment:
+
+- Use direct connections with an explicitly disabled transport proxy. Reject nonempty `HTTP_PROXY`,
+  `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` and their lowercase forms, and kubeconfig proxy URLs before
+  client construction. An explicit proxy needs separate admission; Kubernetes API proxy verbs remain excluded.
+- Reject redirects. Freeze positive per-response byte, page/item, total-request and time budgets before
+  reads, including error bodies and list pagination. Stream under those limits and close every response.
+- Use a bounded request-owned warning handler that projects permitted diagnostics before retention. Never
+  emit raw API warning text to process stderr or install a process-global handler.
+
+The named AICR APIs do not by themselves establish these controls. Require upstream configuration/client
+injection through the existing owner before enabling each affected read route, including inventory calls.
+Reject an interface that cannot enforce the profile before network work; do not change process-global
+environment or transport state around a library call. All live routes run without signing/publication credentials.
 Live collection requires bounded get/list permissions for declared resources.
 No ambient credential fallback, exec, attach, port-forward, proxy, Secret read or watch is enabled by default.
 Record the actual verbs and scopes used. Unsupported requested capabilities fail with `engine-capability`
@@ -250,7 +279,7 @@ observed:
   kubeSystemNamespaceUID: <observed-target-UID>
   podUID: <observed-Pod-UID>
   nodeUID: <observed-node-UID>
-  requestedImage: registry.example/nvke-controller:v0.22.0
+  requestedImage: registry.example/nvke-controller@sha256:<index-I>
   rawImageID: docker-pullable://registry.example/nvke-controller@sha256:<native-B>
   digestKind: native-manifest
 comparison:
@@ -260,7 +289,11 @@ comparison:
 
 The comparison owner consumes a receipt from existing lifecycle owners for the selected output/platform;
 it does not authenticate a reporter-supplied digest. Preserve the original runtime imageID. An unsupported
-runtime digest kind leaves identity unverified. A matching image manifest still does not measure writable
+runtime digest kind leaves identity unverified. The requested index I in this example does not mask the
+observed wrong native child B. For a supported runtime imageID naming index I itself, the comparison instead
+reports `matched` with identity level `index`, expected child A, and native-child measurement unavailable.
+That is an index-level identity observation, not a claim that config, index and native digests are interchangeable.
+A matching image manifest still does not measure writable
 layers, mounts, configuration or process memory.
 
 ### Chart and host information without false identity claims
@@ -277,8 +310,9 @@ Artifact comparison: unverified
 
 The release metadata is useful inventory. To claim archive attribution, the deployment owner must supply
 an admitted record binding archive C and its dependencies to the exact release/revision and install inputs.
-If configuration resolves to native controller image B while the selected output requires child A of index
-I, compare those resolved native subjects and report mismatched. Resource/configuration drift remains a
+If chart configuration names the selected authenticated index I, select its expected child A for the node
+platform. A runtime native manifest A matches; a runtime index I matches only at index level. A runtime
+native manifest B that differs from A is mismatched, even with the correct requested index. Resource/configuration drift remains a
 separate field comparison under an explicit rule.
 
 Similarly, an observed OS release is not disk-image identity. An installed package version is not a
@@ -289,7 +323,7 @@ is unverified. A missing required node is incomplete capture, not evidence that 
 
 | Slice | Deliverable | Dependency and acceptance |
 | --- | --- | --- |
-| API observation | Observation-only entrypoint reusing NVKR's existing Pod/node identity rules | Real selected target, explicit access/scope, inventory without a build baseline; denied reads, wrong expected target, missing nodes and budgets remain explicit. No test run or API mutation. |
+| API observation | Proposed observation owner sharing NVKR's existing Pod/node identity rules | Real selected target, explicit access/scope, inventory without a build baseline; denied reads, wrong expected target, missing nodes and budgets remain explicit. No test run or API mutation. |
 | Installed-release inventory | Admitted AICR Go reader integration | Import policy/dependency review and a bounded access contract. Exercise Helm and Argo permission cases, including named-destination Secret reads; retain permitted metadata only. |
 | Host/package information | Separately admitted host provider or AICR extensions | Explicit agent/host admission and verified owned-resource cleanup, plus an actual package provider. Show useful real observations and denied/unsupported/cleanup-failure cases; do not describe one host as every node. |
 | Artifact comparison | Optional supported joins against selected outputs | Lifecycle baseline receipts, existing OCI owner and deployment-owner records. Chart/disk positive claims wait for verified downstream records; installed-file positives wait for admitted build/host baselines. Demonstrate mismatches and unknown joins. |
@@ -308,7 +342,8 @@ unimplemented. No live acceptance is established by this design or its examples.
 The proposed `pkg/nvkr/observation` module owns request/profile admission, the frozen scope, AICR adapter,
 observation records, comparison outcomes/coverage and descriptive serialization. `conformance` owns the
 shared pure OCI classification and its unchanged strict execution gate; `lifecycle` authenticates optional
-artifact baselines. CLI/SDK delegate. Deployment owners retain placement and installation records.
+artifact baselines. CLI and admitted SDK routes delegate. The cached live route is one-shot CLI only until the upstream
+client-lifetime boundary supports long-lived callers. Deployment owners retain placement and installation records.
 
 Before implementation, assign named deciders and review the ADR-17 package map, ADR-18 host admission, pinned AICR dependency,
 shared client/kubeconfig admission, log and field controls, namespace/Secret access and host/package provider.

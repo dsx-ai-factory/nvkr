@@ -94,7 +94,7 @@ Nothing is implemented.
 
 Proposed [ADR-29](adr/0029-cluster-observation-and-artifact-attribution.md) separates collected cluster
 facts from their optional comparison with selected artifacts. Its [design](cluster-observation-and-artifact-attribution.md)
-proposes AICR Go APIs and an observation-only entrypoint sharing NVKR's OCI identity rules. These
+proposes an `observation` owner using AICR Go APIs and sharing NVKR's OCI identity rules. These
 remain unsigned descriptive diagnostics with explicit access and coverage limits. No standalone collector,
 test execution, signed runtime report or qualification capability is implemented.
 
