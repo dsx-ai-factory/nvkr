@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Separate from Merge Gate so title/body edits do not rerun builds and tests.
+# This reports a check; it is not part of the required aggregate gate and
+# does not change repository rulesets. pull_request_target runs the base
+# branch's script, so a PR cannot change the check that judges it; the token
+# is read-only and no PR code is checked out.
+name: PR Title Lint
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  title:
+    name: Check PR Title
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out base scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+
+      - name: Validate Conventional Commit format
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const triage = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/triage.cjs`);
+            await triage.titleLint({ github, context, core });
