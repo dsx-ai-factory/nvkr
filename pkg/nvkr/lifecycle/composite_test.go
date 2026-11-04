@@ -134,6 +134,32 @@ func TestCompositeAdmissionMatrix(t *testing.T) {
 	}
 }
 
+// TestCompositeHostedFinalizeAdmitsComposite keeps the generated finalizer open
+// to a composite: admission and the drift check pass, so an empty workspace
+// records a failed composite Run rather than an engine-capability refusal.
+func TestCompositeHostedFinalizeAdmitsComposite(t *testing.T) {
+	compositeLifecycleFixture(t, nil)
+	plan, err := CompileFiles(t.Context(), compositeTestPath, compositeTestEnv, "composite-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeCompositeTestDocument(t, "plan.json", plan)
+	if err := os.MkdirAll(".nvkr/factory", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	run, err := FinalizeGenerated(t.Context(), compositeTestPath, compositeTestEnv, "plan.json", "composite-test", "attempt-1", ".nvkr/factory", ".nvkr/run.json")
+	var coded *e.Error
+	if err == nil || (errors.As(err, &coded) && coded.Code == e.CodeEngineCapability) {
+		t.Fatalf("want a recorded failure past composite admission; got %v", err)
+	}
+	if run == nil || run.SchemaVersion != CompositeRunSchemaVersion || run.Composition == nil || run.DefinitionDigest != plan.DefinitionDigest {
+		t.Fatalf("failed composite Run = %+v (%v)", run, err)
+	}
+	if _, err := os.Stat(".nvkr/run.json"); err != nil {
+		t.Fatalf("failed composite Run was not recorded: %v", err)
+	}
+}
+
 // declareLifecycleVariant gives beta a containerd output whose overlay changes
 // the producer, so alpha and beta diverge, and declares containerd a variant of
 // the two members.
