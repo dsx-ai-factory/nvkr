@@ -91,6 +91,7 @@ area/ci:
           - '.github/labeler.yml'
           - '.github/actionlint.yaml'
           - '.github/dependabot.yml'
+          - 'Makefile'
           - 'internal/cicontract/**'
           - 'scripts/ci-*'
           - 'scripts/ci_*'

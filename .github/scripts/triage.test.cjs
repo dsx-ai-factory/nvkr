@@ -15,14 +15,17 @@ const ALL_LABELS = [
 const names = list => (list || []).map(name => ({ name }));
 
 // Records writes and failures; reads return the given fresh state.
-function harness({ issue, pr, available = ALL_LABELS, readError, removeStatus }) {
+function harness({ issue, pr, available = ALL_LABELS, readError, removeStatus, addError }) {
   const calls = { added: [], removed: [], failed: [], info: [] };
   const github = {
     rest: {
       issues: {
         get: async () => ({ data: issue }),
         listLabelsForRepo: 'labels-endpoint',
-        addLabels: async params => { calls.added.push(params.labels); },
+        addLabels: async params => {
+          if (addError) throw new Error('synthetic add failure');
+          calls.added.push(params.labels);
+        },
         removeLabel: async params => {
           if (removeStatus) throw Object.assign(new Error('synthetic'), { status: removeStatus });
           calls.removed.push(params.name);
@@ -78,6 +81,11 @@ test('issue intake', async t => {
       assert.equal(calls.failed.length, c.failed || 0);
     });
   }
+  await t.test('label add failure propagates', async () => {
+    const { args, calls } = harness({ issue: issue(), addError: true });
+    await assert.rejects(triage.issueIntake(args), /synthetic add failure/);
+    assert.deepEqual(calls.failed, []);
+  });
   await t.test('label read failure propagates with no write', async () => {
     const { args, calls } = harness({ issue: issue(), readError: true });
     await assert.rejects(triage.issueIntake(args), /synthetic read failure/);
@@ -104,6 +112,12 @@ test('PR size', async t => {
       assert.deepEqual(calls.removed, c.removed);
     });
   }
+  await t.test('add failure propagates after the stale size was removed', async () => {
+    const pr = { additions: 1, deletions: 0, labels: names(['size/XL']) };
+    const { args, calls } = harness({ pr, addError: true });
+    await assert.rejects(triage.prSize(args), /synthetic add failure/);
+    assert.deepEqual(calls.removed, ['size/XL']);
+  });
   await t.test('concurrently removed label is tolerated', async () => {
     const pr = { additions: 1, deletions: 0, labels: names(['size/XL']) };
     const { args, calls } = harness({ pr, removeStatus: 404 });

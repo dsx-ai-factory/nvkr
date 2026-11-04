@@ -137,6 +137,9 @@ async function prSize({ github, context, core }) {
   const size = sizeLabel(pr.additions + pr.deletions);
   const names = SIZE_LABELS.map(([name]) => name);
   const current = pr.labels.map(label => label.name).filter(name => names.includes(name));
+  // Stale sizes are removed before the new one is added. GitHub writes are not
+  // atomic: if the addition fails the job fails, the PR may briefly have no size
+  // label, and the next synchronize run repairs it.
   for (const name of current.filter(name => name !== size)) {
     try {
       await github.rest.issues.removeLabel({ ...context.repo, issue_number: number, name });
