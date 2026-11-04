@@ -18,7 +18,7 @@ var githubSecretName = regexp.MustCompile(`(?i)^[a-z_][a-z0-9_]*$`)
 
 // renderGitHubPartition keeps original job IDs: shared action selection uses
 // github.job to select parameters from the complete, unchanged Plan.
-func renderGitHubPartition(ctx context.Context, plan *Plan, raw []byte, partition githubExecutionPartition, model *executionGraph, exports []githubPartitionExport) ([]byte, error) {
+func renderGitHubPartition(ctx context.Context, plan *Plan, raw []byte, partition githubExecutionPartition, model *executionGraph, exports []githubPartitionExport, name string) ([]byte, error) {
 	if err := githubNeedsContext(ctx); err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func renderGitHubPartition(ctx context.Context, plan *Plan, raw []byte, partitio
 	}
 	call := githubYAMLMap("inputs", githubYAMLMap("dependencies", githubYAMLMap(
 		"type", githubYAMLString("string"), "required", &yamlv3.Node{Kind: yamlv3.ScalarNode, Tag: "!!bool", Value: "true"})), "outputs", outputs)
-	child := githubYAMLMap("name", githubYAMLString("NVKR execution partition"), "on", githubYAMLMap("workflow_call", call),
+	child := githubYAMLMap("name", githubYAMLString(name), "on", githubYAMLMap("workflow_call", call),
 		"permissions", githubInterfaceClone(githubYAMLField(resolved, "permissions")), "jobs", childJobs)
 	if env := githubYAMLField(resolved, "env"); env != nil {
 		githubYAMLSet(child, "env", githubInterfaceClone(env))

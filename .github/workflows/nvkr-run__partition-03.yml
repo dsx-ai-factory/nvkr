@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: p03 Acquire and prepare capi-controller-image +29
 'on':
   workflow_call:
     inputs:

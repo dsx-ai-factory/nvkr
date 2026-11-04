@@ -170,6 +170,22 @@ func assertGitHubPartitionMembership(t *testing.T, plan *Plan, entry []byte, wor
 		t.Fatal(err)
 	}
 	jobs := githubYAMLField(doc.Content[0], "jobs")
+	for i := 0; i < len(jobs.Content); i += 2 {
+		id, job := jobs.Content[i].Value, jobs.Content[i+1]
+		child, ok := workers[strings.TrimPrefix(githubYAMLValue(job, "uses"), "./")]
+		if !ok {
+			continue
+		}
+		var worker yamlv3.Node
+		if err := yamlv3.Unmarshal(child, &worker); err != nil {
+			t.Fatal(err)
+		}
+		name := githubYAMLValue(job, "name")
+		prefix := "p" + strings.TrimPrefix(id, "nvkr-partition-") + " "
+		if !strings.HasPrefix(name, prefix) || name != githubYAMLValue(worker.Content[0], "name") {
+			t.Fatalf("partition %s caller/worker display names differ or lack index: %q", id, name)
+		}
+	}
 	inline := 0
 	for id := range projection.Full {
 		if id == githubFinalizerJobID {

@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: p15 Package nktp +1
 'on':
   workflow_call:
     inputs:

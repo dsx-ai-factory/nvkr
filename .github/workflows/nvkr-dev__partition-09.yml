@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: 'p09 Package container image: capi-controller-image-arm64 +31'
 'on':
   workflow_call:
     inputs:

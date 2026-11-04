@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: p21 Package controller-chart +2
 'on':
   workflow_call:
     inputs:

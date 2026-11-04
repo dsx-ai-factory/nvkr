@@ -12,6 +12,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   nvkr-partition-00:
+    name: p00 Prepare NVKR runner (arc-amd64-kvm) +3
     uses: ./.github/workflows/nvkr-run__partition-00.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -22,6 +23,7 @@ jobs:
       NKE_SOURCE_TOKEN: ${{ secrets.NKE_SOURCE_TOKEN }}
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-partition-01:
+    name: p01 Acquire capi-controller-image-arm64 +63
     uses: ./.github/workflows/nvkr-run__partition-01.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -36,6 +38,7 @@ jobs:
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       NVKR_REGISTRY_READ: ${{ secrets.NVKR_REGISTRY_READ }}
   nvkr-partition-02:
+    name: p02 Acquire spire-bash-image-arm64 +9
     uses: ./.github/workflows/nvkr-run__partition-02.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -48,6 +51,7 @@ jobs:
       NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-partition-03:
+    name: p03 Acquire and prepare capi-controller-image +29
     uses: ./.github/workflows/nvkr-run__partition-03.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -60,6 +64,7 @@ jobs:
       NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-partition-04:
+    name: p04 Build capnico-controller/linux/arm64 +31
     uses: ./.github/workflows/nvkr-run__partition-04.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -72,6 +77,7 @@ jobs:
       NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-partition-05:
+    name: p05 Build and prepare capnico-controller/linux/amd64 +4
     uses: ./.github/workflows/nvkr-run__partition-05.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -84,6 +90,7 @@ jobs:
       NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-partition-06:
+    name: 'p06 Generate SBOMs: capi-controller-image +26'
     uses: ./.github/workflows/nvkr-run__partition-06.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -96,6 +103,7 @@ jobs:
       NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-partition-07:
+    name: 'p07 Generate SBOMs: spire-tpm-server-image +4'
     uses: ./.github/workflows/nvkr-run__partition-07.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -108,6 +116,7 @@ jobs:
       NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-partition-08:
+    name: p08 Build nvke-node-fde-amd64 +3
     uses: ./.github/workflows/nvkr-run__partition-08.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -121,6 +130,7 @@ jobs:
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       NVKR_REGISTRY_READ: ${{ secrets.NVKR_REGISTRY_READ }}
   nvkr-partition-09:
+    name: 'p09 Package container image: capi-controller-image-arm64 +31'
     uses: ./.github/workflows/nvkr-run__partition-09.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -133,6 +143,7 @@ jobs:
       NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-partition-10:
+    name: 'p10 Generate SBOMs: capnico-controller/linux/amd64 +4'
     uses: ./.github/workflows/nvkr-run__partition-10.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -145,6 +156,7 @@ jobs:
       NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-partition-11:
+    name: 'p11 Generate SBOMs: nktp +26'
     uses: ./.github/workflows/nvkr-run__partition-11.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -157,6 +169,7 @@ jobs:
       NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-partition-12:
+    name: p12 Package spire-tpm-server-image +4
     uses: ./.github/workflows/nvkr-run__partition-12.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -169,6 +182,7 @@ jobs:
       NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-partition-13:
+    name: 'p13 Package binaries: nvkectl-linux-arm64 +27'
     uses: ./.github/workflows/nvkr-run__partition-13.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -181,6 +195,7 @@ jobs:
       NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-partition-14:
+    name: 'p14 Package container image: capnico-controller +3'
     uses: ./.github/workflows/nvkr-run__partition-14.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -193,6 +208,7 @@ jobs:
       NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-partition-15:
+    name: p15 Package nktp +1
     uses: ./.github/workflows/nvkr-run__partition-15.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -205,6 +221,7 @@ jobs:
       NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-partition-16:
+    name: p16 Publish nvke-node-fde-amd64 +3
     uses: ./.github/workflows/nvkr-run__partition-16.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -218,6 +235,7 @@ jobs:
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       NVKR_REGISTRY_WRITE: ${{ secrets.NVKR_REGISTRY_WRITE }}
   nvkr-partition-17:
+    name: p17 Package nvkectl-linux-arm64
     uses: ./.github/workflows/nvkr-run__partition-17.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -230,6 +248,7 @@ jobs:
       NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-partition-18:
+    name: 'p18 Bind image digest and package Helm: controller-chart +4'
     uses: ./.github/workflows/nvkr-run__partition-18.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -242,6 +261,7 @@ jobs:
       NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-partition-19:
+    name: p19 Publish capi-controller-image +29
     uses: ./.github/workflows/nvkr-run__partition-19.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -255,6 +275,7 @@ jobs:
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       NVKR_REGISTRY_WRITE: ${{ secrets.NVKR_REGISTRY_WRITE }}
   nvkr-partition-20:
+    name: p20 Publish capi-controller-image-arm64 +26
     uses: ./.github/workflows/nvkr-run__partition-20.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -268,6 +289,7 @@ jobs:
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       NVKR_REGISTRY_WRITE: ${{ secrets.NVKR_REGISTRY_WRITE }}
   nvkr-partition-21:
+    name: p21 Package controller-chart +2
     uses: ./.github/workflows/nvkr-run__partition-21.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -281,6 +303,7 @@ jobs:
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       NVKR_REGISTRY_WRITE: ${{ secrets.NVKR_REGISTRY_WRITE }}
   nvkr-partition-22:
+    name: p22 Verify release nvke-node-fde-amd64 +3
     uses: ./.github/workflows/nvkr-run__partition-22.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -294,6 +317,7 @@ jobs:
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       NVKR_REGISTRY_READ: ${{ secrets.NVKR_REGISTRY_READ }}
   nvkr-partition-23:
+    name: p23 Publish capnico-controller +34
     uses: ./.github/workflows/nvkr-run__partition-23.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -308,6 +332,7 @@ jobs:
       NVKR_REGISTRY_READ: ${{ secrets.NVKR_REGISTRY_READ }}
       NVKR_REGISTRY_WRITE: ${{ secrets.NVKR_REGISTRY_WRITE }}
   nvkr-partition-24:
+    name: p24 Publish controller-chart +29
     uses: ./.github/workflows/nvkr-run__partition-24.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -322,6 +347,7 @@ jobs:
       NVKR_REGISTRY_READ: ${{ secrets.NVKR_REGISTRY_READ }}
       NVKR_REGISTRY_WRITE: ${{ secrets.NVKR_REGISTRY_WRITE }}
   nvkr-partition-25:
+    name: p25 Verify release capnico-controller +4
     uses: ./.github/workflows/nvkr-run__partition-25.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -335,6 +361,7 @@ jobs:
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       NVKR_REGISTRY_READ: ${{ secrets.NVKR_REGISTRY_READ }}
   nvkr-partition-26:
+    name: p26 Verify release controller-chart
     uses: ./.github/workflows/nvkr-run__partition-26.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -348,6 +375,7 @@ jobs:
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       NVKR_REGISTRY_READ: ${{ secrets.NVKR_REGISTRY_READ }}
   nvkr-partition-27:
+    name: p27 Assemble release from verified output references
     uses: ./.github/workflows/nvkr-run__partition-27.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -361,6 +389,7 @@ jobs:
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       NVKR_REGISTRY_READ: ${{ secrets.NVKR_REGISTRY_READ }}
   nvkr-partition-28:
+    name: p28 Publish release
     uses: ./.github/workflows/nvkr-run__partition-28.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
@@ -374,6 +403,7 @@ jobs:
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
       NVKR_REGISTRY_WRITE: ${{ secrets.NVKR_REGISTRY_WRITE }}
   nvkr-partition-29:
+    name: 'p29 Verify release and deliverable signatures: release'
     uses: ./.github/workflows/nvkr-run__partition-29.yml
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:

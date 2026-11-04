@@ -21,7 +21,7 @@ func TestGitHubPartitionWorkflowPreservesJobIdentityAndFailurePolicy(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	child, err := renderGitHubPartition(t.Context(), plan, raw, githubExecutionPartition{Jobs: []string{"build", "inspect"}}, model, nil)
+	child, err := renderGitHubPartition(t.Context(), plan, raw, githubExecutionPartition{Jobs: []string{"build", "inspect"}}, model, nil, "p00 build +1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func TestGitHubPartitionWorkflowPreservesJobIdentityAndFailurePolicy(t *testing.
 		t.Fatal("worker must not compete with entry workflow concurrency")
 	}
 	for _, ids := range [][]string{{"missing"}, {"build", "build"}, {"source", "build"}, {githubPartitionReporter}} {
-		_, err := renderGitHubPartition(t.Context(), plan, raw, githubExecutionPartition{Jobs: ids}, model, nil)
+		_, err := renderGitHubPartition(t.Context(), plan, raw, githubExecutionPartition{Jobs: ids}, model, nil, "p00 build +1")
 		assertFactoryErrorCode(t, err, e.CodePipelineDrift)
 	}
 }
@@ -84,7 +84,7 @@ func TestGitHubPartitionExports(t *testing.T) {
 		{"explicit after derived", []githubPartitionExport{{Name: "x", Members: []string{"build"}, Statuses: true}, {Name: "x-statuses", Members: []string{"build"}}}, nil},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			child, err := renderGitHubPartition(t.Context(), plan, raw, githubExecutionPartition{Jobs: []string{"build"}}, model, test.exports)
+			child, err := renderGitHubPartition(t.Context(), plan, raw, githubExecutionPartition{Jobs: []string{"build"}}, model, test.exports, "p00 build")
 			if test.want == nil {
 				assertFactoryErrorCode(t, err, e.CodePipelineDrift)
 				return
