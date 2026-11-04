@@ -112,6 +112,10 @@ then failed during helper locator acquisition with HTTP 503. The locator API own
 bounded transient-server retries. Recovery, exhaustion, cancellation and server-delay cases are added to
 the contract suite; [Merge Gate 39276232245](https://github.com/dsx-ai-factory/nvkr/actions/runs/39276232245) passed on `8dc975de`. Local execution remains skipped at the operator's request.
 This is not a successful complete development Run or qualification claim.
+The signed storage download that follows each locator ZIP redirect had no retry. In GPU site composite
+[Run 41884498057](https://github.com/dsx-ai-factory/nvkr/actions/runs/41884498057), the metadata assembly job, which
+reads 406 locators, failed with that storage request's HTTP 503 on three consecutive attempts. The storage download now
+uses the same bounded transient-server budget, with recovery and exhaustion cases in the contract suite.
 
 The explicit `githubDevelopment` Environment setting selects separate fixed workflow/Plan/manifest paths
 with the same compiler, complete graph and helper. The committed development bundle now uses the 81-output

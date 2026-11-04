@@ -57,7 +57,7 @@ func TestGitHubLocatorSelectionAdmission(t *testing.T) {
 }
 
 func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
-	for _, scenario := range []string{"transient ZIP API", "success flat", "success subdirectories", "singleton subdirectory", "earlier attempt", "retry newest first", "retry oldest first", "retry tied", "retry future", "retry corrupt", "retry truncated", "retry repeated id", "retry exact", "partial nonmerged", "empty nonmerged", "missing pattern", "missing exact", "duplicate", "wrong head", "expired", "missing digest", "changed zip", "wrong attempt", "redirect", "secret failure", "occupied index"} {
+	for _, scenario := range []string{"transient ZIP API", "transient ZIP storage", "exhausted ZIP storage", "success flat", "success subdirectories", "singleton subdirectory", "earlier attempt", "retry newest first", "retry oldest first", "retry tied", "retry future", "retry corrupt", "retry truncated", "retry repeated id", "retry exact", "partial nonmerged", "empty nonmerged", "missing pattern", "missing exact", "duplicate", "wrong head", "expired", "missing digest", "changed zip", "wrong attempt", "redirect", "secret failure", "occupied index"} {
 		t.Run(scenario, func(t *testing.T) {
 			index := t.TempDir()
 			request := testRequest
@@ -168,6 +168,9 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 					if scenario == "redirect" {
 						return githubLocatorHTTPFixture(http.StatusFound, nil, http.Header{"Location": {"https://evil.example/secret"}}), nil
 					}
+					if scenario == "exhausted ZIP storage" || (scenario == "transient ZIP storage" && archives == 1) {
+						return githubLocatorHTTPFixture(http.StatusServiceUnavailable, []byte("SECRET storage busy"), nil), nil
+					}
 					return githubLocatorHTTPFixture(http.StatusOK, bodies[strings.TrimPrefix(r.URL.Path, "/")], nil), nil
 				}
 				if r.URL.Host != "api.github.com" || r.Header.Get("Authorization") != "Bearer test-repository-token" {
@@ -255,9 +258,12 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 				return
 			}
 			switch scenario {
-			case "transient ZIP API", "success flat", "success subdirectories", "singleton subdirectory", "missing pattern", "earlier attempt", "retry newest first", "retry oldest first":
+			case "transient ZIP API", "transient ZIP storage", "success flat", "success subdirectories", "singleton subdirectory", "missing pattern", "earlier attempt", "retry newest first", "retry oldest first":
 				if err != nil {
 					t.Fatal(err)
+				}
+				if scenario == "transient ZIP storage" && (zipAPICalls != 2 || archives != 3 || len(archiveReads) != 2) {
+					t.Fatalf("storage retry calls: ZIP API=%d storage=%d paths=%v", zipAPICalls, archives, archiveReads)
 				}
 				if scenario == "transient ZIP API" {
 					if zipAPICalls != 3 || archives != 2 || len(archiveReads) != 2 {
@@ -313,6 +319,11 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 				assertCode(t, err, e.CodeFetchFailed)
 			case "secret failure":
 				assertCode(t, err, e.CodeUnavailable)
+			case "exhausted ZIP storage":
+				assertCode(t, err, e.CodeUnavailable)
+				if archives != githubLocatorAPIAttempts {
+					t.Fatalf("storage retries=%d, want a bounded %d", archives, githubLocatorAPIAttempts)
+				}
 			case "occupied index":
 				assertCode(t, err, e.CodeImmutableViolation)
 				if calls != 0 {

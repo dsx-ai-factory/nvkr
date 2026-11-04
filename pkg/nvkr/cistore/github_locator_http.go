@@ -144,8 +144,7 @@ func githubLocatorHTTPError(ctx context.Context, cause error, message string) er
 }
 
 func githubLocatorRetryDelay(response githubLocatorResponse, attempt int, now time.Time) (time.Duration, bool, error) {
-	transient := response.status == http.StatusInternalServerError || response.status == http.StatusBadGateway ||
-		response.status == http.StatusServiceUnavailable || response.status == http.StatusGatewayTimeout
+	transient := githubLocatorTransientStatus(response.status)
 	limited := response.status == http.StatusTooManyRequests
 	if response.status == http.StatusForbidden {
 		var body struct {
@@ -192,6 +191,11 @@ func githubLocatorRetryDelay(response githubLocatorResponse, attempt int, now ti
 		return 0, true, e.New(e.CodeUnavailable, "CI locator API rate-limit delay exceeds retry budget")
 	}
 	return delay, true, nil
+}
+
+func githubLocatorTransientStatus(status int) bool {
+	return status == http.StatusInternalServerError || status == http.StatusBadGateway ||
+		status == http.StatusServiceUnavailable || status == http.StatusGatewayTimeout
 }
 
 func githubLocatorStatusError(ctx context.Context, status int) error {
