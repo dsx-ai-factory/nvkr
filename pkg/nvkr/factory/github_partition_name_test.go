@@ -28,6 +28,7 @@ func TestGitHubPartitionName(t *testing.T) {
 		{"unnamed job", "", "p03 a +1", 2},
 		{"long", strings.Repeat("x", 70) + " (linux/arm64)", "p03 " + strings.Repeat("x", 34) + "...xx (linux/arm64) +4", 5},
 		{"unicode", strings.Repeat("界", 70) + " (linux/arm64)", "p03 " + strings.Repeat("界", 34) + "...界界 (linux/arm64) +4", 5},
+		{"unicode largest suffix", strings.Repeat("界", 70) + " (linux/arm64)", "p03 " + strings.Repeat("界", 33) + "...界界 (linux/arm64) +63", 64},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			jobs := githubYAMLMap("a", githubYAMLMap("name", githubYAMLString(test.label)))
