@@ -31,14 +31,13 @@ the move preserves each file's existing format.
 | Definition | Environment | Scope |
 |---|---|---|
 | [`definitions/nvke/definition.yaml`](definitions/nvke/definition.yaml) | [`environments/github-release.yaml`](environments/github-release.yaml) | Maintained 69-output release candidate; existing main-only signed publication |
-| Same NVKE Definition | [`environments/github-development.yaml`](environments/github-development.yaml) | Separate signed development bundle and publication namespace |
 | [`definitions/nvke/core.yaml`](definitions/nvke/core.yaml) | [`environments/github-nvke-core.yaml`](environments/github-nvke-core.yaml) | 28-output core pilot with its own named production bundle and publication namespace |
 | [`definitions/nvke/services.yaml`](definitions/nvke/services.yaml) | [`environments/github-nvke-services.yaml`](environments/github-nvke-services.yaml) | 34-output supporting-services pilot |
 | [`definitions/nvke/telemetry.yaml`](definitions/nvke/telemetry.yaml) | [`environments/github-nvke-telemetry.yaml`](environments/github-nvke-telemetry.yaml) | 17-output telemetry pilot |
 | [`definitions/nvke/disks.yaml`](definitions/nvke/disks.yaml) | [`environments/github-nvke-disks.yaml`](environments/github-nvke-disks.yaml) | Four-output native Ubuntu 26.04 plain/public-bootstrap FDE disk pilot |
 | [`definitions/nvke/disks-ubuntu24.yaml`](definitions/nvke/disks-ubuntu24.yaml) | [`environments/github-nvke-disks-ubuntu24.yaml`](environments/github-nvke-disks-ubuntu24.yaml) | Four-output native Ubuntu 24.04 plain/public-bootstrap FDE disk pilot |
-| [`definitions/nvke/gpu-site.composite.yaml`](definitions/nvke/gpu-site.composite.yaml) | [`environments/github-nvke-gpu-site.yaml`](environments/github-nvke-gpu-site.yaml) | 87-output [GPU site composite](definitions/nvke/README.md#gpu-site-composite) of the five families; one partitioned Run and one Release |
-| Same GPU site composite | [`environments/github-nvke-gpu-site-development.yaml`](environments/github-nvke-gpu-site-development.yaml) | Named development bundle with its own signer and disposable publication namespace |
+| [`definitions/nvke/gpu-site.composite.yaml`](definitions/nvke/gpu-site.composite.yaml) | [`environments/github-nvke-gpu-site.yaml`](environments/github-nvke-gpu-site.yaml) | 81-output [GPU site composite](definitions/nvke/README.md#gpu-site-composite) of the five families; one partitioned Run and one Release |
+| Same GPU site composite | [`environments/github-development.yaml`](environments/github-development.yaml) | The repository's fixed signed development bundle (`nvkr-dev.yml`) and disposable publication namespace |
 | [`definitions/demo/arm64-nvidia-tcg.json`](definitions/demo/arm64-nvidia-tcg.json) | [`environments/local-arm64-tcg.json`](environments/local-arm64-tcg.json) | Local 32-output NVIDIA OVN demo |
 | [`definitions/demo/arm64-upstream-tcg.json`](definitions/demo/arm64-upstream-tcg.json) | Same local TCG Environment | Local 32-output upstream OVN diagnostic demo |
 | [`definitions/demo/arm64-nvidia-kvm.json`](definitions/demo/arm64-nvidia-kvm.json) | [`environments/github-nightly-nvidia.json`](environments/github-nightly-nvidia.json) | Named NVIDIA nightly producer; current content differences remain explicit |
@@ -111,5 +110,5 @@ association; no parent Release, automatic association file or hosted acceptance 
 
 The [qualification policy](policies/nvke-qualification.yaml) and
 [nightly build/test workflow](../.github/workflows/nvkr-nightly.yml) have independent owners and scopes.
-[Reconciliation](../docs/adr/reconciliation.md) remains the evidence ledger for implementation and
+[Reconciliation](../docs/adr/reconciliation/README.md) remains the evidence ledger for implementation and
 external acceptance.

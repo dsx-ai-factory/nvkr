@@ -2,7 +2,7 @@
 
 - **Decision status:** Proposed (pending named-decider ratification)
 - **Implementation maturity:** Initial provisional CLI catalog, strict loading/discovery and local-plan profile dispatch
-  are implemented. Broader migration, published adapters and stabilization remain deferred; see `reconciliation.md`.
+  are implemented. Broader migration, published adapters and stabilization remain deferred; see `reconciliation/README.md`.
 - **Acceptance-test maturity:** Initial discovery/admission/snapshot and mocked CLI dispatch contracts are tested.
   No new actual upstream catalog execution or native-platform catalog acceptance is claimed.
 - **Deciders:** Pending; validation, artifact-production and upstream interface owners must be named before ratification.

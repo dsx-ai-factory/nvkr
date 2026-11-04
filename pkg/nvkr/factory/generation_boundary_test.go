@@ -236,7 +236,7 @@ var (
 		"factory github describe-action": true, "factory github install-runtime-inputs": true,
 		"factory github pack-outputs": true, "factory github prepare-images": true,
 		"factory github recover": true, "factory github run-disk": true, "factory github run-node": true,
-		"run finalize": true, "run generate": true, "run qualification-source": true,
+		"run finalize": true, "run generate": true,
 		"run qualify": true, "run smoke-worker": true,
 	}
 	generatedGenerationFlags = map[string]bool{"--engine": true, "--definition": true, "--environment": true,

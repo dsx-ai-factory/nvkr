@@ -16,16 +16,25 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
 
+// developmentGenerationFixture compiles the combined Definition under the
+// development Environment. The committed fixed development bundle belongs to
+// the GPU site composite, whose qualification ADR-26 defers.
 func developmentGenerationFixture(t *testing.T) (*factory.Plan, lifecycle.QualificationPolicy) {
 	t.Helper()
-	plan, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-dev/plan.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	policy, err := lifecycle.LoadQualificationPolicy(t.Context(), "../../../inputs/policies/nvke-development-qualification.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir("../../..")
+	plan, err := lifecycle.CompileFiles(t.Context(), "inputs/definitions/nvke/definition.yaml", "inputs/environments/github-development.yaml", "dev (unknown)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(wd)
 	return plan, policy
 }
 

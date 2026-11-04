@@ -55,19 +55,22 @@ func readMergeGateJobs(t *testing.T) map[string]mergeGateJob {
 }
 
 // mergeGatePairs is the aggregate gate's inventory: each check and its skip
-// companion, the check-paths output that selects the check, and whether a fork
-// pull request deselects it.
+// companion, the check-paths output that selects the check (empty when no path
+// filter applies), whether a fork pull request deselects it, and whether it
+// runs only on pull requests.
 var mergeGatePairs = []struct {
-	skip, output string
-	jobs         []string
-	forkExempt   bool
+	skip, output    string
+	jobs            []string
+	forkExempt      bool
+	pullRequestOnly bool
 }{
-	{"check-skip", "code", []string{"check", "lint", "vulnerabilities", "tests"}, false},
-	{"actionlint-skip", "actions", []string{"actionlint"}, false},
-	{"workflows-regen-skip", "pipeline", []string{"workflows-regen"}, true},
-	{"notices-regen-skip", "notices", []string{"notices-regen"}, false},
-	{"docs-skip", "docs", []string{"docs"}, false},
-	{"analyze-skip", "code", []string{"analyze"}, true},
+	{"check-skip", "code", []string{"check", "lint", "vulnerabilities", "tests"}, false, false},
+	{"actionlint-skip", "actions", []string{"actionlint"}, false, false},
+	{"workflows-regen-skip", "pipeline", []string{"workflows-regen"}, true, false},
+	{"notices-regen-skip", "notices", []string{"notices-regen"}, false, false},
+	{"docs-skip", "docs", []string{"docs"}, false, false},
+	{"analyze-skip", "code", []string{"analyze"}, true, false},
+	{"status-restated-skip", "", []string{"status-restated"}, false, true},
 }
 
 // mergeGateInputs is one observed gate run: classifier outputs, event origin,
@@ -75,17 +78,24 @@ var mergeGatePairs = []struct {
 type mergeGateInputs struct {
 	checkPaths string
 	outputs    map[string]string
-	fork       bool
+	fork, push bool
 	results    map[string]string
 }
 
-// newMergeGateInputs returns the consistent run for the given classifier
-// outputs: each selected check succeeds and its companion is skipped.
+// newMergeGateInputs returns the consistent pull request run for the given
+// classifier outputs: each selected check succeeds and its companion is skipped.
 func newMergeGateInputs(outputs map[string]string, fork bool) mergeGateInputs {
-	in := mergeGateInputs{checkPaths: "success", outputs: outputs, fork: fork, results: map[string]string{}}
+	return newMergeGateRun(outputs, fork, false)
+}
+
+// newMergeGateRun is newMergeGateInputs for any event origin; a push has no
+// fork and runs no pull-request-only check.
+func newMergeGateRun(outputs map[string]string, fork, push bool) mergeGateInputs {
+	in := mergeGateInputs{checkPaths: "success", outputs: outputs, fork: fork, push: push, results: map[string]string{}}
 	for _, pair := range mergeGatePairs {
 		jobResult, skipResult := "skipped", "success"
-		if outputs[pair.output] == "true" && !(fork && pair.forkExempt) {
+		if (pair.output == "" || outputs[pair.output] == "true") && !(fork && pair.forkExempt) &&
+			!(push && pair.pullRequestOnly) {
 			jobResult, skipResult = "success", "skipped"
 		}
 		for _, job := range pair.jobs {
@@ -112,6 +122,7 @@ func (in mergeGateInputs) env(t *testing.T) []string {
 		"NEEDS=" + string(encoded),
 		fmt.Sprintf("SAME_REPOSITORY=%t", !in.fork),
 		fmt.Sprintf("FORK_PULL_REQUEST=%t", in.fork),
+		fmt.Sprintf("PULL_REQUEST=%t", !in.push),
 	}
 }
 
@@ -145,6 +156,7 @@ func TestMergeGateRequiresCompleteCheckPairs(t *testing.T) {
 		"NEEDS":             "${{ toJSON(needs) }}",
 		"SAME_REPOSITORY":   "${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}",
 		"FORK_PULL_REQUEST": "${{ github.event.pull_request.head.repo.fork == true }}",
+		"PULL_REQUEST":      "${{ github.event_name == 'pull_request' }}",
 	} {
 		if step.Env[name] != want {
 			t.Fatalf("%s must bind to %s, got %q", name, want, step.Env[name])
@@ -174,9 +186,12 @@ func TestMergeGateRequiresCompleteCheckPairs(t *testing.T) {
 	}
 	results := []string{"success", "skipped", "failure", "cancelled", "neutral", "missing"} //nolint:misspell // GitHub result enum spelling.
 	for _, pair := range mergeGatePairs {
-		modes := map[string]mergeGateInputs{
-			"selected":   newMergeGateInputs(allTrue(nil), false),
-			"unselected": newMergeGateInputs(allTrue(map[string]string{pair.output: "false"}), false),
+		modes := map[string]mergeGateInputs{"selected": newMergeGateInputs(allTrue(nil), false)}
+		if pair.output != "" {
+			modes["unselected"] = newMergeGateInputs(allTrue(map[string]string{pair.output: "false"}), false)
+		}
+		if pair.pullRequestOnly {
+			modes["push"] = newMergeGateRun(allTrue(nil), false, true)
 		}
 		if pair.forkExempt {
 			modes["fork pull request"] = newMergeGateInputs(allTrue(nil), true)
@@ -213,7 +228,7 @@ func TestMergeGateRequiresCompleteCheckPairs(t *testing.T) {
 			}
 		})
 	}
-	for _, env := range []string{"SAME_REPOSITORY=", "FORK_PULL_REQUEST="} {
+	for _, env := range []string{"SAME_REPOSITORY=", "FORK_PULL_REQUEST=", "PULL_REQUEST="} {
 		t.Run("unknown event "+strings.TrimSuffix(env, "="), func(t *testing.T) {
 			t.Parallel()
 			output, code := runMergeGateStep(t, step, t.TempDir(), append(newMergeGateInputs(allTrue(nil), false).env(t), env))
@@ -267,7 +282,7 @@ func TestMergeGateJobConditionsMatchGate(t *testing.T) {
 					expressions[name] = job.If
 				}
 			}
-			for _, name := range []string{"SAME_REPOSITORY", "FORK_PULL_REQUEST"} {
+			for _, name := range []string{"SAME_REPOSITORY", "FORK_PULL_REQUEST", "PULL_REQUEST"} {
 				expressions[name] = strings.TrimSuffix(strings.TrimPrefix(step.Env[name], "${{ "), " }}")
 			}
 			var program []string
@@ -288,7 +303,7 @@ func TestMergeGateJobConditionsMatchGate(t *testing.T) {
 				env := []string{}
 				for name, run := range selected {
 					switch {
-					case name == "SAME_REPOSITORY" || name == "FORK_PULL_REQUEST":
+					case name == "SAME_REPOSITORY" || name == "FORK_PULL_REQUEST" || name == "PULL_REQUEST":
 						env = append(env, fmt.Sprintf("%s=%t", name, run))
 					case run:
 						in.results[name] = "success"

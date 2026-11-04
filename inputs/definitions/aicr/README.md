@@ -94,7 +94,7 @@ pinned-tool migration changes their published digests and media type, and #288 m
 `argocd-helm` to native `helm-oci`. The leaf check needs a non-shell owner after that
 migration.
 
-[Reconciliation](../../../docs/adr/reconciliation.md#aicr-deployment-bundles)
+[Reconciliation](../../../docs/adr/reconciliation/aicr-deployment-bundles.md#aicr-deployment-bundles)
 records the local GB300 and GB200 Runs and their limits. Changes to the catalog
 change build identity; that Run does not validate the inputs against hardware or
 hosted services.

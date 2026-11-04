@@ -1,9 +1,9 @@
 # ADR-21 — Generated-pipeline maintenance & lifecycle
 
 - **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
-- **Implementation maturity:** Tracked separately in `reconciliation.md`; implementation and test evidence do not
+- **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
-- **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; green unit tests alone do not
+- **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
 - **Deciders:** [INPUT NEEDED — author + reviewers]
 - **Index:** ADR-21 in the consolidated NVKR ADR set (added to close the day-2 pipeline-maintenance gap).
@@ -77,7 +77,7 @@ the largest worker at 134,308 bytes and unchanged signer jobs. These are local g
 Workers never contain OIDC jobs. A fixed `<entry-stem>__signer.yml` signer workflow is proposed only
 together with ADR-18 §8's explicit certificate-identity and trust-policy migration. It is not an admitted
 member name; the reserved child-namespace rules below fail closed on such a file. Workers share one complete Plan and do not add
-an authored lifecycle object or a child Release. ADR-18 owns scheduling and result propagation. [Reconciliation](reconciliation.md#output-local-publication-and-metadata-assembly)
+an authored lifecycle object or a child Release. ADR-18 owns scheduling and result propagation. [Reconciliation](reconciliation/output-local-publication-and-metadata-assembly.md#output-local-publication-and-metadata-assembly)
 records one successful earlier-head full development execution of this opt-in topology; it predates the core
 execution-model extraction and per-worker fragment forwarding, and proves neither current-head worker execution,
 full-product failure/cancellation recovery nor production qualification. Optional qualification
@@ -101,12 +101,12 @@ Plan at that layout and recheck its digest. Development mode changes Environment
 transport-independent logical Build identity. Its execution and retention policy is owned by ADR-18.
 Signed development also binds the disposable namespace and signer policy in this immutable Plan. Actual
 run-attempt destinations are derived by the execution owner under ADR-20; runtime substitutions never
-rewrite generated inputs or bypass drift checks. The maintained development bundle uses the complete M2
-Definition with its separate development Environment.
+rewrite generated inputs or bypass drift checks. The maintained development bundle uses the NVKE GPU site
+composite Definition with its separate development Environment (ADR-26 §9).
 
 For a plain Definition, `githubDevelopment: true` with a nonempty `githubBundle` is unsupported and
-returns `CodeEngineCapability` before catalog resolution or generated-output work. A composite without
-`githubBundle` is refused the same way, because the fixed layout is reserved (ADR-26 §9).
+returns `CodeEngineCapability` before catalog resolution or generated-output work. A composite may use the
+fixed layout or a named development layout; only composites may use a named one (ADR-26 §9).
 Unnamed development and named production remain separate supported selections.
 
 Execution identity and transaction identity are separate. The Plan binds authored inputs and every executable

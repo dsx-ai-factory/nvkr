@@ -130,7 +130,7 @@ or run unrelated instructions.
   Browsing and export are metadata only; pulling checks the selected output's complete payload integrity without
   verifying signatures or policy. Report the pinned release, exact output and destination for a download.
 - Qualification/runtime limits: `qualified` and full-release acceptance remain unavailable in the current
-  public acceptance path ([reconciliation](../../../docs/adr/reconciliation.md)); report actual runtime
+  public acceptance path ([reconciliation](../../../docs/adr/reconciliation/README.md)); report actual runtime
   observations separately. Unit tests, signatures and CI dashboard links alone do not establish qualification.
   Share public evidence only after verifying its publication and access.
 - The next actionable step where blocked. Commit, push or open a PR only when the customer requested it; do

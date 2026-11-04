@@ -18,6 +18,8 @@ for `make test-ci-tools`, which runs the CI report parser and all local adapter 
 only the Python standard library. Go-test adapter wrappers report an explicit skip when Python is
 absent; that is not full-gate coverage. The tooling gate fails if Python is missing or too old and
 runs every suite independently, so a Go-only test pass cannot stand in for the completion gate.
+The restated-status check in `make check` diffs against `origin/main`; set `STATUS_BASE` when your base
+branch has another name, and fetch full history in a shallow clone.
 On macOS with Homebrew, install the additional JSON, timeout, and Python tools with:
 
 ```sh
@@ -98,13 +100,14 @@ telemetry and disks. Each uses its own named production bundle and publication p
 check just these bundles with `make nvke-split-generate` and `make nvke-split-check`; the full
 `workflows-generate` and `workflows-check` targets include them. Shared catalog maintenance enrolls all four
 pairs so a pin update regenerates every affected bundle in the same refresh. The combined selection remains the
-qualification and development baseline until named qualification is supported and independently exercised.
+production qualification baseline until named qualification is supported and independently exercised; the
+[GPU site composite](inputs/definitions/nvke/README.md#gpu-site-composite) owns the development bundle.
 
 ## Test pipeline changes on a feature branch
 
-The committed `nvkr-dev.yml` runs the **same 69-output M2 Definition** as the maintained production
-workflow, including native AMD64/ARM64 plain and public-bootstrap FDE disks, SBOM attestation, per-output publication, cosign signing,
-verification and finalization. Its generator and helper come from the dispatched branch. The separate
+The committed `nvkr-dev.yml` runs the **81-output NVKE GPU site composite**, the five NVKE family Definitions
+together, including native AMD64/ARM64 plain and public-bootstrap FDE disks for Ubuntu 26.04 and 24.04, SBOM
+attestation, per-output publication, cosign signing, verification and finalization. Its generator and helper come from the dispatched branch. The separate
 `inputs/environments/github-development.yaml` selects development credentials, protected environments,
 signer policy and disposable registry destinations. Its Plan and manifest live beneath `.github/nvkr-dev/`.
 The production bundle remains independently owned and checked.
@@ -220,9 +223,11 @@ After locator transfers expire, start a complete new Run.
 
 ### Qualify an existing development Run
 
-`make pipeline-dev-generate` also generates the development qualifier and native smoke worker from
-`inputs/policies/nvke-development-qualification.yaml`. Install those workflows on the default branch once,
-then dispatch a reviewed nondefault branch that contains the generated pair:
+The development bundle now belongs to the GPU site composite, and composite qualification is deferred
+(ADR-26 U8), so `make pipeline-dev-generate` no longer generates the development qualifier and native smoke
+worker; their committed pair is retired. The flow below describes the qualifier as generated for a plain
+development Definition from `inputs/policies/nvke-development-qualification.yaml`: install the pair on the
+default branch once, then dispatch a reviewed nondefault branch that contains it:
 
 ```sh
 gh workflow run nvkr-dev-qualify.yml --repo dsx-ai-factory/nvkr \
@@ -284,7 +289,7 @@ CI come from its selected catalog and lock, rather than edits to rendered YAML.
 Pull requests check both producer bundles and the qualification pair. The maintained publication route admits default-branch manual dispatch;
 only its isolated artifact-signing and SBOM-attestation jobs receive OIDC minting permission. Generic hosted
 runners are the default, with ADR-18's explicitly admitted native ARC disk routes. Dated validation-branch
-exceptions and completed Runs are scoped in [reconciliation](docs/adr/reconciliation.md).
+exceptions and completed Runs are scoped in [reconciliation](docs/adr/reconciliation/README.md).
 
 ## Test timing and cache use
 
@@ -377,7 +382,7 @@ is rejected by dependency SBOM attachment and serialized BOM validation. Factory
 dependency API; no maintained factory output invokes this separate diagnostic. This is not delivered-package
 inspection, payload dependency coverage, installation, signing or publication.
 See [the dependency SBOM reference](docs/dependency-sboms.md) and the
-[dated local fixture observation](docs/adr/reconciliation.md#external-run-references). Native amd64 execution
+[dated local fixture observation](docs/adr/reconciliation/external-run-references.md#external-run-references). Native amd64 execution
 has not been recorded. Rerun the opt-in regression when changing either the factory catalog Syft pin or the
 Syft pin in `toolchains/nvkr-disk-inspect`; record which selected native executable was exercised.
 
@@ -413,7 +418,7 @@ Catalog resolution, pin maintenance, and producer admission have distinct files 
 | Release authority and delivery | `release`, `status`, `delivery` |
 | Public adapters | `client/v1`, `cmd/nvkr` — delegate authority |
 
-Read the relevant current ADR and [reconciliation row](docs/adr/reconciliation.md) before changing authority.
+Read the relevant current ADR and [reconciliation row](docs/adr/reconciliation/README.md) before changing authority.
 Use package-issued opaque receipts, admit capabilities before side effects, validate the complete graph at
 executable boundaries, and preserve exact subject/policy identities. Low-level diagnostic APIs cannot turn
 caller-authored descriptions into authority.

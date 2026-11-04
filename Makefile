@@ -133,6 +133,16 @@ test-ci-tools: ## Require Python and check CI sharding, reports and local adapte
 	python3 -B -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else "Python 3.12+ is required for CI report tests")'
 	python3 -B -m unittest discover -s scripts -p '*_test.py'
 
+# Diff-scoped: only Markdown lines added since the merge base with STATUS_BASE are checked.
+# An empty STATUS_HEAD checks the working tree, including uncommitted and untracked files;
+# CI sets both to the pull request's base and head commits.
+STATUS_BASE ?= origin/main
+STATUS_HEAD ?=
+
+.PHONY: status-restated-check
+status-restated-check: ## Fail when added docs restate validation status outside the reconciliation ledger.
+	python3 -B scripts/check-status-restated.py '$(STATUS_BASE)' '$(STATUS_HEAD)'
+
 .PHONY: cover
 cover: test-race ## Open the HTML coverage report in a browser.
 	go tool cover -html=coverage.out
@@ -224,6 +234,12 @@ definitions-location-check: ## Fail when a file is tracked under the retired top
 	@files=$$(git ls-files -- ':/definitions') || exit 1; \
 	if [ -n "$$files" ]; then printf '%s\n' "$$files" >&2; \
 		echo "ERROR: authored Definitions belong under inputs/ (see inputs/README.md), not top-level definitions/" >&2; exit 1; fi
+
+.PHONY: reconciliation-location-check
+reconciliation-location-check: ## Fail when the retired single-file reconciliation ledger is tracked again.
+	@files=$$(git ls-files -- ':/docs/adr/reconciliation.md') || exit 1; \
+	if [ -n "$$files" ]; then printf '%s\n' "$$files" >&2; \
+		echo "ERROR: the reconciliation ledger is split under docs/adr/reconciliation/ (index: docs/adr/reconciliation/README.md); edit the matching file there, not docs/adr/reconciliation.md" >&2; exit 1; fi
 
 .PHONY: license-header-check
 license-header-check: ## Fail when a source file has no license header.
@@ -325,52 +341,42 @@ nvke-split-check: workflow-generator ## Check the five independent NVKE family b
 			--environment "inputs/environments/github-nvke-$$family.yaml" --root . --check $(PROJECTION_PILOT_FLAG); \
 	done
 
-# The GPU site composite has a named production bundle and a named development bundle (ADR-26 §9).
-NVKE_GPU_SITE_ENVIRONMENTS := github-nvke-gpu-site github-nvke-gpu-site-development
+# The GPU site composite owns a named production bundle and the fixed development bundle (ADR-26 §9).
+NVKE_GPU_SITE := inputs/definitions/nvke/gpu-site.composite.yaml
 
 .PHONY: nvke-gpu-site-generate
-nvke-gpu-site-generate: workflow-generator ## Regenerate the NVKE GPU site composite's production and development bundles.
-	@set -e; for environment in $(NVKE_GPU_SITE_ENVIRONMENTS); do \
-		bin/nvkr-exec run generate --engine github \
-			--definition inputs/definitions/nvke/gpu-site.composite.yaml \
-			--environment "inputs/environments/$$environment.yaml" --root .; \
-	done
+nvke-gpu-site-generate: workflow-generator ## Regenerate the NVKE GPU site composite's named production bundle.
+	bin/nvkr-exec run generate --engine github \
+		--definition $(NVKE_GPU_SITE) --environment inputs/environments/github-nvke-gpu-site.yaml --root .
 
 .PHONY: nvke-gpu-site-check
-nvke-gpu-site-check: workflow-generator ## Check the NVKE GPU site composite's member pins and bundles without changing files.
-	bin/nvkr-exec definition pin --check --definition inputs/definitions/nvke/gpu-site.composite.yaml
-	@set -e; for environment in $(NVKE_GPU_SITE_ENVIRONMENTS); do \
-		bin/nvkr-exec run generate --engine github \
-			--definition inputs/definitions/nvke/gpu-site.composite.yaml \
-			--environment "inputs/environments/$$environment.yaml" --root . --check $(PROJECTION_PILOT_FLAG); \
-	done
+nvke-gpu-site-check: workflow-generator ## Check the NVKE GPU site composite's member pins and named production bundle without changing files.
+	bin/nvkr-exec definition pin --check --definition $(NVKE_GPU_SITE)
+	bin/nvkr-exec run generate --engine github \
+		--definition $(NVKE_GPU_SITE) --environment inputs/environments/github-nvke-gpu-site.yaml --root . --check $(PROJECTION_PILOT_FLAG)
 
 .PHONY: pipeline-dev-generate
-pipeline-dev-generate: workflow-generator ## Regenerate the full feature-branch development pipeline.
+pipeline-dev-generate: workflow-generator ## Regenerate the GPU site composite's feature-branch development pipeline.
 	bin/nvkr-exec run generate --engine github \
-		--definition inputs/definitions/nvke/definition.yaml \
-		--environment inputs/environments/github-development.yaml \
-		--qualification-policy inputs/policies/nvke-development-qualification.yaml --root .
+		--definition $(NVKE_GPU_SITE) --environment inputs/environments/github-development.yaml --root .
 
 .PHONY: pipeline-dev-check
 pipeline-dev-check: workflow-generator ## Check development workflow generation without changing files.
 	bin/nvkr-exec run generate --engine github \
-		--definition inputs/definitions/nvke/definition.yaml \
-		--environment inputs/environments/github-development.yaml \
-		--qualification-policy inputs/policies/nvke-development-qualification.yaml --root . --check $(PROJECTION_PILOT_FLAG)
+		--definition $(NVKE_GPU_SITE) --environment inputs/environments/github-development.yaml --root . --check $(PROJECTION_PILOT_FLAG)
 
 .PHONY: pipeline-dev-run
 pipeline-dev-run: pipeline-dev-check ## Dispatch the clean, pushed current branch (PIPELINE_DEV_REPO=owner/repo).
 	python3 scripts/pipeline-dev.py --repo "$$PIPELINE_DEV_REPO"
 
 .PHONY: check
-check: go-version-check fmt-check definitions-location-check license-header-check vet lint shellcheck test-ci-tools test vulncheck ## Code gate: format, Definition location, license, vet, lint, shell, tool tests, Go tests, vulnerabilities.
+check: go-version-check fmt-check definitions-location-check reconciliation-location-check license-header-check status-restated-check vet lint shellcheck test-ci-tools test vulncheck ## Code gate: format, Definition and ledger location, license, restated status, vet, lint, shell, tool tests, Go tests, vulnerabilities.
 
 # Every merge-gate check that can run locally; CI runs `make test` as test-shard
 # slices. internal/cicontract requires this list to equal the make targets the
 # merge gate runs. CodeQL and the DCO App run only on GitHub.
 # Checks needing extra tools or private access run before the long test suite.
-CI_CHECKS := fmt-check definitions-location-check license-header-check shellcheck actionlint \
+CI_CHECKS := fmt-check definitions-location-check reconciliation-location-check license-header-check status-restated-check shellcheck actionlint \
 	notices-check workflows-check docs-check vet test-ci-tools build lint vulncheck test
 
 .PHONY: ci-check

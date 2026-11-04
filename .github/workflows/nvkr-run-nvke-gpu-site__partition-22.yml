@@ -12,6 +12,10 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
       nvkr-partition-27:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-27 }}
+      nvkr-results-02:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-02 }}
+      nvkr-results-02-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-02-statuses }}
       nvkr-results-09:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09 }}
       nvkr-results-09-statuses:
@@ -28,14 +32,10 @@ name: NVKR execution partition
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0d }}
       nvkr-results-0d-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0d-statuses }}
-      nvkr-results-12:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-12 }}
-      nvkr-results-12-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-12-statuses }}
-      nvkr-results-1e:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1e }}
-      nvkr-results-1e-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-1e-statuses }}
+      nvkr-results-0e:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0e }}
+      nvkr-results-0e-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0e-statuses }}
     secrets:
       NVKR_CI_STORAGE_READ_TOKEN:
         required: true
@@ -321,6 +321,8 @@ jobs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
       nvkr-partition-27: ${{ format('"nvkr-verify-publication-output-nvke-node-4c1e2a592cd8":{0},"nvkr-verify-publication-output-nvke-node-af2f4c2b15ad":{1},"nvkr-verify-publication-output-nvke-node-e5e4f4e0f7d8":{2},"nvkr-verify-publication-output-nvke-node-e90e234f1313":{3},"nvkr-verify-publication-output-nvke-node-fde-amd64":{4},"nvkr-verify-publication-output-nvke-node-fde-arm64":{5},"nvkr-verify-publication-output-nvke-node-image-amd64":{6},"nvkr-verify-publication-output-nvke-node-image-arm64":{7}', toJSON(needs['nvkr-verify-publication-output-nvke-node-4c1e2a592cd8']), toJSON(needs['nvkr-verify-publication-output-nvke-node-af2f4c2b15ad']), toJSON(needs['nvkr-verify-publication-output-nvke-node-e5e4f4e0f7d8']), toJSON(needs['nvkr-verify-publication-output-nvke-node-e90e234f1313']), toJSON(needs['nvkr-verify-publication-output-nvke-node-fde-amd64']), toJSON(needs['nvkr-verify-publication-output-nvke-node-fde-arm64']), toJSON(needs['nvkr-verify-publication-output-nvke-node-image-amd64']), toJSON(needs['nvkr-verify-publication-output-nvke-node-image-arm64'])) }}
+      nvkr-results-02: ${{ format('"nvkr-verify-publication-output-nvke-node-fde-amd64":{0},"nvkr-verify-publication-output-nvke-node-image-amd64":{1}', toJSON(needs['nvkr-verify-publication-output-nvke-node-fde-amd64']), toJSON(needs['nvkr-verify-publication-output-nvke-node-image-amd64'])) }}
+      nvkr-results-02-statuses: ${{ format('{0} {1}', needs['nvkr-verify-publication-output-nvke-node-fde-amd64'].result, needs['nvkr-verify-publication-output-nvke-node-image-amd64'].result) }}
       nvkr-results-09: ${{ format('"nvkr-verify-publication-output-nvke-node-4c1e2a592cd8":{0}', toJSON(needs['nvkr-verify-publication-output-nvke-node-4c1e2a592cd8'])) }}
       nvkr-results-09-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-nvke-node-4c1e2a592cd8'].result) }}
       nvkr-results-0a: ${{ format('"nvkr-verify-publication-output-nvke-node-e90e234f1313":{0}', toJSON(needs['nvkr-verify-publication-output-nvke-node-e90e234f1313'])) }}
@@ -329,10 +331,8 @@ jobs:
       nvkr-results-0b-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-nvke-node-af2f4c2b15ad'].result) }}
       nvkr-results-0d: ${{ format('"nvkr-verify-publication-output-nvke-node-e5e4f4e0f7d8":{0}', toJSON(needs['nvkr-verify-publication-output-nvke-node-e5e4f4e0f7d8'])) }}
       nvkr-results-0d-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-nvke-node-e5e4f4e0f7d8'].result) }}
-      nvkr-results-12: ${{ format('"nvkr-verify-publication-output-nvke-node-fde-amd64":{0},"nvkr-verify-publication-output-nvke-node-image-amd64":{1}', toJSON(needs['nvkr-verify-publication-output-nvke-node-fde-amd64']), toJSON(needs['nvkr-verify-publication-output-nvke-node-image-amd64'])) }}
-      nvkr-results-12-statuses: ${{ format('{0} {1}', needs['nvkr-verify-publication-output-nvke-node-fde-amd64'].result, needs['nvkr-verify-publication-output-nvke-node-image-amd64'].result) }}
-      nvkr-results-1e: ${{ format('"nvkr-verify-publication-output-nvke-node-fde-arm64":{0},"nvkr-verify-publication-output-nvke-node-image-arm64":{1}', toJSON(needs['nvkr-verify-publication-output-nvke-node-fde-arm64']), toJSON(needs['nvkr-verify-publication-output-nvke-node-image-arm64'])) }}
-      nvkr-results-1e-statuses: ${{ format('{0} {1}', needs['nvkr-verify-publication-output-nvke-node-fde-arm64'].result, needs['nvkr-verify-publication-output-nvke-node-image-arm64'].result) }}
+      nvkr-results-0e: ${{ format('"nvkr-verify-publication-output-nvke-node-fde-arm64":{0},"nvkr-verify-publication-output-nvke-node-image-arm64":{1}', toJSON(needs['nvkr-verify-publication-output-nvke-node-fde-arm64']), toJSON(needs['nvkr-verify-publication-output-nvke-node-image-arm64'])) }}
+      nvkr-results-0e-statuses: ${{ format('{0} {1}', needs['nvkr-verify-publication-output-nvke-node-fde-arm64'].result, needs['nvkr-verify-publication-output-nvke-node-image-arm64'].result) }}
     steps:
       - name: Forward provider results
         run: ':'

@@ -201,6 +201,32 @@ func TestCompositeDevelopmentBundles(t *testing.T) {
 		names[name[1]] = true
 	}
 
+	// A composite may instead own the single fixed development layout, with the
+	// fixed workflow, namespace and signer.
+	composite, err := signedComposite(t, false, compositeEnvironment(t, namedDevelopment(t, "", "ghcr.io/example/nvkr/development")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if composite.Composition == nil {
+		t.Fatal("fixed development layout dropped the composition record")
+	}
+	compositeFixed, err := RenderGitHub(t.Context(), composite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if compositeFixed.WorkflowPath != GitHubDevelopmentWorkflowPath || compositeFixed.PlanPath != GitHubDevelopmentPlanPath ||
+		compositeFixed.ManifestPath != GitHubDevelopmentManifestPath {
+		t.Fatalf("composite fixed development layout = %s %s %s", compositeFixed.WorkflowPath, compositeFixed.PlanPath, compositeFixed.ManifestPath)
+	}
+	if err := ValidateGitHubBundle(t.Context(), composite, compositeFixed); err != nil {
+		t.Fatal(err)
+	}
+	fixedSigner := regexp.MustCompile(composite.Environment.Signing.Identity)
+	if !fixedSigner.MatchString("https://github.com/example/nvkr/.github/workflows/nvkr-dev.yml@refs/heads/pull-request/373") ||
+		fixedSigner.MatchString("https://github.com/example/nvkr/.github/workflows/nvkr-dev-product.yml@refs/heads/feature") {
+		t.Fatal("composite fixed development signer is not the fixed workflow's")
+	}
+
 	// Signer identities are disjoint, and neither is a production signer.
 	named := regexp.MustCompile(plan.Environment.Signing.Identity)
 	for subject, want := range map[string]bool{
@@ -225,7 +251,6 @@ func TestCompositeDevelopmentAdmission(t *testing.T) {
 			environment.GitHubDevelopment, environment.GitHubBundle = true, "product"
 		}},
 		{name: "fixed development namespace", mutate: namedDevelopment(t, "product", "ghcr.io/example/nvkr/development")},
-		{name: "composite in the fixed development layout", mutate: namedDevelopment(t, "", "ghcr.io/example/nvkr/development")},
 		{name: "another bundle's namespace", mutate: namedDevelopment(t, "product", "ghcr.io/example/nvkr/development-other")},
 		{name: "reserved bundle name", mutate: namedDevelopment(t, "qualify", "ghcr.io/example/nvkr/development-qualify")},
 		{name: "authored cleanup workflow name", mutate: namedDevelopment(t, "cleanup", "ghcr.io/example/nvkr/development-cleanup")},

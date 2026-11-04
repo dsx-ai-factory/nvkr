@@ -106,4 +106,4 @@ complete customer setup/runtime acceptance.
 A successful local Run retains its disk and record under `.nvkr/runs/<attempt>/`; it remains unqualified.
 Material tracing and published `build-provenance-v1` evidence do not establish a complete installed-software
 inventory or exact-byte reproduction. [Release inspection and verification](release-quickstart.md) apply
-their own scopes; current evidence limits are recorded in [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md).
+their own scopes; current evidence limits are recorded in [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/README.md).

@@ -4,7 +4,7 @@ The NVKE family pilot implements separate authored Definitions and named product
 the combined candidate. It reuses the current lifecycle and catalog owners; it adds no cross-Release import,
 automatic association file or qualification capability. Hosted family execution and consumer acceptance remain
 unrecorded. The [input instructions](../inputs/definitions/nvke/README.md#family-pilot) own commands and
-current selections; [reconciliation](adr/reconciliation.md#maintained-input-and-schema-boundaries) owns
+current selections; [reconciliation](adr/reconciliation/maintained-input-and-schema-boundaries.md#maintained-input-and-schema-boundaries) owns
 implementation and acceptance status.
 
 The pilot incorporates upstream `07181055` (2026-10-20), including `9857feed`'s current catalog pins,
@@ -20,12 +20,12 @@ This document changes no ADR contract or organizational acceptance decision.
 
 | Definition | Outputs | Native targets | Required family |
 | --- | ---: | ---: | --- |
-| [Core](../inputs/definitions/nvke/core.yaml) | 28 | 35 | CLI/operator tools, ARM64 AICR CLI, controller with its bound chart and `controller-profiles` image, NICo charts and Core/Flow images, providers/reference fixture, CAPI and cert-manager bootstrap images |
+| [Core](../inputs/definitions/nvke/core.yaml) | 22 | 27 | CLI/operator tools, controller with its bound chart and `controller-profiles` image, providers/reference fixture, CAPI and cert-manager bootstrap images |
 | [Services](../inputs/definitions/nvke/services.yaml) | 34 | 34 | SPIRE, PostgreSQL, Temporal and local-path-provisioner charts and native runtime images |
 | [Telemetry](../inputs/definitions/nvke/telemetry.yaml) | 17 | 17 | NKTP chart and native runtime images |
 | [Disks](../inputs/definitions/nvke/disks.yaml) | 4 | 4 | Ubuntu 26.04 AMD64/ARM64 plain and public-bootstrap FDE disks with complete material closures |
 | [Disks Ubuntu 24](../inputs/definitions/nvke/disks-ubuntu24.yaml) | 4 | 4 | The same disks on Ubuntu 24.04 through the Ubuntu 24 overlay |
-| Total | 87 | 94 | 69 + 18 = 87: the combined candidate's 69 named outputs plus 18 family-only outputs, which are the core family's three NICo charts, two NICo images, ARM64 operator tools, ARM64 AICR CLI and `controller-profiles` image, the services family's six local-path-provisioner outputs, and the four Ubuntu 24.04 disks |
+| Total | 81 | 86 | 69 + 12 = 81: the combined candidate's 69 named outputs plus 12 family-only outputs, which are the core family's ARM64 operator tools and `controller-profiles` image, the services family's six local-path-provisioner outputs, and the four Ubuntu 24.04 disks |
 
 Each family selects `inputs/environments/github-nvke-<family>.yaml`, with
 `githubBundle: nvke-<family>`. Generation owns `.github/workflows/nvkr-run-nvke-<family>.yml`
@@ -290,8 +290,9 @@ bootstrap/finalization recompilation steps. Unrelated source-access entries rema
 build and publication steps do not receive the revalidation credential.
 [Source-access contract](adr/0020-artifact-publication-and-target-configuration.md#2-target-configuration-surface)
 
-Production and development qualification paths exist for the retained combined candidate. They do not
-qualify independently named family producers. Named producer qualification remains unsupported, as does
+A production qualification path exists for the retained combined candidate. The development bundle now belongs
+to the GPU site composite, whose qualification is deferred, so no development qualification pair is committed.
+Neither qualifies independently named family producers. Named producer qualification remains unsupported, as does
 `githubDevelopment: true` with a nonempty `githubBundle`. The pilot preserves those admission limits.
 A downstream coordinator may dispatch independent named workflows, but exact Run correlation, aggregate
 success decisions and deployment scheduling remain its responsibility.
@@ -396,7 +397,7 @@ and required SBOM bundles under policy, without reading payload layers or granti
 authority. `artifact-publication` additionally verifies the complete held payload closure. Browsing/export
 and diagnostic pulling do not replace policy verification. Neither scope grants full-release/qualified
 acceptance or proves that independently accepted Releases work together.
-[consumer scopes](adr/reconciliation.md#consumer-acceptance-scopes),
+[consumer scopes](adr/reconciliation/consumer-acceptance-scopes.md#consumer-acceptance-scopes),
 [publication architecture](publication-architecture.md#signing-and-publication-order),
 [downstream ownership](adr/0019-clusterdefinition-and-provisioning-adapter-boundary.md#3-downstream-systems-own-deployment)
 
