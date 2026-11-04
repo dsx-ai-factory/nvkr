@@ -79,7 +79,7 @@ repository access or live branch-protection rules.
 4. Link any integration or external-service evidence used for a release claim,
    and keep its subject and scope explicit. Unit tests, a successful CLI build,
    generated plans and older demo runs do not prove new runtime qualification.
-   [Reconciliation](docs/adr/reconciliation.md) owns current capability and
+   [Reconciliation](docs/adr/reconciliation/README.md) owns current capability and
    evidence limits.
 5. Complete the source-release SBOM checks below and record the release
    decision. Unresolved required checks, evidence or approval block publication.

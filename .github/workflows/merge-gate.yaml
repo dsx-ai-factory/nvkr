@@ -132,6 +132,8 @@ jobs:
               - 'inputs/**'
               # Watched so definitions-location-check runs on any re-addition.
               - 'definitions/**'
+              # Watched so reconciliation-location-check runs on any re-addition.
+              - 'docs/adr/reconciliation.md'
               - 'docs/examples/**'
               - 'scripts/**'
               - 'demos/**'
@@ -242,6 +244,9 @@ jobs:
 
       - name: definitions-location-check
         run: make definitions-location-check
+
+      - name: reconciliation-location-check
+        run: make reconciliation-location-check
 
       - name: license-header-check
         run: make license-header-check

@@ -1,0 +1,5 @@
+## Support by owner
+
+| Owner | Implemented and contract-tested | Remaining capability or acceptance |
+|---|---|---|
+| 28 Multi-platform executables (proposed) | Nothing; designed, not implemented. A tool declaration and its lock record name one platform, ADR-12 §1 rejects `platforms` on executable outputs with `invalid-catalog`, and each executable output publishes one single-platform Binary Bundle | Multi-platform tool declarations and `tools` lock entries, per-platform identity, executable `platforms` outputs, the `nvkr.dev/executable-index-build/v1` projection, image-index packaging, index and child evidence, `release pull` projection, qualification smoke and generation are unimplemented (ADR-28 units E1–E8). The AICR migration (E9) and every retrofit in ADR-28 §10 (#297) wait for those units. Darwin children and the qualified lane are deferred and must fail closed; qualification over an index output must fail with `engine-capability` until E7. No index has been built, published, signed or consumed |

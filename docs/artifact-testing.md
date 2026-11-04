@@ -6,52 +6,41 @@ not authenticate artifact membership in a Run or grant release qualification.
 
 ## Run locally
 
-Keep the artifact and canonical Plan from the same NVKR build:
+`nvkr validators` is a hidden command group (omitted from normal help) in development, and its schemas remain provisional. It provides
+discovery, explicit catalog-based selection, and a versioned local-plan profile.
+
+Discovery reads only the catalog index and its entry files; it neither imports source
+nor probes Docker or prepares an environment. `available` describes installed adapter
+support; runtime readiness stays `unverified`. Adapter-owned limitations remain visible
+independently of authored display text. The `cli` suite mixes source tests with
+supplied-executable process contracts: only the contracts exercise the binary, and
+bootstrap E2E is separate.
 
 ```sh
 GOTOOLCHAIN=local go build -o bin/nvkr ./cmd/nvkr
-bin/nvkr run artifact-test \
-  --artifact /path/to/nvkectl \
-  --plan /path/to/matching/plan.json \
-  --suite contract --keep
+
+# Discover available validators
+bin/nvkr validators list --catalog inputs/testing/validators/catalog.yaml
+bin/nvkr validators describe --catalog inputs/testing/validators/catalog.yaml nvke/nvkectl/contract
+
+# Execute a validation profile
+bin/nvkr validators run --profile /path/to/validation.yaml --keep
 ```
 
 Requires the repository-pinned Go version to build NVKR, Git, and Docker.
-This diagnostic uses Docker even when the Plan Environment selects Podman.
+Validation uses Docker even when the Plan Environment selects Podman.
 The command calls the Go Plan loader directly; no helper subprocess or local
 NVKE clone is required.
 
-Select `--output NAME` when a Plan contains multiple standalone CLI outputs.
 Linux AMD64 and ARM64 are supported; foreign-architecture execution needs
 emulation and may affect timing and signal tests. The selected toolchain image
 must provide Go and Make; Plan validation does not prove those tools are present.
 
-- `--suite contract` runs the upstream process contracts against the supplied binary.
-- `--suite cli` runs the full upstream CLI Go suite. Its contracts use the binary;
-  other unit tests exercise upstream source. Bootstrap E2E is separate.
+### Profile
 
-## Provisional validator catalog
-
-The provisional CLI catalog adds discovery and explicit local selection of these same two suites.
-The ADR-24 schemas and SDK methods remain provisional; schema stabilization and
-maintained upstream adoption remain deferred. Discovery reads only the catalog
-index and its entry files. It neither imports source nor probes Docker or prepares an
-environment. `available` describes installed adapter support; runtime readiness stays
-`unverified`. Adapter-owned limitations remain visible independently of authored display text.
-
-```sh
-bin/nvkr validators list --catalog inputs/testing/validators/catalog.yaml
-bin/nvkr validators describe --catalog inputs/testing/validators/catalog.yaml nvke/nvkectl/contract
-bin/nvkr validators run --profile /path/to/validation.yaml --keep
-```
-
-The diagnostic command group is hidden from normal lifecycle help while its contracts
-are provisional. The SDK exposes `ListValidators`, `DescribeValidator`, and
-`PrepareValidatorProfile`; execute the returned invocation with `Run(ctx)`.
-No implicit catalog or suite fallback is installed.
-
-A profile uses ADR-24's explicit catalog, source and role bindings. Paths below are
-relative to the profile file:
+`validators run` is the only NVKR interface for these artifact tests. It requires a
+profile that selects the validator, the source Plan, and an explicit artifact binding.
+Paths below are relative to the profile file:
 
 ```yaml
 apiVersion: nvkr.dev/validation-profile/v1
@@ -69,14 +58,28 @@ checks:
         artifact: ./nvkectl
 ```
 
-Use `nvke/nvkectl/cli` for the full CLI suite. Every selected instance must explicitly
-bind `executable` to one named output and one artifact path; no inference, glob or
-run-all behavior exists. Multiple instances execute in profile order and stop at the
-first failure. Complete structural, adapter and Plan admission finishes before any
-workspace creation, source acquisition, artifact staging or execution. Executable
-paths are checked for regular executable files during admission; supplied bytes are
-copied and hashed by the existing private staging owner when each check starts.
-Artifact locations remain descriptions, not authenticated membership.
+Use `nvke/nvkectl/cli` instead of `nvke/nvkectl/contract` for the full CLI suite.
+
+```sh
+bin/nvkr validators run --profile /path/to/validation.yaml --keep
+```
+
+`output` is required in every binding; use the Plan's output name. The `catalog` path may be
+absolute or relative to the profile file; use an absolute path to decouple the profile
+from its location.
+
+The SDK exposes `ListValidators`, `DescribeValidator`, and `PrepareValidatorProfile`;
+execute the returned invocation with `Run(ctx)`. No implicit catalog or suite fallback
+is installed.
+
+Every selected instance must explicitly bind `executable` to one named output and one
+artifact path; no inference, glob or run-all behavior exists. Multiple instances
+execute in profile order and stop at the first failure. Complete structural, adapter
+and Plan admission finishes before any workspace creation, source acquisition, artifact
+staging or execution. Executable paths are checked for regular executable files during
+admission; supplied bytes are copied and hashed by the existing private staging owner
+when each check starts. Artifact locations remain descriptions, not authenticated
+membership.
 
 One admitted invocation holds the selected entries, resolved absolute artifact paths,
 validated Plan, producer/source descriptions and suite selectors. `Run` does not reopen
@@ -98,27 +101,47 @@ strict typed model. See ADR-24 for document, catalog and instance limits.
 `timeout` in an entry bounds its test container and cannot exceed the adapter's
 30-minute maximum. Dependency acquisition has its own fixed 30-minute bound; source
 Git commands and cleanup retain their existing independent bounds. A shorter caller
-context wins. This differs explicitly from legacy `--timeout`, which still sets both
-container bounds. Existing `run artifact-test` flags, default suite, error mapping and
-custom timeout remain supported directly through factory; migration of that interface
-to catalog entries is deferred rather than silently narrowing its accepted budgets.
-Legacy `validate --config` retains its separate published-source authentication and
-capture-only semantics, together with its independently admitted complete-local-Run
-conformance route. New profiles are not reinterpreted as legacy documents, and neither
-legacy route is relaxed. A new-format published adapter remains unsupported in this slice.
+context wins. `validate --config` retains its separate published-source
+authentication and capture-only semantics, together with its independently admitted
+complete-local-Run conformance route. New profiles are not reinterpreted as
+`validate --config` documents. A new-format published adapter remains unsupported in
+this slice.
+
+### Profile requirements and limits
+
+- A profile is required. The Plan, suite (by validator ID) and artifact are set in it,
+  not by command-line flags.
+- `output` is required in every binding and there is no default suite or inference of
+  a Plan's sole CLI output; a profile must name it (for example `nvkectl`), and a
+  missing value fails with `invalid input binding`.
+- Test execution is capped at 30 minutes per check and dependency acquisition has its
+  own fixed 30-minute bound; longer bounds are not accepted.
+- There is no per-run timeout override. The test-container bound comes only from the
+  catalog entry's `timeout`, so a shorter bound needs a separate catalog entry.
+- Admission errors use the profile loader's codes (for example unknown validator exits
+  13 and an excluded platform exits 29); a missing `--profile` or `--catalog` is a
+  coded usage error (exit 2). Suite-failure status, timeout classification and cleanup follow
+  the execution owners.
+- Workspaces use `--workspace-root` and `--keep`; with `--keep` each also retains
+  `selection.json`.
+- Relative `plan`, `artifact` and `catalog` paths resolve against the profile file's
+  directory, not the working directory.
 
 Contract tests cover deterministic discovery, strict refusal, complete admission before
 execution, edits during dispatch, both suite/architecture selections and retained
-configuration. Factory import/container dispatch is mocked in the new parity tests;
+configuration. Factory import/container dispatch is mocked in these tests;
 these tests do not constitute a fresh actual upstream execution or native-host evidence.
-The prior actual CLI execution records below remain the baseline. New catalog execution
+The prior actual CLI execution records below exercised the earlier Go diagnostic adapter
+and remain the baseline; the profile route has only its own source contracts and
+separately scoped manual observations. New catalog execution
 on native Linux AMD64/ARM64, upstream adoption, bootstrap, controller/chart adapters,
 CI migration and shared schema stabilization remain separate work.
 
 ## How it works
 
 1. Factory validates the complete canonical Plan and selects one CLI producer
-   using the same loader as `nvkr run artifact-test-inputs`.
+   using the same loader as `nvkr run artifact-test-inputs`. `validators run`
+   reaches it through `factory.CLIArtifactPlan.Admit`.
 2. Shallow-fetch the exact source commit, check its tree and clean worktree, and
    require the upstream `test-artifact` entrypoint.
 3. Copy and hash the supplied executable in a private workspace. Dependency
@@ -132,9 +155,9 @@ CI migration and shared schema stabilization remain separate work.
 `--keep` retains the printed `.nvkr/artifact-tests/cli-*/` workspace. Source and
 cache exist only after their phases run; `tests.jsonl` is created for test execution
 and `result.json` only on success. Otherwise the workspace is removed on exit.
-Each dependency/test container has a 30-minute timeout (`--timeout` overrides
-that per-container bound). Each source Git command has its own fixed 30-minute
-bound; `--timeout` does not shorten fetch. Cancellation stops
+The test container is bounded by the entry's `timeout` (at most 30 minutes) and
+dependency acquisition has its own fixed 30-minute bound. Each source Git command has
+its own fixed 30-minute bound; the entry `timeout` does not shorten fetch. Cancellation stops
 and joins the client and requests container removal; removal is best effort.
 Removal uses the existing reaper's separate two-second budget with reserved
 termination grace. The execution outcome is captured before cleanup, so a later
@@ -172,10 +195,10 @@ sudo -E env "PATH=$PATH" make -C cli test-e2e-bootstrap-artifact \
 ```
 
 This is a candidate upstream interface, **not an implemented NVKR bootstrap
-adapter**. `nvkr run artifact-test` still admits only `contract` and `cli`;
-its default, selection, source import, offline containers and error semantics are
-unchanged. Do not point its offline runner at bootstrap or patch an imported
-checkout to add this target. Once adopted, the target must exist at the exact
+adapter**. `nvkr validators run`
+still admits only `contract` and `cli`; their selection, source import,
+offline containers and error semantics are unchanged. Do not point the offline
+runner at bootstrap or patch an imported checkout to add this target. Once adopted, the target must exist at the exact
 artifact source commit selected by `LoadCLIArtifactTestInputs` and imported by
 `sourcegit`; a convenient local checkout is not an alternative test revision.
 

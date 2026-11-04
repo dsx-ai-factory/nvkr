@@ -4,7 +4,7 @@ The NVKE family pilot implements separate authored Definitions and named product
 the combined candidate. It reuses the current lifecycle and catalog owners; it adds no cross-Release import,
 automatic association file or qualification capability. Hosted family execution and consumer acceptance remain
 unrecorded. The [input instructions](../inputs/definitions/nvke/README.md#family-pilot) own commands and
-current selections; [reconciliation](adr/reconciliation.md#maintained-input-and-schema-boundaries) owns
+current selections; [reconciliation](adr/reconciliation/maintained-input-and-schema-boundaries.md#maintained-input-and-schema-boundaries) owns
 implementation and acceptance status.
 
 The pilot incorporates upstream `07181055` (2026-10-20), including `9857feed`'s current catalog pins,
@@ -396,7 +396,7 @@ and required SBOM bundles under policy, without reading payload layers or granti
 authority. `artifact-publication` additionally verifies the complete held payload closure. Browsing/export
 and diagnostic pulling do not replace policy verification. Neither scope grants full-release/qualified
 acceptance or proves that independently accepted Releases work together.
-[consumer scopes](adr/reconciliation.md#consumer-acceptance-scopes),
+[consumer scopes](adr/reconciliation/consumer-acceptance-scopes.md#consumer-acceptance-scopes),
 [publication architecture](publication-architecture.md#signing-and-publication-order),
 [downstream ownership](adr/0019-clusterdefinition-and-provisioning-adapter-boundary.md#3-downstream-systems-own-deployment)
 

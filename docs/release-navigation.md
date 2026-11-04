@@ -261,7 +261,7 @@ establish contracts, not GHCR, signing-service or production acceptance. Pulling
 selection, supported formats, complete aggregate-platform membership, exclusion of unrelated payloads,
 integrity failures, existing-destination refusal, and cleanup. They do not establish registry-service,
 installation, image-runtime, or production acceptance. Current support and external evidence remain recorded in
-[reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md).
+[reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/README.md).
 
 The [recorded loopback replay](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-03-release-navigation.md) exercised the earlier full-closure CLI
 against a Docker registry carrying actual AMD64/ARM64 NVKE CLI bundles and their dependency SBOMs. It is

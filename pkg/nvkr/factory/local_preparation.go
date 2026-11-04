@@ -26,13 +26,17 @@ type localProducerTransform func(authored.DefinitionOutput, string, catalog.Comp
 func prepareLocalInputs(ctx context.Context, definitionPath, environmentPath, out string, files map[string]any,
 	configure func(*authored.Environment, string) error, transform localProducerTransform,
 ) (preparedLocalInputs, error) {
-	return prepareLocalInputsWithScope(ctx, definitionPath, environmentPath, out, files, configure, transform, false)
+	return prepareLocalInputsWithScope(ctx, definitionPath, environmentPath, out, files, configure, transform, false,
+		func(ctx context.Context, selection authored.Catalog) (*catalog.Stack, error) {
+			return loadFactoryCatalogStack(ctx, definitionPath, selection)
+		})
 }
 
 // Exact source preparation transforms a complete catalog consistently across
 // sibling outputs. Native toolchain preparations retain selected-component scope.
 func prepareLocalInputsWithScope(ctx context.Context, definitionPath, environmentPath, out string, files map[string]any,
 	configure func(*authored.Environment, string) error, transform localProducerTransform, wholeCatalog bool,
+	loadStack func(context.Context, authored.Catalog) (*catalog.Stack, error),
 ) (preparedLocalInputs, error) {
 	if filepath.IsAbs(out) || filepath.Clean(out) != out || !strings.HasPrefix(out, ".nvkr/") || strings.ContainsAny(out, "\r\n\x00") {
 		return preparedLocalInputs{}, e.New(e.CodeUsage, "local input preparation requires a fresh repository-relative .nvkr directory")
@@ -99,7 +103,7 @@ func prepareLocalInputsWithScope(ctx context.Context, definitionPath, environmen
 		if err != nil {
 			return preparedLocalInputs{}, err
 		}
-		stack, err := loadFactoryCatalogStack(ctx, definitionPath, selection)
+		stack, err := loadStack(ctx, selection)
 		if err != nil {
 			return preparedLocalInputs{}, err
 		}
@@ -145,6 +149,9 @@ func prepareLocalInputsWithScope(ctx context.Context, definitionPath, environmen
 			if output.Catalog != nil && slices.Equal(selection.Overlays, output.Catalog.Overlays) && selection.Base == output.Catalog.Base {
 				return stacks[output.Name], nil
 			}
+		}
+		if selection.Base == definition.Catalog.Base && slices.Equal(selection.Overlays, definition.Catalog.Overlays) {
+			return loadStack(ctx, baseSelection)
 		}
 		return loadFactoryCatalogStack(ctx, prepared.Definition, selection)
 	})

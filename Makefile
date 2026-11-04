@@ -235,6 +235,12 @@ definitions-location-check: ## Fail when a file is tracked under the retired top
 	if [ -n "$$files" ]; then printf '%s\n' "$$files" >&2; \
 		echo "ERROR: authored Definitions belong under inputs/ (see inputs/README.md), not top-level definitions/" >&2; exit 1; fi
 
+.PHONY: reconciliation-location-check
+reconciliation-location-check: ## Fail when the retired single-file reconciliation ledger is tracked again.
+	@files=$$(git ls-files -- ':/docs/adr/reconciliation.md') || exit 1; \
+	if [ -n "$$files" ]; then printf '%s\n' "$$files" >&2; \
+		echo "ERROR: the reconciliation ledger is split under docs/adr/reconciliation/ (index: docs/adr/reconciliation/README.md); edit the matching file there, not docs/adr/reconciliation.md" >&2; exit 1; fi
+
 .PHONY: license-header-check
 license-header-check: ## Fail when a source file has no license header.
 	@$(LICENSE_FILES) | xargs -0 $(ADDLICENSE) -check -f scripts/license-header.tmpl -c "$(LICENSE_HOLDER)" $(LICENSE_IGNORES) \
@@ -354,13 +360,13 @@ pipeline-dev-run: pipeline-dev-check ## Dispatch the clean, pushed current branc
 	python3 scripts/pipeline-dev.py --repo "$$PIPELINE_DEV_REPO"
 
 .PHONY: check
-check: go-version-check fmt-check definitions-location-check license-header-check status-restated-check vet lint shellcheck test-ci-tools test vulncheck ## Code gate: format, Definition location, license, restated status, vet, lint, shell, tool tests, Go tests, vulnerabilities.
+check: go-version-check fmt-check definitions-location-check reconciliation-location-check license-header-check status-restated-check vet lint shellcheck test-ci-tools test vulncheck ## Code gate: format, Definition and ledger location, license, restated status, vet, lint, shell, tool tests, Go tests, vulnerabilities.
 
 # Every merge-gate check that can run locally; CI runs `make test` as test-shard
 # slices. internal/cicontract requires this list to equal the make targets the
 # merge gate runs. CodeQL and the DCO App run only on GitHub.
 # Checks needing extra tools or private access run before the long test suite.
-CI_CHECKS := fmt-check definitions-location-check license-header-check status-restated-check shellcheck actionlint \
+CI_CHECKS := fmt-check definitions-location-check reconciliation-location-check license-header-check status-restated-check shellcheck actionlint \
 	notices-check workflows-check docs-check vet test-ci-tools build lint vulncheck test
 
 .PHONY: ci-check
