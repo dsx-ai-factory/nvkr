@@ -1,6 +1,6 @@
 # Preview status and known limitations
 
-NVIDIA Kubernetes Recipes (NVKR) is available as a preview. Commands, input schemas and behavior can change between releases, and NVKR is not recommended for production use. This page lists what the preview supports and its known limitations. The [implementation and evidence record](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md) tracks the current status of each capability.
+NVIDIA Kubernetes Recipes (NVKR) is available as a preview. Commands, input schemas and behavior can change between releases, and NVKR is not recommended for production use. This page lists what the preview supports and its known limitations. The [implementation and evidence record](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/README.md) tracks the current status of each capability.
 
 ## Supported at preview
 

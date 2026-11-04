@@ -110,5 +110,5 @@ association; no parent Release, automatic association file or hosted acceptance 
 
 The [qualification policy](policies/nvke-qualification.yaml) and
 [nightly build/test workflow](../.github/workflows/nvkr-nightly.yml) have independent owners and scopes.
-[Reconciliation](../docs/adr/reconciliation.md) remains the evidence ledger for implementation and
+[Reconciliation](../docs/adr/reconciliation/README.md) remains the evidence ledger for implementation and
 external acceptance.

@@ -287,7 +287,7 @@ CI come from its selected catalog and lock, rather than edits to rendered YAML.
 Pull requests check both producer bundles and the qualification pair. The maintained publication route admits default-branch manual dispatch;
 only its isolated artifact-signing and SBOM-attestation jobs receive OIDC minting permission. Generic hosted
 runners are the default, with ADR-18's explicitly admitted native ARC disk routes. Dated validation-branch
-exceptions and completed Runs are scoped in [reconciliation](docs/adr/reconciliation.md).
+exceptions and completed Runs are scoped in [reconciliation](docs/adr/reconciliation/README.md).
 
 ## Test timing and cache use
 
@@ -380,7 +380,7 @@ is rejected by dependency SBOM attachment and serialized BOM validation. Factory
 dependency API; no maintained factory output invokes this separate diagnostic. This is not delivered-package
 inspection, payload dependency coverage, installation, signing or publication.
 See [the dependency SBOM reference](docs/dependency-sboms.md) and the
-[dated local fixture observation](docs/adr/reconciliation.md#external-run-references). Native amd64 execution
+[dated local fixture observation](docs/adr/reconciliation/external-run-references.md#external-run-references). Native amd64 execution
 has not been recorded. Rerun the opt-in regression when changing either the factory catalog Syft pin or the
 Syft pin in `toolchains/nvkr-disk-inspect`; record which selected native executable was exercised.
 
@@ -416,7 +416,7 @@ Catalog resolution, pin maintenance, and producer admission have distinct files 
 | Release authority and delivery | `release`, `status`, `delivery` |
 | Public adapters | `client/v1`, `cmd/nvkr` — delegate authority |
 
-Read the relevant current ADR and [reconciliation row](docs/adr/reconciliation.md) before changing authority.
+Read the relevant current ADR and [reconciliation row](docs/adr/reconciliation/README.md) before changing authority.
 Use package-issued opaque receipts, admit capabilities before side effects, validate the complete graph at
 executable boundaries, and preserve exact subject/policy identities. Low-level diagnostic APIs cannot turn
 caller-authored descriptions into authority.

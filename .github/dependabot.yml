@@ -35,6 +35,11 @@ updates:
     open-pull-requests-limit: 5
     allow:
       - dependency-type: all
+    # actionlint v1.7.12 requires go.yaml.in/yaml/v4 v4.0.0-rc.3 and fails to
+    # compile against rc.7, whose error types changed. Let the yaml version
+    # follow actionlint's own requirement; an actionlint bump raises it.
+    ignore:
+      - dependency-name: go.yaml.in/yaml/v4
     groups:
       actionlint-tool:
         patterns: ["*"]

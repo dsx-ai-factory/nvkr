@@ -176,7 +176,7 @@ extension the tool expects, such as `recipe.yaml` for AICR. For `outputType: oci
 absent path the tool creates, and it must leave exactly one OCI layout there. That form is reserved for bundle
 outputs, and selecting it fails until layout import is available. Execution requires Linux, and a Definition that selects `sbomTool` cannot yet include a
 `file` producer. [ADR-27](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0027-pinned-tool-producers.md)
-and [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md) record the
+and [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/README.md) record the
 remaining limits.
 
 ## Build tools and version stamps
@@ -192,7 +192,7 @@ The catalog also selects how source components are built:
 | `pinned-tool` | One run of a source's pinned release tool, offline, with no source fetch. See [Pinned-tool producers](#pinned-tool-producers). |
 
 A builder type describes production, while an output format describes delivery. Runtime and evidence limits
-still apply; [ADR-10](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0010-pluggable-builder-types.md) and [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md) record them.
+still apply; [ADR-10](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0010-pluggable-builder-types.md) and [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/README.md) record them.
 
 A **toolchain substitution** changes the build container for explicitly named components and an architecture,
 checking the expected old digest. It keeps the existing source and command declarations. The
@@ -224,7 +224,7 @@ The [NVSentinel catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs
 declares OCI, Helm, executable and Debian outputs. Its OS experiment places the same DEB in the existing
 composer/Packer `debs/` folder and regenerates the local APT index. Upstream source is unchanged. Placement
 does not install or enable NVSentinel; local composition metadata is not a full-content dependency SBOM,
-ABI proof or runtime acceptance. See [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation.md).
+ABI proof or runtime acceptance. See [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/README.md).
 
 ## Run the local lab
 

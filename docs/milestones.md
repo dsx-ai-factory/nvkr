@@ -2,7 +2,7 @@
 
 This roadmap summarizes the `pipeline-attested` delivery milestones. The
 [acceptance specification](epics-v1-spec.md) owns artifact scope, numbered acceptance criteria,
-approved fallbacks and completion requirements. [Reconciliation](adr/reconciliation.md) owns
+approved fallbacks and completion requirements. [Reconciliation](adr/reconciliation/README.md) owns
 implementation status and scoped operational evidence. A plan, local dry run or contract test does
 not complete a milestone.
 
@@ -43,7 +43,7 @@ on a public GitHub-hosted AMD64 runner under ADR-18's separate test-adapter
 contract, outside product milestones and qualification. Its complete site/tenant
 lifecycle includes natural deletion and joined cleanup. NVKE owns guest/cluster
 provisioning and teardown; the parent harness owns outer host/network restoration.
-[Reconciliation](adr/reconciliation.md) records exact source revisions, completed
+[Reconciliation](adr/reconciliation/README.md) records exact source revisions, completed
 runs and their limits; the former ARM64 published-artifact cycle is retired.
 
 M2’s product floor remains AMD64 producer provenance. The approved initial scope defers strict

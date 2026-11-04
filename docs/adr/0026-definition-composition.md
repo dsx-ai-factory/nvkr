@@ -2,7 +2,7 @@
 
 - **Decision status:** Proposed (design only; pending named-decider ratification)
 - **Implementation maturity:** U1–U7 implemented; U8 deferred, U9 waits on the result-reuse decision and U10
-  on a hosted composite Run. `reconciliation.md` records the implemented scope.
+  on a hosted composite Run. `reconciliation/README.md` records the implemented scope.
 - **Acceptance-test maturity:** Contract suites for U1–U7, including an opt-in extended identity-invariance
   contract over the four NVKE families. No hosted Run, composite publication or consumer verification
   exercises a composite.

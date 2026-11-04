@@ -192,4 +192,4 @@ publication identities, verification policy, maintenance and the Go SDK.
 Use [CLI setup](../docs/quickstart.md#build-only-the-cli) and [Plan inspection](../docs/plan-and-graph-inspection.md) for first-time planning, the
 [full local NVKE demo](m1-local.md) for CLI/image/chart execution and pull-back, and the
 [documentation index](../docs/README.md) for task guides. The
-[reconciliation record](../docs/adr/reconciliation.md) owns current support and evidence limits.
+[reconciliation record](../docs/adr/reconciliation/README.md) owns current support and evidence limits.

@@ -13,7 +13,7 @@ This catalog selects four output families from `NVIDIA/NVSentinel` at
 
 These are development inputs. Static Plans describe selected work; they do not establish fresh product
 builds, installation, deployment, qualification, signing or publication. Current support and the retired
-recipes' dated evidence are recorded in [reconciliation](../../../docs/adr/reconciliation.md#nvsentinel-catalog-and-package-inputs).
+recipes' dated evidence are recorded in [reconciliation](../../../docs/adr/reconciliation/m3-mvp-scope-and-acceptance-boundary.md#nvsentinel-catalog-and-package-inputs).
 
 ## Debian package
 

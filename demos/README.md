@@ -58,7 +58,7 @@ remain unverified. The [facilitator guide](team-guide.md) explains the separate 
 
 Operational scripts stay in `scripts/`. Their [usage guide](../scripts/README.md) explains runtime,
 credentials, storage ownership, and cleanup. The [facilitator guide](team-guide.md) and
-[reconciliation](../docs/adr/reconciliation.md) describe the subjects and limits of recorded demonstrations.
+[reconciliation](../docs/adr/reconciliation/README.md) describe the subjects and limits of recorded demonstrations.
 
 ## Before sharing an updated tour
 

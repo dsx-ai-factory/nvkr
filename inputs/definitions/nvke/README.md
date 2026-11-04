@@ -110,7 +110,7 @@ takes them from its NICo deployment or builds them as
 [NVKE describes](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/docs/operate/build-node-images.md?plain=1#L22).
 
 NVKR's role ends at building, signing and publishing these outputs. GPU driver, fabric and runtime acceptance
-belongs to AICR and NVKE evidence, and NVKR records none ([reconciliation](../../../docs/adr/reconciliation.md#maintained-input-and-schema-boundaries)).
+belongs to AICR and NVKE evidence, and NVKR records none ([reconciliation](../../../docs/adr/reconciliation/maintained-input-and-schema-boundaries.md#maintained-input-and-schema-boundaries)).
 
 ## Family pilot
 
@@ -218,7 +218,7 @@ artifact-publication` ([Lifecycle](../../../docs/lifecycle.md)); `nvkr release b
 signatures or payloads. The maintained candidate publishes to private GHCR packages. Without
 `--anonymous`, `release verify` reads signature, provenance and SBOM bundles with the same registry
 keychain as payloads, so log in first. That private read is contract-tested only; no private-registry
-verification has been re-run since it changed ([consumer acceptance scopes](../../../docs/adr/reconciliation.md#consumer-acceptance-scopes)).
+verification has been re-run since it changed ([consumer acceptance scopes](../../../docs/adr/reconciliation/consumer-acceptance-scopes.md#consumer-acceptance-scopes)).
 `release verify` writes the verified Release to stdout, so save it:
 
 ```sh
@@ -433,7 +433,7 @@ Publication uses the separate `ghcr.io/dsx-ai-factory/nvkr/m2-candidate` prefix 
 `publication.mode: per-output-v1`. Each output is packaged, published, signed and verified independently.
 Assembly authenticates same-Plan, same-workflow metadata and evidence; it does not download payload layers.
 The release remains one signed entry point. Retry assembly may retain earlier attempt identities;
-[reconciliation](../../../docs/adr/reconciliation.md#m3-mvp-scope-and-acceptance-boundary) records a successful
+[reconciliation](../../../docs/adr/reconciliation/m3-mvp-scope-and-acceptance-boundary.md#m3-mvp-scope-and-acceptance-boundary) records a successful
 producer completion with mixed original attempts. Successful independent retry qualification remains unproved.
 
 Only admitted source retrieval and pinned-source revalidation steps receive `NKE_SOURCE_TOKEN` for NVKE;
@@ -544,6 +544,6 @@ chart-side SPIRE containers are distinct artifacts; one cannot satisfy the other
 M3 build/evidence qualification, delivered-tool smoke and organizational toolchain reviews remain product
 acceptance work. Full disk inspection is a separate deferred capability, not an M3 MVP prerequisite.
 
-[Reconciliation](../../../docs/adr/reconciliation.md) owns current implementation/evidence status;
+[Reconciliation](../../../docs/adr/reconciliation/README.md) owns current implementation/evidence status;
 [the epic specification](../../../docs/epics-v1-spec.md) owns product acceptance. This README owns the
 candidate input selections and the maintained workflow instructions.

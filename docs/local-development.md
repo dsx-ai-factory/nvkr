@@ -105,7 +105,7 @@ tool-check report and qualification statement. It then publishes artifacts and s
 the complete set again and independently verifies the bytes, saved inputs and signatures.
 Its result remains `unqualified-local-execution`. A recorded 2026-10-16 native ARM64 run passed for
 29 outputs and 10 delivered tools. Exact artifact references and remaining checks are tracked in
-[reconciliation](adr/reconciliation.md#local-qualification-demo).
+[reconciliation](adr/reconciliation/m3-mvp-scope-and-acceptance-boundary.md#local-qualification-demo).
 
 For a new complete demo, add `--qualify-local` to the normal native Linux ARM64 command:
 
@@ -410,4 +410,4 @@ repinning. Copy shared catalogs before experimenting with controller/OS changes.
 Unit/contract tests do not prove clean-machine setup, a fresh complete E2E run,
 full-source membership, a complete disk smoke or qualification. Require terminal
 Run records and real consumer checks for your own invocation. Current limits
-belong in [reconciliation](adr/reconciliation.md), not a second quickstart.
+belong in [reconciliation](adr/reconciliation/README.md), not a second quickstart.

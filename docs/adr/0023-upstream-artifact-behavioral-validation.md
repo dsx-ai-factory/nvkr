@@ -1,8 +1,8 @@
 # ADR-23 — Upstream-owned artifact test interfaces
 
 - **Decision status:** Proposed (pending named-decider ratification)
-- **Implementation maturity:** Tracked separately in `reconciliation.md`; draft code is not acceptance.
-- **Acceptance-test maturity:** Tracked separately in `reconciliation.md`; local checks do not establish broader acceptance.
+- **Implementation maturity:** Tracked separately in `reconciliation/README.md`; draft code is not acceptance.
+- **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; local checks do not establish broader acceptance.
 - **Deciders:** Pending; owners must be named before ratification.
 - **Index:** Proposed ADR-23 supplements ADR-01–22; it remains outside the consolidated contract set until accepted.
 - **Relates to:** ADR-03 (coded errors), ADR-13 (evidence), ADR-16 (conformance boundary),

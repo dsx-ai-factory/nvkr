@@ -118,4 +118,4 @@ guest boot and agent-start smoke test remain external acceptance work for each s
 architecture and encryption mode. The prior-source native ARM64 container exercise does not establish main-revision agent compatibility.
 The current overlay awaits CI and external execution; local test execution was stopped at the user’s request.
 Current evidence belongs in
-[reconciliation](../../../../docs/adr/reconciliation.md#ubuntu-24-node-image-inputs).
+[reconciliation](../../../../docs/adr/reconciliation/ubuntu-24-node-image-inputs.md#ubuntu-24-node-image-inputs).

@@ -97,4 +97,4 @@ Base-ISO content, downloads outside APT and events outside the capture window re
 Missing historical repository metadata fails closed; a guessed package URL is never substituted.
 Do not promote this diagnostic to complete acquisition closure or a full disk SBOM. M2's explicit
 build-provenance scope defers deep disk reconciliation beyond the approved M3 MVP; current status belongs in
-[reconciliation](adr/reconciliation.md).
+[reconciliation](adr/reconciliation/README.md).
