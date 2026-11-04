@@ -59,7 +59,10 @@ Apply the repository's live labels. These are the relevant conventions:
 | Labels | Use |
 |---|---|
 | `bug`, `feature`, `documentation` | Issue-form types; `enhancement` also exists. Preserve a valid existing classification. |
-| `github_actions`, `go`, `docker` | Specific technology affected; `.github/labeler.yml` owns automatic PR path mapping. |
+| `area/*` | Exactly one owning area per issue: `catalog`, `definitions`, `run`, `pipeline`, `release`, `security`, `cli`, `sdk`, `ci`, `docs`, `tests`, `toolchains` (label descriptions define each). Intake infers one from the form's Component or title scope; correct a wrong inference. PR paths may carry several; `.github/labeler.yml` owns that mapping. |
+| `github_actions`, `go`, `docker`, `dependencies` | Dependabot update labels; do not use them as areas. |
+| `size/XS` … `size/XL` | PR-only, set automatically from changed lines; never apply to issues. |
+| `do-not-merge` | PR-only hold; the label guard check fails while it is present. |
 | `needs-triage` | Pending maintainer review. Remove only after classification and a next action are recorded. |
 | `duplicate`, `invalid`, `wontfix` | Require evidence and an explicit proposed disposition, not just a label. |
 | `help wanted`, `good first issue` | Use only for scoped work with enough guidance for contributors. |
@@ -69,7 +72,7 @@ Apply the repository's live labels. These are the relevant conventions:
 
 Never create, rename, or delete repository labels. List any unavailable label
 under **Labels this needs** and leave the dependent operation unapplied. Do not
-add replacement `area/*` or priority labels. The reporter's impact choice informs
+add priority labels. The reporter's impact choice informs
 triage but does not assign priority.
 
 Give every candidate one verdict:

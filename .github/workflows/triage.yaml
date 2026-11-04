@@ -1,6 +1,9 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# Decisions live in .github/scripts/triage.cjs, tested by `make test-ci-tools`.
+# Both jobs check out only the base branch's scripts; no PR code is checked
+# out or executed with the write token.
 name: Triage
 
 on:
@@ -27,53 +30,18 @@ jobs:
       contents: read
       issues: write
     steps:
+      - name: Check out scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+
       - name: Add intake labels
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const { data: issue } = await github.rest.issues.get({
-              ...context.repo,
-              issue_number: context.issue.number,
-            });
-            const existing = new Set(issue.labels.map(label => label.name));
-            const wanted = new Set(['needs-triage']);
-            // Use the form's exact component, not keywords in logs or examples.
-            // Free text before or after the dropdown can repeat the heading;
-            // infer nothing unless exactly one Component section exists.
-            const sections = [...(issue.body || '').matchAll(
-              /^### Component(?:\r?\n)+([^\r\n]+)/gm
-            )];
-            const component = sections.length === 1 ? sections[0][1].trim() : undefined;
-            if (component === 'Docs / examples') wanted.add('documentation');
-            // NVKR has no area/* taxonomy. Only infer existing labels from
-            // an explicit title scope.
-            const scope = issue.title.match(/^[a-z]+\(([^)]+)\)!?: /)?.[1];
-            const scopes = new Map([
-              ['ci', 'github_actions'], ['docs', 'documentation'],
-              ['docker', 'docker'], ['go', 'go'],
-            ]);
-            if (scopes.has(scope)) wanted.add(scopes.get(scope));
-            const labels = [...wanted].filter(label => !existing.has(label)).sort();
-            if (!labels.length) return;
-
-            // A maintainer must provision missing labels. Check the entire
-            // set before writing; this workflow never creates repository labels.
-            const available = new Set((await github.paginate(
-              github.rest.issues.listLabelsForRepo,
-              { ...context.repo, per_page: 100 }
-            )).map(label => label.name));
-            const missing = labels.filter(label => !available.has(label));
-            if (missing.length) {
-              core.setFailed(`Missing repository labels: ${missing.join(', ')}`);
-              return;
-            }
-            await github.rest.issues.addLabels({
-              ...context.repo,
-              issue_number: context.issue.number,
-              labels,
-            });
-            // Maintainers remove needs-triage after review. Type labels from
-            // issue forms and inferred labels do not establish completed triage.
+            const triage = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/triage.cjs`);
+            await triage.issueIntake({ github, context, core });
 
   pull-requests:
     if: github.event_name == 'pull_request_target'
@@ -84,12 +52,27 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      # No checkout: labeler reads the configuration from the base repository
-      # via the API. No PR code executes with the write token. Deliberately
+      # The default pull_request_target ref is the base branch. Deliberately
       # omit issues:write, which labeler needs to create repository labels.
+      - name: Check out base configuration and scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            .github/labeler.yml
+            .github/scripts
+          sparse-checkout-cone-mode: false
+
       - name: Label changed paths
         uses: actions/labeler@b8dd2d9be0f68b860e7dae5dae7d772984eacd6d # v6.2.0
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           configuration-path: .github/labeler.yml
           sync-labels: false
+
+      - name: Label size
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const triage = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/triage.cjs`);
+            await triage.prSize({ github, context, core });

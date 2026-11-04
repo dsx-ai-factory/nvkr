@@ -111,6 +111,11 @@ actionlint: go-version-check ## Lint GitHub workflows with the actionlint pinned
 	GOBIN="$(CURDIR)/bin" go -C toolchains/actionlint install tool
 	"$(CURDIR)/bin/actionlint"
 
+.PHONY: test-workflow-scripts
+test-workflow-scripts: ## Test the triage and PR-metadata workflow scripts (needs node).
+	@command -v node >/dev/null 2>&1 || { echo "node not installed — https://nodejs.org/" >&2; exit 1; }
+	node --test .github/scripts/triage.test.cjs
+
 .PHONY: test
 test: ## Fast default tests for CI and agents (no extended fixtures or instrumentation).
 	go test -timeout $(GO_TEST_TIMEOUT) $(GO_TEST_FLAGS) $(PKG)
@@ -366,7 +371,7 @@ check: go-version-check fmt-check definitions-location-check reconciliation-loca
 # slices. internal/cicontract requires this list to equal the make targets the
 # merge gate runs. CodeQL and the DCO App run only on GitHub.
 # Checks needing extra tools or private access run before the long test suite.
-CI_CHECKS := fmt-check definitions-location-check reconciliation-location-check license-header-check status-restated-check shellcheck actionlint \
+CI_CHECKS := fmt-check definitions-location-check reconciliation-location-check license-header-check status-restated-check shellcheck actionlint test-workflow-scripts \
 	notices-check workflows-check docs-check vet test-ci-tools build lint vulncheck test
 
 .PHONY: ci-check

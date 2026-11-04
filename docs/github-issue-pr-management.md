@@ -40,11 +40,12 @@ Maintainers also review the latest [vulnerability scan](cve-management.md) at
 this cadence. A report forwarded by NVIDIA PSIRT is triaged promptly when received.
 
 The [triage workflow](../.github/workflows/triage.yaml) adds `needs-triage` to new
-issues and may add an existing technology or documentation label from an explicit
-title scope or the form's documentation component. A maintainer must create
-`needs-triage` before enabling this intake: missing labels fail the job before any
-labels are applied. Type labels and inferred labels do not complete triage;
-maintainers remove `needs-triage` after review and recording the next action.
+open issues and infers one `area/*` label from the form's Component, the
+documentation form, or an explicit title scope. It never infers an area from free
+text and never creates labels: a missing label fails the job before any label is
+applied. Type labels and inferred labels do not complete triage; maintainers
+correct the area if needed and remove `needs-triage` after review and recording
+the next action.
 
 The [nvkr-triage skill](../.agents/skills/nvkr-triage/SKILL.md) supports this review
 with per-issue recommendations and verification of authorized edits. It does not
@@ -59,14 +60,17 @@ owners review their paths; maintainers handle review, requests for changes, and
 merge decisions under [GOVERNANCE.md](../GOVERNANCE.md). Draft PRs are not ready
 for maintainer review.
 
-The triage workflow adds existing labels according to
-[changed paths](../.github/labeler.yml), preserving manual labels. It reads the
-base repository's configuration without checking out PR code. The separate
+The triage workflow adds `area/*` labels according to
+[changed paths](../.github/labeler.yml), preserving manual labels, and keeps one
+`size/*` label matching the changed line count. The separate
 [title check](../.github/workflows/pr-title-lint.yaml) validates the Conventional
-Commit format on title edits as well as new commits. It reports independently of
-the required `gate` check; this automation does not change branch rules or make
-the title check required. NVKR has no issue-only priority labels, so there is no
-priority-label removal job for PRs.
+Commit format on title edits as well as new commits, and the
+[label guard](../.github/workflows/pr-label-guard.yaml) fails while a PR carries
+`do-not-merge`. These workflows run the base branch's
+[scripts](../.github/scripts/triage.cjs) without checking out PR code; `make
+test-workflow-scripts` tests them. Both checks report independently of the required
+`gate` check; this automation does not change branch rules or make either check
+required.
 
 ## Inactive issues
 
