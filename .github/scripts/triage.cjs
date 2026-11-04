@@ -5,7 +5,7 @@
 // and pr-label-guard.yaml. Each entry point takes actions/github-script's
 // { github, context, core } and reads current state from the API, so a rerun
 // acts on the issue or PR as it is now rather than on the event snapshot.
-// Tests: node --test .github/scripts (run by `make test-ci-tools`).
+// Tests: .github/scripts/triage.test.cjs (run by `make test-workflow-scripts`).
 
 // CONTRIBUTING.md owns the supported types. There is no NVKR title-length
 // limit or requirement for a lowercase scope.

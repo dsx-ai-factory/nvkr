@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# Decisions live in .github/scripts/triage.cjs, tested by `make test-ci-tools`.
+# Decisions live in .github/scripts/triage.cjs, tested by `make test-workflow-scripts`.
 # Both jobs check out only the base branch's scripts; no PR code is checked
 # out or executed with the write token.
 name: Triage
