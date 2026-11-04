@@ -191,6 +191,8 @@ still identify the OCI manifest. Source-build subjects can identify an earlier a
 packaging or image binding; use `helm.defaultDigest` for the published chart bytes.
 Non-Helm outputs omit `helm`. Existing releases need no rebuild or migration: the digest is already
 stored in their publication metadata and checked against their chart manifest during inspection.
+The field is additive, so `schemaVersion` stays v1. Readers that reject unknown JSON fields must accept
+`helm` before reading descriptions from this version of NVKR.
 
 To obtain the value for a selected chart:
 
