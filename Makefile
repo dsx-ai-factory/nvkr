@@ -112,8 +112,9 @@ actionlint: go-version-check ## Lint GitHub workflows with the actionlint pinned
 	"$(CURDIR)/bin/actionlint"
 
 .PHONY: test-workflow-scripts
-test-workflow-scripts: ## Test the triage and PR-metadata workflow scripts (needs node).
+test-workflow-scripts: ## Test the triage and PR-metadata workflow scripts (needs node and npm).
 	@command -v node >/dev/null 2>&1 || { echo "node not installed — https://nodejs.org/" >&2; exit 1; }
+	npm ci --prefix .github/scripts --ignore-scripts --no-audit --no-fund
 	node --test .github/scripts/triage.test.cjs
 
 .PHONY: test

@@ -15,7 +15,7 @@ const ALL_LABELS = [
 const names = list => (list || []).map(name => ({ name }));
 
 // Records writes and failures; reads return the given fresh state.
-function harness({ issue, pr, available = ALL_LABELS, readError, removeStatus, addError }) {
+function harness({ issue, pr, files = [], available = ALL_LABELS, readError, removeStatus, addError }) {
   const calls = { added: [], removed: [], failed: [], info: [] };
   const github = {
     rest: {
@@ -31,9 +31,10 @@ function harness({ issue, pr, available = ALL_LABELS, readError, removeStatus, a
           calls.removed.push(params.name);
         },
       },
-      pulls: { get: async () => ({ data: pr }) },
+      pulls: { get: async () => ({ data: pr }), listFiles: 'files-endpoint' },
     },
     paginate: async (endpoint, params) => {
+      if (endpoint === 'files-endpoint') return files;
       assert.equal(endpoint, 'labels-endpoint');
       assert.equal(params.per_page, 100);
       if (readError) throw new Error('synthetic read failure');
@@ -174,4 +175,191 @@ test('do-not-merge guard', async t => {
       assert.equal(calls.failed.length, c.failed);
     });
   }
+});
+
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const os = require('node:os');
+const rulesSource = require('node:fs').readFileSync(path.join(__dirname, '../labeler.yml'), 'utf8');
+const rules = triage.labelRules(rulesSource);
+const sha = 'a'.repeat(40);
+const request = () => ({ version: 1, number: 2, headSHA: sha, labels: ['area/docs', 'size/XS'] });
+const labelPR = () => ({
+  number: 2, state: 'open', additions: 3, deletions: 2, changed_files: 1, labels: [],
+  head: { sha, ref: 'contributor-branch', repo: { id: 20 } },
+  base: { sha: 'b'.repeat(40), ref: 'main', repo: { id: 10 } },
+});
+const labelRun = () => ({
+  event: 'pull_request', conclusion: 'success', path: '.github/workflows/pr-labels.yaml',
+  head_sha: sha, head_branch: 'contributor-branch', head_repository: { id: 20 }, pull_requests: [],
+});
+
+test('path labels use the maintained config, including nested and hidden Markdown', async t => {
+  for (const [filename, labels] of [
+    ['README.md', ['area/docs']],
+    ['pkg/nvkr/factory/README.md', ['area/docs', 'area/run']],
+    ['.github/scripts/README.md', ['area/ci', 'area/docs']],
+    ['.github/workflows/triage.yaml', ['area/ci']],
+    ['.github/workflows/nvkr-run.yml', ['area/pipeline']],
+    ['pkg/nvkr/sign/testdata/fixture.json', ['area/security', 'area/tests']],
+    ['unmapped/file.txt', []],
+  ]) {
+    await t.test(filename, () => {
+      assert.deepEqual(triage.labelsForPR(labelPR(), [{ filename }], rules), [...labels, 'size/XS']);
+    });
+  }
+  assert.throws(() => triage.labelsForPR(labelPR(), [], rules), /Incomplete/);
+  assert.throws(() => triage.labelsForPR({ ...labelPR(), additions: -1 }, [{}], rules), /Incomplete/);
+});
+
+test('label config rejects unsupported operators and duplicate names', async t => {
+  for (const source of [
+    'null', '[]', 'do-not-merge: []',
+    'area/docs:\n  - head-branch: docs',
+    'area/docs:\n  - changed-files:\n    - all-globs-to-any-file: "**/*.md"',
+    'area/docs:\n  - changed-files:\n    - any-glob-to-any-file: "!**/*.md"',
+    rulesSource + '\narea/docs: []\n',
+  ]) {
+    await t.test(source.slice(0, 60), () => assert.throws(() => triage.labelRules(source)));
+  }
+});
+
+test('artifact schema and config-derived allow-list fail closed', async t => {
+  const cases = [
+    ['null', null], ['array', []], ['missing fields', {}],
+    ['string number', { ...request(), number: '2' }],
+    ['fractional number', { ...request(), number: 2.5 }],
+    ['zero number', { ...request(), number: 0 }],
+    ['negative number', { ...request(), number: -1 }],
+    ['unsafe number', { ...request(), number: Number.MAX_SAFE_INTEGER + 1 }],
+    ['extra field', { ...request(), command: 'id' }],
+    ['unknown version', { ...request(), version: 2 }],
+    ['invalid SHA', { ...request(), headSHA: 'main' }],
+    ['hold label', { ...request(), labels: ['do-not-merge', 'size/XS'] }],
+    ['unconfigured area', { ...request(), labels: ['area/unknown', 'size/XS'] }],
+    ['non-string label', { ...request(), labels: [{ name: 'area/docs' }, 'size/XS'] }],
+    ['labels string', { ...request(), labels: 'size/XS' }],
+    ['duplicate label', { ...request(), labels: ['area/docs', 'area/docs', 'size/XS'] }],
+    ['multiple sizes', { ...request(), labels: ['size/S', 'size/XS'] }],
+    ['missing size', { ...request(), labels: ['area/docs'] }],
+  ];
+  for (const [name, value] of cases) {
+    await t.test(name, () => assert.throws(() => triage.validateLabelRequest(value, rules), /Invalid/));
+  }
+  assert.deepEqual(triage.validateLabelRequest(request(), rules), request());
+  assert.throws(() => triage.validateLabelRequest(request(), rules.filter(rule => rule.label !== 'area/docs')));
+});
+
+test('artifact reader accepts only one bounded JSON regular file', async t => {
+  for (const variant of ['valid', 'invalid JSON', 'oversized', 'symlink', 'extra file', 'directory', 'missing']) {
+    await t.test(variant, async () => {
+      const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'nvkr-label-test-'));
+      t.after(() => fs.rm(directory, { recursive: true, force: true }));
+      const filename = path.join(directory, 'labels.json');
+      if (variant === 'symlink') await fs.symlink(__filename, filename);
+      else if (variant === 'directory') await fs.mkdir(filename);
+      else if (variant !== 'missing') await fs.writeFile(filename,
+        variant === 'invalid JSON' ? '{' : variant === 'oversized' ? ' '.repeat(16385) : JSON.stringify(request()));
+      if (variant === 'extra file') await fs.writeFile(path.join(directory, 'payload.cjs'), 'throw new Error()');
+      if (variant === 'valid') assert.deepEqual(await triage.readLabelRequest(directory, rules), request());
+      else await assert.rejects(triage.readLabelRequest(directory, rules));
+    });
+  }
+});
+
+test('apply binds untrusted requests to the run and current PR before any write', async t => {
+  const cases = [
+    { name: 'fork with empty run associations', ok: true },
+    { name: 'same repository', ok: true, change: ({ pr, run }) => { pr.head.repo.id = 10; run.head_repository.id = 10; } },
+    { name: 'associated PR', ok: true, change: ({ run }) => { run.pull_requests = [{ number: 2, base: { repo: { id: 10 } } }]; } },
+    { name: 'preserve manual labels and replace stale size', ok: true, change: ({ pr }) => { pr.labels = names(['area/cli', 'bug', 'do-not-merge', 'size/XL']); }, removed: ['size/XL'] },
+    { name: 'idempotent', ok: true, change: ({ pr }) => { pr.labels = names(['area/docs', 'size/XS']); }, added: [] },
+    { name: 'different PR number', change: ({ value }) => { value.number = 3; } },
+    { name: 'different head', change: ({ pr }) => { pr.head.sha = 'c'.repeat(40); } },
+    { name: 'different fork with same head and branch', change: ({ pr }) => { pr.head.repo.id = 30; } },
+    { name: 'different branch with same head', change: ({ pr }) => { pr.head.ref = 'other'; } },
+    { name: 'different base repository', change: ({ pr }) => { pr.base.repo.id = 30; } },
+    { name: 'wrong association', change: ({ run }) => { run.pull_requests = [{ number: 3, base: { repo: { id: 10 } } }]; } },
+    { name: 'wrong artifact SHA', change: ({ value }) => { value.headSHA = 'd'.repeat(40); } },
+    { name: 'wrong producer event', change: ({ run }) => { run.event = 'push'; } },
+    { name: 'failed producer', change: ({ run }) => { run.conclusion = 'failure'; } },
+    { name: 'wrong producer path', change: ({ run }) => { run.path = '.github/workflows/attacker.yaml'; } },
+    { name: 'fabricated allowed area', change: ({ value }) => { value.labels = ['area/cli', 'size/XS']; } },
+    { name: 'fabricated allowed size', change: ({ value }) => { value.labels = ['area/docs', 'size/XL']; } },
+    { name: 'unknown label', change: ({ value }) => { value.labels = ['bug', 'size/XS']; } },
+    { name: 'missing label', available: ['size/XS'] },
+    { name: 'incomplete files', files: [] },
+    { name: 'closed PR', ok: true, change: ({ pr }) => { pr.state = 'closed'; }, added: [] },
+    { name: 'retargeted PR', ok: true, change: ({ pr }) => { pr.base.ref = 'release'; }, added: [] },
+  ];
+  for (const c of cases) {
+    await t.test(c.name, async () => {
+      const pr = labelPR(), run = labelRun(), value = request();
+      c.change?.({ pr, run, value });
+      const { args, calls } = harness({ pr, files: [{ filename: 'nested/README.md' }], ...c });
+      args.context.payload = { workflow_run: run, repository: { id: 10 } };
+      if (c.ok) await triage.applyLabelRequest(args, value, rules);
+      else await assert.rejects(triage.applyLabelRequest(args, value, rules));
+      assert.deepEqual(calls.added, c.ok ? c.added || [['area/docs'], ['size/XS']] : []);
+      assert.deepEqual(calls.removed, c.removed || []);
+    });
+  }
+  await t.test('head changes during file pagination', async () => {
+    const pr = labelPR();
+    const { args, calls } = harness({ pr, files: [{ filename: 'README.md' }] });
+    args.context.payload = { workflow_run: labelRun(), repository: { id: 10 } };
+    let reads = 0;
+    args.github.rest.pulls.get = async () => ({ data: ++reads === 1 ? pr : { ...pr, head: { ...pr.head, sha: 'e'.repeat(40) } } });
+    await assert.rejects(triage.applyLabelRequest(args, request(), rules), /does not match/);
+    assert.deepEqual(calls.added, []);
+    assert.deepEqual(calls.removed, []);
+  });
+});
+
+test('producer writes validated JSON and never labels a PR', async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'nvkr-compute-test-'));
+  const previous = process.env.RUNNER_TEMP;
+  process.env.RUNNER_TEMP = directory;
+  t.after(async () => {
+    if (previous === undefined) delete process.env.RUNNER_TEMP;
+    else process.env.RUNNER_TEMP = previous;
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+  const pr = labelPR();
+  const { args, calls } = harness({ pr, files: [{ filename: 'nested/README.md' }] });
+  args.context.payload.pull_request = pr;
+  await triage.computePRLabels(args);
+  assert.deepEqual(await triage.readLabelRequest(path.join(directory, 'pr-labels'), rules), request());
+  assert.deepEqual(calls.added, []);
+  assert.deepEqual(calls.removed, []);
+});
+
+test('workflow permission and checkout boundaries', async t => {
+  const { parse } = require('yaml');
+  const workflow = async name => parse(await fs.readFile(path.join(__dirname, `../workflows/${name}.yaml`), 'utf8'));
+  for (const name of ['pr-labels', 'pr-label-guard', 'pr-title-lint']) {
+    await t.test(name, async () => {
+      const config = await workflow(name);
+      assert.ok(config.on.pull_request.types.includes('edited'));
+      assert.equal(config.on.pull_request_target, undefined);
+      for (const permissions of [config.permissions, ...Object.values(config.jobs).map(job => job.permissions)]) {
+        assert.ok(Object.values(permissions).every(access => access === 'read'));
+      }
+    });
+  }
+  await t.test('writer runs trusted code and downloads only the triggering artifact outside it', async () => {
+    const config = await workflow('pr-labels-apply');
+    assert.deepEqual(config.on, { workflow_run: { workflows: ['PR Labels'], types: ['completed'] } });
+    const job = config.jobs.apply;
+    assert.equal(job.permissions['pull-requests'], 'write');
+    assert.equal(job.permissions.actions, 'read');
+    const checkout = job.steps.filter(step => step.uses?.startsWith('actions/checkout@'));
+    assert.equal(checkout.length, 1);
+    assert.equal(checkout[0].with.ref, '${{ github.event.repository.default_branch }}');
+    assert.equal(checkout[0].with['persist-credentials'], false);
+    const download = job.steps.find(step => step.uses?.startsWith('actions/download-artifact@'));
+    assert.equal(download.with['run-id'], '${{ github.event.workflow_run.id }}');
+    assert.equal(download.with.name, 'pr-labels');
+    assert.equal(download.with.path, '${{ runner.temp }}/pr-labels');
+  });
 });

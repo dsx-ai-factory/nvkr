@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-// Issue and pull request metadata decisions for triage.yaml, pr-title-lint.yaml
-// and pr-label-guard.yaml. Each entry point takes actions/github-script's
+// Issue and pull request metadata decisions for the triage and PR workflows.
+// Each entry point takes actions/github-script's
 // { github, context, core } and reads current state from the API, so a rerun
 // acts on the issue or PR as it is now rather than on the event snapshot.
 // Tests: .github/scripts/triage.test.cjs (run by `make test-workflow-scripts`).
@@ -135,6 +135,10 @@ async function prSize({ github, context, core }) {
   const number = context.payload.pull_request.number;
   const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: number });
   const size = sizeLabel(pr.additions + pr.deletions);
+  await applySize({ github, context, core }, number, pr, size);
+}
+
+async function applySize({ github, context, core }, number, pr, size) {
   const names = SIZE_LABELS.map(([name]) => name);
   const current = pr.labels.map(label => label.name).filter(name => names.includes(name));
   // Stale sizes are removed before the new one is added. GitHub writes are not
@@ -151,6 +155,164 @@ async function prSize({ github, context, core }) {
     await github.rest.issues.addLabels({ ...context.repo, issue_number: number, labels: [size] });
   }
   core.info(`PR size: ${size}`);
+}
+
+// The labeler file is the sole path mapping. Support its current rule shape;
+// new labeler operators must be implemented and tested before they are used.
+function labelRules(source) {
+  const { parse } = require('yaml');
+  const config = parse(source, { uniqueKeys: true });
+  if (!config || typeof config !== 'object' || Array.isArray(config)) {
+    throw new Error('Invalid labeler configuration');
+  }
+  return Object.entries(config).map(([label, rules]) => {
+    if (!/^area\/[a-z][a-z-]*$/.test(label) || !Array.isArray(rules) || rules.length !== 1 ||
+        Object.keys(rules[0] || {}).join() !== 'changed-files') {
+      throw new Error('Unsupported labeler rule');
+    }
+    const changed = rules[0]['changed-files'];
+    if (!Array.isArray(changed) || changed.length !== 1 ||
+        Object.keys(changed[0] || {}).join() !== 'any-glob-to-any-file') {
+      throw new Error('Unsupported changed-files rule');
+    }
+    const value = changed[0]['any-glob-to-any-file'];
+    const globs = typeof value === 'string' ? [value] : value;
+    if (!Array.isArray(globs) || !globs.length ||
+        globs.some(glob => typeof glob !== 'string' || !glob.length || glob.startsWith('!'))) {
+      throw new Error('Invalid labeler globs');
+    }
+    return { label, globs };
+  });
+}
+
+function labelsForPR(pr, files, rules) {
+  const { minimatch } = require('minimatch');
+  if (![pr.additions, pr.deletions, pr.changed_files].every(n => Number.isSafeInteger(n) && n >= 0) ||
+      files.length !== pr.changed_files || !Number.isSafeInteger(pr.additions + pr.deletions)) {
+    throw new Error('Incomplete PR changes; refusing partial labels');
+  }
+  const labels = rules.filter(({ globs }) => files.some(file =>
+    globs.some(glob => minimatch(file.filename, glob, { dot: true }))
+  )).map(({ label }) => label);
+  return [...labels, sizeLabel(pr.additions + pr.deletions)].sort();
+}
+
+// The producer can be changed by a PR. No artifact field grants authority:
+// reject unknown fields/labels, then bind the request to GitHub's run and PR.
+function validateLabelRequest(request, rules) {
+  const allowed = new Set([...rules.map(rule => rule.label), ...SIZE_LABELS.map(([name]) => name)]);
+  if (!request || typeof request !== 'object' || Array.isArray(request) ||
+      Object.keys(request).sort().join() !== 'headSHA,labels,number,version' || request.version !== 1 ||
+      !Number.isSafeInteger(request.number) || request.number <= 0 ||
+      typeof request.headSHA !== 'string' || !/^[a-f0-9]{40}$/.test(request.headSHA) ||
+      !Array.isArray(request.labels) || request.labels.length > allowed.size ||
+      request.labels.some(label => typeof label !== 'string' || !allowed.has(label)) ||
+      new Set(request.labels).size !== request.labels.length ||
+      request.labels.filter(label => label.startsWith('size/')).length !== 1) {
+    throw new Error('Invalid PR label request');
+  }
+  return { ...request, labels: [...request.labels].sort() };
+}
+
+function validateLabelOrigin(request, run, pr, repository) {
+  if (run.event !== 'pull_request' || run.conclusion !== 'success' ||
+      run.path !== '.github/workflows/pr-labels.yaml' ||
+      !Number.isSafeInteger(repository.id) || !Number.isSafeInteger(run.head_repository?.id) ||
+      pr.number !== request.number || pr.base?.repo?.id !== repository.id ||
+      request.headSHA !== run.head_sha || pr.head?.sha !== run.head_sha ||
+      pr.head?.repo?.id !== run.head_repository.id || pr.head?.ref !== run.head_branch ||
+      // Fork runs can have no pull_requests entries. Use the independently
+      // fetched PR's head repository, branch and SHA as the binding in that case.
+      !Array.isArray(run.pull_requests) || (run.pull_requests.length > 0 &&
+        !run.pull_requests.some(item => item.number === request.number && item.base?.repo?.id === repository.id))) {
+    throw new Error('PR label request does not match the triggering run');
+  }
+}
+
+async function readRules() {
+  const fs = require('node:fs/promises');
+  const path = require('node:path');
+  return labelRules(await fs.readFile(path.join(__dirname, '../labeler.yml'), 'utf8'));
+}
+
+async function currentLabels(github, context, pr, rules) {
+  const files = await github.paginate(github.rest.pulls.listFiles, {
+    ...context.repo, pull_number: pr.number, per_page: 100,
+  });
+  return labelsForPR(pr, files, rules);
+}
+
+async function computePRLabels({ github, context, core }) {
+  const fs = require('node:fs/promises');
+  const path = require('node:path');
+  const rules = await readRules();
+  const { data: pr } = await github.rest.pulls.get({
+    ...context.repo, pull_number: context.payload.pull_request.number,
+  });
+  if (pr.state !== 'open' || pr.base.ref !== 'main' ||
+      pr.head.sha !== context.payload.pull_request.head.sha) {
+    throw new Error('PR changed since the triggering event; rerun on its current head');
+  }
+  const request = validateLabelRequest({
+    version: 1, number: pr.number, headSHA: pr.head.sha,
+    labels: await currentLabels(github, context, pr, rules),
+  }, rules);
+  const directory = path.join(process.env.RUNNER_TEMP, 'pr-labels');
+  await fs.mkdir(directory, { recursive: true });
+  await fs.writeFile(path.join(directory, 'labels.json'), JSON.stringify(request) + '\n');
+  core.info('Computed PR label request without label writes.');
+}
+
+async function readLabelRequest(directory, rules) {
+  const fs = require('node:fs/promises');
+  const path = require('node:path');
+  const files = await fs.readdir(directory);
+  if (files.length !== 1 || files[0] !== 'labels.json') throw new Error('Unexpected label artifact files');
+  const filename = path.join(directory, 'labels.json');
+  const stat = await fs.lstat(filename);
+  if (!stat.isFile() || stat.size > 16384) throw new Error('Invalid label artifact file');
+  return validateLabelRequest(JSON.parse(await fs.readFile(filename, 'utf8')), rules);
+}
+
+async function applyLabelRequest({ github, context, core }, request, rules) {
+  request = validateLabelRequest(request, rules);
+  const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: request.number });
+  validateLabelOrigin(request, context.payload.workflow_run, pr, context.payload.repository);
+  if (pr.state !== 'open' || pr.base.ref !== 'main') {
+    core.info('PR is closed or targets another branch; skipping labels.');
+    return;
+  }
+  // An allow-listed label still must match the current API data and trusted
+  // config. Never let a modified producer invent areas or a misleading size.
+  const expected = await currentLabels(github, context, pr, rules);
+  if (JSON.stringify(request.labels) !== JSON.stringify(expected)) {
+    throw new Error('Label request differs from current PR changes or default-branch configuration');
+  }
+  const available = new Set((await github.paginate(github.rest.issues.listLabelsForRepo, {
+    ...context.repo, per_page: 100,
+  })).map(label => label.name));
+  if (expected.some(label => !available.has(label))) throw new Error('Missing repository labels');
+
+  // Read the head/base again after pagination, before the first write.
+  const { data: latest } = await github.rest.pulls.get({ ...context.repo, pull_number: request.number });
+  validateLabelOrigin(request, context.payload.workflow_run, latest, context.payload.repository);
+  if (latest.state !== 'open' || latest.base.ref !== 'main' || latest.base.sha !== pr.base.sha) {
+    throw new Error('PR changed while computing labels');
+  }
+  const additions = expected.filter(label => label.startsWith('area/') &&
+    !latest.labels.some(current => current.name === label));
+  if (additions.length) {
+    await github.rest.issues.addLabels({ ...context.repo, issue_number: request.number, labels: additions });
+  }
+  await applySize({ github, context, core }, request.number, latest,
+    expected.find(label => label.startsWith('size/')));
+}
+
+async function applyPRLabels(args) {
+  const path = require('node:path');
+  const rules = await readRules();
+  const request = await readLabelRequest(path.join(process.env.RUNNER_TEMP, 'pr-labels'), rules);
+  await applyLabelRequest(args, request, rules);
 }
 
 async function titleLint({ github, context, core }) {
@@ -183,12 +345,20 @@ async function doNotMergeGuard({ github, context, core }) {
 }
 
 module.exports = {
+  applyLabelRequest,
+  applyPRLabels,
+  computePRLabels,
   doNotMergeGuard,
   formComponent,
   intakeLabels,
   issueIntake,
+  labelRules,
+  labelsForPR,
   prSize,
   sizeLabel,
+  readLabelRequest,
   titleIsValid,
   titleLint,
+  validateLabelOrigin,
+  validateLabelRequest,
 };

@@ -70,6 +70,12 @@ Apply the repository's live labels. These are the relevant conventions:
 | `lifecycle/stale`, `lifecycle/frozen` | Owned by the existing inactivity policy. Propose freezing accepted/deferred work when justified; assignment alone does not exempt it. |
 | `needs-ci-fix`, `needs-rebase` | PR maintenance labels; do not apply them to issues as priorities. |
 
+PR path/size labels arrive asynchronously after the read-only `pull_request`
+producer and default-branch `workflow_run` writer succeed. For missing labels,
+inspect both runs and any fork approval requirement before recommending manual
+repair. The title and hold-label checks use `pull_request`; the guard also runs
+on retarget edits. See the management guide for validation and retry behavior.
+
 Never create, rename, or delete repository labels. List any unavailable label
 under **Labels this needs** and leave the dependent operation unapplied. Do not
 add priority labels. The reporter's impact choice informs

@@ -1,0 +1,60 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+name: PR Labels
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  compute:
+    name: Compute PR Labels
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      # PR code is untrusted and receives no write token. The consumer verifies
+      # the request against its own default-branch code and current API data.
+      - name: Check out PR configuration and scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            .github/labeler.yml
+            .github/scripts
+          sparse-checkout-cone-mode: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install locked script dependencies
+        run: npm ci --prefix .github/scripts --ignore-scripts --no-audit --no-fund
+
+      - name: Compute labels without write access
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const triage = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/triage.cjs`);
+            await triage.computePRLabels({ github, context, core });
+
+      - name: Upload label request
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pr-labels
+          path: ${{ runner.temp }}/pr-labels/labels.json
+          if-no-files-found: error
+          retention-days: 1
