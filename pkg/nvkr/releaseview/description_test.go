@@ -234,6 +234,30 @@ func TestDescribeMatchesJSONAndRejectsAmbiguousSelection(t *testing.T) {
 	}
 }
 
+func TestDescriptionOmitsHelmOutsideBoundArchive(t *testing.T) {
+	for _, test := range []struct {
+		name, output string
+		index        int
+		digest       string
+	}{
+		{name: "Helm output without archive digest", output: "chart", index: 1},
+		{name: "non-Helm output with archive digest", output: "image", index: 3, digest: "sha256:" + strings.Repeat("9", 64)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			publication := descriptionFixture()
+			publication.Outputs[test.index].ChartArchiveDigest = test.digest
+			got, err := Describe(publication, test.output)
+			if err != nil || len(got.Outputs) != 1 || got.Outputs[0].Helm != nil {
+				t.Fatalf("Helm description escaped its boundary: %+v, %v", got, err)
+			}
+			raw, err := Render(publication, Options{Format: "json", Output: test.output})
+			if err != nil || strings.Contains(string(raw), `"helm"`) {
+				t.Fatalf("JSON gained a Helm description: %s, %v", raw, err)
+			}
+		})
+	}
+}
+
 func TestDescriptionEmptyCollectionsAndUnavailableSources(t *testing.T) {
 	for _, test := range []struct {
 		name        string

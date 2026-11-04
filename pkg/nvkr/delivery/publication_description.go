@@ -134,6 +134,8 @@ func publicationDescription(reference string, inspection Inspection, outputs []O
 			value := *object.Output.Publication
 			origin = &value
 		}
+		// Both callers check this binding first: InspectMetadataDescription via
+		// publishedHelmChartConfig and OpenPublication via inspectOutputs.
 		var chartArchiveDigest string
 		if object.Output.Format == outputFormatHelm {
 			chartArchiveDigest = object.BlobDigest
