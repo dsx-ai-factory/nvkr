@@ -155,16 +155,22 @@ func githubLocatorRetryDelay(response githubLocatorResponse, attempt int, now ti
 	if !limited && !transient {
 		return 0, false, nil
 	}
-	remaining := response.header.Values("X-RateLimit-Remaining")
-	if len(remaining) > 1 || (len(remaining) == 1 && remaining[0] == "0") {
-		return 0, true, e.New(e.CodeUnavailable, "CI locator API primary rate limit is exhausted or ambiguous")
-	}
 	delay := (60 * time.Second) << attempt
 	if transient {
 		delay = (2 * time.Second) << attempt
 	}
-	delay, err := githubLocatorServerDelay(response.header, delay, attempt, now)
+	delay, err := githubAPIServerDelay(response.header, delay, attempt, now)
 	return delay, true, err
+}
+
+// githubAPIServerDelay refuses exhausted or ambiguous primary quota before
+// applying the shared bounded server delay. Storage downloads do not use API quota.
+func githubAPIServerDelay(header http.Header, delay time.Duration, attempt int, now time.Time) (time.Duration, error) {
+	remaining := header.Values("X-RateLimit-Remaining")
+	if len(remaining) > 1 || (len(remaining) == 1 && remaining[0] == "0") {
+		return 0, e.New(e.CodeUnavailable, "GitHub API primary rate limit is exhausted or ambiguous")
+	}
+	return githubLocatorServerDelay(header, delay, attempt, now)
 }
 
 // githubLocatorServerDelay uses the default delay only when Retry-After is
