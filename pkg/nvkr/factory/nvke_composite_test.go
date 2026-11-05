@@ -75,7 +75,7 @@ func TestNVKECompositeAdmission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	effective, want := composition.Effective(), len(combined.Outputs)+len(nvkeFamilyOnlyOutputs)-len(nvkeCompositeExcludedOutputs(t))
+	effective, want := composition.Effective(), len(combined.Outputs)-len(nvkeCombinedOnlyOutputs)+len(nvkeFamilyOnlyOutputs)-len(nvkeCompositeExcludedOutputs(t))
 	if len(composition.Members()) != len(nvkeCompositeFamilies) || len(effective.Outputs) != want || len(composition.Attribution()) != want {
 		t.Fatalf("composite admits %d members and %d outputs, want %d and %d", len(composition.Members()), len(effective.Outputs), len(nvkeCompositeFamilies), want)
 	}
@@ -146,7 +146,7 @@ func TestNVKECompositeIdentityInvariance(t *testing.T) {
 		t.Fatalf("refused for an unexpected reason: %v", err)
 	}
 	excluded := nvkeCompositeExcludedOutputs(t)
-	if want := len(combined.Definition.Outputs) + len(nvkeFamilyOnlyOutputs) - len(excluded); len(plan.LifecycleOutputs) != want || len(plan.Composition.Members) != len(nvkeCompositeFamilies) {
+	if want := len(combined.Definition.Outputs) - len(nvkeCombinedOnlyOutputs) + len(nvkeFamilyOnlyOutputs) - len(excluded); len(plan.LifecycleOutputs) != want || len(plan.Composition.Members) != len(nvkeCompositeFamilies) {
 		t.Fatalf("composite Plan has %d outputs, want %d", len(plan.LifecycleOutputs), want)
 	}
 	// The combined Definition lacks family-only outputs, so the plain baseline is the effective Definition.
@@ -187,7 +187,8 @@ func TestNVKECompositeIdentityInvariance(t *testing.T) {
 	}
 	for _, baseline := range baselines {
 		for _, build := range baseline.Builds {
-			if output, _, _ := strings.Cut(build.Name, "/"); excluded[output] {
+			output, _, _ := strings.Cut(build.Name, "/")
+			if _, combinedOnly := nvkeCombinedOnlyOutputs[output]; excluded[output] || combinedOnly {
 				continue
 			}
 			if !bytes.Equal(mustCanonical(t, build), builds[build.Name]) {
@@ -195,7 +196,7 @@ func TestNVKECompositeIdentityInvariance(t *testing.T) {
 			}
 		}
 		for _, output := range baseline.LifecycleOutputs {
-			if excluded[output.Name] {
+			if _, combinedOnly := nvkeCombinedOnlyOutputs[output.Name]; excluded[output.Name] || combinedOnly {
 				continue
 			}
 			if !bytes.Equal(mustCanonical(t, output), outputs[output.Name]) {
