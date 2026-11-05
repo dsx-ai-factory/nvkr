@@ -66,6 +66,15 @@ test('issue intake', async t => {
     { name: 'repeated Component heading is ambiguous', issue: issue({ body: '### Steps\n\n### Component\n\nDocs / examples\n\n### Component\n\nCLI (nvkr)' }), added: [['needs-triage']] },
     { name: 'unknown component and keywords ignored', issue: issue({ body: '### Component\n\nOther / Unknown\n\ncatalog pipeline release docs ci' }), added: [['needs-triage']] },
     { name: 'documentation form label', issue: issue({ labels: names(['documentation']) }), added: [['area/docs', 'needs-triage']] },
+    { name: 'release scope overrides documentation label', issue: issue({ title: 'docs(release): record consumer acceptance', labels: names(['documentation']) }), added: [['area/release', 'needs-triage']] },
+    { name: 'definitions scope overrides documentation label', issue: issue({ title: 'docs(definitions): explain input resolution', labels: names(['documentation']) }), added: [['area/definitions', 'needs-triage']] },
+    { name: 'component wins over scope and documentation label', issue: issue({ title: 'docs(release): explain', body: '### Component\n\nDefinitions — output selection / catalog substitutions', labels: names(['documentation']) }), added: [['area/definitions', 'needs-triage']] },
+    { name: 'bare factory scope is ambiguous despite title keywords', issue: issue({ title: 'feat(factory): grow pipeline result collectors' }), added: [['needs-triage']] },
+    { name: 'factory with pipeline component', issue: issue({ title: 'feat(factory): grow result collectors', body: '### Component\n\nGenerator / pipeline emission' }), added: [['area/pipeline', 'needs-triage']] },
+    { name: 'factory with Run component', issue: issue({ title: 'feat(factory): reuse results', body: '### Component\n\nRun — planning, generation, or execution' }), added: [['area/run', 'needs-triage']] },
+    { name: 'factory with explicit pipeline scope', issue: issue({ title: 'fix(factory/pipeline): collector capacity' }), added: [['area/pipeline', 'needs-triage']] },
+    { name: 'focused regression keeps behavior scope', issue: issue({ title: 'test(release): verify closure' }), added: [['area/release', 'needs-triage']] },
+    { name: 'shared test harness scope', issue: issue({ title: 'fix(tests): share fixture setup' }), added: [['area/tests', 'needs-triage']] },
     { name: 'explicit ci scope', issue: issue({ title: 'fix(ci): refresh action' }), added: [['area/ci', 'needs-triage']] },
     { name: 'breaking multi-token scope', issue: issue({ title: 'feat(pkg/nvkr/release)!: verify' }), added: [['area/release', 'needs-triage']] },
     { name: 'unmapped scope', issue: issue({ title: 'fix(go): bump' }), added: [['needs-triage']] },
@@ -314,6 +323,51 @@ test('apply binds untrusted requests to the run and current PR before any write'
     assert.deepEqual(calls.added, []);
     assert.deepEqual(calls.removed, []);
   });
+  await t.test('only base SHA changes during file pagination', async () => {
+    const pr = labelPR();
+    // A stale size would be removed if the final guard were bypassed.
+    pr.labels = names(['size/XL']);
+    const { args, calls } = harness({ pr, files: [{ filename: 'README.md' }] });
+    args.context.payload = { workflow_run: labelRun(), repository: { id: 10 } };
+    let reads = 0;
+    args.github.rest.pulls.get = async () => ({ data: ++reads === 1 ? pr : {
+      ...pr, base: { ...pr.base, sha: 'e'.repeat(40) },
+    } });
+    await assert.rejects(triage.applyLabelRequest(args, request(), rules),
+      { message: 'PR changed while computing labels' });
+    assert.equal(reads, 2);
+    assert.deepEqual(calls.added, []);
+    assert.deepEqual(calls.removed, []);
+  });
+});
+
+test('producer refuses changed PRs before writing a request', async t => {
+  const cases = [
+    { name: 'closed PR', change: pr => { pr.state = 'closed'; } },
+    { name: 'retargeted base', change: pr => { pr.base.ref = 'release'; } },
+    { name: 'head differs from triggering event', change: pr => { pr.head.sha = 'c'.repeat(40); } },
+  ];
+  for (const c of cases) {
+    await t.test(c.name, async t => {
+      const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'nvkr-compute-refusal-'));
+      const previous = process.env.RUNNER_TEMP;
+      process.env.RUNNER_TEMP = directory;
+      t.after(async () => {
+        if (previous === undefined) delete process.env.RUNNER_TEMP;
+        else process.env.RUNNER_TEMP = previous;
+        await fs.rm(directory, { recursive: true, force: true });
+      });
+      const pr = labelPR();
+      c.change(pr);
+      const { args, calls } = harness({ pr, files: [{ filename: 'README.md' }] });
+      args.context.payload.pull_request = labelPR();
+      await assert.rejects(triage.computePRLabels(args),
+        { message: 'PR changed since the triggering event; rerun on its current head' });
+      assert.deepEqual(await fs.readdir(directory), []);
+      assert.deepEqual(calls.added, []);
+      assert.deepEqual(calls.removed, []);
+    });
+  }
 });
 
 test('producer writes validated JSON and never labels a PR', async t => {

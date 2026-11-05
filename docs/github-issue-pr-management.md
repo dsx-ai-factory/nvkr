@@ -40,16 +40,56 @@ Maintainers also review the latest [vulnerability scan](cve-management.md) at
 this cadence. A report forwarded by NVIDIA PSIRT is triaged promptly when received.
 
 The [triage workflow](../.github/workflows/triage.yaml) adds `needs-triage` to new
-open issues and infers one `area/*` label from the form's Component, the
-documentation form, or an explicit title scope. It never infers an area from free
-text and never creates labels: a missing label fails the job before any label is
-applied. Type labels and inferred labels do not complete triage; maintainers
-correct the area if needed and remove `needs-triage` after review and recording
-the next action.
+open issues and infers one `area/*` label using the precedence below. It never
+infers an area from free text and never creates labels: a missing label fails the
+job before any label is applied. Type labels and inferred labels do not complete
+triage; maintainers correct the area if needed and remove `needs-triage` after
+review and recording the next action.
+
+Intake preserves an existing area, then prefers the exact Component, an explicit
+mapped title scope, and finally the `documentation` label as a docs fallback.
+Bare `factory` scopes need review because they span Run and pipeline work.
+Generated-workflow capacity and transport belong to pipeline; Run planning and
+execution belong to run. Authored Definition/Environment work belongs to
+definitions, and publication or consumer acceptance belongs to release. Maintainers
+correct mismatched form selections and documentation labels after reading the
+acceptance scope. Focused regression tests retain the behavior's area; tests is
+for shared harnesses and fixtures.
+
+Each issue has one primary area, chosen by the owning behavior. For cross-area
+work, record secondary owners in the next action. Use the closest existing area
+and state the routing assumption when no exact label exists, such as observation
+or validation. Resolve disputed ownership with a maintainer; labels do not change
+module authority. Preserve valid type labels, including `enhancement` on tests or
+refactors, and propose a type when one is missing. Preserve legacy topical labels
+such as `github_actions` unless a maintainer approves removal. An actionable issue
+with `question` may need a design decision and remains an issue.
+
+Queues predating the taxonomy rollout need review even when `needs-triage` is
+absent. Review every open issue, propose one area, and propose `needs-triage` on
+unresolved/manual-review items. Do not add and remove the label just to replay
+intake on classified rows. Maintainer acceptance and a recorded next action
+complete review; a recommendation report alone does not.
+
+Before recommending closure, reconcile every acceptance item with merged code/tests
+or exact operational evidence at the level required. Closing keywords, resolved
+review threads and design merges do not prove completion. Keep partially completed
+issues open and propose removing premature closing keywords, or obtain maintainer
+acceptance to transfer every remaining item to a named surviving issue. Duplicate,
+invalid and superseded dispositions also need an item-by-item mapping to the
+surviving issue or decision.
+
+For old references to the monolithic ADR ledger, find the current owner through
+the [reconciliation index](adr/reconciliation/README.md) and cite the per-ADR or
+topic file. Check stale prerequisite statements against current PR merge state
+and owning code. Propose corrections in the owning ledger file while preserving
+dated evidence and pending ratification; a merged prerequisite alone does not
+prove downstream acceptance.
 
 The [nvkr-triage skill](../.agents/skills/nvkr-triage/SKILL.md) supports this review
-with per-issue recommendations and verification of authorized edits. It does not
-assume a Projects board or assign priority from a reporter's impact selection.
+with recommendations and verification of authorized edits. Its default scope is
+issues only, with excluded open PRs counted and listed. It does not assume a
+Projects board or assign priority from a reporter's impact selection.
 
 ## Pull requests
 
@@ -59,6 +99,15 @@ for the local gate, DCO sign-off, and cryptographic commit signatures. Code
 owners review their paths; maintainers handle review, requests for changes, and
 merge decisions under [GOVERNANCE.md](../GOVERNANCE.md). Draft PRs are not ready
 for maintainer review.
+
+When PR triage is requested, read complete bodies and comment/review threads,
+current labels and assignees, base/head identities, paginated changed-file lists,
+additions/deletions, current-head checks/reviews, draft state and merge conflicts.
+Report unknown or unreadable states for manual review. Propose path areas from
+the labeler configuration and sizes from the changed-line thresholds in
+[triage.cjs](../.github/scripts/triage.cjs), never from an issue's effort estimate.
+Keep PR verdicts separate from issue counts and apply the same authorization and
+verification rules to both.
 
 The [PR labels workflow](../.github/workflows/pr-labels.yaml) computes `area/*`
 labels from [changed paths](../.github/labeler.yml) and one `size/*` label from
