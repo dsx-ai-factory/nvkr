@@ -577,8 +577,11 @@ has its own provider success condition, removing accidental unrelated-output bar
 still requires every job and exact carrier. The projected provider graph is checked for cycles.
 Redundant direct dependency edges are removed only when the full ancestor closure is preserved. Authored
 setup, runtime variables, images or services mentioning `needs` retain ordinary direct lists. Large
-finalizers use 16 fixed FNV-1a buckets, each limited to 64 jobs, to forward exact original results. Addition
-does not rebalance existing membership; overflow fails before generation returns output. Collectors have no
+finalizers use the narrowest of 16, 32 or 64 fixed FNV-1a buckets whose fullest bucket holds at most 64
+jobs to forward exact original results; finalizers that fit 16 buckets keep their membership, and committed
+16-bucket bundles regenerate byte-identically. At a given width, addition does not rebalance existing
+membership; 64-bucket overflow, or a layout over the finalizer parser's token budget, fails before
+generation returns output. Collectors have no
 token permissions, credentials, checkout or artifacts and introduce no producer execution barrier. Finalization
 requires successful collectors, their exact Plan-derived partition and strict bounded reports before recovery.
 The closing summary counts original outcomes, not collector success. Local contracts cover duplicate,

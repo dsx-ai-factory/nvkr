@@ -114,7 +114,8 @@ consumes unchanged. The derivation is a pure, deterministic function of the comp
 | Named outputs | Disjoint union. Each output declaration is copied unchanged except for catalog path rebasing below. Output names are preserved; there is no prefixing, renaming or namespacing. The union is sorted by name. | The same output name in two members is an error, even if the declarations are identical. There is no deduplication. |
 | Per-output catalog | Every output receives an explicit catalog stack. An output without an override inherits its own member's top-level `catalog`. Base and overlay locators are rebased from the member's directory to the composite's directory. Member locators must be relative; absolute locators are rejected, not rebased, matching compile-input capture. | An absolute base or overlay locator, or a rebased locator outside the admitted input root, is an error. |
 | Top-level `catalog` | Every member's top-level catalog stack, after rebasing, must be identical. It becomes the effective Definition's top-level stack. | Any difference is an error. |
-| `sbomTool`, `cosignTool` | Every member must select the same value (including omission). | Any difference is an error. |
+| `sbomTool` | Every member that selects one must select the same value; it becomes the effective `sbomTool`. A member that omits it inherits that shared value, so its outputs get SBOMs inside the composite while its standalone Runs stay unchanged. | Two different selected values are an error. |
+| `cosignTool` | Every member must select the same value (including omission). | Any difference is an error. |
 | Helm image bindings | Copied unchanged. Each member was validated standalone (§2 step 3), so every binding already resolves inside its own member; preserved names keep it resolving to the same output. | A binding cannot reach another member's output by construction. |
 | Platforms | Copied unchanged per output; aggregate `platforms` sets keep their exact membership (ADR-11 §2, ADR-12). | Unsupported platforms fail in the existing compiler and Environment admission, as for any Definition. |
 | Producer pins | Catalog locks remain the only pin owner (ADR-22). One catalog file loads once per compile. For every `(component, target platform)` that outputs of **different** members select, the effective producer snapshot (after overlays and toolchain substitutions) must be identical unless the composite declares both members as variants of that component. | Divergent effective producers for the same component and platform across members are an error unless both members are listed in that component's declared variant. A declared member that selects the component in none of its outputs is an error. Within one member, existing ADR-11 semantics are unchanged. |
@@ -460,8 +461,8 @@ Acceptance tests per unit:
   that selects its component in none of its outputs, → `invalid-catalog`; declared variants change the
   composite digest and an empty declaration does not.
 - **U2:** deterministic output (shuffled member order in memory yields identical bytes); duplicate output name,
-  even with identical declarations → `invalid-catalog`; differing top-level stack, `sbomTool` or `cosignTool`
-  → `invalid-catalog`; absolute member base or overlay locator → `invalid-catalog`, matching captured
+  even with identical declarations → `invalid-catalog`; differing top-level stack, selected `sbomTool` or `cosignTool`
+  → `invalid-catalog`; a member that omits `sbomTool` inherits the shared one; absolute member base or overlay locator → `invalid-catalog`, matching captured
   compile-input replay; default-catalog outputs receive explicit rebased stacks; Helm bindings resolve to the same
   outputs; effective Definition passes `Definition.Validate`.
 - **U3:** **identity invariance** — for the four NVKE families (extended, with pinned-source access like the

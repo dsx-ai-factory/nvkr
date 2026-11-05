@@ -17,15 +17,11 @@ references and own any required association or compatibility decision. See the
 [partitioning strategy](../../definition-partitioning-strategy.md) for scope and historical measurements.
 Proposed [ADR-26](../0026-definition-composition.md) designs a composite of these families as one Release;
 units U1–U7 are implemented and contract-tested only. The authored
-[GPU site composite](../../../inputs/definitions/nvke/README.md#gpu-site-composite) pins the five families,
-declares the eight components the Ubuntu 24.04 overlay replaces as variants of the two disk families, and has
+[GPU site composite](../../../inputs/definitions/nvke/README.md#gpu-site-composite) pins the five families
+and the GB200 AICR Definition, which inherits their `sbomTool`, declares the eight components the Ubuntu 24.04 overlay replaces as variants of the two disk families, and has
 a generated named production bundle and the fixed development bundle, both enrolled in `make workflows-check`
-and catalog maintenance. No hosted composite Run, publication or consumer verification is recorded. The GB200 AICR Definition is
-not a member: it omits the shared `sbomTool: syft`, which ADR-26 refuses first. With that tool added, a
-measurement taken before the core family dropped its NICo outputs and AICR CLI had generation refuse it with
-`engine-capability`, because ADR-18's 16 fixed result-collector buckets would route 65 of the 779 finalizer
-jobs into one bucket, over its 64-job limit. Six-member capacity for the current 80-output selection has not
-been measured.
+and catalog maintenance. No hosted composite Run, publication or consumer verification is recorded. The six-member finalizer fits
+ADR-18's 16 result-collector buckets.
 A fifth, `disks-ubuntu24` family selects four Ubuntu 24.04 disks that the combined candidate omits; see
 [Ubuntu 24 node-image inputs](ubuntu-24-node-image-inputs.md#ubuntu-24-node-image-inputs).
 
