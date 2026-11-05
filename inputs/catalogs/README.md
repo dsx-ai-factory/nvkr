@@ -18,7 +18,8 @@ quickstart. Its tool pin is separate from the AMD64 scanner in the maintained re
 output-scoped selections retain the same NVKE release producers.
 
 The [native ARM64 AICR CLI](tools/aicr-arm64/README.md) pins AICR's release executable and
-delivers its binary attestation beside it as a pinned companion.
+delivers its binary attestation beside it as a pinned companion. No maintained Definition selects it:
+publication accepts one bundle entry per component, so the companion cannot be published yet.
 
 [`nico`](nico/registry.yaml) owns the source-packaged NICo, NICo prerequisite and NICo Flow charts and the
 source-built NICo Core and Flow images, pinned independently of NVKE to one infra-controller release.

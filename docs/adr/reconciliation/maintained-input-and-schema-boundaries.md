@@ -1,9 +1,9 @@
 ## Maintained input and schema boundaries
 
-The NVKE four-family pilot adds independent core (27 outputs), services (34), telemetry (17) and disks (4)
+The NVKE four-family pilot adds independent core (26 outputs), services (34), telemetry (17) and disks (4)
 Definitions under `inputs/definitions/nvke/`, with corresponding `github-nvke-<family>` Environments and
-named production bundles. Their selected output union is the combined candidate's 69 outputs, except `nico-reference-profiles-fixture`, plus 14
-family-only outputs (eight core, six services) that the combined Definition omits for workflow headroom, retaining
+named production bundles. Their selected output union is the combined candidate's 69 outputs, except `nico-reference-profiles-fixture`, plus 13
+family-only outputs (seven core, six services) that the combined Definition omits for workflow headroom, retaining
 aggregate native children, bound chart/image relationships and complete disk material selections. They
 reuse shared catalog/pin owners and publish into separate family prefixes beneath the existing candidate
 namespace. `make nvke-split-generate` and `make nvke-split-check` own the family subset; the repository-wide
@@ -24,7 +24,9 @@ The [GPU system matrix](../../../inputs/definitions/nvke/README.md#gpu-system-ma
 and the site controller to family outputs in documentation only. It adds no Definition axis, input or
 generated file. NVKR records no GPU driver, fabric or runtime acceptance for any of them; that evidence
 belongs to AICR and NVKE. No maintained Definition yet selects the matrix's Ubuntu 24.04 disks,
-offline CAPI repository or composite site Release; the core family selects `controller-profiles`. The GB200 AICR bundle
+offline CAPI repository or composite site Release; the core family selects `controller-profiles`. No maintained Definition selects the ARM64 AICR CLI:
+publication accepts one bundle entry per component build subject, so its pinned attestation companion cannot be
+published beside it yet. The GB200 AICR bundle
 Definition has one local Run and no hosted Release.
 
 The maintained release node-image catalog selects the NVIDIA OVN fork `v2.4.2`
