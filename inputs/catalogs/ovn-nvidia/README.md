@@ -30,6 +30,13 @@ bin/nvkr catalog pin --dir inputs/catalogs/ovn-nvidia \
   --tag v2.4.2 --timeout 5m ovn-kubernetes
 ```
 
+For subsequent reviewed pin changes, first run `make producer-overlays-check` against the old baseline.
+After pinning, run `make producer-overlays-generate` and `make producer-overlays-check`, then regenerate
+affected Run bundles with their recorded inputs and check them with `make workflows-check`. The
+[maintenance guide](../../../docs/catalog-maintenance.md#maintain-producer-copies) lists configured copies,
+excluded variants and recovery after a partial regeneration. A change of chart stream also requires review
+of downstream profile package selections; those are not inferred from the producer lock.
+
 
 
 ## Build and package graph
@@ -253,9 +260,10 @@ closure, reject missing chart/image materials, and compile the diagnostic and
 four-output publication Plans. They verify all six native Helm bindings,
 cross-platform/missing-slot failures, publication-independent Build identity,
 ordinary native hosted routing and byte-exact bundle regeneration.
-Pin-binding tests cross-check the catalog's image tag, Debian revision, chart
-stream and import paths against the reviewed lock and stream. Re-pinning requires
-updating these declarations together. A local BuildKit argument fixture checks
+Source metadata bindings derive the image tag, Debian revision, chart stream and import paths from the lock.
+Two-revision Git fixtures update only the lock and exercise the resulting image arguments, chart checks,
+generated values, package control files and installer constants. Commit-only pins require explicit stream
+metadata and still check the chart version. Installer-time shell expressions remain deferred. A local BuildKit argument fixture checks
 both architectures and the explicit source epoch without building an image.
 Ordinary public-source CI runs only these credential-free contracts.
 The opt-in `TestOVNForkHelmDigestRendering` accepts

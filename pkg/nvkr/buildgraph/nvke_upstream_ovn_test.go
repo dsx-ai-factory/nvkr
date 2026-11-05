@@ -27,9 +27,15 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-const upstreamOVNCommit = "d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d"
-const upstreamOVNTree = "ce0cb49cd14f2fc260457e61a5a222c027a07f79"
-const upstreamOVNEpoch = 1788540677
+func upstreamOVNPin(t *testing.T) catalog.Pin {
+	t.Helper()
+	lock, err := catalog.LoadLockContext(t.Context(), upstreamOVNDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return lock.Pins["ovn-kubernetes"]
+}
+
 const upstreamOVNDir = "../../../inputs/catalogs/ovn-upstream"
 
 func loadUpstreamOVN(t *testing.T) *catalog.Catalog {
@@ -49,11 +55,11 @@ func TestNVKEUpstreamOVNGraphs(t *testing.T) {
 		t.Fatal("upstream closure must contain exactly image, chart and CNI packaging")
 	}
 	for name, component := range cat.Components {
-		if !component.FromSource || component.Prebuilt != nil || component.Repo != "https://github.com/ovn-kubernetes/ovn-kubernetes" || component.Commit != upstreamOVNCommit || component.TreeHash != upstreamOVNTree || component.SourceDate != upstreamOVNEpoch || component.Tag != "v1.4.0" {
+		if !component.FromSource || component.Prebuilt != nil || component.Repo != "https://github.com/ovn-kubernetes/ovn-kubernetes" || component.Commit != upstreamOVNPin(t).Commit || component.TreeHash != upstreamOVNPin(t).TreeHash || component.SourceDate != upstreamOVNPin(t).SourceDateEpoch || component.Tag != upstreamOVNPin(t).Tag {
 			t.Fatalf("%s lost exact upstream source pin", name)
 		}
 		command := strings.Join(component.BuildCommand, "\n")
-		if strings.Contains(command, ovnForkCommit) || strings.Contains(command, ovnForkStream) || strings.Contains(command, "/src/charts/") {
+		if strings.Contains(command, ovnForkPin(t).Commit) || strings.Contains(command, ovnForkStream(t)) || strings.Contains(command, "/src/charts/") {
 			t.Fatalf("%s retains fork-specific source/package inputs", name)
 		}
 		if err := exec.CommandContext(t.Context(), "bash", "-n", "-c", component.BuildCommand[2]).Run(); err != nil {
@@ -61,7 +67,7 @@ func TestNVKEUpstreamOVNGraphs(t *testing.T) {
 		}
 	}
 	image := strings.Join(cat.Components["ovn-kube-ubuntu"].BuildCommand, "\n")
-	for _, fragment := range []string{"build-arg:BUILDER_IMAGE=" + ovnGoBuilder, "build-arg:KUBECTL_MINOR=1.34", "name=localhost/nvke/ovn-kubernetes:git-" + upstreamOVNCommit} {
+	for _, fragment := range []string{"build-arg:BUILDER_IMAGE=" + ovnGoBuilder, "build-arg:KUBECTL_MINOR=1.34", `name=localhost/nvke/ovn-kubernetes:git-"${NVKR_SOURCE_COMMIT:?}"`} {
 		if !strings.Contains(image, fragment) {
 			t.Fatalf("source image lost %q", fragment)
 		}
@@ -200,11 +206,11 @@ func TestNVKEUpstreamOVNDiskSelection(t *testing.T) {
 		t.Fatal("profile package inputs lost exact patch binding")
 	}
 	for _, kind := range []string{"charts", "images"} {
-		if !strings.Contains(string(raw), "nke-cni-ovn-"+kind+"-1.4.0") {
+		if !strings.Contains(string(raw), "nke-cni-ovn-"+kind+"-"+catalog.NormalizeVersion(upstreamOVNPin(t).Tag)) {
 			t.Fatal("upstream profile installs the wrong stream")
 		}
 	}
-	if strings.Contains(string(raw), ovnForkStream) {
+	if strings.Contains(string(raw), ovnForkStream(t)) {
 		t.Fatal("upstream profile retains NVIDIA package stream")
 	}
 	if !strings.Contains(string(raw), "set image-url http://172.30.0.1:18080/nvke-node-image-upstream-ovn-arm64.qcow2") {
@@ -217,7 +223,8 @@ func TestNVKEUpstreamOVNDiskSelection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := strings.NewReplacer("nke-cni-ovn-images-"+ovnForkStream, "nke-cni-ovn-images-1.4.0", "nke-cni-ovn-charts-"+ovnForkStream, "nke-cni-ovn-charts-1.4.0", "nvke-node-image-arm64.qcow2", "nvke-node-image-upstream-ovn-arm64.qcow2").Replace(string(baselinePatch))
+	upstreamStream := catalog.NormalizeVersion(upstreamOVNPin(t).Tag)
+	expected := strings.NewReplacer("nke-cni-ovn-images-"+ovnForkStream(t), "nke-cni-ovn-images-"+upstreamStream, "nke-cni-ovn-charts-"+ovnForkStream(t), "nke-cni-ovn-charts-"+upstreamStream, "nvke-node-image-arm64.qcow2", "nvke-node-image-upstream-ovn-arm64.qcow2").Replace(string(baselinePatch))
 	if string(raw) != expected {
 		t.Fatal("upstream profile alters unrelated bootstrap behavior")
 	}
@@ -265,12 +272,12 @@ func TestNVKEUpstreamOVNFullPlan(t *testing.T) {
 func TestNVKEUpstreamOVNSourceRender(t *testing.T) {
 	source := os.Getenv("NVKR_UPSTREAM_OVN_CHECKOUT")
 	if source == "" {
-		t.Skip("requires a clean exact v1.4.0 source checkout")
+		t.Skip("requires a clean checkout of the locked upstream source")
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
 	commit, err := exec.CommandContext(ctx, "git", "-C", source, "rev-parse", "HEAD").Output()
-	if err != nil || strings.TrimSpace(string(commit)) != upstreamOVNCommit {
+	if err != nil || strings.TrimSpace(string(commit)) != upstreamOVNPin(t).Commit {
 		t.Fatalf("source ref: %s %v", commit, err)
 	}
 	dirty, err := exec.CommandContext(ctx, "git", "-C", source, "status", "--porcelain", "--", "helm/ovn-kubernetes").Output()

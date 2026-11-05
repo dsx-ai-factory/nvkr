@@ -75,6 +75,7 @@ type rawComponent struct {
 	ArtifactPath           string              `json:"artifactPath,omitempty"`
 	WriteDir               string              `json:"writeDir,omitempty"`
 	VersionStamp           map[string]string   `json:"versionStamp,omitempty"` // Go text/template values
+	SourceMetadata         map[string]string   `json:"sourceMetadata,omitempty"`
 	Patches                []patchDeclaration  `json:"patches,omitempty"`
 	Prebuilt               *Prebuilt           `json:"prebuilt,omitempty"` // the no-compile lane
 	ExclusionReason        string              `json:"exclusionReason,omitempty"`

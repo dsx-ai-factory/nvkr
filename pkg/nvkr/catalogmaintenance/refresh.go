@@ -72,6 +72,11 @@ func refresh(ctx context.Context, config Config, generatorVersion string, check 
 	if check {
 		return result, e.New(e.CodeDiff, "catalog pins would change")
 	}
+	if config.ProducerOverlays != "" {
+		if err := GenerateProducerOverlays(ctx, config.ProducerOverlays, false); err != nil {
+			return result, fmt.Errorf("pins committed but producer overlay regeneration failed; retain the disposable checkout for diagnosis: %w", err)
+		}
+	}
 	digest, err := regenerate(ctx, config, generatorVersion, lifecycle.GenerateFiles)
 	if err != nil {
 		return result, err
@@ -105,6 +110,14 @@ func prepare(ctx context.Context, config Config, generatorVersion, sourceReposit
 	}
 	if err := ValidateSourceRepository(sourceRepository); err != nil {
 		return nil, err
+	}
+	if config.ProducerOverlays != "" {
+		if err := admitProducerOverlayTransport(ctx, config.ProducerOverlays, sourceRepository); err != nil {
+			return nil, err
+		}
+		if err := GenerateProducerOverlays(ctx, config.ProducerOverlays, true); err != nil {
+			return nil, err
+		}
 	}
 	for _, relative := range []string{config.Catalog, config.Definition, config.Environment} {
 		if err := admitPath(relative); err != nil {

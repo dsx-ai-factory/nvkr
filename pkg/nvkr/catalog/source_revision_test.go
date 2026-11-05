@@ -30,6 +30,7 @@ func TestSourceRevisionRebindsCompleteOverlayAndStampTemplates(t *testing.T) {
 	stack := sourceRevisionStackFixture(t)
 	component := stack.Catalog.Components["kubectl"]
 	component.VersionStamp = map[string]string{"PINNED_COMMIT": "{{.Commit}}", "PINNED_VERSION": "{{.Tag}}", "PUBLIC_LITERAL": "unchanged"}
+	component.SourceMetadata = map[string]string{"NVKR_SOURCE_COMMIT": "{{.Commit}}", "NVKR_SOURCE_STREAM": "1.0.0"}
 	withOverlay, err := ApplyStack(stack.Catalog, Overlay{APIVersion: OverlayAPIVersion, Kind: OverlayKind, Name: "complete-producer", RequiresCatalogDigest: stack.Digest,
 		Components: map[string]ComponentReplacement{"kubectl": {Component: &component}}})
 	if err != nil {
@@ -61,6 +62,10 @@ func TestSourceRevisionRebindsCompleteOverlayAndStampTemplates(t *testing.T) {
 	stamps := after.Catalog.Components["kubectl"].VersionStamp
 	if stamps["PINNED_COMMIT"] != commit || stamps["PINNED_VERSION"] != commit || stamps["PUBLIC_LITERAL"] != "unchanged" {
 		t.Fatal("version stamps did not follow their owning templates", stamps)
+	}
+	metadata, err := after.Catalog.Components["kubectl"].SourceMetadataEnv()
+	if err != nil || metadata["NVKR_SOURCE_COMMIT"] != commit || metadata["NVKR_SOURCE_STREAM"] != "1.0.0" {
+		t.Fatalf("source metadata lost its template or explicit commit-only stream: %v %v", metadata, err)
 	}
 	unchanged, err := withOverlay.Catalog.SnapshotDigest()
 	if err != nil || unchanged != before {

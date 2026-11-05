@@ -3,3 +3,15 @@
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
 |---|---|---|
 | 22 Pins | Catalog v3/lock v1, per-module tags, source/artifact/action/tool pin maintenance, no-op/check/CAS semantics, derived pin sets including NVKE beta local-chart version omission and descriptive artifact mappings, same-release maintenance groups, whole-producer overlays, exact toolchain substitutions and authored embedded-version metadata authentication; digest-pinned release-tool companions delivered beside the executable in its executable output | Pin-set loading needs pinned Git access. Curated graph/SBOM edges remain deferred. Optional metadata consistency is not disk-content inspection, external acquisition or production acceptance. Companion acquisition, observation and packaging are contract-tested; the AICR v1.1.2 lock was pinned against the real release asset, but no hosted Run has delivered a companion, and a companion attestation is delivered, not verified |
+
+Opt-in `sourceMetadata` bindings derive command environment values from each producer's own source pin,
+including complete resolved copies. Reserved names, collisions, unknown tokens and unsupported producer
+environments fail with coded errors; `ReleaseVersion` refuses commit-only pins. The NVIDIA and upstream
+candidate OVN catalogs derive image tags, Debian revisions, chart checks, generated values and installer
+constants without per-pin registry literals. Local two-revision Git and controlled shell fixtures cover
+lock-only propagation, chart disagreement and deferred installer expressions. These are contract tests,
+not OVN builds or deployment acceptance. Existing catalogs without bindings retain their prior Build bytes;
+the candidate OVN command/environment migration intentionally changes affected Build Digests.
+See `source_metadata_test.go`, `ovn_pin_propagation_test.go` and the
+[copy inventory](../../catalog-maintenance.md#maintain-producer-copies). Maintained release/native and
+excluded KVM variants remain separately authored; profile stream coordination remains downstream-owned.

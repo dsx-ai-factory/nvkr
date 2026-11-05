@@ -43,6 +43,8 @@ type Config struct {
 	// own Definition and Environment, that also consume this catalog's pins, such
 	// as named nightly bundles. They join the same closure under the same rules.
 	AdditionalRuns []RunInput `json:"additionalRuns,omitempty"`
+	// ProducerOverlays selects explicit producer-copy maintenance inputs.
+	ProducerOverlays string `json:"producerOverlays,omitempty"`
 }
 
 // RunInput selects one generated Run bundle by its authored inputs.
@@ -102,7 +104,7 @@ func (config Config) Validate() error {
 			return e.New(e.CodeUsage, "maintenance paths must be clean repository-relative paths: %q", value)
 		}
 	}
-	for _, value := range []string{config.DevelopmentEnvironment, config.QualificationPolicy, config.DevelopmentQualificationPolicy} {
+	for _, value := range []string{config.DevelopmentEnvironment, config.QualificationPolicy, config.DevelopmentQualificationPolicy, config.ProducerOverlays} {
 		if value != "" && !safeRelative(value) {
 			return e.New(e.CodeUsage, "maintenance paths must be clean repository-relative paths: %q", value)
 		}

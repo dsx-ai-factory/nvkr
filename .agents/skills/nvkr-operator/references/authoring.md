@@ -56,6 +56,13 @@ rather than assuming every pin command has check mode. Derived members update th
 [pin-set guide](../../../../docs/generic-pin-set-example.md) and [catalog maintenance
 guide](../../../../docs/catalog-maintenance.md) cover coordinated updates and matching generator identity.
 
+When a pin feeds configured producer copies, follow the maintenance guide's
+[producer-copy sequence](../../../../docs/catalog-maintenance.md#maintain-producer-copies): check the old
+baseline before pin mutation, regenerate the configured overlays before dependent Run bundles, and require
+all byte-exact checks to pass. Keep excluded variants and downstream profile streams explicit. For new
+lock-derived command values, use the catalog guide's opt-in `sourceMetadata` bindings; commit-only pins
+require explicit, chart-validated stream metadata. Report changed Build Digests when migrating bindings.
+
 Never hand-edit `pins.lock.yaml`, generated `.github/workflows/nvkr-run.yml`, or managed `.github/nvkr-run/`
 members. Use the selected inputs and same CLI identity for generation and `--check`. Root generation is
 appropriate only when explicitly updating that root's owned bundle; alternate examples belong in a scratch

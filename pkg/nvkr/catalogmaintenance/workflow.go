@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -163,6 +164,16 @@ func Workflow(ctx context.Context, options WorkflowOptions, generatorVersion str
 		return nil, err
 	}
 	directories, files := members.paths()
+	if config.ProducerOverlays != "" {
+		input, err := loadProducerOverlayInputs(ctx, config.ProducerOverlays)
+		if err != nil {
+			return nil, err
+		}
+		for _, entry := range input.Overlays {
+			files = append(files, entry.Destination)
+		}
+		sort.Strings(files)
+	}
 	actions, err := pipeline.ResolveGitHubActions(plan.Actions)
 	if err != nil {
 		return nil, err
