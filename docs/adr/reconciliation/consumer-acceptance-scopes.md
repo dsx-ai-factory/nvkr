@@ -73,6 +73,31 @@ main integration and preservation of its DOCA graph during source freezing.
 It does not establish acceptance of later commits,
 prove that earlier failed reads recurred, or resolve their private causes.
 
+The first passing scheduled Run on `dsx-ai-factory/nvkr` main was
+[Run 41766922589](https://github.com/dsx-ai-factory/nvkr/actions/runs/41766922589),
+completed November 4, 2026 at 04:58:11 UTC on exact NVKR
+`88756843da1d2c175110c73cfd8af095ed3728fa`, with frozen NVKE
+`9c9c98e45e594b0605eb4b2f6fbb1b0cace1ec55`.
+[Run 41961405274](https://github.com/dsx-ai-factory/nvkr/actions/runs/41961405274)
+also passed on November 5, 2026 at 04:58:14 UTC on exact NVKR
+`47853151ba22789c96f9beb9454755b2c465685a`, with frozen NVKE
+`073f3318f659993a12e20a7d1eefa2b4fc6623df`.
+Both were `schedule` events on `main`, completed with `conclusion=success` on
+attempt 1, and passed the cleanup-bearing `TestEndToEnd` parent plus its site and
+tenant subtests. All job steps and post-steps succeeded; neither Run uploaded
+Actions artifacts. These records establish the hosted build/site/tenant diagnostic
+and joined cleanup only for those exact source pairs and the explicit small profile.
+
+The obsolete requirement in [#353](https://github.com/dsx-ai-factory/nvkr/issues/353)
+to close [#228](https://github.com/dsx-ai-factory/nvkr/issues/228) is retired:
+the maintainer already closed #228 as superseded and
+[withdrew that criterion](https://github.com/dsx-ai-factory/nvkr/issues/353#issuecomment-6619290403).
+The replacement is the hosted E2E from
+[the hosted AMD64 change](https://github.com/dsx-ai-factory/nvkr/pull/283), with
+[the validator consolidation](https://github.com/dsx-ai-factory/nvkr/pull/306)
+removing `run artifact-test`. The scheduled passes do not establish acceptance of
+the retired upstream bootstrap interface or its negative/cleanup matrix.
+
 Trusted source code retains sudo/Docker access on the disposable hosted machine.
 These unsigned local diagnostics grant no conformance or qualified release acceptance.
 
