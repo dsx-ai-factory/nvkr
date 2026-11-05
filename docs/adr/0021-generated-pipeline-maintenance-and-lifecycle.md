@@ -431,6 +431,16 @@ maintenance regenerates a candidate by invoking the existing owners (`run genera
 generator); it renders none of their files itself. Conflating two "CI" artifacts under one verb is
 disallowed; that ambiguity is what makes forgotten-regen drift possible.
 
+Native Packer/inspector maintenance is a separate authored hosted workflow. It reuses native preparation,
+retains exact source/archive/image/executable measurements, and requires a reviewed main-branch per-image
+candidate exception with approver, scope, expiry and license/security review references before publication.
+Both architectures and all subjects are admitted before the first write. Publication is limited to the
+existing internal candidate packages inside the protected publication environment. Independent-reader
+registry read-back and native pulls precede a review-only catalog/overlay/Environment pin change; the existing
+owners regenerate all dependent bundles. Exceptions grant no general approval or qualification, and ordinary
+producer Runs never rebuild toolchains implicitly. The operational owner, cadence, retention and rollback
+procedure live in the maintenance guide; external exercise is recorded in reconciliation.
+
 ## Consequences
 
 **Positive**
