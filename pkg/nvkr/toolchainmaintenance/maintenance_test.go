@@ -314,7 +314,9 @@ func TestReadBackChecksCompressedLayerBytes(t *testing.T) {
 	if err := tw.Close(); err != nil {
 		t.Fatal(err)
 	}
-	layer, err := tarball.LayerFromReader(bytes.NewReader(archive.Bytes()))
+	layer, err := tarball.LayerFromOpener(func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(archive.Bytes())), nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
