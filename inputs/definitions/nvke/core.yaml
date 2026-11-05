@@ -5,7 +5,7 @@ apiVersion: nvkr.dev/definition/v5
 kind: Definition
 metadata:
   name: nvke-core
-  description: Build the maintained AMD64 and ARM64 CLI, controller and provider images with their image-bound controller chart, reference-profile fixture, also delivered as controller-profiles, and acquire operator tools plus native CAPI and cert-manager images.
+  description: Build the maintained AMD64 and ARM64 CLI, controller and provider images with their image-bound controller chart and the reference-profile fixture as controller-profiles, and acquire operator tools plus native CAPI and cert-manager images.
 catalog:
   base: ../../catalogs/nvke/module-tags
 sbomTool: syft
@@ -107,7 +107,8 @@ outputs:
     helm:
       images:
         controller: cwe
-  # NVKE's --release render requires this name. Same curated reference build as below; not fleet configuration.
+  # NVKE's --release render requires this name. The combined Definition's nico-reference-profiles-fixture build:
+  # reference test data, not fleet configuration. One Release cannot publish the same image under two outputs.
   - name: controller-profiles
     platforms: [linux/amd64, linux/arm64]
     catalog:
@@ -122,14 +123,6 @@ outputs:
     format: oci
     components:
       - nvke-controller
-  # Reference test data, not fleet configuration.
-  - name: nico-reference-profiles-fixture
-    platforms: [linux/amd64, linux/arm64]
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components:
-      - nvke-nico-reference-profiles
   - name: nvkectl
     platform: linux/amd64
     format: executable

@@ -1,4 +1,4 @@
-name: p25 Verify release aicr-nvke-gb200-ubu...flow-argocd-helm +9
+name: p25 Verify release aicr-nvke-gb200-ubu...flow-argocd-helm +8
 'on':
   workflow_call:
     inputs:
@@ -351,50 +351,17 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-  nvkr-verify-publication-output-nico-refer-768f0a1fbfbe:
-    name: 'Verify release and deliverable signatures: output-nico-reference-profiles-fixture'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-sign-output-nico-reference-profiles-fixture'].result == 'success' }}
-    environment: 'nvkr-dev-release'
-    permissions:
-      actions: read
-      contents: read
-    env:
-      NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_READ }}'
-      NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_READ_USER }}'
-    steps:
-      - name: Check native runner platform
-        run: |
-          set -eu
-          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
-      - name: Check out workflow source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: 'false'
-      - name: Prepare NVKR runner and job parameters
-        id: nvkr-context
-        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
-        with:
-          runner-artifact: 'nvkr-exec-ubuntu-24-04'
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute node part-1
-        uses: ./.github/nvkr-dev/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-partition-results:
     name: 'Collect provider results: nvkr-partition-results'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-verify-publication-output-aicr-nvke-513beed70afe, nvkr-verify-publication-output-aicr-nvke-a952fe0d3ee1, nvkr-verify-publication-output-aicr-nvke-e82d84e549e4, nvkr-verify-publication-output-local-path-208ce6c5e08d, nvkr-verify-publication-output-nvkectl-linux-arm64, nvkr-verify-publication-output-capnico-controller, nvkr-verify-publication-output-cluster-ap-5fb4884131f8, nvkr-verify-publication-output-controller-profiles, nvkr-verify-publication-output-cwe, nvkr-verify-publication-output-nico-refer-768f0a1fbfbe]
+    needs: [nvkr-verify-publication-output-aicr-nvke-513beed70afe, nvkr-verify-publication-output-aicr-nvke-a952fe0d3ee1, nvkr-verify-publication-output-aicr-nvke-e82d84e549e4, nvkr-verify-publication-output-local-path-208ce6c5e08d, nvkr-verify-publication-output-nvkectl-linux-arm64, nvkr-verify-publication-output-capnico-controller, nvkr-verify-publication-output-cluster-ap-5fb4884131f8, nvkr-verify-publication-output-controller-profiles, nvkr-verify-publication-output-cwe]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     permissions: {}
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
-      nvkr-partition-27: ${{ format('"nvkr-verify-publication-output-aicr-nvke-513beed70afe":{0},"nvkr-verify-publication-output-aicr-nvke-a952fe0d3ee1":{1},"nvkr-verify-publication-output-aicr-nvke-e82d84e549e4":{2},"nvkr-verify-publication-output-capnico-controller":{3},"nvkr-verify-publication-output-cluster-ap-5fb4884131f8":{4},"nvkr-verify-publication-output-controller-profiles":{5},"nvkr-verify-publication-output-cwe":{6},"nvkr-verify-publication-output-local-path-208ce6c5e08d":{7},"nvkr-verify-publication-output-nico-refer-768f0a1fbfbe":{8},"nvkr-verify-publication-output-nvkectl-linux-arm64":{9}', toJSON(needs['nvkr-verify-publication-output-aicr-nvke-513beed70afe']), toJSON(needs['nvkr-verify-publication-output-aicr-nvke-a952fe0d3ee1']), toJSON(needs['nvkr-verify-publication-output-aicr-nvke-e82d84e549e4']), toJSON(needs['nvkr-verify-publication-output-capnico-controller']), toJSON(needs['nvkr-verify-publication-output-cluster-ap-5fb4884131f8']), toJSON(needs['nvkr-verify-publication-output-controller-profiles']), toJSON(needs['nvkr-verify-publication-output-cwe']), toJSON(needs['nvkr-verify-publication-output-local-path-208ce6c5e08d']), toJSON(needs['nvkr-verify-publication-output-nico-refer-768f0a1fbfbe']), toJSON(needs['nvkr-verify-publication-output-nvkectl-linux-arm64'])) }}
+      nvkr-partition-27: ${{ format('"nvkr-verify-publication-output-aicr-nvke-513beed70afe":{0},"nvkr-verify-publication-output-aicr-nvke-a952fe0d3ee1":{1},"nvkr-verify-publication-output-aicr-nvke-e82d84e549e4":{2},"nvkr-verify-publication-output-capnico-controller":{3},"nvkr-verify-publication-output-cluster-ap-5fb4884131f8":{4},"nvkr-verify-publication-output-controller-profiles":{5},"nvkr-verify-publication-output-cwe":{6},"nvkr-verify-publication-output-local-path-208ce6c5e08d":{7},"nvkr-verify-publication-output-nvkectl-linux-arm64":{8}', toJSON(needs['nvkr-verify-publication-output-aicr-nvke-513beed70afe']), toJSON(needs['nvkr-verify-publication-output-aicr-nvke-a952fe0d3ee1']), toJSON(needs['nvkr-verify-publication-output-aicr-nvke-e82d84e549e4']), toJSON(needs['nvkr-verify-publication-output-capnico-controller']), toJSON(needs['nvkr-verify-publication-output-cluster-ap-5fb4884131f8']), toJSON(needs['nvkr-verify-publication-output-controller-profiles']), toJSON(needs['nvkr-verify-publication-output-cwe']), toJSON(needs['nvkr-verify-publication-output-local-path-208ce6c5e08d']), toJSON(needs['nvkr-verify-publication-output-nvkectl-linux-arm64'])) }}
       nvkr-results-01: ${{ format('"nvkr-verify-publication-output-controller-profiles":{0}', toJSON(needs['nvkr-verify-publication-output-controller-profiles'])) }}
       nvkr-results-01-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-controller-profiles'].result) }}
       nvkr-results-02: ${{ format('"nvkr-verify-publication-output-capnico-controller":{0}', toJSON(needs['nvkr-verify-publication-output-capnico-controller'])) }}
@@ -405,8 +372,8 @@ jobs:
       nvkr-results-05-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-cwe'].result) }}
       nvkr-results-07: ${{ format('"nvkr-verify-publication-output-nvkectl-linux-arm64":{0}', toJSON(needs['nvkr-verify-publication-output-nvkectl-linux-arm64'])) }}
       nvkr-results-07-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-nvkectl-linux-arm64'].result) }}
-      nvkr-results-09: ${{ format('"nvkr-verify-publication-output-local-path-208ce6c5e08d":{0},"nvkr-verify-publication-output-nico-refer-768f0a1fbfbe":{1}', toJSON(needs['nvkr-verify-publication-output-local-path-208ce6c5e08d']), toJSON(needs['nvkr-verify-publication-output-nico-refer-768f0a1fbfbe'])) }}
-      nvkr-results-09-statuses: ${{ format('{0} {1}', needs['nvkr-verify-publication-output-local-path-208ce6c5e08d'].result, needs['nvkr-verify-publication-output-nico-refer-768f0a1fbfbe'].result) }}
+      nvkr-results-09: ${{ format('"nvkr-verify-publication-output-local-path-208ce6c5e08d":{0}', toJSON(needs['nvkr-verify-publication-output-local-path-208ce6c5e08d'])) }}
+      nvkr-results-09-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-local-path-208ce6c5e08d'].result) }}
       nvkr-results-0b: ${{ format('"nvkr-verify-publication-output-aicr-nvke-a952fe0d3ee1":{0},"nvkr-verify-publication-output-cluster-ap-5fb4884131f8":{1}', toJSON(needs['nvkr-verify-publication-output-aicr-nvke-a952fe0d3ee1']), toJSON(needs['nvkr-verify-publication-output-cluster-ap-5fb4884131f8'])) }}
       nvkr-results-0b-statuses: ${{ format('{0} {1}', needs['nvkr-verify-publication-output-aicr-nvke-a952fe0d3ee1'].result, needs['nvkr-verify-publication-output-cluster-ap-5fb4884131f8'].result) }}
       nvkr-results-0e: ${{ format('"nvkr-verify-publication-output-aicr-nvke-e82d84e549e4":{0}', toJSON(needs['nvkr-verify-publication-output-aicr-nvke-e82d84e549e4'])) }}

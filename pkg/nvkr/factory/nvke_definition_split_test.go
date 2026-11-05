@@ -22,12 +22,17 @@ var nvkeSplitFamilies = []struct {
 	name            string
 	outputs, native int
 }{
-	{"core", 22, 27},
+	{"core", 21, 25},
 	{"services", 34, 34},
 	{"telemetry", 17, 17},
 	{"disks", 4, 4},
 	{"disks-ubuntu24", 4, 4},
 }
+
+// Combined-only outputs belong to no family. Each maps to the family output that
+// delivers the same selection under another name: one Release cannot publish the
+// same image under two outputs, and NVKE requires the controller-profiles name.
+var nvkeCombinedOnlyOutputs = map[string]string{"nico-reference-profiles-fixture": "controller-profiles"}
 
 // Family-only outputs are not in the combined Definition. Each declaration is
 // pinned exactly so a valid but unintended selection fails here rather than only
@@ -172,21 +177,34 @@ func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 			nativeTotal += native
 		})
 	}
+	for name, replacement := range nvkeCombinedOnlyOutputs {
+		if family, exists := seen[name]; exists {
+			t.Fatalf("combined-only output %q is required by %s", name, family)
+		}
+		want := nvkeFamilyOnlyOutputs[replacement].output
+		want.Name = name
+		if !bytes.Equal(nvkeSplitCanonical(t, want), original[name]) {
+			t.Fatalf("%q no longer delivers the selection of combined-only %q", replacement, name)
+		}
+	}
 	if len(seen) != wantOutputs || nativeTotal != wantNative {
 		t.Fatalf("partition requires %d outputs and %d native targets; want %d and %d", len(seen), nativeTotal, wantOutputs, wantNative)
 	}
 }
 
 // nvkeSplitExpectedTotals derives the family aggregate from the authored combined
-// Definition plus the pinned family-only declarations, independent of the families.
+// Definition, less its combined-only outputs, plus the pinned family-only declarations.
 func nvkeSplitExpectedTotals(combined definition.Definition) (outputs, native int) {
 	for _, output := range combined.Outputs {
-		native += max(1, len(output.Platforms))
+		if _, combinedOnly := nvkeCombinedOnlyOutputs[output.Name]; !combinedOnly {
+			outputs++
+			native += max(1, len(output.Platforms))
+		}
 	}
 	for _, only := range nvkeFamilyOnlyOutputs {
 		native += max(1, len(only.output.Platforms))
 	}
-	return len(combined.Outputs) + len(nvkeFamilyOnlyOutputs), native
+	return outputs + len(nvkeFamilyOnlyOutputs), native
 }
 
 func TestNVKEDefinitionSplitEnvironmentIsolation(t *testing.T) {

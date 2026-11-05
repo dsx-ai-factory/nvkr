@@ -13,7 +13,7 @@ members:
     digest: sha256:b7485bd3759591595973d17dbaa500f9bfab067811125cf8eb78c20470253862
   - name: nvke-core
     definition: core.yaml
-    digest: sha256:6131ff6e773bfe9cc0674ded56ef289a0600afa08ffedc353b5787a0ab603a02
+    digest: sha256:4da78715fe6b6e04945ab99bf2b4c535eacbf90346d816acecd2ceefb7cc348c
   - name: nvke-disks
     definition: disks.yaml
     digest: sha256:56c39c33d1413c41f9259d2e1ad12adb93426d921e10dc1da8228c9329310d5e
