@@ -163,9 +163,17 @@ func githubLocatorRetryDelay(response githubLocatorResponse, attempt int, now ti
 	if transient {
 		delay = (2 * time.Second) << attempt
 	}
-	values := response.header.Values("Retry-After")
+	delay, err := githubLocatorServerDelay(response.header, delay, attempt, now)
+	return delay, true, err
+}
+
+// githubLocatorServerDelay applies a single Retry-After value (seconds or
+// HTTP date) over the default delay, with an increasing minimum for repeated
+// retries. It refuses delays outside the budget instead of retrying earlier.
+func githubLocatorServerDelay(header http.Header, delay time.Duration, attempt int, now time.Time) (time.Duration, error) {
+	values := header.Values("Retry-After")
 	if len(values) > 1 {
-		return 0, true, e.New(e.CodeUnavailable, "CI locator API returned ambiguous rate-limit delay")
+		return 0, e.New(e.CodeUnavailable, "CI locator server returned ambiguous retry delay")
 	}
 	if len(values) == 1 {
 		value := values[0]
@@ -173,24 +181,16 @@ func githubLocatorRetryDelay(response githubLocatorResponse, attempt int, now ti
 		if err == nil && strconv.FormatUint(seconds, 10) == value {
 			delay = time.Duration(seconds) * time.Second
 		} else if deadline, err := http.ParseTime(value); err == nil {
-			delay = deadline.Sub(now)
-			if delay < 0 {
-				delay = 0
-			}
+			delay = max(deadline.Sub(now), 0)
 		} else {
-			return 0, true, e.New(e.CodeUnavailable, "CI locator API returned invalid rate-limit delay")
+			return 0, e.New(e.CodeUnavailable, "CI locator server returned invalid retry delay")
 		}
 	}
-	// Respect the server's delay, with an increasing minimum for repeated limits.
-	// Refuse delays outside the budget instead of retrying earlier than requested.
-	minimum := time.Second << attempt
-	if delay < minimum {
-		delay = minimum
-	}
+	delay = max(delay, time.Second<<attempt)
 	if delay > 120*time.Second {
-		return 0, true, e.New(e.CodeUnavailable, "CI locator API rate-limit delay exceeds retry budget")
+		return 0, e.New(e.CodeUnavailable, "CI locator server retry delay exceeds retry budget")
 	}
-	return delay, true, nil
+	return delay, nil
 }
 
 func githubLocatorTransientStatus(status int) bool {

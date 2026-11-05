@@ -38,7 +38,8 @@ func (g *githubLocatorClient) downloadLocator(ctx context.Context, request Reque
 	if err != nil {
 		return nil, e.New(e.CodeInternal, "creating CI locator ZIP request failed")
 	}
-	// Signed storage answers 5xx under load; retry the same bounded budget as the API.
+	// Signed storage answers 5xx under load; retry the same bounded budget and
+	// Retry-After handling as the API, without its API rate-limit rules.
 	var response githubLocatorResponse
 	for attempt := 0; ; attempt++ {
 		response, err = g.get(ctx, download, maxGitHubLocatorZIPBytes)
@@ -48,7 +49,11 @@ func (g *githubLocatorClient) downloadLocator(ctx context.Context, request Reque
 		if !githubLocatorTransientStatus(response.status) || attempt+1 == githubLocatorAPIAttempts {
 			break
 		}
-		if err := g.wait(ctx, (2*time.Second)<<attempt); err != nil {
+		delay, err := githubLocatorServerDelay(response.header, (2*time.Second)<<attempt, attempt, time.Now())
+		if err != nil {
+			return nil, err
+		}
+		if err := g.wait(ctx, delay); err != nil {
 			return nil, safeIOError(ctx, e.CodeTimeout, "CI locator ZIP retry wait canceled")
 		}
 	}
