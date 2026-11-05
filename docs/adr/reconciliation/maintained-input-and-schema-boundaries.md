@@ -10,7 +10,7 @@ namespace. `make nvke-split-generate` and `make nvke-split-check` own the family
 workflow targets include it. These are authored-input and generation changes, not a new lifecycle or
 cross-Run assembly contract. No hosted family execution, publication or independent consumer acceptance
 is recorded. The combined production and qualification paths remain until consumer and qualification
-cutover; the GPU site composite below owns the fixed development bundle. Named producer qualification and named development remain unsupported; the pilot
+cutover; the GPU site composite below owns the fixed development bundle. Named producer qualification remains unsupported, and so does named development for these plain family Definitions; a composite may have a named development bundle (ADR-26). The pilot
 emits no automatic association file or parent Release. Consumers independently verify exact family
 references and own any required association or compatibility decision. See the
 [pilot inputs](../../../inputs/definitions/nvke/README.md#family-pilot) and
