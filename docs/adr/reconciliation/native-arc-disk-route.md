@@ -90,3 +90,14 @@ PR #97 branch. Removing an authored exception neither changes those provider pol
 The existing provider secret is `NKE_SOURCE_TOKEN`; the rename retains that exact
 credential reference, not an unprovisioned `NVKE_SOURCE_TOKEN`. Dedicated reader-account package access, native pool capacity and successful exact-head
 execution remain external acceptance requirements.
+
+The GPU site production [Run 42116623552](https://github.com/dsx-ai-factory/nvkr/actions/runs/42116623552)
+at `ab3fe8a7` failed before native toolchain materialization; the
+[source-fetch job](https://github.com/dsx-ai-factory/nvkr/actions/runs/42116623552/job/127558874072)
+omitted private-image preparation because the generator did not admit the GPU site publication prefix
+for the existing M2 toolchain pins. The exact `m2-candidate/gpu-site` prefix now receives the same
+separate reader step as the maintained disk families. A contract discovers maintained Plans and checks
+every stage selecting those private subjects for preparation and explicit reader wiring before execution,
+including partition workers. Repository secret-name and variable-name read-back confirmed
+`NVKR_REGISTRY_READ` and `NVKR_REGISTRY_READ_USER`; `nvkr-arc` has no overriding entries.
+This is generation and configuration evidence only; a successful production rerun remains pending.

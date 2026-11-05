@@ -36,6 +36,7 @@ jobs:
       NKE_SOURCE_TOKEN: ${{ secrets.NKE_SOURCE_TOKEN }}
       NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      NVKR_REGISTRY_READ: ${{ secrets.NVKR_REGISTRY_READ }}
   nvkr-partition-02:
     name: p02 Fetch nvke-node-fde-ubuntu24-arm64 +54
     uses: ./.github/workflows/nvkr-run-nvke-gpu-site__partition-02.yml
@@ -50,6 +51,7 @@ jobs:
       NKE_SOURCE_TOKEN: ${{ secrets.NKE_SOURCE_TOKEN }}
       NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      NVKR_REGISTRY_READ: ${{ secrets.NVKR_REGISTRY_READ }}
   nvkr-partition-03:
     name: p03 Acquire and prepare capi-controller-image +8
     uses: ./.github/workflows/nvkr-run-nvke-gpu-site__partition-03.yml
@@ -141,6 +143,7 @@ jobs:
     secrets:
       NVKR_CI_STORAGE_READ_TOKEN: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       NVKR_CI_STORAGE_WRITE_TOKEN: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      NVKR_REGISTRY_READ: ${{ secrets.NVKR_REGISTRY_READ }}
   nvkr-partition-10:
     name: 'p10 Package container image: capi-controller-image-arm64 +38'
     uses: ./.github/workflows/nvkr-run-nvke-gpu-site__partition-10.yml

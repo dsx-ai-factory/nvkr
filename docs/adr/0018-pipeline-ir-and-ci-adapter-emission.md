@@ -358,10 +358,11 @@ disk producer's full material closure.
 Internal native toolchains beneath the candidate publication prefix's `toolchains/`
 repositories use a separate preparation step with `contents: read` and no workflow package scope.
 The maintained M2, exact `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks` and
-`ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-ubuntu24` families and two NVKE
+`ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-ubuntu24` families, the exact
+`ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site` composite and two NVKE
 nightly publication prefixes also reuse the already-published
 `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/` pins. Reusing these toolchain subjects does
-not relocate them into family or nightly output namespaces. Other family prefixes, child or lookalike
+not relocate them into family, composite or nightly output namespaces. Other family prefixes, child or lookalike
 prefixes, unrelated publication owners and other toolchain repositories remain excluded from this exception.
 Only that step receives the independent `NVKR_REGISTRY_READ` credential and explicit account.
 The entry workflow binds both values as explicit composite inputs; composite metadata does not evaluate
