@@ -18,30 +18,16 @@ import (
 )
 
 func (g *githubLocatorClient) downloadLocator(ctx context.Context, request Request, artifact githubLocatorArtifact, allowEarlier bool) ([]byte, error) {
-	location, err := g.apiGET(ctx, "/repos/"+request.Repository+"/actions/artifacts/"+string(artifact.ID)+"/zip")
-	if err != nil {
-		return nil, err
-	}
-	if location.status != http.StatusFound {
-		return nil, githubLocatorStatusError(ctx, location.status)
-	}
-	if len(location.header.Values("Location")) != 1 {
-		return nil, e.New(e.CodeVerifyFailed, "CI locator ZIP requires one provider download location")
-	}
-	address, err := githubLocatorDownloadURL(location.header.Get("Location"))
-	if err != nil {
-		return nil, err
-	}
-	// Construct a new credential-free request. Neither the API Authorization
-	// header nor a cookie jar can follow the signed storage URL; redirects stop.
-	download, err := http.NewRequestWithContext(ctx, http.MethodGet, address.String(), nil)
-	if err != nil {
-		return nil, e.New(e.CodeInternal, "creating CI locator ZIP request failed")
-	}
 	// Signed storage answers 5xx under load; retry the same bounded budget and
-	// Retry-After handling as the API, without its API rate-limit rules.
+	// Retry-After handling as the API, without its API rate-limit rules. Each
+	// attempt takes a fresh redirect: GitHub expires the signed URL after a
+	// minute, and a Retry-After delay may be longer.
 	var response githubLocatorResponse
 	for attempt := 0; ; attempt++ {
+		download, err := g.zipDownloadRequest(ctx, request, artifact)
+		if err != nil {
+			return nil, err
+		}
 		response, err = g.get(ctx, download, maxGitHubLocatorZIPBytes)
 		if err != nil {
 			return nil, err
@@ -66,6 +52,32 @@ func (g *githubLocatorClient) downloadLocator(ctx context.Context, request Reque
 	}
 	request.Name = artifact.Name
 	return unpackGitHubLocator(ctx, response.body, request, allowEarlier)
+}
+
+// zipDownloadRequest asks the API for the artifact's signed storage URL and
+// builds a credential-free request for it.
+func (g *githubLocatorClient) zipDownloadRequest(ctx context.Context, request Request, artifact githubLocatorArtifact) (*http.Request, error) {
+	location, err := g.apiGET(ctx, "/repos/"+request.Repository+"/actions/artifacts/"+string(artifact.ID)+"/zip")
+	if err != nil {
+		return nil, err
+	}
+	if location.status != http.StatusFound {
+		return nil, githubLocatorStatusError(ctx, location.status)
+	}
+	if len(location.header.Values("Location")) != 1 {
+		return nil, e.New(e.CodeVerifyFailed, "CI locator ZIP requires one provider download location")
+	}
+	address, err := githubLocatorDownloadURL(location.header.Get("Location"))
+	if err != nil {
+		return nil, err
+	}
+	// Construct a new credential-free request. Neither the API Authorization
+	// header nor a cookie jar can follow the signed storage URL; redirects stop.
+	download, err := http.NewRequestWithContext(ctx, http.MethodGet, address.String(), nil)
+	if err != nil {
+		return nil, e.New(e.CodeInternal, "creating CI locator ZIP request failed")
+	}
+	return download, nil
 }
 
 func unpackGitHubLocator(ctx context.Context, raw []byte, request Request, allowEarlier bool) ([]byte, error) {

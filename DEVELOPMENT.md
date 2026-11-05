@@ -223,31 +223,10 @@ After locator transfers expire, start a complete new Run.
 
 ### Qualify an existing development Run
 
-The development bundle now belongs to the GPU site composite, and composite qualification is deferred
-(ADR-26 U8), so `make pipeline-dev-generate` no longer generates the development qualifier and native smoke
-worker; their committed pair is retired. The flow below describes the qualifier as generated for a plain
-development Definition from `inputs/policies/nvke-development-qualification.yaml`: install the pair on the
-default branch once, then dispatch a reviewed nondefault branch that contains it:
-
-```sh
-gh workflow run nvkr-dev-qualify.yml --repo dsx-ai-factory/nvkr \
-  --ref YOUR_QUALIFIER_BRANCH \
-  -f source_run_url=https://github.com/dsx-ai-factory/nvkr/actions/runs/RUN_ID/attempts/ATTEMPT
-```
-
-The source must be a successful manual `nvkr-dev.yml` attempt from this repository on a nondefault
-branch. It may come from a different branch or an older commit. The qualifier authenticates the original
-attempt, restores its retained metadata, reproduces its Plan from the exact source inputs, verifies all
-artifacts, runs the native tool smoke profiles, signs development qualification evidence and reads each
-attachment back. It does not rebuild the artifacts. Runs with the public metadata transport can be selected
-even when their finalizer emitted no production qualification handoff.
-
-Use the existing `nvkr-dev-release` environment and dedicated development reader/writer credentials.
-The native worker receives the reader; only the final qualifier receives the writer. Run before provider
-metadata expires or development cleanup deletes the source packages. Qualification does not suspend cleanup.
-Missing inputs or failed checks fail the run. Evidence uses a separate development predicate and cannot
-satisfy production qualification. Disks retain producer-only scope and external suites remain outside MVP.
-The full hosted flow still requires a recorded acceptance run; rendering and local tests alone do not prove it.
+Development qualification is unavailable. The development bundle now belongs to the GPU site composite, and
+qualification rejects a composite Run until composite qualification has a supported owner (ADR-26 U8).
+`make pipeline-dev-generate` therefore generates no development qualifier or native smoke worker, and their
+committed pair is retired.
 
 ### Disposable registry cleanup
 

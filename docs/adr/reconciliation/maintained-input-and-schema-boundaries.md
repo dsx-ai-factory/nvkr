@@ -10,7 +10,7 @@ namespace. `make nvke-split-generate` and `make nvke-split-check` own the family
 workflow targets include it. These are authored-input and generation changes, not a new lifecycle or
 cross-Run assembly contract. No hosted family execution, publication or independent consumer acceptance
 is recorded. The combined production and qualification paths remain until consumer and qualification
-cutover; the GPU site composite below owns the fixed development bundle. Named producer qualification and named development remain unsupported; the pilot
+cutover; the GPU site composite below owns the fixed development bundle. Named producer qualification remains unsupported, and so does named development for these plain family Definitions; a composite may have a named development bundle (ADR-26). The pilot
 emits no automatic association file or parent Release. Consumers independently verify exact family
 references and own any required association or compatibility decision. See the
 [pilot inputs](../../../inputs/definitions/nvke/README.md#family-pilot) and
@@ -30,7 +30,9 @@ and the site controller to family outputs in documentation only. It adds no Defi
 generated file. NVKR records no GPU driver, fabric or runtime acceptance for any of them; that evidence
 belongs to AICR and NVKE. No maintained Definition yet selects the matrix's offline CAPI repository. The core
 family selects `controller-profiles`, `disks-ubuntu24` selects the Ubuntu 24.04 disks, and the GPU site composite
-above selects the composite site Release, which no hosted Run has produced. The GB200 AICR bundle
+above selects the composite site Release, which no hosted Run has produced. No maintained Definition selects the
+ARM64 AICR CLI: publication accepts one bundle entry per component build subject, so its pinned attestation
+companion cannot be published beside it yet. The GB200 AICR bundle
 Definition has one local Run and no hosted Release.
 
 The maintained release node-image catalog selects the NVIDIA OVN fork `v2.4.2`

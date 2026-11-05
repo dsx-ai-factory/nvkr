@@ -426,10 +426,12 @@ Negative cases on the same inputs:
 - Adding a member whose top-level catalog is `../../catalogs/nvke/release` fails with `invalid-catalog`.
 
 Decided: once the composite exists, the hand-maintained combined `definition.yaml` becomes redundant, and
-retiring it is planned as a separate cutover (U10). The combined production, development and qualification
-paths depend on it. The cutover is gated on a successful hosted composite Run with all 69 outputs and one
-Release, followed by independent consumer verification under explicit policy. Composite qualification (U8)
-must exist before the combined qualification path can retire.
+retiring it is planned as a separate cutover (U10). The combined production and qualification paths depend
+on it; the fixed development bundle now belongs to the GPU site composite. The cutover is gated on the Hosted
+acceptance criterion below, followed by U10's membership and Build Digest equality. The current composite
+selection differs from the combined Definition's 69 outputs, so that equality still needs a governed
+membership and naming alignment. Composite qualification (U8) must exist before the combined qualification
+path can retire.
 
 ## Implementation plan
 
@@ -490,7 +492,7 @@ Acceptance tests per unit:
   against a member Release both fail; required member set mismatch fails; a member-filtered view grants no
   capability and its description cannot restore authority.
 - **Hosted:** before reconciliation may claim external exercise, one hosted Run of the NVKE composite must
-  complete with 69 outputs and one root, followed by independent consumer verification under explicit policy.
+  complete with every output of its members (80 for the GPU site composite) and one root, followed by independent consumer verification under explicit policy.
   The same evidence gates U10.
 - **U9 (follow-up):** the reuse decision's matrix, extended with: family output reused only for its same-name
   composite output; an origin outside the authored allowlist refused; equal Build Digest sibling refused;
