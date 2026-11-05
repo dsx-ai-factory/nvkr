@@ -59,7 +59,7 @@ components:
         readonly chart=/src/helm/ovn-kubernetes
         readonly out=/src/nvkr-output/ovn-kubernetes
         readonly stream="${NVKR_SOURCE_STREAM:?}"
-        [[ "$stream" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]
+        [[ "$stream" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.+-]+)?$ ]]
         test -f "$chart/Chart.yaml"
         grep -Fqx "version: $stream" "$chart/Chart.yaml"
         test ! -e "$chart/values.yaml"
@@ -101,7 +101,8 @@ components:
       - -ec
       - |
         readonly stream="${NVKR_SOURCE_STREAM:?}"
-        [[ "$stream" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]
+        # The exact chart stream also forms a Debian package-name suffix.
+        [[ "$stream" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9a-z.+-]+)?$ ]]
         readonly revision="${NVKR_SOURCE_REVISION:?}"
         readonly out=/src/nvkr-output
         readonly charts="$out/charts"

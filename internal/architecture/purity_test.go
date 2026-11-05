@@ -47,6 +47,7 @@ const modulePath = "github.com/dsx-ai-factory/nvkr"
 var identityPackages = []string{
 	modulePath + "/pkg/nvkr/buildgraph",
 	modulePath + "/pkg/nvkr/canonical",
+	modulePath + "/pkg/nvkr/internal/sourceenv",
 	modulePath + "/pkg/nvkr/ir",
 	modulePath + "/pkg/nvkr/target",
 }
@@ -84,6 +85,7 @@ var allowedIdentityImports = map[string]bool{
 	modulePath + "/pkg/nvkr/execution":                true,
 	modulePath + "/pkg/nvkr/internal/packertransport": true,
 	modulePath + "/pkg/nvkr/internal/safetext":        true,
+	modulePath + "/pkg/nvkr/internal/sourceenv":       true,
 	modulePath + "/pkg/nvkr/ir":                       true,
 	modulePath + "/pkg/nvkr/material":                 true,
 	modulePath + "/pkg/nvkr/target":                   true,

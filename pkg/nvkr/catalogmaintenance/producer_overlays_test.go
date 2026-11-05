@@ -154,6 +154,53 @@ func TestProducerOverlayAdmission(t *testing.T) {
 	}
 }
 
+func TestProducerOverlayPartialPublicationRecovery(t *testing.T) {
+	filename, _ := producerOverlayFixture(t)
+	lock, err := catalog.LoadLockContext(t.Context(), "inputs/catalogs/nvidia")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pin := lock.Pins["source"]
+	pin.Commit = strings.Repeat("d", 40)
+	lock.Pins["source"] = pin
+	if err := catalog.WriteLockContext(t.Context(), "inputs/catalogs/nvidia", lock); err != nil {
+		t.Fatal(err)
+	}
+	files, err := renderProducerOverlays(t.Context(), filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	err = writeOverlayFilesWithRename(ctx, files, func(from, to string) error {
+		if err := os.Rename(from, to); err != nil {
+			return err
+		}
+		cancel()
+		return nil
+	})
+	assertCode(t, err, e.CodeTimeout)
+	if !bytes.Equal(readFixture(t, files[0].path), files[0].candidate) || !bytes.Equal(readFixture(t, files[1].path), files[1].before) {
+		t.Fatal("fixture did not interrupt the set after exactly one publication")
+	}
+	assertCode(t, GenerateProducerOverlays(t.Context(), filename, true), e.CodePipelineDrift)
+	if err := GenerateProducerOverlays(t.Context(), filename, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := GenerateProducerOverlays(t.Context(), filename, true); err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range files {
+		if !bytes.Equal(readFixture(t, file.path), file.candidate) {
+			t.Fatal("regeneration did not recover the complete candidate")
+		}
+	}
+	staged, err := filepath.Glob("inputs/catalogs/.producer-overlay-stage-*")
+	if err != nil || len(staged) != 0 {
+		t.Fatalf("interrupted regeneration left staged files: %v %v", staged, err)
+	}
+}
+
 func TestProducerOverlayStaleWriterAndCancellation(t *testing.T) {
 	filename, input := producerOverlayFixture(t)
 	files, err := renderProducerOverlays(t.Context(), filename)

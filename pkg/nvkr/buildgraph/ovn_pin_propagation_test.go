@@ -106,6 +106,17 @@ exec /usr/bin/tar "${args[@]}"
 }
 
 func TestOVNLockOnlyPropagation(t *testing.T) {
+	versions := []struct {
+		stream            string
+		packageCompatible bool
+	}{
+		{"2.4.2", true},
+		{"2.4.3", true},
+		{"2.4.3-rc.1", true},
+		{"2.4.3+build.1", true},
+		{"2.4.3-rc.1+build.1", true},
+		{"2.4.4-RC.1", false},
+	}
 	upstream := t.TempDir()
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
@@ -124,7 +135,8 @@ func TestOVNLockOnlyPropagation(t *testing.T) {
 		}
 	}
 	git("init", "-q", "--template=", "--object-format=sha1", "--initial-branch=main")
-	for _, version := range []string{"2.4.2", "2.4.3"} {
+	for _, tc := range versions {
+		version := tc.stream
 		if err := os.WriteFile(filepath.Join(upstream, "Chart.yaml"), []byte("version: "+version+"\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -156,7 +168,8 @@ func TestOVNLockOnlyPropagation(t *testing.T) {
 				t.Fatal(err)
 			}
 			var previous string
-			for _, version := range []string{"2.4.2", "2.4.3"} {
+			for _, tc := range versions {
+				version := tc.stream
 				t.Run(version, func(t *testing.T) {
 					if _, err := catalog.UpdateSourcePins(t.Context(), catalog.SourcePinRequest{Directory: directory, Sources: []string{"ovn-kubernetes"}, Tag: "v" + version, Runtime: "docker"}); err != nil {
 						t.Fatal(err)
@@ -178,6 +191,18 @@ func TestOVNLockOnlyPropagation(t *testing.T) {
 					}
 					previous = digest
 					root, err := runOVNPackageFixture(t, cat, "arm64", version)
+					if got, err := os.ReadFile(filepath.Join(directory, catalog.RegistryFile)); err != nil || string(got) != string(registry) {
+						t.Fatal("pin update changed registry bytes")
+					}
+					if !tc.packageCompatible {
+						if err == nil {
+							t.Fatal("package-incompatible stream passed packaging")
+						}
+						if _, err := os.Stat(filepath.Join(root, "nvkr-output")); !os.IsNotExist(err) {
+							t.Fatal("package-incompatible stream wrote partial output")
+						}
+						return
+					}
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -199,9 +224,6 @@ func TestOVNLockOnlyPropagation(t *testing.T) {
 					}
 					if _, err := runOVNPackageFixture(t, cat, "arm64", "0.0.1"); err == nil {
 						t.Fatal("source tag/chart disagreement passed packaging")
-					}
-					if got, err := os.ReadFile(filepath.Join(directory, catalog.RegistryFile)); err != nil || string(got) != string(registry) {
-						t.Fatal("pin update changed registry bytes")
 					}
 				})
 			}

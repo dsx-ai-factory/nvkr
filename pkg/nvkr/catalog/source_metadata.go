@@ -27,7 +27,7 @@ func (c Component) SourceMetadataEnv() (map[string]string, error) {
 	if len(c.SourceMetadata) == 0 {
 		return nil, nil
 	}
-	if !c.FromSource || c.Prebuilt != nil || (c.BuilderType != BuilderOCIHermetic && c.BuilderType != BuilderBuildKit && c.BuilderType != BuilderNativeGo) {
+	if !c.FromSource || c.Prebuilt != nil || (c.BuilderType != "" && c.BuilderType != BuilderOCIHermetic && c.BuilderType != BuilderBuildKit && c.BuilderType != BuilderNativeGo) {
 		return nil, e.New(e.CodeInvalidCatalog, "sourceMetadata requires a source command producer with a build environment")
 	}
 	if len(c.SourceMetadata) > 32 {

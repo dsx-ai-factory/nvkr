@@ -64,3 +64,26 @@ func TestSourceMetadataRejectsConflictsAndInvalidBindings(t *testing.T) {
 		})
 	}
 }
+
+func TestSourceMetadataOverlayBuilderDefault(t *testing.T) {
+	for _, builder := range []string{"", BuilderOCIHermetic} {
+		t.Run("builder="+builder, func(t *testing.T) {
+			stack := sourceRevisionStackFixture(t)
+			component := stack.Catalog.Components["kubectl"]
+			component.BuilderType = builder
+			component.SourceMetadata = map[string]string{"NVKR_SOURCE_COMMIT": "{{.Commit}}"}
+			resolved, err := ApplyStack(stack.Catalog, Overlay{
+				APIVersion: OverlayAPIVersion, Kind: OverlayKind, Name: "metadata",
+				RequiresCatalogDigest: stack.Digest,
+				Components:            map[string]ComponentReplacement{"kubectl": {Component: &component}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			metadata, err := resolved.Catalog.Components["kubectl"].SourceMetadataEnv()
+			if err != nil || metadata["NVKR_SOURCE_COMMIT"] != component.Commit {
+				t.Fatalf("overlay metadata: %v %v", metadata, err)
+			}
+		})
+	}
+}

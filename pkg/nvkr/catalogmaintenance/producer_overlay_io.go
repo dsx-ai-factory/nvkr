@@ -21,6 +21,11 @@ const producerOverlayGuard = ".nvkr-producer-overlays.lease"
 // atomic per file, not across the set. Deterministic regeneration/check detects
 // and repairs interrupted sets before Refresh can publish a candidate.
 func writeOverlayFiles(ctx context.Context, files []overlayFile) error {
+	return writeOverlayFilesWithRename(ctx, files, os.Rename)
+}
+
+// The rename seam allows deterministic interruption after a published member.
+func writeOverlayFilesWithRename(ctx context.Context, files []overlayFile, rename func(string, string) error) error {
 	if err := ctx.Err(); err != nil {
 		return contextError(ctx, err)
 	}
@@ -83,7 +88,7 @@ func writeOverlayFiles(ctx context.Context, files []overlayFile) error {
 		if err := admitPath(file.path); err != nil {
 			return err
 		}
-		if err := os.Rename(file.temporary, file.path); err != nil {
+		if err := rename(file.temporary, file.path); err != nil {
 			return e.Wrap(e.CodeInternal, err, "publishing producer overlay %q", file.path)
 		}
 		if err := syncOverlayDirectory(filepath.Dir(file.path)); err != nil {
