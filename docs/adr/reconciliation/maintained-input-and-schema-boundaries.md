@@ -1,9 +1,9 @@
 ## Maintained input and schema boundaries
 
-The NVKE four-family pilot adds independent core (28 outputs), services (34), telemetry (17) and disks (4)
+The NVKE four-family pilot adds independent core (21 outputs), services (34), telemetry (17) and disks (4)
 Definitions under `inputs/definitions/nvke/`, with corresponding `github-nvke-<family>` Environments and
-named production bundles. Their selected output union is the combined candidate's 69 outputs plus 14
-family-only outputs (eight core, six services) that the combined Definition omits for workflow headroom, retaining
+named production bundles. Their selected output union is the combined candidate's 69 outputs, except `nico-reference-profiles-fixture`, plus 8
+family-only outputs (two core, six services) that the combined Definition omits for workflow headroom, retaining
 aggregate native children, bound chart/image relationships and complete disk material selections. They
 reuse shared catalog/pin owners and publish into separate family prefixes beneath the existing candidate
 namespace. `make nvke-split-generate` and `make nvke-split-check` own the family subset; the repository-wide
@@ -218,8 +218,9 @@ catalog command as it was before intermediate-digest validation built both sourc
 the compiler was killed by signal 9 in an 8 GiB Docker VM; no Core image was produced. Neither has been rebuilt
 at `v2.3.0`, and no hosted Run has built, published or signed either image or the Flow chart.
 
-The core family also selects `controller-profiles` from the curated `nvke-nico-reference-profiles` producer, the
-same build as `nico-reference-profiles-fixture`. NVKE's controller deploy item names `profilesArtifact:
+The core family selects `controller-profiles` from the curated `nvke-nico-reference-profiles` producer in place
+of `nico-reference-profiles-fixture`: one Release cannot publish the same image under two outputs, which the publication root rejects.
+NVKE's controller deploy item names `profilesArtifact:
 controller-profiles` (`deploy/nico/controller/release.yaml:20` at `v0.22.0`, `v0.23.0` and main `5293831c`), and a
 `--release` render fails when the Release lacks it; the stack config's `images.profiles` overrides it but cannot
 replace it. The image holds the two NICO test config profiles and their runbooks, not fleet configuration; NVKE's

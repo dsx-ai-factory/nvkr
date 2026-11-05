@@ -1,4 +1,4 @@
-name: p08 Build and prepare nvkectl +13
+name: 'p08 Generate SBOMs: spire-agent-image +11'
 'on':
   workflow_call:
     inputs:
@@ -10,8 +10,6 @@ name: p08 Build and prepare nvkectl +13
         value: ${{ jobs.nvkr-partition-results.outputs.results }}
       statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
-      nvkr-partition-12:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-12 }}
       nvkr-partition-13:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-13 }}
       nvkr-results-00:
@@ -38,10 +36,6 @@ name: p08 Build and prepare nvkectl +13
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09 }}
       nvkr-results-09-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09-statuses }}
-      nvkr-results-0a:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0a }}
-      nvkr-results-0a-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0a-statuses }}
       nvkr-results-0c:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0c }}
       nvkr-results-0c-statuses:
@@ -58,76 +52,6 @@ name: p08 Build and prepare nvkectl +13
 permissions:
   contents: read
 jobs:
-  nvkr-process-nvkectl-build-nvkectl-nvkect-ae9c2b9c3380:
-    name: 'Build and prepare nvkectl'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 180
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-nvkectl-fetch-nvkectl'].result == 'success' }}
-    steps:
-      - name: Check native runner platform
-        run: |
-          set -eu
-          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
-      - name: Check out workflow source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: 'false'
-      - name: Prepare NVKR runner and job parameters
-        id: nvkr-context
-        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
-        with:
-          runner-artifact: 'nvkr-exec-ubuntu-24-04'
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute node part-1
-        uses: ./.github/nvkr-dev/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: execute node part-2
-        uses: ./.github/nvkr-dev/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - name: execute node part-3
-        uses: ./.github/nvkr-dev/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-3'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
-  nvkr-spiffe-csi-image-sbom:
-    name: 'Generate SBOMs: spiffe-csi-image'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-process-spiffe-csi-image-pull-spiffe-2ee250ddfce9'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
-    steps:
-      - name: Check native runner platform
-        run: |
-          set -eu
-          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
-      - name: Check out workflow source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: 'false'
-      - name: Prepare NVKR runner and job parameters
-        id: nvkr-context
-        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
-        with:
-          runner-artifact: 'nvkr-exec-ubuntu-24-04'
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute node part-1
-        uses: ./.github/nvkr-dev/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-spire-agent-image-sbom:
     name: 'Generate SBOMs: spire-agent-image'
     runs-on: 'ubuntu-24.04'
@@ -480,14 +404,13 @@ jobs:
     name: 'Collect provider results: nvkr-partition-results'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-process-nvkectl-build-nvkectl-nvkect-ae9c2b9c3380, nvkr-spiffe-csi-image-sbom, nvkr-spire-agent-image-sbom, nvkr-spire-bash-image-sbom, nvkr-spire-controller-manager-image-sbom, nvkr-spire-crds-sbom, nvkr-spire-oidc-image-sbom, nvkr-spire-sbom, nvkr-spire-server-image-sbom, nvkr-spire-tpm-server-image-sbom, nvkr-temporal-admin-tools-image-sbom, nvkr-temporal-sbom, nvkr-temporal-server-image-sbom, nvkr-temporal-ui-image-sbom]
+    needs: [nvkr-spire-agent-image-sbom, nvkr-spire-bash-image-sbom, nvkr-spire-controller-manager-image-sbom, nvkr-spire-crds-sbom, nvkr-spire-oidc-image-sbom, nvkr-spire-sbom, nvkr-spire-server-image-sbom, nvkr-spire-tpm-server-image-sbom, nvkr-temporal-admin-tools-image-sbom, nvkr-temporal-sbom, nvkr-temporal-server-image-sbom, nvkr-temporal-ui-image-sbom]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     permissions: {}
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
-      nvkr-partition-12: ${{ format('"nvkr-process-nvkectl-build-nvkectl-nvkect-ae9c2b9c3380":{0}', toJSON(needs['nvkr-process-nvkectl-build-nvkectl-nvkect-ae9c2b9c3380'])) }}
-      nvkr-partition-13: ${{ format('"nvkr-spiffe-csi-image-sbom":{0},"nvkr-spire-agent-image-sbom":{1},"nvkr-spire-bash-image-sbom":{2},"nvkr-spire-controller-manager-image-sbom":{3},"nvkr-spire-crds-sbom":{4},"nvkr-spire-oidc-image-sbom":{5},"nvkr-spire-sbom":{6},"nvkr-spire-server-image-sbom":{7},"nvkr-spire-tpm-server-image-sbom":{8},"nvkr-temporal-admin-tools-image-sbom":{9},"nvkr-temporal-sbom":{10},"nvkr-temporal-server-image-sbom":{11},"nvkr-temporal-ui-image-sbom":{12}', toJSON(needs['nvkr-spiffe-csi-image-sbom']), toJSON(needs['nvkr-spire-agent-image-sbom']), toJSON(needs['nvkr-spire-bash-image-sbom']), toJSON(needs['nvkr-spire-controller-manager-image-sbom']), toJSON(needs['nvkr-spire-crds-sbom']), toJSON(needs['nvkr-spire-oidc-image-sbom']), toJSON(needs['nvkr-spire-sbom']), toJSON(needs['nvkr-spire-server-image-sbom']), toJSON(needs['nvkr-spire-tpm-server-image-sbom']), toJSON(needs['nvkr-temporal-admin-tools-image-sbom']), toJSON(needs['nvkr-temporal-sbom']), toJSON(needs['nvkr-temporal-server-image-sbom']), toJSON(needs['nvkr-temporal-ui-image-sbom'])) }}
+      nvkr-partition-13: ${{ format('"nvkr-spire-agent-image-sbom":{0},"nvkr-spire-bash-image-sbom":{1},"nvkr-spire-controller-manager-image-sbom":{2},"nvkr-spire-crds-sbom":{3},"nvkr-spire-oidc-image-sbom":{4},"nvkr-spire-sbom":{5},"nvkr-spire-server-image-sbom":{6},"nvkr-spire-tpm-server-image-sbom":{7},"nvkr-temporal-admin-tools-image-sbom":{8},"nvkr-temporal-sbom":{9},"nvkr-temporal-server-image-sbom":{10},"nvkr-temporal-ui-image-sbom":{11}', toJSON(needs['nvkr-spire-agent-image-sbom']), toJSON(needs['nvkr-spire-bash-image-sbom']), toJSON(needs['nvkr-spire-controller-manager-image-sbom']), toJSON(needs['nvkr-spire-crds-sbom']), toJSON(needs['nvkr-spire-oidc-image-sbom']), toJSON(needs['nvkr-spire-sbom']), toJSON(needs['nvkr-spire-server-image-sbom']), toJSON(needs['nvkr-spire-tpm-server-image-sbom']), toJSON(needs['nvkr-temporal-admin-tools-image-sbom']), toJSON(needs['nvkr-temporal-sbom']), toJSON(needs['nvkr-temporal-server-image-sbom']), toJSON(needs['nvkr-temporal-ui-image-sbom'])) }}
       nvkr-results-00: ${{ format('"nvkr-spire-agent-image-sbom":{0}', toJSON(needs['nvkr-spire-agent-image-sbom'])) }}
       nvkr-results-00-statuses: ${{ format('{0}', needs['nvkr-spire-agent-image-sbom'].result) }}
       nvkr-results-03: ${{ format('"nvkr-spire-controller-manager-image-sbom":{0}', toJSON(needs['nvkr-spire-controller-manager-image-sbom'])) }}
@@ -496,12 +419,10 @@ jobs:
       nvkr-results-05-statuses: ${{ format('{0}', needs['nvkr-temporal-sbom'].result) }}
       nvkr-results-07: ${{ format('"nvkr-spire-bash-image-sbom":{0},"nvkr-temporal-server-image-sbom":{1}', toJSON(needs['nvkr-spire-bash-image-sbom']), toJSON(needs['nvkr-temporal-server-image-sbom'])) }}
       nvkr-results-07-statuses: ${{ format('{0} {1}', needs['nvkr-spire-bash-image-sbom'].result, needs['nvkr-temporal-server-image-sbom'].result) }}
-      nvkr-results-08: ${{ format('"nvkr-spiffe-csi-image-sbom":{0},"nvkr-temporal-ui-image-sbom":{1}', toJSON(needs['nvkr-spiffe-csi-image-sbom']), toJSON(needs['nvkr-temporal-ui-image-sbom'])) }}
-      nvkr-results-08-statuses: ${{ format('{0} {1}', needs['nvkr-spiffe-csi-image-sbom'].result, needs['nvkr-temporal-ui-image-sbom'].result) }}
+      nvkr-results-08: ${{ format('"nvkr-temporal-ui-image-sbom":{0}', toJSON(needs['nvkr-temporal-ui-image-sbom'])) }}
+      nvkr-results-08-statuses: ${{ format('{0}', needs['nvkr-temporal-ui-image-sbom'].result) }}
       nvkr-results-09: ${{ format('"nvkr-spire-crds-sbom":{0},"nvkr-temporal-admin-tools-image-sbom":{1}', toJSON(needs['nvkr-spire-crds-sbom']), toJSON(needs['nvkr-temporal-admin-tools-image-sbom'])) }}
       nvkr-results-09-statuses: ${{ format('{0} {1}', needs['nvkr-spire-crds-sbom'].result, needs['nvkr-temporal-admin-tools-image-sbom'].result) }}
-      nvkr-results-0a: ${{ format('"nvkr-process-nvkectl-build-nvkectl-nvkect-ae9c2b9c3380":{0}', toJSON(needs['nvkr-process-nvkectl-build-nvkectl-nvkect-ae9c2b9c3380'])) }}
-      nvkr-results-0a-statuses: ${{ format('{0}', needs['nvkr-process-nvkectl-build-nvkectl-nvkect-ae9c2b9c3380'].result) }}
       nvkr-results-0c: ${{ format('"nvkr-spire-sbom":{0},"nvkr-spire-server-image-sbom":{1}', toJSON(needs['nvkr-spire-sbom']), toJSON(needs['nvkr-spire-server-image-sbom'])) }}
       nvkr-results-0c-statuses: ${{ format('{0} {1}', needs['nvkr-spire-sbom'].result, needs['nvkr-spire-server-image-sbom'].result) }}
       nvkr-results-0e: ${{ format('"nvkr-spire-oidc-image-sbom":{0},"nvkr-spire-tpm-server-image-sbom":{1}', toJSON(needs['nvkr-spire-oidc-image-sbom']), toJSON(needs['nvkr-spire-tpm-server-image-sbom'])) }}
