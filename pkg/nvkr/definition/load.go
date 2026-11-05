@@ -9,10 +9,9 @@ import (
 	"io"
 	"strings"
 
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	yamlv3 "go.yaml.in/yaml/v3"
 	"sigs.k8s.io/yaml"
-
-	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 const maxDocumentBytes = int64(4 << 20)
