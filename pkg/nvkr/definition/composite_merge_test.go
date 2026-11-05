@@ -36,6 +36,7 @@ func TestCompositeMergeContract(t *testing.T) {
 		composite string
 		mutate    func(members []AdmittedMember)
 		code      e.Code
+		noSBOM    bool
 	}{
 		{name: "valid beside members", composite: "defs/composite.yaml"},
 		{name: "valid in another directory", composite: "product/composite.yaml"},
@@ -54,6 +55,18 @@ func TestCompositeMergeContract(t *testing.T) {
 		}},
 		{name: "differing sbomTool", composite: "defs/composite.yaml", code: e.CodeInvalidCatalog, mutate: func(members []AdmittedMember) {
 			members[1].Definition.SBOMTool = "trivy"
+		}},
+		{name: "omitted sbomTool inherits the shared one", composite: "defs/composite.yaml", mutate: func(members []AdmittedMember) {
+			members[0].Definition.SBOMTool = ""
+		}},
+		{name: "every member omits sbomTool", composite: "defs/composite.yaml", noSBOM: true, mutate: func(members []AdmittedMember) {
+			for i := range members {
+				members[i].Definition.SBOMTool = ""
+			}
+		}},
+		{name: "differing sbomTool after an omitted one", composite: "defs/composite.yaml", code: e.CodeInvalidCatalog, mutate: func(members []AdmittedMember) {
+			members[0].Definition.SBOMTool = ""
+			members[2].Definition.SBOMTool = "trivy"
 		}},
 		{name: "omitted cosignTool", composite: "defs/composite.yaml", code: e.CodeInvalidCatalog, mutate: func(members []AdmittedMember) {
 			members[2].Definition.CosignTool = ""
@@ -86,11 +99,14 @@ func TestCompositeMergeContract(t *testing.T) {
 			if err := effective.Validate(); err != nil {
 				t.Fatal(err)
 			}
-			wantBase, wantImages, wantOverlay := "../catalog", "../images", "overlay.yaml"
+			wantBase, wantImages, wantOverlay, wantSBOM := "../catalog", "../images", "overlay.yaml", "syft"
+			if tc.noSBOM {
+				wantSBOM = ""
+			}
 			if tc.composite == "product/composite.yaml" {
 				wantOverlay = "../defs/overlay.yaml"
 			}
-			if effective.Metadata.Name != "product" || effective.Catalog.Base != wantBase || effective.SBOMTool != "syft" || len(effective.Outputs) != 5 {
+			if effective.Metadata.Name != "product" || effective.Catalog.Base != wantBase || effective.SBOMTool != wantSBOM || len(effective.Outputs) != 5 {
 				t.Fatalf("effective Definition = %+v", effective)
 			}
 			for _, output := range effective.Outputs {

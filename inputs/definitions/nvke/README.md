@@ -20,7 +20,7 @@ the issue that adds it.
 | [Disks Ubuntu 24](disks-ubuntu24.yaml) | [github-nvke-disks-ubuntu24.yaml](../../environments/github-nvke-disks-ubuntu24.yaml) | Ubuntu 24.04 `nvke-node-image-ubuntu24-{amd64,arm64}` and `nvke-node-fde-ubuntu24-{amd64,arm64}` | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | Offline CAPI repository in Core | — | `clusterctl` provider manifests | — | Pending [#324](https://github.com/dsx-ai-factory/nvkr/issues/324) |
 | [GB200 AICR bundle](../aicr/nvke-gb200.yaml) | [aicr-local-arm64.yaml](../../environments/aicr-local-arm64.yaml) (local build only) | `aicr-nvke-gb200-ubuntu-training-kubeflow-{helm,flux,argocd-helm}` | `unqualified-local-execution` | One local Run recorded ([AICR inputs](../aicr/README.md#gb200-nvke-kubeflow-training)); a hosted Release is pending [#325](https://github.com/dsx-ai-factory/nvkr/issues/325) |
-| [GPU site composite](gpu-site.composite.yaml) | [github-nvke-gpu-site.yaml](../../environments/github-nvke-gpu-site.yaml) | Every output of the five NVKE families above, 80 in all, in one Release ([GPU site composite](#gpu-site-composite)) | `pipeline-attested` | Generated named production bundle and the fixed development bundle; no hosted Release recorded. The GB200 AICR bundle is not yet a member |
+| [GPU site composite](gpu-site.composite.yaml) | [github-nvke-gpu-site.yaml](../../environments/github-nvke-gpu-site.yaml) | Every output of the five NVKE families and the GB200 AICR bundle above, 83 in all, in one Release ([GPU site composite](#gpu-site-composite)) | `pipeline-attested` | Generated named production bundle and the fixed development bundle; no hosted Release recorded |
 
 The [AICR inputs](../aicr/README.md) also hold a `generic` GB300 example, which is not an NVKE recipe and is
 not part of an NVKE site.
@@ -41,7 +41,8 @@ with the credentials in [Family pilot](#family-pilot). Each Run publishes one Re
 
 [`gpu-site.composite.yaml`](gpu-site.composite.yaml) is the whole-site entry point. It is an
 [ADR-26](../../../docs/adr/0026-definition-composition.md) composite that pins the core, services, telemetry,
-disks and disks-ubuntu24 Definitions by their `nvkr.definition` digests. One Run builds all 80 outputs and
+disks and disks-ubuntu24 Definitions and the [GB200 AICR bundle](../aicr/nvke-gb200.yaml) by their
+`nvkr.definition` digests. One Run builds all 83 outputs and
 publishes one Release whose membership is the exact union of the members' outputs. The family Definitions,
 Runs and Releases stay as they are; the composite reads the family files and changes none of them.
 
@@ -80,12 +81,9 @@ Release. Composite qualification, member Release reuse and composite runtime Pla
 `engine-capability`. Verifying a composite Release establishes nothing about the family Releases, and the
 reverse also holds.
 
-The [GB200 AICR bundle](../aicr/nvke-gb200.yaml) is not yet a member. Its Definition omits the
-`sbomTool: syft` that every family selects, which ADR-26 requires members to share. A measurement with
-`sbomTool: syft` added, taken before the core family dropped its NICo outputs and AICR CLI, put the
-six-member finalizer at 779 jobs, and ADR-18's 16 fixed result-collector buckets routed 65 of them into one
-bucket, over its 64-job limit, so generation refused it with `engine-capability`. The current 80-output
-selection has not been measured.
+The GB200 AICR Definition selects no `sbomTool`, so its standalone ARM64 local build needs no ARM64 scanner.
+Inside the composite it inherits the families' `syft` (ADR-26), so its bundles get SBOMs there. The
+composite's finalizer fits ADR-18's 16 result-collector buckets.
 
 ### GPU system matrix
 
@@ -469,8 +467,8 @@ provider access restrictions remain operator obligations.
 ## Generate and check the maintained workflow
 
 The committed feature-branch development workflow comes from the [GPU site composite](#gpu-site-composite)
-through `../../environments/github-development.yaml`, not from this Definition. It has 80 outputs, including
-plain and public-bootstrap FDE disks for both Ubuntu series on both native routes, signing and verification.
+through `../../environments/github-development.yaml`, not from this Definition. It has 83 outputs, including
+the three GB200 AICR bundles and plain and public-bootstrap FDE disks for both Ubuntu series on both native routes, signing and verification.
 Only execution/publication policy differs from production: separate development environments and credentials, the
 `nvkr-dev.yml` signer identity, and run-attempt-scoped repositories beneath
 `ghcr.io/dsx-ai-factory/nvkr/development`. `make pipeline-dev-generate` regenerates it;

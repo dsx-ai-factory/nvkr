@@ -6,10 +6,12 @@ package factory
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -135,7 +137,16 @@ func githubResultPartitionFixture(count int) map[string][]string {
 }
 
 func TestGitHubResultCollectorsHaveStableExactMembership(t *testing.T) {
-	for _, count := range []int{64, 65, 596} {
+	// Widths are pinned: 16 is the original layout, 1010 and 1982 are the last
+	// fixtures that fit 16 and 32 buckets, and 1011 and 1983 the first that do
+	// not. Adding one job to 1010 crosses to 32 buckets and reassigns members.
+	for _, test := range []struct {
+		count   int
+		buckets uint64
+		widens  bool
+	}{{64, 0, false}, {65, 16, false}, {596, 16, false}, {1000, 16, false}, {1010, 16, true}, {1011, 32, false},
+		{1982, 32, false}, {1983, 64, false}} {
+		count := test.count
 		t.Run(fmt.Sprint(count), func(t *testing.T) {
 			full := githubResultPartitionFixture(count)
 			projection, err := projectGitHubNeeds(t.Context(), full, false)
@@ -154,7 +165,7 @@ func TestGitHubResultCollectorsHaveStableExactMembership(t *testing.T) {
 					t.Fatalf("collector %s has an invalid bounded dependency set", id)
 				}
 				for _, member := range members {
-					if seen[member] || githubResultCollectorID(member) != id {
+					if seen[member] || githubResultCollectorID(member, test.buckets) != id {
 						t.Fatalf("collector duplicates or reroutes %s", member)
 					}
 					seen[member] = true
@@ -171,9 +182,19 @@ func TestGitHubResultCollectorsHaveStableExactMembership(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			if test.widens {
+				for id, members := range after.Collectors {
+					for _, member := range members {
+						if githubResultCollectorID(member, 2*test.buckets) != id {
+							t.Fatalf("crossing to %d buckets left %s in %s", 2*test.buckets, member, id)
+						}
+					}
+				}
+				return
+			}
 			for id, members := range projection.Collectors {
 				want := slices.Clone(members)
-				if id == githubResultCollectorID(newID) {
+				if id == githubResultCollectorID(newID, test.buckets) {
 					want = append(want, newID)
 					slices.Sort(want)
 				}
@@ -190,25 +211,83 @@ func TestGitHubResultCollectorsHaveStableExactMembership(t *testing.T) {
 	}
 }
 
+// Fill every widest-layout bucket to at most 63 jobs, so count alone decides
+// whether the finalizer token budget admits the layout.
+func githubUniformResultFixture(count int) map[string][]string {
+	full := map[string][]string{}
+	filled := map[string]int{}
+	for index := 0; len(full[githubFinalizerJobID]) < count; index++ {
+		id := fmt.Sprintf("uniform-%05d", index)
+		if bucket := githubResultCollectorID(id, 64); filled[bucket] < 63 {
+			filled[bucket]++
+			full[id] = nil
+			full[githubFinalizerJobID] = append(full[githubFinalizerJobID], id)
+		}
+	}
+	return full
+}
+
+// The generation-time guard must admit exactly the layouts the finalizer parser
+// accepts for GitHub-shaped all-success reports.
+func TestGitHubResultCollectorTokenGuardMatchesFinalizerParser(t *testing.T) {
+	const largest = 3983 // (32768 - 2 - 14*64) / 8
+	projection, err := projectGitHubNeeds(t.Context(), githubUniformResultFixture(largest), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(projection.Collectors) != 64 {
+		t.Fatalf("fixture uses %d collectors, want the widest layout", len(projection.Collectors))
+	}
+	report := map[string]any{}
+	for id, members := range projection.Collectors {
+		needs := map[string]any{}
+		statuses := make([]string, 0, len(members))
+		for _, member := range members {
+			needs[member] = map[string]any{"result": "success", "outputs": map[string]string{}}
+			statuses = append(statuses, "success")
+		}
+		results, err := json.MarshalIndent(needs, "", "  ")
+		if err != nil {
+			t.Fatal(err)
+		}
+		report[id] = map[string]any{"result": "success", "outputs": map[string]string{
+			"results": string(results), "statuses": strings.Join(statuses, " ")}}
+	}
+	raw, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := parseGitHubCollectedProviderResults(t.Context(), string(raw), projection.Full[githubFinalizerJobID], projection.Collectors)
+	if err != nil || len(got) != largest {
+		t.Fatalf("finalizer rejected the largest admitted layout: %d results, %v", len(got), err)
+	}
+	got2, err := projectGitHubNeeds(t.Context(), githubUniformResultFixture(largest+1), false)
+	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+	if got2 != nil {
+		t.Fatal("over-budget collector set returned a partial projection")
+	}
+}
+
 func TestGitHubResultCollectorCapacityAndCollisionFailClosed(t *testing.T) {
 	for _, test := range []struct {
 		name string
 		full func() map[string][]string
 	}{
-		{name: "fixed bucket overflow", full: func() map[string][]string {
+		{name: "single bucket overflow at every width", full: func() map[string][]string {
 			full := map[string][]string{}
 			for index := 0; len(full[githubFinalizerJobID]) < 65; index++ {
 				id := fmt.Sprintf("same-bucket-%d", index)
-				if githubResultCollectorID(id) == "nvkr-results-00" {
+				if githubResultCollectorID(id, 64) == "nvkr-results-00" {
 					full[id] = nil
 					full[githubFinalizerJobID] = append(full[githubFinalizerJobID], id)
 				}
 			}
 			return full
 		}},
+		{name: "widest layout overflow", full: func() map[string][]string { return githubResultPartitionFixture(3469) }},
 		{name: "original job collision", full: func() map[string][]string {
 			full := githubResultPartitionFixture(65)
-			id := githubResultCollectorID(full[githubFinalizerJobID][0])
+			id := githubResultCollectorID(full[githubFinalizerJobID][0], 16)
 			full[id] = nil
 			full[githubFinalizerJobID] = append(full[githubFinalizerJobID], id)
 			return full

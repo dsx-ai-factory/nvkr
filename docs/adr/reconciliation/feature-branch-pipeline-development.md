@@ -118,7 +118,7 @@ reads 406 locators, failed with that storage request's HTTP 503 on three consecu
 uses the same bounded transient-server budget, with recovery and exhaustion cases in the contract suite.
 
 The explicit `githubDevelopment` Environment setting selects separate fixed workflow/Plan/manifest paths
-with the same compiler, complete graph and helper. The committed development bundle now uses the 80-output
+with the same compiler, complete graph and helper. The committed development bundle now uses the 83-output
 [GPU site composite](../../../inputs/definitions/nvke/README.md#gpu-site-composite), including all eight native plain/public-bootstrap
 FDE disk outputs of both Ubuntu series, output-local publication, SBOM attestation, cosign signing, verification,
 metadata assembly and finalization; the combined 69-output candidate no longer has a development bundle. It retains the candidate's existing disk
