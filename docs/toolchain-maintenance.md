@@ -51,11 +51,14 @@ Retrieve both proposals and evidence through the private CI transport. Combine t
 proposals into `inputs/policies/toolchain-maintenance/<preparation-run-id>.json`:
 
 ```sh
-jq -s --arg source '<full-source-commit>' --argjson run 123456789 \
+preparation_run_id=123456789
+mkdir -p inputs/policies/toolchain-maintenance
+jq -s --arg source '<full-source-commit>' --argjson run "$preparation_run_id" \
   --argjson attempt 1 \
   '{schemaVersion:"nvkr.dev/toolchain-refresh/v1", sourceCommit:$source,
     runID:$run, attempt:$attempt, images:(add | sort_by(.arch,.kind))}' \
-  amd64/proposal.json arm64/proposal.json > /tmp/refresh-review.json
+  amd64/proposal.json arm64/proposal.json \
+  > "inputs/policies/toolchain-maintenance/${preparation_run_id}.json"
 ```
 
 The placeholder Run and commit above are synthetic. Use the exact successful

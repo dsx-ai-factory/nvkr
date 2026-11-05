@@ -20,7 +20,6 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
-	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -95,8 +94,9 @@ func read(ctx context.Context, path string) ([]byte, error) {
 }
 
 func decode(raw []byte, into any) error {
-	// JSON's standard decoder accepts duplicate keys; policy documents do not.
-	if _, err := yaml.YAMLToJSONStrict(raw); err != nil {
+	// Reject every duplicate, including aliases that encoding/json folds to the
+	// same struct field, before decoding any approval or measurement values.
+	if err := canonical.ValidateFoldedJSONDocument(raw); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "ambiguous maintenance record")
 	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))

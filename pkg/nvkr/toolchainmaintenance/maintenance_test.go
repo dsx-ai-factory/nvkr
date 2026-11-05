@@ -277,9 +277,33 @@ func TestUnsupportedPublicationHasNoInputWork(t *testing.T) {
 	}
 }
 
-func TestApprovalParserRejectsUnknownAndTrailingData(t *testing.T) {
-	for _, raw := range []string{`{"unknown":true}`, `{} {}`, `{"runID":1,"runID":2}`} {
-		t.Run(raw, func(t *testing.T) { var r Record; assertCode(t, decode([]byte(raw), &r), e.CodeInvalidCatalog) })
+func TestApprovalParserRejectsAmbiguousData(t *testing.T) {
+	for _, test := range []struct{ name, raw string }{
+		{"unknown field", `{"unknown":true}`},
+		{"trailing value", `{} {}`},
+		{"duplicate field", `{"runID":1,"runID":2}`},
+		{"case alias", `{"runID":1,"runid":2}`},
+		{"escaped case alias", `{"runID":1,"\u0072unid":2}`},
+		{"image in array", `{"images":[{"arch":"amd64","ARCH":"arm64"}]}`},
+		{"nested exception", `{"images":[{"exception":{"scope":"internal-m2-candidate-only","SCOPE":"other"}}]}`},
+		{"unicode fold", `{"images":[{"exception":{"scope":"internal-m2-candidate-only","ſcope":"other"}}]}`},
+		{"measurement map", `{"images":[{"executables":{"codecDigest":"one","CODECDIGEST":"two"}}]}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var r Record
+			assertCode(t, decode([]byte(test.raw), &r), e.CodeInvalidCatalog)
+		})
+	}
+	raw, err := json.MarshalIndent(recordFixture(), "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var r Record
+	if err := decode(raw, &r); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.validate(now, true); err != nil {
+		t.Fatal(err)
 	}
 }
 
