@@ -4,11 +4,15 @@
 package definition
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"strings"
 
-	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	yamlv3 "go.yaml.in/yaml/v3"
 	"sigs.k8s.io/yaml"
+
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 const maxDocumentBytes = int64(4 << 20)
@@ -81,6 +85,9 @@ func decodeStrict(raw []byte, label string, output any) error {
 	if int64(len(raw)) > maxDocumentBytes {
 		return e.New(e.CodeInvalidCatalog, "%s document exceeds its byte bound", label)
 	}
+	if err := requireSingleDocument(raw, label); err != nil {
+		return err
+	}
 	if err := yaml.UnmarshalStrict(raw, output); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "parsing %s", label)
 	}
@@ -102,6 +109,24 @@ func decodeStrict(raw []byte, label string, output any) error {
 				}
 			}
 		}
+	}
+	return nil
+}
+
+// requireSingleDocument rejects trailing YAML documents that UnmarshalStrict
+// would otherwise ignore, so concatenated authored files cannot be admitted
+// under the identity of their first document.
+func requireSingleDocument(raw []byte, label string) error {
+	decoder := yamlv3.NewDecoder(bytes.NewReader(raw))
+	var document any
+	if err := decoder.Decode(&document); err != nil {
+		if err == io.EOF {
+			return nil
+		}
+		return e.Wrap(e.CodeInvalidCatalog, err, "parsing %s", label)
+	}
+	if err := decoder.Decode(&document); err != io.EOF {
+		return e.New(e.CodeInvalidCatalog, "%s must contain exactly one YAML document", label)
 	}
 	return nil
 }
