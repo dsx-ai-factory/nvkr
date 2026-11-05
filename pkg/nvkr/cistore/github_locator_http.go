@@ -167,9 +167,10 @@ func githubLocatorRetryDelay(response githubLocatorResponse, attempt int, now ti
 	return delay, true, err
 }
 
-// githubLocatorServerDelay applies a single Retry-After value (seconds or
-// HTTP date) over the default delay, with an increasing minimum for repeated
-// retries. It refuses delays outside the budget instead of retrying earlier.
+// githubLocatorServerDelay uses the default delay only when Retry-After is
+// absent; otherwise one seconds or HTTP-date value replaces it, even if
+// shorter. It then applies the increasing minimum (1s << attempt) and refuses
+// delays over 120s instead of retrying earlier than requested.
 func githubLocatorServerDelay(header http.Header, delay time.Duration, attempt int, now time.Time) (time.Duration, error) {
 	values := header.Values("Retry-After")
 	if len(values) > 1 {

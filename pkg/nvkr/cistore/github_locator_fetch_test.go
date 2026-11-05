@@ -57,7 +57,7 @@ func TestGitHubLocatorSelectionAdmission(t *testing.T) {
 }
 
 func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
-	for _, scenario := range []string{"transient ZIP API", "transient ZIP storage", "storage retry after", "canceled ZIP storage wait", "exhausted ZIP storage", "success flat", "success subdirectories", "singleton subdirectory", "earlier attempt", "retry newest first", "retry oldest first", "retry tied", "retry future", "retry corrupt", "retry truncated", "retry repeated id", "retry exact", "partial nonmerged", "empty nonmerged", "missing pattern", "missing exact", "duplicate", "wrong head", "expired", "missing digest", "changed zip", "wrong attempt", "redirect", "secret failure", "occupied index"} {
+	for _, scenario := range []string{"transient ZIP API", "transient ZIP storage", "storage retry after", "canceled ZIP storage wait", "invalid ZIP storage delay", "exhausted ZIP storage", "success flat", "success subdirectories", "singleton subdirectory", "earlier attempt", "retry newest first", "retry oldest first", "retry tied", "retry future", "retry corrupt", "retry truncated", "retry repeated id", "retry exact", "partial nonmerged", "empty nonmerged", "missing pattern", "missing exact", "duplicate", "wrong head", "expired", "missing digest", "changed zip", "wrong attempt", "redirect", "secret failure", "occupied index"} {
 		t.Run(scenario, func(t *testing.T) {
 			index := t.TempDir()
 			request := testRequest
@@ -151,13 +151,16 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 			archiveReads := map[string]int{}
 			g := newGitHubLocatorClient("test-repository-token")
 			var waits []time.Duration
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
 			g.wait = func(_ context.Context, delay time.Duration) error {
 				if delay < time.Second { // request pacing, not a retry backoff
 					return nil
 				}
 				waits = append(waits, delay)
 				if scenario == "canceled ZIP storage wait" {
-					return context.Canceled
+					cancel()
+					return ctx.Err()
 				}
 				return nil
 			}
@@ -180,6 +183,9 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 					}
 					if scenario == "exhausted ZIP storage" || scenario == "canceled ZIP storage wait" || (scenario == "transient ZIP storage" && archives == 1) {
 						return githubLocatorHTTPFixture(http.StatusServiceUnavailable, []byte("SECRET storage busy"), nil), nil
+					}
+					if scenario == "invalid ZIP storage delay" {
+						return githubLocatorHTTPFixture(http.StatusServiceUnavailable, nil, http.Header{"Retry-After": {"SECRET-delay"}}), nil
 					}
 					if scenario == "storage retry after" && archives == 1 {
 						return githubLocatorHTTPFixture(http.StatusServiceUnavailable, nil, http.Header{"Retry-After": {"30"}}), nil
@@ -230,7 +236,7 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 				t.Fatal("unexpected request")
 				return nil, nil
 			})
-			err := g.fetch(t.Context(), request, index, selection)
+			err := g.fetch(ctx, request, index, selection)
 			if scenario == "partial nonmerged" || scenario == "empty nonmerged" {
 				if err != nil {
 					t.Fatal(err)
@@ -344,6 +350,11 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 				assertCode(t, err, e.CodeTimeout)
 				if archives != 1 || len(waits) != 1 {
 					t.Fatalf("canceled storage wait: storage=%d waits=%v", archives, waits)
+				}
+			case "invalid ZIP storage delay":
+				assertCode(t, err, e.CodeUnavailable)
+				if archives != 1 || len(waits) != 0 {
+					t.Fatalf("invalid storage delay: storage=%d waits=%v", archives, waits)
 				}
 			case "occupied index":
 				assertCode(t, err, e.CodeImmutableViolation)
