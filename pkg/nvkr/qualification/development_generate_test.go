@@ -16,9 +16,14 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
 
+// developmentGenerationFixture loads a recorded Plan of the combined Definition
+// under the development Environment, so the test needs no source access. The
+// committed fixed development bundle belongs to the GPU site composite, whose
+// qualification ADR-26 defers. testdata/development-plan.json is main's
+// .github/nvkr-dev/plan.json at f2354a5a, before that bundle moved.
 func developmentGenerationFixture(t *testing.T) (*factory.Plan, lifecycle.QualificationPolicy) {
 	t.Helper()
-	plan, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-dev/plan.json")
+	plan, err := factory.LoadPlanContext(t.Context(), "testdata/development-plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}

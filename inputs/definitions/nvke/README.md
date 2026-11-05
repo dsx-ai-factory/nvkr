@@ -13,14 +13,14 @@ the issue that adds it.
 
 | Definition | Environment | Produces | Lane when run | Status |
 |---|---|---|---|---|
-| [Core](core.yaml) | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) | Site controller: `nvkectl`, operator tools, controller image and chart, `controller-profiles`, CAPNICo, NICo charts and images, CAPI and cert-manager images | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
+| [Core](core.yaml) | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) | Site controller: `nvkectl`, operator tools, controller image and chart, `controller-profiles`, CAPNICo, CAPI and cert-manager images | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | [Services](services.yaml) | [github-nvke-services.yaml](../../environments/github-nvke-services.yaml) | SPIRE, PostgreSQL, Temporal and local-path-provisioner charts and images | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | [Telemetry](telemetry.yaml) | [github-nvke-telemetry.yaml](../../environments/github-nvke-telemetry.yaml) | NKTP chart and images | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | [Disks](disks.yaml) | [github-nvke-disks.yaml](../../environments/github-nvke-disks.yaml) | Ubuntu 26.04 `nvke-node-image-{amd64,arm64}` and `nvke-node-fde-{amd64,arm64}` | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | [Disks Ubuntu 24](disks-ubuntu24.yaml) | [github-nvke-disks-ubuntu24.yaml](../../environments/github-nvke-disks-ubuntu24.yaml) | Ubuntu 24.04 `nvke-node-image-ubuntu24-{amd64,arm64}` and `nvke-node-fde-ubuntu24-{amd64,arm64}` | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | Offline CAPI repository in Core | — | `clusterctl` provider manifests | — | Pending [#324](https://github.com/dsx-ai-factory/nvkr/issues/324) |
 | [GB200 AICR bundle](../aicr/nvke-gb200.yaml) | [aicr-local-arm64.yaml](../../environments/aicr-local-arm64.yaml) (local build only) | `aicr-nvke-gb200-ubuntu-training-kubeflow-{helm,flux,argocd-helm}` | `unqualified-local-execution` | One local Run recorded ([AICR inputs](../aicr/README.md#gb200-nvke-kubeflow-training)); a hosted Release is pending [#325](https://github.com/dsx-ai-factory/nvkr/issues/325) |
-| GPU site composite | — | Every output above in one Release ([ADR-26](../../../docs/adr/0026-definition-composition.md)) | — | Pending [#326](https://github.com/dsx-ai-factory/nvkr/issues/326) |
+| [GPU site composite](gpu-site.composite.yaml) | [github-nvke-gpu-site.yaml](../../environments/github-nvke-gpu-site.yaml) | Every output of the five NVKE families above, 80 in all, in one Release ([GPU site composite](#gpu-site-composite)) | `pipeline-attested` | Generated named production bundle and the fixed development bundle; no hosted Release recorded. The GB200 AICR bundle is not yet a member |
 
 The [AICR inputs](../aicr/README.md) also hold a `generic` GB300 example, which is not an NVKE recipe and is
 not part of an NVKE site.
@@ -36,6 +36,56 @@ Each family Run is a manual `workflow_dispatch` of `.github/workflows/nvkr-run-n
 with the credentials in [Family pilot](#family-pilot). Each Run publishes one Release under
 `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/<family>`. To consume them, follow
 [Install an NVKE site from the Releases](../../../docs/release-quickstart.md#install-an-nvke-site-from-the-releases).
+
+### GPU site composite
+
+[`gpu-site.composite.yaml`](gpu-site.composite.yaml) is the whole-site entry point. It is an
+[ADR-26](../../../docs/adr/0026-definition-composition.md) composite that pins the core, services, telemetry,
+disks and disks-ubuntu24 Definitions by their `nvkr.definition` digests. One Run builds all 80 outputs and
+publishes one Release whose membership is the exact union of the members' outputs. The family Definitions,
+Runs and Releases stay as they are; the composite reads the family files and changes none of them.
+
+Both disk families select the same disk, agent, installer and DOCA OVS components, and the Ubuntu 24.04
+overlay replaces their producers. The composite declares those eight components as variants of the two disk
+families, so the different producers are admitted for those two members only.
+
+After editing a member Definition, re-pin the composite in the same change, then regenerate its bundles:
+
+```sh
+bin/nvkr definition pin --definition inputs/definitions/nvke/gpu-site.composite.yaml
+make nvke-gpu-site-generate
+make nvke-gpu-site-check
+```
+
+`make workflows-generate`, `make workflows-check` and NVKE catalog maintenance include both bundles.
+
+| Environment | Workflow | Publication | Signer |
+|---|---|---|---|
+| [github-nvke-gpu-site.yaml](../../environments/github-nvke-gpu-site.yaml) | `nvkr-run-nvke-gpu-site.yml`, partitioned | `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site` | That workflow on `main` |
+| [github-development.yaml](../../environments/github-development.yaml) | The fixed `nvkr-dev.yml`, partitioned | `ghcr.io/dsx-ai-factory/nvkr/development/runs/<run>/attempts/<attempt>` | That workflow on any admitted branch |
+
+The production Environment starts from the combined candidate's `github-release.yaml`. The composite owns the
+repository's fixed development bundle, `nvkr-dev.yml`, generated from the unchanged `github-development.yaml`.
+In both, disks run on the native ARC KVM pools and every other job on hosted runners. The combined candidate no
+longer has a development bundle, and the development qualifier pair is retired because composite qualification
+is deferred. Development jobs use the `nvkr-dev-release` and `nvkr-dev-arc` GitHub environments, which admit
+only allowlisted branches. Dispatch a clean pushed branch of this repository that those environments admit:
+
+```sh
+make pipeline-dev-run PIPELINE_DEV_REPO=dsx-ai-factory/nvkr
+```
+
+Every composite Run rebuilds every output, including eight native disk bakes; it does not reuse a family
+Release. Composite qualification, member Release reuse and composite runtime Plans are refused with
+`engine-capability`. Verifying a composite Release establishes nothing about the family Releases, and the
+reverse also holds.
+
+The [GB200 AICR bundle](../aicr/nvke-gb200.yaml) is not yet a member. Its Definition omits the
+`sbomTool: syft` that every family selects, which ADR-26 requires members to share. A measurement with
+`sbomTool: syft` added, taken before the core family dropped its NICo outputs and AICR CLI, put the
+six-member finalizer at 779 jobs, and ADR-18's 16 fixed result-collector buckets routed 65 of them into one
+bucket, over its 64-job limit, so generation refused it with `engine-capability`. The current 80-output
+selection has not been measured.
 
 ### GPU system matrix
 
@@ -66,27 +116,39 @@ belongs to AICR and NVKE evidence, and NVKR records none ([reconciliation](../..
 
 ## Family pilot
 
-Five independent Definitions partition 68 of the combined candidate's 69 named outputs, and together add 17
-family-only outputs, for 85 in all. The core family delivers the 69th, `nico-reference-profiles-fixture`, as `controller-profiles`:
+Five independent Definitions partition 68 of the combined candidate's 69 named outputs, and together add 12
+family-only outputs, for 80 in all. The core family delivers the 69th, `nico-reference-profiles-fixture`, as `controller-profiles`:
 one Release cannot publish the same image under two output names. The core family also
-selects the NICo charts, the NICo Core and Flow images and the `controller-profiles` image, and the services family selects local-path-provisioner, which the combined Definition omits; they were added while its flat workflow had no remaining YAML
+selects the ARM64 operator tools and the `controller-profiles` image, and the services family selects local-path-provisioner, which the combined Definition omits; they were added while its flat workflow had no remaining YAML
 parsing headroom. The Disks Ubuntu 24 family's four outputs are also absent from the combined Definition. They reuse the
 shared catalogs and pins; they do not import each other or change the combined Definition into a parent.
 
 | Definition | Outputs | Membership | Environment |
 |---|---:|---|---|
-| [Core](core.yaml) | 26 | CLI/operator tools, controller with its bound chart and `controller-profiles` image, NICo charts and Core/Flow images, providers, CAPI and cert-manager images | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) |
+| [Core](core.yaml) | 21 | CLI/operator tools, controller with its bound chart and `controller-profiles` image, providers, CAPI and cert-manager images | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) |
 | [Services](services.yaml) | 34 | SPIRE, PostgreSQL, Temporal and local-path-provisioner charts and native images | [github-nvke-services.yaml](../../environments/github-nvke-services.yaml) |
 | [Telemetry](telemetry.yaml) | 17 | NKTP chart and native runtime images | [github-nvke-telemetry.yaml](../../environments/github-nvke-telemetry.yaml) |
 | [Disks](disks.yaml) | 4 | Ubuntu 26.04 native AMD64/ARM64 plain and public-bootstrap FDE disks, each with its complete material closure | [github-nvke-disks.yaml](../../environments/github-nvke-disks.yaml) |
 | [Disks Ubuntu 24](disks-ubuntu24.yaml) | 4 | The same four disks on Ubuntu 24.04 through the [Ubuntu 24 overlay](../../catalogs/node-images/variants/ubuntu24.json) | [github-nvke-disks-ubuntu24.yaml](../../environments/github-nvke-disks-ubuntu24.yaml) |
 
+The core family no longer selects the five NICo outputs or the ARM64 AICR CLI; their catalogs remain. A
+development Run of the [GPU site composite](#gpu-site-composite) at `ee5d61d1`, before this change, failed
+both ([41789718662](https://github.com/dsx-ai-factory/nvkr/actions/runs/41789718662)): the
+[NICo `nico-chart` fetch](https://github.com/dsx-ai-factory/nvkr/actions/runs/41789718662/job/126440623326)
+and the [AICR publication bundle](https://github.com/dsx-ai-factory/nvkr/actions/runs/41789718662/job/126445930388).
+Source admission refuses infra-controller `v2.3.0` because
+`pxe/mkosi.profiles/scout-oss-aarch64/mkosi.extra/etc/systemd/system/multi-user.target.wants/forge-scout.service`
+is an absolute symlink, so no NICo output can be fetched
+([#375](https://github.com/dsx-ai-factory/nvkr/issues/375)). Publication requires one bundle entry per subject,
+and the AICR executable output carries its `aicr-attestation.sigstore.json` companion as a second entry. The
+GB200 AICR bundle builds AICR from its own pinned source and does not need this CLI.
+
 The two disk families are sibling Ubuntu series, not a default and an exception; consumers choose the
 series. Each family has its own Run, signer and publication namespace, so one series can release without
 rebuilding the other. The Ubuntu 24.04 disks stay out of the combined candidate: adding them would make every
-combined release and development dispatch wait on four more native disk bakes, and
-[ADR-26](../../../docs/adr/0026-definition-composition.md) requires both series in one member of any composite.
-Folding them in waits on that composite design and recorded hosted bake capacity.
+combined release and development dispatch wait on four more native disk bakes. The
+[GPU site composite](#gpu-site-composite) releases both series together, as separate members with declared
+variants.
 
 Each Environment selects `githubBundle: nvke-<family>`, the corresponding
 `.github/workflows/nvkr-run-nvke-<family>.yml`, an explicit main-only signer identity, and publication prefix
@@ -109,8 +171,8 @@ Generated Plans, actions and manifests retain their normal ownership; edit the a
 regenerate. Generation and drift checking do not build, publish or qualify any family.
 
 This is a reversible pilot alongside the combined production, development and qualification workflows.
-Named production bundles have no generated qualification pair, and named development bundles remain
-unsupported. The existing combined qualification policies do not cover five independent family Runs.
+Named production bundles have no generated qualification pair, and the family Definitions cannot have named
+development bundles; ADR-26 admits those for composites only. The existing combined qualification policies do not cover five independent family Runs.
 Keep the combined path until the consumer and qualification cutover has its own accepted contract.
 
 Consumers select each exact digest-pinned family Release and verify it under independently chosen policy.
@@ -123,6 +185,9 @@ historical capacity measurements and remaining cutover work.
 
 ## Selected artifacts and their owners
 
+Rows marked "not selected" are catalogs that stay in the repository although no maintained Definition
+selects their outputs.
+
 | Output group | Owning inputs | Selection |
 |---|---|---|
 | CLI | `../../catalogs/nvke/module-tags` | AMD64 `nvkectl` and ARM64 `nvkectl-linux-arm64`, from their shared NVKE v0.23.0 source pin |
@@ -132,8 +197,8 @@ historical capacity measurements and remaining cutover work.
 | Deployment images | `../../catalogs/runtime-dependencies` | Twelve non-test runtime images for each native architecture: PostgreSQL, eight SPIRE images and three Temporal images |
 | CAPNICo | `../../catalogs/nvke/release-components` | Source-built `capnico-controller`, one OCI index requiring AMD64 and ARM64 |
 | Default StorageClass (services family only) | `../../catalogs/local-path-provisioner` | Source-packaged `local-path-provisioner` chart from Rancher `v0.0.37`, one chart per native architecture with its acquired provisioner and BusyBox helper images bound by digest |
-| NICo charts (core family only) | `../../catalogs/nico` | Source-packaged `nico` umbrella, `nico-prereqs` and standalone `nico-flow` charts from one infra-controller `v2.3.0` pin, each stamped `2.3.0` |
-| NICo images (core family only) | `../../catalogs/nico` | Source-built `nico-core-image` and `nico-flow-image`, each one OCI index requiring AMD64 and ARM64, from the same infra-controller pin |
+| NICo charts (not selected) | `../../catalogs/nico` | Source-packaged `nico` umbrella, `nico-prereqs` and standalone `nico-flow` charts from one infra-controller `v2.3.0` pin, each stamped `2.3.0` |
+| NICo images (not selected) | `../../catalogs/nico` | Source-built `nico-core-image` and `nico-flow-image`, each one OCI index requiring AMD64 and ARM64, from the same infra-controller pin |
 | Controller profiles (core family only) | `../../catalogs/nvke/release-components` | `controller-profiles`, the same `nvke-nico-reference-profiles` build as `nico-reference-profiles-fixture`, which the core family therefore omits: the two NICO test config profiles and their runbooks, not fleet configuration. NVKE's `--release` deploy path requires this artifact name for the controller item, so the Release must carry it even when a site sets `images.profiles` to override the image. The combined Definition does not select it, so a `--release` render needs the core family Release |
 | Provisioned infrastructure provider | `../../catalogs/nvke/release` | Existing source-built `cluster-api-provider-provisioned`, independently delivered for both architectures; not CAPNICo or CAPI core |
 | Reference-profile fixture (combined Definition only) | `../../catalogs/nvke/release-components` | `nico-reference-profiles-fixture`, one AMD64/ARM64 content image containing the two NICO test config profiles and their runbooks, not production fleet configuration |
@@ -163,6 +228,9 @@ upstream version bump requires a reviewed catalog/lock update; automatic source-
 detection is not implemented.
 
 ### Setting NICo image values from the Release
+
+No maintained Definition selects the NICo outputs yet ([Family pilot](#family-pilot)); these steps apply once
+they return to the core family.
 
 The `nico` chart is not image-bound. It renders `<repository>:<tag>`, so the consumer sets the values.
 First authenticate the Release under your identity and issuer policy with `nvkr release verify --scope
@@ -400,9 +468,10 @@ provider access restrictions remain operator obligations.
 
 ## Generate and check the maintained workflow
 
-The same Definition also supplies the committed feature-branch development workflow through
-`../../environments/github-development.yaml`. It retains all 69 outputs, including plain and public-bootstrap FDE disks on both native routes, signing and verification.
-Only execution/publication policy changes: separate development environments and credentials, the
+The committed feature-branch development workflow comes from the [GPU site composite](#gpu-site-composite)
+through `../../environments/github-development.yaml`, not from this Definition. It has 80 outputs, including
+plain and public-bootstrap FDE disks for both Ubuntu series on both native routes, signing and verification.
+Only execution/publication policy differs from production: separate development environments and credentials, the
 `nvkr-dev.yml` signer identity, and run-attempt-scoped repositories beneath
 `ghcr.io/dsx-ai-factory/nvkr/development`. `make pipeline-dev-generate` regenerates it;
 `make pipeline-dev-run PIPELINE_DEV_REPO=dsx-ai-factory/nvkr` dispatches a clean pushed branch.

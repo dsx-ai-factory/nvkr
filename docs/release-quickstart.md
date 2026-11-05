@@ -170,6 +170,11 @@ version `main` pins, takes its management-plane inputs from the core family. Its
 Release lacks, including PostgreSQL, SPIRE and Temporal, from their public repositories
 ([NVKE deploy path](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/deploy/nico/README.md?plain=1#L55-L68)).
 
+The [GPU site composite](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md#gpu-site-composite)
+builds the same family outputs into one Release, so a site could take every family output from one reference;
+`qcow-imager.efi` and the GPU stack still come separately, as in the steps below. No
+hosted composite Run is recorded either, so the steps below use the family Releases.
+
 This path cannot yet run end to end. No hosted family Run is recorded; the first one for each family is tracked in [#342](https://github.com/dsx-ai-factory/nvkr/issues/342). The
 steps below name the issue that each missing Release input waits on.
 

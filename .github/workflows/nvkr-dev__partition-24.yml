@@ -1,4 +1,4 @@
-name: p24 Publish controller-chart +29
+name: p24 Publish controller-chart +33
 'on':
   workflow_call:
     inputs:
@@ -311,6 +311,72 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+  nvkr-verify-publication-output-local-path-15c3e80b49ce:
+    name: 'Verify release and deliverable signatures: output-local-path-helper-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-sign-output-local-path-helper-image-arm64'].result == 'success' }}
+    environment: 'nvkr-dev-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_READ_USER }}'
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+  nvkr-verify-publication-output-local-path-b7cdb9064846:
+    name: 'Verify release and deliverable signatures: output-local-path-provisioner-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-sign-output-local-path-provisioner-image-arm64'].result == 'success' }}
+    environment: 'nvkr-dev-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_READ_USER }}'
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-verify-publication-output-nktp-colle-3037712057c4:
     name: 'Verify release and deliverable signatures: output-nktp-collector-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -547,6 +613,39 @@ jobs:
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-sign-output-nktp-target-allocator-image-arm64'].result == 'success' }}
+    environment: 'nvkr-dev-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_READ_USER }}'
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+  nvkr-verify-publication-output-operator-t-26ea922ae95a:
+    name: 'Verify release and deliverable signatures: output-operator-tools-linux-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-sign-output-operator-tools-linux-arm64'].result == 'success' }}
     environment: 'nvkr-dev-release'
     permissions:
       actions: read
@@ -1005,6 +1104,39 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+  nvkr-verify-publication-output-local-path-provisioner:
+    name: 'Verify release and deliverable signatures: output-local-path-provisioner'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-sign-output-local-path-provisioner'].result == 'success' }}
+    environment: 'nvkr-dev-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_READ_USER }}'
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-verify-publication-output-nktp:
     name: 'Verify release and deliverable signatures: output-nktp'
     runs-on: 'ubuntu-24.04'
@@ -1075,27 +1207,27 @@ jobs:
     name: 'Collect provider results: nvkr-partition-results'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-verify-publication-output-capi-contr-a309e0dde6c8, nvkr-verify-publication-output-capi-kubea-459a501ddf86, nvkr-verify-publication-output-capi-kubea-8c536327dae9, nvkr-verify-publication-output-cert-manag-9a8734354915, nvkr-verify-publication-output-cert-manag-b56eb8b59b49, nvkr-verify-publication-output-cert-manag-d72fce3ac728, nvkr-verify-publication-output-csi-node-d-ed501e7759bf, nvkr-verify-publication-output-nktp-colle-3037712057c4, nvkr-verify-publication-output-nktp-kube-59673e96b3e2, nvkr-verify-publication-output-nktp-kubec-58bc88c11e26, nvkr-verify-publication-output-nktp-lgtm-image-arm64, nvkr-verify-publication-output-nktp-metri-72d2044749d1, nvkr-verify-publication-output-nktp-node-89687b0a3b8b, nvkr-verify-publication-output-nktp-opera-e8ca29886a10, nvkr-verify-publication-output-nktp-targe-c21c44003a70, nvkr-verify-publication-output-operator-tools, nvkr-verify-publication-output-postgresql-image-arm64, nvkr-verify-publication-output-spiffe-csi-image-arm64, nvkr-verify-publication-output-spire-agen-690d58615fef, nvkr-verify-publication-output-spire-bash-image-arm64, nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91, nvkr-verify-publication-output-spire-oidc-image-arm64, nvkr-verify-publication-output-spire-serv-2ffabff52266, nvkr-verify-publication-output-spire-tpm-fdd5a5adf925, nvkr-verify-publication-output-temporal-a-325229721989, nvkr-verify-publication-output-temporal-s-030929bd4981, nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac, nvkr-publish-output-controller-chart, nvkr-verify-publication-output-nktp, nvkr-verify-publication-output-nvkectl]
+    needs: [nvkr-verify-publication-output-capi-contr-a309e0dde6c8, nvkr-verify-publication-output-capi-kubea-459a501ddf86, nvkr-verify-publication-output-capi-kubea-8c536327dae9, nvkr-verify-publication-output-cert-manag-9a8734354915, nvkr-verify-publication-output-cert-manag-b56eb8b59b49, nvkr-verify-publication-output-cert-manag-d72fce3ac728, nvkr-verify-publication-output-csi-node-d-ed501e7759bf, nvkr-verify-publication-output-local-path-15c3e80b49ce, nvkr-verify-publication-output-local-path-b7cdb9064846, nvkr-verify-publication-output-nktp-colle-3037712057c4, nvkr-verify-publication-output-nktp-kube-59673e96b3e2, nvkr-verify-publication-output-nktp-kubec-58bc88c11e26, nvkr-verify-publication-output-nktp-lgtm-image-arm64, nvkr-verify-publication-output-nktp-metri-72d2044749d1, nvkr-verify-publication-output-nktp-node-89687b0a3b8b, nvkr-verify-publication-output-nktp-opera-e8ca29886a10, nvkr-verify-publication-output-nktp-targe-c21c44003a70, nvkr-verify-publication-output-operator-t-26ea922ae95a, nvkr-verify-publication-output-operator-tools, nvkr-verify-publication-output-postgresql-image-arm64, nvkr-verify-publication-output-spiffe-csi-image-arm64, nvkr-verify-publication-output-spire-agen-690d58615fef, nvkr-verify-publication-output-spire-bash-image-arm64, nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91, nvkr-verify-publication-output-spire-oidc-image-arm64, nvkr-verify-publication-output-spire-serv-2ffabff52266, nvkr-verify-publication-output-spire-tpm-fdd5a5adf925, nvkr-verify-publication-output-temporal-a-325229721989, nvkr-verify-publication-output-temporal-s-030929bd4981, nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac, nvkr-publish-output-controller-chart, nvkr-verify-publication-output-local-path-provisioner, nvkr-verify-publication-output-nktp, nvkr-verify-publication-output-nvkectl]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     permissions: {}
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
-      nvkr-partition-27: ${{ format('"nvkr-verify-publication-output-capi-contr-a309e0dde6c8":{0},"nvkr-verify-publication-output-capi-kubea-459a501ddf86":{1},"nvkr-verify-publication-output-capi-kubea-8c536327dae9":{2},"nvkr-verify-publication-output-cert-manag-9a8734354915":{3},"nvkr-verify-publication-output-cert-manag-b56eb8b59b49":{4},"nvkr-verify-publication-output-cert-manag-d72fce3ac728":{5},"nvkr-verify-publication-output-csi-node-d-ed501e7759bf":{6},"nvkr-verify-publication-output-nktp":{7},"nvkr-verify-publication-output-nktp-colle-3037712057c4":{8},"nvkr-verify-publication-output-nktp-kube-59673e96b3e2":{9},"nvkr-verify-publication-output-nktp-kubec-58bc88c11e26":{10},"nvkr-verify-publication-output-nktp-lgtm-image-arm64":{11},"nvkr-verify-publication-output-nktp-metri-72d2044749d1":{12},"nvkr-verify-publication-output-nktp-node-89687b0a3b8b":{13},"nvkr-verify-publication-output-nktp-opera-e8ca29886a10":{14},"nvkr-verify-publication-output-nktp-targe-c21c44003a70":{15},"nvkr-verify-publication-output-nvkectl":{16},"nvkr-verify-publication-output-operator-tools":{17},"nvkr-verify-publication-output-postgresql-image-arm64":{18},"nvkr-verify-publication-output-spiffe-csi-image-arm64":{19},"nvkr-verify-publication-output-spire-agen-690d58615fef":{20},"nvkr-verify-publication-output-spire-bash-image-arm64":{21},"nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91":{22},"nvkr-verify-publication-output-spire-oidc-image-arm64":{23},"nvkr-verify-publication-output-spire-serv-2ffabff52266":{24},"nvkr-verify-publication-output-spire-tpm-fdd5a5adf925":{25},"nvkr-verify-publication-output-temporal-a-325229721989":{26},"nvkr-verify-publication-output-temporal-s-030929bd4981":{27},"nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac":{28}', toJSON(needs['nvkr-verify-publication-output-capi-contr-a309e0dde6c8']), toJSON(needs['nvkr-verify-publication-output-capi-kubea-459a501ddf86']), toJSON(needs['nvkr-verify-publication-output-capi-kubea-8c536327dae9']), toJSON(needs['nvkr-verify-publication-output-cert-manag-9a8734354915']), toJSON(needs['nvkr-verify-publication-output-cert-manag-b56eb8b59b49']), toJSON(needs['nvkr-verify-publication-output-cert-manag-d72fce3ac728']), toJSON(needs['nvkr-verify-publication-output-csi-node-d-ed501e7759bf']), toJSON(needs['nvkr-verify-publication-output-nktp']), toJSON(needs['nvkr-verify-publication-output-nktp-colle-3037712057c4']), toJSON(needs['nvkr-verify-publication-output-nktp-kube-59673e96b3e2']), toJSON(needs['nvkr-verify-publication-output-nktp-kubec-58bc88c11e26']), toJSON(needs['nvkr-verify-publication-output-nktp-lgtm-image-arm64']), toJSON(needs['nvkr-verify-publication-output-nktp-metri-72d2044749d1']), toJSON(needs['nvkr-verify-publication-output-nktp-node-89687b0a3b8b']), toJSON(needs['nvkr-verify-publication-output-nktp-opera-e8ca29886a10']), toJSON(needs['nvkr-verify-publication-output-nktp-targe-c21c44003a70']), toJSON(needs['nvkr-verify-publication-output-nvkectl']), toJSON(needs['nvkr-verify-publication-output-operator-tools']), toJSON(needs['nvkr-verify-publication-output-postgresql-image-arm64']), toJSON(needs['nvkr-verify-publication-output-spiffe-csi-image-arm64']), toJSON(needs['nvkr-verify-publication-output-spire-agen-690d58615fef']), toJSON(needs['nvkr-verify-publication-output-spire-bash-image-arm64']), toJSON(needs['nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91']), toJSON(needs['nvkr-verify-publication-output-spire-oidc-image-arm64']), toJSON(needs['nvkr-verify-publication-output-spire-serv-2ffabff52266']), toJSON(needs['nvkr-verify-publication-output-spire-tpm-fdd5a5adf925']), toJSON(needs['nvkr-verify-publication-output-temporal-a-325229721989']), toJSON(needs['nvkr-verify-publication-output-temporal-s-030929bd4981']), toJSON(needs['nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac'])) }}
-      nvkr-results-00: ${{ format('"nvkr-verify-publication-output-nktp-kube-59673e96b3e2":{0},"nvkr-verify-publication-output-temporal-a-325229721989":{1}', toJSON(needs['nvkr-verify-publication-output-nktp-kube-59673e96b3e2']), toJSON(needs['nvkr-verify-publication-output-temporal-a-325229721989'])) }}
-      nvkr-results-00-statuses: ${{ format('{0} {1}', needs['nvkr-verify-publication-output-nktp-kube-59673e96b3e2'].result, needs['nvkr-verify-publication-output-temporal-a-325229721989'].result) }}
+      nvkr-partition-27: ${{ format('"nvkr-verify-publication-output-capi-contr-a309e0dde6c8":{0},"nvkr-verify-publication-output-capi-kubea-459a501ddf86":{1},"nvkr-verify-publication-output-capi-kubea-8c536327dae9":{2},"nvkr-verify-publication-output-cert-manag-9a8734354915":{3},"nvkr-verify-publication-output-cert-manag-b56eb8b59b49":{4},"nvkr-verify-publication-output-cert-manag-d72fce3ac728":{5},"nvkr-verify-publication-output-csi-node-d-ed501e7759bf":{6},"nvkr-verify-publication-output-local-path-15c3e80b49ce":{7},"nvkr-verify-publication-output-local-path-b7cdb9064846":{8},"nvkr-verify-publication-output-local-path-provisioner":{9},"nvkr-verify-publication-output-nktp":{10},"nvkr-verify-publication-output-nktp-colle-3037712057c4":{11},"nvkr-verify-publication-output-nktp-kube-59673e96b3e2":{12},"nvkr-verify-publication-output-nktp-kubec-58bc88c11e26":{13},"nvkr-verify-publication-output-nktp-lgtm-image-arm64":{14},"nvkr-verify-publication-output-nktp-metri-72d2044749d1":{15},"nvkr-verify-publication-output-nktp-node-89687b0a3b8b":{16},"nvkr-verify-publication-output-nktp-opera-e8ca29886a10":{17},"nvkr-verify-publication-output-nktp-targe-c21c44003a70":{18},"nvkr-verify-publication-output-nvkectl":{19},"nvkr-verify-publication-output-operator-t-26ea922ae95a":{20},"nvkr-verify-publication-output-operator-tools":{21},"nvkr-verify-publication-output-postgresql-image-arm64":{22},"nvkr-verify-publication-output-spiffe-csi-image-arm64":{23},"nvkr-verify-publication-output-spire-agen-690d58615fef":{24},"nvkr-verify-publication-output-spire-bash-image-arm64":{25},"nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91":{26},"nvkr-verify-publication-output-spire-oidc-image-arm64":{27},"nvkr-verify-publication-output-spire-serv-2ffabff52266":{28},"nvkr-verify-publication-output-spire-tpm-fdd5a5adf925":{29},"nvkr-verify-publication-output-temporal-a-325229721989":{30},"nvkr-verify-publication-output-temporal-s-030929bd4981":{31},"nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac":{32}', toJSON(needs['nvkr-verify-publication-output-capi-contr-a309e0dde6c8']), toJSON(needs['nvkr-verify-publication-output-capi-kubea-459a501ddf86']), toJSON(needs['nvkr-verify-publication-output-capi-kubea-8c536327dae9']), toJSON(needs['nvkr-verify-publication-output-cert-manag-9a8734354915']), toJSON(needs['nvkr-verify-publication-output-cert-manag-b56eb8b59b49']), toJSON(needs['nvkr-verify-publication-output-cert-manag-d72fce3ac728']), toJSON(needs['nvkr-verify-publication-output-csi-node-d-ed501e7759bf']), toJSON(needs['nvkr-verify-publication-output-local-path-15c3e80b49ce']), toJSON(needs['nvkr-verify-publication-output-local-path-b7cdb9064846']), toJSON(needs['nvkr-verify-publication-output-local-path-provisioner']), toJSON(needs['nvkr-verify-publication-output-nktp']), toJSON(needs['nvkr-verify-publication-output-nktp-colle-3037712057c4']), toJSON(needs['nvkr-verify-publication-output-nktp-kube-59673e96b3e2']), toJSON(needs['nvkr-verify-publication-output-nktp-kubec-58bc88c11e26']), toJSON(needs['nvkr-verify-publication-output-nktp-lgtm-image-arm64']), toJSON(needs['nvkr-verify-publication-output-nktp-metri-72d2044749d1']), toJSON(needs['nvkr-verify-publication-output-nktp-node-89687b0a3b8b']), toJSON(needs['nvkr-verify-publication-output-nktp-opera-e8ca29886a10']), toJSON(needs['nvkr-verify-publication-output-nktp-targe-c21c44003a70']), toJSON(needs['nvkr-verify-publication-output-nvkectl']), toJSON(needs['nvkr-verify-publication-output-operator-t-26ea922ae95a']), toJSON(needs['nvkr-verify-publication-output-operator-tools']), toJSON(needs['nvkr-verify-publication-output-postgresql-image-arm64']), toJSON(needs['nvkr-verify-publication-output-spiffe-csi-image-arm64']), toJSON(needs['nvkr-verify-publication-output-spire-agen-690d58615fef']), toJSON(needs['nvkr-verify-publication-output-spire-bash-image-arm64']), toJSON(needs['nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91']), toJSON(needs['nvkr-verify-publication-output-spire-oidc-image-arm64']), toJSON(needs['nvkr-verify-publication-output-spire-serv-2ffabff52266']), toJSON(needs['nvkr-verify-publication-output-spire-tpm-fdd5a5adf925']), toJSON(needs['nvkr-verify-publication-output-temporal-a-325229721989']), toJSON(needs['nvkr-verify-publication-output-temporal-s-030929bd4981']), toJSON(needs['nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac'])) }}
+      nvkr-results-00: ${{ format('"nvkr-verify-publication-output-local-path-15c3e80b49ce":{0},"nvkr-verify-publication-output-local-path-provisioner":{1},"nvkr-verify-publication-output-nktp-kube-59673e96b3e2":{2},"nvkr-verify-publication-output-temporal-a-325229721989":{3}', toJSON(needs['nvkr-verify-publication-output-local-path-15c3e80b49ce']), toJSON(needs['nvkr-verify-publication-output-local-path-provisioner']), toJSON(needs['nvkr-verify-publication-output-nktp-kube-59673e96b3e2']), toJSON(needs['nvkr-verify-publication-output-temporal-a-325229721989'])) }}
+      nvkr-results-00-statuses: ${{ format('{0} {1} {2} {3}', needs['nvkr-verify-publication-output-local-path-15c3e80b49ce'].result, needs['nvkr-verify-publication-output-local-path-provisioner'].result, needs['nvkr-verify-publication-output-nktp-kube-59673e96b3e2'].result, needs['nvkr-verify-publication-output-temporal-a-325229721989'].result) }}
       nvkr-results-01: ${{ format('"nvkr-verify-publication-output-cert-manag-b56eb8b59b49":{0},"nvkr-verify-publication-output-nvkectl":{1},"nvkr-verify-publication-output-spire-bash-image-arm64":{2}', toJSON(needs['nvkr-verify-publication-output-cert-manag-b56eb8b59b49']), toJSON(needs['nvkr-verify-publication-output-nvkectl']), toJSON(needs['nvkr-verify-publication-output-spire-bash-image-arm64'])) }}
       nvkr-results-01-statuses: ${{ format('{0} {1} {2}', needs['nvkr-verify-publication-output-cert-manag-b56eb8b59b49'].result, needs['nvkr-verify-publication-output-nvkectl'].result, needs['nvkr-verify-publication-output-spire-bash-image-arm64'].result) }}
       nvkr-results-02: ${{ format('"nvkr-verify-publication-output-nktp-metri-72d2044749d1":{0}', toJSON(needs['nvkr-verify-publication-output-nktp-metri-72d2044749d1'])) }}
       nvkr-results-02-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-nktp-metri-72d2044749d1'].result) }}
       nvkr-results-04: ${{ format('"nvkr-verify-publication-output-capi-kubea-459a501ddf86":{0}', toJSON(needs['nvkr-verify-publication-output-capi-kubea-459a501ddf86'])) }}
       nvkr-results-04-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-capi-kubea-459a501ddf86'].result) }}
-      nvkr-results-05: ${{ format('"nvkr-verify-publication-output-capi-contr-a309e0dde6c8":{0}', toJSON(needs['nvkr-verify-publication-output-capi-contr-a309e0dde6c8'])) }}
-      nvkr-results-05-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-capi-contr-a309e0dde6c8'].result) }}
+      nvkr-results-05: ${{ format('"nvkr-verify-publication-output-capi-contr-a309e0dde6c8":{0},"nvkr-verify-publication-output-local-path-b7cdb9064846":{1}', toJSON(needs['nvkr-verify-publication-output-capi-contr-a309e0dde6c8']), toJSON(needs['nvkr-verify-publication-output-local-path-b7cdb9064846'])) }}
+      nvkr-results-05-statuses: ${{ format('{0} {1}', needs['nvkr-verify-publication-output-capi-contr-a309e0dde6c8'].result, needs['nvkr-verify-publication-output-local-path-b7cdb9064846'].result) }}
       nvkr-results-07: ${{ format('"nvkr-verify-publication-output-nktp":{0}', toJSON(needs['nvkr-verify-publication-output-nktp'])) }}
       nvkr-results-07-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-nktp'].result) }}
-      nvkr-results-08: ${{ format('"nvkr-verify-publication-output-spiffe-csi-image-arm64":{0}', toJSON(needs['nvkr-verify-publication-output-spiffe-csi-image-arm64'])) }}
-      nvkr-results-08-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-spiffe-csi-image-arm64'].result) }}
+      nvkr-results-08: ${{ format('"nvkr-verify-publication-output-operator-t-26ea922ae95a":{0},"nvkr-verify-publication-output-spiffe-csi-image-arm64":{1}', toJSON(needs['nvkr-verify-publication-output-operator-t-26ea922ae95a']), toJSON(needs['nvkr-verify-publication-output-spiffe-csi-image-arm64'])) }}
+      nvkr-results-08-statuses: ${{ format('{0} {1}', needs['nvkr-verify-publication-output-operator-t-26ea922ae95a'].result, needs['nvkr-verify-publication-output-spiffe-csi-image-arm64'].result) }}
       nvkr-results-09: ${{ format('"nvkr-verify-publication-output-capi-kubea-8c536327dae9":{0},"nvkr-verify-publication-output-nktp-lgtm-image-arm64":{1},"nvkr-verify-publication-output-spire-agen-690d58615fef":{2},"nvkr-verify-publication-output-spire-serv-2ffabff52266":{3}', toJSON(needs['nvkr-verify-publication-output-capi-kubea-8c536327dae9']), toJSON(needs['nvkr-verify-publication-output-nktp-lgtm-image-arm64']), toJSON(needs['nvkr-verify-publication-output-spire-agen-690d58615fef']), toJSON(needs['nvkr-verify-publication-output-spire-serv-2ffabff52266'])) }}
       nvkr-results-09-statuses: ${{ format('{0} {1} {2} {3}', needs['nvkr-verify-publication-output-capi-kubea-8c536327dae9'].result, needs['nvkr-verify-publication-output-nktp-lgtm-image-arm64'].result, needs['nvkr-verify-publication-output-spire-agen-690d58615fef'].result, needs['nvkr-verify-publication-output-spire-serv-2ffabff52266'].result) }}
       nvkr-results-0a: ${{ format('"nvkr-verify-publication-output-spire-oidc-image-arm64":{0}', toJSON(needs['nvkr-verify-publication-output-spire-oidc-image-arm64'])) }}

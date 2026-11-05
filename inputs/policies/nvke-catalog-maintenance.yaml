@@ -13,9 +13,8 @@ definition: inputs/definitions/nvke/definition.yaml
 environment: inputs/environments/github-release.yaml
 # Generated bundles that share this catalog's pins. Each is checked, regenerated and
 # transported with the production Run; a committed bundle not named here is refused.
-developmentEnvironment: inputs/environments/github-development.yaml
+# The GPU site composite owns the fixed development bundle (github-development.yaml).
 qualificationPolicy: inputs/policies/nvke-qualification.yaml
-developmentQualificationPolicy: inputs/policies/nvke-development-qualification.yaml
 additionalRuns:
   - definition: inputs/definitions/nvke/core.yaml
     environment: inputs/environments/github-nvke-core.yaml
@@ -27,6 +26,10 @@ additionalRuns:
     environment: inputs/environments/github-nvke-disks.yaml
   - definition: inputs/definitions/nvke/disks-ubuntu24.yaml
     environment: inputs/environments/github-nvke-disks-ubuntu24.yaml
+  - definition: inputs/definitions/nvke/gpu-site.composite.yaml
+    environment: inputs/environments/github-nvke-gpu-site.yaml
+  - definition: inputs/definitions/nvke/gpu-site.composite.yaml
+    environment: inputs/environments/github-development.yaml
   - definition: inputs/definitions/demo/arm64-nvidia-kvm.json
     environment: inputs/environments/github-nightly-nvidia.json
   - definition: inputs/definitions/demo/arm64-upstream-kvm.json
