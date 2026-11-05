@@ -108,6 +108,11 @@ catalog owner, update Environment image/executable pins, and invoke
 `make workflows-generate workflows-check`. It preserves historical evidence and
 source-lock approval gates.
 
+Within an affected authored file, the proposal replaces every exact occurrence of
+a selected old pin or predecessor digest, including comments and descriptive text.
+Review those incidental edits along with the executable fields. Unselected files
+and historical evidence are not searched for matching text.
+
 The release App opens a reviewable change on
 `automation/toolchain-refresh-<preparation-run-id>`. It writes no default branch,
 never force-pushes, never merges, and does not reopen a closed proposal. If that

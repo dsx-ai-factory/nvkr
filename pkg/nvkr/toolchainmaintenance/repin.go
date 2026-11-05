@@ -62,6 +62,9 @@ func repin(ctx context.Context, root string, record Record, stage bool) ([]strin
 			pairs = append(pairs, old, replacements[old])
 		}
 		if len(pairs) != 0 {
+			// Preserve formatting while updating all exact occurrences within this
+			// authored file, including comments and descriptive text. The resulting
+			// review diff includes those edits; discovery alone selects the pins.
 			changed = []byte(strings.NewReplacer(pairs...).Replace(string(raw)))
 		}
 		edits[name] = edit{raw, changed}

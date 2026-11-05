@@ -4,6 +4,8 @@
 package toolchainmaintenance
 
 import (
+	"archive/tar"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -265,6 +267,112 @@ func TestReadBackChecksNativeConfiguration(t *testing.T) {
 	}
 }
 
+type readbackImage struct {
+	v1.Image
+	layer v1.Layer
+}
+
+func (im readbackImage) Layers() ([]v1.Layer, error) { return []v1.Layer{im.layer}, nil }
+
+type readbackLayer struct {
+	v1.Layer
+	body *readbackBody
+}
+
+func (layer readbackLayer) Compressed() (io.ReadCloser, error) { return layer.body, nil }
+
+type readbackBody struct {
+	*bytes.Reader
+	readErr, closeErr error
+	read              int
+	closed            bool
+}
+
+func (body *readbackBody) Read(p []byte) (int, error) {
+	if body.readErr != nil {
+		return 0, body.readErr
+	}
+	n, err := body.Reader.Read(p)
+	body.read += n
+	return n, err
+}
+
+func (body *readbackBody) Close() error {
+	body.closed = true
+	return body.closeErr
+}
+
+func TestReadBackChecksCompressedLayerBytes(t *testing.T) {
+	var archive bytes.Buffer
+	tw := tar.NewWriter(&archive)
+	if err := tw.WriteHeader(&tar.Header{Name: "fixture", Mode: 0600, Size: 4}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write([]byte("data")); err != nil {
+		t.Fatal(err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	layer, err := tarball.LayerFromReader(bytes.NewReader(archive.Bytes()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := layer.Compressed()
+	if err != nil {
+		t.Fatal(err)
+	}
+	compressed, err := io.ReadAll(body)
+	closeErr := body.Close()
+	if err != nil || closeErr != nil {
+		t.Fatalf("read compressed fixture: %v, close: %v", err, closeErr)
+	}
+	im, err := mutate.ConfigFile(empty.Image, &v1.ConfigFile{OS: "linux", Architecture: "amd64"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	im, err = mutate.AppendLayers(im, layer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := im.RawManifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, err := im.RawConfigFile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := Image{Arch: "amd64", ManifestDigest: digest(string(manifest)), ImageID: digest(string(config))}
+	for _, test := range []struct {
+		name              string
+		change            func([]byte) []byte
+		readErr, closeErr error
+	}{
+		{"valid", func(b []byte) []byte { return b }, nil, nil},
+		{"truncated", func(b []byte) []byte { return b[:len(b)-1] }, nil, nil},
+		{"altered", func(b []byte) []byte { b[len(b)/2] ^= 1; return b }, nil, nil},
+		{"oversized", func(b []byte) []byte { return append(b, make([]byte, 64)...) }, nil, nil},
+		{"read error", func(b []byte) []byte { return b }, errors.New("synthetic read failure"), nil},
+		{"close error", func(b []byte) []byte { return b }, nil, errors.New("synthetic close failure")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			body := &readbackBody{Reader: bytes.NewReader(test.change(bytes.Clone(compressed))), readErr: test.readErr, closeErr: test.closeErr}
+			err := verifyImage(t.Context(), readbackImage{im, readbackLayer{layer, body}}, expected)
+			if test.name == "valid" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				assertCode(t, err, e.CodeVerifyFailed)
+			}
+			if !body.closed || body.read > len(compressed)+1 {
+				t.Fatalf("readback did not close or bound the stream: closed=%v bytes=%d", body.closed, body.read)
+			}
+		})
+	}
+}
+
 func TestUnsupportedPublicationHasNoInputWork(t *testing.T) {
 	t.Setenv("GITHUB_ACTIONS", "")
 	assertCode(t, Publish(t.Context(), "/does-not-exist", "123", "/does-not-exist"), e.CodeEngineCapability)
@@ -307,7 +415,61 @@ func TestApprovalParserRejectsAmbiguousData(t *testing.T) {
 	}
 }
 
+func isolateGitEnvironment(t *testing.T) {
+	t.Helper()
+	for _, entry := range os.Environ() {
+		key, _, _ := strings.Cut(entry, "=")
+		if strings.HasPrefix(key, "GIT_") {
+			t.Setenv(key, "") // Restore the caller's value at test cleanup.
+			if err := os.Unsetenv(key); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+}
+
+func TestRepinFixturePreservesForeignIndex(t *testing.T) {
+	isolateGitEnvironment(t)
+	foreign := t.TempDir()
+	if err := os.WriteFile(filepath.Join(foreign, "sentinel"), []byte("keep staged\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"init", "--quiet"}, {"add", "sentinel"}} {
+		if _, err := command(t.Context(), foreign, "git", args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	gitDir := filepath.Join(foreign, ".git")
+	indexPath := filepath.Join(gitDir, "index")
+	before, err := os.ReadFile(indexPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name string
+		env  map[string]string
+	}{
+		{"git dir only", map[string]string{"GIT_DIR": gitDir}},
+		{"index only", map[string]string{"GIT_INDEX_FILE": indexPath}},
+		{"all routing", map[string]string{"GIT_DIR": gitDir, "GIT_WORK_TREE": foreign, "GIT_COMMON_DIR": gitDir, "GIT_INDEX_FILE": indexPath, "GIT_OBJECT_DIRECTORY": filepath.Join(gitDir, "objects"), "GIT_ALTERNATE_OBJECT_DIRECTORIES": filepath.Join(gitDir, "objects")}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			for key, value := range test.env {
+				t.Setenv(key, value)
+			}
+			t.Run("fixture", TestRepinRebindsOverlayAndInspectorProfile)
+			after, err := os.ReadFile(indexPath)
+			if err != nil || !bytes.Equal(before, after) {
+				t.Fatalf("fixture changed foreign index: %v", err)
+			}
+		})
+	}
+}
+
 func TestRepinRebindsOverlayAndInspectorProfile(t *testing.T) {
+	isolateGitEnvironment(t)
 	root := t.TempDir()
 	r := recordFixture()
 	registry := map[string]any{"apiVersion": "nvkr.dev/catalog/v3", "kind": "SourceBuildRegistry", "metadata": map[string]any{"name": "fixture"}, "sources": map[string]any{"tool": map[string]any{"repo": "https://example.invalid/tool", "constraint": "1.x", "toolchainImagesByArch": map[string]string{"arm64": Registry + "/packer-native@" + digest("old-arm")}}}, "components": map[string]any{"tool": map[string]any{"fromSource": true, "source": "tool", "platforms": []string{"linux/arm64"}, "outputType": "host-package", "artifactPath": "tool", "buildCommand": []string{"go", "build", "-o", "tool", "."}}}}
@@ -324,16 +486,19 @@ func TestRepinRebindsOverlayAndInspectorProfile(t *testing.T) {
 	}
 	component := base.Components["tool"]
 	overlay := catalog.Overlay{APIVersion: catalog.OverlayAPIVersion, Kind: catalog.OverlayKind, Name: "replacement", RequiresCatalogDigest: baseDigest, Components: map[string]catalog.ComponentReplacement{"tool": {Component: &component}}}
-	overlayPath := filepath.Join(root, "inputs/catalogs/variants/overlay.json")
+	overlayPath := filepath.Join(root, "inputs/catalogs/variants/overlay.yaml")
 	writeJSON(t, overlayPath, overlay)
+	prependComment(t, overlayPath, "predecessor "+baseDigest)
 	profile := map[string]string{"image": Registry + "/inspector-native@" + digest("old-inspector")}
 	for field := range executablePaths {
 		if field != "helperDigest" {
 			profile[field] = digest("old" + field)
 		}
 	}
-	envPath := filepath.Join(root, "inputs/environments/test.json")
-	writeJSON(t, envPath, map[string]any{"diskInspectionProfiles": map[string]any{"linux/arm64": profile}})
+	oldInspector := profile["image"]
+	envPath := filepath.Join(root, "inputs/environments/test.yaml")
+	writeJSON(t, envPath, map[string]any{"diskInspectionProfiles": map[string]any{"linux/arm64": profile}, "note": "Inspector reference: " + oldInspector})
+	prependComment(t, envPath, "inspector "+oldInspector)
 	if _, err := command(t.Context(), root, "git", "init", "--quiet"); err != nil {
 		t.Fatal(err)
 	}
@@ -368,12 +533,30 @@ func TestRepinRebindsOverlayAndInspectorProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 	inspector, _ := selectedImage(r, "arm64", "inspector")
-	if !bytesContainAll(raw, inspector.Reference(), inspector.Executables["scannerDigest"]) {
+	if !bytesContainAll(raw, inspector.Reference(), inspector.Executables["scannerDigest"], "# inspector "+inspector.Reference(), "Inspector reference: "+inspector.Reference()) || bytes.Contains(raw, []byte(oldInspector)) {
 		t.Fatal("profile did not bind image and measurement")
+	}
+	overlayRaw, err := os.ReadFile(overlayPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(overlayRaw, []byte("# predecessor "+updatedOverlay.RequiresCatalogDigest)) || bytes.Contains(overlayRaw, []byte(baseDigest)) {
+		t.Fatal("predecessor comment did not move with the authenticated digest")
 	}
 	changed, err = repin(t.Context(), root, r, true)
 	if err != nil || len(changed) != 0 {
 		t.Fatalf("repin not idempotent: %v %v", changed, err)
+	}
+}
+
+func prependComment(t *testing.T, path, comment string) {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, append([]byte("# "+comment+"\n"), raw...), 0600); err != nil {
+		t.Fatal(err)
 	}
 }
 

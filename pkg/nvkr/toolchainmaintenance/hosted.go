@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
@@ -147,11 +148,10 @@ func command(ctx context.Context, root, executable string, args ...string) ([]by
 	defer cancel()
 	cmd := exec.CommandContext(ctx, executable, args...)
 	cmd.Dir = root
-	cmd.WaitDelay = 5 * time.Second
 	var output limitedBuffer
 	cmd.Stdout = &output
 	// Child stderr can contain credential-bearing URLs; retain the coded boundary.
-	if err := cmd.Run(); err != nil {
+	if err := ownedcmd.Run(ctx, cmd); err != nil {
 		return nil, e.Wrap(e.CodeBuildFailed, err, "maintenance %s failed", executable)
 	}
 	return output.Bytes(), nil
