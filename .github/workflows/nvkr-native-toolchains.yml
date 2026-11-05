@@ -1,9 +1,30 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 ---
 name: Prepare native NVKR toolchains
 'on':
+  schedule:
+    - cron: '0 6 * * 1'
+  push:
+    branches: [main]
+    paths:
+      - '.go-version'
+      - 'go.mod'
+      - 'go.sum'
+      - 'toolchains/nvkr-packer/**'
+      - 'toolchains/nvkr-disk-inspect/**'
+      - 'cmd/nvkr-disk-inspect/**'
+      - 'pkg/nvkr/**'
+      - 'internal/**'
+      - 'scripts/prepare-native-toolchains.sh'
+      - 'scripts/verify-native-toolchains.sh'
+      - '.github/workflows/nvkr-native-toolchains.yml'
   workflow_dispatch:
     inputs:
+      approval_run:
+        description: 'Successful preparation run with a reviewed per-image exception record in main; empty prepares fresh images'
+        type: string
+        default: ''
       verify_published:
         description: >-
           Pull the committed image pins and smoke their native tools
@@ -12,12 +33,13 @@ name: Prepare native NVKR toolchains
         default: false
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: native-toolchains-${{ github.ref }}
   cancel-in-progress: false
 jobs:
   measure:
-    if: github.ref == 'refs/heads/main' && !inputs.verify_published
+    if: github.repository == 'dsx-ai-factory/nvkr' && github.ref == 'refs/heads/main' && !inputs.verify_published && !inputs.approval_run
     permissions:
       contents: read
     strategy:
@@ -52,6 +74,17 @@ jobs:
         env:
           GOTOOLCHAIN: local
         run: CGO_ENABLED=0 go build -trimpath -o nvkr-exec ./cmd/nvkr
+      - name: Describe measured candidate subjects
+        if: success()
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ./nvkr-exec factory toolchain-maintenance --operation describe \
+            --directory ".nvkr/native-toolchains/$NATIVE_ARCH" \
+            --arch "$NATIVE_ARCH" --source "$SOURCE_COMMIT" \
+            > ".nvkr/native-toolchains/$NATIVE_ARCH/proposal.json"
       - name: Retain native measurements
         if: always() && steps.ci-helper.outcome == 'success'
         uses: ./.github/nvkr-run/actions/ci-upload
@@ -66,7 +99,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
   verify-published:
-    if: inputs.verify_published && startsWith(github.ref, 'refs/heads/')
+    if: github.repository == 'dsx-ai-factory/nvkr' && inputs.verify_published && !inputs.approval_run && startsWith(github.ref, 'refs/heads/')
     permissions:
       contents: read
     strategy:
@@ -80,22 +113,6 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     steps:
-      - name: Check native host
-        timeout-minutes: 1
-        env:
-          NATIVE_ARCH: ${{ matrix.arch }}
-        run: |
-          set -euo pipefail
-          case "$NATIVE_ARCH:$(uname -s)/$(uname -m)" in
-            amd64:Linux/x86_64|arm64:Linux/aarch64) ;;
-            *) echo 'native Linux architecture mismatch' >&2; exit 1 ;;
-          esac
-          daemon=$(docker info --format '{{.OSType}}/{{.Architecture}}')
-          case "$NATIVE_ARCH:$daemon" in
-            amd64:linux/x86_64|amd64:linux/amd64) ;;
-            arm64:linux/aarch64|arm64:linux/arm64) ;;
-            *) echo 'native Docker architecture mismatch' >&2; exit 1 ;;
-          esac
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # 7.0.1
         with:
           persist-credentials: false
@@ -149,43 +166,213 @@ jobs:
           NATIVE_ARCH: ${{ matrix.arch }}
           PACKER_IMAGE: ${{ steps.pins.outputs.packer }}
           INSPECTOR_IMAGE: ${{ steps.pins.outputs.inspector }}
+        run: bash scripts/verify-native-toolchains.sh
+
+  admit:
+    if: github.repository == 'dsx-ai-factory/nvkr' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.approval_run && !inputs.verify_published
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      source: ${{ steps.approval.outputs.source }}
+      attempt: ${{ steps.approval.outputs.attempt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # 7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # 7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+      - name: Admit reviewed exceptions and successful source run
+        id: approval
+        env:
+          GOTOOLCHAIN: local
+          APPROVAL_RUN: ${{ inputs.approval_run }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          for image in "$PACKER_IMAGE" "$INSPECTOR_IMAGE"; do
-            platform=$(docker image inspect \
-              --format '{{.Os}}/{{.Architecture}}' "$image")
-            test "$platform" = "linux/$NATIVE_ARCH"
-            docker image inspect --format '{{json .RepoDigests}}' "$image" |
-              jq -e --arg image "$image" 'index($image) != null'
-          done
-          run=(timeout --signal=TERM --kill-after=10s 60s docker run --rm
-            --pull=never --platform "linux/$NATIVE_ARCH" --network none
-            --read-only --cap-drop ALL --security-opt no-new-privileges
-            --user 65534:65534 --env HOME=/nvkr/work/home
-            --env TMPDIR=/nvkr/work
-            --env CHECKPOINT_DISABLE=1
-            --tmpfs '/nvkr/work:rw,nosuid,nodev,size=16777216,mode=1777')
-          "${run[@]}" --entrypoint /bin/sh "$PACKER_IMAGE" -ec '
-            mkdir -p /nvkr/work/home
-            test -d /nvkr/toolchain/packer/plugins
-            export PACKER_PLUGIN_PATH=/nvkr/toolchain/packer/plugins
-            /usr/local/bin/packer version
-            /usr/local/bin/packer plugins installed
-          '
-          "${run[@]}" --entrypoint /bin/sh "$INSPECTOR_IMAGE" -ec '
-            virt-inspector --version
-            qemu-img --version
-            guestfish --version
-            syft version
-            dpkg-deb --version
-          '
-          helper_status=0
-          "${run[@]}" --entrypoint /usr/local/bin/nvkr-disk-inspect \
-            "$INSPECTOR_IMAGE" > "$RUNNER_TEMP/nvkr-helper.stdout" \
-            2> "$RUNNER_TEMP/nvkr-helper.stderr" || helper_status=$?
-          test "$helper_status" = 2
-          test ! -s "$RUNNER_TEMP/nvkr-helper.stdout"
-          grep -F '[NVKR-E-USAGE]' "$RUNNER_TEMP/nvkr-helper.stderr"
-          printf 'Verified pull and native entrypoints: %s\n%s\n%s\n' \
-            "linux/$NATIVE_ARCH" "$PACKER_IMAGE" "$INSPECTOR_IMAGE" \
-            >> "$GITHUB_STEP_SUMMARY"
+          go build -trimpath -o nvkr-exec ./cmd/nvkr
+          ./nvkr-exec factory toolchain-maintenance --operation admit --run "$APPROVAL_RUN" > "$RUNNER_TEMP/approval.json"
+          jq -r '"source=" + .sourceCommit, "attempt=" + (.attempt|tostring)' "$RUNNER_TEMP/approval.json" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: admit
+    runs-on: ubuntu-24.04
+    environment: nvkr-release
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # 7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # 7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+      - name: Build trusted maintenance and storage helper
+        env:
+          GOTOOLCHAIN: local
+        run: go build -trimpath -o nvkr-exec ./cmd/nvkr
+      - name: Restore exact AMD64 preparation attempt
+        uses: ./.github/nvkr-run/actions/ci-download
+        env:
+          NVKR_CI_STORAGE_READ_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
+        with:
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          name: native-toolchains-amd64-${{ needs.admit.outputs.source }}
+          path: .nvkr/maintenance/amd64
+          run-id: ${{ inputs.approval_run }}
+          attempt: ${{ needs.admit.outputs.attempt }}
+      - name: Restore exact ARM64 preparation attempt
+        uses: ./.github/nvkr-run/actions/ci-download
+        env:
+          NVKR_CI_STORAGE_READ_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
+        with:
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          name: native-toolchains-arm64-${{ needs.admit.outputs.source }}
+          path: .nvkr/maintenance/arm64
+          run-id: ${{ inputs.approval_run }}
+          attempt: ${{ needs.admit.outputs.attempt }}
+      - name: Admit all four subjects and publish exact manifests
+        env:
+          APPROVAL_RUN: ${{ inputs.approval_run }}
+          GH_TOKEN: ${{ github.token }}
+          NVKR_REGISTRY_USER: ${{ vars.NVKR_REGISTRY_WRITE_USER }}
+          NVKR_REGISTRY_TOKEN: ${{ secrets.NVKR_REGISTRY_WRITE }}
+        run: ./nvkr-exec factory toolchain-maintenance --operation publish --run "$APPROVAL_RUN" --directory .nvkr/maintenance
+
+  verify-candidate:
+    needs: [admit, publish]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # 7.0.1
+        with:
+          persist-credentials: false
+      - name: Select reviewed candidate subjects
+        id: pins
+        env:
+          APPROVAL_RUN: ${{ inputs.approval_run }}
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          case "$APPROVAL_RUN" in ''|*[!0-9]*) exit 1;; esac
+          record="inputs/policies/toolchain-maintenance/$APPROVAL_RUN.json"
+          jq -er --arg arch "$NATIVE_ARCH" '.images[] | select(.arch == $arch) | .kind + "=ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/" + .kind + "-native@" + .manifestDigest' "$record" >> "$GITHUB_OUTPUT"
+          jq -e --arg arch "$NATIVE_ARCH" '.images[] | select(.arch == $arch and .kind == "inspector") | .executables' "$record" > "$RUNNER_TEMP/expected-executables.json"
+          bash scripts/verify-native-toolchains.sh --check-host
+      - name: Pull exact images with independent pipeline reader
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+          PACKER_IMAGE: ${{ steps.pins.outputs.packer }}
+          INSPECTOR_IMAGE: ${{ steps.pins.outputs.inspector }}
+          GHCR_USER: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          GHCR_TOKEN: ${{ secrets.NVKR_REGISTRY_READ }}
+        run: |
+          set -euo pipefail
+          DOCKER_CONFIG=$(mktemp -d "$RUNNER_TEMP/nvkr-candidate-pull.XXXXXX")
+          export DOCKER_CONFIG
+          trap 'find "$DOCKER_CONFIG" -depth -delete' EXIT
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin
+          docker pull --platform "linux/$NATIVE_ARCH" "$PACKER_IMAGE"
+          docker pull --platform "linux/$NATIVE_ARCH" "$INSPECTOR_IMAGE"
+      - name: Verify native tools and all inspector executable measurements
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+          PACKER_IMAGE: ${{ steps.pins.outputs.packer }}
+          INSPECTOR_IMAGE: ${{ steps.pins.outputs.inspector }}
+          EXPECTED_EXECUTABLES: ${{ runner.temp }}/expected-executables.json
+        run: bash scripts/verify-native-toolchains.sh
+
+  propose:
+    needs: [admit, publish, verify-candidate]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # 7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Fetch private source for catalog and generation checks
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # 7.0.1
+        with:
+          repository: dsx-ai-factory/nvke
+          fetch-depth: 0
+          path: .nvkr-inputs/source
+          token: ${{ secrets.NKE_SOURCE_TOKEN }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # 7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+      - name: Check current generation, read back images, repin and regenerate
+        env:
+          GOTOOLCHAIN: local
+          APPROVAL_RUN: ${{ inputs.approval_run }}
+          GH_TOKEN: ${{ github.token }}
+          NVKR_REGISTRY_USER: ${{ vars.NVKR_REGISTRY_READ_USER }}
+          NVKR_REGISTRY_TOKEN: ${{ secrets.NVKR_REGISTRY_READ }}
+          GIT_CONFIG_COUNT: '1'
+          GIT_CONFIG_KEY_0: url.${{ github.workspace }}/.nvkr-inputs/source/.insteadOf
+          GIT_CONFIG_VALUE_0: https://github.com/dsx-ai-factory/nvke
+        run: |
+          set -euo pipefail
+          make workflows-check
+          bin/nvkr-exec factory toolchain-maintenance --operation repin --run "$APPROVAL_RUN" > "$RUNNER_TEMP/changed-pins.json"
+          make workflows-generate workflows-check
+          git diff --check
+      - name: Create review App token
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510  # v3.3.0
+        with:
+          client-id: ${{ secrets.RELEASE_BOT_CLIENT }}
+          private-key: ${{ secrets.RELEASE_BOT_SECRET }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+      - name: Open reviewable pin change
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+          APPROVAL_RUN: ${{ inputs.approval_run }}
+        run: python3 scripts/propose-toolchain-refresh.py
+
+  report:
+    needs: [measure, admit, publish, verify-candidate, propose]
+    if: always() && github.repository == 'dsx-ai-factory/nvkr' && github.ref == 'refs/heads/main' && !inputs.verify_published
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Notify maintenance owner of pending or failed refresh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RESULTS: ${{ toJSON(needs) }}
+          APPROVAL_RUN: ${{ inputs.approval_run }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          {
+            printf '@njhensley: weekly/source-change native toolchain maintenance.\n\nRun: %s\n\n' "$RUN_URL"
+            printf 'Preparation approval run: %s\n\n' "${APPROVAL_RUN:-not yet approved}"
+            printf 'Job results:\n'
+            jq -r 'to_entries[] | "- " + .key + ": " + .value.result' <<< "$RESULTS"
+            printf '\nOld pins remain selected until a complete refresh passes and its pin change is reviewed and merged.\n'
+            printf 'For a successful preparation, review the retained per-image proposals, license/security findings and source-lock freshness. Record exceptions with approver, candidate scope and expiry before publishing.\n'
+            printf 'Follow docs/toolchain-maintenance.md; refresh acceptance and rollback are recorded separately from build success.\n'
+          } > "$RUNNER_TEMP/refresh-report.md"
+          cat "$RUNNER_TEMP/refresh-report.md" >> "$GITHUB_STEP_SUMMARY"
+          gh issue create --title "Native toolchain refresh $RUN_ID" --assignee njhensley --body-file "$RUNNER_TEMP/refresh-report.md"

@@ -38,7 +38,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH="${arch}" timeout --signal=TERM --kill-after=30s
 mkdir -p "${output}/context/bin"
 cp "bin/nvkr-disk-inspect-${arch}" "${output}/context/bin/"
 # Serial ceilings total 330 minutes: Packer 150, helper 15, inspector 120,
-# five bounded probes 25, archive 20. The 360-minute job retains cleanup/upload
+# five bounded probes 25, archives 20. The 360-minute job retains cleanup/upload
 # headroom; image export/load run together, not as additional serial budgets.
 timeout --signal=TERM --kill-after=30s 120m docker buildx build \
   "${build_tls[@]}" \
@@ -85,14 +85,17 @@ grep -F '[NVKR-E-USAGE]' "${output}/helper-admission.log" >/dev/null
     test "$result" = native-inspector
     printf "Native libguestfs TCG appliance filesystem round trip passed\n"
   ' >"${output}/appliance-probe.log" 2>&1
-timeout --signal=TERM --kill-after=30s 20m docker save "${packer_id}" "${inspector_id}" \
-  | timeout --signal=TERM --kill-after=30s 20m gzip -n >"${output}/images.tar.gz"
+# Separate archives permit exact native manifest admission without loading or
+# executing either image in the credential-bearing publication job.
+timeout --signal=TERM --kill-after=30s 10m docker save "${packer_id}" >"${output}/packer.tar"
+timeout --signal=TERM --kill-after=30s 10m docker save "${inspector_id}" >"${output}/inspector.tar"
 jq -n --arg arch "${arch}" --arg source "$(git rev-parse HEAD)" \
   --arg packer "${packer_id}" --arg inspector "${inspector_id}" \
-  --arg archive "sha256:$(sha256sum "${output}/images.tar.gz" | cut -d' ' -f1)" \
+  --arg packer_archive "sha256:$(sha256sum "${output}/packer.tar" | cut -d' ' -f1)" \
+  --arg inspector_archive "sha256:$(sha256sum "${output}/inspector.tar" | cut -d' ' -f1)" \
   --rawfile hashes "${output}/executables.sha256" \
-  '{schemaVersion:"nvkr.dev/native-toolchain-measurement/v1", scope:"unqualified-diagnostic",
+  '{schemaVersion:"nvkr.dev/native-toolchain-measurement/v2", scope:"unqualified-diagnostic",
     sourceCommit:$source, platform:("linux/"+$arch), packerImageID:$packer,
-    inspectorImageID:$inspector, imageArchiveDigest:$archive, executableMeasurements:$hashes,
+    inspectorImageID:$inspector, archives:{packer:$packer_archive, inspector:$inspector_archive}, executableMeasurements:$hashes,
     publicationApproved:false}' >"${output}/measurement.json"
 printf 'Native measurements: %s/measurement.json\n' "${output}"
