@@ -22,7 +22,7 @@ func cmdFactory() *cli.Command {
 	return &cli.Command{
 		Name:  "factory",
 		Usage: "execute generated internal plan nodes",
-		Subcommands: []*cli.Command{{
+		Subcommands: []*cli.Command{cmdToolchainMaintenance(), {
 			Name:   "execute-node",
 			Hidden: true,
 			Usage:  "execute one node from an exact generated plan",

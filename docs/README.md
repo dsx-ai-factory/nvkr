@@ -57,6 +57,7 @@ records source availability and remaining gaps.
 | Review object-store dependency admission | [Dated dependency evidence](evidence/2026-11-04-object-store-dependency-admission.md) |
 | Coordinated upstream versions and exact locks | [Generic pin-set example](generic-pin-set-example.md), [NVKE acquired charts](nvke-pin-set-usage.md) |
 | Reviewable updates and matching regeneration (the installed `catalog-refresh.yaml` is generated, never hand-edited) | [Catalog maintenance](catalog-maintenance.md) |
+| Refresh native pipeline Packer and inspector images, review exceptions, or roll back pins | [Toolchain maintenance](toolchain-maintenance.md) |
 | Chart slots, image outputs, and registry-independent bytes | [Declarative Helm bindings](declarative-helm-bindings.md) |
 | Software inventories and their exact subjects/stages | [Dependency SBOMs](dependency-sboms.md) |
 | Discover and explicitly select provisional CLI validators | [CLI artifact testing](artifact-testing.md#run-locally) |

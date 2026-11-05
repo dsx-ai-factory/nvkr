@@ -92,7 +92,8 @@ execution pin. The local Docker wrapper freezes the exact observed image ID
 into an attempt-specific catalog overlay before compiling the Plan; NVKR
 rechecks that ID before execution. This binds loaded image bytes to the attempt Plan, not toolchain provenance,
 and does not make the image an approved
-maintained toolchain. There is no toolchain publication workflow in this repository.
+maintained toolchain. The separate [maintenance workflow](../../docs/toolchain-maintenance.md)
+requires reviewed per-image candidate exceptions before publishing retained native archives.
 `images` remains `null` because a local image ID is not an OCI repository
 digest. The build command fails if a rebuilt image differs from its recorded
 runtime-specific local ID.

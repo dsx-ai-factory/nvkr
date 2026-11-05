@@ -46,9 +46,11 @@ composed and tested. Cross-compiling the helper does not exercise it, and merely
 selecting `--platform` does not prove a native host. The repository now supplies `scripts/prepare-native-toolchains.sh` and the manual
 `Prepare native NVKR toolchains` workflow for native Docker assembly and measurement of both architectures.
 They require a clean checkout and retain exact image archives alongside measurements for later publication.
-The workflow also accepts `verify_published=true` for a manual check of the committed Run's selected
-image digests on both native hosted architectures. That mode uses the repository's `packages: read`
-workflow token for pulls, removes its temporary registry configuration, then checks native tool versions
+The [maintenance workflow](../../docs/toolchain-maintenance.md) schedules native preparation weekly,
+requires reviewed per-image exceptions before candidate publication, and proposes the dependent pins.
+It also accepts `verify_published=true` for a manual check of the committed Run's selected
+image digests on both native hosted architectures. That mode uses the independent pipeline reader
+credential for pulls, removes its temporary registry configuration, then checks native tool versions
 and helper argument admission. Review the selected branch before dispatching. Verification grants no
 publication or signing permission; its result establishes pull access and entrypoint execution, not a
 complete disk bake or inspection.
