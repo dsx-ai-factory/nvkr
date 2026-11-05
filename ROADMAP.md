@@ -11,6 +11,7 @@ change scope or come off the list as we learn more. We don't publish dates.
 | **Coming soon** | Being built now. Expect it in an upcoming release. |
 | **Working on it** | Funded and in design or early development. |
 | **Exploring** | On our list, but not yet scheduled. Your feedback shapes what happens next. |
+| **Not yet staged** | Tracked work whose issues have not been assigned a roadmap stage. |
 
 ## Coming soon
 
