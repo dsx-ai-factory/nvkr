@@ -31,11 +31,13 @@ const COMPONENT_AREAS = new Map([
 
 // Conventional Commit title-scope tokens and their area. Free-text keywords
 // are not inferred: issue bodies quote logs and paths from unrelated areas.
+// `factory` spans Run execution and pipeline generation; leave that scope for
+// maintainer review unless the form or another explicit scope names an area.
 const SCOPE_AREAS = new Map([
   ['catalog', 'area/catalog'], ['pins', 'area/catalog'],
   ['definition', 'area/definitions'], ['definitions', 'area/definitions'],
   ['environment', 'area/definitions'], ['environments', 'area/definitions'],
-  ['run', 'area/run'], ['lifecycle', 'area/run'], ['factory', 'area/run'], ['buildgraph', 'area/run'],
+  ['run', 'area/run'], ['lifecycle', 'area/run'], ['buildgraph', 'area/run'],
   ['pipeline', 'area/pipeline'], ['generate', 'area/pipeline'],
   ['release', 'area/release'], ['delivery', 'area/release'], ['qualification', 'area/release'],
   ['security', 'area/security'], ['sign', 'area/security'], ['signing', 'area/security'],
@@ -78,12 +80,12 @@ function scopeArea(title) {
 }
 
 // One inferred area, in order of reporter intent: an area already set, the
-// form's Component, the documentation form's type label, then the title scope.
+// form's Component, the title scope, then the documentation type fallback.
 function inferArea(issue, existing) {
   if ([...existing].some(name => name.startsWith('area/'))) return undefined;
   return COMPONENT_AREAS.get(formComponent(issue.body)) ||
-    (existing.has('documentation') ? 'area/docs' : undefined) ||
-    scopeArea(issue.title);
+    scopeArea(issue.title) ||
+    (existing.has('documentation') ? 'area/docs' : undefined);
 }
 
 function intakeLabels(issue) {
