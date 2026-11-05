@@ -73,7 +73,7 @@ func repin(ctx context.Context, root string, record Record, stage bool) ([]strin
 		}
 	}
 	// Authenticate each predecessor using the catalog owner, then derive its new
-	// digest through the same owner. Never hash marshalled YAML or patch a digest
+	// digest through the same owner. Never hash marshaled YAML or patch a digest
 	// based on its spelling alone.
 	states := map[string]catalogPair{}
 	for _, name := range registries {
