@@ -23,7 +23,7 @@ A fifth, `disks-ubuntu24` family selects four Ubuntu 24.04 disks that the combin
 The [GPU system matrix](../../../inputs/definitions/nvke/README.md#gpu-system-matrix) maps GB200, GB300, VR200
 and the site controller to family outputs in documentation only. It adds no Definition axis, input or
 generated file. NVKR records no GPU driver, fabric or runtime acceptance for any of them; that evidence
-belongs to AICR and NVKE. No maintained Definition yet selects the matrix's Ubuntu 24.04 disks,
+belongs to AICR and NVKE. The Disks Ubuntu 24 family selects the matrix's Ubuntu 24.04 disks. No maintained Definition yet selects its
 offline CAPI repository or composite site Release; the core family selects `controller-profiles`. No maintained Definition selects the ARM64 AICR CLI:
 publication accepts one bundle entry per component build subject, so its pinned attestation companion cannot be
 published beside it yet. The GB200 AICR bundle
