@@ -118,7 +118,12 @@ func decodeStrict(raw []byte, label string, output any) error {
 // under the identity of their first document.
 func requireSingleDocument(raw []byte, label string) error {
 	decoder := yamlv3.NewDecoder(bytes.NewReader(raw))
-	var document any
+	// Decode into a Node rather than any: yaml.v3 builds a Node tree
+	// without the pairwise duplicate-key comparison it does when filling
+	// an interface, which is quadratic for large flat mappings. Only the
+	// EOF check is needed here; UnmarshalStrict still validates the first
+	// document from the raw bytes.
+	var document yamlv3.Node
 	if err := decoder.Decode(&document); err != nil {
 		if err == io.EOF {
 			return nil
