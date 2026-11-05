@@ -104,7 +104,7 @@ bundles. `make workflows-check` checks their exact recorded inputs. The family-o
 `make nvke-split-generate` and `make nvke-split-check`. Generated bundles remain under
 `.github/`; Run records and release artifacts remain with their execution/publication owners.
 
-The pilot retains the combined production/development/qualification paths pending consumer and
+The pilot retains the combined production and qualification paths pending consumer and
 qualification cutover. Its family Releases require separate digest-pinned verification and downstream-owned
 association; no parent Release, automatic association file or hosted acceptance is supplied by the split.
 

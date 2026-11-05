@@ -39,8 +39,8 @@ using the fixed registry reader, before source or producer execution. Namespace 
 other families and foreign toolchain owners receive no exception. These are credential projection
 contracts, not evidence of provisioned package access or hosted disk execution.
 
-The combined [Definition](../inputs/definitions/nvke/definition.yaml), production and development bundles,
-and their qualification paths remain available. The families are a reversible pilot, not a recursive
+The combined [Definition](../inputs/definitions/nvke/definition.yaml), its production bundle and its
+production qualification path remain available; the fixed development bundle belongs to the GPU site composite. The families are a reversible pilot, not a recursive
 replacement for the combined Release. Existing consumer acceptance of the combined publication cannot be
 transferred to four independently produced roots.
 
