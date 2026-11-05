@@ -77,12 +77,19 @@ type Output struct {
 	OS            string         `json:"os,omitempty"`
 	Arch          string         `json:"arch,omitempty"`
 	ChartVersion  string         `json:"chartVersion,omitempty"`
+	Helm          *Helm          `json:"helm,omitempty"`
 	BuildDigest   string         `json:"buildDigest"`
 	Components    []string       `json:"components,omitempty"`
 	Disk          *Disk          `json:"disk,omitempty"`
 	ImageIndex    *ImageIndex    `json:"imageIndex,omitempty"`
 	ArtifactType  string         `json:"artifactType"`
 	BuildSubjects []BuildSubject `json:"buildSubjects"`
+}
+
+// Helm describes the exact compressed chart archive. DefaultDigest uses the
+// name and sha256:<hex> format accepted by AICR's component registry.
+type Helm struct {
+	DefaultDigest string `json:"defaultDigest"`
 }
 
 // Disk describes the publication's exact disk producer and payload binding.
@@ -194,6 +201,9 @@ func describe(selected view) Description {
 			OS: output.OS, Arch: output.Arch, ChartVersion: output.ChartVersion,
 			BuildDigest: output.BuildDigest, Components: slices.Clone(output.Components),
 			ArtifactType: output.ArtifactType, BuildSubjects: make([]BuildSubject, 0, len(output.BuildSubjects)),
+		}
+		if output.Kind == "helm-oci" && output.ChartArchiveDigest != "" {
+			projected.Helm = &Helm{DefaultDigest: output.ChartArchiveDigest}
 		}
 		slices.Sort(projected.Components)
 		for _, subject := range output.BuildSubjects {

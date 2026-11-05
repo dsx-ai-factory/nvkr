@@ -72,6 +72,12 @@ Filtering follows complete metadata validation; detached views establish no regi
 Artifact views also expose config-derived OS/architecture and Helm chart version (not appVersion), with
 native indexes retaining child platforms. Full Helm verification compares the config with Chart.yaml.
 Generic release export and JSON browsing share the explicit `nvkr.dev/release-description/v1` schema.
+Helm outputs expose `helm.defaultDigest` in AICR's `sha256:<64 lowercase hex>` format. Delivery projects
+the existing publication blob digest checked against the chart-content layer; manifest identities and
+publication records are unchanged. Contract tests compare it with exact packaged archive bytes, retain it
+with missing or corrupt payloads during metadata inspection, reject a mismatched publication binding,
+omit it for other output kinds and cover filtered JSON. The lifecycle test exercises source-chart packaging
+through release export. These tests do not establish AICR bundle execution or external registry acceptance.
 Export requires only the immutable publication reference and preserves every named output, native platform,
 aggregate image-index digest/child membership and exact evidence/source binding. Source repository/commit
 descriptions come from output-bound source SBOM properties, without inferred Git tags or a release-wide

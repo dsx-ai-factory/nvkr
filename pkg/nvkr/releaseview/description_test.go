@@ -61,6 +61,13 @@ func TestDescriptionVersionedContract(t *testing.T) {
 		if output.Name == "chart" && (output.ChartVersion != "8.2.1" || output.OS != "" || output.Arch != "") {
 			t.Fatalf("chart version/platform description changed: %+v", output)
 		}
+		if output.Name == "chart" {
+			if output.Helm == nil || output.Helm.DefaultDigest != publication.Outputs[1].ChartArchiveDigest || output.Helm.DefaultDigest == output.Digest {
+				t.Fatalf("chart archive digest lost or replaced by manifest digest: %+v", output)
+			}
+		} else if output.Helm != nil {
+			t.Fatalf("non-Helm output gained chart metadata: %+v", output)
+		}
 	}
 	if !reflect.DeepEqual(kinds, []string{"apt-repository", "helm-oci", "disk-image", "oci", "oci", "executable"}) {
 		t.Fatalf("artifact inventory was narrowed: %v", kinds)
@@ -186,6 +193,7 @@ func TestDescriptionDetachedNestedValues(t *testing.T) {
 	}
 	got.Outputs[0].Components[0] = "replacement"
 	got.Outputs[0].BuildSubjects[0].Component = "replacement"
+	got.Outputs[1].Helm.DefaultDigest = "replacement"
 	got.Outputs[2].Disk.Producer = "replacement"
 	got.Outputs[4].ImageIndex.RequiredPlatforms[0] = "replacement"
 	got.Outputs[4].ImageIndex.Children[0].Component = "replacement"
@@ -198,7 +206,7 @@ func TestDescriptionDetachedNestedValues(t *testing.T) {
 }
 
 func TestDescribeMatchesJSONAndRejectsAmbiguousSelection(t *testing.T) {
-	for _, selection := range []string{"", "tools", "multi", "missing", "tools\n"} {
+	for _, selection := range []string{"", "tools", "multi", "chart", "missing", "tools\n"} {
 		t.Run(selection, func(t *testing.T) {
 			got, err := Describe(descriptionFixture(), selection)
 			if selection == "missing" || selection == "tools\n" {
@@ -223,6 +231,30 @@ func TestDescribeMatchesJSONAndRejectsAmbiguousSelection(t *testing.T) {
 	var coded *e.Error
 	if !errors.As(err, &coded) || coded.Code != e.CodeUsage || !reflect.DeepEqual(got, Description{}) {
 		t.Fatalf("ambiguous selection returned a partial view or wrong error: %+v, %v", got, err)
+	}
+}
+
+func TestDescriptionOmitsHelmOutsideBoundArchive(t *testing.T) {
+	for _, test := range []struct {
+		name, output string
+		index        int
+		digest       string
+	}{
+		{name: "Helm output without archive digest", output: "chart", index: 1},
+		{name: "non-Helm output with archive digest", output: "image", index: 3, digest: "sha256:" + strings.Repeat("9", 64)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			publication := descriptionFixture()
+			publication.Outputs[test.index].ChartArchiveDigest = test.digest
+			got, err := Describe(publication, test.output)
+			if err != nil || len(got.Outputs) != 1 || got.Outputs[0].Helm != nil {
+				t.Fatalf("Helm description escaped its boundary: %+v, %v", got, err)
+			}
+			raw, err := Render(publication, Options{Format: "json", Output: test.output})
+			if err != nil || strings.Contains(string(raw), `"helm"`) {
+				t.Fatalf("JSON gained a Helm description: %s, %v", raw, err)
+			}
+		})
 	}
 }
 
@@ -317,7 +349,7 @@ func descriptionFixture() delivery.PublicationDescription {
 		},
 		Outputs: []delivery.PublicationOutput{
 			{Output: apt, ArtifactType: "application/vnd.nvkr.apt-repository.v1", BuildSubjects: []delivery.BuildSubject{subject("package", "1")}},
-			{Output: chart, ArtifactType: "application/vnd.nvkr.helm-bundle.v1"},
+			{Output: chart, ChartArchiveDigest: digest("0"), ArtifactType: "application/vnd.nvkr.helm-bundle.v1"},
 			{Output: disk, ArtifactType: delivery.MediaDiskImage, BuildSubjects: []delivery.BuildSubject{subject("base-system", "2")}},
 			{Output: native, ArtifactType: "application/vnd.oci.image.manifest.v1+json", BuildSubjects: []delivery.BuildSubject{subject("unfamiliar-service", "3")}},
 			{Output: aggregate, ArtifactType: delivery.MediaOCIIndex},
