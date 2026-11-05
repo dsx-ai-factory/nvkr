@@ -117,6 +117,18 @@ The signed storage download that follows each locator ZIP redirect had no retry.
 reads 406 locators, failed with that storage request's HTTP 503 on three consecutive attempts. The storage download now
 uses the same bounded transient-server budget, with recovery and exhaustion cases in the contract suite.
 
+Private-carrier repository admission in [Run 42100660131](https://github.com/dsx-ai-factory/nvkr/actions/runs/42100660131),
+[ARM64 node-exporter signing job](https://github.com/dsx-ai-factory/nvkr/actions/runs/42100660131/job/127518111891),
+reported an unauthenticated source identity during restore. That path previously classified every non-200
+repository response as a trust failure, so the diagnostic does not establish the original HTTP status.
+Repository and package admission GETs now permit at most four requests for HTTP 5xx, 429 or a 403 JSON
+secondary-rate-limit response, using the existing bounded `Retry-After` parser and cancellable backoff.
+The operation has an eight-minute bound; individual requests retain their thirty-second timeout. Final HTTP
+failures report their status with fetch/availability codes; invalid identities and privacy metadata in HTTP
+200 responses remain trust failures. A failed conditional request invalidates its representation before retry.
+`pkg/nvkr/cistore/privacy_http_test.go` covers recovery, exhaustion, server delays, cancellation, credential
+scope and stale-response rejection. These are local contract tests; no hosted recovery with this fix is recorded.
+
 The explicit `githubDevelopment` Environment setting selects separate fixed workflow/Plan/manifest paths
 with the same compiler, complete graph and helper. The committed development bundle now uses the 80-output
 [GPU site composite](../../../inputs/definitions/nvke/README.md#gpu-site-composite), including all eight native plain/public-bootstrap

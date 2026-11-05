@@ -27,6 +27,8 @@ type backend struct {
 	client    *http.Client
 	transport http.RoundTripper
 	responses admissionResponses
+	wait      func(context.Context, time.Duration) error
+	now       func() time.Time
 }
 
 func newBackend() *backend {
@@ -70,7 +72,10 @@ func (b *backend) source(ctx context.Context, repository string, opts Options) (
 	if err != nil {
 		return record, err
 	}
-	if status != http.StatusOK || record.ID == 0 || record.FullName != repository || record.Owner.Login != strings.Split(repository, "/")[0] || (record.Owner.Type != "Organization" && record.Owner.Type != "User") {
+	if status != http.StatusOK {
+		return record, e.New(e.CodeFetchFailed, "CI storage source repository request returned HTTP %d", status)
+	}
+	if record.ID == 0 || record.FullName != repository || record.Owner.Login != strings.Split(repository, "/")[0] || (record.Owner.Type != "Organization" && record.Owner.Type != "User") {
 		return record, e.New(e.CodeTrustPolicyMissing, "CI storage source repository identity was not authenticated by GitHub")
 	}
 	return record, nil
@@ -98,7 +103,7 @@ func (b *backend) checkPackagePrivacy(ctx context.Context, packageName string, s
 		return false, nil
 	}
 	if status != http.StatusOK {
-		return false, e.New(e.CodeTrustPolicyMissing, "CI storage package access could not be authenticated")
+		return false, e.New(e.CodeFetchFailed, "CI storage package request returned HTTP %d", status)
 	}
 	if record.Name != packageName || record.PackageType != "container" || !strings.EqualFold(record.Owner.Login, source.Owner.Login) || !privateVisibility(record.Visibility) {
 		return false, e.New(e.CodeTrustPolicyMissing, "CI storage requires the exact private or internal GHCR package")
@@ -162,7 +167,8 @@ func privateRepositoryVisibility(raw json.RawMessage) bool {
 }
 
 func (b *backend) get(ctx context.Context, endpoint, token string, result any) (int, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	// Four 30-second requests and three waits of at most 120 seconds.
+	ctx, cancel := context.WithTimeout(ctx, 8*time.Minute)
 	defer cancel()
 	key := admissionResponseKey{url: b.api + endpoint, token: token}
 	held, conditional := b.responses.lookup(key)
@@ -177,10 +183,10 @@ func (b *backend) get(ctx context.Context, endpoint, token string, result any) (
 	if conditional {
 		req.Header.Set("If-None-Match", held.etag)
 	}
-	response, err := b.client.Do(req)
+	response, err := b.admissionGET(ctx, req, key)
 	if err != nil {
 		b.responses.forget(key)
-		return 0, safeIOError(ctx, e.CodeFetchFailed, "CI storage admission request failed")
+		return 0, err
 	}
 	defer response.Body.Close()
 	if response.StatusCode == http.StatusNotModified {

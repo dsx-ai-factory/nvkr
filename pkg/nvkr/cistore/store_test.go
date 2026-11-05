@@ -217,7 +217,11 @@ func TestPrivateCarrierDeniesPrivacyBeforePayloadAccess(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newStorageFixture(t, func(int) (int, any) { p := privatePackage(); tc.change(p); return tc.status, p })
 			_, err := f.b.upload(t.Context(), testRequest, filepath.Join(t.TempDir(), "nonexistent-workspace"), []string{"missing"}, testOptions)
-			assertCode(t, err, e.CodeTrustPolicyMissing)
+			code := e.CodeTrustPolicyMissing
+			if tc.status != http.StatusOK {
+				code = e.CodeFetchFailed
+			}
+			assertCode(t, err, code)
 			if f.transport.calls.Load() != 0 {
 				t.Fatal("registry contacted before privacy admission")
 			}
