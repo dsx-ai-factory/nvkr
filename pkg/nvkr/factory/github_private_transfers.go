@@ -110,6 +110,13 @@ func githubStagePermissions(plan *Plan, stage githubStage) (map[string]string, e
 	}
 	if node.Kind == NodePublish {
 		permissions := map[string]string{"contents": "read"}
+		if IsObjectPublicationNode(plan, node.ID) {
+			permissions["id-token"] = "write"
+			if strings.HasPrefix(plan.Targets["release"].Ref, "ghcr.io/") && !githubScopedPublication(plan) {
+				permissions["packages"] = "read"
+			}
+			return permissions, nil
+		}
 		target := plan.Targets[node.Target]
 		if target.CredentialRef != "" && strings.HasPrefix(target.Ref, "ghcr.io/") && !githubScopedPublication(plan) {
 			permissions["packages"] = "write"

@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: p05 Build capnico-controller/linux/arm64 +36
 'on':
   workflow_call:
     inputs:

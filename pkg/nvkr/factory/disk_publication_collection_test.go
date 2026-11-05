@@ -42,7 +42,7 @@ func TestDiskPublicationCollectionPinsLayoutNotPayload(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			objects, cleanup, err := collectPublicationObjects(t.Context(), plan, artifacts["package/release"], []Artifact{wrapper}, nil)
+			objects, cleanup, err := collectPublicationObjects(t.Context(), plan, artifacts["package/release"], []Artifact{wrapper}, nil, artifacts)
 			if err != nil {
 				t.Fatal(err)
 			}

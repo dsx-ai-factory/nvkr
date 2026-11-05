@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: p14 Bind image digest and package Hel...rovisioner-arm64 +31
 'on':
   workflow_call:
     inputs:

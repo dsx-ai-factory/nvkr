@@ -11,15 +11,18 @@ payloads plus their producer records. The implementation is selected by artifact
 | Helm source archive | NVKR reads standard chart metadata | Source-build stage: bundled charts and declared chart dependencies/locks |
 | Bound Helm package | NVKR re-inspects the final archive after image binding | Packaging stage: chart declarations/references in the exact delivered bytes |
 | Generic OCI bundle | NVKR's bounded archive reader inventories every regular file | `bundle-files/v1`: delivered paths, exact hashes, sizes and modes; referenced images/charts/providers are not inspected |
+| Original Debian package output | Pinned package reader exports the held payload and the offline scanner inspects it under the selected native profile | Exact raw package subject, platform and tool-bound payload inventory; no installation or runtime claim |
 | Separate Debian archive metadata diagnostic | `InspectDebianArchiveMetadata` uses Syft v1.51.1 with the fixed private name `subject.deb`, independent of the caller's filename | Package identity only; `syft-debian-archive-metadata/v1` is rejected by dependency SBOM attachment and serialized BOM validation; no maintained factory output invokes this diagnostic |
 
 Ordinary `InspectDependencies` and held-only `InspectHeldDependencies` retain hint-free host-file scanning;
 factory callers use those dependency APIs. The separate diagnostic's private `.deb` discovery hint supplies
 no format, target-architecture or payload-coverage authority. The existing
-digest-pinned `dpkg-deb` material reader owns authoritative Debian expansion and platform checks for disks.
-Raw Debian output retains the source-created archive through ordinary file authentication and staging.
-It emits declaration-only composition metadata, not an inspected dependency SBOM; this diagnostic does not
-supply payload inspection, installation acceptance or publication authority.
+digest-pinned `dpkg-deb` material reader owns authoritative Debian expansion and platform checks.
+Raw Debian output retains the source-created archive through ordinary producer/result authentication.
+With publication and `sbomTool` configured, its existing native inspection profile supplies pinned reader/scanner
+executables, image and expansion/time bounds for the separate payload-inspection path. The resulting live
+receipt binds raw bytes, platform and tool pins; the metadata diagnostic cannot supply it. Without `sbomTool`,
+the output retains declaration-only composition evidence. Neither route proves installation or runtime acceptance.
 
 The scanner executable is authenticated before use. Subject bytes must match the producer digest. Its output
 is normalized into CycloneDX 1.5: deterministic identities/order, package URLs, versions and artifact dependency

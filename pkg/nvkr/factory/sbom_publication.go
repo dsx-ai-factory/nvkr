@@ -137,7 +137,28 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 				matches = method == sbom.BundleFilesMethod && scanner == ""
 			case "file-archive":
 				matches = method == "archive-content/v1" && scanner == ""
-			case "host-package", "oci-image":
+			case "host-package":
+				if plan.debianPublicationTarget(artifact.BuildTarget) {
+					profile, err := debianPublicationInspectionProfile(plan)
+					if err != nil {
+						return nil, err
+					}
+					platform, reader := "", ""
+					for _, build := range plan.Builds {
+						if build.Name == artifact.BuildTarget {
+							platform = build.Platform
+						}
+					}
+					for _, property := range bom.Metadata.Props {
+						if property.Name == "nvkr:packageReaderDigest" {
+							reader = property.Value
+						}
+					}
+					matches = scanner == profile.ScannerDigest && reader == profile.PackageReaderDigest && sbom.ValidateDebianPayloadEvidence(&bom, platform, entry.ArtifactSHA) == nil
+				} else {
+					matches = method == "syft-cyclonedx/v1" && scanner == toolExecutableDigest(plan, plan.Definition.SBOMTool)
+				}
+			case "oci-image":
 				matches = method == "syft-cyclonedx/v1" && scanner == toolExecutableDigest(plan, plan.Definition.SBOMTool)
 			}
 			if !matches {

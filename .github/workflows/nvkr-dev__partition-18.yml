@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: p18 Package local-path-provisioner-arm64 +1
 'on':
   workflow_call:
     inputs:

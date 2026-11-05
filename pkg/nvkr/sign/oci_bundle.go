@@ -202,6 +202,9 @@ func (s *CosignOCISigner) verifyOCIType(ctx context.Context, source *ociBundleSo
 		if err := contextError(ctx); err != nil {
 			return "", "", nil, err
 		}
+		if source.authenticated != nil {
+			source.authenticated(predicateType, bytes.Clone(bundle))
+		}
 		return identity, issuer, ran, nil
 	}
 	return "", "", nil, fmt.Errorf("all %d OCI bundles failed (%d rejected by claims checks, %d failed cosign verification); last failure: %w",

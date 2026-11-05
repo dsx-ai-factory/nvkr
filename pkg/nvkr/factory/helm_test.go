@@ -293,7 +293,7 @@ func testSourceHelmProducerObservation(t *testing.T, binding, fileOnly bool) {
 		for _, id := range publication.Inputs {
 			inputs = append(inputs, artifacts[id])
 		}
-		objects, cleanup, err := collectPublicationObjects(ctx, plan, Artifact{Producer: publication.ID}, inputs, nil)
+		objects, cleanup, err := collectPublicationObjects(ctx, plan, Artifact{Producer: publication.ID}, inputs, nil, artifacts)
 		if err != nil {
 			t.Fatal(err)
 		}

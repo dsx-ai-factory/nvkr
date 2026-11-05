@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: p02 Fetch nvke-node-fde-ubuntu24-arm64 +53
 'on':
   workflow_call:
     inputs:

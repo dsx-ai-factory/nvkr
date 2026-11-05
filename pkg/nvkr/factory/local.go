@@ -663,6 +663,9 @@ func admitLocalPlanBase(ctx context.Context, plan *Plan) error {
 	if err := rejectUnsupportedLocalPlanRequirements(plan, "local factory execution"); err != nil {
 		return err
 	}
+	if plan.Environment.Publication != nil && len(plan.Environment.Publication.ObjectStores) != 0 {
+		return e.New(e.CodeEngineCapability, "required object-store publication uses GitHub execution")
+	}
 	if PerOutputPublication(plan) {
 		return e.New(e.CodeEngineCapability, "per-output publication requires GitHub execution")
 	}

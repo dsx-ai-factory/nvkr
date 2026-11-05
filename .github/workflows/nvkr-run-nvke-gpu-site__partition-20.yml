@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: p20 Publish capi-controller-image +31
 'on':
   workflow_call:
     inputs:

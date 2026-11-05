@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: p27 Assemble release from verified output references
 'on':
   workflow_call:
     inputs:

@@ -144,6 +144,11 @@ func validateReleaseMetadata(root PublicationRoot) error {
 			}
 		case "apt-repository":
 			kind, media = "apt-repository", "application/vnd.nvkr.apt-repository.v1"
+		case outputFormatDebian:
+			kind, media = outputFormatDebian, MediaDeliveryObject
+			if len(o.Output.Components) != 1 || o.Output.TransportPath != "" || o.SemanticDigest != o.BlobDigest {
+				return e.New(e.CodeVerifyFailed, "Debian publication requires its exact original raw package subject")
+			}
 		case "disk-image":
 			kind, media = "disk-image", o.ArtifactType
 			if media != MediaDiskImage || o.Output.Disk == nil || !isDigest(o.Output.Disk.PayloadDigest) ||

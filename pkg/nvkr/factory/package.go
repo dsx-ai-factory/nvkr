@@ -27,6 +27,8 @@ func executePackage(ctx context.Context, plan *Plan, node Node, artifacts map[st
 		return err
 	}
 	switch node.PackageKind {
+	case PackageDebian:
+		return executeDebianPackage(ctx, plan, node, output, inputs, artifacts)
 	case PackageImage:
 		if node.ImageIndex != nil {
 			return executeImageIndexPackage(ctx, plan, node, output, artifacts, stdout)

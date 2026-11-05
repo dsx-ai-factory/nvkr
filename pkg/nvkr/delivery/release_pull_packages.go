@@ -27,6 +27,34 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+func pullDebianOutput(ctx context.Context, reference, out, metadataRoot, workspace string, object PublishedObject, options RegistryOptions) (PulledFile, error) {
+	manifest, err := flatManifest(ctx, metadataRoot, object)
+	if err != nil {
+		return PulledFile{}, err
+	}
+	if object.Output == nil || object.Output.Format != outputFormatDebian || object.Output.TransportPath != "" || object.SemanticDigest != object.BlobDigest {
+		return PulledFile{}, e.New(e.CodeVerifyFailed, "selected Debian output changes original raw file binding")
+	}
+	if err := validateDebianCarrier(ctx, metadataRoot, manifest, object.BlobDigest); err != nil {
+		return PulledFile{}, err
+	}
+	file, err := fetchPullLayer(ctx, reference, manifest.Layers[0], workspace, options)
+	if err != nil {
+		return PulledFile{}, err
+	}
+	defer file.Close()
+	name := object.Name + ".deb"
+	if err := publishPullDirectory(ctx, out, func(stage *os.File) error {
+		return writeImageIndexFile(ctx, stage, name, func(destination io.Writer) error {
+			_, err := streamDiskPayload(ctx, file, destination, object.BlobDigest, manifest.Layers[0].Size)
+			return err
+		})
+	}); err != nil {
+		return PulledFile{}, err
+	}
+	return PulledFile{Path: name, SHA256: object.BlobDigest, Size: manifest.Layers[0].Size}, nil
+}
+
 func pullHelmOutput(ctx context.Context, reference, out, metadataRoot, workspace string, object PublishedObject, options RegistryOptions) (PulledFile, error) {
 	manifest, err := flatManifest(ctx, metadataRoot, object)
 	if err != nil {

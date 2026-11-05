@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: 'p07 Generate SBOMs: capi-controller-image +19'
 'on':
   workflow_call:
     inputs:

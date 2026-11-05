@@ -22,7 +22,7 @@ func executePublicationPackage(ctx context.Context, plan *Plan, node Node, outpu
 	if err != nil {
 		return err
 	}
-	objects, cleanup, err := collectPublicationObjects(ctx, plan, output, inputs, evidence)
+	objects, cleanup, err := collectPublicationObjects(ctx, plan, output, inputs, evidence, artifacts)
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func publicationEvidenceObjects(ctx context.Context, plan *Plan, node Node, inpu
 
 // collectPublicationObjects owns any temporary carriers until its returned cleanup
 // runs. The caller retains them through metadata binding and publication assembly.
-func collectPublicationObjects(ctx context.Context, plan *Plan, output Artifact, inputs []Artifact, objects []delivery.ObjectInput) ([]delivery.ObjectInput, func(), error) {
+func collectPublicationObjects(ctx context.Context, plan *Plan, output Artifact, inputs []Artifact, objects []delivery.ObjectInput, artifacts map[string]Artifact) ([]delivery.ObjectInput, func(), error) {
 	var temporaryArchives []string
 	cleanup := func() {
 		for _, path := range temporaryArchives {
@@ -104,6 +104,30 @@ func collectPublicationObjects(ctx context.Context, plan *Plan, output Artifact,
 		object := delivery.ObjectInput{Name: input.Name, Kind: input.Kind, Path: input.Path,
 			ArtifactType: input.MediaType, LayerMediaType: input.MediaType}
 		switch input.Kind {
+		case PackageDebian:
+			var expected LifecycleOutputPlan
+			for _, candidate := range plan.LifecycleOutputs {
+				if candidate.Name == input.Name && candidate.Kind == PackageDebian {
+					expected = candidate
+				}
+			}
+			observed, err := ObserveLifecyclePayload(ctx, plan, expected, artifacts)
+			if err != nil {
+				return nil, nil, err
+			}
+			if _, err := delivery.InspectDebianArtifact(ctx, input.Path, observed.Digest); err != nil {
+				return nil, nil, err
+			}
+			object.Layout, object.SemanticDigest = true, observed.Digest
+			object.BlobDigest, err = digestFactoryPath(ctx, filepath.Join(input.Path, "index.json"))
+			if err != nil {
+				return nil, nil, err
+			}
+			for _, build := range plan.Builds {
+				if build.Name == input.Name {
+					object.OS, object.Arch, _ = strings.Cut(build.Platform, "/")
+				}
+			}
 		case PackageDiskImage:
 			var expected LifecycleOutputPlan
 			for _, candidate := range plan.LifecycleOutputs {
