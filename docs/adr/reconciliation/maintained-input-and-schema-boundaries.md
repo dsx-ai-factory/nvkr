@@ -1,8 +1,9 @@
 ## Maintained input and schema boundaries
 
-The NVKE four-family pilot adds independent core (20 outputs), services (28), telemetry (17) and disks (4)
+The NVKE four-family pilot adds independent core (26 outputs), services (34), telemetry (17) and disks (4)
 Definitions under `inputs/definitions/nvke/`, with corresponding `github-nvke-<family>` Environments and
-named production bundles. Their selected output union is the combined candidate's 69 outputs, retaining
+named production bundles. Their selected output union is the combined candidate's 69 outputs, except `nico-reference-profiles-fixture`, plus 13
+family-only outputs (seven core, six services) that the combined Definition omits for workflow headroom, retaining
 aggregate native children, bound chart/image relationships and complete disk material selections. They
 reuse shared catalog/pin owners and publish into separate family prefixes beneath the existing candidate
 namespace. `make nvke-split-generate` and `make nvke-split-check` own the family subset; the repository-wide
@@ -22,8 +23,10 @@ A fifth, `disks-ubuntu24` family selects four Ubuntu 24.04 disks that the combin
 The [GPU system matrix](../../../inputs/definitions/nvke/README.md#gpu-system-matrix) maps GB200, GB300, VR200
 and the site controller to family outputs in documentation only. It adds no Definition axis, input or
 generated file. NVKR records no GPU driver, fabric or runtime acceptance for any of them; that evidence
-belongs to AICR and NVKE. No maintained Definition yet selects the matrix's Ubuntu 24.04 disks,
-`controller-profiles` output, offline CAPI repository or composite site Release. The GB200 AICR bundle
+belongs to AICR and NVKE. The Disks Ubuntu 24 family selects the matrix's Ubuntu 24.04 disks. No maintained Definition yet selects its
+offline CAPI repository or composite site Release; the core family selects `controller-profiles`. No maintained Definition selects the ARM64 AICR CLI:
+publication accepts one bundle entry per component build subject, so its pinned attestation companion cannot be
+published beside it yet. The GB200 AICR bundle
 Definition has one local Run and no hosted Release.
 
 The maintained release node-image catalog selects the NVIDIA OVN fork `v2.4.2`
@@ -148,7 +151,7 @@ CAPNICo and explicitly named reference-profile fixtures, the existing provisione
 and fourteen acquired runtime-image components delivered separately for both native architectures.
 The selected NVKE/CAPI sources and NVKE telemetry pipelines dependency charts own their versions; Helm test-only images are
 excluded. `nico-reference-profiles-fixture` identifies reference test data in the release membership itself,
-not fleet configuration, the runnable demo's `controller-profiles`, or a complete legacy OSProfile set.
+not fleet configuration or a complete legacy OSProfile set; the core family also delivers that build as `controller-profiles`.
 Provider manifests, image-reference relocation and installation remain consumer work, not delivery proved here.
 Native children are locked separately from source-owned index parents, and materialization authenticates actual
 membership. Controlled source/pin/image tests and exact-source approval do not prove external layer acquisition,
@@ -207,6 +210,17 @@ build command built both architectures locally in the pinned BuildKit image (AMD
 catalog command as it was before intermediate-digest validation built both source-owned bases, bound them by digest and compiled for about 220 seconds before
 the compiler was killed by signal 9 in an 8 GiB Docker VM; no Core image was produced. Neither has been rebuilt
 at `v2.3.0`, and no hosted Run has built, published or signed either image or the Flow chart.
+
+The core family selects `controller-profiles` from the curated `nvke-nico-reference-profiles` producer in place
+of `nico-reference-profiles-fixture`: one Release cannot publish the same image under two outputs, which the publication root rejects.
+NVKE's controller deploy item names `profilesArtifact:
+controller-profiles` (`deploy/nico/controller/release.yaml:20` at `v0.22.0`, `v0.23.0` and main `5293831c`), and a
+`--release` render fails when the Release lacks it; the stack config's `images.profiles` overrides it but cannot
+replace it. The image holds the two NICO test config profiles and their runbooks, not fleet configuration; NVKE's
+full fixture tree, with its empty and failure-injection profiles, is not selected. The combined Definition does not
+select it. It is contract-tested by the family membership matrix and the regenerated core bundle only; no hosted
+Run has built or published it, and no NVKE render has consumed it. CAPI provider manifests and a clusterctl local
+repository are not delivered.
 
 Current Definition v5/catalog v3/IR v4/Plan and artifact-graph v5 reject retired recipe, cluster, category,
 role, composition and staging fields, including empty legacy fields. Runs/Releases use v4 and validation vectors retain v3; publication roots and Inventory/ReleaseSet use v4; disk manifests use v2. Removed compiler-handoff,

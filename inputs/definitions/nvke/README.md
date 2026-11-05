@@ -13,12 +13,12 @@ the issue that adds it.
 
 | Definition | Environment | Produces | Lane when run | Status |
 |---|---|---|---|---|
-| [Core](core.yaml) | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) | Site controller: `nvkectl`, operator tools, AICR CLI, controller image and chart, CAPNICo, NICo charts and images, CAPI and cert-manager images | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
+| [Core](core.yaml) | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) | Site controller: `nvkectl`, operator tools, controller image and chart, `controller-profiles`, CAPNICo, NICo charts and images, CAPI and cert-manager images | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | [Services](services.yaml) | [github-nvke-services.yaml](../../environments/github-nvke-services.yaml) | SPIRE, PostgreSQL, Temporal and local-path-provisioner charts and images | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | [Telemetry](telemetry.yaml) | [github-nvke-telemetry.yaml](../../environments/github-nvke-telemetry.yaml) | NKTP chart and images | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | [Disks](disks.yaml) | [github-nvke-disks.yaml](../../environments/github-nvke-disks.yaml) | Ubuntu 26.04 `nvke-node-image-{amd64,arm64}` and `nvke-node-fde-{amd64,arm64}` | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | [Disks Ubuntu 24](disks-ubuntu24.yaml) | [github-nvke-disks-ubuntu24.yaml](../../environments/github-nvke-disks-ubuntu24.yaml) | Ubuntu 24.04 `nvke-node-image-ubuntu24-{amd64,arm64}` and `nvke-node-fde-ubuntu24-{amd64,arm64}` | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
-| `controller-profiles` and an offline CAPI repository in Core | — | The profiles image NVKE's deploy path names, and `clusterctl` provider manifests | — | Pending [#324](https://github.com/dsx-ai-factory/nvkr/issues/324) |
+| Offline CAPI repository in Core | — | `clusterctl` provider manifests | — | Pending [#324](https://github.com/dsx-ai-factory/nvkr/issues/324) |
 | [GB200 AICR bundle](../aicr/nvke-gb200.yaml) | [aicr-local-arm64.yaml](../../environments/aicr-local-arm64.yaml) (local build only) | `aicr-nvke-gb200-ubuntu-training-kubeflow-{helm,flux,argocd-helm}` | `unqualified-local-execution` | One local Run recorded ([AICR inputs](../aicr/README.md#gb200-nvke-kubeflow-training)); a hosted Release is pending [#325](https://github.com/dsx-ai-factory/nvkr/issues/325) |
 | GPU site composite | — | Every output above in one Release ([ADR-26](../../../docs/adr/0026-definition-composition.md)) | — | Pending [#326](https://github.com/dsx-ai-factory/nvkr/issues/326) |
 
@@ -66,15 +66,16 @@ belongs to AICR and NVKE evidence, and NVKR records none ([reconciliation](../..
 
 ## Family pilot
 
-Five independent Definitions partition the combined candidate's 69 named outputs, and together add 17
-family-only outputs, for 86 in all. The core family also
-selects the NICo charts, the NICo Core and Flow images and the ARM64 AICR CLI, and the services family selects local-path-provisioner, which the combined Definition omits; they were added while its flat workflow had no remaining YAML
+Five independent Definitions partition 68 of the combined candidate's 69 named outputs, and together add 17
+family-only outputs, for 85 in all. The core family delivers the 69th, `nico-reference-profiles-fixture`, as `controller-profiles`:
+one Release cannot publish the same image under two output names. The core family also
+selects the NICo charts, the NICo Core and Flow images and the `controller-profiles` image, and the services family selects local-path-provisioner, which the combined Definition omits; they were added while its flat workflow had no remaining YAML
 parsing headroom. The Disks Ubuntu 24 family's four outputs are also absent from the combined Definition. They reuse the
 shared catalogs and pins; they do not import each other or change the combined Definition into a parent.
 
 | Definition | Outputs | Membership | Environment |
 |---|---:|---|---|
-| [Core](core.yaml) | 27 | CLI/operator tools, AICR CLI, controller and bound chart, NICo charts and Core/Flow images, providers/reference fixture, CAPI and cert-manager images | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) |
+| [Core](core.yaml) | 26 | CLI/operator tools, controller with its bound chart and `controller-profiles` image, NICo charts and Core/Flow images, providers, CAPI and cert-manager images | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) |
 | [Services](services.yaml) | 34 | SPIRE, PostgreSQL, Temporal and local-path-provisioner charts and native images | [github-nvke-services.yaml](../../environments/github-nvke-services.yaml) |
 | [Telemetry](telemetry.yaml) | 17 | NKTP chart and native runtime images | [github-nvke-telemetry.yaml](../../environments/github-nvke-telemetry.yaml) |
 | [Disks](disks.yaml) | 4 | Ubuntu 26.04 native AMD64/ARM64 plain and public-bootstrap FDE disks, each with its complete material closure | [github-nvke-disks.yaml](../../environments/github-nvke-disks.yaml) |
@@ -127,15 +128,15 @@ historical capacity measurements and remaining cutover work.
 | CLI | `../../catalogs/nvke/module-tags` | AMD64 `nvkectl` and ARM64 `nvkectl-linux-arm64`, from their shared NVKE v0.23.0 source pin |
 | Controller and charts | `../../catalogs/nvke/release` | AMD64/ARM64 aggregate `cwe`, image-bound `controller-chart`, PostgreSQL, SPIRE, SPIRE CRDs and Temporal chart packages |
 | Operator tools | `../../catalogs/tools/operator-amd64`, `../../catalogs/tools/operator-arm64` | AMD64 `operator-tools` and, in the core family only, ARM64 `operator-tools-linux-arm64` Helm and kubectl executables, at the same pinned versions |
-| AICR CLI (core family only) | `../../catalogs/tools/aicr-arm64` | ARM64 `aicr` release executable with its `aicr-attestation.sigstore.json` companion beside it; upstream evidence is not verified (`evidence.none`) |
 | Node images | `../../catalogs/node-images/release`, `../../catalogs/node-images/variants/native-toolchains.yaml` | Separate native AMD64 and ARM64 plain and public-bootstrap FDE QCOW2s, with explicit material producers; the Disks Ubuntu 24 family adds `../../catalogs/node-images/variants/ubuntu24.json` |
 | Deployment images | `../../catalogs/runtime-dependencies` | Twelve non-test runtime images for each native architecture: PostgreSQL, eight SPIRE images and three Temporal images |
 | CAPNICo | `../../catalogs/nvke/release-components` | Source-built `capnico-controller`, one OCI index requiring AMD64 and ARM64 |
 | Default StorageClass (services family only) | `../../catalogs/local-path-provisioner` | Source-packaged `local-path-provisioner` chart from Rancher `v0.0.37`, one chart per native architecture with its acquired provisioner and BusyBox helper images bound by digest |
 | NICo charts (core family only) | `../../catalogs/nico` | Source-packaged `nico` umbrella, `nico-prereqs` and standalone `nico-flow` charts from one infra-controller `v2.3.0` pin, each stamped `2.3.0` |
 | NICo images (core family only) | `../../catalogs/nico` | Source-built `nico-core-image` and `nico-flow-image`, each one OCI index requiring AMD64 and ARM64, from the same infra-controller pin |
+| Controller profiles (core family only) | `../../catalogs/nvke/release-components` | `controller-profiles`, the same `nvke-nico-reference-profiles` build as `nico-reference-profiles-fixture`, which the core family therefore omits: the two NICO test config profiles and their runbooks, not fleet configuration. NVKE's `--release` deploy path requires this artifact name for the controller item, so the Release must carry it even when a site sets `images.profiles` to override the image. The combined Definition does not select it, so a `--release` render needs the core family Release |
 | Provisioned infrastructure provider | `../../catalogs/nvke/release` | Existing source-built `cluster-api-provider-provisioned`, independently delivered for both architectures; not CAPNICo or CAPI core |
-| Reference-profile fixture | `../../catalogs/nvke/release-components` | `nico-reference-profiles-fixture`, one AMD64/ARM64 content image containing the two NICO test config profiles and their runbooks, not production fleet configuration or the demo's runnable `controller-profiles` |
+| Reference-profile fixture (combined Definition only) | `../../catalogs/nvke/release-components` | `nico-reference-profiles-fixture`, one AMD64/ARM64 content image containing the two NICO test config profiles and their runbooks, not production fleet configuration |
 | Telemetry | `../../catalogs/nvke/release-components` | Source-packaged `nktp` with its three vendored dependencies; eight required/optional runtime images for each native architecture, including the enabled Target Allocator and the uninstall hook's kubectl |
 | Bootstrap runtime images | `../../catalogs/nvke/release-components` | CAPI core, kubeadm bootstrap/control-plane and three cert-manager images, each with separate AMD64 and ARM64 outputs |
 
@@ -154,7 +155,7 @@ built OCI exports only. The architecture-independent NKTP chart is packaged once
 | Default StorageClass | Rancher publishes `rancher/local-path-provisioner` images but no Helm repository; the chart is packaged from `deploy/chart/local-path-provisioner` at `v0.0.37`, whose values select image `v0.0.37`. The chart's `busybox:latest` helper is replaced by an explicit `1.37.0` selection | A hashed source patch adds empty `image.digest` and `helperImage.digest` values that render `@digest` when set; unset renders are unchanged. Acquired images are native outputs, so each chart binds one architecture's digests; a mixed-architecture cluster needs a source-built image index |
 | NKTP chart and dependencies | The same NVKE `v0.23.0` source as the maintained controller; `nktp/deploy/charts/nktp/Chart.yaml` and `Chart.lock` select three exact dependencies; packaging stamps chart `0.23.0` | Fetch verifies Helm `v4.2.4` and all three acquired chart archives; packaging uses the retained closure with no network |
 | NKTP images | Selected source values and authenticated dependency charts: collector `0.162.0`, operator `0.161.0` (the OpenTelemetry kube-stack `0.25.1` subchart's app version), LGTM `0.38.0`, kube-state-metrics `v2.20.0`, node-exporter `v1.12.1`, optional metrics-server `v0.8.1`, uninstall kubectl `v1.35.6`; the NKTP values select Target Allocator `0.161.0` | Acquired images, not source builds; native subjects and parent indexes are lock-owned. Helm test-only BusyBox is excluded. Images are delivered separately; chart references are not automatically rewritten to publication repositories |
-| Reference-profile fixture | The selected NVKE fixture Dockerfile, `nico-vms-cp.yaml`, `nico-vms-worker.yaml` and sibling runbooks | Explicitly named `nico-reference-profiles-fixture`: the control-plane profile skips its pre-join reboot. It must not be installed as production fleet configuration. No empty/failure-test config profile, placeholder example, copied OSProfile or new Dockerfile/patch is added |
+| Reference-profile fixture | The selected NVKE fixture Dockerfile, `nico-vms-cp.yaml`, `nico-vms-worker.yaml` and sibling runbooks | Explicitly named `nico-reference-profiles-fixture`; the core family also delivers the same build as `controller-profiles`. The control-plane profile skips its pre-join reboot. It must not be installed as production fleet configuration. No empty/failure-test config profile, placeholder example, copied OSProfile or new Dockerfile/patch is added |
 | CAPI and cert-manager images | Selected NVKE `make/tool-versions.mk` chooses CAPI `v1.13.6`; its published provider manifests name the three controllers, and its clusterctl config selects cert-manager `v1.21.1` | Acquired runtime images only. Provider manifests/metadata and installation remain a separate consumer contract |
 
 These version selections are explicit mirrors of the pinned upstream files, not live imports. A future

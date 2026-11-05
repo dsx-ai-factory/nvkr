@@ -20,12 +20,12 @@ This document changes no ADR contract or organizational acceptance decision.
 
 | Definition | Outputs | Native targets | Required family |
 | --- | ---: | ---: | --- |
-| [Core](../inputs/definitions/nvke/core.yaml) | 27 | 33 | CLI/operator tools, ARM64 AICR CLI, controller with its bound chart, NICo charts and Core/Flow images, providers/reference fixture, CAPI and cert-manager bootstrap images |
+| [Core](../inputs/definitions/nvke/core.yaml) | 26 | 32 | CLI/operator tools, controller with its bound chart and `controller-profiles` image, NICo charts and Core/Flow images, providers, CAPI and cert-manager bootstrap images |
 | [Services](../inputs/definitions/nvke/services.yaml) | 34 | 34 | SPIRE, PostgreSQL, Temporal and local-path-provisioner charts and native runtime images |
 | [Telemetry](../inputs/definitions/nvke/telemetry.yaml) | 17 | 17 | NKTP chart and native runtime images |
 | [Disks](../inputs/definitions/nvke/disks.yaml) | 4 | 4 | Ubuntu 26.04 AMD64/ARM64 plain and public-bootstrap FDE disks with complete material closures |
 | [Disks Ubuntu 24](../inputs/definitions/nvke/disks-ubuntu24.yaml) | 4 | 4 | The same disks on Ubuntu 24.04 through the Ubuntu 24 overlay |
-| Total | 86 | 92 | The combined candidate's complete named output set plus the core family's three NICo charts, two NICo images, ARM64 operator tools and ARM64 AICR CLI, the services family's six local-path-provisioner outputs, and the four Ubuntu 24.04 disks |
+| Total | 85 | 91 | 68 + 17 = 85: the combined candidate's 69 named outputs except `nico-reference-profiles-fixture`, which the core family delivers as `controller-profiles` because one Release cannot publish the same image twice, plus 17 family-only outputs, which are the core family's three NICo charts, two NICo images, ARM64 operator tools and `controller-profiles` image, the services family's six local-path-provisioner outputs, and the four Ubuntu 24.04 disks |
 
 Each family selects `inputs/environments/github-nvke-<family>.yaml`, with
 `githubBundle: nvke-<family>`. Generation owns `.github/workflows/nvkr-run-nvke-<family>.yml`
