@@ -40,10 +40,11 @@ type DependencyInventory struct {
 // exact held input. It authenticates that scan, not complete disk coverage or a
 // relationship to another artifact. Factory must bind it to the original Run.
 type DependencyScanReceipt struct {
-	subject   string
-	size      int64
-	kind      string
-	inventory DependencyInventory
+	subject                 string
+	size                    int64
+	kind                    string
+	inventory               DependencyInventory
+	packageReader, platform string
 }
 
 // Binding identifies the bytes actually supplied to the scanner.

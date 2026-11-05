@@ -159,6 +159,7 @@ jobs:
               - '.github/actionlint.yaml'
               - '.github/workflows/**'
               - '.github/actions/**'
+              - '.github/scripts/**'
               # The pinned linter and its make recipe.
               - 'toolchains/actionlint/**'
               - 'Makefile'
@@ -412,6 +413,15 @@ jobs:
       - name: actionlint
         run: make actionlint
 
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      # Workflow scripts required by triage, title lint and label guard.
+      - name: test-workflow-scripts
+        run: make test-workflow-scripts
+
   actionlint-skip:
     needs: [check-paths]
     if: needs.check-paths.outputs.actions != 'true'
@@ -570,6 +580,40 @@ jobs:
     steps:
       - run: echo "No docs or Fern inputs changed — docs check not required"
 
+  # Restated validation status
+  #
+  # Status lives in the per-section ledger under docs/adr/reconciliation/
+  # (index README.md, owner files adr-NN.md) and in docs/evidence/ records;
+  # other documents link the owning row instead of restating it. The check reads only
+  # the Markdown lines a PR adds, so it runs on pull requests only: a push or
+  # dispatch has no base to diff against. Full history is fetched so the
+  # merge base of the PR's base and head is available.
+
+  status-restated:
+    needs: [check-paths]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check added docs for restated status
+        env:
+          STATUS_BASE: ${{ github.event.pull_request.base.sha }}
+          STATUS_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: make status-restated-check
+
+  status-restated-skip:
+    needs: [check-paths]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - run: echo "Not a pull request — no base to check restated status against"
+
   # Static analysis (CodeQL)
   #
   # Provider-only: `make ci-check` cannot reproduce the hosted CodeQL analysis.
@@ -664,6 +708,8 @@ jobs:
       - notices-regen-skip
       - docs
       - docs-skip
+      - status-restated
+      - status-restated-skip
     runs-on: ubuntu-latest
     # Allow runner finalization after the checks; a one-minute job budget can
     # expire even after this script reports success.
@@ -671,11 +717,13 @@ jobs:
     steps:
       - name: Check gate
         # Each `if:` above is mirrored here: the fork predicates exactly as
-        # workflows-regen and analyze evaluate them.
+        # workflows-regen and analyze evaluate them, and the pull request
+        # predicate as status-restated does.
         env:
           NEEDS: ${{ toJSON(needs) }}
           SAME_REPOSITORY: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
           FORK_PULL_REQUEST: ${{ github.event.pull_request.head.repo.fork == true }}
+          PULL_REQUEST: ${{ github.event_name == 'pull_request' }}
         run: |
           set -euo pipefail
           echo "Gate results:"
@@ -696,7 +744,8 @@ jobs:
           # dependency absent from this table fails the gate.
           if ! violations=$(jq -r \
             --arg same_repository "$SAME_REPOSITORY" \
-            --arg fork_pull_request "$FORK_PULL_REQUEST" '
+            --arg fork_pull_request "$FORK_PULL_REQUEST" \
+            --arg pull_request "$PULL_REQUEST" '
             def flag($value; $label):
               if $value == "true" then true
               elif $value == "false" then false
@@ -706,6 +755,7 @@ jobs:
             | $needs["check-paths"].outputs as $paths
             | flag($same_repository; "same-repository status") as $same_repository
             | flag($fork_pull_request; "fork status") as $fork_pull_request
+            | flag($pull_request; "pull request status") as $pull_request
             | [
                 {skip: "check-skip", jobs: ["check", "lint", "vulnerabilities", "tests"],
                  run: flag($paths.code; "code classification")},
@@ -717,6 +767,8 @@ jobs:
                  run: flag($paths.notices; "notices classification")},
                 {skip: "docs-skip", jobs: ["docs"],
                  run: flag($paths.docs; "docs classification")},
+                {skip: "status-restated-skip", jobs: ["status-restated"],
+                 run: $pull_request},
                 {skip: "analyze-skip", jobs: ["analyze"],
                  run: (flag($paths.code; "code classification") and ($fork_pull_request | not))}
               ] as $pairs

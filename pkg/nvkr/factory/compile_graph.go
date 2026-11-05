@@ -75,6 +75,20 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 			return ArtifactGraph{}, e.New(e.CodeProvenanceMissing, "SBOM scanner is not a pinned tool")
 		}
 	}
+	toolPlan := plan
+	toolPlan.Graph.Nodes = mapNodes(nodes)
+	for _, output := range definition.Outputs {
+		if !plan.debianPublicationTarget(output.Name) || definition.SBOMTool == "" {
+			continue
+		}
+		profile, err := debianPublicationInspectionProfile(&toolPlan)
+		if err != nil {
+			return ArtifactGraph{}, err
+		}
+		node := nodes[output.Name+"/sbom"]
+		node.Container, node.Platform = profile.Image, delivery.UtilityPlatform
+		nodes[node.ID] = node
+	}
 	for id, node := range nodes {
 		if node.Kind != NodeSBOM {
 			continue
@@ -150,7 +164,7 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 				inputs = append(inputs, "result/"+input.BuildTarget+"/"+input.Component)
 			}
 		}
-		if spec.Kind == PackageBundle {
+		if spec.Kind == PackageBundle || spec.Kind == PackageDebian {
 			input := artifacts[inputs[0]]
 			if nodes[input.Producer].Kind != NodeBuild {
 				return ArtifactGraph{}, e.New(e.CodeInvalidCatalog, "bundle package %q requires a source build", spec.Name)
@@ -224,6 +238,9 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 	plan.Graph.Nodes = mapNodes(nodes)
 	plan.Graph.Artifacts = mapArtifacts(artifacts)
 	if err := bindEvidenceAttestation(&plan); err != nil {
+		return ArtifactGraph{}, err
+	}
+	if err := addObjectPublicationDataflow(&plan, runsOn); err != nil {
 		return ArtifactGraph{}, err
 	}
 	return plan.Graph, nil

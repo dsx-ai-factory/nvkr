@@ -111,6 +111,12 @@ actionlint: go-version-check ## Lint GitHub workflows with the actionlint pinned
 	GOBIN="$(CURDIR)/bin" go -C toolchains/actionlint install tool
 	"$(CURDIR)/bin/actionlint"
 
+.PHONY: test-workflow-scripts
+test-workflow-scripts: ## Test the triage and PR-metadata workflow scripts (needs node and npm).
+	@command -v node >/dev/null 2>&1 || { echo "node not installed — https://nodejs.org/" >&2; exit 1; }
+	npm ci --prefix .github/scripts --ignore-scripts --no-audit --no-fund
+	node --test .github/scripts/triage.test.cjs
+
 .PHONY: test
 test: ## Fast default tests for CI and agents (no extended fixtures or instrumentation).
 	go test -timeout $(GO_TEST_TIMEOUT) $(GO_TEST_FLAGS) $(PKG)
@@ -132,6 +138,16 @@ test-full: ## Include extended capacity/integration fixtures with race + coverag
 test-ci-tools: ## Require Python and check CI sharding, reports and local adapters.
 	python3 -B -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else "Python 3.12+ is required for CI report tests")'
 	python3 -B -m unittest discover -s scripts -p '*_test.py'
+
+# Diff-scoped: only Markdown lines added since the merge base with STATUS_BASE are checked.
+# An empty STATUS_HEAD checks the working tree, including uncommitted and untracked files;
+# CI sets both to the pull request's base and head commits.
+STATUS_BASE ?= origin/main
+STATUS_HEAD ?=
+
+.PHONY: status-restated-check
+status-restated-check: ## Fail when added docs restate validation status outside the reconciliation ledger.
+	python3 -B scripts/check-status-restated.py '$(STATUS_BASE)' '$(STATUS_HEAD)'
 
 .PHONY: cover
 cover: test-race ## Open the HTML coverage report in a browser.
@@ -350,13 +366,13 @@ pipeline-dev-run: pipeline-dev-check ## Dispatch the clean, pushed current branc
 	python3 scripts/pipeline-dev.py --repo "$$PIPELINE_DEV_REPO"
 
 .PHONY: check
-check: go-version-check fmt-check definitions-location-check reconciliation-location-check license-header-check vet lint shellcheck test-ci-tools test vulncheck ## Code gate: format, Definition and ledger location, license, vet, lint, shell, tool tests, Go tests, vulnerabilities.
+check: go-version-check fmt-check definitions-location-check reconciliation-location-check license-header-check status-restated-check vet lint shellcheck test-ci-tools test vulncheck ## Code gate: format, Definition and ledger location, license, restated status, vet, lint, shell, tool tests, Go tests, vulnerabilities.
 
 # Every merge-gate check that can run locally; CI runs `make test` as test-shard
 # slices. internal/cicontract requires this list to equal the make targets the
 # merge gate runs. CodeQL and the DCO App run only on GitHub.
 # Checks needing extra tools or private access run before the long test suite.
-CI_CHECKS := fmt-check definitions-location-check reconciliation-location-check license-header-check shellcheck actionlint \
+CI_CHECKS := fmt-check definitions-location-check reconciliation-location-check license-header-check status-restated-check shellcheck actionlint test-workflow-scripts \
 	notices-check workflows-check docs-check vet test-ci-tools build lint vulncheck test
 
 .PHONY: ci-check

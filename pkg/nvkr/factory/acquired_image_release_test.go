@@ -96,7 +96,7 @@ func TestAcquiredImageReleaseEvidenceRetainsNativeSubject(t *testing.T) {
 			for _, id := range release.Inputs {
 				inputs = append(inputs, artifacts[id])
 			}
-			objects, cleanup, err := collectPublicationObjects(t.Context(), plan, artifacts["package/release"], inputs, evidence)
+			objects, cleanup, err := collectPublicationObjects(t.Context(), plan, artifacts["package/release"], inputs, evidence, artifacts)
 			if err != nil {
 				t.Fatal(err)
 			}

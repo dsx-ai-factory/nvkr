@@ -53,7 +53,8 @@ records source availability and remaining gaps.
 | Canonical Plans, graph views, comparison, and drift | [Plan and graph inspection](plan-and-graph-inspection.md) |
 | Registry/layout browsing, generic JSON export, output downloads, credentials, and metadata limits | [Release navigation](release-navigation.md) |
 | Publication graph, artifact subjects, and signing scope | [Publication architecture](publication-architecture.md) |
-| Review the S3 boot and package delivery contract | [ADR-20 contract](adr/0020-artifact-publication-and-target-configuration.md#s3-file-delivery-contract), [implementation boundary](adr/reconciliation/s3-boot-and-package-delivery-contract.md#s3-boot-and-package-delivery-contract) |
+| Configure or review required object-store publication | [Publication guide](publication-architecture.md#required-s3-copy), [ADR-20 contract](adr/0020-artifact-publication-and-target-configuration.md#s3-file-delivery-contract), [implementation boundary](adr/reconciliation/object-store-publication.md#object-store-publication) |
+| Review object-store dependency admission | [Dated dependency evidence](evidence/2026-11-04-object-store-dependency-admission.md) |
 | Coordinated upstream versions and exact locks | [Generic pin-set example](generic-pin-set-example.md), [NVKE acquired charts](nvke-pin-set-usage.md) |
 | Reviewable updates and matching regeneration (the installed `catalog-refresh.yaml` is generated, never hand-edited) | [Catalog maintenance](catalog-maintenance.md) |
 | Chart slots, image outputs, and registry-independent bytes | [Declarative Helm bindings](declarative-helm-bindings.md) |
@@ -107,6 +108,12 @@ Proposed [ADR-28: Multi-platform executables](adr/0028-multi-platform-executable
 source for every platform of a release, where the platforms share a format, companions and admitted URL
 spellings, and executable outputs published as standard OCI image indexes. The AICR CLI is the first
 migration, and the ADR inventories existing executables to retrofit. It is design only.
+
+Proposed [ADR-29: Cluster observation and artifact attribution](adr/0029-cluster-observation-and-artifact-attribution.md)
+and its [feature design](cluster-observation-and-artifact-attribution.md) describe gathering cluster facts
+and optionally comparing them with selected NVKR artifacts. The design names AICR Go APIs, reuse of NVKR's
+existing OCI identity rules, access boundaries and missing measurements. It adds no standalone collector or
+test, signing or qualification capability.
 
 Proposed [ADR-30: authenticated result reuse](adr/0030-authenticated-result-reuse.md) designs cross-Run reuse
 of complete named outputs and the test matrix for implementing it; reuse is not implemented.

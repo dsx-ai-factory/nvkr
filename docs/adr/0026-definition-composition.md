@@ -58,6 +58,9 @@ members:
   - name: <member Definition metadata.name>
     definition: <locator relative to this file>
     digest: sha256:<nvkr.definition digest of that member>
+variants:                     # optional; see §3
+  - component: <catalog component name>
+    members: [<member name>, <member name>]
 ```
 
 - `members` is nonempty, sorted by `name` and unique. Each entry has exactly these three fields.
@@ -69,8 +72,12 @@ members:
   `Definition.Digest` already computes. It is the member's identity. A missing digest, a malformed digest or a
   digest that differs from the loaded member is a coded error. Formatting or comment edits to a member do not
   change its canonical digest; any semantic edit does and fails closed until the composite is re-pinned (§9).
+- `variants` is optional. It is sorted by `component`, with at most one entry per component. Each entry has
+  exactly these two fields, a canonical component name and at least two members that are sorted, unique and
+  listed in `members`. It is the only authored input that admits cross-member producer divergence (§3). It
+  selects, overrides and defaults nothing.
 - A composite carries no `catalog`, `sbomTool`, `cosignTool`, `outputs` or any other Definition field. Unknown
-  fields are rejected by strict decoding.
+  fields, including unknown fields inside a variant, are rejected by strict decoding.
 
 Path inclusion without a digest is rejected: a member edit would silently change the composite's meaning, and a
 moved or substituted file could not be detected. Pure digest addressing without a locator is also rejected for
@@ -81,14 +88,16 @@ locator finds bytes; only the digest admits them.
 
 `pkg/nvkr/definition` owns composite loading and admission. In order, it:
 
-1. strictly decodes the composite (4 MiB bound, as for Definitions) and validates its own schema;
+1. strictly decodes the composite (4 MiB bound, as for Definitions) and validates its own schema, including the
+   shape of any declared variants;
 2. admits at most **16** members and rejects duplicate names, duplicate resolved locators and duplicate digests;
 3. loads each member through the existing strict Definition loader, so each member must be a complete, valid
    `nvkr.dev/definition/v5` Definition on its own, including its own Helm image bindings;
 4. rejects any member whose document kind is `CompositeDefinition` (§8);
 5. recomputes each member's canonical digest and requires equality with the pinned digest;
-6. performs the structural merge of §3 (every rule except the cross-member producer comparison) and validates
-   the resulting effective Definition with the ordinary `Definition.Validate`.
+6. performs the structural merge of §3 (every rule except the cross-member producer comparison), validates
+   the resulting effective Definition with the ordinary `Definition.Validate`, and requires every declared
+   variant member to select its component in one of its own outputs.
 
 Only after all six steps may factory open catalogs. The cross-member producer rule of §3 needs resolved catalogs
 and overlays, so compilation (U3) checks it after opening them and before it returns any Plan, bundle or output.
@@ -108,18 +117,27 @@ consumes unchanged. The derivation is a pure, deterministic function of the comp
 | `sbomTool`, `cosignTool` | Every member must select the same value (including omission). | Any difference is an error. |
 | Helm image bindings | Copied unchanged. Each member was validated standalone (§2 step 3), so every binding already resolves inside its own member; preserved names keep it resolving to the same output. | A binding cannot reach another member's output by construction. |
 | Platforms | Copied unchanged per output; aggregate `platforms` sets keep their exact membership (ADR-11 §2, ADR-12). | Unsupported platforms fail in the existing compiler and Environment admission, as for any Definition. |
-| Producer pins | Catalog locks remain the only pin owner (ADR-22). One catalog file loads once per compile. For every `(component, target platform)` that outputs of **different** members select, the effective producer snapshot (after overlays and toolchain substitutions) must be identical. | Divergent effective producers for the same component and platform across members are an error. Within one member, existing ADR-11 semantics are unchanged. |
+| Producer pins | Catalog locks remain the only pin owner (ADR-22). One catalog file loads once per compile. For every `(component, target platform)` that outputs of **different** members select, the effective producer snapshot (after overlays and toolchain substitutions) must be identical unless the composite declares both members as variants of that component. | Divergent effective producers for the same component and platform across members are an error unless both members are listed in that component's declared variant. A declared member that selects the component in none of its outputs is an error. Within one member, existing ADR-11 semantics are unchanged. |
 | Environment | Not merged. A composite Run selects exactly one Environment authored for the composite. Member Environments are not inputs and are never read. | The composite Environment is admitted against the effective Definition by the existing rules: unsupported platforms, missing execution classes and unrelated source-access entries fail as they do today. |
 | Metadata | The composite's own `metadata` names the effective Definition. Member descriptions are not concatenated. | — |
 
 The cross-member producer rule is deliberately stricter than a single Definition: two family owners releasing the
-same component at different pins is exactly the silent incompatibility a combined Release must not hide. Authors
-who intend two variants of one component must put both outputs in one member, where the variant is explicit. The
-core, services, telemetry and Ubuntu 26.04 disks families select no `(component, platform)` in common, so the rule
-does not affect them. The Ubuntu 24.04 disks family replaces the same disk, agent, installer and DOCA OVS
-components through its overlay, so it is a separately released sibling that the combined Definition omits.
-A composite that holds both Ubuntu series must select both in one member; the worked example below composes
-the other four families.
+same component at different pins is exactly the silent incompatibility a combined Release must not hide. An
+author who intends different producers of one component in different members declares that in the composite. A
+`variants` entry names the component and the members that may diverge on it. The declaration lives in the
+composite, so review sees it, and the composite digest binds it (§4). It permits divergence only between the
+listed members for that component, on every platform they select. Any other divergence still fails, including
+one between a declared member and an unlisted member that selects the same component. Every declared member must
+select the component in at least one of its outputs, so admission refuses a misspelled or stale declaration. A
+declaration does not require the producers to differ, so catalog maintenance that converges the pins does not
+break the composite. Authors may still put both outputs in one member, where ADR-11 already admits the variant.
+
+The core, services, telemetry and Ubuntu 26.04 disks families select no `(component, platform)` in common and
+declare no variants. The Ubuntu 24.04 disks family replaces the same disk, agent, installer and DOCA OVS
+components through its overlay, so it is a separately released sibling that the combined Definition omits. A
+composite that holds both Ubuntu series either selects both in one member or lists both disk families as members
+and declares each of those components as a variant of the two; the worked example below composes the other four
+families.
 
 The effective Definition is a derived internal record, like a Plan. It is never written as an authored input,
 cannot be selected with `--definition` and has no file. `definition inspect` may show it as a description.
@@ -128,7 +146,7 @@ cannot be selected with `--definition` and has no file. `definition inspect` may
 
 | Identity | Family | Binds | Excludes |
 |---|---|---|---|
-| Composite Definition | new `nvkr.composite-definition` | composite `metadata` and the sorted `(name, digest)` member list | member locators (transport, like `DefinitionPath`) |
+| Composite Definition | new `nvkr.composite-definition` | composite `metadata`, the sorted `(name, digest)` member list and the declared variants (omitted when none, so a composite without variants keeps its digest) | member locators (transport, like `DefinitionPath`) |
 | Member Definition | existing `nvkr.definition` | each member exactly as today | — |
 | Effective Definition | existing `nvkr.definition` | the derived v5 Definition | — |
 | Plan | existing `nvkr.run-plan/v1` | as today, plus a `composition` record | — |
@@ -137,11 +155,20 @@ cannot be selected with `--definition` and has no file. `definition inspect` may
 
 The new family is registered in ADR-01 when implemented. A composite's Plan, Run record and publication-root
 metadata carry a **composition record**: the composite digest, the effective Definition digest, every member's
-`(name, digest)`, and for every named output the member that declared it. Plans, Run records and publication
-roots that carry a composition record use new schema majors; records of plain Definitions keep their current
-schemas and bytes. A reader that does not admit the new major rejects it. A reader that admits it requires a
-complete, consistent record: every output attributed to exactly one listed member, no unlisted member, and an
-effective Definition digest that recomputes from the recorded Plan inputs.
+`(name, digest)`, the declared variants, and for every named output the member that declared it. Plans, Run
+records and publication roots that carry a composition record use new schema majors; records of plain
+Definitions keep their current schemas and bytes. A record without declared variants omits the field and keeps
+its bytes. A reader that does not admit the new major rejects it. A reader that admits it requires a complete,
+consistent record that recomputes the composite digest: every output attributed to exactly one listed member, no
+unlisted member, and declared variants that name only listed members. Run-record and publication readers stop
+there; they establish the record's identity, membership and attribution and have no effective Definition. Plan
+validation has the effective Definition, so it also requires the effective Definition digest to recompute, every
+declared variant member to select its component, and the §3 cross-member producer comparison to hold over the
+Plan's resolved producers; a saved Plan cannot drop a declaration it needs. A consumer that needs those checks
+binds the Plan through an exact-input expectation (§10).
+
+Each variant producer is attributed to the member that selected it. Every native build belongs to one named
+output, the record attributes that output to one member, and the Plan records the build's resolved producers.
 
 The existing `definitionDigest` field binds the composite digest for a composite and the Definition digest for a
 plain Definition. Records carry an explicit definition kind so a verifier always recomputes under the right
@@ -256,7 +283,8 @@ Policy (ADR-04 §5), with the same lane and scope rules. The policy schema does 
 
 - Optional exact-input expectations (ADR-17 §1) may pin the composite digest, the Environment and the Plan.
   Lifecycle additionally exposes the authenticated composition record in the Release view, so a consumer can
-  require an exact member `(name, digest)` set.
+  require an exact member `(name, digest)` set. A member-set requirement does not constrain declared variants;
+  a consumer that cares reads them from the same record, and a composite-digest expectation binds them.
 - An expectation prepared from a member Definition does not match a composite Release, and a composite
   expectation does not match a member Release. There is no implicit acceptance across forms.
 - Verifying a composite Release establishes nothing about any family Release, and verifying all four family
@@ -276,8 +304,8 @@ and owning operation carry that detail.
 
 | Condition | Code |
 |---|---|
-| Malformed composite, unknown field, empty or unsorted members, too many members, duplicate member name, locator or digest, member name mismatch, locator outside the input root, absolute member catalog or overlay locator, nested member | `invalid-catalog` |
-| Duplicate output name across members, differing top-level catalog stacks or tool selectors, divergent cross-member effective producer | `invalid-catalog` |
+| Malformed composite, unknown field, empty or unsorted members, too many members, duplicate member name, locator or digest, member name mismatch, locator outside the input root, absolute member catalog or overlay locator, nested member, malformed variant (non-canonical, unsorted or repeated component; fewer than two, unsorted, repeated or unlisted members) | `invalid-catalog` |
+| Duplicate output name across members, differing top-level catalog stacks or tool selectors, divergent cross-member effective producer without a declared variant covering both members, declared variant member that does not select its component | `invalid-catalog` |
 | Member digest differs from the loaded member, at load, generation or `--check` | `unverified-ref` |
 | Deferred use (qualification, member Release reuse) | `engine-capability` |
 | Cancellation or deadline during admission | `timeout` |
@@ -409,9 +437,9 @@ not only failure, and are table-driven.
 
 | Unit | Owner | Delivers | Depends on |
 |---|---|---|---|
-| U1 Schema and admission | `pkg/nvkr/definition`, `pkg/nvkr/canonical` | Composite type, strict decode, `nvkr.composite-definition` family, bounded no-follow member loading, digest check, §2 order | — |
+| U1 Schema and admission | `pkg/nvkr/definition`, `pkg/nvkr/canonical` | Composite type and declared variants, strict decode, `nvkr.composite-definition` family, bounded no-follow member loading, digest check, §2 order | — |
 | U2 Effective Definition | `pkg/nvkr/definition` | Pure §3 merge with rebasing and conflict rules | U1 |
-| U3 Compilation and Plan | `pkg/nvkr/factory` | Per-output stacks from rebased locators, cross-member producer check, Plan composition record and schema major, compile-input capture and replay of member files | U2 |
+| U3 Compilation and Plan | `pkg/nvkr/factory` | Per-output stacks from rebased locators, cross-member producer check with declared variants, Plan composition record and schema major, compile-input capture and replay of member files | U2 |
 | U4 Admission matrix and pinning | `pkg/nvkr/lifecycle`, `cmd/nvkr` | `--definition` dispatch by kind, §9 capability matrix, `definition inspect` view, `definition pin [--check]` | U1, U3 |
 | U5 Generation, development and maintenance | `pkg/nvkr/factory`, `catalogmaintenance` | Named composite production bundles, flat and partitioned; named composite development bundles with independent manifest, signer and disposable namespaces; drift on member edit; maintenance-closure enrollment | U3, U4 |
 | U6 Run and publication records | `pkg/nvkr/lifecycle`, `pkg/nvkr/delivery` | Run-record and publication-root schema majors with composition binding and per-output attribution; release description export | U3 |
@@ -426,7 +454,9 @@ Acceptance tests per unit:
   duplicate name/locator/digest, name mismatch, `..` escape, symlink locator, non-regular file, nested
   composite, self-reference); digest mismatch → `unverified-ref`; formatting-only member edit keeps the digest;
   pre-cancelled context → `timeout` with no member read; composite digest excludes locators (moving a member and
-  updating its locator keeps the composite digest).
+  updating its locator keeps the composite digest); each malformed-variant row of §11, and a declared member
+  that selects its component in none of its outputs, → `invalid-catalog`; declared variants change the
+  composite digest and an empty declaration does not.
 - **U2:** deterministic output (shuffled member order in memory yields identical bytes); duplicate output name,
   even with identical declarations → `invalid-catalog`; differing top-level stack, `sbomTool` or `cosignTool`
   → `invalid-catalog`; absolute member base or overlay locator → `invalid-catalog`, matching captured
@@ -435,8 +465,12 @@ Acceptance tests per unit:
 - **U3:** **identity invariance** — for the four NVKE families (extended, with pinned-source access like the
   existing split contract), every output's Build Digest and native records equal the family Plans and the
   combined Plan; divergent cross-member producer for one `(component, platform)` → `invalid-catalog` with no
-  Plan; within-member variants still compile; captured inputs include every member file and replay without the
-  checkout; plain-Definition Plans are byte-identical to before.
+  Plan; a declared pair compiles, records its variants, keeps identity invariance and attributes each producer
+  only to declared members; a declaration on the wrong component or member → `invalid-catalog`; converged
+  producers under a declaration still compile; a record with an added or unlisted-member variant, or a compiled
+  Plan stripped of a needed declaration with a recomputed digest, fails Plan validation; within-member variants
+  still compile; captured inputs include every member file and replay without the checkout; plain-Definition
+  Plans are byte-identical to before.
 - **U4:** each deferred row of §9 → `engine-capability` before catalog resolution, with no attempt directory;
   `definition pin --check` reports drift without writing; pin rewrite uses byte-CAS and loses cleanly to a
   concurrent writer with `write-conflict`; CLI and SDK both reach the same owner.
@@ -474,7 +508,8 @@ Acceptance tests per unit:
 **Negative / costs**
 - A new document kind, digest family, schema majors and a pin-maintenance command must be implemented.
 - A composite Run rebuilds outputs its families already published until authenticated reuse exists.
-- The cross-member producer rule can reject a composition that would be a valid single Definition.
+- The cross-member producer rule can reject a composition that would be a valid single Definition until its
+  author declares the variant in the composite.
 
 **Neutral**
 - Family Releases and the retained combined path are unchanged. Consumers that prefer to associate family
@@ -515,14 +550,19 @@ Acceptance tests per unit:
 The questions left open by the first draft were decided on 2026-10-29:
 
 1. Error codes: reuse `invalid-catalog`, `unverified-ref`, `engine-capability` and `timeout`; no new ADR-03 band (§11).
-2. Cross-member pin divergence: rejected; the stricter rule stays (§3).
+2. Cross-member pin divergence: rejected unless the composite declares a variant naming the component and both
+   members (§1, §3); every undeclared divergence fails.
 3. Cross-workflow reuse: a follow-up after draft ADR-30 lands; composites rebuild everything until then (§6, U9).
 4. Combined `definition.yaml`: a separate cutover gated on a hosted composite Run and consumer verification (U10).
 5. Development bundles: pulled forward into U5 (§9).
 
 ## Acceptance evidence
 
-Contract suites only. U1–U7 are implemented with table-driven contract tests that assert coded errors;
+Contract suites only. U1–U7 are implemented with table-driven contract tests that assert coded errors. Declared
+variants are contract-tested at admission (U1), compilation and Plan validation (U3), in the inspect view (U4),
+in prepared Run records and publication metadata (U6), and in the verified consumer view (U7). The opt-in
+extended contract also compiles the 26.04 and 24.04 disk families as separate members: refused without
+declarations and admitted with the eight components the 24.04 overlay replaces declared.
 `NVKR_TEST_EXTENDED=1` additionally compiles the worked example above against the combined Plan's resolved
 catalogs and shows that every composite output and native build keeps the Build Digest and native build records
 of the combined Definition and the four families, including family-only outputs the combined Definition lacks,

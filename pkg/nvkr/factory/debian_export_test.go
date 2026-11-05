@@ -144,21 +144,22 @@ func TestRawDebianUnsupportedCapabilitiesBeforeCatalogIO(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		mutate func(*authored.Definition, *authored.Environment)
+		code   e.Code
 	}{
-		{"inspection", func(d *authored.Definition, _ *authored.Environment) { d.SBOMTool = "absent-scanner" }},
-		{"publication", func(_ *authored.Definition, env *authored.Environment) {
-			env.Publication = &authored.Publication{RepositoryPrefix: "example.test/team", Anonymous: true}
-		}},
+		{"inspection", func(d *authored.Definition, _ *authored.Environment) { d.SBOMTool = "absent-scanner" }, e.CodeEngineCapability},
+		{"signing without publication", func(_ *authored.Definition, env *authored.Environment) {
+			env.Signing = cosignSigningProfile()
+		}, e.CodeInvalidCatalog},
 		{"hosted", func(_ *authored.Definition, env *authored.Environment) {
 			env.GitHubRunners = map[string]string{"linux/amd64": "ubuntu-latest"}
-		}},
+		}, e.CodeEngineCapability},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			d, env, _ := rawDebianInputs(t)
 			d.Catalog.Base = "missing-catalog"
 			tc.mutate(&d, &env)
 			plan, err := CompileDocuments(t.Context(), "definition.yaml", d, "environment.yaml", env, "test")
-			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			assertFactoryErrorCode(t, err, tc.code)
 			if plan != nil {
 				t.Fatal("unsupported capability returned Plan")
 			}

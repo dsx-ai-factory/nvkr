@@ -390,7 +390,7 @@ failure, suite failure and timeout. This ADR allocates no new exit codes.
 | Maintained pin readiness | Producer catalog owners refresh explicit pins and regenerate Plans | An entry cannot patch a checkout or substitute a convenient test revision |
 | Suite completeness | Upstream owns an inventory/completion protocol; the adapter validates it | Package presence, test counts and process exit zero cannot establish exhaustive coverage |
 | Run/output membership | Artifact owners authenticate exact attempt, output, platform and bytes | A supplied Plan plus matching checksum is still a trusted-input diagnostic |
-| Installed identity | Image/chart adapters observe actual selected and running subjects | Requested references and successful rendering do not prove which bytes executed |
+| Installed identity | Existing conformance owns strict test-bound OCI observations; proposed ADR-29 assigns standalone collection/comparison to the observation owner, with deployment owners supplying installation records | Image/chart test adapters consume the applicable observations; catalog entries, requested references and rendering do not establish installed identity |
 | Infrastructure | Execution/downstream owners admit tools, networking, privileges, leases and cleanup | A declared requirement is not available capacity or environment authority |
 | Report validity and verdict | Adapter-specific parsers and completeness checks | A report format label or complete capture is not a passing result |
 | CI policy | Workflow generator and downstream coordinators own transport, triggers and credentials | Catalog files do not authorize workflow generation, scheduling or runner changes |

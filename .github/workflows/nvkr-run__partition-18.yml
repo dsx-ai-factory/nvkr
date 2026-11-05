@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: 'p18 Bind image digest and package Helm: controller-chart +4'
 'on':
   workflow_call:
     inputs:

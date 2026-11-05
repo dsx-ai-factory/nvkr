@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: 'p11 Generate SBOMs: nktp +26'
 'on':
   workflow_call:
     inputs:

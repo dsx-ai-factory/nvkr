@@ -11,11 +11,11 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-// Raw package export is a local, unqualified artifact capability. Hosted jobs
-// and independently invoked nodes do not own its durable lifecycle staging.
+// Local raw packages retain their original staging lane. Publication packages
+// separately authenticate the exact raw producer/result in their OCI carrier.
 func rejectUnjoinedDebianPlan(plan *Plan, adapter string) error {
 	for _, output := range plan.Definition.Outputs {
-		if output.Format == authored.OutputDebianPackage {
+		if output.Format == authored.OutputDebianPackage && !plan.debianPublicationTarget(output.Name) {
 			return e.New(e.CodeEngineCapability, "%s does not admit raw Debian outputs; use local lifecycle execution", adapter)
 		}
 	}

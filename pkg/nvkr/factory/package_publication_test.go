@@ -40,7 +40,7 @@ func TestPublicationObjectsPropagateDigestFailure(t *testing.T) {
 			}
 			output := Artifact{Path: filepath.Join(dir, "publication")}
 			objects, cleanup, err := collectPublicationObjects(ctx, &Plan{}, output,
-				[]Artifact{{Name: "payload", Kind: "record", Path: path}}, nil)
+				[]Artifact{{Name: "payload", Kind: "record", Path: path}}, nil, nil)
 			if cleanup != nil {
 				defer cleanup()
 			}

@@ -92,6 +92,12 @@ its [aggregate identity](adr/0028-multi-platform-executable-indexes.md#5-aggrega
 [image-index publication](adr/0028-multi-platform-executable-indexes.md#6-publication-a-standard-image-index-over-minimal-per-platform-images).
 Nothing is implemented.
 
+Proposed [ADR-29](adr/0029-cluster-observation-and-artifact-attribution.md) separates collected cluster
+facts from their optional comparison with selected artifacts. Its [design](cluster-observation-and-artifact-attribution.md)
+proposes an `observation` owner using AICR Go APIs and sharing NVKR's OCI identity rules. These
+remain unsigned descriptive diagnostics with explicit access and coverage limits. No standalone collector,
+test execution, signed runtime report or qualification capability is implemented.
+
 ## Assumptions {#assumptions}
 
 These assumptions are subject to the current ADRs and milestone acceptance criteria.
@@ -290,9 +296,10 @@ Specialized byte-changing transformations remain explicit product intent.
 
 A proposed composite Definition (ADR-26) would enter this flow before the compiler: admission loads each
 digest-pinned member, rejects drift and structural conflicts, and derives one effective Definition that the same
-compiler consumes; the compiler rejects divergent cross-member producers once catalogs are resolved. Composition
-changes Definition, Plan, Run and Release identities and records every member digest and output attribution; it
-never changes an output's Build Digest. This path is implemented and contract-tested, not externally exercised.
+compiler consumes; once catalogs are resolved, the compiler rejects any cross-member producer divergence that the
+composite does not declare as a variant. Composition changes Definition, Plan, Run and Release identities and
+records every member digest, declared variant and output attribution; it never changes an output's Build Digest.
+Its [reconciliation row](adr/reconciliation/adr-26.md) records the implementation and evidence.
 
 A proposed pinned-tool producer (ADR-27) is an ordinary selected component inside this flow. ADR-27 owns its
 [execution](adr/0027-pinned-tool-producers.md#3-execution-offline-isolated-fixed), its
@@ -502,11 +509,10 @@ milestone specification.
 
 ## Current support boundary
 
-ADR-20 specifies, but does not enable, complete S3 delivery for selected VM/iPXE/EFI/QCOW2 and Debian package
-artifacts. The contract keeps OCI source publications immutable, adds native file/member representations,
-and authenticates a derived delivery root with portable original proofs. Typed configuration, executable
-adapters, provider acceptance and actual boot/package-install acceptance remain required. Existing schema
-constants, whole-Plan verification and current capability admission are unchanged by this documentation freeze.
+ADR-20 specifies required object-store copying of complete existing signed publications, with S3 as the
+first byte provider. It reuses original artifacts, provenance and SBOMs, complete Plan verification and ordinary
+generated publication/finalization. External provider, workflow and downstream boot/install acceptance remain
+separate evidence; the transport adds no deployment or qualification claim.
 
 [Reconciliation](adr/reconciliation/README.md) owns the current support matrix. Local immutable attempts,
 Plan/graph inspection, GitHub generation, metadata-only release navigation and the scoped
@@ -570,18 +576,12 @@ The current publication input owner admits omitted or explicit OCI selection and
 combined APT/OCI selection before catalog, generation or execution work. Required selections never fall back
 to another transport; a direct APT publisher and its service/signing contract remain deferred (ADR-20 §2).
 
-The file-delivery contract reserves Definition v6 `file` outputs, Environment v2 `publication.fileTargets`,
-Run Plan/artifact-graph v6, PublicationRoot v5 native-file membership and Run v5 requirements/completion.
-Release v4 remains the unchanged OCI source view; S3 coordinates, selected delivery completion and separate
-effective policies belong to generated delivery records and receipts. The extension's new native-file and
-delivery-root families are distinct from
-Build, payload and OCI wrapper identity. A lifecycle selection receipt retains selected complete output-local
-publications and actual source proof bytes; it does not relax whole-Plan completeness. Separate caller policies
-authenticate source and delivery roles. Transfer uses conditional writes and full read-back; detached completion
-is published last. An ambiguous final write may leave a valid completion, so producer success requires
-reconciliation and consumers always authenticate the complete required closure. Boot HTTPS access is
-separate from S3 API access. Downstream owners render machine-specific boot configuration and prove actual
-EFI imaging/reboot, direct VM boot and package installation; NVKR supplies no new provisioning service.
+Environment v2 adds required object-store destinations. Existing original publication identities and
+whole-Plan verification remain authoritative. Immutable conditional writes and complete pinned readback precede
+a small transport inventory written last. Independent consumers restore the original closure and authenticate
+all original proof subjects, SBOMs and exact aggregate/local output descriptors under their own policy without
+registry discovery. No new signed delivery root, native schema, namespace state or supervisor is required.
+A failed or uncertain copy cannot yield successful Run completion; remote immutable bytes are not rolled back.
 
 The qualified lane additionally consumes signed builder profiles, immutable promotion and evidence policies,
 and an operator trust store. It generates the exact Inventory compatibility form only after authenticated
@@ -1256,6 +1256,7 @@ already obtained.
 | Proposed ADR-26 composite Definitions, then member Release reuse and composite qualification | Release-engineering, catalog, qualification and result-reuse owners | One combined Release from independently owned Definitions without a hand-maintained combined copy |
 | Proposed ADR-27 pinned-tool producers, then AICR layout output (NVIDIA/aicr#3534) and layout import | Catalog, execution, evidence and release-engineering owners | Outputs rendered by released tools, starting with AICR bundles, without rebuilding the tool from source |
 | Proposed ADR-28 multi-platform executables, then the AICR migration and the per-platform retrofits | Catalog, release-engineering, delivery and evidence owners | One tool source per release where [ADR-28 §1](adr/0028-multi-platform-executable-indexes.md#1-one-tool-source-declares-every-platform) admits it, and one image-index output per executable, consumable by standard OCI clients |
+| Proposed ADR-29 observation owner and AICR import exception, bounded access/log/field controls, host/package provider and downstream installation/boot records | NVKR observation, AICR and downstream deployment owners; named deciders unassigned | Standalone descriptive collection and supported exact chart/disk/package comparisons |
 
 Qualified helper-image use remains unavailable until it satisfies ADR-07/18's executable/runtime admission.
 Source bootstrap records only the identities that actually participated; delivery by image cannot imply

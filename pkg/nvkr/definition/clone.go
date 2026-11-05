@@ -57,6 +57,13 @@ func (input Environment) Clone() Environment {
 		value := *input.Publication
 		value.Transports = slices.Clone(value.Transports)
 		value.ImageTags = maps.Clone(value.ImageTags)
+		value.ObjectStores = slices.Clone(value.ObjectStores)
+		for index := range value.ObjectStores {
+			if value.ObjectStores[index].S3 != nil {
+				copyS3 := *value.ObjectStores[index].S3
+				value.ObjectStores[index].S3 = &copyS3
+			}
+		}
 		input.Publication = &value
 	}
 	if input.Signing != nil {

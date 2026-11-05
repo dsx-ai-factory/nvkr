@@ -74,7 +74,7 @@ func admitExecutionNode(ctx context.Context, plan *Plan, nodeID string) (Node, e
 	for _, node := range plan.Graph.Nodes {
 		if node.ID == nodeID {
 			for _, output := range plan.Definition.Outputs {
-				if output.Name == node.BuildTarget && output.Format == authored.OutputDebianPackage {
+				if output.Name == node.BuildTarget && output.Format == authored.OutputDebianPackage && !plan.debianPublicationTarget(output.Name) {
 					return Node{}, e.New(e.CodeEngineCapability, "raw Debian output operations require local lifecycle execution")
 				}
 			}

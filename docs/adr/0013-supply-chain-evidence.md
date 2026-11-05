@@ -436,25 +436,20 @@ payload dependency evidence. The ordinary path-based `InspectDependencies` and h
 The Syft v1.51.1 discovery premise is version-specific: rerun the opt-in regression when changing either
 the factory catalog Syft pin or the Syft pin in `toolchains/nvkr-disk-inspect`.
 
-Factory callers retain the ordinary dependency API; no maintained factory output invokes the separate
-Debian metadata diagnostic. Factory SBOM nodes inspect producer bytes before APT wrapping, and the existing
-executable/APT routes do not preserve a source-created Debian package. The diagnostic does not admit such
-a delivery route. The authoritative Debian material reader remains digest-pinned
-`dpkg-deb`, with platform checks and bounded payload expansion in the disk owner. Local raw Debian output uses ordinary producer-result authentication and archive retention.
-Independent standalone package payload inspection and dependency evidence remain deferred. This diagnostic does not validate target architecture, preserve a source package,
-enable direct APT publication, or prove installation.
+No maintained factory output invokes the separate Debian metadata diagnostic. Original `debian-package`
+outputs preserve the source-created archive and its ordinary authenticated producer/result pair. With
+publication configured, a standard one-layer OCI carrier binds the raw package without changing its digest.
+Without a selected scanner, its existing composition document does not claim dependency inspection.
 
-ADR-20's native `file` format must preserve source-created Debian packages unchanged.
-Its `deb` kind requires the pinned authoritative Debian tooling to validate package name, version,
-architecture and declared dependencies against the actual held package, then inspect bounded payload
-contents for the required subject-bound evidence. Archive acquisition, member hashes, control metadata
-and actual payload dependencies are distinct claims. No source pathname, filename suffix, caller hint,
-`archive-content/v1` inventory or `deb-archive-metadata/v1` diagnostic may satisfy the payload-evidence gate.
-Every selected package/member and architecture needs its own exact subject and output membership; variants
-that intentionally conflict use separate installation cases. Merely exposing current disk materials as
-files does not complete this evidence path. Native file delivery remains unadmitted until implementation
-satisfies its native package and independent consumer contracts and operational acceptance is recorded
-in reconciliation.
+With `sbomTool`, standalone package inspection reuses the existing held Debian material reader, bounded
+payload export and offline scanner. The Environment's native inspection profile supplies the pinned
+package reader/scanner, container and expansion/time bounds; selecting that profile grants no disk/runtime
+claim. Missing or changed tools/profile fail before work. The live scan receipt binds the exact raw subject,
+platform and tool pins before the `syft-debian-payload/v1` method may be attached. A filename hint, control
+metadata diagnostic, caller-created dependency list or archive member hashes cannot manufacture this receipt.
+Serialized evidence preserves those bindings and the original raw subject. Packages are neither rebuilt nor
+installed. Installation, package alternatives, runtime compatibility and operational acceptance remain
+separate from payload inspection and signed publication.
 
 For `efi`, `ipxe`, `kernel`, `initrd` and `iso` files, preserve the actual source/material and exact-byte
 subjects. An inventory of archive members establishes those bytes, not boot compatibility, installed

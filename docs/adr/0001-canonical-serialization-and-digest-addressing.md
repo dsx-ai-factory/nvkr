@@ -154,7 +154,9 @@ Production SLSA build-type URIs use `/v2` for the replacement of compiler-handof
 `definitionDigest` and `environmentDigest`. SLSA provenance/v1 and in-toto Statement/v1 remain unchanged.
 Historical production predicates are rejected rather than relabeled or re-signed under the current contract.
 
-Environment stays `nvkr.dev/environment/v1`; the generated Run's unchanged exact-file commit manifest stays
+Environment uses `nvkr.dev/environment/v1` without object-store destinations and
+`nvkr.dev/environment/v2` when they are configured (ADR-20); omission preserves the v1 wire shape.
+The generated Run's unchanged exact-file commit manifest stays
 `nvkr.dev/generated-run/v1`. Unchanged wire shapes keep their existing major. Evidence,
 publication, and release owners version every field or meaning changed from Recipe identity to Build identity;
 they must not accept a former `recipeDigest` under a new `buildDigest` spelling. Existing family tags remain
@@ -219,36 +221,12 @@ identities and inexact bindings fail closed. The canonical document is bounded b
 transport limit. Pretty-printed JSON hashes are insufficient for either document. Reconciliation records
 implementation and external acceptance independently of schema registration.
 
-The S3/native-file contract in ADR-20 defines the following new families. Their names and semantics form
-the implementation contract; executable codec registration and decoders remain implementation work.
-
-| Object | Canonical schema | Frozen family kind |
-| --- | --- | --- |
-| Native file/member manifest | `nvkr.dev/native-file/v1` | `nvkr.native-file` |
-| Derived signed file-delivery root | `nvkr.dev/file-delivery/v1` | `nvkr.file-delivery` |
-
-The extension reserves the following wire versions. This table does not change the implemented versions above.
-
-| Object | Version decision | Reason |
-| --- | --- | --- |
-| Definition | Reserve `nvkr.dev/definition/v6` | Adds native `file` outputs. |
-| Environment | Reserve `nvkr.dev/environment/v2` | Adds typed file targets. |
-| Run Plan and artifact graph | Reserve `nvkr.dev/run-plan/v6` and `nvkr.dev/artifact-graph/v6` | Extends closed output and operation vocabularies. |
-| PublicationRoot | Reserve `nvkr.dev/publication-root/v5` and matching v5 root/config media types | Adds native-file output membership. |
-| Run | Reserve `nvkr.dev/run/v5` | Adds native-file requirements and required delivery completion. |
-| Release view | Retain `nvkr.dev/release/v4` for the unchanged OCI source view | S3 coordinates, completion and separate policies belong to delivery records and receipts. |
-
-ADR-20 owns the exact publication media types and the unchanged Release-view boundary. Older schemas retain
-their existing fields and meanings; this reservation registers no decoder or executable capability.
-
-The native manifest binds unchanged producer bytes and complete admitted regular members. The delivery
-root binds authenticated source publications to exact stored bytes and destinations. Neither reuses retired
-`nvkr.publication`/`nvkr.publication-manifest` families or changes Build identity. Implementations must register
-the distinct tags and add strict canonical/unknown-schema/family-separation contracts before minting them.
-The `nvkr.dev/file-delivery-locator/v1` locator pins raw document/bundle hashes and sizes; it is transport
-selection, not another semantic identity or trust object. The raw SHA-256 digests of the root JSON,
-detached bundle and native payload remain distinct from the typed identities of the delivery root and
-native-file manifest.
+Object-store copying in ADR-20 reuses the original publication and artifact identities. Environment v2
+adds required object-store destinations without changing old inputs or logical Build identity. The generated
+transport inventory uses strict canonical JSON and raw SHA-256 for exact bytes; it is not a new semantic trust
+object. Original signatures retain their original subjects. There is no native-file or derived file-delivery
+digest family in this transport implementation, and no new Definition, Run or PublicationRoot schema is needed.
+Old schema readers reject the new Environment version rather than silently dropping a required destination.
 
 ## Consequences
 

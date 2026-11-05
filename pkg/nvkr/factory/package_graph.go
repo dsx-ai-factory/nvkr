@@ -22,6 +22,23 @@ func derivePublication(definition authored.Definition, environment authored.Envi
 	closureInputs := make([]string, 0, len(definition.Outputs))
 	for _, output := range definition.Outputs {
 		if output.Format == authored.OutputDebianPackage {
+			if environment.Publication != nil {
+				var root string
+				for _, build := range builds {
+					if build.Name == output.Name {
+						var err error
+						root, err = lifecycleArtifactID(output, build.ResolvedComponents)
+						if err != nil {
+							return nil, nil, nil, err
+						}
+					}
+				}
+				if root == "" {
+					return nil, nil, nil, e.New(e.CodePipelineDrift, "Debian output has no exact original raw producer")
+				}
+				packages = append(packages, packageSpec{Name: output.Name, Kind: PackageDebian, Inputs: []string{root}})
+				closureInputs = append(closureInputs, "package/"+output.Name)
+			}
 			continue
 		}
 		if output.Format == authored.OutputDiskImage {
@@ -109,7 +126,8 @@ func derivePublication(definition authored.Definition, environment authored.Envi
 	targets := map[string]Target{"release": {ImageTags: maps.Clone(publication.ImageTags), Kind: TargetOCI, Ref: publication.RepositoryPrefix + "/releases", CredentialRef: publication.CredentialRef, Anonymous: publication.Anonymous, PlainHTTP: publication.PlainHTTP}}
 	routes := []Route{{Name: "release", Input: "package/release", Target: "release"}}
 	packages = append(packages, packageSpec{Name: "release", Kind: PackageOCI, Inputs: closureInputs})
-	return deriveOutputPublication(definition, environment, packages, targets, routes)
+	packages, targets, routes, err := deriveOutputPublication(definition, environment, packages, targets, routes)
+	return withObjectPublicationTargets(environment, packages, targets, routes, err)
 }
 
 func packageProducerResults(inputs []string, nodes map[string]Node, artifacts map[string]Artifact) []string {
@@ -125,7 +143,7 @@ func packageProducerResults(inputs []string, nodes map[string]Node, artifacts ma
 		seen[inputID] = true
 		input := artifacts[inputID]
 		switch input.Kind {
-		case PackageBinaryBundle, PackageAPT, PackageHelm, PackageBundle, PackageImage, PackageDiskImage:
+		case PackageBinaryBundle, PackageAPT, PackageHelm, PackageBundle, PackageImage, PackageDiskImage, PackageDebian:
 		default:
 			continue
 		}
@@ -364,6 +382,10 @@ func validatePackageInputs(spec packageSpec, inputs []string, artifacts map[stri
 			if artifact.Kind != PackageDiskImage || artifact.BuildTarget != spec.Name || artifact.Component == "" {
 				return e.New(e.CodeInvalidCatalog, "disk package %q requires its exact raw producer subject", spec.Name)
 			}
+		case PackageDebian:
+			if artifact.Kind != "host-package" || artifact.BuildTarget != spec.Name || artifact.Component == "" {
+				return e.New(e.CodeInvalidCatalog, "Debian carrier requires its exact original raw producer")
+			}
 		case PackageImage:
 			if artifact.Kind != "oci-image" || artifact.BuildTarget == "" {
 				return e.New(e.CodeInvalidCatalog, "container image package %q requires a build OCI image export", spec.Name)
@@ -391,7 +413,7 @@ func validateRouteCompatibility(route Route, target Target, artifact Artifact) e
 			"delivery route %q requires an object-store publication adapter that is not implemented", route.Name)
 	case TargetOCI:
 		switch artifact.Kind {
-		case PackageBinaryBundle, PackageOCI, PackageHelm, PackageBundle, PackageImage, PackageDiskImage, "oci-image":
+		case PackageBinaryBundle, PackageOCI, PackageHelm, PackageBundle, PackageImage, PackageDiskImage, PackageDebian, "oci-image":
 		default:
 			return e.New(e.CodeInvalidCatalog, "delivery route %q sends unsupported %q to OCI target", route.Name, artifact.Kind)
 		}
@@ -405,6 +427,8 @@ func packageMediaType(kind string) string {
 		return "application/vnd.oci.image.manifest.v1+json"
 	case PackageDiskImage:
 		return delivery.MediaDiskImage
+	case PackageDebian:
+		return delivery.MediaDeliveryObject
 	case PackageBinaryBundle:
 		return "application/vnd.nvkr.binary-bundle.v1"
 	case PackageAPT:

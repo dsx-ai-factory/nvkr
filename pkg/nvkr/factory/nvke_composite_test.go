@@ -20,11 +20,17 @@ import (
 const nvkeCompositePath = "inputs/definitions/nvke/composite.yaml"
 
 // nvkeCompositeFamilies are the worked example's members. The Ubuntu 24.04 disk
-// family shares component names with the Ubuntu 26.04 one, so ADR-26 refuses it
-// as a separate member; a composite holding both series needs them in one member.
+// family shares component names with the Ubuntu 26.04 one at different pins, so
+// ADR-26 refuses it as a separate member unless the composite declares those
+// components as variants of the two disk families.
 var nvkeCompositeFamilies = []string{"core", "disks", "services", "telemetry"}
 
 const nvkeCompositeExcludedFamily = "disks-ubuntu24"
+
+// nvkeUbuntuSeriesVariants are the components the Ubuntu 24.04 overlay replaces,
+// sorted as a composite declares them.
+var nvkeUbuntuSeriesVariants = []string{"nvke-agent", "nvke-doca-ovs", "nvke-node-fde-amd64", "nvke-node-fde-arm64",
+	"nvke-node-image", "nvke-node-image-amd64", "ubuntu-installer-iso", "ubuntu-installer-iso-amd64"}
 
 func nvkeCompositeMember(t *testing.T, family string) authored.CompositeMember {
 	t.Helper()
@@ -135,8 +141,10 @@ func TestNVKECompositeIdentityInvariance(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Both Ubuntu disk series as separate members select divergent producers
-	// for the same components, which ADR-26 refuses at compilation.
-	bothSeries, err := admitNVKEComposite(t, nvkeComposite(t, nvkeCompositeMember(t, nvkeCompositeExcludedFamily)))
+	// for the same components, which ADR-26 refuses at compilation unless the
+	// composite declares each of them as a variant of the two disk families.
+	series := nvkeComposite(t, nvkeCompositeMember(t, nvkeCompositeExcludedFamily))
+	bothSeries, err := admitNVKEComposite(t, series)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,6 +152,16 @@ func TestNVKECompositeIdentityInvariance(t *testing.T) {
 	assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
 	if !strings.Contains(err.Error(), "select divergent producers") {
 		t.Fatalf("refused for an unexpected reason: %v", err)
+	}
+	for _, component := range nvkeUbuntuSeriesVariants {
+		series.Variants = append(series.Variants, authored.DeclaredVariant{Component: component, Members: []string{"nvke-disks", "nvke-" + nvkeCompositeExcludedFamily}})
+	}
+	declared, err := admitNVKEComposite(t, series)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := compileComposition(t.Context(), declared, "inputs/environments/github-release.yaml", environment, combined.GeneratorVersion, loadStack); err != nil {
+		t.Fatalf("both Ubuntu series with declared variants: %v", err)
 	}
 	excluded := nvkeCompositeExcludedOutputs(t)
 	if want := len(combined.Definition.Outputs) - len(nvkeCombinedOnlyOutputs) + len(nvkeFamilyOnlyOutputs) - len(excluded); len(plan.LifecycleOutputs) != want || len(plan.Composition.Members) != len(nvkeCompositeFamilies) {

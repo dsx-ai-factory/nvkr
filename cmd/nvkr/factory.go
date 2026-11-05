@@ -10,8 +10,11 @@ import (
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/urfave/cli/v2"
 )
+
+var executeGitHubObjectPublication = lifecycle.ExecuteGitHubObjectPublication
 
 // cmdFactory retains the generated-plan execution and admission adapters. Definition,
 // Environment, Run, and provider generation are owned by the lifecycle commands.
@@ -204,6 +207,9 @@ func cmdFactoryGitHub() *cli.Command {
 			return factory.RunGitHubDisk(c.Context, plan, c.String("output"), options)
 		}),
 		githubFactoryCommand("run-node", "node", func(c *cli.Context, plan *factory.Plan, options factory.GitHubStepOptions) error {
+			if factory.IsObjectPublicationNode(plan, c.String("node")) {
+				return executeGitHubObjectPublication(c.Context, plan, c.String("node"), factoryGeneratorVersion(), options)
+			}
 			return factory.RunGitHubNode(c.Context, plan, c.String("node"), options)
 		}),
 		githubFactoryCommand("restore-inputs", "stage", func(c *cli.Context, plan *factory.Plan, options factory.GitHubStepOptions) error {

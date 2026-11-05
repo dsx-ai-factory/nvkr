@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: 'p07 Generate SBOMs: spire-tpm-server-image +4'
 'on':
   workflow_call:
     inputs:

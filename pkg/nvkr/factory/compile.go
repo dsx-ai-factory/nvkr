@@ -218,7 +218,7 @@ func compileWithTargetStacksFor(ctx context.Context, definition authored.Definit
 		return nil, err
 	}
 	if record != nil {
-		if plan.DefinitionDigest, err = authored.CompositeDigest(record.Metadata, record.Members); err != nil {
+		if plan.DefinitionDigest, err = authored.CompositeDigest(record.Metadata, record.Members, record.Variants...); err != nil {
 			return nil, err
 		}
 		plan.SchemaVersion, plan.Composition = CompositePlanSchemaVersion, record.Clone()

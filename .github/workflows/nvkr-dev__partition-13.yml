@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: 'p13 Package binaries: nvkectl-linux-arm64 +27'
 'on':
   workflow_call:
     inputs:

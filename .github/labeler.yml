@@ -1,0 +1,118 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# area/* labels by changed path. Dependabot owns the dependencies, go, docker
+# and github_actions labels; changed paths alone do not identify an update.
+
+area/catalog:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'inputs/catalogs/**'
+          - 'pkg/nvkr/catalog/**'
+          - 'pkg/nvkr/catalogmaintenance/**'
+          - '**/pins.lock.yaml'
+
+area/definitions:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'inputs/definitions/**'
+          - 'inputs/environments/**'
+          - 'inputs/experiments/**'
+          - 'pkg/nvkr/definition/**'
+          - 'pkg/nvkr/profile/**'
+
+area/run:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'pkg/nvkr/assemble/**'
+          - 'pkg/nvkr/buildgraph/**'
+          - 'pkg/nvkr/development/**'
+          - 'pkg/nvkr/execution/**'
+          - 'pkg/nvkr/factory/**'
+          - 'pkg/nvkr/ir/**'
+          - 'pkg/nvkr/lifecycle/**'
+          - 'pkg/nvkr/material/**'
+          - 'pkg/nvkr/planview/**'
+          - 'pkg/nvkr/progress/**'
+          - 'pkg/nvkr/status/**'
+          - 'pkg/nvkr/target/**'
+
+# Generated CI bundles and the generator that emits them.
+area/pipeline:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'pkg/nvkr/pipeline/**'
+          - '.github/nvkr-*/**'
+          - '.github/workflows/nvkr-*.yml'
+
+area/release:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'inputs/policies/**'
+          - 'pkg/nvkr/cistore/**'
+          - 'pkg/nvkr/conformance/**'
+          - 'pkg/nvkr/delivery/**'
+          - 'pkg/nvkr/qualification/**'
+          - 'pkg/nvkr/qualificationorigin/**'
+          - 'pkg/nvkr/release/**'
+          - 'pkg/nvkr/releasemanifest/**'
+          - 'pkg/nvkr/releaseview/**'
+          - 'pkg/nvkr/testresults/**'
+          - 'pkg/nvkr/validation/**'
+
+area/security:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'SECURITY.md'
+          - 'cmd/nvkr-site-identity-helper/**'
+          - 'pkg/nvkr/attest/**'
+          - 'pkg/nvkr/provenance/**'
+          - 'pkg/nvkr/sbom/**'
+          - 'pkg/nvkr/sign/**'
+          - 'pkg/nvkr/siteidentity/**'
+          - 'pkg/nvkr/trust/**'
+
+area/cli:
+  - changed-files:
+      - any-glob-to-any-file: 'cmd/**'
+
+area/sdk:
+  - changed-files:
+      - any-glob-to-any-file: 'client/**'
+
+# This repository's own CI. Generated nvkr-*.yml workflows are area/pipeline.
+area/ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/workflows/*.yaml'
+          - '.github/workflows/*fern*.yml'
+          - '.github/actions/**'
+          - '.github/scripts/**'
+          - '.github/labeler.yml'
+          - '.github/actionlint.yaml'
+          - '.github/dependabot.yml'
+          - 'Makefile'
+          - 'internal/cicontract/**'
+          - 'scripts/ci-*'
+          - 'scripts/ci_*'
+          - 'toolchains/actionlint/**'
+
+area/docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - '.agents/skills/**'
+          - 'demos/**'
+          - 'docs/**'
+          - 'fern/**'
+
+area/tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/testdata/**'
+          - 'inputs/testing/**'
+          - 'internal/testutil/**'
+
+area/toolchains:
+  - changed-files:
+      - any-glob-to-any-file: 'toolchains/**'
