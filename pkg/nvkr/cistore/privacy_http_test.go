@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -31,6 +32,10 @@ func TestAdmissionSourceRetriesAvailabilityWithoutWeakeningIdentity(t *testing.T
 	}{
 		{name: "500 then success", status: 500, calls: 2, waits: []time.Duration{2 * time.Second}},
 		{name: "other 5xx then success", status: 501, calls: 2, waits: []time.Duration{2 * time.Second}},
+		{name: "500 exhausted primary quota", status: 500, header: http.Header{"X-Ratelimit-Remaining": {"0"}}, calls: 1, code: e.CodeUnavailable},
+		{name: "500 ambiguous primary quota", status: 500, header: http.Header{"X-Ratelimit-Remaining": {"1", "1"}}, calls: 1, code: e.CodeUnavailable},
+		{name: "501 exhausted primary quota", status: 501, header: http.Header{"X-Ratelimit-Remaining": {"0"}}, calls: 1, code: e.CodeUnavailable},
+		{name: "501 ambiguous primary quota", status: 501, header: http.Header{"X-Ratelimit-Remaining": {"1", "1"}}, calls: 1, code: e.CodeUnavailable},
 		{name: "persistent 502", status: 502, persistent: true, calls: 4, waits: []time.Duration{2 * time.Second, 4 * time.Second, 8 * time.Second}, code: e.CodeUnavailable},
 		{name: "429 Retry-After seconds", status: 429, header: http.Header{"Retry-After": {"7"}}, calls: 2, waits: []time.Duration{7 * time.Second}},
 		{name: "429 Retry-After date", status: 429, header: http.Header{"Retry-After": {now.Add(45 * time.Second).Format(http.TimeFormat)}}, calls: 2, waits: []time.Duration{45 * time.Second}},
@@ -93,6 +98,72 @@ func TestAdmissionSourceRetriesAvailabilityWithoutWeakeningIdentity(t *testing.T
 				t.Fatalf("calls=%d closes=%d waits=%v; want calls=%d waits=%v", calls, closes, waits, tc.calls, tc.waits)
 			}
 		})
+	}
+}
+
+func TestAdmissionRetryOperationBudget(t *testing.T) {
+	for _, endpoint := range []string{"source", "package"} {
+		for _, tc := range []struct {
+			name    string
+			parent  time.Duration
+			budget  time.Duration
+			calls   int
+			elapsed time.Duration
+			code    e.Code
+		}{
+			{"retry beyond former cap", time.Hour, 8 * time.Minute, 2, time.Minute, ""},
+			{"earlier parent deadline", 45 * time.Second, 45 * time.Second, 1, 45 * time.Second, e.CodeTimeout},
+		} {
+			t.Run(endpoint+"/"+tc.name, func(t *testing.T) {
+				synctest.Test(t, func(t *testing.T) {
+					started := time.Now()
+					ctx, cancel := context.WithTimeout(t.Context(), tc.parent)
+					defer cancel()
+					b := newBackend()
+					calls, waits := 0, 0
+					b.wait = func(ctx context.Context, delay time.Duration) error {
+						waits++
+						deadline, ok := ctx.Deadline()
+						if !ok || !deadline.Equal(started.Add(tc.budget)) {
+							t.Fatalf("admission deadline=%v; want %v", deadline, started.Add(tc.budget))
+						}
+						return waitChunkRetry(ctx, delay)
+					}
+					b.client.Transport = admissionTransportFunc(func(r *http.Request) (*http.Response, error) {
+						calls++
+						deadline, ok := r.Context().Deadline()
+						if !ok || !deadline.Equal(time.Now().Add(30*time.Second)) {
+							t.Fatalf("individual request deadline=%v; want 30 seconds from now", deadline)
+						}
+						if calls == 1 {
+							response := admissionResponseFor(r, 503, "", "")
+							response.Header.Set("Retry-After", "60")
+							return response, nil
+						}
+						body := admissionSource
+						if endpoint == "package" {
+							body = admissionPrivatePackage
+						}
+						return admissionResponseFor(r, 200, "", body), nil
+					})
+					var err error
+					if endpoint == "source" {
+						_, err = b.source(ctx, testRequest.Repository, testOptions)
+					} else {
+						source := repositoryRecord{Owner: account{Login: "Example", Type: "Organization"}}
+						_, err = b.checkPrivacy(ctx, testRequest, source, testOptions)
+					}
+					if tc.code != "" {
+						assertCode(t, err, tc.code)
+					} else if err != nil {
+						t.Fatal(err)
+					}
+					if calls != tc.calls || waits != 1 || time.Since(started) != tc.elapsed {
+						t.Fatalf("calls=%d waits=%d elapsed=%v; want calls=%d waits=1 elapsed=%v", calls, waits, time.Since(started), tc.calls, tc.elapsed)
+					}
+				})
+			})
+		}
 	}
 }
 

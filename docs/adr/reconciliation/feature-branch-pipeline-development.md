@@ -123,11 +123,15 @@ reported an unauthenticated source identity during restore. That path previously
 repository response as a trust failure, so the diagnostic does not establish the original HTTP status.
 Repository and package admission GETs now permit at most four requests for HTTP 5xx, 429 or a 403 JSON
 secondary-rate-limit response, using the existing bounded `Retry-After` parser and cancellable backoff.
+All retryable API responses refuse exhausted or ambiguous primary quota before waiting or retrying.
 The operation has an eight-minute bound; individual requests retain their thirty-second timeout. Final HTTP
 failures report their status with fetch/availability codes; invalid identities and privacy metadata in HTTP
 200 responses remain trust failures. A failed conditional request invalidates its representation before retry.
-`pkg/nvkr/cistore/privacy_http_test.go` covers recovery, exhaustion, server delays, cancellation, credential
-scope and stale-response rejection. These are local contract tests; no hosted recovery with this fix is recorded.
+`pkg/nvkr/cistore/privacy_http_test.go` covers recovery, exhaustion, server delays, primary-quota refusal,
+cancellation, credential scope and stale-response rejection. Simulated-clock tests through repository and
+package admission pin the eight-minute operation budget, thirty-second request deadlines, successful retry
+beyond thirty seconds and precedence of an earlier parent deadline. These are local contract tests; no hosted
+recovery with this fix is recorded.
 
 The explicit `githubDevelopment` Environment setting selects separate fixed workflow/Plan/manifest paths
 with the same compiler, complete graph and helper. The committed development bundle now uses the 80-output

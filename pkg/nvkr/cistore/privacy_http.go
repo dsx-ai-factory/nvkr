@@ -51,7 +51,7 @@ func (b *backend) admissionGET(ctx context.Context, req *http.Request, key admis
 		var retry bool
 		if response.StatusCode >= 500 && response.StatusCode < 600 {
 			retry = true
-			delay, err = githubLocatorServerDelay(response.Header, (2*time.Second)<<attempt, attempt, now())
+			delay, err = githubAPIServerDelay(response.Header, (2*time.Second)<<attempt, attempt, now())
 		} else {
 			delay, retry, err = githubLocatorRetryDelay(githubLocatorResponse{status: response.StatusCode, header: response.Header, body: raw}, attempt, now())
 		}
