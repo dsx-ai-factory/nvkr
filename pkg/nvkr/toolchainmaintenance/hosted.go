@@ -148,6 +148,21 @@ func command(ctx context.Context, root, executable string, args ...string) ([]by
 	defer cancel()
 	cmd := exec.CommandContext(ctx, executable, args...)
 	cmd.Dir = root
+	if executable == "git" {
+		// The explicit checkout owns repository, index and object selection;
+		// inherited hook/tool routing must not redirect admission or repinning.
+		inherited := cmd.Environ()
+		cmd.Env = make([]string, 0, len(inherited))
+		for _, entry := range inherited {
+			key, _, _ := strings.Cut(entry, "=")
+			switch key {
+			case "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+				"GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_SHALLOW_FILE", "GIT_PREFIX":
+				continue
+			}
+			cmd.Env = append(cmd.Env, entry)
+		}
+	}
 	var output limitedBuffer
 	cmd.Stdout = &output
 	// Child stderr can contain credential-bearing URLs; retain the coded boundary.

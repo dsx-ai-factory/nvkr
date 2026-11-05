@@ -458,10 +458,19 @@ func TestRepinFixturePreservesForeignIndex(t *testing.T) {
 		{"all routing", map[string]string{"GIT_DIR": gitDir, "GIT_WORK_TREE": foreign, "GIT_COMMON_DIR": gitDir, "GIT_INDEX_FILE": indexPath, "GIT_OBJECT_DIRECTORY": filepath.Join(gitDir, "objects"), "GIT_ALTERNATE_OBJECT_DIRECTORIES": filepath.Join(gitDir, "objects")}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			for key, value := range test.env {
-				t.Setenv(key, value)
-			}
-			t.Run("fixture", TestRepinRebindsOverlayAndInspectorProfile)
+			t.Run("fixture", func(t *testing.T) {
+				for key, value := range test.env {
+					t.Setenv(key, value)
+				}
+				t.Run("isolated setup", TestRepinRebindsOverlayAndInspectorProfile)
+			})
+			t.Run("runtime", func(t *testing.T) {
+				testRepinFixture(t, func() {
+					for key, value := range test.env {
+						t.Setenv(key, value)
+					}
+				})
+			})
 			after, err := os.ReadFile(indexPath)
 			if err != nil || !bytes.Equal(before, after) {
 				t.Fatalf("fixture changed foreign index: %v", err)
@@ -471,6 +480,11 @@ func TestRepinFixturePreservesForeignIndex(t *testing.T) {
 }
 
 func TestRepinRebindsOverlayAndInspectorProfile(t *testing.T) {
+	testRepinFixture(t, nil)
+}
+
+func testRepinFixture(t *testing.T, beforeRepin func()) {
+	t.Helper()
 	isolateGitEnvironment(t)
 	root := t.TempDir()
 	r := recordFixture()
@@ -506,6 +520,9 @@ func TestRepinRebindsOverlayAndInspectorProfile(t *testing.T) {
 	}
 	if _, err := command(t.Context(), root, "git", "add", "inputs"); err != nil {
 		t.Fatal(err)
+	}
+	if beforeRepin != nil {
+		beforeRepin()
 	}
 	changed, err := repin(t.Context(), root, r, true)
 	if err != nil {
