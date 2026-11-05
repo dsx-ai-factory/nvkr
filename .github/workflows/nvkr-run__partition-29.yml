@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: 'p29 Verify release and deliverable signatures: release'
 'on':
   workflow_call:
     inputs:

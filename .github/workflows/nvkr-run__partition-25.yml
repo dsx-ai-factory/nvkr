@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: p25 Verify release capnico-controller +4
 'on':
   workflow_call:
     inputs:

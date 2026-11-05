@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: p08 Build nvke-node-fde-amd64 +3
 'on':
   workflow_call:
     inputs:

@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: p00 Prepare NVKR runner (arc-amd64-kvm) +3
 'on':
   workflow_call:
     inputs:
