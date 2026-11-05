@@ -41,6 +41,11 @@ published as a standard OCI image index over minimal per-platform images. It is 
 declarations, tool pins and executable outputs remain single-platform, and executables publish only as Binary
 Bundles. It also inventories the existing per-platform executable deliveries to retrofit.
 
+[ADR-29](../0029-cluster-observation-and-artifact-attribution.md) proposes cluster information gathering and
+optional descriptive comparison with selected NVKR artifacts. It is design only. The proposed observation
+owner, shared in-process Kubernetes reader and AICR Go integration remain unimplemented and subject to
+dependency admission. Existing conformance execution retains its separate strict admission and checks.
+
 [ADR-30](../0030-authenticated-result-reuse.md) proposes pipeline-attested cross-Run reuse of complete named
 outputs: a Plan-derived reuse key, untrusted discovery, owner-issued acceptance receipts, typed refusals and a
 `reused` Run origin. It is designed, not implemented: no code, contract test, hosted Run or qualification
@@ -55,8 +60,8 @@ Each section lives in its own file; edit only the file that owns the affected ro
 - [External test output and local diagnostic boundary](external-test-output-and-local-diagnostic-boundary.md)
 - [M3 MVP scope and acceptance boundary](m3-mvp-scope-and-acceptance-boundary.md)
 - [M4 release manifest issuance](m4-release-manifest-issuance.md)
-- [S3 boot and package delivery contract](s3-boot-and-package-delivery-contract.md)
-- Support by owner, one file per owner row group: [01–03](adr-01-03.md), [04](adr-04.md), [05](adr-05.md), [06](adr-06.md), [07–08](adr-07-08.md), [09](adr-09.md), [10](adr-10.md), [11–12](adr-11-12.md), [13](adr-13.md), [14](adr-14.md), [15](adr-15.md), [16](adr-16.md), [17](adr-17.md), [18](adr-18.md), [19](adr-19.md), [20](adr-20.md), [21](adr-21.md), [22](adr-22.md), [23](adr-23.md), [24](adr-24.md), [25](adr-25.md), [26](adr-26.md), [27](adr-27.md), [28](adr-28.md), [30](adr-30.md)
+- [Object-store publication](object-store-publication.md)
+- Support by owner, one file per owner row group: [01–03](adr-01-03.md), [04](adr-04.md), [05](adr-05.md), [06](adr-06.md), [07–08](adr-07-08.md), [09](adr-09.md), [10](adr-10.md), [11–12](adr-11-12.md), [13](adr-13.md), [14](adr-14.md), [15](adr-15.md), [16](adr-16.md), [17](adr-17.md), [18](adr-18.md), [19](adr-19.md), [20](adr-20.md), [21](adr-21.md), [22](adr-22.md), [23](adr-23.md), [24](adr-24.md), [25](adr-25.md), [26](adr-26.md), [27](adr-27.md), [28](adr-28.md), [29](adr-29.md), [30](adr-30.md)
 - [Feature-branch pipeline development](feature-branch-pipeline-development.md)
 - [Ubuntu 24 node-image inputs](ubuntu-24-node-image-inputs.md)
 - [Native disk execution and inspection](native-disk-execution-and-inspection.md)

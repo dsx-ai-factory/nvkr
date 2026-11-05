@@ -27,9 +27,8 @@ native disk and pipeline-attested stages with separate signer policy, credential
 registry namespaces. Cleanup admits only internal-visibility packages in those namespaces.
 Unsigned development remains static-unqualified. Neither setting grants production
 acceptance, provider access or qualified evidence.
-ADR-20 specifies an S3 extension with typed file destinations under Environment publication settings.
-Destinations and clean boot URLs remain transport configuration; they do not change producer Build identity.
-Its future schema reservation does not change the implemented Environment version or enable delivery.
+ADR-20's object-store publication configures required S3 destinations separately from producer identity.
+It copies complete existing signed publications and original evidence through a generic byte transport.
 _Avoid_: Delivery profile, component catalog, build identity
 
 **Run**:
@@ -231,26 +230,12 @@ producer. The same package bytes can be supplied as an OS build material. Local 
 installation or runtime acceptance.
 _Avoid_: APT repository, installed package, builder type
 
-**Native file output**:
-The Artifact representation specified in ADR-20 for unchanged producer-created Debian packages, EFI/iPXE
-files and installer assets. All regular files in an archive retain the parent archive identity, canonical
-member name, digest, size, mode and declared kind. File integrity is distinct from package dependencies and
-boot readiness. Implementation remains outstanding under the ADR-20 contract.
-_Avoid_: Reconstructed package, executable tool, installed inventory
-
-**File-delivery root**:
-A generated record with a detached signature, binding selected authenticated source publications and exact
-named payload and evidence objects to their S3 routes and read-back observations. It preserves original
-provenance and adds no build, boot or qualification verdict. Implementation remains outstanding under the
-specified contract.
-_Avoid_: Authored lifecycle object, replacement source release, successful upload flag
-
-**File-delivery locator**:
-Caller-pinned transport coordinates and raw hashes/sizes for the delivery document and detached bundle.
-It locates proof; independent consumer policy and complete-byte checks establish acceptance. A final commit
-may exist after lost acknowledgement, so an indeterminate producer result requires independent reconciliation.
-Implementation remains outstanding under the ADR-20 contract.
-_Avoid_: Trusted policy, mutable release name, atomic bucket transaction
+**Object-store publication**:
+A required immutable copy of a complete original signed publication and its artifact/evidence closure.
+S3 is the first provider. The transport inventory locates original bytes and proof bundles; consumer policy
+and complete verification establish acceptance. It changes neither Build identity nor the original signature
+subject and grants no destination authorization, boot, installation or qualification claim.
+_Avoid_: New signed release, successful upload flag, mutable channel, atomic bucket transaction
 
 ## Evidence and authority
 
@@ -277,6 +262,20 @@ admission and frozen dispatch for the existing process-contract and mixed CLI su
 provisional; published adapters, controller/chart checks and broader migration are deferred. Existing legacy
 validation routes retain their separate admission and capture contracts.
 _Avoid_: Producer catalog, upstream test implementation, executable plugin, qualification policy
+
+**Cluster observation (proposed)**:
+A scoped, time-bounded record of discovered cluster facts, their sources and collection gaps. Raw AICR
+Snapshot inputs are distinct from this NVKR observation. Information gathering does not require a build
+baseline or test run. Lane none: unsigned and descriptive. Proposed in
+[ADR-29](docs/adr/0029-cluster-observation-and-artifact-attribution.md); the standalone route is not implemented.
+_Avoid_: Artifact comparison, authored lifecycle object, complete host attestation, test verdict
+
+**Artifact comparison (proposed)**:
+A descriptive comparison of a cluster observation with selected NVKR outputs and their evidence, under
+an explicit scope and comparison profile, distinct from the public Verification Policy. Reports produced/acquired
+identity, installation attribution and measured contents separately. Missing baselines or unsupported joins remain unverified; observations can
+still be useful without a comparison. Proposed in ADR-29; no qualification, signing or release authority.
+_Avoid_: Cluster observation, verified installation from a version label, qualification receipt
 
 **Release authenticity**:
 Acceptance of a Release's signed membership, each named output's signatures and production provenance, and required inventories under consumer policy, without checking artifact payload bytes. It establishes neither payload integrity nor release qualification.

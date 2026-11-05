@@ -16,6 +16,72 @@ currently returns `engine-capability` before catalog, generation or execution wo
 APT-only does not require OCI settings to report this capability gap. A local unsigned APT layout or its OCI
 upload does not satisfy a request for a signed, installable APT repository.
 
+## Required S3 copy
+
+To copy every selected artifact and its original evidence to S3, use an Environment with
+`apiVersion: nvkr.dev/environment/v2` and add a destination beneath the existing `publication` settings:
+
+```yaml
+publication:
+  credentialRef: github:GITHUB_TOKEN
+  repositoryPrefix: ghcr.io/example/product
+  objectStores:
+    - name: artifacts
+      provider: s3
+      s3:
+        region: us-east-1
+        bucket: example-artifact-bucket
+        prefix: product/artifacts
+        expectedBucketOwner: "123456789012"
+        roleRef: github:ARTIFACT_PUBLISH_ROLE_ARN
+```
+
+Keep the original signing identity, pinned cosign selection and hosted execution settings. Set the protected
+workflow variable `ARTIFACT_PUBLISH_ROLE_ARN` in `nvkr-release` to the operator-provisioned workload role. The publisher obtains
+a short-lived AWS session from GitHub OIDC; credentials are never authored in the Environment. Configure
+role trust for audience `sts.amazonaws.com`, the exact repository and protected release Environment subject,
+and the default-branch ref. The legacy subject is `repo:OWNER/REPO:environment:nvkr-release`; the immutable
+form is `repo:OWNER@OWNER_ID/REPO@REPOSITORY_ID:environment:nvkr-release`. Match the actual configured subject.
+In role trust, require the exact `token.actions.githubusercontent.com:repository_id`, `:repository_owner_id`,
+`:ref` and `:environment` condition keys alongside `:aud` and `:sub`; AWS maps these directly, without
+customizing the GitHub subject. The linked contract gives the complete condition-key names and example;
+protect deployment branches, reviewers and workflow changes. Signing jobs can share that Environment and
+OIDC permission, so this trusts the release context rather than isolating a single generated job. See
+[the role-trust contract and official setup links](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0020-artifact-publication-and-target-configuration.md#s3-file-delivery-contract).
+Its prefix-scoped permissions are `s3:PutObject`, `s3:GetObject`, `s3:GetObjectVersion`,
+`s3:AbortMultipartUpload` and `s3:ListMultipartUploadParts`. Independent consumers use separate read-only
+credentials with `s3:GetObject` and, for versioned locators, `s3:GetObjectVersion`. A denied version read
+fails without falling back to current bytes. For general-purpose SSE-KMS buckets with a customer-managed
+key, the writer also needs `kms:GenerateDataKey` and `kms:Decrypt` on that key; read-only consumers need
+`kms:Decrypt`. The role and key policy must authorize these uses. See [SSE-KMS permissions](https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingKMSEncryption.html).
+A generic registry secret keeps its original grants; select a
+scoped `GITHUB_TOKEN` or separate read credential for read-only source access. Custom S3-compatible HTTPS
+endpoints and `addressing: path` are explicit
+options; provider compatibility must be tested separately.
+
+The generated S3 publication step follows the original signature and verification steps. Its failure fails
+the Run. It copies the existing artifacts, signatures, provenance and SBOM bundles without changing their
+subjects. Every object receives a complete pinned readback before the final immutable transport inventory
+is written. The job records that exact inventory locator. Raw QCOW2 bytes are available at their digest blob
+key, with the original output name and payload binding in the inventory.
+
+Optional `transfer` fields on the destination are `maxObjectBytes`, `maxTotalBytes`, `maxObjects` and
+`operationTimeoutSeconds`; defaults are 64 GiB, 256 GiB, 8192 and 1200 seconds. A total-only budget lowers the
+omitted per-object default to that total when smaller; explicitly inconsistent limits remain invalid.
+The complete inventory must fit before any upload, including its worst-case provider-pin encoding. The inventory
+is bounded at 128 MiB, with retained proof bundles bounded at 8 MiB each and 16 MiB combined. Object-count ceilings also share
+these independent byte limits. The operation timeout is at most 3509 seconds, leaving 60 seconds for
+cleanup plus 30 seconds of clock skew and one second of expiry precision within a one-hour workload session.
+A temporary session must cover
+both deadlines; insufficient lifetime fails before writes. SDK callers use the same publication owner and
+byte-provider interface. A consumer restores
+the original closure and verifies every original proof and exact input/output binding under its own policy;
+an inventory, ETag or S3 metadata alone is not authenticity evidence. See the
+[consumer API and implementation boundary](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/object-store-publication.md#object-store-publication).
+
+This is artifact publication. Serving an APT repository, extracting a new boot-file format, booting a disk,
+installing a package and qualifying a release retain their separate contracts and acceptance evidence.
+
 ## Registry graph
 
 Solid arrows are OCI descriptors within a repository. Dashed metadata arrows bind exact sibling locations

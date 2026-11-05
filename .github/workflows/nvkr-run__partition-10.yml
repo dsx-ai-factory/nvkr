@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: 'p10 Generate SBOMs: capnico-controller/linux/amd64 +4'
 'on':
   workflow_call:
     inputs:

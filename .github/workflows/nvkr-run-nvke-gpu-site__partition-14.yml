@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: 'p14 Package OCI bundle: aicr-nvke-gb2...flow-argocd-helm +34'
 'on':
   workflow_call:
     inputs:

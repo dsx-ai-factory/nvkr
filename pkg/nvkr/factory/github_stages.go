@@ -17,12 +17,13 @@ import (
 // one target's observation-to-SBOM edge, never global adjacency. A disk's
 // operations share its live owner. Validate the complete contracted graph.
 type githubStage struct {
-	DiskOutput            string
-	ID                    string
-	Name                  string
-	Nodes                 []Node
-	diskExecutionBudget   time.Duration
-	diskJobTimeoutMinutes int
+	DiskOutput                      string
+	ID                              string
+	Name                            string
+	Nodes                           []Node
+	diskExecutionBudget             time.Duration
+	diskJobTimeoutMinutes           int
+	objectPublicationTimeoutMinutes int
 }
 
 const (
@@ -49,6 +50,9 @@ func githubDiskStepTimeoutMinutes(stage githubStage) int {
 // keep the bounded 60-minute adapter default. Producer stages reserve each serial
 // node's declared or default budget so co-location cannot shorten producer time.
 func githubStageTimeoutMinutes(stage githubStage) (int, error) {
+	if stage.objectPublicationTimeoutMinutes > 0 {
+		return stage.objectPublicationTimeoutMinutes, nil
+	}
 	if stage.DiskOutput != "" {
 		if stage.diskExecutionBudget <= 0 || stage.diskJobTimeoutMinutes <= 0 {
 			return 0, e.New(e.CodeEngineCapability, "GitHub disk stage %q has no derived execution budget", stage.ID)
@@ -249,6 +253,13 @@ func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
 			if err != nil {
 				return nil, nil, err
 			}
+		}
+		if IsObjectPublicationNode(plan, stage.Nodes[0].ID) {
+			destination, err := objectPublicationDestination(plan, stage.Nodes[0].Target)
+			if err != nil {
+				return nil, nil, err
+			}
+			stage.objectPublicationTimeoutMinutes = int((destination.EffectiveTransfer().OperationTimeoutSeconds+60+59)/60) + githubSupportJobTimeoutMinutes
 		}
 		if previous, exists := jobOwners[stage.ID]; exists {
 			return nil, nil, e.New(e.CodeEngineCapability,

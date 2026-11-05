@@ -232,14 +232,14 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 		}
 		sourceEnvironments[nodeJobs[node.ID]] = githubSourceEnvironment(plan, node)
 	}
-	signJobs := make(map[string]bool, len(plan.Graph.Nodes))
+	oidcJobs := make(map[string]bool, len(plan.Graph.Nodes))
 	for _, node := range plan.Graph.Nodes {
 		node, err := plan.GitHubExecutionFor(node)
 		if err != nil {
 			return err
 		}
-		if node.Kind == NodeSign || node.Kind == NodeAttestEvidence {
-			signJobs[nodeJobs[node.ID]] = true
+		if node.Kind == NodeSign || node.Kind == NodeAttestEvidence || IsObjectPublicationNode(plan, node.ID) {
+			oidcJobs[nodeJobs[node.ID]] = true
 		}
 	}
 	catalogEnv := githubCatalogSourceEnvironment(plan)
@@ -322,13 +322,12 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 		if jobID == "nvkr-lifecycle-run" && job.If != "${{ always() && "+githubDispatchCondition(plan)+" }}" {
 			return e.New(e.CodeEngineCapability, "GitHub Run finalization must follow the admitted execution event even after failure")
 		}
-		// An OIDC identity token is the credential a keyless signature is minted from.
-		// Only the signing job may request one; anywhere else it is an ambient
-		// authority the pipeline never needs and must not be granted.
+		// OIDC is scoped to keyless signing and the exact configured object
+		// publisher workload. Producers and other jobs receive neither authority.
 		if token, ok := job.Permissions["id-token"]; ok {
-			if !signJobs[jobID] {
+			if !oidcJobs[jobID] {
 				return e.New(e.CodeEngineCapability,
-					"GitHub job %q requests id-token %q but is not a signing job", jobID, token)
+					"GitHub job %q requests id-token %q without an admitted workload", jobID, token)
 			}
 			if token != "write" {
 				return e.New(e.CodeEngineCapability,
@@ -454,7 +453,10 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 				return err
 			}
 		}
-		if node.Kind == NodePublish {
+		if err := validateObjectPublicationJob(plan, node, stage, job); err != nil {
+			return err
+		}
+		if node.Kind == NodePublish && !IsObjectPublicationNode(plan, node.ID) {
 			target := plan.Targets[node.Target]
 			if !githubScopedPublication(plan) && strings.HasPrefix(target.Ref, "ghcr.io/") && job.Permissions["packages"] != "write" {
 				return e.New(e.CodeEngineCapability, "GitHub publish job %q lacks explicit packages:write", jobID)

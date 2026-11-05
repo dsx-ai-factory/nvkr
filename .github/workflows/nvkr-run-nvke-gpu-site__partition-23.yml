@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: p23 Publish aicr-nvke-gb200-ubuntu-tr...flow-argocd-helm +41
 'on':
   workflow_call:
     inputs:

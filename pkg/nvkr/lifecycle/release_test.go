@@ -665,6 +665,26 @@ func TestConsumerReconstructsAPTAndHelmArtifactsFromOneReleaseReference(t *testi
 	if err != nil || !strings.Contains(string(rawNavigation), `"buildSubjects":[]`) {
 		t.Fatalf("component-free Helm subjects must encode as an array: %s, %v", rawNavigation, err)
 	}
+	rawExport, err := ExportRelease(ctx, reference, InspectionOptions{LayoutPath: layout})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var exported struct {
+		Outputs []struct {
+			Name   string `json:"name"`
+			Digest string `json:"digest"`
+			Helm   *struct {
+				DefaultDigest string `json:"defaultDigest"`
+			} `json:"helm"`
+		} `json:"outputs"`
+	}
+	if err := json.Unmarshal(rawExport, &exported); err != nil {
+		t.Fatal(err)
+	}
+	if len(exported.Outputs) != 2 || exported.Outputs[0].Name != "gpu-runtime" || exported.Outputs[0].Digest != helm.Digest ||
+		exported.Outputs[0].Helm == nil || exported.Outputs[0].Helm.DefaultDigest != pipeline.FileDigest(helmRaw) || exported.Outputs[1].Helm != nil {
+		t.Fatalf("release export lost final chart archive identity: %s", rawExport)
+	}
 	verifier := &releaseVerifier{record: sign.VerificationRecord{SchemaVersion: sign.VerificationRecordSchemaVersion,
 		Ref: reference, Digest: publication.RootDigest, Identity: "^builder$", Issuer: "issuer", PredicateType: sign.ProvenancePredicateType,
 		SignatureVerified: true, AttestationVerified: true, ObservedIdentity: "builder", ObservedIssuer: "issuer", Ran: [][]string{{"cosign", "verify"}}}}

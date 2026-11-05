@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: p18 Package aicr-nvke-gb200-ubuntu-tra...flow-argocd-helm +4
 'on':
   workflow_call:
     inputs:

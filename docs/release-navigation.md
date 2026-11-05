@@ -184,6 +184,31 @@ digest remains the published index digest. Helm `chartVersion` comes from the ex
 distinct from `appVersion`. A chart package's version or platform label does not establish the compatibility
 of its rendered workloads.
 
+Helm outputs also carry `helm.defaultDigest`, the SHA-256 of the final compressed `.tgz` archive,
+written as `sha256:<64 lowercase hex>`. It comes from the recorded Helm content-layer binding
+(`application/vnd.cncf.helm.chart.content.v1.tar+gzip`). The existing output `digest` and `reference`
+still identify the OCI manifest. Source-build subjects can identify an earlier archive before chart
+packaging or image binding; use `helm.defaultDigest` for the published chart bytes.
+Non-Helm outputs omit `helm`. Existing releases need no rebuild or migration: the digest is already
+stored in their publication metadata and checked against their chart manifest during inspection.
+The field is additive, so `schemaVersion` stays v1. Readers that reject unknown JSON fields must accept
+`helm` before reading descriptions from this version of NVKR.
+
+To obtain the value for a selected chart:
+
+```sh
+jq -er '.outputs[] | select(.name == "controller-chart") | .helm.defaultDigest' release-description.json
+```
+
+Copy that value to the matching AICR component registry entry's `components[].helm.defaultDigest`,
+alongside its `defaultRepository`, `defaultChart` and `defaultVersion`. AICR's
+[Helm registry contract](https://github.com/NVIDIA/aicr/blob/9522cd0227e35196f53e2d5cd587296d81f34fac/pkg/recipe/components.go#L352)
+uses this archive digest for `aicr bundle --vendor-charts`. The check applies when the recipe still
+uses that registry entry's exact repository, chart and version; overriding those coordinates removes
+that registry digest from the vendoring check. The field is a registry input, not a recipe Helm values
+override. Export still checks metadata only; it does not hash downloaded payloads or authenticate the
+publisher. Authenticate the accepted release under your policy separately.
+
 Source-built evidence may carry `source.repo` and `source.commit` alongside its exact `binding`. Source
 metadata is not collapsed into one release-wide repository or revision, and uses of one repository at
 different commits remain distinct records. Missing or redacted properties remain absent or partial; a

@@ -102,7 +102,8 @@ func lowerGitHubPartitions(ctx context.Context, plan *Plan, raw []byte) ([]byte,
 	callerJobs := githubYAMLMap()
 	for index, partition := range partitions {
 		id := githubPartitionID(index)
-		child, err := renderGitHubPartition(ctx, plan, raw, partition, model, githubPartitionExports(id, consumers, owners))
+		name := githubPartitionName(index, partition, jobs)
+		child, err := renderGitHubPartition(ctx, plan, raw, partition, model, githubPartitionExports(id, consumers, owners), name)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -132,7 +133,7 @@ func lowerGitHubPartitions(ctx context.Context, plan *Plan, raw []byte) ([]byte,
 		if githubYAMLField(permissions, "id-token") != nil {
 			return nil, nil, e.New(e.CodeEngineCapability, "GitHub execution partition %s caller would grant OIDC tokens outside the admitted signer workflow", id)
 		}
-		call := githubYAMLMap("uses", githubYAMLString("./"+path), "if", githubYAMLString("${{ always() && "+githubDispatchCondition(plan)+" }}"),
+		call := githubYAMLMap("name", githubYAMLString(name), "uses", githubYAMLString("./"+path), "if", githubYAMLString("${{ always() && "+githubDispatchCondition(plan)+" }}"),
 			"permissions", permissions, "with", githubYAMLMap("dependencies", githubYAMLString("${{ "+githubPartitionResultsExpression(id, parents, owners)+" }}")))
 		var needs []string
 		for _, parent := range parents {

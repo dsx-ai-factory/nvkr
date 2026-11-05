@@ -101,6 +101,11 @@ func (plan Plan) validateSigningGraph() error {
 	for _, node := range plan.Graph.Nodes {
 		switch node.Kind {
 		case NodePublish:
+			// Object publication preserves the original signed source closure.
+			// Its exact verification dependency is rederived with the graph.
+			if IsObjectPublicationNode(&plan, node.ID) {
+				continue
+			}
 			published[node.Target] = true
 			continue
 		case NodeSign:

@@ -95,20 +95,27 @@ func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 			if payload.ID == "" {
 				return e.New(e.CodeProvenanceMissing, "missing SBOM payload for %q", entry.Artifact)
 			}
-			kind, err := plan.sbomPayloadKind(payload)
-			if err != nil {
-				return err
-			}
-			var inventory sbom.DependencyInventory
-			if kind == "oci-image" && planNode(plan, payload.Producer).Kind == NodeAcquire {
-				inventory, err = inspectAcquiredImageDependencies(ctx, plan, node, payload, artifacts, entry.ArtifactSHA, scanner)
+			var bom *sbom.BOM
+			method := "original Debian payload"
+			if plan.debianPublicationTarget(node.BuildTarget) && payload.Kind == "host-package" {
+				bom, err = inspectDebianProducerSBOM(ctx, plan, payload, artifacts, scanner, boms[entry.Artifact])
 			} else {
-				inventory, err = sbom.InspectDependencies(ctx, payload.Path, entry.ArtifactSHA, kind, scanner)
+				kind, kindErr := plan.sbomPayloadKind(payload)
+				if kindErr != nil {
+					return kindErr
+				}
+				var inventory sbom.DependencyInventory
+				if kind == "oci-image" && planNode(plan, payload.Producer).Kind == NodeAcquire {
+					inventory, err = inspectAcquiredImageDependencies(ctx, plan, node, payload, artifacts, entry.ArtifactSHA, scanner)
+				} else {
+					inventory, err = sbom.InspectDependencies(ctx, payload.Path, entry.ArtifactSHA, kind, scanner)
+				}
+				if err != nil {
+					return err
+				}
+				bom, err = sbom.WithDependencies(boms[entry.Artifact], inventory.Components, inventory.Method, inventory.ScannerDigest)
+				method = inventory.Method
 			}
-			if err != nil {
-				return err
-			}
-			bom, err := sbom.WithDependencies(boms[entry.Artifact], inventory.Components, inventory.Method, inventory.ScannerDigest)
 			if err != nil {
 				return err
 			}
@@ -117,7 +124,7 @@ func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(stdout, "Inspected %s: %d inventory entries (%s)\n", entry.Artifact, len(bom.Components), inventory.Method)
+			fmt.Fprintf(stdout, "Inspected %s: %d inventory entries (%s)\n", entry.Artifact, len(bom.Components), method)
 		}
 	}
 	// Validate binds the index's exact subject and evidence digests before any bytes
@@ -201,6 +208,15 @@ func (plan *Plan) validateSBOMGraph() error {
 				return e.New(e.CodeEngineCapability, "disk SBOM requires its exact offline Plan-selected inspection profile")
 			}
 			continue
+		}
+		if plan.debianPublicationTarget(node.BuildTarget) && tool != "" {
+			profile, err := debianPublicationInspectionProfile(plan)
+			if err != nil {
+				return err
+			}
+			if node.Container != profile.Image || node.Platform != plan.Environment.UtilityPlatform || node.Network != ir.NetworkNone {
+				return e.New(e.CodeEngineCapability, "Debian SBOM requires its exact offline reader/scanner tooling profile")
+			}
 		}
 		if tool == "" && !plan.hasBundleTarget(node.BuildTarget) {
 			continue

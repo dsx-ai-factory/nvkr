@@ -371,7 +371,7 @@ func inspectOutputs(ctx context.Context, layout string, inspection Inspection, s
 			continue
 		} // Inspect already requires exact evidence membership for every other object.
 		output := Output{Name: object.Name, Kind: binding.Format, Digest: object.DescriptorDigest, BuildDigest: binding.BuildDigest, Components: append([]string(nil), binding.Components...), Disk: cloneDiskOutput(binding.Disk), ImageIndex: binding.ImageIndex.Clone()}
-		if binding.Format == "apt-repository" {
+		if binding.Format == "apt-repository" || binding.Format == outputFormatDebian {
 			output.Digest = object.SemanticDigest
 		}
 		if err := output.Validate(); err != nil {
@@ -379,6 +379,11 @@ func inspectOutputs(ctx context.Context, layout string, inspection Inspection, s
 		}
 		members := append([]string(nil), output.Components...)
 		switch output.Kind {
+		case outputFormatDebian:
+			if len(binding.Components) != 1 || len(binding.BuildSubjects) != 1 || binding.BuildSubjects[0].Component != binding.Components[0] || binding.BuildSubjects[0].Digest != object.BlobDigest || object.SemanticDigest != object.BlobDigest {
+				return nil, e.New(e.CodeVerifyFailed, "Debian carrier differs from exact original producer subject")
+			}
+			platforms[output.Name] = publicationPlatform{OS: object.OS, Arch: object.Arch}
 		case outputFormatBundle:
 			manifest, err := flatManifest(ctx, layout, object)
 			if err != nil {

@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
@@ -37,9 +38,24 @@ func (g *githubLocatorClient) downloadLocator(ctx context.Context, request Reque
 	if err != nil {
 		return nil, e.New(e.CodeInternal, "creating CI locator ZIP request failed")
 	}
-	response, err := g.get(ctx, download, maxGitHubLocatorZIPBytes)
-	if err != nil {
-		return nil, err
+	// Signed storage answers 5xx under load; retry the same bounded budget and
+	// Retry-After handling as the API, without its API rate-limit rules.
+	var response githubLocatorResponse
+	for attempt := 0; ; attempt++ {
+		response, err = g.get(ctx, download, maxGitHubLocatorZIPBytes)
+		if err != nil {
+			return nil, err
+		}
+		if !githubLocatorTransientStatus(response.status) || attempt+1 == githubLocatorAPIAttempts {
+			break
+		}
+		delay, err := githubLocatorServerDelay(response.header, (2*time.Second)<<attempt, attempt, time.Now())
+		if err != nil {
+			return nil, err
+		}
+		if err := g.wait(ctx, delay); err != nil {
+			return nil, safeIOError(ctx, e.CodeTimeout, "CI locator ZIP retry wait canceled")
+		}
 	}
 	if response.status != http.StatusOK {
 		return nil, githubLocatorStatusError(ctx, response.status)

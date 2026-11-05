@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"sort"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -140,6 +141,44 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "image index on non-image output")
 		}
 		return observeImageIndex(ctx, plan, expected, artifact, artifacts)
+	}
+	if expected.Kind == PackageDebian {
+		matched := false
+		for _, candidate := range plan.LifecycleOutputs {
+			matched = matched || reflect.DeepEqual(candidate, expected)
+		}
+		if !matched {
+			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "Debian observation changes exact lifecycle requirements")
+		}
+		if len(expected.Components) != 1 || artifact.Component != expected.Components[0] || artifact.Kind != "host-package" {
+			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "Debian output changes original named producer")
+		}
+		instruction, err := producerInstructionFor(plan, artifact)
+		if err != nil {
+			return LifecyclePayloadObservation{}, err
+		}
+		if instruction.Kind != ir.KindBuild || instruction.Component != expected.Components[0] || instruction.OutputType != "host-package" {
+			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "Debian output has no original source producer")
+		}
+		resultArtifact, ok := artifacts["result/"+expected.Name+"/"+artifact.Component]
+		if !ok || resultArtifact.Kind != "producer-result" || resultArtifact.Producer != artifact.Producer || resultArtifact.Component != artifact.Component || resultArtifact.BuildTarget != expected.Name {
+			return LifecyclePayloadObservation{}, e.New(e.CodeReleaseIncomplete, "Debian output omits its exact producer record")
+		}
+		info, err := os.Lstat(artifact.Path)
+		if err != nil {
+			return LifecyclePayloadObservation{}, e.Wrap(e.CodeVerifyFailed, err, "opening original Debian producer")
+		}
+		if !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > pipeline.MaxBuildMaterialBytes {
+			return LifecyclePayloadObservation{}, e.New(e.CodeEngineCapability, "Debian producer is not one bounded original regular file")
+		}
+		result, err := pipeline.AuthenticateResultForConsumption(ctx, instruction, artifact.Path, resultArtifact.Path)
+		if err != nil {
+			return LifecyclePayloadObservation{}, err
+		}
+		if result.Size <= 0 || result.Size > pipeline.MaxBuildMaterialBytes {
+			return LifecyclePayloadObservation{}, e.New(e.CodeEngineCapability, "Debian producer exceeds regular-file admission")
+		}
+		return LifecyclePayloadObservation{Digest: result.SHA256, SemanticDigest: result.SHA256, Components: append([]string(nil), expected.Components...)}, nil
 	}
 	if node.ImageIndex != nil {
 		return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "native output cannot omit image index requirements")

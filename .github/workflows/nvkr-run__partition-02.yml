@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: p02 Acquire spire-bash-image-arm64 +9
 'on':
   workflow_call:
     inputs:

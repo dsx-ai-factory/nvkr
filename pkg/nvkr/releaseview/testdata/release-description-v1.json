@@ -50,6 +50,9 @@
       "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
       "reference": "registry.example/product/chart@sha256:2222222222222222222222222222222222222222222222222222222222222222",
       "chartVersion": "8.2.1",
+      "helm": {
+        "defaultDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      },
       "buildDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "components": [
         "application-chart"

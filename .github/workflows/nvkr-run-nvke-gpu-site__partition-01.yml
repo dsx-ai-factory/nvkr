@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: p01 Fetch aicr-nvke-gb200-ubuntu-training-kubeflow-flux +63
 'on':
   workflow_call:
     inputs:

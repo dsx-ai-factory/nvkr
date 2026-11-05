@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: p13 Package nktp-node-exporter-image +17
 'on':
   workflow_call:
     inputs:

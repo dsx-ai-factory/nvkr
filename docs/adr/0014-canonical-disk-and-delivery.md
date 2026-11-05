@@ -176,7 +176,8 @@ identity. Current existing-byte measurement does not implement that production c
 NVKR produces artifacts and verified references. Downstream consumers own boot serving, installation and Helm
 deployment. No provisioning bundle or node-SKU interface is retained without a supported artifact producer.
 
-ADR-20 specifies the S3 delivery contract for the complete selected QCOW2, EFI, iPXE and Debian package set.
+ADR-20 copies complete existing artifact publications to an object store, with S3 as the first provider.
+The downstream boot/install requirements below are separate from successful byte publication.
 Raw QCOW2 payload identity remains separate from its OCI wrapper and canonical decoded-disk identity;
 relocation cannot upgrade production evidence into reproduction. Native packages preserve their original
 bytes rather than being rebuilt by the legacy development packager. Plain and public-bootstrap FDE keep
@@ -190,7 +191,7 @@ imaging, installed-disk reboot and first-boot service checks, plus direct VM QCO
 installation on each supported architecture/profile. An emulator path that parses an iPXE script and boots
 the QCOW2 directly cannot prove EFI execution. A transport signature, build success or matching architecture
 cannot establish imager parameter compatibility or Secure Boot. Delivery, boot readiness and qualification
-are reported separately; the contract freeze enables none of these paths.
+are reported separately; a copied artifact alone establishes none of these boot/install outcomes.
 The downstream serving/client trust boundary must bind the script and EFI bytes actually executed to the
 authenticated assets; preflight URL verification alone cannot prevent later substitution. Acceptance must
 demonstrate rejection of script or EFI substitution after verification and rejection of a QCOW2 whose digest

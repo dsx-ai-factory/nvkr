@@ -1,4 +1,4 @@
-name: NVKR execution partition
+name: p17 Publish nvke-node-fde-amd64 +7
 'on':
   workflow_call:
     inputs:
