@@ -149,6 +149,7 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 			calls, archives := 0, 0
 			zipAPICalls := 0
 			archiveReads := map[string]int{}
+			signedURLs := map[string]bool{}
 			g := newGitHubLocatorClient("test-repository-token")
 			var waits []time.Duration
 			ctx, cancel := context.WithCancel(t.Context())
@@ -169,6 +170,10 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 				if r.URL.Host == "account.blob.core.windows.net" {
 					archives++
 					archiveReads[r.URL.Path]++
+					if signedURLs[r.URL.RawQuery] {
+						t.Fatal("storage retry reused an expiring signed URL")
+					}
+					signedURLs[r.URL.RawQuery] = true
 					if r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" {
 						t.Fatal("repository credential escaped to ZIP storage")
 					}
@@ -231,7 +236,7 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 						return githubLocatorHTTPFixture(502, nil, nil), nil
 					}
 					parts := strings.Split(r.URL.Path, "/")
-					return githubLocatorHTTPFixture(302, nil, http.Header{"Location": {"https://account.blob.core.windows.net/" + parts[len(parts)-2] + "?signed=SECRET"}}), nil
+					return githubLocatorHTTPFixture(302, nil, http.Header{"Location": {"https://account.blob.core.windows.net/" + parts[len(parts)-2] + "?signed=SECRET-" + strconv.Itoa(zipAPICalls)}}), nil
 				}
 				t.Fatal("unexpected request")
 				return nil, nil
@@ -281,10 +286,10 @@ func TestGitHubLocatorAcquisitionAuthenticatesBeforeWriting(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if scenario == "transient ZIP storage" && (zipAPICalls != 2 || archives != 3 || len(archiveReads) != 2) {
+				if scenario == "transient ZIP storage" && (zipAPICalls != 3 || archives != 3 || len(archiveReads) != 2) {
 					t.Fatalf("storage retry calls: ZIP API=%d storage=%d paths=%v", zipAPICalls, archives, archiveReads)
 				}
-				if scenario == "storage retry after" && (archives != 3 || len(waits) != 1 || waits[0] != 30*time.Second) {
+				if scenario == "storage retry after" && (zipAPICalls != 3 || archives != 3 || len(waits) != 1 || waits[0] != 30*time.Second) {
 					t.Fatalf("storage Retry-After: storage=%d waits=%v", archives, waits)
 				}
 				if scenario == "transient ZIP API" {
