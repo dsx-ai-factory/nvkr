@@ -107,6 +107,11 @@ func TestPrivateToolchainPublicationBoundary(t *testing.T) {
 		want                     bool
 	}{
 		{"current", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
+		{"gpu site current subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
+		{"gpu site prefix lookalike", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site-mirror", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
+		{"gpu site child prefix", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site/other", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
+		{"gpu site foreign toolchain owner", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site", "ghcr.io/other/nvkr/m2-candidate/toolchains/packer", false, false},
+		{"gpu site non-toolchain subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/other/packer", false, false},
 		{"disk family current subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
 		{"disk family prefix lookalike", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-mirror", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
 		{"disk family child prefix", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks/other", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
@@ -208,6 +213,72 @@ func TestMaintainedNamedPrivateImageCredentialBoundary(t *testing.T) {
 				t.Fatal(err)
 			}
 			assertGitHubPrivateImageCredentialBoundary(t, plan, bundle, 4)
+		})
+	}
+}
+
+// Discover maintained bundles so a new publication namespace cannot silently
+// omit preparation. Select required stages from the pinned subjects themselves,
+// independently of the publication allowlist used by the renderer and validator.
+func TestMaintainedPrivateToolchainPreparation(t *testing.T) {
+	plans, err := filepath.Glob("../../../.github/*/plan.json")
+	if err != nil || len(plans) == 0 {
+		t.Fatalf("discover maintained plans: %v (%d plans)", err, len(plans))
+	}
+	for _, path := range plans {
+		t.Run(filepath.Base(filepath.Dir(path)), func(t *testing.T) {
+			plan, err := LoadPlanContext(t.Context(), path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if plan.Environment.GitHubARC != "native-kvm-v1" {
+				return
+			}
+			stages, _, err := githubStages(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			required := map[string]bool{}
+			for _, stage := range stages {
+				for _, node := range stage.Nodes {
+					if strings.HasPrefix(node.Container, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/") {
+						required[stage.ID] = true
+					}
+				}
+			}
+			if len(required) == 0 {
+				return
+			}
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, document := range githubEmittedWorkflows(t, plan, bundle) {
+				for id, job := range document.Jobs {
+					if !required[id] {
+						continue
+					}
+					prepared, execution := -1, -1
+					for index, step := range job.Steps {
+						if strings.Contains(step.Run, "factory github prepare-images ") {
+							if prepared >= 0 || step.Env[githubImageToken] != "${{ secrets.NVKR_REGISTRY_READ }}" || step.Env[githubImageUser] != "${{ vars.NVKR_REGISTRY_READ_USER }}" || step.If != "" || step.ContinueOnError {
+								t.Fatalf("%s: preparation must run once with the explicit reader", id)
+							}
+							prepared = index
+						}
+						if execution < 0 && (strings.Contains(step.Run, "factory github run-node ") || strings.Contains(step.Run, "factory github run-disk ")) {
+							execution = index
+						}
+					}
+					if prepared < 0 || execution <= prepared {
+						t.Errorf("%s: private native toolchain requires preparation and reader wiring before execution", id)
+					}
+					delete(required, id)
+				}
+			}
+			if len(required) != 0 {
+				t.Fatalf("private toolchain stages missing from emitted workflows: %v", required)
+			}
 		})
 	}
 }
