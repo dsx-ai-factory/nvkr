@@ -181,7 +181,11 @@ func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 		if family, exists := seen[name]; exists {
 			t.Fatalf("combined-only output %q is required by %s", name, family)
 		}
-		want := nvkeFamilyOnlyOutputs[replacement].output
+		pinned, ok := nvkeFamilyOnlyOutputs[replacement]
+		if !ok {
+			t.Fatalf("combined-only %q names undeclared family output %q", name, replacement)
+		}
+		want := pinned.output
 		want.Name = name
 		if !bytes.Equal(nvkeSplitCanonical(t, want), original[name]) {
 			t.Fatalf("%q no longer delivers the selection of combined-only %q", replacement, name)
